@@ -7,7 +7,7 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//msp/slurm-service/internal/operator/api/v1:api",
-        "//msp/slurm-service/internal/operator/internal/controller",
+        "//msp/slurm-service/internal/operator/internal/controller/clustercontroller",
         "@io_k8s_apimachinery//pkg/runtime",
         "@io_k8s_apimachinery//pkg/util/runtime",
         "@io_k8s_client_go//kubernetes/scheme",

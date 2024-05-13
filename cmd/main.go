@@ -35,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/controller"
+	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -122,7 +122,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.SlurmClusterReconciler{
+	if err = (&clustercontroller.SlurmClusterReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
