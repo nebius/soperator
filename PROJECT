@@ -7,4 +7,14 @@ layout:
 - go.kubebuilder.io/v4
 projectName: operator
 repo: nebius.ai/slurm-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: nebius.ai
+  group: slurm
+  kind: SlurmCluster
+  path: nebius.ai/slurm-operator/api/v1
+  version: v1
 version: "3"

@@ -1,0 +1,9 @@
+apiVersion: slurm.nebius.ai/v1
+kind: SlurmCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/managed-by: kustomize
+  name: slurmcluster-sample
+spec:
+  # TODO(user): Add fields here
