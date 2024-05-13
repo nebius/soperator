@@ -5,7 +5,7 @@
 domain: nebius.ai
 layout:
 - go.kubebuilder.io/v4
-projectName: operator
+projectName: slurm-operator
 repo: nebius.ai/slurm-operator
 resources:
 - api:
