@@ -3,7 +3,11 @@ kind: Namespace
 metadata:
   labels:
     control-plane: controller-manager
-    app.kubernetes.io/name: operator
+    app.kubernetes.io/name: namespace
+    app.kubernetes.io/instance: system
+    app.kubernetes.io/component: manager
+    app.kubernetes.io/created-by: slurm-operator
+    app.kubernetes.io/part-of: slurm-operator
     app.kubernetes.io/managed-by: kustomize
   name: system
 ---
@@ -14,7 +18,11 @@ metadata:
   namespace: system
   labels:
     control-plane: controller-manager
-    app.kubernetes.io/name: operator
+    app.kubernetes.io/name: deployment
+    app.kubernetes.io/instance: controller-manager
+    app.kubernetes.io/component: manager
+    app.kubernetes.io/created-by: slurm-operator
+    app.kubernetes.io/part-of: slurm-operator
     app.kubernetes.io/managed-by: kustomize
 spec:
   selector:
@@ -85,10 +93,9 @@ spec:
         # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
         resources:
           limits:
-            cpu: 500m
             memory: 128Mi
           requests:
-            cpu: 10m
+            cpu: 100m
             memory: 64Mi
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10

@@ -2,8 +2,12 @@ apiVersion: slurm.nebius.ai/v1
 kind: SlurmCluster
 metadata:
   labels:
-    app.kubernetes.io/name: operator
+    app.kubernetes.io/name: slurmcluster
+    app.kubernetes.io/instance: slurmcluster-sample
+    app.kubernetes.io/part-of: slurm-operator
     app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: slurm-operator
   name: slurmcluster-sample
+  namespace: slurm-poc
 spec:
   # TODO(user): Add fields here

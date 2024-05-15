@@ -1,2 +1,8 @@
 resources:
 - manager.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+images:
+  - name: controller
+    newName: cr.nemax.nebius.cloud/crnsp9v7ps4c2uks5n6a/slurm-operator
+    newTag: latest
