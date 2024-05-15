@@ -28,6 +28,8 @@ unexport GOPACKAGESDRIVER
 # Limit the scope of generation otherwise it will try to generate configs for non-controller code
 GENPATH = "./api/v1;./internal/controller/..."
 
+CHART_PATH    = ../../../cd/base/helm/slurm-operator
+
 .PHONY: all
 all: build
 
@@ -142,19 +144,21 @@ $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
 ## Tool Binaries
-KUBECTL ?= kubectl
-KUSTOMIZE ?= $(LOCALBIN)/kustomize
+KUBECTL        ?= kubectl
+KUSTOMIZE      ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-ENVTEST ?= $(LOCALBIN)/setup-envtest
-GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
-HELMIFY ?= $(LOCALBIN)/helmify
+ENVTEST        ?= $(LOCALBIN)/setup-envtest
+GOLANGCI_LINT   = $(LOCALBIN)/golangci-lint
+HELMIFY        ?= $(LOCALBIN)/helmify
+YQ             ?= $(LOCALBIN)/yq
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.3.0
+KUSTOMIZE_VERSION        ?= v5.3.0
 CONTROLLER_TOOLS_VERSION ?= v0.14.0
-ENVTEST_VERSION ?= release-0.17
-GOLANGCI_LINT_VERSION ?= v1.57.2
-HELMIFY_VERSION ?= 0.4.11
+ENVTEST_VERSION          ?= release-0.17
+GOLANGCI_LINT_VERSION    ?= v1.57.2
+HELMIFY_VERSION          ?= 0.4.11
+YQ_VERSION               ?= 4.44.1
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -193,6 +197,13 @@ $(HELMIFY): $(LOCALBIN)
 gazelle:
 	bazel run //:gazelle -- msp/slurm-service/internal/operator
 
+.PHONY: yq
+yq: $(YQ) ## Download yq locally if necessary.
+$(YQ): $(LOCALBIN)
+	test -s $(LOCALBIN)/yq || GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@v$(YQ_VERSION)
+
 .PHONY: helm
-helm: kustomize helmify
-	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir ../../../cd/base/helm/slurm-operator
+helm: kustomize helmify yq
+	rm -rf $(CHART_PATH)
+	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir $(CHART_PATH)
+	$(YQ) -i 'del(.controllerManager.manager.image.tag)' "$(CHART_PATH)/values.yaml"
