@@ -29,6 +29,7 @@ unexport GOPACKAGESDRIVER
 GENPATH = "./api/v1;./internal/controller/..."
 
 CHART_PATH    = ../../../cd/base/helm/slurm-operator
+CHART_VERSION = $(shell cat ./config/chart.version)
 
 .PHONY: all
 all: build
@@ -207,3 +208,4 @@ helm: kustomize helmify yq
 	rm -rf $(CHART_PATH)
 	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir $(CHART_PATH)
 	$(YQ) -i 'del(.controllerManager.manager.image.tag)' "$(CHART_PATH)/values.yaml"
+	$(YQ) -i ".version = \"$(CHART_VERSION)\"" "$(CHART_PATH)/Chart.yaml"
