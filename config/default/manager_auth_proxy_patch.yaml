@@ -27,10 +27,9 @@ spec:
           name: https
         resources:
           limits:
-            cpu: 500m
             memory: 128Mi
           requests:
-            cpu: 5m
+            cpu: 50m
             memory: 64Mi
       - name: manager
         args:
