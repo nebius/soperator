@@ -10,7 +10,6 @@ func BuildClusterDefaultLabels(clusterName string, componentType consts.Componen
 	return map[string]string{
 		consts.LabelNameKey:      consts.LabelNameValue,
 		consts.LabelInstanceKey:  clusterName,
-		consts.LabelVersionKey:   consts.LabelVersionValue,
 		consts.LabelComponentKey: consts.ComponentNameByType[componentType],
 		consts.LabelPartOfKey:    consts.LabelPartOfValue,
 		consts.LabelManagedByKey: consts.LabelManagedByValue,
