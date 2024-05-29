@@ -40,6 +40,9 @@ type ControllerNodeSpec struct {
 
 	// Image defines the image used for controller node
 	Image ImageSpec `json:"image"`
+
+	// Pod defines the spec for controller pods
+	Pod *PodSpec `json:"pod,omitempty"`
 }
 
 // SlurmClusterStatus defines the observed state of SlurmCluster
