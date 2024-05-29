@@ -205,7 +205,9 @@ $(YQ): $(LOCALBIN)
 
 .PHONY: helm
 helm: kustomize helmify yq
+	mv $(CHART_PATH)/Chart.yaml $(CHART_PATH)/../Chart.yaml
 	rm -rf $(CHART_PATH)
 	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir $(CHART_PATH)
+	mv $(CHART_PATH)/../Chart.yaml $(CHART_PATH)/Chart.yaml
 	$(YQ) -i 'del(.controllerManager.manager.image.tag)' "$(CHART_PATH)/values.yaml"
 	$(YQ) -i ".version = \"$(CHART_VERSION)\"" "$(CHART_PATH)/Chart.yaml"
