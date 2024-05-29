@@ -24,7 +24,7 @@ import (
 type SlurmClusterSpec struct {
 	// ControllerNode defines the desired state of SlurmCluster controller nodes
 	// kubebuilder:validation:Required
-	ControllerNode ControllerNodeSpec `json:"controller_node"`
+	ControllerNode ControllerNodeSpec `json:"controllerNode"`
 }
 
 // ControllerNodeSpec defines the desired state of SlurmCluster controller nodes
@@ -39,11 +39,20 @@ type ControllerNodeSpec struct {
 	Size int32 `json:"size,omitempty"`
 
 	// Image defines the image used for controller node
-	Image ImageSpec `json:"image"`
+	Image *ImageSpec `json:"image,omitempty"`
 
 	// Pod defines the spec for controller pods
 	Pod *PodSpec `json:"pod,omitempty"`
 }
+
+const (
+	ConditionClusterControllersAvailable = "ControllersAvailable"
+	ConditionClusterWorkersAvailable     = "WorkersAvailable"
+
+	PhaseClusterReconciling  = "Reconciling"
+	PhaseClusterNotAvailable = "Not available"
+	PhaseClusterAvailable    = "Available"
+)
 
 // SlurmClusterStatus defines the observed state of SlurmCluster
 type SlurmClusterStatus struct {

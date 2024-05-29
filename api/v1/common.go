@@ -7,11 +7,11 @@ import (
 // ImageSpec defines the desired state of the image used for container
 type ImageSpec struct {
 	// Repository defines the path to the image
-	Repository string `json:"repository"`
+	Repository *string `json:"repository"`
 
 	// Tag defines the tag of the image
 	// +kubebuilder:default=latest
-	Tag string `json:"tag"`
+	Tag *string `json:"tag"`
 }
 
 // PodSpec defines the desired state of the common component pod specs
@@ -23,7 +23,7 @@ type PodSpec struct {
 	Memory *string `json:"memory,omitempty"`
 
 	// PVCSize defines the disk size
-	PVCSize *string `json:"pvc_size,omitempty"`
+	PVCSize *string `json:"pvcSize,omitempty"`
 
 	// Affinity defines the desired affinity
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`

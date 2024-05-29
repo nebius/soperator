@@ -26,7 +26,7 @@ spec:
             type: object
           spec:
             properties:
-              controller_node:
+              controllerNode:
                 properties:
                   image:
                     properties:
@@ -450,7 +450,7 @@ spec:
                         type: string
                       memory:
                         type: string
-                      pvc_size:
+                      pvcSize:
                         type: string
                       tolerations:
                         items:
@@ -475,11 +475,9 @@ spec:
                     maximum: 1
                     minimum: 1
                     type: integer
-                required:
-                - image
                 type: object
             required:
-            - controller_node
+            - controllerNode
             type: object
           status:
             properties:
