@@ -3,6 +3,7 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "api",
     srcs = [
+        "common.go",
         "groupversion_info.go",
         "slurmcluster_types.go",
         "zz_generated.deepcopy.go",
