@@ -1,8 +1,6 @@
 package values
 
 import (
-	"context"
-
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 )
 
@@ -10,6 +8,6 @@ import (
 // TODO database configuration
 type SlurmDatabase struct{}
 
-func buildSlurmDatabaseFrom(_ context.Context, _ *slurmv1.SlurmCluster) (SlurmDatabase, error) {
-	return SlurmDatabase{}, nil
+func buildSlurmDatabaseFrom(_ *slurmv1.SlurmCluster) SlurmDatabase {
+	return SlurmDatabase{}
 }

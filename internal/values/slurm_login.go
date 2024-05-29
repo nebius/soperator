@@ -1,8 +1,6 @@
 package values
 
 import (
-	"context"
-
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 )
 
@@ -10,6 +8,6 @@ import (
 // TODO login node reconciliation
 type SlurmLogin struct{}
 
-func buildSlurmLoginFrom(_ context.Context, _ *slurmv1.SlurmCluster) (SlurmLogin, error) {
-	return SlurmLogin{}, nil
+func buildSlurmLoginFrom(_ *slurmv1.SlurmCluster) SlurmLogin {
+	return SlurmLogin{}
 }

@@ -36,7 +36,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
-	"nebius.ai/slurm-operator/internal/reconciler"
+	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	//+kubebuilder:scaffold:imports
 )
 

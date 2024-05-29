@@ -1,8 +1,6 @@
 package values
 
 import (
-	"context"
-
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 )
 
@@ -10,6 +8,6 @@ import (
 // TODO workers reconciliation
 type SlurmWorker struct{}
 
-func buildSlurmWorkerFrom(_ context.Context, _ *slurmv1.SlurmCluster) (SlurmWorker, error) {
-	return SlurmWorker{}, nil
+func buildSlurmWorkerFrom(_ *slurmv1.SlurmCluster) SlurmWorker {
+	return SlurmWorker{}
 }

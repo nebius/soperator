@@ -1,15 +1,16 @@
 package consts
 
-import (
-	corev1 "k8s.io/api/core/v1"
+const (
+	ServiceControllerName = "slurmctld"
+	ServiceWorkerName     = "slurmd"
 )
 
 const (
-	ServiceControllerClusterPortProtocol = corev1.ProtocolTCP
-	ServiceControllerClusterPort         = 6817
-	ServiceControllerClusterTargetPort   = "slurmctld"
+	StatefulSetControllerName = ServiceControllerName
+	StatefulSetWorkerName     = ServiceWorkerName
+)
 
-	ServiceWorkerClusterPortProtocol = corev1.ProtocolTCP
-	ServiceWorkerClusterPort         = 6818
-	ServiceWorkerClusterTargetPort   = "slurmd"
+const (
+	ContainerControllerName = ServiceControllerName
+	ContainerWorkerName     = ServiceWorkerName
 )

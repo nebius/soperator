@@ -10,11 +10,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/models/slurm"
-	"nebius.ai/slurm-operator/internal/reconciler"
+	"nebius.ai/slurm-operator/internal/controller/reconciler"
+	"nebius.ai/slurm-operator/internal/values"
 )
 
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch;delete
@@ -37,17 +38,21 @@ type SlurmClusterReconciler struct {
 // Reconcile implements the reconciling logic for the Slurm Cluster.
 // The reconciling cycle is actually implemented in the auxiliary 'reconcile' method
 func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
+	logger := log.FromContext(ctx).WithValues(
+		"SlurmCluster.Namespace", req.Namespace,
+		"SlurmCluster.Name", req.Name,
+	)
+	log.IntoContext(ctx, logger)
 
 	slurmCluster := &slurmv1.SlurmCluster{}
 	err := r.Get(ctx, req.NamespacedName, slurmCluster)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.Info("slurmCluster resource not found. Ignoring since object must be deleted")
+			logger.Info("SlurmCluster resource not found. Ignoring since object must be deleted")
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		logger.Error(err, "Failed to get slurmCluster")
+		logger.Error(err, "Failed to get SlurmCluster")
 		return ctrl.Result{}, err
 	}
 
@@ -71,88 +76,82 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return result, errors.Join(err, statusErr)
 }
 
-func (r *SlurmClusterReconciler) reconcile(ctx context.Context, slurmCluster *slurmv1.SlurmCluster) (ctrl.Result, error) {
+func (r *SlurmClusterReconciler) reconcile(ctx context.Context, clusterCR *slurmv1.SlurmCluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-	logger.Info("Starting reconciliation of Slurm Cluster",
-		"SlurmCluster.Namespace", slurmCluster.Namespace, "SlurmCluster.Name", slurmCluster.Name)
+	logger.Info("Starting reconciliation of Slurm Cluster")
 
-	slurmClusterValues, err := smodels.BuildClusterValuesFrom(slurmCluster)
+	clusterValues, err := values.BuildSlurmClusterFrom(ctx, clusterCR)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	meta.SetStatusCondition(
-		&slurmCluster.Status.Conditions,
+		&clusterCR.Status.Conditions,
 		metav1.Condition{
 			Type:    slurmv1.ConditionClusterControllersAvailable,
 			Status:  metav1.ConditionUnknown,
 			Reason:  "Reconciling",
 			Message: "Reconciling Slurm Controllers",
-		})
+		},
+	)
 
-	// TODO workers reconcilation
-	//meta.SetStatusCondition(
-	//	&slurmCluster.Status.Conditions,
-	//	metav1.Condition{
-	//		Type:    slurmv1.ConditionClusterWorkersAvailable,
-	//		Status:  metav1.ConditionUnknown,
-	//		Reason:  "Reconciling",
-	//		Message: "Reconciling Slurm Workers",
-	//	})
+	// Reconciliation
+	{
+		initialPhase := slurmv1.PhaseClusterReconciling
+		clusterCR.Status.Phase = &initialPhase
 
-	initialPhase := slurmv1.PhaseClusterReconciling
-	slurmCluster.Status.Phase = &initialPhase
+		// Common
+		if res, err := r.DeployCommon(ctx, clusterValues, clusterCR); err != nil {
+			return res, err
+		}
 
-	// Reconcile Controllers
-	if res, err := r.DeployControllers(ctx, slurmClusterValues, slurmCluster); err != nil {
-		return res, err
-	}
-	if res, err := r.UpdateControllers(ctx, slurmClusterValues, slurmCluster); err != nil {
-		return res, err
-	}
-
-	// Reconcile Workers
-	// TODO workers reconcilation
-	//if res, err := r.DeployWorkers(ctx, slurmClusterValues, slurmCluster); err != nil {
-	//	return res, err
-	//}
-	//if res, err := r.UpdateWorkers(ctx, slurmClusterValues, slurmCluster); err != nil {
-	//	return res, err
-	//}
-
-	notAvailablePhase := slurmv1.PhaseClusterNotAvailable
-	slurmCluster.Status.Phase = &notAvailablePhase
-
-	// Validate Controllers
-	if res, err := r.ValidateControllers(ctx, slurmClusterValues, slurmCluster); err != nil {
-		return res, err
-	} else if res.Requeue {
-		return res, err
+		// Controllers
+		if res, err := r.DeployControllers(ctx, clusterValues, clusterCR); err != nil {
+			return res, err
+		}
+		if res, err := r.UpdateControllers(ctx, clusterValues, clusterCR); err != nil {
+			return res, err
+		}
 	}
 
-	// Validate Workers
-	// TODO workers validation
-	//if res, err := r.ValidateWorkers(ctx, slurmClusterValues, slurmCluster); err != nil {
-	//	return res, err
-	//} else if res.Requeue {
-	//	return res, err
-	//}
+	// Validation
+	{
+		notAvailablePhase := slurmv1.PhaseClusterNotAvailable
+		clusterCR.Status.Phase = &notAvailablePhase
 
-	availablePhase := slurmv1.PhaseClusterAvailable
-	slurmCluster.Status.Phase = &availablePhase
+		// Controllers
+		if res, err := r.ValidateControllers(ctx, clusterValues, clusterCR); err != nil {
+			return res, err
+		} else if res.Requeue {
+			return res, err
+		}
+	}
 
-	logger.Info("Finished reconciliation of Slurm Cluster",
-		"SlurmCluster.Namespace", slurmCluster.Namespace, "SlurmCluster.Name", slurmCluster.Name)
+	// Availability
+	{
+		availablePhase := slurmv1.PhaseClusterAvailable
+		clusterCR.Status.Phase = &availablePhase
+	}
+
+	logger.Info("Finished reconciliation of Slurm Cluster")
 
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if err := indexFields(mgr); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&slurmv1.SlurmCluster{}).
 		Owns(&corev1.Service{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.mapObjectsToReconcileRequests),
+		).
 		Complete(r)
 }
