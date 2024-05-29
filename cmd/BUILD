@@ -8,6 +8,7 @@ go_library(
     deps = [
         "//msp/slurm-service/internal/operator/api/v1:api",
         "//msp/slurm-service/internal/operator/internal/controller/clustercontroller",
+        "//msp/slurm-service/internal/operator/internal/controller/reconciler",
         "@io_k8s_apimachinery//pkg/runtime",
         "@io_k8s_apimachinery//pkg/util/runtime",
         "@io_k8s_client_go//kubernetes/scheme",

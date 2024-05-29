@@ -36,6 +36,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
+	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -123,8 +124,11 @@ func main() {
 	}
 
 	if err = (&clustercontroller.SlurmClusterReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Reconciler: reconciler.Reconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("slurm-cluster-controller"),
+		},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SlurmCluster")
 		os.Exit(1)

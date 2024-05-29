@@ -24,7 +24,7 @@ var _ = Describe("Minimal Slurm Cluster", Ordered, func() {
 		Expect(k8sClient.Create(context.Background(), ns)).To(Succeed())
 	})
 
-	It("should create an available Spark Cluster", func() {
+	It("should create an available Slurm Cluster", func() {
 		shouldCreateAvailableSlurmCluster{
 			ctx:    ctx,
 			client: k8sClient,
