@@ -133,16 +133,11 @@ func RenderVolumeSpool(cluster *values.SlurmCluster) corev1.Volume {
 }
 
 // RenderVolumeMountSpool renders [corev1.VolumeMount] defining the mounting path for spool contents
-func RenderVolumeMountSpool(componentType consts.ComponentType) (corev1.VolumeMount, error) {
-	mountPath, err := naming.BuildVolumeMountSpoolPath(componentType)
-	if err != nil {
-		return corev1.VolumeMount{}, err
-	}
-
+func RenderVolumeMountSpool(directory string) corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      consts.VolumeSpoolName,
-		MountPath: mountPath,
-	}, nil
+		MountPath: naming.BuildVolumeMountSpoolPath(directory),
+	}
 }
 
 // endregion Spool

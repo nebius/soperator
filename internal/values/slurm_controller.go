@@ -21,10 +21,10 @@ func buildSlurmControllerFrom(cluster *slurmv1.SlurmCluster) SlurmController {
 		SlurmNode: *cluster.Spec.SlurmNodes.Controller.SlurmNode.DeepCopy(),
 		Service: buildServiceFrom(
 			cluster.Spec.SlurmNodes.Controller.Slurmctld,
-			naming.BuildServiceName(consts.ComponentTypeController, cluster.Name, consts.ServiceControllerName),
+			naming.BuildServiceName(consts.ComponentTypeController, cluster.Name),
 		),
 		StatefulSet: buildStatefulSetFrom(
-			naming.BuildStatefulSetName(consts.ComponentTypeController, cluster.Name, consts.StatefulSetControllerName),
+			naming.BuildStatefulSetName(consts.ComponentTypeController, cluster.Name),
 			cluster.Spec.SlurmNodes.Controller.SlurmNode.Size,
 		),
 		VolumeUsers: *cluster.Spec.SlurmNodes.Controller.Volumes.Users.DeepCopy(),

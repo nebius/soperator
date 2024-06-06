@@ -73,7 +73,7 @@ func RenderStatefulSet(cluster *values.SlurmCluster) (appsv1.StatefulSet, error)
 					Annotations: map[string]string{
 						consts.AnnotationVersions: string(podVersion),
 						fmt.Sprintf(
-							"%s/%s", consts.AnnotationApparmorKey, consts.ServiceControllerName,
+							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerSlurmctldName,
 						): consts.AnnotationApparmorValueUnconfined,
 					},
 				},

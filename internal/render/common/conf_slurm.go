@@ -15,14 +15,13 @@ func GenerateSlurmConfig(cluster *values.SlurmCluster) (ConfFile, error) {
 	res.addComment("")
 	// example: SlurmctldHost=controller-0(controller-0.controller.slurm-poc.svc.cluster.local)
 	for i := range cluster.NodeController.Size {
-		instanceName, instanceFQDN := naming.BuildServiceFQDN(
+		replicaName, replicaFQDN := naming.BuildServiceReplicaFQDN(
 			consts.ComponentTypeController,
 			cluster.Namespace,
 			cluster.Name,
-			cluster.NodeController.Service.Name,
 			i,
 		)
-		res.addProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", instanceName, instanceFQDN))
+		res.addProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", replicaName, replicaFQDN))
 	}
 	res.addComment("")
 	res.addProperty("AuthType", "auth/slurm")
@@ -40,23 +39,11 @@ func GenerateSlurmConfig(cluster *values.SlurmCluster) (ConfFile, error) {
 	res.addProperty("SlurmdPidFile", "/var/run/slurmd.pid")
 	res.addProperty("SlurmdPort", cluster.NodeController.Service.Port) // FIXME this must be worker service port
 	res.addComment("")
-	{
-		slurmDSpoolDir, err := naming.BuildVolumeMountSpoolPath(consts.ComponentTypeWorker)
-		if err != nil {
-			return nil, err
-		}
-		res.addProperty("SlurmdSpoolDir", slurmDSpoolDir)
-	}
+	res.addProperty("SlurmdSpoolDir", naming.BuildVolumeMountSpoolPath(consts.SlurmdName))
 	res.addComment("")
 	res.addProperty("SlurmUser", "root")
 	res.addComment("")
-	{
-		slurmCtrlDSpoolDir, err := naming.BuildVolumeMountSpoolPath(consts.ComponentTypeController)
-		if err != nil {
-			return nil, err
-		}
-		res.addProperty("StateSaveLocation", slurmCtrlDSpoolDir)
-	}
+	res.addProperty("StateSaveLocation", naming.BuildVolumeMountSpoolPath(consts.SlurmctldName))
 	res.addComment("")
 	res.addProperty("TaskPlugin", "task/affinity")
 	res.addComment("")

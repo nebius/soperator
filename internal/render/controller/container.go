@@ -21,21 +21,15 @@ func renderContainerSlurmCtlD(cluster *values.SlurmCluster) (corev1.Container, e
 		common.RenderVolumeMountSlurmKey(),
 		common.RenderVolumeMountSlurmConfigs(),
 		common.RenderVolumeMountUsers(),
-	}
-	{
-		vmSpool, err := common.RenderVolumeMountSpool(consts.ComponentTypeController)
-		if err != nil {
-			return corev1.Container{}, err
-		}
-		volumeMounts = append(volumeMounts, vmSpool)
+		common.RenderVolumeMountSpool(consts.SlurmctldName),
 	}
 
 	return corev1.Container{
-		Name:            consts.ContainerControllerName,
+		Name:            consts.ContainerSlurmctldName,
 		Image:           cluster.NodeController.Service.Image,
 		ImagePullPolicy: corev1.PullAlways, // TODO use digest and set to corev1.PullIfNotPresent
 		Ports: []corev1.ContainerPort{{
-			Name:          consts.ServiceControllerName,
+			Name:          consts.ContainerSlurmctldName,
 			ContainerPort: cluster.NodeController.Service.Port,
 			Protocol:      cluster.NodeController.Service.Protocol,
 		}},

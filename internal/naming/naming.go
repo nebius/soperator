@@ -2,69 +2,67 @@ package naming
 
 import (
 	"fmt"
+	"path"
+	"strings"
 
 	"nebius.ai/slurm-operator/internal/consts"
 )
 
+const (
+	entityService     = "svc"
+	entityStatefulSet = "sts"
+)
+
 type namedEntity struct {
+	clusterName string
+
 	// componentType defines whether the entity belongs to some component.
 	// nil if common
 	componentType *consts.ComponentType
 
-	clusterName string
-	entityName  string
+	entity string
 }
 
 func (e namedEntity) String() string {
-	if e.componentType == nil {
-		return fmt.Sprintf("%s-%s", e.clusterName, e.entityName)
+	es := []string{e.clusterName}
+	if e.componentType != nil {
+		es = append(es, (*e.componentType).String())
 	}
-	return fmt.Sprintf("%s-%s-%s", e.clusterName, consts.ComponentNameByType[*e.componentType], e.entityName)
+	es = append(es, e.entity)
+
+	return strings.Join(es, "-")
 }
 
-func BuildServiceName(componentType consts.ComponentType, clusterName, svcName string) string {
+func BuildServiceName(componentType consts.ComponentType, clusterName string) string {
 	return namedEntity{
 		componentType: &componentType,
 		clusterName:   clusterName,
-		entityName:    svcName,
+		entity:        entityService,
 	}.String()
 }
 
-func BuildServiceFQDN(componentType consts.ComponentType, namespace, clusterName, serviceName string, replicaIndex int32) (instanceName, instanceFQDN string) {
-	fullServiceName := BuildServiceName(componentType, clusterName, serviceName)
-	instanceName = fmt.Sprintf("%s-%d", fullServiceName, replicaIndex)
-	instanceFQDN = fmt.Sprintf("%s.%s.%s.svc.cluster.local", instanceName, fullServiceName, namespace)
-	return instanceName, instanceFQDN
+func BuildServiceReplicaFQDN(componentType consts.ComponentType, namespace, clusterName string, replicaIndex int32) (replicaName, replicaFQDN string) {
+	serviceName := BuildServiceName(componentType, clusterName)
+	replicaName = fmt.Sprintf("%s-%d", serviceName, replicaIndex)
+	replicaFQDN = fmt.Sprintf("%s.%s.%s.svc.cluster.local", replicaName, serviceName, namespace)
+	return replicaName, replicaFQDN
 }
 
-func BuildStatefulSetName(componentType consts.ComponentType, clusterName, stsName string) string {
+func BuildStatefulSetName(componentType consts.ComponentType, clusterName string) string {
 	return namedEntity{
 		componentType: &componentType,
 		clusterName:   clusterName,
-		entityName:    stsName,
+		entity:        entityStatefulSet,
 	}.String()
 }
 
 func BuildConfigMapSlurmConfigsName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,
-		entityName:  consts.ConfigMapSlurmConfigsName,
+		entity:      consts.ConfigMapSlurmConfigsName,
 	}.String()
 }
 
-func BuildPVCName(clusterName string, componentType consts.ComponentType) string {
-	return fmt.Sprintf("%s-%s-pvc", clusterName, consts.ComponentNameByType[componentType])
-}
-
-func BuildVolumeMountSpoolPath(componentType consts.ComponentType) (string, error) {
-	var serviceName string
-	switch componentType {
-	case consts.ComponentTypeController:
-		serviceName = consts.ServiceControllerName
-	case consts.ComponentTypeWorker:
-		serviceName = consts.ServiceWorkerName
-	default:
-		return "", fmt.Errorf("failed to build spool volume mount path for unknown component type: %q", componentType)
-	}
-	return fmt.Sprintf("%s/%s", consts.VolumeSpoolMountPath, serviceName), nil
+func BuildVolumeMountSpoolPath(directory string) string {
+	return path.Join(consts.VolumeSpoolMountPath, directory)
 }
