@@ -12,25 +12,41 @@ import (
 	"nebius.ai/slurm-operator/internal/naming"
 )
 
+// region Container
+
+type Container struct {
+	slurmv1.NodeContainer
+
+	Name string
+}
+
+func buildContainerFrom(
+	container slurmv1.NodeContainer,
+	name string,
+) Container {
+	return Container{
+		NodeContainer: *container.DeepCopy(),
+		Name:          name,
+	}
+}
+
+// endregion Container
+
 // region Service
 
 type Service struct {
-	slurmv1.NodeService
-
-	Name        string
-	ServiceType corev1.ServiceType
-	Protocol    corev1.Protocol
+	Name     string
+	Type     corev1.ServiceType
+	Protocol corev1.Protocol
 }
 
 func buildServiceFrom(
-	svc slurmv1.NodeService,
 	name string,
 ) Service {
 	return Service{
-		NodeService: *svc.DeepCopy(),
-		Name:        name,
-		ServiceType: corev1.ServiceTypeClusterIP,
-		Protocol:    corev1.ProtocolTCP,
+		Name:     name,
+		Type:     corev1.ServiceTypeClusterIP,
+		Protocol: corev1.ProtocolTCP,
 	}
 }
 

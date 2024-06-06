@@ -1,6 +1,8 @@
 package common
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -37,44 +39,12 @@ func RenderVolumeClaimTemplate(componentType consts.ComponentType, cluster *valu
 
 // endregion PVC template
 
-// region Slurm key
-
-// RenderVolumeSlurmKey renders [corev1.Volume] containing Slurm key file
-func RenderVolumeSlurmKey(cluster *values.SlurmCluster) corev1.Volume {
-	return corev1.Volume{
-		Name: consts.VolumeSlurmKeyName,
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: cluster.Secrets.SlurmKey.Name,
-				Items: []corev1.KeyToPath{
-					{
-						Key:  cluster.Secrets.SlurmKey.Key,
-						Path: consts.SecretSlurmKeyFileName,
-						Mode: &consts.SecretSlurmKeyFileMode,
-					},
-				},
-			},
-		},
-	}
-}
-
-// RenderVolumeMountSlurmKey renders [corev1.VolumeMount] defining the mounting path for Slurm key file
-func RenderVolumeMountSlurmKey() corev1.VolumeMount {
-	return corev1.VolumeMount{
-		Name:      consts.VolumeSlurmKeyName,
-		MountPath: consts.VolumeSlurmKeyMountPath,
-		ReadOnly:  true,
-	}
-}
-
-// endregion Slurm key
-
 // region Slurm configs
 
 // RenderVolumeSlurmConfigs renders [corev1.Volume] containing Slurm config files
 func RenderVolumeSlurmConfigs(cluster *values.SlurmCluster) corev1.Volume {
 	return corev1.Volume{
-		Name: consts.VolumeSlurmConfigsName,
+		Name: consts.VolumeNameSlurmConfigs,
 		VolumeSource: corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{
 				LocalObjectReference: corev1.LocalObjectReference{Name: cluster.ConfigMapSlurmConfigs.Name},
@@ -86,44 +56,24 @@ func RenderVolumeSlurmConfigs(cluster *values.SlurmCluster) corev1.Volume {
 // RenderVolumeMountSlurmConfigs renders [corev1.VolumeMount] defining the mounting path for Slurm config files
 func RenderVolumeMountSlurmConfigs() corev1.VolumeMount {
 	return corev1.VolumeMount{
-		Name:      consts.VolumeSlurmConfigsName,
-		MountPath: consts.VolumeSlurmConfigsMountPath,
+		Name:      consts.VolumeNameSlurmConfigs,
+		MountPath: consts.VolumeMountPathSlurmConfigs,
 		ReadOnly:  true,
 	}
 }
 
 // endregion Slurm configs
 
-// region Users
-
-// RenderVolumeUsers renders [corev1.Volume] containing users contents
-func RenderVolumeUsers(cluster *values.SlurmCluster) corev1.Volume {
-	return corev1.Volume{
-		Name: consts.VolumeUsersName,
-		VolumeSource: utils.MustGetBy(
-			cluster.VolumeSources,
-			*cluster.NodeController.VolumeUsers.VolumeSourceName,
-			func(s slurmv1.VolumeSource) string { return s.Name },
-		).VolumeSource,
-	}
-}
-
-// RenderVolumeMountUsers renders [corev1.VolumeMount] defining the mounting path for users contents
-func RenderVolumeMountUsers() corev1.VolumeMount {
-	return corev1.VolumeMount{
-		Name:      consts.VolumeSpoolName,
-		MountPath: consts.VolumeUsersMountPath,
-	}
-}
-
-// endregion Users
-
 // region Spool
 
+func RenderVolumeNameSpool(componentType consts.ComponentType) string {
+	return fmt.Sprintf("%s-%s", componentType.String(), consts.VolumeNameSpool)
+}
+
 // RenderVolumeSpool renders [corev1.Volume] containing spool contents
-func RenderVolumeSpool(cluster *values.SlurmCluster) corev1.Volume {
+func RenderVolumeSpool(componentType consts.ComponentType, cluster *values.SlurmCluster) corev1.Volume {
 	return corev1.Volume{
-		Name: consts.VolumeSpoolName,
+		Name: RenderVolumeNameSpool(componentType),
 		VolumeSource: utils.MustGetBy(
 			cluster.VolumeSources,
 			*cluster.NodeController.VolumeSpool.VolumeSourceName,
@@ -133,11 +83,85 @@ func RenderVolumeSpool(cluster *values.SlurmCluster) corev1.Volume {
 }
 
 // RenderVolumeMountSpool renders [corev1.VolumeMount] defining the mounting path for spool contents
-func RenderVolumeMountSpool(directory string) corev1.VolumeMount {
+func RenderVolumeMountSpool(componentType consts.ComponentType, directory string) corev1.VolumeMount {
 	return corev1.VolumeMount{
-		Name:      consts.VolumeSpoolName,
+		Name:      RenderVolumeNameSpool(componentType),
 		MountPath: naming.BuildVolumeMountSpoolPath(directory),
 	}
 }
 
 // endregion Spool
+
+// region Jail
+
+// RenderVolumeJail renders [corev1.Volume] containing jail contents
+func RenderVolumeJail(cluster *values.SlurmCluster) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameJail,
+		VolumeSource: utils.MustGetBy(
+			cluster.VolumeSources,
+			*cluster.NodeController.VolumeJail.VolumeSourceName,
+			func(s slurmv1.VolumeSource) string { return s.Name },
+		).VolumeSource,
+	}
+}
+
+// RenderVolumeMountJail renders [corev1.VolumeMount] defining the mounting path for jail contents
+func RenderVolumeMountJail() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameJail,
+		MountPath: consts.VolumeMountPathJail,
+	}
+}
+
+// endregion Jail
+
+// region Munge
+
+// RenderVolumeMungeSocket renders [corev1.Volume] containing munge socket contents
+func RenderVolumeMungeSocket() corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameMungeSocket,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+}
+
+// RenderVolumeMountMungeSocket renders [corev1.VolumeMount] defining the mounting path for munge socket
+func RenderVolumeMountMungeSocket() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameMungeSocket,
+		MountPath: consts.VolumeMountPathMungeSocket,
+	}
+}
+
+// RenderVolumeMungeKey renders [corev1.Volume] containing munge key file
+func RenderVolumeMungeKey(cluster *values.SlurmCluster) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameMungeKey,
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: cluster.Secrets.MungeKey.Name,
+				Items: []corev1.KeyToPath{
+					{
+						Key:  cluster.Secrets.MungeKey.Key,
+						Path: consts.SecretMungeKeyFileName,
+						Mode: &consts.SecretMungeKeyFileMode,
+					},
+				},
+			},
+		},
+	}
+}
+
+// RenderVolumeMountMungeKey renders [corev1.VolumeMount] defining the mounting path for munge key file
+func RenderVolumeMountMungeKey() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameMungeKey,
+		MountPath: consts.VolumeMountPathMungeKey,
+		ReadOnly:  true,
+	}
+}
+
+// endregion Munge

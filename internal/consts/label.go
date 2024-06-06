@@ -2,7 +2,7 @@ package consts
 
 const (
 	LabelNameKey   = "app.kubernetes.io/name"
-	LabelNameValue = SlurmCluster
+	LabelNameValue = slurmCluster
 
 	// LabelInstanceKey value is taken from the corresponding CRD
 	LabelInstanceKey = "app.kubernetes.io/instance"
@@ -11,8 +11,8 @@ const (
 	LabelComponentKey = "app.kubernetes.io/component"
 
 	LabelPartOfKey   = "app.kubernetes.io/part-of"
-	LabelPartOfValue = SlurmOperator
+	LabelPartOfValue = slurmOperator
 
 	LabelManagedByKey   = "app.kubernetes.io/managed-by"
-	LabelManagedByValue = SlurmOperator
+	LabelManagedByValue = slurmOperator
 )

@@ -81,8 +81,8 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 
 		// Node volume source names are not empty
 		volumeSourceNamesRaw := []*string{
-			c.NodeController.VolumeUsers.VolumeSourceName,
 			c.NodeController.VolumeSpool.VolumeSourceName,
+			c.NodeController.VolumeJail.VolumeSourceName,
 		}
 		for _, volumeSourceName := range volumeSourceNamesRaw {
 			if volumeSourceName == nil {
@@ -120,19 +120,20 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 	}
 
 	// Secrets
+	// TODO login node
 	{
 		//loginNodeCount := c.NodeLogin.Size
-		//if loginNodeCount == 0 && clusterCrd.Spec.Secrets.SSHPublicKeys != nil {
+		//if loginNodeCount == 0 && clusterCrd.Spec.Secrets.SSHRootPublicKeys != nil {
 		//	err := fmt.Errorf("secrets are invalid. login node size %d (unused) is specified, but SSH public keys provided", loginNodeCount)
 		//	logger.Error(
 		//		err,
 		//		"Secrets are invalid. login nodes are unused, but SSH public keys provided",
 		//		"Slurm.LoginNode.Count", loginNodeCount,
-		//		"Slurm.Secret.SSHPublicKeys.Name", clusterCrd.Spec.Secrets.SSHPublicKeys.Name,
+		//		"Slurm.Secret.SSHRootPublicKeys.Name", clusterCrd.Spec.Secrets.SSHRootPublicKeys.Name,
 		//	)
 		//	return slurmv1.Secrets{}, err
 		//}
-		//if loginNodeCount > 0 && clusterCrd.Spec.Secrets.SSHPublicKeys == nil {
+		//if loginNodeCount > 0 && clusterCrd.Spec.Secrets.SSHRootPublicKeys == nil {
 		//	err := fmt.Errorf("secrets are invalid. login node size %d (used) is specified, but SSH public keys are not provided", loginNodeCount)
 		//	logger.Error(
 		//		err,

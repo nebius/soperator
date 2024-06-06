@@ -31,19 +31,15 @@ func RenderStatefulSet(cluster *values.SlurmCluster) (appsv1.StatefulSet, error)
 	)
 
 	volumes := []corev1.Volume{
-		common.RenderVolumeSlurmKey(cluster),
 		common.RenderVolumeSlurmConfigs(cluster),
-	}
-	if cluster.NodeController.VolumeUsers.VolumeSourceName != nil {
-		volumes = append(volumes, common.RenderVolumeUsers(cluster))
+		common.RenderVolumeMungeKey(cluster),
+		common.RenderVolumeMungeSocket(),
 	}
 	if cluster.NodeController.VolumeSpool.VolumeSourceName != nil {
-		volumes = append(volumes, common.RenderVolumeSpool(cluster))
+		volumes = append(volumes, common.RenderVolumeSpool(consts.ComponentTypeController, cluster))
 	}
-
-	container, err := renderContainerSlurmCtlD(cluster)
-	if err != nil {
-		return appsv1.StatefulSet{}, err
+	if cluster.NodeController.VolumeJail.VolumeSourceName != nil {
+		volumes = append(volumes, common.RenderVolumeJail(cluster))
 	}
 
 	return appsv1.StatefulSet{
@@ -56,7 +52,7 @@ func RenderStatefulSet(cluster *values.SlurmCluster) (appsv1.StatefulSet, error)
 			},
 		},
 		Spec: appsv1.StatefulSetSpec{
-			ServiceName: cluster.NodeController.Service.Name,
+			ServiceName: cluster.NodeController.ContainerSlurmctld.Name,
 			Replicas:    &cluster.NodeController.StatefulSet.Replicas,
 			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -75,25 +71,31 @@ func RenderStatefulSet(cluster *values.SlurmCluster) (appsv1.StatefulSet, error)
 						fmt.Sprintf(
 							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerSlurmctldName,
 						): consts.AnnotationApparmorValueUnconfined,
+						fmt.Sprintf(
+							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerMungeName,
+						): consts.AnnotationApparmorValueUnconfined,
 					},
 				},
 				Spec: corev1.PodSpec{
 					Affinity:     nodeFilter.Affinity,
 					NodeSelector: nodeFilter.NodeSelector,
 					Tolerations:  nodeFilter.Tolerations,
-					Containers:   []corev1.Container{container},
-					Volumes:      volumes,
+					Containers: []corev1.Container{
+						renderContainerSlurmctld(cluster),
+						renderContainerMunge(cluster),
+					},
+					Volumes: volumes,
 				},
 			},
 			VolumeClaimTemplates: common.RenderVolumeClaimTemplates(
 				consts.ComponentTypeController,
 				cluster,
 				[]values.PVCTemplateSpec{{
-					Name: consts.VolumeUsersName,
-					Spec: cluster.NodeController.VolumeUsers.VolumeClaimTemplateSpec,
-				}, {
-					Name: consts.VolumeSpoolName,
+					Name: common.RenderVolumeNameSpool(consts.ComponentTypeController),
 					Spec: cluster.NodeController.VolumeSpool.VolumeClaimTemplateSpec,
+				}, {
+					Name: consts.VolumeNameJail,
+					Spec: cluster.NodeController.VolumeJail.VolumeClaimTemplateSpec,
 				}},
 			),
 		},

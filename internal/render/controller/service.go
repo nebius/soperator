@@ -22,11 +22,11 @@ func RenderService(cluster *values.SlurmCluster) corev1.Service {
 			Labels:    common.RenderLabels(consts.ComponentTypeController, cluster.Name),
 		},
 		Spec: corev1.ServiceSpec{
-			Type:     cluster.NodeController.Service.ServiceType,
+			Type:     cluster.NodeController.Service.Type,
 			Selector: common.RenderMatchLabels(consts.ComponentTypeController, cluster.Name),
 			Ports: []corev1.ServicePort{{
 				Protocol: cluster.NodeController.Service.Protocol,
-				Port:     cluster.NodeController.Service.Port,
+				Port:     cluster.NodeController.ContainerSlurmctld.Port,
 			}},
 		},
 	}

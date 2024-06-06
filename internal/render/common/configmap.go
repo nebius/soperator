@@ -14,11 +14,6 @@ import (
 // [consts.ConfigMapCGroupConfigKey] - cgroup config
 // [consts.ConfigMapSpankConfigKey] - SPANK plugins config
 func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) (corev1.ConfigMap, error) {
-	slurmConfig, err := GenerateSlurmConfig(cluster)
-	if err != nil {
-		return corev1.ConfigMap{}, nil
-	}
-
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.ConfigMapSlurmConfigs.Name,
@@ -26,9 +21,10 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) (corev1.ConfigMap
 			Labels:    RenderLabels(consts.ComponentTypeController, cluster.Name),
 		},
 		Data: map[string]string{
-			consts.ConfigMapSlurmConfigKey:  slurmConfig.Render(),
+			consts.ConfigMapSlurmConfigKey:  GenerateSlurmConfig(cluster).Render(),
 			consts.ConfigMapCGroupConfigKey: GenerateCGroupConfig().Render(),
 			consts.ConfigMapSpankConfigKey:  GenerateSpankConfig().Render(),
+			consts.ConfigMapGresConfigKey:   GenerateGresConfig().Render(),
 		},
 	}, nil
 }

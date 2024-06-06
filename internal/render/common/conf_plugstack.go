@@ -8,7 +8,7 @@ import (
 
 func GenerateSpankConfig() ConfFile {
 	res := &rawConfig{}
-	res.addLine(fmt.Sprintf("required chroot.so %s", consts.VolumeJailMountPath))
+	res.addLine(fmt.Sprintf("required chroot.so %s", consts.VolumeMountPathJail))
 	res.addLine("required spank_pyxis.so")
 	return res
 }

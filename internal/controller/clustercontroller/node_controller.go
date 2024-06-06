@@ -119,16 +119,17 @@ func (r SlurmClusterReconciler) getControllersStatefulSetDependencies(ctx contex
 	}
 	res = append(res, slurmConfigsConfigMap)
 
-	slurmKeySecret := &corev1.Secret{}
-	if err := r.GetNamespacedObject(ctx, clusterValues.Namespace, clusterValues.Secrets.SlurmKey.Name, slurmKeySecret); err != nil {
+	mungeKeySecret := &corev1.Secret{}
+	if err := r.GetNamespacedObject(ctx, clusterValues.Namespace, clusterValues.Secrets.MungeKey.Name, mungeKeySecret); err != nil {
 		return []metav1.Object{}, err
 	}
-	res = append(res, slurmKeySecret)
+	res = append(res, mungeKeySecret)
 
 	// SSH public keys secret is a dependency if login nodes are used
-	//if clusterValues.Secrets.SSHPublicKeys != nil {
+	// TODO login node
+	//if clusterValues.Secrets.SSHRootPublicKeys != nil {
 	//	secret := &corev1.Secret{}
-	//	if err := r.GetNamespacedObject(ctx, clusterValues.Secrets.SSHPublicKeys.Name, clusterValues.Namespace, secret); err != nil {
+	//	if err := r.GetNamespacedObject(ctx, clusterValues.Secrets.SSHRootPublicKeys.Name, clusterValues.Namespace, secret); err != nil {
 	//		return []metav1.Object{}, err
 	//	}
 	//	res = append(res, secret)

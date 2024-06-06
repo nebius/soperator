@@ -10,24 +10,33 @@ import (
 type SlurmController struct {
 	slurmv1.SlurmNode
 
+	ContainerSlurmctld Container
+	ContainerMunge     Container
+
 	Service     Service
 	StatefulSet StatefulSet
-	VolumeUsers slurmv1.NodeVolume
+
 	VolumeSpool slurmv1.NodeVolume
+	VolumeJail  slurmv1.NodeVolume
 }
 
 func buildSlurmControllerFrom(cluster *slurmv1.SlurmCluster) SlurmController {
 	return SlurmController{
 		SlurmNode: *cluster.Spec.SlurmNodes.Controller.SlurmNode.DeepCopy(),
-		Service: buildServiceFrom(
+		ContainerSlurmctld: buildContainerFrom(
 			cluster.Spec.SlurmNodes.Controller.Slurmctld,
-			naming.BuildServiceName(consts.ComponentTypeController, cluster.Name),
+			consts.ContainerSlurmctldName,
 		),
+		ContainerMunge: buildContainerFrom(
+			cluster.Spec.SlurmNodes.Controller.Munge,
+			consts.ContainerMungeName,
+		),
+		Service: buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeController, cluster.Name)),
 		StatefulSet: buildStatefulSetFrom(
 			naming.BuildStatefulSetName(consts.ComponentTypeController, cluster.Name),
 			cluster.Spec.SlurmNodes.Controller.SlurmNode.Size,
 		),
-		VolumeUsers: *cluster.Spec.SlurmNodes.Controller.Volumes.Users.DeepCopy(),
 		VolumeSpool: *cluster.Spec.SlurmNodes.Controller.Volumes.Spool.DeepCopy(),
+		VolumeJail:  *cluster.Spec.SlurmNodes.Controller.Volumes.Jail.DeepCopy(),
 	}
 }

@@ -64,5 +64,5 @@ func BuildConfigMapSlurmConfigsName(clusterName string) string {
 }
 
 func BuildVolumeMountSpoolPath(directory string) string {
-	return path.Join(consts.VolumeSpoolMountPath, directory)
+	return path.Join(consts.VolumeMountPathSpool, directory)
 }

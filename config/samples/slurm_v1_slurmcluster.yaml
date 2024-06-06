@@ -28,19 +28,19 @@ spec:
                     values:
                       - f2m7hn7o3ga84eopr11m
   volumeSources:
-    - name: jail
-      persistentVolumeClaim:
-        claimName: slurm-example-jail
-        readOnly: false
     - name: spool
       persistentVolumeClaim:
         claimName: slurm-example-controller-spool
         readOnly: false
+    - name: jail
+      persistentVolumeClaim:
+        claimName: slurm-example-jail
+        readOnly: false
   secrets:
-    slurmKey:
+    mungeKey:
       name: munge-key
       key: munge.key
-    sshPublicKeys:
+    sshRootPublicKeys:
       name: ssh-root-keys
       keys:
         - authorized_keys
@@ -55,11 +55,13 @@ spec:
           cpu: 1000m
           memory: 10Gi
           ephemeralStorage: 10Gi
+      munge:
+        image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest
       volumes:
-        users:
-          volumeSourceName: "jail"
         spool:
           volumeSourceName: "spool"
+        jail:
+          volumeSourceName: "jail"
     worker:
       size: 1
       k8sNodeFilterName: "gpu"
