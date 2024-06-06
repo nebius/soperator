@@ -14,18 +14,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/controller"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
 // DeployControllers creates all resources necessary for deploying Slurm controllers.
-func (r SlurmClusterReconciler) DeployControllers(ctx context.Context, clusterValues *values.SlurmCluster, clusterCR *slurmv1.SlurmCluster) (ctrl.Result, error) {
+func (r SlurmClusterReconciler) DeployControllers(
+	ctx context.Context,
+	clusterValues *values.SlurmCluster,
+	clusterCR *slurmv1.SlurmCluster,
+) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	// Deploy K8sService
 	{
 		found := &corev1.Service{}
-		dep := controller.RenderService(clusterValues)
+		dep := controller.RenderService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeController)
 		if res, err := r.EnsureDeployed(ctx, &dep, found, clusterCR); err != nil {
 			return res, err
 		}
@@ -34,7 +39,14 @@ func (r SlurmClusterReconciler) DeployControllers(ctx context.Context, clusterVa
 	// Deploy StatefulSet
 	{
 		found := &appsv1.StatefulSet{}
-		dep, err := controller.RenderStatefulSet(clusterValues)
+		dep, err := controller.RenderStatefulSet(
+			clusterValues.Namespace,
+			clusterValues.Name,
+			clusterValues.NodeFilters,
+			&clusterValues.Secrets,
+			clusterValues.VolumeSources,
+			&clusterValues.NodeController,
+		)
 		if err != nil {
 			logger.Error(err, "Controller StatefulSet deployment failed")
 			return ctrl.Result{}, err
@@ -53,34 +65,57 @@ func (r SlurmClusterReconciler) DeployControllers(ctx context.Context, clusterVa
 }
 
 // UpdateControllers makes sure that Slurm controllers are up-to-date with CRD.
-func (r SlurmClusterReconciler) UpdateControllers(ctx context.Context, clusterValues *values.SlurmCluster, clusterCR *slurmv1.SlurmCluster) (ctrl.Result, error) {
+func (r SlurmClusterReconciler) UpdateControllers(
+	ctx context.Context,
+	clusterValues *values.SlurmCluster,
+	clusterCR *slurmv1.SlurmCluster,
+) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	{
-		existing := &appsv1.StatefulSet{}
-		updated, err := controller.RenderStatefulSet(clusterValues)
-		if err != nil {
-			logger.Error(err, "Controller StatefulSet update failed")
-			return ctrl.Result{}, err
-		}
-		dependencies, err := r.getControllersStatefulSetDependencies(ctx, clusterValues)
-		if err != nil {
-			logger.Error(err, "Failed at retrieving dependencies for the controller StatefulSet")
-			return ctrl.Result{}, err
-		}
-		if res, err := r.EnsureUpdated(ctx, &updated, existing, clusterCR, dependencies...); err != nil {
-			return res, err
-		}
+	existing := &appsv1.StatefulSet{}
+	updated, err := controller.RenderStatefulSet(
+		clusterValues.Namespace,
+		clusterValues.Name,
+		clusterValues.NodeFilters,
+		&clusterValues.Secrets,
+		clusterValues.VolumeSources,
+		&clusterValues.NodeController,
+	)
+	if err != nil {
+		logger.Error(err, "Controller StatefulSet update failed")
 		return ctrl.Result{}, err
 	}
+
+	dependencies, err := r.getControllersStatefulSetDependencies(ctx, clusterValues)
+	if err != nil {
+		logger.Error(err, "Failed at retrieving dependencies for the controller StatefulSet")
+		return ctrl.Result{}, err
+	}
+
+	if res, err := r.EnsureUpdated(ctx, &updated, existing, clusterCR, dependencies...); err != nil {
+		return res, err
+	}
+
+	return ctrl.Result{}, nil
 }
 
 // ValidateControllers checks that Slurm controllers are reconciled with the desired state correctly
-func (r SlurmClusterReconciler) ValidateControllers(ctx context.Context, clusterValues *values.SlurmCluster, clusterCR *slurmv1.SlurmCluster) (ctrl.Result, error) {
+func (r SlurmClusterReconciler) ValidateControllers(
+	ctx context.Context,
+	clusterValues *values.SlurmCluster,
+	clusterCR *slurmv1.SlurmCluster,
+) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	found := &appsv1.StatefulSet{}
-	err := r.Get(ctx, types.NamespacedName{Name: clusterValues.NodeController.StatefulSet.Name, Namespace: clusterValues.Namespace}, found)
+	err := r.Get(
+		ctx,
+		types.NamespacedName{
+			Name:      clusterValues.NodeController.StatefulSet.Name,
+			Namespace: clusterValues.Namespace,
+		},
+		found,
+	)
 	if err != nil && apierrors.IsNotFound(err) {
 		return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 	} else if err != nil {
@@ -110,17 +145,30 @@ func (r SlurmClusterReconciler) ValidateControllers(ctx context.Context, cluster
 	return ctrl.Result{}, nil
 }
 
-func (r SlurmClusterReconciler) getControllersStatefulSetDependencies(ctx context.Context, clusterValues *values.SlurmCluster) ([]metav1.Object, error) {
+func (r SlurmClusterReconciler) getControllersStatefulSetDependencies(
+	ctx context.Context,
+	clusterValues *values.SlurmCluster,
+) ([]metav1.Object, error) {
 	var res []metav1.Object
 
 	slurmConfigsConfigMap := &corev1.ConfigMap{}
-	if err := r.GetNamespacedObject(ctx, clusterValues.Namespace, clusterValues.ConfigMapSlurmConfigs.Name, slurmConfigsConfigMap); err != nil {
+	if err := r.GetNamespacedObject(
+		ctx,
+		clusterValues.Namespace,
+		naming.BuildConfigMapSlurmConfigsName(clusterValues.Name),
+		slurmConfigsConfigMap,
+	); err != nil {
 		return []metav1.Object{}, err
 	}
 	res = append(res, slurmConfigsConfigMap)
 
 	mungeKeySecret := &corev1.Secret{}
-	if err := r.GetNamespacedObject(ctx, clusterValues.Namespace, clusterValues.Secrets.MungeKey.Name, mungeKeySecret); err != nil {
+	if err := r.GetNamespacedObject(
+		ctx,
+		clusterValues.Namespace,
+		clusterValues.Secrets.MungeKey.Name,
+		mungeKeySecret,
+	); err != nil {
 		return []metav1.Object{}, err
 	}
 	res = append(res, mungeKeySecret)
@@ -129,7 +177,12 @@ func (r SlurmClusterReconciler) getControllersStatefulSetDependencies(ctx contex
 	// TODO login node
 	//if clusterValues.Secrets.SSHRootPublicKeys != nil {
 	//	secret := &corev1.Secret{}
-	//	if err := r.GetNamespacedObject(ctx, clusterValues.Secrets.SSHRootPublicKeys.Name, clusterValues.Namespace, secret); err != nil {
+	//	if err := r.GetNamespacedObject(
+	//		ctx,
+	//		clusterValues.Secrets.SSHRootPublicKeys.Name,
+	//		clusterValues.Namespace,
+	//		secret,
+	//	); err != nil {
 	//		return []metav1.Object{}, err
 	//	}
 	//	res = append(res, secret)

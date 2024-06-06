@@ -14,7 +14,10 @@ import (
 )
 
 // mapObjectsToReconcileRequests is used to watch not-owned resource and created reconcile requests for SlurmCluster objects
-func (r *SlurmClusterReconciler) mapObjectsToReconcileRequests(ctx context.Context, obj client.Object) []reconcile.Request {
+func (r *SlurmClusterReconciler) mapObjectsToReconcileRequests(
+	ctx context.Context,
+	obj client.Object,
+) []reconcile.Request {
 	var (
 		fieldPaths = []string{
 			consts.IndexFieldSecretMungeKey,

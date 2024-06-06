@@ -20,23 +20,23 @@ type SlurmController struct {
 	VolumeJail  slurmv1.NodeVolume
 }
 
-func buildSlurmControllerFrom(cluster *slurmv1.SlurmCluster) SlurmController {
+func buildSlurmControllerFrom(clusterName string, controller *slurmv1.SlurmNodeController) SlurmController {
 	return SlurmController{
-		SlurmNode: *cluster.Spec.SlurmNodes.Controller.SlurmNode.DeepCopy(),
+		SlurmNode: *controller.SlurmNode.DeepCopy(),
 		ContainerSlurmctld: buildContainerFrom(
-			cluster.Spec.SlurmNodes.Controller.Slurmctld,
-			consts.ContainerSlurmctldName,
+			controller.Slurmctld,
+			consts.ContainerNameSlurmctld,
 		),
 		ContainerMunge: buildContainerFrom(
-			cluster.Spec.SlurmNodes.Controller.Munge,
-			consts.ContainerMungeName,
+			controller.Munge,
+			consts.ContainerNameMunge,
 		),
-		Service: buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeController, cluster.Name)),
+		Service: buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeController, clusterName)),
 		StatefulSet: buildStatefulSetFrom(
-			naming.BuildStatefulSetName(consts.ComponentTypeController, cluster.Name),
-			cluster.Spec.SlurmNodes.Controller.SlurmNode.Size,
+			naming.BuildStatefulSetName(consts.ComponentTypeController, clusterName),
+			controller.SlurmNode.Size,
 		),
-		VolumeSpool: *cluster.Spec.SlurmNodes.Controller.Volumes.Spool.DeepCopy(),
-		VolumeJail:  *cluster.Spec.SlurmNodes.Controller.Volumes.Jail.DeepCopy(),
+		VolumeSpool: *controller.Volumes.Spool.DeepCopy(),
+		VolumeJail:  *controller.Volumes.Jail.DeepCopy(),
 	}
 }

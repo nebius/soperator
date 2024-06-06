@@ -195,10 +195,20 @@ type SlurmNodeControllerVolumes struct {
 type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
 
+	// MaxGPU represents the maximal number of GPUs available for one worker
+	//
+	// +kubebuilder:validation:Required
+	MaxGPU int32 `json:"maxGpu"`
+
 	// Slurmd represents the Slurm daemon service configuration
 	//
 	// +kubebuilder:validation:Required
 	Slurmd NodeContainer `json:"slurmd"`
+
+	// Munge represents the Slurm munge configuration
+	//
+	// +kubebuilder:validation:Required
+	Munge NodeContainer `json:"munge"`
 
 	// Volumes represents the volume configurations for the worker node
 	//
@@ -208,11 +218,6 @@ type SlurmNodeWorker struct {
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node
 type SlurmNodeWorkerVolumes struct {
-	// Users represents the user data volume configuration
-	//
-	// +kubebuilder:validation:Required
-	Users NodeVolume `json:"users"`
-
 	// Spool represents the spool data volume configuration
 	//
 	// +kubebuilder:validation:Required

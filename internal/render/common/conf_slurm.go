@@ -37,7 +37,7 @@ func GenerateSlurmConfig(cluster *values.SlurmCluster) ConfFile {
 	res.addProperty("SlurmctldPort", cluster.NodeController.ContainerSlurmctld.Port)
 	res.addComment("")
 	res.addProperty("SlurmdPidFile", "/var/run/"+consts.SlurmdName+".pid")
-	res.addProperty("SlurmdPort", cluster.NodeController.ContainerSlurmctld.Port) // FIXME this must be worker service port
+	res.addProperty("SlurmdPort", cluster.NodeWorker.ContainerSlurmd.Port)
 	res.addComment("")
 	res.addProperty("SlurmdSpoolDir", naming.BuildVolumeMountSpoolPath(consts.SlurmdName))
 	res.addComment("")

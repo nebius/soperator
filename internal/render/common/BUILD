@@ -9,6 +9,7 @@ go_library(
         "conf_slurm.go",
         "config.go",
         "configmap.go",
+        "container.go",
         "label.go",
         "version.go",
         "volume.go",

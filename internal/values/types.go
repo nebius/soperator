@@ -9,7 +9,6 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/naming"
 )
 
 // region Container
@@ -73,40 +72,28 @@ func buildStatefulSetFrom(
 
 // endregion StatefulSet
 
-// region ConfigMap
-
-type K8sConfigMap struct {
-	Name string
-}
-
-func buildSlurmConfigFrom(cluster *slurmv1.SlurmCluster) K8sConfigMap {
-	return K8sConfigMap{Name: naming.BuildConfigMapSlurmConfigsName(cluster.Name)}
-}
-
-// endregion ConfigMap
-
 // region CR version
 
-func buildCRVersionFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) string {
+func buildCRVersionFrom(ctx context.Context, crVersion string) string {
 	logger := log.FromContext(ctx)
 
-	if cluster.Spec.CRVersion == "" {
+	if crVersion == "" {
 		logger.Info(
 			"CR version is empty, using default",
 			"Slurm.CR.DefaultVersion", consts.VersionCR)
 		return consts.VersionCR
 	}
 
-	return cluster.Spec.CRVersion
+	return crVersion
 }
 
 // endregion CR version
 
 // region K8sNodeFilter
 
-func buildNodeFiltersFrom(cluster *slurmv1.SlurmCluster) []slurmv1.K8sNodeFilter {
-	res := make([]slurmv1.K8sNodeFilter, len(cluster.Spec.K8sNodeFilters))
-	for i, nodeFilter := range cluster.Spec.K8sNodeFilters {
+func buildNodeFiltersFrom(nodeFilters []slurmv1.K8sNodeFilter) []slurmv1.K8sNodeFilter {
+	res := make([]slurmv1.K8sNodeFilter, len(nodeFilters))
+	for i, nodeFilter := range nodeFilters {
 		res[i] = *nodeFilter.DeepCopy()
 	}
 	return res
@@ -116,9 +103,9 @@ func buildNodeFiltersFrom(cluster *slurmv1.SlurmCluster) []slurmv1.K8sNodeFilter
 
 // region Volume
 
-func buildVolumeSourcesFrom(cluster *slurmv1.SlurmCluster) []slurmv1.VolumeSource {
-	res := make([]slurmv1.VolumeSource, len(cluster.Spec.VolumeSources))
-	for i, volumeSource := range cluster.Spec.VolumeSources {
+func buildVolumeSourcesFrom(volumeSources []slurmv1.VolumeSource) []slurmv1.VolumeSource {
+	res := make([]slurmv1.VolumeSource, len(volumeSources))
+	for i, volumeSource := range volumeSources {
 		res[i].Name = volumeSource.Name
 		res[i].VolumeSource = *volumeSource.VolumeSource.DeepCopy()
 	}
@@ -138,8 +125,8 @@ type PVCTemplateSpec struct {
 
 // region Secret
 
-func buildSecretsFrom(cluster *slurmv1.SlurmCluster) slurmv1.Secrets {
-	return *cluster.Spec.Secrets.DeepCopy()
+func buildSecretsFrom(secrets *slurmv1.Secrets) slurmv1.Secrets {
+	return *secrets.DeepCopy()
 }
 
 // endregion Secret

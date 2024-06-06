@@ -4,7 +4,7 @@ metadata:
   namespace: slurm-example
   name: slurm-1
 spec:
-  crVersion: 0.1.1
+  crVersion: 0.1.5
   pause: false
   k8sNodeFilters:
     - name: gpu
@@ -28,14 +28,29 @@ spec:
                     values:
                       - f2m7hn7o3ga84eopr11m
   volumeSources:
-    - name: spool
+    - name: controller-spool
       persistentVolumeClaim:
         claimName: slurm-example-controller-spool
+        readOnly: false
+    - name: worker-spool
+      persistentVolumeClaim:
+        claimName: slurm-example-worker-spool
         readOnly: false
     - name: jail
       persistentVolumeClaim:
         claimName: slurm-example-jail
         readOnly: false
+    - name: datasets
+      persistentVolumeClaim:
+        claimName: slurm-example-customer-datasets
+        readOnly: false
+    - name: checkpoints
+      persistentVolumeClaim:
+        claimName: slurm-example-customer-checkpoints
+        readOnly: false
+    - name: ml-config
+      configMap:
+        name: slurm-example-customer-ml-configs
   secrets:
     mungeKey:
       name: munge-key
@@ -59,49 +74,35 @@ spec:
         image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest
       volumes:
         spool:
-          volumeSourceName: "spool"
+          volumeSourceName: "controller-spool"
         jail:
           volumeSourceName: "jail"
     worker:
       size: 1
       k8sNodeFilterName: "gpu"
+      maxGpu: 2
       slurmd:
         image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/worker_slurmd:latest
         port: 6818
         resources:
           cpu: 1000m
           memory: 10Gi
-          # nvidia.com/gpu: 8
           ephemeralStorage: 50Gi
+      munge:
+        image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest
       volumes:
-        users:
-          volumeClaimTemplateSpec:
-            accessModes:
-              - ReadWriteMany
-            resources:
-              requests:
-                storage: 10Gi
-            storageClassName: nebius-network-ssd
-            volumeMode: Filesystem
         spool:
-          volumeClaimTemplateSpec:
-            accessModes:
-              - ReadWriteMany
-            resources:
-              requests:
-                storage: 10Gi
-            storageClassName: nebius-network-ssd
-            volumeMode: Filesystem
+          volumeSourceName: "worker-spool"
         jail:
-          volumeSourceName: jail
+          volumeSourceName: "jail"
         jailSubMounts:
-           - name: "datasets"
+           - name: datasets
              mountPath: "/mnt/datasets"
              volumeSourceName: "datasets"
-           - name: "checkpoints"
+           - name: checkpoints
              mountPath: "/mnt/checkpoints"
              volumeSourceName: "checkpoints"
-           - name: "ml-configs"
+           - name: ml-configs
              mountPath: "/etc/ml-config"
              volumeSourceName: "ml-configs"
     login:

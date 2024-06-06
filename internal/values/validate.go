@@ -81,8 +81,16 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 
 		// Node volume source names are not empty
 		volumeSourceNamesRaw := []*string{
+			// controller
 			c.NodeController.VolumeSpool.VolumeSourceName,
 			c.NodeController.VolumeJail.VolumeSourceName,
+			// worker
+			c.NodeWorker.VolumeSpool.VolumeSourceName,
+			c.NodeWorker.VolumeJail.VolumeSourceName,
+		}
+		// worker jail sub-mounts
+		for _, subMount := range c.NodeWorker.JailSubMounts {
+			volumeSourceNamesRaw = append(volumeSourceNamesRaw, &subMount.VolumeSourceName)
 		}
 		for _, volumeSourceName := range volumeSourceNamesRaw {
 			if volumeSourceName == nil {

@@ -5,4 +5,6 @@ const (
 
 	AnnotationApparmorKey             = "container.apparmor.security.beta.kubernetes.io"
 	AnnotationApparmorValueUnconfined = "unconfined"
+
+	AnnotationMaxGPU = "nvidia.com/gpu"
 )

@@ -1,9 +1,10 @@
 package consts
 
 const (
-	ContainerSlurmctldName = SlurmctldName
-	ContainerMungeName     = Munge
-	ContainerSlurmdName    = SlurmdName
+	ContainerNameSlurmctld         = SlurmctldName
+	ContainerNameMunge             = Munge
+	ContainerNameSlurmd            = SlurmdName
+	ContainerNameToolkitValidation = "toolkit-validation"
 
 	ContainerSecurityContextCapabilitySysAdmin = "SYS_ADMIN"
 )

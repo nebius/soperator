@@ -41,7 +41,12 @@ func BuildServiceName(componentType consts.ComponentType, clusterName string) st
 	}.String()
 }
 
-func BuildServiceReplicaFQDN(componentType consts.ComponentType, namespace, clusterName string, replicaIndex int32) (replicaName, replicaFQDN string) {
+func BuildServiceReplicaFQDN(
+	componentType consts.ComponentType,
+	namespace,
+	clusterName string,
+	replicaIndex int32,
+) (replicaName, replicaFQDN string) {
 	serviceName := BuildServiceName(componentType, clusterName)
 	replicaName = fmt.Sprintf("%s-%d", serviceName, replicaIndex)
 	replicaFQDN = fmt.Sprintf("%s.%s.%s.svc.cluster.local", replicaName, serviceName, namespace)
