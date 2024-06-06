@@ -8,6 +8,6 @@ import (
 // TODO login node reconciliation
 type SlurmLogin struct{}
 
-func buildSlurmLoginFrom(_ *slurmv1.SlurmCluster) SlurmLogin {
+func buildSlurmLoginFrom(_ string, _ *slurmv1.SlurmNodeLogin) SlurmLogin {
 	return SlurmLogin{}
 }

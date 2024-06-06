@@ -1,9 +1,14 @@
 package consts
 
 const (
-	ConfigMapSlurmConfigsName = SlurmPrefix + "configs"
+	slurmConfigs = slurmPrefix + "configs"
+)
+
+const (
+	ConfigMapSlurmConfigsName = slurmConfigs
 
 	ConfigMapSlurmConfigKey  = "slurm.conf"
 	ConfigMapCGroupConfigKey = "cgroup.conf"
 	ConfigMapSpankConfigKey  = "plugstack.conf"
+	ConfigMapGresConfigKey   = "gres.conf"
 )

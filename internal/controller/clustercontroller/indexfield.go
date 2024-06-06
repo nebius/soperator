@@ -11,10 +11,10 @@ import (
 )
 
 func indexFields(mgr ctrl.Manager) error {
-	if err := indexField(mgr, consts.IndexFieldSecretSlurmKey, indexFuncSecretSlurmKey); err != nil {
+	if err := indexField(mgr, consts.IndexFieldSecretMungeKey, indexFuncSecretMungeKey); err != nil {
 		return err
 	}
-	if err := indexField(mgr, consts.IndexFieldSecretSSHPublicKeys, indexFuncSecretSSHPublicKeys); err != nil {
+	if err := indexField(mgr, consts.IndexFieldSecretSSHRootPublicKeys, indexFuncSecretSSHRootPublicKeys); err != nil {
 		return err
 	}
 
@@ -25,18 +25,18 @@ func indexField(mgr ctrl.Manager, field string, fn client.IndexerFunc) error {
 	return mgr.GetFieldIndexer().IndexField(context.Background(), &slurmv1.SlurmCluster{}, field, fn)
 }
 
-func indexFuncSecretSlurmKey(obj client.Object) []string {
+func indexFuncSecretMungeKey(obj client.Object) []string {
 	cluster := obj.(*slurmv1.SlurmCluster)
-	if cluster.Spec.Secrets.SlurmKey.Name != "" {
-		return []string{cluster.Spec.Secrets.SlurmKey.Name}
+	if cluster.Spec.Secrets.MungeKey.Name != "" {
+		return []string{cluster.Spec.Secrets.MungeKey.Name}
 	}
 	return []string{}
 }
 
-func indexFuncSecretSSHPublicKeys(obj client.Object) []string {
+func indexFuncSecretSSHRootPublicKeys(obj client.Object) []string {
 	cluster := obj.(*slurmv1.SlurmCluster)
-	if cluster.Spec.Secrets.SSHPublicKeys != nil && cluster.Spec.Secrets.SSHPublicKeys.Name != "" {
-		return []string{cluster.Spec.Secrets.SSHPublicKeys.Name}
+	if cluster.Spec.Secrets.SSHRootPublicKeys != nil && cluster.Spec.Secrets.SSHRootPublicKeys.Name != "" {
+		return []string{cluster.Spec.Secrets.SSHRootPublicKeys.Name}
 	}
 	return []string{}
 }

@@ -20,12 +20,9 @@ type SlurmCluster struct {
 	VolumeSources []slurmv1.VolumeSource
 	Secrets       slurmv1.Secrets
 
-	ConfigMapSlurmConfigs K8sConfigMap
-
 	NodeController SlurmController
 	NodeWorker     SlurmWorker
 	NodeLogin      SlurmLogin
-	NodeDatabase   SlurmDatabase
 }
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD
@@ -35,16 +32,14 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 			Namespace: cluster.Namespace,
 			Name:      cluster.Name,
 		},
-		CRVersion:             buildCRVersionFrom(ctx, cluster),
-		Pause:                 cluster.Spec.Pause,
-		NodeFilters:           buildNodeFiltersFrom(cluster),
-		VolumeSources:         buildVolumeSourcesFrom(cluster),
-		Secrets:               buildSecretsFrom(cluster),
-		ConfigMapSlurmConfigs: buildSlurmConfigFrom(cluster),
-		NodeController:        buildSlurmControllerFrom(cluster),
-		NodeWorker:            buildSlurmWorkerFrom(cluster),
-		NodeLogin:             buildSlurmLoginFrom(cluster),
-		NodeDatabase:          buildSlurmDatabaseFrom(cluster),
+		CRVersion:      buildCRVersionFrom(ctx, cluster.Spec.CRVersion),
+		Pause:          cluster.Spec.Pause,
+		NodeFilters:    buildNodeFiltersFrom(cluster.Spec.K8sNodeFilters),
+		VolumeSources:  buildVolumeSourcesFrom(cluster.Spec.VolumeSources),
+		Secrets:        buildSecretsFrom(&cluster.Spec.Secrets),
+		NodeController: buildSlurmControllerFrom(cluster.Name, &cluster.Spec.SlurmNodes.Controller),
+		NodeWorker:     buildSlurmWorkerFrom(cluster.Name, &cluster.Spec.SlurmNodes.Worker),
+		NodeLogin:      buildSlurmLoginFrom(cluster.Name, &cluster.Spec.SlurmNodes.Login),
 	}
 
 	if err := res.Validate(ctx); err != nil {

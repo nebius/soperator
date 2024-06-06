@@ -1,16 +1,31 @@
 package consts
 
 const (
-	VolumeSlurmKeyName     = SlurmPrefix + "key"
-	VolumeSlurmConfigsName = SlurmPrefix + "configs"
-	VolumeUsersName        = SlurmPrefix + "users"
-	VolumeSpoolName        = SlurmPrefix + "spool"
+	spool = "spool"
+	jail  = "jail"
 
-	volumeSlurmK8sConfPath = "/etc/slurm-k8s-conf"
+	Munge       = "munge"
+	mungePrefix = Munge + "-"
+	mungeKey    = mungePrefix + "key"
 
-	VolumeSlurmKeyMountPath     = volumeSlurmK8sConfPath + "/key"
-	VolumeSlurmConfigsMountPath = volumeSlurmK8sConfPath + "/configs"
-	VolumeUsersMountPath        = "/etc/users"
-	VolumeSpoolMountPath        = "/var/spool"
-	VolumeJailMountPath         = "/mnt/jail"
+	nvidia = "nvidia"
+	boot   = "boot"
+)
+
+const (
+	VolumeNameSlurmConfigs = slurmConfigs
+	VolumeNameSpool        = spool
+	VolumeNameJail         = jail
+	VolumeNameMungeSocket  = mungePrefix + "socket"
+	VolumeNameMungeKey     = mungeKey
+	VolumeNameNvidia       = nvidia
+	VolumeNameBoot         = boot
+
+	VolumeMountPathSlurmConfigs = "/mnt/" + slurmConfigs
+	VolumeMountPathSpool        = "/var/" + spool
+	VolumeMountPathJail         = "/mnt/" + jail
+	VolumeMountPathMungeSocket  = "/run/" + Munge
+	VolumeMountPathMungeKey     = "/mnt/" + mungeKey
+	VolumeMountPathNvidia       = "/run/" + nvidia
+	VolumeMountPathBoot         = "/" + boot
 )

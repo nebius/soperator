@@ -10,7 +10,7 @@ func RenderLabels(componentType consts.ComponentType, clusterName string) map[st
 	return map[string]string{
 		consts.LabelNameKey:      consts.LabelNameValue,
 		consts.LabelInstanceKey:  clusterName,
-		consts.LabelComponentKey: consts.ComponentNameByType[componentType],
+		consts.LabelComponentKey: componentType.String(),
 		consts.LabelPartOfKey:    consts.LabelPartOfValue,
 		consts.LabelManagedByKey: consts.LabelManagedByValue,
 	}
@@ -21,6 +21,6 @@ func RenderMatchLabels(componentType consts.ComponentType, clusterName string) m
 	return map[string]string{
 		consts.LabelNameKey:      consts.LabelNameValue,
 		consts.LabelInstanceKey:  clusterName,
-		consts.LabelComponentKey: consts.ComponentNameByType[componentType],
+		consts.LabelComponentKey: componentType.String(),
 	}
 }

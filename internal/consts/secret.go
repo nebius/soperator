@@ -1,9 +1,9 @@
 package consts
 
 const (
-	SecretSlurmKeyFileName = "slurm.key"
+	SecretMungeKeyFileName = Munge + ".key"
 )
 
 var (
-	SecretSlurmKeyFileMode = int32(0400)
+	SecretMungeKeyFileMode = int32(0400)
 )

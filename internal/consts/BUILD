@@ -6,6 +6,7 @@ go_library(
         "annotation.go",
         "component.go",
         "configmap.go",
+        "container.go",
         "indexfield.go",
         "label.go",
         "secret.go",

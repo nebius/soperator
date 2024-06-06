@@ -1,5 +1,9 @@
 package consts
 
 const (
-	SlurmPrefix = "slurm-"
+	Slurm       = "slurm"
+	slurmPrefix = Slurm + "-"
+
+	slurmCluster  = Slurm + "cluster"
+	slurmOperator = slurmPrefix + "operator"
 )

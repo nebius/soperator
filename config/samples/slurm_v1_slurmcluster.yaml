@@ -1,13 +1,140 @@
 apiVersion: slurm.nebius.ai/v1
 kind: SlurmCluster
 metadata:
-  labels:
-    app.kubernetes.io/name: slurmcluster
-    app.kubernetes.io/instance: slurmcluster-sample
-    app.kubernetes.io/part-of: slurm-operator
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: slurm-operator
-  name: slurmcluster-sample
-  namespace: slurm-poc
+  namespace: slurm-example
+  name: slurm-1
 spec:
-  # TODO(user): Add fields here
+  crVersion: 0.1.5
+  pause: false
+  k8sNodeFilters:
+    - name: gpu
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nebius.com/node-group-id
+                    operator: In
+                    values:
+                      - f2mnotpqedjho5akhb4b
+    - name: no-gpu-ssd
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nebius.com/node-group-id
+                    operator: In
+                    values:
+                      - f2m7hn7o3ga84eopr11m
+  volumeSources:
+    - name: controller-spool
+      persistentVolumeClaim:
+        claimName: slurm-example-controller-spool
+        readOnly: false
+    - name: worker-spool
+      persistentVolumeClaim:
+        claimName: slurm-example-worker-spool
+        readOnly: false
+    - name: jail
+      persistentVolumeClaim:
+        claimName: slurm-example-jail
+        readOnly: false
+    - name: datasets
+      persistentVolumeClaim:
+        claimName: slurm-example-customer-datasets
+        readOnly: false
+    - name: checkpoints
+      persistentVolumeClaim:
+        claimName: slurm-example-customer-checkpoints
+        readOnly: false
+    - name: ml-config
+      configMap:
+        name: slurm-example-customer-ml-configs
+  secrets:
+    mungeKey:
+      name: munge-key
+      key: munge.key
+    sshRootPublicKeys:
+      name: ssh-root-keys
+      keys:
+        - authorized_keys
+  slurmNodes:
+    controller:
+      size: 1
+      k8sNodeFilterName: "no-gpu-ssd"
+      slurmctld:
+        image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/controller_slurmctld:latest
+        port: 6817
+        resources:
+          cpu: 1000m
+          memory: 10Gi
+          ephemeralStorage: 10Gi
+      munge:
+        image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest
+      volumes:
+        spool:
+          volumeSourceName: "controller-spool"
+        jail:
+          volumeSourceName: "jail"
+    worker:
+      size: 1
+      k8sNodeFilterName: "gpu"
+      maxGpu: 2
+      slurmd:
+        image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/worker_slurmd:latest
+        port: 6818
+        resources:
+          cpu: 1000m
+          memory: 10Gi
+          ephemeralStorage: 50Gi
+      munge:
+        image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest
+      volumes:
+        spool:
+          volumeSourceName: "worker-spool"
+        jail:
+          volumeSourceName: "jail"
+        jailSubMounts:
+           - name: datasets
+             mountPath: "/mnt/datasets"
+             volumeSourceName: "datasets"
+           - name: checkpoints
+             mountPath: "/mnt/checkpoints"
+             volumeSourceName: "checkpoints"
+           - name: ml-configs
+             mountPath: "/etc/ml-config"
+             volumeSourceName: "ml-configs"
+    login:
+      size: 1
+      k8sNodeFilterName: "no-gpu-ssd"
+      sshd:
+        image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/login_sshd:latest
+        port: 22
+        resources:
+          cpu: 1000m
+          memory: 10Gi
+          ephemeralStorage: 10Gi
+      sshdServiceType: "LoadBalancer"
+      volumes:
+        users:
+          volumeClaimTemplateSpec:
+            accessModes:
+              - ReadWriteMany
+            resources:
+              requests:
+                storage: 10Gi
+            storageClassName: "nebius-network-ssd"
+            volumeMode: Filesystem
+        jail:
+          volumeSourceName: "jail"
+        jailSubMounts:
+           - name: "datasets"
+             mountPath: "/mnt/datasets"
+             volumeSourceName: "datasets"
+           - name: "checkpoints"
+             mountPath: "/mnt/checkpoints"
+             volumeSourceName: "checkpoints"
+           - name: "ml-configs"
+             mountPath: "/etc/ml-config"
+             volumeSourceName: "ml-configs"

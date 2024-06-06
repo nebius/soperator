@@ -1,20 +1,24 @@
 package consts
 
-type ComponentType string
+// This is expected behaviour of enum. Standard `type ComponentType string`
+// makes it possible to pass any string value to fields expecting ComponentType.
 
-const (
-	ComponentTypeController = "controller"
-	ComponentTypeWorker     = "worker"
-)
+// ComponentType is an enum of Slurm component types
+type ComponentType interface {
+	ct()
+	String() string
+}
 
-const (
-	ComponentNameController = SlurmPrefix + ComponentTypeController
-	ComponentNameWorker     = SlurmPrefix + ComponentTypeWorker
-)
+type baseComponentType struct {
+	value string
+}
+
+func (b baseComponentType) ct() {}
+func (b baseComponentType) String() string {
+	return b.value
+}
 
 var (
-	ComponentNameByType = map[ComponentType]string{
-		ComponentTypeController: ComponentNameController,
-		ComponentTypeWorker:     ComponentNameWorker,
-	}
+	ComponentTypeController ComponentType = baseComponentType{"controller"}
+	ComponentTypeWorker     ComponentType = baseComponentType{"worker"}
 )

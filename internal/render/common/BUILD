@@ -4,10 +4,12 @@ go_library(
     name = "common",
     srcs = [
         "conf_cgroup.go",
+        "conf_gres.go",
         "conf_plugstack.go",
         "conf_slurm.go",
         "config.go",
         "configmap.go",
+        "container.go",
         "label.go",
         "version.go",
         "volume.go",

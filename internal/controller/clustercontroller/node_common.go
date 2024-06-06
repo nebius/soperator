@@ -12,7 +12,11 @@ import (
 )
 
 // DeployCommon creates all common resources for Slurm cluster.
-func (r SlurmClusterReconciler) DeployCommon(ctx context.Context, clusterValues *values.SlurmCluster, clusterCR *slurmv1.SlurmCluster) (ctrl.Result, error) {
+func (r SlurmClusterReconciler) DeployCommon(
+	ctx context.Context,
+	clusterValues *values.SlurmCluster,
+	clusterCR *slurmv1.SlurmCluster,
+) (ctrl.Result, error) {
 	// Deploy Slurm configs ConfigMap
 	{
 		found := &corev1.ConfigMap{}

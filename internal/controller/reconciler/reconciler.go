@@ -37,7 +37,12 @@ func (r Reconciler) GetNamespacedObject(ctx context.Context, namespace, name str
 
 // EnsureDeployed ensures that 'resourceToDeploy' is deployed. If a corresponding resource 'existingResource' is found,
 // it doesn't take any action
-func (r Reconciler) EnsureDeployed(ctx context.Context, resourceToDeploy, existingResource, resourceOwner client.Object, deps ...metav1.Object) (ctrl.Result, error) {
+func (r Reconciler) EnsureDeployed(
+	ctx context.Context,
+	resourceToDeploy,
+	existingResource,
+	resourceOwner client.Object,
+	deps ...metav1.Object) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	err := r.GetNamespacedObject(ctx, resourceToDeploy.GetNamespace(), resourceToDeploy.GetName(), existingResource)
@@ -80,7 +85,13 @@ func (r Reconciler) EnsureDeployed(ctx context.Context, resourceToDeploy, existi
 // Therefore, if the dependency changes its version, the update is triggered.
 // If the resource is a 'StatefulSet', dependency 'versions' annotation is propagated to the relative PodTemplate,
 // thus triggering a rolling update of the pods.
-func (r Reconciler) EnsureUpdated(ctx context.Context, updated, existing, owner client.Object, deps ...metav1.Object) (ctrl.Result, error) {
+func (r Reconciler) EnsureUpdated(
+	ctx context.Context,
+	updated,
+	existing,
+	owner client.Object,
+	deps ...metav1.Object,
+) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	err := r.GetNamespacedObject(ctx, updated.GetNamespace(), updated.GetName(), existing)

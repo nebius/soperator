@@ -112,6 +112,14 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, clusterCR *slurm
 		if res, err := r.UpdateControllers(ctx, clusterValues, clusterCR); err != nil {
 			return res, err
 		}
+
+		// Workers
+		if res, err := r.DeployWorkers(ctx, clusterValues, clusterCR); err != nil {
+			return res, err
+		}
+		if res, err := r.UpdateWorkers(ctx, clusterValues, clusterCR); err != nil {
+			return res, err
+		}
 	}
 
 	// Validation
@@ -121,6 +129,13 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, clusterCR *slurm
 
 		// Controllers
 		if res, err := r.ValidateControllers(ctx, clusterValues, clusterCR); err != nil {
+			return res, err
+		} else if res.Requeue {
+			return res, err
+		}
+
+		// Workers
+		if res, err := r.ValidateWorkers(ctx, clusterValues, clusterCR); err != nil {
 			return res, err
 		} else if res.Requeue {
 			return res, err
