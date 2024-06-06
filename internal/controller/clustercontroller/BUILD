@@ -6,7 +6,6 @@ go_library(
         "indexfield.go",
         "node_common.go",
         "node_controller.go",
-        "node_database.go",
         "node_login.go",
         "node_worker.go",
         "reconcile.go",

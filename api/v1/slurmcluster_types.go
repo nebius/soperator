@@ -156,11 +156,6 @@ type SlurmNodes struct {
 	//
 	// +kubebuilder:validation:Required
 	Login SlurmNodeLogin `json:"login"`
-
-	// Database represents the Slurm database node configuration
-	//
-	// +kubebuilder:validation:Required
-	Database SlurmNodeDatabase `json:"database"`
 }
 
 // SlurmNodeController defines the configuration for the Slurm controller node
@@ -272,29 +267,6 @@ type SlurmNodeLoginVolumes struct {
 	JailSubMounts []NodeVolumeJailSubMount `json:"jailSubMounts"`
 }
 
-// SlurmNodeDatabase defines the configuration for the Slurm database node
-type SlurmNodeDatabase struct {
-	SlurmNode `json:",inline"`
-
-	// Slurmdbd represents the Slurm database daemon service configuration
-	//
-	// +kubebuilder:validation:Required
-	Slurmdbd NodeContainer `json:"slurmdbd"`
-
-	// Volumes represents the volume configurations for the database node
-	//
-	// +kubebuilder:validation:Required
-	Volumes SlurmNodeDatabaseVolumes `json:"volumes"`
-}
-
-// SlurmNodeDatabaseVolumes defines the volumes for the Slurm database node
-type SlurmNodeDatabaseVolumes struct {
-	// AccountingData represents the accounting data volume configuration
-	//
-	// +kubebuilder:validation:Required
-	AccountingData NodeVolume `json:"accountingData"`
-}
-
 // SlurmNode represents the common configuration for a Slurm node.
 type SlurmNode struct {
 	// Size defines the number of node instances
@@ -403,7 +375,6 @@ type SlurmClusterStatus struct {
 // +kubebuilder:printcolumn:name="Controllers",type=integer,JSONPath=`.spec.slurmNodes.controller.size`,description="The number of controller nodes"
 // +kubebuilder:printcolumn:name="Workers",type=integer,JSONPath=`.spec.slurmNodes.worker.size`,description="The number of worker nodes"
 // +kubebuilder:printcolumn:name="Login",type=integer,JSONPath=`.spec.slurmNodes.login.size`,description="The number of login nodes"
-// +kubebuilder:printcolumn:name="Database",type=integer,JSONPath=`.spec.slurmNodes.database.size`,description="Whether the database is used"
 type SlurmCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

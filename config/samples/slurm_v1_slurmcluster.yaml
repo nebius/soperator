@@ -137,23 +137,3 @@ spec:
            - name: "ml-configs"
              mountPath: "/etc/ml-config"
              volumeSourceName: "ml-configs"
-    database:
-      size: 0 # the size can be either 0 or 1
-      k8sNodeFilterName: "no-gpu-ssd"
-      slurmdbd:
-        image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/login_sshd:latest
-        port: 22
-        resources:
-          cpu: 1000m
-          memory: 10Gi
-          ephemeralStorage: 50Gi
-      volumes:
-        accountingData:
-          volumeClaimTemplateSpec:
-            accessModes:
-              - ReadWriteMany
-            resources:
-              requests:
-                storage: 10Gi
-            storageClassName: "nebius-network-ssd"
-            volumeMode: Filesystem

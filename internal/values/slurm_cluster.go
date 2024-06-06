@@ -25,7 +25,6 @@ type SlurmCluster struct {
 	NodeController SlurmController
 	NodeWorker     SlurmWorker
 	NodeLogin      SlurmLogin
-	NodeDatabase   SlurmDatabase
 }
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD
@@ -44,7 +43,6 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		NodeController:        buildSlurmControllerFrom(cluster),
 		NodeWorker:            buildSlurmWorkerFrom(cluster),
 		NodeLogin:             buildSlurmLoginFrom(cluster),
-		NodeDatabase:          buildSlurmDatabaseFrom(cluster),
 	}
 
 	if err := res.Validate(ctx); err != nil {
