@@ -57,6 +57,45 @@ type SlurmClusterSpec struct {
 	SlurmNodes SlurmNodes `json:"slurmNodes"`
 }
 
+// K8sNodeFilter defines the k8s node filter used in Slurm node specifications
+type K8sNodeFilter struct {
+	// Name defines the name of the filter
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// Affinity defines the desired affinity for the node
+	//
+	// NOTE: Affinity could not be set if NodeSelector is specified
+	//
+	// +kubebuilder:validation:Optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// Tolerations define the desired tolerations for the node
+	//
+	// +kubebuilder:validation:Optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// NodeSelector defines the desired selector for the node
+	//
+	// NOTE: NodeSelector could not be set if Affinity is specified
+	//
+	// +kubebuilder:validation:Optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+}
+
+// VolumeSource defines the source for the volume
+type VolumeSource struct {
+	corev1.VolumeSource `json:",inline"`
+
+	// Name defines the name of the volume source
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+}
+
 // Secrets defines the [corev1.Secret] references required for Slurm cluster
 type Secrets struct {
 	// SlurmKey defines the [corev1.Secret] reference required for inter-server communication of Slurm nodes
@@ -99,45 +138,6 @@ type SSHPublicKeysSecret struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	Keys []string `json:"keys"`
-}
-
-// K8sNodeFilter defines the k8s node filter used in Slurm node specifications
-type K8sNodeFilter struct {
-	// Name defines the name of the filter
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name"`
-
-	// Affinity defines the desired affinity for the node
-	//
-	// NOTE: Affinity could not be set if NodeSelector is specified
-	//
-	// +kubebuilder:validation:Optional
-	Affinity *corev1.Affinity `json:"affinity,omitempty"`
-
-	// Tolerations define the desired tolerations for the node
-	//
-	// +kubebuilder:validation:Optional
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-
-	// NodeSelector defines the desired selector for the node
-	//
-	// NOTE: NodeSelector could not be set if Affinity is specified
-	//
-	// +kubebuilder:validation:Optional
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-}
-
-// VolumeSource defines the source for the volume
-type VolumeSource struct {
-	corev1.VolumeSource `json:",inline"`
-
-	// Name defines the name of the volume source
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name"`
 }
 
 // SlurmNodes define the desired state of the Slurm nodes
@@ -287,15 +287,12 @@ type SlurmNodeDatabaseVolumes struct {
 	// AccountingData represents the accounting data volume configuration
 	//
 	// +kubebuilder:validation:Required
-	AccountingData NodeVolume `json:"users"`
+	AccountingData NodeVolume `json:"accountingData"`
 }
 
 // SlurmNode represents the common configuration for a Slurm node.
 type SlurmNode struct {
 	// Size defines the number of node instances
-	//
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:ExclusiveMinimum=false
 	Size int32 `json:"size,omitempty"`
 
 	// K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
@@ -349,12 +346,6 @@ type NodeVolume struct {
 	//
 	// +kubebuilder:validation:Optional
 	VolumeSourceName *string `json:"volumeSourceName,omitempty"`
-
-	// VolumeSource defines the [corev1.VolumeSource]
-	//
-	// +kubebuilder:validation:Optional
-	// FIXME I think it's redundant as we provide a way to declare volume sources and referring them by name
-	//VolumeSource *corev1.VolumeSource `json:"volumeSource,omitempty"`
 
 	// VolumeClaimTemplateSpec defines the [corev1.PersistentVolumeClaim] template specification
 	//
