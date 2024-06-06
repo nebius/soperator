@@ -29,7 +29,6 @@ func GenerateSlurmConfig(cluster *values.SlurmCluster) ConfFile {
 	res.addComment("")
 	res.addProperty("GresTypes", "gpu")
 	res.addProperty("MailProg", "/usr/bin/true")
-	res.addProperty("PluginDir", "/usr/local/lib/"+consts.Slurm)
 	res.addProperty("ProctrackType", "proctrack/linuxproc")
 	res.addProperty("ReturnToService", 1)
 	res.addComment("")
