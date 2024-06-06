@@ -9,7 +9,7 @@ import (
 )
 
 func GenerateSlurmConfig(cluster *values.SlurmCluster) (ConfFile, error) {
-	res := propertiesConfig{}
+	res := &propertiesConfig{}
 
 	res.addProperty("ClusterName", cluster.Name)
 	res.addComment("")
