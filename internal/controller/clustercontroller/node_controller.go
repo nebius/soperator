@@ -114,13 +114,13 @@ func (r SlurmClusterReconciler) getControllersStatefulSetDependencies(ctx contex
 	var res []metav1.Object
 
 	slurmConfigsConfigMap := &corev1.ConfigMap{}
-	if err := r.GetNamespacedObject(ctx, clusterValues.ConfigMapSlurmConfigs.Name, clusterValues.Namespace, slurmConfigsConfigMap); err != nil {
+	if err := r.GetNamespacedObject(ctx, clusterValues.Namespace, clusterValues.ConfigMapSlurmConfigs.Name, slurmConfigsConfigMap); err != nil {
 		return []metav1.Object{}, err
 	}
 	res = append(res, slurmConfigsConfigMap)
 
 	slurmKeySecret := &corev1.Secret{}
-	if err := r.GetNamespacedObject(ctx, clusterValues.Secrets.SlurmKey.Name, clusterValues.Namespace, slurmKeySecret); err != nil {
+	if err := r.GetNamespacedObject(ctx, clusterValues.Namespace, clusterValues.Secrets.SlurmKey.Name, slurmKeySecret); err != nil {
 		return []metav1.Object{}, err
 	}
 	res = append(res, slurmKeySecret)
