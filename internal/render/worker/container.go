@@ -2,10 +2,13 @@ package worker
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -21,13 +24,18 @@ func renderContainerToolkitValidation(container *values.Container) corev1.Contai
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Command: []string{
 			"sh",
-			"-c",
 		},
 		Args: []string{
-			fmt.Sprintf("until [ -f %s/validations/toolkit-ready ]; do", consts.VolumeMountPathNvidia),
-			"echo 'waiting for nvidia container stack to be setup';",
-			"sleep 5;",
-			"done",
+			"-c",
+			strings.Join(
+				[]string{
+					fmt.Sprintf("until [ -f %s/validations/toolkit-ready ]; do", consts.VolumeMountPathNvidia),
+					"echo 'waiting for nvidia container stack to be setup';",
+					"sleep 5;",
+					"done",
+				},
+				" ",
+			),
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			renderVolumeMountNvidia(),
@@ -88,10 +96,14 @@ func renderContainerSlurmd(
 			},
 		},
 		SecurityContext: &corev1.SecurityContext{
+			Privileged: ptr.To(true),
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{
 					consts.ContainerSecurityContextCapabilitySysAdmin,
 				},
+			},
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeUnconfined,
 			},
 		},
 		Resources: corev1.ResourceRequirements{
@@ -99,7 +111,7 @@ func renderContainerSlurmd(
 				corev1.ResourceCPU:              container.Resources.CPU,
 				corev1.ResourceMemory:           container.Resources.Memory,
 				corev1.ResourceEphemeralStorage: container.Resources.EphemeralStorage,
-				consts.AnnotationMaxGPU:         resource.MustParse(string(maxGPU)),
+				consts.AnnotationMaxGPU:         resource.MustParse(strconv.Itoa(int(maxGPU))),
 			},
 		},
 	}

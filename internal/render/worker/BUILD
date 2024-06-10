@@ -21,5 +21,6 @@ go_library(
         "@io_k8s_apimachinery//pkg/api/resource",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
         "@io_k8s_apimachinery//pkg/util/intstr",
+        "@io_k8s_utils//ptr",
     ],
 )
