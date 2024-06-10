@@ -111,7 +111,7 @@ func renderContainerSlurmd(
 				corev1.ResourceCPU:              container.Resources.CPU,
 				corev1.ResourceMemory:           container.Resources.Memory,
 				corev1.ResourceEphemeralStorage: container.Resources.EphemeralStorage,
-				consts.AnnotationMaxGPU:         resource.MustParse(string(maxGPU)),
+				consts.AnnotationMaxGPU:         resource.MustParse(strconv.Itoa(int(maxGPU))),
 			},
 		},
 	}
