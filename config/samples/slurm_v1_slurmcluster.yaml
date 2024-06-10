@@ -1,8 +1,11 @@
+# Usage of quote-wrapping for string literals in this example acts like a visual mark for referring to other resources
+# like user-created PVCs or 3rd-party annotations
+
 apiVersion: slurm.nebius.ai/v1
 kind: SlurmCluster
 metadata:
-  namespace: slurm-example
-  name: slurm-1
+  namespace: dstaroff
+  name: slurm1
 spec:
   crVersion: 0.1.5
   pause: false
@@ -13,65 +16,65 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
-                  - key: nebius.com/node-group-id
+                  - key: "nebius.com/node-group-id"
                     operator: In
                     values:
-                      - f2mnotpqedjho5akhb4b
+                      - "f2m3qsrqa74ugs37saab"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
     - name: no-gpu-ssd
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
-                  - key: nebius.com/node-group-id
+                  - key: "nebius.com/node-group-id"
                     operator: In
                     values:
-                      - f2m7hn7o3ga84eopr11m
+                      - "f2md1q6j5mq7mju9agk2"
   volumeSources:
     - name: controller-spool
       persistentVolumeClaim:
-        claimName: slurm-example-controller-spool
-        readOnly: false
-    - name: worker-spool
-      persistentVolumeClaim:
-        claimName: slurm-example-worker-spool
+        claimName: "controller-spool"
         readOnly: false
     - name: jail
       persistentVolumeClaim:
-        claimName: slurm-example-jail
+        claimName: "jail"
         readOnly: false
-    - name: datasets
-      persistentVolumeClaim:
-        claimName: slurm-example-customer-datasets
-        readOnly: false
-    - name: checkpoints
-      persistentVolumeClaim:
-        claimName: slurm-example-customer-checkpoints
-        readOnly: false
-    - name: ml-config
-      configMap:
-        name: slurm-example-customer-ml-configs
+    #- name: datasets
+    #  persistentVolumeClaim:
+    #    claimName: slurm-example-customer-datasets
+    #    readOnly: false
+    #- name: checkpoints
+    #  persistentVolumeClaim:
+    #    claimName: slurm-example-customer-checkpoints
+    #    readOnly: false
+    #- name: ml-config
+    #  configMap:
+    #    name: slurm-example-customer-ml-configs
   secrets:
     mungeKey:
-      name: munge-key
-      key: munge.key
+      name: "munge-key"
+      key: "munge.key"
     sshRootPublicKeys:
-      name: ssh-root-keys
+      name: "ssh-root-keys"
       keys:
-        - authorized_keys
+        - "authorized_keys"
   slurmNodes:
     controller:
       size: 1
       k8sNodeFilterName: "no-gpu-ssd"
       slurmctld:
-        image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/controller_slurmctld:latest
+        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/controller_slurmctld:latest"
         port: 6817
         resources:
           cpu: 1000m
           memory: 10Gi
           ephemeralStorage: 10Gi
       munge:
-        image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest
+        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
       volumes:
         spool:
           volumeSourceName: "controller-spool"
@@ -80,36 +83,41 @@ spec:
     worker:
       size: 1
       k8sNodeFilterName: "gpu"
-      maxGpu: 2
+      maxGpu: 1
       slurmd:
-        image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/worker_slurmd:latest
+        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/worker_slurmd:latest"
         port: 6818
         resources:
           cpu: 1000m
           memory: 10Gi
-          ephemeralStorage: 50Gi
+          ephemeralStorage: 10Gi
       munge:
-        image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest
+        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
       volumes:
         spool:
-          volumeSourceName: "worker-spool"
+          volumeClaimTemplateSpec:
+            storageClassName: "nebius-network-ssd"
+            accessModes: [ "ReadWriteOnce" ]
+            resources:
+              requests:
+                storage: 50Gi
         jail:
           volumeSourceName: "jail"
-        jailSubMounts:
-           - name: datasets
-             mountPath: "/mnt/datasets"
-             volumeSourceName: "datasets"
-           - name: checkpoints
-             mountPath: "/mnt/checkpoints"
-             volumeSourceName: "checkpoints"
-           - name: ml-configs
-             mountPath: "/etc/ml-config"
-             volumeSourceName: "ml-configs"
+        jailSubMounts: []
+          #- name: datasets
+          #  mountPath: "/mnt/datasets"
+          #  volumeSourceName: "datasets"
+          #- name: checkpoints
+          #  mountPath: "/mnt/checkpoints"
+          #  volumeSourceName: "checkpoints"
+          #- name: ml-configs
+          #  mountPath: "/etc/ml-config"
+          #  volumeSourceName: "ml-configs"
     login:
       size: 1
       k8sNodeFilterName: "no-gpu-ssd"
       sshd:
-        image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/login_sshd:latest
+        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/login_sshd:latest"
         port: 22
         resources:
           cpu: 1000m
@@ -128,13 +136,13 @@ spec:
             volumeMode: Filesystem
         jail:
           volumeSourceName: "jail"
-        jailSubMounts:
-           - name: "datasets"
-             mountPath: "/mnt/datasets"
-             volumeSourceName: "datasets"
-           - name: "checkpoints"
-             mountPath: "/mnt/checkpoints"
-             volumeSourceName: "checkpoints"
-           - name: "ml-configs"
-             mountPath: "/etc/ml-config"
-             volumeSourceName: "ml-configs"
+        jailSubMounts: []
+          #- name: "datasets"
+          #  mountPath: "/mnt/datasets"
+          #  volumeSourceName: "datasets"
+          #- name: "checkpoints"
+          #  mountPath: "/mnt/checkpoints"
+          #  volumeSourceName: "checkpoints"
+          #- name: "ml-configs"
+          #  mountPath: "/etc/ml-config"
+          #  volumeSourceName: "ml-configs"
