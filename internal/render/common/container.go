@@ -1,6 +1,9 @@
 package common
 
 import (
+	"fmt"
+	"path"
+
 	corev1 "k8s.io/api/core/v1"
 
 	"nebius.ai/slurm-operator/internal/consts"
@@ -18,20 +21,20 @@ func RenderContainerMunge(container *values.Container) corev1.Container {
 			RenderVolumeMountJail(),
 			RenderVolumeMountMungeSocket(),
 		},
-		//ReadinessProbe: &corev1.Probe{
-		//	ProbeHandler: corev1.ProbeHandler{
-		//		Exec: &corev1.ExecAction{
-		//			Command: []string{
-		//				"/bin/sh",
-		//				"-c",
-		//				fmt.Sprintf(
-		//					"'test -S %s'",
-		//					path.Join(consts.VolumeMountPathMungeSocket, "munge.socket.2"),
-		//				),
-		//			},
-		//		},
-		//	},
-		//},
+		ReadinessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"/bin/sh",
+						"-c",
+						fmt.Sprintf(
+							"test -S %s",
+							path.Join(consts.VolumeMountPathMungeSocket, "munge.socket.2"),
+						),
+					},
+				},
+			},
+		},
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{
