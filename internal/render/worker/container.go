@@ -96,10 +96,14 @@ func renderContainerSlurmd(
 			},
 		},
 		SecurityContext: &corev1.SecurityContext{
+			Privileged: ptr.To(true),
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{
 					consts.ContainerSecurityContextCapabilitySysAdmin,
 				},
+			},
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeUnconfined,
 			},
 		},
 		Resources: corev1.ResourceRequirements{
