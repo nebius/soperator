@@ -2,10 +2,13 @@ package worker
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -21,13 +24,18 @@ func renderContainerToolkitValidation(container *values.Container) corev1.Contai
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Command: []string{
 			"sh",
-			"-c",
 		},
 		Args: []string{
-			fmt.Sprintf("until [ -f %s/validations/toolkit-ready ]; do", consts.VolumeMountPathNvidia),
-			"echo 'waiting for nvidia container stack to be setup';",
-			"sleep 5;",
-			"done",
+			"-c",
+			strings.Join(
+				[]string{
+					fmt.Sprintf("until [ -f %s/validations/toolkit-ready ]; do", consts.VolumeMountPathNvidia),
+					"echo 'waiting for nvidia container stack to be setup';",
+					"sleep 5;",
+					"done",
+				},
+				" ",
+			),
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			renderVolumeMountNvidia(),
