@@ -15,13 +15,13 @@ func GenerateSlurmConfig(cluster *values.SlurmCluster) ConfFile {
 	res.addComment("")
 	// example: SlurmctldHost=controller-0(controller-0.controller.slurm-poc.svc.cluster.local)
 	for i := range cluster.NodeController.Size {
-		replicaName, replicaFQDN := naming.BuildServiceReplicaFQDN(
+		hostName, hostFQDN := naming.BuildServiceHostFQDN(
 			consts.ComponentTypeController,
 			cluster.Namespace,
 			cluster.Name,
 			i,
 		)
-		res.addProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", replicaName, replicaFQDN))
+		res.addProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", hostName, hostFQDN))
 	}
 	res.addComment("")
 	res.addProperty("AuthType", "auth/"+consts.Munge)

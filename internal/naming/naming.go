@@ -41,16 +41,18 @@ func BuildServiceName(componentType consts.ComponentType, clusterName string) st
 	}.String()
 }
 
-func BuildServiceReplicaFQDN(
+func BuildServiceHostFQDN(
 	componentType consts.ComponentType,
 	namespace,
 	clusterName string,
-	replicaIndex int32,
-) (replicaName, replicaFQDN string) {
-	serviceName := BuildServiceName(componentType, clusterName)
-	replicaName = fmt.Sprintf("%s-%d", serviceName, replicaIndex)
-	replicaFQDN = fmt.Sprintf("%s.%s.%s.svc.cluster.local", replicaName, serviceName, namespace)
-	return replicaName, replicaFQDN
+	hostIndex int32,
+) (hostName, hostFQDN string) {
+	// <stsName>-<index>.<svcName>.<namespace>.svc.cluster.local
+	stsName := BuildStatefulSetName(componentType, clusterName)
+	svcName := BuildServiceName(componentType, clusterName)
+	hostName = fmt.Sprintf("%s-%d", stsName, hostIndex)
+	hostFQDN = fmt.Sprintf("%s.%s.%s.svc.cluster.local", hostName, svcName, namespace)
+	return hostName, hostFQDN
 }
 
 func BuildStatefulSetName(componentType consts.ComponentType, clusterName string) string {
