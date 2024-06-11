@@ -35,6 +35,11 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	Pause bool `json:"pause,omitempty"` // TODO cluster pausing/resuming
 
+	// PeriodicChecks defines k8s slurm specific cronjobs
+	//
+	// +kubebuilder:validation:Optional
+	PeriodicChecks PeriodicChecks `json:"periodicChecks"`
+
 	// K8sNodeFilters define the k8s node filters used further in Slurm node specifications
 	//
 	// +kubebuilder:validation:Required
@@ -55,6 +60,90 @@ type SlurmClusterSpec struct {
 	//
 	// +kubebuilder:validation:Required
 	SlurmNodes SlurmNodes `json:"slurmNodes"`
+}
+
+// PeriodicChecks defines k8s slurm specific cronjobs
+// +kubebuilder:validation:Optional
+type PeriodicChecks struct {
+	NCCLBenchmark NCCLBenchmark `json:"ncclBenchmark"`
+}
+
+// NCCLBenchmark slurm nccl-test benchmark
+type NCCLBenchmark struct {
+	// Name defines the name of the NCCLBenchmark
+	//
+	// +kubebuilder:default:="nccl-benchmark"
+	Name string `json:"name"`
+
+	// Suspend set to true stops cronjobs scheduling.
+	//
+	// +kubebuilder:default:=false
+	Suspend bool `json:"suspend,omitempty"`
+
+	// Cronjob schedule. By default run benchmark every 3 hours
+	//
+	// +kubebuilder:default:="0 */3 * * *"
+	Schedule string `json:"schedule"`
+
+	// ActiveDeadlineSeconds is a k8s CronJob timeout seconds
+	// +kubebuilder:default:=1800
+	ActiveDeadlineSeconds int64 `json:"activeDeadlineSeconds"`
+
+	// SuccessfulJobsHistoryLimit The number of successful finished jobs to retain
+	// +kubebuilder:default:=3
+	SuccessfulJobsHistoryLimit int32 `json:"successfulJobsHistoryLimit"`
+
+	// FailedJobsHistoryLimit The number of failed finished jobs to retain
+	// +kubebuilder:default:=3
+	FailedJobsHistoryLimit int32 `json:"failedJobsHistoryLimit"`
+
+	// Image defines the container image
+	//
+	// +kubebuilder:validation:Required
+	Image string `json:"image"`
+
+	// NcclSettings defines nccl test params
+	// +kubebuilder:validation:Optional
+	NcclSettings NcclSettings `json:"ncclSettings"`
+
+	// FailureActions defines actions if benchmark failed
+	// +kubebuilder:validation:Optional
+	FailureActions FailureActions `json:"failureActions"`
+
+	// K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
+	// Must correspond to the name of one of [K8sNodeFilter]
+	//
+	// +kubebuilder:validation:Required
+	K8sNodeFilterName string `json:"k8sNodeFilterName"`
+}
+
+type NcclSettings struct {
+	// MinBytes minimum size to start with
+	// +kubebuilder:default:="512Mb"
+	MinBytes string `json:"minBytes"`
+
+	// MaxBytes maximum size to end at
+	// +kubebuilder:default:="8Gb"
+	MaxBytes string `json:"maxBytes"`
+
+	// StepFactor multiplication factor between sizes
+	// +kubebuilder:default:="2"
+	StepFactor string `json:"stepFactor"`
+
+	// Timeout in nccl test format string
+	// +kubebuilder:default:="20:00"
+	Timeout string `json:"timeout"`
+
+	// ThresholdMoreThan fail cronjob if result less than value
+	// +kubebuilder:default:="0"
+	ThresholdMoreThan string `json:"thresholdMoreThan"`
+}
+
+type FailureActions struct {
+
+	// SetSlurmNodeDrainState drain slurm node if benchmark failed
+	// +kubebuilder:default:="false"
+	SetSlurmNodeDrainState string `json:"setSlurmNodeDrainState"`
 }
 
 // K8sNodeFilter defines the k8s node filter used in Slurm node specifications

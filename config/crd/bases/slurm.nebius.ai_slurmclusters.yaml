@@ -479,6 +479,79 @@ spec:
                 type: array
               pause:
                 type: boolean
+              periodicChecks:
+                properties:
+                  ncclBenchmark:
+                    properties:
+                      activeDeadlineSeconds:
+                        default: 1800
+                        format: int64
+                        type: integer
+                      failedJobsHistoryLimit:
+                        default: 3
+                        format: int32
+                        type: integer
+                      failureActions:
+                        properties:
+                          setSlurmNodeDrainState:
+                            default: "false"
+                            type: string
+                        required:
+                        - setSlurmNodeDrainState
+                        type: object
+                      image:
+                        type: string
+                      k8sNodeFilterName:
+                        type: string
+                      name:
+                        default: nccl-benchmark
+                        type: string
+                      ncclSettings:
+                        properties:
+                          maxBytes:
+                            default: 8Gb
+                            type: string
+                          minBytes:
+                            default: 512Mb
+                            type: string
+                          stepFactor:
+                            default: "2"
+                            type: string
+                          thresholdMoreThan:
+                            default: "0"
+                            type: string
+                          timeout:
+                            default: "20:00"
+                            type: string
+                        required:
+                        - maxBytes
+                        - minBytes
+                        - stepFactor
+                        - thresholdMoreThan
+                        - timeout
+                        type: object
+                      schedule:
+                        default: 0 */3 * * *
+                        type: string
+                      successfulJobsHistoryLimit:
+                        default: 3
+                        format: int32
+                        type: integer
+                      suspend:
+                        default: false
+                        type: boolean
+                    required:
+                    - activeDeadlineSeconds
+                    - failedJobsHistoryLimit
+                    - image
+                    - k8sNodeFilterName
+                    - name
+                    - schedule
+                    - successfulJobsHistoryLimit
+                    type: object
+                required:
+                - ncclBenchmark
+                type: object
               secrets:
                 properties:
                   mungeKey:

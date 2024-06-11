@@ -16,6 +16,8 @@ type SlurmCluster struct {
 	CRVersion string
 	Pause     bool
 
+	NCCLBenchmark SlurmNCCLBenchmark
+
 	NodeFilters   []slurmv1.K8sNodeFilter
 	VolumeSources []slurmv1.VolumeSource
 	Secrets       slurmv1.Secrets
@@ -34,6 +36,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		},
 		CRVersion:      buildCRVersionFrom(ctx, cluster.Spec.CRVersion),
 		Pause:          cluster.Spec.Pause,
+		NCCLBenchmark:  buildSlurmNCCLBenchmarkFrom(&cluster.Spec.PeriodicChecks.NCCLBenchmark),
 		NodeFilters:    buildNodeFiltersFrom(cluster.Spec.K8sNodeFilters),
 		VolumeSources:  buildVolumeSourcesFrom(cluster.Spec.VolumeSources),
 		Secrets:        buildSecretsFrom(&cluster.Spec.Secrets),

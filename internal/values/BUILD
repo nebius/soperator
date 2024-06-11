@@ -6,6 +6,7 @@ go_library(
         "slurm_cluster.go",
         "slurm_controller.go",
         "slurm_login.go",
+        "slurm_periodic_checks.go",
         "slurm_worker.go",
         "types.go",
         "validate.go",
@@ -21,5 +22,6 @@ go_library(
         "@io_k8s_apimachinery//pkg/types",
         "@io_k8s_apimachinery//pkg/util/intstr",
         "@io_k8s_sigs_controller_runtime//pkg/log",
+        "@io_k8s_utils//ptr",
     ],
 )
