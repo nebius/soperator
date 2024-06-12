@@ -3,6 +3,7 @@ package worker
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -21,8 +22,9 @@ func RenderService(namespace, clusterName string, worker *values.SlurmWorker) co
 			Type:     worker.Service.Type,
 			Selector: common.RenderMatchLabels(consts.ComponentTypeWorker, clusterName),
 			Ports: []corev1.ServicePort{{
-				Protocol: worker.Service.Protocol,
-				Port:     worker.ContainerSlurmd.Port,
+				Protocol:   worker.Service.Protocol,
+				Port:       worker.ContainerSlurmd.Port,
+				TargetPort: intstr.FromString(worker.ContainerSlurmd.Name),
 			}},
 		},
 	}

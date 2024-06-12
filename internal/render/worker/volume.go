@@ -2,6 +2,7 @@ package worker
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -89,11 +90,10 @@ func renderVolumeNvidia() corev1.Volume {
 
 // renderVolumeMountNvidia renders [corev1.VolumeMount] defining the mounting path for nvidia
 func renderVolumeMountNvidia() corev1.VolumeMount {
-	mountPropagation := corev1.MountPropagationHostToContainer
 	return corev1.VolumeMount{
 		Name:             consts.VolumeNameNvidia,
 		MountPath:        consts.VolumeMountPathNvidia,
-		MountPropagation: &mountPropagation,
+		MountPropagation: ptr.To(corev1.MountPropagationHostToContainer),
 	}
 }
 
@@ -115,31 +115,11 @@ func renderVolumeBoot() corev1.Volume {
 
 // renderVolumeMountBoot renders [corev1.VolumeMount] defining the mounting path for boot
 func renderVolumeMountBoot() corev1.VolumeMount {
-	mountPropagation := corev1.MountPropagationHostToContainer
 	return corev1.VolumeMount{
 		Name:             consts.VolumeNameBoot,
 		MountPath:        consts.VolumeMountPathBoot,
-		MountPropagation: &mountPropagation,
+		MountPropagation: ptr.To(corev1.MountPropagationHostToContainer),
 	}
 }
 
 // endregion Boot
-
-// region JailSubMounts
-
-func renderVolumeMountsForJailSubMounts(subMounts []slurmv1.NodeVolumeJailSubMount) []corev1.VolumeMount {
-	var res []corev1.VolumeMount
-	for _, subMount := range subMounts {
-		res = append(res, renderVolumeMountJailSubMount(subMount))
-	}
-	return res
-}
-
-func renderVolumeMountJailSubMount(subMount slurmv1.NodeVolumeJailSubMount) corev1.VolumeMount {
-	return corev1.VolumeMount{
-		Name:      subMount.Name,
-		MountPath: subMount.MountPath,
-	}
-}
-
-// endregion JailSubMounts

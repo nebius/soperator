@@ -3,6 +3,7 @@ package controller
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -21,8 +22,9 @@ func RenderService(namespace, clusterName string, controller *values.SlurmContro
 			Type:     controller.Service.Type,
 			Selector: common.RenderMatchLabels(consts.ComponentTypeController, clusterName),
 			Ports: []corev1.ServicePort{{
-				Protocol: controller.Service.Protocol,
-				Port:     controller.ContainerSlurmctld.Port,
+				Protocol:   controller.Service.Protocol,
+				Port:       controller.ContainerSlurmctld.Port,
+				TargetPort: intstr.FromString(controller.ContainerSlurmctld.Name),
 			}},
 		},
 	}

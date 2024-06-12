@@ -1,13 +1,53 @@
 package values
 
 import (
+	"path"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/naming"
 )
 
 // SlurmLogin contains the data needed to deploy and reconcile Slurm Login nodes
-// TODO login node reconciliation
-type SlurmLogin struct{}
+type SlurmLogin struct {
+	slurmv1.SlurmNode
 
-func buildSlurmLoginFrom(_ string, _ *slurmv1.SlurmNodeLogin) SlurmLogin {
-	return SlurmLogin{}
+	ContainerSshd  Container
+	ContainerMunge Container
+
+	Service     Service
+	StatefulSet StatefulSet
+
+	VolumeJail    slurmv1.NodeVolume
+	JailSubMounts []slurmv1.NodeVolumeJailSubMount
+}
+
+func buildSlurmLoginFrom(clusterName string, login *slurmv1.SlurmNodeLogin) SlurmLogin {
+	svc := buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeLogin, clusterName))
+	svc.Type = login.SshdServiceType
+
+	res := SlurmLogin{
+		SlurmNode: *login.SlurmNode.DeepCopy(),
+		ContainerSshd: buildContainerFrom(
+			login.Sshd,
+			consts.ContainerNameSshd,
+		),
+		ContainerMunge: buildContainerFrom(
+			login.Munge,
+			consts.ContainerNameMunge,
+		),
+		Service: svc,
+		StatefulSet: buildStatefulSetFrom(
+			naming.BuildStatefulSetName(consts.ComponentTypeLogin, clusterName),
+			login.SlurmNode.Size,
+		),
+		VolumeJail: *login.Volumes.Jail.DeepCopy(),
+	}
+	for _, jailSubMount := range login.Volumes.JailSubMounts {
+		subMount := *jailSubMount.DeepCopy()
+		subMount.MountPath = path.Join(consts.VolumeMountPathJail, subMount.MountPath)
+		res.JailSubMounts = append(res.JailSubMounts, subMount)
+	}
+
+	return res
 }

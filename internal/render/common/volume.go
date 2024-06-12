@@ -173,6 +173,25 @@ func RenderVolumeMountMungeKey() corev1.VolumeMount {
 
 // endregion Munge
 
+// region JailSubMounts
+
+func RenderVolumeMountsForJailSubMounts(subMounts []slurmv1.NodeVolumeJailSubMount) []corev1.VolumeMount {
+	var res []corev1.VolumeMount
+	for _, subMount := range subMounts {
+		res = append(res, RenderVolumeMountJailSubMount(subMount))
+	}
+	return res
+}
+
+func RenderVolumeMountJailSubMount(subMount slurmv1.NodeVolumeJailSubMount) corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      subMount.Name,
+		MountPath: subMount.MountPath,
+	}
+}
+
+// endregion JailSubMounts
+
 func RenderVolumeFromSource(sources []slurmv1.VolumeSource, sourceName, volumeName string) corev1.Volume {
 	return corev1.Volume{
 		Name: volumeName,

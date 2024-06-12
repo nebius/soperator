@@ -59,7 +59,7 @@ func renderContainerSlurmd(
 		renderVolumeMountNvidia(),
 		renderVolumeMountBoot(),
 	}
-	volumeMounts = append(volumeMounts, renderVolumeMountsForJailSubMounts(jailSubMounts)...)
+	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
 
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
@@ -83,7 +83,7 @@ func renderContainerSlurmd(
 			},
 		},
 		Ports: []corev1.ContainerPort{{
-			Name:          consts.ContainerNameSlurmd,
+			Name:          container.Name,
 			ContainerPort: container.Port,
 			Protocol:      corev1.ProtocolTCP,
 		}},

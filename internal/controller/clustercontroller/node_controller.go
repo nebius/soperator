@@ -27,7 +27,7 @@ func (r SlurmClusterReconciler) DeployControllers(
 ) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	// Deploy K8sService
+	// Deploy Service
 	{
 		found := &corev1.Service{}
 		dep := controller.RenderService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeController)
@@ -172,21 +172,6 @@ func (r SlurmClusterReconciler) getControllersStatefulSetDependencies(
 		return []metav1.Object{}, err
 	}
 	res = append(res, mungeKeySecret)
-
-	// SSH public keys secret is a dependency if login nodes are used
-	// TODO login node
-	//if clusterValues.Secrets.SSHRootPublicKeys != nil {
-	//	secret := &corev1.Secret{}
-	//	if err := r.GetNamespacedObject(
-	//		ctx,
-	//		clusterValues.Secrets.SSHRootPublicKeys.Name,
-	//		clusterValues.Namespace,
-	//		secret,
-	//	); err != nil {
-	//		return []metav1.Object{}, err
-	//	}
-	//	res = append(res, secret)
-	//}
 
 	return res, nil
 }

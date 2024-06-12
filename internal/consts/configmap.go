@@ -5,10 +5,13 @@ const (
 )
 
 const (
-	ConfigMapSlurmConfigsName = slurmConfigs
+	ConfigMapNameSlurmConfigs = slurmConfigs
+	ConfigMapNameSSHConfigs   = sshConfigs
 
-	ConfigMapSlurmConfigKey  = "slurm.conf"
-	ConfigMapCGroupConfigKey = "cgroup.conf"
-	ConfigMapSpankConfigKey  = "plugstack.conf"
-	ConfigMapGresConfigKey   = "gres.conf"
+	ConfigMapKeySlurmConfig  = "slurm.conf"
+	ConfigMapKeyCGroupConfig = "cgroup.conf"
+	ConfigMapKeySpankConfig  = "plugstack.conf"
+	ConfigMapKeyGresConfig   = "gres.conf"
+
+	ConfigMapKeySshdConfig = SshdName + "_config"
 )

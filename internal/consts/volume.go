@@ -10,6 +10,10 @@ const (
 
 	nvidia = "nvidia"
 	boot   = "boot"
+
+	sshConfigs     = "ssh-configs"
+	sshRootKeys    = "ssh-root-keys"
+	authorizedKeys = "authorized_keys"
 )
 
 const (
@@ -20,12 +24,17 @@ const (
 	VolumeNameMungeKey     = mungeKey
 	VolumeNameNvidia       = nvidia
 	VolumeNameBoot         = boot
+	VolumeNameSSHConfigs   = sshConfigs
+	VolumeNameSSHRootKeys  = sshRootKeys
 
-	VolumeMountPathSlurmConfigs = "/mnt/" + slurmConfigs
-	VolumeMountPathSpool        = "/var/" + spool
-	VolumeMountPathJail         = "/mnt/" + jail
-	VolumeMountPathMungeSocket  = "/run/" + Munge
-	VolumeMountPathMungeKey     = "/mnt/" + mungeKey
-	VolumeMountPathNvidia       = "/run/" + nvidia
-	VolumeMountPathBoot         = "/" + boot
+	VolumeMountPathSlurmConfigs   = "/mnt/" + slurmConfigs
+	VolumeMountPathSpool          = "/var/" + spool
+	VolumeMountPathJail           = "/mnt/" + jail
+	VolumeMountPathMungeSocket    = "/run/" + Munge
+	VolumeMountPathMungeKey       = "/mnt/" + mungeKey
+	VolumeMountPathNvidia         = "/run/" + nvidia
+	VolumeMountPathBoot           = "/" + boot
+	VolumeMountPathSSHConfigs     = "/mnt/" + sshConfigs
+	VolumeMountPathSSHRootKeys    = "/root/.ssh/" + authorizedKeys
+	VolumeMountSubPathSSHRootKeys = authorizedKeys
 )

@@ -27,7 +27,7 @@ func (r SlurmClusterReconciler) DeployWorkers(
 ) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	// Deploy K8sService
+	// Deploy Service
 	{
 		found := &corev1.Service{}
 		dep := worker.RenderService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeWorker)

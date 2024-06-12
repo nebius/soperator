@@ -128,6 +128,16 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, clusterCR *slurm
 		if res, err := r.UpdateWorkers(ctx, clusterValues, clusterCR); err != nil {
 			return res, err
 		}
+
+		// Login
+		if clusterValues.NodeLogin.Size > 0 {
+			if res, err := r.DeployLogin(ctx, clusterValues, clusterCR); err != nil {
+				return res, err
+			}
+			if res, err := r.UpdateLogin(ctx, clusterValues, clusterCR); err != nil {
+				return res, err
+			}
+		}
 	}
 
 	// Validation
@@ -147,6 +157,15 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, clusterCR *slurm
 			return res, err
 		} else if res.Requeue {
 			return res, err
+		}
+
+		// Login
+		if clusterValues.NodeLogin.Size > 0 {
+			if res, err := r.ValidateLogin(ctx, clusterValues, clusterCR); err != nil {
+				return res, err
+			} else if res.Requeue {
+				return res, err
+			}
 		}
 	}
 
@@ -172,6 +191,7 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&corev1.ConfigMap{}).
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.mapObjectsToReconcileRequests),

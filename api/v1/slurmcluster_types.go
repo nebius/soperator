@@ -193,17 +193,17 @@ type Secrets struct {
 	// MungeKey defines the [corev1.Secret] reference required for inter-server communication of Slurm nodes
 	//
 	// +kubebuilder:validation:Required
-	MungeKey MungeKeySecret `json:"mungeKey"`
+	MungeKey SecretKey `json:"mungeKey"`
 
 	// SSHRootPublicKeys defines the [corev1.Secret] reference required for SSH connection to Slurm login nodes.
 	// Required in case of login node usage
 	//
 	// +kubebuilder:validation:Optional
-	SSHRootPublicKeys *SSHPublicKeysSecret `json:"sshRootPublicKeys,omitempty"`
+	SSHRootPublicKeys *SecretKey `json:"sshRootPublicKeys,omitempty"`
 }
 
-// MungeKeySecret defines the [corev1.Secret] reference required for inter-server communication of Slurm nodes
-type MungeKeySecret struct {
+// SecretKey defines the [corev1.Secret] reference with specification of key used for content gathering
+type SecretKey struct {
 	// Name defines the name of the Slurm key secret
 	//
 	// +kubebuilder:validation:Required
@@ -215,21 +215,6 @@ type MungeKeySecret struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
 	Key string `json:"key"`
-}
-
-// SSHPublicKeysSecret defines the [corev1.Secret] reference required for SSH connection to Slurm login nodes
-type SSHPublicKeysSecret struct {
-	// Name defines the name of the Slurm key secret
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name"`
-
-	// Keys defines the keys in the secret containing particular SSH public keys
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	Keys []string `json:"keys"`
 }
 
 // SlurmNodes define the desired state of the Slurm nodes
@@ -335,6 +320,11 @@ type SlurmNodeLogin struct {
 	// +kubebuilder:validation:Required
 	Sshd NodeContainer `json:"sshd"`
 
+	// Munge represents the Slurm munge configuration
+	//
+	// +kubebuilder:validation:Required
+	Munge NodeContainer `json:"munge"`
+
 	// SshdServiceType represents the service type for the SSH daemon
 	//
 	// +kubebuilder:validation:Required
@@ -348,11 +338,6 @@ type SlurmNodeLogin struct {
 
 // SlurmNodeLoginVolumes defines the volumes for the Slurm login node
 type SlurmNodeLoginVolumes struct {
-	// Users represents the user data volume configuration
-	//
-	// +kubebuilder:validation:Required
-	Users NodeVolume `json:"users"`
-
 	// Jail represents the jail data volume configuration
 	//
 	// +kubebuilder:validation:Required
@@ -449,6 +434,7 @@ type NodeVolumeJailSubMount struct {
 const (
 	ConditionClusterControllersAvailable = "ControllersAvailable"
 	ConditionClusterWorkersAvailable     = "WorkersAvailable"
+	ConditionClusterLoginAvailable       = "LoginAvailable"
 
 	PhaseClusterReconciling  = "Reconciling"
 	PhaseClusterNotAvailable = "Not available"
