@@ -66,7 +66,14 @@ func BuildStatefulSetName(componentType consts.ComponentType, clusterName string
 func BuildConfigMapSlurmConfigsName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,
-		entity:      consts.ConfigMapSlurmConfigsName,
+		entity:      consts.ConfigMapNameSlurmConfigs,
+	}.String()
+}
+
+func BuildConfigMapSSHConfigsName(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.ConfigMapNameSSHConfigs,
 	}.String()
 }
 

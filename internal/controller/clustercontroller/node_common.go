@@ -31,3 +31,5 @@ func (r SlurmClusterReconciler) DeployCommon(
 
 	return ctrl.Result{}, nil
 }
+
+// TODO Update common if CR changed

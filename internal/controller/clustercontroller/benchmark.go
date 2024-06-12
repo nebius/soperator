@@ -15,7 +15,7 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-// DeployBenchmark creates benchmark resources for Slurm cluster.
+// DeployNCCLBenchmark creates benchmark resources for Slurm cluster
 func (r SlurmClusterReconciler) DeployNCCLBenchmark(
 	ctx context.Context,
 	clusterValues *values.SlurmCluster,

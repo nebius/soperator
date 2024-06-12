@@ -92,6 +92,10 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 		for _, subMount := range c.NodeWorker.JailSubMounts {
 			volumeSourceNamesRaw = append(volumeSourceNamesRaw, &subMount.VolumeSourceName)
 		}
+		// login jail sub-mounts
+		for _, subMount := range c.NodeLogin.JailSubMounts {
+			volumeSourceNamesRaw = append(volumeSourceNamesRaw, &subMount.VolumeSourceName)
+		}
 		for _, volumeSourceName := range volumeSourceNamesRaw {
 			if volumeSourceName == nil {
 				continue
@@ -136,11 +140,11 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 			if err != nil {
 				logger.Error(
 					err,
-					"Specified volume source name for NCCLBenchmark not found in VolumeSources",
+					"NCCLBenchmark requires jail specified in VolumeSources",
 					"Slurm.VolumeSource.Name", consts.VolumeNameJail,
 				)
 				return fmt.Errorf(
-					"specified node volume source name %q not found in VolumeSources: %w",
+					"NCCLBenchmark requires volume source with name %q specified in VolumeSources: %w",
 					consts.VolumeNameJail,
 					err,
 				)
@@ -149,28 +153,27 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 	}
 
 	// Secrets
-	// TODO login node
 	{
-		//loginNodeCount := c.NodeLogin.Size
-		//if loginNodeCount == 0 && clusterCrd.Spec.Secrets.SSHRootPublicKeys != nil {
-		//	err := fmt.Errorf("secrets are invalid. login node size %d (unused) is specified, but SSH public keys provided", loginNodeCount)
-		//	logger.Error(
-		//		err,
-		//		"Secrets are invalid. login nodes are unused, but SSH public keys provided",
-		//		"Slurm.LoginNode.Count", loginNodeCount,
-		//		"Slurm.Secret.SSHRootPublicKeys.Name", clusterCrd.Spec.Secrets.SSHRootPublicKeys.Name,
-		//	)
-		//	return slurmv1.Secrets{}, err
-		//}
-		//if loginNodeCount > 0 && clusterCrd.Spec.Secrets.SSHRootPublicKeys == nil {
-		//	err := fmt.Errorf("secrets are invalid. login node size %d (used) is specified, but SSH public keys are not provided", loginNodeCount)
-		//	logger.Error(
-		//		err,
-		//		"Secrets are invalid. login nodes are used, but SSH public keys are not provided",
-		//		"Slurm.LoginNode.Count", loginNodeCount,
-		//	)
-		//	return slurmv1.Secrets{}, err
-		//}
+		loginNodeCount := c.NodeLogin.Size
+		if loginNodeCount == 0 && c.Secrets.SSHRootPublicKeys != nil {
+			err := fmt.Errorf("secrets are invalid. login node size %d (unused) is specified, but SSH public keys provided", loginNodeCount)
+			logger.Error(
+				err,
+				"Secrets are invalid. login nodes are unused, but SSH public keys provided",
+				"Slurm.LoginNode.Count", loginNodeCount,
+				"Slurm.Secret.SSHRootPublicKeys.Name", c.Secrets.SSHRootPublicKeys.Name,
+			)
+			return err
+		}
+		if loginNodeCount > 0 && c.Secrets.SSHRootPublicKeys == nil {
+			err := fmt.Errorf("secrets are invalid. login node size %d (used) is specified, but SSH public keys are not provided", loginNodeCount)
+			logger.Error(
+				err,
+				"Secrets are invalid. login nodes are used, but SSH public keys are not provided",
+				"Slurm.LoginNode.Count", loginNodeCount,
+			)
+			return err
+		}
 	}
 
 	return nil

@@ -19,23 +19,23 @@ func renderContainerNCCLBenchmark(ncclBenchmark *values.SlurmNCCLBenchmark) core
 		Env: []corev1.EnvVar{
 			{
 				Name:  "NCCL_MIN_BYTES",
-				Value: ncclBenchmark.NcclSettings.MinBytes,
+				Value: ncclBenchmark.NCCLSettings.MinBytes,
 			},
 			{
 				Name:  "NCCL_MAX_BYTES",
-				Value: ncclBenchmark.NcclSettings.MaxBytes,
+				Value: ncclBenchmark.NCCLSettings.MaxBytes,
 			},
 			{
 				Name:  "NCCL_STEP_FACTOR",
-				Value: ncclBenchmark.NcclSettings.StepFactor,
+				Value: ncclBenchmark.NCCLSettings.StepFactor,
 			},
 			{
 				Name:  "NCCL_BENCH_TIMOUT",
-				Value: ncclBenchmark.NcclSettings.Timeout,
+				Value: ncclBenchmark.NCCLSettings.Timeout,
 			},
 			{
 				Name:  "NCCL_THRESHOLD_MORE_THAN",
-				Value: ncclBenchmark.NcclSettings.ThresholdMoreThan,
+				Value: ncclBenchmark.NCCLSettings.ThresholdMoreThan,
 			},
 			{
 				Name:  "DRAIN_SLURM_STATE",

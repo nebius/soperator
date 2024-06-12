@@ -1,4 +1,4 @@
-package controller
+package login
 
 import (
 	"fmt"
@@ -14,17 +14,17 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-// RenderStatefulSet renders new [appsv1.StatefulSet] containing Slurm controller pods
+// RenderStatefulSet renders new [appsv1.StatefulSet] containing Slurm login pods
 func RenderStatefulSet(
 	namespace,
 	clusterName string,
 	nodeFilters []slurmv1.K8sNodeFilter,
 	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
-	controller *values.SlurmController,
+	login *values.SlurmLogin,
 ) (appsv1.StatefulSet, error) {
-	labels := common.RenderLabels(consts.ComponentTypeController, clusterName)
-	matchLabels := common.RenderMatchLabels(consts.ComponentTypeController, clusterName)
+	labels := common.RenderLabels(consts.ComponentTypeLogin, clusterName)
+	matchLabels := common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName)
 
 	stsVersion, podVersion, err := common.GenerateVersionsAnnotationPlaceholders()
 	if err != nil {
@@ -33,18 +33,18 @@ func RenderStatefulSet(
 
 	nodeFilter := utils.MustGetBy(
 		nodeFilters,
-		controller.K8sNodeFilterName,
+		login.K8sNodeFilterName,
 		func(f slurmv1.K8sNodeFilter) string { return f.Name },
 	)
 
-	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecs(clusterName, secrets, volumeSources, controller)
+	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecs(clusterName, secrets, volumeSources, login)
 	if err != nil {
 		return appsv1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
 	return appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      controller.StatefulSet.Name,
+			Name:      login.StatefulSet.Name,
 			Namespace: namespace,
 			Labels:    labels,
 			Annotations: map[string]string{
@@ -52,12 +52,12 @@ func RenderStatefulSet(
 			},
 		},
 		Spec: appsv1.StatefulSetSpec{
-			ServiceName: controller.Service.Name,
-			Replicas:    &controller.StatefulSet.Replicas,
+			ServiceName: login.Service.Name,
+			Replicas:    &login.StatefulSet.Replicas,
 			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-					MaxUnavailable: &controller.StatefulSet.MaxUnavailable,
+					MaxUnavailable: &login.StatefulSet.MaxUnavailable,
 				},
 			},
 			Selector: &metav1.LabelSelector{
@@ -69,7 +69,7 @@ func RenderStatefulSet(
 					Annotations: map[string]string{
 						consts.AnnotationVersions: string(podVersion),
 						fmt.Sprintf(
-							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmctld,
+							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSshd,
 						): consts.AnnotationApparmorValueUnconfined,
 						fmt.Sprintf(
 							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
@@ -81,14 +81,14 @@ func RenderStatefulSet(
 					NodeSelector: nodeFilter.NodeSelector,
 					Tolerations:  nodeFilter.Tolerations,
 					Containers: []corev1.Container{
-						renderContainerSlurmctld(&controller.ContainerSlurmctld),
-						common.RenderContainerMunge(&controller.ContainerMunge),
+						renderContainerSshd(&login.ContainerSshd, login.JailSubMounts),
+						common.RenderContainerMunge(&login.ContainerMunge),
 					},
 					Volumes: volumes,
 				},
 			},
 			VolumeClaimTemplates: common.RenderVolumeClaimTemplates(
-				consts.ComponentTypeController,
+				consts.ComponentTypeLogin,
 				namespace,
 				clusterName,
 				pvcTemplateSpecs,

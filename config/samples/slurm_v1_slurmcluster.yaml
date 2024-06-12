@@ -13,7 +13,7 @@ spec:
     ncclBenchmark:
       enabled: true
       schedule: "0 */3 * * *" # Run every 3 hours
-      activeDeadlineSeconds: 1800 # K8s CronJob timeout seconds (30 min)
+      activeDeadlineSeconds: 1800 # k8s CronJob timeout seconds (30 min)
       successfulJobsHistoryLimit: 3
       failedJobsHistoryLimit: 3
       image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/nccl_benchmark:latest
@@ -21,10 +21,10 @@ spec:
         minBytes: "512Kb"
         maxBytes: "512Mb"
         stepFactor: "2"
-        timeout: "20:00" # 20 minute
+        timeout: "20:00" # 20 minutes
         thresholdMoreThan: "0"
       failureActions:
-        #        setK8SNodeStatus: "GpuSlow"
+        #setK8SNodeStatus: "GpuSlow"
         setSlurmNodeDrainState: false
       k8sNodeFilterName: "no-gpu-ssd"
   k8sNodeFilters:
@@ -78,8 +78,7 @@ spec:
       key: "munge.key"
     sshRootPublicKeys:
       name: "ssh-root-keys"
-      keys:
-        - "authorized_keys"
+      key: "authorized_keys"
   slurmNodes:
     controller:
       size: 1
@@ -139,19 +138,12 @@ spec:
         port: 22
         resources:
           cpu: 1000m
-          memory: 10Gi
-          ephemeralStorage: 10Gi
+          memory: 1Gi
+          ephemeralStorage: 1Gi
       sshdServiceType: "LoadBalancer"
+      munge:
+        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
       volumes:
-        users:
-          volumeClaimTemplateSpec:
-            accessModes:
-              - ReadWriteMany
-            resources:
-              requests:
-                storage: 10Gi
-            storageClassName: "nebius-network-ssd"
-            volumeMode: Filesystem
         jail:
           volumeSourceName: "jail"
         jailSubMounts: []

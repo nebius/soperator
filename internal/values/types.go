@@ -112,10 +112,6 @@ func buildVolumeSourcesFrom(volumeSources []slurmv1.VolumeSource) []slurmv1.Volu
 	return res
 }
 
-func buildVolumeFrom(volume *slurmv1.NodeVolume) slurmv1.NodeVolume {
-	return *volume.DeepCopy()
-}
-
 type PVCTemplateSpec struct {
 	Name string
 	Spec *corev1.PersistentVolumeClaimSpec

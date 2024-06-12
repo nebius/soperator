@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -154,7 +155,7 @@ func RenderVolumeMungeKey(mungeKeySecretName, mungeKeySecretKey string) corev1.V
 					{
 						Key:  mungeKeySecretKey,
 						Path: consts.SecretMungeKeyFileName,
-						Mode: &consts.SecretMungeKeyFileMode,
+						Mode: ptr.To(consts.SecretMungeKeyFileMode),
 					},
 				},
 			},
@@ -172,6 +173,25 @@ func RenderVolumeMountMungeKey() corev1.VolumeMount {
 }
 
 // endregion Munge
+
+// region JailSubMounts
+
+func RenderVolumeMountsForJailSubMounts(subMounts []slurmv1.NodeVolumeJailSubMount) []corev1.VolumeMount {
+	var res []corev1.VolumeMount
+	for _, subMount := range subMounts {
+		res = append(res, RenderVolumeMountJailSubMount(subMount))
+	}
+	return res
+}
+
+func RenderVolumeMountJailSubMount(subMount slurmv1.NodeVolumeJailSubMount) corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      subMount.Name,
+		MountPath: subMount.MountPath,
+	}
+}
+
+// endregion JailSubMounts
 
 func RenderVolumeFromSource(sources []slurmv1.VolumeSource, sourceName, volumeName string) corev1.Volume {
 	return corev1.Volume{
