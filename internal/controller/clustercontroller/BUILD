@@ -3,6 +3,7 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "clustercontroller",
     srcs = [
+        "benchmark.go",
         "indexfield.go",
         "node_common.go",
         "node_controller.go",
@@ -18,11 +19,13 @@ go_library(
         "//msp/slurm-service/internal/operator/internal/consts",
         "//msp/slurm-service/internal/operator/internal/controller/reconciler",
         "//msp/slurm-service/internal/operator/internal/naming",
+        "//msp/slurm-service/internal/operator/internal/render/benchmark",
         "//msp/slurm-service/internal/operator/internal/render/common",
         "//msp/slurm-service/internal/operator/internal/render/controller",
         "//msp/slurm-service/internal/operator/internal/render/worker",
         "//msp/slurm-service/internal/operator/internal/values",
         "@io_k8s_api//apps/v1:apps",
+        "@io_k8s_api//batch/v1:batch",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_apimachinery//pkg/api/errors",
         "@io_k8s_apimachinery//pkg/api/meta",

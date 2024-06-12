@@ -105,6 +105,14 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, clusterCR *slurm
 			return res, err
 		}
 
+		// NCCLBenchmark
+		if res, err := r.DeployNCCLBenchmark(ctx, clusterValues, clusterCR); err != nil {
+			return res, err
+		}
+		if res, err := r.UpdateNCCLBenchmark(ctx, clusterValues, clusterCR); err != nil {
+			return res, err
+		}
+
 		// Controllers
 		if res, err := r.DeployControllers(ctx, clusterValues, clusterCR); err != nil {
 			return res, err

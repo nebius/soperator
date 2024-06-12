@@ -21,4 +21,5 @@ func (b baseComponentType) String() string {
 var (
 	ComponentTypeController ComponentType = baseComponentType{"controller"}
 	ComponentTypeWorker     ComponentType = baseComponentType{"worker"}
+	ComponentTypeBenchmark  ComponentType = baseComponentType{"nccl-benchmark"}
 )
