@@ -13,7 +13,7 @@ import (
 // renderContainerNCCLBenchmark renders [corev1.Container] for slurmctld
 func renderContainerNCCLBenchmark(ncclBenchmark *values.SlurmNCCLBenchmark) corev1.Container {
 	return corev1.Container{
-		Name:            consts.ContainerNameNCCLBenchmark,
+		Name:            ncclBenchmark.ContainerNCCLBenchmark.Name,
 		Image:           ncclBenchmark.Image,
 		ImagePullPolicy: corev1.PullAlways, // TODO use digest and set to corev1.PullIfNotPresent
 		Env: []corev1.EnvVar{
