@@ -11,7 +11,7 @@ spec:
   pause: false
   periodicChecks:
     ncclBenchmark:
-      suspend: false
+      enabled: true
       schedule: "0 */3 * * *" # Run every 3 hours
       activeDeadlineSeconds: 1800 # K8s CronJob timeout seconds (30 min)
       successfulJobsHistoryLimit: 3

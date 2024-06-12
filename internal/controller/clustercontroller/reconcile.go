@@ -148,13 +148,6 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, clusterCR *slurm
 		} else if res.Requeue {
 			return res, err
 		}
-
-		// NCCL Benchmark
-		if res, err := r.ValidateNCCLBenchmark(ctx, clusterValues, clusterCR); err != nil {
-			return res, err
-		} else if res.Requeue {
-			return res, err
-		}
 	}
 
 	// Availability

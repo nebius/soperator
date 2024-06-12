@@ -67,11 +67,11 @@ type PeriodicChecks struct {
 
 // NCCLBenchmark slurm nccl-test benchmark
 type NCCLBenchmark struct {
-	// Suspend set to true stops cronjobs scheduling.
+	// Enabled set to false stops cronjobs scheduling.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=false
-	Suspend bool `json:"suspend,omitempty"`
+	// +kubebuilder:default:=true
+	Enabled bool `json:"enabled,omitempty"`
 
 	// Cronjob schedule. By default run benchmark every 3 hours
 	//

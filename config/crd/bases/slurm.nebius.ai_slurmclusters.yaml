@@ -487,6 +487,9 @@ spec:
                         default: 1800
                         format: int64
                         type: integer
+                      enabled:
+                        default: true
+                        type: boolean
                       failedJobsHistoryLimit:
                         default: 3
                         format: int32
@@ -526,9 +529,6 @@ spec:
                         default: 3
                         format: int32
                         type: integer
-                      suspend:
-                        default: false
-                        type: boolean
                     required:
                     - image
                     - k8sNodeFilterName

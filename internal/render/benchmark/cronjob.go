@@ -42,6 +42,9 @@ func RenderCronJob(
 		common.RenderVolumeJailFromSource(volumeSources, *ncclBenchmark.VolumeJail.VolumeSourceName),
 	}
 
+	// Suspend param in CronJob is inverted value Enabled from CRD
+	suspend := !ncclBenchmark.Enabled
+
 	return batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      consts.ContainerNameNCCLBenchmark,
@@ -53,7 +56,7 @@ func RenderCronJob(
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule: ncclBenchmark.Schedule,
-			Suspend:  &ncclBenchmark.Suspend,
+			Suspend:  &suspend,
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
 					Parallelism:  ptr.To(int32(1)),
