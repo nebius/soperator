@@ -494,8 +494,8 @@ spec:
                       failureActions:
                         properties:
                           setSlurmNodeDrainState:
-                            default: "false"
-                            type: string
+                            default: false
+                            type: boolean
                         type: object
                       image:
                         type: string

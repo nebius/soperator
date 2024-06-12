@@ -145,8 +145,8 @@ type FailureActions struct {
 
 	// SetSlurmNodeDrainState drain slurm node if benchmark failed
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="false"
-	SetSlurmNodeDrainState string `json:"setSlurmNodeDrainState,omitempty"`
+	// +kubebuilder:default:=false
+	SetSlurmNodeDrainState bool `json:"setSlurmNodeDrainState,omitempty"`
 }
 
 // K8sNodeFilter defines the k8s node filter used in Slurm node specifications

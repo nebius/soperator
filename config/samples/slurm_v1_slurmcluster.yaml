@@ -25,7 +25,7 @@ spec:
         thresholdMoreThan: "0"
       failureActions:
         #        setK8SNodeStatus: "GpuSlow"
-        setSlurmNodeDrainState: "true"
+        setSlurmNodeDrainState: false
       k8sNodeFilterName: "no-gpu-ssd"
   k8sNodeFilters:
     - name: gpu

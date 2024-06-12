@@ -1,6 +1,8 @@
 package benchmark
 
 import (
+	"strconv"
+
 	corev1 "k8s.io/api/core/v1"
 
 	"nebius.ai/slurm-operator/internal/consts"
@@ -37,7 +39,7 @@ func renderContainerNCCLBenchmark(ncclBenchmark *values.SlurmNCCLBenchmark) core
 			},
 			{
 				Name:  "DRAIN_SLURM_STATE",
-				Value: ncclBenchmark.FailureActions.SetSlurmNodeDrainState,
+				Value: strconv.FormatBool(ncclBenchmark.FailureActions.SetSlurmNodeDrainState),
 			},
 		},
 		SecurityContext: &corev1.SecurityContext{
