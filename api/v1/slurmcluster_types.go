@@ -61,7 +61,6 @@ type SlurmClusterSpec struct {
 }
 
 // PeriodicChecks defines k8s slurm specific cronjobs
-// +kubebuilder:validation:Optional
 type PeriodicChecks struct {
 	NCCLBenchmark NCCLBenchmark `json:"ncclBenchmark"`
 }
@@ -70,25 +69,30 @@ type PeriodicChecks struct {
 type NCCLBenchmark struct {
 	// Suspend set to true stops cronjobs scheduling.
 	//
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=false
 	Suspend bool `json:"suspend,omitempty"`
 
 	// Cronjob schedule. By default run benchmark every 3 hours
 	//
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="0 */3 * * *"
-	Schedule string `json:"schedule"`
+	Schedule string `json:"schedule,omitempty"`
 
 	// ActiveDeadlineSeconds is a k8s CronJob timeout seconds
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=1800
-	ActiveDeadlineSeconds int64 `json:"activeDeadlineSeconds"`
+	ActiveDeadlineSeconds int64 `json:"activeDeadlineSeconds,omitempty"`
 
 	// SuccessfulJobsHistoryLimit The number of successful finished jobs to retain
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=3
-	SuccessfulJobsHistoryLimit int32 `json:"successfulJobsHistoryLimit"`
+	SuccessfulJobsHistoryLimit int32 `json:"successfulJobsHistoryLimit,omitempty"`
 
 	// FailedJobsHistoryLimit The number of failed finished jobs to retain
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=3
-	FailedJobsHistoryLimit int32 `json:"failedJobsHistoryLimit"`
+	FailedJobsHistoryLimit int32 `json:"failedJobsHistoryLimit,omitempty"`
 
 	// Image defines the container image
 	//
@@ -112,31 +116,37 @@ type NCCLBenchmark struct {
 
 type NcclSettings struct {
 	// MinBytes minimum size to start with
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="512Mb"
-	MinBytes string `json:"minBytes"`
+	MinBytes string `json:"minBytes,omitempty"`
 
 	// MaxBytes maximum size to end at
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="8Gb"
-	MaxBytes string `json:"maxBytes"`
+	MaxBytes string `json:"maxBytes,omitempty"`
 
 	// StepFactor multiplication factor between sizes
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="2"
-	StepFactor string `json:"stepFactor"`
+	StepFactor string `json:"stepFactor,omitempty"`
 
 	// Timeout in nccl test format string
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="20:00"
-	Timeout string `json:"timeout"`
+	Timeout string `json:"timeout,omitempty"`
 
 	// ThresholdMoreThan fail cronjob if result less than value
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="0"
-	ThresholdMoreThan string `json:"thresholdMoreThan"`
+	ThresholdMoreThan string `json:"thresholdMoreThan,omitempty"`
 }
 
 type FailureActions struct {
 
 	// SetSlurmNodeDrainState drain slurm node if benchmark failed
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="false"
-	SetSlurmNodeDrainState string `json:"setSlurmNodeDrainState"`
+	SetSlurmNodeDrainState string `json:"setSlurmNodeDrainState,omitempty"`
 }
 
 // K8sNodeFilter defines the k8s node filter used in Slurm node specifications

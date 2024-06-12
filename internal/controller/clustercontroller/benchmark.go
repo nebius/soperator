@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/benchmark"
 	"nebius.ai/slurm-operator/internal/values"
@@ -97,7 +98,7 @@ func (r SlurmClusterReconciler) ValidateNCCLBenchmark(
 	err := r.Get(
 		ctx,
 		types.NamespacedName{
-			Name:      clusterValues.NCCLBenchmark.Name,
+			Name:      consts.ContainerNameNCCLBenchmark,
 			Namespace: clusterValues.Namespace,
 		},
 		found,

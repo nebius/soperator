@@ -496,8 +496,6 @@ spec:
                           setSlurmNodeDrainState:
                             default: "false"
                             type: string
-                        required:
-                        - setSlurmNodeDrainState
                         type: object
                       image:
                         type: string
@@ -520,12 +518,6 @@ spec:
                           timeout:
                             default: "20:00"
                             type: string
-                        required:
-                        - maxBytes
-                        - minBytes
-                        - stepFactor
-                        - thresholdMoreThan
-                        - timeout
                         type: object
                       schedule:
                         default: 0 */3 * * *
@@ -538,12 +530,8 @@ spec:
                         default: false
                         type: boolean
                     required:
-                    - activeDeadlineSeconds
-                    - failedJobsHistoryLimit
                     - image
                     - k8sNodeFilterName
-                    - schedule
-                    - successfulJobsHistoryLimit
                     type: object
                 required:
                 - ncclBenchmark
