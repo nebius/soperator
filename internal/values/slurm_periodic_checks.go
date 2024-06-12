@@ -19,7 +19,7 @@ func buildSlurmNCCLBenchmarkFrom(ncclBenchmark *slurmv1.NCCLBenchmark) SlurmNCCL
 	return SlurmNCCLBenchmark{
 		NCCLBenchmark: *ncclBenchmark.DeepCopy(),
 		ContainerNCCLBenchmark: Container{
-			Name:          ncclBenchmark.Name,
+			Name:          consts.ContainerNameNCCLBenchmark,
 			NodeContainer: slurmv1.NodeContainer{Image: ncclBenchmark.Image},
 		},
 		VolumeJail: slurmv1.NodeVolume{

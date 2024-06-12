@@ -503,9 +503,6 @@ spec:
                         type: string
                       k8sNodeFilterName:
                         type: string
-                      name:
-                        default: nccl-benchmark
-                        type: string
                       ncclSettings:
                         properties:
                           maxBytes:
@@ -545,7 +542,6 @@ spec:
                     - failedJobsHistoryLimit
                     - image
                     - k8sNodeFilterName
-                    - name
                     - schedule
                     - successfulJobsHistoryLimit
                     type: object
@@ -2141,6 +2137,7 @@ spec:
                 type: array
             required:
             - k8sNodeFilters
+            - periodicChecks
             - secrets
             - slurmNodes
             type: object

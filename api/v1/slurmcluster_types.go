@@ -36,8 +36,6 @@ type SlurmClusterSpec struct {
 	Pause bool `json:"pause,omitempty"` // TODO cluster pausing/resuming
 
 	// PeriodicChecks defines k8s slurm specific cronjobs
-	//
-	// +kubebuilder:validation:Optional
 	PeriodicChecks PeriodicChecks `json:"periodicChecks"`
 
 	// K8sNodeFilters define the k8s node filters used further in Slurm node specifications
@@ -70,11 +68,6 @@ type PeriodicChecks struct {
 
 // NCCLBenchmark slurm nccl-test benchmark
 type NCCLBenchmark struct {
-	// Name defines the name of the NCCLBenchmark
-	//
-	// +kubebuilder:default:="nccl-benchmark"
-	Name string `json:"name"`
-
 	// Suspend set to true stops cronjobs scheduling.
 	//
 	// +kubebuilder:default:=false
@@ -104,11 +97,11 @@ type NCCLBenchmark struct {
 
 	// NcclSettings defines nccl test params
 	// +kubebuilder:validation:Optional
-	NcclSettings NcclSettings `json:"ncclSettings"`
+	NcclSettings NcclSettings `json:"ncclSettings,omitempty"`
 
 	// FailureActions defines actions if benchmark failed
 	// +kubebuilder:validation:Optional
-	FailureActions FailureActions `json:"failureActions"`
+	FailureActions FailureActions `json:"failureActions,omitempty"`
 
 	// K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
 	// Must correspond to the name of one of [K8sNodeFilter]
