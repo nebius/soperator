@@ -140,11 +140,11 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 			if err != nil {
 				logger.Error(
 					err,
-					"Specified volume source name for NCCLBenchmark not found in VolumeSources",
+					"NCCLBenchmark requires jail specified in VolumeSources",
 					"Slurm.VolumeSource.Name", consts.VolumeNameJail,
 				)
 				return fmt.Errorf(
-					"specified node volume source name %q not found in VolumeSources: %w",
+					"NCCLBenchmark requires volume source with name %q specified in VolumeSources: %w",
 					consts.VolumeNameJail,
 					err,
 				)

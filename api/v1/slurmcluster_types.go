@@ -29,16 +29,18 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	CRVersion string `json:"crVersion,omitempty"` // TODO backward compatibility
 
-	// Pause set to true gracefully stops the cluster.
-	// Setting it to false after shut down starts the cluster back
+	// Pause defines whether to gracefully stop the cluster.
+	// Setting it to false after cluster has been paused starts the cluster back
 	//
 	// +kubebuilder:validation:Optional
 	Pause bool `json:"pause,omitempty"` // TODO cluster pausing/resuming
 
-	// PeriodicChecks defines k8s slurm specific cronjobs
+	// PeriodicChecks define the k8s CronJobs performing cluster checks
+	//
+	// +kubebuilder:validation:Required
 	PeriodicChecks PeriodicChecks `json:"periodicChecks"`
 
-	// K8sNodeFilters define the k8s node filters used further in Slurm node specifications
+	// K8sNodeFilters define the k8s node filters used in Slurm node specifications
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
@@ -49,61 +51,70 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	VolumeSources []VolumeSource `json:"volumeSources,omitempty"`
 
-	// Secrets defines the [corev1.Secret] references required for Slurm cluster
+	// Secrets define the [corev1.Secret] references needed for Slurm cluster operation
 	//
 	// +kubebuilder:validation:Required
 	Secrets Secrets `json:"secrets"`
 
-	// SlurmNodes defines the desired state of Slurm nodes
+	// SlurmNodes define the desired state of Slurm nodes
 	//
 	// +kubebuilder:validation:Required
 	SlurmNodes SlurmNodes `json:"slurmNodes"`
 }
 
-// PeriodicChecks defines k8s slurm specific cronjobs
+// PeriodicChecks define the k8s CronJobs performing cluster checks
 type PeriodicChecks struct {
+	// NCCLBenchmark defines the desired state of nccl benchmark
+	//
+	// +kubebuilder:validation:Required
 	NCCLBenchmark NCCLBenchmark `json:"ncclBenchmark"`
 }
 
-// NCCLBenchmark slurm nccl-test benchmark
+// NCCLBenchmark defines the desired state of nccl benchmark
 type NCCLBenchmark struct {
-	// Enabled set to false stops cronjobs scheduling.
+	// Enabled defines whether the CronJob should be scheduled
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=true
+	// +kubebuilder:default=true
 	Enabled bool `json:"enabled,omitempty"`
 
-	// Cronjob schedule. By default run benchmark every 3 hours
+	// Schedule defines the CronJob schedule.
+	// By default, runs benchmark every 3 hours
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="0 */3 * * *"
+	// +kubebuilder:default="0 */3 * * *"
 	Schedule string `json:"schedule,omitempty"`
 
-	// ActiveDeadlineSeconds is a k8s CronJob timeout seconds
+	// ActiveDeadlineSeconds defines the CronJob timeout in seconds
+	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=1800
+	// +kubebuilder:default=1800
 	ActiveDeadlineSeconds int64 `json:"activeDeadlineSeconds,omitempty"`
 
-	// SuccessfulJobsHistoryLimit The number of successful finished jobs to retain
+	// SuccessfulJobsHistoryLimit defines the number of successful finished jobs to retain
+	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=3
+	// +kubebuilder:default=3
 	SuccessfulJobsHistoryLimit int32 `json:"successfulJobsHistoryLimit,omitempty"`
 
-	// FailedJobsHistoryLimit The number of failed finished jobs to retain
+	// FailedJobsHistoryLimit defines the number of failed finished jobs to retain
+	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=3
+	// +kubebuilder:default=3
 	FailedJobsHistoryLimit int32 `json:"failedJobsHistoryLimit,omitempty"`
 
-	// Image defines the container image
+	// Image defines the nccl container image
 	//
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
-	// NcclSettings defines nccl test params
+	// NCCLSettings define nccl settings
+	//
 	// +kubebuilder:validation:Optional
-	NcclSettings NcclSettings `json:"ncclSettings,omitempty"`
+	NCCLSettings NCCLSettings `json:"ncclSettings,omitempty"`
 
-	// FailureActions defines actions if benchmark failed
+	// FailureActions define actions performed on benchmark failure
+	//
 	// +kubebuilder:validation:Optional
 	FailureActions FailureActions `json:"failureActions,omitempty"`
 
@@ -114,38 +125,46 @@ type NCCLBenchmark struct {
 	K8sNodeFilterName string `json:"k8sNodeFilterName"`
 }
 
-type NcclSettings struct {
-	// MinBytes minimum size to start with
+// NCCLSettings define nccl settings
+type NCCLSettings struct {
+	// MinBytes defines the minimum memory size to start nccl with
+	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="512Mb"
+	// +kubebuilder:default="512Mb"
 	MinBytes string `json:"minBytes,omitempty"`
 
-	// MaxBytes maximum size to end at
+	// MaxBytes defines the maximum memory size to finish nccl with
+	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="8Gb"
+	// +kubebuilder:default="8Gb"
 	MaxBytes string `json:"maxBytes,omitempty"`
 
-	// StepFactor multiplication factor between sizes
+	// StepFactor defines the multiplication factor between two sequential memory sizes
+	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="2"
+	// +kubebuilder:default="2"
 	StepFactor string `json:"stepFactor,omitempty"`
 
-	// Timeout in nccl test format string
+	// Timeout defines the timeout for nccl in its special format
+	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="20:00"
+	// +kubebuilder:default="20:00"
 	Timeout string `json:"timeout,omitempty"`
 
-	// ThresholdMoreThan fail cronjob if result less than value
+	// ThresholdMoreThan defines the threshold for benchmark result that must be guaranteed.
+	// CronJob will fail if the result is less than the threshold
+	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="0"
+	// +kubebuilder:default="0"
 	ThresholdMoreThan string `json:"thresholdMoreThan,omitempty"`
 }
 
+// FailureActions define actions performed on benchmark failure
 type FailureActions struct {
-
-	// SetSlurmNodeDrainState drain slurm node if benchmark failed
+	// SetSlurmNodeDrainState defines whether to drain Slurm node in case of benchmark failure
+	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=false
+	// +kubebuilder:default=false
 	SetSlurmNodeDrainState bool `json:"setSlurmNodeDrainState,omitempty"`
 }
 
@@ -188,7 +207,7 @@ type VolumeSource struct {
 	Name string `json:"name"`
 }
 
-// Secrets defines the [corev1.Secret] references required for Slurm cluster
+// Secrets define the [corev1.Secret] references needed for Slurm cluster operation
 type Secrets struct {
 	// MungeKey defines the [corev1.Secret] reference required for inter-server communication of Slurm nodes
 	//

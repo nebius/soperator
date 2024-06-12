@@ -55,6 +55,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddProperty("GresTypes", "gpu")
 	res.AddProperty("MailProg", "/usr/bin/true")
+	res.AddProperty("PluginDir", "/usr/lib/x86_64-linux-gnu/"+consts.Slurm)
 	res.AddProperty("ProctrackType", "proctrack/linuxproc")
 	res.AddProperty("ReturnToService", 1)
 	res.AddComment("")
@@ -93,9 +94,9 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("JobCompType", "jobcomp/none")
 	res.AddProperty("JobAcctGatherFrequency", 30)
 	res.AddProperty("SlurmctldDebug", "debug3")
-	res.AddProperty("SlurmctldLogFile", "/var/log/"+consts.SlurmctldName+".log")
+	res.AddProperty("SlurmctldLogFile", "/var/log/"+consts.Slurm+"/"+consts.SlurmctldName+".log")
 	res.AddProperty("SlurmdDebug", "debug3")
-	res.AddProperty("SlurmdLogFile", "/var/log/"+consts.SlurmdName+".log")
+	res.AddProperty("SlurmdLogFile", "/var/log/"+consts.Slurm+"/"+consts.SlurmdName+".log")
 	res.AddComment("")
 	res.AddComment("COMPUTE NODES")
 	res.AddComment("We're using the \"dynamic nodes\" feature: https://slurm.schedmd.com/dynamic_nodes.html")
@@ -114,7 +115,7 @@ func generateCGroupConfig() renderutils.ConfigFile {
 func generateSpankConfig() renderutils.ConfigFile {
 	res := &renderutils.RawConfig{}
 	res.AddLine(fmt.Sprintf("required chroot.so %s", consts.VolumeMountPathJail))
-	res.AddLine("required spank_pyxis.so")
+	res.AddLine("required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1")
 	return res
 }
 

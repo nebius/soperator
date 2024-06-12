@@ -13,7 +13,7 @@ spec:
     ncclBenchmark:
       enabled: true
       schedule: "0 */3 * * *" # Run every 3 hours
-      activeDeadlineSeconds: 1800 # K8s CronJob timeout seconds (30 min)
+      activeDeadlineSeconds: 1800 # k8s CronJob timeout seconds (30 min)
       successfulJobsHistoryLimit: 3
       failedJobsHistoryLimit: 3
       image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/nccl_benchmark:latest
@@ -21,10 +21,10 @@ spec:
         minBytes: "512Kb"
         maxBytes: "512Mb"
         stepFactor: "2"
-        timeout: "20:00" # 20 minute
+        timeout: "20:00" # 20 minutes
         thresholdMoreThan: "0"
       failureActions:
-        #        setK8SNodeStatus: "GpuSlow"
+        #setK8SNodeStatus: "GpuSlow"
         setSlurmNodeDrainState: false
       k8sNodeFilterName: "no-gpu-ssd"
   k8sNodeFilters:
