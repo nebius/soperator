@@ -44,7 +44,7 @@ func RenderCronJob(
 
 	return batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ncclBenchmark.Name,
+			Name:      consts.ContainerNameNCCLBenchmark,
 			Namespace: namespace,
 			Labels:    labels,
 			Annotations: map[string]string{
@@ -65,7 +65,7 @@ func RenderCronJob(
 							Annotations: map[string]string{
 								consts.AnnotationVersions: string(podVersion),
 								fmt.Sprintf(
-									"%s/%s", consts.AnnotationApparmorKey, ncclBenchmark.Name,
+									"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameNCCLBenchmark,
 								): consts.AnnotationApparmorValueUnconfined,
 							},
 						},
