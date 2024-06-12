@@ -37,7 +37,7 @@ spec:
                   - key: "nebius.com/node-group-id"
                     operator: In
                     values:
-                      - "f2m3qsrqa74ugs37saab"
+                      - "f2mek81b68gi5k66dsfg"
       tolerations:
         - key: nvidia.com/gpu
           operator: Exists

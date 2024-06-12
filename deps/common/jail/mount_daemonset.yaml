@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  namespace: dstaroff
+  name: jail-mount
+spec:
+  selector:
+    matchLabels:
+      slurm: jail-mount
+  template:
+    metadata:
+      labels:
+        slurm: jail-mount
+    spec:
+      initContainers:
+      - name: mount-jail-filestore
+        image: busybox
+        command:
+        - "/bin/sh"
+        - "-c"
+        - |
+            mkdir -p /host/mnt/jail && \
+            if mountpoint -q /host/mnt/jail; then \
+                echo "The node's /mnt/jail is already a mount point" && \
+                umount /host/mnt/jail && \
+                echo "Unmounted /mnt/jail from the node"; \
+            fi && \
+            mount -t virtiofs -o rw,relatime,exec,dev jail /host/mnt/jail && \
+            echo "Mounted filestore to the node's /mnt/jail"
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: host-mount
+          mountPath: /host/mnt
+          mountPropagation: Bidirectional
+      containers:
+      - name: sleep
+        image: busybox
+        command: ["/bin/sh", "-c", "echo 'Sleep infinitely' && sleep infinity"]
+      volumes:
+      - name: host-mount
+        hostPath:
+          path: /mnt
+      tolerations:
+      # Allow scheduling on GPU nodes
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            # Require scheduling on GPU nodes
+            - matchExpressions:
+              - key: nebius.com/node-group-id
+                operator: In
+                values:
+                - "f2mek81b68gi5k66dsfg"
+            # Require scheduling on NO-GPU nodes
+            - matchExpressions:
+              - key: nebius.com/node-group-id
+                operator: In
+                values:
+                - "f2md1q6j5mq7mju9agk2"
