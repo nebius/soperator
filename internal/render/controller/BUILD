@@ -6,6 +6,7 @@ go_library(
         "container.go",
         "service.go",
         "statefulset.go",
+        "volume.go",
     ],
     importpath = "nebius.ai/slurm-operator/internal/render/controller",
     visibility = ["//msp/slurm-service:__subpackages__"],

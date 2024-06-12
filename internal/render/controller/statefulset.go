@@ -37,52 +37,7 @@ func RenderStatefulSet(
 		func(f slurmv1.K8sNodeFilter) string { return f.Name },
 	)
 
-	volumes := []corev1.Volume{
-		common.RenderVolumeSlurmConfigs(clusterName),
-		common.RenderVolumeMungeKey(secrets.MungeKey.Name, secrets.MungeKey.Key),
-		common.RenderVolumeMungeSocket(),
-	}
-	var pvcTemplateSpecs []values.PVCTemplateSpec
-
-	{
-		if controller.VolumeSpool.VolumeSourceName != nil {
-			volumes = append(
-				volumes,
-				common.RenderVolumeSpoolFromSource(
-					consts.ComponentTypeController,
-					volumeSources,
-					*controller.VolumeSpool.VolumeSourceName,
-				),
-			)
-		} else {
-			pvcTemplateSpecs = append(
-				pvcTemplateSpecs,
-				values.PVCTemplateSpec{
-					Name: common.RenderVolumeNameSpool(consts.ComponentTypeController),
-					Spec: controller.VolumeSpool.VolumeClaimTemplateSpec,
-				},
-			)
-		}
-	}
-	{
-		if controller.VolumeJail.VolumeSourceName != nil {
-			volumes = append(
-				volumes,
-				common.RenderVolumeJailFromSource(
-					volumeSources,
-					*controller.VolumeJail.VolumeSourceName,
-				),
-			)
-		} else {
-			pvcTemplateSpecs = append(
-				pvcTemplateSpecs,
-				values.PVCTemplateSpec{
-					Name: consts.VolumeNameJail,
-					Spec: controller.VolumeJail.VolumeClaimTemplateSpec,
-				},
-			)
-		}
-	}
+	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecs(clusterName, secrets, volumeSources, controller)
 
 	return appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
