@@ -77,6 +77,13 @@ func BuildConfigMapSSHConfigsName(clusterName string) string {
 	}.String()
 }
 
+func BuildConfigMapNCCLTopologyName(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.ConfigMapNameNCCLTopology,
+	}.String()
+}
+
 func BuildVolumeMountSpoolPath(directory string) string {
 	return path.Join(consts.VolumeMountPathSpool, directory)
 }
