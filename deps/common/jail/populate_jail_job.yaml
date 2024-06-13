@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  namespace: dstaroff
+  name: populate-jail
+spec:
+  parallelism: 1
+  completions: 1
+  template:
+    metadata:
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/populate-jail: unconfined # Required for mounting virtual filesystems
+    spec:
+      containers:
+      - name: populate-jail
+        image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: jail
+          mountPath: /mnt/jail
+        securityContext:
+          capabilities:
+            add:
+            - "SYS_ADMIN" # Required for mounting virtual filesystems
+      volumes:
+      - name: jail
+        persistentVolumeClaim:
+          claimName: jail
+          readOnly: false
+      restartPolicy: Never
+      # Allow scheduling on GPU nodes
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            # Require scheduling on GPU nodes
+            - matchExpressions:
+              - key: nebius.com/node-group-id
+                operator: In
+                values:
+                - "f2mek81b68gi5k66dsfg"
+            # Require scheduling on NO-GPU nodes
+            - matchExpressions:
+              - key: nebius.com/node-group-id
+                operator: In
+                values:
+                - "f2md1q6j5mq7mju9agk2"
