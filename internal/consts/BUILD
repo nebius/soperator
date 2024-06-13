@@ -12,6 +12,7 @@ go_library(
         "secret.go",
         "service.go",
         "slurm.go",
+        "statefulset.go",
         "version.go",
         "volume.go",
     ],

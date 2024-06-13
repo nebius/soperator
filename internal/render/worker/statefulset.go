@@ -52,8 +52,9 @@ func RenderStatefulSet(
 			},
 		},
 		Spec: appsv1.StatefulSetSpec{
-			ServiceName: worker.Service.Name,
-			Replicas:    &worker.StatefulSet.Replicas,
+			PodManagementPolicy: consts.PodManagementPolicy,
+			ServiceName:         worker.Service.Name,
+			Replicas:            &worker.StatefulSet.Replicas,
 			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
