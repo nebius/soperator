@@ -201,8 +201,8 @@ func (r SlurmClusterReconciler) getLoginStatefulSetDependencies(
 	rootPublicKeysSecret := &corev1.Secret{}
 	if err := r.GetNamespacedObject(
 		ctx,
-		clusterValues.Secrets.SSHRootPublicKeys.Name,
 		clusterValues.Namespace,
+		clusterValues.Secrets.SSHRootPublicKeys.Name,
 		rootPublicKeysSecret,
 	); err != nil {
 		return []metav1.Object{}, err
