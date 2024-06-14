@@ -9,6 +9,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -67,7 +68,21 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		result = ctrl.Result{}
 	}
 
-	statusErr := r.Status().Update(ctx, slurmCluster)
+	statusErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		cluster := &slurmv1.SlurmCluster{}
+		innerErr := r.Get(ctx, req.NamespacedName, cluster)
+		if innerErr != nil {
+			if apierrors.IsNotFound(innerErr) {
+				logger.Info("SlurmCluster resource not found. Ignoring since object must be deleted")
+				return nil
+			}
+			// Error reading the object - requeue the request.
+			logger.Error(innerErr, "Failed to get SlurmCluster")
+			return innerErr
+		}
+
+		return r.Status().Update(ctx, cluster)
+	})
 	if statusErr != nil {
 		logger.Error(statusErr, "Failed to update SlurmCluster status")
 		result = ctrl.Result{}

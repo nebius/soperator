@@ -58,6 +58,7 @@ func renderContainerSlurmd(
 		common.RenderVolumeMountMungeSocket(),
 		renderVolumeMountNvidia(),
 		renderVolumeMountBoot(),
+		renderVolumeMountNCCLTopology(),
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
 

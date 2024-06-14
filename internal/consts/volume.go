@@ -14,6 +14,8 @@ const (
 	sshConfigs     = "ssh-configs"
 	sshRootKeys    = "ssh-root-keys"
 	authorizedKeys = "authorized_keys"
+
+	ncclTopology = "nccl-topology"
 )
 
 const (
@@ -26,6 +28,7 @@ const (
 	VolumeNameBoot         = boot
 	VolumeNameSSHConfigs   = sshConfigs
 	VolumeNameSSHRootKeys  = sshRootKeys
+	VolumeNameNCCLTopology = ncclTopology
 
 	VolumeMountPathSlurmConfigs   = "/mnt/" + slurmConfigs
 	VolumeMountPathSpool          = "/var/" + spool
@@ -37,4 +40,5 @@ const (
 	VolumeMountPathSSHConfigs     = "/mnt/" + sshConfigs
 	VolumeMountPathSSHRootKeys    = "/root/.ssh/" + authorizedKeys
 	VolumeMountSubPathSSHRootKeys = authorizedKeys
+	VolumeMountPathNCCLTopology   = "/run/nvidia-topologyd"
 )

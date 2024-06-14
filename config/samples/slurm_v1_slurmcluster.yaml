@@ -7,7 +7,7 @@ metadata:
   namespace: dstaroff
   name: slurm1
 spec:
-  crVersion: 0.1.5
+  crVersion: 0.1.7
   pause: false
   periodicChecks:
     ncclBenchmark:

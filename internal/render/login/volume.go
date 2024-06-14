@@ -85,7 +85,7 @@ func renderVolumeMountSshConfigs() corev1.VolumeMount {
 // renderVolumeSshRootKeys renders [corev1.Volume] containing SSH root keys contents
 func renderVolumeSshRootKeys(secret slurmv1.SecretKey) corev1.Volume {
 	return corev1.Volume{
-		Name: consts.VolumeNameNvidia,
+		Name: consts.VolumeNameSSHRootKeys,
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
 				SecretName: secret.Name,

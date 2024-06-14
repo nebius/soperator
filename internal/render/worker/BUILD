@@ -3,6 +3,7 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "worker",
     srcs = [
+        "configmap.go",
         "container.go",
         "service.go",
         "statefulset.go",
@@ -13,7 +14,9 @@ go_library(
     deps = [
         "//msp/slurm-service/internal/operator/api/v1:api",
         "//msp/slurm-service/internal/operator/internal/consts",
+        "//msp/slurm-service/internal/operator/internal/naming",
         "//msp/slurm-service/internal/operator/internal/render/common",
+        "//msp/slurm-service/internal/operator/internal/render/utils:renderutils",
         "//msp/slurm-service/internal/operator/internal/utils",
         "//msp/slurm-service/internal/operator/internal/values",
         "@io_k8s_api//apps/v1:apps",

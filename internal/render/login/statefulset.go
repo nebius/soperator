@@ -26,11 +26,6 @@ func RenderStatefulSet(
 	labels := common.RenderLabels(consts.ComponentTypeLogin, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName)
 
-	stsVersion, podVersion, err := common.GenerateVersionsAnnotationPlaceholders()
-	if err != nil {
-		return appsv1.StatefulSet{}, fmt.Errorf("generating versions annotation placeholders: %w", err)
-	}
-
 	nodeFilter := utils.MustGetBy(
 		nodeFilters,
 		login.K8sNodeFilterName,
@@ -42,14 +37,11 @@ func RenderStatefulSet(
 		return appsv1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
-	return appsv1.StatefulSet{
+	sts := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      login.StatefulSet.Name,
 			Namespace: namespace,
 			Labels:    labels,
-			Annotations: map[string]string{
-				consts.AnnotationVersions: string(stsVersion),
-			},
 		},
 		Spec: appsv1.StatefulSetSpec{
 			PodManagementPolicy: consts.PodManagementPolicy,
@@ -64,30 +56,6 @@ func RenderStatefulSet(
 			Selector: &metav1.LabelSelector{
 				MatchLabels: matchLabels,
 			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-					Annotations: map[string]string{
-						consts.AnnotationVersions: string(podVersion),
-						fmt.Sprintf(
-							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSshd,
-						): consts.AnnotationApparmorValueUnconfined,
-						fmt.Sprintf(
-							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-						): consts.AnnotationApparmorValueUnconfined,
-					},
-				},
-				Spec: corev1.PodSpec{
-					Affinity:     nodeFilter.Affinity,
-					NodeSelector: nodeFilter.NodeSelector,
-					Tolerations:  nodeFilter.Tolerations,
-					Containers: []corev1.Container{
-						renderContainerSshd(&login.ContainerSshd, login.JailSubMounts),
-						common.RenderContainerMunge(&login.ContainerMunge),
-					},
-					Volumes: volumes,
-				},
-			},
 			VolumeClaimTemplates: common.RenderVolumeClaimTemplates(
 				consts.ComponentTypeLogin,
 				namespace,
@@ -95,5 +63,36 @@ func RenderStatefulSet(
 				pvcTemplateSpecs,
 			),
 		},
-	}, nil
+	}
+	pts := corev1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: labels,
+			Annotations: map[string]string{
+				fmt.Sprintf(
+					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSshd,
+				): consts.AnnotationApparmorValueUnconfined,
+				fmt.Sprintf(
+					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
+				): consts.AnnotationApparmorValueUnconfined,
+			},
+		},
+		Spec: corev1.PodSpec{
+			Affinity:     nodeFilter.Affinity,
+			NodeSelector: nodeFilter.NodeSelector,
+			Tolerations:  nodeFilter.Tolerations,
+			Containers: []corev1.Container{
+				renderContainerSshd(&login.ContainerSshd, login.JailSubMounts),
+				common.RenderContainerMunge(&login.ContainerMunge),
+			},
+			Volumes: volumes,
+		},
+	}
+	sts.Spec.Template = pts
+
+	err = common.SetVersions(&sts, &pts)
+	if err != nil {
+		return appsv1.StatefulSet{}, err
+	}
+
+	return sts, nil
 }

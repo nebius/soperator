@@ -27,6 +27,18 @@ func (r SlurmClusterReconciler) DeployWorkers(
 ) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
+	// Deploy NCCL topology ConfigMap
+	{
+		found := &corev1.ConfigMap{}
+		dep, err := worker.RenderConfigMapNCCLTopology(clusterValues)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if res, err := r.EnsureDeployed(ctx, &dep, found, clusterCR); err != nil {
+			return res, err
+		}
+	}
+
 	// Deploy Service
 	{
 		found := &corev1.Service{}
