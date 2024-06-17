@@ -2,7 +2,6 @@ package controller
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -28,8 +27,12 @@ func renderContainerSlurmctld(container *values.Container) corev1.Container {
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				TCPSocket: &corev1.TCPSocketAction{
-					Port: intstr.FromInt32(container.Port),
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"/bin/sh",
+						"-c",
+						"/usr/bin/pgrep -x slurmctld > /dev/null && exit 0 || exit 1",
+					},
 				},
 			},
 		},

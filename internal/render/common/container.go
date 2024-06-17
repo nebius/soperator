@@ -35,6 +35,17 @@ func RenderContainerMunge(container *values.Container) corev1.Container {
 				},
 			},
 		},
+		LivenessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"/bin/sh",
+						"-c",
+						"/usr/bin/pgrep -x munged > /dev/null && exit 0 || exit 1",
+					},
+				},
+			},
+		},
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{
