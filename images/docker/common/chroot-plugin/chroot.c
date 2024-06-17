@@ -130,13 +130,6 @@ int slurm_spank_init_post_opt(spank_t spank, int argc, char **argv) {
         return ESPANK_SUCCESS;
     }
 
-    char enjail_env[64];
-    int espank = spank_getenv(spank, "SLURM_SPANK_CHROOT_ENJAIL", enjail_env, sizeof(enjail_env));
-    if (espank == ESPANK_SUCCESS && enjail_env == "0"){
-        slurm_debug("chroot: init_post_opt: The process won't be enjailed because it's turned off, exit");
-        return ESPANK_SUCCESS;
-    }
-
     slurm_debug("chroot: init_post_opt: Enter jail environment");
 
     int res = -1;
@@ -151,10 +144,6 @@ int slurm_spank_init_post_opt(spank_t spank, int argc, char **argv) {
     res = remount_proc();
     if (res != 0) {
         return 300 + res;
-    }
-
-    if (spank_setenv(spank, "SLURM_SPANK_CHROOT_ENJAIL", "0", 1) != ESPANK_SUCCESS) {
-        return 400;
     }
 
     return ESPANK_SUCCESS;
