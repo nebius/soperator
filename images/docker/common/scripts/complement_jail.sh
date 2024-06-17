@@ -27,8 +27,9 @@ pushd "${jaildir}"
     mount --rbind /dev dev/
     mount --rbind /run run/
 
-    echo "Bind-mount /tmp because it should be node-local"
-    mount --bind /tmp tmp/
+    echo "Remount /tmp"
+    # TODO: Maybe we should do this after nvidia-container-cli?
+    mount -t tmpfs tmpfs tmp/
 
     echo "Bind-mount /var/log because it should be node-local"
     mount --bind /var/log var/log
@@ -64,6 +65,18 @@ pushd "${jaildir}"
         filename=$(basename "$file")
         touch "etc/slurm/$filename" && mount --bind "$file" "etc/slurm/$filename"
     done
+
+    if [ -n "$worker" ]; then
+        echo "Bind-mount slurmd spool directory from the host because it should be propagated to the jail"
+        mount --bind /var/spool/slurmd var/spool/slurmd/
+    fi
+
+    if [ -z "$worker" ]; then
+        echo "Bind-mount all GPU-specific empty lib files into the host's libdummy"
+        find "${jaildir}/lib/x86_64-linux-gnu" -maxdepth 1 -type f -empty -print0 | while IFS= read -r -d '' file; do
+            mount --bind "/lib/x86_64-linux-gnu/libdummy.so" "$file"
+        done
+    fi
 
     if [ -n "$worker" ]; then
         echo "Update linker cache inside the jail"

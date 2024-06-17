@@ -2,6 +2,7 @@
 #include <slurm/spank.h>
 #include <slurm/slurm_errno.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <sched.h>
 #include <stdio.h>
 #include <sys/mount.h>
@@ -17,6 +18,19 @@
 #endif
 
 SPANK_PLUGIN("chroot", 1);
+
+// The following Slurm job step IDs are copied from the Slurm source code:
+//
+// Max job step ID of normal step
+#define SLURM_MAX_NORMAL_STEP_ID (0xfffffff0)
+// Job step ID of pending step
+#define SLURM_PENDING_STEP (0xfffffffd)
+// Job step ID of external process container
+#define SLURM_EXTERN_CONT  (0xfffffffc)
+// Job step ID of batch scripts
+#define SLURM_BATCH_SCRIPT (0xfffffffb)
+// Job step ID for the interactive step (if used)
+#define SLURM_INTERACTIVE_STEP (0xfffffffa)
 
 int change_root(const char *jail_path) {
     slurm_debug("chroot: change_root: Initialize host_in_jail_path = jail_path + /mnt/host");
@@ -84,8 +98,12 @@ int remount_proc() {
     return 0;
 }
 
-int slurm_spank_task_init_privileged(spank_t spank, int argc, char **argv) {
-    slurm_debug("chroot: slurm_spank_task_init_privileged: Enter jail environment");
+int slurm_spank_init_post_opt(spank_t spank, int argc, char **argv) {
+    spank_context_t spank_ctx = spank_context();
+    if (spank_ctx != S_CTX_REMOTE) {
+        slurm_debug("chroot: init_post_opt: Called not in remote context, exit");
+        return ESPANK_SUCCESS;
+    }
 
     if (argc != 1) {
         fprintf(stderr, "expected 1 plugin argument: <path_to_jail>, but got %d arguments\n", argc);
@@ -93,36 +111,50 @@ int slurm_spank_task_init_privileged(spank_t spank, int argc, char **argv) {
     }
     char *jail_path = argv[0];
 
+    uint32_t job_stepid = 0;
+    spank_get_item(spank, S_JOB_STEPID, &job_stepid);
+    // Possible job step ids:
+    // - SLURM_MAX_NORMAL_STEP_ID (any normal job step ID has ID less or equal to that)
+    // - SLURM_PENDING_STEP
+    // - SLURM_EXTERN_CONT
+    // - SLURM_BATCH_SCRIPT
+    // - SLURM_INTERACTIVE_STEP
+    if (job_stepid <= SLURM_MAX_NORMAL_STEP_ID) {
+        slurm_debug("chroot: init_post_opt: Called in normal job step");
+    } else if (job_stepid == SLURM_BATCH_SCRIPT) {
+        slurm_debug("chroot: init_post_opt: Called in batch job step");
+    } else if (job_stepid == SLURM_INTERACTIVE_STEP) {
+        slurm_debug("chroot: init_post_opt: Called in interactive job step");
+    } else {
+        slurm_debug("chroot: init_post_opt: Called not in batch or normal job step, exit");
+        return ESPANK_SUCCESS;
+    }
+
+    char enjail_env[64];
+    int espank = spank_getenv(spank, "SLURM_SPANK_CHROOT_ENJAIL", enjail_env, sizeof(enjail_env));
+    if (espank == ESPANK_SUCCESS && enjail_env == "0"){
+        slurm_debug("chroot: init_post_opt: The process won't be enjailed because it's turned off, exit");
+        return ESPANK_SUCCESS;
+    }
+
+    slurm_debug("chroot: init_post_opt: Enter jail environment");
+
     int res = -1;
 
-    slurm_debug("chroot: slurm_spank_task_init_privileged: Change the process root into %s", jail_path);
+    slurm_debug("chroot: init_post_opt: Change the process root into %s", jail_path);
     res = change_root(jail_path);
     if (res != 0) {
         return 200 + res;
     }
 
-    slurm_debug("chroot: slurm_spank_task_init_privileged: Remount /proc in jail");
+    slurm_debug("chroot: init_post_opt: Remount /proc in jail");
     res = remount_proc();
     if (res != 0) {
         return 300 + res;
     }
 
-    return ESPANK_SUCCESS;
-}
-
-int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
-    slurm_debug("chroot: slurm_spank_task_exit: Enter jail environment");
-
-    if (argc != 1) {
-        fprintf(stderr, "expected 1 plugin argument: <path_to_jail>, but got %d arguments\n", argc);
-        return 100;
-    }
-    char *jail_path = argv[0];
-
-    slurm_debug("chroot: slurm_spank_task_exit: Change the process root into %s", jail_path);
-    int res = change_root(jail_path);
-    if (res != 0) {
-        return 200 + res;
+    if (spank_setenv(spank, "SLURM_SPANK_CHROOT_ENJAIL", "0", 1) != ESPANK_SUCCESS) {
+        return 400;
     }
 
     return ESPANK_SUCCESS;
