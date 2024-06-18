@@ -7,8 +7,11 @@ metadata:
   namespace: dstaroff
   name: slurm1
 spec:
-  crVersion: 0.1.7
+  crVersion: 0.1.8
   pause: false
+  populateJail:
+    image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest
+    k8sNodeFilterName: "gpu"
   periodicChecks:
     ncclBenchmark:
       enabled: true
@@ -100,7 +103,7 @@ spec:
     worker:
       size: 1
       k8sNodeFilterName: "gpu"
-      maxGpu: 1
+      maxGpu: 2
       slurmd:
         image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/worker_slurmd:latest"
         port: 6818

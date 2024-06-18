@@ -9,6 +9,7 @@ go_library(
         "container.go",
         "cronjob.go",
         "indexfield.go",
+        "job.go",
         "label.go",
         "secret.go",
         "service.go",

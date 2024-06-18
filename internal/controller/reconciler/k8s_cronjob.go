@@ -43,14 +43,14 @@ func (r *CronJobReconciler) Reconcile(
 }
 
 func (r *CronJobReconciler) patch(existing, desired client.Object) (client.Patch, error) {
-	patchImpl := func(e, d *batchv1.CronJob) client.Patch {
-		res := client.MergeFrom(e.DeepCopy())
+	patchImpl := func(src, dst *batchv1.CronJob) client.Patch {
+		res := client.MergeFrom(src.DeepCopy())
 
-		e.Spec.Schedule = d.Spec.Schedule
-		e.Spec.Suspend = d.Spec.Suspend
-		e.Spec.SuccessfulJobsHistoryLimit = d.Spec.SuccessfulJobsHistoryLimit
-		e.Spec.FailedJobsHistoryLimit = d.Spec.FailedJobsHistoryLimit
-		e.Spec.JobTemplate.Spec.Template.Spec = d.Spec.JobTemplate.Spec.Template.Spec
+		src.Spec.Schedule = dst.Spec.Schedule
+		src.Spec.Suspend = dst.Spec.Suspend
+		src.Spec.SuccessfulJobsHistoryLimit = dst.Spec.SuccessfulJobsHistoryLimit
+		src.Spec.FailedJobsHistoryLimit = dst.Spec.FailedJobsHistoryLimit
+		src.Spec.JobTemplate.Spec.Template.Spec = dst.Spec.JobTemplate.Spec.Template.Spec
 
 		return res
 	}

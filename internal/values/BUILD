@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "slurm_cluster.go",
         "slurm_controller.go",
+        "slurm_jail.go",
         "slurm_login.go",
         "slurm_periodic_checks.go",
         "slurm_worker.go",
