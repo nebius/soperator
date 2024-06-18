@@ -94,10 +94,11 @@ func renderContainerSlurmd(
 					Command: []string{
 						"/bin/sh",
 						"-c",
-						"/usr/bin/pgrep -x slurmd > /dev/null && exit 0 || exit 1",
+						"/usr/bin/sinfo > /dev/null && exit 0 || exit 1",
 					},
 				},
 			},
+			PeriodSeconds: 30,
 		},
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: ptr.To(true),

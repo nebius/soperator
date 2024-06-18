@@ -41,7 +41,7 @@ func RenderContainerMunge(container *values.Container) corev1.Container {
 					Command: []string{
 						"/bin/sh",
 						"-c",
-						"/usr/bin/pgrep -x munged > /dev/null && exit 0 || exit 1",
+						"/usr/bin/munge -n > /dev/null && exit 0 || exit 1",
 					},
 				},
 			},

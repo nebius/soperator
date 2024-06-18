@@ -31,7 +31,7 @@ func renderContainerSlurmctld(container *values.Container) corev1.Container {
 					Command: []string{
 						"/bin/sh",
 						"-c",
-						"/usr/bin/pgrep -x slurmctld > /dev/null && exit 0 || exit 1",
+						"/usr/bin/sinfo > /dev/null && exit 0 || exit 1",
 					},
 				},
 			},
