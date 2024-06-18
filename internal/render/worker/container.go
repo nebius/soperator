@@ -7,7 +7,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -91,10 +90,15 @@ func renderContainerSlurmd(
 		VolumeMounts: volumeMounts,
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				TCPSocket: &corev1.TCPSocketAction{
-					Port: intstr.FromInt32(container.Port),
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"/bin/sh",
+						"-c",
+						"/usr/bin/sinfo > /dev/null && exit 0 || exit 1",
+					},
 				},
 			},
+			PeriodSeconds: 30,
 		},
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: ptr.To(true),
