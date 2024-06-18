@@ -42,6 +42,13 @@ RUN apt install -y openssh-server
 # Create root .ssh directory
 RUN mkdir -m 700 -p /root/.ssh
 
+# Create dummy library for replacing GPU-specific libraries with it
+RUN mkdir -p /usr/src/dummy && \
+    cd /usr/src/dummy && \
+    echo "int main() { return 0; }" > dummy.c && \
+    gcc -shared -o libdummy.so dummy.c && \
+    cp libdummy.so /lib/x86_64-linux-gnu/
+
 # Copy script for complementing jail filesystem in runtime
 COPY docker/common/scripts/complement_jail.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/complement_jail.sh

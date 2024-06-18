@@ -37,7 +37,8 @@ RUN apt-get update && \
         lsof \
         pciutils \
         iproute2 \
-        infiniband-diags
+        infiniband-diags \
+        kmod
 
 # Install PMIx
 COPY docker/common/scripts/install_pmix.sh /opt/bin/
