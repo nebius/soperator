@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,20 +13,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/render/populate_jail"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-// DeployPopulateJail creates populate job resources for Slurm cluster
-func (r SlurmClusterReconciler) DeployPopulateJail(
+// ReconcilePopulateJail reconciles all resources necessary for deploying Populate Jail Job
+func (r SlurmClusterReconciler) ReconcilePopulateJail(
 	ctx context.Context,
 	clusterValues *values.SlurmCluster,
-	clusterCR *slurmv1.SlurmCluster,
-) (ctrl.Result, batchv1.Job, error) {
+	cluster *slurmv1.SlurmCluster,
+) (batchv1.Job, error) {
 	logger := log.FromContext(ctx)
 
-	found := &batchv1.Job{}
-	dep, err := populate_jail.RenderJob(
+	job, err := populate_jail.RenderPopulateJailJob(
 		clusterValues.Namespace,
 		clusterValues.Name,
 		clusterValues.NodeFilters,
@@ -33,15 +34,26 @@ func (r SlurmClusterReconciler) DeployPopulateJail(
 		&clusterValues.PopulateJail,
 	)
 	if err != nil {
-		logger.Error(err, "PopulateJail Job deployment failed")
-		return ctrl.Result{}, batchv1.Job{}, err
+		logger.Error(err, "Failed to render Populate Jail Job")
+		return batchv1.Job{}, errors.Wrap(err, "rendering Populate Jail Job")
 	}
 
-	if res, err := r.EnsureDeployed(ctx, &dep, found, clusterCR, []v1.Object{}...); err != nil {
-		return res, batchv1.Job{}, err
+	reconcilePopulateJailImpl := func() error {
+		logger = logger.WithValues(logfield.ResourceKV(&job)...)
+
+		err = r.Job.Reconcile(ctx, cluster, &job, []v1.Object{}...)
+		if err != nil {
+			logger.Error(err, "Failed to reconcile Populate Jail Job")
+			return errors.Wrap(err, "reconciling Populate Jail Job")
+		}
+		return nil
 	}
 
-	return ctrl.Result{}, dep, nil
+	if err := reconcilePopulateJailImpl(); err != nil {
+		logger.Error(err, "Failed to reconcile Populate Jail Job")
+		return batchv1.Job{}, errors.Wrap(err, "reconciling Populate Jail Job")
+	}
+	return job, nil
 }
 
 func (r SlurmClusterReconciler) CheckPopulateJail(

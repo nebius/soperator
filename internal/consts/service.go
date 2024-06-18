@@ -6,4 +6,5 @@ const (
 	SshdName      = "sshd"
 
 	ncclBenchmark = "nccl-benchmark"
+	populateJail  = "populate-jail"
 )

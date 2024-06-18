@@ -15,7 +15,7 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-func RenderJob(
+func RenderPopulateJailJob(
 	namespace,
 	clusterName string,
 	nodeFilters []slurmv1.K8sNodeFilter,
@@ -34,45 +34,36 @@ func RenderJob(
 		common.RenderVolumeJailFromSource(volumeSources, *populateJail.VolumeJail.VolumeSourceName),
 	}
 
-	job := batchv1.Job{
+	return batchv1.Job{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "Job",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      consts.ContainerNamePopulateJail,
+			Name:      populateJail.Name,
 			Namespace: namespace,
 			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+					Annotations: map[string]string{
+						fmt.Sprintf(
+							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNamePopulateJail,
+						): consts.AnnotationApparmorValueUnconfined,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Affinity:      nodeFilter.Affinity,
+					NodeSelector:  nodeFilter.NodeSelector,
+					Tolerations:   nodeFilter.Tolerations,
+					RestartPolicy: "Never",
+					Volumes:       volumes,
+					Containers:    []corev1.Container{renderContainerPopulateJail(populateJail)},
+				},
+			},
 			Parallelism: ptr.To(int32(1)),
 			Completions: ptr.To(int32(1)),
 		},
-	}
-
-	pts := corev1.PodTemplateSpec{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: labels,
-			Annotations: map[string]string{
-				fmt.Sprintf(
-					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNamePopulateJail,
-				): consts.AnnotationApparmorValueUnconfined,
-			},
-		},
-		Spec: corev1.PodSpec{
-			Affinity:      nodeFilter.Affinity,
-			NodeSelector:  nodeFilter.NodeSelector,
-			Tolerations:   nodeFilter.Tolerations,
-			RestartPolicy: "Never",
-			Volumes:       volumes,
-			Containers:    []corev1.Container{renderContainerPopulateJail(populateJail)},
-		},
-	}
-
-	job.Spec.Template = pts
-
-	err := common.SetVersions(&job, &pts)
-	if err != nil {
-		return batchv1.Job{}, err
-	}
-	return job, nil
+	}, nil
 }

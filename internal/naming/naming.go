@@ -91,6 +91,13 @@ func BuildCronJobNCCLBenchmarkName(clusterName string) string {
 	}.String()
 }
 
+func BuildPopulateJailJobName(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.JobNamePopulateJail,
+	}.String()
+}
+
 func BuildVolumeMountSpoolPath(directory string) string {
 	return path.Join(consts.VolumeMountPathSpool, directory)
 }
