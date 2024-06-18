@@ -7,6 +7,7 @@ const (
 	ContainerNameSshd              = SshdName
 	ContainerNameToolkitValidation = "toolkit-validation"
 	ContainerNameNCCLBenchmark     = ncclBenchmark
+	ContainerNamePopulateJail      = "populate-jail"
 
 	ContainerSecurityContextCapabilitySysAdmin = "SYS_ADMIN"
 )

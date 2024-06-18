@@ -35,6 +35,11 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	Pause bool `json:"pause,omitempty"` // TODO cluster pausing/resuming
 
+	// PopulateJail defines the k8s Job that performs initial jail file system population
+	//
+	// +kubebuilder:validation:Required
+	PopulateJail PopulateJail `json:"populateJail"`
+
 	// PeriodicChecks define the k8s CronJobs performing cluster checks
 	//
 	// +kubebuilder:validation:Required
@@ -60,6 +65,19 @@ type SlurmClusterSpec struct {
 	//
 	// +kubebuilder:validation:Required
 	SlurmNodes SlurmNodes `json:"slurmNodes"`
+}
+
+type PopulateJail struct {
+	// Image defines the populate jail container image
+	//
+	// +kubebuilder:validation:Required
+	Image string `json:"image"`
+
+	// K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
+	// Must correspond to the name of one of [K8sNodeFilter]
+	//
+	// +kubebuilder:validation:Required
+	K8sNodeFilterName string `json:"k8sNodeFilterName"`
 }
 
 // PeriodicChecks define the k8s CronJobs performing cluster checks

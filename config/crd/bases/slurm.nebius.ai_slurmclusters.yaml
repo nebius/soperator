@@ -1115,6 +1115,22 @@ spec:
                 required:
                 - ncclBenchmark
                 type: object
+              populateJail:
+                description: PopulateJail defines the k8s Job that performs initial
+                  jail file system population
+                properties:
+                  image:
+                    description: Image defines the populate jail container image
+                    type: string
+                  k8sNodeFilterName:
+                    description: |-
+                      K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
+                      Must correspond to the name of one of [K8sNodeFilter]
+                    type: string
+                required:
+                - image
+                - k8sNodeFilterName
+                type: object
               secrets:
                 description: Secrets define the [corev1.Secret] references needed
                   for Slurm cluster operation
@@ -4299,6 +4315,7 @@ spec:
             required:
             - k8sNodeFilters
             - periodicChecks
+            - populateJail
             - secrets
             - slurmNodes
             type: object
