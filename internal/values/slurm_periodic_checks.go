@@ -5,19 +5,23 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/naming"
 )
 
 type SlurmNCCLBenchmark struct {
 	slurmv1.NCCLBenchmark
+
+	Name string
 
 	ContainerNCCLBenchmark Container
 
 	VolumeJail slurmv1.NodeVolume
 }
 
-func buildSlurmNCCLBenchmarkFrom(ncclBenchmark *slurmv1.NCCLBenchmark) SlurmNCCLBenchmark {
+func buildSlurmNCCLBenchmarkFrom(clusterName string, ncclBenchmark *slurmv1.NCCLBenchmark) SlurmNCCLBenchmark {
 	return SlurmNCCLBenchmark{
 		NCCLBenchmark: *ncclBenchmark.DeepCopy(),
+		Name:          naming.BuildCronJobNCCLBenchmarkName(clusterName),
 		ContainerNCCLBenchmark: Container{
 			Name:          consts.ContainerNameNCCLBenchmark,
 			NodeContainer: slurmv1.NodeContainer{Image: ncclBenchmark.Image},

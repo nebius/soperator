@@ -37,7 +37,7 @@ func RenderStatefulSet(
 		return appsv1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
-	sts := appsv1.StatefulSet{
+	return appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      worker.StatefulSet.Name,
 			Namespace: namespace,
@@ -62,40 +62,32 @@ func RenderStatefulSet(
 				clusterName,
 				pvcTemplateSpecs,
 			),
-		},
-	}
-	pts := corev1.PodTemplateSpec{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: labels,
-			Annotations: map[string]string{
-				fmt.Sprintf(
-					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmd,
-				): consts.AnnotationApparmorValueUnconfined,
-				fmt.Sprintf(
-					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-				): consts.AnnotationApparmorValueUnconfined,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+					Annotations: map[string]string{
+						fmt.Sprintf(
+							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmd,
+						): consts.AnnotationApparmorValueUnconfined,
+						fmt.Sprintf(
+							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
+						): consts.AnnotationApparmorValueUnconfined,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Affinity:     nodeFilter.Affinity,
+					NodeSelector: nodeFilter.NodeSelector,
+					Tolerations:  nodeFilter.Tolerations,
+					InitContainers: []corev1.Container{
+						renderContainerToolkitValidation(&worker.ContainerToolkitValidation),
+					},
+					Containers: []corev1.Container{
+						renderContainerSlurmd(&worker.ContainerSlurmd, worker.MaxGPU, worker.JailSubMounts),
+						common.RenderContainerMunge(&worker.ContainerMunge),
+					},
+					Volumes: volumes,
+				},
 			},
 		},
-		Spec: corev1.PodSpec{
-			Affinity:     nodeFilter.Affinity,
-			NodeSelector: nodeFilter.NodeSelector,
-			Tolerations:  nodeFilter.Tolerations,
-			InitContainers: []corev1.Container{
-				renderContainerToolkitValidation(&worker.ContainerToolkitValidation),
-			},
-			Containers: []corev1.Container{
-				renderContainerSlurmd(&worker.ContainerSlurmd, worker.MaxGPU, worker.JailSubMounts),
-				common.RenderContainerMunge(&worker.ContainerMunge),
-			},
-			Volumes: volumes,
-		},
-	}
-	sts.Spec.Template = pts
-
-	err = common.SetVersions(&sts, &pts)
-	if err != nil {
-		return appsv1.StatefulSet{}, err
-	}
-
-	return sts, nil
+	}, nil
 }

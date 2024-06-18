@@ -4,4 +4,6 @@ const (
 	SlurmctldName = "slurmctld"
 	SlurmdName    = "slurmd"
 	SshdName      = "sshd"
+
+	ncclBenchmark = "nccl-benchmark"
 )

@@ -6,7 +6,7 @@ const (
 	ContainerNameSlurmd            = SlurmdName
 	ContainerNameSshd              = SshdName
 	ContainerNameToolkitValidation = "toolkit-validation"
-	ContainerNameNCCLBenchmark     = "nccl-benchmark"
+	ContainerNameNCCLBenchmark     = ncclBenchmark
 
 	ContainerSecurityContextCapabilitySysAdmin = "SYS_ADMIN"
 )

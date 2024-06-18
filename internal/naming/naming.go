@@ -84,6 +84,13 @@ func BuildConfigMapNCCLTopologyName(clusterName string) string {
 	}.String()
 }
 
+func BuildCronJobNCCLBenchmarkName(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.CronJobNameNCCLBenchmark,
+	}.String()
+}
+
 func BuildVolumeMountSpoolPath(directory string) string {
 	return path.Join(consts.VolumeMountPathSpool, directory)
 }
