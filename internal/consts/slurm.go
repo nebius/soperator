@@ -4,6 +4,6 @@ const (
 	Slurm       = "slurm"
 	slurmPrefix = Slurm + "-"
 
-	slurmCluster  = Slurm + "cluster"
+	SlurmCluster  = Slurm + "cluster"
 	slurmOperator = slurmPrefix + "operator"
 )

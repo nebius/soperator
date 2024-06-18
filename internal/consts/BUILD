@@ -7,6 +7,7 @@ go_library(
         "component.go",
         "configmap.go",
         "container.go",
+        "cronjob.go",
         "indexfield.go",
         "label.go",
         "secret.go",

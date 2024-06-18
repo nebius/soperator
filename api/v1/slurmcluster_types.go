@@ -451,6 +451,7 @@ type NodeVolumeJailSubMount struct {
 }
 
 const (
+	ConditionClusterCommonAvailable      = "CommonAvailable"
 	ConditionClusterControllersAvailable = "ControllersAvailable"
 	ConditionClusterWorkersAvailable     = "WorkersAvailable"
 	ConditionClusterLoginAvailable       = "LoginAvailable"

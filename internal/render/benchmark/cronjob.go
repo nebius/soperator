@@ -15,7 +15,7 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-func RenderCronJob(
+func RenderNCCLBenchmarkCronJob(
 	namespace,
 	clusterName string,
 	nodeFilters []slurmv1.K8sNodeFilter,
@@ -31,9 +31,9 @@ func RenderCronJob(
 		func(f slurmv1.K8sNodeFilter) string { return f.Name },
 	)
 
-	cj := batchv1.CronJob{
+	return batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      consts.ContainerNameNCCLBenchmark,
+			Name:      ncclBenchmark.Name,
 			Namespace: namespace,
 			Labels:    labels,
 		},
@@ -45,41 +45,33 @@ func RenderCronJob(
 					Parallelism:  ptr.To(int32(1)),
 					Completions:  ptr.To(int32(1)),
 					BackoffLimit: ptr.To(int32(0)),
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: labels,
+							Annotations: map[string]string{
+								fmt.Sprintf(
+									"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameNCCLBenchmark,
+								): consts.AnnotationApparmorValueUnconfined,
+							},
+						},
+						Spec: corev1.PodSpec{
+							Affinity:              nodeFilter.Affinity,
+							NodeSelector:          nodeFilter.NodeSelector,
+							Tolerations:           nodeFilter.Tolerations,
+							ActiveDeadlineSeconds: &ncclBenchmark.ActiveDeadlineSeconds,
+							RestartPolicy:         corev1.RestartPolicyNever,
+							Volumes: []corev1.Volume{
+								common.RenderVolumeSlurmConfigs(clusterName),
+								common.RenderVolumeMungeKey(secrets.MungeKey.Name, secrets.MungeKey.Key),
+								common.RenderVolumeJailFromSource(volumeSources, *ncclBenchmark.VolumeJail.VolumeSourceName),
+							},
+							Containers: []corev1.Container{renderContainerNCCLBenchmark(ncclBenchmark)},
+						},
+					},
 				},
 			},
 			SuccessfulJobsHistoryLimit: &ncclBenchmark.SuccessfulJobsHistoryLimit,
 			FailedJobsHistoryLimit:     &ncclBenchmark.FailedJobsHistoryLimit,
 		},
-	}
-	pts := corev1.PodTemplateSpec{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: labels,
-			Annotations: map[string]string{
-				fmt.Sprintf(
-					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameNCCLBenchmark,
-				): consts.AnnotationApparmorValueUnconfined,
-			},
-		},
-		Spec: corev1.PodSpec{
-			Affinity:              nodeFilter.Affinity,
-			NodeSelector:          nodeFilter.NodeSelector,
-			Tolerations:           nodeFilter.Tolerations,
-			ActiveDeadlineSeconds: &ncclBenchmark.ActiveDeadlineSeconds,
-			RestartPolicy:         corev1.RestartPolicyNever,
-			Volumes: []corev1.Volume{
-				common.RenderVolumeSlurmConfigs(clusterName),
-				common.RenderVolumeMungeKey(secrets.MungeKey.Name, secrets.MungeKey.Key),
-				common.RenderVolumeJailFromSource(volumeSources, *ncclBenchmark.VolumeJail.VolumeSourceName),
-			},
-			Containers: []corev1.Container{renderContainerNCCLBenchmark(ncclBenchmark)},
-		},
-	}
-	cj.Spec.JobTemplate.Spec.Template = pts
-
-	err := common.SetVersions(&cj, &pts)
-	if err != nil {
-		return batchv1.CronJob{}, err
-	}
-
-	return cj, nil
+	}, nil
 }
