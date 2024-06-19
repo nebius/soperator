@@ -30,6 +30,9 @@ RUN apt update && \
         pkg-config \
         software-properties-common \
         squashfs-tools \
+        iputils-ping \
+        dnsutils \
+        telnet \
         strace \
         sudo \
         tree \
