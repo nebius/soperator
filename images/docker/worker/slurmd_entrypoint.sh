@@ -23,9 +23,9 @@ pushd /usr/lib/x86_64-linux-gnu
     ln -s libnvidia-ml.so.1 libnvidia-ml.so
 popd
 
-echo "Unlimit all ulimits"
-ulimit -Sl unlimited && ulimit -Hl unlimited # max locked memory (needed for Infiniband RDMA to work)
-ulimit -Sn 1048576 && ulimit -Hn 1048576 # number of open files
+echo "Set ulimits"
+ulimit -Hl unlimited && ulimit -Sl unlimited # max locked memory (needed for Infiniband RDMA to work)
+ulimit -Hn 1048576 && ulimit -Sn 1048576 # number of open files
 
 echo "Apply sysctl limits from /etc/sysctl.conf"
 sysctl -p

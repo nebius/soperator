@@ -63,7 +63,7 @@ pushd "${jaildir}"
     echo "Bind-mount slurm configs"
     for file in /mnt/slurm-configs/*; do
         filename=$(basename "$file")
-        touch "etc/slurm/$filename" && mount --bind "$file" "etc/slurm/$filename"
+        mount --bind "$file" "etc/slurm/$filename"
     done
 
     if [ -n "$worker" ]; then
@@ -73,7 +73,7 @@ pushd "${jaildir}"
 
     if [ -z "$worker" ]; then
         echo "Bind-mount all GPU-specific empty lib files into the host's libdummy"
-        find "${jaildir}/lib/x86_64-linux-gnu" -maxdepth 1 -type f -empty -print0 | while IFS= read -r -d '' file; do
+        find "${jaildir}/lib/x86_64-linux-gnu" -maxdepth 1 -type f ! -type l -empty -print0 | while IFS= read -r -d '' file; do
             mount --bind "/lib/x86_64-linux-gnu/libdummy.so" "$file"
         done
     fi
