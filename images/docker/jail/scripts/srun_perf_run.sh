@@ -31,10 +31,10 @@ if [ -z "$min_bytes" ] || [ -z "$max_bytes" ] || [ -z "$step_factor" ] || [ -z "
     exit 1
 fi
 
-# TODO: MSP-2184
-#export NCCL_P2P_DISABLE=1
-#export NCCL_SHM_DISABLE=1
-#export NCCL_ALGO=Ring
+# TODO: MSP-2184 make vars optional in operator
+export NCCL_P2P_DISABLE=1
+export NCCL_SHM_DISABLE=1
+export NCCL_ALGO=Ring
 
 perf_output=$(/usr/bin/all_reduce_perf -b "$min_bytes" -e "$max_bytes" -f "$step_factor" -g "$SLURM_GPUS")
 echo "Performance output: $perf_output"
