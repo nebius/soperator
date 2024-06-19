@@ -34,7 +34,7 @@ func (c *PropertiesConfig) AddComment(comment string) {
 func (c *PropertiesConfig) Render() string {
 	var res []string
 	for _, p := range c.props {
-		res = append(res, fmt.Sprintf("%s = %v", p.key, p.value))
+		res = append(res, fmt.Sprintf("%s=%v", p.key, p.value))
 	}
 	return strings.Join(res, "\n")
 }

@@ -45,6 +45,21 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 			}
 		}
 
+		// Sysctl ConfigMap
+		{
+			desired, err := worker.RenderConfigMapSysctl(clusterValues)
+			if err != nil {
+				logger.Error(err, "Failed to render worker Sysctl ConfigMap")
+				return errors.Wrap(err, "rendering worker Sysctl ConfigMap")
+			}
+			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
+			err = r.ConfigMap.Reconcile(ctx, cluster, &desired)
+			if err != nil {
+				logger.Error(err, "Failed to reconcile worker Sysctl ConfigMap")
+				return errors.Wrap(err, "reconciling worker Sysctl ConfigMap")
+			}
+		}
+
 		// Service
 		{
 			desired := worker.RenderService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeWorker)

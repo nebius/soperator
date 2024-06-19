@@ -13,6 +13,8 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
+// region SSH config
+
 // RenderConfigMapSSHConfigs renders new [corev1.ConfigMap] containing sshd config file
 func RenderConfigMapSSHConfigs(cluster *values.SlurmCluster) (corev1.ConfigMap, error) {
 	return corev1.ConfigMap{
@@ -43,3 +45,36 @@ func generateSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddLine("    ChrootDirectory " + consts.VolumeMountPathJail)
 	return res
 }
+
+// endregion SSH config
+
+// region Security limits
+
+// RenderConfigMapSecurityLimits renders new [corev1.ConfigMap] containing security limits config file
+func RenderConfigMapSecurityLimits(cluster *values.SlurmCluster) (corev1.ConfigMap, error) {
+	return corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      naming.BuildConfigMapSecurityLimitsName(cluster.Name),
+			Namespace: cluster.Namespace,
+			Labels:    common.RenderLabels(consts.ComponentTypeLogin, cluster.Name),
+		},
+		Data: map[string]string{
+			consts.ConfigMapKeySecurityLimits: generateSecurityLimitsConfig().Render(),
+		},
+	}, nil
+}
+
+func generateSecurityLimitsConfig() renderutils.ConfigFile {
+	res := &renderutils.RawConfig{}
+	res.AddLine("*       soft    memlock     unlimited")
+	res.AddLine("*       hard    memlock     unlimited")
+	res.AddLine("*       soft    nofile      1048576")
+	res.AddLine("*       hard    nofile      1048576")
+	res.AddLine("root    soft    memlock     unlimited")
+	res.AddLine("root    hard    memlock     unlimited")
+	res.AddLine("root    soft    nofile      1048576")
+	res.AddLine("root    hard    nofile      1048576")
+	return res
+}
+
+// endregion Security limits

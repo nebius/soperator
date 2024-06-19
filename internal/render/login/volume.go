@@ -23,6 +23,7 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeMungeSocket(),
 		renderVolumeSshConfigs(clusterName),
 		renderVolumeSshRootKeys(*secrets.SSHRootPublicKeys),
+		renderVolumeSecurityLimits(clusterName),
 	}
 
 	// Jail could be specified by template spec or by volume source name
@@ -110,5 +111,32 @@ func renderVolumeMountSshRootKeys() corev1.VolumeMount {
 }
 
 // endregion root keys
+
+// region security limits
+
+// renderVolumeSecurityLimits renders [corev1.Volume] containing security limits config contents
+func renderVolumeSecurityLimits(clusterName string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSecurityLimits,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: naming.BuildConfigMapSecurityLimitsName(clusterName),
+				},
+			},
+		},
+	}
+}
+
+// renderVolumeMountSecurityLimits renders [corev1.VolumeMount] defining the mounting path for security limits config
+func renderVolumeMountSecurityLimits() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSecurityLimits,
+		MountPath: consts.VolumeMountPathSecurityLimits,
+		SubPath:   consts.VolumeMountSubPathSecurityLimits,
+	}
+}
+
+// endregion security limits
 
 // endregion SSH
