@@ -43,11 +43,11 @@ func (r *ServiceReconciler) Reconcile(
 }
 
 func (r *ServiceReconciler) patch(existing, desired client.Object) (client.Patch, error) {
-	patchImpl := func(src, dst *corev1.Service) client.Patch {
-		res := client.MergeFrom(src.DeepCopy())
+	patchImpl := func(dst, src *corev1.Service) client.Patch {
+		res := client.MergeFrom(dst.DeepCopy())
 
-		src.Spec.Type = dst.Spec.Type
-		src.Spec.Ports = append([]corev1.ServicePort{}, dst.Spec.Ports...)
+		dst.Spec.Type = src.Spec.Type
+		dst.Spec.Ports = append([]corev1.ServicePort{}, src.Spec.Ports...)
 
 		return res
 	}

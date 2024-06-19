@@ -43,10 +43,10 @@ func (r *JobReconciler) Reconcile(
 }
 
 func (r *JobReconciler) patch(existing, desired client.Object) (client.Patch, error) {
-	patchImpl := func(src, dst *batchv1.Job) client.Patch {
-		res := client.MergeFrom(src.DeepCopy())
+	patchImpl := func(dst, src *batchv1.Job) client.Patch {
+		res := client.MergeFrom(dst.DeepCopy())
 
-		src.Spec.Template.Spec = dst.Spec.Template.Spec
+		dst.Spec.Template.Spec = src.Spec.Template.Spec
 
 		return res
 	}
