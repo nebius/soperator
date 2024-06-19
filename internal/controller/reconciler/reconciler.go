@@ -82,6 +82,13 @@ func (r Reconciler) EnsureDeployed(
 			logger.Error(err, "Failed creating new resource")
 			return err
 		}
+
+		// updating `existing` with newly created resource
+		err = r.Get(ctx, client.ObjectKeyFromObject(desired), existing)
+		if err != nil {
+			logger.Error(err, "Failed to get newly created resource")
+			return errors.Wrap(err, "getting newly created resource")
+		}
 	}
 
 	return nil

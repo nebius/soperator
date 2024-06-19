@@ -45,6 +45,21 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 			}
 		}
 
+		// Security limits ConfigMap
+		{
+			desired, err := login.RenderConfigMapSecurityLimits(clusterValues)
+			if err != nil {
+				logger.Error(err, "Failed to render login Security limits ConfigMap")
+				return errors.Wrap(err, "rendering login Security limits ConfigMap")
+			}
+			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
+			err = r.ConfigMap.Reconcile(ctx, cluster, &desired)
+			if err != nil {
+				logger.Error(err, "Failed to reconcile login Security limits ConfigMap")
+				return errors.Wrap(err, "reconciling login Security limits ConfigMap")
+			}
+		}
+
 		// Service
 		{
 			desired := login.RenderService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeLogin)

@@ -41,6 +41,16 @@ func BuildServiceName(componentType consts.ComponentType, clusterName string) st
 	}.String()
 }
 
+func BuildServiceFQDN(
+	componentType consts.ComponentType,
+	namespace,
+	clusterName string,
+) string {
+	// <svcName>.<namespace>.svc.cluster.local
+	svcName := BuildServiceName(componentType, clusterName)
+	return fmt.Sprintf("%s.%s.svc.cluster.local", svcName, namespace)
+}
+
 func BuildServiceHostFQDN(
 	componentType consts.ComponentType,
 	namespace,
@@ -48,10 +58,8 @@ func BuildServiceHostFQDN(
 	hostIndex int32,
 ) (hostName, hostFQDN string) {
 	// <stsName>-<index>.<svcName>.<namespace>.svc.cluster.local
-	stsName := BuildStatefulSetName(componentType, clusterName)
-	svcName := BuildServiceName(componentType, clusterName)
-	hostName = fmt.Sprintf("%s-%d", stsName, hostIndex)
-	hostFQDN = fmt.Sprintf("%s.%s.%s.svc.cluster.local", hostName, svcName, namespace)
+	hostName = fmt.Sprintf("%s-%d", BuildStatefulSetName(componentType, clusterName), hostIndex)
+	hostFQDN = fmt.Sprintf("%s.%s", hostName, BuildServiceFQDN(componentType, namespace, clusterName))
 	return hostName, hostFQDN
 }
 
@@ -70,6 +78,8 @@ func BuildConfigMapSlurmConfigsName(clusterName string) string {
 	}.String()
 }
 
+// region Login
+
 func BuildConfigMapSSHConfigsName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,
@@ -77,12 +87,32 @@ func BuildConfigMapSSHConfigsName(clusterName string) string {
 	}.String()
 }
 
+func BuildConfigMapSecurityLimitsName(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.ConfigMapNameSecurityLimits,
+	}.String()
+}
+
+// endregion Login
+
+// region Worker
+
 func BuildConfigMapNCCLTopologyName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,
 		entity:      consts.ConfigMapNameNCCLTopology,
 	}.String()
 }
+
+func BuildConfigMapSysctlName(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.ConfigMapNameSysctl,
+	}.String()
+}
+
+// endregion Worker
 
 func BuildCronJobNCCLBenchmarkName(clusterName string) string {
 	return namedEntity{

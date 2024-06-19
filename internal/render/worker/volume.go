@@ -2,6 +2,7 @@ package worker
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -26,6 +27,8 @@ func renderVolumesAndClaimTemplateSpecs(
 		renderVolumeNvidia(),
 		renderVolumeBoot(),
 		renderVolumeNCCLTopology(clusterName),
+		renderVolumeSharedMemory(),
+		renderVolumeSysctl(clusterName),
 	}
 
 	// Spool and Jail could be specified by template spec or by volume source name
@@ -152,3 +155,55 @@ func renderVolumeMountNCCLTopology() corev1.VolumeMount {
 }
 
 // endregion NCCL Topology
+
+// region Shared memory
+
+// renderVolumeSharedMemory renders [corev1.Volume] containing shared memory contents
+func renderVolumeSharedMemory() corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSharedMemory,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{
+				Medium:    corev1.StorageMediumMemory,
+				SizeLimit: ptr.To(resource.MustParse("64Gi")), // TODO subject to be configurable
+			},
+		},
+	}
+}
+
+// renderVolumeMountSharedMemory renders [corev1.VolumeMount] defining the mounting path for shared memory
+func renderVolumeMountSharedMemory() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSharedMemory,
+		MountPath: consts.VolumeMountPathSharedMemory,
+	}
+}
+
+// endregion Shared memory
+
+// region Sysctl
+
+// renderVolumeSysctl renders [corev1.Volume] containing sysctl config contents
+func renderVolumeSysctl(clusterName string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSysctl,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: naming.BuildConfigMapSysctlName(clusterName),
+				},
+			},
+		},
+	}
+}
+
+// renderVolumeMountSysctl renders [corev1.VolumeMount] defining the mounting path for sysctl config
+func renderVolumeMountSysctl() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSysctl,
+		MountPath: consts.VolumeMountPathSysctl,
+		SubPath:   consts.VolumeMountSubPathSysctl,
+	}
+}
+
+// endregion Sysctl

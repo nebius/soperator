@@ -9,6 +9,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
@@ -83,6 +84,11 @@ func RenderStatefulSet(
 						common.RenderContainerMunge(&login.ContainerMunge),
 					},
 					Volumes: volumes,
+					DNSConfig: &corev1.PodDNSConfig{
+						Searches: []string{
+							naming.BuildServiceFQDN(consts.ComponentTypeWorker, namespace, clusterName),
+						},
+					},
 				},
 			},
 		},

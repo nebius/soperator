@@ -58,6 +58,8 @@ func renderContainerSlurmd(
 		renderVolumeMountNvidia(),
 		renderVolumeMountBoot(),
 		renderVolumeMountNCCLTopology(),
+		renderVolumeMountSharedMemory(),
+		renderVolumeMountSysctl(),
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
 
@@ -110,6 +112,7 @@ func renderContainerSlurmd(
 			SeccompProfile: &corev1.SeccompProfile{
 				Type: corev1.SeccompProfileTypeUnconfined,
 			},
+			ProcMount: ptr.To(corev1.UnmaskedProcMount),
 		},
 		Resources: corev1.ResourceRequirements{
 			Limits: corev1.ResourceList{

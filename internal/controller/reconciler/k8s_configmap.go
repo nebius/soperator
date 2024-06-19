@@ -43,10 +43,10 @@ func (r *ConfigMapReconciler) Reconcile(
 }
 
 func (r *ConfigMapReconciler) patch(existing, desired client.Object) (client.Patch, error) {
-	patchImpl := func(src, dst *corev1.ConfigMap) client.Patch {
-		res := client.MergeFrom(src.DeepCopy())
+	patchImpl := func(dst, src *corev1.ConfigMap) client.Patch {
+		res := client.MergeFrom(dst.DeepCopy())
 
-		src.Data = dst.Data
+		dst.Data = src.Data
 
 		return res
 	}

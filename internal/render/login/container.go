@@ -3,6 +3,7 @@ package login
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -21,6 +22,7 @@ func renderContainerSshd(
 		common.RenderVolumeMountMungeSocket(),
 		renderVolumeMountSshConfigs(),
 		renderVolumeMountSshRootKeys(),
+		renderVolumeMountSecurityLimits(),
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
 
@@ -42,6 +44,7 @@ func renderContainerSshd(
 			},
 		},
 		SecurityContext: &corev1.SecurityContext{
+			Privileged: ptr.To(true),
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{
 					consts.ContainerSecurityContextCapabilitySysAdmin,

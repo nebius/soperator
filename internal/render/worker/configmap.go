@@ -11,6 +11,8 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
+// region NCCL topology
+
 // RenderConfigMapNCCLTopology renders new [corev1.ConfigMap] containing NCCL topology config file
 func RenderConfigMapNCCLTopology(cluster *values.SlurmCluster) (corev1.ConfigMap, error) {
 	return corev1.ConfigMap{
@@ -99,3 +101,29 @@ func generateVirtualTopology() renderutils.ConfigFile {
 	res.AddLine("</system>")
 	return res
 }
+
+// endregion NCCL topology
+
+// region Sysctl
+
+// RenderConfigMapSysctl renders new [corev1.ConfigMap] containing sysctl config file
+func RenderConfigMapSysctl(cluster *values.SlurmCluster) (corev1.ConfigMap, error) {
+	return corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      naming.BuildConfigMapSysctlName(cluster.Name),
+			Namespace: cluster.Namespace,
+			Labels:    common.RenderLabels(consts.ComponentTypeWorker, cluster.Name),
+		},
+		Data: map[string]string{
+			consts.ConfigMapKeySysctl: generateSysctlConfig().Render(),
+		},
+	}, nil
+}
+
+func generateSysctlConfig() renderutils.ConfigFile {
+	res := &renderutils.PropertiesConfig{}
+	res.AddProperty("vm.max_map_count", 655300)
+	return res
+}
+
+// endregion Sysctl

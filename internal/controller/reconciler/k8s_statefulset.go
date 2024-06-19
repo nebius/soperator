@@ -44,13 +44,13 @@ func (r *StatefulSetReconciler) Reconcile(
 }
 
 func (r *StatefulSetReconciler) patch(existing, desired client.Object) (client.Patch, error) {
-	patchImpl := func(src, dst *appsv1.StatefulSet) client.Patch {
-		res := client.MergeFrom(src.DeepCopy())
+	patchImpl := func(dst, src *appsv1.StatefulSet) client.Patch {
+		res := client.MergeFrom(dst.DeepCopy())
 
-		src.Spec.Replicas = dst.Spec.Replicas
-		src.Spec.UpdateStrategy = dst.Spec.UpdateStrategy
-		src.Spec.VolumeClaimTemplates = append([]corev1.PersistentVolumeClaim{}, dst.Spec.VolumeClaimTemplates...)
-		src.Spec.Template.Spec = dst.Spec.Template.Spec
+		dst.Spec.Replicas = src.Spec.Replicas
+		dst.Spec.UpdateStrategy = src.Spec.UpdateStrategy
+		dst.Spec.VolumeClaimTemplates = append([]corev1.PersistentVolumeClaim{}, src.Spec.VolumeClaimTemplates...)
+		dst.Spec.Template.Spec = src.Spec.Template.Spec
 
 		return res
 	}
