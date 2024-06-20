@@ -34,7 +34,7 @@ func renderContainerNCCLBenchmark(ncclBenchmark *values.SlurmNCCLBenchmark) core
 				Value: ncclBenchmark.NCCLSettings.Timeout,
 			},
 			{
-				Name:  "NCCL_THRESHOLD_MORE_THAN",
+				Name:  "THRESHOLD_MORE_THAN",
 				Value: ncclBenchmark.NCCLSettings.ThresholdMoreThan,
 			},
 			{

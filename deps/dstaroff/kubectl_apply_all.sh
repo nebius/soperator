@@ -29,5 +29,5 @@ kubectl --context="$context_name" --namespace=dstaroff apply -f node/controller/
 kubectl --context="$context_name" --namespace=dstaroff apply -f common/jail/mount_daemonset.yaml
 kubectl --context="$context_name" --namespace=dstaroff rollout status daemonset jail-mount --timeout=10h
 
-kubectl --context="$context_name" --namespace=dstaroff apply -f common/jail/populate_jail_job.yaml
-kubectl --context="$context_name" --namespace=dstaroff wait --for=condition=complete --timeout=10h job/populate-jail
+kubectl --context="$context_name" --namespace=dstaroff apply -f common/config/munge_key_secret.yaml
+kubectl --context="$context_name" --namespace=dstaroff apply -f common/config/ssh_root_keys_secret.yaml

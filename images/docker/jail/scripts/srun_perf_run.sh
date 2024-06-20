@@ -1,6 +1,6 @@
 #!/bin/bash
 
-while getopts ":b:e:f:d:" opt; do
+while getopts ":b:e:f:l:d:" opt; do
   case ${opt} in
     b )
       min_bytes=$OPTARG
@@ -10,6 +10,9 @@ while getopts ":b:e:f:d:" opt; do
       ;;
     f )
       step_factor=$OPTARG
+      ;;
+    l )
+      limit=$OPTARG
       ;;
     d )
       drain_state=$OPTARG
@@ -26,8 +29,8 @@ while getopts ":b:e:f:d:" opt; do
 done
 shift $((OPTIND -1))
 
-if [ -z "$min_bytes" ] || [ -z "$max_bytes" ] || [ -z "$step_factor" ] || [ -z "$drain_state" ]; then
-    echo "Usage: $0 -b <min_bytes> -e <max_bytes> -f <step_factor> -d <drain_state>" >&2
+if [ -z "$min_bytes" ] || [ -z "$max_bytes" ] || [ -z "$step_factor" ] || [ -z "$limit" ] || [ -z "$drain_state" ]; then
+    echo "Usage: $0 -b <min_bytes> -e <max_bytes> -f <step_factor> -l <limit> -d <drain_state>" >&2
     exit 1
 fi
 
@@ -48,12 +51,12 @@ fi
 current_node=$(hostname)
 echo "Current node: $current_node"
 
-if [ "$(echo "$avg_bandwidth == 0" | bc)" -eq 1 ]; then
+if [ "$(echo "$avg_bandwidth < $limit" | bc)" -eq 1 ]; then
   echo "Avg bus bandwidth = $avg_bandwidth"
   if [ "$drain_state" = "true" ]; then
-    reason="GPUPerfProblem avg bus bandwidth = $avg_bandwidth"
+    reason="GPUPerfProblem: all_reduce_perf: avg bus bandwidth = $avg_bandwidth, min = $limit"
     scontrol update NodeName="$current_node" State=drain Reason="$reason"
-    echo "$(hostname) node drained with reason: $reason"
+    echo "$(hostname) node drained at $(date) with reason: $reason"
   fi
   exit 1
 else

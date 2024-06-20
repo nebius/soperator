@@ -2,7 +2,7 @@
 
 set -e
 
-while getopts ":b:e:f:g:t:d:" opt; do
+while getopts ":b:e:f:g:t:l:d:" opt; do
   case ${opt} in
     b )
       min_bytes=$OPTARG
@@ -18,6 +18,9 @@ while getopts ":b:e:f:g:t:d:" opt; do
       ;;
     t )
       bench_timout=$OPTARG
+      ;;
+    l )
+      limit=$OPTARG
       ;;
     d )
       drain_state=$OPTARG
@@ -39,8 +42,8 @@ if [ -z "$num_gpus" ]; then
   num_gpus=$(sinfo -N -o "%G" | awk -F '[:,=()]' '/gpu/ {for (i=1; i<=NF; i++) if ($i == "gpu") {print $(i+2)}}' | sort -n | head -1)
 fi
 
-if [ -z "$min_bytes" ] || [ -z "$max_bytes" ] || [ -z "$step_factor" ] || [ -z "$bench_timout" ] || [ -z "$drain_state" ]; then
-    echo "Usage: $0 -b <min_bytes> -e <max_bytes> -f <step_factor> [-g <num_gpus>] -t <bench_timout> -d <drain_state>" >&2
+if [ -z "$min_bytes" ] || [ -z "$max_bytes" ] || [ -z "$step_factor" ] || [ -z "$bench_timout" ] || [ -z "$limit" ] || [ -z "$drain_state" ]; then
+    echo "Usage: $0 -b <min_bytes> -e <max_bytes> -f <step_factor> -t <bench_timout> -l <limit> -d <drain_state>" >&2
     exit 1
 fi
 
@@ -58,7 +61,8 @@ run_job_on_node() {
   local min_bytes=$6
   local max_bytes=$7
   local step_factor=$8
-  local drain_state=$9
+  local limit=$9
+  local drain_state=${10}
 
   job_exists=$(squeue --name="$job_name" --nodelist="$node" -o "%.100j" | grep -w "$job_name")
 
@@ -73,7 +77,7 @@ run_job_on_node() {
          --exclusive \
          --gpus="$num_gpus" \
          --time="$bench_timout" \
-         /usr/bin/srun_perf_run.sh -b "$min_bytes" -e "$max_bytes" -f "$step_factor" -d "$drain_state"
+         /usr/bin/srun_perf_run.sh -b "$min_bytes" -e "$max_bytes" -f "$step_factor" -l "$limit" -d "$drain_state"
     echo "exit_code $?"
   fi
 }
@@ -81,7 +85,7 @@ run_job_on_node() {
 export -f run_job_on_node
 
 # Run jobs in parallel and capture exit codes
-output=$(parallel --no-notice -j 0 run_job_on_node ::: "$ready_nodes" ::: "$job_name" ::: "$ntasks_per_node" ::: "$num_gpus" ::: "$bench_timout" ::: "$min_bytes" ::: "$max_bytes" ::: "$step_factor" ::: "$drain_state")
+output=$(parallel --no-notice -j 0 run_job_on_node ::: "$ready_nodes" ::: "$job_name" ::: "$ntasks_per_node" ::: "$num_gpus" ::: "$bench_timout" ::: "$min_bytes" ::: "$max_bytes" ::: "$step_factor" ::: "$limit" ::: "$drain_state")
 echo "$output"
 
 exit_codes=$(echo "$output" | grep 'exit_code' | awk '{print $2}')

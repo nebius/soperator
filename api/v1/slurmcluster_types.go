@@ -310,6 +310,7 @@ type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
 
 	// MaxGPU represents the maximal number of GPUs available for one worker
+	// TODO: Put it to the Slurmd.Resources
 	//
 	// +kubebuilder:validation:Required
 	MaxGPU int32 `json:"maxGpu"`

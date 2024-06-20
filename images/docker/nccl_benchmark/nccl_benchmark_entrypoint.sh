@@ -24,10 +24,12 @@ munged --num-threads="$MUNGE_NUM_THREADS" --key-file="$MUNGE_KEY_FILE" --pid-fil
 echo "Waiting until munge started"
 while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done
 
+echo "Start NCCL test benchmark"
 /usr/bin/srun_perf.sh \
     -b "$NCCL_MIN_BYTES" \
     -e "$NCCL_MAX_BYTES" \
     -f "$NCCL_STEP_FACTOR" \
     -g "$NCCL_GPU_NUM" \
     -t "$NCCL_BENCH_TIMOUT" \
+    -l "$THRESHOLD_MORE_THAN" \
     -d "$DRAIN_SLURM_STATE"
