@@ -53,6 +53,7 @@ pushd "${jaildir}"
             --utility \
             --compute \
             "${jaildir}"
+        touch "etc/gpu_libs_installed.flag"
     fi
 
     if [ -n "$worker" ]; then
@@ -63,7 +64,7 @@ pushd "${jaildir}"
     echo "Bind-mount slurm configs"
     for file in /mnt/slurm-configs/*; do
         filename=$(basename "$file")
-        mount --bind "$file" "etc/slurm/$filename"
+        touch "etc/slurm/$filename" && mount --bind "$file" "etc/slurm/$filename"
     done
 
     if [ -n "$worker" ]; then
@@ -72,6 +73,10 @@ pushd "${jaildir}"
     fi
 
     if [ -z "$worker" ]; then
+        while [ ! -f "etc/gpu_libs_installed.flag" ]; do
+            echo "Waiting for GPU libs to be propagated to the jail from a worker node"
+            sleep 10
+        done
         echo "Bind-mount all GPU-specific empty lib files into the host's libdummy"
         find "${jaildir}/lib/x86_64-linux-gnu" -maxdepth 1 -type f ! -type l -empty -print0 | while IFS= read -r -d '' file; do
             mount --bind "/lib/x86_64-linux-gnu/libdummy.so" "$file"

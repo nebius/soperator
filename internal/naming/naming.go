@@ -14,21 +14,30 @@ const (
 )
 
 type namedEntity struct {
+	// clusterName is an optional name of the cluster.
+	// empty if nothing
 	clusterName string
 
 	// componentType defines whether the entity belongs to some component.
 	// nil if common
 	componentType *consts.ComponentType
 
+	// entity is an optional K8S resource marker (e.g. "sts", "svc", etc.)
+	// empty if nothing
 	entity string
 }
 
 func (e namedEntity) String() string {
-	es := []string{e.clusterName}
+	var es []string
+	if e.clusterName != "" {
+		es = append(es, e.clusterName)
+	}
 	if e.componentType != nil {
 		es = append(es, (*e.componentType).String())
 	}
-	es = append(es, e.entity)
+	if e.entity != "" {
+		es = append(es, e.entity)
+	}
 
 	return strings.Join(es, "-")
 }
@@ -66,8 +75,8 @@ func BuildServiceHostFQDN(
 func BuildStatefulSetName(componentType consts.ComponentType, clusterName string) string {
 	return namedEntity{
 		componentType: &componentType,
-		clusterName:   clusterName,
-		entity:        entityStatefulSet,
+		clusterName:   "",
+		entity:        "",
 	}.String()
 }
 

@@ -1,0 +1,185 @@
+# Usage of quote-wrapping for string literals in this example acts like a visual mark for referring to other resources
+# like user-created PVCs or 3rd-party annotations
+
+apiVersion: slurm.nebius.ai/v1
+kind: SlurmCluster
+metadata:
+  namespace: slurm-poc
+  name: slurm2
+spec:
+  crVersion: 0.1.8
+  pause: false
+  populateJail:
+    image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest
+    k8sNodeFilterName: "gpu"
+  periodicChecks:
+    ncclBenchmark:
+      enabled: true
+      schedule: "0 */3 * * *" # Run every 3 hours
+      activeDeadlineSeconds: 1800 # k8s CronJob timeout seconds (30 min)
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 3
+      image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/nccl_benchmark:latest
+      ncclSettings:
+        minBytes: "512Mb"
+        maxBytes: "8Gb"
+        stepFactor: "2"
+        timeout: "20:00" # 20 minutes
+        thresholdMoreThan: "42"
+      failureActions:
+        setSlurmNodeDrainState: true
+      k8sNodeFilterName: "no-gpu"
+  k8sNodeFilters:
+    - name: gpu
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: "nebius.com/node-group-id"
+                    operator: In
+                    values:
+                      - "f2mpmlsb2me7caebvaje"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+    - name: no-gpu
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: "nebius.com/node-group-id"
+                    operator: In
+                    values:
+                      - "f2misrg1i9vtg1mtcqg3"
+    - name: no-gpu-controller
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: "nebius.com/node-group-id"
+                    operator: In
+                    values:
+                      - "f2misrg1i9vtg1mtcqg3"
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: "app.kubernetes.io/component"
+                  operator: In
+                  values:
+                    - "controller"
+              topologyKey: "kubernetes.io/hostname"
+    - name: no-gpu-login
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: "nebius.com/node-group-id"
+                    operator: In
+                    values:
+                      - "f2misrg1i9vtg1mtcqg3"
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: "app.kubernetes.io/component"
+                      operator: In
+                      values:
+                        - "login"
+                topologyKey: "kubernetes.io/hostname"
+  volumeSources:
+    - name: controller-spool
+      persistentVolumeClaim:
+        claimName: "controller-spool"
+        readOnly: false
+    - name: jail
+      persistentVolumeClaim:
+        claimName: "jail"
+        readOnly: false
+  secrets:
+    mungeKey:
+      name: "munge-key"
+      key: "munge.key"
+    sshRootPublicKeys:
+      name: "ssh-root-keys"
+      key: "authorized_keys"
+  slurmNodes:
+    controller:
+      size: 2
+      k8sNodeFilterName: "no-gpu-controller"
+      slurmctld:
+        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/controller_slurmctld:latest"
+        port: 6817
+        resources:
+          cpu: 1000m
+          memory: 3Gi
+          ephemeralStorage: 20Gi
+      munge:
+        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
+        resources:
+          cpu: 1000m
+          memory: 1Gi
+          ephemeralStorage: 5Gi
+      volumes:
+        spool:
+          volumeSourceName: "controller-spool"
+        jail:
+          volumeSourceName: "jail"
+    worker:
+      size: 2
+      k8sNodeFilterName: "gpu"
+      maxGpu: 8
+      slurmd:
+        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/worker_slurmd:latest"
+        port: 6818
+        resources:
+          cpu: 156000m
+          memory: 1220Gi
+          ephemeralStorage: 55Gi
+      munge:
+        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
+        resources:
+          cpu: 2000m
+          memory: 4Gi
+          ephemeralStorage: 5Gi
+      volumes:
+        spool:
+          volumeClaimTemplateSpec:
+            storageClassName: "nebius-network-ssd"
+            accessModes: [ "ReadWriteOnce" ]
+            resources:
+              requests:
+                storage: 128Gi
+        jail:
+          volumeSourceName: "jail"
+        jailSubMounts: []
+    login:
+      size: 2
+      k8sNodeFilterName: "no-gpu-login"
+      sshd:
+        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/login_sshd:latest"
+        port: 22
+        resources:
+          cpu: 3000m
+          memory: 9Gi
+          ephemeralStorage: 30Gi
+      sshdServiceType: "LoadBalancer"
+      munge:
+        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
+        resources:
+          cpu: 500m
+          memory: 500Mi
+          ephemeralStorage: 5Gi
+      volumes:
+        jail:
+          volumeSourceName: "jail"
+        jailSubMounts: []
