@@ -41,7 +41,7 @@ pushd "${jaildir}"
     mount --bind /etc/hosts etc/hosts
 
     if [ -n "$worker" ]; then
-        echo "Run nvidia-container-cli to propagate NVIDA drivers, CUDA, NVML and other GPU-related stuff to the jail"
+        echo "Run nvidia-container-cli to propagate NVIDIA drivers, CUDA, NVML and other GPU-related stuff to the jail"
         nvidia-container-cli \
             --user \
             --debug=/dev/stderr \

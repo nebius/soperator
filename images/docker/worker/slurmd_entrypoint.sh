@@ -49,5 +49,22 @@ echo "Detect available GPUs"
 # See Slurm docs: https://slurm.schedmd.com/gres.html#AutoDetect
 GRES=$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -e 's/ /_/g' -e 's/.*/\L&/' | sort | uniq -c | awk '{print "gpu:" $2 ":" $1}' | paste -sd "," -)
 
+
+# Hack with logs: multilog will write log in stdout and in log file, and rotate log file
+MULTILOGS=/var/log/slurm/multilog
+CURRENT_MULTILOG=$MULTILOGS/current
+
+mkdir -p $MULTILOGS
+touch $CURRENT_MULTILOG
+ln -s $CURRENT_MULTILOG /var/log/slurm/slurmd.log
+
+exec 2>&1
+
+# # s100000000 (bytes) - 100MB, n5 - 5 files
 echo "Start slurmd daemon"
-/usr/sbin/slurmd -D -Z --conf "NodeHostname=${K8S_POD_NAME} NodeAddr=${K8S_POD_NAME}.worker.${K8S_POD_NAMESPACE}.svc.cluster.local Gres=${GRES}"
+exec /usr/sbin/slurmd \
+  -D \
+  -Z \
+  --conf \
+  "NodeHostname=${K8S_POD_NAME} NodeAddr=${K8S_POD_NAME}.worker.${K8S_POD_NAMESPACE}.svc.cluster.local Gres=${GRES}" \
+  2>&1 | tee >(multilog s100000000 n5 $MULTILOGS)

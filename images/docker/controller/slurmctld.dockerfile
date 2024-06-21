@@ -34,7 +34,8 @@ RUN apt-get update && \
         strace \
         vim \
         tree \
-        lsof
+        lsof \
+        daemontools
 
 # Install PMIx
 COPY docker/common/scripts/install_pmix.sh /opt/bin/
