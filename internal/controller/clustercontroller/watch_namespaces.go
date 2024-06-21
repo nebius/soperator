@@ -8,9 +8,15 @@ import (
 type WatchNamespaces []string
 
 func NewWatchNamespaces(env string) WatchNamespaces {
-	env = strings.Trim(env, " ")
-	namespaces := strings.Split(env, " ")
-	return namespaces
+	namespacesFromEnv := strings.Split(env, ",")
+	var watchNamespaces []string
+	for _, ns := range namespacesFromEnv {
+		ns = strings.TrimSpace(ns)
+		if len(ns) > 0 {
+			watchNamespaces = append(watchNamespaces, ns)
+		}
+	}
+	return watchNamespaces
 }
 
 const allNamespaces = "*"
