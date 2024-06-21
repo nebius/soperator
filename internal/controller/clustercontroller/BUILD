@@ -11,6 +11,7 @@ go_library(
         "populate_job.go",
         "reconcile.go",
         "reconcile_external.go",
+        "watch_namespaces.go",
     ],
     importpath = "nebius.ai/slurm-operator/internal/controller/clustercontroller",
     visibility = ["//msp/slurm-service:__subpackages__"],

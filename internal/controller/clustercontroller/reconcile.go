@@ -3,6 +3,7 @@ package clustercontroller
 import (
 	"context"
 	errorsStd "errors"
+	"os"
 
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -45,6 +46,8 @@ import (
 type SlurmClusterReconciler struct {
 	*reconciler.Reconciler
 
+	WatchNamespaces WatchNamespaces
+
 	ConfigMap   *reconciler.ConfigMapReconciler
 	CronJob     *reconciler.CronJobReconciler
 	Job         *reconciler.JobReconciler
@@ -54,13 +57,15 @@ type SlurmClusterReconciler struct {
 
 func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *SlurmClusterReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
+	watchNamespacesEnv := os.Getenv("SLURM_OPERATOR_WATCH_NAMESPACES")
 	return &SlurmClusterReconciler{
-		Reconciler:  r,
-		ConfigMap:   reconciler.NewConfigMapReconciler(r),
-		CronJob:     reconciler.NewCronJobReconciler(r),
-		Job:         reconciler.NewJobReconciler(r),
-		Service:     reconciler.NewServiceReconciler(r),
-		StatefulSet: reconciler.NewStatefulSetReconciler(r),
+		Reconciler:      r,
+		WatchNamespaces: NewWatchNamespaces(watchNamespacesEnv),
+		ConfigMap:       reconciler.NewConfigMapReconciler(r),
+		CronJob:         reconciler.NewCronJobReconciler(r),
+		Job:             reconciler.NewJobReconciler(r),
+		Service:         reconciler.NewServiceReconciler(r),
+		StatefulSet:     reconciler.NewStatefulSetReconciler(r),
 	}
 }
 
@@ -72,6 +77,11 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		logfield.ClusterName, req.Name,
 	)
 	log.IntoContext(ctx, logger)
+
+	// If the namespace isn't watched, we have nothing to do
+	if !r.WatchNamespaces.IsWatched(req.NamespacedName.Namespace) {
+		return ctrl.Result{}, nil
+	}
 
 	slurmCluster := &slurmv1.SlurmCluster{}
 	err := r.Get(ctx, req.NamespacedName, slurmCluster)
