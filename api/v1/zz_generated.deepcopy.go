@@ -408,6 +408,13 @@ func (in *SlurmNodeLogin) DeepCopyInto(out *SlurmNodeLogin) {
 	out.SlurmNode = in.SlurmNode
 	in.Sshd.DeepCopyInto(&out.Sshd)
 	in.Munge.DeepCopyInto(&out.Munge)
+	if in.SshdServiceAnnotations != nil {
+		in, out := &in.SshdServiceAnnotations, &out.SshdServiceAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	in.Volumes.DeepCopyInto(&out.Volumes)
 }
 

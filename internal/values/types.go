@@ -34,18 +34,22 @@ func buildContainerFrom(
 // region Service
 
 type Service struct {
-	Name     string
-	Type     corev1.ServiceType
-	Protocol corev1.Protocol
+	Name           string
+	Type           corev1.ServiceType
+	Annotations    map[string]string
+	LoadBalancerIP string
+	Protocol       corev1.Protocol
 }
 
 func buildServiceFrom(
 	name string,
 ) Service {
 	return Service{
-		Name:     name,
-		Type:     corev1.ServiceTypeClusterIP,
-		Protocol: corev1.ProtocolTCP,
+		Name:           name,
+		Type:           corev1.ServiceTypeClusterIP,
+		Annotations:    map[string]string{},
+		LoadBalancerIP: "",
+		Protocol:       corev1.ProtocolTCP,
 	}
 }
 

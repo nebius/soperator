@@ -1809,6 +1809,16 @@ spec:
                         required:
                         - image
                         type: object
+                      sshdServiceAnnotations:
+                        additionalProperties:
+                          type: string
+                        description: SshdServiceAnnotations represent K8S annotations
+                          that should be added to the Login node service
+                        type: object
+                      sshdServiceLoadBalancerIP:
+                        description: SshdServiceLoadBalancerIP represents the static
+                          IP address of the LoadBalancer service
+                        type: string
                       sshdServiceType:
                         description: SshdServiceType represents the service type for
                           the SSH daemon

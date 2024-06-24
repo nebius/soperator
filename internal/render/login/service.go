@@ -14,13 +14,15 @@ import (
 func RenderService(namespace, clusterName string, login *values.SlurmLogin) corev1.Service {
 	return corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      login.Service.Name,
-			Namespace: namespace,
-			Labels:    common.RenderLabels(consts.ComponentTypeLogin, clusterName),
+			Name:        login.Service.Name,
+			Namespace:   namespace,
+			Labels:      common.RenderLabels(consts.ComponentTypeLogin, clusterName),
+			Annotations: login.Service.Annotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Type:     login.Service.Type,
-			Selector: common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName),
+			Type:           login.Service.Type,
+			Selector:       common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName),
+			LoadBalancerIP: login.Service.LoadBalancerIP,
 			Ports: []corev1.ServicePort{{
 				Protocol:   login.Service.Protocol,
 				Port:       login.ContainerSshd.Port,
