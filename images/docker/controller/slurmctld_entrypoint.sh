@@ -21,5 +21,8 @@ chmod 755 /var/spool/slurmctld # It changes permissions of this shared directory
 echo "Waiting until munge started"
 while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done
 
+# Hack with logs: multilog will write log in stdout and in log file, and rotate log file
+# # s100000000 (bytes) - 100MB, n5 - 5 files
+
 echo "Start slurmctld daemon"
-/usr/sbin/slurmctld -D
+exec /usr/sbin/slurmctld -D 2>&1 | tee >(multilog s100000000 n5 /var/log/slurm/multilog)
