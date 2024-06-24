@@ -97,6 +97,11 @@ RUN rm -rf /home
 # Expose the port used for accessing slurmd
 EXPOSE 6818
 
+# Create dir and file for multilog hack
+RUN mkdir -p /var/log/slurm/multilog && \
+    touch /var/log/slurm/multilog/current && \
+    ln -s /var/log/slurm/multilog/current /var/log/slurm/slurmd.log
+
 # Copy & run the entrypoint script
 COPY docker/worker/slurmd_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh
