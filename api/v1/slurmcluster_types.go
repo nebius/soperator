@@ -370,12 +370,12 @@ type SlurmNodeLogin struct {
 	// SshdServiceAnnotations represent K8S annotations that should be added to the Login node service
 	//
 	// +kubebuilder:validation:Optional
-	SshdServiceAnnotations map[string]string `json:"sshdServiceAnnotations"`
+	SshdServiceAnnotations map[string]string `json:"sshdServiceAnnotations,omitempty"`
 
 	// SshdServiceLoadBalancerIP represents the static IP address of the LoadBalancer service
 	//
 	// +kubebuilder:validation:Optional
-	SshdServiceLoadBalancerIP string `json:"sshdServiceLoadBalancerIP"`
+	SshdServiceLoadBalancerIP string `json:"sshdServiceLoadBalancerIP,omitempty"`
 
 	// Volumes represents the volume configurations for the login node
 	//
