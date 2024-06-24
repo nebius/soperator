@@ -25,6 +25,8 @@ type SlurmLogin struct {
 func buildSlurmLoginFrom(clusterName string, login *slurmv1.SlurmNodeLogin) SlurmLogin {
 	svc := buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeLogin, clusterName))
 	svc.Type = login.SshdServiceType
+	svc.Annotations = login.SshdServiceAnnotations
+	svc.LoadBalancerIP = login.SshdServiceLoadBalancerIP
 
 	res := SlurmLogin{
 		SlurmNode: *login.SlurmNode.DeepCopy(),

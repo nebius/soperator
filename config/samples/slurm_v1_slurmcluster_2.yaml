@@ -7,7 +7,7 @@ metadata:
   namespace: slurm-poc
   name: slurm2
 spec:
-  crVersion: 0.1.8
+  crVersion: 0.1.9
   pause: false
   populateJail:
     image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest
@@ -173,6 +173,9 @@ spec:
           memory: 9Gi
           ephemeralStorage: 30Gi
       sshdServiceType: "LoadBalancer"
+      sshdServiceAnnotations:
+        external-dns.alpha.kubernetes.io/hostname: "slurm2.slurm-operator.msp-dev.nemax.nebius.cloud."
+      sshdServiceLoadBalancerIP: "195.242.16.24"
       munge:
         image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
         resources:

@@ -310,7 +310,6 @@ type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
 
 	// MaxGPU represents the maximal number of GPUs available for one worker
-	// TODO: Put it to the Slurmd.Resources
 	//
 	// +kubebuilder:validation:Required
 	MaxGPU int32 `json:"maxGpu"`
@@ -367,6 +366,16 @@ type SlurmNodeLogin struct {
 	//
 	// +kubebuilder:validation:Required
 	SshdServiceType corev1.ServiceType `json:"sshdServiceType"`
+
+	// SshdServiceAnnotations represent K8S annotations that should be added to the Login node service
+	//
+	// +kubebuilder:validation:Optional
+	SshdServiceAnnotations map[string]string `json:"sshdServiceAnnotations,omitempty"`
+
+	// SshdServiceLoadBalancerIP represents the static IP address of the LoadBalancer service
+	//
+	// +kubebuilder:validation:Optional
+	SshdServiceLoadBalancerIP string `json:"sshdServiceLoadBalancerIP,omitempty"`
 
 	// Volumes represents the volume configurations for the login node
 	//
