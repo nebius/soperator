@@ -32,6 +32,9 @@ CHART_PATH                  = helm
 CHART_OPERATOR_PATH         = $(CHART_PATH)/slurm-operator
 CHART_OPERATOR_VERSION_FILE = $(CHART_PATH)/slurm-operator.version
 CHART_OPERATOR_VERSION      = $(shell cat $(CHART_OPERATOR_VERSION_FILE))
+CHART_CLUSTER_PATH          = $(CHART_PATH)/slurm-cluster
+CHART_CLUSTER_VERSION_FILE  = $(CHART_PATH)/slurm-cluster.version
+CHART_CLUSTER_VERSION       = $(shell cat $(CHART_CLUSTER_VERSION_FILE))
 
 .PHONY: all
 all: build
@@ -207,6 +210,7 @@ $(YQ): $(LOCALBIN)
 
 .PHONY: helm
 helm: kustomize helmify yq
+	# region operator
 	mv $(CHART_OPERATOR_PATH)/Chart.yaml $(CHART_PATH)/operator-chart.yaml
 
 	rm -rf $(CHART_OPERATOR_PATH)
@@ -216,3 +220,8 @@ helm: kustomize helmify yq
 
 	$(YQ) -i 'del(.controllerManager.manager.image.tag)' "$(CHART_OPERATOR_PATH)/values.yaml"
 	$(YQ) -i ".version = \"$(CHART_OPERATOR_VERSION)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
+	# endregion operator
+
+	# region cluster
+	$(YQ) -i ".version = \"$(CHART_CLUSTER_VERSION)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
+	#endregion cluster

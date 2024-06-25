@@ -1,0 +1,183 @@
+clusterName: "slurm1"
+
+# Additional annotations for the cluster
+annotations: {}
+
+# Whether to gracefully stop the cluster. Setting it to false after cluster has been paused starts the cluster back
+pause: false
+
+# K8s node filters used in Slurm node specifications. Define which nodes should be used to allocate pods to
+k8sNodeFilters:
+  - name: gpu
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: "nebius.com/node-group-id"
+                  operator: In
+                  values:
+                    - "f2mpmlsb2me7caebvaje"
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+  - name: no-gpu
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: "nebius.com/node-group-id"
+                  operator: In
+                  values:
+                    - "f2misrg1i9vtg1mtcqg3"
+
+# Sources for the volumes used in Slurm node specifications
+volumeSources:
+  - name: spool
+    persistentVolumeClaim:
+      claimName: "spool"
+      readOnly: false
+  - name: jail
+    persistentVolumeClaim:
+      claimName: "jail"
+      readOnly: false
+
+# Secret references needed for Slurm cluster operation
+secrets:
+  # Secret reference required for inter-server communication of Slurm nodes
+  mungeKey:
+    # Whether to create new secret with generated values or to use provided reference
+    create: true
+    # Name of the secret to use if not creating
+    name: "munge-key"
+    # Key of the secret with Munge key data to use if not creating
+    key: "key"
+  # Secret reference required for SSH connection to Slurm login nodes. Required in case of login node usage
+  sshRootPublicKeys:
+    # Whether to create new secret or to use provided reference
+    create: true
+    # Authorized keys to be put into the secret if creating. Each key must be base64 encoded string
+    keys:
+      - "c3NoLWVkMjU1MTkga2V5IHVzZXIxQGV4YW1wbGUuY29t"
+      - "c3NoLWVkMjU1MTkga2V5IHVzZXIyQGV4YW1wbGUuY29t"
+    # Name of the secret to use if not creating
+    name: "ssh-root-public-keys"
+    # Key of the secret with authorized keys data to use if not creating
+    key: "authorized_keys"
+
+# Job performing initial jail file system population
+populateJail:
+  # Image for the populate jail job
+  image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest"
+  # Name of the k8s node filter
+  k8sNodeFilterName: "gpu"
+
+# Periodic checks. e.g. GPU health
+periodicChecks:
+  # NCCL test benchmark
+  ncclBenchmark:
+    # Whether to enable the benchmark
+    enabled: true
+    # CronJob schedule. By default, runs every 3 hours
+    schedule: "0 */3 * * *"
+    # CronJob timeout in seconds. By default, equals to 30 min
+    activeDeadlineSeconds: 1800
+    # Number of successful finished jobs to retain
+    successfulJobsHistoryLimit: 3
+    # Number of failed finished jobs to retain
+    failedJobsHistoryLimit: 3
+    # Image for the NCCL test
+    image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/nccl_benchmark:latest"
+    # NCCL test settings
+    ncclSettings:
+      # Minimum memory size to start NCCL with
+      minBytes: "512Mb"
+      # Maximum memory size to finish NCCL with
+      maxBytes: "8Gb"
+      # Multiplication factor between two sequential memory sizes
+      stepFactor: "2"
+      # NCCL timeout in its special format. By default, 20 minutes
+      timeout: "20:00"
+      # Threshold for benchmark result that must be guaranteed. CronJob will fail if the result is less than the threshold
+      thresholdMoreThan: "42"
+    # Actions performed on benchmark failure
+    failureActions:
+      # Whether to drain Slurm node in case of benchmark failure
+      setSlurmNodeDrainState: true
+    # Name of the k8s node filter
+    k8sNodeFilterName: "no-gpu"
+
+slurmNodes:
+  controller:
+    size: 2
+    k8sNodeFilterName: "no-gpu-controller"
+    slurmctld:
+      port: 6817
+      resources:
+        cpu: "1000m"
+        memory: "3Gi"
+        ephemeralStorage: "20Gi"
+    munge:
+      resources:
+        cpu: "1000m"
+        memory: "1Gi"
+        ephemeralStorage: "5Gi"
+    volumes:
+      spool:
+        volumeSourceName: "controller-spool"
+      jail:
+        volumeSourceName: "jail"
+  worker:
+    size: 2
+    k8sNodeFilterName: "gpu"
+    maxGpu: 8
+    slurmd:
+      port: 6818
+      resources:
+        cpu: "156000m"
+        memory: "1220Gi"
+        ephemeralStorage: "55Gi"
+    munge:
+      resources:
+        cpu: "2000m"
+        memory: "4Gi"
+        ephemeralStorage: "5Gi"
+    volumes:
+      spool:
+        volumeClaimTemplateSpec:
+          storageClassName: "nebius-network-ssd"
+          accessModes: [ "ReadWriteOnce" ]
+          resources:
+            requests:
+              storage: "128Gi"
+      jail:
+        volumeSourceName: "jail"
+      jailSubMounts: []
+  login:
+    size: 2
+    k8sNodeFilterName: "no-gpu-login"
+    sshd:
+      port: 22
+      resources:
+        cpu: "3000m"
+        memory: "9Gi"
+        ephemeralStorage: "30Gi"
+    sshdServiceType: "LoadBalancer"
+    sshdServiceLoadBalancerIP: "195.242.16.24"
+    munge:
+      resources:
+        cpu: "500m"
+        memory: "500Mi"
+        ephemeralStorage: "5Gi"
+    volumes:
+      jail:
+        volumeSourceName: "jail"
+      jailSubMounts: []
+
+slurmNodeImages:
+  slurmctld: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/controller_slurmctld:latest"
+  slurmd:    "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/worker_slurmd:latest"
+  sshd:      "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/login_sshd:latest"
+  munge:     "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
