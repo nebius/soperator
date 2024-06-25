@@ -12,8 +12,6 @@ import (
 type SlurmWorker struct {
 	slurmv1.SlurmNode
 
-	MaxGPU int32
-
 	ContainerToolkitValidation Container
 	ContainerSlurmd            Container
 	ContainerMunge             Container
@@ -29,7 +27,6 @@ type SlurmWorker struct {
 func buildSlurmWorkerFrom(clusterName string, worker *slurmv1.SlurmNodeWorker) SlurmWorker {
 	res := SlurmWorker{
 		SlurmNode: *worker.SlurmNode.DeepCopy(),
-		MaxGPU:    worker.MaxGPU,
 		ContainerToolkitValidation: Container{
 			NodeContainer: slurmv1.NodeContainer{
 				Image: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v23.9.1",

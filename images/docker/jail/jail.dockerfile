@@ -127,6 +127,13 @@ COPY docker/jail/init-users/* /etc/
 RUN chmod 644 /etc/passwd /etc/group && chown 0:0 /etc/passwd /etc/group && \
     chmod 640 /etc/shadow /etc/gshadow && chown 0:42 /etc/shadow /etc/gshadow
 
+# Adjust the default $HOME directory content
+RUN cd /etc/skel && \
+    mkdir -m 755 .slurm && \
+    touch .slurm/defaults && \
+    chmod 644 .slurm/defaults && \
+    cp -r /etc/skel/.slurm /root/
+
 # Copy createuser utility script
 COPY docker/jail/scripts/createuser.sh /usr/bin/createuser
 RUN chmod +x /usr/bin/createuser

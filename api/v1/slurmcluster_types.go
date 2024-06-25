@@ -18,7 +18,6 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -309,11 +308,6 @@ type SlurmNodeControllerVolumes struct {
 type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
 
-	// MaxGPU represents the maximal number of GPUs available for one worker
-	//
-	// +kubebuilder:validation:Required
-	MaxGPU int32 `json:"maxGpu"`
-
 	// Slurmd represents the Slurm daemon service configuration
 	//
 	// +kubebuilder:validation:Required
@@ -420,28 +414,10 @@ type NodeContainer struct {
 	// +kubebuilder:validation:Optional
 	Port int32 `json:"port,omitempty"`
 
-	// Resources defines the resource requirements for the container
+	// Resources defines the [corev1.ResourceRequirements] for the container
 	//
 	// +kubebuilder:validation:Optional
-	Resources NodeServiceResources `json:"resources,omitempty"`
-}
-
-// NodeServiceResources defines the resource requirements for a node service
-type NodeServiceResources struct {
-	// CPU defines the CPU resource requirement
-	//
-	// +kubebuilder:validation:Required
-	CPU resource.Quantity `json:"cpu"`
-
-	// Memory defines the memory resource requirement
-	//
-	// +kubebuilder:validation:Required
-	Memory resource.Quantity `json:"memory"`
-
-	// EphemeralStorage defines the ephemeral storage resource requirement
-	//
-	// +kubebuilder:validation:Required
-	EphemeralStorage resource.Quantity `json:"ephemeralStorage"`
+	Resources corev1.ResourceList `json:"resources,omitempty"`
 }
 
 // NodeVolume defines the configuration for a node volume.

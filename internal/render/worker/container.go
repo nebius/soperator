@@ -2,11 +2,9 @@ package worker
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -47,7 +45,6 @@ func renderContainerToolkitValidation(container *values.Container) corev1.Contai
 // renderContainerSlurmd renders [corev1.Container] for slurmd
 func renderContainerSlurmd(
 	container *values.Container,
-	maxGPU int32,
 	jailSubMounts []slurmv1.NodeVolumeJailSubMount,
 ) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
@@ -115,12 +112,8 @@ func renderContainerSlurmd(
 			ProcMount: ptr.To(corev1.UnmaskedProcMount),
 		},
 		Resources: corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:              container.Resources.CPU,
-				corev1.ResourceMemory:           container.Resources.Memory,
-				corev1.ResourceEphemeralStorage: container.Resources.EphemeralStorage,
-				consts.AnnotationMaxGPU:         resource.MustParse(strconv.Itoa(int(maxGPU))),
-			},
+			Limits:   container.Resources,
+			Requests: container.Resources,
 		},
 	}
 }
