@@ -35,6 +35,10 @@ CHART_OPERATOR_VERSION      = $(shell cat $(CHART_OPERATOR_VERSION_FILE))
 CHART_CLUSTER_PATH          = $(CHART_PATH)/slurm-cluster
 CHART_CLUSTER_VERSION_FILE  = $(CHART_PATH)/slurm-cluster.version
 CHART_CLUSTER_VERSION       = $(shell cat $(CHART_CLUSTER_VERSION_FILE))
+CHART_STORAGE_PATH          = $(CHART_PATH)/slurm-cluster-storage
+CHART_STORAGE_VERSION_FILE  = $(CHART_PATH)/slurm-cluster-storage.version
+CHART_STORAGE_VERSION       = $(shell cat $(CHART_STORAGE_VERSION_FILE))
+VERSION_FILE                = internal/consts/version.go
 
 .PHONY: all
 all: build
@@ -89,6 +93,45 @@ lint: golangci-lint ## Run golangci-lint linter & yamllint
 .PHONY: lint-fix
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
+
+.PHONY: gazelle
+gazelle: ## Run gazelle
+	bazel run //:gazelle -- msp/slurm-service/internal/operator
+
+.PHONY: helm
+helm: kustomize helmify yq ## Update Helm charts
+	# region operator
+	mv $(CHART_OPERATOR_PATH)/Chart.yaml $(CHART_PATH)/operator-chart.yaml
+
+	rm -rf $(CHART_OPERATOR_PATH)
+	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir $(CHART_OPERATOR_PATH)
+
+	mv $(CHART_PATH)/operator-chart.yaml $(CHART_OPERATOR_PATH)/Chart.yaml
+
+	$(YQ) -i 'del(.controllerManager.manager.image.tag)' "$(CHART_OPERATOR_PATH)/values.yaml"
+	$(YQ) -i ".version = \"$(CHART_OPERATOR_VERSION)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
+	# endregion operator
+
+	# region cluster
+	$(YQ) -i ".version = \"$(CHART_CLUSTER_VERSION)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
+	#endregion cluster
+
+	# region storage
+	$(YQ) -i ".version = \"$(CHART_STORAGE_VERSION)\"" "$(CHART_STORAGE_PATH)/Chart.yaml"
+	#endregion storage
+
+.PHONY: bump-chart-versions
+bump-chart-versions: ## Bump Helm chart versions
+	@echo "Current version: $(CHART_OPERATOR_VERSION)"
+	@read -p "New version: " newVersion; \
+		echo $$newVersion > $(CHART_OPERATOR_VERSION_FILE); \
+		echo $$newVersion > $(CHART_CLUSTER_VERSION_FILE); \
+		echo $$newVersion > $(CHART_STORAGE_VERSION_FILE); \
+		echo 'package consts'                 >  $(VERSION_FILE); \
+		echo ''                               >> $(VERSION_FILE); \
+		echo 'const ('                        >> $(VERSION_FILE); \
+		echo "	VersionCR = \"$$newVersion\"" >> $(VERSION_FILE); \
+		echo ')'                              >> $(VERSION_FILE)
 
 ##@ Build
 
@@ -199,29 +242,7 @@ helmify: $(HELMIFY) ## Download helmify locally if necessary.
 $(HELMIFY): $(LOCALBIN)
 	test -s $(LOCALBIN)/helmify || GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@v$(HELMIFY_VERSION)
 
-.PHONY: gazelle
-gazelle:
-	bazel run //:gazelle -- msp/slurm-service/internal/operator
-
 .PHONY: yq
 yq: $(YQ) ## Download yq locally if necessary.
 $(YQ): $(LOCALBIN)
 	test -s $(LOCALBIN)/yq || GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@v$(YQ_VERSION)
-
-.PHONY: helm
-helm: kustomize helmify yq
-	# region operator
-	mv $(CHART_OPERATOR_PATH)/Chart.yaml $(CHART_PATH)/operator-chart.yaml
-
-	rm -rf $(CHART_OPERATOR_PATH)
-	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir $(CHART_OPERATOR_PATH)
-
-	mv $(CHART_PATH)/operator-chart.yaml $(CHART_OPERATOR_PATH)/Chart.yaml
-
-	$(YQ) -i 'del(.controllerManager.manager.image.tag)' "$(CHART_OPERATOR_PATH)/values.yaml"
-	$(YQ) -i ".version = \"$(CHART_OPERATOR_VERSION)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
-	# endregion operator
-
-	# region cluster
-	$(YQ) -i ".version = \"$(CHART_CLUSTER_VERSION)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
-	#endregion cluster
