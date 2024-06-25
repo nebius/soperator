@@ -22,7 +22,7 @@ fi
 
 echo "Preparing jail dir"
 mkdir -p jail
-rm -rf jail/*
+rm -rf jail/* image.tar
 
 echo "Building tarball from docker file ${dockerfile}"
 docker build --tag jail --target jail --load $ignore_cache --platform=linux/amd64 -f "${dockerfile}" --output type=tar,dest=image.tar .
