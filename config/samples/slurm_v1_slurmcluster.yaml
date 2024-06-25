@@ -95,6 +95,10 @@ spec:
           ephemeralStorage: 10Gi
       munge:
         image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
+        resources:
+          cpu: 1000m
+          memory: 1Gi
+          ephemeralStorage: 5Gi
       volumes:
         spool:
           volumeSourceName: "controller-spool"
