@@ -6,7 +6,7 @@ annotations: {}
 # Whether to gracefully stop the cluster. Setting it to false after cluster has been paused starts the cluster back
 pause: false
 
-# K8s node filters used in Slurm node specifications. Define which nodes should be used to allocate pods to
+# K8s node filters used in Slurm node specifications. Define which nodes should be used to schedule pods to
 k8sNodeFilters:
   - name: gpu
     affinity:
@@ -69,8 +69,6 @@ secrets:
 
 # Job performing initial jail file system population
 populateJail:
-  # Image for the populate jail job
-  image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest"
   # Name of the k8s node filter
   k8sNodeFilterName: "gpu"
 
@@ -112,7 +110,7 @@ periodicChecks:
 slurmNodes:
   controller:
     size: 2
-    k8sNodeFilterName: "no-gpu-controller"
+    k8sNodeFilterName: "no-gpu"
     slurmctld:
       port: 6817
       resources:
@@ -157,7 +155,7 @@ slurmNodes:
       jailSubMounts: []
   login:
     size: 2
-    k8sNodeFilterName: "no-gpu-login"
+    k8sNodeFilterName: "no-gpu"
     sshd:
       port: 22
       resources:
@@ -177,7 +175,8 @@ slurmNodes:
       jailSubMounts: []
 
 slurmNodeImages:
-  slurmctld: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/controller_slurmctld:latest"
-  slurmd:    "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/worker_slurmd:latest"
-  sshd:      "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/login_sshd:latest"
-  munge:     "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
+  slurmctld:    "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/controller_slurmctld:latest"
+  slurmd:       "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/worker_slurmd:latest"
+  sshd:         "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/login_sshd:latest"
+  munge:        "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
+  populateJail: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest"

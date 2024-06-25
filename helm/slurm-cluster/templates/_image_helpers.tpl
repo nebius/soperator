@@ -1,6 +1,6 @@
 {{/* Populate jail Job image */}}
 {{- define "slurm-cluster.image.populateJail" -}}
-    {{- (default "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest" .Values.populateJail.image) | quote -}}
+    {{- (default "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest" .Values.slurmNodeImages.populateJail) | quote -}}
 {{- end }}
 
 {{/* NCCL benchmark CronJob image */}}
