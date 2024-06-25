@@ -14,7 +14,7 @@ done
 
 mkdir -p outputs
 
-./docker/jail/make_rootfs_tarball.sh -d docker/jail/jail.dockerfile -t docker/jail/jail_rootfs.tar.gz $iopt > outputs/make_rootfs_tarball.log 2>&1
+./docker/jail/make_rootfs_tarball.sh -d docker/jail/jail.dockerfile $iopt > outputs/make_rootfs_tarball.log 2>&1
 ./build.sh -t populate_jail -d docker/populate_jail/populate_jail.dockerfile $iopt $nopt > outputs/populate_jail.log 2>&1
 
 echo "Finished: build_populate_jail.sh"

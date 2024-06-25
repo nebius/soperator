@@ -2,9 +2,9 @@ FROM ubuntu:focal as populate_jail
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-RUN apt update && apt install -y pigz
+RUN apt update && apt install -y rclone rsync
 
-COPY docker/jail/jail_rootfs.tar.gz .
+ADD jail /jail
 
 COPY docker/populate_jail/populate_jail_entrypoint.sh .
 RUN chmod +x ./populate_jail_entrypoint.sh
