@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ include "slurm-cluster-filestore.volume.jail.pvc" . }}
+spec:
+  storageClassName: {{ include "slurm-cluster-filestore.volume.jail.storageClass" . }}
+  resources:
+    requests:
+      storage: {{ include "slurm-cluster-filestore.volume.jail.size" . }}
+  accessModes:
+    - ReadWriteMany

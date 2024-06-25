@@ -1,15 +1,15 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: {{ include "slurm-cluster-storage.volume.spool.pv" . }}
+  name: {{ include "slurm-cluster-filestore.volume.controller-spool.pv" . }}
 spec:
-  storageClassName: {{ include "slurm-cluster-storage.volume.spool.storageClass" . }}
+  storageClassName: {{ include "slurm-cluster-filestore.volume.controller-spool.storageClass" . }}
   volumeMode: Filesystem
   mountOptions:
     - rw
     - relatime
   capacity:
-    storage: {{ .Values.volume.spool.size }}
+    storage: {{ .Values.volume.controllerSpool.size }}
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
@@ -17,7 +17,7 @@ spec:
     path: /mnt/controller-spool
   claimRef:
     namespace: {{ .Release.Namespace }}
-    name: {{ include "slurm-cluster-storage.volume.spool.pvc" . }}
+    name: {{ include "slurm-cluster-filestore.volume.controller-spool.pvc" . }}
   nodeAffinity:
     required:
       nodeSelectorTerms:
@@ -26,4 +26,4 @@ spec:
             - key: nebius.com/node-group-id
               operator: In
               values:
-                - {{ include "slurm-cluster-storage.nodeGroup.nonGpu" . }}
+                - {{ include "slurm-cluster-filestore.nodeGroup.nonGpu" . }}

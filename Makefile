@@ -35,9 +35,9 @@ CHART_OPERATOR_VERSION      = $(shell cat $(CHART_OPERATOR_VERSION_FILE))
 CHART_CLUSTER_PATH          = $(CHART_PATH)/slurm-cluster
 CHART_CLUSTER_VERSION_FILE  = $(CHART_PATH)/slurm-cluster.version
 CHART_CLUSTER_VERSION       = $(shell cat $(CHART_CLUSTER_VERSION_FILE))
-CHART_STORAGE_PATH          = $(CHART_PATH)/slurm-cluster-storage
-CHART_STORAGE_VERSION_FILE  = $(CHART_PATH)/slurm-cluster-storage.version
-CHART_STORAGE_VERSION       = $(shell cat $(CHART_STORAGE_VERSION_FILE))
+CHART_FILESTORE_PATH          = $(CHART_PATH)/slurm-cluster-filestore
+CHART_FILESTORE_VERSION_FILE  = $(CHART_PATH)/slurm-cluster-filestore.version
+CHART_FILESTORE_VERSION       = $(shell cat $(CHART_FILESTORE_VERSION_FILE))
 VERSION_FILE                = internal/consts/version.go
 
 .PHONY: all
@@ -117,7 +117,7 @@ helm: kustomize helmify yq ## Update Helm charts
 	#endregion cluster
 
 	# region storage
-	$(YQ) -i ".version = \"$(CHART_STORAGE_VERSION)\"" "$(CHART_STORAGE_PATH)/Chart.yaml"
+	$(YQ) -i ".version = \"$(CHART_FILESTORE_VERSION)\"" "$(CHART_FILESTORE_PATH)/Chart.yaml"
 	#endregion storage
 
 .PHONY: bump-chart-versions
@@ -126,7 +126,7 @@ bump-chart-versions: ## Bump Helm chart versions
 	@read -p "New version: " newVersion; \
 		echo $$newVersion > $(CHART_OPERATOR_VERSION_FILE); \
 		echo $$newVersion > $(CHART_CLUSTER_VERSION_FILE); \
-		echo $$newVersion > $(CHART_STORAGE_VERSION_FILE); \
+		echo $$newVersion > $(CHART_FILESTORE_VERSION_FILE); \
 		echo 'package consts'                 >  $(VERSION_FILE); \
 		echo ''                               >> $(VERSION_FILE); \
 		echo 'const ('                        >> $(VERSION_FILE); \

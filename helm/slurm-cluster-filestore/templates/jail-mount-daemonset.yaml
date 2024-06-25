@@ -2,15 +2,15 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   namespace: {{ .Release.Namespace }}
-  name: {{ include "slurm-cluster-storage.volume.jail.mount" . }}
+  name: {{ include "slurm-cluster-filestore.volume.jail.mount" . }}
 spec:
   selector:
     matchLabels:
-      slurm: {{ include "slurm-cluster-storage.volume.jail.mount" . }}
+      slurm: {{ include "slurm-cluster-filestore.volume.jail.mount" . }}
   template:
     metadata:
       labels:
-        slurm: {{ include "slurm-cluster-storage.volume.jail.mount" . }}
+        slurm: {{ include "slurm-cluster-filestore.volume.jail.mount" . }}
     spec:
       initContainers:
         - name: mount-jail-filestore
@@ -25,7 +25,7 @@ spec:
                     umount /host/mnt/jail && \
                     echo "Unmounted /mnt/jail from the node"; \
                 fi && \
-                mount -t virtiofs -o rw,relatime,exec,dev jail /host/mnt/jail && \
+                mount -t virtiofs -o rw,relatime,exec,dev {{- include "slurm-cluster-filestore.volume.jail.device" . -}} /host/mnt/jail && \
                 echo "Mounted filestore to the node's /mnt/jail"
           securityContext:
             privileged: true
@@ -55,10 +55,10 @@ spec:
                 - key: nebius.com/node-group-id
                   operator: In
                   values:
-                    - {{ include "slurm-cluster-storage.nodeGroup.gpu" . }}
+                    - {{ include "slurm-cluster-filestore.nodeGroup.gpu" . }}
               # Require scheduling on Non-GPU nodes
               - matchExpressions:
                 - key: nebius.com/node-group-id
                   operator: In
                   values:
-                    - {{ include "slurm-cluster-storage.nodeGroup.nonGpu" . }}
+                    - {{ include "slurm-cluster-filestore.nodeGroup.nonGpu" . }}

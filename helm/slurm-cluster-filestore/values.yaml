@@ -1,0 +1,28 @@
+storageClass:
+  local:
+    # By default, equals to slurm-local-pv
+    name: ""
+
+volume:
+  jail:
+    # By default, equals to jail
+    name: ""
+    # By default, equals to jail
+    filestoreDeviceName: "jail"
+    # Required
+    size: "128Gi"
+  controllerSpool:
+    # By default, equals to spool
+    name: ""
+    # By default, equals to controller-spool
+    filestoreDeviceName: ""
+    # Required
+    size: "32Gi"
+
+nodeGroup:
+  gpu:
+    # Required
+    id: ""
+  nonGpu:
+    # Required
+    id: ""
