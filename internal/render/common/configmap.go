@@ -73,6 +73,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddProperty("TaskPlugin", "task/affinity")
 	res.AddComment("")
+	res.AddProperty("CliFilterPlugins", "cli_filter/user_defaults")
+	res.AddComment("")
 	res.AddComment("HEALTH CHECKS")
 	res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
 	res.AddProperty("HealthCheckInterval", 30)

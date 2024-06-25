@@ -116,12 +116,12 @@ slurmNodes:
       resources:
         cpu: "1000m"
         memory: "3Gi"
-        ephemeralStorage: "20Gi"
+        ephemeral-storage: "20Gi"
     munge:
       resources:
         cpu: "1000m"
         memory: "1Gi"
-        ephemeralStorage: "5Gi"
+        ephemeral-storage: "5Gi"
     volumes:
       spool:
         volumeSourceName: "controller-spool"
@@ -130,18 +130,18 @@ slurmNodes:
   worker:
     size: 2
     k8sNodeFilterName: "gpu"
-    maxGpu: 8
     slurmd:
       port: 6818
       resources:
         cpu: "156000m"
         memory: "1220Gi"
-        ephemeralStorage: "55Gi"
+        ephemeral-storage: "55Gi"
+        nvidia.com/gpu: 8
     munge:
       resources:
         cpu: "2000m"
         memory: "4Gi"
-        ephemeralStorage: "5Gi"
+        ephemeral-storage: "5Gi"
     volumes:
       spool:
         volumeClaimTemplateSpec:
@@ -161,20 +161,20 @@ slurmNodes:
       resources:
         cpu: "3000m"
         memory: "9Gi"
-        ephemeralStorage: "30Gi"
+        ephemeral-storage: "30Gi"
     sshdServiceType: "LoadBalancer"
     sshdServiceLoadBalancerIP: "195.242.16.24"
     munge:
       resources:
         cpu: "500m"
         memory: "500Mi"
-        ephemeralStorage: "5Gi"
+        ephemeral-storage: "5Gi"
     volumes:
       jail:
         volumeSourceName: "jail"
       jailSubMounts: []
 
-slurmNodeImages:
+images:
   slurmctld:    "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/controller_slurmctld:latest"
   slurmd:       "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/worker_slurmd:latest"
   sshd:         "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/login_sshd:latest"

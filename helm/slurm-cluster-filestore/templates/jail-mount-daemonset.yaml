@@ -12,35 +12,29 @@ spec:
       labels:
         slurm: {{ include "slurm-cluster-filestore.volume.jail.mount" . }}
     spec:
-      initContainers:
+      containers:
         - name: mount-jail-filestore
           image: busybox
           command:
-            - "/bin/sh"
-            - "-c"
-            - |
-                mkdir -p /host/mnt/jail && \
-                if mountpoint -q /host/mnt/jail; then \
-                    echo "The node's /mnt/jail is already a mount point" && \
-                    umount /host/mnt/jail && \
-                    echo "Unmounted /mnt/jail from the node"; \
-                fi && \
-                mount -t virtiofs -o rw,relatime,exec,dev {{- include "slurm-cluster-filestore.volume.jail.device" . -}} /host/mnt/jail && \
-                echo "Mounted filestore to the node's /mnt/jail"
+            - /bin/sh
+            - -c
+            - /mount-scripts/ensure_mounted.sh -d {{- include "slurm-cluster-filestore.volume.jail.device" . -}} -p /mnt/jail -s 60
           securityContext:
             privileged: true
           volumeMounts:
             - name: host-mount
               mountPath: /host/mnt
               mountPropagation: Bidirectional
-      containers:
-        - name: sleep
-          image: busybox
-          command: ["/bin/sh", "-c", "echo 'Sleep infinitely' && sleep infinity"]
+            - name: mount-scripts
+              mountPath: /mount-scripts
       volumes:
         - name: host-mount
           hostPath:
             path: /mnt
+        - name: mount-scripts
+          configMap:
+            name: mount-scripts
+            defaultMode: 0500
       tolerations:
         # Allow scheduling on GPU nodes
         - key: nvidia.com/gpu

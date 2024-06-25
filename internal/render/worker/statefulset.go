@@ -83,7 +83,7 @@ func RenderStatefulSet(
 						renderContainerToolkitValidation(&worker.ContainerToolkitValidation),
 					},
 					Containers: []corev1.Container{
-						renderContainerSlurmd(&worker.ContainerSlurmd, worker.MaxGPU, worker.JailSubMounts),
+						renderContainerSlurmd(&worker.ContainerSlurmd, worker.JailSubMounts),
 						common.RenderContainerMunge(&worker.ContainerMunge),
 					},
 					Volumes: volumes,

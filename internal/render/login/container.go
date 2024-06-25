@@ -52,11 +52,8 @@ func renderContainerSshd(
 			},
 		},
 		Resources: corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:              container.Resources.CPU,
-				corev1.ResourceMemory:           container.Resources.Memory,
-				corev1.ResourceEphemeralStorage: container.Resources.EphemeralStorage,
-			},
+			Limits:   container.Resources,
+			Requests: container.Resources,
 		},
 	}
 }

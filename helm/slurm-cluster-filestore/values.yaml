@@ -12,7 +12,7 @@ volume:
     # Required
     size: "128Gi"
   controllerSpool:
-    # By default, equals to spool
+    # By default, equals to controller-spool
     name: ""
     # By default, equals to controller-spool
     filestoreDeviceName: ""

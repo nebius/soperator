@@ -11,7 +11,6 @@ go_library(
     visibility = ["//msp/slurm-service:__subpackages__"],
     deps = [
         "@io_k8s_api//core/v1:core",
-        "@io_k8s_apimachinery//pkg/api/resource",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
         "@io_k8s_apimachinery//pkg/runtime",
         "@io_k8s_apimachinery//pkg/runtime/schema",

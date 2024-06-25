@@ -7,7 +7,7 @@ metadata:
   namespace: slurm-poc
   name: slurm2
 spec:
-  crVersion: 0.1.9
+  crVersion: 0.1.10
   pause: false
   populateJail:
     image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest
@@ -54,48 +54,6 @@ spec:
                     operator: In
                     values:
                       - "f2misrg1i9vtg1mtcqg3"
-    - name: no-gpu-controller
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: "nebius.com/node-group-id"
-                    operator: In
-                    values:
-                      - "f2misrg1i9vtg1mtcqg3"
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                - key: "app.kubernetes.io/component"
-                  operator: In
-                  values:
-                    - "controller"
-              topologyKey: "kubernetes.io/hostname"
-    - name: no-gpu-login
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: "nebius.com/node-group-id"
-                    operator: In
-                    values:
-                      - "f2misrg1i9vtg1mtcqg3"
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                    - key: "app.kubernetes.io/component"
-                      operator: In
-                      values:
-                        - "login"
-                topologyKey: "kubernetes.io/hostname"
   volumeSources:
     - name: controller-spool
       persistentVolumeClaim:
@@ -115,20 +73,20 @@ spec:
   slurmNodes:
     controller:
       size: 2
-      k8sNodeFilterName: "no-gpu-controller"
+      k8sNodeFilterName: "no-gpu"
       slurmctld:
         image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/controller_slurmctld:latest"
         port: 6817
         resources:
           cpu: 1000m
           memory: 3Gi
-          ephemeralStorage: 20Gi
+          ephemeral-storage: 20Gi
       munge:
         image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
         resources:
           cpu: 1000m
           memory: 1Gi
-          ephemeralStorage: 5Gi
+          ephemeral-storage: 5Gi
       volumes:
         spool:
           volumeSourceName: "controller-spool"
@@ -137,20 +95,20 @@ spec:
     worker:
       size: 2
       k8sNodeFilterName: "gpu"
-      maxGpu: 8
       slurmd:
         image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/worker_slurmd:latest"
         port: 6818
         resources:
           cpu: 156000m
           memory: 1220Gi
-          ephemeralStorage: 55Gi
+          ephemeral-storage: 55Gi
+          nvidia.com/gpu: 8
       munge:
         image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
         resources:
           cpu: 2000m
           memory: 4Gi
-          ephemeralStorage: 5Gi
+          ephemeral-storage: 5Gi
       volumes:
         spool:
           volumeClaimTemplateSpec:
@@ -164,24 +122,22 @@ spec:
         jailSubMounts: []
     login:
       size: 2
-      k8sNodeFilterName: "no-gpu-login"
+      k8sNodeFilterName: "no-gpu"
       sshd:
         image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/login_sshd:latest"
         port: 22
         resources:
           cpu: 3000m
           memory: 9Gi
-          ephemeralStorage: 30Gi
+          ephemeral-storage: 30Gi
       sshdServiceType: "LoadBalancer"
-      sshdServiceAnnotations:
-        external-dns.alpha.kubernetes.io/hostname: "slurm2.slurm-operator.msp-dev.nemax.nebius.cloud."
       sshdServiceLoadBalancerIP: "195.242.16.24"
       munge:
         image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
         resources:
           cpu: 500m
           memory: 500Mi
-          ephemeralStorage: 5Gi
+          ephemeral-storage: 5Gi
       volumes:
         jail:
           volumeSourceName: "jail"
