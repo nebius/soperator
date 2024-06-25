@@ -28,8 +28,10 @@ unexport GOPACKAGESDRIVER
 # Limit the scope of generation otherwise it will try to generate configs for non-controller code
 GENPATH = "./api/v1;./internal/controller/..."
 
-CHART_PATH    = ../../../cd/base/helm/slurm-operator
-CHART_VERSION = $(shell cat ./config/chart.version)
+CHART_PATH                  = helm
+CHART_OPERATOR_PATH         = $(CHART_PATH)/slurm-operator
+CHART_OPERATOR_VERSION_FILE = $(CHART_PATH)/slurm-operator.version
+CHART_OPERATOR_VERSION      = $(shell cat $(CHART_OPERATOR_VERSION_FILE))
 
 .PHONY: all
 all: build
@@ -205,9 +207,12 @@ $(YQ): $(LOCALBIN)
 
 .PHONY: helm
 helm: kustomize helmify yq
-	mv $(CHART_PATH)/Chart.yaml $(CHART_PATH)/../Chart.yaml
-	rm -rf $(CHART_PATH)
-	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir $(CHART_PATH)
-	mv $(CHART_PATH)/../Chart.yaml $(CHART_PATH)/Chart.yaml
-	$(YQ) -i 'del(.controllerManager.manager.image.tag)' "$(CHART_PATH)/values.yaml"
-	$(YQ) -i ".version = \"$(CHART_VERSION)\"" "$(CHART_PATH)/Chart.yaml"
+	mv $(CHART_OPERATOR_PATH)/Chart.yaml $(CHART_PATH)/operator-chart.yaml
+
+	rm -rf $(CHART_OPERATOR_PATH)
+	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir $(CHART_OPERATOR_PATH)
+
+	mv $(CHART_PATH)/operator-chart.yaml $(CHART_OPERATOR_PATH)/Chart.yaml
+
+	$(YQ) -i 'del(.controllerManager.manager.image.tag)' "$(CHART_OPERATOR_PATH)/values.yaml"
+	$(YQ) -i ".version = \"$(CHART_OPERATOR_VERSION)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
