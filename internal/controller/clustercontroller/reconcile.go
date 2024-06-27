@@ -185,14 +185,9 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		initialPhase := slurmv1.PhaseClusterReconciling
 		cluster.Status.Phase = &initialPhase
 
-		job, err := r.ReconcilePopulateJail(ctx, clusterValues, cluster)
+		result, err := r.ReconcilePopulateJail(ctx, clusterValues, cluster)
 		if err != nil {
-			return ctrl.Result{}, err
-		}
-		// We should wait until job create all needed files in file store
-		res, wait, err := r.CheckPopulateJail(ctx, &job)
-		if err != nil || wait == true {
-			return res, err
+			return result, err
 		}
 
 		if err = r.ReconcileCommon(ctx, cluster, clusterValues); err != nil {
