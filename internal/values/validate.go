@@ -155,21 +155,21 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 	// Secrets
 	{
 		loginNodeCount := c.NodeLogin.Size
-		if loginNodeCount == 0 && c.Secrets.SSHRootPublicKeys != nil {
-			err := fmt.Errorf("secrets are invalid. login node size %d (unused) is specified, but SSH public keys provided", loginNodeCount)
+		if loginNodeCount == 0 && c.NodeLogin.SshRootPublicKeysConfigMap != nil {
+			err := fmt.Errorf("SshRootPublicKeys are invalid. login node size %d (unused) is specified, but SSH public keys provided", loginNodeCount)
 			logger.Error(
 				err,
-				"Secrets are invalid. login nodes are unused, but SSH public keys provided",
+				"SshRootPublicKeys are invalid. login nodes are unused, but SSH public keys provided",
 				"Slurm.LoginNode.Count", loginNodeCount,
-				"Slurm.Secret.SSHRootPublicKeys.Name", c.Secrets.SSHRootPublicKeys.Name,
+				"Slurm.NodeLogin.SSHRootPublicKeys.Name", c.NodeLogin.SshRootPublicKeysConfigMap.Name,
 			)
 			return err
 		}
-		if loginNodeCount > 0 && c.Secrets.SSHRootPublicKeys == nil {
-			err := fmt.Errorf("secrets are invalid. login node size %d (used) is specified, but SSH public keys are not provided", loginNodeCount)
+		if loginNodeCount > 0 && c.NodeLogin.SshRootPublicKeysConfigMap == nil {
+			err := fmt.Errorf("SshRootPublicKeys are invalid. login node size %d (used) is specified, but SSH public keys are not provided", loginNodeCount)
 			logger.Error(
 				err,
-				"Secrets are invalid. login nodes are used, but SSH public keys are not provided",
+				"SshRootPublicKeys are invalid. login nodes are used, but SSH public keys are not provided",
 				"Slurm.LoginNode.Count", loginNodeCount,
 			)
 			return err

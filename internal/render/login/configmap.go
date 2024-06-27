@@ -31,7 +31,7 @@ func RenderConfigMapSSHConfigs(cluster *values.SlurmCluster) (corev1.ConfigMap, 
 
 func generateSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res := &renderutils.RawConfig{}
-	res.AddLine("LogLevel DEBUG3")
+	res.AddLine("LogLevel INFO")
 	res.AddLine(fmt.Sprintf("Port %d", cluster.NodeLogin.ContainerSshd.Port))
 	res.AddLine("PermitRootLogin yes")
 	res.AddLine("PasswordAuthentication no")

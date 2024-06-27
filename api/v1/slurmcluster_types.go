@@ -236,12 +236,6 @@ type Secrets struct {
 	//
 	// +kubebuilder:validation:Required
 	MungeKey SecretKey `json:"mungeKey"`
-
-	// SSHRootPublicKeys defines the [corev1.Secret] reference required for SSH connection to Slurm login nodes.
-	// Required in case of login node usage
-	//
-	// +kubebuilder:validation:Optional
-	SSHRootPublicKeys *SecretKey `json:"sshRootPublicKeys,omitempty"`
 }
 
 // SecretKey defines the [corev1.Secret] reference with specification of key used for content gathering
@@ -372,6 +366,11 @@ type SlurmNodeLogin struct {
 	// +kubebuilder:validation:Optional
 	SshdServiceAnnotations map[string]string `json:"sshdServiceAnnotations,omitempty"`
 
+	// SshRootPublicKeysConfigMap authorized_keys for SSH connection to Slurm login nodes
+	//
+	// +kubebuilder:validation:Required
+	SshRootPublicKeysConfigMap SshRootPublicKeysConfigMap `json:"sshRootPublicKeysConfigMap"`
+
 	// SshdServiceLoadBalancerIP represents the static IP address of the LoadBalancer service
 	//
 	// +kubebuilder:validation:Optional
@@ -381,6 +380,20 @@ type SlurmNodeLogin struct {
 	//
 	// +kubebuilder:validation:Required
 	Volumes SlurmNodeLoginVolumes `json:"volumes"`
+}
+
+type SshRootPublicKeysConfigMap struct {
+	// Name defines the name of the key
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// Key defines the key
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	Key string `json:"key"`
 }
 
 // SlurmNodeLoginVolumes defines the volumes for the Slurm login node

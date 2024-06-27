@@ -1151,24 +1151,6 @@ spec:
                     - key
                     - name
                     type: object
-                  sshRootPublicKeys:
-                    description: |-
-                      SSHRootPublicKeys defines the [corev1.Secret] reference required for SSH connection to Slurm login nodes.
-                      Required in case of login node usage
-                    properties:
-                      key:
-                        description: Key defines the key in the secret containing
-                          the Slurm key
-                        minLength: 1
-                        type: string
-                      name:
-                        description: Name defines the name of the Slurm key secret
-                        minLength: 1
-                        type: string
-                    required:
-                    - key
-                    - name
-                    type: object
                 required:
                 - mungeKey
                 type: object
@@ -1194,35 +1176,14 @@ spec:
                             format: int32
                             type: integer
                           resources:
-                            description: Resources defines the resource requirements
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: Resources defines the [corev1.ResourceRequirements]
                               for the container
-                            properties:
-                              cpu:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: CPU defines the CPU resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                              ephemeralStorage:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: EphemeralStorage defines the ephemeral
-                                  storage resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                              memory:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: Memory defines the memory resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                            required:
-                            - cpu
-                            - ephemeralStorage
-                            - memory
                             type: object
                         required:
                         - image
@@ -1243,35 +1204,14 @@ spec:
                             format: int32
                             type: integer
                           resources:
-                            description: Resources defines the resource requirements
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: Resources defines the [corev1.ResourceRequirements]
                               for the container
-                            properties:
-                              cpu:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: CPU defines the CPU resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                              ephemeralStorage:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: EphemeralStorage defines the ephemeral
-                                  storage resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                              memory:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: Memory defines the memory resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                            required:
-                            - cpu
-                            - ephemeralStorage
-                            - memory
                             type: object
                         required:
                         - image
@@ -1727,35 +1667,14 @@ spec:
                             format: int32
                             type: integer
                           resources:
-                            description: Resources defines the resource requirements
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: Resources defines the [corev1.ResourceRequirements]
                               for the container
-                            properties:
-                              cpu:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: CPU defines the CPU resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                              ephemeralStorage:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: EphemeralStorage defines the ephemeral
-                                  storage resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                              memory:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: Memory defines the memory resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                            required:
-                            - cpu
-                            - ephemeralStorage
-                            - memory
                             type: object
                         required:
                         - image
@@ -1764,6 +1683,22 @@ spec:
                         description: Size defines the number of node instances
                         format: int32
                         type: integer
+                      sshRootPublicKeysConfigMap:
+                        description: SshRootPublicKeysConfigMap authorized_keys for
+                          SSH connection to Slurm login nodes
+                        properties:
+                          key:
+                            description: Key defines the key
+                            minLength: 1
+                            type: string
+                          name:
+                            description: Name defines the name of the key
+                            minLength: 1
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
                       sshd:
                         description: Sshd represents the SSH daemon service configuration
                         properties:
@@ -1775,35 +1710,14 @@ spec:
                             format: int32
                             type: integer
                           resources:
-                            description: Resources defines the resource requirements
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: Resources defines the [corev1.ResourceRequirements]
                               for the container
-                            properties:
-                              cpu:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: CPU defines the CPU resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                              ephemeralStorage:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: EphemeralStorage defines the ephemeral
-                                  storage resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                              memory:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: Memory defines the memory resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                            required:
-                            - cpu
-                            - ephemeralStorage
-                            - memory
                             type: object
                         required:
                         - image
@@ -2067,6 +1981,7 @@ spec:
                     required:
                     - k8sNodeFilterName
                     - munge
+                    - sshRootPublicKeysConfigMap
                     - sshd
                     - sshdServiceType
                     - volumes
@@ -2079,11 +1994,6 @@ spec:
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
                           Must correspond to the name of one of [K8sNodeFilter]
                         type: string
-                      maxGpu:
-                        description: MaxGPU represents the maximal number of GPUs
-                          available for one worker
-                        format: int32
-                        type: integer
                       munge:
                         description: Munge represents the Slurm munge configuration
                         properties:
@@ -2095,35 +2005,14 @@ spec:
                             format: int32
                             type: integer
                           resources:
-                            description: Resources defines the resource requirements
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: Resources defines the [corev1.ResourceRequirements]
                               for the container
-                            properties:
-                              cpu:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: CPU defines the CPU resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                              ephemeralStorage:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: EphemeralStorage defines the ephemeral
-                                  storage resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                              memory:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: Memory defines the memory resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                            required:
-                            - cpu
-                            - ephemeralStorage
-                            - memory
                             type: object
                         required:
                         - image
@@ -2143,35 +2032,14 @@ spec:
                             format: int32
                             type: integer
                           resources:
-                            description: Resources defines the resource requirements
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: Resources defines the [corev1.ResourceRequirements]
                               for the container
-                            properties:
-                              cpu:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: CPU defines the CPU resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                              ephemeralStorage:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: EphemeralStorage defines the ephemeral
-                                  storage resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                              memory:
-                                anyOf:
-                                - type: integer
-                                - type: string
-                                description: Memory defines the memory resource requirement
-                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                x-kubernetes-int-or-string: true
-                            required:
-                            - cpu
-                            - ephemeralStorage
-                            - memory
                             type: object
                         required:
                         - image
@@ -2630,7 +2498,6 @@ spec:
                         type: object
                     required:
                     - k8sNodeFilterName
-                    - maxGpu
                     - munge
                     - slurmd
                     - volumes

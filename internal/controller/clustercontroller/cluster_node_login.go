@@ -176,6 +176,19 @@ func (r SlurmClusterReconciler) getLoginStatefulSetDependencies(
 	}
 	res = append(res, slurmConfigsConfigMap)
 
+	rootPublicKeys := &corev1.ConfigMap{}
+	if err := r.Get(
+		ctx,
+		types.NamespacedName{
+			Namespace: clusterValues.Namespace,
+			Name:      clusterValues.NodeLogin.SshRootPublicKeysConfigMap.Name,
+		},
+		rootPublicKeys,
+	); err != nil {
+		return []metav1.Object{}, err
+	}
+	res = append(res, rootPublicKeys)
+
 	mungeKeySecret := &corev1.Secret{}
 	if err := r.Get(
 		ctx,
@@ -201,19 +214,6 @@ func (r SlurmClusterReconciler) getLoginStatefulSetDependencies(
 		return []metav1.Object{}, err
 	}
 	res = append(res, sshConfigsConfigMap)
-
-	rootPublicKeysSecret := &corev1.Secret{}
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{
-			Namespace: clusterValues.Namespace,
-			Name:      clusterValues.Secrets.SSHRootPublicKeys.Name,
-		},
-		rootPublicKeysSecret,
-	); err != nil {
-		return []metav1.Object{}, err
-	}
-	res = append(res, rootPublicKeysSecret)
 
 	return res, nil
 }

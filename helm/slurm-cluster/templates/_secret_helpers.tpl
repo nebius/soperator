@@ -19,21 +19,3 @@
 {{/*
 ---
 */}}
-
-{{/* SSH root public keys secret name */}}
-{{- define "slurm-cluster.secret.sshRootPublicKeys.name" -}}
-{{- if .Values.secrets.sshRootPublicKeys.create }}
-{{- "ssh-root-public-keys" | quote -}}
-{{- else }}
-{{- required ".Values.secrets.sshRootPublicKeys.name must be provided if .Values.secrets.sshRootPublicKeys.create is disabled" .Values.secrets.sshRootPublicKeys.name | quote -}}
-{{- end }}
-{{- end }}
-
-{{/* SSH root public keys secret key */}}
-{{- define "slurm-cluster.secret.sshRootPublicKeys.key" -}}
-{{- if .Values.secrets.sshRootPublicKeys.create }}
-{{- "authorized_keys" | quote -}}
-{{- else }}
-{{- required ".Values.secrets.sshRootPublicKeys.key must be provided if .Values.secrets.sshRootPublicKeys.create is disabled" .Values.secrets.sshRootPublicKeys.key | quote -}}
-{{- end }}
-{{- end }}
