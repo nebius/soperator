@@ -12,6 +12,8 @@ spec:
   populateJail:
     image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest
     k8sNodeFilterName: "gpu"
+#    jailSnapshotVolume:
+#      volumeSourceName: "jail-snapshot"
   periodicChecks:
     ncclBenchmark:
       enabled: true
@@ -63,6 +65,14 @@ spec:
       persistentVolumeClaim:
         claimName: "jail"
         readOnly: false
+    - name: mlperf-sd
+      persistentVolumeClaim:
+        claimName: "mlperf-sd"
+        readOnly: false
+#    - name: jail-snapshot
+#      persistentVolumeClaim:
+#        claimName: "jail-snapshot-ubuntu:22.04-cuda:12"
+#        readOnly: true
   secrets:
     mungeKey:
       name: "munge-key"
@@ -119,7 +129,10 @@ spec:
                 storage: 128Gi
         jail:
           volumeSourceName: "jail"
-        jailSubMounts: []
+        jailSubMounts:
+          - name: "mlcommons-sd-bench-data"
+            mountPath: "/mlperf-sd"
+            volumeSourceName: "mlperf-sd"
     login:
       size: 2
       k8sNodeFilterName: "no-gpu"

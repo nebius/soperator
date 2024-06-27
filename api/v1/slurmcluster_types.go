@@ -77,6 +77,12 @@ type PopulateJail struct {
 	//
 	// +kubebuilder:validation:Required
 	K8sNodeFilterName string `json:"k8sNodeFilterName"`
+
+	// JailSnapshotVolume represents configuration of the volume containing the initial content of the jail root
+	// directory. If not set, the default content is used (the Image already includes this default content)
+	//
+	// +kubebuilder:validation:Optional
+	JailSnapshotVolume *NodeVolume `json:"jailSnapshotVolume,omitempty"`
 }
 
 // PeriodicChecks define the k8s CronJobs performing cluster checks

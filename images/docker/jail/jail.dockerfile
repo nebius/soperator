@@ -107,8 +107,8 @@ RUN chmod +x /opt/bin/install_container_toolkit.sh && \
 
 # Copy and install NCCL packages
 COPY --from=nccl /usr/src/nccl/build/pkg/deb/*.deb /tmp/
-RUN dpkg -i /tmp/libnccl2_2.21.5-1+cuda12.2_amd64.deb && \
-    dpkg -i /tmp/libnccl-dev_2.21.5-1+cuda12.2_amd64.deb && \
+RUN dpkg -i /tmp/libnccl2_2.22.3-1+cuda12.2_amd64.deb && \
+    dpkg -i /tmp/libnccl-dev_2.22.3-1+cuda12.2_amd64.deb && \
     rm -rf /tmp/*.deb
 
 # Copy NCCL tests executables

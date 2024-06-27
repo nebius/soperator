@@ -9,6 +9,12 @@ import (
 )
 
 func renderContainerPopulateJail(populateJail *values.PopulateJail) corev1.Container {
+	volumeMounts := []corev1.VolumeMount{
+		common.RenderVolumeMountJail(),
+	}
+	if populateJail.JailSnapshotVolume != nil {
+		volumeMounts = append(volumeMounts, common.RenderVolumeMountJailSnapshot())
+	}
 	return corev1.Container{
 		Name:            populateJail.ContainerPopulateJail.Name,
 		Image:           populateJail.ContainerPopulateJail.Image,
@@ -20,8 +26,6 @@ func renderContainerPopulateJail(populateJail *values.PopulateJail) corev1.Conta
 				},
 			},
 		},
-		VolumeMounts: []corev1.VolumeMount{
-			common.RenderVolumeMountJail(),
-		},
+		VolumeMounts: volumeMounts,
 	}
 }

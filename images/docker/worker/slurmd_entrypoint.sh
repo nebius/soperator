@@ -34,9 +34,9 @@ echo "Update linker cache"
 ldconfig
 
 echo "Complement jail rootfs"
-/opt/bin/slurm/complement_jail.sh -j /mnt/jail -w
+/opt/bin/slurm/complement_jail.sh -j /mnt/jail -u /mnt/jail.upper -w
 
-echo "Waiting until munge started"
+echo "Waiting until munge is started"
 while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done
 
 echo "Detect available GPUs"

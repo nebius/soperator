@@ -1,5 +1,5 @@
 # Image URL to use all building/pushing image targets
-IMG ?= cr.nemax.nebius.cloud/crnsp9v7ps4c2uks5n6a/slurm-operator
+IMG ?= cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/slurm-operator
 TAG ?= latest
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.

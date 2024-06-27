@@ -3,6 +3,7 @@ package common
 import (
 	"errors"
 	"fmt"
+	"path"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -124,6 +125,23 @@ func RenderVolumeMountJail() corev1.VolumeMount {
 
 // endregion Jail
 
+// region JailSnapshot
+
+// RenderVolumeJailSnapshotFromSource renders [corev1.Volume] containing initial jail snapshot contents
+func RenderVolumeJailSnapshotFromSource(sources []slurmv1.VolumeSource, sourceName string) corev1.Volume {
+	return RenderVolumeFromSource(sources, sourceName, consts.VolumeNameJailSnapshot)
+}
+
+// RenderVolumeMountJailSnapshot renders [corev1.VolumeMount] defining the mounting path for jail snapshot contents
+func RenderVolumeMountJailSnapshot() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameJailSnapshot,
+		MountPath: consts.VolumeMountPathJailSnapshot,
+	}
+}
+
+// endregion JailSnapshot
+
 // region Munge
 
 // RenderVolumeMungeSocket renders [corev1.Volume] containing munge socket contents
@@ -187,7 +205,7 @@ func RenderVolumeMountsForJailSubMounts(subMounts []slurmv1.NodeVolumeJailSubMou
 func RenderVolumeMountJailSubMount(subMount slurmv1.NodeVolumeJailSubMount) corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      subMount.Name,
-		MountPath: subMount.MountPath,
+		MountPath: path.Join(consts.VolumeMountPathJailUpper, subMount.MountPath),
 	}
 }
 

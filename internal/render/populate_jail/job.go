@@ -33,6 +33,10 @@ func RenderPopulateJailJob(
 	volumes := []corev1.Volume{
 		common.RenderVolumeJailFromSource(volumeSources, *populateJail.VolumeJail.VolumeSourceName),
 	}
+	if populateJail.JailSnapshotVolume != nil {
+		snapshotVolume := common.RenderVolumeJailSnapshotFromSource(volumeSources, *populateJail.JailSnapshotVolume.VolumeSourceName)
+		volumes = append(volumes, snapshotVolume)
+	}
 
 	return batchv1.Job{
 		TypeMeta: metav1.TypeMeta{
