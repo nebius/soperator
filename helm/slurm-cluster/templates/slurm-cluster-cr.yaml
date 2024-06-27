@@ -39,9 +39,6 @@ spec:
     mungeKey:
       name: {{ include "slurm-cluster.secret.mungeKey.name" . }}
       key: {{ include "slurm-cluster.secret.mungeKey.key" . }}
-    sshRootPublicKeys:
-      name: {{ include "slurm-cluster.secret.sshRootPublicKeys.name" . }}
-      key: {{ include "slurm-cluster.secret.sshRootPublicKeys.key" . }}
   populateJail:
     image: {{ include "slurm-cluster.image.populateJail" . }}
     k8sNodeFilterName: {{ required "Populate Jail job k8s node filter name must be provided." .Values.populateJail.k8sNodeFilterName | quote }}

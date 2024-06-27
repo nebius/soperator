@@ -51,7 +51,7 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 	if err != nil && apierrors.IsNotFound(err) {
 		if err := reconcilePopulateJailImpl(); err != nil {
 			logger.Error(err, "Failed to reconcile Populate Jail Job")
-			return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, true, errors.Wrap(err, "reconciling Populate Jail Job")
+			return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, false, errors.Wrap(err, "reconciling Populate Jail Job")
 		}
 	} else if err != nil {
 		logger.Error(err, "Failed to get PopulateJail Job")
