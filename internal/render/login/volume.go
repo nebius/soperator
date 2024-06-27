@@ -22,7 +22,7 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeMungeKey(secrets.MungeKey.Name, secrets.MungeKey.Key),
 		common.RenderVolumeMungeSocket(),
 		renderVolumeSshConfigs(clusterName),
-		renderVolumeSshRootKeys(login.SshRootPublicKeysConfigMap.Name),
+		renderVolumeSshRootKeys(clusterName),
 		renderVolumeSecurityLimits(clusterName),
 	}
 
@@ -84,13 +84,13 @@ func renderVolumeMountSshConfigs() corev1.VolumeMount {
 // region root keys
 
 // renderVolumeSshRootKeys renders [corev1.Volume] containing SSH root keys contents
-func renderVolumeSshRootKeys(configName string) corev1.Volume {
+func renderVolumeSshRootKeys(clusterName string) corev1.Volume {
 	return corev1.Volume{
 		Name: consts.VolumeNameSSHRootKeys,
 		VolumeSource: corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{
 				LocalObjectReference: corev1.LocalObjectReference{
-					Name: configName,
+					Name: naming.BuildConfigMapSshRootPublicKeysName(clusterName),
 				},
 				DefaultMode: ptr.To(int32(384)),
 			},

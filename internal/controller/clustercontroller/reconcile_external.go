@@ -21,7 +21,6 @@ func (r *SlurmClusterReconciler) mapObjectsToReconcileRequests(
 	var (
 		fieldPaths = []string{
 			consts.IndexFieldSecretMungeKey,
-			consts.IndexFieldSecretSSHRootPublicKeys,
 		}
 		res []reconcile.Request
 	)

@@ -185,8 +185,8 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		initialPhase := slurmv1.PhaseClusterReconciling
 		cluster.Status.Phase = &initialPhase
 
-		result, err := r.ReconcilePopulateJail(ctx, clusterValues, cluster)
-		if err != nil {
+		result, wait, err := r.ReconcilePopulateJail(ctx, clusterValues, cluster)
+		if err != nil || wait == true {
 			return result, err
 		}
 

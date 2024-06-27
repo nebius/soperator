@@ -1890,22 +1890,12 @@ spec:
                         description: Size defines the number of node instances
                         format: int32
                         type: integer
-                      sshRootPublicKeysConfigMap:
-                        description: SshRootPublicKeysConfigMap authorized_keys for
-                          SSH connection to Slurm login nodes
-                        properties:
-                          key:
-                            description: Key defines the key
-                            minLength: 1
-                            type: string
-                          name:
-                            description: Name defines the name of the key
-                            minLength: 1
-                            type: string
-                        required:
-                        - key
-                        - name
-                        type: object
+                      sshRootPublicKeys:
+                        description: SshRootPublicKeys represents the list of public
+                          authorized_keys for SSH connection to Slurm login nodes
+                        items:
+                          type: string
+                        type: array
                       sshd:
                         description: Sshd represents the SSH daemon service configuration
                         properties:
@@ -2188,7 +2178,7 @@ spec:
                     required:
                     - k8sNodeFilterName
                     - munge
-                    - sshRootPublicKeysConfigMap
+                    - sshRootPublicKeys
                     - sshd
                     - sshdServiceType
                     - volumes

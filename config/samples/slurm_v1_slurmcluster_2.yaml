@@ -140,9 +140,9 @@ spec:
           cpu: 3000m
           memory: 9Gi
           ephemeral-storage: 30Gi
-      sshRootPublicKeysConfigMap:
-        name: "ssh-root-keys"
-        key: "authorized_keys"
+      sshRootPublicKeys:
+        - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzxkjzPQ4EyZSjan4MLGFSA18idpZicoKW7HC4YmwgN rdjjke@gmail.com"
+        - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICL8scMKnwu+Y9S6XDACacZ54+qu+YRo2y4IeXSPjTuo pavel@sofrony.ru"
       sshdServiceType: "LoadBalancer"
       sshdServiceLoadBalancerIP: "195.242.16.24"
       munge:

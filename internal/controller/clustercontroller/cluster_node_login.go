@@ -45,6 +45,21 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 			}
 		}
 
+		// SshRootPublicKeys ConfigMap
+		{
+			desired, err := login.RenderSshRootPublicKeysConfig(clusterValues)
+			if err != nil {
+				logger.Error(err, "Failed to render login SshRootPublicKeys ConfigMap")
+				return errors.Wrap(err, "rendering login SshRootPublicKeys ConfigMap")
+			}
+			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
+			err = r.ConfigMap.Reconcile(ctx, cluster, &desired)
+			if err != nil {
+				logger.Error(err, "Failed to reconcile login SshRootPublicKeys ConfigMap")
+				return errors.Wrap(err, "reconciling login SshRootPublicKeys ConfigMap")
+			}
+		}
+
 		// Security limits ConfigMap
 		{
 			desired, err := login.RenderConfigMapSecurityLimits(clusterValues)
@@ -181,7 +196,7 @@ func (r SlurmClusterReconciler) getLoginStatefulSetDependencies(
 		ctx,
 		types.NamespacedName{
 			Namespace: clusterValues.Namespace,
-			Name:      clusterValues.NodeLogin.SshRootPublicKeysConfigMap.Name,
+			Name:      naming.BuildConfigMapSshRootPublicKeysName(clusterValues.Name),
 		},
 		rootPublicKeys,
 	); err != nil {

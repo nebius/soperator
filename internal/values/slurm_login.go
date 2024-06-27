@@ -18,7 +18,7 @@ type SlurmLogin struct {
 	Service     Service
 	StatefulSet StatefulSet
 
-	SshRootPublicKeysConfigMap *slurmv1.SshRootPublicKeysConfigMap
+	SshRootPublicKeys []string
 
 	VolumeJail    slurmv1.NodeVolume
 	JailSubMounts []slurmv1.NodeVolumeJailSubMount
@@ -45,8 +45,8 @@ func buildSlurmLoginFrom(clusterName string, login *slurmv1.SlurmNodeLogin) Slur
 			naming.BuildStatefulSetName(consts.ComponentTypeLogin, clusterName),
 			login.SlurmNode.Size,
 		),
-		SshRootPublicKeysConfigMap: login.SshRootPublicKeysConfigMap.DeepCopy(),
-		VolumeJail:                 *login.Volumes.Jail.DeepCopy(),
+		SshRootPublicKeys: login.SshRootPublicKeys,
+		VolumeJail:        *login.Volumes.Jail.DeepCopy(),
 	}
 	for _, jailSubMount := range login.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()
