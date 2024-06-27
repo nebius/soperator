@@ -8,16 +8,21 @@ volume:
     # By default, equals to jail
     name: ""
     # By default, equals to jail
-    filestoreDeviceName: "jail"
+    filestoreDeviceName: ""
     # Required
-    size: "128Gi"
+    size: "2Ti"
   controllerSpool:
     # By default, equals to controller-spool
     name: ""
     # By default, equals to controller-spool
     filestoreDeviceName: ""
     # Required
-    size: "32Gi"
+    size: "30Gi"
+  jailSubMounts: []
+#  jailSubMounts:
+#    - name: "mlperf-sd"
+#      filestoreDeviceName: "mlperf-sd"
+#      size: "1500Gi"
 
 nodeGroup:
   gpu:

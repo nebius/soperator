@@ -1,6 +1,6 @@
 {{/* Local storage class */}}
 {{- define "slurm-cluster-filestore.class.local.name" -}}
-    {{- default "slurm-local-pv" .Values.storageClass.local.name | trim | kebabcase | quote -}}
+    {{- default "slurm-local-pv" $.Values.storageClass.local.name | trim | kebabcase | quote -}}
 {{- end }}
 
 {{/*
@@ -85,12 +85,51 @@
 ---
 */}}
 
+{{/* Jail submount device name */}}
+{{- define "slurm-cluster-filestore.volume.jail-submount.device" -}}
+    {{- required "Jail submount device name is required." .filestoreDeviceName | trim | kebabcase -}}
+{{- end }}
+
+{{/* Jail submount volume */}}
+{{- define "slurm-cluster-filestore.volume.jail-submount.name" -}}
+    {{- required "Jail submount name is required." .name | trim | kebabcase -}}
+{{- end }}
+
+{{/* Jail submount PVC name */}}
+{{- define "slurm-cluster-filestore.volume.jail-submount.pvc" -}}
+  {{- cat (include "slurm-cluster-filestore.volume.jail-submount.name" .) "pvc" | kebabcase | quote -}}
+{{- end }}
+
+{{/* Jail submount PV name */}}
+{{- define "slurm-cluster-filestore.volume.jail-submount.pv" -}}
+    {{- cat (include "slurm-cluster-filestore.volume.jail-submount.name" .) "pv" | kebabcase | quote -}}
+{{- end }}
+
+{{/* Jail submount mount name */}}
+{{- define "slurm-cluster-filestore.volume.jail-submount.mount" -}}
+    {{- cat (include "slurm-cluster-filestore.volume.jail-submount.name" .) "mount" | kebabcase | quote -}}
+{{- end }}
+
+{{/* Jail submount storage class name */}}
+{{- define "slurm-cluster-filestore.volume.jail-submount.storageClass" -}}
+    {{- include "slurm-cluster-filestore.class.local.name" . -}}
+{{- end }}
+
+{{/* Jail submount size */}}
+{{- define "slurm-cluster-filestore.volume.jail-submount.size" -}}
+    {{- required "Jail submount volume size is required." .size -}}
+{{- end }}
+
+{{/*
+---
+*/}}
+
 {{/* GPU node group */}}
 {{- define "slurm-cluster-filestore.nodeGroup.gpu" -}}
-    {{- required "GPU node group ID is required." .Values.nodeGroup.gpu.id | quote -}}
+    {{- required "GPU node group ID is required." $.Values.nodeGroup.gpu.id | quote -}}
 {{- end }}
 
 {{/* Non-GPU node group */}}
 {{- define "slurm-cluster-filestore.nodeGroup.nonGpu" -}}
-    {{- required "Non-GPU node group ID is required." .Values.nodeGroup.nonGpu.id | quote -}}
+    {{- required "Non-GPU node group ID is required." $.Values.nodeGroup.nonGpu.id | quote -}}
 {{- end }}

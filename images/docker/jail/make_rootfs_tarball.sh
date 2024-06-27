@@ -20,12 +20,10 @@ if [ -z "$dockerfile" ]; then
     usage
 fi
 
-echo "Preparing jail dir"
-mkdir -p jail
-rm -rf jail/* image.tar
+echo "Removing previous jail rootfs tar archive"
+rm -rf jail_rootfs.tar
 
 echo "Building tarball from docker file ${dockerfile}"
-docker build --tag jail --target jail --load $ignore_cache --platform=linux/amd64 -f "${dockerfile}" --output type=tar,dest=image.tar .
+docker build --tag jail --target jail --load $ignore_cache --platform=linux/amd64 -f "${dockerfile}" --output type=tar,dest=jail_rootfs.tar .
 
-echo "Unpack tarball"
-tar -xvf image.tar -C jail/
+echo "Built tarball jail_rootfs.tar"

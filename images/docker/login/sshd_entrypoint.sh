@@ -22,7 +22,7 @@ echo "Create privilege separation directory /var/run/sshd"
 mkdir -p /var/run/sshd
 
 echo "Complement jail rootfs"
-/opt/bin/slurm/complement_jail.sh -j /mnt/jail
+/opt/bin/slurm/complement_jail.sh -j /mnt/jail -u /mnt/jail.upper
 
 echo "Waiting until munge started"
 while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done

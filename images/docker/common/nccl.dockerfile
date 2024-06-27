@@ -42,6 +42,6 @@ RUN cd /usr/src && \
 ################################################################
 # RESULT
 ################################################################
-# /usr/src/nccl/build/pkg/deb/libnccl-dev_2.21.5-1+cuda12.2_amd64.deb
-# /usr/src/nccl/build/pkg/deb/libnccl2_2.21.5-1+cuda12.2_amd64.deb
+# /usr/src/nccl/build/pkg/deb/libnccl-dev_2.22.3-1+cuda12.2_amd64.deb
+# /usr/src/nccl/build/pkg/deb/libnccl2_2.22.3-1+cuda12.2_amd64.deb
 ################################################################

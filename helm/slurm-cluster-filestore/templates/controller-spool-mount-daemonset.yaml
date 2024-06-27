@@ -18,7 +18,7 @@ spec:
           command:
             - /bin/sh
             - -c
-            - /mount-scripts/ensure_mounted.sh -d {{- include "slurm-cluster-filestore.volume.controller-spool.device" . -}} -p /mnt/controller-spool -s 60
+            - /mount-scripts/ensure_mounted.sh -d {{ include "slurm-cluster-filestore.volume.controller-spool.device" . }} -p /mnt/controller-spool -s 60
           securityContext:
             privileged: true
           volumeMounts:

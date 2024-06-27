@@ -35,14 +35,22 @@ k8sNodeFilters:
 
 # Sources for the volumes used in Slurm node specifications
 volumeSources:
-  - name: spool
+  - name: controller-spool
     persistentVolumeClaim:
-      claimName: "spool"
+      claimName: "controller-spool-pvc"
       readOnly: false
   - name: jail
     persistentVolumeClaim:
-      claimName: "jail"
+      claimName: "jail-pvc"
       readOnly: false
+#  - name: jail-snapshot
+#    persistentVolumeClaim:
+#      claimName: "jail-snapshot-pvc"
+#      readOnly: true
+#  - name: mlperf-sd
+#    persistentVolumeClaim:
+#      claimName: "mlperf-sd-pvc"
+#      readOnly: false
 
 # Secret references needed for Slurm cluster operation
 secrets:
@@ -71,6 +79,10 @@ secrets:
 populateJail:
   # Name of the k8s node filter
   k8sNodeFilterName: "gpu"
+  # Configuration of the volume containing the custom initial jail content (the default content is used if not set)
+  jailSnapshotVolume: null
+#  jailSnapshotVolume:
+#    volumeSourceName: "jail-snapshot"
 
 # Periodic checks. e.g. GPU health
 periodicChecks:
@@ -116,12 +128,12 @@ slurmNodes:
       resources:
         cpu: "1000m"
         memory: "3Gi"
-        ephemeral-storage: "20Gi"
+        ephemeralStorage: "20Gi"
     munge:
       resources:
         cpu: "1000m"
         memory: "1Gi"
-        ephemeral-storage: "5Gi"
+        ephemeralStorage: "5Gi"
     volumes:
       spool:
         volumeSourceName: "controller-spool"
@@ -135,13 +147,13 @@ slurmNodes:
       resources:
         cpu: "156000m"
         memory: "1220Gi"
-        ephemeral-storage: "55Gi"
-        nvidia.com/gpu: 8
+        ephemeralStorage: "55Gi"
+        gpu: 8
     munge:
       resources:
         cpu: "2000m"
         memory: "4Gi"
-        ephemeral-storage: "5Gi"
+        ephemeralStorage: "5Gi"
     volumes:
       spool:
         volumeClaimTemplateSpec:
@@ -153,6 +165,10 @@ slurmNodes:
       jail:
         volumeSourceName: "jail"
       jailSubMounts: []
+#      jailSubMounts:
+#        - name: "mlcommons-sd-bench-data"
+#          mountPath: "/mlperf-sd"
+#          volumeSourceName: "mlperf-sd"
   login:
     size: 2
     k8sNodeFilterName: "no-gpu"
@@ -161,18 +177,22 @@ slurmNodes:
       resources:
         cpu: "3000m"
         memory: "9Gi"
-        ephemeral-storage: "30Gi"
+        ephemeralStorage: "30Gi"
     sshdServiceType: "LoadBalancer"
     sshdServiceLoadBalancerIP: "195.242.16.24"
     munge:
       resources:
         cpu: "500m"
         memory: "500Mi"
-        ephemeral-storage: "5Gi"
+        ephemeralStorage: "5Gi"
     volumes:
       jail:
         volumeSourceName: "jail"
       jailSubMounts: []
+#      jailSubMounts:
+#        - name: "mlcommons-sd-bench-data"
+#          mountPath: "/mlperf-sd"
+#          volumeSourceName: "mlperf-sd"
 
 images:
   slurmctld:    "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/controller_slurmctld:latest"

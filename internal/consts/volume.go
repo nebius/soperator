@@ -26,6 +26,7 @@ const (
 	VolumeNameSlurmConfigs   = slurmConfigs
 	VolumeNameSpool          = spool
 	VolumeNameJail           = jail
+	VolumeNameJailSnapshot   = jail + "-snapshot"
 	VolumeNameMungeSocket    = mungePrefix + "socket"
 	VolumeNameMungeKey       = mungeKey
 	VolumeNameNvidia         = nvidia
@@ -40,6 +41,8 @@ const (
 	VolumeMountPathSlurmConfigs      = "/mnt/" + slurmConfigs
 	VolumeMountPathSpool             = "/var/" + spool
 	VolumeMountPathJail              = "/mnt/" + jail
+	VolumeMountPathJailSnapshot      = "/jail"
+	VolumeMountPathJailUpper         = "/mnt/" + jail + ".upper"
 	VolumeMountPathMungeSocket       = "/run/" + Munge
 	VolumeMountPathMungeKey          = "/mnt/" + mungeKey
 	VolumeMountPathNvidia            = "/run/" + nvidia

@@ -54,7 +54,7 @@ echo "Current node: $current_node"
 if [ "$(echo "$avg_bandwidth < $limit" | bc)" -eq 1 ]; then
   echo "Avg bus bandwidth = $avg_bandwidth"
   if [ "$drain_state" = "true" ]; then
-    reason="GPUPerfProblem: all_reduce_perf: avg bus bandwidth = $avg_bandwidth, min = $limit"
+    reason="GPU benchmark ended with unsatisfactory result: NCCL test all_reduce_perf: Avg bus bandwidth=$avg_bandwidth, min=$limit"
     scontrol update NodeName="$current_node" State=drain Reason="$reason"
     echo "$(hostname) node drained at $(date) with reason: $reason"
   fi

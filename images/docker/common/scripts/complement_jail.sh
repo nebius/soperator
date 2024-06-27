@@ -4,19 +4,20 @@
 
 set -e # Exit immediately if any command returns a non-zero error code
 
-usage() { echo "usage: ${0} -j <path_to_jail_dir> [-w] [-h]" >&2; exit 1; }
+usage() { echo "usage: ${0} -j <path_to_jail_dir> -u <path_to_upper_jail_dir> [-w] [-h]" >&2; exit 1; }
 
-while getopts j:wh flag
+while getopts j:u:wh flag
 do
     case "${flag}" in
         j) jaildir=${OPTARG};;
+        u) upperdir=${OPTARG};;
         w) worker=1;;
         h) usage;;
         *) usage;;
     esac
 done
 
-if [ -z "$jaildir" ]; then
+if [ -z "$jaildir" ] || [ -z "$upperdir" ]; then
     usage
 fi
 
@@ -28,7 +29,6 @@ pushd "${jaildir}"
     mount --rbind /run run/
 
     echo "Remount /tmp"
-    # TODO: Maybe we should do this after nvidia-container-cli?
     mount -t tmpfs tmpfs tmp/
 
     echo "Bind-mount /var/log because it should be node-local"
@@ -39,6 +39,19 @@ pushd "${jaildir}"
 
     echo "Bind-mount /etc/hosts"
     mount --bind /etc/hosts etc/hosts
+
+    echo "Bind-mount jail submounts from upper ${upperdir} into the actual ${jaildir}"
+    submounts=$( \
+        findmnt --output TARGET --submounts --target / --pairs | \
+        grep "^TARGET=\"${upperdir}/" | \
+        sed -e "s|^TARGET=\"${upperdir}/||" -e "s|\"$||" \
+    )
+    while IFS= read -r path; do
+        if [ -n "$path" ]; then
+            echo "Bind-mount jail submount ${path}"
+            mkdir -p "${path}" && mount --bind "${upperdir}/${path}" "${path}"
+        fi
+    done <<< "$submounts"
 
     if [ -n "$worker" ]; then
         echo "Run nvidia-container-cli to propagate NVIDIA drivers, CUDA, NVML and other GPU-related stuff to the jail"
