@@ -90,7 +90,7 @@ spec:
       k8sNodeFilterName: {{ required ".Values.slurmNodes.worker.k8sNodeFilterName must be provided." .Values.slurmNodes.worker.k8sNodeFilterName | quote }}
       slurmd:
         image: {{ include "slurm-cluster.image.slurmd" . }}
-        port: {{ default 6817 .Values.slurmNodes.worker.slurmd.port }}
+        port: {{ default 6818 .Values.slurmNodes.worker.slurmd.port }}
         resources:
           cpu: {{ required ".Values.slurmNodes.worker.slurmd.resources.cpu must be provided." .Values.slurmNodes.worker.slurmd.resources.cpu | quote}}
           memory: {{ required ".Values.slurmNodes.worker.slurmd.resources.memory must be provided." .Values.slurmNodes.worker.slurmd.resources.memory | quote}}
@@ -114,7 +114,7 @@ spec:
       k8sNodeFilterName: {{ required ".Values.slurmNodes.login.k8sNodeFilterName must be provided." .Values.slurmNodes.login.k8sNodeFilterName | quote }}
       sshd:
         image: {{ include "slurm-cluster.image.sshd" . }}
-        port: {{ default 6817 .Values.slurmNodes.login.sshd.port }}
+        port: {{ default 22 .Values.slurmNodes.login.sshd.port }}
         resources:
           cpu: {{ required ".Values.slurmNodes.login.sshd.resources.cpu must be provided." .Values.slurmNodes.login.sshd.resources.cpu | quote}}
           memory: {{ required ".Values.slurmNodes.login.sshd.resources.memory must be provided." .Values.slurmNodes.login.sshd.resources.memory | quote}}
