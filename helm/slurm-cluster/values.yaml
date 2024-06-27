@@ -62,18 +62,6 @@ secrets:
     name: "munge-key"
     # Key of the secret with Munge key data to use if not creating
     key: "key"
-  # Secret reference required for SSH connection to Slurm login nodes. Required in case of login node usage
-  sshRootPublicKeys:
-    # Whether to create new secret or to use provided reference
-    create: true
-    # Authorized keys to be put into the secret if creating. Each key must be base64 encoded string
-    keys:
-      - "c3NoLWVkMjU1MTkga2V5IHVzZXIxQGV4YW1wbGUuY29t"
-      - "c3NoLWVkMjU1MTkga2V5IHVzZXIyQGV4YW1wbGUuY29t"
-    # Name of the secret to use if not creating
-    name: "ssh-root-public-keys"
-    # Key of the secret with authorized keys data to use if not creating
-    key: "authorized_keys"
 
 # Job performing initial jail file system population
 populateJail:
@@ -178,6 +166,10 @@ slurmNodes:
         cpu: "3000m"
         memory: "9Gi"
         ephemeralStorage: "30Gi"
+    # Authorized keys required for SSH connection to Slurm login nodes
+    sshRootPublicKeys:
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzxkjzPQ4EyZSjan4MLGFSA18idpZicoKW7Hfff username1"
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICL8scMKnwu+Y9S6XDACacZ54+qu+YRo2y4Ieddd username2"
     sshdServiceType: "LoadBalancer"
     sshdServiceLoadBalancerIP: "195.242.16.24"
     munge:

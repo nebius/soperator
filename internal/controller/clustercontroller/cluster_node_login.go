@@ -45,6 +45,21 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 			}
 		}
 
+		// SshRootPublicKeys ConfigMap
+		{
+			desired, err := login.RenderSshRootPublicKeysConfig(clusterValues)
+			if err != nil {
+				logger.Error(err, "Failed to render login SshRootPublicKeys ConfigMap")
+				return errors.Wrap(err, "rendering login SshRootPublicKeys ConfigMap")
+			}
+			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
+			err = r.ConfigMap.Reconcile(ctx, cluster, &desired)
+			if err != nil {
+				logger.Error(err, "Failed to reconcile login SshRootPublicKeys ConfigMap")
+				return errors.Wrap(err, "reconciling login SshRootPublicKeys ConfigMap")
+			}
+		}
+
 		// Security limits ConfigMap
 		{
 			desired, err := login.RenderConfigMapSecurityLimits(clusterValues)
@@ -176,6 +191,19 @@ func (r SlurmClusterReconciler) getLoginStatefulSetDependencies(
 	}
 	res = append(res, slurmConfigsConfigMap)
 
+	rootPublicKeys := &corev1.ConfigMap{}
+	if err := r.Get(
+		ctx,
+		types.NamespacedName{
+			Namespace: clusterValues.Namespace,
+			Name:      naming.BuildConfigMapSshRootPublicKeysName(clusterValues.Name),
+		},
+		rootPublicKeys,
+	); err != nil {
+		return []metav1.Object{}, err
+	}
+	res = append(res, rootPublicKeys)
+
 	mungeKeySecret := &corev1.Secret{}
 	if err := r.Get(
 		ctx,
@@ -201,19 +229,6 @@ func (r SlurmClusterReconciler) getLoginStatefulSetDependencies(
 		return []metav1.Object{}, err
 	}
 	res = append(res, sshConfigsConfigMap)
-
-	rootPublicKeysSecret := &corev1.Secret{}
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{
-			Namespace: clusterValues.Namespace,
-			Name:      clusterValues.Secrets.SSHRootPublicKeys.Name,
-		},
-		rootPublicKeysSecret,
-	); err != nil {
-		return []metav1.Object{}, err
-	}
-	res = append(res, rootPublicKeysSecret)
 
 	return res, nil
 }

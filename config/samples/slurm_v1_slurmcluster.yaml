@@ -7,7 +7,7 @@ metadata:
   namespace: dstaroff
   name: slurm1
 spec:
-  crVersion: 0.1.10
+  crVersion: 0.1.12
   pause: false
   populateJail:
     image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest
@@ -79,9 +79,6 @@ spec:
     mungeKey:
       name: "munge-key"
       key: "munge.key"
-    sshRootPublicKeys:
-      name: "ssh-root-keys"
-      key: "authorized_keys"
   slurmNodes:
     controller:
       size: 1
@@ -147,6 +144,9 @@ spec:
           cpu: 1000m
           memory: 1Gi
           ephemeral-storage: 1Gi
+      sshRootPublicKeys:
+        - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzxkjzPQ4EyZSjan4MLGFSA18idpZicoKW7HC4YmwgN rdjjke@gmail.com"
+        - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICL8scMKnwu+Y9S6XDACacZ54+qu+YRo2y4IeXSPjTuo pavel@sofrony.ru"
       sshdServiceType: "LoadBalancer"
       munge:
         image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"

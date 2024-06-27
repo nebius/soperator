@@ -7,7 +7,7 @@ metadata:
   namespace: slurm-poc
   name: slurm2
 spec:
-  crVersion: 0.1.10
+  crVersion: 0.1.12
   pause: false
   populateJail:
     image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest
@@ -77,9 +77,6 @@ spec:
     mungeKey:
       name: "munge-key"
       key: "munge.key"
-    sshRootPublicKeys:
-      name: "ssh-root-keys"
-      key: "authorized_keys"
   slurmNodes:
     controller:
       size: 2
@@ -143,6 +140,9 @@ spec:
           cpu: 3000m
           memory: 9Gi
           ephemeral-storage: 30Gi
+      sshRootPublicKeys:
+        - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzxkjzPQ4EyZSjan4MLGFSA18idpZicoKW7HC4YmwgN rdjjke@gmail.com"
+        - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICL8scMKnwu+Y9S6XDACacZ54+qu+YRo2y4IeXSPjTuo pavel@sofrony.ru"
       sshdServiceType: "LoadBalancer"
       sshdServiceLoadBalancerIP: "195.242.16.24"
       munge:

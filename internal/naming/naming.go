@@ -96,6 +96,13 @@ func BuildConfigMapSSHConfigsName(clusterName string) string {
 	}.String()
 }
 
+func BuildConfigMapSshRootPublicKeysName(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.ConfigMapNameSshRootPublicKeys,
+	}.String()
+}
+
 func BuildConfigMapSecurityLimitsName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,

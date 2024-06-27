@@ -21,7 +21,6 @@ func (r *SlurmClusterReconciler) mapObjectsToReconcileRequests(
 	var (
 		fieldPaths = []string{
 			consts.IndexFieldSecretMungeKey,
-			consts.IndexFieldSecretSSHRootPublicKeys,
 		}
 		res []reconcile.Request
 	)
@@ -54,10 +53,6 @@ func indexFields(mgr ctrl.Manager) error {
 	if err := indexField(mgr, consts.IndexFieldSecretMungeKey, indexFuncSecretMungeKey); err != nil {
 		return err
 	}
-	if err := indexField(mgr, consts.IndexFieldSecretSSHRootPublicKeys, indexFuncSecretSSHRootPublicKeys); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -69,14 +64,6 @@ func indexFuncSecretMungeKey(obj client.Object) []string {
 	cluster := obj.(*slurmv1.SlurmCluster)
 	if cluster.Spec.Secrets.MungeKey.Name != "" {
 		return []string{cluster.Spec.Secrets.MungeKey.Name}
-	}
-	return []string{}
-}
-
-func indexFuncSecretSSHRootPublicKeys(obj client.Object) []string {
-	cluster := obj.(*slurmv1.SlurmCluster)
-	if cluster.Spec.Secrets.SSHRootPublicKeys != nil && cluster.Spec.Secrets.SSHRootPublicKeys.Name != "" {
-		return []string{cluster.Spec.Secrets.SSHRootPublicKeys.Name}
 	}
 	return []string{}
 }

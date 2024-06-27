@@ -22,7 +22,7 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 	ctx context.Context,
 	clusterValues *values.SlurmCluster,
 	cluster *slurmv1.SlurmCluster,
-) (ctrl.Result, error) {
+) (ctrl.Result, bool, error) {
 	logger := log.FromContext(ctx)
 
 	job, err := populate_jail.RenderPopulateJailJob(
@@ -34,7 +34,7 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 	)
 	if err != nil {
 		logger.Error(err, "Failed to render Populate Jail Job")
-		return ctrl.Result{}, errors.Wrap(err, "rendering Populate Jail Job")
+		return ctrl.Result{}, false, errors.Wrap(err, "rendering Populate Jail Job")
 	}
 
 	reconcilePopulateJailImpl := func() error {
@@ -47,22 +47,22 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 		return nil
 	}
 
-	err = r.Get(ctx, client.ObjectKey{Name: job.Name, Namespace: job.Namespace}, job.DeepCopy())
+	err = r.Get(ctx, client.ObjectKey{Name: job.Name, Namespace: job.Namespace}, &job)
 	if err != nil && apierrors.IsNotFound(err) {
 		if err := reconcilePopulateJailImpl(); err != nil {
 			logger.Error(err, "Failed to reconcile Populate Jail Job")
-			return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, errors.Wrap(err, "reconciling Populate Jail Job")
+			return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, false, errors.Wrap(err, "reconciling Populate Jail Job")
 		}
 	} else if err != nil {
 		logger.Error(err, "Failed to get PopulateJail Job")
-		return ctrl.Result{}, errors.Wrap(err, "reconciling Populate Jail Job")
+		return ctrl.Result{}, false, errors.Wrap(err, "reconciling Populate Jail Job")
 	}
 
 	if job.Status.Succeeded > 0 {
 		logger.Info("PopulateJail Job completed successfully")
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, false, nil
 	}
 
-	logger.Info("PopulateJail Job status not completed yet")
-	return ctrl.Result{}, nil
+	logger.Info("PopulateJail Job status not completed yet", "job", job)
+	return ctrl.Result{}, true, nil
 }

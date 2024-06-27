@@ -31,7 +31,6 @@ controllerManager:
           - ALL
     image:
       repository: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/slurm-operator
-      tag: latest
     resources:
       limits:
         memory: 128Mi
