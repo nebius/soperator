@@ -30,7 +30,7 @@ controllerManager:
         drop:
           - ALL
     image:
-      repository: cr.nemax.nebius.cloud/crnsp9v7ps4c2uks5n6a/slurm-operator
+      repository: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/slurm-operator
     resources:
       limits:
         memory: 128Mi
@@ -41,6 +41,8 @@ controllerManager:
   serviceAccount:
     annotations: {}
 kubernetesClusterDomain: cluster.local
+watchNamespaces: "*" # Watch all namespaces
+#watchNamespaces: "default,slurm-cluster" # Watch namespaces "default" and "slurm-cluster"
 metricsService:
   ports:
     - name: https

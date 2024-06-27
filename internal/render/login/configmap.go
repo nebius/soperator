@@ -72,7 +72,7 @@ func generateSshRootPublicKeysConfig(cluster *values.SlurmCluster) renderutils.C
 	return res
 }
 
-// endregion SSH config
+// endregion SshRootPublicKeys config
 
 // region Security limits
 
