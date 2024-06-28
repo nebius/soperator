@@ -48,6 +48,7 @@ spec:
           value: {{ quote .Values.watchNamespaces }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
+        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz

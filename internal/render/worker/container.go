@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
+	"nebius.ai/slurm-operator/internal/naming"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -46,6 +47,7 @@ func renderContainerToolkitValidation(container *values.Container) corev1.Contai
 func renderContainerSlurmd(
 	container *values.Container,
 	jailSubMounts []slurmv1.NodeVolumeJailSubMount,
+	clusterName string,
 ) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountSlurmConfigs(),
@@ -79,6 +81,9 @@ func renderContainerSlurmd(
 						FieldPath: "metadata.namespace",
 					},
 				},
+			}, {
+				Name:  "K8S_SERVICE_NAME",
+				Value: naming.BuildServiceName(consts.ComponentTypeWorker, clusterName),
 			},
 		},
 		Ports: []corev1.ContainerPort{{

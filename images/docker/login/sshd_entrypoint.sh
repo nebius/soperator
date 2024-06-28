@@ -12,12 +12,6 @@ chown -h 0:42 /etc/{shadow,gshadow}
 echo "Link home from jail to use SSH keys from there"
 ln -s /mnt/jail/home /home
 
-echo "Bind-mount slurm configs from K8S config map"
-for file in /mnt/slurm-configs/*; do
-    filename=$(basename "$file")
-    touch "/etc/slurm/$filename" && mount --bind "$file" "/etc/slurm/$filename"
-done
-
 echo "Create privilege separation directory /var/run/sshd"
 mkdir -p /var/run/sshd
 

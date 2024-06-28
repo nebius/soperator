@@ -1,8 +1,6 @@
 package values
 
 import (
-	"path"
-
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -50,7 +48,6 @@ func buildSlurmLoginFrom(clusterName string, login *slurmv1.SlurmNodeLogin) Slur
 	}
 	for _, jailSubMount := range login.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()
-		subMount.MountPath = path.Join(consts.VolumeMountPathJail, subMount.MountPath)
 		res.JailSubMounts = append(res.JailSubMounts, subMount)
 	}
 
