@@ -49,7 +49,9 @@ pushd "${jaildir}"
     while IFS= read -r path; do
         if [ -n "$path" ]; then
             echo "Bind-mount jail submount ${path}"
-            mkdir -p "${path}" && mount --bind "${upperdir}/${path}" "${path}"
+            mkdir -p "${path}"
+            chmod 777 "${upperdir}/${path}" # TODO: Support setting configurable permissions for jail submounts
+            mount --bind "${upperdir}/${path}" "${path}"
         fi
     done <<< "$submounts"
 

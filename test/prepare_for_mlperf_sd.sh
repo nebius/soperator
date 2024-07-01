@@ -17,4 +17,4 @@ if [ -z "$user" ] || [ -z "$key" ] || [ -z "$address" ]; then
     usage
 fi
 
-rsync -Prv -e "ssh -i ${key}" mlperf-sd "${user}"@"${address}":/tmp/
+scp -i "${key}" -r ./mlperf-sd "${user}"@"${address}":/tmp/

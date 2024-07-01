@@ -19,8 +19,9 @@ func RenderService(namespace, clusterName string, controller *values.SlurmContro
 			Labels:    common.RenderLabels(consts.ComponentTypeController, clusterName),
 		},
 		Spec: corev1.ServiceSpec{
-			Type:     controller.Service.Type,
-			Selector: common.RenderMatchLabels(consts.ComponentTypeController, clusterName),
+			Type:      controller.Service.Type,
+			Selector:  common.RenderMatchLabels(consts.ComponentTypeController, clusterName),
+			ClusterIP: "None",
 			Ports: []corev1.ServicePort{{
 				Protocol:   controller.Service.Protocol,
 				Port:       controller.ContainerSlurmctld.Port,
