@@ -1,6 +1,6 @@
 #!/bin/bash
 
-while getopts ":b:e:f:l:d:" opt; do
+while getopts ":b:e:f:l:d:u:" opt; do
   case ${opt} in
     b )
       min_bytes=$OPTARG
@@ -17,6 +17,9 @@ while getopts ":b:e:f:l:d:" opt; do
     d )
       drain_state=$OPTARG
       ;;
+    u )
+      use_infiniband=$OPTARG
+      ;;
     \? )
       echo "Invalid option: $OPTARG" 1>&2
       exit 1
@@ -29,15 +32,16 @@ while getopts ":b:e:f:l:d:" opt; do
 done
 shift $((OPTIND -1))
 
-if [ -z "$min_bytes" ] || [ -z "$max_bytes" ] || [ -z "$step_factor" ] || [ -z "$limit" ] || [ -z "$drain_state" ]; then
-    echo "Usage: $0 -b <min_bytes> -e <max_bytes> -f <step_factor> -l <limit> -d <drain_state>" >&2
+if [ -z "$min_bytes" ] || [ -z "$max_bytes" ] || [ -z "$step_factor" ] || [ -z "$limit" ] || [ -z "$drain_state" ] || [ -z "$use_infiniband" ]; then
+    echo "Usage: $0 -b <min_bytes> -e <max_bytes> -f <step_factor> -l <limit> -d <drain_state> -u <use_infiniband>" >&2
     exit 1
 fi
 
-# TODO: MSP-2184 make vars optional in operator
-export NCCL_P2P_DISABLE=1
-export NCCL_SHM_DISABLE=1
-export NCCL_ALGO=Ring
+if [ "$use_infiniband" = "true" ]; then
+    export NCCL_P2P_DISABLE=1
+    export NCCL_SHM_DISABLE=1
+    export NCCL_ALGO=Ring
+fi
 
 perf_output=$(/usr/bin/all_reduce_perf -b "$min_bytes" -e "$max_bytes" -f "$step_factor" -g "$SLURM_GPUS")
 echo "Performance output: $perf_output"

@@ -32,4 +32,5 @@ echo "Start NCCL test benchmark"
     -g "$NCCL_GPU_NUM" \
     -t "$NCCL_BENCH_TIMOUT" \
     -l "$THRESHOLD_MORE_THAN" \
-    -d "$DRAIN_SLURM_STATE"
+    -d "$DRAIN_SLURM_STATE" \
+    -u "$USE_INFINIBAND"
