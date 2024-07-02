@@ -26,6 +26,7 @@ spec:
         stepFactor: "2"
         timeout: "20:00" # 20 minutes
         thresholdMoreThan: "0"
+        useInfiniband: true
       failureActions:
         #setK8SNodeStatus: "GpuSlow"
         setSlurmNodeDrainState: false

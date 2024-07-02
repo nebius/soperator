@@ -41,6 +41,10 @@ func renderContainerNCCLBenchmark(ncclBenchmark *values.SlurmNCCLBenchmark) core
 				Name:  "DRAIN_SLURM_STATE",
 				Value: strconv.FormatBool(ncclBenchmark.FailureActions.SetSlurmNodeDrainState),
 			},
+			{
+				Name:  "USE_INFINIBAND",
+				Value: strconv.FormatBool(ncclBenchmark.NCCLSettings.UseInfiniband),
+			},
 		},
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{

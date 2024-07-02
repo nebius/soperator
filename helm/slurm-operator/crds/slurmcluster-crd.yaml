@@ -1094,6 +1094,12 @@ spec:
                             description: Timeout defines the timeout for nccl in its
                               special format
                             type: string
+                          useInfiniband:
+                            default: false
+                            description: |-
+                              UseInfiniband defines using NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring env variables for test
+                              https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html
+                            type: boolean
                         type: object
                       schedule:
                         default: 0 */3 * * *

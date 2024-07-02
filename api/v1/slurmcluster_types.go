@@ -180,6 +180,13 @@ type NCCLSettings struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="0"
 	ThresholdMoreThan string `json:"thresholdMoreThan,omitempty"`
+
+	// UseInfiniband defines using NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring env variables for test
+	// https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	UseInfiniband bool `json:"useInfiniband,omitempty"`
 }
 
 // FailureActions define actions performed on benchmark failure
