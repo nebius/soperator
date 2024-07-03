@@ -3,4 +3,4 @@ name: slurm-cluster
 description: A Helm chart for Kubernetes
 type: application
 version: 0.1.13
-appVersion: "1.7.0-r42033"
+appVersion: "1.8.0-r43162"
