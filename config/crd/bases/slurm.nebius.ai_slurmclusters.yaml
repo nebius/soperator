@@ -15,6 +15,10 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - description: The phase of Slurm cluster creation.
+      jsonPath: .status.phase
+      name: Status
+      type: string
     - description: The number of controller nodes
       jsonPath: .spec.slurmNodes.controller.size
       name: Controllers

@@ -42,13 +42,14 @@ spec:
         command:
         - /manager
         env:
+        - name: SLURM_OPERATOR_WATCH_NAMESPACES
+          value: {{ quote .Values.controllerManager.manager.env.slurmOperatorWatchNamespaces
+            }}
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
-        - name: SLURM_OPERATOR_WATCH_NAMESPACES
-          value: {{ quote .Values.watchNamespaces }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ .Values.controllerManager.manager.imagePullPolicy }}
         livenessProbe:
           httpGet:
             path: /healthz

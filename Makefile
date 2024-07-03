@@ -101,12 +101,13 @@ gazelle: ## Run gazelle
 .PHONY: helm
 helm: kustomize helmify yq ## Update Helm charts
 	# region operator
-	mv $(CHART_OPERATOR_PATH)/Chart.yaml $(CHART_PATH)/operator-chart.yaml
+	$(YQ) '.appVersion' $(CHART_OPERATOR_PATH)/Chart.yaml > $(CHART_PATH)/operatorAppVersion
 
 	rm -rf $(CHART_OPERATOR_PATH)
 	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir $(CHART_OPERATOR_PATH)
 
-	mv $(CHART_PATH)/operator-chart.yaml $(CHART_OPERATOR_PATH)/Chart.yaml
+	$(YQ) -i ".appVersion = \"$$(cat $(CHART_PATH)/operatorAppVersion)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
+	rm -f $(CHART_PATH)/operatorAppVersion
 
 	$(YQ) -i 'del(.controllerManager.manager.image.tag)' "$(CHART_OPERATOR_PATH)/values.yaml"
 	$(YQ) -i ".version = \"$(CHART_OPERATOR_VERSION)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
