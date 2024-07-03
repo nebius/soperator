@@ -25,6 +25,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
+	"nebius.ai/slurm-operator/internal/controller/state"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/values"
 )
@@ -136,6 +137,15 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1.SlurmCluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+
+	if state.ReconciliationState.Present(cluster.GetObjectKind(), client.ObjectKeyFromObject(cluster)) {
+		return ctrl.Result{}, nil
+	}
+	state.ReconciliationState.Set(cluster.GetObjectKind(), client.ObjectKeyFromObject(cluster))
+	defer func() {
+		state.ReconciliationState.Remove(cluster.GetObjectKind(), client.ObjectKeyFromObject(cluster))
+	}()
+
 	logger.Info("Starting reconciliation of Slurm Cluster")
 
 	clusterValues, err := values.BuildSlurmClusterFrom(ctx, cluster)
@@ -146,7 +156,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 	r.setUpConditions(cluster)
 
 	// Reconciliation
-	res, err := r.withPhase(ctx, cluster,
+	res, err := r.runWithPhase(ctx, cluster,
 		ptr.To(slurmv1.PhaseClusterReconciling),
 		func() (ctrl.Result, error) {
 			result, wait, err := r.ReconcilePopulateJail(ctx, clusterValues, cluster)
@@ -182,7 +192,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 	}
 
 	// Validation
-	res, err = r.withPhase(ctx, cluster,
+	res, err = r.runWithPhase(ctx, cluster,
 		ptr.To(slurmv1.PhaseClusterNotAvailable),
 		func() (ctrl.Result, error) {
 			// Controllers
@@ -221,7 +231,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 	}
 
 	// Availability
-	if _, err = r.withPhase(ctx, cluster,
+	if _, err = r.runWithPhase(ctx, cluster,
 		ptr.To(slurmv1.PhaseClusterAvailable),
 		func() (ctrl.Result, error) { return ctrl.Result{}, nil },
 	); err != nil {
@@ -272,7 +282,7 @@ func (r *SlurmClusterReconciler) setUpConditions(cluster *slurmv1.SlurmCluster) 
 	)
 }
 
-func (r *SlurmClusterReconciler) withPhase(ctx context.Context, cluster *slurmv1.SlurmCluster, phase *string, do func() (ctrl.Result, error)) (ctrl.Result, error) {
+func (r *SlurmClusterReconciler) runWithPhase(ctx context.Context, cluster *slurmv1.SlurmCluster, phase *string, do func() (ctrl.Result, error)) (ctrl.Result, error) {
 	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.Phase = phase
 	if err := r.Status().Patch(ctx, cluster, patch); err != nil {
