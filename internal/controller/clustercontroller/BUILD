@@ -41,9 +41,12 @@ go_library(
         "@io_k8s_client_go//tools/record",
         "@io_k8s_client_go//util/retry",
         "@io_k8s_sigs_controller_runtime//:controller-runtime",
+        "@io_k8s_sigs_controller_runtime//pkg/builder",
         "@io_k8s_sigs_controller_runtime//pkg/client",
         "@io_k8s_sigs_controller_runtime//pkg/handler",
         "@io_k8s_sigs_controller_runtime//pkg/log",
+        "@io_k8s_sigs_controller_runtime//pkg/predicate",
         "@io_k8s_sigs_controller_runtime//pkg/reconcile",
+        "@io_k8s_utils//ptr",
     ],
 )

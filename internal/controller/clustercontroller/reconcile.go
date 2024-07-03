@@ -15,10 +15,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
@@ -140,116 +143,144 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		return ctrl.Result{}, err
 	}
 
-	// Set status conditions
-	{
-		meta.SetStatusCondition(
-			&cluster.Status.Conditions,
-			metav1.Condition{
-				Type:    slurmv1.ConditionClusterCommonAvailable,
-				Status:  metav1.ConditionUnknown,
-				Reason:  "Reconciling",
-				Message: "Reconciling Slurm common resources",
-			},
-		)
-		meta.SetStatusCondition(
-			&cluster.Status.Conditions,
-			metav1.Condition{
-				Type:    slurmv1.ConditionClusterControllersAvailable,
-				Status:  metav1.ConditionUnknown,
-				Reason:  "Reconciling",
-				Message: "Reconciling Slurm Controllers",
-			},
-		)
-		meta.SetStatusCondition(
-			&cluster.Status.Conditions,
-			metav1.Condition{
-				Type:    slurmv1.ConditionClusterWorkersAvailable,
-				Status:  metav1.ConditionUnknown,
-				Reason:  "Reconciling",
-				Message: "Reconciling Slurm Workers",
-			},
-		)
-		meta.SetStatusCondition(
-			&cluster.Status.Conditions,
-			metav1.Condition{
-				Type:    slurmv1.ConditionClusterLoginAvailable,
-				Status:  metav1.ConditionUnknown,
-				Reason:  "Reconciling",
-				Message: "Reconciling Slurm Login",
-			},
-		)
-	}
+	r.setUpConditions(cluster)
 
 	// Reconciliation
-	{
-		initialPhase := slurmv1.PhaseClusterReconciling
-		cluster.Status.Phase = &initialPhase
+	res, err := r.withPhase(ctx, cluster,
+		ptr.To(slurmv1.PhaseClusterReconciling),
+		func() (ctrl.Result, error) {
+			result, wait, err := r.ReconcilePopulateJail(ctx, clusterValues, cluster)
+			if err != nil || wait == true {
+				return result, err
+			}
 
-		result, wait, err := r.ReconcilePopulateJail(ctx, clusterValues, cluster)
-		if err != nil || wait == true {
-			return result, err
-		}
-
-		if err = r.ReconcileCommon(ctx, cluster, clusterValues); err != nil {
-			return ctrl.Result{}, err
-		}
-		if err = r.ReconcileNCCLBenchmark(ctx, cluster, clusterValues); err != nil {
-			return ctrl.Result{}, err
-		}
-		if err = r.ReconcileControllers(ctx, cluster, clusterValues); err != nil {
-			return ctrl.Result{}, err
-		}
-		if err = r.ReconcileWorkers(ctx, cluster, clusterValues); err != nil {
-			return ctrl.Result{}, err
-		}
-		if clusterValues.NodeLogin.Size > 0 {
-			if err = r.ReconcileLogin(ctx, cluster, clusterValues); err != nil {
+			if err = r.ReconcileCommon(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
-		}
+			if err = r.ReconcileNCCLBenchmark(ctx, cluster, clusterValues); err != nil {
+				return ctrl.Result{}, err
+			}
+			if err = r.ReconcileControllers(ctx, cluster, clusterValues); err != nil {
+				return ctrl.Result{}, err
+			}
+			if err = r.ReconcileWorkers(ctx, cluster, clusterValues); err != nil {
+				return ctrl.Result{}, err
+			}
+			if clusterValues.NodeLogin.Size > 0 {
+				if err = r.ReconcileLogin(ctx, cluster, clusterValues); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+
+			return ctrl.Result{}, nil
+		},
+	)
+	if err != nil {
+		return ctrl.Result{}, err
+	} else if res.Requeue {
+		return res, nil
 	}
 
 	// Validation
-	{
-		notAvailablePhase := slurmv1.PhaseClusterNotAvailable
-		cluster.Status.Phase = &notAvailablePhase
-
-		// Controllers
-		if res, err := r.ValidateControllers(ctx, cluster, clusterValues); err != nil {
-			logger.Error(err, "Failed to validate Slurm controllers")
-			return ctrl.Result{}, errors.Wrap(err, "validating Slurm controllers")
-		} else if res.Requeue {
-			return res, nil
-		}
-
-		// Workers
-		if res, err := r.ValidateWorkers(ctx, cluster, clusterValues); err != nil {
-			logger.Error(err, "Failed to validate Slurm workers")
-			return ctrl.Result{}, errors.Wrap(err, "validating Slurm workers")
-		} else if res.Requeue {
-			return res, nil
-		}
-
-		// Login
-		if clusterValues.NodeLogin.Size > 0 {
-			if res, err := r.ValidateLogin(ctx, cluster, clusterValues); err != nil {
-				logger.Error(err, "Failed to validate Slurm login")
-				return ctrl.Result{}, errors.Wrap(err, "validating Slurm login")
+	res, err = r.withPhase(ctx, cluster,
+		ptr.To(slurmv1.PhaseClusterNotAvailable),
+		func() (ctrl.Result, error) {
+			// Controllers
+			if res, err := r.ValidateControllers(ctx, cluster, clusterValues); err != nil {
+				logger.Error(err, "Failed to validate Slurm controllers")
+				return ctrl.Result{}, errors.Wrap(err, "validating Slurm controllers")
 			} else if res.Requeue {
 				return res, nil
 			}
-		}
+
+			// Workers
+			if res, err := r.ValidateWorkers(ctx, cluster, clusterValues); err != nil {
+				logger.Error(err, "Failed to validate Slurm workers")
+				return ctrl.Result{}, errors.Wrap(err, "validating Slurm workers")
+			} else if res.Requeue {
+				return res, nil
+			}
+
+			// Login
+			if clusterValues.NodeLogin.Size > 0 {
+				if res, err := r.ValidateLogin(ctx, cluster, clusterValues); err != nil {
+					logger.Error(err, "Failed to validate Slurm login")
+					return ctrl.Result{}, errors.Wrap(err, "validating Slurm login")
+				} else if res.Requeue {
+					return res, nil
+				}
+			}
+
+			return ctrl.Result{}, nil
+		},
+	)
+	if err != nil {
+		return ctrl.Result{}, err
+	} else if res.Requeue {
+		return res, nil
 	}
 
 	// Availability
-	{
-		availablePhase := slurmv1.PhaseClusterAvailable
-		cluster.Status.Phase = &availablePhase
+	if _, err = r.withPhase(ctx, cluster,
+		ptr.To(slurmv1.PhaseClusterAvailable),
+		func() (ctrl.Result, error) { return ctrl.Result{}, nil },
+	); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	logger.Info("Finished reconciliation of Slurm Cluster")
 
 	return ctrl.Result{}, nil
+}
+
+func (r *SlurmClusterReconciler) setUpConditions(cluster *slurmv1.SlurmCluster) {
+	meta.SetStatusCondition(
+		&cluster.Status.Conditions,
+		metav1.Condition{
+			Type:    slurmv1.ConditionClusterCommonAvailable,
+			Status:  metav1.ConditionUnknown,
+			Reason:  "Reconciling",
+			Message: "Reconciling Slurm common resources",
+		},
+	)
+	meta.SetStatusCondition(
+		&cluster.Status.Conditions,
+		metav1.Condition{
+			Type:    slurmv1.ConditionClusterControllersAvailable,
+			Status:  metav1.ConditionUnknown,
+			Reason:  "Reconciling",
+			Message: "Reconciling Slurm Controllers",
+		},
+	)
+	meta.SetStatusCondition(
+		&cluster.Status.Conditions,
+		metav1.Condition{
+			Type:    slurmv1.ConditionClusterWorkersAvailable,
+			Status:  metav1.ConditionUnknown,
+			Reason:  "Reconciling",
+			Message: "Reconciling Slurm Workers",
+		},
+	)
+	meta.SetStatusCondition(
+		&cluster.Status.Conditions,
+		metav1.Condition{
+			Type:    slurmv1.ConditionClusterLoginAvailable,
+			Status:  metav1.ConditionUnknown,
+			Reason:  "Reconciling",
+			Message: "Reconciling Slurm Login",
+		},
+	)
+}
+
+func (r *SlurmClusterReconciler) withPhase(ctx context.Context, cluster *slurmv1.SlurmCluster, phase *string, do func() (ctrl.Result, error)) (ctrl.Result, error) {
+	patch := client.MergeFrom(cluster.DeepCopy())
+	cluster.Status.Phase = phase
+	if err := r.Status().Patch(ctx, cluster, patch); err != nil {
+		log.FromContext(ctx).Error(err, "Failed to update Slurm cluster status phase")
+		return ctrl.Result{}, errors.Wrap(err, "updating cluster status phase")
+	}
+
+	return do()
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -259,7 +290,7 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&slurmv1.SlurmCluster{}).
+		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Owns(&corev1.Service{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&corev1.PersistentVolumeClaim{}).

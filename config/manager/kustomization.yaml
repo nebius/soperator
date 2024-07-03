@@ -4,5 +4,5 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
   - name: controller
-    newName: cr.nemax.nebius.cloud/crnsp9v7ps4c2uks5n6a/slurm-operator
+    newName: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/slurm-operator
     newTag: latest
