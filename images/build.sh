@@ -20,8 +20,13 @@ if [ -z "$tag" ] || [ -z "$dockerfile" ]; then
     usage
 fi
 
-# https://console.nebius.ai/folders/bjef05jvuvmaf2mmuckr/container-registry/registries/crnonjecps8pifr7am4i/overview
-container_registry_id=crnonjecps8pifr7am4i
+## Stable
+## https://console.nebius.ai/folders/bjef05jvuvmaf2mmuckr/container-registry/registries/crnonjecps8pifr7am4i/overview
+#container_registry_id=crnonjecps8pifr7am4i
+
+# Unstable:
+# https://console.nebius.ai/folders/bjef05jvuvmaf2mmuckr/container-registry/registries/crn5116fa35rj0dqqui5/overview
+container_registry_id=crn5116fa35rj0dqqui5
 
 docker build --tag "${tag}" --target "${tag}" $ignore_cache --load --platform=linux/amd64 -f "${dockerfile}" .
 
