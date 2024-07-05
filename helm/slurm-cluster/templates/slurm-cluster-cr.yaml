@@ -47,7 +47,7 @@ spec:
       volumeSourceName: {{ required "Jail snapshot volume source name must be provided." .Values.populateJail.jailSnapshotVolume.volumeSourceName | quote }}
     {{- end }}
   ncclSettings:
-    topologyType: {{ (default "H100 GPU cluster" .Values.ncclSettings.topologyType) | quote }}
+    topologyType: {{ (default "auto" .Values.ncclSettings.topologyType) | quote }}
     topologyData: {{ (default "" .Values.ncclSettings.topologyData) | quote }}
   periodicChecks:
     ncclBenchmark:

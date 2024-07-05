@@ -31,7 +31,7 @@ func buildSlurmWorkerFrom(
 ) SlurmWorker {
 	res := SlurmWorker{
 		SlurmNode:    *worker.SlurmNode.DeepCopy(),
-		NCCLSettings: *ncclSettings,
+		NCCLSettings: *ncclSettings.DeepCopy(),
 		ContainerToolkitValidation: Container{
 			NodeContainer: slurmv1.NodeContainer{
 				Image: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v23.9.1",

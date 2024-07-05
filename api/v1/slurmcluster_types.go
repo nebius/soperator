@@ -35,8 +35,8 @@ type SlurmClusterSpec struct {
 	Pause bool `json:"pause,omitempty"` // TODO cluster pausing/resuming
 
 	// NCCLSettings
-	// +kubebuilder:validation:Required
-	NCCLSettings NCCLSettings `json:"ncclSettings"`
+	// +kubebuilder:validation:Optional
+	NCCLSettings NCCLSettings `json:"ncclSettings,omitempty"`
 
 	// PopulateJail defines the k8s Job that performs initial jail file system population
 	//
@@ -76,7 +76,7 @@ type NCCLSettings struct {
 	//
 	// +kubebuilder:validation:Enum="H100 GPU cluster";auto;custom
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="H100 GPU cluster"
+	// +kubebuilder:default="auto"
 	TopologyType string `json:"topologyType,omitempty"`
 
 	// TopologyData defines NCCL GPU topology

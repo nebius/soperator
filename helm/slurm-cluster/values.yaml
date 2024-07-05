@@ -74,7 +74,7 @@ populateJail:
 
 ncclSettings:
   # TopologyType define type of NCCL GPU topology Enum: H100 GPU cluster, auto, custom
-  topologyType: "H100 GPU cluster"
+  topologyType: "auto"
   # TopologyData defines NCCL GPU topology
   topologyData: ""
 

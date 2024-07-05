@@ -30,7 +30,7 @@ func RenderConfigMapSSHConfigs(cluster *values.SlurmCluster) (corev1.ConfigMap, 
 }
 
 func generateSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
-	res := &renderutils.RawConfig{}
+	res := &renderutils.MultilineStringConfig{}
 	res.AddLine("LogLevel INFO")
 	res.AddLine(fmt.Sprintf("Port %d", cluster.NodeLogin.ContainerSshd.Port))
 	res.AddLine("PermitRootLogin yes")
@@ -65,7 +65,7 @@ func RenderSshRootPublicKeysConfig(cluster *values.SlurmCluster) (corev1.ConfigM
 }
 
 func generateSshRootPublicKeysConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
-	res := &renderutils.RawConfig{}
+	res := &renderutils.MultilineStringConfig{}
 	for _, key := range cluster.NodeLogin.SshRootPublicKeys {
 		res.AddLine(key)
 	}
@@ -91,7 +91,7 @@ func RenderConfigMapSecurityLimits(cluster *values.SlurmCluster) (corev1.ConfigM
 }
 
 func generateSecurityLimitsConfig() renderutils.ConfigFile {
-	res := &renderutils.RawConfig{}
+	res := &renderutils.MultilineStringConfig{}
 	res.AddLine("*       soft    memlock     unlimited")
 	res.AddLine("*       hard    memlock     unlimited")
 	res.AddLine("*       soft    nofile      1048576")

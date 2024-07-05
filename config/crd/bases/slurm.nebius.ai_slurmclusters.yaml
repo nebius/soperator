@@ -1030,7 +1030,7 @@ spec:
                     description: TopologyData defines NCCL GPU topology
                     type: string
                   topologyType:
-                    default: H100 GPU cluster
+                    default: auto
                     description: TopologyType define type of NCCL GPU topology
                     enum:
                     - H100 GPU cluster
@@ -4412,7 +4412,6 @@ spec:
                 type: array
             required:
             - k8sNodeFilters
-            - ncclSettings
             - periodicChecks
             - populateJail
             - secrets

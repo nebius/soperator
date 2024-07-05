@@ -14,7 +14,6 @@ spec:
     k8sNodeFilterName: "gpu"
   ncclSettings:
     topologyType: "auto"
-    topologyData: ""
   periodicChecks:
     ncclBenchmark:
       enabled: true

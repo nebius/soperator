@@ -15,18 +15,14 @@ import (
 
 // region NCCL topology
 
-type NCCLType string
-
-const (
-	NCCLTypeAuto           NCCLType = "auto"
-	NCCLTypeH100GPUCluster NCCLType = "H100 GPU cluster"
-	NCCLTypeCustom         NCCLType = "custom"
-)
-
 // RenderConfigMapNCCLTopology renders new [corev1.ConfigMap] containing NCCL topology config file
 func RenderConfigMapNCCLTopology(cluster *values.SlurmCluster) (corev1.ConfigMap, error) {
+	ncclType, err := consts.StringToNCCLType(cluster.NodeWorker.NCCLSettings.TopologyType)
+	if err != nil {
+		return corev1.ConfigMap{}, err
+	}
 	topology, err := generateVirtualTopology(
-		NCCLType(cluster.NodeWorker.NCCLSettings.TopologyType),
+		ncclType,
 		cluster.NodeWorker.NCCLSettings.TopologyData,
 	)
 	if err != nil {
@@ -45,14 +41,14 @@ func RenderConfigMapNCCLTopology(cluster *values.SlurmCluster) (corev1.ConfigMap
 	}, nil
 }
 
-func generateVirtualTopology(ncclType NCCLType, topologyData string) (renderutils.ConfigFile, error) {
-	res := &renderutils.RawConfig{}
+func generateVirtualTopology(ncclType consts.NCCLType, topologyData string) (renderutils.ConfigFile, error) {
+	res := &renderutils.MultilineStringConfig{}
 	switch ncclType {
-	case NCCLTypeAuto:
+	case consts.NCCLTypeAuto:
 		return res, nil
-	case NCCLTypeH100GPUCluster:
+	case consts.NCCLTypeH100GPUCluster:
 		return generateVirtualH100GPUClusterTopology(), nil
-	case NCCLTypeCustom:
+	case consts.NCCLTypeCustom:
 		if topologyData != "" {
 			return renderutils.NewAsIsConfig(topologyData), nil
 		}
@@ -63,7 +59,7 @@ func generateVirtualTopology(ncclType NCCLType, topologyData string) (renderutil
 }
 
 func generateVirtualH100GPUClusterTopology() renderutils.ConfigFile {
-	res := &renderutils.RawConfig{}
+	res := &renderutils.MultilineStringConfig{}
 	res.AddLine("<system version=\"1\">")
 	res.AddLine("    <cpu numaid=\"0\" affinity=\"00000000,00000000,0000ffff,ffffffff,ffffffff\" arch=\"x86_64\" vendor=\"GenuineIntel\" familyid=\"6\" modelid=\"106\">")
 	res.AddLine("        <pci busid=\"0000:8a:00.0\" class=\"0x060400\" vendor=\"0x104c\" device=\"0x8232\" subsystem_vendor=\"0x0000\" subsystem_device=\"0x0000\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")

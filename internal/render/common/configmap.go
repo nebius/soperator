@@ -115,7 +115,7 @@ func generateCGroupConfig() renderutils.ConfigFile {
 }
 
 func generateSpankConfig() renderutils.ConfigFile {
-	res := &renderutils.RawConfig{}
+	res := &renderutils.MultilineStringConfig{}
 	res.AddLine(fmt.Sprintf("required chroot.so %s", consts.VolumeMountPathJail))
 	res.AddLine("required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1")
 	return res

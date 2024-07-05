@@ -16,7 +16,6 @@ spec:
 #      volumeSourceName: "jail-snapshot"
   ncclSettings:
     topologyType: "H100 GPU cluster"
-    topologyData: ""
   periodicChecks:
     ncclBenchmark:
       enabled: true
