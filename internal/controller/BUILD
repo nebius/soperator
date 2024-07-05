@@ -6,7 +6,6 @@ go_test(
         "common_subjects_test.go",
         "fixtures_test.go",
         "helpers_test.go",
-        "minimal_cluster_test.go",
         "suite_test.go",
     ],
     data = [
@@ -20,7 +19,6 @@ go_test(
         "//msp/slurm-service/internal/operator/api/v1:api",
         "@com_github_onsi_ginkgo_v2//:ginkgo",
         "@com_github_onsi_gomega//:gomega",
-        "@io_k8s_api//core/v1:core",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
         "@io_k8s_apimachinery//pkg/types",
         "@io_k8s_client_go//kubernetes/scheme",
