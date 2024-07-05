@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: {{ include "slurm-cluster-filestore.volume.jail.pv" . }}
+  name: {{ include "slurm-cluster-storage.volume.jail.pv" . }}
 spec:
-  storageClassName: {{ include "slurm-cluster-filestore.volume.jail.storageClass" . }}
+  storageClassName: {{ include "slurm-cluster-storage.volume.jail.storageClass" . }}
   volumeMode: Filesystem
   mountOptions:
     - rw
@@ -11,7 +11,7 @@ spec:
     - exec
     - dev
   capacity:
-    storage: {{ include "slurm-cluster-filestore.volume.jail.size" . }}
+    storage: {{ include "slurm-cluster-storage.volume.jail.size" . }}
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
@@ -19,7 +19,7 @@ spec:
     path: /mnt/jail
   claimRef:
     namespace: {{ .Release.Namespace }}
-    name: {{ include "slurm-cluster-filestore.volume.jail.pvc" . }}
+    name: {{ include "slurm-cluster-storage.volume.jail.pvc" . }}
   nodeAffinity:
     required:
       nodeSelectorTerms:
@@ -28,10 +28,10 @@ spec:
             - key: nebius.com/node-group-id
               operator: In
               values:
-                - {{ include "slurm-cluster-filestore.nodeGroup.gpu" . }}
+                - {{ include "slurm-cluster-storage.nodeGroup.gpu" . }}
         # Allow attaching to Non-GPU nodes
         - matchExpressions:
             - key: nebius.com/node-group-id
               operator: In
               values:
-                - {{ include "slurm-cluster-filestore.nodeGroup.nonGpu" . }}
+                - {{ include "slurm-cluster-storage.nodeGroup.nonGpu" . }}

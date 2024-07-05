@@ -7,8 +7,12 @@ volume:
   jail:
     # By default, equals to jail
     name: ""
-    # By default, equals to jail
+    # Whether to use glusterfs or filestore. By default, equals to "filestore"
+    type: ""
+    # Used with "filestore" type. By default, equals to jail
     filestoreDeviceName: ""
+    # Used with "glusterfs" type. Required
+    glusterfsHostName: ""
     # Required
     size: "2Ti"
   controllerSpool:

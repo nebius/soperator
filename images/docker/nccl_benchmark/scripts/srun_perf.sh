@@ -43,6 +43,7 @@ shift $((OPTIND -1))
 # If num_gpus not set, get it from sinfo (min gpu on host)
 if [ -z "$num_gpus" ]; then
   num_gpus=$(sinfo -N -o "%G" | awk -F '[:,=()]' '/gpu/ {for (i=1; i<=NF; i++) if ($i == "gpu") {print $(i+2)}}' | sort -n | head -1)
+  echo "$num_gpus GPUs on each node are going to be benchmarked"
 fi
 
 if [ -z "$min_bytes" ] || [ -z "$max_bytes" ] || [ -z "$step_factor" ] || [ -z "$bench_timout" ] || [ -z "$limit" ] || [ -z "$drain_state" ] || [ -z "$use_infiniband" ]; then
