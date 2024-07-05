@@ -4,11 +4,11 @@ set -e
 
 usage() { echo "usage: ${0} -v <version> [-f] [-h]" >&2; exit 1; }
 
-while getopts v:f:h flag
+while getopts v:fh flag
 do
     case "${flag}" in
         v) version=${OPTARG};;
-        f) force=${OPTARG};;
+        f) force=1;;
         h) usage;;
         *) usage;;
     esac
