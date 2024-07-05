@@ -72,6 +72,12 @@ populateJail:
 #  jailSnapshotVolume:
 #    volumeSourceName: "jail-snapshot"
 
+ncclSettings:
+  # TopologyType define type of NCCL GPU topology Enum: H100 GPU cluster, auto, custom
+  topologyType: "H100 GPU cluster"
+  # TopologyData defines NCCL GPU topology
+  topologyData: ""
+
 # Periodic checks. e.g. GPU health
 periodicChecks:
   # NCCL test benchmark
@@ -89,7 +95,7 @@ periodicChecks:
     # Image for the NCCL test
     image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/nccl_benchmark:latest"
     # NCCL test settings
-    ncclSettings:
+    periodicCheckNCCLSettings:
       # Minimum memory size to start NCCL with
       minBytes: "512Mb"
       # Maximum memory size to finish NCCL with

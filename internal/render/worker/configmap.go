@@ -1,6 +1,8 @@
 package worker
 
 import (
+	"errors"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -13,8 +15,24 @@ import (
 
 // region NCCL topology
 
+type NCCLType string
+
+const (
+	NCCLTypeAuto           NCCLType = "auto"
+	NCCLTypeH100GPUCluster NCCLType = "H100 GPU cluster"
+	NCCLTypeCustom         NCCLType = "custom"
+)
+
 // RenderConfigMapNCCLTopology renders new [corev1.ConfigMap] containing NCCL topology config file
 func RenderConfigMapNCCLTopology(cluster *values.SlurmCluster) (corev1.ConfigMap, error) {
+	topology, err := generateVirtualTopology(
+		NCCLType(cluster.NodeWorker.NCCLSettings.TopologyType),
+		cluster.NodeWorker.NCCLSettings.TopologyData,
+	)
+	if err != nil {
+		return corev1.ConfigMap{}, err
+	}
+
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapNCCLTopologyName(cluster.Name),
@@ -22,12 +40,29 @@ func RenderConfigMapNCCLTopology(cluster *values.SlurmCluster) (corev1.ConfigMap
 			Labels:    common.RenderLabels(consts.ComponentTypeWorker, cluster.Name),
 		},
 		Data: map[string]string{
-			consts.ConfigMapKeyNCCLTopology: generateVirtualTopology().Render(),
+			consts.ConfigMapKeyNCCLTopology: topology.Render(),
 		},
 	}, nil
 }
 
-func generateVirtualTopology() renderutils.ConfigFile {
+func generateVirtualTopology(ncclType NCCLType, topologyData string) (renderutils.ConfigFile, error) {
+	res := &renderutils.RawConfig{}
+	switch ncclType {
+	case NCCLTypeAuto:
+		return res, nil
+	case NCCLTypeH100GPUCluster:
+		return generateVirtualH100GPUClusterTopology(), nil
+	case NCCLTypeCustom:
+		if topologyData != "" {
+			return renderutils.NewAsIsConfig(topologyData), nil
+		}
+		return res, errors.New("topologyData can't be empty for custom type of NCCL topology")
+	default:
+		return res, nil
+	}
+}
+
+func generateVirtualH100GPUClusterTopology() renderutils.ConfigFile {
 	res := &renderutils.RawConfig{}
 	res.AddLine("<system version=\"1\">")
 	res.AddLine("    <cpu numaid=\"0\" affinity=\"00000000,00000000,0000ffff,ffffffff,ffffffff\" arch=\"x86_64\" vendor=\"GenuineIntel\" familyid=\"6\" modelid=\"106\">")

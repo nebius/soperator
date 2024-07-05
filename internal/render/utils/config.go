@@ -12,6 +12,7 @@ type ConfigFile interface {
 var (
 	_ ConfigFile = &PropertiesConfig{}
 	_ ConfigFile = &RawConfig{}
+	_ ConfigFile = &AsIsConfig{}
 )
 
 type PropertiesConfig struct {
@@ -49,4 +50,16 @@ func (c *RawConfig) AddLine(line string) {
 
 func (c *RawConfig) Render() string {
 	return strings.Join(c.lines, "\n")
+}
+
+type AsIsConfig struct {
+	config string
+}
+
+func (c AsIsConfig) Render() (line string) {
+	return c.config
+}
+
+func NewAsIsConfig(config string) ConfigFile {
+	return AsIsConfig{config: config}
 }

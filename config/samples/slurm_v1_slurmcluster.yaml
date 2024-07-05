@@ -7,11 +7,14 @@ metadata:
   namespace: dstaroff
   name: slurm1
 spec:
-  crVersion: 0.1.12
+  crVersion: 0.1.14
   pause: false
   populateJail:
     image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest
     k8sNodeFilterName: "gpu"
+  ncclSettings:
+    topologyType: "auto"
+    topologyData: ""
   periodicChecks:
     ncclBenchmark:
       enabled: true
@@ -20,7 +23,7 @@ spec:
       successfulJobsHistoryLimit: 3
       failedJobsHistoryLimit: 3
       image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/nccl_benchmark:latest
-      ncclSettings:
+      periodicCheckNCCLSettings:
         minBytes: "512Kb"
         maxBytes: "512Mb"
         stepFactor: "2"

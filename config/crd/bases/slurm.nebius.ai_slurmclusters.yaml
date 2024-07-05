@@ -1023,6 +1023,21 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+              ncclSettings:
+                description: NCCLSettings
+                properties:
+                  topologyData:
+                    description: TopologyData defines NCCL GPU topology
+                    type: string
+                  topologyType:
+                    default: H100 GPU cluster
+                    description: TopologyType define type of NCCL GPU topology
+                    enum:
+                    - H100 GPU cluster
+                    - auto
+                    - custom
+                    type: string
+                type: object
               pause:
                 description: |-
                   Pause defines whether to gracefully stop the cluster.
@@ -1070,7 +1085,7 @@ spec:
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
                           Must correspond to the name of one of [K8sNodeFilter]
                         type: string
-                      ncclSettings:
+                      periodicCheckNCCLSettings:
                         description: NCCLSettings define nccl settings
                         properties:
                           maxBytes:
@@ -4397,6 +4412,7 @@ spec:
                 type: array
             required:
             - k8sNodeFilters
+            - ncclSettings
             - periodicChecks
             - populateJail
             - secrets
