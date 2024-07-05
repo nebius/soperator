@@ -1,0 +1,10 @@
+title: Slurm operator
+description: Slurm operator for creating Slurm cluster in k8s.
+meta:
+  title: Metadata
+  noIndex: false
+links:
+  - title: Quick start
+    description: Quick start
+    href: quickstart.md
+
