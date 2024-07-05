@@ -1,0 +1,5 @@
+title: Slurm operator
+href: index.yaml
+items:
+  - name: Quick start
+    href: quickstart.md

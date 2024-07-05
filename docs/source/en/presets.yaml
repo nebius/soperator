@@ -1,0 +1,2 @@
+default:
+  slurm-operator: Slurm operator
