@@ -90,6 +90,8 @@ sbatch \
     --job-name="mlperf-ssd:${JOB_NAME}" \
     --nodes="${NUM_NODES}" \
     --ntasks-per-node="${GPUS_PER_NODE}" \
+    --cpus-per-task=16 \
+    --mem-per-cpu="8G" \
     --time="${WALLTIME}" \
     --output="${LOG_DIR}/%A_${JOB_NAME}.out" \
     ./scripts/slurm/srun.sh \

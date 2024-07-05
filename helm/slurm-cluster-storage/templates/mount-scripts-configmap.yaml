@@ -1,0 +1,134 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mount-scripts
+data:
+  ensure_mounted_filestore.sh: |
+    #!/bin/sh
+
+    usage() { echo "usage: ${0} -d <device_name> -p <path> -s <sleep_period_between_checks> [-h]" >&2; exit 1; }
+
+    while getopts d:p:s:h flag
+    do
+        case "${flag}" in
+            d) device_name=${OPTARG};;
+            p) path=${OPTARG};;
+            s) sleep_period=${OPTARG};;
+            h) usage;;
+            *) usage;;
+        esac
+    done
+
+    if [ -z "$device_name" ] || [ -z "$path" ] || [ -z "$sleep_period" ]; then
+        usage
+    fi
+
+    host_path="/host$path"
+
+    echo "Create directory $path if it doesn't exist"
+    mkdir -m 755 -p "$host_path"
+
+    mount_virtiofs() {
+        mount -t virtiofs -o rw,relatime "$device_name" "$host_path"
+        echo "Mounted virtiofs device $device_name to $path"
+    }
+
+    ensure_mounted() {
+        mount_point_info=$(grep " $host_path " /proc/mounts)
+        if [ -z "$mount_point_info" ]; then
+            echo "Directory $path is not a mount point, mounting it"
+            mount_virtiofs
+        else
+            echo "Directory $path is already a mount point, checking its options"
+            target=$(echo "$mount_point_info" | awk '{print $2}')
+            source=$(echo "$mount_point_info" | awk '{print $1}')
+            options=$(echo "$mount_point_info" | awk '{print $4}')
+
+            if [ "$target" != "$host_path" ] || \
+               [ "$source" != "$device_name" ] || \
+               ! echo "$options" | grep -q "rw" || \
+               ! echo "$options" | grep -q "relatime"
+            then
+                echo "Mount options for $path are not correct, remounting it"
+                umount "$host_path"
+                echo "Unmounted file system from $path"
+                mount_virtiofs
+            else
+                echo "Mount point has correct options"
+            fi
+        fi
+    }
+
+    while true; do
+        ensure_mounted
+        /bin/sleep $sleep_period
+    done
+  ensure_mounted_glusterfs.sh: |
+    #!/bin/sh
+
+    usage() { echo "usage: ${0} -g <glusterfs_hostname> -p <path> -s <sleep_period_between_checks> [-h]" >&2; exit 1; }
+
+    while getopts g:p:s:h flag
+    do
+        case "${flag}" in
+            g) gluster_hostname=${OPTARG};;
+            p) path=${OPTARG};;
+            s) sleep_period=${OPTARG};;
+            h) usage;;
+            *) usage;;
+        esac
+    done
+
+    if [ -z "$gluster_hostname" ] || [ -z "$path" ] || [ -z "$sleep_period" ]; then
+        usage
+    fi
+
+    echo "Enter K8S node's namespaces"
+    nsenter --target 1 --mount --uts --ipc --net --pid
+
+    echo "Fork process"
+    (
+        echo "Install GlusterFS client"
+        apt-get update && apt-get install -y glusterfs-client=7.2-2build1 || exit
+
+        host_path="/host$path"
+
+        echo "Create directory $path if it doesn't exist"
+        mkdir -m 755 -p "$host_path"
+
+        mount_glusterfs() {
+            mount -t glusterfs $gluster_hostname:/stripe-volume "$host_path"
+            echo "Mounted glusterfs from host $gluster_hostname to $path"
+        }
+
+        ensure_mounted() {
+            mount_point_info=$(grep " $host_path " /proc/mounts)
+            if [ -z "$mount_point_info" ]; then
+                echo "Directory $path is not a mount point, mounting it"
+                mount_glusterfs
+            else
+                echo "Directory $path is already a mount point, checking its options"
+                target=$(echo "$mount_point_info" | awk '{print $2}')
+                source=$(echo "$mount_point_info" | awk '{print $1}')
+                options=$(echo "$mount_point_info" | awk '{print $4}')
+
+                if [ "$target" != "$host_path" ] || \
+                   [ "$source" != "$gluster_hostname:/stripe-volume" ] || \
+                   ! echo "$options" | grep -q "rw" || \
+                   ! echo "$options" | grep -q "relatime"
+                then
+                    echo "Mount options for $path are not correct, remounting it"
+                    umount "$host_path"
+                    echo "Unmounted file system from $path"
+                    mount_glusterfs
+                else
+                    echo "Mount point has correct options"
+                fi
+            fi
+        }
+
+        while true; do
+            ensure_mounted
+            /bin/sleep $sleep_period
+        done
+    )

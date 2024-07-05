@@ -38,6 +38,7 @@ if [ -z "$min_bytes" ] || [ -z "$max_bytes" ] || [ -z "$step_factor" ] || [ -z "
 fi
 
 if [ "$use_infiniband" = "true" ]; then
+    echo "Make NCCL use Infiniband"
     export NCCL_P2P_DISABLE=1
     export NCCL_SHM_DISABLE=1
     export NCCL_ALGO=Ring
@@ -64,6 +65,6 @@ if [ "$(echo "$avg_bandwidth < $limit" | bc)" -eq 1 ]; then
   fi
   exit 1
 else
-  echo "Avg bus bandwidth > 0: $avg_bandwidth"
+  echo "Avg bus bandwidth > $limit: $avg_bandwidth"
   echo "Performance test completed at $(date)"
 fi

@@ -3,15 +3,15 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   namespace: {{ $.Release.Namespace }}
-  name: {{ include "slurm-cluster-filestore.volume.jail-submount.mount" . }}
+  name: {{ include "slurm-cluster-storage.volume.jail-submount.mount" . }}
 spec:
   selector:
     matchLabels:
-      slurm: {{ include "slurm-cluster-filestore.volume.jail-submount.mount" . }}
+      slurm: {{ include "slurm-cluster-storage.volume.jail-submount.mount" . }}
   template:
     metadata:
       labels:
-        slurm: {{ include "slurm-cluster-filestore.volume.jail-submount.mount" . }}
+        slurm: {{ include "slurm-cluster-storage.volume.jail-submount.mount" . }}
     spec:
       containers:
         - name: mount-jail-submount-filestore
@@ -19,7 +19,7 @@ spec:
           command:
             - /bin/sh
             - -c
-            - /mount-scripts/ensure_mounted.sh -d {{ include "slurm-cluster-filestore.volume.jail-submount.device" . }} -p /mnt/{{ include "slurm-cluster-filestore.volume.jail-submount.name" . }} -s 60
+            - /mount-scripts/ensure_mounted_filestore.sh -d {{ include "slurm-cluster-storage.volume.jail-submount.device" . }} -p /mnt/{{ include "slurm-cluster-storage.volume.jail-submount.name" . }} -s 60
           securityContext:
             privileged: true
           volumeMounts:
@@ -50,11 +50,11 @@ spec:
                   - key: nebius.com/node-group-id
                     operator: In
                     values:
-                      - {{ include "slurm-cluster-filestore.nodeGroup.gpu" $ }}
+                      - {{ include "slurm-cluster-storage.nodeGroup.gpu" $ }}
                       # Require scheduling on Non-GPU nodes
               - matchExpressions:
                   - key: nebius.com/node-group-id
                     operator: In
                     values:
-                      - {{ include "slurm-cluster-filestore.nodeGroup.nonGpu" $ }}
+                      - {{ include "slurm-cluster-storage.nodeGroup.nonGpu" $ }}
 {{- end }}

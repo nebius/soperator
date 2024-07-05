@@ -1,5 +1,10 @@
 #!/bin/bash
 
+while ! mountpoint -q /mnt/jail; do
+    echo "Waiting until /mnt/jail is mounted"
+    sleep 10
+done
+
 echo "Delete everything from jail directory"
 rm -rf /mnt/jail/*
 
