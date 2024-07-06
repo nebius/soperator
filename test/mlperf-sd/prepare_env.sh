@@ -15,8 +15,8 @@ popd
 echo "Adjust some files"
 mkdir -p /mlperf-sd/data/results
 mkdir -p /mlperf-sd/hf_home
-cp -r /tmp/mlperf-sd/training        /mlperf-sd/
-cp -r /tmp/mlperf-sd/aws_download.sh /mlperf-sd/
+cp -r /opt/mlperf-sd/training        /mlperf-sd/
+cp -r /opt/mlperf-sd/aws_download.sh /mlperf-sd/
 
 chown -R 0:0 /mlperf-sd
 
