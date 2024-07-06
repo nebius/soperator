@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH -J enroot
-#SBATCH --output=/demo/outputs/enroot.out
-#SBATCH --error=/demo/outputs/enroot.out
+#SBATCH --output=/quickstart/outputs/enroot.out
+#SBATCH --error=/quickstart/outputs/enroot.out
 
 # Specify the image in order to run the job inside a container
 srun --container-image="nvidia/cuda:12.2.2-base-ubuntu20.04" \

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH -J hello
-#SBATCH --output=/demo/outputs/hello.out
-#SBATCH --error=/demo/outputs/hello.out
+#SBATCH --output=/quickstart/outputs/hello.out
+#SBATCH --error=/quickstart/outputs/hello.out
 #SBATCH --cpus-per-task=120
 #SBATCH --mem-per-cpu=8G
 #SBATCH --gpus=4
