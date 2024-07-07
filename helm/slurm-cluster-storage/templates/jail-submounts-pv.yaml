@@ -35,4 +35,5 @@ spec:
               operator: In
               values:
                 - {{ include "slurm-cluster-storage.nodeGroup.nonGpu" $ }}
+---
 {{- end }}

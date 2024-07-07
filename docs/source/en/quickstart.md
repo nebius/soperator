@@ -50,6 +50,8 @@ Create and open a directory: `mkdir slurm-operator-tf`
 Unpack the tarball into it: `tar -xvf slurm_operator_tf_*****.tar.gz -C ./slurm-operator-tf`
 
 #### Step 3. Initialize terraform
+Enter the "slurm-cluster" terraform directory: `cd terraform/slurm-cluster`
+
 Execute `terraform init`. This command downloads all referenced modules.
 
 #### Step 4. Fill out terraform variables
@@ -68,7 +70,7 @@ are comprehensively commented.
 > ## BASIC CONFIGURATION
 > 
 > ### Nebius folder ID to create the K8S cluster in it.
-> k8s_folder_id = "put_your_folder_id_here"
+> k8s_folder_id = "TODO: Put your folder ID here"
 > 
 > ### Name of the K8S cluster. A short random prefix is added. For example, if you set "slurm-test" here, the actual name
 > ### will be "slurm-test-randstr1.
@@ -85,9 +87,9 @@ are comprehensively commented.
 > 
 > ### K8S cluster maintenance windows. During the specified intervals the K8S master may not be available.
 > k8s_cluster_master_maintenance_windows = [{
->   day        = "monday"
->   start_time = "20:00"
->   duration   = "3h"
+> day        = "monday"
+> start_time = "20:00"
+> duration   = "3h"
 > }]
 > 
 > 
@@ -96,7 +98,7 @@ are comprehensively commented.
 > 
 > ### ID of an existing network in which a new subnet for the K8S cluster is created. If empty, a new network is created.
 > ### A separate subnet is created in either case.
-> k8s_network_id = "put_your_network_id_here"
+> k8s_network_id = "TODO: Put your network ID here"
 > 
 > ### IPv4 CIDR blocks for the new subnet. In case the subnet is created in an existing network, ensure it doesn't
 > ### conflict with CIDR blocks of existing subnets.
@@ -112,66 +114,66 @@ are comprehensively commented.
 > 
 > ### Configuration of the node group with GPUs. Its nodes are interconnected and forms a GPU cluster.
 > k8s_cluster_node_group_gpu = {
->   #### The kind of GPUs. For example, "h100" (type A), "h100-c" (type C), "h100-c-llm" (type C allowing "preemptible").
->   platform = "h100"
+> #### The kind of GPUs. For example, "h100" (type A), "h100-c" (type C), "h100-c-llm" (type C allowing "preemptible").
+> platform = "h100"
 > 
->   #### Whether the nodes can be taken away in favor of higher priority tasks. The only allowed platform is "h100-c-llm".
->   preemptible = false
+> #### Whether the nodes can be taken away in favor of higher priority tasks. The only allowed platform is "h100-c-llm".
+> preemptible = false
 > 
->   #### Number of nodes in the group. It should be at least 2 in order to benefit from the GPU cluster interconnection.
->   #### The created node group doesn't have auto-scaling, but the size can be updated using this terraform.
->   size = 2
+> #### Number of nodes in the group. It should be at least 2 in order to benefit from the GPU cluster interconnection.
+> #### The created node group doesn't have auto-scaling, but the size can be updated using this terraform.
+> size = 2
 > 
->   #### Number of vCPU on the nodes. Not any value is supported. Typically, each GPU platform has only a single permitted
->   #### set of resources (CPU & memory).
->   cpu_cores = 160
+> #### Number of vCPU on the nodes. Not any value is supported. Typically, each GPU platform has only a single permitted
+> #### set of resources (CPU & memory).
+> cpu_cores = 160
 > 
->   #### Size of the real memory on the nodes in GB. Not any value is supported. See the comment above.
->   memory_gb = 1280
+> #### Size of the real memory on the nodes in GB. Not any value is supported. See the comment above.
+> memory_gb = 1280
 > 
->   #### Number of GPUs on each node.
->   gpus = 8
+> #### Number of GPUs on each node.
+> gpus = 8
 > 
->   #### Interconnect type. Typically, "InfiniBand".
->   interconnect_type = "InfiniBand"
+> #### Interconnect type. Typically, "InfiniBand".
+> interconnect_type = "InfiniBand"
 > 
->   #### Interconnect physical cluster name. GPUs of certain platforms can be created only in certain physical clusters.
->   #### e.g. "h100" platform can be created only in "fabric-1", and "h100-c" & "h100-c-llm" in "fabric-4" or fabric-6".
->   #### This value cannot be changed after creation.
->   interconnect_physical_cluster = "fabric-1"
+> #### Interconnect physical cluster name. GPUs of certain platforms can be created only in certain physical clusters.
+> #### e.g. "h100" platform can be created only in "fabric-1", and "h100-c" & "h100-c-llm" in "fabric-4" or fabric-6".
+> #### This value cannot be changed after creation.
+> interconnect_physical_cluster = "fabric-1"
 > 
->   #### Type of boot disks attached to the nodes.
->   disk_type = "network-ssd"
+> #### Type of boot disks attached to the nodes.
+> disk_type = "network-ssd"
 > 
->   #### Size of boot disks in GB.
->   disk_size_gb = 1024
+> #### Size of boot disks in GB.
+> disk_size_gb = 1024
 > 
->   #### Value for the "cloud.google.com/gke-accelerator" label assigned to each node. Should be "nvidia-h100-80gb" for
->   #### all H100 GPU platforms.
->   gke_accelerator = "nvidia-h100-80gb"
+> #### Value for the "cloud.google.com/gke-accelerator" label assigned to each node. Should be "nvidia-h100-80gb" for
+> #### all H100 GPU platforms.
+> gke_accelerator = "nvidia-h100-80gb"
 > 
->   #### Major version of the NVIDIA GPU driver to be installed on the nodes.
->   driver_config = "535"
+> #### Major version of the NVIDIA GPU driver to be installed on the nodes.
+> driver_config = "535"
 > }
 > 
 > ### Configuration of the node group without GPUs.
 > k8s_cluster_node_group_non_gpu = {
->   #### Number of nodes in the group. It should be at least 2 in order to benefit from K8S high-availability features.
->   #### The created node group doesn't have auto-scaling, but the size can be updated using this terraform.
->   size = 2
+> #### Number of nodes in the group. It should be at least 2 in order to benefit from K8S high-availability features.
+> #### The created node group doesn't have auto-scaling, but the size can be updated using this terraform.
+> size = 2
 > 
->   #### Number of vCPU on the nodes with platform "standard-v2". Not any value is supported. The platform has only
->   #### specific permitted sets of resources (CPU & memory). For example, 8 CPU & 32 memory, or 32 CPU & 128 memory.
->   cpu_cores = 32
+> #### Number of vCPU on the nodes with platform "standard-v2". Not any value is supported. The platform has only
+> #### specific permitted sets of resources (CPU & memory). For example, 8 CPU & 32 memory, or 32 CPU & 128 memory.
+> cpu_cores = 32
 > 
->   #### Size of the real memory on the nodes in GB. Not any value is supported. See the comment above.
->   memory_gb = 128
+> #### Size of the real memory on the nodes in GB. Not any value is supported. See the comment above.
+> memory_gb = 128
 > 
->   #### Type of boot disks attached to the nodes.
->   disk_type = "network-ssd"
+> #### Type of boot disks attached to the nodes.
+> disk_type = "network-ssd"
 > 
->   #### Size of boot disks in GB.
->   disk_size_gb = 1024
+> #### Size of boot disks in GB.
+> disk_size_gb = 1024
 > }
 > 
 > 
@@ -182,7 +184,7 @@ are comprehensively commented.
 > k8s_cluster_ssh_username = "ubuntu"
 > 
 > ### SSH public key for connecting to K8S nodes. Either the key as a string or path to the key must be set.
-> k8s_cluster_ssh_public_key = "put_your_ssh_public_key_here"
+> k8s_cluster_ssh_public_key = "TODO: Put your public SSH key here"
 > k8s_cluster_ssh_public_key_path = null
 > 
 > 
@@ -244,10 +246,10 @@ are comprehensively commented.
 > 
 > ### Folder ID to create GlusterFS nodes in it. Several GlusterFS storages should not be created in the same folder due
 > ### to possible conflicts in compute instance names.
-> glusterfs_cluster_folder_id = "bje82q7sm8njm3c4rrlq"
+> glusterfs_cluster_folder_id = "TODO: Put your folder ID here"
 > 
 > ### SSH key for connecting to GlusterFS compute instances.
-> glusterfs_cluster_ssh_public_key = "put_your_ssh_public_key_here"
+> glusterfs_cluster_ssh_public_key = "TODO: Put your public SSH key here"
 > glusterfs_cluster_ssh_public_key_path = null
 > 
 > ### Size of separate disks comprising the cluster in GB. The total size of the storage = (disk size * number of nodes).
@@ -269,11 +271,11 @@ are comprehensively commented.
 > 
 > ### Configuration of the shared storages mounted to Slurm nodes.
 > slurm_cluster_storages = {
->   #### "Jail" storage configuration.
->   jail = {
->     ##### Name of the storage. It doesn't matter a lot. Used as a base name for different entities: compute file storage
->     ##### name, mounted device name, K8S PV & PVC names, and the like.
->     name = "jail"
+> #### "Jail" storage configuration.
+> jail = {
+> ##### Name of the storage. It doesn't matter a lot. Used as a base name for different entities: compute file storage
+> ##### name, mounted device name, K8S PV & PVC names, and the like.
+> name = "jail"
 > 
 >     ##### Size of the storage in bytes. In case GlusterFS is used, it must not exceed the total size of the storage set
 >     ##### in the "glusterfs_cluster_disk_dize" and "glusterfs_cluster_nodes" variables.
@@ -281,34 +283,44 @@ are comprehensively commented.
 > 
 >     ##### Type of the shared storage. Can be either "glusterfs" or "filestore".
 >     type = "glusterfs"
->   }
 > 
->   #### "Controller spool" storage configuration.
->   controller_spool = {
->     ##### Name of the storage. It doesn't matter a lot. Used as a base name for different entities: compute file storage
->     ##### name, mounted device name, K8S PV & PVC names, and the like.
->     name = "controller-spool"
+>     ##### ID for an existing compute file storage for using it instead of creating a new one. It is relevant, only when
+>     ##### type = "filestore".
+>     filestore_id = null
+> }
+> 
+> #### "Controller spool" storage configuration.
+> controller_spool = {
+> ##### Name of the storage. It doesn't matter a lot. Used as a base name for different entities: compute file storage
+> ##### name, mounted device name, K8S PV & PVC names, and the like.
+> name = "controller-spool"
 > 
 >     ##### Size of the storage in bytes.
 >     size = 100 * (1024 * 1024 * 1024) # 100Gi
->   }
 > 
->   #### "Jail submount" storages configuration. If empty, no additional shared storages are mounted to the jail.
->   #### All these storages are initially mounted with 777 permissions and root:root ownerships, but users can change them
->   #### after the Slurm cluster is created.
->   #### It's enough to execute the command like `sudo chmod 755 /mlperf-sd && sudo chown bob:bob /mlperf-sd` on any of
->   #### the Slurm nodes (login or worker) and these changes will apply to all other nodes in the cluster.
->   jail_submounts = [{
->     ##### Name of the storage. It doesn't matter a lot. Used as a base name for different entities: compute file storage
->     ##### name, mounted device name, K8S PV & PVC names, and the like.
->     name = "mlperf-sd"
+>     ##### ID for an existing compute file storage for using it instead of creating a new one.
+>     filestore_id = null
+> }
+> 
+> #### "Jail submount" storages configuration. If empty, no additional shared storages are mounted to the jail.
+> #### All these storages are initially mounted with 777 permissions and root:root ownerships, but users can change them
+> #### after the Slurm cluster is created.
+> #### It's enough to execute the command like `sudo chmod 755 /mlperf-sd && sudo chown bob:bob /mlperf-sd` on any of
+> #### the Slurm nodes (login or worker) and these changes will apply to all other nodes in the cluster.
+> jail_submounts = [{
+> ##### Name of the storage. It doesn't matter a lot. Used as a base name for different entities: compute file storage
+> ##### name, mounted device name, K8S PV & PVC names, and the like.
+> name = "mlperf-sd"
 > 
 >     ##### Size of the storage in bytes.
 >     size = 1500 * (1024 * 1024 * 1024) # 1500Gi
 > 
 >     ##### The absolute path within the jail environment for which data will be available to users.
 >     mountPath = "/mlperf-sd"
->   }]
+> 
+>     ##### ID for an existing compute file storage for using it instead of creating a new one.
+>     filestore_id = null
+> }]
 > }
 > 
 > ### Configuration of PVC with the initial jail content. Must be an object with fields name and size (in bytes). If set,
@@ -351,7 +363,7 @@ are comprehensively commented.
 > ### List of SSH public keys that will authorized for user root. After connecting to the cluster as root, the Slurm admin
 > ### can create other Linux users with different authorized SSH keys.
 > slurm_cluster_ssh_root_public_keys = [
->   "put_your_public_ssh_key_here",
+> "TODO: Put your public SSH key here",
 > ]
 > 
 > 
@@ -370,18 +382,18 @@ are comprehensively commented.
 > ### The slurmd container is the place where all user jobs are executed. It must have most of the resources of GPU K8S
 > ### nodes.
 > slurm_cluster_node_worker_slurmd_resources = {
->   cpu_cores               = 156
->   memory_bytes            = 1220 * (1024 * 1024 * 1024) # 1220Gi
->   ephemeral_storage_bytes = 900 * (1024 * 1024 * 1024) # 900Gi
+> cpu_cores               = 156
+> memory_bytes            = 1220 * (1024 * 1024 * 1024) # 1220Gi
+> ephemeral_storage_bytes = 720 * (1024 * 1024 * 1024) # 720Gi
 > }
 > 
 > ### Resources, dedicated to the munged daemon on each worker node. If set to null, the container has will have no K8S
 > ### resource requests & limits.
 > ### The munged container is used for internal authentication within the Slurm cluster.
 > slurm_cluster_node_worker_munge_resources = {
->   cpu_cores               = 2
->   memory_bytes            = 4 * (1024 * 1024 * 1024) # 4Gi
->   ephemeral_storage_bytes = 8 * (1024 * 1024 * 1024) # 8Gi
+> cpu_cores               = 2
+> memory_bytes            = 4 * (1024 * 1024 * 1024) # 4Gi
+> ephemeral_storage_bytes = 8 * (1024 * 1024 * 1024) # 8Gi
 > }
 > 
 > 
@@ -404,18 +416,18 @@ are comprehensively commented.
 > ### The slurmdctld container is the place where the Slurm cluster is controlled from. It must have enough resources for
 > ### operation, but there's no sense in giving it more than 16 CPU and 64 GiB of memory.
 > slurm_cluster_node_controller_slurmctld_resources = {
->   cpu_cores               = 12
->   memory_bytes            = 48 * (1024 * 1024 * 1024) # 48Gi
->   ephemeral_storage_bytes = 16 * (1024 * 1024 * 1024) # 16Gi
+> cpu_cores               = 8
+> memory_bytes            = 32 * (1024 * 1024 * 1024) # 32Gi
+> ephemeral_storage_bytes = 16 * (1024 * 1024 * 1024) # 16Gi
 > }
 > 
 > ### Resources, dedicated to the munged daemon on each controller node. If set to null, the container will have no K8S
 > ### resource requests & limits.
 > ### The munged container is used for internal authentication within the Slurm cluster.
 > slurm_cluster_node_controller_munge_resources = {
->   cpu_cores               = 1
->   memory_bytes            = 2 * (1024 * 1024 * 1024) # 2Gi
->   ephemeral_storage_bytes = 4 * (1024 * 1024 * 1024) # 4Gi
+> cpu_cores               = 1
+> memory_bytes            = 2 * (1024 * 1024 * 1024) # 2Gi
+> ephemeral_storage_bytes = 4 * (1024 * 1024 * 1024) # 4Gi
 > }
 > 
 > 
@@ -438,51 +450,51 @@ are comprehensively commented.
 > ### The sshd container is the place where the Slurm users are connected to. It must have as many resources, as clients
 > ### need, but typically not so many because they are used as a thin client.
 > slurm_cluster_node_login_sshd_resources = {
->   cpu_cores               = 16
->   memory_bytes            = 64 * (1024 * 1024 * 1024) # 64Gi
->   ephemeral_storage_bytes = 800 * (1024 * 1024 * 1024) # 800Gi
+> cpu_cores               = 16
+> memory_bytes            = 64 * (1024 * 1024 * 1024) # 64Gi
+> ephemeral_storage_bytes = 720 * (1024 * 1024 * 1024) # 720Gi
 > }
 > 
 > ### Resources, dedicated to the munged daemon on each login node. If set to null, the container will have no K8S
 > ### resource requests & limits.
 > ### The munged container is used for internal authentication within the Slurm cluster.
 > slurm_cluster_node_login_munge_resources = {
->   cpu_cores               = 1
->   memory_bytes            = 2 * (1024 * 1024 * 1024) # 2Gi
->   ephemeral_storage_bytes = 4 * (1024 * 1024 * 1024) # 4Gi
+> cpu_cores               = 1
+> memory_bytes            = 2 * (1024 * 1024 * 1024) # 2Gi
+> ephemeral_storage_bytes = 4 * (1024 * 1024 * 1024) # 4Gi
 > }
 > 
 > 
 > 
 > ## PERIODIC GPU BENCHMARK CONFIGURATION
 > ## ---------------------------------------------------------------------------------------------------------------------
-> ## GPU benchmarks are implemented as "all_reduce_perf" NCCL tests. These checks are implemented as usual Slurm jobs,
-> ## which are periodically scheduled from a K8S CronJobs and stay in the same queue with users' workload.
+> ## GPU benchmarks are implemented as "all_reduce_perf" NCCL tests. These checks are launched as usual Slurm jobs, which
+> ## are periodically scheduled from a K8S CronJob and stay in the same queue with users' workload.
 > 
 > ### Cron string representing the schedule for running NCCL benchmarks.
 > slurm_cluster_nccl_benchmark_schedule = "0 */3 * * *" # Every 3 hours
 > 
 > ### Configuration of NCCL benchmarks. Most of the parameters are just passed as arguments to all_reduce_perf NCCL test.
 > slurm_cluster_nccl_benchmark_settings = {
->   #### The initial size of the data that is transferred at the beginning of the benchmark.
->   min_bytes = "512Mb"
+> #### The initial size of the data that is transferred at the beginning of the benchmark.
+> min_bytes = "512Mb"
 > 
->   #### The final size of the data that is transferred at the end of the benchmark.
->   max_bytes = "8Gb"
+> #### The final size of the data that is transferred at the end of the benchmark.
+> max_bytes = "8Gb"
 > 
->   #### Step factor affecting the number of data transfers.
->   step_factor = "2"
+> #### Step factor affecting the number of data transfers.
+> step_factor = "2"
 > 
->   ### Benchmark timeout. If the benchmark exceeds it, the Slurm nodes won't be drained, but the K8S job becomes Failed.
->   timeout = "20:00"
+> ### Benchmark timeout. If the benchmark exceeds it, the Slurm nodes won't be drained, but the K8S job becomes Failed.
+> timeout = "20:00"
 > 
->   ### The target value of the "Avg bus bandwidth" result in "all_reduce_perf" NCCL test. If some Slurm worker node shows
->   ### a result less that this threshold, it is drained.
->   threshold_more_than = "420"
+> ### The target value of the "Avg bus bandwidth" result in "all_reduce_perf" NCCL test. If some Slurm worker node shows
+> ### a result less that this threshold, it is drained.
+> threshold_more_than = "420"
 > 
->   ### Whether to use Infiniband (true) or NVLink (false) during this test. Changing this variable may require changing
->   ### the "threshold_more_than" variable as well. The normal limit for Infiniband is 42 and for NVLink is 420.
->   use_infiniband = false
+> ### Whether to use Infiniband (true) or NVLink (false) during this test. Changing this variable may require changing
+> ### the "threshold_more_than" variable as well. The normal limit for Infiniband is 42 and for NVLink is 420.
+> use_infiniband = false
 > }
 > 
 > ### Whether to drain Slurm nodes that showed unsatisfactory results. When drained, the details of the benchmark results
@@ -492,7 +504,9 @@ are comprehensively commented.
 </details>
 
 #### Step 5. Apply terraform
-You can start by executing `terraform plan`. It will output all resources it's going to create.
+Issue an IAM token for interacting with the cloud: `source ncp_auth.sh`.
+
+Then you can start by executing `terraform plan`. It will output all resources it's going to create.
 
 If you are OK with it, execute `terraform apply`. Creating all resources usually takes ~30 min.
 
