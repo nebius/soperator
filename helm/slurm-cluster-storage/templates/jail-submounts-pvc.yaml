@@ -11,4 +11,5 @@ spec:
       storage: {{ include "slurm-cluster-storage.volume.jail-submount.size" . }}
   accessModes:
     - ReadWriteMany
+---
 {{- end }}
