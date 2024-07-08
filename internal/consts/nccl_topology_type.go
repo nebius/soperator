@@ -3,7 +3,7 @@ package consts
 import "errors"
 
 type NCCLType interface {
-	ct()
+	ncclType()
 	String() string
 }
 
@@ -11,7 +11,7 @@ type baseNCCLType struct {
 	value string
 }
 
-func (b baseNCCLType) ct() {}
+func (b baseNCCLType) ncclType() {}
 func (b baseNCCLType) String() string {
 	return b.value
 }
