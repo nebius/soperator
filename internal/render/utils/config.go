@@ -11,7 +11,8 @@ type ConfigFile interface {
 
 var (
 	_ ConfigFile = &PropertiesConfig{}
-	_ ConfigFile = &RawConfig{}
+	_ ConfigFile = &MultilineStringConfig{}
+	_ ConfigFile = &AsIsConfig{}
 )
 
 type PropertiesConfig struct {
@@ -39,14 +40,26 @@ func (c *PropertiesConfig) Render() string {
 	return strings.Join(res, "\n")
 }
 
-type RawConfig struct {
+type MultilineStringConfig struct {
 	lines []string
 }
 
-func (c *RawConfig) AddLine(line string) {
+func (c *MultilineStringConfig) AddLine(line string) {
 	c.lines = append(c.lines, line)
 }
 
-func (c *RawConfig) Render() string {
+func (c *MultilineStringConfig) Render() string {
 	return strings.Join(c.lines, "\n")
+}
+
+type AsIsConfig struct {
+	config string
+}
+
+func (c AsIsConfig) Render() string {
+	return c.config
+}
+
+func NewAsIsConfig(config string) ConfigFile {
+	return AsIsConfig{config: config}
 }

@@ -34,6 +34,10 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	Pause bool `json:"pause,omitempty"` // TODO cluster pausing/resuming
 
+	// NCCLSettings
+	// +kubebuilder:validation:Optional
+	NCCLSettings NCCLSettings `json:"ncclSettings,omitempty"`
+
 	// PopulateJail defines the k8s Job that performs initial jail file system population
 	//
 	// +kubebuilder:validation:Required
@@ -64,6 +68,21 @@ type SlurmClusterSpec struct {
 	//
 	// +kubebuilder:validation:Required
 	SlurmNodes SlurmNodes `json:"slurmNodes"`
+}
+
+type NCCLSettings struct {
+
+	// TopologyType define type of NCCL GPU topology
+	//
+	// +kubebuilder:validation:Enum="H100 GPU cluster";auto;custom
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="auto"
+	TopologyType string `json:"topologyType,omitempty"`
+
+	// TopologyData defines NCCL GPU topology
+	//
+	// +kubebuilder:validation:Optional
+	TopologyData string `json:"topologyData,omitempty"`
 }
 
 type PopulateJail struct {
@@ -134,7 +153,7 @@ type NCCLBenchmark struct {
 	// NCCLSettings define nccl settings
 	//
 	// +kubebuilder:validation:Optional
-	NCCLSettings NCCLSettings `json:"ncclSettings,omitempty"`
+	NCCLSettings PeriodicCheckNCCLSettings `json:"periodicCheckNCCLSettings,omitempty"`
 
 	// FailureActions define actions performed on benchmark failure
 	//
@@ -148,8 +167,8 @@ type NCCLBenchmark struct {
 	K8sNodeFilterName string `json:"k8sNodeFilterName"`
 }
 
-// NCCLSettings define nccl settings
-type NCCLSettings struct {
+// PeriodicCheckNCCLSettings define nccl settings for periodic nccl benchmark
+type PeriodicCheckNCCLSettings struct {
 	// MinBytes defines the minimum memory size to start nccl with
 	//
 	// +kubebuilder:validation:Optional

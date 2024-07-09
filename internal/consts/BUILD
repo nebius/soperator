@@ -11,6 +11,7 @@ go_library(
         "indexfield.go",
         "job.go",
         "label.go",
+        "nccl_topology_type.go",
         "secret.go",
         "service.go",
         "slurm.go",

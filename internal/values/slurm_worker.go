@@ -10,6 +10,8 @@ import (
 type SlurmWorker struct {
 	slurmv1.SlurmNode
 
+	NCCLSettings slurmv1.NCCLSettings
+
 	ContainerToolkitValidation Container
 	ContainerSlurmd            Container
 	ContainerMunge             Container
@@ -22,9 +24,14 @@ type SlurmWorker struct {
 	JailSubMounts []slurmv1.NodeVolumeJailSubMount
 }
 
-func buildSlurmWorkerFrom(clusterName string, worker *slurmv1.SlurmNodeWorker) SlurmWorker {
+func buildSlurmWorkerFrom(
+	clusterName string,
+	worker *slurmv1.SlurmNodeWorker,
+	ncclSettings *slurmv1.NCCLSettings,
+) SlurmWorker {
 	res := SlurmWorker{
-		SlurmNode: *worker.SlurmNode.DeepCopy(),
+		SlurmNode:    *worker.SlurmNode.DeepCopy(),
+		NCCLSettings: *ncclSettings.DeepCopy(),
 		ContainerToolkitValidation: Container{
 			NodeContainer: slurmv1.NodeContainer{
 				Image: "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v23.9.1",

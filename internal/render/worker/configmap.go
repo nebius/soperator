@@ -1,6 +1,8 @@
 package worker
 
 import (
+	"errors"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -15,6 +17,18 @@ import (
 
 // RenderConfigMapNCCLTopology renders new [corev1.ConfigMap] containing NCCL topology config file
 func RenderConfigMapNCCLTopology(cluster *values.SlurmCluster) (corev1.ConfigMap, error) {
+	ncclType, err := consts.StringToNCCLType(cluster.NodeWorker.NCCLSettings.TopologyType)
+	if err != nil {
+		return corev1.ConfigMap{}, err
+	}
+	topology, err := generateVirtualTopology(
+		ncclType,
+		cluster.NodeWorker.NCCLSettings.TopologyData,
+	)
+	if err != nil {
+		return corev1.ConfigMap{}, err
+	}
+
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapNCCLTopologyName(cluster.Name),
@@ -22,13 +36,30 @@ func RenderConfigMapNCCLTopology(cluster *values.SlurmCluster) (corev1.ConfigMap
 			Labels:    common.RenderLabels(consts.ComponentTypeWorker, cluster.Name),
 		},
 		Data: map[string]string{
-			consts.ConfigMapKeyNCCLTopology: generateVirtualTopology().Render(),
+			consts.ConfigMapKeyNCCLTopology: topology.Render(),
 		},
 	}, nil
 }
 
-func generateVirtualTopology() renderutils.ConfigFile {
-	res := &renderutils.RawConfig{}
+func generateVirtualTopology(ncclType consts.NCCLType, topologyData string) (renderutils.ConfigFile, error) {
+	res := &renderutils.MultilineStringConfig{}
+	switch ncclType {
+	case consts.NCCLTypeAuto:
+		return res, nil
+	case consts.NCCLTypeH100GPUCluster:
+		return generateVirtualH100GPUClusterTopology(), nil
+	case consts.NCCLTypeCustom:
+		if topologyData != "" {
+			return renderutils.NewAsIsConfig(topologyData), nil
+		}
+		return res, errors.New("topologyData can't be empty for custom type of NCCL topology")
+	default:
+		return res, nil
+	}
+}
+
+func generateVirtualH100GPUClusterTopology() renderutils.ConfigFile {
+	res := &renderutils.MultilineStringConfig{}
 	res.AddLine("<system version=\"1\">")
 	res.AddLine("    <cpu numaid=\"0\" affinity=\"00000000,00000000,0000ffff,ffffffff,ffffffff\" arch=\"x86_64\" vendor=\"GenuineIntel\" familyid=\"6\" modelid=\"106\">")
 	res.AddLine("        <pci busid=\"0000:8a:00.0\" class=\"0x060400\" vendor=\"0x104c\" device=\"0x8232\" subsystem_vendor=\"0x0000\" subsystem_device=\"0x0000\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
