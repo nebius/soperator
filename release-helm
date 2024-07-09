@@ -93,14 +93,14 @@ if [ -n "${name}" ]; then
     echo "Chart with name '${name}' does not exist."; exit 1
   fi
 
-  [ -z "${version}" ] && version=$(cat "${HELM_PATH}/${name}.version")
+  [ -z "${version}" ] && version=$(cat VERSION)
   chart "${name}"
 fi
 
 if [ -n "${all}" ]; then
   for dirpath in "${HELM_PATH}"/* ; do
       [ ! -d "${dirpath}" ] && continue
-      [ -z "${version}" ] && version=$(cat "${dirpath}.version")
+      [ -z "${version}" ] && version=$(cat VERSION)
       chart "$(basename "${dirpath}")" "${version}"
   done
 fi
