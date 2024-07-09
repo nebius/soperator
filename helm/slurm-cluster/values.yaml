@@ -1,11 +1,8 @@
 clusterName: "slurm1"
-
 # Additional annotations for the cluster
 annotations: {}
-
 # Whether to gracefully stop the cluster. Setting it to false after cluster has been paused starts the cluster back
 pause: false
-
 # K8s node filters used in Slurm node specifications. Define which nodes should be used to schedule pods to
 k8sNodeFilters:
   - name: gpu
@@ -32,7 +29,6 @@ k8sNodeFilters:
                   operator: In
                   values:
                     - "f2misrg1i9vtg1mtcqg3"
-
 # Sources for the volumes used in Slurm node specifications
 volumeSources:
   - name: controller-spool
@@ -62,7 +58,6 @@ secrets:
     name: "munge-key"
     # Key of the secret with Munge key data to use if not creating
     key: "key"
-
 # Job performing initial jail file system population
 populateJail:
   # Name of the k8s node filter
@@ -77,7 +72,6 @@ ncclSettings:
   topologyType: "auto"
   # TopologyData defines NCCL GPU topology
   topologyData: ""
-
 # Periodic checks. e.g. GPU health
 periodicChecks:
   # NCCL test benchmark
@@ -93,7 +87,7 @@ periodicChecks:
     # Number of failed finished jobs to retain
     failedJobsHistoryLimit: 3
     # Image for the NCCL test
-    image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/nccl_benchmark:latest"
+    image: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/nccl_benchmark"
     # NCCL test settings
     periodicCheckNCCLSettings:
       # Minimum memory size to start NCCL with
@@ -114,7 +108,6 @@ periodicChecks:
       setSlurmNodeDrainState: true
     # Name of the k8s node filter
     k8sNodeFilterName: "no-gpu"
-
 slurmNodes:
   controller:
     size: 2
@@ -154,17 +147,17 @@ slurmNodes:
       spool:
         volumeClaimTemplateSpec:
           storageClassName: "nebius-network-ssd"
-          accessModes: [ "ReadWriteOnce" ]
+          accessModes: ["ReadWriteOnce"]
           resources:
             requests:
               storage: "128Gi"
       jail:
         volumeSourceName: "jail"
       jailSubMounts: []
-#      jailSubMounts:
-#        - name: "mlcommons-sd-bench-data"
-#          mountPath: "/mlperf-sd"
-#          volumeSourceName: "mlperf-sd"
+      #      jailSubMounts:
+      #        - name: "mlcommons-sd-bench-data"
+      #          mountPath: "/mlperf-sd"
+      #          volumeSourceName: "mlperf-sd"
   login:
     size: 2
     k8sNodeFilterName: "no-gpu"
@@ -195,8 +188,8 @@ slurmNodes:
 #          volumeSourceName: "mlperf-sd"
 
 images:
-  slurmctld:    "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/controller_slurmctld:latest"
-  slurmd:       "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/worker_slurmd:latest"
-  sshd:         "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/login_sshd:latest"
-  munge:        "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
-  populateJail: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest"
+  slurmctld: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/controller_slurmctld"
+  slurmd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/worker_slurmd"
+  sshd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/login_sshd"
+  munge: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/munge"
+  populateJail: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/populate_jail"
