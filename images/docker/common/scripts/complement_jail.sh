@@ -28,6 +28,9 @@ pushd "${jaildir}"
     mount --rbind /dev dev/
     mount --rbind /run run/
 
+    echo "Bind-mount cgroup filesystem"
+    mount --rbind /sys/fs/cgroup sys/fs/cgroup
+
     echo "Remount /tmp"
     mount -t tmpfs tmpfs tmp/
 

@@ -89,6 +89,7 @@ MOUNTS="${NCCL_TOPO_FILE}:${NCCL_TOPO_FILE},${PWD}:${WORKDIR_MNT},${LAION_400M}:
 sbatch \
     --job-name="mlperf-ssd:${JOB_NAME}" \
     --nodes="${NUM_NODES}" \
+    --gpus-per-node=${GPUS_PER_NODE} \
     --ntasks-per-node="${GPUS_PER_NODE}" \
     --cpus-per-task=16 \
     --mem-per-cpu="8G" \

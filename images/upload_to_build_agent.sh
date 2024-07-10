@@ -25,3 +25,4 @@ rsync -Prv -e "ssh -i ${key}" build.sh               "${user}"@"${agent_ip}":/us
 rsync -Prv -e "ssh -i ${key}" build_common.sh        "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/
 rsync -Prv -e "ssh -i ${key}" build_all.sh           "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/
 rsync -Prv -e "ssh -i ${key}" build_populate_jail.sh "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/
+rsync -Prv -e "ssh -i ${key}" ../VERSION             "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/

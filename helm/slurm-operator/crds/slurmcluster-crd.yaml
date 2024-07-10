@@ -1084,7 +1084,7 @@ spec:
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
                           Must correspond to the name of one of [K8sNodeFilter]
                         type: string
-                      periodicCheckNCCLSettings:
+                      ncclArguments:
                         description: NCCLSettings define nccl settings
                         properties:
                           maxBytes:

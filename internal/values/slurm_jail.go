@@ -16,6 +16,8 @@ type PopulateJail struct {
 	ContainerPopulateJail Container
 
 	VolumeJail slurmv1.NodeVolume
+
+	Overwrite bool
 }
 
 func buildSlurmPopulateJailFrom(clusterName string, populateJail *slurmv1.PopulateJail) PopulateJail {
@@ -29,5 +31,6 @@ func buildSlurmPopulateJailFrom(clusterName string, populateJail *slurmv1.Popula
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),
 		},
+		Overwrite: populateJail.Overwrite,
 	}
 }
