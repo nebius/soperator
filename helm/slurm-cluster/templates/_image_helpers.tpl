@@ -1,29 +1,29 @@
 {{/* Populate jail Job image */}}
 {{- define "slurm-cluster.image.populateJail" -}}
-    {{- (default "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest" .Values.images.populateJail) | quote -}}
+    {{- printf "%s:%s" (default (printf "%s/populate_jail" (include "slurm-cluster.containerRegistry" .)) .Values.images.populateJail) .Chart.Version | quote -}}
 {{- end }}
 
 {{/* NCCL benchmark CronJob image */}}
 {{- define "slurm-cluster.image.ncclBenchmark" -}}
-    {{- (default "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/nccl_benchmark:latest" .Values.populateJail.image) | quote -}}
+    {{- printf "%s:%s" (default (printf "%s/nccl_benchmark" (include "slurm-cluster.containerRegistry" .)) .Values.periodicChecks.ncclBenchmark.image) .Chart.Version | quote -}}
 {{- end }}
 
 {{/* Slurmctld image */}}
 {{- define "slurm-cluster.image.slurmctld" -}}
-    {{- (default "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/controller_slurmctld:latest" .Values.images.slurmctld) | quote -}}
+    {{- printf "%s:%s" (default (printf "%s/controller_slurmctld" (include "slurm-cluster.containerRegistry" .)) .Values.images.slurmctld) .Chart.Version | quote -}}
 {{- end }}
 
 {{/* Slurmd image */}}
 {{- define "slurm-cluster.image.slurmd" -}}
-    {{- (default "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/worker_slurmd:latest" .Values.images.slurmd) | quote -}}
+    {{- printf "%s:%s" (default (printf "%s/worker_slurmd" (include "slurm-cluster.containerRegistry" .)) .Values.images.slurmd) .Chart.Version | quote -}}
 {{- end }}
 
 {{/* Sshd image */}}
 {{- define "slurm-cluster.image.sshd" -}}
-    {{- (default "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/login_sshd:latest" .Values.images.sshd) | quote -}}
+    {{- printf "%s:%s" (default (printf "%s/login_sshd" (include "slurm-cluster.containerRegistry" .)) .Values.images.sshd) .Chart.Version | quote -}}
 {{- end }}
 
 {{/* Munge image */}}
 {{- define "slurm-cluster.image.munge" -}}
-    {{- (default "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest" .Values.images.munge) | quote -}}
+    {{- printf "%s:%s" (default (printf "%s/munge" (include "slurm-cluster.containerRegistry" .)) .Values.images.munge) .Chart.Version | quote -}}
 {{- end }}

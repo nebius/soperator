@@ -7,13 +7,13 @@ metadata:
   namespace: slurm-poc
   name: slurm2
 spec:
-  crVersion: 0.1.14
+  crVersion: 0.1.15
   pause: false
   populateJail:
-    image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/populate_jail:latest
+    image: cr.nemax.nebius.cloud/crnbu823dealq64cp1s6/populate_jail:0.1.15
     k8sNodeFilterName: "gpu"
-#    jailSnapshotVolume:
-#      volumeSourceName: "jail-snapshot"
+    #    jailSnapshotVolume:
+    #      volumeSourceName: "jail-snapshot"
   ncclSettings:
     topologyType: "H100 GPU cluster"
   periodicChecks:
@@ -23,7 +23,7 @@ spec:
       activeDeadlineSeconds: 1800 # k8s CronJob timeout seconds (30 min)
       successfulJobsHistoryLimit: 3
       failedJobsHistoryLimit: 3
-      image: cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/nccl_benchmark:latest
+      image: cr.nemax.nebius.cloud/crnbu823dealq64cp1s6/nccl_benchmark:0.1.15
       periodicCheckNCCLSettings:
         minBytes: "512Mb"
         maxBytes: "8Gb"
@@ -71,10 +71,10 @@ spec:
       persistentVolumeClaim:
         claimName: "mlperf-sd"
         readOnly: false
-#    - name: jail-snapshot
-#      persistentVolumeClaim:
-#        claimName: "jail-snapshot-ubuntu:22.04-cuda:12"
-#        readOnly: true
+        #    - name: jail-snapshot
+        #      persistentVolumeClaim:
+        #        claimName: "jail-snapshot-ubuntu:22.04-cuda:12"
+        #        readOnly: true
   secrets:
     mungeKey:
       name: "munge-key"
@@ -84,14 +84,14 @@ spec:
       size: 2
       k8sNodeFilterName: "no-gpu"
       slurmctld:
-        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/controller_slurmctld:latest"
+        image: "cr.nemax.nebius.cloud/crnbu823dealq64cp1s6/controller_slurmctld:0.1.15"
         port: 6817
         resources:
           cpu: 1000m
           memory: 3Gi
           ephemeral-storage: 20Gi
       munge:
-        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
+        image: "cr.nemax.nebius.cloud/crnbu823dealq64cp1s6/munge:0.1.15"
         resources:
           cpu: 1000m
           memory: 1Gi
@@ -105,7 +105,7 @@ spec:
       size: 2
       k8sNodeFilterName: "gpu"
       slurmd:
-        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/worker_slurmd:latest"
+        image: "cr.nemax.nebius.cloud/crnbu823dealq64cp1s6/worker_slurmd:0.1.15"
         port: 6818
         resources:
           cpu: 156000m
@@ -113,7 +113,7 @@ spec:
           ephemeral-storage: 55Gi
           nvidia.com/gpu: 8
       munge:
-        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
+        image: "cr.nemax.nebius.cloud/crnbu823dealq64cp1s6/munge:0.1.15"
         resources:
           cpu: 2000m
           memory: 4Gi
@@ -122,7 +122,7 @@ spec:
         spool:
           volumeClaimTemplateSpec:
             storageClassName: "nebius-network-ssd"
-            accessModes: [ "ReadWriteOnce" ]
+            accessModes: ["ReadWriteOnce"]
             resources:
               requests:
                 storage: 128Gi
@@ -136,7 +136,7 @@ spec:
       size: 2
       k8sNodeFilterName: "no-gpu"
       sshd:
-        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/login_sshd:latest"
+        image: "cr.nemax.nebius.cloud/crnbu823dealq64cp1s6/login_sshd:0.1.15"
         port: 22
         resources:
           cpu: 3000m
@@ -148,7 +148,7 @@ spec:
       sshdServiceType: "LoadBalancer"
       sshdServiceLoadBalancerIP: "195.242.16.24"
       munge:
-        image: "cr.nemax.nebius.cloud/crnonjecps8pifr7am4i/munge:latest"
+        image: "cr.nemax.nebius.cloud/crnbu823dealq64cp1s6/munge:0.1.15"
         resources:
           cpu: 500m
           memory: 500Mi

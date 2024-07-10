@@ -9,13 +9,13 @@ nebius_image(
 )
 
 oci_push(
-    name = "push_poc",
+    name = "push_unstable",
     image = ":image",
-    repository = "cr.nemax.nebius.cloud/crnsp9v7ps4c2uks5n6a/slurm-operator",
+    repository = "cr.nemax.nebius.cloud/crnbu823dealq64cp1s6/slurm-operator",
 )
 
 oci_push(
-    name = "push_prod",
+    name = "push_stable",
     image = ":image",
-    repository = "cr.nemax.nebius.cloud/crncqadmoafmltf8el6q/slurm-operator",
+    repository = "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/slurm-operator",
 )
