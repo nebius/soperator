@@ -102,6 +102,12 @@ type PopulateJail struct {
 	//
 	// +kubebuilder:validation:Optional
 	JailSnapshotVolume *NodeVolume `json:"jailSnapshotVolume,omitempty"`
+
+	// Overwrite defines whether to overwrite content on the jail volume if it's already populated.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Overwrite bool `json:"overwrite"`
 }
 
 // PeriodicChecks define the k8s CronJobs performing cluster checks
@@ -150,10 +156,10 @@ type NCCLBenchmark struct {
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
-	// NCCLSettings define nccl settings
+	// NCCLArguments define nccl settings
 	//
 	// +kubebuilder:validation:Optional
-	NCCLSettings PeriodicCheckNCCLSettings `json:"periodicCheckNCCLSettings,omitempty"`
+	NCCLArguments NCCLArguments `json:"ncclArguments,omitempty"`
 
 	// FailureActions define actions performed on benchmark failure
 	//
@@ -167,8 +173,8 @@ type NCCLBenchmark struct {
 	K8sNodeFilterName string `json:"k8sNodeFilterName"`
 }
 
-// PeriodicCheckNCCLSettings define nccl settings for periodic nccl benchmark
-type PeriodicCheckNCCLSettings struct {
+// NCCLArguments define nccl settings for periodic nccl benchmark
+type NCCLArguments struct {
 	// MinBytes defines the minimum memory size to start nccl with
 	//
 	// +kubebuilder:validation:Optional

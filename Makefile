@@ -1,8 +1,3 @@
-# Unstable images go here
-# https://console.nebius.ai/folders/bje82q7sm8njm3c4rrlq/container-registry/registries/crnbu823dealq64cp1s6/overview
-CONTAINER_REGISTRY_UNSTABLE_ID = crnbu823dealq64cp1s6
-CONTAINER_REGISTRY_UNSTABLE = cr.nemax.nebius.cloud/$(CONTAINER_REGISTRY_UNSTABLE_ID)
-
 # Stable images get pulled from here
 # https://console.nebius.ai/folders/bje82q7sm8njm3c4rrlq/container-registry/registries/crnlu9nio77sg3p8n5bi/overview
 CONTAINER_REGISTRY_STABLE_ID = crnlu9nio77sg3p8n5bi
@@ -47,7 +42,7 @@ VERSION               = $(shell cat VERSION)
 GO_CONST_VERSION_FILE = internal/consts/version.go
 
 # Image URL to use all building/pushing image targets
-OPERATOR_IMAGE_REPO ?= $(CONTAINER_REGISTRY_UNSTABLE)/slurm-operator
+OPERATOR_IMAGE_REPO ?= $(CONTAINER_REGISTRY_STABLE)/slurm-operator
 OPERATOR_IMAGE_TAG  ?= $(VERSION)
 
 .PHONY: all
@@ -133,37 +128,14 @@ sync-version: ## Sync versions from file
 	@sed -i '' -e "s/image: controller:[^ ]*/image: controller:$(VERSION)/" config/manager/manager.yaml
 	@# endregion config/manager/manager.yaml
 
-	@# region config/samples/slurm_v1_slurmcluster.yaml
-	@echo 'Syncing config/samples/slurm_v1_slurmcluster.yaml'
-	@$(YQ) -i ".spec.crVersion = \"$(VERSION)\"" "config/samples/slurm_v1_slurmcluster.yaml"
-	@$(YQ) -i ".spec.populateJail.image = \"$(CONTAINER_REGISTRY_UNSTABLE)/populate_jail:$(VERSION)\"" "config/samples/slurm_v1_slurmcluster.yaml"
-	@$(YQ) -i ".spec.periodicChecks.ncclBenchmark.image = \"$(CONTAINER_REGISTRY_UNSTABLE)/nccl_benchmark:$(VERSION)\"" "config/samples/slurm_v1_slurmcluster.yaml"
-	@$(YQ) -i ".spec.slurmNodes.controller.slurmctld.image = \"$(CONTAINER_REGISTRY_UNSTABLE)/controller_slurmctld:$(VERSION)\"" "config/samples/slurm_v1_slurmcluster.yaml"
-	@$(YQ) -i ".spec.slurmNodes.controller.munge.image = \"$(CONTAINER_REGISTRY_UNSTABLE)/munge:$(VERSION)\"" "config/samples/slurm_v1_slurmcluster.yaml"
-	@$(YQ) -i ".spec.slurmNodes.worker.slurmd.image = \"$(CONTAINER_REGISTRY_UNSTABLE)/worker_slurmd:$(VERSION)\"" "config/samples/slurm_v1_slurmcluster.yaml"
-	@$(YQ) -i ".spec.slurmNodes.worker.munge.image = \"$(CONTAINER_REGISTRY_UNSTABLE)/munge:$(VERSION)\"" "config/samples/slurm_v1_slurmcluster.yaml"
-	@$(YQ) -i ".spec.slurmNodes.login.sshd.image = \"$(CONTAINER_REGISTRY_UNSTABLE)/login_sshd:$(VERSION)\"" "config/samples/slurm_v1_slurmcluster.yaml"
-	@$(YQ) -i ".spec.slurmNodes.login.munge.image = \"$(CONTAINER_REGISTRY_UNSTABLE)/munge:$(VERSION)\"" "config/samples/slurm_v1_slurmcluster.yaml"
-	@# endregion config/samples/slurm_v1_slurmcluster.yaml
-
-	@# region config/samples/slurm_v1_slurmcluster_2.yaml
-	@echo 'Syncing config/samples/slurm_v1_slurmcluster_2.yaml'
-	@$(YQ) -i ".spec.crVersion = \"$(VERSION)\"" "config/samples/slurm_v1_slurmcluster_2.yaml"
-	@$(YQ) -i ".spec.populateJail.image = \"$(CONTAINER_REGISTRY_UNSTABLE)/populate_jail:$(VERSION)\"" "config/samples/slurm_v1_slurmcluster_2.yaml"
-	@$(YQ) -i ".spec.periodicChecks.ncclBenchmark.image = \"$(CONTAINER_REGISTRY_UNSTABLE)/nccl_benchmark:$(VERSION)\"" "config/samples/slurm_v1_slurmcluster_2.yaml"
-	@$(YQ) -i ".spec.slurmNodes.controller.slurmctld.image = \"$(CONTAINER_REGISTRY_UNSTABLE)/controller_slurmctld:$(VERSION)\"" "config/samples/slurm_v1_slurmcluster_2.yaml"
-	@$(YQ) -i ".spec.slurmNodes.controller.munge.image = \"$(CONTAINER_REGISTRY_UNSTABLE)/munge:$(VERSION)\"" "config/samples/slurm_v1_slurmcluster_2.yaml"
-	@$(YQ) -i ".spec.slurmNodes.worker.slurmd.image = \"$(CONTAINER_REGISTRY_UNSTABLE)/worker_slurmd:$(VERSION)\"" "config/samples/slurm_v1_slurmcluster_2.yaml"
-	@$(YQ) -i ".spec.slurmNodes.worker.munge.image = \"$(CONTAINER_REGISTRY_UNSTABLE)/munge:$(VERSION)\"" "config/samples/slurm_v1_slurmcluster_2.yaml"
-	@$(YQ) -i ".spec.slurmNodes.login.sshd.image = \"$(CONTAINER_REGISTRY_UNSTABLE)/login_sshd:$(VERSION)\"" "config/samples/slurm_v1_slurmcluster_2.yaml"
-	@$(YQ) -i ".spec.slurmNodes.login.munge.image = \"$(CONTAINER_REGISTRY_UNSTABLE)/munge:$(VERSION)\"" "config/samples/slurm_v1_slurmcluster_2.yaml"
-	@# endregion config/samples/slurm_v1_slurmcluster_2.yaml
-
 	@# region helm chart versions
 	@echo 'Syncing helm chart versions'
 	@$(YQ) -i ".version = \"$(VERSION)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(VERSION)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(VERSION)\"" "$(CHART_STORAGE_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(VERSION)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(VERSION)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(VERSION)\"" "$(CHART_STORAGE_PATH)/Chart.yaml"
 	@# endregion helm chart versions
 
 	@# region helm/slurm-cluster/values.yaml
@@ -192,13 +164,6 @@ sync-version: ## Sync versions from file
 	@$(YQ) -i ".controllerManager.manager.image.tag = \"$(VERSION)\"" "helm/slurm-operator/values.yaml"
 	@# endregion helm/slurm-operator/values.yaml
 
-	@# region images/build.sh
-	@echo 'Syncing images/build.sh'
-	@sed -i '' -e 's,# Stable: [^ ]*,# Stable: https://console.nebius.ai/folders/bje82q7sm8njm3c4rrlq/container-registry/registries/$(CONTAINER_REGISTRY_STABLE_ID)/overview,' images/build.sh
-	@sed -i '' -e 's,# Unstable: [^ ]*,# Unstable: https://console.nebius.ai/folders/bje82q7sm8njm3c4rrlq/container-registry/registries/$(CONTAINER_REGISTRY_UNSTABLE_ID)/overview,' images/build.sh
-	@sed -i '' -e 's/if \[ -n "$${stable}" \]; then container_registry_id[^.]*/if \[ -n "$${stable}" \]; then container_registry_id=$(CONTAINER_REGISTRY_STABLE_ID); else container_registry_id=$(CONTAINER_REGISTRY_UNSTABLE_ID); fi/' images/build.sh
-	@# endregion images/build.sh
-
 	@# region internal/consts
 	@echo "Syncing $(GO_CONST_VERSION_FILE)"
 	@echo '// This file is generated by make sync-version.' >  $(GO_CONST_VERSION_FILE)
@@ -209,10 +174,10 @@ sync-version: ## Sync versions from file
 	@echo ')'                                               >> $(GO_CONST_VERSION_FILE)
 	@# endregion internal/consts
 
-	@# region release-helm
-	@echo 'Syncing release-helm'
-	@sed -i '' -e "s/CONTAINER_REGISTRY_ID=[^ ]*/CONTAINER_REGISTRY_ID='$(CONTAINER_REGISTRY_HELM_ID)'/" release-helm
-	@# endregion release-helm
+	@# region release_helm.sh
+	@echo 'Syncing release_helm.sh'
+	@sed -i '' -e "s/CONTAINER_REGISTRY_ID=[^ ]*/CONTAINER_REGISTRY_ID='$(CONTAINER_REGISTRY_HELM_ID)'/" release_helm.sh
+	@# endregion release_helm.sh
 
 	@# region terraform/slurm-cluster/terraform.tfvars.example
 	@echo 'Syncing terraform/slurm-cluster/terraform.tfvars.example'
@@ -252,7 +217,7 @@ docker-build: ## Build docker image with the manager.
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
-	$(CONTAINER_TOOL) run //msp/slurm-service/internal/operator/docker:push_poc -- --repository $(OPERATOR_IMAGE_REPO) --tag $(OPERATOR_IMAGE_TAG)
+	$(CONTAINER_TOOL) run //msp/slurm-service/internal/operator/docker:push_stable -- --repository $(OPERATOR_IMAGE_REPO) --tag $(OPERATOR_IMAGE_TAG)
 
 ##@ Deployment
 

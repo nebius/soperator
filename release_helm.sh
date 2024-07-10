@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Example: ./release-helm -afyr
+# Example: ./release_helm.sh -afyr
 
 set -e
 
@@ -44,14 +44,6 @@ mkdir -p $RELEASE_PATH
 
 # https://console.nebius.ai/folders/bje82q7sm8njm3c4rrlq/container-registry/registries/crnefnj17i4kqgt3up94/overview
 CONTAINER_REGISTRY_ID='crnefnj17i4kqgt3up94'
-
-if [ -n "${release}" ]; then
-  echo 'Logging in to Container registry...'
-  ncp config get service-account-key | yq -P -oj | docker login \
-    --username json_key \
-    --password-stdin \
-    cr.ai.nebius.cloud
-fi
 
 chart() {
   CHART_NAME=${1} && shift 1

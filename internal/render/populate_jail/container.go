@@ -15,10 +15,17 @@ func renderContainerPopulateJail(populateJail *values.PopulateJail) corev1.Conta
 	if populateJail.JailSnapshotVolume != nil {
 		volumeMounts = append(volumeMounts, common.RenderVolumeMountJailSnapshot())
 	}
+	overwriteEnv := "0"
+	if populateJail.Overwrite {
+		overwriteEnv = "1"
+	}
 	return corev1.Container{
 		Name:            populateJail.ContainerPopulateJail.Name,
 		Image:           populateJail.ContainerPopulateJail.Image,
 		ImagePullPolicy: corev1.PullAlways, // TODO use digest and set to corev1.PullIfNotPresent
+		Env: []corev1.EnvVar{
+			{Name: "OVERWRITE", Value: overwriteEnv},
+		},
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{

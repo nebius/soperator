@@ -46,6 +46,7 @@ spec:
     jailSnapshotVolume:
       volumeSourceName: {{ required "Jail snapshot volume source name must be provided." .Values.populateJail.jailSnapshotVolume.volumeSourceName | quote }}
     {{- end }}
+    overwrite: {{ default false .Values.populateJail.overwrite }}
   ncclSettings:
     topologyType: {{ (default "auto" .Values.ncclSettings.topologyType) | quote }}
     topologyData: {{ (default "" .Values.ncclSettings.topologyData) | quote }}
@@ -57,13 +58,13 @@ spec:
       successfulJobsHistoryLimit: {{ default 3 .Values.periodicChecks.ncclBenchmark.successfulJobsHistoryLimit }}
       failedJobsHistoryLimit: {{ default 3 .Values.periodicChecks.ncclBenchmark.failedJobsHistoryLimit }}
       image: {{ include "slurm-cluster.image.ncclBenchmark" . }}
-      periodicCheckNCCLSettings:
-        minBytes: {{ (default "512Mb" .Values.periodicChecks.ncclBenchmark.periodicCheckNCCLSettings.minBytes) | quote }}
-        maxBytes: {{ (default "8Gb" .Values.periodicChecks.ncclBenchmark.periodicCheckNCCLSettings.maxBytes) | quote }}
-        stepFactor: {{ (default "2" .Values.periodicChecks.ncclBenchmark.periodicCheckNCCLSettings.stepFactor) | quote }}
-        timeout: {{ (default "20:00" .Values.periodicChecks.ncclBenchmark.periodicCheckNCCLSettings.timeout) | quote }}
-        thresholdMoreThan: {{ (default "42" .Values.periodicChecks.ncclBenchmark.periodicCheckNCCLSettings.thresholdMoreThan) | quote }}
-        useInfiniband: {{ (default false .Values.periodicChecks.ncclBenchmark.periodicCheckNCCLSettings.useInfiniband) }}
+      ncclArguments:
+        minBytes: {{ (default "512Mb" .Values.periodicChecks.ncclBenchmark.ncclArguments.minBytes) | quote }}
+        maxBytes: {{ (default "8Gb" .Values.periodicChecks.ncclBenchmark.ncclArguments.maxBytes) | quote }}
+        stepFactor: {{ (default "2" .Values.periodicChecks.ncclBenchmark.ncclArguments.stepFactor) | quote }}
+        timeout: {{ (default "20:00" .Values.periodicChecks.ncclBenchmark.ncclArguments.timeout) | quote }}
+        thresholdMoreThan: {{ (default "42" .Values.periodicChecks.ncclBenchmark.ncclArguments.thresholdMoreThan) | quote }}
+        useInfiniband: {{ (default false .Values.periodicChecks.ncclBenchmark.ncclArguments.useInfiniband) }}
       failureActions:
         setSlurmNodeDrainState: {{ default true .Values.periodicChecks.ncclBenchmark.failureActions.setSlurmNodeDrainState }}
       k8sNodeFilterName: {{ (required ".Values.periodicChecks.ncclBenchmark.k8sNodeFilterName must be provided." .Values.periodicChecks.ncclBenchmark.k8sNodeFilterName ) | quote }}

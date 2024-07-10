@@ -1085,8 +1085,8 @@ spec:
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
                           Must correspond to the name of one of [K8sNodeFilter]
                         type: string
-                      periodicCheckNCCLSettings:
-                        description: NCCLSettings define nccl settings
+                      ncclArguments:
+                        description: NCCLArguments define nccl settings
                         properties:
                           maxBytes:
                             default: 8Gb
@@ -1358,6 +1358,11 @@ spec:
                       K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
                       Must correspond to the name of one of [K8sNodeFilter]
                     type: string
+                  overwrite:
+                    default: false
+                    description: Overwrite defines whether to overwrite content on
+                      the jail volume if it's already populated.
+                    type: boolean
                 required:
                 - image
                 - k8sNodeFilterName

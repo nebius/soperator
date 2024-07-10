@@ -1,5 +1,3 @@
 ## Append samples of your project ##
-resources:
-- slurm_v1_slurmcluster.yaml
-- slurm_v1_slurmcluster_2.yaml
+resources: []
 #+kubebuilder:scaffold:manifestskustomizesamples

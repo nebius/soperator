@@ -107,7 +107,7 @@ data:
                 echo "Directory $path is not a mount point, mounting it"
                 mount_glusterfs
             else
-                echo "Directory $path is already a mount point, checking its options"
+                echo "Directory $path is already a mount point, validating it"
                 target=$(echo "$mount_point_info" | awk '{print $2}')
                 source=$(echo "$mount_point_info" | awk '{print $1}')
                 options=$(echo "$mount_point_info" | awk '{print $4}')
@@ -115,14 +115,15 @@ data:
                 if [ "$target" != "$host_path" ] || \
                    [ "$source" != "$gluster_hostname:/stripe-volume" ] || \
                    ! echo "$options" | grep -q "rw" || \
-                   ! echo "$options" | grep -q "relatime"
+                   ! echo "$options" | grep -q "relatime" ||
+                   ! stat "$host_path"
                 then
-                    echo "Mount options for $path are not correct, remounting it"
+                    echo "Mount point $path is not correct, remounting it"
                     umount "$host_path"
                     echo "Unmounted file system from $path"
                     mount_glusterfs
                 else
-                    echo "Mount point has correct options"
+                    echo "Mount point is correct"
                 fi
             fi
         }

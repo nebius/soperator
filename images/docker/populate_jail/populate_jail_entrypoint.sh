@@ -5,6 +5,11 @@ while ! mountpoint -q /mnt/jail; do
     sleep 10
 done
 
+if [ "$OVERWRITE" != "1" ] && [ -d /mnt/jail/dev ]; then
+    echo "Jail is already populated and content overwriting is turned off, exiting"
+    exit 0
+fi
+
 echo "Delete everything from jail directory"
 rm -rf /mnt/jail/*
 

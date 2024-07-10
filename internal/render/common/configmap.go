@@ -56,7 +56,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("GresTypes", "gpu")
 	res.AddProperty("MailProg", "/usr/bin/true")
 	res.AddProperty("PluginDir", "/usr/lib/x86_64-linux-gnu/"+consts.Slurm)
-	res.AddProperty("ProctrackType", "proctrack/linuxproc")
+	res.AddProperty("ProctrackType", "proctrack/cgroup")
 	res.AddProperty("ReturnToService", 1)
 	res.AddComment("")
 	res.AddProperty("SlurmctldPidFile", "/var/run/"+consts.SlurmctldName+".pid")
@@ -71,7 +71,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddProperty("StateSaveLocation", naming.BuildVolumeMountSpoolPath(consts.SlurmctldName))
 	res.AddComment("")
-	res.AddProperty("TaskPlugin", "task/affinity")
+	res.AddProperty("TaskPlugin", "task/cgroup,task/affinity")
 	res.AddComment("")
 	res.AddProperty("CliFilterPlugins", "cli_filter/user_defaults")
 	res.AddComment("")
@@ -91,6 +91,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("SCHEDULING")
 	res.AddProperty("SchedulerType", "sched/backfill")
 	res.AddProperty("SelectType", "select/cons_tres")
+	res.AddProperty("SelectTypeParameters", "CR_Core_Memory")
 	res.AddComment("")
 	res.AddComment("LOGGING AND ACCOUNTING")
 	res.AddProperty("JobCompType", "jobcomp/none")
@@ -103,7 +104,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("COMPUTE NODES")
 	res.AddComment("We're using the \"dynamic nodes\" feature: https://slurm.schedmd.com/dynamic_nodes.html")
 	res.AddProperty("MaxNodeCount", "512")
-	res.AddProperty("PartitionName", "main Nodes=ALL Default=YES MaxTime=INFINITE State=UP")
+	res.AddProperty("PartitionName", "main Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
 
 	return res
 }
@@ -111,6 +112,11 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 func generateCGroupConfig() renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
 	res.AddProperty("CgroupPlugin", "cgroup/v1")
+	res.AddProperty("CgroupMountpoint", "/sys/fs/cgroup")
+	res.AddProperty("ConstrainCores", "yes")
+	res.AddProperty("ConstrainDevices", "yes")
+	res.AddProperty("ConstrainRAMSpace", "yes")
+	res.AddProperty("ConstrainSwapSpace", "yes")
 	return res
 }
 
