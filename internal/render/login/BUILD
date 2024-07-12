@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "configmap.go",
         "container.go",
+        "secret.go",
         "service.go",
         "statefulset.go",
         "volume.go",
@@ -24,5 +25,6 @@ go_library(
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
         "@io_k8s_apimachinery//pkg/util/intstr",
         "@io_k8s_utils//ptr",
+        "@org_golang_x_crypto//ssh",
     ],
 )

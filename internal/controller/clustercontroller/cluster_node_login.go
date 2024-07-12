@@ -60,6 +60,43 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 			}
 		}
 
+		// SSHDKeys Secrets
+		{
+			desired := corev1.Secret{}
+			sshdSecretKeysName := naming.BuildSecretSSHDKeysName(clusterValues.Name)
+			if clusterValues.Secrets.SshdKeysName != "" {
+				sshdSecretKeysName = clusterValues.Secrets.SshdKeysName
+			}
+
+			if err := r.Get(
+				ctx,
+				types.NamespacedName{
+					Namespace: clusterValues.Namespace,
+					Name:      sshdSecretKeysName,
+				},
+				&desired,
+			); err != nil {
+				if apierrors.IsNotFound(err) && clusterValues.Secrets.SshdKeysName == "" {
+					renderedDesired, err := login.RenderSSHDKeysSecret(clusterValues)
+					desired = *renderedDesired.DeepCopy()
+					if err != nil {
+						logger.Error(err, "Failed to render login SSHDKeys Secrets")
+						return errors.Wrap(err, "rendering login SSHDKeys Secrets")
+					}
+				} else {
+					logger.Error(err, "Failed to get login SSHDKeys Secrets")
+					return errors.Wrap(err, "getting login SSHDKeys Secrets")
+				}
+			}
+
+			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
+			err := r.Secret.Reconcile(ctx, cluster, &desired)
+			if err != nil {
+				logger.Error(err, "Failed to reconcile login SSHDKeys Secrets")
+				return errors.Wrap(err, "reconciling login SSHDKeys Secrets")
+			}
+		}
+
 		// Security limits ConfigMap
 		{
 			desired, err := login.RenderConfigMapSecurityLimits(clusterValues)

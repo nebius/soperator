@@ -40,7 +40,7 @@ import (
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=create;delete;get;list;patch;update;watch
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;watch;list
+//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get;update
 // +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
@@ -53,6 +53,7 @@ type SlurmClusterReconciler struct {
 	WatchNamespaces WatchNamespaces
 
 	ConfigMap   *reconciler.ConfigMapReconciler
+	Secret      *reconciler.SecretReconciler
 	CronJob     *reconciler.CronJobReconciler
 	Job         *reconciler.JobReconciler
 	Service     *reconciler.ServiceReconciler
@@ -66,6 +67,7 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 		Reconciler:      r,
 		WatchNamespaces: NewWatchNamespaces(watchNamespacesEnv),
 		ConfigMap:       reconciler.NewConfigMapReconciler(r),
+		Secret:          reconciler.NewSecretReconciler(r),
 		CronJob:         reconciler.NewCronJobReconciler(r),
 		Job:             reconciler.NewJobReconciler(r),
 		Service:         reconciler.NewServiceReconciler(r),
@@ -307,6 +309,7 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ConfigMap{}).
 		Owns(&batchv1.Job{}).
 		Owns(&batchv1.CronJob{}).
+		Owns(&corev1.Secret{}).
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.mapObjectsToReconcileRequests),

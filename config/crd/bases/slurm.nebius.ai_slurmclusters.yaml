@@ -1388,6 +1388,10 @@ spec:
                     - key
                     - name
                     type: object
+                  sshdKeysName:
+                    description: SshdKeysName defines name of the [corev1.Secret]
+                      with ssh keys for SSHD server
+                    type: string
                 required:
                 - mungeKey
                 type: object

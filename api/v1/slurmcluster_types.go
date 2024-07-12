@@ -268,6 +268,10 @@ type Secrets struct {
 	//
 	// +kubebuilder:validation:Required
 	MungeKey SecretKey `json:"mungeKey"`
+
+	// SshdKeysName defines name of the [corev1.Secret] with ssh keys for SSHD server
+	// +kubebuilder:validation:Optional
+	SshdKeysName string `json:"sshdKeysName,omitempty"`
 }
 
 // SecretKey defines the [corev1.Secret] reference with specification of key used for content gathering

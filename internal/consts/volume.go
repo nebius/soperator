@@ -33,6 +33,8 @@ const (
 	VolumeNameBoot           = boot
 	VolumeNameSSHConfigs     = sshConfigs
 	VolumeNameSSHRootKeys    = sshRootKeys
+	VolumeNameSSHDKeys       = "sshd-keys"
+	VolumeMountPathSSHDKeys  = "/etc/ssh/sshd_keys"
 	VolumeNameSecurityLimits = securityLimits
 	VolumeNameNCCLTopology   = ncclTopology
 	VolumeNameSharedMemory   = "dev-shm"

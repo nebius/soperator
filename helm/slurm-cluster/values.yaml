@@ -58,16 +58,17 @@ secrets:
     name: "munge-key"
     # Key of the secret with Munge key data to use if not creating
     key: "key"
+  # Secret reference required for login sshd. If secret name empty - operator generate own secret with keys
+  sshdKeysName: ""
 # Job performing initial jail file system population
 populateJail:
   # Name of the k8s node filter
   k8sNodeFilterName: "gpu"
   # Configuration of the volume containing the custom initial jail content (the default content is used if not set)
   jailSnapshotVolume: null
-#  jailSnapshotVolume:
-#    volumeSourceName: "jail-snapshot"
+  #  jailSnapshotVolume:
+  #    volumeSourceName: "jail-snapshot"
   overwrite: false
-
 ncclSettings:
   # TopologyType define type of NCCL GPU topology Enum: H100 GPU cluster, auto, custom
   topologyType: "auto"

@@ -20,6 +20,7 @@ func renderContainerSshd(
 		common.RenderVolumeMountSlurmConfigs(),
 		common.RenderVolumeMountJail(),
 		common.RenderVolumeMountMungeSocket(),
+		renderVolumeMountSshdKeys(),
 		renderVolumeMountSshConfigs(),
 		renderVolumeMountSshRootKeys(),
 		renderVolumeMountSecurityLimits(),
