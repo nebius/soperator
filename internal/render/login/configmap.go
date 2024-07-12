@@ -41,6 +41,9 @@ func generateSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddLine("X11Forwarding no")
 	res.AddLine("AllowTcpForwarding no")
 	res.AddLine("Subsystem sftp /usr/lib/openssh/sftp-server")
+	res.AddLine("HostKey " + consts.VolumeMountPathSSHDKeys + "/" + consts.SecretSshdRSAKeyName)
+	res.AddLine("HostKey " + consts.VolumeMountPathSSHDKeys + "/" + consts.SecretSshdECDSAKeyName)
+	res.AddLine("HostKey " + consts.VolumeMountPathSSHDKeys + "/" + consts.SecretSshdECDSA25519KeyName)
 	res.AddLine("Match User *")
 	res.AddLine("    ChrootDirectory " + consts.VolumeMountPathJail)
 	return res

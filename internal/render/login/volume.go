@@ -17,10 +17,16 @@ func renderVolumesAndClaimTemplateSpecs(
 	volumeSources []slurmv1.VolumeSource,
 	login *values.SlurmLogin,
 ) (volumes []corev1.Volume, pvcTemplateSpecs []values.PVCTemplateSpec, err error) {
+	sshdKeysSecretName := naming.BuildSecretSSHDKeysName(clusterName)
+	if secrets.SshdKeysName != "" {
+		sshdKeysSecretName = secrets.SshdKeysName
+	}
+
 	volumes = []corev1.Volume{
 		common.RenderVolumeSlurmConfigs(clusterName),
 		common.RenderVolumeMungeKey(secrets.MungeKey.Name, secrets.MungeKey.Key),
 		common.RenderVolumeMungeSocket(),
+		renderVolumeSshdKeys(sshdKeysSecretName),
 		renderVolumeSshConfigs(clusterName),
 		renderVolumeSshRootKeys(clusterName),
 		renderVolumeSecurityLimits(clusterName),
@@ -109,6 +115,63 @@ func renderVolumeMountSshRootKeys() corev1.VolumeMount {
 }
 
 // endregion root keys
+
+// region sshd keys
+
+// renderVolumeSshdKeys renders [corev1.Volume] containing SSHD key pairs
+func renderVolumeSshdKeys(sshdKeysSecretName string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSSHDKeys,
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: sshdKeysSecretName,
+				Items: []corev1.KeyToPath{
+					{
+						Key:  consts.SecretSshdECDSAKeyName,
+						Path: consts.SecretSshdECDSAKeyName,
+						Mode: ptr.To(consts.SecretSshdKeysPrivateFileMode),
+					},
+					{
+						Key:  consts.SecretSshdECDSAPubKeyName,
+						Path: consts.SecretSshdECDSAPubKeyName,
+						Mode: ptr.To(consts.SecretSshdKeysPublicFileMode),
+					},
+					{
+						Key:  consts.SecretSshdECDSA25519KeyName,
+						Path: consts.SecretSshdECDSA25519KeyName,
+						Mode: ptr.To(consts.SecretSshdKeysPrivateFileMode),
+					},
+					{
+						Key:  consts.SecretSshdECDSA25519PubKeyName,
+						Path: consts.SecretSshdECDSA25519PubKeyName,
+						Mode: ptr.To(consts.SecretSshdKeysPublicFileMode),
+					},
+					{
+						Key:  consts.SecretSshdRSAKeyName,
+						Path: consts.SecretSshdRSAKeyName,
+						Mode: ptr.To(consts.SecretSshdKeysPrivateFileMode),
+					},
+					{
+						Key:  consts.SecretSshdRSAPubKeyName,
+						Path: consts.SecretSshdRSAPubKeyName,
+						Mode: ptr.To(consts.SecretSshdKeysPublicFileMode),
+					},
+				},
+			},
+		},
+	}
+}
+
+// renderVolumeMountSshdKeys renders [corev1.VolumeMount] defining the mounting path for SSHD key pairs
+func renderVolumeMountSshdKeys() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSSHDKeys,
+		MountPath: consts.VolumeMountPathSSHDKeys,
+		ReadOnly:  true,
+	}
+}
+
+// endregion sshd keys
 
 // region security limits
 

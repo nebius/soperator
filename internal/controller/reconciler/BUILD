@@ -6,6 +6,7 @@ go_library(
         "k8s_configmap.go",
         "k8s_cronjob.go",
         "k8s_job.go",
+        "k8s_secret.go",
         "k8s_service.go",
         "k8s_statefulset.go",
         "reconciler.go",

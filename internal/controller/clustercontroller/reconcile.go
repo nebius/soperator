@@ -53,6 +53,7 @@ type SlurmClusterReconciler struct {
 	WatchNamespaces WatchNamespaces
 
 	ConfigMap   *reconciler.ConfigMapReconciler
+	Secret      *reconciler.SecretReconciler
 	CronJob     *reconciler.CronJobReconciler
 	Job         *reconciler.JobReconciler
 	Service     *reconciler.ServiceReconciler
@@ -66,6 +67,7 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 		Reconciler:      r,
 		WatchNamespaces: NewWatchNamespaces(watchNamespacesEnv),
 		ConfigMap:       reconciler.NewConfigMapReconciler(r),
+		Secret:          reconciler.NewSecretReconciler(r),
 		CronJob:         reconciler.NewCronJobReconciler(r),
 		Job:             reconciler.NewJobReconciler(r),
 		Service:         reconciler.NewServiceReconciler(r),
@@ -307,6 +309,7 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ConfigMap{}).
 		Owns(&batchv1.Job{}).
 		Owns(&batchv1.CronJob{}).
+		Owns(&corev1.Secret{}).
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.mapObjectsToReconcileRequests),

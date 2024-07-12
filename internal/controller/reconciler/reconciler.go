@@ -169,6 +169,8 @@ func (r Reconciler) reconcile(
 			switch desired.(type) {
 			case *corev1.ConfigMap:
 				existing = &corev1.ConfigMap{}
+			case *corev1.Secret:
+				existing = &corev1.Secret{}
 			case *batchv1.CronJob:
 				existing = &batchv1.CronJob{}
 			case *batchv1.Job:
