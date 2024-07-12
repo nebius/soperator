@@ -18,7 +18,7 @@
 
 {{/* sshdKeysName secret */}}
 {{- define "slurm-cluster.secret.sshdKeysName" -}}
-{{- .Values.secrets.sshdKxeysName }}
+{{- .Values.secrets.sshdKeysName }}
 {{- end }}
 
 {{/*
