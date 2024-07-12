@@ -105,12 +105,8 @@ gazelle: ## Run gazelle
 
 .PHONY: helm
 helm: kustomize helmify yq ## Update slurm-operator Helm chart
-	$(YQ) '.appVersion' $(CHART_OPERATOR_PATH)/Chart.yaml > $(CHART_PATH)/operatorAppVersion
-
 	rm -rf $(CHART_OPERATOR_PATH)
 	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir $(CHART_OPERATOR_PATH)
-
-	$(YQ) -i ".appVersion = \"$$(cat $(CHART_PATH)/operatorAppVersion)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
 	rm -f $(CHART_PATH)/operatorAppVersion
 
 	$(YQ) -i 'del(.controllerManager.manager.image.tag)' "$(CHART_OPERATOR_PATH)/values.yaml"
@@ -179,16 +175,16 @@ sync-version: ## Sync versions from file
 	@sed -i '' -e "s/CONTAINER_REGISTRY_ID=[^ ]*/CONTAINER_REGISTRY_ID='$(CONTAINER_REGISTRY_HELM_ID)'/" release_helm.sh
 	@# endregion release_helm.sh
 
-	@# region terraform/slurm-cluster/terraform.tfvars.example
-	@echo 'Syncing terraform/slurm-cluster/terraform.tfvars.example'
-	@sed -i '' -e 's/slurm_operator_version = "[^ ]*/slurm_operator_version = "$(VERSION)"/' terraform/slurm-cluster/terraform.tfvars.example
-	@# endregion terraform/slurm-cluster/terraform.tfvars.example
+	@# region terraform/terraform.tfvars.example
+	@echo 'Syncing terraform/terraform.tfvars.example'
+	@sed -i '' -e 's/slurm_operator_version = "[^ ]*/slurm_operator_version = "$(VERSION)"/' terraform/terraform.tfvars.example
+	@# endregion terraform/terraform.tfvars.example
 
-	@# region terraform/slurm-cluster/slurm_cluster_variables.tf
-	@echo 'Syncing terraform/slurm-cluster/slurm_cluster_variables.tf'
-	@sed -i '' -e 's/default *= *"0.1.[^ ]*/default = "$(VERSION)"/' terraform/slurm-cluster/slurm_cluster_variables.tf
-	@terraform fmt terraform/slurm-cluster/slurm_cluster_variables.tf
-	@# endregion terraform/slurm-cluster/slurm_cluster_variables.tf
+	@# region terraform/slurm_cluster_variables.tf
+	@echo 'Syncing terraform/slurm_cluster_variables.tf'
+	@sed -i '' -e 's/default *= *"0.1.[^ ]*/default = "$(VERSION)"/' terraform/slurm_cluster_variables.tf
+	@terraform fmt terraform/slurm_cluster_variables.tf
+	@# endregion terraform/slurm_cluster_variables.tf
 
 ##@ Build
 

@@ -1388,9 +1388,9 @@ spec:
                     - key
                     - name
                     type: object
-                  sshdKeys:
-                    description: SshdKeys defines name of the [corev1.Secret] with
-                      ssh keys for SSHD server
+                  sshdKeysName:
+                    description: SshdKeysName defines name of the [corev1.Secret]
+                      with ssh keys for SSHD server
                     type: string
                 required:
                 - mungeKey

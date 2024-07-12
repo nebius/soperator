@@ -51,7 +51,7 @@ make docker-push
 
 #### Step 6. Pack new terraform tarball
 ```
-./release_terraform.sh -d my_change_description
+./release_terraform.sh
 ```
 
 #### Step 7. Check the release
