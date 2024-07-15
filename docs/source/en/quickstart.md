@@ -583,7 +583,7 @@ In your terraform release, there is a directory `test`. Enter it: `cd test`.
 
 Run the script that uploads several batch job scripts to your cluster:
 ```shell
-./prepare_for_quickcheck.sh -u root -k ~/.ssh/id_ed25519.pub -a <ip_of_slurm_cluster>
+./prepare_for_quickcheck.sh -u root -k ~/.ssh/id_ed25519 -a <ip_of_slurm_cluster>
 ```
 
 Within an SSH session to the Slurm cluster, execute:
