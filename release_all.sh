@@ -72,8 +72,8 @@ EOF
 ssh -i "$key" "$user"@"$address" "${remote_command}"
 echo "All images are built successfully"
 
-echo "Updating CRD"
-make manifests
+echo "Updating CRDs & auto-generated code"
+make generate manifests
 
 echo "Building image of the operator"
 make docker-push
