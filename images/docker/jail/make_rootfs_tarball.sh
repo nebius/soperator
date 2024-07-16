@@ -27,3 +27,4 @@ echo "Building tarball from docker file ${dockerfile}"
 docker build --tag jail --target jail --load $ignore_cache --platform=linux/amd64 -f "${dockerfile}" --output type=tar,dest=jail_rootfs.tar .
 
 echo "Built tarball jail_rootfs.tar"
+echo "OK"

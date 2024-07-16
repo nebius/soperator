@@ -16,7 +16,7 @@ done
 mkdir -p "terraform-releases"
 
 read -r version < ./VERSION
-version=$(echo "$version" | tr '.' '_')
+version=$(echo "$version" | tr '.' '_' | tr '-' '_')
 
 tarball="terraform-releases/unstable/slurm_operator_tf_${version}.tar.gz"
 if [ ! -f "$tarball" ] || [ -n "$force" ]; then

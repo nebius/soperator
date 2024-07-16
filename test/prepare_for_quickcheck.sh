@@ -17,4 +17,4 @@ if [ -z "$user" ] || [ -z "$key" ] || [ -z "$address" ]; then
     usage
 fi
 
-scp -i "${key}" -r ./demo "${user}"@"${address}":/
+scp -i "${key}" -r ./quickcheck "${user}"@"${address}":/

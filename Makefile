@@ -109,8 +109,6 @@ helm: kustomize helmify yq ## Update slurm-operator Helm chart
 	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir $(CHART_OPERATOR_PATH)
 	rm -f $(CHART_PATH)/operatorAppVersion
 
-	$(YQ) -i 'del(.controllerManager.manager.image.tag)' "$(CHART_OPERATOR_PATH)/values.yaml"
-
 .PHONY: sync-version
 sync-version: ## Sync versions from file
 	@# region config/manager/kustomization.yaml
