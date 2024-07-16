@@ -37,14 +37,8 @@ checks are implemented as usual Slurm jobs - they stay in the same queue with us
 The creation process consists of the following steps.
 
 #### Step 1. Download a release of the Slurm operator
-Download tarball with the latest version from [Arcanum](https://arcanum.nebius.dev/nebo/msp/slurm-service/internal/operator/terraform-releases).
+Download tarball with the latest version from [Arcanum](https://arcanum.nebius.dev/nebo/msp/slurm-service/internal/operator/terraform-releases/stable).
 In browser, press on the file with the latest version, and then press the "Raw" button in the upper right corner.
-
-<details>
-  <summary>Tarball naming semantics</summary>
-
-> Each tarball release is named as `slurm_operator_tf_<YEAR>_<MONTH>_<SERIAL>_<SHORT_CHANGE_DESC>.tar.gz`
-</details>
 
 #### Step 2. Extract the tarball
 Create and open a directory: `mkdir slurm-operator-tf`
@@ -102,7 +96,7 @@ Required variables (e.g. a folder ID or your public SSH key) have values prefixe
 > 
 > ### ID of an existing network in which a new subnet for the K8S cluster is created. If empty, a new network is created.
 > ### A separate subnet is created in either case.
-> k8s_network_id = "TODO: Put your network ID here"
+> k8s_network_id = ""
 > 
 > ### IPv4 CIDR blocks for the new subnet. In case the subnet is created in an existing network, ensure it doesn't
 > ### conflict with CIDR blocks of existing subnets.
@@ -614,7 +608,7 @@ In your terraform release, there is a directory `test`. Enter it: `cd test`.
 
 Run the script that uploads several scripts to your cluster:
 ```shell
-./prepare_for_mlperf_sd.sh -u root -k ~/.ssh/id_ed25519.pub -a <ip_of_slurm_cluster>
+./prepare_for_mlperf_sd.sh -u root -k ~/.ssh/id_ed25519 -a <ip_of_slurm_cluster>
 ```
 
 Within an SSH session to the Slurm cluster, execute:
