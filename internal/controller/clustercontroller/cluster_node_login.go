@@ -77,7 +77,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 				&desired,
 			); err != nil {
 				if apierrors.IsNotFound(err) && clusterValues.Secrets.SshdKeysName == "" {
-					renderedDesired, err := login.RenderSSHDKeysSecret(clusterValues)
+					renderedDesired, err := login.RenderSSHDKeysSecret(clusterValues.Name, clusterValues.Namespace)
 					desired = *renderedDesired.DeepCopy()
 					if err != nil {
 						logger.Error(err, "Failed to render login SSHDKeys Secrets")
@@ -246,7 +246,7 @@ func (r SlurmClusterReconciler) getLoginStatefulSetDependencies(
 		ctx,
 		types.NamespacedName{
 			Namespace: clusterValues.Namespace,
-			Name:      clusterValues.Secrets.MungeKey.Name,
+			Name:      naming.BuildSecretMungeKeyName(clusterValues.Name),
 		},
 		mungeKeySecret,
 	); err != nil {

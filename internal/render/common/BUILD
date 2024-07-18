@@ -6,6 +6,7 @@ go_library(
         "configmap.go",
         "container.go",
         "label.go",
+        "secret.go",
         "volume.go",
     ],
     importpath = "nebius.ai/slurm-operator/internal/render/common",

@@ -16,13 +16,12 @@ import (
 
 func renderVolumesAndClaimTemplateSpecs(
 	clusterName string,
-	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	worker *values.SlurmWorker,
 ) (volumes []corev1.Volume, pvcTemplateSpecs []values.PVCTemplateSpec, err error) {
 	volumes = []corev1.Volume{
 		common.RenderVolumeSlurmConfigs(clusterName),
-		common.RenderVolumeMungeKey(secrets.MungeKey.Name, secrets.MungeKey.Key),
+		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeMungeSocket(),
 		renderVolumeNvidia(),
 		renderVolumeBoot(),

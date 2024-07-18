@@ -84,7 +84,7 @@ func (r SlurmClusterReconciler) getNCCLBenchmarkDependencies(
 		ctx,
 		types.NamespacedName{
 			Namespace: clusterValues.Namespace,
-			Name:      clusterValues.Secrets.MungeKey.Name,
+			Name:      naming.BuildSecretMungeKeyName(clusterValues.Name),
 		},
 		mungeKeySecret,
 	); err != nil {

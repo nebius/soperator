@@ -19,6 +19,7 @@ func (b baseComponentType) String() string {
 }
 
 var (
+	ComponentTypeCommon       ComponentType = baseComponentType{"common"}
 	ComponentTypeController   ComponentType = baseComponentType{"controller"}
 	ComponentTypeWorker       ComponentType = baseComponentType{"worker"}
 	ComponentTypeLogin        ComponentType = baseComponentType{"login"}

@@ -264,29 +264,9 @@ type VolumeSource struct {
 
 // Secrets define the [corev1.Secret] references needed for Slurm cluster operation
 type Secrets struct {
-	// MungeKey defines the [corev1.Secret] reference required for inter-server communication of Slurm nodes
-	//
-	// +kubebuilder:validation:Required
-	MungeKey SecretKey `json:"mungeKey"`
-
 	// SshdKeysName defines name of the [corev1.Secret] with ssh keys for SSHD server
 	// +kubebuilder:validation:Optional
 	SshdKeysName string `json:"sshdKeysName,omitempty"`
-}
-
-// SecretKey defines the [corev1.Secret] reference with specification of key used for content gathering
-type SecretKey struct {
-	// Name defines the name of the Slurm key secret
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name"`
-
-	// Key defines the key in the secret containing the Slurm key
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength=1
-	Key string `json:"key"`
 }
 
 // SlurmNodes define the desired state of the Slurm nodes

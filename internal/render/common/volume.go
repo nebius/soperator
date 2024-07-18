@@ -163,15 +163,15 @@ func RenderVolumeMountMungeSocket() corev1.VolumeMount {
 }
 
 // RenderVolumeMungeKey renders [corev1.Volume] containing munge key file
-func RenderVolumeMungeKey(mungeKeySecretName, mungeKeySecretKey string) corev1.Volume {
+func RenderVolumeMungeKey(clusterName string) corev1.Volume {
 	return corev1.Volume{
 		Name: consts.VolumeNameMungeKey,
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
-				SecretName: mungeKeySecretName,
+				SecretName: naming.BuildSecretMungeKeyName(clusterName),
 				Items: []corev1.KeyToPath{
 					{
-						Key:  mungeKeySecretKey,
+						Key:  consts.SecretMungeKeyFileName,
 						Path: consts.SecretMungeKeyFileName,
 						Mode: ptr.To(consts.SecretMungeKeyFileMode),
 					},

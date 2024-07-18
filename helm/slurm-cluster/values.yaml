@@ -50,14 +50,6 @@ volumeSources:
 
 # Secret references needed for Slurm cluster operation
 secrets:
-  # Secret reference required for inter-server communication of Slurm nodes
-  mungeKey:
-    # Whether to create new secret with generated values or to use provided reference
-    create: true
-    # Name of the secret to use if not creating
-    name: "munge-key"
-    # Key of the secret with Munge key data to use if not creating
-    key: "key"
   # Secret reference required for login sshd. If secret name empty - operator generate own secret with keys
   sshdKeysName: ""
 # Job performing initial jail file system population
