@@ -1,7 +1,7 @@
 package consts
 
 const (
-	SecretMungeKeyName     = "munge"
+	SecretMungeKeyName     = Munge
 	SecretMungeKeyFileName = Munge + ".key"
 	SecretMungeKeyFileMode = int32(0400)
 
