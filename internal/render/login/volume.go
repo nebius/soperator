@@ -24,7 +24,7 @@ func renderVolumesAndClaimTemplateSpecs(
 
 	volumes = []corev1.Volume{
 		common.RenderVolumeSlurmConfigs(clusterName),
-		common.RenderVolumeMungeKey(secrets.MungeKey.Name, secrets.MungeKey.Key),
+		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeMungeSocket(),
 		renderVolumeSshdKeys(sshdKeysSecretName),
 		renderVolumeSshConfigs(clusterName),

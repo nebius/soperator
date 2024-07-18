@@ -32,7 +32,7 @@ func RenderStatefulSet(
 		func(f slurmv1.K8sNodeFilter) string { return f.Name },
 	)
 
-	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecs(clusterName, secrets, volumeSources, controller)
+	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecs(clusterName, volumeSources, controller)
 	if err != nil {
 		return appsv1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}

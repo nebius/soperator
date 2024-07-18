@@ -62,7 +62,7 @@ func RenderNCCLBenchmarkCronJob(
 							RestartPolicy:         corev1.RestartPolicyNever,
 							Volumes: []corev1.Volume{
 								common.RenderVolumeSlurmConfigs(clusterName),
-								common.RenderVolumeMungeKey(secrets.MungeKey.Name, secrets.MungeKey.Key),
+								common.RenderVolumeMungeKey(clusterName),
 								common.RenderVolumeJailFromSource(volumeSources, *ncclBenchmark.VolumeJail.VolumeSourceName),
 							},
 							Containers: []corev1.Container{renderContainerNCCLBenchmark(ncclBenchmark)},

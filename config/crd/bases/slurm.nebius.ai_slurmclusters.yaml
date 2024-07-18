@@ -1371,29 +1371,10 @@ spec:
                 description: Secrets define the [corev1.Secret] references needed
                   for Slurm cluster operation
                 properties:
-                  mungeKey:
-                    description: MungeKey defines the [corev1.Secret] reference required
-                      for inter-server communication of Slurm nodes
-                    properties:
-                      key:
-                        description: Key defines the key in the secret containing
-                          the Slurm key
-                        minLength: 1
-                        type: string
-                      name:
-                        description: Name defines the name of the Slurm key secret
-                        minLength: 1
-                        type: string
-                    required:
-                    - key
-                    - name
-                    type: object
                   sshdKeysName:
                     description: SshdKeysName defines name of the [corev1.Secret]
                       with ssh keys for SSHD server
                     type: string
-                required:
-                - mungeKey
                 type: object
               slurmNodes:
                 description: SlurmNodes define the desired state of Slurm nodes

@@ -18,7 +18,6 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
-	"nebius.ai/slurm-operator/internal/values"
 )
 
 // region Sshd keys
@@ -135,16 +134,16 @@ func collectSshdKeyPairsData() (map[string][]byte, error) {
 }
 
 // RenderSSHDKeysSecret renders new [corev1.Secret] containing sshd server key pairs
-func RenderSSHDKeysSecret(cluster *values.SlurmCluster) (corev1.Secret, error) {
+func RenderSSHDKeysSecret(clusterName string, namespace string) (corev1.Secret, error) {
 	data, err := collectSshdKeyPairsData()
 	if err != nil {
 		return corev1.Secret{}, fmt.Errorf("error collecting SSHD key pairs: %w", err)
 	}
 	return corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      naming.BuildSecretSSHDKeysName(cluster.Name),
-			Namespace: cluster.Namespace,
-			Labels:    common.RenderLabels(consts.ComponentTypeLogin, cluster.Name),
+			Name:      naming.BuildSecretSSHDKeysName(clusterName),
+			Namespace: namespace,
+			Labels:    common.RenderLabels(consts.ComponentTypeLogin, clusterName),
 		},
 		Data: data,
 	}, nil

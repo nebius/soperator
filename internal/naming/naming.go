@@ -87,6 +87,13 @@ func BuildConfigMapSlurmConfigsName(clusterName string) string {
 	}.String()
 }
 
+func BuildSecretMungeKeyName(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.SecretMungeKeyName,
+	}.String()
+}
+
 // region Login
 
 func BuildConfigMapSSHConfigsName(clusterName string) string {
@@ -137,6 +144,8 @@ func BuildConfigMapSysctlName(clusterName string) string {
 
 // endregion Worker
 
+// region NCCLBenchmark
+
 func BuildCronJobNCCLBenchmarkName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,
@@ -144,12 +153,18 @@ func BuildCronJobNCCLBenchmarkName(clusterName string) string {
 	}.String()
 }
 
+// endregion NCCLBenchmark
+
+// region PopulateJailJob
+
 func BuildPopulateJailJobName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,
 		entity:      consts.JobNamePopulateJail,
 	}.String()
 }
+
+// endregion PopulateJailJob
 
 func BuildVolumeMountSpoolPath(directory string) string {
 	return path.Join(consts.VolumeMountPathSpool, directory)

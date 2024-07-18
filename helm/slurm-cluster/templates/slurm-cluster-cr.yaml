@@ -36,9 +36,6 @@ spec:
       {{- omit . "name" | toYaml | nindent 6 }}
     {{- end }}
   secrets:
-    mungeKey:
-      name: {{ include "slurm-cluster.secret.mungeKey.name" . }}
-      key: {{ include "slurm-cluster.secret.mungeKey.key" . }}
     sshdKeysName: {{ include "slurm-cluster.secret.sshdKeysName" . }}
   populateJail:
     image: {{ include "slurm-cluster.image.populateJail" . }}
