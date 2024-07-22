@@ -22,6 +22,7 @@ import (
 	"os"
 	"reflect"
 
+	"go.uber.org/zap/zapcore"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -41,10 +42,7 @@ import (
 	//+kubebuilder:scaffold:imports
 )
 
-var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
-)
+var scheme = runtime.NewScheme()
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
@@ -53,12 +51,51 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
+func getZapOpts(logFormat, logLevel string) []zap.Opts {
+	var zapOpts []zap.Opts
+
+	// Configure log format
+	if logFormat == "json" {
+		zapOpts = append(zapOpts, zap.UseDevMode(false))
+	} else {
+		zapOpts = append(zapOpts, zap.UseDevMode(true))
+	}
+
+	// Configure log level
+	var level zapcore.Level
+	switch logLevel {
+	case "debug":
+		level = zapcore.DebugLevel
+	case "info":
+		level = zapcore.InfoLevel
+	case "warn":
+		level = zapcore.WarnLevel
+	case "error":
+		level = zapcore.ErrorLevel
+	case "dpanic":
+		level = zapcore.DPanicLevel
+	case "panic":
+		level = zapcore.PanicLevel
+	case "fatal":
+		level = zapcore.FatalLevel
+	default:
+		level = zapcore.InfoLevel
+	}
+	zapOpts = append(zapOpts, zap.Level(level))
+	return zapOpts
+}
+
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
-	var secureMetrics bool
-	var enableHTTP2 bool
+	var (
+		metricsAddr          string
+		enableLeaderElection bool
+		probeAddr            string
+		secureMetrics        bool
+		enableHTTP2          bool
+		logFormat            string
+		logLevel             string
+	)
+
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -68,13 +105,13 @@ func main() {
 		"If set the metrics endpoint is served securely")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	opts := zap.Options{
-		Development: true,
-	}
-	opts.BindFlags(flag.CommandLine)
+	flag.StringVar(&logFormat, "log-format", "json", "Log format: plain or json")
+	flag.StringVar(&logLevel, "log-level", "debug", "Log level: debug, info, warn, error, dpanic, panic, fatal")
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	opts := getZapOpts(logFormat, logLevel)
+	ctrl.SetLogger(zap.New(opts...))
+	setupLog := ctrl.Log.WithName("setup")
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
