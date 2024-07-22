@@ -526,6 +526,11 @@ Required variables (e.g. a folder ID or your public SSH key) have values prefixe
 #### Step 5. Apply terraform
 Issue an IAM token for interacting with the cloud: `source ncp_auth.sh`.
 
+Authenticate in the Nebius Container Registry in order to download Helm charts:
+```
+ncp container registry configure-docker
+```
+
 Then you can start by executing `terraform plan`. It will output all resources it's going to create.
 
 If you are OK with it, execute `terraform apply`. Creating all resources usually takes ~15 min.
@@ -559,8 +564,8 @@ In order to connect to your cluster, extract its static IP address from your ter
 jq '.resources[] | select(.type == "nebius_vpc_address") | .instances[0].attributes.external_ipv4_address[0].address' terraform.tfstate
 ```
 
-Connect to the cluster by SSH: `ssh -i ~/.ssh/id_ed25519.pub <ip_of_slurm_cluster>`. You'll appear on one of the login 
-nodes.
+Connect to the cluster by SSH: `ssh -i ~/.ssh/id_ed25519.pub root@<ip_of_slurm_cluster>`. You'll appear on one of the 
+login nodes.
 
 Take a look on the list of Slurm workers: `sinfo -Nl`. Make sure they all are in `idle` state.
 
