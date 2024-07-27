@@ -69,7 +69,7 @@ run_job_on_node() {
   local drain_state=${10}
   local use_infiniband=${11}
 
-  job_exists=$(squeue --name="$job_name" --nodelist="$node" -o "%.100j" | grep -w "$job_name")
+  job_exists=$(squeue --name="$job_name" -O "ReqNodes" --noheader | grep -w "$node")
 
   if [ -n "$job_exists" ]; then
     echo "Job '$job_name' is already running on node '$node'."
@@ -79,8 +79,9 @@ run_job_on_node() {
     srun --ntasks-per-node="$ntasks_per_node" \
          --job-name="$job_name" \
          --nodelist="$node" \
-         --exclusive \
          --gpus="$num_gpus" \
+         --cpus-per-task=16 \
+         --mem-per-cpu="64GB" \
          --time="$bench_timout" \
          /usr/bin/srun_perf_run.sh -b "$min_bytes" -e "$max_bytes" -f "$step_factor" -l "$limit" -d "$drain_state" -u "$use_infiniband"
     echo "exit_code $?"
