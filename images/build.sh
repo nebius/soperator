@@ -4,7 +4,7 @@ set -e # Exit immediately if any command returns a non-zero error code
 
 usage() { echo "usage: ${0} -d <dockerfile> -t <docker-target> [-i] [-n] [-h]" >&2; exit 1; }
 
-while getopts d:t:insh flag
+while getopts d:t:inh flag
 do
     case "${flag}" in
         d) dockerfile=${OPTARG};;

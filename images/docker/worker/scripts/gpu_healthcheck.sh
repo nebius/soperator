@@ -3,7 +3,7 @@
 set -e
 
 # Run GPU healthcheck
-/usr/bin/nvidia-smi
+output=$(/usr/bin/nvidia-smi 2>&1)
 exit_code=$?
 
 current_node=$(hostname)
@@ -13,10 +13,13 @@ node_reason=$(echo "$node_info" | grep "Reason=" | awk -F'Reason=' '{print $2}')
 
 if [[ $exit_code -eq 0 ]];
   then
-    if [[ "$node_status" == "drain" && "$node_reason" == "GPUProblem" ]];
+    echo "OK"
+    if [[ "$node_status" == "drain" && "$node_reason" == "GPUHealthcheckError" ]];
       then
-        scontrol update NodeName="$current_node" State=resume Reason="Undraining after GPUProblem"
+        scontrol update NodeName="$current_node" State=resume Reason=""
     fi
 else
-  scontrol update NodeName="$current_node" State=drain Reason="GPUProblem"
+  echo "ERROR: nvidia-smi finished with exit code $exit_code"
+  echo "$output"
+  scontrol update NodeName="$current_node" State=drain Reason="GPUHealthcheckError"
 fi

@@ -8,6 +8,9 @@ The private doc targeted on solution architects is available here:  https://docs
 ### How to make a release
 
 #### Step 1. Update version in file VERSION
+
+**DO NOT SKIP THIS STEP! Otherwise, you may break someone's production.**
+
 After you started working on a new task and created a branch for it, patch the version in file [VERSION](./VERSION) by
 adding the following suffix: `-<your_name>-<short_description>`.
 
