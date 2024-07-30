@@ -26,6 +26,6 @@ if [ ! -f "$tarball" ] || [ -n "$force" ]; then
         --exclude="terraform/oldbius/.terraform.tfstate.lock.info" \
         --exclude="terraform/oldbius/terraform.tfstate" \
         --exclude="terraform/oldbius/terraform.tfstate.backup" \
-        terraform test
+        terraform/oldbius test
     echo "Created $(pwd)/$tarball"
 fi

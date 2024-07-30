@@ -37,7 +37,7 @@ checks are implemented as usual Slurm jobs - they stay in the same queue with us
 The creation process consists of the following steps.
 
 #### Step 1. Download a release of the Slurm operator
-Download tarball with the latest version from [Arcanum](https://arcanum.nebius.dev/nebo/msp/slurm-service/internal/operator/terraform-releases/stable).
+Download tarball with the latest version from [Arcanum](https://arcanum.nebius.dev/nebo/msp/slurm-service/internal/operator/terraform-releases/oldbius/stable).
 In browser, press on the file with the latest version, and then press the "Raw" button in the upper right corner.
 
 #### Step 2. Extract the tarball
