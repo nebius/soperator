@@ -13,19 +13,19 @@ do
     esac
 done
 
-mkdir -p "terraform-releases"
+mkdir -p "terraform-releases/oldbius"
 
 read -r version < ./VERSION
 version=$(echo "$version" | tr '.' '_' | tr '-' '_')
 
-tarball="terraform-releases/unstable/slurm_operator_tf_${version}.tar.gz"
+tarball="terraform-releases/oldbius/unstable/slurm_operator_tf_${version}.tar.gz"
 if [ ! -f "$tarball" ] || [ -n "$force" ]; then
     tar -czf "$tarball" \
-        --exclude="terraform/.terraform" \
-        --exclude="terraform/.terraform.lock.hcl" \
-        --exclude="terraform/.terraform.tfstate.lock.info" \
-        --exclude="terraform/terraform.tfstate" \
-        --exclude="terraform/terraform.tfstate.backup" \
+        --exclude="terraform/oldbius/.terraform" \
+        --exclude="terraform/oldbius/.terraform.lock.hcl" \
+        --exclude="terraform/oldbius/.terraform.tfstate.lock.info" \
+        --exclude="terraform/oldbius/terraform.tfstate" \
+        --exclude="terraform/oldbius/terraform.tfstate.backup" \
         terraform test
     echo "Created $(pwd)/$tarball"
 fi

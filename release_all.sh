@@ -85,7 +85,7 @@ echo "Packing new terraform tarball"
 ./release_terraform.sh
 
 echo "Unpacking the terraform tarball"
-pushd ./terraform-releases/unstable
+pushd ./terraform-releases/oldbius/unstable
     ./unpack_current_version.sh
 popd
 
@@ -97,10 +97,10 @@ GREEN='\033[0;32m'
 RESET='\033[0m'
 
 if [ $stable == "1" ]; then
-    mv "terraform-releases/unstable/$tarball" "terraform-releases/stable/"
+    mv "terraform-releases/oldbius/unstable/$tarball" "terraform-releases/oldbius/stable/"
     echo -e "${GREEN}Stable version '$version' is successfully released${RESET}"
 else
-    echo -e "${GREEN}Unstable version '$version' is successfully released and unpacked to terraform-releases/unstable/${RESET}"
+    echo -e "${GREEN}Unstable version '$version' is successfully released and unpacked to terraform-releases/oldbius/unstable/${RESET}"
 fi
 
 end_time=$(date +%s)
