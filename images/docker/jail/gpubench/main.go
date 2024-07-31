@@ -103,9 +103,9 @@ func main() {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		failExuteMsg := "Failed to execute all_reduce_perf"
-		generateEvent(ctx, currentNode, failExuteMsg, v1.EventTypeWarning, gpuBenchmarkFinished)
-		logrus.WithField("error", err).Fatal(failExuteMsg)
+		failExecuteMsg := "Failed to execute all_reduce_perf"
+		generateEvent(ctx, currentNode, failExecuteMsg, v1.EventTypeWarning, gpuBenchmarkFinished)
+		logrus.WithField("error", err).Fatal(failExecuteMsg)
 	}
 	succedExuteMsg := "Succed to execute all_reduce_perf"
 	generateEvent(ctx, currentNode, succedExuteMsg, v1.EventTypeNormal, gpuBenchmarkExecuted)
@@ -135,23 +135,17 @@ func main() {
 		logrus.Fatal("No AVG bandwidth output, test in trouble")
 	}
 
-	limitValue, err := strconv.ParseFloat(fmt.Sprintf("%f", *limit), 64)
-	if err != nil {
-		logrus.WithField("error", err).Fatal("Failed to parse limit value")
-	}
-	limitStr := strconv.FormatFloat(*limit, 'f', -1, 64) // Convert *limit to string
-
-	if avgBandwidth < limitValue {
+	if avgBandwidth < *limit {
 		succeed := 0
 		logrus.WithField("avg_bandwidth", avgBandwidth).Info(fmt.Sprintf("Avg bus bandwidth: %f", avgBandwidth))
 		messageReason := fmt.Sprintf(
-			"The GPU benchmark ended with an unsatisfactory result for the NCCL test all_reduce_perf: Avg bus bandwidth=%f, min=%s",
+			"The GPU benchmark ended with an unsatisfactory result for the NCCL test all_reduce_perf: Avg bus bandwidth=%f, min=%f",
 			avgBandwidth,
-			limitStr, // Use the converted limitStr
+			*limit, // Use the converted limitStr
 		)
 		if *drainSlurmNode == true {
 			cmd := exec.Command("scontrol", "update", "NodeName="+currentNode, "State=drain", "Reason="+messageReason)
-			_, err := cmd.Output()
+			_, err := cmd.CombinedOutput()
 			if err != nil {
 				failedDrainNodeMsg := fmt.Sprintf("Failed to drain node %s", currentNode)
 				generateEvent(ctx, currentNode, failedDrainNodeMsg, v1.EventTypeWarning, gpuBenchmarkFinished)
@@ -159,18 +153,18 @@ func main() {
 			}
 			logrus.WithField("node", currentNode).Info("Node drained with reason: ", messageReason)
 		}
-		sendMetrics(ctx, currentNode, avgBandwidth, limitValue, succeed)
+		sendMetrics(ctx, currentNode, avgBandwidth, *limit, succeed)
 		generateEvent(ctx, currentNode, messageReason, v1.EventTypeWarning, gpuBenchmarkFinished)
 		logrus.Fatal(messageReason)
 	} else {
 		succeed := 1
 		logrus.WithField("avg_bandwidth", avgBandwidth).Info(fmt.Sprintf(
-			"Avg bus bandwidth > %s: %f",
-			limitStr, // Use the converted limitStr
+			"Avg bus bandwidth > %f: %f",
+			*limit, // Use the converted limitStr
 			avgBandwidth))
 		benchmarkFinishedMsg := fmt.Sprintf("GPU benchmark finished with Avg bus bandwidth=%f", avgBandwidth)
 		logrus.WithField("avg_bandwidth", avgBandwidth).Info(benchmarkFinishedMsg)
-		sendMetrics(ctx, currentNode, avgBandwidth, limitValue, succeed)
+		sendMetrics(ctx, currentNode, avgBandwidth, *limit, succeed)
 		generateEvent(ctx, currentNode, benchmarkFinishedMsg, v1.EventTypeNormal, gpuBenchmarkFinished)
 	}
 
