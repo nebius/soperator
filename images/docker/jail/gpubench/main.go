@@ -36,6 +36,8 @@ import (
 const (
 	gpuBenchmarkFinished = "GPUBenchmarkFinished"
 	gpuBenchmarkExecuted = "GPUBenchmarkExecuted"
+	LogFormatText        = "text"
+	LogFormatJSON        = "json"
 )
 
 var (
@@ -62,18 +64,23 @@ var (
 	pushMetricsGrpc  = fs.Bool("push_metrics_grpc", false, "push metrics to opentelemetry")
 	exporterEndpoint = fs.String("exporter_endpoint", "localhost:4317", "opentelemetry exporter endpoint")
 	debugLog         = fs.Bool("debug", false, "debug log")
+	logFormat        = fs.String("log_format", LogFormatJSON, "log format (text or json)")
 )
 
 func init() {
-	logrus.SetFormatter(&logrus.JSONFormatter{})
+	_ = fs.Parse(os.Args[1:])
+
+	if *logFormat == LogFormatText {
+		logrus.SetFormatter(&logrus.TextFormatter{})
+	} else {
+		logrus.SetFormatter(&logrus.JSONFormatter{})
+	}
+
 	currentNode, err = os.Hostname()
 	if err != nil {
 		logrus.WithField("error", err).Fatal("Failed to get hostname")
 	}
-	err = fs.Parse(os.Args[1:])
-	if err != nil {
-		logrus.WithField("error", err).Fatal("Failed to parse flags")
-	}
+
 	if *debugLog {
 		logrus.SetLevel(logrus.DebugLevel)
 	} else {
