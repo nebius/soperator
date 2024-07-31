@@ -68,35 +68,6 @@ func init() {
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 }
 
-func initConn() (*grpc.ClientConn, error) {
-	// It connects the OpenTelemetry Collector through local gRPC connection.
-	conn, err := grpc.NewClient(*exporterEndpoint,
-		// TODO: add tls options in a future.
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gRPC connection to collector: %w", err)
-	}
-
-	return conn, err
-}
-
-// Initializes an OTLP exporter, and configures the corresponding meter provider.
-func initMeterProvider(ctx context.Context, res *resource.Resource, conn *grpc.ClientConn) (func(context.Context) error, error) {
-	metricExporter, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithGRPCConn(conn))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create metrics exporter: %w", err)
-	}
-
-	meterProvider := sdkmetric.NewMeterProvider(
-		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)),
-		sdkmetric.WithResource(res),
-	)
-	otel.SetMeterProvider(meterProvider)
-
-	return meterProvider.Shutdown, nil
-}
-
 func main() {
 	logrus.Info(fmt.Sprintf("Starting %s", nameNCCL))
 
@@ -204,6 +175,39 @@ func main() {
 	}
 
 }
+
+func generateEvent(ctx context.Context, currentNode, message, eventType, reason string) {
+	if *pushEvents == true {
+		onceClientset.Do(func() {
+			clientset, err = initClientset(k8sServiceHost, k8sServicePort)
+			if err != nil {
+				logrus.WithField("error", err).Fatal("Failed to create clientset")
+			}
+		})
+		event := &v1.Event{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "slurm-node-",
+				Namespace:    *namespace,
+			},
+			Reason:         reason,
+			Message:        message,
+			Type:           eventType,
+			LastTimestamp:  metav1.Now(),
+			Source:         v1.EventSource{Component: nameNCCL},
+			InvolvedObject: v1.ObjectReference{Kind: "Pod", Namespace: *namespace, Name: currentNode},
+		}
+
+		opts := metav1.CreateOptions{}
+
+		event, err := clientset.CoreV1().Events(*namespace).Create(ctx, event, opts)
+		if err != nil {
+			logrus.WithField("error", err).Error("Failed to create event")
+		}
+
+		logrus.WithField("event", event).Info("Event created")
+	}
+}
+
 func initClientset(K8SServiceHost, K8SServicePort *string) (*kubernetes.Clientset, error) {
 	var config *rest.Config
 
@@ -225,6 +229,36 @@ func initClientset(K8SServiceHost, K8SServicePort *string) (*kubernetes.Clientse
 	}
 
 	return kubernetes.NewForConfig(config)
+}
+
+func sendMetrics(ctx context.Context, slurmNode string, avgBandwidth, limitValue float64, succeed int) {
+	if *pushMetricsGrpc == false {
+		meter := getMeter(ctx)
+		commonAttrs := []attribute.KeyValue{
+			attribute.String("namespace", *namespace),
+			attribute.String("slurm_node", slurmNode),
+		}
+		avgBandwidthGauge, err := meter.Float64Gauge("slurm_jobs_avg_bandwidth", metric.WithDescription("Avg bus bandwidth"))
+		if err != nil {
+			logrus.WithField("error", err).Error("Failed to create job metric")
+		}
+		limitValueGauge, err := meter.Float64Gauge("slurm_jobs_limit_value", metric.WithDescription("Limit value"))
+		if err != nil {
+			logrus.WithField("error", err).Error("Failed to create job metric")
+		}
+		succeedGauge, err := meter.Int64Gauge("slurm_jobs_succeed", metric.WithDescription("Succeed jobs. 0 - failed, 1 - succeed"))
+		if err != nil {
+			logrus.WithField("error", err).Error("Failed to create job metric")
+		}
+		avgBandwidthGauge.Record(ctx, avgBandwidth, metric.WithAttributes(commonAttrs...))
+		logrus.WithField("avg_bandwidth", avgBandwidth).Info("Metrics sent")
+
+		limitValueGauge.Record(ctx, limitValue, metric.WithAttributes(commonAttrs...))
+		logrus.WithField("limit_value", limitValue).Info("Metrics sent")
+
+		succeedGauge.Record(ctx, int64(succeed), metric.WithAttributes(commonAttrs...))
+		logrus.WithField("succeed", succeed).Info("Metrics sent")
+	}
 }
 
 func getMeter(ctx context.Context) metric.Meter {
@@ -261,64 +295,31 @@ func getMeter(ctx context.Context) metric.Meter {
 	return meter
 }
 
-func sendMetrics(ctx context.Context, slurmNode string, avgBandwidth, limitValue float64, succeed int) {
-	if *pushMetricsGrpc == false {
-		meter := getMeter(ctx)
-		commonAttrs := []attribute.KeyValue{
-			attribute.String("namespace", *namespace),
-			attribute.String("slurm_node", slurmNode),
-		}
-		avgBandwidthGauge, err := meter.Float64Gauge("slurm_jobs_avg_bandwidth", metric.WithDescription("Avg bus bandwidth"))
-		if err != nil {
-			logrus.WithField("error", err).Error("Failed to create job metric")
-		}
-		limitValueGauge, err := meter.Float64Gauge("slurm_jobs_limit_value", metric.WithDescription("Limit value"))
-		if err != nil {
-			logrus.WithField("error", err).Error("Failed to create job metric")
-		}
-		succeedGauge, err := meter.Int64Gauge("slurm_jobs_succeed", metric.WithDescription("Succeed jobs. 0 - failed, 1 - succeed"))
-		if err != nil {
-			logrus.WithField("error", err).Error("Failed to create job metric")
-		}
-		avgBandwidthGauge.Record(ctx, avgBandwidth, metric.WithAttributes(commonAttrs...))
-		logrus.WithField("avg_bandwidth", avgBandwidth).Info("Metrics sent")
-
-		limitValueGauge.Record(ctx, limitValue, metric.WithAttributes(commonAttrs...))
-		logrus.WithField("limit_value", limitValue).Info("Metrics sent")
-
-		succeedGauge.Record(ctx, int64(succeed), metric.WithAttributes(commonAttrs...))
-		logrus.WithField("succeed", succeed).Info("Metrics sent")
+func initConn() (*grpc.ClientConn, error) {
+	// It connects the OpenTelemetry Collector through local gRPC connection.
+	conn, err := grpc.NewClient(*exporterEndpoint,
+		// TODO: add tls options in a future.
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gRPC connection to collector: %w", err)
 	}
+
+	return conn, err
 }
 
-func generateEvent(ctx context.Context, currentNode, message, eventType, reason string) {
-	if *pushEvents == true {
-		onceClientset.Do(func() {
-			clientset, err = initClientset(k8sServiceHost, k8sServicePort)
-			if err != nil {
-				logrus.WithField("error", err).Fatal("Failed to create clientset")
-			}
-		})
-		event := &v1.Event{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "slurm-node-",
-				Namespace:    *namespace,
-			},
-			Reason:         reason,
-			Message:        message,
-			Type:           eventType,
-			LastTimestamp:  metav1.Now(),
-			Source:         v1.EventSource{Component: nameNCCL},
-			InvolvedObject: v1.ObjectReference{Kind: "Pod", Namespace: *namespace, Name: currentNode},
-		}
-
-		opts := metav1.CreateOptions{}
-
-		event, err := clientset.CoreV1().Events(*namespace).Create(ctx, event, opts)
-		if err != nil {
-			logrus.WithField("error", err).Error("Failed to create event")
-		}
-
-		logrus.WithField("event", event).Info("Event created")
+// Initializes an OTLP exporter, and configures the corresponding meter provider.
+func initMeterProvider(ctx context.Context, res *resource.Resource, conn *grpc.ClientConn) (func(context.Context) error, error) {
+	metricExporter, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithGRPCConn(conn))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create metrics exporter: %w", err)
 	}
+
+	meterProvider := sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)),
+		sdkmetric.WithResource(res),
+	)
+	otel.SetMeterProvider(meterProvider)
+
+	return meterProvider.Shutdown, nil
 }
