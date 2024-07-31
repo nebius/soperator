@@ -109,10 +109,10 @@ func main() {
 	}
 	succedExuteMsg := "Succed to execute all_reduce_perf"
 	generateEvent(ctx, currentNode, succedExuteMsg, v1.EventTypeNormal, gpuBenchmarkExecuted)
-	logrus.WithField("output", succedExuteMsg).Info(gpuBenchmarkExecuted)
+	logrus.Info(succedExuteMsg)
 
 	perfOutput := string(output)
-	logrus.WithField("output", perfOutput).Info(gpuBenchmarkExecuted)
+	logrus.Info(perfOutput)
 
 	lines := strings.Split(perfOutput, "\n")
 	var avgBandwidth float64
