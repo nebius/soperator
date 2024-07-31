@@ -48,8 +48,7 @@ var (
 	clientset     *kubernetes.Clientset
 	onceClientset sync.Once
 
-	fs = flag.NewFlagSet("flag", flag.ExitOnError)
-
+	fs               = flag.NewFlagSet("flag", flag.ExitOnError)
 	minBytes         = fs.String("min_bytes", "512M", "minimum size to start with")
 	maxBytes         = fs.String("max_bytes", "8G", "maximum size to end at")
 	stepFactor       = fs.Int("step_factor", 2, "multiplication factor between sizes")
@@ -130,25 +129,7 @@ func main() {
 	log.Debug(perfOutput)
 
 	lines := strings.Split(perfOutput, "\n")
-	var avgBandwidth float64
-
-	foundLine := false
-	for _, line := range lines {
-		if strings.Contains(line, "Avg bus bandwidth") {
-			parts := strings.Fields(line)
-			avgBandwidth, err = strconv.ParseFloat(parts[len(parts)-1], 64)
-			if err != nil {
-				noOutput := "No AVG bandwidth output, test in trouble"
-				generateEvent(ctx, currentNode, noOutput, v1.EventTypeWarning, gpuBenchmarkFinished)
-				log.WithField("error", err).Fatal(noOutput)
-			}
-			foundLine = true
-			break
-		}
-	}
-	if !foundLine {
-		log.Fatal("No AVG bandwidth output, test in trouble")
-	}
+	avgBandwidth := getAvgBandwidth(ctx, lines)
 
 	if avgBandwidth < *limit {
 		succeed := 0
@@ -159,14 +140,7 @@ func main() {
 			*limit, // Use the converted limitStr
 		)
 		if *drainSlurmNode == true {
-			cmd := exec.Command("scontrol", "update", "NodeName="+currentNode, "State=drain", "Reason="+messageReason)
-			_, err := cmd.CombinedOutput()
-			if err != nil {
-				failedDrainNodeMsg := fmt.Sprintf("Failed to drain node %s", currentNode)
-				generateEvent(ctx, currentNode, failedDrainNodeMsg, v1.EventTypeWarning, gpuBenchmarkFinished)
-				log.WithField("error", err).Fatal(failedDrainNodeMsg)
-			}
-			log.WithField("node", currentNode).Info("Node drained with reason: ", messageReason)
+			drainNode(ctx, currentNode, messageReason)
 		}
 		sendMetrics(ctx, currentNode, avgBandwidth, *limit, succeed)
 		generateEvent(ctx, currentNode, messageReason, v1.EventTypeWarning, gpuBenchmarkFinished)
@@ -230,6 +204,40 @@ func generateEvent(ctx context.Context, currentNode, message, eventType, reason 
 
 		log.WithField("event", event).Debug("Event created")
 	}
+}
+
+func getAvgBandwidth(ctx context.Context, lines []string) float64 {
+	var avgBandwidth float64
+
+	foundLine := false
+	for _, line := range lines {
+		if strings.Contains(line, "Avg bus bandwidth") {
+			parts := strings.Fields(line)
+			avgBandwidth, err = strconv.ParseFloat(parts[len(parts)-1], 64)
+			if err != nil {
+				noOutput := "No AVG bandwidth output, test in trouble"
+				generateEvent(ctx, currentNode, noOutput, v1.EventTypeWarning, "NoAVGBandwidthOutput")
+				log.WithField("error", err).Fatal(noOutput)
+			}
+			foundLine = true
+			break
+		}
+	}
+	if !foundLine {
+		log.Fatal("No AVG bandwidth output, test in trouble")
+	}
+	return avgBandwidth
+}
+
+func drainNode(ctx context.Context, slurmNode, messageReason string) {
+	cmd := exec.Command("scontrol", "update", "NodeName="+currentNode, "State=drain", "Reason="+messageReason)
+	_, err := cmd.CombinedOutput()
+	if err != nil {
+		failedDrainNodeMsg := fmt.Sprintf("Failed to drain node %s", currentNode)
+		generateEvent(ctx, currentNode, failedDrainNodeMsg, v1.EventTypeWarning, "FailedDrainSlurmNode")
+		log.WithField("error", err).Fatal(failedDrainNodeMsg)
+	}
+	log.WithField("node", currentNode).Info("Node drained with reason: ", messageReason)
 }
 
 func initClientset(K8SServiceHost *string, K8SServicePort *int) (*kubernetes.Clientset, error) {

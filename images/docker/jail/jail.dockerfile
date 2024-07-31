@@ -1,3 +1,17 @@
+# First stage: Build the gpubench application
+FROM golang:1.22 AS gpubench_builder
+
+WORKDIR /app
+
+COPY ./gpubench/go.mod ./gpubench/go.sum ./
+
+RUN go mod download
+
+COPY ./gpubench/main.go .
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o gpubench .
+
+
 FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu20.04 as jail
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -114,9 +128,8 @@ RUN dpkg -i /tmp/libnccl2_2.22.3-1+cuda12.2_amd64.deb && \
 # Copy NCCL tests executables
 COPY --from=nccl_tests /usr/src/nccl-tests/build/*_perf /usr/bin/
 
-# Copy script that performs GPU benchmark
-COPY docker/jail/scripts/srun_perf_run.sh /usr/bin/srun_perf_run.sh
-RUN chmod +x /usr/bin/srun_perf_run.sh
+# Copy binary that performs GPU benchmark
+COPY --from=gpubench_builder /app/gpubench /usr/bin/
 
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host
