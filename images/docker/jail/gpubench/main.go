@@ -130,7 +130,7 @@ func main() {
 		"-g", gpuCount,
 	)
 
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		failExuteMsg := "Failed to execute all_reduce_perf"
 		generateEvent(ctx, currentNode, failExuteMsg, v1.EventTypeWarning, gpuBenchmarkFinished)
