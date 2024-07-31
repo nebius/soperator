@@ -36,8 +36,8 @@ import (
 const (
 	gpuBenchmarkFinished = "GPUBenchmarkFinished"
 	gpuBenchmarkExecuted = "GPUBenchmarkExecuted"
-	LogFormatText        = "text"
-	LogFormatJSON        = "json"
+	logFormatText        = "text"
+	logFormatJSON        = "json"
 )
 
 var (
@@ -64,17 +64,17 @@ var (
 	pushMetricsGrpc  = fs.Bool("push_metrics_grpc", false, "push metrics to opentelemetry")
 	exporterEndpoint = fs.String("exporter_endpoint", "localhost:4317", "opentelemetry exporter endpoint")
 	debugLog         = fs.Bool("debug", false, "debug log")
-	logFormat        = fs.String("log_format", LogFormatJSON, "log format (text or json)")
+	logFormat        = fs.String("log_format", logFormatJSON, "log format (text or json)")
 )
 
 func init() {
 	_ = fs.Parse(os.Args[1:])
 
-	if *logFormat != LogFormatText && *logFormat != LogFormatJSON {
+	if *logFormat != logFormatText && *logFormat != logFormatJSON {
 		logrus.WithField("logFormat", *logFormat).Fatal("Invalid log format")
 	}
 
-	if *logFormat == LogFormatText {
+	if *logFormat == logFormatText {
 		logrus.SetFormatter(&logrus.TextFormatter{})
 	} else {
 		logrus.SetFormatter(&logrus.JSONFormatter{})
