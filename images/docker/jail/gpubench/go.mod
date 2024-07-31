@@ -1,10 +1,11 @@
-module nebius.ai/slurm-operator/srun-perf
+module nebius.ai/slurm-operator/gpubench
 
 go 1.22.0
 
 toolchain go1.22.5
 
 require (
+	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/sirupsen/logrus v1.9.3
 	k8s.io/api v0.30.2
 	k8s.io/apimachinery v0.30.2

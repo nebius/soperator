@@ -34,6 +34,6 @@ echo "Start NCCL test benchmark"
     -l "$THRESHOLD_MORE_THAN" \
     -d "$DRAIN_SLURM_STATE" \
     -u "$USE_INFINIBAND" \
-    -y "$K8S_NAMESPACE" \
-    -x "$KUBERNETES_SERVICE_HOST" \
-    -z "$KUBERNETES_SERVICE_PORT"
+    -n "$K8S_NAMESPACE" \
+    -h "$KUBERNETES_SERVICE_HOST" \
+    -p "$KUBERNETES_SERVICE_PORT"
