@@ -146,6 +146,7 @@ func main() {
 	lines := strings.Split(perfOutput, "\n")
 	var avgBandwidth float64
 
+	foundLine := false
 	for _, line := range lines {
 		if strings.Contains(line, "Avg bus bandwidth") {
 			parts := strings.Fields(line)
@@ -155,8 +156,12 @@ func main() {
 				generateEvent(ctx, currentNode, noOutput, v1.EventTypeWarning, gpuBenchmarkFinished)
 				logrus.WithField("error", err).Fatal(noOutput)
 			}
+			foundLine = true
 			break
 		}
+	}
+	if !foundLine {
+		logrus.Fatal("No AVG bandwidth output, test in trouble")
 	}
 
 	limitValue, err := strconv.ParseFloat(fmt.Sprintf("%f", *limit), 64)
