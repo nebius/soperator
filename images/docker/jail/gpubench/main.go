@@ -70,6 +70,10 @@ var (
 func init() {
 	_ = fs.Parse(os.Args[1:])
 
+	if *logFormat != LogFormatText && *logFormat != LogFormatJSON {
+		logrus.WithField("logFormat", *logFormat).Fatal("Invalid log format")
+	}
+
 	if *logFormat == LogFormatText {
 		logrus.SetFormatter(&logrus.TextFormatter{})
 	} else {
