@@ -233,11 +233,11 @@ func drainNode(ctx context.Context, slurmNode, messageReason string) {
 	cmd := exec.Command("scontrol", "update", "NodeName="+currentNode, "State=drain", "Reason="+messageReason)
 	_, err := cmd.CombinedOutput()
 	if err != nil {
-		failedDrainNodeMsg := fmt.Sprintf("Failed to drain node %s", currentNode)
-		generateEvent(ctx, currentNode, failedDrainNodeMsg, v1.EventTypeWarning, "FailedDrainSlurmNode")
+		failedDrainNodeMsg := fmt.Sprintf("Failed to drain node %s", slurmNode)
+		generateEvent(ctx, slurmNode, failedDrainNodeMsg, v1.EventTypeWarning, "FailedDrainSlurmNode")
 		log.WithField("error", err).Fatal(failedDrainNodeMsg)
 	}
-	log.WithField("node", currentNode).Info("Node drained with reason: ", messageReason)
+	log.WithField("node", slurmNode).Info("Node drained with reason: ", messageReason)
 }
 
 func initClientset(K8SServiceHost *string, K8SServicePort *int) (*kubernetes.Clientset, error) {
