@@ -11,7 +11,8 @@ COPY ./gpubench/main.go .
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o gpubench .
 
-
+######################################
+# Second stage: Build the NCCL tests
 FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu20.04 as jail
 
 ARG DEBIAN_FRONTEND=noninteractive
