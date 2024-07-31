@@ -9,7 +9,7 @@ RUN go mod download
 
 COPY ./gpubench/main.go .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o gpubench .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o gpubench .
 
 ######################################
 # Second stage: Build the NCCL tests
