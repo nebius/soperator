@@ -2,7 +2,7 @@
 
 set -e
 
-while getopts ":b:e:f:g:t:l:d:u:" opt; do
+while getopts ":b:e:f:g:t:l:d:u:x:z:y:" opt; do
   case ${opt} in
     b )
       min_bytes=$OPTARG
@@ -27,6 +27,15 @@ while getopts ":b:e:f:g:t:l:d:u:" opt; do
       ;;
     u )
       use_infiniband=$OPTARG
+      ;;
+    x )
+      kubernetes_service_host=$OPTARG
+      ;;
+    z )
+      kubernetes_service_port=$OPTARG
+      ;;
+    y )
+      namespace=$OPTARG
       ;;
     \? )
       echo "Invalid option: $OPTARG" 1>&2
@@ -83,7 +92,7 @@ run_job_on_node() {
          --cpus-per-task=16 \
          --mem-per-cpu="64GB" \
          --time="$bench_timout" \
-         /usr/bin/srun_perf_run.sh -b "$min_bytes" -e "$max_bytes" -f "$step_factor" -l "$limit" -d "$drain_state" -u "$use_infiniband"
+         /usr/bin/srun-perf -b "$min_bytes" -e "$max_bytes" -f "$step_factor" -l "$limit" -d "$drain_state" -u "$use_infiniband" -namespace "$namespace" -service_host "$kubernetes_service_host" -service_host "$kubernetes_service_port"
     echo "exit_code $?"
   fi
 }
