@@ -171,7 +171,7 @@ func main() {
 	limitStr := strconv.FormatFloat(*limit, 'f', -1, 64) // Convert *limit to string
 
 	if avgBandwidth < limitValue {
-		succeed := 1
+		succeed := 0
 		logrus.WithField("avg_bandwidth", avgBandwidth).Info(fmt.Sprintf("Avg bus bandwidth: %f", avgBandwidth))
 		messageReason := fmt.Sprintf(
 			"The GPU benchmark ended with an unsatisfactory result for the NCCL test all_reduce_perf: Avg bus bandwidth=%f, min=%s",
@@ -192,7 +192,7 @@ func main() {
 		generateEvent(ctx, currentNode, messageReason, v1.EventTypeWarning, gpuBenchmarkFinished)
 		logrus.Fatal(messageReason)
 	} else {
-		succeed := 0
+		succeed := 1
 		logrus.WithField("avg_bandwidth", avgBandwidth).Info(fmt.Sprintf(
 			"Avg bus bandwidth > %s: %f",
 			limitStr, // Use the converted limitStr
@@ -276,7 +276,7 @@ func sendMetrics(ctx context.Context, slurmNode string, avgBandwidth, limitValue
 		if err != nil {
 			logrus.WithField("error", err).Error("Failed to create job metric")
 		}
-		succeedGauge, err := meter.Int64Gauge("slurm_jobs_succeed", metric.WithDescription("Succeed jobs. 1 - failed, 0 - succeed"))
+		succeedGauge, err := meter.Int64Gauge("slurm_jobs_succeed", metric.WithDescription("Succeed jobs. 0 - failed, 1 - succeed"))
 		if err != nil {
 			logrus.WithField("error", err).Error("Failed to create job metric")
 		}
