@@ -173,16 +173,16 @@ sync-version: ## Sync versions from file
 	@sed -i '' -e "s/CONTAINER_REGISTRY_ID=[^ ]*/CONTAINER_REGISTRY_ID='$(CONTAINER_REGISTRY_HELM_ID)'/" release_helm.sh
 	@# endregion release_helm.sh
 
-	@# region terraform/terraform.tfvars.example
-	@echo 'Syncing terraform/terraform.tfvars.example'
-	@sed -i '' -e 's/slurm_operator_version = "[^ ]*/slurm_operator_version = "$(VERSION)"/' terraform/terraform.tfvars.example
-	@# endregion terraform/terraform.tfvars.example
+	@# region terraform/oldbius/terraform.tfvars.example
+	@echo 'Syncing terraform/oldbius/terraform.tfvars.example'
+	@sed -i '' -e 's/slurm_operator_version = "[^ ]*/slurm_operator_version = "$(VERSION)"/' terraform/oldbius/terraform.tfvars.example
+	@# endregion terraform/oldbius/terraform.tfvars.example
 
-	@# region terraform/slurm_cluster_variables.tf
-	@echo 'Syncing terraform/slurm_cluster_variables.tf'
-	@sed -i '' -e 's/default *= *"0.1.[^ ]*/default = "$(VERSION)"/' terraform/slurm_cluster_variables.tf
-	@terraform fmt terraform/slurm_cluster_variables.tf
-	@# endregion terraform/slurm_cluster_variables.tf
+	@# region terraform/oldbius/slurm_cluster_variables.tf
+	@echo 'Syncing terraform/oldbius/slurm_cluster_variables.tf'
+	@sed -i '' -e 's/default *= *"0.1.[^ ]*/default = "$(VERSION)"/' terraform/oldbius/slurm_cluster_variables.tf
+	@terraform fmt terraform/oldbius/slurm_cluster_variables.tf
+	@# endregion terraform/oldbius/slurm_cluster_variables.tf
 
 ##@ Build
 
