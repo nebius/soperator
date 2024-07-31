@@ -3,11 +3,11 @@ FROM golang:1.22 AS gpubench_builder
 
 WORKDIR /app
 
-COPY ./gpubench/go.mod ./gpubench/go.sum ./
+COPY docker/jail/gpubench/go.mod docker/jail/gpubench/go.sum ./
 
 RUN go mod download
 
-COPY ./gpubench/main.go .
+COPY docker/jail/gpubench/main.go .
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o gpubench .
 
