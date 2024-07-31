@@ -37,3 +37,7 @@ echo "Start NCCL test benchmark"
     -n "$K8S_NAMESPACE" \
     -h "$KUBERNETES_SERVICE_HOST" \
     -p "$KUBERNETES_SERVICE_PORT"
+    -s "f" \
+    -m "f" \
+    -c "localhost:4317"
+# flags: -s "f" -m "f" -c "localhost:4317" will be replaced by the actual values in the future

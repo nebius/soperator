@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -41,46 +40,60 @@ const (
 
 var (
 	err error
+	log *logrus.Entry
 
-	nameNCCL = "nccl-benchmark"
-
-	onceMeter sync.Once
-	meter     metric.Meter
+	nameNCCL    = "nccl-benchmark"
+	currentNode string
 
 	clientset     *kubernetes.Clientset
 	onceClientset sync.Once
 
-	stepFactor       = flag.Int("step_factor", 2, "multiplication factor between sizes")
-	limit            = flag.Float64("limit", 420, "limit")
-	minBytes         = flag.String("min_bytes", "512M", "minimum size to start with")
-	maxBytes         = flag.String("max_bytes", "8G", "maximum size to end at")
-	useInfiniband    = flag.String("use_infiniband", "", "use infiniband for NCCL")
-	namespace        = flag.String("namespace", "default", "kubernetes n amespace")
-	k8sServiceHost   = flag.String("service_host", "kubernetes.default.svc", "kubernetes kube apiserver host")
-	k8sServicePort   = flag.String("service_port", "443", "kubernetes kube apiserver port")
-	drainSlurmNode   = flag.Bool("drain_state", false, "drain slurm node")
-	pushEvents       = flag.Bool("push_events", false, "push events to kubernetes")
-	pushMetricsGrpc  = flag.Bool("push_metrics_grpc", false, "push metrics to opentelemetry")
-	exporterEndpoint = flag.String("exporter_endpoint", "localhost:4317", "opentelemetry exporter endpoint")
+	fs = flag.NewFlagSet("flag", flag.ExitOnError)
+
+	minBytes         = fs.String("min_bytes", "512M", "minimum size to start with")
+	maxBytes         = fs.String("max_bytes", "8G", "maximum size to end at")
+	stepFactor       = fs.Int("step_factor", 2, "multiplication factor between sizes")
+	limit            = fs.Float64("limit", 420, "limit")
+	useInfiniband    = fs.Bool("use_infiniband", false, "use infiniband for NCCL")
+	drainSlurmNode   = fs.Bool("drain_state", false, "drain slurm node")
+	namespace        = fs.String("namespace", "default", "kubernetes namespace")
+	k8sServiceHost   = fs.String("kube_service_host", "kubernetes.default.svc", "kubernetes kube apiserver host")
+	k8sServicePort   = fs.Int("kube_service_port", 443, "kubernetes kube apiserver port")
+	pushEvents       = fs.Bool("push_events", false, "push events to kubernetes")
+	pushMetricsGrpc  = fs.Bool("push_metrics_grpc", false, "push metrics to opentelemetry")
+	exporterEndpoint = fs.String("exporter_endpoint", "localhost:4317", "opentelemetry exporter endpoint")
+	debugLog         = fs.Bool("debug", false, "debug log")
 )
 
 func init() {
 	logrus.SetFormatter(&logrus.JSONFormatter{})
-}
-
-func main() {
-	logrus.Info(fmt.Sprintf("Starting %s", nameNCCL))
-
-	flag.Parse()
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer cancel()
-
-	currentNode, err := os.Hostname()
+	currentNode, err = os.Hostname()
 	if err != nil {
 		logrus.WithField("error", err).Fatal("Failed to get hostname")
 	}
+	err = fs.Parse(os.Args[1:])
+	if err != nil {
+		logrus.WithField("error", err).Fatal("Failed to parse flags")
+	}
+	if *debugLog {
+		logrus.SetLevel(logrus.DebugLevel)
+	} else {
+		logrus.SetLevel(logrus.InfoLevel)
+	}
+	log = logrus.WithField("slurmNode", currentNode)
+}
 
-	if *useInfiniband == "true" {
+func main() {
+	log.Info(fmt.Sprintf("Starting %s", nameNCCL))
+	if *debugLog {
+		debugFlags()
+	}
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	if *useInfiniband {
+		log.Debug("Using Infiniband for NCCL")
 		os.Setenv("NCCL_P2P_DISABLE", "1")
 		os.Setenv("NCCL_SHM_DISABLE", "1")
 		os.Setenv("NCCL_ALGO", "Ring")
@@ -88,11 +101,12 @@ func main() {
 
 	gpuCount := os.Getenv("SLURM_GPUS")
 	if gpuCount == "" {
-		logrus.Fatal("Empty SLURM_GPUS")
+		log.Fatal("Empty SLURM_GPUS")
 	}
 
 	stepFactorStr := strconv.Itoa(*stepFactor) // Convert StepFactor to string for exec.Command
 
+	log.Debug("Starting all_reduce_perf")
 	cmd := exec.Command(
 		"/usr/bin/all_reduce_perf",
 		"-b", *minBytes,
@@ -101,18 +115,19 @@ func main() {
 		"-g", gpuCount,
 	)
 
+	log.Debug("Executing all_reduce_perf")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		failExecuteMsg := "Failed to execute all_reduce_perf"
 		generateEvent(ctx, currentNode, failExecuteMsg, v1.EventTypeWarning, gpuBenchmarkFinished)
-		logrus.WithField("error", err).Fatal(failExecuteMsg)
+		log.WithField("error", err).Fatal(failExecuteMsg)
 	}
 	succedExuteMsg := "Succed to execute all_reduce_perf"
 	generateEvent(ctx, currentNode, succedExuteMsg, v1.EventTypeNormal, gpuBenchmarkExecuted)
-	logrus.Info(succedExuteMsg)
+	log.Info(succedExuteMsg)
 
 	perfOutput := string(output)
-	logrus.Info(perfOutput)
+	log.Debug(perfOutput)
 
 	lines := strings.Split(perfOutput, "\n")
 	var avgBandwidth float64
@@ -125,19 +140,19 @@ func main() {
 			if err != nil {
 				noOutput := "No AVG bandwidth output, test in trouble"
 				generateEvent(ctx, currentNode, noOutput, v1.EventTypeWarning, gpuBenchmarkFinished)
-				logrus.WithField("error", err).Fatal(noOutput)
+				log.WithField("error", err).Fatal(noOutput)
 			}
 			foundLine = true
 			break
 		}
 	}
 	if !foundLine {
-		logrus.Fatal("No AVG bandwidth output, test in trouble")
+		log.Fatal("No AVG bandwidth output, test in trouble")
 	}
 
 	if avgBandwidth < *limit {
 		succeed := 0
-		logrus.WithField("avg_bandwidth", avgBandwidth).Info(fmt.Sprintf("Avg bus bandwidth: %f", avgBandwidth))
+		log.WithField("avg_bandwidth", avgBandwidth).Info(fmt.Sprintf("Avg bus bandwidth: %f", avgBandwidth))
 		messageReason := fmt.Sprintf(
 			"The GPU benchmark ended with an unsatisfactory result for the NCCL test all_reduce_perf: Avg bus bandwidth=%f, min=%f",
 			avgBandwidth,
@@ -149,25 +164,40 @@ func main() {
 			if err != nil {
 				failedDrainNodeMsg := fmt.Sprintf("Failed to drain node %s", currentNode)
 				generateEvent(ctx, currentNode, failedDrainNodeMsg, v1.EventTypeWarning, gpuBenchmarkFinished)
-				logrus.WithField("error", err).Fatal(failedDrainNodeMsg)
+				log.WithField("error", err).Fatal(failedDrainNodeMsg)
 			}
-			logrus.WithField("node", currentNode).Info("Node drained with reason: ", messageReason)
+			log.WithField("node", currentNode).Info("Node drained with reason: ", messageReason)
 		}
 		sendMetrics(ctx, currentNode, avgBandwidth, *limit, succeed)
 		generateEvent(ctx, currentNode, messageReason, v1.EventTypeWarning, gpuBenchmarkFinished)
-		logrus.Fatal(messageReason)
+		log.Fatal(messageReason)
 	} else {
 		succeed := 1
-		logrus.WithField("avg_bandwidth", avgBandwidth).Info(fmt.Sprintf(
+		log.WithField("avg_bandwidth", avgBandwidth).Info(fmt.Sprintf(
 			"Avg bus bandwidth > %f: %f",
 			*limit, // Use the converted limitStr
 			avgBandwidth))
 		benchmarkFinishedMsg := fmt.Sprintf("GPU benchmark finished with Avg bus bandwidth=%f", avgBandwidth)
-		logrus.WithField("avg_bandwidth", avgBandwidth).Info(benchmarkFinishedMsg)
+		log.WithField("avg_bandwidth", avgBandwidth).Info(benchmarkFinishedMsg)
 		sendMetrics(ctx, currentNode, avgBandwidth, *limit, succeed)
 		generateEvent(ctx, currentNode, benchmarkFinishedMsg, v1.EventTypeNormal, gpuBenchmarkFinished)
 	}
+}
 
+func debugFlags() {
+	log.WithField("min_bytes", *minBytes).Debug("Flag min_bytes")
+	log.WithField("max_bytes", *maxBytes).Debug("Flag max_bytes")
+	log.WithField("step_factor", *stepFactor).Debug("Flag step_factor")
+	log.WithField("limit", *limit).Debug("Flag limit")
+	log.WithField("use_infiniband", *useInfiniband).Debug("Flag use_infiniband")
+	log.WithField("drain_state", *drainSlurmNode).Debug("Flag drain_state")
+	log.WithField("namespace", *namespace).Debug("Flag namespace")
+	log.WithField("kube_service_host", *k8sServiceHost).Debug("Flag kube_service_host")
+	log.WithField("kube_service_port", *k8sServicePort).Debug("Flag kube_service_port")
+	log.WithField("push_events", *pushEvents).Debug("Flag push_events")
+	log.WithField("push_metrics_grpc", *pushMetricsGrpc).Debug("Flag push_metrics_grpc")
+	log.WithField("exporter_endpoint", *exporterEndpoint).Debug("Flag exporter_endpoint")
+	log.WithField("debug", *debugLog).Debug("Flag debug")
 }
 
 func generateEvent(ctx context.Context, currentNode, message, eventType, reason string) {
@@ -175,7 +205,7 @@ func generateEvent(ctx context.Context, currentNode, message, eventType, reason 
 		onceClientset.Do(func() {
 			clientset, err = initClientset(k8sServiceHost, k8sServicePort)
 			if err != nil {
-				logrus.WithField("error", err).Fatal("Failed to create clientset")
+				log.WithField("error", err).Fatal("Failed to create clientset")
 			}
 		})
 		event := &v1.Event{
@@ -195,30 +225,30 @@ func generateEvent(ctx context.Context, currentNode, message, eventType, reason 
 
 		event, err := clientset.CoreV1().Events(*namespace).Create(ctx, event, opts)
 		if err != nil {
-			logrus.WithField("error", err).Error("Failed to create event")
+			log.WithField("error", err).Error("Failed to create event")
 		}
 
-		logrus.WithField("event", event).Info("Event created")
+		log.WithField("event", event).Debug("Event created")
 	}
 }
 
-func initClientset(K8SServiceHost, K8SServicePort *string) (*kubernetes.Clientset, error) {
+func initClientset(K8SServiceHost *string, K8SServicePort *int) (*kubernetes.Clientset, error) {
 	var config *rest.Config
 
 	if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); os.IsNotExist(err) {
 		os.Setenv("KUBERNETES_SERVICE_HOST", *K8SServiceHost)
-		os.Setenv("KUBERNETES_SERVICE_PORT", *K8SServicePort)
+		os.Setenv("KUBERNETES_SERVICE_PORT", strconv.Itoa(*K8SServicePort))
 		// In-cluster config
 		config, err = rest.InClusterConfig()
 		if err != nil {
-			logrus.WithField("error", err).Fatal("Failed to get in-cluster config")
+			log.WithField("error", err).Fatal("Failed to get in-cluster config")
 		}
 	} else {
 		// Out-of-cluster config
 		kubeconfig := filepath.Join(os.Getenv("HOME"), ".kube", "config")
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
-			logrus.WithField("error", err).Fatal("Failed to get out-of-cluster config")
+			log.WithField("error", err).Fatal("Failed to get out-of-cluster config")
 		}
 	}
 
@@ -226,37 +256,9 @@ func initClientset(K8SServiceHost, K8SServicePort *string) (*kubernetes.Clientse
 }
 
 func sendMetrics(ctx context.Context, slurmNode string, avgBandwidth, limitValue float64, succeed int) {
-	if *pushMetricsGrpc == false {
-		meter := getMeter(ctx)
-		commonAttrs := []attribute.KeyValue{
-			attribute.String("namespace", *namespace),
-			attribute.String("slurm_node", slurmNode),
-		}
-		avgBandwidthGauge, err := meter.Float64Gauge("slurm_jobs_avg_bandwidth", metric.WithDescription("Avg bus bandwidth"))
-		if err != nil {
-			logrus.WithField("error", err).Error("Failed to create job metric")
-		}
-		limitValueGauge, err := meter.Float64Gauge("slurm_jobs_limit_value", metric.WithDescription("Limit value"))
-		if err != nil {
-			logrus.WithField("error", err).Error("Failed to create job metric")
-		}
-		succeedGauge, err := meter.Int64Gauge("slurm_jobs_succeed", metric.WithDescription("Succeed jobs. 0 - failed, 1 - succeed"))
-		if err != nil {
-			logrus.WithField("error", err).Error("Failed to create job metric")
-		}
-		avgBandwidthGauge.Record(ctx, avgBandwidth, metric.WithAttributes(commonAttrs...))
-		logrus.WithField("avg_bandwidth", avgBandwidth).Info("Metrics sent")
+	if *pushMetricsGrpc == true {
+		log.WithField("avg_bandwidth", avgBandwidth).Debug("Sending metrics")
 
-		limitValueGauge.Record(ctx, limitValue, metric.WithAttributes(commonAttrs...))
-		logrus.WithField("limit_value", limitValue).Info("Metrics sent")
-
-		succeedGauge.Record(ctx, int64(succeed), metric.WithAttributes(commonAttrs...))
-		logrus.WithField("succeed", succeed).Info("Metrics sent")
-	}
-}
-
-func getMeter(ctx context.Context) metric.Meter {
-	onceMeter.Do(func() {
 		serviceName := semconv.ServiceNameKey.String(nameNCCL)
 
 		conn, err := initConn()
@@ -274,7 +276,7 @@ func getMeter(ctx context.Context) metric.Meter {
 			log.Fatal(err)
 		}
 
-		meter = otel.Meter(nameNCCL)
+		meter := otel.Meter(nameNCCL)
 		shutdownMeterProvider, err := initMeterProvider(ctx, res, conn)
 		if err != nil {
 			log.Fatal(err)
@@ -285,8 +287,34 @@ func getMeter(ctx context.Context) metric.Meter {
 				log.Fatalf("failed to shutdown MeterProvider: %s", err)
 			}
 		}()
-	})
-	return meter
+
+		commonAttrs := []attribute.KeyValue{
+			attribute.String("namespace", *namespace),
+			attribute.String("slurm_node", slurmNode),
+		}
+
+		avgBandwidthGauge, err := meter.Float64Gauge("slurm_job_nccl_benchmark_avg_bandwidth", metric.WithDescription("Avg bus bandwidth"))
+		if err != nil {
+			log.WithField("error", err).Error("Failed to create job metric")
+		}
+		limitValueGauge, err := meter.Float64Gauge("slurm_job_nccl_benchmark_limit_value", metric.WithDescription("Limit value"))
+		if err != nil {
+			log.WithField("error", err).Error("Failed to create job metric")
+		}
+		succeedGauge, err := meter.Int64Gauge("slurm_job_nccl_benchmark_succeed", metric.WithDescription("Succeed jobs. 0 - failed, 1 - succeed"))
+		if err != nil {
+			log.WithField("error", err).Error("Failed to create job metric")
+		}
+
+		avgBandwidthGauge.Record(ctx, avgBandwidth, metric.WithAttributes(commonAttrs...))
+		log.WithField("avg_bandwidth", avgBandwidth).Info("Metrics sent")
+
+		limitValueGauge.Record(ctx, limitValue, metric.WithAttributes(commonAttrs...))
+		log.WithField("limit_value", limitValue).Info("Metrics sent")
+
+		succeedGauge.Record(ctx, int64(succeed), metric.WithAttributes(commonAttrs...))
+		log.WithField("succeed", succeed).Info("Metrics sent")
+	}
 }
 
 func initConn() (*grpc.ClientConn, error) {
