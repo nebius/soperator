@@ -36,7 +36,7 @@ echo "Start NCCL test benchmark"
     -u "$USE_INFINIBAND" \
     -n "$K8S_NAMESPACE" \
     -h "$KUBERNETES_SERVICE_HOST" \
-    -p "$KUBERNETES_SERVICE_PORT"
+    -p "$KUBERNETES_SERVICE_PORT" \
     -s "f" \
     -m "f" \
     -c "localhost:4317"
