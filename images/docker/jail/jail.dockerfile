@@ -56,7 +56,9 @@ RUN apt update && \
         zstd \
         pciutils \
         iproute2 \
-        infiniband-diags
+        infiniband-diags \
+        libncurses5-dev \
+        libdrm-dev
 
 # Install python
 COPY docker/common/scripts/install_python.sh /opt/bin/
@@ -119,6 +121,12 @@ COPY docker/common/scripts/install_container_toolkit.sh /opt/bin/
 RUN chmod +x /opt/bin/install_container_toolkit.sh && \
     /opt/bin/install_container_toolkit.sh && \
     rm /opt/bin/install_container_toolkit.sh
+
+# Install nvtop GPU monitoring utility
+COPY docker/common/scripts/install_nvtop.sh /opt/bin/
+RUN chmod +x /opt/bin/install_nvtop.sh && \
+    /opt/bin/install_nvtop.sh && \
+    rm /opt/bin/install_nvtop.sh
 
 # Copy and install NCCL packages
 COPY --from=nccl /usr/src/nccl/build/pkg/deb/*.deb /tmp/

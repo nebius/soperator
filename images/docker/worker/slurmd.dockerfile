@@ -39,7 +39,9 @@ RUN apt-get update && \
         iproute2 \
         infiniband-diags \
         kmod \
-        daemontools
+        daemontools \
+        libncurses5-dev \
+        libdrm-dev
 
 # Install PMIx
 COPY docker/common/scripts/install_pmix.sh /opt/bin/
@@ -74,6 +76,12 @@ COPY docker/common/scripts/install_container_toolkit.sh /opt/bin/
 RUN chmod +x /opt/bin/install_container_toolkit.sh && \
     /opt/bin/install_container_toolkit.sh && \
     rm /opt/bin/install_container_toolkit.sh
+
+# Install nvtop GPU monitoring utility
+COPY docker/common/scripts/install_nvtop.sh /opt/bin/
+RUN chmod +x /opt/bin/install_nvtop.sh && \
+    /opt/bin/install_nvtop.sh && \
+    rm /opt/bin/install_nvtop.sh
 
 # Create node-local directories for enroot runtime data
 RUN mkdir -p -m 777 /usr/share/enroot/enroot-data && \
