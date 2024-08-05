@@ -1,6 +1,7 @@
 # First stage: Build the gpubench application
 FROM golang:1.22 AS gpubench_builder
 
+ARG GO_LDFLAGS
 ARG CGO_ENABLED=0
 ARG GOOS=linux
 ARG GOARCH=amd64
@@ -13,7 +14,8 @@ RUN go mod download
 
 COPY docker/jail/gpubench/main.go .
 
-RUN go build -o gpubench .
+RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
+    go build -o gpubench .
 
 #######################################################################################################################
 # Second stage: Build the NCCL tests
