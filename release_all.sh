@@ -82,10 +82,10 @@ echo "Pusing Helm charts"
 ./release_helm.sh -afyr
 
 echo "Packing new terraform tarball"
-./release_terraform.sh
+./release_terraform.sh -f
 
 echo "Unpacking the terraform tarball"
-pushd ./terraform-releases/oldbius/unstable
+pushd ./terraform-releases/unstable
     ./unpack_current_version.sh
 popd
 
@@ -96,11 +96,11 @@ tarball="slurm_operator_tf_$version_formatted.tar.gz"
 GREEN='\033[0;32m'
 RESET='\033[0m'
 
-if [ $stable == "1" ]; then
-    mv "terraform-releases/oldbius/unstable/$tarball" "terraform-releases/oldbius/stable/"
+if [ "$stable" == "1" ]; then
+    mv "terraform-releases/unstable/$tarball" "terraform-releases/stable/"
     echo -e "${GREEN}Stable version '$version' is successfully released${RESET}"
 else
-    echo -e "${GREEN}Unstable version '$version' is successfully released and unpacked to terraform-releases/oldbius/unstable/${RESET}"
+    echo -e "${GREEN}Unstable version '$version' is successfully released and unpacked to terraform-releases/unstable/${RESET}"
 fi
 
 end_time=$(date +%s)

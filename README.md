@@ -48,7 +48,7 @@ cd terraform-releases/oldbius/unstable/terraform
 
 In order to create or update a Slurm cluster, fill out the `terraform.tfvars` file.
 There are some existing sets of variables that can be used for our test clusters located at 
-[dev-tfvars](terraform-releases/oldbius/unstable/dev-tfvars) directory.
+[dev-tfvars](terraform-releases/unstable/dev-tfvars) directory.
 
 Initialize & apply your terraform:
 
@@ -88,6 +88,6 @@ Change the [VERSION](./VERSION) file once again: increment the `MAJOR.MINOR.PATH
 principle.
 
 Create a final, stable, release by repeating [Step 2](#step-2-release-new-version-of-all-components) and pass the `-s`
-option to `release_all.sh` script. It will put the new tarball to [stable](terraform-releases/oldbius/stable) directory.
+option to `release_all.sh` script. It will put the new tarball to [stable](terraform-releases/stable) directory.
 
 That's it!

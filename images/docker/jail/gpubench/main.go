@@ -148,7 +148,7 @@ func main() {
 		messageReason := fmt.Sprintf(
 			"The GPU benchmark ended with an unsatisfactory result for the NCCL test all_reduce_perf: Avg bus bandwidth=%f, min=%f",
 			avgBandwidth,
-			*limit, // Use the converted limitStr
+			*limit,
 		)
 		if *drainSlurmNode == true {
 			drainNode(ctx, currentNode, messageReason)
@@ -159,9 +159,9 @@ func main() {
 	} else {
 		succeed := 1
 		log.WithField("avg_bandwidth", avgBandwidth).Info(fmt.Sprintf(
-			"Avg bus bandwidth > %f: %f",
-			*limit, // Use the converted limitStr
-			avgBandwidth))
+			"Avg bus bandwidth > %f, min = %f",
+			avgBandwidth,
+			*limit))
 		benchmarkFinishedMsg := fmt.Sprintf("GPU benchmark finished with Avg bus bandwidth=%f", avgBandwidth)
 		log.WithField("avg_bandwidth", avgBandwidth).Info(benchmarkFinishedMsg)
 		sendMetrics(ctx, currentNode, avgBandwidth, *limit, succeed)
@@ -241,7 +241,7 @@ func getAvgBandwidth(ctx context.Context, lines []string) float64 {
 }
 
 func drainNode(ctx context.Context, slurmNode, messageReason string) {
-	cmd := exec.Command("scontrol", "update", "NodeName="+currentNode, "State=drain", "Reason="+messageReason)
+	cmd := exec.Command("scontrol", "update", "NodeName="+currentNode, "State=drain", fmt.Sprintf("Reason=%q", messageReason))
 	_, err := cmd.CombinedOutput()
 	if err != nil {
 		failedDrainNodeMsg := fmt.Sprintf("Failed to drain node %s", slurmNode)

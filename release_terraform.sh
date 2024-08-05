@@ -13,12 +13,10 @@ do
     esac
 done
 
-mkdir -p "terraform-releases/oldbius"
-
 read -r version < ./VERSION
 version=$(echo "$version" | tr '.' '_' | tr '-' '_')
 
-tarball="terraform-releases/oldbius/unstable/slurm_operator_tf_${version}.tar.gz"
+tarball="terraform-releases/unstable/slurm_operator_tf_${version}.tar.gz"
 if [ ! -f "$tarball" ] || [ -n "$force" ]; then
     tar -czf "$tarball" \
         --exclude="terraform/oldbius/.terraform" \

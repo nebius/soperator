@@ -37,7 +37,7 @@ checks are implemented as usual Slurm jobs - they stay in the same queue with us
 The creation process consists of the following steps.
 
 #### Step 1. Download a release of the Slurm operator
-Download tarball with the latest version from [Arcanum](https://arcanum.nebius.dev/nebo/msp/slurm-service/internal/operator/terraform-releases/oldbius/stable).
+Download tarball with the latest version from [Arcanum](https://arcanum.nebius.dev/nebo/msp/slurm-service/internal/operator/terraform-releases/stable).
 In browser, press on the file with the latest version, and then press the "Raw" button in the upper right corner.
 
 #### Step 2. Extract the tarball
@@ -46,7 +46,7 @@ Create and open a directory: `mkdir slurm-operator-tf`
 Unpack the tarball into it: `tar -xvf slurm_operator_tf_*****.tar.gz -C ./slurm-operator-tf`
 
 #### Step 3. Initialize terraform
-Enter the "terraform" directory: `cd terraform`
+Enter the directory with terraform files: `cd terraform/oldbius`
 
 Execute `terraform init`. This command will download all referenced modules.
 
