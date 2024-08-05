@@ -22,6 +22,7 @@ endif
 # scaffolded by default. However, you might want to replace it to use other
 # tools. (i.e. podman)
 CONTAINER_TOOL ?= bazel
+BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -87,10 +88,6 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
 
-.PHONY: bazel-test ## Run test with bazel. `vet` not working with bazel (locally)
-bazel-test: manifests generate fmt
-	bazel test "..."
-
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter & yamllint
 	$(GOLANGCI_LINT) run
@@ -98,10 +95,6 @@ lint: golangci-lint ## Run golangci-lint linter & yamllint
 .PHONY: lint-fix
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
-
-.PHONY: gazelle
-gazelle: ## Run gazelle
-	bazel run //:gazelle -- msp/slurm-service/internal/operator
 
 .PHONY: helm
 helm: kustomize helmify yq ## Update slurm-operator Helm chart
@@ -190,28 +183,20 @@ sync-version: ## Sync versions from file
 build: manifests generate fmt vet ## Build manager binary with native toolchain.
 	go build -o bin/manager cmd/main.go
 
-.PHONY: bazel-build
-bazel-build: manifests generate fmt  ## Build manager binary with bazel.
-	bazel build "..."
-
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host with native toolchain.
 	go run ./cmd/main.go
-
-.PHONY: bazel-run
-bazel-run: manifests generate fmt  ## Run a controller from your host with bazel.
-	bazel run //msp/slurm-service/internal/operator/cmd:cmd
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) run //msp/slurm-service/internal/operator/docker:image -- --repository $(OPERATOR_IMAGE_REPO) --tag $(OPERATOR_IMAGE_TAG)
+	docker build --tag $(OPERATOR_IMAGE_REPO):$(OPERATOR_IMAGE_TAG) --target release --load --platform=linux/amd64 .
 
 .PHONY: docker-push
-docker-push: ## Push docker image with the manager.
-	$(CONTAINER_TOOL) run //msp/slurm-service/internal/operator/docker:push_stable -- --repository $(OPERATOR_IMAGE_REPO) --tag $(OPERATOR_IMAGE_TAG)
+docker-push: docker-build ## Push docker image with the manager.
+	docker push $(OPERATOR_IMAGE_REPO):$(OPERATOR_IMAGE_TAG)
 
 ##@ Deployment
 

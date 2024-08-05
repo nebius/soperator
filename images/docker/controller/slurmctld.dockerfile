@@ -1,4 +1,4 @@
-FROM ubuntu:focal as controller_slurmctld
+FROM ubuntu:focal AS controller_slurmctld
 
 ARG DEBIAN_FRONTEND=noninteractive
 

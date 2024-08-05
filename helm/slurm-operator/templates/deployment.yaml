@@ -40,7 +40,7 @@ spec:
           | nindent 10 }}
       - args: {{- toYaml .Values.controllerManager.manager.args | nindent 8 }}
         command:
-        - /manager
+        - /usr/bin/slurm_operator
         env:
         - name: SLURM_OPERATOR_WATCH_NAMESPACES
           value: {{ quote .Values.controllerManager.manager.env.slurmOperatorWatchNamespaces

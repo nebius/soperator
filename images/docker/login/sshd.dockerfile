@@ -1,4 +1,4 @@
-FROM ubuntu:focal as login_sshd
+FROM ubuntu:focal AS login_sshd
 
 ARG DEBIAN_FRONTEND=noninteractive
 

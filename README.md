@@ -43,7 +43,7 @@ It will also unpack the tarball to the same directory, so you can apply it and c
 Enter the directory with your terraform files:
 
 ```shell
-cd terraform-releases/oldbius/unstable/terraform
+cd terraform-releases/oldbius/unstable
 ```
 
 In order to create or update a Slurm cluster, fill out the `terraform.tfvars` file.
@@ -53,9 +53,8 @@ There are some existing sets of variables that can be used for our test clusters
 Initialize & apply your terraform:
 
 ```shell
-terraform init
-source ./ncp_auth.sh
-terraform apply
+./tfoldbius.sh init
+./tfoldbius.sh apply
 ```
 
 Wait until it finishes.

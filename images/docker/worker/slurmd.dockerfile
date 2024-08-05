@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu20.04 as worker_slurmd
+FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu20.04 AS worker_slurmd
 
 ARG DEBIAN_FRONTEND=noninteractive
 
