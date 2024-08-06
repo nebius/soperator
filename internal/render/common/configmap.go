@@ -78,7 +78,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("LaunchParameters", "use_interactive_step")
 	res.AddComment("")
 	res.AddProperty("MaxJobCount", 1000) // Keep 1000 last jobs in controller memory
-	res.AddProperty("MinJobAge", 0)      // Don't remove jobs from controller memory after some time
+	res.AddProperty("MinJobAge", 86400)  // Don't remove jobs from controller memory after some time
 	res.AddComment("")
 	res.AddComment("HEALTH CHECKS")
 	res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
