@@ -68,6 +68,11 @@ type SlurmClusterSpec struct {
 	//
 	// +kubebuilder:validation:Required
 	SlurmNodes SlurmNodes `json:"slurmNodes"`
+
+	// Metrics define the desired state of the prometheus or opentelemetry metrics
+	//
+	// +kubebuilder:validation:Optional
+	Metrics *Metrics `json:"metrics,omitempty"`
 }
 
 type NCCLSettings struct {
@@ -171,6 +176,15 @@ type NCCLBenchmark struct {
 	//
 	// +kubebuilder:validation:Required
 	K8sNodeFilterName string `json:"k8sNodeFilterName"`
+
+	// Define whether to send Kubernetes events for Slurm jobs
+	//
+	// +kubebuilder:validation:Optional
+	SendJobsEvents *bool `json:"sendJobsEvents,omitempty"`
+	// kubebuilder:validation:Optional
+	SendOTELMetrics *bool `json:"sendOTELMetrics,omitempty"`
+	// kubebuilder:validation:Optional
+	OtelCollectorEndpoint *string `json:"otelCollectorEndpoint,omitempty"`
 }
 
 // NCCLArguments define nccl settings for periodic nccl benchmark
@@ -475,7 +489,24 @@ type NodeVolumeJailSubMount struct {
 	VolumeSourceName string `json:"volumeSourceName"`
 }
 
+type Metrics struct {
+	// It has to be set to true if OpenTelemetry Operator is used
+	// +kubebuilder:validation:Optional
+	EnableOtelCollector *bool `json:"enableOtelCollector,omitempty"`
+	// It has to be set to true if Prometheus Operator is used
+	// +kubebuilder:validation:Optional
+	EnableMetrics *bool `json:"enableMetrics,omitempty"`
+	// It references the PodTemplate with the OpenTelemetry Collector configuration
+	// +kubebuilder:validation:Optional
+	PodTemplateNameRef *string `json:"podTemplateNameRef,omitempty"`
+	// It defines the number of replicas for the OpenTelemetry Collector
+	// +kubebuilder:validation:Optional
+	ReplicasOtelCollector *int32 `json:"replicasOtelCollector,omitempty"`
+}
+
 const (
+	SlurmClusterKind = "SlurmCluster"
+
 	ConditionClusterCommonAvailable      = "CommonAvailable"
 	ConditionClusterControllersAvailable = "ControllersAvailable"
 	ConditionClusterWorkersAvailable     = "WorkersAvailable"

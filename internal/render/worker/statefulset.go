@@ -76,9 +76,10 @@ func RenderStatefulSet(
 					},
 				},
 				Spec: corev1.PodSpec{
-					Affinity:     nodeFilter.Affinity,
-					NodeSelector: nodeFilter.NodeSelector,
-					Tolerations:  nodeFilter.Tolerations,
+					ServiceAccountName: naming.BuildServiceAccountWorkerName(clusterName),
+					Affinity:           nodeFilter.Affinity,
+					NodeSelector:       nodeFilter.NodeSelector,
+					Tolerations:        nodeFilter.Tolerations,
 					InitContainers: []corev1.Container{
 						renderContainerToolkitValidation(&worker.ContainerToolkitValidation),
 					},

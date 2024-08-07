@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -97,6 +98,66 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 			if err != nil {
 				logger.Error(err, "Failed to reconcile worker StatefulSet")
 				return errors.Wrap(err, "reconciling worker StatefulSet")
+			}
+		}
+
+		// ServiceAccount
+		{
+			desired := worker.RenderServiceAccount(clusterValues.Namespace, clusterValues.Name)
+			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
+			err := r.ServiceAccount.Reconcile(ctx, cluster, &desired)
+			if err != nil {
+				logger.Error(err, "Failed to reconcile worker ServiceAccount")
+				return errors.Wrap(err, "reconciling worker ServiceAccount")
+			}
+		}
+
+		// Role
+		{
+
+			if clusterValues.NCCLBenchmark.SendJobsEvents != nil && *clusterValues.NCCLBenchmark.SendJobsEvents {
+				desired := worker.RenderRole(clusterValues.Namespace, clusterValues.Name)
+				logger = logger.WithValues(logfield.ResourceKV(&desired)...)
+				err := r.Role.Reconcile(ctx, cluster, &desired)
+				if err != nil {
+					logger.Error(err, "Failed to reconcile worker Role")
+					return errors.Wrap(err, "reconciling worker Role")
+				}
+			} else {
+				// If SenJobsEvents is set to false or nil, the Role is not necessary because we don't need the permissions.
+				// We need to explicitly delete the Role in case the user initially set JobsEvents to true and then removed it or set it to false.
+				// Without explicit deletion through reconciliation,
+				// Еhe Role will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
+				var desired *rbacv1.Role
+				err := r.Role.Reconcile(ctx, cluster, desired)
+				if err != nil {
+					logger.Error(err, "Failed to reconcile worker Role")
+					return errors.Wrap(err, "reconciling worker Role")
+				}
+			}
+		}
+
+		// RoleBinding
+		{
+			if clusterValues.NCCLBenchmark.SendJobsEvents != nil && *clusterValues.NCCLBenchmark.SendJobsEvents {
+				desired := worker.RenderRoleBinding(clusterValues.Namespace, clusterValues.Name)
+				logger = logger.WithValues(logfield.ResourceKV(&desired)...)
+				err := r.RoleBinding.Reconcile(ctx, cluster, &desired)
+				if err != nil {
+					logger.Error(err, "Failed to reconcile worker RoleBinding")
+					return errors.Wrap(err, "reconciling worker RoleBinding")
+				}
+			} else {
+				// If SenJobsEvents is set to false or nil, the RoleBinding is not necessary because we don't need the permissions.
+				// We need to explicitly delete the RoleBinding in case the user initially set JobsEvents to true and then removed it or set it to false.
+				// Without explicit deletion through reconciliation,
+				// Еhe RoleBinding will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
+				var desired *rbacv1.RoleBinding
+				err := r.RoleBinding.Reconcile(ctx, cluster, desired)
+				if err != nil {
+					logger.Error(err, "Failed to reconcile worker Role")
+					return errors.Wrap(err, "reconciling worker Role")
+				}
 			}
 		}
 

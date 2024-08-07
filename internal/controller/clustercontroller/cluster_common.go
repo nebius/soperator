@@ -42,6 +42,43 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 			logger.Info("Reconcile for SlurmConfigs configMap completed successfully")
 		}
 
+		// OpenTelelmetry Collector
+		{
+			foundPodTemplate := &corev1.PodTemplate{}
+			if clusterValues.Metrics != nil && clusterValues.Metrics.EnableOtelCollector != nil {
+
+				if clusterValues.Metrics.PodTemplateNameRef != nil {
+					podTemplateName := *clusterValues.Metrics.PodTemplateNameRef
+
+					err := r.Get(
+						ctx,
+						types.NamespacedName{
+							Namespace: clusterValues.Namespace,
+							Name:      podTemplateName,
+						},
+						foundPodTemplate,
+					)
+					if err != nil {
+						logger.Error(err, "Failed to get PodTemplate")
+						return errors.Wrap(err, "getting PodTemplate")
+					}
+				}
+			}
+			desired, err := common.RenderOtelCollector(clusterValues.Name, clusterValues.Namespace, clusterValues.Metrics, foundPodTemplate)
+			if err != nil {
+				err = r.Otel.Reconcile(ctx, cluster, &desired, false)
+			} else {
+				err = r.Otel.Reconcile(ctx, cluster, &desired, true)
+
+			}
+			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
+			if err != nil {
+				logger.Error(err, "Failed to reconcile OpenTelemetry Collector")
+				return errors.Wrap(err, "reconciling OpenTelemetry Collector")
+			}
+
+		}
+
 		// Munge secret
 		{
 			desired := corev1.Secret{}

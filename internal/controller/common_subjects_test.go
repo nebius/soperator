@@ -10,10 +10,6 @@ import (
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 )
 
-const (
-	SlurmClusterKind = "SlurmCluster"
-)
-
 type shouldCreateAvailableSlurmCluster struct {
 	ctx    context.Context
 	client client.Client

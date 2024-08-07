@@ -9,24 +9,33 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controller/state"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/values"
+
+	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 )
 
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch;delete
@@ -44,6 +53,10 @@ import (
 // +kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get;update
 // +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=cronjobs/status,verbs=get;update
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;delete
+// +kubebuilder:rbac:groups=opentelemetry.io,resources=opentelemetrycollectors,verbs=get;list;watch;update;patch;delete;create
+// +kubebuilder:rbac:groups=core,resources=podtemplates,verbs=get;list;watch
 
 // SlurmClusterReconciler reconciles a SlurmCluster object
 type SlurmClusterReconciler struct {
@@ -51,12 +64,16 @@ type SlurmClusterReconciler struct {
 
 	WatchNamespaces WatchNamespaces
 
-	ConfigMap   *reconciler.ConfigMapReconciler
-	Secret      *reconciler.SecretReconciler
-	CronJob     *reconciler.CronJobReconciler
-	Job         *reconciler.JobReconciler
-	Service     *reconciler.ServiceReconciler
-	StatefulSet *reconciler.StatefulSetReconciler
+	ConfigMap      *reconciler.ConfigMapReconciler
+	Secret         *reconciler.SecretReconciler
+	CronJob        *reconciler.CronJobReconciler
+	Job            *reconciler.JobReconciler
+	Service        *reconciler.ServiceReconciler
+	StatefulSet    *reconciler.StatefulSetReconciler
+	ServiceAccount *reconciler.ServiceAccountReconciler
+	Role           *reconciler.RoleReconciler
+	RoleBinding    *reconciler.RoleBindingReconciler
+	Otel           *reconciler.OtelReconciler
 }
 
 func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *SlurmClusterReconciler {
@@ -71,6 +88,10 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 		Job:             reconciler.NewJobReconciler(r),
 		Service:         reconciler.NewServiceReconciler(r),
 		StatefulSet:     reconciler.NewStatefulSetReconciler(r),
+		ServiceAccount:  reconciler.NewServiceAccountReconciler(r),
+		Role:            reconciler.NewRoleReconciler(r),
+		RoleBinding:     reconciler.NewRoleBindingReconciler(r),
+		Otel:            reconciler.NewOtelReconciler(r),
 	}
 }
 
@@ -294,9 +315,46 @@ func (r *SlurmClusterReconciler) runWithPhase(ctx context.Context, cluster *slur
 	return do()
 }
 
+const (
+	podTemplateField = ".spec.metrics.podTemplateNameRef"
+)
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	/*
+		The `PodTemplate` field must be indexed by the manager, so that we will be able to lookup `SlurmCluster` by a referenced `PodTemplateNameRef` name.
+		This will allow for quickly answer the question:
+		- If PodTemplate _x_ is updated, which SlurmCluster are affected?
+	*/
+
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &slurmv1.SlurmCluster{}, podTemplateField, func(rawObj client.Object) []string {
+		slurmCluster := rawObj.(*slurmv1.SlurmCluster)
+		if slurmCluster.Spec.Metrics == nil || slurmCluster.Spec.Metrics.PodTemplateNameRef == nil {
+			return nil
+		}
+		return []string{*slurmCluster.Spec.Metrics.PodTemplateNameRef}
+	}); err != nil {
+		return err
+	}
+
+	/*
+		We need to define a predicate to filter out delete events for ServiceAccount objects.
+		This is necessary because we want to ignore all events for ServiceAccount objects except for delete events.
+		We want to reconcile SlurmCluster resources just when a ServiceAccount is deleted.
+	*/
+	saPredicate := predicate.Funcs{
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			if sa, ok := e.Object.(*corev1.ServiceAccount); ok {
+				return sa.GetDeletionTimestamp() != nil
+			}
+			return false
+		},
+		CreateFunc:  func(e event.CreateEvent) bool { return false },
+		UpdateFunc:  func(e event.UpdateEvent) bool { return false },
+		GenericFunc: func(e event.GenericEvent) bool { return false },
+	}
+
+	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Owns(&corev1.Service{}).
 		Owns(&appsv1.StatefulSet{}).
@@ -305,5 +363,51 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Owns(&batchv1.CronJob{}).
 		Owns(&corev1.Secret{}).
-		Complete(r)
+		Owns(&rbacv1.Role{}).
+		Owns(&rbacv1.RoleBinding{}).
+		Watches(
+			&corev1.PodTemplate{},
+			handler.EnqueueRequestsFromMapFunc(r.findObjectsForPodTemplate),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		Owns(&corev1.ServiceAccount{}, builder.WithPredicates(saPredicate))
+
+	// Conditionally add OpenTelemetryCollector ownership
+	if check.IsOpenTelemetryCollectorCRDInstalled {
+		builder.Owns(&otelv1beta1.OpenTelemetryCollector{})
+	}
+
+	return builder.Complete(r)
+}
+
+/*
+Because we have already created an index on the `podTemplate` reference field, this mapping function is quite straight forward.
+We first need to list out all `SlurmCluster` that use `podTemplate` given in the mapping function.
+This is done by merely submitting a List request using our indexed field as the field selector.
+
+When the list of `SlurmCluster` that reference the `podTemplate` is found,
+we just need to loop through the list and create a reconcile request for each one.
+If an error occurs fetching the list, or no `SlurmCluster` are found, then no reconcile requests will be returned.
+*/
+func (r *SlurmClusterReconciler) findObjectsForPodTemplate(ctx context.Context, podTemplate client.Object) []reconcile.Request {
+	attachedSlurmClusters := &slurmv1.SlurmClusterList{}
+	listOps := &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(podTemplateField, podTemplate.GetName()),
+		Namespace:     podTemplate.GetNamespace(),
+	}
+	err := r.List(ctx, attachedSlurmClusters, listOps)
+	if err != nil {
+		return []reconcile.Request{}
+	}
+
+	requests := make([]reconcile.Request, len(attachedSlurmClusters.Items))
+	for i, item := range attachedSlurmClusters.Items {
+		requests[i] = reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.GetName(),
+				Namespace: item.GetNamespace(),
+			},
+		}
+	}
+	return requests
 }
