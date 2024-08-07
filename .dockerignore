@@ -1,0 +1,13 @@
+/bin
+/config
+/deps
+/docker
+/docs
+/helm*
+/images
+/terraform*
+/test
+.*
+*.sh
+Makefile
+Dockerfile

@@ -1,6 +1,11 @@
 # First stage: Build the gpubench application
 FROM golang:1.22 AS gpubench_builder
 
+ARG GO_LDFLAGS
+ARG CGO_ENABLED=0
+ARG GOOS=linux
+ARG GOARCH=amd64
+
 WORKDIR /app
 
 COPY docker/jail/gpubench/go.mod docker/jail/gpubench/go.sum ./
@@ -9,11 +14,12 @@ RUN go mod download
 
 COPY docker/jail/gpubench/main.go .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o gpubench .
+RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
+    go build -o gpubench .
 
-######################################
+#######################################################################################################################
 # Second stage: Build the NCCL tests
-FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu20.04 as jail
+FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu20.04 AS jail
 
 ARG DEBIAN_FRONTEND=noninteractive
 

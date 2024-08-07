@@ -1,4 +1,4 @@
-FROM ubuntu:focal as nccl_benchmark
+FROM ubuntu:focal AS nccl_benchmark
 
 ARG DEBIAN_FRONTEND=noninteractive
 

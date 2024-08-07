@@ -161,7 +161,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		ptr.To(slurmv1.PhaseClusterReconciling),
 		func() (ctrl.Result, error) {
 			result, wait, err := r.ReconcilePopulateJail(ctx, clusterValues, cluster)
-			if err != nil || wait == true {
+			if err != nil || wait {
 				return result, err
 			}
 

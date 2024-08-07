@@ -1,4 +1,4 @@
-FROM ubuntu:focal as munge
+FROM ubuntu:focal AS munge
 
 ARG DEBIAN_FRONTEND=noninteractive
 

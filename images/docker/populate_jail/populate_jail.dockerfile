@@ -1,4 +1,4 @@
-FROM ubuntu:focal as populate_jail
+FROM ubuntu:focal AS populate_jail
 
 ARG DEBIAN_FRONTEND=noninteractive
 

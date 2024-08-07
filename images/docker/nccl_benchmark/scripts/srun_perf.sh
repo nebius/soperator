@@ -105,7 +105,7 @@ run_job_on_node() {
          --nodelist="$node" \
          --gpus="$num_gpus" \
          --cpus-per-task=16 \
-         --mem-per-cpu="64GB" \
+         --mem-per-cpu="12GB" \
          --time="$bench_timout" \
          /usr/bin/gpubench -debug=true -min_bytes="$min_bytes" -step_factor="$step_factor" -limit="$limit" -drain_state=$drain_state -max_bytes="$max_bytes" -namespace="$namespace" -kube_service_host="$kubernetes_service_host" -kube_service_port="$kubernetes_service_port" -exporter_endpoint="$exporter_endpoint" -use_infiniband=$use_infiniband -push_events=$push_events -push_metrics_grpc="$push_metrics_grpc"
     echo "exit_code $?"
