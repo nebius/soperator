@@ -19,7 +19,7 @@ import (
 func Test_IsControllerOwnerRole(t *testing.T) {
 	cluster := &slurmv1.SlurmCluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-cluster",
+			Name: defaultNameCluster,
 		},
 	}
 
@@ -29,7 +29,7 @@ func Test_IsControllerOwnerRole(t *testing.T) {
 				OwnerReferences: []metav1.OwnerReference{
 					{
 						Kind: slurmv1.SlurmClusterKind,
-						Name: "test-cluster",
+						Name: defaultNameCluster,
 					},
 				},
 			},
@@ -73,8 +73,8 @@ func Test_GetRole(t *testing.T) {
 			name: "Role exists",
 			cluster: &slurmv1.SlurmCluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
-					Namespace: "default",
+					Name:      defaultNameCluster,
+					Namespace: defaultNamespace,
 				},
 				Spec: slurmv1.SlurmClusterSpec{
 					PeriodicChecks: slurmv1.PeriodicChecks{
@@ -87,8 +87,8 @@ func Test_GetRole(t *testing.T) {
 
 			existingRB: &rbacv1.Role{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      naming.BuildRoleWorkerName("test-cluster"),
-					Namespace: "default",
+					Name:      naming.BuildRoleWorkerName(defaultNameCluster),
+					Namespace: defaultNamespace,
 				},
 			},
 			expectErr: false,
@@ -97,8 +97,8 @@ func Test_GetRole(t *testing.T) {
 			name: "Role does not exist",
 			cluster: &slurmv1.SlurmCluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
-					Namespace: "default",
+					Name:      defaultNameCluster,
+					Namespace: defaultNamespace,
 				},
 			},
 			existingRB: nil,
@@ -108,8 +108,8 @@ func Test_GetRole(t *testing.T) {
 			name: "Error getting Role",
 			cluster: &slurmv1.SlurmCluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
-					Namespace: "default",
+					Name:      defaultNameCluster,
+					Namespace: defaultNamespace,
 				},
 			},
 			existingRB: nil,
@@ -153,8 +153,8 @@ func Test_GetRole(t *testing.T) {
 				assert.Equal(t, tt.existingRB.Name, role.Name)
 				assert.Equal(t, tt.existingRB.Namespace, role.Namespace)
 			} else {
-				assert.Equal(t, naming.BuildRoleWorkerName("test-cluster"), role.Name)
-				assert.Equal(t, "default", role.Namespace)
+				assert.Equal(t, "", role.Name)
+				assert.Equal(t, "", role.Namespace)
 			}
 		})
 	}
@@ -175,14 +175,14 @@ func Test_DeleteRoleOwnedByController(t *testing.T) {
 			name: "Role deleted successfully",
 			cluster: &slurmv1.SlurmCluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
-					Namespace: "default",
+					Name:      defaultNameCluster,
+					Namespace: defaultNamespace,
 				},
 			},
 			role: &rbacv1.Role{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      naming.BuildRoleWorkerName("test-cluster"),
-					Namespace: "default",
+					Name:      naming.BuildRoleWorkerName(defaultNameCluster),
+					Namespace: defaultNamespace,
 				},
 			},
 			expectErr: false,
@@ -191,14 +191,14 @@ func Test_DeleteRoleOwnedByController(t *testing.T) {
 			name: "Error deleting Role",
 			cluster: &slurmv1.SlurmCluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
-					Namespace: "default",
+					Name:      defaultNameCluster,
+					Namespace: defaultNamespace,
 				},
 			},
 			role: &rbacv1.Role{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      naming.BuildRoleWorkerName("test-cluster"),
-					Namespace: "default",
+					Name:      naming.BuildRoleWorkerName(defaultNameCluster),
+					Namespace: defaultNamespace,
 				},
 			},
 			expectErr: true,
