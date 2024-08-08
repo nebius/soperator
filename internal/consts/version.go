@@ -2,5 +2,5 @@
 package consts
 
 const (
-	VersionCR = "1.4.6-uburro-metrics"
+	VersionCR = "1.4.6"
 )

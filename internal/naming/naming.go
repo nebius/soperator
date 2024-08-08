@@ -183,5 +183,5 @@ func BuildRoleBindingWorkerName(clusterName string) string {
 }
 
 func BuildOtelSvc(clusterName string) string {
-	return clusterName + "-collector"
+	return clusterName + "-collector:4317"
 }

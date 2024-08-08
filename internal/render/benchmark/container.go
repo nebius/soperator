@@ -29,7 +29,7 @@ func renderContainerNCCLBenchmark(
 
 	otelCollectorEndpoint := "localhost:4317"
 	if metrics != nil && metrics.EnableOtelCollector != nil {
-		otelCollectorEndpoint = naming.BuildOtelSvc(clusterName) + ":4317"
+		otelCollectorEndpoint = naming.BuildOtelSvc(clusterName)
 	} else if ncclBenchmark.OtelCollectorEndpoint != nil {
 		otelCollectorEndpoint = *ncclBenchmark.OtelCollectorEndpoint
 	}

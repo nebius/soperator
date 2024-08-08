@@ -1,4 +1,4 @@
-package common
+package otel
 
 import (
 	"errors"
@@ -159,7 +159,7 @@ func RenderOtelCollector(clusterName,
 }
 
 func renderEnableMetrics(metrics *slurmv1.Metrics) bool {
-	if metrics.EnableMetrics != nil {
+	if metrics != nil && metrics.EnableMetrics != nil {
 		return *metrics.EnableMetrics
 	}
 	return false
@@ -168,7 +168,7 @@ func renderEnableMetrics(metrics *slurmv1.Metrics) bool {
 func renderReplicasOtelCollector(metrics *slurmv1.Metrics) *int32 {
 	var defaultReplicas int32 = 1
 	var replicasOtelCollector *int32 = &defaultReplicas
-	if metrics.ReplicasOtelCollector != nil {
+	if metrics != nil && metrics.ReplicasOtelCollector != nil {
 		return metrics.ReplicasOtelCollector
 	}
 	return replicasOtelCollector

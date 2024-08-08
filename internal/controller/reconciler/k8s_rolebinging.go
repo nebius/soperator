@@ -2,6 +2,7 @@ package reconciler
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -36,7 +37,8 @@ func (r *RoleBindingReconciler) Reconcile(
 	deps ...metav1.Object,
 ) error {
 	if desired == nil {
-		// If desired is nil, delete the Role
+		// If desired is nil, delete the Role Binding
+		log.FromContext(ctx).Info(fmt.Sprintf("Deleting RoleBinding %s, because of RoleBinding is not needed", naming.BuildRoleBindingWorkerName(cluster.Name)))
 		return r.deleteRoleBindingIfOwnedByController(ctx, cluster)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {

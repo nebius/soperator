@@ -17,6 +17,8 @@ import (
 )
 
 func Test_IsControllerOwnerRoleBinding(t *testing.T) {
+	defaultNameCluster := "test-cluster"
+
 	cluster := &slurmv1.SlurmCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: defaultNameCluster,
@@ -59,6 +61,9 @@ func Test_IsControllerOwnerRoleBinding(t *testing.T) {
 }
 
 func Test_GetRoleBinding(t *testing.T) {
+	defaultNamespace := "test-namespace"
+	defaultNameCluster := "test-cluster"
+
 	scheme := runtime.NewScheme()
 	_ = slurmv1.AddToScheme(scheme)
 	_ = rbacv1.AddToScheme(scheme)
@@ -161,6 +166,9 @@ func Test_GetRoleBinding(t *testing.T) {
 }
 
 func Test_DeleteRoleBindingOwnedByController(t *testing.T) {
+	defaultNamespace := "test-namespace"
+	defaultNameCluster := "test-cluster"
+
 	scheme := runtime.NewScheme()
 	_ = slurmv1.AddToScheme(scheme)
 	_ = rbacv1.AddToScheme(scheme)

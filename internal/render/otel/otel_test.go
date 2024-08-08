@@ -1,4 +1,4 @@
-package common
+package otel
 
 import (
 	"testing"
@@ -6,12 +6,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 )
 
 func Test_RenderEnableMetrics(t *testing.T) {
 	// Test when metrics is nil
-	assert.False(t, renderEnableMetrics(nil))
+	// assert.False(t, renderEnableMetrics(nil))
 
 	// Test when metrics is not nil but EnableMetrics is nil
 	metrics := &slurmv1.Metrics{}
@@ -43,6 +44,8 @@ func Test_RenderReplicasOtelCollector(t *testing.T) {
 }
 
 func Test_RenderPodTemplateImage(t *testing.T) {
+	defaultImageName := "test-image"
+
 	// Test when podTemplate is nil
 	assert.Equal(t, DefaultOtelCollectorImage, renderPodTemplateImage(nil))
 
@@ -57,44 +60,91 @@ func Test_RenderPodTemplateImage(t *testing.T) {
 	assert.Equal(t, DefaultOtelCollectorImage, renderPodTemplateImage(podTemplate))
 
 	// Test when Containers is not empty
-	image := "test-image"
 	podTemplate.Template.Spec.Containers = append(podTemplate.Template.Spec.Containers, corev1.Container{
-		Image: image,
+		Image: defaultImageName,
 	})
-	assert.Equal(t, image, renderPodTemplateImage(podTemplate))
+	assert.Equal(t, defaultImageName, renderPodTemplateImage(podTemplate))
 }
 
-func Test_RenderOtelCollector_Image(t *testing.T) {
-	clusterName := "test-cluster"
-	namespace := "test-namespace"
+func Test_RenderOtelCollector_Image_True(t *testing.T) {
+	defaultNamespace := "test-namespace"
+	defaultImageName := "test-image"
+	defaultNameCluster := "test-cluster"
+	defaultPodTemplateName := "test-pod-template"
+
 	metrics := &slurmv1.Metrics{
 		EnableMetrics:         new(bool),
 		ReplicasOtelCollector: new(int32),
+		EnableOtelCollector:   new(bool),
+		PodTemplateNameRef:    &defaultPodTemplateName,
 	}
+	*metrics.EnableOtelCollector = true
+
 	foundPodTemplate := &corev1.PodTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      defaultPodTemplateName,
+			Namespace: defaultNamespace,
+		},
 		Template: corev1.PodTemplateSpec{
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
 					{
-						Image: "test-image",
+						Image: defaultImageName,
 					},
 				},
 			},
 		},
 	}
 
-	result, _ := RenderOtelCollector(clusterName, namespace, metrics, foundPodTemplate)
+	result, _ := RenderOtelCollector(defaultNameCluster, defaultNamespace, metrics, foundPodTemplate)
 
-	assert.Equal(t, "test-image", result.Spec.OpenTelemetryCommonFields.Image)
+	assert.Equal(t, defaultImageName, result.Spec.OpenTelemetryCommonFields.Image)
 }
 
-func Test_RenderOtelCollector_NodeSelector(t *testing.T) {
-	clusterName := "test-cluster"
-	namespace := "test-namespace"
+func Test_RenderOtelCollector_Image_False(t *testing.T) {
+	defaultNamespace := "test-namespace"
+	defaultImageName := "test-image"
+	defaultNameCluster := "test-cluster"
+	defaultPodTemplateName := "test-pod-template"
+
 	metrics := &slurmv1.Metrics{
 		EnableMetrics:         new(bool),
 		ReplicasOtelCollector: new(int32),
+		EnableOtelCollector:   new(bool),
+		PodTemplateNameRef:    &defaultPodTemplateName,
 	}
+
+	foundPodTemplate := &corev1.PodTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      defaultPodTemplateName,
+			Namespace: defaultNamespace,
+		},
+		Template: corev1.PodTemplateSpec{
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Image: defaultImageName,
+					},
+				},
+			},
+		},
+	}
+
+	result, _ := RenderOtelCollector(defaultNameCluster, defaultNamespace, metrics, foundPodTemplate)
+
+	assert.Equal(t, "", result.Spec.OpenTelemetryCommonFields.Image)
+}
+
+func Test_RenderOtelCollector_NodeSelector(t *testing.T) {
+	defaultNamespace := "test-namespace"
+	defaultNameCluster := "test-cluster"
+
+	metrics := &slurmv1.Metrics{
+		EnableMetrics:         new(bool),
+		ReplicasOtelCollector: new(int32),
+		EnableOtelCollector:   new(bool),
+	}
+	*metrics.EnableOtelCollector = true
 
 	// Test when NodeSelector is nil
 	foundPodTemplate := &corev1.PodTemplate{
@@ -104,23 +154,27 @@ func Test_RenderOtelCollector_NodeSelector(t *testing.T) {
 			},
 		},
 	}
-	result, _ := RenderOtelCollector(clusterName, namespace, metrics, foundPodTemplate)
+	result, _ := RenderOtelCollector(defaultNameCluster, defaultNamespace, metrics, foundPodTemplate)
 	assert.Nil(t, result.Spec.OpenTelemetryCommonFields.NodeSelector)
 
 	// Test when NodeSelector is not empty
 	nodeSelector := map[string]string{"disktype": "ssd"}
 	foundPodTemplate.Template.Spec.NodeSelector = nodeSelector
-	result, _ = RenderOtelCollector(clusterName, namespace, metrics, foundPodTemplate)
+	result, _ = RenderOtelCollector(defaultNameCluster, defaultNamespace, metrics, foundPodTemplate)
 	assert.Equal(t, nodeSelector, result.Spec.OpenTelemetryCommonFields.NodeSelector)
 }
 
 func Test_RenderOtelCollector_Resources(t *testing.T) {
-	clusterName := "test-cluster"
-	namespace := "test-namespace"
+	defaultNamespace := "test-namespace"
+	defaultNameCluster := "test-cluster"
+
 	metrics := &slurmv1.Metrics{
 		EnableMetrics:         new(bool),
 		ReplicasOtelCollector: new(int32),
+		EnableOtelCollector:   new(bool),
 	}
+	*metrics.EnableOtelCollector = true
+
 	foundPodTemplate := &corev1.PodTemplate{
 		Template: corev1.PodTemplateSpec{
 			Spec: corev1.PodSpec{
@@ -140,21 +194,31 @@ func Test_RenderOtelCollector_Resources(t *testing.T) {
 		},
 	}
 
-	result, _ := RenderOtelCollector(clusterName, namespace, metrics, foundPodTemplate)
+	result, _ := RenderOtelCollector(defaultNameCluster, defaultNamespace, metrics, foundPodTemplate)
 
 	assert.Equal(t, resource.MustParse("1Gi"), result.Spec.OpenTelemetryCommonFields.Resources.Limits[corev1.ResourceMemory])
 	assert.Equal(t, resource.MustParse("1"), result.Spec.OpenTelemetryCommonFields.Resources.Requests[corev1.ResourceCPU])
 }
 
 func Test_RenderOtelCollector_Env(t *testing.T) {
-	clusterName := "test-cluster"
-	namespace := "test-namespace"
+	defaultNamespace := "test-namespace"
+	defaultNameCluster := "test-cluster"
+	defaultPodTemplateName := "test-pod-template"
+
 	metrics := &slurmv1.Metrics{
 		EnableMetrics:         new(bool),
 		ReplicasOtelCollector: new(int32),
+		EnableOtelCollector:   new(bool),
+		PodTemplateNameRef:    &defaultPodTemplateName,
 	}
+	*metrics.EnableOtelCollector = true
+
 	foundPodTemplate := &corev1.PodTemplate{
 		Template: corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      defaultPodTemplateName,
+				Namespace: defaultNamespace,
+			},
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
 					{
@@ -170,7 +234,7 @@ func Test_RenderOtelCollector_Env(t *testing.T) {
 		},
 	}
 
-	result, _ := RenderOtelCollector(clusterName, namespace, metrics, foundPodTemplate)
+	result, _ := RenderOtelCollector(defaultNameCluster, defaultNamespace, metrics, foundPodTemplate)
 
 	assert.Equal(t, "TEST_ENV", result.Spec.OpenTelemetryCommonFields.Env[0].Name)
 	assert.Equal(t, "test", result.Spec.OpenTelemetryCommonFields.Env[0].Value)

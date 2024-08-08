@@ -2,6 +2,7 @@ package reconciler
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -37,6 +38,7 @@ func (r *RoleReconciler) Reconcile(
 ) error {
 	if desired == nil {
 		// If desired is nil, delete the Role
+		log.FromContext(ctx).Info(fmt.Sprintf("Deleting Role %s, because of Role is not needed", naming.BuildRoleWorkerName(cluster.Name)))
 		return r.deleteRoleIfOwnedByController(ctx, cluster)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {

@@ -2,6 +2,7 @@ package reconciler
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 
@@ -35,12 +36,12 @@ func (r *OtelReconciler) Reconcile(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
 	desired *otelv1beta1.OpenTelemetryCollector,
-	otelINtaled bool,
+	otelInstalled bool,
 	deps ...metav1.Object,
 ) error {
-	if !otelINtaled {
-		// If desired is nil, delete the Role
-		log.FromContext(ctx).Info("Deleting OpenTelemetryCollector")
+	if !otelInstalled {
+		// If desired is nil, delete the OpenTelemetryCollector
+		log.FromContext(ctx).Info(fmt.Sprintf("Deleting OpenTelemetryCollector %s-collector, because of OpenTelemetryCollector is not needed", cluster.Name))
 		return r.deleteOteIfOwnedByController(ctx, cluster)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {

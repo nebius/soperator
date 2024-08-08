@@ -13,6 +13,7 @@ import (
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
+	"nebius.ai/slurm-operator/internal/render/otel"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -42,7 +43,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 			logger.Info("Reconcile for SlurmConfigs configMap completed successfully")
 		}
 
-		// OpenTelelmetry Collector
+		// OpenTelemetry Collector
 		{
 			foundPodTemplate := &corev1.PodTemplate{}
 			if clusterValues.Metrics != nil && clusterValues.Metrics.EnableOtelCollector != nil {
@@ -64,7 +65,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					}
 				}
 			}
-			desired, err := common.RenderOtelCollector(clusterValues.Name, clusterValues.Namespace, clusterValues.Metrics, foundPodTemplate)
+			desired, err := otel.RenderOtelCollector(clusterValues.Name, clusterValues.Namespace, clusterValues.Metrics, foundPodTemplate)
 			if err != nil {
 				err = r.Otel.Reconcile(ctx, cluster, &desired, false)
 			} else {
@@ -76,7 +77,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 				logger.Error(err, "Failed to reconcile OpenTelemetry Collector")
 				return errors.Wrap(err, "reconciling OpenTelemetry Collector")
 			}
-
+			logger.Info("Reconcile for OpenTelemetry Collector completed successfully")
 		}
 
 		// Munge secret
