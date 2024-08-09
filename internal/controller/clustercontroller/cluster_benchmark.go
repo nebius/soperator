@@ -32,6 +32,7 @@ func (r SlurmClusterReconciler) ReconcileNCCLBenchmark(
 			&clusterValues.Secrets,
 			clusterValues.VolumeSources,
 			&clusterValues.NCCLBenchmark,
+			clusterValues.Metrics,
 		)
 		if err != nil {
 			logger.Error(err, "Failed to render NCCL benchmark CronJob")

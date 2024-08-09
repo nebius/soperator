@@ -169,3 +169,19 @@ func BuildPopulateJailJobName(clusterName string) string {
 func BuildVolumeMountSpoolPath(directory string) string {
 	return path.Join(consts.VolumeMountPathSpool, directory)
 }
+
+func BuildServiceAccountWorkerName(clusterName string) string {
+	return clusterName + "-worker-sa"
+}
+
+func BuildRoleWorkerName(clusterName string) string {
+	return clusterName + "-worker-events-role"
+}
+
+func BuildRoleBindingWorkerName(clusterName string) string {
+	return clusterName + "-worker-events-role-binding"
+}
+
+func BuildOtelSvc(clusterName string) string {
+	return clusterName + "-collector:4317"
+}

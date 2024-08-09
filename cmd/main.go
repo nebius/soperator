@@ -36,7 +36,9 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
 	//+kubebuilder:scaffold:imports
@@ -47,7 +49,14 @@ var scheme = runtime.NewScheme()
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
+	// Check if OpenTelemetryCollector CRD is installed before adding it to the scheme
+	// This is required to avoid errors when the CRD is not installed before the operator starts
+	if check.IsOtelCRDInstalled() {
+		utilruntime.Must(otelv1beta1.AddToScheme(scheme))
+	}
+
 	utilruntime.Must(slurmv1.AddToScheme(scheme))
+
 	//+kubebuilder:scaffold:scheme
 }
 

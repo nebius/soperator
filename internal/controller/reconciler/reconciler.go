@@ -9,6 +9,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -16,6 +17,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/logfield"
@@ -179,6 +182,14 @@ func (r Reconciler) reconcile(
 				existing = &corev1.Service{}
 			case *appsv1.StatefulSet:
 				existing = &appsv1.StatefulSet{}
+			case *corev1.ServiceAccount:
+				existing = &corev1.ServiceAccount{}
+			case *rbacv1.Role:
+				existing = &rbacv1.Role{}
+			case *rbacv1.RoleBinding:
+				existing = &rbacv1.RoleBinding{}
+			case *otelv1beta1.OpenTelemetryCollector:
+				existing = &otelv1beta1.OpenTelemetryCollector{}
 			default:
 				return errors.New(fmt.Sprintf("unimplemented resolver for resource type %T", desired))
 			}
