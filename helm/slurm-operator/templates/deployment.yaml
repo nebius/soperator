@@ -42,6 +42,8 @@ spec:
         command:
         - /usr/bin/slurm_operator
         env:
+        - name: IS_OPENTELEMETRY_COLLECTOR_CRD_INSTALLED
+          value: {{ quote .Values.opentelemetryOperator.enabled }}
         - name: SLURM_OPERATOR_WATCH_NAMESPACES
           value: {{ quote .Values.controllerManager.manager.env.slurmOperatorWatchNamespaces
             }}

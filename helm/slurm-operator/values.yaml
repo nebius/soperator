@@ -1,3 +1,6 @@
+# # if CRD OpenTelemetryCollector is installed in the cluster
+opentelemetryOperator:
+  enabled: false
 controllerManager:
   kubeRbacProxy:
     args:
@@ -35,7 +38,7 @@ controllerManager:
       slurmOperatorWatchNamespaces: '*'
     image:
       repository: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/slurm-operator
-      tag: 1.4.6
+      tag: 1.5.1
     imagePullPolicy: Always
     resources:
       limits:

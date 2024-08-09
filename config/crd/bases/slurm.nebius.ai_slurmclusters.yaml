@@ -1070,8 +1070,12 @@ spec:
                       is used
                     type: boolean
                   podTemplateNameRef:
+                    description: It references the PodTemplate with the OpenTelemetry
+                      Collector configuration
                     type: string
                   replicasOtelCollector:
+                    description: It defines the number of replicas for the OpenTelemetry
+                      Collector
                     format: int32
                     type: integer
                 type: object

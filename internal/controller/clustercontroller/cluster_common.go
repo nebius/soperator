@@ -10,6 +10,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -45,39 +46,41 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 
 		// OpenTelemetry Collector
 		{
-			foundPodTemplate := &corev1.PodTemplate{}
-			if clusterValues.Metrics != nil && clusterValues.Metrics.EnableOtelCollector != nil {
+			if check.IsOtelCRDInstalled() {
+				foundPodTemplate := &corev1.PodTemplate{}
+				if clusterValues.Metrics != nil && clusterValues.Metrics.EnableOtelCollector != nil {
 
-				if clusterValues.Metrics.PodTemplateNameRef != nil {
-					podTemplateName := *clusterValues.Metrics.PodTemplateNameRef
+					if clusterValues.Metrics.PodTemplateNameRef != nil {
+						podTemplateName := *clusterValues.Metrics.PodTemplateNameRef
 
-					err := r.Get(
-						ctx,
-						types.NamespacedName{
-							Namespace: clusterValues.Namespace,
-							Name:      podTemplateName,
-						},
-						foundPodTemplate,
-					)
-					if err != nil {
-						logger.Error(err, "Failed to get PodTemplate")
-						return errors.Wrap(err, "getting PodTemplate")
+						err := r.Get(
+							ctx,
+							types.NamespacedName{
+								Namespace: clusterValues.Namespace,
+								Name:      podTemplateName,
+							},
+							foundPodTemplate,
+						)
+						if err != nil {
+							logger.Error(err, "Failed to get PodTemplate")
+							return errors.Wrap(err, "getting PodTemplate")
+						}
 					}
 				}
-			}
-			desired, err := otel.RenderOtelCollector(clusterValues.Name, clusterValues.Namespace, clusterValues.Metrics, foundPodTemplate)
-			if err != nil {
-				err = r.Otel.Reconcile(ctx, cluster, &desired, false)
-			} else {
-				err = r.Otel.Reconcile(ctx, cluster, &desired, true)
+				desired, err := otel.RenderOtelCollector(clusterValues.Name, clusterValues.Namespace, clusterValues.Metrics, foundPodTemplate)
+				if err != nil {
+					err = r.Otel.Reconcile(ctx, cluster, &desired, false)
+				} else {
+					err = r.Otel.Reconcile(ctx, cluster, &desired, true)
 
+				}
+				logger = logger.WithValues(logfield.ResourceKV(&desired)...)
+				if err != nil {
+					logger.Error(err, "Failed to reconcile OpenTelemetry Collector")
+					return errors.Wrap(err, "reconciling OpenTelemetry Collector")
+				}
+				logger.Info("Reconcile for OpenTelemetry Collector completed successfully")
 			}
-			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
-			if err != nil {
-				logger.Error(err, "Failed to reconcile OpenTelemetry Collector")
-				return errors.Wrap(err, "reconciling OpenTelemetry Collector")
-			}
-			logger.Info("Reconcile for OpenTelemetry Collector completed successfully")
 		}
 
 		// Munge secret
