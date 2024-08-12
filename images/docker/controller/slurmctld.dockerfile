@@ -1,4 +1,8 @@
-FROM ubuntu:focal AS controller_slurmctld
+ARG BASE_IMAGE=ubuntu:focal
+
+FROM $BASE_IMAGE AS controller_slurmctld
+
+ARG SLURM_VERSION=23.11.6
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -45,15 +49,15 @@ RUN chmod +x /opt/bin/install_pmix.sh && \
 
 # TODO: Install only necessary packages
 # Copy and install Slurm packages
-COPY --from=slurm /usr/src/slurm-smd-client_23.11.6-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-dev_23.11.6-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libnss-slurm_23.11.6-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libpmi0_23.11.6-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libpmi2-0_23.11.6-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libslurm-perl_23.11.6-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-openlava_23.11.6-1_all.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-slurmctld_23.11.6-1_amd64.deb /tmp
-COPY --from=slurm /usr/src/slurm-smd_23.11.6-1_amd64.deb /tmp/
+COPY --from=slurm /usr/src/slurm-smd-client_$SLURM_VERSION-1_amd64.deb /tmp/
+COPY --from=slurm /usr/src/slurm-smd-dev_$SLURM_VERSION-1_amd64.deb /tmp/
+COPY --from=slurm /usr/src/slurm-smd-libnss-slurm_$SLURM_VERSION-1_amd64.deb /tmp/
+COPY --from=slurm /usr/src/slurm-smd-libpmi0_$SLURM_VERSION-1_amd64.deb /tmp/
+COPY --from=slurm /usr/src/slurm-smd-libpmi2-0_$SLURM_VERSION-1_amd64.deb /tmp/
+COPY --from=slurm /usr/src/slurm-smd-libslurm-perl_$SLURM_VERSION-1_amd64.deb /tmp/
+COPY --from=slurm /usr/src/slurm-smd-openlava_$SLURM_VERSION-1_all.deb /tmp/
+COPY --from=slurm /usr/src/slurm-smd-slurmctld_$SLURM_VERSION-1_amd64.deb /tmp
+COPY --from=slurm /usr/src/slurm-smd_$SLURM_VERSION-1_amd64.deb /tmp/
 RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
 
 # Install slurm plugins

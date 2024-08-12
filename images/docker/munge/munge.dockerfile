@@ -1,4 +1,6 @@
-FROM ubuntu:focal AS munge
+ARG BASE_IMAGE=ubuntu:focal
+
+FROM $BASE_IMAGE AS munge
 
 ARG DEBIAN_FRONTEND=noninteractive
 

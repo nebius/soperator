@@ -1,3 +1,6 @@
+# BASE_IMAGE drfined here for second multistage build
+ARG BASE_IMAGE=nvidia/cuda:12.2.2-cudnn8-devel-ubuntu20.04
+
 # First stage: Build the gpubench application
 FROM golang:1.22 AS gpubench_builder
 
@@ -18,8 +21,13 @@ RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
     go build -o gpubench .
 
 #######################################################################################################################
-# Second stage: Build the NCCL tests
-FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu20.04 AS jail
+# Second stage: Build jail image
+
+ARG BASE_IMAGE=nvidia/cuda:12.2.2-cudnn8-devel-ubuntu20.04
+
+FROM $BASE_IMAGE AS jail
+
+ARG SLURM_VERSION=23.11.6
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -102,14 +110,14 @@ RUN chmod +x /opt/bin/install_pmix.sh && \
 
 # TODO: Install only necessary packages
 # Copy and install Slurm packages
-COPY --from=slurm /usr/src/slurm-smd-client_23.11.6-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-dev_23.11.6-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libnss-slurm_23.11.6-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libpmi0_23.11.6-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libpmi2-0_23.11.6-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libslurm-perl_23.11.6-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-openlava_23.11.6-1_all.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd_23.11.6-1_amd64.deb /tmp/
+COPY --from=slurm /usr/src/slurm-smd-client_$SLURM_VERSION-1_amd64.deb /tmp/
+COPY --from=slurm /usr/src/slurm-smd-dev_$SLURM_VERSION-1_amd64.deb /tmp/
+COPY --from=slurm /usr/src/slurm-smd-libnss-slurm_$SLURM_VERSION-1_amd64.deb /tmp/
+COPY --from=slurm /usr/src/slurm-smd-libpmi0_$SLURM_VERSION-1_amd64.deb /tmp/
+COPY --from=slurm /usr/src/slurm-smd-libpmi2-0_$SLURM_VERSION-1_amd64.deb /tmp/
+COPY --from=slurm /usr/src/slurm-smd-libslurm-perl_$SLURM_VERSION-1_amd64.deb /tmp/
+COPY --from=slurm /usr/src/slurm-smd-openlava_$SLURM_VERSION-1_all.deb /tmp/
+COPY --from=slurm /usr/src/slurm-smd_$SLURM_VERSION-1_amd64.deb /tmp/
 RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
 
 # Install slurm plugins
