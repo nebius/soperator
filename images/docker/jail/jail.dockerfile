@@ -1,4 +1,4 @@
-# BASE_IMAGE drfined here for second multistage build
+# BASE_IMAGE defined here for second multistage build
 ARG BASE_IMAGE=nvidia/cuda:12.2.2-cudnn8-devel-ubuntu20.04
 
 # First stage: Build the gpubench application
