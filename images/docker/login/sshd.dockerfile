@@ -1,4 +1,6 @@
-FROM ubuntu:focal AS login_sshd
+ARG BASE_IMAGE=ubuntu:focal
+
+FROM $BASE_IMAGE AS login_sshd
 
 ARG DEBIAN_FRONTEND=noninteractive
 

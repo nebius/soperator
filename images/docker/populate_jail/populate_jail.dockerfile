@@ -1,4 +1,6 @@
-FROM ubuntu:focal AS populate_jail
+ARG BASE_IMAGE=ubuntu:focal
+
+FROM $BASE_IMAGE AS populate_jail
 
 ARG DEBIAN_FRONTEND=noninteractive
 
