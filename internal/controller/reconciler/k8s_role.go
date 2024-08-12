@@ -92,15 +92,13 @@ func (r *RoleReconciler) getRole(ctx context.Context, cluster *slurmv1.SlurmClus
 // Function to check if the controller is the owner
 func isControllerOwnerRole(role *rbacv1.Role, cluster *slurmv1.SlurmCluster) bool {
 	// Check if the controller is the owner of the Role
-	isOwner := false
 	for _, ownerRef := range role.GetOwnerReferences() {
 		if ownerRef.Kind == slurmv1.SlurmClusterKind && ownerRef.Name == cluster.Name {
-			isOwner = true
-			break
+			return true
 		}
 	}
 
-	return isOwner
+	return false
 }
 
 func (r *RoleReconciler) deleteRoleOwnedByController(

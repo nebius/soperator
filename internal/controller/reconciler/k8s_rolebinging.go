@@ -92,15 +92,13 @@ func (r *RoleBindingReconciler) getRoleBinding(ctx context.Context, cluster *slu
 // Function to check if the controller is the owner
 func isControllerOwnerRoleBinding(roleBinding *rbacv1.RoleBinding, cluster *slurmv1.SlurmCluster) bool {
 	// Check if the controller is the owner of the Role
-	isOwner := false
 	for _, ownerRef := range roleBinding.GetOwnerReferences() {
 		if ownerRef.Kind == slurmv1.SlurmClusterKind && ownerRef.Name == cluster.Name {
-			isOwner = true
-			break
+			return true
 		}
 	}
 
-	return isOwner
+	return false
 }
 
 func (r *RoleBindingReconciler) deleteRoleBindingOwnedByController(
