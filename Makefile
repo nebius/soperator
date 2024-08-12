@@ -17,11 +17,6 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
-# CONTAINER_TOOL defines the container tool to be used for building images.
-# Be aware that the target commands are only tested with Docker which is
-# scaffolded by default. However, you might want to replace it to use other
-# tools. (i.e. podman)
-CONTAINER_TOOL ?= bazel
 BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
@@ -29,8 +24,6 @@ BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
-# If this variable is set to use bazel's driver it will lead to panics in gen-controller
-unexport GOPACKAGESDRIVER
 # Limit the scope of generation otherwise it will try to generate configs for non-controller code
 GENPATH = "./api/v1;./internal/controller/..."
 
