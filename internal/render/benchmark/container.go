@@ -21,6 +21,8 @@ func renderContainerNCCLBenchmark(
 
 	var sendJobsEvents bool
 	var sendOtelMetrics bool
+	var sendOtelMetricsGrpc bool
+	var sendOtelMetricsHttp bool
 	var otelCollectorEnabled bool
 
 	if metrics != nil && metrics.JobsTelemetry != nil {
@@ -33,8 +35,10 @@ func renderContainerNCCLBenchmark(
 	switch sendOtelMetrics {
 	case metrics.JobsTelemetry.OtelCollectorGrpcHost != nil:
 		otelCollectorHost = *metrics.JobsTelemetry.OtelCollectorGrpcHost
+		sendOtelMetricsGrpc = true
 	case metrics.JobsTelemetry.OtelCollectorHttpHost != nil:
 		otelCollectorHost = *metrics.JobsTelemetry.OtelCollectorHttpHost
+		sendOtelMetricsHttp = true
 	case otelCollectorEnabled:
 		naming.BuildOtelSvcEndpoint(clusterName, metrics.JobsTelemetry.OtelCollectorPort)
 	}
@@ -81,6 +85,14 @@ func renderContainerNCCLBenchmark(
 			{
 				Name:  "SEND_OTEL_METRICS",
 				Value: strconv.FormatBool(sendOtelMetrics),
+			},
+			{
+				Name:  "SEND_OTEL_METRICS_GRPC",
+				Value: strconv.FormatBool(sendOtelMetricsGrpc),
+			},
+			{
+				Name:  "SEND_OTEL_METRICS_HTTP",
+				Value: strconv.FormatBool(sendOtelMetricsHttp),
 			},
 			{
 				Name:  "OTEL_COLLECTOR_ENDPOINT",

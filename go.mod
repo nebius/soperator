@@ -5,7 +5,6 @@ go 1.22.0
 toolchain go1.22.5
 
 require (
-	github.com/aws/smithy-go v1.20.3
 	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
 	github.com/open-telemetry/opentelemetry-operator v0.103.0
