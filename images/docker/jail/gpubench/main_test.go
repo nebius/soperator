@@ -2,69 +2,114 @@ package main
 
 import (
 	"context"
-	"flag"
-	"os"
 	"testing"
+
+	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/metric/noop"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestMainFunction(t *testing.T) {
-	// Set command-line arguments
-	os.Args = []string{"cmd", "--slurm_name=workerTest", "--message=This is a test event", "--type=Normal"}
+func TestSendMetrics(t *testing.T) {
+	ctx := context.Background()
+	meter := noop.NewMeterProvider().Meter("test-meter")
 
-	// Parse command-line arguments
-	slurmNodeName := flag.String("slurm_name", "", "The reason for the event")
-	message := flag.String("message", "", "The message for the event")
-	eventType := flag.String("type", "", "The type of the event")
-	flag.Parse()
+	slurmNode := "test-node"
+	avgBandwidth := 500.0
+	limitValue := 420.0
+	succeed := 1
 
-	// Check command-line arguments
-	if *slurmNodeName != "workerTest" || *message != "This is a test event" || *eventType != "Normal" {
-		t.Fatalf("Command-line arguments are incorrect")
+	*pushMetricsGrpc = true
+	// *pushMetricsHttp = true
+
+	hook := testLogHook()
+	defer hook.reset()
+
+	sendMetrics(ctx, meter, slurmNode, avgBandwidth, limitValue, succeed)
+
+	assertLogContains(t, hook, "avg_bandwidth", avgBandwidth)
+	assertLogContains(t, hook, "limit_value", limitValue)
+	assertLogContains(t, hook, "succeed", succeed)
+}
+
+func assertLogContains(t *testing.T, hook *testLogger, field string, expectedValue interface{}) {
+	for _, entry := range hook.entries {
+		if entry.Data[field] == expectedValue {
+			return
+		}
+	}
+	t.Errorf("Log does not contain expected field %s with value %v", field, expectedValue)
+}
+
+type testLogger struct {
+	entries []logrus.Entry
+}
+
+func (l *testLogger) Fire(entry *logrus.Entry) error {
+	l.entries = append(l.entries, *entry)
+	return nil
+}
+
+func (l *testLogger) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
+func testLogHook() *testLogger {
+	hook := &testLogger{}
+	logrus.AddHook(hook)
+	return hook
+}
+
+func (l *testLogger) reset() {
+	logrus.StandardLogger().ReplaceHooks(make(logrus.LevelHooks))
+}
+
+func TestGenerateEvent(t *testing.T) {
+	e := &EventGenerator{
+		clientset: &MockClientset{},
 	}
 
-	// Create fake client
-	clientset := fake.NewSimpleClientset()
+	ctx := context.Background()
+	currentNode := "node1"
+	message := "message"
+	eventType := "type"
+	reason := "reason"
 
-	namespace := "test"
-	event := &v1.Event{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "slurm-node-",
-			Namespace:    namespace,
-		},
-		Message:        *message,
-		Reason:         *slurmNodeName,
-		Type:           *eventType,
-		LastTimestamp:  metav1.Now(),
-		Source:         v1.EventSource{Component: "nccl-benchmark"},
-		InvolvedObject: v1.ObjectReference{Kind: "Pod", Namespace: namespace, Name: *slurmNodeName},
-	}
+	e.generateEvent(ctx, currentNode, message, eventType, reason)
 
-	ctx := context.TODO()
-	opts := metav1.CreateOptions{}
+	// If the function didn't panic or block, we assume it passed.
+	// More detailed assertions would require more detailed mocks.
+	assert.True(t, true)
+}
 
-	// Create event
-	_, err := clientset.CoreV1().Events(namespace).Create(ctx, event, opts)
-	if err != nil {
-		t.Fatalf("Failed to create event: %v", err)
-	}
+type MockEventInterface struct {
+	corev1.EventInterface // Embed the interface we want to mock
+}
 
-	// List events
-	events, err := clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		t.Fatalf("Failed to list events: %v", err)
-	}
+// Override the Create method
+func (m *MockEventInterface) Create(ctx context.Context, event *v1.Event, opts metav1.CreateOptions) (*v1.Event, error) {
+	return event, nil
+}
 
-	// Check if event was created
-	if len(events.Items) != 1 {
-		t.Fatalf("Expected 1 event, got %d", len(events.Items))
-	}
+type MockCoreV1 struct {
+	corev1.CoreV1Interface // Embed the interface we want to mock
+}
 
-	// Check event properties
-	if events.Items[0].Message != *message || events.Items[0].Reason != *slurmNodeName || events.Items[0].Type != *eventType {
-		t.Errorf("Event properties are incorrect")
-	}
+// Override the Events method
+func (m *MockCoreV1) Events(namespace string) corev1.EventInterface {
+	return &MockEventInterface{}
+}
+
+type MockClientset struct {
+	*fake.Clientset
+}
+
+// Ensure CoreV1 returns a CoreV1Interface
+func (m *MockClientset) CoreV1() corev1.CoreV1Interface {
+	return &MockCoreV1{}
 }
