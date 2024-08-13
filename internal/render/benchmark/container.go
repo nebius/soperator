@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"fmt"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -15,24 +16,30 @@ import (
 // renderContainerNCCLBenchmark renders [corev1.Container] for slurmctld
 func renderContainerNCCLBenchmark(
 	ncclBenchmark *values.SlurmNCCLBenchmark,
-	metrics *slurmv1.Metrics,
+	metrics *slurmv1.Telemetry,
 	clusterName string) corev1.Container {
+
 	var sendJobsEvents bool
-	if ncclBenchmark.SendJobsEvents != nil && *ncclBenchmark.SendJobsEvents {
-		sendJobsEvents = true
-	}
-
 	var sendOtelMetrics bool
-	if ncclBenchmark.SendOTELMetrics != nil && *ncclBenchmark.SendOTELMetrics {
-		sendOtelMetrics = true
+	var otelCollectorEnabled bool
+
+	if metrics != nil && metrics.JobsTelemetry != nil {
+		sendJobsEvents = metrics.JobsTelemetry.SendJobsEvents
+		sendOtelMetrics = metrics.JobsTelemetry.SendOtelMetrics
+		otelCollectorEnabled = metrics.OpenTelemetryCollector.EnabledOtelCollector
 	}
 
-	otelCollectorEndpoint := "localhost:4317"
-	if metrics != nil && metrics.EnableOtelCollector != nil {
-		otelCollectorEndpoint = naming.BuildOtelSvc(clusterName)
-	} else if ncclBenchmark.OtelCollectorEndpoint != nil {
-		otelCollectorEndpoint = *ncclBenchmark.OtelCollectorEndpoint
+	otelCollectorHost := "localhost"
+	switch sendOtelMetrics {
+	case metrics.JobsTelemetry.OtelCollectorGrpcHost != nil:
+		otelCollectorHost = *metrics.JobsTelemetry.OtelCollectorGrpcHost
+	case metrics.JobsTelemetry.OtelCollectorHttpHost != nil:
+		otelCollectorHost = *metrics.JobsTelemetry.OtelCollectorHttpHost
+	case otelCollectorEnabled:
+		naming.BuildOtelSvcEndpoint(clusterName, metrics.JobsTelemetry.OtelCollectorPort)
 	}
+
+	otelCollectorEndpoint := fmt.Sprintf("%s:%d", otelCollectorHost, metrics.JobsTelemetry.OtelCollectorPort)
 
 	return corev1.Container{
 		Name:            ncclBenchmark.ContainerNCCLBenchmark.Name,

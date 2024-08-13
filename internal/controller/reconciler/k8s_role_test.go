@@ -82,9 +82,9 @@ func Test_GetRole(t *testing.T) {
 					Namespace: defaultNamespace,
 				},
 				Spec: slurmv1.SlurmClusterSpec{
-					PeriodicChecks: slurmv1.PeriodicChecks{
-						NCCLBenchmark: slurmv1.NCCLBenchmark{
-							SendJobsEvents: &[]bool{true}[0],
+					Telemetry: &slurmv1.Telemetry{
+						JobsTelemetry: &slurmv1.JobsTelemetry{
+							SendJobsEvents: true,
 						},
 					},
 				},

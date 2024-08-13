@@ -48,10 +48,10 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 		{
 			if check.IsOtelCRDInstalled() {
 				foundPodTemplate := &corev1.PodTemplate{}
-				if clusterValues.Metrics != nil && clusterValues.Metrics.EnableOtelCollector != nil {
+				if clusterValues.Telemetry.OpenTelemetryCollector != nil && clusterValues.Telemetry.OpenTelemetryCollector.EnabledOtelCollector {
 
-					if clusterValues.Metrics.PodTemplateNameRef != nil {
-						podTemplateName := *clusterValues.Metrics.PodTemplateNameRef
+					if clusterValues.Telemetry.OpenTelemetryCollector.PodTemplateNameRef != nil {
+						podTemplateName := *clusterValues.Telemetry.OpenTelemetryCollector.PodTemplateNameRef
 
 						err := r.Get(
 							ctx,
@@ -67,7 +67,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 						}
 					}
 				}
-				desired, err := otel.RenderOtelCollector(clusterValues.Name, clusterValues.Namespace, clusterValues.Metrics, foundPodTemplate)
+				desired, err := otel.RenderOtelCollector(clusterValues.Name, clusterValues.Namespace, clusterValues.Telemetry, foundPodTemplate)
 				if err != nil {
 					err = r.Otel.Reconcile(ctx, cluster, &desired, false)
 				} else {

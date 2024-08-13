@@ -182,6 +182,6 @@ func BuildRoleBindingWorkerName(clusterName string) string {
 	return clusterName + "-worker-events-role-binding"
 }
 
-func BuildOtelSvc(clusterName string) string {
-	return clusterName + "-collector:4317"
+func BuildOtelSvcEndpoint(clusterName string, otelCollectorPort int32) string {
+	return fmt.Sprintf("%s-collector:%d", clusterName, otelCollectorPort)
 }

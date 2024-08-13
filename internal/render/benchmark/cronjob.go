@@ -22,7 +22,7 @@ func RenderNCCLBenchmarkCronJob(
 	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	ncclBenchmark *values.SlurmNCCLBenchmark,
-	metrics *slurmv1.Metrics,
+	metrics *slurmv1.Telemetry,
 ) (batchv1.CronJob, error) {
 	labels := common.RenderLabels(consts.ComponentTypeBenchmark, clusterName)
 

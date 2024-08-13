@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"fmt"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -8,16 +9,34 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/values"
 
-	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_RenderContainerNCCLBenchmark(t *testing.T) {
+
+	var otelCollectorPort int32 = 4398
 	ncclBenchmark := &values.SlurmNCCLBenchmark{
 		Name: "test-nccl-benchmark",
 
 		ContainerNCCLBenchmark: values.Container{
 			Name: consts.ContainerNameNCCLBenchmark,
+		},
+	}
+
+	metrics := &slurmv1.Telemetry{
+		Prometheus: &slurmv1.MetricsPrometheus{
+			Enabled: true,
+		},
+		OpenTelemetryCollector: &slurmv1.MetricsOpenTelemetryCollector{
+			EnabledOtelCollector:  true,
+			ReplicasOtelCollector: 1,
+		},
+		JobsTelemetry: &slurmv1.JobsTelemetry{
+			SendJobsEvents:        true,
+			SendOtelMetrics:       true,
+			OtelCollectorGrpcHost: nil,
+			OtelCollectorHttpHost: nil,
+			OtelCollectorPort:     otelCollectorPort,
 		},
 	}
 
@@ -29,12 +48,7 @@ func Test_RenderContainerNCCLBenchmark(t *testing.T) {
 	ncclBenchmark.NCCLArguments.ThresholdMoreThan = "100"
 	ncclBenchmark.NCCLArguments.UseInfiniband = true
 	ncclBenchmark.FailureActions.SetSlurmNodeDrainState = true
-	ncclBenchmark.SendJobsEvents = ptr.Bool(true)
-	ncclBenchmark.SendOTELMetrics = ptr.Bool(true)
-	ncclBenchmark.OtelCollectorEndpoint = ptr.String("localhost:4317")
 	ncclBenchmark.Image = "test-image"
-
-	metrics := &slurmv1.Metrics{}
 
 	container := renderContainerNCCLBenchmark(ncclBenchmark, metrics, "test-cluster")
 
@@ -50,7 +64,7 @@ func Test_RenderContainerNCCLBenchmark(t *testing.T) {
 	assert.Equal(t, "true", getEnvVarValue(container, "USE_INFINIBAND"))
 	assert.Equal(t, "true", getEnvVarValue(container, "SEND_JOBS_EVENTS"))
 	assert.Equal(t, "true", getEnvVarValue(container, "SEND_OTEL_METRICS"))
-	assert.Equal(t, "localhost:4317", getEnvVarValue(container, "OTEL_COLLECTOR_ENDPOINT"))
+	assert.Equal(t, fmt.Sprintf("localhost:%d", otelCollectorPort), getEnvVarValue(container, "OTEL_COLLECTOR_ENDPOINT"))
 	assert.Len(t, container.VolumeMounts, 3)
 }
 

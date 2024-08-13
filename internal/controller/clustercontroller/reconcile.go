@@ -330,10 +330,10 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &slurmv1.SlurmCluster{}, podTemplateField, func(rawObj client.Object) []string {
 		slurmCluster := rawObj.(*slurmv1.SlurmCluster)
-		if slurmCluster.Spec.Metrics == nil || slurmCluster.Spec.Metrics.PodTemplateNameRef == nil {
+		if slurmCluster.Spec.Telemetry == nil || slurmCluster.Spec.Telemetry.OpenTelemetryCollector == nil || slurmCluster.Spec.Telemetry.OpenTelemetryCollector.PodTemplateNameRef == nil {
 			return nil
 		}
-		return []string{*slurmCluster.Spec.Metrics.PodTemplateNameRef}
+		return []string{*slurmCluster.Spec.Telemetry.OpenTelemetryCollector.PodTemplateNameRef}
 	}); err != nil {
 		return err
 	}
