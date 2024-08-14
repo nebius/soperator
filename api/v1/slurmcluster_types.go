@@ -72,7 +72,7 @@ type SlurmClusterSpec struct {
 	// Metrics define the desired state of the prometheus or opentelemetry metrics
 	//
 	// +kubebuilder:validation:Optional
-	Telemetry *Telemetry `json:"metrics,omitempty"`
+	Telemetry *Telemetry `json:"telemetry,omitempty"`
 }
 
 type NCCLSettings struct {

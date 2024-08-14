@@ -77,3 +77,51 @@ func getEnvVarValue(container corev1.Container, name string) string {
 
 	return ""
 }
+
+func Test_RenderContainerNCCLBenchmark_JobTelemetry_Nil(t *testing.T) {
+
+	ncclBenchmark := &values.SlurmNCCLBenchmark{
+		Name: "test-nccl-benchmark",
+
+		ContainerNCCLBenchmark: values.Container{
+			Name: consts.ContainerNameNCCLBenchmark,
+		},
+	}
+
+	metrics := &slurmv1.Telemetry{
+		Prometheus: &slurmv1.MetricsPrometheus{
+			Enabled: true,
+		},
+		OpenTelemetryCollector: &slurmv1.MetricsOpenTelemetryCollector{
+			EnabledOtelCollector:  true,
+			ReplicasOtelCollector: 1,
+		},
+	}
+
+	ncclBenchmark.ContainerNCCLBenchmark.Image = "test-image"
+	ncclBenchmark.NCCLArguments.MinBytes = "1024"
+	ncclBenchmark.NCCLArguments.MaxBytes = "2048"
+	ncclBenchmark.NCCLArguments.StepFactor = "2"
+	ncclBenchmark.NCCLArguments.Timeout = "300"
+	ncclBenchmark.NCCLArguments.ThresholdMoreThan = "100"
+	ncclBenchmark.NCCLArguments.UseInfiniband = true
+	ncclBenchmark.FailureActions.SetSlurmNodeDrainState = true
+	ncclBenchmark.Image = "test-image"
+
+	container := renderContainerNCCLBenchmark(ncclBenchmark, metrics, "test-cluster")
+
+	assert.Equal(t, consts.ContainerNameNCCLBenchmark, container.Name)
+	assert.Equal(t, "test-image", container.Image)
+	assert.Equal(t, corev1.PullAlways, container.ImagePullPolicy)
+	assert.Equal(t, "1024", getEnvVarValue(container, "NCCL_MIN_BYTES"))
+	assert.Equal(t, "2048", getEnvVarValue(container, "NCCL_MAX_BYTES"))
+	assert.Equal(t, "2", getEnvVarValue(container, "NCCL_STEP_FACTOR"))
+	assert.Equal(t, "300", getEnvVarValue(container, "NCCL_BENCH_TIMOUT"))
+	assert.Equal(t, "100", getEnvVarValue(container, "THRESHOLD_MORE_THAN"))
+	assert.Equal(t, "true", getEnvVarValue(container, "DRAIN_SLURM_STATE"))
+	assert.Equal(t, "true", getEnvVarValue(container, "USE_INFINIBAND"))
+	assert.Equal(t, "false", getEnvVarValue(container, "SEND_JOBS_EVENTS"))
+	assert.Equal(t, "false", getEnvVarValue(container, "SEND_OTEL_METRICS"))
+	assert.Equal(t, fmt.Sprintf("localhost:%d", OtelCollectorPort), getEnvVarValue(container, "OTEL_COLLECTOR_ENDPOINT"))
+	assert.Len(t, container.VolumeMounts, 3)
+}

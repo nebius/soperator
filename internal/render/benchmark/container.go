@@ -13,6 +13,10 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
+var (
+	OtelCollectorPort int32 = 4317
+)
+
 // renderContainerNCCLBenchmark renders [corev1.Container] for slurmctld
 func renderContainerNCCLBenchmark(
 	ncclBenchmark *values.SlurmNCCLBenchmark,
@@ -29,21 +33,24 @@ func renderContainerNCCLBenchmark(
 		sendJobsEvents = metrics.JobsTelemetry.SendJobsEvents
 		sendOtelMetrics = metrics.JobsTelemetry.SendOtelMetrics
 		otelCollectorEnabled = metrics.OpenTelemetryCollector.EnabledOtelCollector
+		OtelCollectorPort = metrics.JobsTelemetry.OtelCollectorPort
 	}
 
 	otelCollectorHost := "localhost"
-	switch sendOtelMetrics {
-	case metrics.JobsTelemetry.OtelCollectorGrpcHost != nil:
-		otelCollectorHost = *metrics.JobsTelemetry.OtelCollectorGrpcHost
-		sendOtelMetricsGrpc = true
-	case metrics.JobsTelemetry.OtelCollectorHttpHost != nil:
-		otelCollectorHost = *metrics.JobsTelemetry.OtelCollectorHttpHost
-		sendOtelMetricsHttp = true
-	case otelCollectorEnabled:
-		naming.BuildOtelSvcEndpoint(clusterName, metrics.JobsTelemetry.OtelCollectorPort)
+	if sendOtelMetrics {
+		switch {
+		case metrics.JobsTelemetry.OtelCollectorGrpcHost != nil:
+			otelCollectorHost = *metrics.JobsTelemetry.OtelCollectorGrpcHost
+			sendOtelMetricsGrpc = true
+		case metrics.JobsTelemetry.OtelCollectorHttpHost != nil:
+			otelCollectorHost = *metrics.JobsTelemetry.OtelCollectorHttpHost
+			sendOtelMetricsHttp = true
+		case otelCollectorEnabled:
+			naming.BuildOtelSvcEndpoint(clusterName, OtelCollectorPort)
+		}
 	}
 
-	otelCollectorEndpoint := fmt.Sprintf("%s:%d", otelCollectorHost, metrics.JobsTelemetry.OtelCollectorPort)
+	otelCollectorEndpoint := fmt.Sprintf("%s:%d", otelCollectorHost, OtelCollectorPort)
 
 	return corev1.Container{
 		Name:            ncclBenchmark.ContainerNCCLBenchmark.Name,
