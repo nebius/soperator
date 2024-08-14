@@ -21,7 +21,7 @@ func RenderOtelCollector(clusterName,
 	metrics *slurmv1.Telemetry,
 	foundPodTemplate *corev1.PodTemplate,
 ) (otelv1beta1.OpenTelemetryCollector, error) {
-	if metrics == nil || metrics.OpenTelemetryCollector == nil || !metrics.OpenTelemetryCollector.EnabledOtelCollector {
+	if metrics == nil || metrics.OpenTelemetryCollector == nil || !metrics.OpenTelemetryCollector.Enabled {
 		return otelv1beta1.OpenTelemetryCollector{}, errors.New("OpenTelemetry Collector is not enabled")
 	}
 
