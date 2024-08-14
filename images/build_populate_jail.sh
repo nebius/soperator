@@ -14,7 +14,7 @@ done
 
 mkdir -p outputs
 
-./docker/jail/make_rootfs_tarball.sh -d docker/jail/jail.dockerfile ${iopt}
-IMAGE_VERSION=${IMAGE_VERSION} ./build.sh -d docker/populate_jail/populate_jail.dockerfile -t populate_jail ${iopt} ${nopt}
+./jail/make_rootfs_tarball.sh -d jail/jail.dockerfile ${iopt}
+IMAGE_VERSION=${IMAGE_VERSION} ./build.sh -d populate_jail/populate_jail.dockerfile -t populate_jail ${iopt} ${nopt}
 
 echo "Finished: build_populate_jail.sh"

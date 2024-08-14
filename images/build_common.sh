@@ -13,9 +13,9 @@ done
 
 mkdir -p outputs
 
-IMAGE_VERSION=latest ./build.sh -d docker/common/nccl.dockerfile       -t nccl       ${iopt} -n
-IMAGE_VERSION=latest ./build.sh -d docker/common/nccl_tests.dockerfile -t nccl_tests ${iopt} -n
-IMAGE_VERSION=latest ./build.sh -d docker/common/slurm.dockerfile      -t slurm      ${iopt} -n
+IMAGE_VERSION=latest ./build.sh -d common/nccl.dockerfile       -t nccl       ${iopt} -n
+IMAGE_VERSION=latest ./build.sh -d common/nccl_tests.dockerfile -t nccl_tests ${iopt} -n
+IMAGE_VERSION=latest ./build.sh -d common/slurm.dockerfile      -t slurm      ${iopt} -n
 
 wait
 

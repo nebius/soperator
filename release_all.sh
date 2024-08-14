@@ -39,9 +39,7 @@ echo "Version is ${VERSION}"
 echo "Image version is ${IMAGE_VERSION}"
 
 echo "Uploading images to the build agent"
-pushd images
-    ./upload_to_build_agent.sh -u "$user" -k "$key"
-popd
+./images/upload_to_build_agent.sh -u "$user" -k "$key"
 
 remote_command=$(cat <<EOF
 set -e

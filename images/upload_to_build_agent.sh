@@ -20,9 +20,5 @@ echo "Uploading sources to the slurm-build-agent VM (https://console.nebius.ai/f
 
 agent_ip=195.242.25.163
 
-rsync -Prv -e "ssh -i ${key}" docker                 "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/
-rsync -Prv -e "ssh -i ${key}" build.sh               "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/
-rsync -Prv -e "ssh -i ${key}" build_common.sh        "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/
-rsync -Prv -e "ssh -i ${key}" build_all.sh           "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/
-rsync -Prv -e "ssh -i ${key}" build_populate_jail.sh "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/
-rsync -Prv -e "ssh -i ${key}" ../VERSION             "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/
+rsync -Prv -e "ssh -i ${key}" images/                 "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/
+rsync -Prv -e "ssh -i ${key}" VERSION             "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/

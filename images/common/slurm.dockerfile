@@ -43,7 +43,7 @@ RUN cd /usr/src && \
 
 # Install PMIx in order to build Slurm with PMIx support
 # Slurm deb packages will be already compiled with PMIx support even without it, but only with v3, while we use v5
-COPY docker/common/scripts/install_pmix.sh /opt/bin/
+COPY common/scripts/install_pmix.sh /opt/bin/
 RUN chmod +x /opt/bin/install_pmix.sh && \
     /opt/bin/install_pmix.sh && \
     rm /opt/bin/install_pmix.sh
