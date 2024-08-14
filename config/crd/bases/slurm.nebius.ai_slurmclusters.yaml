@@ -2787,6 +2787,11 @@ spec:
                         description: Specifies the HTTP OtelCollector host for sending
                           Opentelemetry metrics
                         type: string
+                      otelCollectorPath:
+                        default: /v1/metrics
+                        description: Specifies the path to the OtelCollector endpoint
+                          for sending Opentelemetry metrics
+                        type: string
                       otelCollectorPort:
                         default: 4317
                         description: 'Specifies the port for OtelCollector, default
@@ -2794,10 +2799,12 @@ spec:
                         format: int32
                         type: integer
                       sendJobsEvents:
+                        default: false
                         description: Defines whether to send Kubernetes events for
                           Slurm NCCLBenchmark jobs
                         type: boolean
                       sendOtelMetrics:
+                        default: false
                         description: Defines whether to send Opentelemetry metrics
                           for Slurm NCCLBenchmark jobs
                         type: boolean
@@ -2806,7 +2813,8 @@ spec:
                     description: It has to be set to true if OpenTelemetry Operator
                       CRD is used
                     properties:
-                      enableOtelCollector:
+                      enabled:
+                        default: false
                         description: It has to be set to true if OpenTelemetry Operator
                           is used
                         type: boolean
