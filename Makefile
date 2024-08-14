@@ -1,11 +1,20 @@
-# Stable images get pulled from here
-# https://console.nebius.ai/folders/bje82q7sm8njm3c4rrlq/container-registry/registries/crnlu9nio77sg3p8n5bi/overview
-CONTAINER_REGISTRY_STABLE_ID = crnlu9nio77sg3p8n5bi
-CONTAINER_REGISTRY_STABLE = cr.nemax.nebius.cloud/$(CONTAINER_REGISTRY_STABLE_ID)
+CONTAINER_REGISTRY_ADDR = cr.nemax.nebius.cloud
 
-# OCI for Helm charts
+# Stable images get pulled from here
+# Link here
+CONTAINER_REGISTRY_STABLE_ID = id_here
+
+# Unstable images get pulled from here
+# https://console.nebius.ai/folders/bje82q7sm8njm3c4rrlq/container-registry/registries/crnlu9nio77sg3p8n5bi/overview
+CONTAINER_REGISTRY_UNSTABLE_ID =  crnlu9nio77sg3p8n5bi
+
+# OCI for Stable helm charts
+# Link here
+CONTAINER_REGISTRY_HELM_STABLE_ID = id_here
+
+# OCI for Unstable Helm charts
 # https://console.nebius.ai/folders/bje82q7sm8njm3c4rrlq/container-registry/registries/crnefnj17i4kqgt3up94/overview
-CONTAINER_REGISTRY_HELM_ID = crnefnj17i4kqgt3up94
+CONTAINER_REGISTRY_HELM_UNSTABLE_ID = crnefnj17i4kqgt3up94
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.28.0
@@ -27,17 +36,35 @@ SHELL = /usr/bin/env bash -o pipefail
 # Limit the scope of generation otherwise it will try to generate configs for non-controller code
 GENPATH = "./api/v1;./internal/controller/..."
 
-CHART_PATH            = helm
-CHART_OPERATOR_PATH   = $(CHART_PATH)/slurm-operator
-CHART_CLUSTER_PATH    = $(CHART_PATH)/slurm-cluster
-CHART_STORAGE_PATH    = $(CHART_PATH)/slurm-cluster-storage
+CHART_PATH            		= helm
+CHART_OPERATOR_PATH   		= $(CHART_PATH)/slurm-operator
+CHART_CLUSTER_PATH    		= $(CHART_PATH)/slurm-cluster
+CHART_STORAGE_PATH    		= $(CHART_PATH)/slurm-cluster-storage
 
-VERSION               = $(shell cat VERSION)
+SLURM_VERSION		  		= 23.11.6
+UBUNTU_VERSION		  		= focal
+VERSION               		= $(shell cat VERSION)
+CONTAINER_REGISTRY_ID 		= $(CONTAINER_REGISTRY_UNSTABLE_ID)
+CONTAINER_REGISTRY_HELM_ID 	= $(CONTAINER_REGISTRY_HELM_UNSTABLE_ID)
+
+ifeq ($(shell uname), Darwin)
+    SHA_CMD = shasum -a 256
+else
+    SHA_CMD = sha256sum
+endif
+ifeq ($(UNSTABLE), true)
+    SHORT_SHA 					= $(shell echo -n "$(VERSION)" | $(SHA_CMD) | cut -c1-8)
+    VERSION 					:= $(VERSION)-$(SHORT_SHA)
+    CONTAINER_REGISTRY_ID  		= $(CONTAINER_REGISTRY_UNSTABLE_ID)
+    CONTAINER_REGISTRY_HELM_ID 	= $(CONTAINER_REGISTRY_HELM_UNSTABLE_ID)
+endif
+
+IMAGE_VERSION		  = $(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(VERSION)
 GO_CONST_VERSION_FILE = internal/consts/version.go
 
 # Image URL to use all building/pushing image targets
-OPERATOR_IMAGE_REPO ?= $(CONTAINER_REGISTRY_STABLE)/slurm-operator
-OPERATOR_IMAGE_TAG  ?= $(VERSION)
+OPERATOR_IMAGE_REPO = $(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/slurm-operator
+OPERATOR_IMAGE_TAG  = $(VERSION)
 
 .PHONY: all
 all: build
@@ -95,11 +122,21 @@ helm: kustomize helmify yq ## Update slurm-operator Helm chart
 	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir $(CHART_OPERATOR_PATH)
 	rm -f $(CHART_PATH)/operatorAppVersion
 
+.PHONY: get-version
+get-version:
+	@echo '$(VERSION)'
+
+.PHONY: get-image-version
+get-image-version:
+	@echo '$(IMAGE_VERSION)'
+
 .PHONY: sync-version
 sync-version: ## Sync versions from file
+	@echo 'Version is - $(VERSION)'
+	@echo 'Image version is - $(IMAGE_VERSION)'
 	@# region config/manager/kustomization.yaml
 	@echo 'Syncing config/manager/kustomization.yaml'
-	@$(YQ) -i ".images.[0].newName = \"$(CONTAINER_REGISTRY_STABLE)/slurm-operator\"" "config/manager/kustomization.yaml"
+	@$(YQ) -i ".images.[0].newName = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/slurm-operator\"" "config/manager/kustomization.yaml"
 	@$(YQ) -i ".images.[0].newTag = \"$(VERSION)\"" "config/manager/kustomization.yaml"
 	@# endregion config/manager/kustomization.yaml
 
@@ -120,12 +157,12 @@ sync-version: ## Sync versions from file
 
 	@# region helm/slurm-cluster/values.yaml
 	@echo 'Syncing helm/slurm-cluster/values.yaml'
-	@$(YQ) -i ".periodicChecks.ncclBenchmark.image = \"$(CONTAINER_REGISTRY_STABLE)/nccl_benchmark\"" "helm/slurm-cluster/values.yaml"
-	@$(YQ) -i ".images.slurmctld = \"$(CONTAINER_REGISTRY_STABLE)/controller_slurmctld\"" "helm/slurm-cluster/values.yaml"
-	@$(YQ) -i ".images.slurmd = \"$(CONTAINER_REGISTRY_STABLE)/worker_slurmd\"" "helm/slurm-cluster/values.yaml"
-	@$(YQ) -i ".images.sshd = \"$(CONTAINER_REGISTRY_STABLE)/login_sshd\"" "helm/slurm-cluster/values.yaml"
-	@$(YQ) -i ".images.munge = \"$(CONTAINER_REGISTRY_STABLE)/munge\"" "helm/slurm-cluster/values.yaml"
-	@$(YQ) -i ".images.populateJail = \"$(CONTAINER_REGISTRY_STABLE)/populate_jail\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.ncclBenchmark = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/nccl_benchmark:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.slurmctld = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/controller_slurmctld:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.slurmd = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/worker_slurmd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.sshd = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/login_sshd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.munge = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/munge:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.populateJail = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/populate_jail:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@# endregion helm/slurm-cluster/values.yaml
 
 	@# region helm/slurm-cluster/templates/_registry_helpers.tpl
@@ -134,13 +171,13 @@ sync-version: ## Sync versions from file
 	@echo ''                                                       >>  $(CHART_CLUSTER_PATH)/templates/_registry_helpers.tpl
 	@echo '{{/* Container registry with stable Docker images */}}' >> $(CHART_CLUSTER_PATH)/templates/_registry_helpers.tpl
 	@echo '{{- define "slurm-cluster.containerRegistry" -}}'       >> $(CHART_CLUSTER_PATH)/templates/_registry_helpers.tpl
-	@echo "    {{- \"$(CONTAINER_REGISTRY_STABLE)\" -}}"           >> $(CHART_CLUSTER_PATH)/templates/_registry_helpers.tpl
+	@echo "    {{- \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)\" -}}"           >> $(CHART_CLUSTER_PATH)/templates/_registry_helpers.tpl
 	@echo "{{- end }}"                                             >> $(CHART_CLUSTER_PATH)/templates/_registry_helpers.tpl
 	@# endregion helm/slurm-cluster/templates/_registry_helpers.tpl
 
 	@# region helm/slurm-operator/values.yaml
 	@echo 'Syncing helm/slurm-operator/values.yaml'
-	@$(YQ) -i ".controllerManager.manager.image.repository = \"$(CONTAINER_REGISTRY_STABLE)/slurm-operator\"" "helm/slurm-operator/values.yaml"
+	@$(YQ) -i ".controllerManager.manager.image.repository = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/slurm-operator\"" "helm/slurm-operator/values.yaml"
 	@$(YQ) -i ".controllerManager.manager.image.tag = \"$(VERSION)\"" "helm/slurm-operator/values.yaml"
 	@# endregion helm/slurm-operator/values.yaml
 

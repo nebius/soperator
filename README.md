@@ -9,19 +9,17 @@ The private doc targeted on solution architects is available here:  https://docs
 
 **DO NOT SKIP THIS STEP! Otherwise, you may break someone's production.**
 
-After you started working on a new task and created a branch for it, patch the version in file [VERSION](./VERSION) by
-adding the following suffix: `-<your_name>-<short_description>`.
+After you started working on a new task and created a branch for it, patch the version in file [VERSION](./VERSION)
 
-For example, if the version looked so:
-
+Example:
 ```
 1.2.3
 ```
 
-Make it look so:
+When you will run ./release_all.sh without `-s (stable)`, version in file will not changed, but will be:
 
 ```
-1.2.3-rodrijjke-fix-munge
+1.2.3-c47f5b18
 ```
 
 In this approach, the `MAJOR.MINOR.PATH` part that you remained untouched shows the version of the system your changes 

@@ -80,8 +80,6 @@ periodicChecks:
     successfulJobsHistoryLimit: 3
     # Number of failed finished jobs to retain
     failedJobsHistoryLimit: 3
-    # Image for the NCCL test
-    image: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/nccl_benchmark"
     # NCCL test settings
     ncclArguments:
       # Minimum memory size to start NCCL with
@@ -182,8 +180,9 @@ slurmNodes:
 #          volumeSourceName: "mlperf-sd"
 
 images:
-  slurmctld: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/controller_slurmctld"
-  slurmd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/worker_slurmd"
-  sshd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/login_sshd"
-  munge: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/munge"
-  populateJail: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/populate_jail"
+  slurmctld: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/controller_slurmctld:focal-slurm23.11.6-1.5.7"
+  slurmd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/worker_slurmd:focal-slurm23.11.6-1.5.7"
+  sshd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/login_sshd:focal-slurm23.11.6-1.5.7"
+  munge: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/munge:focal-slurm23.11.6-1.5.7"
+  populateJail: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/populate_jail:focal-slurm23.11.6-1.5.7"
+  ncclBenchmark: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/nccl_benchmark:focal-slurm23.11.6-1.5.7

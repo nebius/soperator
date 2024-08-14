@@ -1,6 +1,6 @@
 FROM golang:1.22 AS operator_builder
 
-ARG GO_LDFLAGS
+ARG GO_LDFLAGS=""
 ARG BUILD_TIME
 ARG CGO_ENABLED=0
 ARG GOOS=linux

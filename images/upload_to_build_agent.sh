@@ -16,7 +16,7 @@ if [ -z "$user" ] || [ -z "$key" ]; then
     usage
 fi
 
-echo "Uploading nebo/msp/prototypes/slurm sources to the slurm-build-agent VM (https://console.nebius.ai/folders/bje82q7sm8njm3c4rrlq/compute/instance/dp75k0v9ooje2g6vk0c0/overview)"
+echo "Uploading sources to the slurm-build-agent VM (https://console.nebius.ai/folders/bje82q7sm8njm3c4rrlq/compute/instance/dp75k0v9ooje2g6vk0c0/overview)"
 
 agent_ip=195.242.25.163
 
