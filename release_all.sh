@@ -24,8 +24,19 @@ fi
 
 start_time=$(date +%s)
 
-echo "Syncing versions among all files"
-make sync-version
+if [ "$stable" == "1" ]; then
+    UNSTABLE="false"
+else
+    UNSTABLE="true"
+fi
+
+echo "Syncing versions among all files for stable release"
+make sync-version UNSTABLE=${UNSTABLE}
+IMAGE_VERSION=$(make get-image-version UNSTABLE=${UNSTABLE})
+VERSION=$(make get-version UNSTABLE=${UNSTABLE})
+
+echo "Version is ${VERSION}"
+echo "Image version is ${IMAGE_VERSION}"
 
 echo "Uploading images to the build agent"
 pushd images
@@ -45,8 +56,8 @@ rm -rf outputs/*
 
 echo "Building container images"
 ./build_common.sh
-./build_all.sh &
-./build_populate_jail.sh &
+IMAGE_VERSION=${IMAGE_VERSION} ./build_all.sh -s "${stable}" &
+IMAGE_VERSION=${IMAGE_VERSION} ./build_populate_jail.sh -s "${stable}" &
 
 wait
 
@@ -72,35 +83,34 @@ EOF
 ssh -i "$key" "$user"@"$address" "${remote_command}"
 echo "All images are built successfully"
 
-echo "Updating CRDs & auto-generated code"
-make generate manifests
+echo "Updating CRDs & auto-generated code (included in test step) & run tests"
+make test UNSTABLE=${UNSTABLE}
 
 echo "Building image of the operator"
-make docker-push
+make docker-push UNSTABLE=${UNSTABLE}
 
 echo "Pusing Helm charts"
-./release_helm.sh -afyr
+./release_helm.sh -afyr -v ${VERSION}
 
 echo "Packing new terraform tarball"
-./release_terraform.sh -f
+VERSION=${VERSION} ./release_terraform.sh -f
 
 echo "Unpacking the terraform tarball"
-pushd ./terraform-releases/unstable
-    ./unpack_current_version.sh
-popd
-
-version=$(cat < VERSION | tr -d '\n')
-version_formatted=$(echo "${version}" | tr '-' '_' | tr '.' '_')
+version_formatted=$(echo "${VERSION}" | tr '-' '_' | tr '.' '_')
 tarball="slurm_operator_tf_$version_formatted.tar.gz"
+
+pushd ./terraform-releases/unstable
+    VERSION=${VERSION} TARBALL=${tarball} ./unpack_current_version.sh
+popd
 
 GREEN='\033[0;32m'
 RESET='\033[0m'
 
 if [ "$stable" == "1" ]; then
     mv "terraform-releases/unstable/$tarball" "terraform-releases/stable/"
-    echo -e "${GREEN}Stable version '$version' is successfully released${RESET}"
+    echo -e "${GREEN}Stable version '$VERSION' is successfully released${RESET}"
 else
-    echo -e "${GREEN}Unstable version '$version' is successfully released and unpacked to terraform-releases/unstable/${RESET}"
+    echo -e "${GREEN}Unstable version '$VERSION' is successfully released and unpacked to terraform-releases/unstable/${RESET}"
 fi
 
 end_time=$(date +%s)

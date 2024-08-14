@@ -20,18 +20,16 @@ if [ -z "${dockerfile}" ] || [ -z "${target}" ]; then
     usage
 fi
 
-read -r version < ./VERSION
-
-docker build --tag "${target}:${version}" --target "${target}" ${ignore_cache} --load --platform=linux/amd64 -f "${dockerfile}" .
-echo "Built image ${target}:${version}"
+docker build --tag "${target}:${IMAGE_VERSION}" --target "${target}" ${ignore_cache} --load --platform=linux/amd64 -f "${dockerfile}" .
+echo "Built image ${target}:${IMAGE_VERSION}"
 echo "OK"
 
 if [ -z "${no_push}" ]; then
     # https://console.nebius.ai/folders/bje82q7sm8njm3c4rrlq/container-registry/registries/crnlu9nio77sg3p8n5bi/overview
     container_registry_id=crnlu9nio77sg3p8n5bi
 
-    docker tag "${target}:${version}" "cr.ai.nebius.cloud/${container_registry_id}/${target}:${version}"
-    docker push "cr.ai.nebius.cloud/${container_registry_id}/${target}:${version}"
-    echo "Pushed image ${target}:${version}"
+    docker tag "${target}:${IMAGE_VERSION}" "cr.ai.nebius.cloud/${container_registry_id}/${target}:${IMAGE_VERSION}"
+    docker push "cr.ai.nebius.cloud/${container_registry_id}/${target}:${IMAGE_VERSION}"
+    echo "Pushed image ${target}:${IMAGE_VERSION}"
     echo "OK"
 fi
