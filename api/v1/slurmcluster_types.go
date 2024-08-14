@@ -500,8 +500,8 @@ type Telemetry struct {
 type MetricsOpenTelemetryCollector struct {
 	// It has to be set to true if OpenTelemetry Operator is used
 	//
-	// +kubebuilder:validation:Optional
-	EnabledOtelCollector bool `json:"enableOtelCollector,omitempty"`
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled,omitempty"`
 
 	// It references the PodTemplate with the OpenTelemetry Collector configuration
 	//
@@ -526,12 +526,13 @@ type MetricsPrometheus struct {
 
 type JobsTelemetry struct {
 	// Defines whether to send Kubernetes events for Slurm NCCLBenchmark jobs
-	// +kubebuilder:validation:Optional
+	//
+	// +kubebuilder:default=false
 	SendJobsEvents bool `json:"sendJobsEvents,omitempty"`
 
 	// Defines whether to send Opentelemetry metrics for Slurm NCCLBenchmark jobs
 	//
-	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
 	SendOtelMetrics bool `json:"sendOtelMetrics,omitempty"`
 
 	// Specifies the gRPC OtelCollector host for sending Opentelemetry metrics
@@ -548,6 +549,10 @@ type JobsTelemetry struct {
 	//
 	// +kubebuilder:default=4317
 	OtelCollectorPort int32 `json:"otelCollectorPort,omitempty"`
+	// Specifies the path to the OtelCollector endpoint for sending Opentelemetry metrics
+	//
+	// +kubebuilder:default="/v1/metrics"
+	OtelCollectorPath string `json:"otelCollectorPath,omitempty"`
 }
 
 const (

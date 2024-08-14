@@ -24,7 +24,7 @@ func Test_RenderOtelCollector_Image_True(t *testing.T) {
 			Enabled: true,
 		},
 		OpenTelemetryCollector: &slurmv1.MetricsOpenTelemetryCollector{
-			EnabledOtelCollector:  true,
+			Enabled:               true,
 			ReplicasOtelCollector: 1,
 		},
 	}
@@ -59,7 +59,7 @@ func Test_RenderOtelCollector_Image_Default(t *testing.T) {
 			Enabled: true,
 		},
 		OpenTelemetryCollector: &slurmv1.MetricsOpenTelemetryCollector{
-			EnabledOtelCollector:  true,
+			Enabled:               true,
 			ReplicasOtelCollector: 1,
 		},
 	}
@@ -80,7 +80,7 @@ func Test_RenderOtelCollector_NodeSelector(t *testing.T) {
 			Enabled: true,
 		},
 		OpenTelemetryCollector: &slurmv1.MetricsOpenTelemetryCollector{
-			EnabledOtelCollector:  true,
+			Enabled:               true,
 			ReplicasOtelCollector: 1,
 		},
 	}
@@ -112,7 +112,7 @@ func Test_RenderOtelCollector_Resources(t *testing.T) {
 			Enabled: true,
 		},
 		OpenTelemetryCollector: &slurmv1.MetricsOpenTelemetryCollector{
-			EnabledOtelCollector:  true,
+			Enabled:               true,
 			ReplicasOtelCollector: 1,
 		},
 	}
@@ -152,7 +152,7 @@ func Test_RenderOtelCollector_Env(t *testing.T) {
 			Enabled: true,
 		},
 		OpenTelemetryCollector: &slurmv1.MetricsOpenTelemetryCollector{
-			EnabledOtelCollector:  true,
+			Enabled:               true,
 			ReplicasOtelCollector: 1,
 			PodTemplateNameRef:    &defaultPodTemplateName,
 		},
@@ -194,7 +194,7 @@ func Test_RenderOtelCollector_Endpoint_Default(t *testing.T) {
 			Enabled: true,
 		},
 		OpenTelemetryCollector: &slurmv1.MetricsOpenTelemetryCollector{
-			EnabledOtelCollector:  true,
+			Enabled:               true,
 			ReplicasOtelCollector: 1,
 		},
 	}
@@ -229,7 +229,7 @@ func Test_RenderOtelCollector_Endpoint_Custom_Port(t *testing.T) {
 			Enabled: true,
 		},
 		OpenTelemetryCollector: &slurmv1.MetricsOpenTelemetryCollector{
-			EnabledOtelCollector:  true,
+			Enabled:               true,
 			ReplicasOtelCollector: 1,
 			OtelCollectorPort:     defaultOtelCollectorPort,
 		},
@@ -252,7 +252,7 @@ func Test_RenderOtelCollector_Endpoint_Custom_Port(t *testing.T) {
 			Enabled: true,
 		},
 		OpenTelemetryCollector: &slurmv1.MetricsOpenTelemetryCollector{
-			EnabledOtelCollector:  true,
+			Enabled:               true,
 			ReplicasOtelCollector: 1,
 			OtelCollectorPort:     customOtelCollectorPort,
 		},

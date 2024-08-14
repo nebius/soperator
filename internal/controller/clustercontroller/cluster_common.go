@@ -48,7 +48,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 		{
 			if check.IsOtelCRDInstalled() {
 				foundPodTemplate := &corev1.PodTemplate{}
-				if clusterValues.Telemetry.OpenTelemetryCollector != nil && clusterValues.Telemetry.OpenTelemetryCollector.EnabledOtelCollector {
+				if clusterValues.Telemetry.OpenTelemetryCollector != nil && clusterValues.Telemetry.OpenTelemetryCollector.Enabled {
 
 					if clusterValues.Telemetry.OpenTelemetryCollector.PodTemplateNameRef != nil {
 						podTemplateName := *clusterValues.Telemetry.OpenTelemetryCollector.PodTemplateNameRef

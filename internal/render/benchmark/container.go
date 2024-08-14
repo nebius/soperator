@@ -15,6 +15,7 @@ import (
 
 var (
 	OtelCollectorPort int32 = 4317
+	OtelCollectorPath       = "/v1/metrics"
 )
 
 // renderContainerNCCLBenchmark renders [corev1.Container] for slurmctld
@@ -32,8 +33,12 @@ func renderContainerNCCLBenchmark(
 	if metrics != nil && metrics.JobsTelemetry != nil {
 		sendJobsEvents = metrics.JobsTelemetry.SendJobsEvents
 		sendOtelMetrics = metrics.JobsTelemetry.SendOtelMetrics
-		otelCollectorEnabled = metrics.OpenTelemetryCollector.EnabledOtelCollector
 		OtelCollectorPort = metrics.JobsTelemetry.OtelCollectorPort
+		OtelCollectorPath = metrics.JobsTelemetry.OtelCollectorPath
+	}
+
+	if metrics != nil && metrics.OpenTelemetryCollector != nil {
+		otelCollectorEnabled = metrics.OpenTelemetryCollector.Enabled
 	}
 
 	otelCollectorHost := "localhost"
@@ -104,6 +109,10 @@ func renderContainerNCCLBenchmark(
 			{
 				Name:  "OTEL_COLLECTOR_ENDPOINT",
 				Value: otelCollectorEndpoint,
+			},
+			{
+				Name:  "OTEL_COLLECTOR_PATH",
+				Value: OtelCollectorPath,
 			},
 		},
 		SecurityContext: &corev1.SecurityContext{
