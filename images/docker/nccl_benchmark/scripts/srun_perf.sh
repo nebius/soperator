@@ -2,7 +2,7 @@
 
 set -e
 
-while getopts ":b:e:f:g:t:l:d:u:h:p:n:s:m:c:" opt; do
+while getopts ":b:e:f:g:t:l:d:u:h:p:n:s:m:w:c:" opt; do
   case ${opt} in
     b )
       min_bytes=$OPTARG
@@ -42,6 +42,9 @@ while getopts ":b:e:f:g:t:l:d:u:h:p:n:s:m:c:" opt; do
       ;;
     m )
       push_metrics_grpc=$OPTARG
+      ;;
+    w )
+      push_metrics_http=$OPTARG
       ;;
     c )
       exporter_endpoint=$OPTARG
@@ -91,7 +94,8 @@ run_job_on_node() {
   local kubernetes_service_port=${14}
   local push_events=${15}
   local push_metrics_grpc=${16}
-  local exporter_endpoint=${17}
+  local push_metrics_http=${17}
+  local exporter_endpoint=${18}
 
   job_exists=$(squeue --name="$job_name" -O "ReqNodes" --noheader | grep -w "$node")
 
@@ -107,7 +111,7 @@ run_job_on_node() {
          --cpus-per-task=16 \
          --mem-per-cpu="12GB" \
          --time="$bench_timout" \
-         /usr/bin/gpubench -debug=true -min_bytes="$min_bytes" -step_factor="$step_factor" -limit="$limit" -drain_state=$drain_state -max_bytes="$max_bytes" -namespace="$namespace" -kube_service_host="$kubernetes_service_host" -kube_service_port="$kubernetes_service_port" -exporter_endpoint="$exporter_endpoint" -use_infiniband=$use_infiniband -push_events=$push_events -push_metrics_grpc="$push_metrics_grpc"
+         /usr/bin/gpubench -debug=true -min_bytes="$min_bytes" -step_factor="$step_factor" -limit="$limit" -drain_state=$drain_state -max_bytes="$max_bytes" -namespace="$namespace" -kube_service_host="$kubernetes_service_host" -kube_service_port="$kubernetes_service_port" -exporter_endpoint="$exporter_endpoint" -use_infiniband=$use_infiniband -push_events=$push_events -push_metrics_grpc="$push_metrics_grpc" -push_metrics_http="$push_metrics_http"
     echo "exit_code $?"
   fi
 }

@@ -114,8 +114,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 
 		// Role
 		{
-
-			if clusterValues.NCCLBenchmark.SendJobsEvents != nil && *clusterValues.NCCLBenchmark.SendJobsEvents {
+			if clusterValues.Telemetry != nil && clusterValues.Telemetry.JobsTelemetry != nil && clusterValues.Telemetry.JobsTelemetry.SendJobsEvents {
 				desired := worker.RenderRole(clusterValues.Namespace, clusterValues.Name)
 				logger = logger.WithValues(logfield.ResourceKV(&desired)...)
 				err := r.Role.Reconcile(ctx, cluster, &desired)
@@ -139,7 +138,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 
 		// RoleBinding
 		{
-			if clusterValues.NCCLBenchmark.SendJobsEvents != nil && *clusterValues.NCCLBenchmark.SendJobsEvents {
+			if clusterValues.Telemetry != nil && clusterValues.Telemetry.JobsTelemetry != nil && clusterValues.Telemetry.JobsTelemetry.SendJobsEvents {
 				desired := worker.RenderRoleBinding(clusterValues.Namespace, clusterValues.Name)
 				logger = logger.WithValues(logfield.ResourceKV(&desired)...)
 				err := r.RoleBinding.Reconcile(ctx, cluster, &desired)

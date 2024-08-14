@@ -72,7 +72,7 @@ type SlurmClusterSpec struct {
 	// Metrics define the desired state of the prometheus or opentelemetry metrics
 	//
 	// +kubebuilder:validation:Optional
-	Metrics *Metrics `json:"metrics,omitempty"`
+	Telemetry *Telemetry `json:"metrics,omitempty"`
 }
 
 type NCCLSettings struct {
@@ -176,15 +176,6 @@ type NCCLBenchmark struct {
 	//
 	// +kubebuilder:validation:Required
 	K8sNodeFilterName string `json:"k8sNodeFilterName"`
-
-	// Define whether to send Kubernetes events for Slurm jobs
-	//
-	// +kubebuilder:validation:Optional
-	SendJobsEvents *bool `json:"sendJobsEvents,omitempty"`
-	// kubebuilder:validation:Optional
-	SendOTELMetrics *bool `json:"sendOTELMetrics,omitempty"`
-	// kubebuilder:validation:Optional
-	OtelCollectorEndpoint *string `json:"otelCollectorEndpoint,omitempty"`
 }
 
 // NCCLArguments define nccl settings for periodic nccl benchmark
@@ -489,19 +480,74 @@ type NodeVolumeJailSubMount struct {
 	VolumeSourceName string `json:"volumeSourceName"`
 }
 
-type Metrics struct {
+type Telemetry struct {
+	// It has to be set to true if OpenTelemetry Operator CRD is used
+	//
+	// +kubebuilder:validation:Optional
+	OpenTelemetryCollector *MetricsOpenTelemetryCollector `json:"openTelemetryCollector,omitempty"`
+
+	// It has to be set to true if Prometheus Operator CRD is used
+	//
+	// +kubebuilder:validation:Optional
+	Prometheus *MetricsPrometheus `json:"prometheus,omitempty"`
+
+	// It has to be set to true if Kubernetes events for Slurm jobs are sent
+	//
+	// +kubebuilder:validation:Optional
+	JobsTelemetry *JobsTelemetry `json:"jobsTelemetry,omitempty"`
+}
+
+type MetricsOpenTelemetryCollector struct {
 	// It has to be set to true if OpenTelemetry Operator is used
+	//
 	// +kubebuilder:validation:Optional
-	EnableOtelCollector *bool `json:"enableOtelCollector,omitempty"`
-	// It has to be set to true if Prometheus Operator is used
-	// +kubebuilder:validation:Optional
-	EnableMetrics *bool `json:"enableMetrics,omitempty"`
+	EnabledOtelCollector bool `json:"enableOtelCollector,omitempty"`
+
 	// It references the PodTemplate with the OpenTelemetry Collector configuration
+	//
 	// +kubebuilder:validation:Optional
 	PodTemplateNameRef *string `json:"podTemplateNameRef,omitempty"`
+
 	// It defines the number of replicas for the OpenTelemetry Collector
+	//
+	// +kubebuilder:default=1
+	ReplicasOtelCollector int32 `json:"replicasOtelCollector,omitempty"`
+	// Specifies the port for OtelCollector, default value: 4317
+	// kubebuilder:default=4317
+	OtelCollectorPort int32 `json:"otelCollectorPort,omitempty"`
+}
+
+type MetricsPrometheus struct {
+	// It has to be set to true if Prometheus Operator is used
+	//
 	// +kubebuilder:validation:Optional
-	ReplicasOtelCollector *int32 `json:"replicasOtelCollector,omitempty"`
+	Enabled bool `json:"enabled,omitempty"`
+}
+
+type JobsTelemetry struct {
+	// Defines whether to send Kubernetes events for Slurm NCCLBenchmark jobs
+	// +kubebuilder:validation:Optional
+	SendJobsEvents bool `json:"sendJobsEvents,omitempty"`
+
+	// Defines whether to send Opentelemetry metrics for Slurm NCCLBenchmark jobs
+	//
+	// +kubebuilder:validation:Optional
+	SendOtelMetrics bool `json:"sendOtelMetrics,omitempty"`
+
+	// Specifies the gRPC OtelCollector host for sending Opentelemetry metrics
+	//
+	// +kubebuilder:validation:Optional
+	OtelCollectorGrpcHost *string `json:"otelCollectorGrpcHost,omitempty"`
+
+	// Specifies the HTTP OtelCollector host for sending Opentelemetry metrics
+	//
+	// +kubebuilder:validation:Optional
+	OtelCollectorHttpHost *string `json:"otelCollectorHttpHost,omitempty"`
+
+	// Specifies the port for OtelCollector, default value: 4317
+	//
+	// +kubebuilder:default=4317
+	OtelCollectorPort int32 `json:"otelCollectorPort,omitempty"`
 }
 
 const (

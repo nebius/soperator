@@ -2,6 +2,7 @@ package otel
 
 import (
 	"errors"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,22 +13,25 @@ import (
 )
 
 const (
-	// DefaultOtelCollectorImage is the default image for OpenTelemetry Collector
 	DefaultOtelCollectorImage = "otel/opentelemetry-collector:0.106.1"
 )
 
 func RenderOtelCollector(clusterName,
 	namespace string,
-	metrics *slurmv1.Metrics,
+	metrics *slurmv1.Telemetry,
 	foundPodTemplate *corev1.PodTemplate,
 ) (otelv1beta1.OpenTelemetryCollector, error) {
-	if metrics == nil || metrics.EnableOtelCollector == nil || !*metrics.EnableOtelCollector {
+	if metrics == nil || metrics.OpenTelemetryCollector == nil || !metrics.OpenTelemetryCollector.EnabledOtelCollector {
 		return otelv1beta1.OpenTelemetryCollector{}, errors.New("OpenTelemetry Collector is not enabled")
 	}
 
-	enableMetrics := renderEnableMetrics(metrics)
-	replicasOtelCollector := renderReplicasOtelCollector(metrics)
+	replicasOtelCollector := metrics.OpenTelemetryCollector.ReplicasOtelCollector
 	imageOtelCollector := renderPodTemplateImage(foundPodTemplate)
+
+	enableMetrics := false
+	if metrics.Prometheus == nil {
+		enableMetrics = metrics.Prometheus.Enabled
+	}
 
 	var securityContext *corev1.PodSecurityContext
 	var nodeSelector map[string]string
@@ -43,6 +47,11 @@ func RenderOtelCollector(clusterName,
 	var envFrom []corev1.EnvFromSource
 	var podAnnotations map[string]string
 	var imagePullPolicy corev1.PullPolicy = corev1.PullIfNotPresent
+	var otelCollectorPort int32 = 4317
+
+	if metrics.OpenTelemetryCollector != nil && metrics.OpenTelemetryCollector.OtelCollectorPort != 0 {
+		otelCollectorPort = metrics.OpenTelemetryCollector.OtelCollectorPort
+	}
 
 	if foundPodTemplate != nil {
 		securityContext = foundPodTemplate.Template.Spec.SecurityContext
@@ -98,7 +107,7 @@ func RenderOtelCollector(clusterName,
 						"otlp": map[string]interface{}{
 							"protocols": map[string]interface{}{
 								"grpc": map[string]interface{}{
-									"endpoint": "0.0.0.0:4317",
+									"endpoint": fmt.Sprintf("0.0.0.0:%d", otelCollectorPort),
 								},
 							},
 						},
@@ -138,7 +147,7 @@ func RenderOtelCollector(clusterName,
 			OpenTelemetryCommonFields: otelv1beta1.OpenTelemetryCommonFields{
 				Image:                     imageOtelCollector,
 				ImagePullPolicy:           imagePullPolicy,
-				Replicas:                  replicasOtelCollector,
+				Replicas:                  &replicasOtelCollector,
 				ManagementState:           otelv1beta1.ManagementStateManaged,
 				PodSecurityContext:        securityContext,
 				NodeSelector:              nodeSelector,
@@ -156,22 +165,6 @@ func RenderOtelCollector(clusterName,
 			},
 		},
 	}, nil
-}
-
-func renderEnableMetrics(metrics *slurmv1.Metrics) bool {
-	if metrics != nil && metrics.EnableMetrics != nil {
-		return *metrics.EnableMetrics
-	}
-	return false
-}
-
-func renderReplicasOtelCollector(metrics *slurmv1.Metrics) *int32 {
-	var defaultReplicas int32 = 1
-	var replicasOtelCollector *int32 = &defaultReplicas
-	if metrics != nil && metrics.ReplicasOtelCollector != nil {
-		return metrics.ReplicasOtelCollector
-	}
-	return replicasOtelCollector
 }
 
 func renderPodTemplateImage(podTemplate *corev1.PodTemplate) string {
