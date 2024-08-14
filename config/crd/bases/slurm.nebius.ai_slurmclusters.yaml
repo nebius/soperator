@@ -1066,33 +1066,40 @@ spec:
                       Slurm jobs are sent
                     properties:
                       otelCollectorGrpcHost:
-                        description: kubebuilder:validation:Optional
+                        description: Specifies the gRPC OtelCollector host for sending
+                          Opentelemetry metrics
                         type: string
                       otelCollectorHttpHost:
-                        description: kubebuilder:validation:Optional
+                        description: Specifies the HTTP OtelCollector host for sending
+                          Opentelemetry metrics
                         type: string
                       otelCollectorPort:
-                        description: kubebuilder:default=4317
+                        default: 4317
+                        description: 'Specifies the port for OtelCollector, default
+                          value: 4317'
                         format: int32
                         type: integer
                       sendJobsEvents:
-                        description: Define whether to send Kubernetes events for
-                          Slurm jobs
+                        description: Defines whether to send Kubernetes events for
+                          Slurm NCCLBenchmark jobs
                         type: boolean
                       sendOtelMetrics:
-                        description: kubebuilder:validation:Optional
+                        description: Defines whether to send Opentelemetry metrics
+                          for Slurm NCCLBenchmark jobs
                         type: boolean
                     type: object
                   openTelemetryCollector:
                     description: It has to be set to true if OpenTelemetry Operator
-                      is used
+                      CRD is used
                     properties:
                       enableOtelCollector:
                         description: It has to be set to true if OpenTelemetry Operator
                           is used
                         type: boolean
                       otelCollectorPort:
-                        description: kubebuilder:default=4317
+                        description: |-
+                          Specifies the port for OtelCollector, default value: 4317
+                          kubebuilder:default=4317
                         format: int32
                         type: integer
                       podTemplateNameRef:
@@ -1107,8 +1114,8 @@ spec:
                         type: integer
                     type: object
                   prometheus:
-                    description: It has to be set to true if Prometheus Operator is
-                      used
+                    description: It has to be set to true if Prometheus Operator CRD
+                      is used
                     properties:
                       enabled:
                         description: It has to be set to true if Prometheus Operator
