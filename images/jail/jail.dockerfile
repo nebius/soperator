@@ -11,11 +11,11 @@ ARG GOARCH=amd64
 
 WORKDIR /app
 
-COPY docker/jail/gpubench/go.mod docker/jail/gpubench/go.sum ./
+COPY jail/gpubench/go.mod jail/gpubench/go.sum ./
 
 RUN go mod download
 
-COPY docker/jail/gpubench/main.go .
+COPY jail/gpubench/main.go .
 
 RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
     go build -o gpubench .
@@ -75,7 +75,7 @@ RUN apt update && \
         libdrm-dev
 
 # Install python
-COPY docker/common/scripts/install_python.sh /opt/bin/
+COPY common/scripts/install_python.sh /opt/bin/
 RUN chmod +x /opt/bin/install_python.sh && \
     /opt/bin/install_python.sh && \
     rm /opt/bin/install_python.sh
@@ -84,26 +84,26 @@ RUN chmod +x /opt/bin/install_python.sh && \
 RUN pip install mpi4py
 
 # Install parallel because it's required for enroot operation
-COPY docker/common/scripts/install_parallel.sh /opt/bin/
+COPY common/scripts/install_parallel.sh /opt/bin/
 RUN chmod +x /opt/bin/install_parallel.sh && \
     /opt/bin/install_parallel.sh && \
     rm /opt/bin/install_parallel.sh
 
 # Install enroot
-COPY docker/common/scripts/install_enroot.sh /opt/bin/
+COPY common/scripts/install_enroot.sh /opt/bin/
 RUN chmod +x /opt/bin/install_enroot.sh && \
     /opt/bin/install_enroot.sh && \
     rm /opt/bin/install_enroot.sh
 
 # Copy enroot configuration
-COPY docker/jail/enroot-conf/enroot.conf /etc/enroot/
+COPY jail/enroot-conf/enroot.conf /etc/enroot/
 RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
 
 # Create directory for enroot runtime data that will be mounted from the host
 RUN mkdir -p -m 777 /usr/share/enroot/enroot-data
 
 # Install PMIx
-COPY docker/common/scripts/install_pmix.sh /opt/bin/
+COPY common/scripts/install_pmix.sh /opt/bin/
 RUN chmod +x /opt/bin/install_pmix.sh && \
     /opt/bin/install_pmix.sh && \
     rm /opt/bin/install_pmix.sh
@@ -121,8 +121,8 @@ COPY --from=slurm /usr/src/slurm-smd_$SLURM_VERSION-1_amd64.deb /tmp/
 RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
 
 # Install slurm plugins
-COPY docker/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
-COPY docker/common/scripts/install_slurm_plugins.sh /opt/bin/
+COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
+COPY common/scripts/install_slurm_plugins.sh /opt/bin/
 RUN chmod +x /opt/bin/install_slurm_plugins.sh && \
     /opt/bin/install_slurm_plugins.sh && \
     rm /opt/bin/install_slurm_plugins.sh
@@ -131,13 +131,13 @@ RUN chmod +x /opt/bin/install_slurm_plugins.sh && \
 RUN mkdir -m 755 -p /var/spool/slurmd
 
 # Install nvidia-container-toolkit
-COPY docker/common/scripts/install_container_toolkit.sh /opt/bin/
+COPY common/scripts/install_container_toolkit.sh /opt/bin/
 RUN chmod +x /opt/bin/install_container_toolkit.sh && \
     /opt/bin/install_container_toolkit.sh && \
     rm /opt/bin/install_container_toolkit.sh
 
 # Install nvtop GPU monitoring utility
-COPY docker/common/scripts/install_nvtop.sh /opt/bin/
+COPY common/scripts/install_nvtop.sh /opt/bin/
 RUN chmod +x /opt/bin/install_nvtop.sh && \
     /opt/bin/install_nvtop.sh && \
     rm /opt/bin/install_nvtop.sh
@@ -159,7 +159,7 @@ RUN mkdir -m 555 /mnt/host
 
 # Copy initial users
 RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
-COPY docker/jail/init-users/* /etc/
+COPY jail/init-users/* /etc/
 RUN chmod 644 /etc/passwd /etc/group && chown 0:0 /etc/passwd /etc/group && \
     chmod 640 /etc/shadow /etc/gshadow && chown 0:42 /etc/shadow /etc/gshadow
 
@@ -171,7 +171,7 @@ RUN cd /etc/skel && \
     cp -r /etc/skel/.slurm /root/
 
 # Copy createuser utility script
-COPY docker/jail/scripts/createuser.sh /usr/bin/createuser
+COPY jail/scripts/createuser.sh /usr/bin/createuser
 RUN chmod +x /usr/bin/createuser
 
 # Update linker cache
