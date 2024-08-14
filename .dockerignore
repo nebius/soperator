@@ -2,7 +2,7 @@
 /config
 /deps
 /docker
-/docs
+/slurm-service/internal/docs
 /helm*
 /images
 /terraform*
