@@ -38,6 +38,6 @@ echo "Start NCCL test benchmark"
     -h "$KUBERNETES_SERVICE_HOST" \
     -p "$KUBERNETES_SERVICE_PORT" \
     -s "$SEND_JOBS_EVENTS" \
-    -m "$SEND_OTEL_METRICS_GRPC" \
-    -w "$SEND_OTEL_METRICS_HTTP" \
-    -c "$OTEL_COLLECTOR_ENDPOINT"
+    -m "$SEND_OTEL_METRICS" \
+    -c "$OTEL_COLLECTOR_ENDPOINT" \
+    -q "$OTEL_COLLECTOR_PATH"
