@@ -184,6 +184,7 @@ rules:
   - create
   - delete
   - get
+  - patch
   - list
   - watch
 - apiGroups:
@@ -194,6 +195,7 @@ rules:
   - create
   - delete
   - get
+  - patch
   - list
   - patch
   - update

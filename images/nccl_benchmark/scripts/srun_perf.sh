@@ -2,7 +2,7 @@
 
 set -e
 
-while getopts ":b:e:f:g:t:l:d:u:h:p:n:s:m:w:c:" opt; do
+while getopts ":b:e:f:g:t:l:d:u:h:p:n:s:m:w:c:q:" opt; do
   case ${opt} in
     b )
       min_bytes=$OPTARG
@@ -48,6 +48,9 @@ while getopts ":b:e:f:g:t:l:d:u:h:p:n:s:m:w:c:" opt; do
       ;;
     c )
       exporter_endpoint=$OPTARG
+      ;;
+    q )
+      push_metrics_path=$OPTARG
       ;;
     \? )
       echo "Invalid option: $OPTARG" 1>&2
@@ -96,6 +99,7 @@ run_job_on_node() {
   local push_metrics_grpc=${16}
   local push_metrics_http=${17}
   local exporter_endpoint=${18}
+  local push_metrics_path=${19}
 
   job_exists=$(squeue --name="$job_name" -O "ReqNodes" --noheader | grep -w "$node")
 
@@ -111,7 +115,7 @@ run_job_on_node() {
          --cpus-per-task=16 \
          --mem-per-cpu="12GB" \
          --time="$bench_timout" \
-         /usr/bin/gpubench -debug=true -min_bytes="$min_bytes" -step_factor="$step_factor" -limit="$limit" -drain_state=$drain_state -max_bytes="$max_bytes" -namespace="$namespace" -kube_service_host="$kubernetes_service_host" -kube_service_port="$kubernetes_service_port" -exporter_endpoint="$exporter_endpoint" -use_infiniband=$use_infiniband -push_events=$push_events -push_metrics_grpc="$push_metrics_grpc" -push_metrics_http="$push_metrics_http"
+         /usr/bin/gpubench -debug=true -min_bytes="$min_bytes" -step_factor="$step_factor" -limit="$limit" -drain_state=$drain_state -max_bytes="$max_bytes" -namespace="$namespace" -kube_service_host="$kubernetes_service_host" -kube_service_port="$kubernetes_service_port" -exporter_endpoint="$exporter_endpoint" -use_infiniband=$use_infiniband -push_events=$push_events -push_metrics_grpc="$push_metrics_grpc" -push_metrics_http="$push_metrics_http" -push_metrics_path="$push_metrics_path"
     echo "exit_code $?"
   fi
 }
@@ -119,8 +123,7 @@ run_job_on_node() {
 export -f run_job_on_node
 
 # Run jobs in parallel and capture exit codes
-output=$(parallel --no-notice -j 0 run_job_on_node ::: "$ready_nodes" ::: "$job_name" ::: "$ntasks_per_node" ::: "$num_gpus" ::: "$bench_timout" ::: "$min_bytes" ::: "$max_bytes" ::: "$step_factor" ::: "$limit" ::: "$drain_state" ::: "$use_infiniband" ::: "$namespace" ::: "$kubernetes_service_host" ::: "$kubernetes_service_port" ::: "$push_events" ::: "$push_metrics_grpc" ::: "$exporter_endpoint")
-echo "$output"
+output=$(parallel --no-notice -j 0 run_job_on_node ::: "$ready_nodes" ::: "$job_name" ::: "$ntasks_per_node" ::: "$num_gpus" ::: "$bench_timout" ::: "$min_bytes" ::: "$max_bytes" ::: "$step_factor" ::: "$limit" ::: "$drain_state" ::: "$use_infiniband" ::: "$namespace" ::: "$kubernetes_service_host" ::: "$kubernetes_service_port" ::: "$push_events" ::: "$push_metrics_grpc" ::: "$push_metrics_http" ::: "$exporter_endpoint" ::: "$push_metrics_path")
 
 exit_codes=$(echo "$output" | grep 'exit_code' | awk '{print $2}')
 

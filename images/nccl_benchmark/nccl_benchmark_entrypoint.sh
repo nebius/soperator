@@ -40,4 +40,5 @@ echo "Start NCCL test benchmark"
     -s "$SEND_JOBS_EVENTS" \
     -m "$SEND_OTEL_METRICS_GRPC" \
     -w "$SEND_OTEL_METRICS_HTTP" \
-    -c "$OTEL_COLLECTOR_ENDPOINT"
+    -c "$OTEL_COLLECTOR_ENDPOINT" \
+    -q "$OTEL_COLLECTOR_PATH"
