@@ -35,15 +35,11 @@ RUN apt-get update && \
         vim
 
 # TODO: Install only necessary packages
-# Copy and install Slurm packages
-COPY --from=slurm /usr/src/slurm-smd-client_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-dev_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libnss-slurm_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libpmi0_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libpmi2-0_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libslurm-perl_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-openlava_$SLURM_VERSION-1_all.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd_$SLURM_VERSION-1_amd64.deb /tmp/
+# Download and install Slurm packages
+RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libpmi0 slurm-smd-libpmi2-0 slurm-smd-libslurm-perl slurm-smd; do \
+        wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/v$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb; \
+    done
+
 RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
 
 # Install slurm plugins
@@ -87,4 +83,4 @@ ENV MUNGE_SOCKET_FILE=/run/munge/munge.socket.2
 # Copy & run the entrypoint script
 COPY nccl_benchmark/nccl_benchmark_entrypoint.sh /opt/bin/nccl_benchmark_entrypoint.sh
 RUN chmod +x /opt/bin/nccl_benchmark_entrypoint.sh
-ENTRYPOINT /opt/bin/nccl_benchmark_entrypoint.sh
+ENTRYPOINT ["/opt/bin/nccl_benchmark_entrypoint.sh"]

@@ -71,4 +71,4 @@ EXPOSE 22
 # Copy & run the entrypoint script
 COPY login/sshd_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/sshd_entrypoint.sh
-ENTRYPOINT /opt/bin/slurm/sshd_entrypoint.sh
+ENTRYPOINT ["/opt/bin/slurm/sshd_entrypoint.sh"]

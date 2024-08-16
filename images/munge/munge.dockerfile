@@ -25,4 +25,4 @@ ENV MUNGE_SOCKET_FILE=/run/munge/munge.socket.2
 # Copy & run the entrypoint script
 COPY munge/munge_entrypoint.sh /opt/bin/
 RUN chmod +x /opt/bin/munge_entrypoint.sh
-ENTRYPOINT /opt/bin/munge_entrypoint.sh
+ENTRYPOINT ["/opt/bin/munge_entrypoint.sh"]

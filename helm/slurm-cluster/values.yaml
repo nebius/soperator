@@ -180,9 +180,9 @@ slurmNodes:
 #          volumeSourceName: "mlperf-sd"
 
 images:
-  slurmctld: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/controller_slurmctld:focal-slurm23.11.6-1.5.7"
-  slurmd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/worker_slurmd:focal-slurm23.11.6-1.5.7"
-  sshd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/login_sshd:focal-slurm23.11.6-1.5.7"
-  munge: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/munge:focal-slurm23.11.6-1.5.7"
-  populateJail: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/populate_jail:focal-slurm23.11.6-1.5.7"
-  ncclBenchmark: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/nccl_benchmark:focal-slurm23.11.6-1.5.7
+  slurmctld: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/controller_slurmctld:1.6.2-focal-slurm23.11.6"
+  slurmd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/worker_slurmd:1.6.2-focal-slurm23.11.6"
+  sshd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/login_sshd:1.6.2-focal-slurm23.11.6"
+  munge: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/munge:1.6.2-focal-slurm23.11.6"
+  populateJail: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/populate_jail:1.6.2-focal-slurm23.11.6"
+  ncclBenchmark: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/nccl_benchmark:1.6.2-focal-slurm23.11.6

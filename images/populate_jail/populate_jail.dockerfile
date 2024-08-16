@@ -12,4 +12,4 @@ RUN mkdir /jail && tar -xvf /jail_rootfs.tar -C /jail && rm /jail_rootfs.tar
 
 COPY populate_jail/populate_jail_entrypoint.sh .
 RUN chmod +x ./populate_jail_entrypoint.sh
-ENTRYPOINT ./populate_jail_entrypoint.sh
+ENTRYPOINT ["./populate_jail_entrypoint.sh"]

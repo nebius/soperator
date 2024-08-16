@@ -48,16 +48,11 @@ RUN chmod +x /opt/bin/install_pmix.sh && \
     rm /opt/bin/install_pmix.sh
 
 # TODO: Install only necessary packages
-# Copy and install Slurm packages
-COPY --from=slurm /usr/src/slurm-smd-client_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-dev_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libnss-slurm_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libpmi0_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libpmi2-0_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libslurm-perl_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-openlava_$SLURM_VERSION-1_all.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-slurmctld_$SLURM_VERSION-1_amd64.deb /tmp
-COPY --from=slurm /usr/src/slurm-smd_$SLURM_VERSION-1_amd64.deb /tmp/
+# Download and install Slurm packages
+RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libpmi0 slurm-smd-libpmi2-0 slurm-smd-libslurm-perl slurm-smd-slurmctld slurm-smd; do \
+        wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/v$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb; \
+    done
+
 RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
 
 # Install slurm plugins
@@ -85,4 +80,4 @@ RUN mkdir -p /var/log/slurm/multilog && \
 # Copy & run the entrypoint script
 COPY controller/slurmctld_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/slurmctld_entrypoint.sh
-ENTRYPOINT /opt/bin/slurm/slurmctld_entrypoint.sh
+ENTRYPOINT ["/opt/bin/slurm/slurmctld_entrypoint.sh"]
