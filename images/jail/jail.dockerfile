@@ -109,15 +109,11 @@ RUN chmod +x /opt/bin/install_pmix.sh && \
     rm /opt/bin/install_pmix.sh
 
 # TODO: Install only necessary packages
-# Copy and install Slurm packages
-COPY --from=slurm /usr/src/slurm-smd-client_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-dev_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libnss-slurm_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libpmi0_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libpmi2-0_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-libslurm-perl_$SLURM_VERSION-1_amd64.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd-openlava_$SLURM_VERSION-1_all.deb /tmp/
-COPY --from=slurm /usr/src/slurm-smd_$SLURM_VERSION-1_amd64.deb /tmp/
+# Download and install Slurm packages
+RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libpmi0 slurm-smd-libpmi2-0 slurm-smd-libslurm-perl slurm-smd; do \
+        wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/v$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb; \
+    done
+
 RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
 
 # Install slurm plugins
@@ -142,14 +138,17 @@ RUN chmod +x /opt/bin/install_nvtop.sh && \
     /opt/bin/install_nvtop.sh && \
     rm /opt/bin/install_nvtop.sh
 
-# Copy and install NCCL packages
-COPY --from=nccl /usr/src/nccl/build/pkg/deb/*.deb /tmp/
-RUN dpkg -i /tmp/libnccl2_2.22.3-1+cuda12.2_amd64.deb && \
+# Download and install NCCL packages
+RUN wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/v$SLURM_VERSION/libnccl2_2.22.3-1+cuda12.2_amd64.deb && \
+    wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/v$SLURM_VERSION/libnccl-dev_2.22.3-1+cuda12.2_amd64.deb && \
+    dpkg -i /tmp/libnccl2_2.22.3-1+cuda12.2_amd64.deb && \
     dpkg -i /tmp/libnccl-dev_2.22.3-1+cuda12.2_amd64.deb && \
     rm -rf /tmp/*.deb
 
-# Copy NCCL tests executables
-COPY --from=nccl_tests /usr/src/nccl-tests/build/*_perf /usr/bin/
+# Download NCCL tests executables
+RUN wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/v$SLURM_VERSION/nccl-tests-perf.tar.gz && \
+    tar -xvzf /tmp/nccl-tests-perf.tar.gz -C /usr/bin && \
+    rm -rf /tmp/nccl-tests-perf.tar.gz
 
 # Copy binary that performs GPU benchmark
 COPY --from=gpubench_builder /app/gpubench /usr/bin/

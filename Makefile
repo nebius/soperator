@@ -47,6 +47,13 @@ VERSION               		= $(shell cat VERSION)
 CONTAINER_REGISTRY_ID 		= $(CONTAINER_REGISTRY_UNSTABLE_ID)
 CONTAINER_REGISTRY_HELM_ID 	= $(CONTAINER_REGISTRY_HELM_UNSTABLE_ID)
 
+IMAGE_VERSION		  = $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)
+GO_CONST_VERSION_FILE = internal/consts/version.go
+
+# Image URL to use all building/pushing image targets
+OPERATOR_IMAGE_REPO = $(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/slurm-operator
+OPERATOR_IMAGE_TAG  = $(VERSION)
+
 ifeq ($(shell uname), Darwin)
     SHA_CMD = shasum -a 256
 else
@@ -54,17 +61,11 @@ else
 endif
 ifeq ($(UNSTABLE), true)
     SHORT_SHA 					= $(shell echo -n "$(VERSION)" | $(SHA_CMD) | cut -c1-8)
-    VERSION 					:= $(VERSION)-$(SHORT_SHA)
     CONTAINER_REGISTRY_ID  		= $(CONTAINER_REGISTRY_UNSTABLE_ID)
     CONTAINER_REGISTRY_HELM_ID 	= $(CONTAINER_REGISTRY_HELM_UNSTABLE_ID)
+    OPERATOR_IMAGE_TAG  		= $(VERSION)-$(SHORT_SHA)
+    IMAGE_VERSION		  		= $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
 endif
-
-IMAGE_VERSION		  = $(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(VERSION)
-GO_CONST_VERSION_FILE = internal/consts/version.go
-
-# Image URL to use all building/pushing image targets
-OPERATOR_IMAGE_REPO = $(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/slurm-operator
-OPERATOR_IMAGE_TAG  = $(VERSION)
 
 .PHONY: all
 all: build
@@ -124,7 +125,15 @@ helm: kustomize helmify yq ## Update slurm-operator Helm chart
 
 .PHONY: get-version
 get-version:
+ifeq ($(UNSTABLE), true)
+	@echo '$(VERSION)-$(SHORT_SHA)'
+else
 	@echo '$(VERSION)'
+endif
+
+.PHONY: get-operator-tag-version
+get-operator-tag-version:
+	@echo '$(OPERATOR_IMAGE_TAG)'
 
 .PHONY: get-image-version
 get-image-version:
@@ -134,27 +143,28 @@ get-image-version:
 sync-version: ## Sync versions from file
 	@echo 'Version is - $(VERSION)'
 	@echo 'Image version is - $(IMAGE_VERSION)'
+	@echo 'Operator image tag is - $(OPERATOR_IMAGE_TAG)'
 	@# region config/manager/kustomization.yaml
 	@echo 'Syncing config/manager/kustomization.yaml'
 	@$(YQ) -i ".images.[0].newName = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/slurm-operator\"" "config/manager/kustomization.yaml"
-	@$(YQ) -i ".images.[0].newTag = \"$(VERSION)\"" "config/manager/kustomization.yaml"
+	@$(YQ) -i ".images.[0].newTag = \"$(OPERATOR_IMAGE_TAG)\"" "config/manager/kustomization.yaml"
 	@# endregion config/manager/kustomization.yaml
 
 	@# region config/manager/manager.yaml
 	@echo 'Syncing config/manager/manager.yaml'
-	@sed -i '' -e "s/image: controller:[^ ]*/image: controller:$(VERSION)/" config/manager/manager.yaml
+	@sed -i '' -e "s/image: controller:[^ ]*/image: controller:$(OPERATOR_IMAGE_TAG)/" config/manager/manager.yaml
 	@# endregion config/manager/manager.yaml
 
 	@# region helm chart versions
 	@echo 'Syncing helm chart versions'
-	@$(YQ) -i ".version = \"$(VERSION)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
-	@$(YQ) -i ".version = \"$(VERSION)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
-	@$(YQ) -i ".version = \"$(VERSION)\"" "$(CHART_STORAGE_PATH)/Chart.yaml"
-	@$(YQ) -i ".appVersion = \"$(VERSION)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
-	@$(YQ) -i ".appVersion = \"$(VERSION)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
-	@$(YQ) -i ".appVersion = \"$(VERSION)\"" "$(CHART_STORAGE_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_STORAGE_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_STORAGE_PATH)/Chart.yaml"
 	@# endregion helm chart versions
-
+#
 	@# region helm/slurm-cluster/values.yaml
 	@echo 'Syncing helm/slurm-cluster/values.yaml'
 	@$(YQ) -i ".images.ncclBenchmark = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/nccl_benchmark:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
@@ -178,7 +188,7 @@ sync-version: ## Sync versions from file
 	@# region helm/slurm-operator/values.yaml
 	@echo 'Syncing helm/slurm-operator/values.yaml'
 	@$(YQ) -i ".controllerManager.manager.image.repository = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/slurm-operator\"" "helm/slurm-operator/values.yaml"
-	@$(YQ) -i ".controllerManager.manager.image.tag = \"$(VERSION)\"" "helm/slurm-operator/values.yaml"
+	@$(YQ) -i ".controllerManager.manager.image.tag = \"$(OPERATOR_IMAGE_TAG)\"" "helm/slurm-operator/values.yaml"
 	@# endregion helm/slurm-operator/values.yaml
 
 	@# region internal/consts
@@ -187,7 +197,7 @@ sync-version: ## Sync versions from file
 	@echo 'package consts'                                  >> $(GO_CONST_VERSION_FILE)
 	@echo ''                                                >> $(GO_CONST_VERSION_FILE)
 	@echo 'const ('                                         >> $(GO_CONST_VERSION_FILE)
-	@echo "	VersionCR = \"$(VERSION)\""                     >> $(GO_CONST_VERSION_FILE)
+	@echo "	VersionCR = \"$(OPERATOR_IMAGE_TAG)\""          >> $(GO_CONST_VERSION_FILE)
 	@echo ')'                                               >> $(GO_CONST_VERSION_FILE)
 	@# endregion internal/consts
 
@@ -198,12 +208,12 @@ sync-version: ## Sync versions from file
 
 	@# region terraform/oldbius/terraform.tfvars.example
 	@echo 'Syncing terraform/oldbius/terraform.tfvars.example'
-	@sed -i '' -e 's/slurm_operator_version = "[^ ]*/slurm_operator_version = "$(VERSION)"/' terraform/oldbius/terraform.tfvars.example
+	@sed -i '' -e 's/slurm_operator_version = "[^ ]*/slurm_operator_version = "$(OPERATOR_IMAGE_TAG)"/' terraform/oldbius/terraform.tfvars.example
 	@# endregion terraform/oldbius/terraform.tfvars.example
 
 	@# region terraform/oldbius/slurm_cluster_variables.tf
 	@echo 'Syncing terraform/oldbius/slurm_cluster_variables.tf'
-	@sed -i '' -e 's/default *= *"0.1.[^ ]*/default = "$(VERSION)"/' terraform/oldbius/slurm_cluster_variables.tf
+	@sed -i '' -e 's/default *= *"0.1.[^ ]*/default = "$(OPERATOR_IMAGE_TAG)"/' terraform/oldbius/slurm_cluster_variables.tf
 	@terraform fmt terraform/oldbius/slurm_cluster_variables.tf
 	@# endregion terraform/oldbius/slurm_cluster_variables.tf
 
