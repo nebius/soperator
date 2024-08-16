@@ -16,6 +16,9 @@ func Test_RenderContainerNCCLBenchmark(t *testing.T) {
 
 	var otelCollectorPort int32 = 4398
 	var otelCollectorPath = "/v1/metrics/test"
+	var namespace = "test-namespace"
+	var clusterName = "test-cluster"
+
 	ncclBenchmark := &values.SlurmNCCLBenchmark{
 		Name: "test-nccl-benchmark",
 
@@ -52,7 +55,7 @@ func Test_RenderContainerNCCLBenchmark(t *testing.T) {
 	ncclBenchmark.FailureActions.SetSlurmNodeDrainState = true
 	ncclBenchmark.Image = "test-image"
 
-	container := renderContainerNCCLBenchmark(ncclBenchmark, metrics, "test-cluster")
+	container := renderContainerNCCLBenchmark(ncclBenchmark, metrics, clusterName, namespace)
 
 	assert.Equal(t, consts.ContainerNameNCCLBenchmark, container.Name)
 	assert.Equal(t, "test-image", container.Image)
@@ -65,9 +68,11 @@ func Test_RenderContainerNCCLBenchmark(t *testing.T) {
 	assert.Equal(t, "true", getEnvVarValue(container, "DRAIN_SLURM_STATE"))
 	assert.Equal(t, "true", getEnvVarValue(container, "USE_INFINIBAND"))
 	assert.Equal(t, "true", getEnvVarValue(container, "SEND_JOBS_EVENTS"))
-	assert.Equal(t, "true", getEnvVarValue(container, "SEND_OTEL_METRICS"))
+	assert.Equal(t, namespace, getEnvVarValue(container, "K8S_NAMESPACE"))
+	assert.Equal(t, "true", getEnvVarValue(container, "SEND_OTEL_METRICS_GRPC"))
+	assert.Equal(t, "false", getEnvVarValue(container, "SEND_OTEL_METRICS_HTTP"))
 	assert.Equal(t, otelCollectorPath, getEnvVarValue(container, "OTEL_COLLECTOR_PATH"))
-	assert.Equal(t, fmt.Sprintf("localhost:%d", otelCollectorPort), getEnvVarValue(container, "OTEL_COLLECTOR_ENDPOINT"))
+	assert.Equal(t, fmt.Sprintf("%s-collector:%d", clusterName, otelCollectorPort), getEnvVarValue(container, "OTEL_COLLECTOR_ENDPOINT"))
 	assert.Len(t, container.VolumeMounts, 3)
 }
 
@@ -82,6 +87,9 @@ func getEnvVarValue(container corev1.Container, name string) string {
 }
 
 func Test_RenderContainerNCCLBenchmark_Default(t *testing.T) {
+
+	var namespace = "test-namespace"
+	var clusterName = "test-cluster"
 
 	ncclBenchmark := &values.SlurmNCCLBenchmark{
 		Name: "test-nccl-benchmark",
@@ -101,10 +109,11 @@ func Test_RenderContainerNCCLBenchmark_Default(t *testing.T) {
 		},
 	}
 
-	container := renderContainerNCCLBenchmark(ncclBenchmark, metrics, "test-cluster")
+	container := renderContainerNCCLBenchmark(ncclBenchmark, metrics, clusterName, namespace)
 
 	assert.Equal(t, "false", getEnvVarValue(container, "SEND_JOBS_EVENTS"))
-	assert.Equal(t, "false", getEnvVarValue(container, "SEND_OTEL_METRICS"))
+	assert.Equal(t, "false", getEnvVarValue(container, "SEND_OTEL_METRICS_HTTP"))
+	assert.Equal(t, "false", getEnvVarValue(container, "SEND_OTEL_METRICS_GRPC"))
 	assert.Equal(t, OtelCollectorPath, getEnvVarValue(container, "OTEL_COLLECTOR_PATH"))
 	assert.Equal(t, fmt.Sprintf("localhost:%d", OtelCollectorPort), getEnvVarValue(container, "OTEL_COLLECTOR_ENDPOINT"))
 	assert.Len(t, container.VolumeMounts, 3)

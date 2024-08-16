@@ -66,7 +66,7 @@ func RenderNCCLBenchmarkCronJob(
 								common.RenderVolumeMungeKey(clusterName),
 								common.RenderVolumeJailFromSource(volumeSources, *ncclBenchmark.VolumeJail.VolumeSourceName),
 							},
-							Containers: []corev1.Container{renderContainerNCCLBenchmark(ncclBenchmark, metrics, clusterName)},
+							Containers: []corev1.Container{renderContainerNCCLBenchmark(ncclBenchmark, metrics, clusterName, namespace)},
 						},
 					},
 				},
