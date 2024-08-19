@@ -2542,10 +2542,14 @@ spec:
                               - volumeSourceName
                               type: object
                             type: array
-                          sizeSharedMemory:
+                          sharedMemorySize:
+                            anyOf:
+                            - type: integer
+                            - type: string
                             default: 64Gi
                             description: Size of the shared memory for NCCL
-                            type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
                           spool:
                             description: Spool represents the spool data volume configuration
                             properties:
