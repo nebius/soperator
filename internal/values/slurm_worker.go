@@ -1,6 +1,7 @@
 package values
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -19,9 +20,10 @@ type SlurmWorker struct {
 	Service     Service
 	StatefulSet StatefulSet
 
-	VolumeSpool   slurmv1.NodeVolume
-	VolumeJail    slurmv1.NodeVolume
-	JailSubMounts []slurmv1.NodeVolumeJailSubMount
+	VolumeSpool      slurmv1.NodeVolume
+	VolumeJail       slurmv1.NodeVolume
+	JailSubMounts    []slurmv1.NodeVolumeJailSubMount
+	SharedMemorySize *resource.Quantity
 }
 
 func buildSlurmWorkerFrom(
@@ -51,8 +53,9 @@ func buildSlurmWorkerFrom(
 			naming.BuildStatefulSetName(consts.ComponentTypeWorker, clusterName),
 			worker.SlurmNode.Size,
 		),
-		VolumeSpool: *worker.Volumes.Spool.DeepCopy(),
-		VolumeJail:  *worker.Volumes.Jail.DeepCopy(),
+		VolumeSpool:      *worker.Volumes.Spool.DeepCopy(),
+		VolumeJail:       *worker.Volumes.Jail.DeepCopy(),
+		SharedMemorySize: worker.Volumes.SharedMemorySize,
 	}
 	for _, jailSubMount := range worker.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()

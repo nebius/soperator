@@ -2543,6 +2543,10 @@ spec:
                               - volumeSourceName
                               type: object
                             type: array
+                          sizeSharedMemory:
+                            default: 64Gi
+                            description: Size of the shared memory for NCCL
+                            type: string
                           spool:
                             description: Spool represents the spool data volume configuration
                             properties:
