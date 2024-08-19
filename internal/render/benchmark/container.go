@@ -22,7 +22,7 @@ var (
 func renderContainerNCCLBenchmark(
 	ncclBenchmark *values.SlurmNCCLBenchmark,
 	metrics *slurmv1.Telemetry,
-	clusterName string) corev1.Container {
+	clusterName, namespace string) corev1.Container {
 
 	var sendJobsEvents bool
 	var sendOtelMetrics bool
@@ -42,6 +42,7 @@ func renderContainerNCCLBenchmark(
 	}
 
 	otelCollectorHost := "localhost"
+
 	if sendOtelMetrics {
 		switch {
 		case metrics.JobsTelemetry.OtelCollectorGrpcHost != nil:
@@ -51,7 +52,10 @@ func renderContainerNCCLBenchmark(
 			otelCollectorHost = *metrics.JobsTelemetry.OtelCollectorHttpHost
 			sendOtelMetricsHttp = true
 		case otelCollectorEnabled:
-			naming.BuildOtelSvcEndpoint(clusterName, OtelCollectorPort)
+			otelCollectorHost = naming.BuildOtelSvcEndpoint(clusterName)
+			sendOtelMetricsGrpc = true
+		default:
+			sendOtelMetricsHttp = true
 		}
 	}
 
@@ -91,12 +95,12 @@ func renderContainerNCCLBenchmark(
 				Value: strconv.FormatBool(ncclBenchmark.NCCLArguments.UseInfiniband),
 			},
 			{
-				Name:  "SEND_JOBS_EVENTS",
-				Value: strconv.FormatBool(sendJobsEvents),
+				Name:  "K8S_NAMESPACE",
+				Value: namespace,
 			},
 			{
-				Name:  "SEND_OTEL_METRICS",
-				Value: strconv.FormatBool(sendOtelMetrics),
+				Name:  "SEND_JOBS_EVENTS",
+				Value: strconv.FormatBool(sendJobsEvents),
 			},
 			{
 				Name:  "SEND_OTEL_METRICS_GRPC",
