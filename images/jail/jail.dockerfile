@@ -1,5 +1,5 @@
 # BASE_IMAGE defined here for second multistage build
-ARG BASE_IMAGE=nvidia/cuda:12.2.2-cudnn8-devel-ubuntu20.04
+ARG BASE_IMAGE=nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
 
 # First stage: Build the gpubench application
 FROM golang:1.22 AS gpubench_builder
@@ -23,11 +23,11 @@ RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 #######################################################################################################################
 # Second stage: Build jail image
 
-ARG BASE_IMAGE=nvidia/cuda:12.2.2-cudnn8-devel-ubuntu20.04
+ARG BASE_IMAGE=nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
 
 FROM $BASE_IMAGE AS jail
 
-ARG SLURM_VERSION=23.11.6
+ARG SLURM_VERSION=24.05.2
 ARG CUDA_VERSION=12.2.2
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -112,7 +112,7 @@ RUN chmod +x /opt/bin/install_pmix.sh && \
 # TODO: Install only necessary packages
 # Download and install Slurm packages
 RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libpmi0 slurm-smd-libpmi2-0 slurm-smd-libslurm-perl slurm-smd; do \
-        wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$UBUNTU_CODENAME-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb; \
+        wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb; \
     done
 
 RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
