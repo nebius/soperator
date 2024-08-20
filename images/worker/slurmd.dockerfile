@@ -1,8 +1,8 @@
-ARG BASE_IMAGE=nvidia/cuda:12.2.2-cudnn8-devel-ubuntu20.04
+ARG BASE_IMAGE=nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
 
 FROM $BASE_IMAGE AS worker_slurmd
 
-ARG SLURM_VERSION=23.11.6
+ARG SLURM_VERSION=24.05.2
 ARG CUDA_VERSION=12.2.2
 
 ARG DEBIAN_FRONTEND=noninteractive
