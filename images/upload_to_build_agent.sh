@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 usage() { echo "usage: ${0} -u <ssh_user> -k <path_to_ssh_key> [-h]" >&2; exit 1; }
 
 while getopts u:k:h flag
