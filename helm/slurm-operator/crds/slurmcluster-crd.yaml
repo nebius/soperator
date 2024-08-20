@@ -1056,28 +1056,6 @@ spec:
                   type: object
                 minItems: 1
                 type: array
-              metrics:
-                description: Metrics define the desired state of the prometheus or
-                  opentelemetry metrics
-                properties:
-                  enableMetrics:
-                    description: It has to be set to true if Prometheus Operator is
-                      used
-                    type: boolean
-                  enableOtelCollector:
-                    description: It has to be set to true if OpenTelemetry Operator
-                      is used
-                    type: boolean
-                  podTemplateNameRef:
-                    description: It references the PodTemplate with the OpenTelemetry
-                      Collector configuration
-                    type: string
-                  replicasOtelCollector:
-                    description: It defines the number of replicas for the OpenTelemetry
-                      Collector
-                    format: int32
-                    type: integer
-                type: object
               ncclSettings:
                 description: NCCLSettings
                 properties:
@@ -1176,22 +1154,12 @@ spec:
                               https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html
                             type: boolean
                         type: object
-                      otelCollectorEndpoint:
-                        description: kubebuilder:validation:Optional
-                        type: string
                       schedule:
                         default: 0 */3 * * *
                         description: |-
                           Schedule defines the CronJob schedule.
                           By default, runs benchmark every 3 hours
                         type: string
-                      sendJobsEvents:
-                        description: Define whether to send Kubernetes events for
-                          Slurm jobs
-                        type: boolean
-                      sendOTELMetrics:
-                        description: kubebuilder:validation:Optional
-                        type: boolean
                       successfulJobsHistoryLimit:
                         default: 3
                         description: SuccessfulJobsHistoryLimit defines the number
@@ -2574,6 +2542,14 @@ spec:
                               - volumeSourceName
                               type: object
                             type: array
+                          sharedMemorySize:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            default: 64Gi
+                            description: Size of the shared memory for NCCL
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
                           spool:
                             description: Spool represents the spool data volume configuration
                             properties:
@@ -2801,6 +2777,80 @@ spec:
                 - controller
                 - login
                 - worker
+                type: object
+              telemetry:
+                description: Metrics define the desired state of the prometheus or
+                  opentelemetry metrics
+                properties:
+                  jobsTelemetry:
+                    description: It has to be set to true if Kubernetes events for
+                      Slurm jobs are sent
+                    properties:
+                      otelCollectorGrpcHost:
+                        description: Specifies the gRPC OtelCollector host for sending
+                          Opentelemetry metrics
+                        type: string
+                      otelCollectorHttpHost:
+                        description: Specifies the HTTP OtelCollector host for sending
+                          Opentelemetry metrics
+                        type: string
+                      otelCollectorPath:
+                        default: /v1/metrics
+                        description: Specifies the path to the OtelCollector endpoint
+                          for sending Opentelemetry metrics
+                        type: string
+                      otelCollectorPort:
+                        default: 4317
+                        description: 'Specifies the port for OtelCollector, default
+                          value: 4317'
+                        format: int32
+                        type: integer
+                      sendJobsEvents:
+                        default: false
+                        description: Defines whether to send Kubernetes events for
+                          Slurm NCCLBenchmark jobs
+                        type: boolean
+                      sendOtelMetrics:
+                        default: false
+                        description: Defines whether to send Opentelemetry metrics
+                          for Slurm NCCLBenchmark jobs
+                        type: boolean
+                    type: object
+                  openTelemetryCollector:
+                    description: It has to be set to true if OpenTelemetry Operator
+                      CRD is used
+                    properties:
+                      enabled:
+                        default: false
+                        description: It has to be set to true if OpenTelemetry Operator
+                          is used
+                        type: boolean
+                      otelCollectorPort:
+                        description: |-
+                          Specifies the port for OtelCollector, default value: 4317
+                          kubebuilder:default=4317
+                        format: int32
+                        type: integer
+                      podTemplateNameRef:
+                        description: It references the PodTemplate with the OpenTelemetry
+                          Collector configuration
+                        type: string
+                      replicasOtelCollector:
+                        default: 1
+                        description: It defines the number of replicas for the OpenTelemetry
+                          Collector
+                        format: int32
+                        type: integer
+                    type: object
+                  prometheus:
+                    description: It has to be set to true if Prometheus Operator CRD
+                      is used
+                    properties:
+                      enabled:
+                        description: It has to be set to true if Prometheus Operator
+                          is used
+                        type: boolean
+                    type: object
                 type: object
               volumeSources:
                 description: VolumeSources define the sources for the volumes

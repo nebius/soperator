@@ -26,7 +26,7 @@ func renderVolumesAndClaimTemplateSpecs(
 		renderVolumeNvidia(),
 		renderVolumeBoot(),
 		renderVolumeNCCLTopology(clusterName),
-		renderVolumeSharedMemory(),
+		renderVolumeSharedMemory(worker.SharedMemorySize),
 		renderVolumeSysctl(clusterName),
 	}
 
@@ -158,13 +158,13 @@ func renderVolumeMountNCCLTopology() corev1.VolumeMount {
 // region Shared memory
 
 // renderVolumeSharedMemory renders [corev1.Volume] containing shared memory contents
-func renderVolumeSharedMemory() corev1.Volume {
+func renderVolumeSharedMemory(sizeSharedMemory *resource.Quantity) corev1.Volume {
 	return corev1.Volume{
 		Name: consts.VolumeNameSharedMemory,
 		VolumeSource: corev1.VolumeSource{
 			EmptyDir: &corev1.EmptyDirVolumeSource{
 				Medium:    corev1.StorageMediumMemory,
-				SizeLimit: ptr.To(resource.MustParse("64Gi")), // TODO subject to be configurable
+				SizeLimit: sizeSharedMemory,
 			},
 		},
 	}

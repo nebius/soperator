@@ -18,6 +18,7 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -361,6 +362,11 @@ type SlurmNodeWorkerVolumes struct {
 	//
 	// +kubebuilder:validation:Required
 	JailSubMounts []NodeVolumeJailSubMount `json:"jailSubMounts"`
+
+	// Size of the shared memory for NCCL
+	//
+	// +kubebuilder:default="64Gi"
+	SharedMemorySize *resource.Quantity `json:"sharedMemorySize,omitempty"`
 }
 
 // SlurmNodeLogin defines the configuration for the Slurm login node
