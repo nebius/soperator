@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 usage() { echo "usage: ${0} [-i] [-n] [-h]" >&2; exit 1; }
 
 while getopts inh flag

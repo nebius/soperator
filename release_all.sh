@@ -26,11 +26,13 @@ start_time=$(date +%s)
 
 if [ "$stable" == "1" ]; then
     UNSTABLE="false"
+    echo "Syncing versions among all files for stable release"
 else
     UNSTABLE="true"
+    echo "Syncing versions among all files for unstable release"
 fi
 
-echo "Syncing versions among all files for stable release"
+
 make sync-version UNSTABLE=${UNSTABLE}
 IMAGE_VERSION=$(make get-image-version UNSTABLE=${UNSTABLE})
 VERSION=$(make get-version UNSTABLE=${UNSTABLE})

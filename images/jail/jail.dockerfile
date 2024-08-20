@@ -28,6 +28,7 @@ ARG BASE_IMAGE=nvidia/cuda:12.2.2-cudnn8-devel-ubuntu20.04
 FROM $BASE_IMAGE AS jail
 
 ARG SLURM_VERSION=23.11.6
+ARG CUDA_VERSION=12.2.2
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -111,7 +112,7 @@ RUN chmod +x /opt/bin/install_pmix.sh && \
 # TODO: Install only necessary packages
 # Download and install Slurm packages
 RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libpmi0 slurm-smd-libpmi2-0 slurm-smd-libslurm-perl slurm-smd; do \
-        wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/v$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb; \
+        wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$UBUNTU_CODENAME-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb; \
     done
 
 RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
@@ -139,14 +140,14 @@ RUN chmod +x /opt/bin/install_nvtop.sh && \
     rm /opt/bin/install_nvtop.sh
 
 # Download and install NCCL packages
-RUN wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/v$SLURM_VERSION/libnccl2_2.22.3-1+cuda12.2_amd64.deb && \
-    wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/v$SLURM_VERSION/libnccl-dev_2.22.3-1+cuda12.2_amd64.deb && \
+RUN wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/libnccl2_2.22.3-1+cuda12.2_amd64.deb && \
+    wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/libnccl-dev_2.22.3-1+cuda12.2_amd64.deb && \
     dpkg -i /tmp/libnccl2_2.22.3-1+cuda12.2_amd64.deb && \
     dpkg -i /tmp/libnccl-dev_2.22.3-1+cuda12.2_amd64.deb && \
     rm -rf /tmp/*.deb
 
 # Download NCCL tests executables
-RUN wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/v$SLURM_VERSION/nccl-tests-perf.tar.gz && \
+RUN wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/nccl-tests-perf.tar.gz && \
     tar -xvzf /tmp/nccl-tests-perf.tar.gz -C /usr/bin && \
     rm -rf /tmp/nccl-tests-perf.tar.gz
 
