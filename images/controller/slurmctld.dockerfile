@@ -43,7 +43,7 @@ RUN apt-get update && \
         daemontools
 
 # Install PMIx
-COPY common/scripts/install_pmix.sh /opt/bin/
+COPY images/common/scripts/install_pmix.sh /opt/bin/
 RUN chmod +x /opt/bin/install_pmix.sh && \
     /opt/bin/install_pmix.sh && \
     rm /opt/bin/install_pmix.sh
@@ -59,8 +59,8 @@ RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-l
 RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
 
 # Install slurm plugins
-COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
-COPY common/scripts/install_slurm_plugins.sh /opt/bin/
+COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
+COPY images/common/scripts/install_slurm_plugins.sh /opt/bin/
 RUN chmod +x /opt/bin/install_slurm_plugins.sh && \
     /opt/bin/install_slurm_plugins.sh && \
     rm /opt/bin/install_slurm_plugins.sh
@@ -81,6 +81,6 @@ RUN mkdir -p /var/log/slurm/multilog && \
     ln -s /var/log/slurm/multilog/current /var/log/slurm/slurmctld.log
 
 # Copy & run the entrypoint script
-COPY controller/slurmctld_entrypoint.sh /opt/bin/slurm/
+COPY images/controller/slurmctld_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/slurmctld_entrypoint.sh
 ENTRYPOINT ["/opt/bin/slurm/slurmctld_entrypoint.sh"]

@@ -46,14 +46,14 @@ RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-l
 RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
 
 # Install slurm plugins
-COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
-COPY common/scripts/install_slurm_plugins.sh /opt/bin/
+COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
+COPY images/common/scripts/install_slurm_plugins.sh /opt/bin/
 RUN chmod +x /opt/bin/install_slurm_plugins.sh && \
     /opt/bin/install_slurm_plugins.sh && \
     rm /opt/bin/install_slurm_plugins.sh
 
 # Install munge
-COPY common/scripts/install_munge.sh /opt/bin/
+COPY images/common/scripts/install_munge.sh /opt/bin/
 RUN chmod +x /opt/bin/install_munge.sh && \
     /opt/bin/install_munge.sh && \
     rm /opt/bin/install_munge.sh
@@ -62,13 +62,13 @@ RUN chmod +x /opt/bin/install_munge.sh && \
 RUN mkdir -m 755 /run/munge
 
 # Install parallel because it's used in the benchmark script
-COPY common/scripts/install_parallel.sh /opt/bin/
+COPY images/common/scripts/install_parallel.sh /opt/bin/
 RUN chmod +x /opt/bin/install_parallel.sh && \
     /opt/bin/install_parallel.sh && \
     rm /opt/bin/install_parallel.sh
 
 # Copy srun_perf script that schedules jobs with GPU benchmark
-COPY nccl_benchmark/scripts/srun_perf.sh /usr/bin/srun_perf.sh
+COPY images/nccl_benchmark/scripts/srun_perf.sh /usr/bin/srun_perf.sh
 RUN chmod +x /usr/bin/srun_perf.sh
 
 # Update linker cache
@@ -84,6 +84,6 @@ ENV MUNGE_PID_FILE=/run/munge/munged.pid
 ENV MUNGE_SOCKET_FILE=/run/munge/munge.socket.2
 
 # Copy & run the entrypoint script
-COPY nccl_benchmark/nccl_benchmark_entrypoint.sh /opt/bin/nccl_benchmark_entrypoint.sh
+COPY images/nccl_benchmark/nccl_benchmark_entrypoint.sh /opt/bin/nccl_benchmark_entrypoint.sh
 RUN chmod +x /opt/bin/nccl_benchmark_entrypoint.sh
 ENTRYPOINT ["/opt/bin/nccl_benchmark_entrypoint.sh"]

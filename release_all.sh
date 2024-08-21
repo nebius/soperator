@@ -36,6 +36,7 @@ fi
 make sync-version UNSTABLE=${UNSTABLE}
 IMAGE_VERSION=$(make get-image-version UNSTABLE=${UNSTABLE})
 VERSION=$(make get-version UNSTABLE=${UNSTABLE})
+
 OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
 
 echo "Version is ${VERSION}"
@@ -56,27 +57,35 @@ sudo su -- <<'ENDSSH'
 echo "Remove previous outputs"
 rm -rf outputs/*
 
-echo "Building container images"
-IMAGE_VERSION=${IMAGE_VERSION} ./build_all.sh &
-IMAGE_VERSION=${IMAGE_VERSION} ./build_populate_jail.sh &
+echo "Building and pushing container images"
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd DOCKERFILE=images/worker/slurmd.dockerfile
+make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd
+
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld DOCKERFILE=images/controller/slurmctld.dockerfile
+make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld
+
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd DOCKERFILE=images/login/sshd.dockerfile
+make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd
+
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=munge DOCKERFILE=images/munge/munge.dockerfile
+make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=munge
+
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=nccl_benchmark DOCKERFILE=images/nccl_benchmark/nccl_benchmark.dockerfile
+make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=nccl_benchmark
+echo "Common images were built"
+
+echo "Removing previous jail rootfs tar archive"
+rm -rf jail_rootfs.tar
+
+echo "Building tarball for jail"
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=jail DOCKERFILE=images/jail/jail.dockerfile DOCKER_OUTPUT="--output type=tar,dest=jail_rootfs.tar"
+echo "Built tarball jail_rootfs.tar"
+
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail DOCKERFILE=images/populate_jail/populate_jail.dockerfile
+make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail
 
 wait
 
-echo "Parsing build outputs"
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-RESET='\033[0m'
-for log_file in outputs/*; do
-    if [ -f "\$log_file" ]; then
-        last_line="\$(tail -n 1 \$log_file)"
-        if [ "\${last_line}" == "OK" ]; then
-            echo -e "\${GREEN}\${log_file} is OK\${RESET}"
-        else
-            echo -e "\${RED}\${log_file} is NOT OK\${RESET}"
-            exit 1
-        fi
-    fi
-done
 ENDSSH
 EOF
 )
@@ -85,13 +94,15 @@ ssh -i "$key" "$user"@"$address" "${remote_command}"
 echo "All images are built successfully"
 
 echo "Updating CRDs & auto-generated code (included in test step) & run tests"
-make test UNSTABLE=${UNSTABLE}
+make test UNSTABLE="${UNSTABLE}"
 
 echo "Building image of the operator"
-make docker-push UNSTABLE=${UNSTABLE}
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator DOCKERFILE=Dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+echo "Pushing image of the operator"
+make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
 
-echo "Pusing Helm charts"
-./release_helm.sh -afyr -v ${OPERATOR_IMAGE_TAG}
+echo "Pushing Helm charts"
+./release_helm.sh -afyr -v "${OPERATOR_IMAGE_TAG}"
 
 echo "Packing new terraform tarball"
 VERSION=${OPERATOR_IMAGE_TAG} ./release_terraform.sh -f
