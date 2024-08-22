@@ -173,6 +173,7 @@ rules:
   verbs:
   - create
   - delete
+  - patch
   - get
   - list
   - watch
