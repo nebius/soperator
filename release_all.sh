@@ -43,6 +43,9 @@ echo "Version is ${VERSION}"
 echo "Image version is ${IMAGE_VERSION}"
 echo "Operator image tag version is ${OPERATOR_IMAGE_TAG}"
 
+echo "Updating CRDs & auto-generated code (included in test step) & run tests"
+make test UNSTABLE="${UNSTABLE}"
+
 echo "Uploading images to the build agent"
 ./images/upload_to_build_agent.sh -u "$user" -k "$key"
 
@@ -54,35 +57,41 @@ echo "Entering /usr/src/prototypes/slurm/${user}"
 cd "/usr/src/prototypes/slurm/${user}"
 sudo su -- <<'ENDSSH'
 
-echo "Remove previous outputs"
-rm -rf outputs/*
-
 echo "Building and pushing container images"
-make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd DOCKERFILE=images/worker/slurmd.dockerfile
+
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd DOCKERFILE=worker/slurmd.dockerfile
 make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd
 
-make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld DOCKERFILE=images/controller/slurmctld.dockerfile
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld DOCKERFILE=controller/slurmctld.dockerfile
 make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld
 
-make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd DOCKERFILE=images/login/sshd.dockerfile
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd DOCKERFILE=login/sshd.dockerfile
 make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd
 
-make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=munge DOCKERFILE=images/munge/munge.dockerfile
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=munge DOCKERFILE=munge/munge.dockerfile
 make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=munge
 
-make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=nccl_benchmark DOCKERFILE=images/nccl_benchmark/nccl_benchmark.dockerfile
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=nccl_benchmark DOCKERFILE=nccl_benchmark/nccl_benchmark.dockerfile
 make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=nccl_benchmark
 echo "Common images were built"
 
 echo "Removing previous jail rootfs tar archive"
-rm -rf jail_rootfs.tar
+rm -rf images/jail_rootfs.tar
 
 echo "Building tarball for jail"
-make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=jail DOCKERFILE=images/jail/jail.dockerfile DOCKER_OUTPUT="--output type=tar,dest=jail_rootfs.tar"
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=jail DOCKERFILE=jail/jail.dockerfile DOCKER_OUTPUT="--output type=tar,dest=jail_rootfs.tar"
 echo "Built tarball jail_rootfs.tar"
 
-make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail DOCKERFILE=images/populate_jail/populate_jail.dockerfile
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail DOCKERFILE=populate_jail/populate_jail.dockerfile
 make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail
+
+echo "Building image of the operator"
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator DOCKERFILE=Dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+echo "Pushing image of the operator"
+make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+
+echo "Pushing Helm charts"
+make release-helm UNSTABLE="${UNSTABLE}" OPERATOR_IMAGE_TAG="${OPERATOR_IMAGE_TAG}"
 
 wait
 
@@ -93,16 +102,9 @@ EOF
 ssh -i "$key" "$user"@"$address" "${remote_command}"
 echo "All images are built successfully"
 
-echo "Updating CRDs & auto-generated code (included in test step) & run tests"
-make test UNSTABLE="${UNSTABLE}"
-
-echo "Building image of the operator"
-make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator DOCKERFILE=Dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
-echo "Pushing image of the operator"
-make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
-
-echo "Pushing Helm charts"
-./release_helm.sh -afyr -v "${OPERATOR_IMAGE_TAG}"
+######################################################
+### The code below should be moved to terraform repo
+######################################################
 
 echo "Packing new terraform tarball"
 VERSION=${OPERATOR_IMAGE_TAG} ./release_terraform.sh -f

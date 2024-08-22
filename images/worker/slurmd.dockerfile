@@ -49,7 +49,7 @@ RUN apt-get update && \
         libdrm-dev
 
 # Install PMIx
-COPY images/common/scripts/install_pmix.sh /opt/bin/
+COPY common/scripts/install_pmix.sh /opt/bin/
 RUN chmod +x /opt/bin/install_pmix.sh && \
     /opt/bin/install_pmix.sh && \
     rm /opt/bin/install_pmix.sh
@@ -68,20 +68,20 @@ RUN wget -q -P /tmp https://github.com/nebius/slurm-deb-packages/releases/downlo
 RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
 
 # Install slurm plugins
-COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
-COPY images/common/scripts/install_slurm_plugins.sh /opt/bin/
+COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
+COPY common/scripts/install_slurm_plugins.sh /opt/bin/
 RUN chmod +x /opt/bin/install_slurm_plugins.sh && \
     /opt/bin/install_slurm_plugins.sh && \
     rm /opt/bin/install_slurm_plugins.sh
 
 # Install nvidia-container-toolkit
-COPY images/common/scripts/install_container_toolkit.sh /opt/bin/
+COPY common/scripts/install_container_toolkit.sh /opt/bin/
 RUN chmod +x /opt/bin/install_container_toolkit.sh && \
     /opt/bin/install_container_toolkit.sh && \
     rm /opt/bin/install_container_toolkit.sh
 
 # Install nvtop GPU monitoring utility
-COPY images/common/scripts/install_nvtop.sh /opt/bin/
+COPY common/scripts/install_nvtop.sh /opt/bin/
 RUN chmod +x /opt/bin/install_nvtop.sh && \
     /opt/bin/install_nvtop.sh && \
     rm /opt/bin/install_nvtop.sh
@@ -91,11 +91,11 @@ RUN mkdir -p -m 777 /usr/share/enroot/enroot-data && \
     mkdir -p -m 755 /run/enroot
 
 # Copy GPU healthcheck script
-COPY images/worker/scripts/gpu_healthcheck.sh /usr/bin/gpu_healthcheck.sh
+COPY worker/scripts/gpu_healthcheck.sh /usr/bin/gpu_healthcheck.sh
 RUN chmod +x /usr/bin/gpu_healthcheck.sh
 
 # Copy script for complementing jail filesystem in runtime
-COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
+COPY common/scripts/complement_jail.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/complement_jail.sh
 
 # Update linker cache
@@ -114,6 +114,6 @@ RUN mkdir -p /var/log/slurm/multilog && \
     ln -s /var/log/slurm/multilog/current /var/log/slurm/slurmd.log
 
 # Copy & run the entrypoint script
-COPY images/worker/slurmd_entrypoint.sh /opt/bin/slurm/
+COPY worker/slurmd_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh
 ENTRYPOINT ["/opt/bin/slurm/slurmd_entrypoint.sh"]

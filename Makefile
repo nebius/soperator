@@ -237,7 +237,11 @@ endif
 ifndef DOCKERFILE
 	$(error DOCKERFILE is not set, docker image cannot be built)
 endif
+ifeq (${IMAGE_NAME},slurm-operator)
 	docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} ${DOCKER_BUILD_PLATFORM} -f ${DOCKERFILE} ${DOCKER_OUTPUT} .
+else
+	cd images && docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} ${DOCKER_BUILD_PLATFORM} -f ${DOCKERFILE} ${DOCKER_OUTPUT} .
+endif
 
 .PHONY: docker-push
 docker-push: ## Push docker image
@@ -246,6 +250,11 @@ ifndef IMAGE_NAME
 endif
 	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "cr.ai.nebius.cloud/${CONTAINER_REGISTRY_ID}/${IMAGE_NAME}:${IMAGE_VERSION}"
 	docker push "cr.ai.nebius.cloud/${CONTAINER_REGISTRY_ID}/${IMAGE_NAME}:${IMAGE_VERSION}"
+
+.PHONY: release-helm
+release-helm: ## Build & push helm docker image
+	mkdir -p "helm-releases"
+	./release_helm.sh -afyr -v "${OPERATOR_IMAGE_TAG}"
 
 ##@ Deployment
 

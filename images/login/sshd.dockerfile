@@ -55,7 +55,7 @@ RUN mkdir -p /usr/src/dummy && \
     cp libdummy.so /lib/x86_64-linux-gnu/
 
 # Copy script for complementing jail filesystem in runtime
-COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
+COPY common/scripts/complement_jail.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/complement_jail.sh
 
 # Update linker cache
@@ -69,6 +69,6 @@ RUN rm -rf /home
 EXPOSE 22
 
 # Copy & run the entrypoint script
-COPY images/login/sshd_entrypoint.sh /opt/bin/slurm/
+COPY login/sshd_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/sshd_entrypoint.sh
 ENTRYPOINT ["/opt/bin/slurm/sshd_entrypoint.sh"]

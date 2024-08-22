@@ -22,6 +22,12 @@ echo "Uploading sources to the slurm-build-agent VM (https://console.nebius.ai/f
 
 agent_ip=195.242.25.163
 
-rsync -Prv -e "ssh -i ${key}" images              "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/
-rsync -Prv -e "ssh -i ${key}" VERSION             "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/
-rsync -Prv -e "ssh -i ${key}" Makefile            "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/
+rsync -Prv \
+    -e "ssh -i ${key}" \
+    --exclude '.DS_Store' \
+    --exclude '.idea' \
+    --exclude 'test' \
+    --exclude '.github' \
+    --exclude 'helm-releases' \
+    --exclude 'terraform-releases' \
+    ../operator/ "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/
