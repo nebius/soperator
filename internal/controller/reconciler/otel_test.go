@@ -5,18 +5,18 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/naming"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 )
 
-func Test_IsControllerOwnerRoleBinding(t *testing.T) {
+func Test_IsControllerOwnerOtel(t *testing.T) {
 	defaultNameCluster := "test-cluster"
 
 	cluster := &slurmv1.SlurmCluster{
@@ -26,7 +26,7 @@ func Test_IsControllerOwnerRoleBinding(t *testing.T) {
 	}
 
 	t.Run("controller is owner", func(t *testing.T) {
-		roleBinding := &rbacv1.RoleBinding{
+		otel := &otelv1beta1.OpenTelemetryCollector{
 			ObjectMeta: metav1.ObjectMeta{
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -37,13 +37,13 @@ func Test_IsControllerOwnerRoleBinding(t *testing.T) {
 			},
 		}
 
-		isOwner := isControllerOwnerRoleBinding(roleBinding, cluster)
+		isOwner := isControllerOwnerOtel(otel, cluster)
 
 		assert.True(t, isOwner)
 	})
 
 	t.Run("controller is not owner", func(t *testing.T) {
-		roleBinding := &rbacv1.RoleBinding{
+		otel := &otelv1beta1.OpenTelemetryCollector{
 			ObjectMeta: metav1.ObjectMeta{
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -54,28 +54,28 @@ func Test_IsControllerOwnerRoleBinding(t *testing.T) {
 			},
 		}
 
-		isOwner := isControllerOwnerRoleBinding(roleBinding, cluster)
+		isOwner := isControllerOwnerOtel(otel, cluster)
 
 		assert.False(t, isOwner)
 	})
 }
 
-func Test_GetRoleBinding(t *testing.T) {
+func Test_GetOtel(t *testing.T) {
 	defaultNamespace := "test-namespace"
 	defaultNameCluster := "test-cluster"
 
 	scheme := runtime.NewScheme()
 	_ = slurmv1.AddToScheme(scheme)
-	_ = rbacv1.AddToScheme(scheme)
+	_ = otelv1beta1.AddToScheme(scheme)
 
 	tests := []struct {
-		name       string
-		cluster    *slurmv1.SlurmCluster
-		existingRB *rbacv1.RoleBinding
-		expectErr  bool
+		name         string
+		cluster      *slurmv1.SlurmCluster
+		existingOtel *otelv1beta1.OpenTelemetryCollector
+		expectErr    bool
 	}{
 		{
-			name: "RoleBinding exists",
+			name: "Otel exists",
 			cluster: &slurmv1.SlurmCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      defaultNameCluster,
@@ -90,35 +90,35 @@ func Test_GetRoleBinding(t *testing.T) {
 				},
 			},
 
-			existingRB: &rbacv1.RoleBinding{
+			existingOtel: &otelv1beta1.OpenTelemetryCollector{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      naming.BuildRoleBindingWorkerName(defaultNameCluster),
+					Name:      defaultNameCluster,
 					Namespace: defaultNamespace,
 				},
 			},
 			expectErr: false,
 		},
 		{
-			name: "RoleBinding does not exist",
+			name: "Otel does not exist",
 			cluster: &slurmv1.SlurmCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      defaultNameCluster,
 					Namespace: defaultNamespace,
 				},
 			},
-			existingRB: nil,
-			expectErr:  false,
+			existingOtel: nil,
+			expectErr:    false,
 		},
 		{
-			name: "Error getting RoleBinding",
+			name: "Error getting Otel",
 			cluster: &slurmv1.SlurmCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      defaultNameCluster,
 					Namespace: defaultNamespace,
 				},
 			},
-			existingRB: nil,
-			expectErr:  true,
+			existingOtel: nil,
+			expectErr:    true,
 		},
 	}
 
@@ -126,13 +126,13 @@ func Test_GetRoleBinding(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up the fake client
 			objs := []runtime.Object{}
-			if tt.existingRB != nil {
-				objs = append(objs, tt.existingRB)
+			if tt.existingOtel != nil {
+				objs = append(objs, tt.existingOtel)
 			}
 
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 
-			r := &RoleBindingReconciler{
+			r := &OtelReconciler{
 				Reconciler: &Reconciler{
 					Client: fakeClient,
 					Scheme: scheme,
@@ -146,7 +146,7 @@ func Test_GetRoleBinding(t *testing.T) {
 
 			// Run the test
 			ctx := context.TODO()
-			roleBinding, err := r.getRoleBinding(ctx, tt.cluster)
+			otel, err := r.getOtel(ctx, tt.cluster)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -154,61 +154,60 @@ func Test_GetRoleBinding(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			switch {
-			case tt.existingRB != nil:
-				assert.Equal(t, tt.existingRB.Name, roleBinding.Name)
-				assert.Equal(t, tt.existingRB.Namespace, roleBinding.Namespace)
-			case roleBinding != nil:
-				assert.Equal(t, "", roleBinding.Name)
-				assert.Equal(t, "", roleBinding.Namespace)
-			default:
-				assert.Nil(t, roleBinding)
+			if tt.existingOtel != nil {
+				assert.Equal(t, tt.existingOtel.Name, otel.Name)
+				assert.Equal(t, tt.existingOtel.Namespace, otel.Namespace)
+			} else if otel != nil {
+				assert.Equal(t, "", otel.Name)
+				assert.Equal(t, "", otel.Namespace)
+			} else {
+				assert.Nil(t, otel)
 			}
 		})
 	}
 }
 
-func Test_DeleteRoleBindingOwnedByController(t *testing.T) {
+func Test_DeleteOtelOwnedByController(t *testing.T) {
 	defaultNamespace := "test-namespace"
 	defaultNameCluster := "test-cluster"
 
 	scheme := runtime.NewScheme()
 	_ = slurmv1.AddToScheme(scheme)
-	_ = rbacv1.AddToScheme(scheme)
+	_ = otelv1beta1.AddToScheme(scheme)
 
 	tests := []struct {
-		name        string
-		cluster     *slurmv1.SlurmCluster
-		roleBinding *rbacv1.RoleBinding
-		expectErr   bool
+		name      string
+		cluster   *slurmv1.SlurmCluster
+		otel      *otelv1beta1.OpenTelemetryCollector
+		expectErr bool
 	}{
 		{
-			name: "RoleBinding deleted successfully",
+			name: "Otel deleted successfully",
 			cluster: &slurmv1.SlurmCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      defaultNameCluster,
 					Namespace: defaultNamespace,
 				},
 			},
-			roleBinding: &rbacv1.RoleBinding{
+			otel: &otelv1beta1.OpenTelemetryCollector{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      naming.BuildRoleBindingWorkerName(defaultNameCluster),
+					Name:      defaultNameCluster,
 					Namespace: defaultNamespace,
 				},
 			},
 			expectErr: false,
 		},
 		{
-			name: "Error deleting RoleBinding",
+			name: "Error deleting Otel",
 			cluster: &slurmv1.SlurmCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      defaultNameCluster,
 					Namespace: defaultNamespace,
 				},
 			},
-			roleBinding: &rbacv1.RoleBinding{
+			otel: &otelv1beta1.OpenTelemetryCollector{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      naming.BuildRoleBindingWorkerName(defaultNameCluster),
+					Name:      defaultNameCluster,
 					Namespace: defaultNamespace,
 				},
 			},
@@ -219,10 +218,10 @@ func Test_DeleteRoleBindingOwnedByController(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up the fake client
-			objs := []runtime.Object{tt.roleBinding}
+			objs := []runtime.Object{tt.otel}
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 
-			r := &RoleBindingReconciler{
+			r := &OtelReconciler{
 				Reconciler: &Reconciler{
 					Client: fakeClient,
 					Scheme: scheme,
@@ -236,18 +235,18 @@ func Test_DeleteRoleBindingOwnedByController(t *testing.T) {
 
 			// Run the test
 			ctx := context.TODO()
-			err := r.deleteRoleBindingOwnedByController(ctx, tt.cluster, tt.roleBinding)
+			err := r.deleteOtelOwnedByController(ctx, tt.cluster, tt.otel)
 
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 
-				// Verify the role binding was deleted
+				// Verify the otel collector was deleted
 				err = fakeClient.Get(ctx, types.NamespacedName{
-					Namespace: tt.roleBinding.Namespace,
-					Name:      tt.roleBinding.Name,
-				}, &rbacv1.RoleBinding{})
+					Namespace: tt.otel.Namespace,
+					Name:      tt.otel.Name,
+				}, &otelv1beta1.OpenTelemetryCollector{})
 				assert.True(t, apierrors.IsNotFound(err))
 			}
 		})

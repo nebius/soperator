@@ -16,7 +16,8 @@ const (
 	DefaultOtelCollectorImage = "otel/opentelemetry-collector:0.106.1"
 )
 
-func RenderOtelCollector(clusterName,
+func RenderOtelCollector(
+	clusterName,
 	namespace string,
 	metrics *slurmv1.Telemetry,
 	foundPodTemplate *corev1.PodTemplate,
