@@ -14,7 +14,7 @@ k8sNodeFilters:
                 - key: "nebius.com/node-group-id"
                   operator: In
                   values:
-                    - "f2mpmlsb2me7caebvaje"
+                    - "node-group-id-here"
     tolerations:
       - key: nvidia.com/gpu
         operator: Exists
@@ -28,7 +28,7 @@ k8sNodeFilters:
                 - key: "nebius.com/node-group-id"
                   operator: In
                   values:
-                    - "f2misrg1i9vtg1mtcqg3"
+                    - "node-group-id-here"
 # Sources for the volumes used in Slurm node specifications
 volumeSources:
   - name: controller-spool
@@ -185,4 +185,4 @@ images:
   sshd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/login_sshd:1.8.1-jammy-slurm24.05.2"
   munge: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/munge:1.8.1-jammy-slurm24.05.2"
   populateJail: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/populate_jail:1.8.1-jammy-slurm24.05.2"
-  ncclBenchmark: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/nccl_benchmark:1.8.1-jammy-slurm24.05.2
+  ncclBenchmark: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/nccl_benchmark:1.8.1-jammy-slurm24.05.2"
