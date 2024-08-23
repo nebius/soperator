@@ -19,6 +19,8 @@ CONTAINER_REGISTRY_HELM_UNSTABLE_ID = crnefnj17i4kqgt3up94
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.28.0
 
+DOCKER_BUILD_PLATFORM = "--platform=linux/amd64"
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -49,9 +51,9 @@ CONTAINER_REGISTRY_HELM_ID 	= $(CONTAINER_REGISTRY_HELM_UNSTABLE_ID)
 
 IMAGE_VERSION		  = $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)
 GO_CONST_VERSION_FILE = internal/consts/version.go
+IMAGE_REPO			  = $(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)
 
-# Image URL to use all building/pushing image targets
-OPERATOR_IMAGE_REPO = $(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/slurm-operator
+OPERATOR_IMAGE_REPO = $(IMAGE_REPO)/slurm-operator
 OPERATOR_IMAGE_TAG  = $(VERSION)
 
 ifeq ($(shell uname), Darwin)
@@ -227,16 +229,32 @@ build: manifests generate fmt vet ## Build manager binary with native toolchain.
 run: manifests generate fmt vet ## Run a controller from your host with native toolchain.
 	go run ./cmd/main.go
 
-# If you wish to build the manager image targeting other platforms you can use the --platform flag.
-# (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
-# More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
-docker-build: ## Build docker image with the manager.
-	docker build --tag $(OPERATOR_IMAGE_REPO):$(OPERATOR_IMAGE_TAG) --target release --load --platform=linux/amd64 .
+docker-build: ## Build docker image
+ifndef IMAGE_NAME
+	$(error IMAGE_NAME is not set, docker image cannot be built)
+endif
+ifndef DOCKERFILE
+	$(error DOCKERFILE is not set, docker image cannot be built)
+endif
+ifeq (${IMAGE_NAME},slurm-operator)
+	docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} ${DOCKER_BUILD_PLATFORM} -f ${DOCKERFILE} ${DOCKER_OUTPUT} .
+else
+	cd images && docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} ${DOCKER_BUILD_PLATFORM} -f ${DOCKERFILE} ${DOCKER_OUTPUT} .
+endif
 
 .PHONY: docker-push
-docker-push: docker-build ## Push docker image with the manager.
-	docker push $(OPERATOR_IMAGE_REPO):$(OPERATOR_IMAGE_TAG)
+docker-push: ## Push docker image
+ifndef IMAGE_NAME
+	$(error IMAGE_NAME is not set, docker image can not be pushed)
+endif
+	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "cr.ai.nebius.cloud/${CONTAINER_REGISTRY_ID}/${IMAGE_NAME}:${IMAGE_VERSION}"
+	docker push "cr.ai.nebius.cloud/${CONTAINER_REGISTRY_ID}/${IMAGE_NAME}:${IMAGE_VERSION}"
+
+.PHONY: release-helm
+release-helm: ## Build & push helm docker image
+	mkdir -p "helm-releases"
+	./release_helm.sh -afyr -v "${OPERATOR_IMAGE_TAG}"
 
 ##@ Deployment
 
@@ -254,7 +272,7 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(OPERATOR_IMAGE_REPO):$(OPERATOR_IMAGE_TAG)
+	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMAGE_REPO)/slurm-operator:$(OPERATOR_IMAGE_TAG)
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 
 .PHONY: undeploy

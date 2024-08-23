@@ -16,7 +16,7 @@ RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
     go build -o slurm_operator ./cmd/
 
 #######################################################################################################################
-FROM alpine:latest AS release
+FROM alpine:latest AS slurm-operator
 
 COPY --from=operator_builder /operator/slurm_operator /usr/bin/
 
