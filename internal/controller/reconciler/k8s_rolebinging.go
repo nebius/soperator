@@ -84,7 +84,7 @@ func (r *RoleBindingReconciler) getRoleBinding(ctx context.Context, cluster *slu
 			return roleBinding, nil
 		}
 		// Other error occurred
-		return roleBinding, errors.Wrap(err, "getting Worker RoleBinding")
+		return nil, errors.Wrap(err, "getting Worker RoleBinding")
 	}
 	return roleBinding, nil
 }

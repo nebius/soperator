@@ -84,7 +84,7 @@ func (r *RoleReconciler) getRole(ctx context.Context, cluster *slurmv1.SlurmClus
 			return role, nil
 		}
 		// Other error occurred
-		return role, errors.Wrap(err, "getting Role")
+		return nil, errors.Wrap(err, "getting Role")
 	}
 	return role, nil
 }

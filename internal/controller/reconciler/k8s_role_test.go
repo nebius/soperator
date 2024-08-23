@@ -153,13 +153,15 @@ func Test_GetRole(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-
-			if tt.existingRB != nil {
+			switch {
+			case tt.existingRB != nil:
 				assert.Equal(t, tt.existingRB.Name, role.Name)
 				assert.Equal(t, tt.existingRB.Namespace, role.Namespace)
-			} else {
+			case role != nil:
 				assert.Equal(t, "", role.Name)
 				assert.Equal(t, "", role.Namespace)
+			default:
+				assert.Nil(t, role)
 			}
 		})
 	}

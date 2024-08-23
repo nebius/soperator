@@ -42,7 +42,7 @@ func (r *OtelReconciler) Reconcile(
 	if !otelInstalled {
 		// If desired is nil, delete the OpenTelemetryCollector
 		log.FromContext(ctx).Info(fmt.Sprintf("Deleting OpenTelemetryCollector %s-collector, because of OpenTelemetryCollector is not needed", cluster.Name))
-		return r.deleteOteIfOwnedByController(ctx, cluster)
+		return r.deleteOtelIfOwnedByController(ctx, cluster)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
 		log.FromContext(ctx).
@@ -53,7 +53,7 @@ func (r *OtelReconciler) Reconcile(
 	return nil
 }
 
-func (r *OtelReconciler) deleteOteIfOwnedByController(
+func (r *OtelReconciler) deleteOtelIfOwnedByController(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
 ) error {
@@ -68,7 +68,7 @@ func (r *OtelReconciler) deleteOteIfOwnedByController(
 		return nil
 	}
 	// The controller is the owner of the OpenTelemetryCollector, delete it
-	return r.deleteOpenTelemetryCollectorOwnedByController(ctx, cluster, otel)
+	return r.deleteOtelOwnedByController(ctx, cluster, otel)
 }
 
 func (r *OtelReconciler) getOtel(ctx context.Context, cluster *slurmv1.SlurmCluster) (*otelv1beta1.OpenTelemetryCollector, error) {
@@ -87,7 +87,7 @@ func (r *OtelReconciler) getOtel(ctx context.Context, cluster *slurmv1.SlurmClus
 			return otel, nil
 		}
 		// Other error occurred
-		return otel, errors.Wrap(err, "getting Worker OpenTelemetryCollector")
+		return nil, errors.Wrap(err, "getting Worker OpenTelemetryCollector")
 	}
 	return otel, nil
 }
@@ -106,7 +106,7 @@ func isControllerOwnerOtel(otel *otelv1beta1.OpenTelemetryCollector, cluster *sl
 	return isOwner
 }
 
-func (r *OtelReconciler) deleteOpenTelemetryCollectorOwnedByController(
+func (r *OtelReconciler) deleteOtelOwnedByController(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
 	otel *otelv1beta1.OpenTelemetryCollector,
