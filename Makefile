@@ -255,6 +255,7 @@ endif
 release-helm: ## Build & push helm docker image
 	mkdir -p "helm-releases"
 	./release_helm.sh -afyr -v "${OPERATOR_IMAGE_TAG}"
+	rm -rf /helm-releases/*
 
 ##@ Deployment
 
