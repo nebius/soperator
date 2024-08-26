@@ -31,8 +31,14 @@ are based on.
 ./release_all.sh -u <ssh_user_name> -k <path_to_private_ssh_key> -a <address_of_the_build_agent>
 ```
 
+Change version in terraform/VERSION file
+
+```shell
+cd terraform && make release-terraform UNSTABLE=true
+```
+
 This will build & push all components (container images, operator, helm charts, etc.) and produce a terraform release 
-tarball in the `terraform-releases/oldbius/unstable` directory.
+tarball in the `terraform/releases/oldbius/unstable` directory.
 
 It will also unpack the tarball to the same directory, so you can apply it and check your changes.
 
@@ -41,12 +47,12 @@ It will also unpack the tarball to the same directory, so you can apply it and c
 Enter the directory with your terraform files:
 
 ```shell
-cd terraform-releases/unstable
+cd terraform/releases/unstable
 ```
 
 In order to create or update a Slurm cluster, fill out the `terraform.tfvars` file.
 There are some existing sets of variables that can be used for our test clusters located at 
-[dev-tfvars](terraform-releases/unstable/dev-tfvars) directory.
+[dev-tfvars](terraform/releases/unstable/dev-tfvars) directory.
 
 Initialize & apply your terraform:
 
@@ -71,12 +77,12 @@ Test your changes. The general cluster functionality can be checked in the same 
 ### Step 5. (Optional) Fix found issues
 
 If the initial version doesn't work, change your version suffix somehow. It's recommended just to add a counter to the 
-end. In our example, the version could become `1.2.3-rodrijjke-fix-munge-1`. 
+end. In our example, the version could become `1.2.3-c47f5b18`. 
 
 Then you need to create a new release (repeat [Step 2](#step-2-release-new-version-of-all-components)).
 
 Don't worry about backing up your `terraform.tfvars` & `terraform.tfstate` files in the 
-`terraform-releases/oldbius/unstable/terraform` directory. Creation of a new release won't overwrite them.
+`terraform/releases/oldbius/unstable/terraform` directory. Creation of a new release won't overwrite them.
 
 ### Step 6. Make release stable
 
@@ -89,6 +95,6 @@ Change the [VERSION](./VERSION) file once again: increment the `MAJOR.MINOR.PATH
 principle.
 
 Create a final, stable, release by repeating [Step 2](#step-2-release-new-version-of-all-components) and pass the `-s`
-option to `release_all.sh` script. It will put the new tarball to [stable](terraform-releases/stable) directory.
+option to `release_all.sh` script. `And UNSTABLE=true` for building terraform. It will put the new tarball to [stable](terraform/releases/stable) directory.
 
 That's it!
