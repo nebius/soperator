@@ -28,6 +28,8 @@ rsync -Prv \
     --exclude '.idea' \
     --exclude 'test' \
     --exclude '.github' \
+    --exclude '.git' \
+    --exclude 'bin' \
     --exclude 'helm-releases' \
-    --exclude 'terraform-releases' \
-    ../operator/ "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/
+    --exclude 'terraform' \
+    ./ "${user}"@"${agent_ip}":/usr/src/prototypes/slurm/${user}/

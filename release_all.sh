@@ -47,7 +47,7 @@ echo "Updating CRDs & auto-generated code (included in test step) & run tests"
 make test UNSTABLE="${UNSTABLE}"
 
 echo "Uploading images to the build agent"
-./images/upload_to_build_agent.sh -u "$user" -k "$key"
+./upload_to_build_agent.sh -u "$user" -k "$key"
 
 remote_command=$(cat <<EOF
 set -e

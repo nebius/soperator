@@ -1,2 +1,5 @@
-/.idea/
+!go.mod
 .DS_Store
+/.idea/
+bin
+cover.out

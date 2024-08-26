@@ -82,7 +82,7 @@ RUN chmod +x /opt/bin/install_python.sh && \
     rm /opt/bin/install_python.sh
 
 # Install mpi4py
-RUN pip install mpi4py
+RUN pip install -U pip wheel build && pip install mpi4py
 
 # Install parallel because it's required for enroot operation
 COPY common/scripts/install_parallel.sh /opt/bin/
