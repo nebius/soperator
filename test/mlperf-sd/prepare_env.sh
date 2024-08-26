@@ -7,8 +7,9 @@ cd /mlperf-sd
 
 echo "Checkout MLCommons git repo"
 export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
-git clone https://github.com/mlcommons/training
+git clone --depth=1 https://github.com/mlcommons/training
 pushd /mlperf-sd/training
+    git fetch --depth=1 origin 00f04c57d589721aabce4618922780d29f73cf4e
     git checkout 00f04c57d589721aabce4618922780d29f73cf4e
 popd
 

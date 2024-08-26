@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH -J nccl
-#SBATCH --output=/quickstart/outputs/nccl.out
-#SBATCH --error=/quickstart/outputs/nccl.out
+#SBATCH --output=/quickcheck/outputs/nccl.out
+#SBATCH --error=/quickcheck/outputs/nccl.out
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=8G
 #SBATCH --gres=gpu:nvidia_h100_80gb_hbm3:8

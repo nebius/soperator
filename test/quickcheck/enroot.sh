@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH -J enroot
-#SBATCH --output=/quickstart/outputs/enroot.out
-#SBATCH --error=/quickstart/outputs/enroot.out
+#SBATCH --output=/quickcheck/outputs/enroot.out
+#SBATCH --error=/quickcheck/outputs/enroot.out
 #SBATCH --gpus=1
 
 # Specify the image in order to run the job inside a container
