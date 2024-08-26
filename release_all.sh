@@ -102,31 +102,6 @@ EOF
 ssh -i "$key" "$user"@"$address" "${remote_command}"
 echo "All images are built successfully"
 
-######################################################
-### The code below should be moved to terraform repo
-######################################################
-
-echo "Packing new terraform tarball"
-VERSION=${OPERATOR_IMAGE_TAG} ./terraform/release_terraform.sh -f
-
-echo "Unpacking the terraform tarball"
-version_formatted=$(echo "${OPERATOR_IMAGE_TAG}" | tr '-' '_' | tr '.' '_')
-tarball="slurm_operator_tf_$version_formatted.tar.gz"
-
-pushd ./terraform/releases/unstable
-    VERSION=${OPERATOR_IMAGE_TAG} TARBALL=${tarball} ./unpack_current_version.sh
-popd
-
-GREEN='\033[0;32m'
-RESET='\033[0m'
-
-if [ "$stable" == "1" ]; then
-    mv "terraform/releases/unstable/$tarball" "terraform/releases/stable/"
-    echo -e "${GREEN}Stable version '$OPERATOR_IMAGE_TAG' is successfully released${RESET}"
-else
-    echo -e "${GREEN}Unstable version '$OPERATOR_IMAGE_TAG' is successfully released and unpacked to releases/unstable/${RESET}"
-fi
-
 end_time=$(date +%s)
 duration=$((end_time - start_time))
 
