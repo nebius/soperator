@@ -13,6 +13,7 @@ import (
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/benchmark"
+	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -25,39 +26,54 @@ func (r SlurmClusterReconciler) ReconcileNCCLBenchmark(
 	logger := log.FromContext(ctx)
 
 	reconcileNCCLBenchmarkImpl := func() error {
-		desired, err := benchmark.RenderNCCLBenchmarkCronJob(
-			clusterValues.Namespace,
-			clusterValues.Name,
-			clusterValues.NodeFilters,
-			&clusterValues.Secrets,
-			clusterValues.VolumeSources,
-			&clusterValues.NCCLBenchmark,
-			clusterValues.Telemetry,
+		return utils.ExecuteMultiStep(ctx,
+			"Reconciliation of NCCL benchmark",
+			utils.MultiStepExecutionStrategyFailAtFirstError, utils.MultiStepExecutionStep{
+				Name: "NCCL benchmark CronJob",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					desired, err := benchmark.RenderNCCLBenchmarkCronJob(
+						clusterValues.Namespace,
+						clusterValues.Name,
+						clusterValues.NodeFilters,
+						&clusterValues.Secrets,
+						clusterValues.VolumeSources,
+						&clusterValues.NCCLBenchmark,
+						clusterValues.Telemetry,
+					)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering NCCL benchmark CronJob")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
+
+					deps, err := r.getNCCLBenchmarkDependencies(ctx, clusterValues)
+					if err != nil {
+						stepLogger.Error(err, "Failed to retrieve dependencies")
+						return errors.Wrap(err, "retrieving dependencies for NCCLBenchmark CronJob")
+					}
+					stepLogger.Info("Retrieved dependencies")
+
+					if err = r.CronJob.Reconcile(ctx, cluster, &desired, deps...); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling NCCL benchmark CronJob")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
 		)
-		if err != nil {
-			logger.Error(err, "Failed to render NCCL benchmark CronJob")
-			return errors.Wrap(err, "rendering NCCL benchmark CronJob")
-		}
-		logger = logger.WithValues(logfield.ResourceKV(&desired)...)
-
-		deps, err := r.getNCCLBenchmarkDependencies(ctx, clusterValues)
-		if err != nil {
-			logger.Error(err, "Failed to retrieve dependencies for NCCLBenchmark CronJob")
-			return errors.Wrap(err, "retrieving dependencies for NCCLBenchmark CronJob")
-		}
-
-		err = r.CronJob.Reconcile(ctx, cluster, &desired, deps...)
-		if err != nil {
-			logger.Error(err, "Failed to reconcile NCCL benchmark CronJob")
-			return errors.Wrap(err, "reconciling NCCL benchmark CronJob")
-		}
-		return nil
 	}
 
 	if err := reconcileNCCLBenchmarkImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile NCCL benchmark")
 		return errors.Wrap(err, "reconciling NCCL benchmark")
 	}
+	logger.Info("Reconciled NCCL benchmark")
 	return nil
 }
 

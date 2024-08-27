@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,6 +18,7 @@ import (
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/worker"
+	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -31,142 +31,208 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 	logger := log.FromContext(ctx)
 
 	reconcileWorkersImpl := func() error {
-		// NCCL topology ConfigMap
-		{
-			desired, err := worker.RenderConfigMapNCCLTopology(clusterValues)
-			if err != nil {
-				logger.Error(err, "Failed to render worker NCCL topology ConfigMap")
-				return errors.Wrap(err, "rendering worker NCCL topology ConfigMap")
-			}
-			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
-			err = r.ConfigMap.Reconcile(ctx, cluster, &desired)
-			if err != nil {
-				logger.Error(err, "Failed to reconcile worker NCCL topology ConfigMap")
-				return errors.Wrap(err, "reconciling worker NCCL topology ConfigMap")
-			}
-		}
+		return utils.ExecuteMultiStep(ctx,
+			"Reconciliation of Slurm Workers",
+			utils.MultiStepExecutionStrategyCollectErrors,
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Worker NCCL topology ConfigMap",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
 
-		// Sysctl ConfigMap
-		{
-			desired, err := worker.RenderConfigMapSysctl(clusterValues)
-			if err != nil {
-				logger.Error(err, "Failed to render worker Sysctl ConfigMap")
-				return errors.Wrap(err, "rendering worker Sysctl ConfigMap")
-			}
-			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
-			err = r.ConfigMap.Reconcile(ctx, cluster, &desired)
-			if err != nil {
-				logger.Error(err, "Failed to reconcile worker Sysctl ConfigMap")
-				return errors.Wrap(err, "reconciling worker Sysctl ConfigMap")
-			}
-		}
+					desired, err := worker.RenderConfigMapNCCLTopology(clusterValues)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering worker NCCL topology ConfigMap")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
 
-		// Service
-		{
-			desired := worker.RenderService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeWorker)
-			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
-			err := r.Service.Reconcile(ctx, cluster, &desired)
-			if err != nil {
-				logger.Error(err, "Failed to reconcile worker Service")
-				return errors.Wrap(err, "reconciling worker Service")
-			}
-		}
+					if err = r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling worker NCCL topology ConfigMap")
+					}
+					stepLogger.Info("Reconciled")
 
-		// StatefulSet
-		{
-			desired, err := worker.RenderStatefulSet(
-				clusterValues.Namespace,
-				clusterValues.Name,
-				clusterValues.NodeFilters,
-				&clusterValues.Secrets,
-				clusterValues.VolumeSources,
-				&clusterValues.NodeWorker,
-			)
-			if err != nil {
-				logger.Error(err, "Failed to render worker StatefulSet")
-				return errors.Wrap(err, "rendering worker StatefulSet")
-			}
-			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
+					return nil
+				},
+			},
 
-			deps, err := r.getWorkersStatefulSetDependencies(ctx, clusterValues)
-			if err != nil {
-				logger.Error(err, "Failed to retrieve dependencies for worker StatefulSet")
-				return errors.Wrap(err, "retrieving dependencies for worker StatefulSet")
-			}
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Worker sysctl ConfigMap",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
 
-			err = r.StatefulSet.Reconcile(ctx, cluster, &desired, deps...)
-			if err != nil {
-				logger.Error(err, "Failed to reconcile worker StatefulSet")
-				return errors.Wrap(err, "reconciling worker StatefulSet")
-			}
-		}
+					desired, err := worker.RenderConfigMapSysctl(clusterValues)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering worker Sysctl ConfigMap")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
 
-		// ServiceAccount
-		{
-			desired := worker.RenderServiceAccount(clusterValues.Namespace, clusterValues.Name)
-			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
-			err := r.ServiceAccount.Reconcile(ctx, cluster, &desired)
-			if err != nil {
-				logger.Error(err, "Failed to reconcile worker ServiceAccount")
-				return errors.Wrap(err, "reconciling worker ServiceAccount")
-			}
-		}
+					if err = r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling worker Sysctl ConfigMap")
+					}
+					stepLogger.Info("Reconciled")
 
-		// Role
-		{
-			if clusterValues.Telemetry != nil && clusterValues.Telemetry.JobsTelemetry != nil && clusterValues.Telemetry.JobsTelemetry.SendJobsEvents {
-				desired := worker.RenderRole(clusterValues.Namespace, clusterValues.Name)
-				logger = logger.WithValues(logfield.ResourceKV(&desired)...)
-				err := r.Role.Reconcile(ctx, cluster, &desired)
-				if err != nil {
-					logger.Error(err, "Failed to reconcile worker Role")
-					return errors.Wrap(err, "reconciling worker Role")
-				}
-			} else {
-				// If SenJobsEvents is set to false or nil, the Role is not necessary because we don't need the permissions.
-				// We need to explicitly delete the Role in case the user initially set JobsEvents to true and then removed it or set it to false.
-				// Without explicit deletion through reconciliation,
-				// Еhe Role will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
-				var desired *rbacv1.Role
-				err := r.Role.Reconcile(ctx, cluster, desired)
-				if err != nil {
-					logger.Error(err, "Failed to reconcile worker Role")
-					return errors.Wrap(err, "reconciling worker Role")
-				}
-			}
-		}
+					return nil
+				},
+			},
 
-		// RoleBinding
-		{
-			if clusterValues.Telemetry != nil && clusterValues.Telemetry.JobsTelemetry != nil && clusterValues.Telemetry.JobsTelemetry.SendJobsEvents {
-				desired := worker.RenderRoleBinding(clusterValues.Namespace, clusterValues.Name)
-				logger = logger.WithValues(logfield.ResourceKV(&desired)...)
-				err := r.RoleBinding.Reconcile(ctx, cluster, &desired)
-				if err != nil {
-					logger.Error(err, "Failed to reconcile worker RoleBinding")
-					return errors.Wrap(err, "reconciling worker RoleBinding")
-				}
-			} else {
-				// If SenJobsEvents is set to false or nil, the RoleBinding is not necessary because we don't need the permissions.
-				// We need to explicitly delete the RoleBinding in case the user initially set JobsEvents to true and then removed it or set it to false.
-				// Without explicit deletion through reconciliation,
-				// Еhe RoleBinding will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
-				var desired *rbacv1.RoleBinding
-				err := r.RoleBinding.Reconcile(ctx, cluster, desired)
-				if err != nil {
-					logger.Error(err, "Failed to reconcile worker Role")
-					return errors.Wrap(err, "reconciling worker Role")
-				}
-			}
-		}
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Worker Service",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
 
-		return nil
+					desired := worker.RenderService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeWorker)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
+
+					if err := r.Service.Reconcile(ctx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling worker Service")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Worker StatefulSet",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					desired, err := worker.RenderStatefulSet(
+						clusterValues.Namespace,
+						clusterValues.Name,
+						clusterValues.NodeFilters,
+						&clusterValues.Secrets,
+						clusterValues.VolumeSources,
+						&clusterValues.NodeWorker,
+					)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering worker StatefulSet")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
+
+					deps, err := r.getWorkersStatefulSetDependencies(ctx, clusterValues)
+					if err != nil {
+						stepLogger.Error(err, "Failed to retrieve dependencies")
+						return errors.Wrap(err, "retrieving dependencies for worker StatefulSet")
+					}
+					stepLogger.Info("Retrieved dependencies")
+
+					if err = r.StatefulSet.Reconcile(ctx, cluster, &desired, deps...); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling worker StatefulSet")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Worker ServiceAccount",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					desired := worker.RenderServiceAccount(clusterValues.Namespace, clusterValues.Name)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
+
+					if err := r.ServiceAccount.Reconcile(ctx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling worker ServiceAccount")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Worker Role",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					if clusterValues.Telemetry != nil && clusterValues.Telemetry.JobsTelemetry != nil && clusterValues.Telemetry.JobsTelemetry.SendJobsEvents {
+						desired := worker.RenderRole(clusterValues.Namespace, clusterValues.Name)
+						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+						stepLogger.Info("Rendered")
+
+						if err := r.Role.Reconcile(ctx, cluster, &desired); err != nil {
+							stepLogger.Error(err, "Failed to reconcile")
+							return errors.Wrap(err, "reconciling worker Role")
+						}
+					} else {
+						// If SendJobsEvents is set to false or nil, the Role is not necessary because we don't need the permissions.
+						// We need to explicitly delete the Role in case the user initially set JobsEvents to true and then removed it or set it to false.
+						// Without explicit deletion through reconciliation,
+						// The Role will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
+						stepLogger.Info("Removing")
+						if err := r.Role.Reconcile(ctx, cluster, nil); err != nil {
+							stepLogger.Error(err, "Failed to remove")
+							return errors.Wrap(err, "removing worker Role")
+						}
+						stepLogger.Info("Removed")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Worker RoleBinding",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					if clusterValues.Telemetry != nil && clusterValues.Telemetry.JobsTelemetry != nil && clusterValues.Telemetry.JobsTelemetry.SendJobsEvents {
+						desired := worker.RenderRoleBinding(clusterValues.Namespace, clusterValues.Name)
+						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+						stepLogger.Info("Rendered")
+
+						if err := r.RoleBinding.Reconcile(ctx, cluster, &desired); err != nil {
+							stepLogger.Error(err, "Failed to reconcile")
+							return errors.Wrap(err, "reconciling worker RoleBinding")
+						}
+					} else {
+						// If SendJobsEvents is set to false or nil, the RoleBinding is not necessary because we don't need the permissions.
+						// We need to explicitly delete the RoleBinding in case the user initially set JobsEvents to true and then removed it or set it to false.
+						// Without explicit deletion through reconciliation,
+						// Еhe RoleBinding will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
+						stepLogger.Info("Removing")
+						if err := r.RoleBinding.Reconcile(ctx, cluster, nil); err != nil {
+							stepLogger.Error(err, "Failed to remove")
+							return errors.Wrap(err, "removing worker Role")
+						}
+						stepLogger.Info("Removed")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+		)
 	}
 
 	if err := reconcileWorkersImpl(); err != nil {
-		logger.Error(err, "Failed to reconcile Slurm workers")
-		return errors.Wrap(err, "reconciling Slurm workers")
+		logger.Error(err, "Failed to reconcile Slurm Workers")
+		return errors.Wrap(err, "reconciling Slurm Workers")
 	}
+	logger.Info("Reconciled Slurm Workers")
 	return nil
 }
 

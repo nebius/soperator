@@ -10,10 +10,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/logfield"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/logfield"
 
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 )
@@ -36,11 +37,10 @@ func (r *OtelReconciler) Reconcile(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
 	desired *otelv1beta1.OpenTelemetryCollector,
-	otelInstalled bool,
+	removeOtel bool,
 	deps ...metav1.Object,
 ) error {
-	if !otelInstalled {
-		// If desired is nil, delete the OpenTelemetryCollector
+	if removeOtel {
 		log.FromContext(ctx).Info(fmt.Sprintf("Deleting OpenTelemetryCollector %s-collector, because of OpenTelemetryCollector is not needed", cluster.Name))
 		return r.deleteOtelIfOwnedByController(ctx, cluster)
 	}

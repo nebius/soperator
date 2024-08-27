@@ -18,6 +18,7 @@ import (
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/login"
+	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -30,135 +31,182 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 	logger := log.FromContext(ctx)
 
 	reconcileLoginImpl := func() error {
-		// SSH configs ConfigMap
-		{
-			desired, err := login.RenderConfigMapSSHConfigs(clusterValues)
-			if err != nil {
-				logger.Error(err, "Failed to render login SSH configs ConfigMap")
-				return errors.Wrap(err, "rendering login SSH configs ConfigMap")
-			}
-			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
-			err = r.ConfigMap.Reconcile(ctx, cluster, &desired)
-			if err != nil {
-				logger.Error(err, "Failed to reconcile login SSH configs ConfigMap")
-				return errors.Wrap(err, "reconciling login SSH configs ConfigMap")
-			}
-		}
+		return utils.ExecuteMultiStep(ctx,
+			"Reconciliation of Slurm Login",
+			utils.MultiStepExecutionStrategyCollectErrors,
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Login SSH configs ConfigMap",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
 
-		// SshRootPublicKeys ConfigMap
-		{
-			desired, err := login.RenderSshRootPublicKeysConfig(clusterValues)
-			if err != nil {
-				logger.Error(err, "Failed to render login SshRootPublicKeys ConfigMap")
-				return errors.Wrap(err, "rendering login SshRootPublicKeys ConfigMap")
-			}
-			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
-			err = r.ConfigMap.Reconcile(ctx, cluster, &desired)
-			if err != nil {
-				logger.Error(err, "Failed to reconcile login SshRootPublicKeys ConfigMap")
-				return errors.Wrap(err, "reconciling login SshRootPublicKeys ConfigMap")
-			}
-		}
-
-		// SSHDKeys Secrets
-		{
-			desired := corev1.Secret{}
-			sshdSecretKeysName := naming.BuildSecretSSHDKeysName(clusterValues.Name)
-			if clusterValues.Secrets.SshdKeysName != "" {
-				sshdSecretKeysName = clusterValues.Secrets.SshdKeysName
-			}
-
-			if err := r.Get(
-				ctx,
-				types.NamespacedName{
-					Namespace: clusterValues.Namespace,
-					Name:      sshdSecretKeysName,
-				},
-				&desired,
-			); err != nil {
-				if apierrors.IsNotFound(err) && clusterValues.Secrets.SshdKeysName == "" {
-					renderedDesired, err := login.RenderSSHDKeysSecret(clusterValues.Name, clusterValues.Namespace)
-					desired = *renderedDesired.DeepCopy()
+					desired, err := login.RenderConfigMapSSHConfigs(clusterValues)
 					if err != nil {
-						logger.Error(err, "Failed to render login SSHDKeys Secrets")
-						return errors.Wrap(err, "rendering login SSHDKeys Secrets")
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering login SSH configs ConfigMap")
 					}
-				} else {
-					logger.Error(err, "Failed to get login SSHDKeys Secrets")
-					return errors.Wrap(err, "getting login SSHDKeys Secrets")
-				}
-			}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
 
-			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
-			err := r.Secret.Reconcile(ctx, cluster, &desired)
-			if err != nil {
-				logger.Error(err, "Failed to reconcile login SSHDKeys Secrets")
-				return errors.Wrap(err, "reconciling login SSHDKeys Secrets")
-			}
-		}
+					if err = r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling login SSH configs ConfigMap")
+					}
+					stepLogger.Info("Reconciled")
 
-		// Security limits ConfigMap
-		{
-			desired, err := login.RenderConfigMapSecurityLimits(clusterValues)
-			if err != nil {
-				logger.Error(err, "Failed to render login Security limits ConfigMap")
-				return errors.Wrap(err, "rendering login Security limits ConfigMap")
-			}
-			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
-			err = r.ConfigMap.Reconcile(ctx, cluster, &desired)
-			if err != nil {
-				logger.Error(err, "Failed to reconcile login Security limits ConfigMap")
-				return errors.Wrap(err, "reconciling login Security limits ConfigMap")
-			}
-		}
+					return nil
+				},
+			},
 
-		// Service
-		{
-			desired := login.RenderService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeLogin)
-			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
-			err := r.Service.Reconcile(ctx, cluster, &desired)
-			if err != nil {
-				logger.Error(err, "Failed to reconcile login Service")
-				return errors.Wrap(err, "reconciling login Service")
-			}
-		}
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Login SSH root public keys ConfigMap",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
 
-		// StatefulSet
-		{
-			desired, err := login.RenderStatefulSet(
-				clusterValues.Namespace,
-				clusterValues.Name,
-				clusterValues.NodeFilters,
-				&clusterValues.Secrets,
-				clusterValues.VolumeSources,
-				&clusterValues.NodeLogin,
-			)
-			if err != nil {
-				logger.Error(err, "Failed to render login StatefulSet")
-				return errors.Wrap(err, "rendering login StatefulSet")
-			}
-			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
+					desired, err := login.RenderSshRootPublicKeysConfig(clusterValues)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering login SshRootPublicKeys ConfigMap")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
 
-			deps, err := r.getLoginStatefulSetDependencies(ctx, clusterValues)
-			if err != nil {
-				logger.Error(err, "Failed to retrieve dependencies for login StatefulSet")
-				return errors.Wrap(err, "retrieving dependencies for login StatefulSet")
-			}
+					if err = r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling login SshRootPublicKeys ConfigMap")
+					}
+					stepLogger.Info("Reconciled")
 
-			err = r.StatefulSet.Reconcile(ctx, cluster, &desired, deps...)
-			if err != nil {
-				logger.Error(err, "Failed to reconcile login StatefulSet")
-				return errors.Wrap(err, "reconciling login StatefulSet")
-			}
-		}
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Login sshd keys Secret",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
 
-		return nil
+					desired := corev1.Secret{}
+					if getErr := r.Get(
+						ctx,
+						types.NamespacedName{
+							Namespace: clusterValues.Namespace,
+							Name:      clusterValues.Secrets.SshdKeysName,
+						},
+						&desired,
+					); getErr != nil {
+						if !apierrors.IsNotFound(getErr) {
+							stepLogger.Error(getErr, "Failed to get")
+							return errors.Wrap(getErr, "getting login SSHDKeys Secrets")
+						}
+
+						renderedDesired, err := login.RenderSSHDKeysSecret(clusterValues.Name, clusterValues.Namespace, clusterValues.Secrets.SshdKeysName)
+						if err != nil {
+							stepLogger.Error(err, "Failed to render")
+							return errors.Wrap(err, "rendering login SSHDKeys Secrets")
+						}
+						desired = *renderedDesired.DeepCopy()
+						stepLogger.Info("Rendered")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+
+					if err := r.Secret.Reconcile(ctx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling login SSHDKeys Secrets")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Login Security limits ConfigMap",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					desired, err := login.RenderConfigMapSecurityLimits(clusterValues)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering login Security limits ConfigMap")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
+
+					if err = r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling login Security limits ConfigMap")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Login Service",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					desired := login.RenderService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeLogin)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
+
+					if err := r.Service.Reconcile(ctx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling login Service")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Login StatefulSet",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					desired, err := login.RenderStatefulSet(
+						clusterValues.Namespace,
+						clusterValues.Name,
+						clusterValues.NodeFilters,
+						&clusterValues.Secrets,
+						clusterValues.VolumeSources,
+						&clusterValues.NodeLogin,
+					)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering login StatefulSet")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
+
+					deps, err := r.getLoginStatefulSetDependencies(ctx, clusterValues)
+					if err != nil {
+						stepLogger.Error(err, "Failed to retrieve dependencies")
+						return errors.Wrap(err, "retrieving dependencies for login StatefulSet")
+					}
+					stepLogger.Info("Retrieved dependencies")
+
+					if err = r.StatefulSet.Reconcile(ctx, cluster, &desired, deps...); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling login StatefulSet")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+		)
 	}
 
 	if err := reconcileLoginImpl(); err != nil {
-		logger.Error(err, "Failed to reconcile Slurm login")
-		return errors.Wrap(err, "reconciling Slurm login")
+		logger.Error(err, "Failed to reconcile Slurm Login")
+		return errors.Wrap(err, "reconciling Slurm Login")
 	}
+	logger.Info("Reconciled Slurm Login")
 	return nil
 }
 
