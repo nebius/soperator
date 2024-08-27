@@ -8,6 +8,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/utils"
 )
 
@@ -163,6 +164,11 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 				"Slurm.LoginNode.Count", loginNodeCount,
 			)
 			return err
+		}
+
+		if c.Secrets.SshdKeysName == "" {
+			logger.Info("SshdKeysName is empty. Using default name")
+			c.Secrets.SshdKeysName = naming.BuildSecretSSHDKeysName(c.Name)
 		}
 	}
 

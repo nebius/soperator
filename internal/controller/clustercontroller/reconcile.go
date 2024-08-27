@@ -161,13 +161,31 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1.SlurmCluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	if state.ReconciliationState.Present(cluster.GetObjectKind(), client.ObjectKeyFromObject(cluster)) {
-		return ctrl.Result{}, nil
+	{
+		kind := cluster.GetObjectKind()
+		key := client.ObjectKeyFromObject(cluster)
+		if state.ReconciliationState.Present(kind, key) {
+			logger.Info("Reconciliation skipped, as object is already present in reconciliation state",
+				"kind", kind.GroupVersionKind().String(),
+				"key", key.String(),
+			)
+			return ctrl.Result{}, nil
+		}
+
+		state.ReconciliationState.Set(kind, key)
+		logger.Info("Reconciliation state set for object",
+			"kind", kind.GroupVersionKind().String(),
+			"key", key.String(),
+		)
+
+		defer func() {
+			state.ReconciliationState.Remove(kind, key)
+			logger.Info("Reconciliation state removed for object",
+				"kind", kind.GroupVersionKind().String(),
+				"key", key.String(),
+			)
+		}()
 	}
-	state.ReconciliationState.Set(cluster.GetObjectKind(), client.ObjectKeyFromObject(cluster))
-	defer func() {
-		state.ReconciliationState.Remove(cluster.GetObjectKind(), client.ObjectKeyFromObject(cluster))
-	}()
 
 	logger.Info("Starting reconciliation of Slurm Cluster")
 
@@ -182,9 +200,8 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 	res, err := r.runWithPhase(ctx, cluster,
 		ptr.To(slurmv1.PhaseClusterReconciling),
 		func() (ctrl.Result, error) {
-			result, wait, err := r.ReconcilePopulateJail(ctx, clusterValues, cluster)
-			if err != nil || wait {
-				return result, err
+			if err = r.ReconcilePopulateJail(ctx, clusterValues, cluster); err != nil {
+				return ctrl.Result{}, err
 			}
 
 			if err = r.ReconcileCommon(ctx, cluster, clusterValues); err != nil {
@@ -355,7 +372,7 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		GenericFunc: func(e event.GenericEvent) bool { return false },
 	}
 
-	builder := ctrl.NewControllerManagedBy(mgr).
+	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
 		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Owns(&corev1.Service{}).
 		Owns(&appsv1.StatefulSet{}).
@@ -375,10 +392,10 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	// Conditionally add OpenTelemetryCollector ownership
 	if check.IsOpenTelemetryCollectorCRDInstalled {
-		builder.Owns(&otelv1beta1.OpenTelemetryCollector{})
+		controllerBuilder.Owns(&otelv1beta1.OpenTelemetryCollector{})
 	}
 
-	return builder.Complete(r)
+	return controllerBuilder.Complete(r)
 }
 
 /*

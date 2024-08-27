@@ -15,6 +15,7 @@ import (
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/render/otel"
+	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -27,100 +28,127 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 	logger := log.FromContext(ctx)
 
 	reconcileCommonImpl := func() error {
-		// Slurm configs
-		{
-			desired, err := common.RenderConfigMapSlurmConfigs(clusterValues)
-			if err != nil {
-				logger.Error(err, "Failed to render ConfigMap with Slurm configs")
-				return errors.Wrap(err, "rendering ConfigMap with Slurm configs")
-			}
-			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
+		return utils.ExecuteMultiStep(ctx,
+			"Reconciliation of common resources",
+			utils.MultiStepExecutionStrategyCollectErrors,
+			utils.MultiStepExecutionStep{
+				Name: "Slurm configs ConfigMap",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
 
-			err = r.ConfigMap.Reconcile(ctx, cluster, &desired)
-			if err != nil {
-				logger.Error(err, "Failed to reconcile ConfigMap with Slurm configs")
-				return errors.Wrap(err, "reconciling ConfigMap with Slurm configs")
-			}
-			logger.Info("Reconcile for SlurmConfigs configMap completed successfully")
-		}
-
-		// OpenTelemetry Collector
-		{
-			if check.IsOtelCRDInstalled() {
-				foundPodTemplate := &corev1.PodTemplate{}
-				if clusterValues.Telemetry.OpenTelemetryCollector != nil && clusterValues.Telemetry.OpenTelemetryCollector.Enabled {
-
-					if clusterValues.Telemetry.OpenTelemetryCollector.PodTemplateNameRef != nil {
-						podTemplateName := *clusterValues.Telemetry.OpenTelemetryCollector.PodTemplateNameRef
-
-						err := r.Get(
-							ctx,
-							types.NamespacedName{
-								Namespace: clusterValues.Namespace,
-								Name:      podTemplateName,
-							},
-							foundPodTemplate,
-						)
-						if err != nil {
-							logger.Error(err, "Failed to get PodTemplate")
-							return errors.Wrap(err, "getting PodTemplate")
-						}
+					desired, err := common.RenderConfigMapSlurmConfigs(clusterValues)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering ConfigMap with Slurm configs")
 					}
-				}
-				desired, err := otel.RenderOtelCollector(clusterValues.Name, clusterValues.Namespace, clusterValues.Telemetry, foundPodTemplate)
-				if err != nil {
-					err = r.Otel.Reconcile(ctx, cluster, &desired, false)
-				} else {
-					err = r.Otel.Reconcile(ctx, cluster, &desired, true)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
 
-				}
-				logger = logger.WithValues(logfield.ResourceKV(&desired)...)
-				if err != nil {
-					logger.Error(err, "Failed to reconcile OpenTelemetry Collector")
-					return errors.Wrap(err, "reconciling OpenTelemetry Collector")
-				}
-				logger.Info("Reconcile for OpenTelemetry Collector completed successfully")
-			}
-		}
+					if err = r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling ConfigMap with Slurm configs")
+					}
+					stepLogger.Info("Reconciled")
 
-		// Munge secret
-		{
-			desired := corev1.Secret{}
-			if err := r.Get(
-				ctx,
-				types.NamespacedName{
-					Namespace: clusterValues.Namespace,
-					Name:      naming.BuildSecretMungeKeyName(clusterValues.Name),
+					return nil
 				},
-				&desired,
-			); err != nil {
-				if apierrors.IsNotFound(err) {
-					renderedDesired, err := common.RenderMungeKeySecret(clusterValues.Name, clusterValues.Namespace)
-					desired = *renderedDesired.DeepCopy()
-					if err != nil {
-						logger.Error(err, "Failed to render Munge Key Secret")
-						return errors.Wrap(err, "rendering Munge Key Secret")
+			},
+			utils.MultiStepExecutionStep{
+				Name: "OpenTelemetry Collector",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					if check.IsOtelCRDInstalled() {
+						// TODO: It's better to move it to values/validate.go
+						foundPodTemplate := &corev1.PodTemplate{}
+						if clusterValues.Telemetry.OpenTelemetryCollector != nil &&
+							clusterValues.Telemetry.OpenTelemetryCollector.Enabled &&
+							clusterValues.Telemetry.OpenTelemetryCollector.PodTemplateNameRef != nil {
+
+							podTemplateName := *clusterValues.Telemetry.OpenTelemetryCollector.PodTemplateNameRef
+
+							if err := r.Get(
+								ctx,
+								types.NamespacedName{
+									Namespace: clusterValues.Namespace,
+									Name:      podTemplateName,
+								},
+								foundPodTemplate,
+							); err != nil {
+								stepLogger.Error(err, "Failed to get PodTemplate")
+								return errors.Wrap(err, "getting PodTemplate")
+							}
+						}
+
+						desired, err := otel.RenderOtelCollector(clusterValues.Name, clusterValues.Namespace, clusterValues.Telemetry, foundPodTemplate)
+						removeOtel := false
+						if err != nil {
+							// TODO: Using error presence as an indicator for resource deletion doesn't seem good
+							stepLogger.Error(err, "Failed to render")
+							stepLogger.Info("Removing")
+							removeOtel = true
+						} else {
+							stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+							stepLogger.Info("Rendered")
+						}
+
+						if err = r.Otel.Reconcile(ctx, cluster, &desired, removeOtel); err != nil {
+							stepLogger.Error(err, "Failed to reconcile")
+							return errors.Wrap(err, "reconciling OpenTelemetry Collector")
+						}
+						stepLogger.Info("Reconciled")
 					}
-					logger = logger.WithValues(logfield.ResourceKV(&desired)...)
-					err = r.Secret.Reconcile(ctx, cluster, &desired)
-					if err != nil {
-						logger.Error(err, "Failed to reconcile Munge Key Secret")
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Munge key Secret",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					desired := corev1.Secret{}
+					if getErr := r.Get(
+						ctx,
+						types.NamespacedName{
+							Namespace: clusterValues.Namespace,
+							Name:      naming.BuildSecretMungeKeyName(clusterValues.Name),
+						},
+						&desired,
+					); getErr != nil {
+						if !apierrors.IsNotFound(getErr) {
+							stepLogger.Error(getErr, "Failed to get")
+							return errors.Wrap(getErr, "getting Munge Key Secret")
+						}
+
+						renderedDesired, err := common.RenderMungeKeySecret(clusterValues.Name, clusterValues.Namespace)
+						if err != nil {
+							stepLogger.Error(err, "Failed to render")
+							return errors.Wrap(err, "rendering Munge Key Secret")
+						}
+						desired = *renderedDesired.DeepCopy()
+						stepLogger.Info("Rendered")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+
+					if err := r.Secret.Reconcile(ctx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling Munge Key Secret")
 					}
-				} else {
-					logger.Error(err, "Failed to get Munge Key Secret")
-					return errors.Wrap(err, "getting Munge Key Secret")
-				}
-			}
-			logger.Info("Reconcile for munge key secret completed successfully")
-		}
+					stepLogger.Info("Reconciled")
 
-		return nil
+					return nil
+				},
+			},
+		)
 	}
 
 	if err := reconcileCommonImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile common resources")
 		return errors.Wrap(err, "reconciling common resources")
 	}
+	logger.Info("Reconciled common resources")
 	return nil
 }

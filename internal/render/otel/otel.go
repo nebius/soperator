@@ -34,6 +34,7 @@ func RenderOtelCollector(
 		enableMetrics = metrics.Prometheus.Enabled
 	}
 
+	// TODO: Looks like a mess, need to move these to values
 	var securityContext *corev1.PodSecurityContext
 	var nodeSelector map[string]string
 	var tolerations []corev1.Toleration

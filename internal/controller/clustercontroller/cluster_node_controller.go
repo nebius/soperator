@@ -18,6 +18,7 @@ import (
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/controller"
+	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -30,53 +31,73 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 	logger := log.FromContext(ctx)
 
 	reconcileControllersImpl := func() error {
-		// Service
-		{
-			desired := controller.RenderService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeController)
-			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
-			err := r.Service.Reconcile(ctx, cluster, &desired)
-			if err != nil {
-				logger.Error(err, "Failed to reconcile controller Service")
-				return errors.Wrap(err, "reconciling controller Service")
-			}
-		}
+		return utils.ExecuteMultiStep(ctx,
+			"Reconciliation of Slurm Controllers",
+			utils.MultiStepExecutionStrategyCollectErrors,
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Controller Service",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
 
-		// StatefulSet
-		{
-			desired, err := controller.RenderStatefulSet(
-				clusterValues.Namespace,
-				clusterValues.Name,
-				clusterValues.NodeFilters,
-				&clusterValues.Secrets,
-				clusterValues.VolumeSources,
-				&clusterValues.NodeController,
-			)
-			if err != nil {
-				logger.Error(err, "Failed to render controller StatefulSet")
-				return errors.Wrap(err, "rendering controller StatefulSet")
-			}
-			logger = logger.WithValues(logfield.ResourceKV(&desired)...)
+					desired := controller.RenderService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeController)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
 
-			deps, err := r.getControllersStatefulSetDependencies(ctx, clusterValues)
-			if err != nil {
-				logger.Error(err, "Failed to retrieve dependencies for controller StatefulSet")
-				return errors.Wrap(err, "retrieving dependencies for controller StatefulSet")
-			}
+					if err := r.Service.Reconcile(ctx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling controller Service")
+					}
+					stepLogger.Info("Reconciled")
 
-			err = r.StatefulSet.Reconcile(ctx, cluster, &desired, deps...)
-			if err != nil {
-				logger.Error(err, "Failed to reconcile controller StatefulSet")
-				return errors.Wrap(err, "reconciling controller StatefulSet")
-			}
-		}
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Controller StatefulSet",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
 
-		return nil
+					desired, err := controller.RenderStatefulSet(
+						clusterValues.Namespace,
+						clusterValues.Name,
+						clusterValues.NodeFilters,
+						&clusterValues.Secrets,
+						clusterValues.VolumeSources,
+						&clusterValues.NodeController,
+					)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering controller StatefulSet")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
+
+					deps, err := r.getControllersStatefulSetDependencies(ctx, clusterValues)
+					if err != nil {
+						stepLogger.Error(err, "Failed to retrieve dependencies")
+						return errors.Wrap(err, "retrieving dependencies for controller StatefulSet")
+					}
+					stepLogger.Info("Retrieved dependencies")
+
+					if err = r.StatefulSet.Reconcile(ctx, cluster, &desired, deps...); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling controller StatefulSet")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+		)
 	}
 
 	if err := reconcileControllersImpl(); err != nil {
-		logger.Error(err, "Failed to reconcile Slurm controllers")
-		return errors.Wrap(err, "reconciling Slurm controllers")
+		logger.Error(err, "Failed to reconcile Slurm Controllers")
+		return errors.Wrap(err, "reconciling Slurm Controllers")
 	}
+	logger.Info("Reconciled Slurm Controllers")
 	return nil
 }
 

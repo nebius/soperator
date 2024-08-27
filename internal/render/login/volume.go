@@ -17,16 +17,11 @@ func renderVolumesAndClaimTemplateSpecs(
 	volumeSources []slurmv1.VolumeSource,
 	login *values.SlurmLogin,
 ) (volumes []corev1.Volume, pvcTemplateSpecs []values.PVCTemplateSpec, err error) {
-	sshdKeysSecretName := naming.BuildSecretSSHDKeysName(clusterName)
-	if secrets.SshdKeysName != "" {
-		sshdKeysSecretName = secrets.SshdKeysName
-	}
-
 	volumes = []corev1.Volume{
 		common.RenderVolumeSlurmConfigs(clusterName),
 		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeMungeSocket(),
-		renderVolumeSshdKeys(sshdKeysSecretName),
+		renderVolumeSshdKeys(secrets.SshdKeysName),
 		renderVolumeSshConfigs(clusterName),
 		renderVolumeSshRootKeys(clusterName),
 		renderVolumeSecurityLimits(clusterName),
