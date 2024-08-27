@@ -6,7 +6,7 @@ CONTAINER_REGISTRY_STABLE_ID = id_here
 
 # Unstable images get pulled from here
 # https://console.nebius.ai/folders/bje82q7sm8njm3c4rrlq/container-registry/registries/crnlu9nio77sg3p8n5bi/overview
-CONTAINER_REGISTRY_UNSTABLE_ID =  crnlu9nio77sg3p8n5bi
+CONTAINER_REGISTRY_UNSTABLE_ID = crnlu9nio77sg3p8n5bi
 
 # OCI for Stable helm charts
 # Link here
