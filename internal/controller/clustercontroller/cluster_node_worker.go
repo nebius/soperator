@@ -176,7 +176,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 							return errors.Wrap(err, "reconciling worker Role")
 						}
 					} else {
-						// If SenJobsEvents is set to false or nil, the Role is not necessary because we don't need the permissions.
+						// If SendJobsEvents is set to false or nil, the Role is not necessary because we don't need the permissions.
 						// We need to explicitly delete the Role in case the user initially set JobsEvents to true and then removed it or set it to false.
 						// Without explicit deletion through reconciliation,
 						// The Role will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
@@ -209,7 +209,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 							return errors.Wrap(err, "reconciling worker RoleBinding")
 						}
 					} else {
-						// If SenJobsEvents is set to false or nil, the RoleBinding is not necessary because we don't need the permissions.
+						// If SendJobsEvents is set to false or nil, the RoleBinding is not necessary because we don't need the permissions.
 						// We need to explicitly delete the RoleBinding in case the user initially set JobsEvents to true and then removed it or set it to false.
 						// Without explicit deletion through reconciliation,
 						// Еhe RoleBinding will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.

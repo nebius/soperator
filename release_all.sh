@@ -2,7 +2,7 @@
 
 set -e
 
-usage() { echo "usage: ${0} [-s] -u <ssh_user> -k <path_to_ssh_key> -a <address_of_build_agent> [-s] [-h]" >&2; exit 1; }
+usage() { echo "usage: ${0} [-s] -u <ssh_user> -k <path_to_ssh_key> -a <address_of_build_agent> [-h]" >&2; exit 1; }
 
 while getopts u:k:a:sh flag
 do
