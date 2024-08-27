@@ -2,7 +2,7 @@
 
 set -e
 
-usage() { echo "usage: ${0} [-s] -u <ssh_user> -k <path_to_ssh_key> -a <address_of_build_agent> [-h]" >&2; exit 1; }
+usage() { echo "usage: ${0} [-s] -u <ssh_user> -k <path_to_ssh_key> -a <address_of_build_agent> [-s] [-h]" >&2; exit 1; }
 
 while getopts u:k:a:sh flag
 do
@@ -20,8 +20,6 @@ if [ -z "$user" ] || [ -z "$key" ] || [ -z "$address" ]; then
     usage
 fi
 
-
-
 start_time=$(date +%s)
 
 if [ "$stable" == "1" ]; then
@@ -31,7 +29,6 @@ else
     UNSTABLE="true"
     echo "Syncing versions among all files for unstable release"
 fi
-
 
 make sync-version UNSTABLE=${UNSTABLE}
 IMAGE_VERSION=$(make get-image-version UNSTABLE=${UNSTABLE})
@@ -47,7 +44,7 @@ echo "Updating CRDs & auto-generated code (included in test step) & run tests"
 make test UNSTABLE="${UNSTABLE}"
 
 echo "Uploading images to the build agent"
-./upload_to_build_agent.sh -u "$user" -k "$key"
+./upload_to_build_agent.sh -u "$user" -k "$key" -a "$address"
 
 remote_command=$(cat <<EOF
 set -e
