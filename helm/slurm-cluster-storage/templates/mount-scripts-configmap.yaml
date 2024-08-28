@@ -63,6 +63,7 @@ data:
         ensure_mounted
         /bin/sleep $sleep_period
     done
+
   ensure_mounted_glusterfs.sh: |
     #!/bin/sh
 

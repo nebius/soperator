@@ -23,17 +23,7 @@ spec:
   nodeAffinity:
     required:
       nodeSelectorTerms:
-        # Allow attaching to GPU nodes
         - matchExpressions:
-            - key: nebius.com/node-group-id
-              operator: In
-              values:
-                - {{ include "slurm-cluster-storage.nodeGroup.gpu" $ }}
-                # Allow attaching to Non-GPU nodes
-        - matchExpressions:
-            - key: nebius.com/node-group-id
-              operator: In
-              values:
-                - {{ include "slurm-cluster-storage.nodeGroup.nonGpu" $ }}
+{{ $.Values.scheduling.cpuAndGpu.matchExpressions | toYaml | indent 12 }}
 ---
 {{- end }}

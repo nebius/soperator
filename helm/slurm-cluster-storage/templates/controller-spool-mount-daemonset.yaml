@@ -39,9 +39,7 @@ spec:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
-              # Require scheduling on Non-GPU nodes
               - matchExpressions:
-                - key: nebius.com/node-group-id
-                  operator: In
-                  values:
-                    - {{ include "slurm-cluster-storage.nodeGroup.nonGpu" . }}
+{{ .Values.scheduling.cpuOnly.matchExpressions | toYaml | indent 18 }}
+      tolerations:
+{{ .Values.scheduling.cpuOnly.tolerations | toYaml | indent 8 }}

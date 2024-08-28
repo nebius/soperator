@@ -1,37 +1,48 @@
 storageClass:
   local:
-    # By default, equals to slurm-local-pv
-    name: ""
+    name: "slurm-local-pv"
 
 volume:
   jail:
-    # By default, equals to jail
-    name: ""
-    # Whether to use glusterfs or filestore. By default, equals to "filestore"
-    type: ""
-    # Used with "filestore" type. By default, equals to jail
-    filestoreDeviceName: ""
-    # Used with "glusterfs" type. Required
-    glusterfsHostName: ""
-    # Required
+    name: "jail"
     size: "2Ti"
+    # Whether to use 'filestore' or 'glusterfs'
+    # TODO: get rid of glusterfs after moving to newbius
+    type: "filestore"
+    # Required in case of 'filestore' type
+    filestoreDeviceName: "jail"
+    # Required in case of 'glusterfs' type
+    glusterfsHostName: ""
   controllerSpool:
-    # By default, equals to controller-spool
-    name: ""
-    # By default, equals to controller-spool
-    filestoreDeviceName: ""
-    # Required
+    name: "controller-spool"
     size: "30Gi"
+    filestoreDeviceName: "controller-spool"
   jailSubMounts: []
 #  jailSubMounts:
 #    - name: "mlperf-sd"
-#      filestoreDeviceName: "mlperf-sd"
 #      size: "1500Gi"
+#      filestoreDeviceName: "mlperf-sd"
+#      mountPath: "/mlperf-sd"
 
-nodeGroup:
-  gpu:
-    # Required
-    id: ""
-  nonGpu:
-    # Required
-    id: ""
+scheduling:
+  cpuOnly:
+    matchExpressions: []
+#    matchExpressions:
+#      - key: nebius.com/node-group-id
+#        operator: In
+#        values:
+#          - "<CPU Node group ID>"
+    tolerations: []
+  cpuAndGpu:
+    matchExpressions: []
+#    matchExpressions:
+#      - key: nebius.com/node-group-id
+#        operator: In
+#        values:
+#          - "<GPU Node group ID>"
+#          - "<CPU Node group ID>"
+    tolerations: []
+#    tolerations:
+#      - key: nvidia.com/gpu
+#        operator: Exists
+#        effect: NoSchedule

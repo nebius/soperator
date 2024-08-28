@@ -19,7 +19,7 @@ spec:
           command:
             - /bin/sh
             - -c
-            - /mount-scripts/ensure_mounted_filestore.sh -d {{ include "slurm-cluster-storage.volume.jail-submount.device" . }} -p /mnt/{{ include "slurm-cluster-storage.volume.jail-submount.name" . }} -s 60
+            - /mount-scripts/ensure_mounted_filestore.sh -d {{ include "slurm-cluster-storage.volume.jail-submount.device" . }} -p {{ include "slurm-cluster-storage.volume.jail-submount.mountPath" . }} -s 60
           securityContext:
             privileged: true
           volumeMounts:
@@ -36,26 +36,13 @@ spec:
           configMap:
             name: mount-scripts
             defaultMode: 0500
-      tolerations:
-        # Allow scheduling on GPU nodes
-        - key: nvidia.com/gpu
-          operator: Exists
-          effect: NoSchedule
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
-              # Require scheduling on GPU nodes
               - matchExpressions:
-                  - key: nebius.com/node-group-id
-                    operator: In
-                    values:
-                      - {{ include "slurm-cluster-storage.nodeGroup.gpu" $ }}
-                      # Require scheduling on Non-GPU nodes
-              - matchExpressions:
-                  - key: nebius.com/node-group-id
-                    operator: In
-                    values:
-                      - {{ include "slurm-cluster-storage.nodeGroup.nonGpu" $ }}
+{{ $.Values.scheduling.cpuAndGpu.matchExpressions | toYaml | indent 18 }}
+      tolerations:
+{{ $.Values.scheduling.cpuAndGpu.tolerations | toYaml | indent 8}}
 ---
 {{- end }}
