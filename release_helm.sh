@@ -86,7 +86,7 @@ if [ -n "${name}" ]; then
   fi
 
   [ -z "${version}" ] && version=$(cat VERSION)
-  chart "${name}"
+  chart "${name}" "${version}"
 fi
 
 if [ -n "${all}" ]; then

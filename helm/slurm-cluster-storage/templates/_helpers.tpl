@@ -1,30 +1,15 @@
 {{/* Local storage class */}}
 {{- define "slurm-cluster-storage.class.local.name" -}}
-    {{- default "slurm-local-pv" $.Values.storageClass.local.name | trim | kebabcase | quote -}}
+    {{- required "Local storage class name is required." .Values.storageClass.local.name | trim | kebabcase | quote -}}
 {{- end }}
 
 {{/*
 ---
 */}}
 
-{{/* Jail storage type */}}
-{{- define "slurm-cluster-storage.volume.jail.type" -}}
-    {{- default "glusterfs" .Values.volume.jail.type | trim -}}
-{{- end }}
-
-{{/* Jail filestore device name */}}
-{{- define "slurm-cluster-storage.volume.jail.device" -}}
-    {{- default "jail" .Values.volume.jail.filestoreDeviceName | trim | kebabcase -}}
-{{- end }}
-
-{{/* Jail GlusterFS host name */}}
-{{- define "slurm-cluster-storage.volume.jail.hostname" -}}
-    {{- .Values.volume.jail.glusterfsHostName | trim | kebabcase -}}
-{{- end }}
-
 {{/* Jail volume */}}
 {{- define "slurm-cluster-storage.volume.jail.name" -}}
-    {{- default "jail" .Values.volume.jail.name | trim | kebabcase -}}
+    {{- required "Jail volume name is required." .Values.volume.jail.name | trim | kebabcase -}}
 {{- end }}
 
 {{/* Jail PVC name */}}
@@ -52,18 +37,39 @@
     {{- required "Jail volume size is required." .Values.volume.jail.size -}}
 {{- end }}
 
+{{/* Jail storage type */}}
+{{- define "slurm-cluster-storage.volume.jail.type" -}}
+    {{- if not (or (eq .Values.volume.jail.type "filestore") (eq .Values.volume.jail.type "glusterfs")) -}}
+        {{- fail "Jail volume type must be one of 'filestore' or 'glusterfs'." -}}
+    {{- end }}
+    {{- required "Jail volume type is required." .Values.volume.jail.type | trim -}}
+{{- end }}
+
+{{/* Jail filestore device name */}}
+{{- define "slurm-cluster-storage.volume.jail.device" -}}
+    {{- if eq .Values.volume.jail.type "filestore" -}}
+        {{- required "Jail volume filestore device name is required." .Values.volume.jail.filestoreDeviceName | trim | kebabcase -}}
+    {{- else }}
+        {{- "" -}}
+    {{- end }}
+{{- end }}
+
+{{/* Jail GlusterFS host name */}}
+{{- define "slurm-cluster-storage.volume.jail.hostname" -}}
+    {{- if eq .Values.volume.jail.type "glusterfs" -}}
+        {{- required "Jail volume GlusterFS hostname is required." .Values.volume.jail.glusterfsHostName | trim | kebabcase -}}
+    {{- else }}
+        {{- "" -}}
+    {{- end }}
+{{- end }}
+
 {{/*
 ---
 */}}
 
-{{/* Controller spool device name */}}
-{{- define "slurm-cluster-storage.volume.controller-spool.device" -}}
-    {{- default "controller-spool" .Values.volume.controllerSpool.filestoreDeviceName | trim | kebabcase -}}
-{{- end }}
-
 {{/* Controller spool volume */}}
 {{- define "slurm-cluster-storage.volume.controller-spool.name" -}}
-    {{- default "controller-spool" .Values.volume.controllerSpool.name | trim | kebabcase -}}
+    {{- required "Controller spool volume name is required." .Values.volume.controllerSpool.name | trim | kebabcase -}}
 {{- end }}
 
 {{/* Controller spool PVC name */}}
@@ -88,21 +94,21 @@
 
 {{/* Controller spool size */}}
 {{- define "slurm-cluster-storage.volume.controller-spool.size" -}}
-    {{- required "Spool volume size is required." .Values.volume.controllerSpool.size -}}
+    {{- required "Controller spool volume size is required." .Values.volume.controllerSpool.size -}}
+{{- end }}
+
+{{/* Controller spool device name */}}
+{{- define "slurm-cluster-storage.volume.controller-spool.device" -}}
+    {{- required "Controller spool Filestore device name is required." .Values.volume.controllerSpool.filestoreDeviceName | trim | kebabcase -}}
 {{- end }}
 
 {{/*
 ---
 */}}
 
-{{/* Jail submount device name */}}
-{{- define "slurm-cluster-storage.volume.jail-submount.device" -}}
-    {{- required "Jail submount device name is required." .filestoreDeviceName | trim | kebabcase -}}
-{{- end }}
-
 {{/* Jail submount volume */}}
 {{- define "slurm-cluster-storage.volume.jail-submount.name" -}}
-    {{- required "Jail submount name is required." .name | trim | kebabcase -}}
+    {{- cat "jail-submount" (required "Jail submount name is required." .name) | trim | kebabcase -}}
 {{- end }}
 
 {{/* Jail submount PVC name */}}
@@ -130,16 +136,12 @@
     {{- required "Jail submount volume size is required." .size -}}
 {{- end }}
 
-{{/*
----
-*/}}
-
-{{/* GPU node group */}}
-{{- define "slurm-cluster-storage.nodeGroup.gpu" -}}
-    {{- required "GPU node group ID is required." $.Values.nodeGroup.gpu.id | quote -}}
+{{/* Jail submount device name */}}
+{{- define "slurm-cluster-storage.volume.jail-submount.device" -}}
+    {{- required "Jail submount Filestore device name is required." .filestoreDeviceName | trim | kebabcase -}}
 {{- end }}
 
-{{/* Non-GPU node group */}}
-{{- define "slurm-cluster-storage.nodeGroup.nonGpu" -}}
-    {{- required "Non-GPU node group ID is required." $.Values.nodeGroup.nonGpu.id | quote -}}
+{{/* Jail submount mount path */}}
+{{- define "slurm-cluster-storage.volume.jail-submount.mountPath" -}}
+    {{- required "Jail submount path is required." .mountPath | trim | kebabcase -}}
 {{- end }}

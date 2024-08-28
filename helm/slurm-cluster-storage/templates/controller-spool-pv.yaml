@@ -9,7 +9,7 @@ spec:
     - rw
     - relatime
   capacity:
-    storage: {{ .Values.volume.controllerSpool.size }}
+    storage: {{ include "slurm-cluster-storage.volume.controller-spool.size" . }}
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
@@ -21,9 +21,5 @@ spec:
   nodeAffinity:
     required:
       nodeSelectorTerms:
-        # Allow attaching to Non-GPU nodes
         - matchExpressions:
-            - key: nebius.com/node-group-id
-              operator: In
-              values:
-                - {{ include "slurm-cluster-storage.nodeGroup.nonGpu" . }}
+{{ .Values.scheduling.cpuOnly.matchExpressions | toYaml | indent 12 }}
