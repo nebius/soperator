@@ -48,6 +48,7 @@ else
     USER_MAIL					= $(shell git log -1 --pretty=format:'%ae')
 endif
 ifeq ($(UNSTABLE), true)
+	USER_MAIL					= $(shell git log -1 --pretty=format:'%ae')
     SHORT_SHA 					= $(shell echo -n "$(USER_MAIL)-$(VERSION)" | $(SHA_CMD) | cut -c1-8)
     OPERATOR_IMAGE_TAG  		= $(VERSION)-$(SHORT_SHA)
     IMAGE_VERSION		  		= $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
