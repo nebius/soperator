@@ -36,6 +36,7 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
 
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch;delete
@@ -53,9 +54,10 @@ import (
 //+kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get;update
 //+kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=batch,resources=cronjobs/status,verbs=get;update
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;delete
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;delete
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;delete;patch
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;delete;patch
 //+kubebuilder:rbac:groups=opentelemetry.io,resources=opentelemetrycollectors,verbs=get;list;watch;update;patch;delete;create
+//+kubebuilder:rbac:groups=monitoring.coreos.com,resources=podmonitors,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=core,resources=podtemplates,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;delete
 
@@ -75,6 +77,8 @@ type SlurmClusterReconciler struct {
 	Role           *reconciler.RoleReconciler
 	RoleBinding    *reconciler.RoleBindingReconciler
 	Otel           *reconciler.OtelReconciler
+	PodMonitor     *reconciler.PodMonitorReconciler
+	SlurmExporter  *reconciler.SlurmExporterReconciler
 }
 
 func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *SlurmClusterReconciler {
@@ -93,6 +97,8 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 		Role:            reconciler.NewRoleReconciler(r),
 		RoleBinding:     reconciler.NewRoleBindingReconciler(r),
 		Otel:            reconciler.NewOtelReconciler(r),
+		PodMonitor:      reconciler.NewPodMonitorReconciler(r),
+		SlurmExporter:   reconciler.NewSlurmExporterReconciler(r),
 	}
 }
 
@@ -393,6 +399,10 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Conditionally add OpenTelemetryCollector ownership
 	if check.IsOpenTelemetryCollectorCRDInstalled {
 		controllerBuilder.Owns(&otelv1beta1.OpenTelemetryCollector{})
+	}
+	// Conditionally add PrometheusOperator ownership
+	if check.IsPrometheusOperatorCRDInstalled {
+		controllerBuilder.Owns(&prometheusv1.PodMonitor{})
 	}
 
 	return controllerBuilder.Complete(r)

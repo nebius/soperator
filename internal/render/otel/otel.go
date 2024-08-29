@@ -21,9 +21,9 @@ func RenderOtelCollector(
 	namespace string,
 	metrics *slurmv1.Telemetry,
 	foundPodTemplate *corev1.PodTemplate,
-) (otelv1beta1.OpenTelemetryCollector, error) {
+) (*otelv1beta1.OpenTelemetryCollector, error) {
 	if metrics == nil || metrics.OpenTelemetryCollector == nil || !metrics.OpenTelemetryCollector.Enabled {
-		return otelv1beta1.OpenTelemetryCollector{}, errors.New("OpenTelemetry Collector is not enabled")
+		return nil, errors.New("OpenTelemetry Collector is not enabled")
 	}
 
 	replicasOtelCollector := metrics.OpenTelemetryCollector.ReplicasOtelCollector
@@ -74,7 +74,7 @@ func RenderOtelCollector(
 		podAnnotations = foundPodTemplate.Template.Annotations
 	}
 
-	return otelv1beta1.OpenTelemetryCollector{
+	return &otelv1beta1.OpenTelemetryCollector{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "opentelemetry.io/v1beta1",
 			Kind:       "OpenTelemetryCollector",

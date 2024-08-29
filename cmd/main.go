@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/check"
@@ -50,10 +51,13 @@ var scheme = runtime.NewScheme()
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	// Check if OpenTelemetryCollector CRD is installed before adding it to the scheme
+	// Check if OpenTelemetryCollector and PodMonitor CRD is installed before adding it to the scheme
 	// This is required to avoid errors when the CRD is not installed before the operator starts
 	if check.IsOtelCRDInstalled() {
 		utilruntime.Must(otelv1beta1.AddToScheme(scheme))
+	}
+	if check.IsPrometheusCRDInstalled() {
+		utilruntime.Must(prometheusv1.AddToScheme(scheme))
 	}
 
 	utilruntime.Must(slurmv1.AddToScheme(scheme))

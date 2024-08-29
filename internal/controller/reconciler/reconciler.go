@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/logfield"
@@ -190,6 +191,10 @@ func (r Reconciler) reconcile(
 				existing = &rbacv1.RoleBinding{}
 			case *otelv1beta1.OpenTelemetryCollector:
 				existing = &otelv1beta1.OpenTelemetryCollector{}
+			case *appsv1.Deployment:
+				existing = &appsv1.Deployment{}
+			case *prometheusv1.PodMonitor:
+				existing = &prometheusv1.PodMonitor{}
 			default:
 				return errors.New(fmt.Sprintf("unimplemented resolver for resource type %T", desired))
 			}

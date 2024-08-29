@@ -25,4 +25,5 @@ var (
 	ComponentTypeLogin        ComponentType = baseComponentType{"login"}
 	ComponentTypeBenchmark    ComponentType = baseComponentType{"nccl-benchmark"}
 	ComponentTypePopulateJail ComponentType = baseComponentType{"populate-jail"}
+	ComponentTypeExporter     ComponentType = baseComponentType{"exporter"}
 )

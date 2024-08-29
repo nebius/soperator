@@ -185,3 +185,7 @@ func BuildRoleBindingWorkerName(clusterName string) string {
 func BuildOtelSvcEndpoint(clusterName string) string {
 	return fmt.Sprintf("%s-collector", clusterName)
 }
+
+func BuildSlurmExporterName(clusterName string) string {
+	return fmt.Sprintf("%s-exporter", clusterName)
+}
