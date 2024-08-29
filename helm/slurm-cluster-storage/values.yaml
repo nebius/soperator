@@ -22,7 +22,6 @@ volume:
 #    - name: "mlperf-sd"
 #      size: "1500Gi"
 #      filestoreDeviceName: "mlperf-sd"
-#      mountPath: "/mlperf-sd"
 
 scheduling:
   cpuOnly:

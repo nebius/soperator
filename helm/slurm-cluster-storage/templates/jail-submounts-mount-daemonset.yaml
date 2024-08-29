@@ -19,7 +19,7 @@ spec:
           command:
             - /bin/sh
             - -c
-            - /mount-scripts/ensure_mounted_filestore.sh -d {{ include "slurm-cluster-storage.volume.jail-submount.device" . }} -p {{ include "slurm-cluster-storage.volume.jail-submount.mountPath" . }} -s 60
+            - /mount-scripts/ensure_mounted_filestore.sh -d {{ include "slurm-cluster-storage.volume.jail-submount.device" . }} -p /mnt/{{ include "slurm-cluster-storage.volume.jail-submount.name" . }} -s 60
           securityContext:
             privileged: true
           volumeMounts:

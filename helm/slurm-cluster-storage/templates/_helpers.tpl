@@ -140,8 +140,3 @@
 {{- define "slurm-cluster-storage.volume.jail-submount.device" -}}
     {{- required "Jail submount Filestore device name is required." .filestoreDeviceName | trim | kebabcase -}}
 {{- end }}
-
-{{/* Jail submount mount path */}}
-{{- define "slurm-cluster-storage.volume.jail-submount.mountPath" -}}
-    {{- required "Jail submount path is required." .mountPath | trim | kebabcase -}}
-{{- end }}
