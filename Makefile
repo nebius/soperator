@@ -142,7 +142,7 @@ get-image-version:
 	@echo '$(IMAGE_VERSION)'
 
 .PHONY: sync-version
-sync-version: ## Sync versions from file
+sync-version: yq ## Sync versions from file
 	@echo 'Version is - $(VERSION)'
 	@echo 'Image version is - $(IMAGE_VERSION)'
 	@echo 'Operator image tag is - $(OPERATOR_IMAGE_TAG)'

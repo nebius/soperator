@@ -96,3 +96,5 @@ if [ -n "${all}" ]; then
       chart "$(basename "${dirpath}")" "${version}"
   done
 fi
+
+rm -rf ${RELEASE_PATH}
