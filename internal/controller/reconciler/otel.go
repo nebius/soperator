@@ -37,10 +37,13 @@ func (r *OtelReconciler) Reconcile(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
 	desired *otelv1beta1.OpenTelemetryCollector,
-	removeOtel bool,
 	deps ...metav1.Object,
 ) error {
-	if removeOtel {
+	if desired == nil {
+		// If desired is nil, delete the OpenTelemetryCollector
+		// TODO: Using error or desired is nil presence as an indicator for resource deletion doesn't seem good
+		// We should use conditions instead. if condition is met and resource exists, delete it
+		// MSP-2715 - task to improve resource deletion
 		log.FromContext(ctx).Info(fmt.Sprintf("Deleting OpenTelemetryCollector %s-collector, because of OpenTelemetryCollector is not needed", cluster.Name))
 		return r.deleteOtelIfOwnedByController(ctx, cluster)
 	}

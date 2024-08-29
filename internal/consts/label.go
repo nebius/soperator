@@ -4,6 +4,8 @@ const (
 	LabelNameKey   = "app.kubernetes.io/name"
 	LabelNameValue = SlurmCluster
 
+	LabelNameExporterValue = "slurm-exporter"
+
 	// LabelInstanceKey value is taken from the corresponding CRD
 	LabelInstanceKey = "app.kubernetes.io/instance"
 

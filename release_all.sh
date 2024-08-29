@@ -70,6 +70,9 @@ make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=munge
 
 make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=nccl_benchmark DOCKERFILE=nccl_benchmark/nccl_benchmark.dockerfile
 make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=nccl_benchmark
+
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=exporter DOCKERFILE=exporter/exporter.dockerfile
+make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=exporter
 echo "Common images were built"
 
 echo "Removing previous jail rootfs tar archive"

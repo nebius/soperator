@@ -20,6 +20,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
 
 // SlurmClusterSpec defines the desired state of SlurmCluster
@@ -519,6 +521,7 @@ type MetricsOpenTelemetryCollector struct {
 	// +kubebuilder:default=1
 	ReplicasOtelCollector int32 `json:"replicasOtelCollector,omitempty"`
 	// Specifies the port for OtelCollector, default value: 4317
+	//
 	// kubebuilder:default=4317
 	OtelCollectorPort int32 `json:"otelCollectorPort,omitempty"`
 }
@@ -526,8 +529,25 @@ type MetricsOpenTelemetryCollector struct {
 type MetricsPrometheus struct {
 	// It has to be set to true if Prometheus Operator is used
 	//
-	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
 	Enabled bool `json:"enabled,omitempty"`
+	// Specifies image for Slurm Exporter
+	//
+	// +kubebuilder:validation:Optional
+	ImageSlurmExporter *string `json:"imageSlurmExporter,omitempty"`
+	// It references the PodTemplate with the Slurm Exporter configuration
+	//
+	// +kubebuilder:validation:Optional
+	PodTemplateNameRef *string `json:"podTemplateNameRef,omitempty"`
+	// Resources defines the [corev1.ResourceRequirements] for the container the Slurm Exporter
+	//
+	// +kubebuilder:validation:Optional
+	ResourcesSlurmExporter corev1.ResourceList `json:"resources,omitempty"`
+	// It references the PodMonitor configuration
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={jobLabel: "slurm-exporter", interval: "30s", scrapeTimeout: "20s"}
+	PodMonitorConfig PodMonitorConfig `json:"podMonitorConfig,omitempty"`
 }
 
 type JobsTelemetry struct {
@@ -559,6 +579,30 @@ type JobsTelemetry struct {
 	//
 	// +kubebuilder:default="/v1/metrics"
 	OtelCollectorPath string `json:"otelCollectorPath,omitempty"`
+}
+
+// PodMonitor defines a prometheus PodMonitor object.
+type PodMonitorConfig struct {
+	// JobLabel to add to the PodMonitor object. If not set, the default value is "slurm-exporter"
+	//
+	// +kubebuilder:validation:Optional +kubebuilder:default="slurm-exporter"
+	JobLabel string `json:"jobLabel,omitempty"`
+	// Interval for scraping metrics. 30s by default.
+	//
+	// +kubebuilder:validation:Optional
+	Interval prometheusv1.Duration `json:"interval,omitempty"`
+	// ScrapeTimeout defines the timeout for scraping metrics.
+	//
+	// +kubebuilder:validation:Optional
+	ScrapeTimeout prometheusv1.Duration `json:"scrapeTimeout,omitempty"`
+	// RelabelConfig allows dynamic rewriting of the label set for targets, alerts,
+	//
+	// +kubebuilder:validation:Optional
+	RelabelConfig []prometheusv1.RelabelConfig `json:"relabelConfig,omitempty"`
+	// `metricRelabelings` configures the relabeling rules to apply to the samples before ingestion.
+	//
+	// +kubebuilder:validation:Optional
+	MetricRelabelConfigs []prometheusv1.RelabelConfig `json:"metricRelabelConfigs,omitempty"`
 }
 
 const (
