@@ -58,11 +58,14 @@ OPERATOR_IMAGE_TAG  = $(VERSION)
 
 ifeq ($(shell uname), Darwin)
     SHA_CMD = shasum -a 256
+    SED_COMMAND = sed -i '' -e
 else
     SHA_CMD = sha256sum
+    SED_COMMAND = sed -i -e
 endif
 ifeq ($(UNSTABLE), true)
-    SHORT_SHA 					= $(shell echo -n "$(VERSION)" | $(SHA_CMD) | cut -c1-8)
+	USER_MAIL					= $(shell git log -1 --pretty=format:'%ae')
+    SHORT_SHA 					= $(shell echo -n "$(USER_MAIL)-$(VERSION)" | $(SHA_CMD) | cut -c1-8)
     CONTAINER_REGISTRY_ID  		= $(CONTAINER_REGISTRY_UNSTABLE_ID)
     CONTAINER_REGISTRY_HELM_ID 	= $(CONTAINER_REGISTRY_HELM_UNSTABLE_ID)
     OPERATOR_IMAGE_TAG  		= $(VERSION)-$(SHORT_SHA)
@@ -109,7 +112,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
+	go test ./... -coverprofile cover.out
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter & yamllint
@@ -142,7 +145,7 @@ get-image-version:
 	@echo '$(IMAGE_VERSION)'
 
 .PHONY: sync-version
-sync-version: ## Sync versions from file
+sync-version: yq ## Sync versions from file
 	@echo 'Version is - $(VERSION)'
 	@echo 'Image version is - $(IMAGE_VERSION)'
 	@echo 'Operator image tag is - $(OPERATOR_IMAGE_TAG)'
@@ -154,7 +157,7 @@ sync-version: ## Sync versions from file
 
 	@# region config/manager/manager.yaml
 	@echo 'Syncing config/manager/manager.yaml'
-	@sed -i '' -e "s/image: controller:[^ ]*/image: controller:$(OPERATOR_IMAGE_TAG)/" config/manager/manager.yaml
+	@$(SED_COMMAND) "s/image: controller:[^ ]*/image: controller:$(OPERATOR_IMAGE_TAG)/" config/manager/manager.yaml
 	@# endregion config/manager/manager.yaml
 
 	@# region helm chart versions
@@ -205,7 +208,7 @@ sync-version: ## Sync versions from file
 
 	@# region release_helm.sh
 	@echo 'Syncing release_helm.sh'
-	@sed -i '' -e "s/CONTAINER_REGISTRY_ID=[^ ]*/CONTAINER_REGISTRY_ID='$(CONTAINER_REGISTRY_HELM_ID)'/" release_helm.sh
+	@$(SED_COMMAND) "s/CONTAINER_REGISTRY_ID=[^ ]*/CONTAINER_REGISTRY_ID='$(CONTAINER_REGISTRY_HELM_ID)'/" release_helm.sh
 	@# endregion release_helm.sh
 
 ##@ Build
