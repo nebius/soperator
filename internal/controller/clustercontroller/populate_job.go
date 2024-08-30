@@ -65,7 +65,7 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 						stepLogger.Info("Rendered")
 
-						if err = r.Job.Reconcile(ctx, cluster, &desired, nil); err != nil {
+						if err = r.Job.Reconcile(ctx, cluster, &desired); err != nil {
 							stepLogger.Error(err, "Failed to reconcile")
 							return errors.Wrap(err, "reconciling Populate jail Job")
 						}
