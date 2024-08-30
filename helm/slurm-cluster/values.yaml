@@ -185,6 +185,10 @@ telemetry: {}
   #   otelCollectorPort: 8429
   #   sendJobsEvents: true
   #   sendOtelMetrics: true
+  # openTelemetryCollector:
+  #   enabled: true
+  #   replicasOtelCollector: 1
+  #   otelCollectorPort: 8429
   # prometheus:
   #   enabled: true
   #   imageSlurmExporter: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/exporter:1.9.2-jammy-slurm24.05.2-185df658

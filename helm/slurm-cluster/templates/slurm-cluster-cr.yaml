@@ -189,5 +189,8 @@ spec:
       {{- if .Values.telemetry.prometheus.enabled }}
       enabled: {{ .Values.telemetry.prometheus.enabled }}
       {{- end }}
+      {{- if .Values.telemetry.prometheus.imageSlurmExporter }}
+      imageSlurmExporter: {{ .Values.telemetry.prometheus.imageSlurmExporter | quote }}
+      {{- end }}
     {{- end }}
   {{- end }}
