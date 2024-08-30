@@ -178,7 +178,20 @@ slurmNodes:
 #        - name: "mlcommons-sd-bench-data"
 #          mountPath: "/mlperf-sd"
 #          volumeSourceName: "mlperf-sd"
-
+telemetry: {}
+  # jobsTelemetry:
+  #   otelCollectorHttpHost: vmsingle-slurm.monitoring-system.svc.cluster.local
+  #   otelCollectorPath: /opentelemetry/api/v1/push
+  #   otelCollectorPort: 8429
+  #   sendJobsEvents: true
+  #   sendOtelMetrics: true
+  # openTelemetryCollector:
+  #   enabled: true
+  #   replicasOtelCollector: 1
+  #   otelCollectorPort: 8429
+  # prometheus:
+  #   enabled: true
+  #   imageSlurmExporter: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/exporter:1.9.2-jammy-slurm24.05.2-185df658
 images:
   slurmctld: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/controller_slurmctld:1.10.3-jammy-slurm24.05.2"
   slurmd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/worker_slurmd:1.10.3-jammy-slurm24.05.2"
