@@ -67,7 +67,7 @@ spec:
         #   type: RuntimeDefault
       containers:
       - command:
-        - /manager
+        - /usr/bin/slurm_operator
         args:
         - --leader-elect
         env:

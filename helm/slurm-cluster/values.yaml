@@ -163,8 +163,12 @@ slurmNodes:
     sshRootPublicKeys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzxkjzPQ4EyZSjan4MLGFSA18idpZicoKW7Hfff username1"
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICL8scMKnwu+Y9S6XDACacZ54+qu+YRo2y4Ieddd username2"
-    sshdServiceType: "LoadBalancer"
-    sshdServiceLoadBalancerIP: "195.242.16.24"
+    # Either `LoadBalancer` or `NodePort`
+    sshdServiceType: "NodePort"
+    # Required in case of sshdServiceType == `LoadBalancer`
+    sshdServiceLoadBalancerIP: <your-ip-here>
+    # Required in case of sshdServiceType == `NodePort`
+    sshdServiceNodePort: 30022
     munge:
       resources:
         cpu: "500m"

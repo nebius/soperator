@@ -128,12 +128,13 @@ spec:
       sshRootPublicKeys:
         {{- default list .Values.slurmNodes.login.sshRootPublicKeys | toYaml | nindent 8 }}
       sshdServiceType: {{ default "LoadBalancer" .Values.slurmNodes.login.sshdServiceType | quote }}
-      sshdServiceAnnotations:
-        external-dns.alpha.kubernetes.io/hostname: "{{ include "slurm-cluster.name" . }}.slurm-operator.msp-dev.nemax.nebius.cloud."
+      sshdServiceAnnotations: {}
+      {{- /*external-dns.alpha.kubernetes.io/hostname: "{{ include "slurm-cluster.name" . }}.slurm-operator.msp-dev.nemax.nebius.cloud."*/ -}}
       {{- if eq .Values.slurmNodes.login.sshdServiceType "LoadBalancer" }}
-        {{- with .Values.slurmNodes.login.sshdServiceLoadBalancerIP }}
-      sshdServiceLoadBalancerIP: {{ . | quote }}
-        {{- end }}
+      sshdServiceLoadBalancerIP: {{ required "slurmNodes.login.sshdServiceLoadBalancerIP is required in case of slurmNodes.login.sshdServiceType == `LoadBalancer`" .Values.slurmNodes.login.sshdServiceLoadBalancerIP | quote }}
+      {{- end }}
+      {{- if eq .Values.slurmNodes.login.sshdServiceType "NodePort" }}
+      sshdServiceNodePort: {{ required "slurmNodes.login.sshdServiceNodePort is required in case of slurmNodes.login.sshdServiceType == `NodePort`" .Values.slurmNodes.login.sshdServiceNodePort }}
       {{- end }}
       munge:
         image: {{ required "sshd munge" .Values.images.munge | quote }}
