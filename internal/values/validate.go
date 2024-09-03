@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -170,6 +172,93 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 			logger.Info("SshdKeysName is empty. Using default name")
 			c.Secrets.SshdKeysName = naming.BuildSecretSSHDKeysName(c.Name)
 		}
+	}
+
+	if err := utils.ExecuteMultiStep(ctx,
+		"Login nodes validation",
+		utils.MultiStepExecutionStrategyCollectErrors,
+		utils.MultiStepExecutionStep{
+			Name: "SshdServiceType valid",
+			Func: func(stepCtx context.Context) error {
+				if slices.Contains(
+					[]string{
+						string(corev1.ServiceTypeLoadBalancer),
+						string(corev1.ServiceTypeNodePort),
+					},
+					string(c.NodeLogin.Service.Type),
+				) {
+					return nil
+				}
+
+				err := fmt.Errorf("SshdServiceType is invalid. It must be one of %q or %q", string(corev1.ServiceTypeLoadBalancer), string(corev1.ServiceTypeNodePort))
+				log.FromContext(stepCtx).Error(
+					err,
+					"SshdServiceType is invalid",
+					"Slurm.LoginNode.SshdServiceType", string(c.NodeLogin.Service.Type),
+				)
+				return err
+			},
+		},
+		utils.MultiStepExecutionStep{
+			Name: "SshdServiceLoadBalancerIP specified",
+			Func: func(stepCtx context.Context) error {
+				if c.NodeLogin.Service.Type != corev1.ServiceTypeLoadBalancer {
+					return nil
+				}
+				if c.NodeLogin.Service.LoadBalancerIP != "" {
+					return nil
+				}
+
+				err := fmt.Errorf("SshdServiceLoadBalancerIP is not specified, but SshdServiceType %q is used", string(corev1.ServiceTypeLoadBalancer))
+				log.FromContext(stepCtx).Error(
+					err,
+					"SshdServiceLoadBalancerIP is not specified",
+					"Slurm.LoginNode.SshdServiceType", string(c.NodeLogin.Service.Type),
+				)
+				return err
+			},
+		},
+		utils.MultiStepExecutionStep{
+			Name: "SshdServiceNodePort specified",
+			Func: func(stepCtx context.Context) error {
+				if c.NodeLogin.Service.Type != corev1.ServiceTypeNodePort {
+					return nil
+				}
+				if c.NodeLogin.Service.NodePort != 0 {
+					return nil
+				}
+
+				err := fmt.Errorf("SshdServiceNodePort is not specified, but SshdServiceType %q is used", string(corev1.ServiceTypeNodePort))
+				log.FromContext(stepCtx).Error(
+					err,
+					"SshdServiceNodePort is not specified",
+					"Slurm.LoginNode.SshdServiceType", string(c.NodeLogin.Service.Type),
+				)
+				return err
+			},
+		},
+		utils.MultiStepExecutionStep{
+			Name: "SshdServiceNodePort valid",
+			Func: func(stepCtx context.Context) error {
+				if c.NodeLogin.Service.Type != corev1.ServiceTypeNodePort {
+					return nil
+				}
+				if c.NodeLogin.Service.NodePort >= 30000 && c.NodeLogin.Service.NodePort <= 32768 {
+					return nil
+				}
+
+				err := fmt.Errorf("SshdServiceNodePort is invalid. It must be in range 30000-32768, got %d", c.NodeLogin.Service.NodePort)
+				log.FromContext(stepCtx).Error(
+					err,
+					"SshdServiceNodePort is invalid. It must be in range 30000-32768",
+					"Slurm.LoginNode.SshdServiceType", string(c.NodeLogin.Service.Type),
+					"Slurm.LoginNode.SshdServiceNodePort", c.NodeLogin.Service.NodePort,
+				)
+				return err
+			},
+		},
+	); err != nil {
+		return err
 	}
 
 	return nil

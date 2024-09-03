@@ -12,7 +12,7 @@ import (
 
 // RenderService renders new [corev1.Service] serving Slurm login
 func RenderService(namespace, clusterName string, login *values.SlurmLogin) corev1.Service {
-	return corev1.Service{
+	res := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        login.Service.Name,
 			Namespace:   namespace,
@@ -20,9 +20,8 @@ func RenderService(namespace, clusterName string, login *values.SlurmLogin) core
 			Annotations: login.Service.Annotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Type:           login.Service.Type,
-			Selector:       common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName),
-			LoadBalancerIP: login.Service.LoadBalancerIP,
+			Type:     login.Service.Type,
+			Selector: common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName),
 			Ports: []corev1.ServicePort{{
 				Protocol:   login.Service.Protocol,
 				Port:       login.ContainerSshd.Port,
@@ -30,4 +29,13 @@ func RenderService(namespace, clusterName string, login *values.SlurmLogin) core
 			}},
 		},
 	}
+
+	switch login.Service.Type {
+	case corev1.ServiceTypeLoadBalancer:
+		res.Spec.LoadBalancerIP = login.Service.LoadBalancerIP
+	case corev1.ServiceTypeNodePort:
+		res.Spec.Ports[0].NodePort = login.Service.NodePort
+	}
+
+	return res
 }
