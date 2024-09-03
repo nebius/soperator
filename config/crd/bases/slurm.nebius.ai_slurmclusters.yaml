@@ -1987,9 +1987,16 @@ spec:
                         description: SshdServiceLoadBalancerIP represents the static
                           IP address of the LoadBalancer service
                         type: string
+                      sshdServiceNodePort:
+                        default: 0
+                        description: SshdServiceNodePort represents the port to be
+                          opened on nodes in case of NodePort type of service
+                        format: int32
+                        type: integer
                       sshdServiceType:
-                        description: SshdServiceType represents the service type for
-                          the SSH daemon
+                        description: |-
+                          SshdServiceType represents the service type for the SSH daemon
+                          Must be one of [corev1.ServiceTypeLoadBalancer] or [corev1.ServiceTypeNodePort]
                         type: string
                       volumes:
                         description: Volumes represents the volume configurations
@@ -2802,8 +2809,7 @@ spec:
                         type: string
                       otelCollectorPort:
                         default: 4317
-                        description: 'Specifies the port for OtelCollector, default
-                          value: 4317'
+                        description: Specifies the port for OtelCollector
                         format: int32
                         type: integer
                       sendJobsEvents:
@@ -2827,11 +2833,8 @@ spec:
                           is used
                         type: boolean
                       otelCollectorPort:
-                        description: |-
-                          Specifies the port for OtelCollector, default value: 4317
-
-
-                          kubebuilder:default=4317
+                        default: 4317
+                        description: Specifies the port for OtelCollector
                         format: int32
                         type: integer
                       podTemplateNameRef:

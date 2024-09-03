@@ -163,8 +163,12 @@ slurmNodes:
     sshRootPublicKeys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzxkjzPQ4EyZSjan4MLGFSA18idpZicoKW7Hfff username1"
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICL8scMKnwu+Y9S6XDACacZ54+qu+YRo2y4Ieddd username2"
-    sshdServiceType: "LoadBalancer"
-    sshdServiceLoadBalancerIP: "195.242.16.24"
+    # Either `LoadBalancer` or `NodePort`
+    sshdServiceType: "NodePort"
+    # Required in case of sshdServiceType == `LoadBalancer`
+    sshdServiceLoadBalancerIP: <your-ip-here>
+    # Required in case of sshdServiceType == `NodePort`
+    sshdServiceNodePort: 30022
     munge:
       resources:
         cpu: "500m"
@@ -193,9 +197,9 @@ telemetry: {}
 #   enabled: true
 #   imageSlurmExporter: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/exporter:1.9.2-jammy-slurm24.05.2-185df658
 images:
-  slurmctld: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/controller_slurmctld:1.10.4-jammy-slurm24.05.2"
-  slurmd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/worker_slurmd:1.10.4-jammy-slurm24.05.2"
-  sshd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/login_sshd:1.10.4-jammy-slurm24.05.2"
-  munge: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/munge:1.10.4-jammy-slurm24.05.2"
-  populateJail: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/populate_jail:1.10.4-jammy-slurm24.05.2"
-  ncclBenchmark: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/nccl_benchmark:1.10.4-jammy-slurm24.05.2"
+  slurmctld: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/controller_slurmctld:1.11.3-jammy-slurm24.05.2"
+  slurmd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/worker_slurmd:1.11.3-jammy-slurm24.05.2"
+  sshd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/login_sshd:1.11.3-jammy-slurm24.05.2"
+  munge: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/munge:1.11.3-jammy-slurm24.05.2"
+  populateJail: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/populate_jail:1.11.3-jammy-slurm24.05.2"
+  ncclBenchmark: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/nccl_benchmark:1.11.3-jammy-slurm24.05.2"

@@ -1,6 +1,3 @@
-# # if CRD OpenTelemetryCollector is installed in the cluster
-opentelemetryOperator:
-  enabled: false
 controllerManager:
   kubeRbacProxy:
     args:
@@ -27,8 +24,6 @@ controllerManager:
       - --health-probe-bind-address=:8081
       - --metrics-bind-address=127.0.0.1:8080
       - --leader-elect
-      - --log-format=plain
-      - --log-level=debug
     containerSecurityContext:
       allowPrivilegeEscalation: false
       capabilities:
@@ -38,7 +33,7 @@ controllerManager:
       slurmOperatorWatchNamespaces: '*'
     image:
       repository: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/slurm-operator
-      tag: 1.10.4
+      tag: 1.11.3
     imagePullPolicy: Always
     resources:
       limits:
