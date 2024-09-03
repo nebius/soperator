@@ -40,6 +40,7 @@ GENPATH = "./api/v1;./internal/controller/..."
 
 CHART_PATH            		= helm
 CHART_OPERATOR_PATH   		= $(CHART_PATH)/slurm-operator
+CHART_OPERATOR_CRDS_PATH   	= $(CHART_PATH)/slurm-operator-crds
 CHART_CLUSTER_PATH    		= $(CHART_PATH)/slurm-cluster
 CHART_STORAGE_PATH    		= $(CHART_PATH)/slurm-cluster-storage
 
@@ -127,6 +128,7 @@ helm: kustomize helmify yq ## Update slurm-operator Helm chart
 	rm -rf $(CHART_OPERATOR_PATH)
 	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir $(CHART_OPERATOR_PATH)
 	rm -f $(CHART_PATH)/operatorAppVersion
+	cp -r $(CHART_OPERATOR_PATH)/crds/* $(CHART_OPERATOR_CRDS_PATH)/templates/
 
 .PHONY: get-version
 get-version:
@@ -163,9 +165,11 @@ sync-version: yq ## Sync versions from file
 	@# region helm chart versions
 	@echo 'Syncing helm chart versions'
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_CRDS_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_STORAGE_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_CRDS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_STORAGE_PATH)/Chart.yaml"
 	@# endregion helm chart versions
