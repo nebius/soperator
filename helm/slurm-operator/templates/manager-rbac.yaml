@@ -82,18 +82,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - serviceaccounts
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - events
   verbs:
   - create
@@ -145,7 +133,31 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - podmonitors
   verbs:
   - create
   - delete
@@ -173,9 +185,9 @@ rules:
   verbs:
   - create
   - delete
-  - patch
   - get
   - list
+  - patch
   - watch
 - apiGroups:
   - rbac.authorization.k8s.io
@@ -185,8 +197,8 @@ rules:
   - create
   - delete
   - get
-  - patch
   - list
+  - patch
   - watch
 - apiGroups:
   - slurm.nebius.ai

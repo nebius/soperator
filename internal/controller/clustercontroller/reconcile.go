@@ -59,7 +59,7 @@ import (
 //+kubebuilder:rbac:groups=opentelemetry.io,resources=opentelemetrycollectors,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=podmonitors,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=core,resources=podtemplates,verbs=get;list;watch
-//+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;delete
+//+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;update;patch;delete;create
 
 // SlurmClusterReconciler reconciles a SlurmCluster object
 type SlurmClusterReconciler struct {
