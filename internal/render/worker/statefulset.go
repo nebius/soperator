@@ -38,6 +38,26 @@ func RenderStatefulSet(
 		return appsv1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
+	annotations := map[string]string{
+		fmt.Sprintf(
+			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmd,
+		): consts.AnnotationApparmorValueUnconfined,
+		fmt.Sprintf(
+			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
+		): consts.AnnotationApparmorValueUnconfined,
+	}
+	initContainers := []corev1.Container{
+		renderContainerToolkitValidation(&worker.ContainerToolkitValidation),
+	}
+	if worker.CgroupVersion == consts.CGroupV2 {
+		initContainers = append(
+			initContainers,
+			renderContainerCgroupMaker(&worker.CgroupMakerContainer),
+		)
+		annotations[fmt.Sprintf(
+			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameCgroupMaker,
+		)] = consts.AnnotationApparmorValueUnconfined
+	}
 	return appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      worker.StatefulSet.Name,
@@ -65,24 +85,15 @@ func RenderStatefulSet(
 			),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-					Annotations: map[string]string{
-						fmt.Sprintf(
-							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmd,
-						): consts.AnnotationApparmorValueUnconfined,
-						fmt.Sprintf(
-							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-						): consts.AnnotationApparmorValueUnconfined,
-					},
+					Labels:      labels,
+					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: naming.BuildServiceAccountWorkerName(clusterName),
 					Affinity:           nodeFilter.Affinity,
 					NodeSelector:       nodeFilter.NodeSelector,
 					Tolerations:        nodeFilter.Tolerations,
-					InitContainers: []corev1.Container{
-						renderContainerToolkitValidation(&worker.ContainerToolkitValidation),
-					},
+					InitContainers:     initContainers,
 					Containers: []corev1.Container{
 						renderContainerSlurmd(&worker.ContainerSlurmd, worker.JailSubMounts, clusterName),
 						common.RenderContainerMunge(&worker.ContainerMunge),

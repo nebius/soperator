@@ -9,6 +9,7 @@ const (
 	ContainerNameNCCLBenchmark     = ncclBenchmark
 	ContainerNamePopulateJail      = populateJail
 	ContainerNameExporter          = Exporter
+	ContainerNameCgroupMaker       = CgroupMaker
 
 	ContainerSecurityContextCapabilitySysAdmin = "SYS_ADMIN"
 

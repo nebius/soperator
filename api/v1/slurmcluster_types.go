@@ -328,6 +328,10 @@ type SlurmNodeControllerVolumes struct {
 	Jail NodeVolume `json:"jail"`
 }
 
+// Add XValidation to enforce the rule:
+//
+// If CgroupVersion is "v2", InitContainer must not be null
+// +kubebuilder:validation:XValidation:rule="self.cgroupVersion == 'v2' ? self.cgroupMakerContainer != null : true",message="cgroupMakerContainer must be set if CgroupVersion is 'v2'"
 // SlurmNodeWorker defines the configuration for the Slurm worker node
 type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
@@ -346,6 +350,17 @@ type SlurmNodeWorker struct {
 	//
 	// +kubebuilder:validation:Required
 	Volumes SlurmNodeWorkerVolumes `json:"volumes"`
+	// CgroupVersion defines the version of the cgroup
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="v2"
+	// +kubebuilder:validation:Enum="v1";"v2"
+	CgroupVersion string `json:"cgroupVersion,omitempty"`
+	// CgroupMakerContainer create system.slice for cgroup v2
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={image:"busybox:latest"}
+	CgroupMakerContainer NodeContainer `json:"cgroupMakerContainer"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node
