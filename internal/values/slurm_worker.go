@@ -16,7 +16,6 @@ type SlurmWorker struct {
 	ContainerToolkitValidation Container
 	ContainerSlurmd            Container
 	ContainerMunge             Container
-	CgroupMakerContainer       Container
 
 	CgroupVersion string
 
@@ -46,10 +45,6 @@ func buildSlurmWorkerFrom(
 		ContainerSlurmd: buildContainerFrom(
 			worker.Slurmd,
 			consts.ContainerNameSlurmd,
-		),
-		CgroupMakerContainer: buildContainerFrom(
-			worker.CgroupMakerContainer,
-			consts.ContainerNameCgroupMaker,
 		),
 		ContainerMunge: buildContainerFrom(
 			worker.Munge,
