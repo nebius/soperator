@@ -329,6 +329,7 @@ type SlurmNodeControllerVolumes struct {
 }
 
 // SlurmNodeWorker defines the configuration for the Slurm worker node
+// +kubebuilder:validation:XValidation:rule="self.slurmd.resources.memory > self.volumes.sharedMemorySize",message="resources memory of slurmd must be bigger than sharedMemorySize"
 type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
 
@@ -563,6 +564,9 @@ type MetricsPrometheus struct {
 	PodMonitorConfig PodMonitorConfig `json:"podMonitorConfig,omitempty"`
 }
 
+// XValidation: both OtelCollectorGrpcHost and OtelCollectorHttpHost cannot have values at the same time
+//
+// +kubebuilder:validation:XValidation:rule="!(has(self.otelCollectorGrpcHost) && has(self.otelCollectorHttpHost))",message="Both OtelCollectorGrpcHost and OtelCollectorHttpHost cannot be set at the same time."
 type JobsTelemetry struct {
 	// Defines whether to send Kubernetes events for Slurm NCCLBenchmark jobs
 	//
