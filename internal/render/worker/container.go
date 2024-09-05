@@ -43,55 +43,12 @@ func renderContainerToolkitValidation(container *values.Container) corev1.Contai
 	}
 }
 
-func renderContainerCgroupMaker(container *values.Container) corev1.Container {
-	return corev1.Container{
-		Name:            consts.ContainerNameCgroupMaker,
-		Image:           container.Image,
-		ImagePullPolicy: corev1.PullIfNotPresent,
-		Resources: corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceMemory: *container.Resources.Memory(),
-			},
-			Requests: container.Resources,
-		},
-		Command: []string{
-			"sh",
-		},
-		Args: []string{
-			"-c",
-			strings.Join(
-				[]string{
-					`export CGROUP_PATH=$(cat /proc/self/cgroup | awk -F'/' '{print "/"$2"/"$3"/"$4}');`,
-					`if [ -n "${CGROUP_PATH}" ]; then`,
-					`echo "cgroup v2 detected, creating cgroup for ${CGROUP_PATH}";`,
-					`mkdir -p /sys/fs/cgroup/${CGROUP_PATH}/system.slice;`,
-					`fi`,
-				},
-				" ",
-			),
-		},
-
-		SecurityContext: &corev1.SecurityContext{
-			Privileged: ptr.To(true),
-			Capabilities: &corev1.Capabilities{
-
-				Drop: []corev1.Capability{"ALL"},
-			},
-			SeccompProfile: &corev1.SeccompProfile{
-				Type: corev1.SeccompProfileTypeUnconfined,
-			},
-			ProcMount: ptr.To(corev1.UnmaskedProcMount),
-		},
-		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-		TerminationMessagePath:   "/dev/termination-log",
-	}
-}
-
 // renderContainerSlurmd renders [corev1.Container] for slurmd
 func renderContainerSlurmd(
 	container *values.Container,
 	jailSubMounts []slurmv1.NodeVolumeJailSubMount,
 	clusterName string,
+	cgroupVersion string,
 ) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountSlurmConfigs(),
@@ -110,26 +67,7 @@ func renderContainerSlurmd(
 		Name:            consts.ContainerNameSlurmd,
 		Image:           container.Image,
 		ImagePullPolicy: corev1.PullAlways, // TODO use digest and set to corev1.PullIfNotPresent
-		Env: []corev1.EnvVar{
-			{
-				Name: "K8S_POD_NAME",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						FieldPath: "metadata.name",
-					},
-				},
-			}, {
-				Name: "K8S_POD_NAMESPACE",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						FieldPath: "metadata.namespace",
-					},
-				},
-			}, {
-				Name:  "K8S_SERVICE_NAME",
-				Value: naming.BuildServiceName(consts.ComponentTypeWorker, clusterName),
-			},
-		},
+		Env:             renderSlurmdEnv(clusterName, cgroupVersion),
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,
 			ContainerPort: container.Port,
@@ -165,4 +103,34 @@ func renderContainerSlurmd(
 			Requests: container.Resources,
 		},
 	}
+}
+
+func renderSlurmdEnv(clusterName, cgroupVersion string) []corev1.EnvVar {
+	envVar := []corev1.EnvVar{
+		{
+			Name: "K8S_POD_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.name",
+				},
+			},
+		}, {
+			Name: "K8S_POD_NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.namespace",
+				},
+			},
+		}, {
+			Name:  "K8S_SERVICE_NAME",
+			Value: naming.BuildServiceName(consts.ComponentTypeWorker, clusterName),
+		},
+	}
+	if cgroupVersion == consts.CGroupV2 {
+		envVar = append(envVar, corev1.EnvVar{
+			Name:  consts.CGroupV2Env,
+			Value: "true",
+		})
+	}
+	return envVar
 }

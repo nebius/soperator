@@ -49,15 +49,6 @@ func RenderStatefulSet(
 	initContainers := []corev1.Container{
 		renderContainerToolkitValidation(&worker.ContainerToolkitValidation),
 	}
-	if worker.CgroupVersion == consts.CGroupV2 {
-		initContainers = append(
-			initContainers,
-			renderContainerCgroupMaker(&worker.CgroupMakerContainer),
-		)
-		annotations[fmt.Sprintf(
-			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameCgroupMaker,
-		)] = consts.AnnotationApparmorValueUnconfined
-	}
 	return appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      worker.StatefulSet.Name,
@@ -95,7 +86,7 @@ func RenderStatefulSet(
 					Tolerations:        nodeFilter.Tolerations,
 					InitContainers:     initContainers,
 					Containers: []corev1.Container{
-						renderContainerSlurmd(&worker.ContainerSlurmd, worker.JailSubMounts, clusterName),
+						renderContainerSlurmd(&worker.ContainerSlurmd, worker.JailSubMounts, clusterName, worker.CgroupVersion),
 						common.RenderContainerMunge(&worker.ContainerMunge),
 					},
 					Volumes: volumes,

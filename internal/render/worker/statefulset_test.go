@@ -77,7 +77,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 	workerCGroupV2 := workerCGroupV1
 	workerCGroupV2.CgroupVersion = consts.CGroupV2
 
-	result, _ = worker.RenderStatefulSet(testNamespace, testCluster, nodeFilter, secret, voluemSource, workerCGroupV2)
-	assert.True(t, len(result.Spec.Template.Spec.InitContainers) == 2)
-	assert.Equal(t, consts.ContainerNameCgroupMaker, result.Spec.Template.Spec.InitContainers[1].Name)
+	result, err = worker.RenderStatefulSet(testNamespace, testCluster, nodeFilter, secret, voluemSource, workerCGroupV2)
+	assert.NoError(t, err)
+	assert.Equal(t, consts.CGroupV2Env, result.Spec.Template.Spec.Containers[0].Env[3].Name)
 }
