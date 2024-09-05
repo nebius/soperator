@@ -34,8 +34,8 @@ IgnoreSystemd=yes`
 ConstrainCores=yes
 ConstrainDevices=yes
 ConstrainRAMSpace=yes
-ConstrainSwapSpace=yes
-CgroupPlugin=cgroup/v1`
+CgroupPlugin=cgroup/v1
+ConstrainSwapSpace=yes`
 	resV1 := generateCGroupConfig(clusterV1)
 	assert.Equal(t, expectedV1, resV1.Render())
 
