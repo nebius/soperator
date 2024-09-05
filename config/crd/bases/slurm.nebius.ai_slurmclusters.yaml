@@ -2788,6 +2788,9 @@ spec:
                     - slurmd
                     - volumes
                     type: object
+                    x-kubernetes-validations:
+                    - message: resources memory of slurmd must be bigger than sharedMemorySize
+                      rule: self.slurmd.resources.memory > self.volumes.sharedMemorySize
                 required:
                 - controller
                 - login
@@ -2830,6 +2833,10 @@ spec:
                           for Slurm NCCLBenchmark jobs
                         type: boolean
                     type: object
+                    x-kubernetes-validations:
+                    - message: Both OtelCollectorGrpcHost and OtelCollectorHttpHost
+                        cannot be set at the same time.
+                      rule: '!(has(self.otelCollectorGrpcHost) && has(self.otelCollectorHttpHost))'
                   openTelemetryCollector:
                     description: It has to be set to true if OpenTelemetry Operator
                       CRD is used
