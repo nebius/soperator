@@ -119,15 +119,16 @@ func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("ConstrainCores", "yes")
 	res.AddProperty("ConstrainDevices", "yes")
 	res.AddProperty("ConstrainRAMSpace", "yes")
-	if cluster.NodeWorker.CgroupVersion == consts.CGroupV2 {
+	switch cluster.NodeWorker.CgroupVersion {
+	case consts.CGroupV1:
+		res.AddProperty("CgroupPlugin", "cgroup/v1")
+		res.AddProperty("ConstrainSwapSpace", "yes")
+	case consts.CGroupV2:
 		res.AddProperty("CgroupPlugin", "cgroup/v2")
 		res.AddProperty("ConstrainSwapSpace", "no")
 		res.AddProperty("EnableControllers", "yes")
 		res.AddProperty("IgnoreSystemd", "yes")
-		return res
 	}
-	res.AddProperty("ConstrainSwapSpace", "yes")
-	res.AddProperty("CgroupPlugin", "cgroup/v1")
 	return res
 }
 
