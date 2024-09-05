@@ -24,8 +24,12 @@ func buildSlurmExporterFrom(
 	telemetry *slurmv1.Telemetry,
 	controller *slurmv1.SlurmNodeController,
 ) SlurmExporter {
+	var metricsPrometheus slurmv1.MetricsPrometheus
+	if telemetry != nil && telemetry.Prometheus != nil {
+		metricsPrometheus = *telemetry.Prometheus.DeepCopy()
+	}
 	return SlurmExporter{
-		MetricsPrometheus: *telemetry.Prometheus.DeepCopy(),
+		MetricsPrometheus: metricsPrometheus,
 		SlurmNode:         *controller.SlurmNode.DeepCopy(),
 		Name:              naming.BuildSlurmExporterName(clusterName),
 		ContainerMunge: buildContainerFrom(

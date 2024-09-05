@@ -39,6 +39,8 @@ const (
 	VolumeNameNCCLTopology   = ncclTopology
 	VolumeNameSharedMemory   = "dev-shm"
 	VolumeNameSysctl         = sysctl
+	VolumeNameProc           = "proc"
+	VolumeNameCgroup         = "cgroup"
 
 	VolumeMountPathSlurmConfigs      = "/mnt/" + slurmConfigs
 	VolumeMountPathSpool             = "/var/" + spool
@@ -58,4 +60,6 @@ const (
 	VolumeMountPathSharedMemory      = "/dev/shm"
 	VolumeMountPathSysctl            = "/etc/" + sysctlConfFile
 	VolumeMountSubPathSysctl         = sysctlConfFile
+	VolumeMountPathProc              = "/proc"
+	VolumeMountPathCgroup            = "/sys/fs/cgroup"
 )

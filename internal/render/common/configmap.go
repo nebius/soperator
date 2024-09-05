@@ -27,7 +27,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) (corev1.ConfigMap
 		},
 		Data: map[string]string{
 			consts.ConfigMapKeySlurmConfig:  generateSlurmConfig(cluster).Render(),
-			consts.ConfigMapKeyCGroupConfig: generateCGroupConfig().Render(),
+			consts.ConfigMapKeyCGroupConfig: generateCGroupConfig(cluster).Render(),
 			consts.ConfigMapKeySpankConfig:  generateSpankConfig().Render(),
 			consts.ConfigMapKeyGresConfig:   generateGresConfig().Render(),
 		},
@@ -113,14 +113,22 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	return res
 }
 
-func generateCGroupConfig() renderutils.ConfigFile {
+func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
-	res.AddProperty("CgroupPlugin", "cgroup/v1")
 	res.AddProperty("CgroupMountpoint", "/sys/fs/cgroup")
 	res.AddProperty("ConstrainCores", "yes")
 	res.AddProperty("ConstrainDevices", "yes")
 	res.AddProperty("ConstrainRAMSpace", "yes")
-	res.AddProperty("ConstrainSwapSpace", "yes")
+	switch cluster.NodeWorker.CgroupVersion {
+	case consts.CGroupV1:
+		res.AddProperty("CgroupPlugin", "cgroup/v1")
+		res.AddProperty("ConstrainSwapSpace", "yes")
+	case consts.CGroupV2:
+		res.AddProperty("CgroupPlugin", "cgroup/v2")
+		res.AddProperty("ConstrainSwapSpace", "no")
+		res.AddProperty("EnableControllers", "yes")
+		res.AddProperty("IgnoreSystemd", "yes")
+	}
 	return res
 }
 

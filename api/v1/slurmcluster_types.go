@@ -328,6 +328,10 @@ type SlurmNodeControllerVolumes struct {
 	Jail NodeVolume `json:"jail"`
 }
 
+// Add XValidation to enforce the rule:
+//
+// If CgroupVersion is "v2", InitContainer must not be null
+// +kubebuilder:validation:XValidation:rule="self.cgroupVersion == 'v2' ? self.cgroupMakerContainer != null : true",message="cgroupMakerContainer must be set if CgroupVersion is 'v2'"
 // SlurmNodeWorker defines the configuration for the Slurm worker node
 type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
@@ -346,6 +350,17 @@ type SlurmNodeWorker struct {
 	//
 	// +kubebuilder:validation:Required
 	Volumes SlurmNodeWorkerVolumes `json:"volumes"`
+	// CgroupVersion defines the version of the cgroup
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="v2"
+	// +kubebuilder:validation:Enum="v1";"v2"
+	CgroupVersion string `json:"cgroupVersion,omitempty"`
+	// CgroupMakerContainer create system.slice for cgroup v2
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={image:"busybox:latest"}
+	CgroupMakerContainer NodeContainer `json:"cgroupMakerContainer"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node
@@ -386,6 +401,7 @@ type SlurmNodeLogin struct {
 	Munge NodeContainer `json:"munge"`
 
 	// SshdServiceType represents the service type for the SSH daemon
+	// Must be one of [corev1.ServiceTypeLoadBalancer] or [corev1.ServiceTypeNodePort]
 	//
 	// +kubebuilder:validation:Required
 	SshdServiceType corev1.ServiceType `json:"sshdServiceType"`
@@ -404,6 +420,12 @@ type SlurmNodeLogin struct {
 	//
 	// +kubebuilder:validation:Optional
 	SshdServiceLoadBalancerIP string `json:"sshdServiceLoadBalancerIP,omitempty"`
+
+	// SshdServiceNodePort represents the port to be opened on nodes in case of NodePort type of service
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=0
+	SshdServiceNodePort int32 `json:"sshdServiceNodePort,omitempty"`
 
 	// Volumes represents the volume configurations for the login node
 	//
@@ -520,9 +542,9 @@ type MetricsOpenTelemetryCollector struct {
 	//
 	// +kubebuilder:default=1
 	ReplicasOtelCollector int32 `json:"replicasOtelCollector,omitempty"`
-	// Specifies the port for OtelCollector, default value: 4317
+	// Specifies the port for OtelCollector
 	//
-	// kubebuilder:default=4317
+	// +kubebuilder:default=4317
 	OtelCollectorPort int32 `json:"otelCollectorPort,omitempty"`
 }
 
@@ -571,7 +593,7 @@ type JobsTelemetry struct {
 	// +kubebuilder:validation:Optional
 	OtelCollectorHttpHost *string `json:"otelCollectorHttpHost,omitempty"`
 
-	// Specifies the port for OtelCollector, default value: 4317
+	// Specifies the port for OtelCollector
 	//
 	// +kubebuilder:default=4317
 	OtelCollectorPort int32 `json:"otelCollectorPort,omitempty"`

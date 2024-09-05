@@ -38,6 +38,7 @@ type Service struct {
 	Type           corev1.ServiceType
 	Annotations    map[string]string
 	LoadBalancerIP string
+	NodePort       int32
 	Protocol       corev1.Protocol
 }
 
@@ -49,6 +50,7 @@ func buildServiceFrom(
 		Type:           corev1.ServiceTypeClusterIP,
 		Annotations:    map[string]string{},
 		LoadBalancerIP: "",
+		NodePort:       0,
 		Protocol:       corev1.ProtocolTCP,
 	}
 }

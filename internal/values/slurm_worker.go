@@ -16,6 +16,9 @@ type SlurmWorker struct {
 	ContainerToolkitValidation Container
 	ContainerSlurmd            Container
 	ContainerMunge             Container
+	CgroupMakerContainer       Container
+
+	CgroupVersion string
 
 	Service     Service
 	StatefulSet StatefulSet
@@ -44,6 +47,10 @@ func buildSlurmWorkerFrom(
 			worker.Slurmd,
 			consts.ContainerNameSlurmd,
 		),
+		CgroupMakerContainer: buildContainerFrom(
+			worker.CgroupMakerContainer,
+			consts.ContainerNameCgroupMaker,
+		),
 		ContainerMunge: buildContainerFrom(
 			worker.Munge,
 			consts.ContainerNameMunge,
@@ -56,6 +63,7 @@ func buildSlurmWorkerFrom(
 		VolumeSpool:      *worker.Volumes.Spool.DeepCopy(),
 		VolumeJail:       *worker.Volumes.Jail.DeepCopy(),
 		SharedMemorySize: worker.Volumes.SharedMemorySize,
+		CgroupVersion:    worker.CgroupVersion,
 	}
 	for _, jailSubMount := range worker.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()

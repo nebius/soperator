@@ -27,6 +27,7 @@ func buildSlurmLoginFrom(clusterName string, login *slurmv1.SlurmNodeLogin) Slur
 	svc.Type = login.SshdServiceType
 	svc.Annotations = login.SshdServiceAnnotations
 	svc.LoadBalancerIP = login.SshdServiceLoadBalancerIP
+	svc.NodePort = login.SshdServiceNodePort
 
 	res := SlurmLogin{
 		SlurmNode: *login.SlurmNode.DeepCopy(),
