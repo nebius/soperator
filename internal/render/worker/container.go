@@ -43,6 +43,50 @@ func renderContainerToolkitValidation(container *values.Container) corev1.Contai
 	}
 }
 
+func renderContainerCgroupMaker(container *values.Container) corev1.Container {
+	return corev1.Container{
+		Name:            consts.ContainerNameCgroupMaker,
+		Image:           container.Image,
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Resources: corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceMemory: *container.Resources.Memory(),
+			},
+			Requests: container.Resources,
+		},
+		Command: []string{
+			"sh",
+		},
+		Args: []string{
+			"-c",
+			strings.Join(
+				[]string{
+					`export CGROUP_PATH=$(cat /proc/self/cgroup | awk -F'/' '{print "/"$2"/"$3"/"$4}');`,
+					`if [ -n "${CGROUP_PATH}" ]; then`,
+					`echo "cgroup v2 detected, creating cgroup for ${CGROUP_PATH}";`,
+					`mkdir -p /sys/fs/cgroup/${CGROUP_PATH}/system.slice;`,
+					`fi`,
+				},
+				" ",
+			),
+		},
+
+		SecurityContext: &corev1.SecurityContext{
+			Privileged: ptr.To(true),
+			Capabilities: &corev1.Capabilities{
+
+				Drop: []corev1.Capability{"ALL"},
+			},
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeUnconfined,
+			},
+			ProcMount: ptr.To(corev1.UnmaskedProcMount),
+		},
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+		TerminationMessagePath:   "/dev/termination-log",
+	}
+}
+
 // renderContainerSlurmd renders [corev1.Container] for slurmd
 func renderContainerSlurmd(
 	container *values.Container,

@@ -2254,6 +2254,39 @@ spec:
                   worker:
                     description: Worker represents the Slurm worker node configuration
                     properties:
+                      cgroupMakerContainer:
+                        default:
+                          image: busybox:latest
+                        description: CgroupMakerContainer create system.slice for
+                          cgroup v2
+                        properties:
+                          image:
+                            description: Image defines the container image
+                            type: string
+                          port:
+                            description: Port defines the port the container exposes
+                            format: int32
+                            type: integer
+                          resources:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: Resources defines the [corev1.ResourceRequirements]
+                              for the container
+                            type: object
+                        required:
+                        - image
+                        type: object
+                      cgroupVersion:
+                        default: v2
+                        description: CgroupVersion defines the version of the cgroup
+                        enum:
+                        - v1
+                        - v2
+                        type: string
                       k8sNodeFilterName:
                         description: |-
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
@@ -2781,6 +2814,11 @@ spec:
                     - slurmd
                     - volumes
                     type: object
+                    x-kubernetes-validations:
+                    - message: cgroupMakerContainer must be set if CgroupVersion is
+                        'v2'
+                      rule: 'self.cgroupVersion == ''v2'' ? self.cgroupMakerContainer
+                        != null : true'
                 required:
                 - controller
                 - login
