@@ -2,6 +2,7 @@ package values
 
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"

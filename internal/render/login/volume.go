@@ -177,7 +177,7 @@ func renderVolumeSecurityLimits(clusterName string) corev1.Volume {
 		VolumeSource: corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{
 				LocalObjectReference: corev1.LocalObjectReference{
-					Name: naming.BuildConfigMapSecurityLimitsName(clusterName),
+					Name: naming.BuildConfigMapSecurityLimitsName(consts.ComponentTypeLogin, clusterName),
 				},
 			},
 		},

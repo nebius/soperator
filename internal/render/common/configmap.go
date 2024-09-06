@@ -144,3 +144,56 @@ func generateGresConfig() renderutils.ConfigFile {
 	res.AddProperty("AutoDetect", "nvml")
 	return res
 }
+
+// region Security limits
+
+// RenderConfigMapSecurityLimits renders new [corev1.ConfigMap] containing security limits config file
+func RenderConfigMapSecurityLimits(componentType consts.ComponentType, cluster *values.SlurmCluster) corev1.ConfigMap {
+	var data string
+	switch componentType {
+	case consts.ComponentTypeLogin:
+		data = cluster.NodeLogin.ContainerSshd.NodeContainer.SecurityLimitsConfig
+		if data == "" {
+			data = generateDefaultSecurityLimitsConfig().Render()
+		}
+	case consts.ComponentTypeWorker:
+		data = cluster.NodeWorker.ContainerSlurmd.NodeContainer.SecurityLimitsConfig
+		if data == "" {
+			data = generateDefaultSecurityLimitsConfig().Render()
+		}
+	case consts.ComponentTypeController:
+		data = cluster.NodeController.ContainerSlurmctld.NodeContainer.SecurityLimitsConfig
+	//case consts.ComponentTypeExporter:
+	//	data = cluster.SlurmExporter.
+	case consts.ComponentTypeBenchmark:
+		data = cluster.NCCLBenchmark.ContainerNCCLBenchmark.NodeContainer.SecurityLimitsConfig
+	default:
+		data = ""
+	}
+
+	if data == "" {
+		return corev1.ConfigMap{}
+	}
+
+	return corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      naming.BuildConfigMapSecurityLimitsName(componentType, cluster.Name),
+			Namespace: cluster.Namespace,
+			Labels:    RenderLabels(componentType, cluster.Name),
+		},
+		Data: map[string]string{
+			consts.ConfigMapKeySecurityLimits: data,
+		},
+	}
+}
+
+func generateDefaultSecurityLimitsConfig() renderutils.ConfigFile {
+	res := &renderutils.MultilineStringConfig{}
+	res.AddLine("*       soft    memlock     unlimited")
+	res.AddLine("*       hard    memlock     unlimited")
+	res.AddLine("*       soft    nofile      1048576")
+	res.AddLine("*       hard    nofile      1048576")
+	return res
+}
+
+// endregion Security limits

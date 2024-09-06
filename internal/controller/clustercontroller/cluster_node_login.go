@@ -15,8 +15,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
+	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/render/login"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
@@ -126,17 +128,17 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
 
-					desired, err := login.RenderConfigMapSecurityLimits(clusterValues)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering login Security limits ConfigMap")
+					if clusterValues.NodeLogin.ContainerSshd.NodeContainer.SecurityLimitsConfig == "" {
+						return nil
 					}
+
+					desired := common.RenderConfigMapSecurityLimits(consts.ComponentTypeLogin, clusterValues)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err = r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+					if err := r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling login Security limits ConfigMap")
+						return errors.Wrap(err, "reconciling login security limits configmap")
 					}
 					stepLogger.Info("Reconciled")
 
