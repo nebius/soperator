@@ -1,4 +1,4 @@
-package common_test
+package prometheus_test
 
 import (
 	"testing"
@@ -11,42 +11,9 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/render/common"
+	slurmprometheus "nebius.ai/slurm-operator/internal/render/prometheus"
 	"nebius.ai/slurm-operator/internal/values"
 )
-
-var defaultNodeFilter = []slurmv1.K8sNodeFilter{
-	{
-		Name: "test-node-filter",
-		Affinity: &corev1.Affinity{
-			NodeAffinity: &corev1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-					NodeSelectorTerms: []corev1.NodeSelectorTerm{
-						{
-							MatchExpressions: []corev1.NodeSelectorRequirement{
-								{
-									Key:      "key",
-									Operator: corev1.NodeSelectorOpIn,
-									Values:   []string{"value"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		NodeSelector: map[string]string{
-			"key": "value",
-		},
-		Tolerations: []corev1.Toleration{
-			{
-				Key:      "key",
-				Operator: corev1.TolerationOpExists,
-				Effect:   corev1.TaintEffectNoSchedule,
-			},
-		},
-	},
-}
 
 var volumeSources = []slurmv1.VolumeSource{
 	{
@@ -146,7 +113,7 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 		},
 	}
 
-	result := common.BasePodTemplateSpec(clusterName, munge, podParams, defaultNodeFilter, volumeSources, matchLabels)
+	result := slurmprometheus.BasePodTemplateSpec(clusterName, munge, podParams, defaultNodeFilter, volumeSources, matchLabels)
 
 	assert.Equal(t, expected.Labels, result.Labels)
 
@@ -245,7 +212,7 @@ func Test_RenderPodTemplateSpec(t *testing.T) {
 		},
 	}
 
-	result := common.RenderPodTemplateSpec(clusterName, munge, podParams, defaultNodeFilter, volumeSources, matchLabels, podTemplateSpec)
+	result := slurmprometheus.RenderPodTemplateSpec(clusterName, munge, podParams, defaultNodeFilter, volumeSources, matchLabels, podTemplateSpec)
 
 	assert.Equal(t, expected.Labels, result.Labels)
 
