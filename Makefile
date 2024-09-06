@@ -178,6 +178,7 @@ sync-version: yq ## Sync versions from file
 	@echo 'Syncing helm/slurm-cluster/values.yaml'
 	@$(YQ) -i ".images.ncclBenchmark = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/nccl_benchmark:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.slurmctld = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/controller_slurmctld:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.slurmdbd = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/controller_slurmdbd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.slurmd = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/worker_slurmd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.sshd = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/login_sshd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.munge = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/munge:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
