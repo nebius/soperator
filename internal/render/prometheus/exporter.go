@@ -55,7 +55,7 @@ func RenderDeploymentExporter(
 			Selector: &metav1.LabelSelector{
 				MatchLabels: matchLabels,
 			},
-			Template: common.RenderPodTemplateSpec(
+			Template: RenderPodTemplateSpec(
 				clusterName,
 				&valuesExporter.ContainerMunge,
 				valuesExporter,
