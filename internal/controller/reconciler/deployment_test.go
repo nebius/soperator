@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func Test_IsControllerOwnerExporter(t *testing.T) {
+func Test_IsControllerOwnerDeployment(t *testing.T) {
 	defaultNameCluster := "test-cluster"
 
 	cluster := &slurmv1.SlurmCluster{
@@ -25,7 +25,7 @@ func Test_IsControllerOwnerExporter(t *testing.T) {
 	}
 
 	t.Run("controller is owner", func(t *testing.T) {
-		slurmExporter := &appsv1.Deployment{
+		slurmDeployment := &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -36,13 +36,13 @@ func Test_IsControllerOwnerExporter(t *testing.T) {
 			},
 		}
 
-		isOwner := isControllerOwnerExporter(slurmExporter, cluster)
+		isOwner := isControllerOwnerDeployment(slurmDeployment, cluster)
 
 		assert.True(t, isOwner)
 	})
 
 	t.Run("controller is not owner", func(t *testing.T) {
-		slurmExporter := &appsv1.Deployment{
+		slurmDeployment := &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -53,13 +53,13 @@ func Test_IsControllerOwnerExporter(t *testing.T) {
 			},
 		}
 
-		isOwner := isControllerOwnerExporter(slurmExporter, cluster)
+		isOwner := isControllerOwnerDeployment(slurmDeployment, cluster)
 
 		assert.False(t, isOwner)
 	})
 }
 
-func Test_GetExporter(t *testing.T) {
+func Test_GetDeployment(t *testing.T) {
 	defaultNamespace := "test-namespace"
 	defaultNameCluster := "test-cluster"
 
@@ -74,7 +74,7 @@ func Test_GetExporter(t *testing.T) {
 		expectErr  bool
 	}{
 		{
-			name: "Exporter exists",
+			name: "Deployment exists",
 			cluster: &slurmv1.SlurmCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      defaultNameCluster,
@@ -98,7 +98,7 @@ func Test_GetExporter(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name: "Exporter does not exist",
+			name: "Deployment does not exist",
 			cluster: &slurmv1.SlurmCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      defaultNameCluster,
@@ -109,7 +109,7 @@ func Test_GetExporter(t *testing.T) {
 			expectErr:  false,
 		},
 		{
-			name: "Error getting Exporter",
+			name: "Error getting Deployment",
 			cluster: &slurmv1.SlurmCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      defaultNameCluster,
@@ -131,7 +131,7 @@ func Test_GetExporter(t *testing.T) {
 
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 
-			r := &SlurmExporterReconciler{
+			r := &DeploymentReconciler{
 				Reconciler: &Reconciler{
 					Client: fakeClient,
 					Scheme: scheme,
@@ -145,7 +145,7 @@ func Test_GetExporter(t *testing.T) {
 
 			// Run the test
 			ctx := context.TODO()
-			slurmExporter, err := r.getExporter(ctx, tt.cluster)
+			slurmDeployment, err := r.getDeployment(ctx, tt.cluster)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -155,19 +155,19 @@ func Test_GetExporter(t *testing.T) {
 
 			switch {
 			case tt.existingPM != nil:
-				assert.Equal(t, tt.existingPM.Name, slurmExporter.Name)
-				assert.Equal(t, tt.existingPM.Namespace, slurmExporter.Namespace)
-			case slurmExporter != nil:
-				assert.Equal(t, "", slurmExporter.Name)
-				assert.Equal(t, "", slurmExporter.Namespace)
+				assert.Equal(t, tt.existingPM.Name, slurmDeployment.Name)
+				assert.Equal(t, tt.existingPM.Namespace, slurmDeployment.Namespace)
+			case slurmDeployment != nil:
+				assert.Equal(t, "", slurmDeployment.Name)
+				assert.Equal(t, "", slurmDeployment.Namespace)
 			default:
-				assert.Nil(t, slurmExporter)
+				assert.Nil(t, slurmDeployment)
 			}
 		})
 	}
 }
 
-func Test_DeleteExporterOwnedByController(t *testing.T) {
+func Test_DeleteDeploymentOwnedByController(t *testing.T) {
 	defaultNamespace := "test-namespace"
 	defaultNameCluster := "test-cluster"
 
@@ -176,20 +176,20 @@ func Test_DeleteExporterOwnedByController(t *testing.T) {
 	_ = appsv1.AddToScheme(scheme)
 
 	tests := []struct {
-		name          string
-		cluster       *slurmv1.SlurmCluster
-		slurmExporter *appsv1.Deployment
-		expectErr     bool
+		name            string
+		cluster         *slurmv1.SlurmCluster
+		slurmDeployment *appsv1.Deployment
+		expectErr       bool
 	}{
 		{
-			name: "Exporter deleted successfully",
+			name: "Deployment deleted successfully",
 			cluster: &slurmv1.SlurmCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      defaultNameCluster,
 					Namespace: defaultNamespace,
 				},
 			},
-			slurmExporter: &appsv1.Deployment{
+			slurmDeployment: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      defaultNameCluster,
 					Namespace: defaultNamespace,
@@ -198,14 +198,14 @@ func Test_DeleteExporterOwnedByController(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name: "Error deleting Exporter",
+			name: "Error deleting Deployment",
 			cluster: &slurmv1.SlurmCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      defaultNameCluster,
 					Namespace: defaultNamespace,
 				},
 			},
-			slurmExporter: &appsv1.Deployment{
+			slurmDeployment: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      defaultNameCluster,
 					Namespace: defaultNamespace,
@@ -218,10 +218,10 @@ func Test_DeleteExporterOwnedByController(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up the fake client
-			objs := []runtime.Object{tt.slurmExporter}
+			objs := []runtime.Object{tt.slurmDeployment}
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 
-			r := &SlurmExporterReconciler{
+			r := &DeploymentReconciler{
 				Reconciler: &Reconciler{
 					Client: fakeClient,
 					Scheme: scheme,
@@ -235,7 +235,7 @@ func Test_DeleteExporterOwnedByController(t *testing.T) {
 
 			// Run the test
 			ctx := context.TODO()
-			err := r.deleteExporterOwnedByController(ctx, tt.cluster, tt.slurmExporter)
+			err := r.deleteDeploymentOwnedByController(ctx, tt.cluster, tt.slurmDeployment)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -244,8 +244,8 @@ func Test_DeleteExporterOwnedByController(t *testing.T) {
 
 				// Verify the pod monitor was deleted
 				err = fakeClient.Get(ctx, types.NamespacedName{
-					Namespace: tt.slurmExporter.Namespace,
-					Name:      tt.slurmExporter.Name,
+					Namespace: tt.slurmDeployment.Namespace,
+					Name:      tt.slurmDeployment.Name,
 				}, &appsv1.Deployment{})
 				assert.True(t, apierrors.IsNotFound(err))
 			}
