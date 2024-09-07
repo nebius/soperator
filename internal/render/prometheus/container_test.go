@@ -1,4 +1,4 @@
-package common_test
+package prometheus_test
 
 import (
 	"testing"
@@ -11,7 +11,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/render/common"
+	. "nebius.ai/slurm-operator/internal/render/prometheus"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -42,7 +42,7 @@ func Test_RenderContainerExporter(t *testing.T) {
 		},
 	}
 
-	result := common.RenderContainerExporter(containerParams)
+	result := RenderContainerExporter(containerParams)
 
 	if _, ok := result.Resources.Limits[corev1.ResourceCPU]; ok {
 		t.Errorf("ResourceCPU should not be set")

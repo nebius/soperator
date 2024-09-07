@@ -61,7 +61,7 @@ func BasePodTemplateSpec(
 			NodeSelector: nodeSelector,
 			Containers: []corev1.Container{
 				common.RenderContainerMunge(munge),
-				common.RenderContainerExporter(valuesExporter),
+				RenderContainerExporter(valuesExporter),
 			},
 			Volumes: volumes,
 		},
