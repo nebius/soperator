@@ -149,30 +149,31 @@ func generateGresConfig() renderutils.ConfigFile {
 
 // RenderConfigMapSecurityLimits renders new [corev1.ConfigMap] containing security limits config file
 func RenderConfigMapSecurityLimits(componentType consts.ComponentType, cluster *values.SlurmCluster) corev1.ConfigMap {
-	var data string
+	data := generateEmptySecurityLimitsConfig().Render()
+
 	switch componentType {
 	case consts.ComponentTypeLogin:
-		data = cluster.NodeLogin.ContainerSshd.NodeContainer.SecurityLimitsConfig
-		if data == "" {
+		limits := cluster.NodeLogin.ContainerSshd.NodeContainer.SecurityLimitsConfig
+		if limits == "" {
 			data = generateDefaultSecurityLimitsConfig().Render()
 		}
 	case consts.ComponentTypeWorker:
-		data = cluster.NodeWorker.ContainerSlurmd.NodeContainer.SecurityLimitsConfig
-		if data == "" {
+		limits := cluster.NodeWorker.ContainerSlurmd.NodeContainer.SecurityLimitsConfig
+		if limits == "" {
 			data = generateDefaultSecurityLimitsConfig().Render()
 		}
 	case consts.ComponentTypeController:
-		data = cluster.NodeController.ContainerSlurmctld.NodeContainer.SecurityLimitsConfig
+		limits := cluster.NodeController.ContainerSlurmctld.NodeContainer.SecurityLimitsConfig
+		if limits == "" {
+			data = limits
+		}
 	//case consts.ComponentTypeExporter:
 	//	data = cluster.SlurmExporter.
 	case consts.ComponentTypeBenchmark:
-		data = cluster.NCCLBenchmark.ContainerNCCLBenchmark.NodeContainer.SecurityLimitsConfig
-	default:
-		data = generateEmptySecurityLimitsConfig().Render()
-	}
-
-	if data == "" {
-		data = generateEmptySecurityLimitsConfig().Render()
+		limits := cluster.NCCLBenchmark.ContainerNCCLBenchmark.NodeContainer.SecurityLimitsConfig
+		if limits == "" {
+			data = limits
+		}
 	}
 
 	return corev1.ConfigMap{
