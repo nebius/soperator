@@ -60,12 +60,13 @@ OPERATOR_IMAGE_TAG  = $(VERSION)
 ifeq ($(shell uname), Darwin)
     SHA_CMD = shasum -a 256
     SED_COMMAND = sed -i '' -e
+    USER_MAIL					= $(shell git config user.email)
 else
     SHA_CMD = sha256sum
     SED_COMMAND = sed -i -e
+    USER_MAIL					= $(shell git log -1 --pretty=format:'%ae')
 endif
 ifeq ($(UNSTABLE), true)
-	USER_MAIL					= $(shell git log -1 --pretty=format:'%ae')
     SHORT_SHA 					= $(shell echo -n "$(USER_MAIL)-$(VERSION)" | $(SHA_CMD) | cut -c1-8)
     CONTAINER_REGISTRY_ID  		= $(CONTAINER_REGISTRY_UNSTABLE_ID)
     CONTAINER_REGISTRY_HELM_ID 	= $(CONTAINER_REGISTRY_HELM_UNSTABLE_ID)

@@ -158,3 +158,5 @@ func generateSysctlConfig() renderutils.ConfigFile {
 }
 
 // endregion Sysctl
+
+// region Security limits
