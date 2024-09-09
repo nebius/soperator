@@ -90,10 +90,6 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
 
-					if clusterValues.NodeWorker.ContainerSlurmd.NodeContainer.SecurityLimitsConfig == "" {
-						return nil
-					}
-
 					desired := common.RenderConfigMapSecurityLimits(consts.ComponentTypeWorker, clusterValues)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")

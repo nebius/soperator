@@ -38,10 +38,6 @@ func (r SlurmClusterReconciler) ReconcileNCCLBenchmark(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
 
-					if clusterValues.NCCLBenchmark.ContainerNCCLBenchmark.NodeContainer.SecurityLimitsConfig == "" {
-						return nil
-					}
-
 					desired := common.RenderConfigMapSecurityLimits(consts.ComponentTypeBenchmark, clusterValues)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")

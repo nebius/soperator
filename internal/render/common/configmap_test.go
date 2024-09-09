@@ -129,8 +129,8 @@ func TestRenderConfigMapSecurityLimits(t *testing.T) {
 				},
 			},
 			componentType: consts.ComponentTypeController,
-			expectedData:  "",
-			expectedLabel: "",
+			expectedData:  "#Empty security limits file",
+			expectedLabel: "controller",
 		},
 		{
 			name: "Controller custom security limits",

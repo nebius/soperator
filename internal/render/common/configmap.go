@@ -168,11 +168,11 @@ func RenderConfigMapSecurityLimits(componentType consts.ComponentType, cluster *
 	case consts.ComponentTypeBenchmark:
 		data = cluster.NCCLBenchmark.ContainerNCCLBenchmark.NodeContainer.SecurityLimitsConfig
 	default:
-		data = ""
+		data = generateEmptySecurityLimitsConfig().Render()
 	}
 
 	if data == "" {
-		return corev1.ConfigMap{}
+		data = generateEmptySecurityLimitsConfig().Render()
 	}
 
 	return corev1.ConfigMap{
@@ -193,6 +193,12 @@ func generateDefaultSecurityLimitsConfig() renderutils.ConfigFile {
 	res.AddLine("*       hard    memlock     unlimited")
 	res.AddLine("*       soft    nofile      1048576")
 	res.AddLine("*       hard    nofile      1048576")
+	return res
+}
+
+func generateEmptySecurityLimitsConfig() renderutils.ConfigFile {
+	res := &renderutils.MultilineStringConfig{}
+	res.AddLine("#Empty security limits file")
 	return res
 }
 
