@@ -78,7 +78,7 @@ type SlurmClusterReconciler struct {
 	RoleBinding    *reconciler.RoleBindingReconciler
 	Otel           *reconciler.OtelReconciler
 	PodMonitor     *reconciler.PodMonitorReconciler
-	SlurmExporter  *reconciler.SlurmExporterReconciler
+	Deployment     *reconciler.DeploymentReconciler
 }
 
 func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *SlurmClusterReconciler {
@@ -98,7 +98,7 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 		RoleBinding:     reconciler.NewRoleBindingReconciler(r),
 		Otel:            reconciler.NewOtelReconciler(r),
 		PodMonitor:      reconciler.NewPodMonitorReconciler(r),
-		SlurmExporter:   reconciler.NewSlurmExporterReconciler(r),
+		Deployment:      reconciler.NewDeploymentReconciler(r),
 	}
 }
 
