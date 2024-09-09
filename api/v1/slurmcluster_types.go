@@ -328,11 +328,8 @@ type SlurmNodeControllerVolumes struct {
 	Jail NodeVolume `json:"jail"`
 }
 
-// Add XValidation to enforce the rule:
-//
-// If CgroupVersion is "v2", InitContainer must not be null
-// +kubebuilder:validation:XValidation:rule="self.cgroupVersion == 'v2' ? self.cgroupMakerContainer != null : true",message="cgroupMakerContainer must be set if CgroupVersion is 'v2'"
 // SlurmNodeWorker defines the configuration for the Slurm worker node
+// +kubebuilder:validation:XValidation:rule="self.slurmd.resources.memory > self.volumes.sharedMemorySize",message="resources memory of slurmd must be bigger than sharedMemorySize"
 type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
 
@@ -356,11 +353,6 @@ type SlurmNodeWorker struct {
 	// +kubebuilder:default="v2"
 	// +kubebuilder:validation:Enum="v1";"v2"
 	CgroupVersion string `json:"cgroupVersion,omitempty"`
-	// CgroupMakerContainer create system.slice for cgroup v2
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={image:"busybox:latest"}
-	CgroupMakerContainer NodeContainer `json:"cgroupMakerContainer"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node
@@ -474,6 +466,14 @@ type NodeContainer struct {
 	//
 	// +kubebuilder:validation:Optional
 	Resources corev1.ResourceList `json:"resources,omitempty"`
+
+	// SecurityLimitsConfig represents multiline limits.conf
+	// format of a string should be: '* <soft|hard> <item> <value>'
+	// example: '* soft nofile 1024'
+	//
+	// +kubebuilder:validation:Pattern=`(^\s*\*\s+(soft|hard)\s+\w+\s+\d+\s*$)?`
+	// +kubebuilder:validation:XValidation:rule="self == '' || self.split('\\n').all(line.matches('^\\\\s*\\\\*\\\\s+(soft|hard)\\\\s+\\\\w+\\\\s+\\\\d+\\\\s*$'))",message="Each line must match the pattern '* <soft|hard> <item> <value>'"
+	SecurityLimitsConfig string `json:"securityLimitsConfig,omitempty"`
 }
 
 // NodeVolume defines the configuration for a node volume.
@@ -572,6 +572,9 @@ type MetricsPrometheus struct {
 	PodMonitorConfig PodMonitorConfig `json:"podMonitorConfig,omitempty"`
 }
 
+// XValidation: both OtelCollectorGrpcHost and OtelCollectorHttpHost cannot have values at the same time
+//
+// +kubebuilder:validation:XValidation:rule="!(has(self.otelCollectorGrpcHost) && has(self.otelCollectorHttpHost))",message="Both OtelCollectorGrpcHost and OtelCollectorHttpHost cannot be set at the same time."
 type JobsTelemetry struct {
 	// Defines whether to send Kubernetes events for Slurm NCCLBenchmark jobs
 	//

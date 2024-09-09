@@ -117,10 +117,11 @@ func BuildConfigMapSshRootPublicKeysName(clusterName string) string {
 	}.String()
 }
 
-func BuildConfigMapSecurityLimitsName(clusterName string) string {
+func BuildConfigMapSecurityLimitsName(componentType consts.ComponentType, clusterName string) string {
 	return namedEntity{
-		clusterName: clusterName,
-		entity:      consts.ConfigMapNameSecurityLimits,
+		componentType: &componentType,
+		clusterName:   clusterName,
+		entity:        consts.ConfigMapNameSecurityLimits,
 	}.String()
 }
 

@@ -10,9 +10,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/benchmark"
+	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
@@ -28,7 +30,29 @@ func (r SlurmClusterReconciler) ReconcileNCCLBenchmark(
 	reconcileNCCLBenchmarkImpl := func() error {
 		return utils.ExecuteMultiStep(ctx,
 			"Reconciliation of NCCL benchmark",
-			utils.MultiStepExecutionStrategyFailAtFirstError, utils.MultiStepExecutionStep{
+			utils.MultiStepExecutionStrategyFailAtFirstError,
+
+			utils.MultiStepExecutionStep{
+				Name: "Slurm NCCL Benchmark Security limits ConfigMap",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					desired := common.RenderConfigMapSecurityLimits(consts.ComponentTypeBenchmark, clusterValues)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
+
+					if err := r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling nccl benchmark security limits configmap")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+
+			utils.MultiStepExecutionStep{
 				Name: "NCCL benchmark CronJob",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)

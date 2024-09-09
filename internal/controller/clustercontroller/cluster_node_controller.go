@@ -15,8 +15,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
+	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/render/controller"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
@@ -34,6 +36,27 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 		return utils.ExecuteMultiStep(ctx,
 			"Reconciliation of Slurm Controllers",
 			utils.MultiStepExecutionStrategyCollectErrors,
+
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Controller Security limits ConfigMap",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					desired := common.RenderConfigMapSecurityLimits(consts.ComponentTypeController, clusterValues)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
+
+					if err := r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling controller security limits configmap")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+
 			utils.MultiStepExecutionStep{
 				Name: "Slurm Controller Service",
 				Func: func(stepCtx context.Context) error {

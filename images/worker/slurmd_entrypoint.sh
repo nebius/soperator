@@ -2,6 +2,18 @@
 
 set -e # Exit immediately if any command returns a non-zero error code
 
+echo "Starting slurmd entrypoint script"
+if [ -n "${CGROUP_V2}" ]; then
+    CGROUP_PATH=$(cat /proc/self/cgroup | awk -F'/' '{print "/"$2"/"$3"/"$4}')
+    if [ -n "${CGROUP_PATH}" ]; then
+        echo "cgroup v2 detected, creating cgroup for ${CGROUP_PATH}"
+		mkdir -p /sys/fs/cgroup/${CGROUP_PATH}/system.slice
+    else
+        echo "cgroup v2 detected, but cgroup path is empty"
+        exit 1
+    fi
+fi
+
 echo "Link users from jail"
 ln -s /mnt/jail/etc/passwd /etc/passwd
 ln -s /mnt/jail/etc/group /etc/group
@@ -22,10 +34,6 @@ echo "Create NVML symlink with the name expected by Slurm"
 pushd /usr/lib/x86_64-linux-gnu
     ln -s libnvidia-ml.so.1 libnvidia-ml.so
 popd
-
-echo "Set ulimits"
-ulimit -Hl unlimited && ulimit -Sl unlimited # max locked memory (needed for Infiniband RDMA to work)
-ulimit -Hn 1048576 && ulimit -Sn 1048576 # number of open files
 
 echo "Apply sysctl limits from /etc/sysctl.conf"
 sysctl -p

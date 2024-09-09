@@ -1,4 +1,4 @@
-package common
+package prometheus
 
 import (
 	"encoding/json"
@@ -11,6 +11,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
@@ -24,10 +25,10 @@ func BasePodTemplateSpec(
 	matchLabels map[string]string,
 ) corev1.PodTemplateSpec {
 	volumes := []corev1.Volume{
-		RenderVolumeJailFromSource(volumeSources, *valuesExporter.VolumeJail.VolumeSourceName),
-		RenderVolumeSlurmConfigs(clusterName),
-		RenderVolumeMungeKey(clusterName),
-		RenderVolumeMungeSocket(),
+		common.RenderVolumeJailFromSource(volumeSources, *valuesExporter.VolumeJail.VolumeSourceName),
+		common.RenderVolumeSlurmConfigs(clusterName),
+		common.RenderVolumeMungeKey(clusterName),
+		common.RenderVolumeMungeSocket(),
 	}
 
 	var affinity *corev1.Affinity = nil
@@ -59,7 +60,7 @@ func BasePodTemplateSpec(
 			Affinity:     affinity,
 			NodeSelector: nodeSelector,
 			Containers: []corev1.Container{
-				RenderContainerMunge(munge),
+				common.RenderContainerMunge(munge),
 				RenderContainerExporter(valuesExporter),
 			},
 			Volumes: volumes,

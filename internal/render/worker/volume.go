@@ -23,6 +23,7 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeSlurmConfigs(clusterName),
 		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeMungeSocket(),
+		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeWorker),
 		renderVolumeNvidia(),
 		renderVolumeBoot(),
 		renderVolumeNCCLTopology(clusterName),

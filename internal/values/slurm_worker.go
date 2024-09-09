@@ -2,6 +2,7 @@ package values
 
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -16,7 +17,6 @@ type SlurmWorker struct {
 	ContainerToolkitValidation Container
 	ContainerSlurmd            Container
 	ContainerMunge             Container
-	CgroupMakerContainer       Container
 
 	CgroupVersion string
 
@@ -46,10 +46,6 @@ func buildSlurmWorkerFrom(
 		ContainerSlurmd: buildContainerFrom(
 			worker.Slurmd,
 			consts.ContainerNameSlurmd,
-		),
-		CgroupMakerContainer: buildContainerFrom(
-			worker.CgroupMakerContainer,
-			consts.ContainerNameCgroupMaker,
 		),
 		ContainerMunge: buildContainerFrom(
 			worker.Munge,
