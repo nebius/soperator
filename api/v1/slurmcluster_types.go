@@ -473,7 +473,7 @@ type NodeContainer struct {
 	//
 	// +kubebuilder:validation:Pattern=`(^\s*\*\s+(soft|hard)\s+\w+\s+\d+\s*$)?`
 	// +kubebuilder:validation:XValidation:rule="self == '' || self.split('\\n').all(line.matches('^\\\\s*\\\\*\\\\s+(soft|hard)\\\\s+\\\\w+\\\\s+\\\\d+\\\\s*$'))",message="Each line must match the pattern '* <soft|hard> <item> <value>'"
-	SecurityLimitsConfig string `json:"SecurityLimitsConfig,omitempty"`
+	SecurityLimitsConfig string `json:"securityLimitsConfig,omitempty"`
 }
 
 // NodeVolume defines the configuration for a node volume.
