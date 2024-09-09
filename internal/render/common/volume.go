@@ -241,3 +241,30 @@ func AddVolumeOrSpec(
 
 	return volumes, pvcTemplateSpecs, nil
 }
+
+// region security limits
+
+// RenderVolumeSecurityLimits renders [corev1.Volume] containing security limits config contents
+func RenderVolumeSecurityLimits(clusterName string, componentType consts.ComponentType) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSecurityLimits,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: naming.BuildConfigMapSecurityLimitsName(componentType, clusterName),
+				},
+			},
+		},
+	}
+}
+
+// RenderVolumeMountSecurityLimits renders [corev1.VolumeMount] defining the mounting path for security limits config
+func RenderVolumeMountSecurityLimits() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSecurityLimits,
+		MountPath: consts.VolumeMountPathSecurityLimits,
+		SubPath:   consts.VolumeMountSubPathSecurityLimits,
+	}
+}
+
+// endregion security limits

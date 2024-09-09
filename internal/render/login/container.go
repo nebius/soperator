@@ -20,10 +20,10 @@ func renderContainerSshd(
 		common.RenderVolumeMountSlurmConfigs(),
 		common.RenderVolumeMountJail(),
 		common.RenderVolumeMountMungeSocket(),
+		common.RenderVolumeMountSecurityLimits(),
 		renderVolumeMountSshdKeys(),
 		renderVolumeMountSshConfigs(),
 		renderVolumeMountSshRootKeys(),
-		renderVolumeMountSecurityLimits(),
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
 

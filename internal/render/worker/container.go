@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
+
 	"nebius.ai/slurm-operator/internal/naming"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -55,6 +56,7 @@ func renderContainerSlurmd(
 		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
 		common.RenderVolumeMountJail(),
 		common.RenderVolumeMountMungeSocket(),
+		common.RenderVolumeMountSecurityLimits(),
 		renderVolumeMountNvidia(),
 		renderVolumeMountBoot(),
 		renderVolumeMountNCCLTopology(),
