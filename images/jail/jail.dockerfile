@@ -1,5 +1,5 @@
 # BASE_IMAGE defined here for second multistage build
-ARG BASE_IMAGE=nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
+ARG BASE_IMAGE=ghcr.io/asteny/cuda_base:12.2.2
 
 # First stage: Build the gpubench application
 FROM golang:1.22 AS gpubench_builder
@@ -23,7 +23,7 @@ RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 #######################################################################################################################
 # Second stage: Build jail image
 
-ARG BASE_IMAGE=nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
+ARG BASE_IMAGE=ghcr.io/asteny/cuda_base:12.2.2
 
 FROM $BASE_IMAGE AS jail
 
