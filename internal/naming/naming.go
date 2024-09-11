@@ -80,6 +80,14 @@ func BuildStatefulSetName(componentType consts.ComponentType, clusterName string
 	}.String()
 }
 
+func BuildDeploymentName(componentType consts.ComponentType, clusterName string) string {
+	return namedEntity{
+		componentType: &componentType,
+		clusterName:   "",
+		entity:        "",
+	}.String()
+}
+
 func BuildConfigMapSlurmConfigsName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,
@@ -188,4 +196,11 @@ func BuildOtelSvcEndpoint(clusterName string) string {
 
 func BuildSlurmExporterName(clusterName string) string {
 	return fmt.Sprintf("%s-exporter", clusterName)
+}
+
+func BuildSecretSlurmdbdConfigsName(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.SecretSlurmdbdConfigs,
+	}.String()
 }
