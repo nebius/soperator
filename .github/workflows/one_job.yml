@@ -64,6 +64,9 @@ jobs:
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld DOCKERFILE=controller/slurmctld.dockerfile
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld
 
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd DOCKERFILE=accounting/slurmdbd.dockerfile
+          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd
+
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd DOCKERFILE=login/sshd.dockerfile
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd
 
