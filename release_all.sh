@@ -62,7 +62,7 @@ make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd
 make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld DOCKERFILE=controller/slurmctld.dockerfile
 make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld
 
-make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd DOCKERFILE=slurmdbd/slurmdbd.dockerfile
+make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd DOCKERFILE=accounting/slurmdbd.dockerfile
 make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd
 
 make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd DOCKERFILE=login/sshd.dockerfile
