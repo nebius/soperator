@@ -349,11 +349,11 @@ type ExternalDB struct {
 	// Secret for connection string to the SlurmDBD database
 	//
 	// +kubebuilder:validation:Optional
-	Secret SecretName `json:"secret"`
+	Secret SecretAccounting `json:"secret"`
 }
 
-// SecretName defines the name of the secret
-type SecretName struct {
+// SecretAccounting defines the name of the secret for the external database
+type SecretAccounting struct {
 	// Name defines the name of the secret
 	//
 	// +kubebuilder:validation:Optional
