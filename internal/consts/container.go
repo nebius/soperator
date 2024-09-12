@@ -2,6 +2,7 @@ package consts
 
 const (
 	ContainerNameSlurmctld         = SlurmctldName
+	ContainerNameAccounting        = AccountingName
 	ContainerNameMunge             = Munge
 	ContainerNameSlurmd            = SlurmdName
 	ContainerNameSshd              = SshdName
