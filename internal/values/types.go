@@ -3,6 +3,7 @@ package values
 import (
 	"context"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -132,3 +133,24 @@ func buildSecretsFrom(secrets *slurmv1.Secrets) slurmv1.Secrets {
 }
 
 // endregion Secret
+
+// region Deployment
+type Deployment struct {
+	Name            string
+	Replicas        int32
+	Strategy        appsv1.DeploymentStrategyType
+	PodTemplateSpec *corev1.PodTemplateSpec
+}
+
+func buildDeploymentFrom(
+	name string,
+) Deployment {
+	return Deployment{
+		Name:            name,
+		Replicas:        int32(1),
+		Strategy:        appsv1.RecreateDeploymentStrategyType,
+		PodTemplateSpec: nil,
+	}
+}
+
+// endregion Deployment

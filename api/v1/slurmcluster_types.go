@@ -279,6 +279,11 @@ type Secrets struct {
 
 // SlurmNodes define the desired state of the Slurm nodes
 type SlurmNodes struct {
+	// Slurmdbd represents the Slurm database daemon configuration
+	//
+	// +kubebuilder:validation:optional
+	Accounting SlurmNodeAccounting `json:"accounting"`
+
 	// Controller represents the Slurm controller node configuration
 	//
 	// +kubebuilder:validation:Required
@@ -293,6 +298,70 @@ type SlurmNodes struct {
 	//
 	// +kubebuilder:validation:Required
 	Login SlurmNodeLogin `json:"login"`
+}
+
+// Slurmdbd represents the Slurm database daemon configuration
+// +kubebuilder:validation:XValidation:rule="self.enabled == false || (self.slurmdbd.image != \"\" && self.externalDB.enabled != false)",message="Slurmdbd and ExternalDB must be provided when Accounting is enabled"
+type SlurmNodeAccounting struct {
+	SlurmNode `json:",inline"`
+
+	// Enabled defines whether the SlurmDBD is enabled
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled"`
+	// Slurmdbd represents the Slurm control daemon configuration
+	//
+	// +kubebuilder:validation:Optional
+	Slurmdbd NodeContainer `json:"slurmdbd"`
+
+	// Munge represents the Slurm munge configuration
+	//
+	// +kubebuilder:validation:Optional
+	Munge NodeContainer `json:"munge"`
+	// ExternalDB represents the external database configuration of connection string
+	//
+	// +kubebuilder:validation:Optional
+	ExternalDB ExternalDB `json:"externalDB"`
+}
+
+// ExternalDB represents the external database configuration of connection string
+// +kubebuilder:validation:XValidation:rule="self.enabled == false || (self.host != \"\" && self.secret.name != \"\" && self.secret.passwordKey != \"\")",message="host and secret must be provided when Accounting and ExternalDB are enabled"
+type ExternalDB struct {
+	// Enabled defines whether the external database is enabled
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled"`
+	// Host for connection string to the SlurmDBD database
+	//
+	// +kubebuilder:validation:Optional
+	Host string `json:"host"`
+	// Port for connection string to the SlurmDBD database
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=3306
+	Port int32 `json:"port"`
+	// Key defines the key of username and password in the secret
+	//
+	// +kubebuilder:validation:Optional
+	User string `json:"user"`
+	// Secret for connection string to the SlurmDBD database
+	//
+	// +kubebuilder:validation:Optional
+	Secret SecretAccounting `json:"secret"`
+}
+
+// SecretAccounting defines the name of the secret for the external database
+type SecretAccounting struct {
+	// Name defines the name of the secret
+	//
+	// +kubebuilder:validation:Optional
+	Name string `json:"name"`
+	// Key defines the key of password in the secret (do not put here the password, just name of the key in the secret)
+	//
+	// +kubebuilder:validation:Optional
+	PasswordKey string `json:"passwordKey"`
 }
 
 // SlurmNodeController defines the configuration for the Slurm controller node
@@ -329,7 +398,6 @@ type SlurmNodeControllerVolumes struct {
 }
 
 // SlurmNodeWorker defines the configuration for the Slurm worker node
-// +kubebuilder:validation:XValidation:rule="self.slurmd.resources.memory > self.volumes.sharedMemorySize",message="resources memory of slurmd must be bigger than sharedMemorySize"
 type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
 
@@ -637,6 +705,7 @@ const (
 	ConditionClusterControllersAvailable = "ControllersAvailable"
 	ConditionClusterWorkersAvailable     = "WorkersAvailable"
 	ConditionClusterLoginAvailable       = "LoginAvailable"
+	ConditionClusterAccountingAvailable  = "SlurmdbdAvailable"
 
 	PhaseClusterReconciling  = "Reconciling"
 	PhaseClusterNotAvailable = "Not available"
