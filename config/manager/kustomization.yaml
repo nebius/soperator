@@ -5,4 +5,4 @@ kind: Kustomization
 images:
   - name: controller
     newName: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/slurm-operator
-    newTag: 1.12.2
+    newTag: 1.13.2

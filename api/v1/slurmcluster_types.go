@@ -539,8 +539,7 @@ type NodeContainer struct {
 	// format of a string should be: '* <soft|hard> <item> <value>'
 	// example: '* soft nofile 1024'
 	//
-	// +kubebuilder:validation:Pattern=`(^\s*\*\s+(soft|hard)\s+\w+\s+\d+\s*$)?`
-	// +kubebuilder:validation:XValidation:rule="self == '' || self.split('\\n').all(line.matches('^\\\\s*\\\\*\\\\s+(soft|hard)\\\\s+\\\\w+\\\\s+\\\\d+\\\\s*$'))",message="Each line must match the pattern '* <soft|hard> <item> <value>'"
+
 	SecurityLimitsConfig string `json:"securityLimitsConfig,omitempty"`
 }
 
