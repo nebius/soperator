@@ -48,12 +48,14 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 	}
 
 	podParams := &values.SlurmExporter{
-		MetricsPrometheus: slurmv1.MetricsPrometheus{
-			Enabled:            true,
-			ImageSlurmExporter: ptr.To(imageExporter),
-			ResourcesSlurmExporter: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse(memory),
-				corev1.ResourceCPU:    resource.MustParse(cpu),
+		Enabled: true,
+		ExporterContainer: slurmv1.ExporterContainer{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: imageExporter,
+				Resources: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse(memory),
+					corev1.ResourceCPU:    resource.MustParse(cpu),
+				},
 			},
 		},
 		SlurmNode: slurmv1.SlurmNode{
@@ -149,9 +151,11 @@ func Test_RenderPodTemplateSpec(t *testing.T) {
 	}
 
 	podParams := &values.SlurmExporter{
-		MetricsPrometheus: slurmv1.MetricsPrometheus{
-			Enabled:            true,
-			ImageSlurmExporter: ptr.To(imageExporter),
+		Enabled: true,
+		ExporterContainer: slurmv1.ExporterContainer{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: imageExporter,
+			},
 		},
 		Name: "test-pod-template",
 		VolumeJail: slurmv1.NodeVolume{

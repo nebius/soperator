@@ -2,38 +2,34 @@ package values
 
 import (
 	"k8s.io/utils/ptr"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 )
 
 type SlurmExporter struct {
-	slurmv1.MetricsPrometheus
-
 	slurmv1.SlurmNode
 
-	Name string
+	Name             string
+	Enabled          bool
+	PodMonitorConfig slurmv1.PodMonitorConfig
 
+	slurmv1.ExporterContainer
 	ContainerMunge Container
 
 	VolumeJail slurmv1.NodeVolume
 }
 
-func buildSlurmExporterFrom(
-	clusterName string,
-	telemetry *slurmv1.Telemetry,
-	controller *slurmv1.SlurmNodeController,
-) SlurmExporter {
-	var metricsPrometheus slurmv1.MetricsPrometheus
-	if telemetry != nil && telemetry.Prometheus != nil {
-		metricsPrometheus = *telemetry.Prometheus.DeepCopy()
-	}
+func buildSlurmExporterFrom(clusterName string, exporter *slurmv1.SlurmExporter) SlurmExporter {
 	return SlurmExporter{
-		MetricsPrometheus: metricsPrometheus,
-		SlurmNode:         *controller.SlurmNode.DeepCopy(),
+		SlurmNode:         *exporter.SlurmNode.DeepCopy(),
 		Name:              naming.BuildSlurmExporterName(clusterName),
+		Enabled:           exporter.Enabled,
+		PodMonitorConfig:  *exporter.PodMonitorConfig.DeepCopy(),
+		ExporterContainer: *exporter.Exporter.DeepCopy(),
 		ContainerMunge: buildContainerFrom(
-			controller.Munge,
+			exporter.Munge,
 			consts.ContainerNameMunge,
 		),
 		VolumeJail: slurmv1.NodeVolume{

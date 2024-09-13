@@ -19,20 +19,16 @@ const (
 func RenderOtelCollector(
 	clusterName,
 	namespace string,
-	metrics *slurmv1.Telemetry,
+	telemetry *slurmv1.Telemetry,
+	enableMetrics bool,
 	foundPodTemplate *corev1.PodTemplate,
 ) (*otelv1beta1.OpenTelemetryCollector, error) {
-	if metrics == nil || metrics.OpenTelemetryCollector == nil || !metrics.OpenTelemetryCollector.Enabled {
+	if telemetry == nil || telemetry.OpenTelemetryCollector == nil || !telemetry.OpenTelemetryCollector.Enabled {
 		return nil, errors.New("OpenTelemetry Collector is not enabled")
 	}
 
-	replicasOtelCollector := metrics.OpenTelemetryCollector.ReplicasOtelCollector
+	replicasOtelCollector := telemetry.OpenTelemetryCollector.ReplicasOtelCollector
 	imageOtelCollector := renderPodTemplateImage(foundPodTemplate)
-
-	enableMetrics := false
-	if metrics.Prometheus == nil {
-		enableMetrics = metrics.Prometheus.Enabled
-	}
 
 	// TODO: Looks like a mess, need to move these to values
 	var securityContext *corev1.PodSecurityContext
@@ -51,8 +47,8 @@ func RenderOtelCollector(
 	var imagePullPolicy corev1.PullPolicy = corev1.PullIfNotPresent
 	var otelCollectorPort int32 = 4317
 
-	if metrics.OpenTelemetryCollector != nil && metrics.OpenTelemetryCollector.OtelCollectorPort != 0 {
-		otelCollectorPort = metrics.OpenTelemetryCollector.OtelCollectorPort
+	if telemetry.OpenTelemetryCollector != nil && telemetry.OpenTelemetryCollector.OtelCollectorPort != 0 {
+		otelCollectorPort = telemetry.OpenTelemetryCollector.OtelCollectorPort
 	}
 
 	if foundPodTemplate != nil {

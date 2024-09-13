@@ -86,7 +86,11 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 							}
 
 							desired, err := otel.RenderOtelCollector(
-								clusterValues.Name, clusterValues.Namespace, clusterValues.Telemetry, foundPodTemplate,
+								clusterValues.Name,
+								clusterValues.Namespace,
+								clusterValues.Telemetry,
+								cluster.Spec.SlurmNodes.Exporter.Enabled,
+								foundPodTemplate,
 							)
 							if err != nil {
 								stepLogger.Error(err, "Failed to render")
@@ -155,9 +159,11 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					stepLogger.Info("Reconciling")
 
 					if check.IsPrometheusOperatorCRDInstalled {
-						if check.IsPrometheusEnabled(clusterValues.Telemetry) {
+						if check.IsPrometheusEnabled(&clusterValues.SlurmExporter) {
 							desired, err := slurmprometheus.RenderPodMonitor(
-								clusterValues.Name, clusterValues.Namespace, clusterValues.Telemetry,
+								clusterValues.Name,
+								clusterValues.Namespace,
+								&clusterValues.SlurmExporter,
 							)
 							if err != nil {
 								stepLogger.Error(err, "Failed to render")
@@ -183,11 +189,11 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
 					if check.IsPrometheusOperatorCRDInstalled {
-						if check.IsPrometheusEnabled(clusterValues.Telemetry) {
+						if check.IsPrometheusEnabled(&clusterValues.SlurmExporter) {
 							var foundPodTemplate *corev1.PodTemplate = nil
 
-							if clusterValues.Telemetry.Prometheus.PodTemplateNameRef != nil {
-								podTemplateName := *clusterValues.Telemetry.Prometheus.PodTemplateNameRef
+							if clusterValues.SlurmExporter.PodTemplateNameRef != nil {
+								podTemplateName := *clusterValues.SlurmExporter.PodTemplateNameRef
 
 								err := r.Get(
 									ctx,

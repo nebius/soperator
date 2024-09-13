@@ -5,21 +5,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
+
 	. "nebius.ai/slurm-operator/internal/render/prometheus"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
 func Test_RenderDeploymentExporter_Error(t *testing.T) {
 
-	telemetryNil := &values.SlurmExporter{}
+	exporterNil := &values.SlurmExporter{}
 
-	telemetryImageSlurmExporterNil := &values.SlurmExporter{
-		MetricsPrometheus: slurmv1.MetricsPrometheus{
-			Enabled:            true,
-			ImageSlurmExporter: nil,
-		},
-		Name: "test",
+	exporterImageNil := &values.SlurmExporter{
+		Enabled: true,
 	}
 
 	testCases := []struct {
@@ -27,12 +23,12 @@ func Test_RenderDeploymentExporter_Error(t *testing.T) {
 		expectedError  error
 	}{
 		{
-			valuesExporter: telemetryNil,
+			valuesExporter: exporterNil,
 			expectedError:  errors.New("prometheus is not enabled"),
 		},
 		{
-			valuesExporter: telemetryImageSlurmExporterNil,
-			expectedError:  errors.New("ImageSlurmExporter is nil"),
+			valuesExporter: exporterImageNil,
+			expectedError:  errors.New("image for ContainerExporter is empty"),
 		},
 	}
 
