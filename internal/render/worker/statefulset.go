@@ -45,6 +45,7 @@ func RenderStatefulSet(
 		fmt.Sprintf(
 			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
 		): consts.AnnotationApparmorValueUnconfined,
+		consts.DefaultContainerAnnotationName: consts.ContainerNameSlurmd,
 	}
 	initContainers := []corev1.Container{
 		renderContainerToolkitValidation(&worker.ContainerToolkitValidation),
