@@ -2,6 +2,7 @@ package values
 
 import (
 	"k8s.io/utils/ptr"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -39,7 +40,7 @@ func buildAccountingFrom(clusterName string, accounting *slurmv1.SlurmNodeAccoun
 		),
 		Service: buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeAccounting, clusterName)),
 		Deployment: buildDeploymentFrom(
-			naming.BuildDeploymentName(consts.ComponentTypeAccounting, clusterName),
+			naming.BuildDeploymentName(consts.ComponentTypeAccounting),
 		),
 		ExternalDB: accounting.ExternalDB,
 		Enabled:    accounting.Enabled,

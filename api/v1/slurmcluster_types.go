@@ -304,7 +304,6 @@ type SlurmNodes struct {
 }
 
 // Slurmdbd represents the Slurm database daemon configuration
-// +kubebuilder:validation:XValidation:rule="self.enabled == false || (self.slurmdbd.image != \"\" && self.externalDB.enabled != false)",message="Slurmdbd and ExternalDB must be provided when Accounting is enabled"
 type SlurmNodeAccounting struct {
 	SlurmNode `json:",inline"`
 
@@ -329,7 +328,6 @@ type SlurmNodeAccounting struct {
 }
 
 // ExternalDB represents the external database configuration of connection string
-// +kubebuilder:validation:XValidation:rule="self.enabled == false || (self.host != \"\" && self.secret.name != \"\" && self.secret.passwordKey != \"\")",message="host and secret must be provided when Accounting and ExternalDB are enabled"
 type ExternalDB struct {
 	// Enabled defines whether the external database is enabled
 	//

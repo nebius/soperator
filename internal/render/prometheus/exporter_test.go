@@ -33,7 +33,7 @@ func Test_RenderDeploymentExporter_Error(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.valuesExporter.Name, func(t *testing.T) {
+		t.Run("exporter", func(t *testing.T) {
 
 			_, err := RenderDeploymentExporter(
 				defaultNamespace, defaultNameCluster, tc.valuesExporter, defaultNodeFilter, defaultVolumeSources, defaultPodTemplate,

@@ -15,7 +15,6 @@ import (
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/render/otel"
-	slurmprometheus "nebius.ai/slurm-operator/internal/render/prometheus"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
@@ -149,87 +148,6 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					}
 					stepLogger.Info("Reconciled")
 
-					return nil
-				},
-			},
-			utils.MultiStepExecutionStep{
-				Name: "PodMonitor",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
-
-					if check.IsPrometheusOperatorCRDInstalled {
-						if check.IsPrometheusEnabled(&clusterValues.SlurmExporter) {
-							desired, err := slurmprometheus.RenderPodMonitor(
-								clusterValues.Name,
-								clusterValues.Namespace,
-								&clusterValues.SlurmExporter,
-							)
-							if err != nil {
-								stepLogger.Error(err, "Failed to render")
-							}
-							if desired != nil {
-								stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-							}
-							err = r.PodMonitor.Reconcile(ctx, cluster, desired)
-							if err != nil {
-								stepLogger.Error(err, "Failed to reconcile")
-								return errors.Wrap(err, "reconciling PodMonitor")
-							}
-							stepLogger.Info("Reconciled")
-						}
-					}
-
-					return nil
-				},
-			},
-			utils.MultiStepExecutionStep{
-				Name: "Slurm Exporter",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
-					if check.IsPrometheusOperatorCRDInstalled {
-						if check.IsPrometheusEnabled(&clusterValues.SlurmExporter) {
-							var foundPodTemplate *corev1.PodTemplate = nil
-
-							if clusterValues.SlurmExporter.PodTemplateNameRef != nil {
-								podTemplateName := *clusterValues.SlurmExporter.PodTemplateNameRef
-
-								err := r.Get(
-									ctx,
-									types.NamespacedName{
-										Namespace: clusterValues.Namespace,
-										Name:      podTemplateName,
-									},
-									foundPodTemplate,
-								)
-								if err != nil {
-									stepLogger.Error(err, "Failed to get PodTemplate")
-									return errors.Wrap(err, "getting PodTemplate")
-								}
-							}
-							desired, err := slurmprometheus.RenderDeploymentExporter(
-								clusterValues.Name,
-								clusterValues.Namespace,
-								&clusterValues.SlurmExporter,
-								clusterValues.NodeFilters,
-								clusterValues.VolumeSources,
-								foundPodTemplate,
-							)
-							if err != nil {
-								stepLogger.Error(err, "Failed to render")
-							}
-							if desired != nil {
-								logger = logger.WithValues(logfield.ResourceKV(desired)...)
-							}
-							err = r.Deployment.Reconcile(ctx, cluster, desired)
-							if err != nil {
-								stepLogger.Error(err, "Failed to reconcile")
-								return errors.Wrap(err, "reconciling Slurm Exporter Deployment")
-							}
-							stepLogger.Info("Reconciled")
-						}
-					}
 					return nil
 				},
 			},

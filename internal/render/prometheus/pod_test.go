@@ -61,7 +61,6 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 		SlurmNode: slurmv1.SlurmNode{
 			K8sNodeFilterName: "test-node-filter",
 		},
-		Name: "test-pod-template",
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To("test-volume-source"),
 		},
@@ -157,7 +156,6 @@ func Test_RenderPodTemplateSpec(t *testing.T) {
 				Image: imageExporter,
 			},
 		},
-		Name: "test-pod-template",
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To("test-volume-source"),
 		},
