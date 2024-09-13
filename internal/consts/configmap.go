@@ -2,7 +2,7 @@ package consts
 
 const (
 	slurmConfigs   = slurmPrefix + "configs"
-	slurmdbdSecret = "slurmdb-secret"
+	slurmdbdSecret = "slurm-secrets"
 )
 
 const (
