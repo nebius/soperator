@@ -145,6 +145,7 @@ slurmNodes:
   worker:
     size: 2
     k8sNodeFilterName: "gpu"
+    cgroupVersion: v2
     slurmd:
       port: 6818
       resources:
