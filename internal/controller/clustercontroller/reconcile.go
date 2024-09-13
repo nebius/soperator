@@ -222,6 +222,9 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 			if err = r.ReconcileWorkers(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
+			if err = r.ReconcileAccounting(ctx, cluster, clusterValues); err != nil {
+				return ctrl.Result{}, err
+			}
 			if clusterValues.NodeLogin.Size > 0 {
 				if err = r.ReconcileLogin(ctx, cluster, clusterValues); err != nil {
 					return ctrl.Result{}, err
@@ -265,6 +268,14 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 				} else if res.Requeue {
 					return res, nil
 				}
+			}
+
+			// Accounting
+			if res, err := r.ValidateAccounting(ctx, cluster, clusterValues); err != nil {
+				logger.Error(err, "Failed to validate Slurm accounting")
+				return ctrl.Result{}, errors.Wrap(err, "validating Slurm accounting")
+			} else if res.Requeue {
+				return res, nil
 			}
 
 			return ctrl.Result{}, nil
