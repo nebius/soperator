@@ -34,135 +34,136 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 	isAccountingEnabled := clusterValues.NodeAccounting.Enabled
 	isExternalDBEnabled := clusterValues.NodeAccounting.ExternalDB.Enabled
 
-	if isAccountingEnabled && isExternalDBEnabled {
-		reconcileAccountingImpl := func() error {
-			return utils.ExecuteMultiStep(ctx,
-				"Reconciliation of Accounting",
-				utils.MultiStepExecutionStrategyCollectErrors,
-				utils.MultiStepExecutionStep{
-					Name: "Slurm Secret Slurmdbd Configs",
-					Func: func(stepCtx context.Context) error {
-						stepLogger := log.FromContext(stepCtx)
-						stepLogger.Info("Reconciling")
+	if !isAccountingEnabled || !isExternalDBEnabled {
+		logger.Info("Slurm Accounting is disabled. Skipping reconciliation")
+		return nil
+	}
 
-						var secret = &corev1.Secret{}
-						var err error
+	reconcileAccountingImpl := func() error {
+		return utils.ExecuteMultiStep(ctx,
+			"Reconciliation of Accounting",
+			utils.MultiStepExecutionStrategyCollectErrors,
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Secret Slurmdbd Configs",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
 
-						isSecretNameEmpty := clusterValues.NodeAccounting.ExternalDB.Secret.Name == ""
-						if isSecretNameEmpty {
-							stepLogger.Error(err, "Secret name is empty")
-							return errors.Wrap(err, "secret name is empty")
-						}
+					var secret = &corev1.Secret{}
+					var err error
 
-						secretNameAcc := clusterValues.NodeAccounting.ExternalDB.Secret.Name
-						err = r.Get(
-							ctx,
-							types.NamespacedName{
-								Namespace: clusterValues.Namespace,
-								Name:      secretNameAcc,
-							},
-							secret,
-						)
-						if err != nil {
-							stepLogger.Error(err, fmt.Sprintf("Failed to get Secret %s", secretNameAcc))
-							return errors.Wrap(err, fmt.Sprintf("getting Secret %s", secretNameAcc))
-						}
-						desired, err := accounting.RenderSecret(
+					isSecretNameEmpty := clusterValues.NodeAccounting.ExternalDB.Secret.Name == ""
+					if isSecretNameEmpty {
+						stepLogger.Error(err, "Secret name is empty")
+						return errors.Wrap(err, "secret name is empty")
+					}
+
+					secretNameAcc := clusterValues.NodeAccounting.ExternalDB.Secret.Name
+					err = r.Get(
+						ctx,
+						types.NamespacedName{
+							Namespace: clusterValues.Namespace,
+							Name:      secretNameAcc,
+						},
+						secret,
+					)
+					if err != nil {
+						stepLogger.Error(err, fmt.Sprintf("Failed to get Secret %s", secretNameAcc))
+						return errors.Wrap(err, fmt.Sprintf("getting Secret %s", secretNameAcc))
+					}
+					desired, err := accounting.RenderSecret(
+						clusterValues.Namespace,
+						clusterValues.Name,
+						&clusterValues.NodeAccounting,
+						secret,
+					)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering accounting Secret")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
+					stepLogger.Info("Rendered")
+
+					if err = r.Secret.Reconcile(ctx, cluster, desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling accounting Secret")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Service",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+					if clusterValues.NodeAccounting.Enabled {
+						desired, err := accounting.RenderService(
 							clusterValues.Namespace,
 							clusterValues.Name,
-							&clusterValues.NodeAccounting,
-							secret,
+							clusterValues.NodeAccounting,
 						)
 						if err != nil {
 							stepLogger.Error(err, "Failed to render")
-							return errors.Wrap(err, "rendering accounting Secret")
+							return errors.Wrap(err, "rendering accounting Service")
 						}
 						stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 						stepLogger.Info("Rendered")
 
-						if err = r.Secret.Reconcile(ctx, cluster, desired); err != nil {
+						if err = r.Service.Reconcile(ctx, cluster, desired); err != nil {
 							stepLogger.Error(err, "Failed to reconcile")
-							return errors.Wrap(err, "reconciling accounting Secret")
+							return errors.Wrap(err, "reconciling accounting Deployment")
 						}
 						stepLogger.Info("Reconciled")
-
-						return nil
-					},
+					}
+					return nil
 				},
-				utils.MultiStepExecutionStep{
-					Name: "Slurm Service",
-					Func: func(stepCtx context.Context) error {
-						stepLogger := log.FromContext(stepCtx)
-						stepLogger.Info("Reconciling")
-						if clusterValues.NodeAccounting.Enabled {
-							desired, err := accounting.RenderService(
-								clusterValues.Namespace,
-								clusterValues.Name,
-								clusterValues.NodeAccounting,
-							)
-							if err != nil {
-								stepLogger.Error(err, "Failed to render")
-								return errors.Wrap(err, "rendering accounting Service")
-							}
-							stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-							stepLogger.Info("Rendered")
-
-							if err = r.Service.Reconcile(ctx, cluster, desired); err != nil {
-								stepLogger.Error(err, "Failed to reconcile")
-								return errors.Wrap(err, "reconciling accounting Deployment")
-							}
-							stepLogger.Info("Reconciled")
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Deployment",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+					if clusterValues.NodeAccounting.Enabled {
+						desired, err := accounting.RenderDeployment(
+							clusterValues.Namespace,
+							clusterValues.Name,
+							&clusterValues.NodeAccounting,
+							clusterValues.NodeFilters,
+							clusterValues.VolumeSources,
+						)
+						if err != nil {
+							stepLogger.Error(err, "Failed to render")
+							return errors.Wrap(err, "rendering accounting Deployment")
 						}
-						return nil
-					},
-				},
-				utils.MultiStepExecutionStep{
-					Name: "Slurm Deployment",
-					Func: func(stepCtx context.Context) error {
-						stepLogger := log.FromContext(stepCtx)
-						stepLogger.Info("Reconciling")
-						if clusterValues.NodeAccounting.Enabled {
-							desired, err := accounting.RenderDeployment(
-								clusterValues.Namespace,
-								clusterValues.Name,
-								&clusterValues.NodeAccounting,
-								clusterValues.NodeFilters,
-								clusterValues.VolumeSources,
-							)
-							if err != nil {
-								stepLogger.Error(err, "Failed to render")
-								return errors.Wrap(err, "rendering accounting Deployment")
-							}
-							stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-							stepLogger.Info("Rendered")
+						stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
+						stepLogger.Info("Rendered")
 
-							deps, err := r.getAccountingDeploymentDependencies(ctx, clusterValues)
-							if err != nil {
-								stepLogger.Error(err, "Failed to retrieve dependencies")
-								return errors.Wrap(err, "retrieving dependencies for accounting Deployment")
-							}
-							stepLogger.Info("Retrieved dependencies")
-
-							if err = r.Deployment.Reconcile(ctx, cluster, desired, deps...); err != nil {
-								stepLogger.Error(err, "Failed to reconcile")
-								return errors.Wrap(err, "reconciling accounting Deployment")
-							}
-							stepLogger.Info("Reconciled")
+						deps, err := r.getAccountingDeploymentDependencies(ctx, clusterValues)
+						if err != nil {
+							stepLogger.Error(err, "Failed to retrieve dependencies")
+							return errors.Wrap(err, "retrieving dependencies for accounting Deployment")
 						}
-						return nil
-					},
-				},
-			)
-		}
+						stepLogger.Info("Retrieved dependencies")
 
-		if err := reconcileAccountingImpl(); err != nil {
-			logger.Error(err, "Failed to reconcile Slurm Accounting")
-			return errors.Wrap(err, "reconciling Slurm Accounting")
-		}
-		logger.Info("Reconciled Slurm Accounting")
-	} else {
-		logger.Info("Slurm Accounting is disabled. Skipping reconciliation")
+						if err = r.Deployment.Reconcile(ctx, cluster, desired, deps...); err != nil {
+							stepLogger.Error(err, "Failed to reconcile")
+							return errors.Wrap(err, "reconciling accounting Deployment")
+						}
+						stepLogger.Info("Reconciled")
+					}
+					return nil
+				},
+			},
+		)
 	}
+
+	if err := reconcileAccountingImpl(); err != nil {
+		logger.Error(err, "Failed to reconcile Slurm Accounting")
+		return errors.Wrap(err, "reconciling Slurm Accounting")
+	}
+	logger.Info("Reconciled Slurm Accounting")
 	return nil
 }
 
