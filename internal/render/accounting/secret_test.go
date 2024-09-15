@@ -48,7 +48,7 @@ func Test_RenderSecret_Errors(t *testing.T) {
 
 	// // Test with missing password key
 	testAcc = *acc
-	testAcc.ExternalDB.Secret.PasswordKey = "missing-key"
+	testAcc.ExternalDB.PasswordSecretKeyRef.Key = "missing-key"
 	_, err = accounting.RenderSecret(defaultNamespace, defaultNameCluster, &testAcc, defaultSecret)
 	assert.Equal(t, accounting.ErrPasswordKeyMissing, err.Error())
 

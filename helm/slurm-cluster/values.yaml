@@ -108,9 +108,9 @@ slurmNodes:
       # host: ""
       # port: 3306
       # user: ""
-      # secret:
+      # passwordSecretKeyRef:
       #   name: ""
-      #   passwordKey: ""
+      #   key: ""
     k8sNodeFilterName: "no-gpu"
     slurmdbd:
       port: 6819

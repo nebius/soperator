@@ -1436,25 +1436,25 @@ spec:
                             description: Host for connection string to the SlurmDBD
                               database
                             type: string
+                          passwordSecretKeyRef:
+                            description: SecretRef defines the reference to the secret
+                              with the password key for the external database
+                            properties:
+                              key:
+                                description: Key defines the key of password in the
+                                  secret (do not put here the password, just name
+                                  of the key in the secret)
+                                type: string
+                              name:
+                                description: Name defines the name of the secret
+                                type: string
+                            type: object
                           port:
                             default: 3306
                             description: Port for connection string to the SlurmDBD
                               database
                             format: int32
                             type: integer
-                          secret:
-                            description: Secret for connection string to the SlurmDBD
-                              database
-                            properties:
-                              name:
-                                description: Name defines the name of the secret
-                                type: string
-                              passwordKey:
-                                description: Key defines the key of password in the
-                                  secret (do not put here the password, just name
-                                  of the key in the secret)
-                                type: string
-                            type: object
                           user:
                             description: Key defines the key of username and password
                               in the secret

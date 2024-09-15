@@ -52,13 +52,13 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					var secret = &corev1.Secret{}
 					var err error
 
-					isSecretNameEmpty := clusterValues.NodeAccounting.ExternalDB.Secret.Name == ""
+					isSecretNameEmpty := clusterValues.NodeAccounting.ExternalDB.PasswordSecretKeyRef.Name == ""
 					if isSecretNameEmpty {
 						stepLogger.Error(err, "Secret name is empty")
 						return errors.Wrap(err, "secret name is empty")
 					}
 
-					secretNameAcc := clusterValues.NodeAccounting.ExternalDB.Secret.Name
+					secretNameAcc := clusterValues.NodeAccounting.ExternalDB.PasswordSecretKeyRef.Name
 					err = r.Get(
 						ctx,
 						types.NamespacedName{

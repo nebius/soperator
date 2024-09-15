@@ -65,7 +65,7 @@ func checkSecret(accounting *values.SlurmAccounting, secret *corev1.Secret) ([]b
 		return nil, errors.New(ErrDBHostEmpty)
 	}
 
-	passwordName, exists := secret.Data[accounting.ExternalDB.Secret.PasswordKey]
+	passwordName, exists := secret.Data[accounting.ExternalDB.PasswordSecretKeyRef.Key]
 	if !exists {
 		return nil, errors.New(ErrPasswordKeyMissing)
 	}
