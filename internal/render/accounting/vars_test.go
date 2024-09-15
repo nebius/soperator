@@ -108,9 +108,9 @@ var (
 			Host: "test-host",
 			Port: 5432,
 			User: user,
-			Secret: slurmv1.SecretAccounting{
-				Name:        secretName,
-				PasswordKey: passwordKey,
+			PasswordSecretKeyRef: slurmv1.PasswordSecretKeyRef{
+				Name: secretName,
+				Key:  passwordKey,
 			},
 		},
 		Enabled: true,

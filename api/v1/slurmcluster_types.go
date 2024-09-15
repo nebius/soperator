@@ -346,14 +346,13 @@ type ExternalDB struct {
 	//
 	// +kubebuilder:validation:Optional
 	User string `json:"user"`
-	// Secret for connection string to the SlurmDBD database
+	// SecretRef defines the reference to the secret with the password key for the external database
 	//
 	// +kubebuilder:validation:Optional
-	Secret SecretAccounting `json:"secret"`
+	PasswordSecretKeyRef PasswordSecretKeyRef `json:"passwordSecretKeyRef"`
 }
 
-// SecretAccounting defines the name of the secret for the external database
-type SecretAccounting struct {
+type PasswordSecretKeyRef struct {
 	// Name defines the name of the secret
 	//
 	// +kubebuilder:validation:Optional
@@ -361,7 +360,7 @@ type SecretAccounting struct {
 	// Key defines the key of password in the secret (do not put here the password, just name of the key in the secret)
 	//
 	// +kubebuilder:validation:Optional
-	PasswordKey string `json:"passwordKey"`
+	Key string `json:"key"`
 }
 
 // SlurmNodeController defines the configuration for the Slurm controller node
