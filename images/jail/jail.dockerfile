@@ -73,7 +73,10 @@ RUN apt update && \
         iproute2 \
         infiniband-diags \
         libncurses5-dev \
-        libdrm-dev
+        libdrm-dev \
+        zip \
+        unzip \
+        rsync
 
 # Install python
 COPY common/scripts/install_python.sh /opt/bin/
