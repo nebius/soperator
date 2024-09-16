@@ -3,3 +3,6 @@
 /.idea/
 bin
 cover.out
+release_all.sh
+release_helm.sh
+upload_to_build_agent.sh
