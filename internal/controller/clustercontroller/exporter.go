@@ -26,7 +26,7 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 
 	reconcileExporterImpl := func() error {
 		return utils.ExecuteMultiStep(ctx,
-			"Reconciliation of common resources",
+			"Reconciliation of exporter resources",
 			utils.MultiStepExecutionStrategyCollectErrors,
 			utils.MultiStepExecutionStep{
 				Name: "PodMonitor",
@@ -35,7 +35,9 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 					stepLogger.Info("Reconciling")
 
 					if check.IsPrometheusOperatorCRDInstalled {
+						stepLogger.Info("Prometheus Operator CRD is installed")
 						if check.IsPrometheusEnabled(&clusterValues.SlurmExporter) {
+							stepLogger.Info("Prometheus is enabled")
 							desired, err := slurmprometheus.RenderPodMonitor(
 								clusterValues.Name,
 								clusterValues.Namespace,
@@ -65,7 +67,9 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
 					if check.IsPrometheusOperatorCRDInstalled {
+						stepLogger.Info("Prometheus Operator CRD is installed")
 						if check.IsPrometheusEnabled(&clusterValues.SlurmExporter) {
+							stepLogger.Info("Prometheus is enabled")
 							var foundPodTemplate *corev1.PodTemplate = nil
 
 							if clusterValues.SlurmExporter.PodTemplateNameRef != nil {
