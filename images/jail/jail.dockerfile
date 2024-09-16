@@ -76,8 +76,7 @@ RUN apt update && \
         libdrm-dev \
         zip \
         unzip \
-        rsync \
-        aws-cli
+        rsync
 
 # Install python
 COPY common/scripts/install_python.sh /opt/bin/
