@@ -19,25 +19,7 @@ func Test_RenderPodMonitor(t *testing.T) {
 	interval := "1m"
 	scrapeTimeout := "30m"
 
-	//telemetry := &slurmv1.Telemetry{
-	//	Prometheus: &slurmv1.MetricsPrometheus{
-	//		Enabled: true,
-	//		PodMonitorConfig: slurmv1.PodMonitorConfig{
-	//			JobLabel:             jobLabel,
-	//			Interval:             prometheusv1.Duration(interval),
-	//			ScrapeTimeout:        prometheusv1.Duration(scrapeTimeout),
-	//			MetricRelabelConfigs: []prometheusv1.RelabelConfig{},
-	//			RelabelConfig:        []prometheusv1.RelabelConfig{},
-	//		},
-	//	},
-	//}
-
 	exporter := values.SlurmExporter{
-		//SlurmNode:         slurmv1.SlurmNode{},
-		//Name:              "",
-		//ExporterContainer: slurmv1.ExporterContainer{},
-		//ContainerMunge:    values.Container{},
-		//VolumeJail:        slurmv1.NodeVolume{},
 		Enabled: true,
 		PodMonitorConfig: slurmv1.PodMonitorConfig{
 			JobLabel:             jobLabel,
