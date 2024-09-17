@@ -37,10 +37,41 @@ ARG CUDA_VERSION=12.2.2
 RUN apt-get update && \
     apt -y install \
         wget \
+        git \
+        curl \
         build-essential \
+        bc \
+        python3 \
         autoconf \
-        pkg-config
-
+        pkg-config \
+        libssl-dev \
+        libpam0g-dev \
+        libtool \
+        libjansson-dev \
+        libjson-c-dev \
+        libmunge-dev \
+        libhwloc-dev \
+        liblz4-dev \
+        flex \
+        libevent-dev \
+        jq \
+        squashfs-tools \
+        zstd \
+        software-properties-common \
+        iputils-ping \
+        dnsutils \
+        telnet \
+        strace \
+        vim \
+        tree \
+        lsof \
+        pciutils \
+        iproute2 \
+        infiniband-diags \
+        kmod \
+        daemontools \
+        libncurses5-dev \
+        libdrm-dev
 
 # TODO: Install only necessary packages
 # Download and install Slurm packages
