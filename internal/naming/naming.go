@@ -80,10 +80,9 @@ func BuildStatefulSetName(componentType consts.ComponentType, clusterName string
 	}.String()
 }
 
-func BuildDeploymentName(componentType consts.ComponentType, clusterName string) string {
+func BuildDeploymentName(componentType consts.ComponentType) string {
 	return namedEntity{
 		componentType: &componentType,
-		clusterName:   clusterName,
 		entity:        "",
 	}.String()
 }
@@ -193,10 +192,6 @@ func BuildRoleBindingWorkerName(clusterName string) string {
 
 func BuildOtelSvcEndpoint(clusterName string) string {
 	return fmt.Sprintf("%s-collector", clusterName)
-}
-
-func BuildSlurmExporterName(clusterName string) string {
-	return fmt.Sprintf("%s-exporter", clusterName)
 }
 
 func BuildSecretSlurmdbdConfigsName(clusterName string) string {

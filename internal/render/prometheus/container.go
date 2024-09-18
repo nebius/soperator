@@ -13,7 +13,7 @@ import (
 func RenderContainerExporter(containerParams *values.SlurmExporter) corev1.Container {
 	return corev1.Container{
 		Name:            consts.ContainerNameExporter,
-		Image:           *containerParams.ImageSlurmExporter,
+		Image:           containerParams.ExporterContainer.Image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Ports: []corev1.ContainerPort{
 			{
@@ -22,10 +22,10 @@ func RenderContainerExporter(containerParams *values.SlurmExporter) corev1.Conta
 			},
 		},
 		Resources: corev1.ResourceRequirements{
-			Requests: containerParams.ResourcesSlurmExporter,
-			// We are do not want to use limits for cpu
+			Requests: containerParams.ExporterContainer.Resources,
+			// We do not want to use limits for cpu
 			Limits: corev1.ResourceList{
-				corev1.ResourceMemory: *containerParams.ResourcesSlurmExporter.Memory(),
+				corev1.ResourceMemory: *containerParams.ExporterContainer.Resources.Memory(),
 			},
 		},
 		Env: []corev1.EnvVar{

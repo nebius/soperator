@@ -5,9 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	consts "nebius.ai/slurm-operator/internal/consts"
 	slurmprometheus "nebius.ai/slurm-operator/internal/render/prometheus"
+	"nebius.ai/slurm-operator/internal/values"
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
@@ -17,16 +19,14 @@ func Test_RenderPodMonitor(t *testing.T) {
 	interval := "1m"
 	scrapeTimeout := "30m"
 
-	metrics := &slurmv1.Telemetry{
-		Prometheus: &slurmv1.MetricsPrometheus{
-			Enabled: true,
-			PodMonitorConfig: slurmv1.PodMonitorConfig{
-				JobLabel:             jobLabel,
-				Interval:             prometheusv1.Duration(interval),
-				ScrapeTimeout:        prometheusv1.Duration(scrapeTimeout),
-				MetricRelabelConfigs: []prometheusv1.RelabelConfig{},
-				RelabelConfig:        []prometheusv1.RelabelConfig{},
-			},
+	exporter := values.SlurmExporter{
+		Enabled: true,
+		PodMonitorConfig: slurmv1.PodMonitorConfig{
+			JobLabel:             jobLabel,
+			Interval:             prometheusv1.Duration(interval),
+			ScrapeTimeout:        prometheusv1.Duration(scrapeTimeout),
+			MetricRelabelConfigs: []prometheusv1.RelabelConfig{},
+			RelabelConfig:        []prometheusv1.RelabelConfig{},
 		},
 	}
 
@@ -54,7 +54,7 @@ func Test_RenderPodMonitor(t *testing.T) {
 		},
 	}
 
-	result, err := slurmprometheus.RenderPodMonitor(defaultNameCluster, defaultNamespace, metrics)
+	result, err := slurmprometheus.RenderPodMonitor(defaultNameCluster, defaultNamespace, &exporter)
 	assert.NoError(t, err)
 	assert.Equal(t, expected.Name, result.Name)
 	assert.Equal(t, expected.Namespace, result.Namespace)

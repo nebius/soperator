@@ -35,7 +35,7 @@ func RenderDeployment(
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      naming.BuildDeploymentName(consts.ComponentTypeAccounting, clusterName),
+			Name:      naming.BuildDeploymentName(consts.ComponentTypeAccounting),
 			Namespace: namespace,
 			Labels:    labels,
 		},

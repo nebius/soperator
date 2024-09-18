@@ -184,6 +184,7 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.sshd = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/login_sshd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.munge = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/munge:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.populateJail = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/populate_jail:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.exporter = \"$(CONTAINER_REGISTRY_ADDR)/$(CONTAINER_REGISTRY_ID)/exporter:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@# endregion helm/slurm-cluster/values.yaml
 
 	@# region helm/slurm-cluster/templates/_registry_helpers.tpl
