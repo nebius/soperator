@@ -52,6 +52,7 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 						renderedDesired, err := populate_jail.RenderPopulateJailJob(
 							clusterValues.Namespace,
 							clusterValues.Name,
+							clusterValues.ClusterType,
 							clusterValues.NodeFilters,
 							clusterValues.VolumeSources,
 							&clusterValues.PopulateJail,

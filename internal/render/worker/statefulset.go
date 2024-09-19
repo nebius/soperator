@@ -19,8 +19,8 @@ import (
 func RenderStatefulSet(
 	namespace,
 	clusterName string,
+	clusterType consts.ClusterType,
 	nodeFilters []slurmv1.K8sNodeFilter,
-	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	worker *values.SlurmWorker,
 ) (appsv1.StatefulSet, error) {
@@ -47,9 +47,12 @@ func RenderStatefulSet(
 		): consts.AnnotationApparmorValueUnconfined,
 		consts.DefaultContainerAnnotationName: consts.ContainerNameSlurmd,
 	}
-	initContainers := []corev1.Container{
-		renderContainerToolkitValidation(&worker.ContainerToolkitValidation),
+
+	var initContainers []corev1.Container
+	if clusterType == consts.ClusterTypeGPU {
+		initContainers = append(initContainers, renderContainerToolkitValidation(&worker.ContainerToolkitValidation))
 	}
+
 	return appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      worker.StatefulSet.Name,
@@ -87,7 +90,13 @@ func RenderStatefulSet(
 					Tolerations:        nodeFilter.Tolerations,
 					InitContainers:     initContainers,
 					Containers: []corev1.Container{
-						renderContainerSlurmd(&worker.ContainerSlurmd, worker.JailSubMounts, clusterName, worker.CgroupVersion),
+						renderContainerSlurmd(
+							&worker.ContainerSlurmd,
+							worker.JailSubMounts,
+							clusterName,
+							clusterType,
+							worker.CgroupVersion,
+						),
 						common.RenderContainerMunge(&worker.ContainerMunge),
 					},
 					Volumes: volumes,

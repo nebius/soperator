@@ -17,6 +17,12 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	CRVersion string `json:"crVersion,omitempty"` // TODO backward compatibility
 
+	// ClusterType define type of slurm worker nodes
+	// +kubebuilder:validation:Enum=gpu;cpu
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="gpu"
+	ClusterType string `json:"clusterType,omitempty"`
+
 	// Pause defines whether to gracefully stop the cluster.
 	// Setting it to false after cluster has been paused starts the cluster back
 	//
