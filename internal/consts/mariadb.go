@@ -9,7 +9,7 @@ const (
 	MariaDbSecretName     = "mariadb-password"
 	MariaDbSecretRootName = "mariadb-root"
 	MariaDbPort           = 3306
-	MyCnf                 = `[mariadb]
+	MariaDbDefaultMyCnf   = `[mariadb]
 bind-address=*
 default_storage_engine=InnoDB
 innodb_default_row_format=DYNAMIC
