@@ -200,3 +200,10 @@ func BuildSecretSlurmdbdConfigsName(clusterName string) string {
 		entity:      consts.SecretSlurmdbdConfigs,
 	}.String()
 }
+
+func BuildMariaDbName(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.MariaDbClusterSuffix,
+	}.String()
+}
