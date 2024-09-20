@@ -21,6 +21,7 @@ import (
 	"flag"
 	"os"
 	"reflect"
+	"time"
 
 	"go.uber.org/zap/zapcore"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -36,6 +37,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	mariadv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
@@ -58,6 +60,9 @@ func init() {
 	}
 	if check.IsPrometheusCRDInstalled() {
 		utilruntime.Must(prometheusv1.AddToScheme(scheme))
+	}
+	if check.IsMariaDbCRDInstalled() {
+		utilruntime.Must(mariadv1alpha1.AddToScheme(scheme))
 	}
 
 	utilruntime.Must(slurmv1.AddToScheme(scheme))
@@ -108,6 +113,9 @@ func main() {
 		enableHTTP2          bool
 		logFormat            string
 		logLevel             string
+
+		cacheSyncTimeout time.Duration
+		maxConcurrency   int
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
@@ -121,6 +129,8 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.StringVar(&logFormat, "log-format", "json", "Log format: plain or json")
 	flag.StringVar(&logLevel, "log-level", "debug", "Log level: debug, info, warn, error, dpanic, panic, fatal")
+	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 5*time.Minute, "The maximum duration allowed for caching sync")
+	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.Parse()
 
 	opts := getZapOpts(logFormat, logLevel)
@@ -179,7 +189,7 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		mgr.GetEventRecorderFor(consts.SlurmCluster+"-controller"),
-	).SetupWithManager(mgr); err != nil {
+	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", reflect.TypeOf(slurmv1.SlurmCluster{}).Name())
 		os.Exit(1)
 	}
