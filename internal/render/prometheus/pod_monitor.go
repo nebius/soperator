@@ -3,8 +3,8 @@ package prometheus
 import (
 	"errors"
 
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	consts "nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/values"
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
@@ -13,13 +13,13 @@ import (
 
 func RenderPodMonitor(
 	clusterName, namespace string,
-	metrics *slurmv1.Telemetry,
+	exporterValues *values.SlurmExporter,
 ) (*prometheusv1.PodMonitor, error) {
-	if metrics == nil || metrics.Prometheus == nil || !metrics.Prometheus.Enabled {
+	if exporterValues == nil || &exporterValues.PodMonitorConfig == nil || !exporterValues.Enabled {
 		return nil, errors.New("prometheus PodMonitor is not enabled")
 	}
 
-	metricsSpec := metrics.Prometheus.PodMonitorConfig
+	metricsSpec := exporterValues.PodMonitorConfig
 
 	return &prometheusv1.PodMonitor{
 		ObjectMeta: metav1.ObjectMeta{

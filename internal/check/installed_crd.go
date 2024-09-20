@@ -4,6 +4,7 @@ import (
 	"os"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/values"
 )
 
 var (
@@ -27,8 +28,9 @@ func IsMariaDbCRDInstalled() bool {
 	return IsMariaDbOperatorCRDInstalled
 }
 
-func IsPrometheusEnabled(telemetry *slurmv1.Telemetry) bool {
-	if telemetry != nil && telemetry.Prometheus != nil && telemetry.Prometheus.Enabled {
+func IsPrometheusEnabled(exporter *values.SlurmExporter) bool {
+	if exporter != nil && exporter.Enabled {
+
 		return true
 	}
 	return false

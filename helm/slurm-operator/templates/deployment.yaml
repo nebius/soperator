@@ -47,6 +47,10 @@ spec:
             }}
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
+        - name: IS_PROMETHEUS_CRD_INSTALLED
+          value: {{ quote .Values.isPrometheusCrdInstalled }}
+        - name: IS_OPENTELEMETRY_COLLECTOR_CRD_INSTALLED
+          value: {{ quote .Values.isOpenTelemetryCollectorCrdInstalled }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
         imagePullPolicy: {{ .Values.controllerManager.manager.imagePullPolicy }}

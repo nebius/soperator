@@ -1,19 +1,3 @@
-/*
-Copyright 2024.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package v1
 
 import (
@@ -299,6 +283,9 @@ type SlurmNodes struct {
 	//
 	// +kubebuilder:validation:Required
 	Login SlurmNodeLogin `json:"login"`
+
+	// Exporter represents the Slurm exporter configuration
+	Exporter SlurmExporter `json:"exporter,omitempty"`
 }
 
 // Slurmdbd represents the Slurm database daemon configuration
@@ -520,6 +507,52 @@ type SlurmNodeLoginVolumes struct {
 	JailSubMounts []NodeVolumeJailSubMount `json:"jailSubMounts"`
 }
 
+// SlurmExporter defines the configuration for the Slurm exporter
+type SlurmExporter struct {
+	SlurmNode `json:",inline"`
+	// It has to be set to true if Prometheus Operator is used
+	//
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled,omitempty"`
+	// It references the PodMonitor configuration
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={jobLabel: "slurm-exporter", interval: "30s", scrapeTimeout: "20s"}
+	PodMonitorConfig PodMonitorConfig `json:"podMonitorConfig,omitempty"`
+	// Exporter represents the Slurm exporter daemon configuration
+	//
+	// +kubebuilder:validation:Required
+	Exporter ExporterContainer `json:"exporter,omitempty"`
+
+	// Munge represents the Slurm munge configuration
+	//
+	// +kubebuilder:validation:Required
+	Munge NodeContainer `json:"munge"`
+
+	// Volumes represents the volume configurations for the controller node
+	//
+	// +kubebuilder:validation:Required
+	Volumes SlurmExporterVolumes `json:"volumes"`
+}
+
+// ExporterContainer defines the configuration for one of node containers
+type ExporterContainer struct {
+	NodeContainer `json:",inline"`
+
+	// It references the PodTemplate with the Slurm Exporter configuration
+	//
+	// +kubebuilder:validation:Optional
+	PodTemplateNameRef *string `json:"podTemplateNameRef,omitempty"`
+}
+
+// SlurmExporterVolumes define the volumes for the Slurm controller node
+type SlurmExporterVolumes struct {
+	// Jail represents the jail data volume configuration
+	//
+	// +kubebuilder:validation:Required
+	Jail NodeVolume `json:"jail"`
+}
+
 // SlurmNode represents the common configuration for a Slurm node.
 type SlurmNode struct {
 	// Size defines the number of node instances
@@ -553,7 +586,7 @@ type NodeContainer struct {
 	// format of a string should be: '* <soft|hard> <item> <value>'
 	// example: '* soft nofile 1024'
 	//
-
+	// +kubebuilder:validation:Optional
 	SecurityLimitsConfig string `json:"securityLimitsConfig,omitempty"`
 }
 
@@ -596,13 +629,7 @@ type Telemetry struct {
 	//
 	// +kubebuilder:validation:Optional
 	OpenTelemetryCollector *MetricsOpenTelemetryCollector `json:"openTelemetryCollector,omitempty"`
-
-	// It has to be set to true if Prometheus Operator CRD is used
-	//
-	// +kubebuilder:validation:Optional
-	Prometheus *MetricsPrometheus `json:"prometheus,omitempty"`
-
-	// It has to be set to true if Kubernetes events for Slurm jobs are sent
+	//It has to be set to true if Kubernetes events for Slurm jobs are sent
 	//
 	// +kubebuilder:validation:Optional
 	JobsTelemetry *JobsTelemetry `json:"jobsTelemetry,omitempty"`
@@ -629,30 +656,7 @@ type MetricsOpenTelemetryCollector struct {
 	OtelCollectorPort int32 `json:"otelCollectorPort,omitempty"`
 }
 
-type MetricsPrometheus struct {
-	// It has to be set to true if Prometheus Operator is used
-	//
-	// +kubebuilder:default=false
-	Enabled bool `json:"enabled,omitempty"`
-	// Specifies image for Slurm Exporter
-	//
-	// +kubebuilder:validation:Optional
-	ImageSlurmExporter *string `json:"imageSlurmExporter,omitempty"`
-	// It references the PodTemplate with the Slurm Exporter configuration
-	//
-	// +kubebuilder:validation:Optional
-	PodTemplateNameRef *string `json:"podTemplateNameRef,omitempty"`
-	// Resources defines the [corev1.ResourceRequirements] for the container the Slurm Exporter
-	//
-	// +kubebuilder:validation:Optional
-	ResourcesSlurmExporter corev1.ResourceList `json:"resources,omitempty"`
-	// It references the PodMonitor configuration
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={jobLabel: "slurm-exporter", interval: "30s", scrapeTimeout: "20s"}
-	PodMonitorConfig PodMonitorConfig `json:"podMonitorConfig,omitempty"`
-}
-
+// JobsTelemetry
 // XValidation: both OtelCollectorGrpcHost and OtelCollectorHttpHost cannot have values at the same time
 //
 // +kubebuilder:validation:XValidation:rule="!(has(self.otelCollectorGrpcHost) && has(self.otelCollectorHttpHost))",message="Both OtelCollectorGrpcHost and OtelCollectorHttpHost cannot be set at the same time."
@@ -687,7 +691,7 @@ type JobsTelemetry struct {
 	OtelCollectorPath string `json:"otelCollectorPath,omitempty"`
 }
 
-// PodMonitor defines a prometheus PodMonitor object.
+// PodMonitorConfig defines a prometheus PodMonitor object.
 type PodMonitorConfig struct {
 	// JobLabel to add to the PodMonitor object. If not set, the default value is "slurm-exporter"
 	//

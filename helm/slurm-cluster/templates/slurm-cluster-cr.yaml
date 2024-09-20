@@ -176,6 +176,21 @@ spec:
           {{- required ".Values.slurmNodes.login.volumes.jail must be provided." .Values.slurmNodes.login.volumes.jail | toYaml | nindent 10 }}
         jailSubMounts:
           {{- default list .Values.slurmNodes.login.volumes.jailSubMounts | toYaml | nindent 10 }}
+    exporter:
+      enabled: {{ .Values.slurmNodes.exporter.enabled }}
+      size: {{ required ".Values.slurmNodes.exporter.size must be provided." .Values.slurmNodes.exporter.size }}
+      k8sNodeFilterName: {{ required ".Values.slurmNodes.exporter.k8sNodeFilterName must be provided." .Values.slurmNodes.exporter.k8sNodeFilterName | quote }}
+      exporter:
+        image: {{ required "exporter image" .Values.images.exporter | quote }}
+      munge:
+        image: {{ required "munge image" .Values.images.munge | quote }}
+        resources:
+          cpu: {{ required ".Values.slurmNodes.controller.munge.resources.cpu must be provided." .Values.slurmNodes.controller.munge.resources.cpu | quote}}
+          memory: {{ required ".Values.slurmNodes.controller.munge.resources.memory must be provided." .Values.slurmNodes.controller.munge.resources.memory | quote}}
+          ephemeral-storage: {{ required ".Values.slurmNodes.controller.munge.resources.ephemeralStorage must be provided." .Values.slurmNodes.controller.munge.resources.ephemeralStorage | quote}}
+      volumes:
+        jail:
+          {{- required ".Values.slurmNodes.exporter.volumes.jail must be provided." .Values.slurmNodes.exporter.volumes.jail | toYaml | nindent 10 }}
   {{- if .Values.telemetry }}
   telemetry:
     {{- if .Values.telemetry.jobsTelemetry }}
@@ -212,15 +227,6 @@ spec:
       {{- end }}
       {{- if .Values.telemetry.jobsTelemetry.otelCollectorPort }}
       otelCollectorPort: {{ .Values.telemetry.openTelemetryCollector.OtelCollectorPort }}
-      {{- end }}
-    {{- end }}
-    {{- if .Values.telemetry.prometheus }}
-    prometheus:
-      {{- if .Values.telemetry.prometheus.enabled }}
-      enabled: {{ .Values.telemetry.prometheus.enabled }}
-      {{- end }}
-      {{- if .Values.telemetry.prometheus.imageSlurmExporter }}
-      imageSlurmExporter: {{ .Values.telemetry.prometheus.imageSlurmExporter | quote }}
       {{- end }}
     {{- end }}
   {{- end }}

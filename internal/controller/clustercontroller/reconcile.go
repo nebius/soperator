@@ -213,6 +213,9 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 			if err = r.ReconcileCommon(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
+			if err = r.ReconcileAccounting(ctx, cluster, clusterValues); err != nil {
+				return ctrl.Result{}, err
+			}
 			if err = r.ReconcileNCCLBenchmark(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -222,13 +225,13 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 			if err = r.ReconcileWorkers(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
-			if err = r.ReconcileAccounting(ctx, cluster, clusterValues); err != nil {
-				return ctrl.Result{}, err
-			}
 			if clusterValues.NodeLogin.Size > 0 {
 				if err = r.ReconcileLogin(ctx, cluster, clusterValues); err != nil {
 					return ctrl.Result{}, err
 				}
+			}
+			if err = r.ReconcileExporter(ctx, cluster, clusterValues); err != nil {
+				return ctrl.Result{}, err
 			}
 
 			return ctrl.Result{}, nil
