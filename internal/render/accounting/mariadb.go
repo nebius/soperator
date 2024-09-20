@@ -101,7 +101,7 @@ func RenderMariaDb(
 	}, nil
 }
 
-func getMariaDbConfig(mariaDb slurmv1.MariaDbOpeator) (int32, int32, *bool) {
+func getMariaDbConfig(mariaDb slurmv1.MariaDbOperator) (int32, int32, *bool) {
 	port := int32(consts.MariaDbPort)
 	replicas := int32(1)
 	antiAffinityEnabled := ptr.To(false)
