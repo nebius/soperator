@@ -18,6 +18,7 @@ type SlurmAccounting struct {
 	Service    Service
 	Deployment Deployment
 	ExternalDB slurmv1.ExternalDB
+	MariaDb    slurmv1.MariaDbOpeator
 	Enabled    bool
 
 	VolumeJail slurmv1.NodeVolume
@@ -43,6 +44,7 @@ func buildAccountingFrom(clusterName string, accounting *slurmv1.SlurmNodeAccoun
 			naming.BuildDeploymentName(consts.ComponentTypeAccounting),
 		),
 		ExternalDB: accounting.ExternalDB,
+		MariaDb:    accounting.MariaDbOpeator,
 		Enabled:    accounting.Enabled,
 
 		VolumeJail: slurmv1.NodeVolume{
