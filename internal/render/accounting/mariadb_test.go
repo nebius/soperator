@@ -11,7 +11,7 @@ import (
 )
 
 func Test_GetMariaDbConfig(t *testing.T) {
-	mariaDb := slurmv1.MariaDbOpeator{
+	mariaDb := slurmv1.MariaDbOperator{
 		Enabled: true,
 		NodeContainer: slurmv1.NodeContainer{
 			Image: "mariadb:10.5",
@@ -48,7 +48,7 @@ func Test_RenderMariaDb(t *testing.T) {
 	portMariadb := int32(3306)
 	nodeFilterName := "cpu"
 	accounting := &values.SlurmAccounting{
-		MariaDb: slurmv1.MariaDbOpeator{
+		MariaDb: slurmv1.MariaDbOperator{
 			Replicas: replicas,
 			Enabled:  true,
 			NodeContainer: slurmv1.NodeContainer{
