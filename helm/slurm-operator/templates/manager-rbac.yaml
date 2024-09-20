@@ -155,6 +155,30 @@ rules:
   - update
   - watch
 - apiGroups:
+  - k8s.mariadb.com
+  resources:
+  - grants
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - k8s.mariadb.com
+  resources:
+  - mariadbs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - monitoring.coreos.com
   resources:
   - podmonitors
