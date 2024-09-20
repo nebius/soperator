@@ -4,6 +4,8 @@ import (
 	"context"
 	errorsStd "errors"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -17,10 +19,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -35,6 +39,7 @@ import (
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 
+	mariadv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
@@ -60,6 +65,8 @@ import (
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=podmonitors,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=core,resources=podtemplates,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;update;patch;delete;create
+//+kubebuilder:rbac:groups=k8s.mariadb.com,resources=mariadbs,verbs=get;list;watch;update;patch;delete;create
+//+kubebuilder:rbac:groups=k8s.mariadb.com,resources=grants,verbs=get;list;watch;update;patch;delete;create
 
 // SlurmClusterReconciler reconciles a SlurmCluster object
 type SlurmClusterReconciler struct {
@@ -79,6 +86,8 @@ type SlurmClusterReconciler struct {
 	Otel           *reconciler.OtelReconciler
 	PodMonitor     *reconciler.PodMonitorReconciler
 	Deployment     *reconciler.DeploymentReconciler
+	MariaDb        *reconciler.MariaDbReconciler
+	MariaDbGrant   *reconciler.MariaDbGrantReconciler
 }
 
 func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *SlurmClusterReconciler {
@@ -99,6 +108,8 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 		Otel:            reconciler.NewOtelReconciler(r),
 		PodMonitor:      reconciler.NewPodMonitorReconciler(r),
 		Deployment:      reconciler.NewDeploymentReconciler(r),
+		MariaDb:         reconciler.NewMariaDbReconciler(r),
+		MariaDbGrant:    reconciler.NewMariaDbGrantReconciler(r),
 	}
 }
 
@@ -437,30 +448,49 @@ const (
 	podTemplateField = ".spec.metrics.podTemplateNameRef"
 )
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	/*
-		The `PodTemplate` field must be indexed by the manager, so that we will be able to lookup `SlurmCluster` by a referenced `PodTemplateNameRef` name.
-		This will allow for quickly answer the question:
-		- If PodTemplate _x_ is updated, which SlurmCluster are affected?
-	*/
+func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency int, cacheSyncTimeout time.Duration) error {
+	if err := r.setupPodTemplateIndexer(mgr); err != nil {
+		return err
+	}
 
-	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &slurmv1.SlurmCluster{}, podTemplateField, func(rawObj client.Object) []string {
+	saPredicate := r.createServiceAccountPredicate()
+
+	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
+		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.GenerationChangedPredicate{}))
+
+	controllerBuilder.Watches(
+		&corev1.PodTemplate{},
+		handler.EnqueueRequestsFromMapFunc(r.findObjectsForPodTemplate),
+		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+	)
+
+	resourceChecks := r.createResourceChecks(saPredicate)
+
+	for _, resourceCheck := range resourceChecks {
+		if resourceCheck.Check {
+			for _, obj := range resourceCheck.Objects {
+				controllerBuilder.Owns(obj, builder.WithPredicates(resourceCheck.Predicate))
+			}
+		}
+	}
+
+	controllerBuilder.WithOptions(getDefaultOptions(maxConcurrency, cacheSyncTimeout))
+
+	return controllerBuilder.Complete(r)
+}
+
+func (r *SlurmClusterReconciler) setupPodTemplateIndexer(mgr ctrl.Manager) error {
+	return mgr.GetFieldIndexer().IndexField(context.Background(), &slurmv1.SlurmCluster{}, podTemplateField, func(rawObj client.Object) []string {
 		slurmCluster := rawObj.(*slurmv1.SlurmCluster)
 		if slurmCluster.Spec.Telemetry == nil || slurmCluster.Spec.Telemetry.OpenTelemetryCollector == nil || slurmCluster.Spec.Telemetry.OpenTelemetryCollector.PodTemplateNameRef == nil {
 			return nil
 		}
 		return []string{*slurmCluster.Spec.Telemetry.OpenTelemetryCollector.PodTemplateNameRef}
-	}); err != nil {
-		return err
-	}
+	})
+}
 
-	/*
-		We need to define a predicate to filter out delete events for ServiceAccount objects.
-		This is necessary because we want to ignore all events for ServiceAccount objects except for delete events.
-		We want to reconcile SlurmCluster resources just when a ServiceAccount is deleted.
-	*/
-	saPredicate := predicate.Funcs{
+func (r *SlurmClusterReconciler) createServiceAccountPredicate() predicate.Funcs {
+	return predicate.Funcs{
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			if sa, ok := e.Object.(*corev1.ServiceAccount); ok {
 				return sa.GetDeletionTimestamp() != nil
@@ -471,35 +501,6 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		UpdateFunc:  func(e event.UpdateEvent) bool { return false },
 		GenericFunc: func(e event.GenericEvent) bool { return false },
 	}
-
-	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
-		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
-		Owns(&corev1.Service{}).
-		Owns(&appsv1.StatefulSet{}).
-		Owns(&corev1.PersistentVolumeClaim{}).
-		Owns(&corev1.ConfigMap{}).
-		Owns(&batchv1.Job{}).
-		Owns(&batchv1.CronJob{}).
-		Owns(&corev1.Secret{}).
-		Owns(&rbacv1.Role{}).
-		Owns(&rbacv1.RoleBinding{}).
-		Watches(
-			&corev1.PodTemplate{},
-			handler.EnqueueRequestsFromMapFunc(r.findObjectsForPodTemplate),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		Owns(&corev1.ServiceAccount{}, builder.WithPredicates(saPredicate))
-
-	// Conditionally add OpenTelemetryCollector ownership
-	if check.IsOpenTelemetryCollectorCRDInstalled {
-		controllerBuilder.Owns(&otelv1beta1.OpenTelemetryCollector{})
-	}
-	// Conditionally add PrometheusOperator ownership
-	if check.IsPrometheusOperatorCRDInstalled {
-		controllerBuilder.Owns(&prometheusv1.PodMonitor{})
-	}
-
-	return controllerBuilder.Complete(r)
 }
 
 /*
@@ -532,4 +533,75 @@ func (r *SlurmClusterReconciler) findObjectsForPodTemplate(ctx context.Context, 
 		}
 	}
 	return requests
+}
+
+type ResourceCheck struct {
+	Check     bool
+	Objects   []client.Object
+	Predicate predicate.Predicate
+}
+
+func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Funcs) []ResourceCheck {
+	return []ResourceCheck{
+		{
+			Check: true,
+			Objects: []client.Object{
+				&corev1.Service{},
+				&appsv1.StatefulSet{},
+				&corev1.PersistentVolumeClaim{},
+				&corev1.ConfigMap{},
+				&batchv1.Job{},
+				&batchv1.CronJob{},
+				&corev1.Secret{},
+				&rbacv1.Role{},
+				&rbacv1.RoleBinding{},
+			},
+			Predicate: predicate.GenerationChangedPredicate{},
+		},
+		{
+			Check: true,
+			Objects: []client.Object{
+				&corev1.ServiceAccount{},
+			},
+			Predicate: saPredicate,
+		},
+		{
+			Check: check.IsOpenTelemetryCollectorCRDInstalled,
+			Objects: []client.Object{
+				&otelv1beta1.OpenTelemetryCollector{},
+			},
+			Predicate: predicate.GenerationChangedPredicate{},
+		},
+		{
+			Check: check.IsPrometheusOperatorCRDInstalled,
+			Objects: []client.Object{
+				&prometheusv1.PodMonitor{},
+			},
+			Predicate: predicate.GenerationChangedPredicate{},
+		},
+		{
+			Check: check.IsMariaDbOperatorCRDInstalled,
+			Objects: []client.Object{
+				&mariadv1alpha1.MariaDB{},
+				&mariadv1alpha1.Grant{},
+			},
+			Predicate: predicate.GenerationChangedPredicate{},
+		},
+	}
+}
+
+var (
+	optionsInit    sync.Once
+	defaultOptions *controller.Options
+)
+
+func getDefaultOptions(maxConcurrency int, cacheSyncTimeout time.Duration) controller.Options {
+	optionsInit.Do(func() {
+		defaultOptions = &controller.Options{
+			RateLimiter:             workqueue.NewItemExponentialFailureRateLimiter(2*time.Second, 2*time.Minute),
+			CacheSyncTimeout:        cacheSyncTimeout,
+			MaxConcurrentReconciles: maxConcurrency,
+		}
+	})
+	return *defaultOptions
 }
