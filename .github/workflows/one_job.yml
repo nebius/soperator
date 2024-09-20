@@ -3,6 +3,9 @@ name: Build All in one job
 on:
   push:
 
+permissions:
+  contents: read
+
 jobs:
   pre-build:
     runs-on: self-hosted
@@ -11,6 +14,11 @@ jobs:
       UNSTABLE: ${{ steps.set-env.outputs.unstable }}
 
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@91182cccc01eb5e619899d80e4e971d6181294a7 # v2.10.1
+        with:
+          egress-policy: audit
+
       - name: Set environment to global output variables based on branch
         id: set-env
         run: |
@@ -30,21 +38,26 @@ jobs:
     needs: pre-build
 
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@91182cccc01eb5e619899d80e4e971d6181294a7 # v2.10.1
+        with:
+          egress-policy: audit
+
       - name: Debug vars
         run: echo "UNSTABLE - is ${{ needs.pre-build.outputs.unstable }}"
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - name: Install GO
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
             go-version-file: 'go.mod'
 
       - run: go version
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
 
       - name: Run all
         run: |
