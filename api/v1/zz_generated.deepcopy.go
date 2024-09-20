@@ -127,6 +127,16 @@ func (in *K8sNodeFilter) DeepCopy() *K8sNodeFilter {
 func (in *MariaDbOpeator) DeepCopyInto(out *MariaDbOpeator) {
 	*out = *in
 	in.NodeContainer.DeepCopyInto(&out.NodeContainer)
+	if in.PodSecurityContext != nil {
+		in, out := &in.PodSecurityContext, &out.PodSecurityContext
+		*out = new(corev1.PodSecurityContext)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.SecurityContext != nil {
+		in, out := &in.SecurityContext, &out.SecurityContext
+		*out = new(corev1.SecurityContext)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Metrics != nil {
 		in, out := &in.Metrics, &out.Metrics
 		*out = new(v1alpha1.MariadbMetrics)
