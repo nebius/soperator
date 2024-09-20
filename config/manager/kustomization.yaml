@@ -2,5 +2,5 @@ resources:
   - manager.yaml
 images:
   - name: controller
-    newName: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/slurm-operator
-    newTag: 1.14.1
+    newName: ghcr.io/nebius/soperator/slurm-operator
+    newTag: 1.13.5
