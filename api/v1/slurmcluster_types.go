@@ -5,6 +5,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	mariadv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
 
@@ -315,6 +316,10 @@ type SlurmNodeAccounting struct {
 	//
 	// +kubebuilder:validation:Optional
 	ExternalDB ExternalDB `json:"externalDB,omitempty"`
+	// MariaDbOpeator represents the MariaDB CRD configuration
+	//
+	// +kubebuilder:validation:Optional
+	MariaDbOpeator MariaDbOpeator `json:"mariaDbOpeator"`
 }
 
 // ExternalDB represents the external database configuration of connection string
@@ -352,6 +357,18 @@ type PasswordSecretKeyRef struct {
 	//
 	// +kubebuilder:validation:Optional
 	Key string `json:"key"`
+}
+
+type MariaDbOpeator struct {
+	// +kubebuilder:validation:Optional
+	Enabled bool `json:"enabled"`
+
+	NodeContainer `json:",inline"`
+
+	Replicas    int32                          `json:"replicas"`
+	Metrics     *mariadv1alpha1.MariadbMetrics `json:"metrics,omitempty"`
+	Replication *mariadv1alpha1.Replication    `json:"replication,omitempty"`
+	Storage     mariadv1alpha1.Storage         `json:"storage,omitempty"`
 }
 
 // SlurmNodeController defines the configuration for the Slurm controller node
