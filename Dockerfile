@@ -1,4 +1,4 @@
-FROM golang:1.22 AS operator_builder
+FROM golang:1.22@sha256:4594271250150c1a322ed749abfd218e1a8c6eb1ade90872e325a664412e2037 AS operator_builder
 
 ARG GO_LDFLAGS=""
 ARG BUILD_TIME
@@ -16,7 +16,7 @@ RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
     go build -o slurm_operator ./cmd/
 
 #######################################################################################################################
-FROM alpine:latest AS slurm-operator
+FROM alpine:latest@sha256:beefdbd8a1da6d2915566fde36db9db0b524eb737fc57cd1367effd16dc0d06d AS slurm-operator
 
 COPY --from=operator_builder /operator/slurm_operator /usr/bin/
 
