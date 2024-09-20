@@ -54,3 +54,7 @@ metricsService:
       protocol: TCP
       targetPort: https
   type: ClusterIP
+# True if the Prometheus CRD is installed in the cluster kubernetes (default false)
+isPrometheusCrdInstalled: false
+# True if the OpenTelemetry Collector CRD is installed in the cluster kubernetes (default false)
+isOpenTelemetryCollectorCrdInstalled: false
