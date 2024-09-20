@@ -64,6 +64,8 @@ func (r *MariaDbReconciler) patch(existing, desired client.Object) (client.Patch
 		dst.Spec.NodeSelector = src.Spec.NodeSelector
 		dst.Spec.Resources = src.Spec.Resources
 		dst.Spec.Metrics = src.Spec.Metrics
+		dst.Spec.SecurityContext = src.Spec.SecurityContext
+		dst.Spec.PodSecurityContext = src.Spec.PodSecurityContext
 		return res
 	}
 	return patchImpl(existing.(*mariadv1alpha1.MariaDB), desired.(*mariadv1alpha1.MariaDB)), nil
