@@ -42,15 +42,17 @@ spec:
         command:
         - /usr/bin/slurm_operator
         env:
+        - name: IS_OPENTELEMETRY_COLLECTOR_CRD_INSTALLED
+          value: {{ quote .Values.controllerManager.manager.env.isOpentelemetryCollectorCrdInstalled
+            }}
+        - name: IS_PROMETHEUS_CRD_INSTALLED
+          value: {{ quote .Values.controllerManager.manager.env.isPrometheusCrdInstalled
+            }}
         - name: SLURM_OPERATOR_WATCH_NAMESPACES
           value: {{ quote .Values.controllerManager.manager.env.slurmOperatorWatchNamespaces
             }}
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
-        - name: IS_PROMETHEUS_CRD_INSTALLED
-          value: {{ quote .Values.isPrometheusCrdInstalled }}
-        - name: IS_OPENTELEMETRY_COLLECTOR_CRD_INSTALLED
-          value: {{ quote .Values.isOpenTelemetryCollectorCrdInstalled }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
         imagePullPolicy: {{ .Values.controllerManager.manager.imagePullPolicy }}

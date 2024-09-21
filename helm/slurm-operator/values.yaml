@@ -30,6 +30,8 @@ controllerManager:
         drop:
           - ALL
     env:
+      isOpentelemetryCollectorCrdInstalled: "false"
+      isPrometheusCrdInstalled: "false"
       slurmOperatorWatchNamespaces: '*'
     image:
       repository: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/slurm-operator
@@ -52,7 +54,3 @@ metricsService:
       protocol: TCP
       targetPort: https
   type: ClusterIP
-# True if the Prometheus CRD is installed in the cluster kubernetes (default false)
-isPrometheusCrdInstalled: false
-# True if the OpenTelemetry Collector CRD is installed in the cluster kubernetes (default false)
-isOpenTelemetryCollectorCrdInstalled: false
