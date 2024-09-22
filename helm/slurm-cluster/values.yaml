@@ -235,11 +235,11 @@ telemetry: {}
 #   otelCollectorPort: 8429
 
 images:
-  slurmctld: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/controller_slurmctld:1.14.0-jammy-slurm24.05.2"
-  slurmd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/worker_slurmd:1.14.0-jammy-slurm24.05.2"
-  sshd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/login_sshd:1.14.0-jammy-slurm24.05.2"
-  munge: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/munge:1.14.0-jammy-slurm24.05.2"
-  populateJail: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/populate_jail:1.14.0-jammy-slurm24.05.2"
-  ncclBenchmark: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/nccl_benchmark:1.14.0-jammy-slurm24.05.2"
-  slurmdbd: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/controller_slurmdbd:1.14.0-jammy-slurm24.05.2
-  exporter: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/exporter:1.14.0-jammy-slurm24.05.2"
+  slurmctld: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/controller_slurmctld:1.14.1-jammy-slurm24.05.2"
+  slurmd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/worker_slurmd:1.14.1-jammy-slurm24.05.2"
+  sshd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/login_sshd:1.14.1-jammy-slurm24.05.2"
+  munge: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/munge:1.14.1-jammy-slurm24.05.2"
+  populateJail: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/populate_jail:1.14.1-jammy-slurm24.05.2"
+  ncclBenchmark: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/nccl_benchmark:1.14.1-jammy-slurm24.05.2"
+  slurmdbd: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/controller_slurmdbd:1.14.1-jammy-slurm24.05.2
+  exporter: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/exporter:1.14.1-jammy-slurm24.05.2"

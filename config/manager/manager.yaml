@@ -79,7 +79,7 @@ spec:
             value: "false"
           - name: SLURM_OPERATOR_WATCH_NAMESPACES
             value: "*"
-        image: controller:1.14.0
+        image: controller:1.14.1
         imagePullPolicy: Always
         name: manager
         securityContext:
