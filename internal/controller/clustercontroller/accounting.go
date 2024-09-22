@@ -200,14 +200,14 @@ func (r SlurmClusterReconciler) ValidateAccounting(
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:   slurmv1.ConditionClusterAccountingAvailable,
 			Status: metav1.ConditionFalse, Reason: "NotAvailable",
-			Message: "Slurm accounting are not available yet",
+			Message: "Slurm accounting is not available yet",
 		})
 		return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 10}, nil
 	} else {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:   slurmv1.ConditionClusterAccountingAvailable,
 			Status: metav1.ConditionTrue, Reason: "Available",
-			Message: "Slurm accounting are available",
+			Message: "Slurm accounting is available",
 		})
 	}
 

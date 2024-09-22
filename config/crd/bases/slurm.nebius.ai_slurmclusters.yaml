@@ -31,6 +31,10 @@ spec:
       jsonPath: .spec.slurmNodes.login.size
       name: Login
       type: integer
+    - description: Whether accounting is enabled
+      jsonPath: .spec.slurmNodes.accounting.enabled
+      name: Accounting
+      type: boolean
     name: v1
     schema:
       openAPIV3Schema:

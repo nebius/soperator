@@ -711,7 +711,7 @@ const (
 	ConditionClusterControllersAvailable = "ControllersAvailable"
 	ConditionClusterWorkersAvailable     = "WorkersAvailable"
 	ConditionClusterLoginAvailable       = "LoginAvailable"
-	ConditionClusterAccountingAvailable  = "SlurmdbdAvailable"
+	ConditionClusterAccountingAvailable  = "AccountingAvailable"
 
 	PhaseClusterReconciling  = "Reconciling"
 	PhaseClusterNotAvailable = "Not available"
@@ -736,6 +736,7 @@ type SlurmClusterStatus struct {
 // +kubebuilder:printcolumn:name="Controllers",type=integer,JSONPath=`.spec.slurmNodes.controller.size`,description="The number of controller nodes"
 // +kubebuilder:printcolumn:name="Workers",type=integer,JSONPath=`.spec.slurmNodes.worker.size`,description="The number of worker nodes"
 // +kubebuilder:printcolumn:name="Login",type=integer,JSONPath=`.spec.slurmNodes.login.size`,description="The number of login nodes"
+// +kubebuilder:printcolumn:name="Accounting",type=boolean,JSONPath=`.spec.slurmNodes.accounting.enabled`,description="Whether accounting is enabled"
 type SlurmCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

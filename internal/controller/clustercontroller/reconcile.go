@@ -247,6 +247,13 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 	res, err = r.runWithPhase(ctx, cluster,
 		ptr.To(slurmv1.PhaseClusterNotAvailable),
 		func() (ctrl.Result, error) {
+			// Common
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:   slurmv1.ConditionClusterCommonAvailable,
+				Status: metav1.ConditionTrue, Reason: "Available",
+				Message: "Slurm common components are available",
+			})
+
 			// Controllers
 			if res, err := r.ValidateControllers(ctx, cluster, clusterValues); err != nil {
 				logger.Error(err, "Failed to validate Slurm controllers")
@@ -271,14 +278,28 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 				} else if res.Requeue {
 					return res, nil
 				}
+			} else {
+				meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+					Type:   slurmv1.ConditionClusterLoginAvailable,
+					Status: metav1.ConditionFalse, Reason: "NotAvailable",
+					Message: "Slurm Login is disabled",
+				})
 			}
 
 			// Accounting
-			if res, err := r.ValidateAccounting(ctx, cluster, clusterValues); err != nil {
-				logger.Error(err, "Failed to validate Slurm accounting")
-				return ctrl.Result{}, errors.Wrap(err, "validating Slurm accounting")
-			} else if res.Requeue {
-				return res, nil
+			if clusterValues.NodeAccounting.Enabled {
+				if res, err := r.ValidateAccounting(ctx, cluster, clusterValues); err != nil {
+					logger.Error(err, "Failed to validate Slurm accounting")
+					return ctrl.Result{}, errors.Wrap(err, "validating Slurm accounting")
+				} else if res.Requeue {
+					return res, nil
+				}
+			} else {
+				meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+					Type:   slurmv1.ConditionClusterAccountingAvailable,
+					Status: metav1.ConditionFalse, Reason: "NotAvailable",
+					Message: "Slurm accounting is disabled",
+				})
 			}
 
 			return ctrl.Result{}, nil
@@ -338,6 +359,15 @@ func (r *SlurmClusterReconciler) setUpConditions(cluster *slurmv1.SlurmCluster) 
 			Status:  metav1.ConditionUnknown,
 			Reason:  "Reconciling",
 			Message: "Reconciling Slurm Login",
+		},
+	)
+	meta.SetStatusCondition(
+		&cluster.Status.Conditions,
+		metav1.Condition{
+			Type:    slurmv1.ConditionClusterAccountingAvailable,
+			Status:  metav1.ConditionUnknown,
+			Reason:  "Reconciling",
+			Message: "Reconciling Slurm Accounting",
 		},
 	)
 }
