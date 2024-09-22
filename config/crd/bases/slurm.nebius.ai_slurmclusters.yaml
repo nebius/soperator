@@ -1417,7 +1417,11 @@ spec:
                 description: SlurmNodes define the desired state of Slurm nodes
                 properties:
                   accounting:
-                    description: Slurmdbd represents the Slurm database daemon configuration
+                    description: |-
+                      Accounting represents the Slurm accounting configuration
+
+
+                      TODO: Making accounting optional requires SlurmNode.K8sNodeFilterName to be optional.
                     properties:
                       enabled:
                         default: false
@@ -1499,7 +1503,7 @@ spec:
                         format: int32
                         type: integer
                       slurmdbd:
-                        description: Slurmdbd represents the Slurm control daemon
+                        description: Slurmdbd represents the Slurm database daemon
                           configuration
                         properties:
                           image:
@@ -2041,7 +2045,11 @@ spec:
                     - volumes
                     type: object
                   exporter:
-                    description: Exporter represents the Slurm exporter configuration
+                    description: |-
+                      Exporter represents the Slurm exporter configuration
+
+
+                      TODO: Making exporter optional requires SlurmNode.K8sNodeFilterName to be optional.
                     properties:
                       enabled:
                         default: false
@@ -3457,6 +3465,7 @@ spec:
                 required:
                 - accounting
                 - controller
+                - exporter
                 - login
                 - worker
                 type: object

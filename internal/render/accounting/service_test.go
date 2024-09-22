@@ -5,8 +5,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
 	"nebius.ai/slurm-operator/internal/consts"
-	accounting "nebius.ai/slurm-operator/internal/render/accounting"
+	"nebius.ai/slurm-operator/internal/render/accounting"
 	"nebius.ai/slurm-operator/internal/render/common"
 )
 
@@ -14,7 +15,7 @@ func Test_RenderService(t *testing.T) {
 	namespace := "test-namespace"
 	clusterName := "test-cluster"
 
-	service, err := accounting.RenderService(namespace, clusterName, *acc)
+	service, err := accounting.RenderService(namespace, clusterName, acc)
 	assert.NoError(t, err)
 
 	assert.Equal(t, acc.Service.Name, service.Name)

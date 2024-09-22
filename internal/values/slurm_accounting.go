@@ -8,9 +8,11 @@ import (
 	"nebius.ai/slurm-operator/internal/naming"
 )
 
-// Accounting contains the data needed to deploy and reconcile the Slurm Controllers
+// SlurmAccounting contains the data needed to deploy and reconcile the Slurm Controllers
 type SlurmAccounting struct {
 	slurmv1.SlurmNode
+
+	Enabled bool
 
 	ContainerAccounting Container
 	ContainerMunge      Container
@@ -18,7 +20,6 @@ type SlurmAccounting struct {
 	Service    Service
 	Deployment Deployment
 	ExternalDB slurmv1.ExternalDB
-	Enabled    bool
 
 	VolumeJail slurmv1.NodeVolume
 }
@@ -33,6 +34,7 @@ func buildAccountingFrom(clusterName string, accounting *slurmv1.SlurmNodeAccoun
 	}
 	return SlurmAccounting{
 		SlurmNode:           *accounting.SlurmNode.DeepCopy(),
+		Enabled:             accounting.Enabled,
 		ContainerAccounting: containerAcc,
 		ContainerMunge: buildContainerFrom(
 			accounting.Munge,
@@ -43,8 +45,6 @@ func buildAccountingFrom(clusterName string, accounting *slurmv1.SlurmNodeAccoun
 			naming.BuildDeploymentName(consts.ComponentTypeAccounting),
 		),
 		ExternalDB: accounting.ExternalDB,
-		Enabled:    accounting.Enabled,
-
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),
 		},

@@ -98,25 +98,25 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
-					if clusterValues.NodeAccounting.Enabled {
-						desired, err := accounting.RenderService(
-							clusterValues.Namespace,
-							clusterValues.Name,
-							clusterValues.NodeAccounting,
-						)
-						if err != nil {
-							stepLogger.Error(err, "Failed to render")
-							return errors.Wrap(err, "rendering accounting Service")
-						}
-						stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-						stepLogger.Info("Rendered")
 
-						if err = r.Service.Reconcile(ctx, cluster, desired); err != nil {
-							stepLogger.Error(err, "Failed to reconcile")
-							return errors.Wrap(err, "reconciling accounting Deployment")
-						}
-						stepLogger.Info("Reconciled")
+					desired, err := accounting.RenderService(
+						clusterValues.Namespace,
+						clusterValues.Name,
+						&clusterValues.NodeAccounting,
+					)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering accounting Service")
 					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
+					stepLogger.Info("Rendered")
+
+					if err = r.Service.Reconcile(ctx, cluster, desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling accounting Deployment")
+					}
+					stepLogger.Info("Reconciled")
+
 					return nil
 				},
 			},
@@ -125,34 +125,34 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
-					if clusterValues.NodeAccounting.Enabled {
-						desired, err := accounting.RenderDeployment(
-							clusterValues.Namespace,
-							clusterValues.Name,
-							&clusterValues.NodeAccounting,
-							clusterValues.NodeFilters,
-							clusterValues.VolumeSources,
-						)
-						if err != nil {
-							stepLogger.Error(err, "Failed to render")
-							return errors.Wrap(err, "rendering accounting Deployment")
-						}
-						stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-						stepLogger.Info("Rendered")
 
-						deps, err := r.getAccountingDeploymentDependencies(ctx, clusterValues)
-						if err != nil {
-							stepLogger.Error(err, "Failed to retrieve dependencies")
-							return errors.Wrap(err, "retrieving dependencies for accounting Deployment")
-						}
-						stepLogger.Info("Retrieved dependencies")
-
-						if err = r.Deployment.Reconcile(ctx, cluster, desired, deps...); err != nil {
-							stepLogger.Error(err, "Failed to reconcile")
-							return errors.Wrap(err, "reconciling accounting Deployment")
-						}
-						stepLogger.Info("Reconciled")
+					desired, err := accounting.RenderDeployment(
+						clusterValues.Namespace,
+						clusterValues.Name,
+						&clusterValues.NodeAccounting,
+						clusterValues.NodeFilters,
+						clusterValues.VolumeSources,
+					)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering accounting Deployment")
 					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
+					stepLogger.Info("Rendered")
+
+					deps, err := r.getAccountingDeploymentDependencies(ctx, clusterValues)
+					if err != nil {
+						stepLogger.Error(err, "Failed to retrieve dependencies")
+						return errors.Wrap(err, "retrieving dependencies for accounting Deployment")
+					}
+					stepLogger.Info("Retrieved dependencies")
+
+					if err = r.Deployment.Reconcile(ctx, cluster, desired, deps...); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling accounting Deployment")
+					}
+					stepLogger.Info("Reconciled")
+
 					return nil
 				},
 			},
