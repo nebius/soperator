@@ -263,9 +263,10 @@ type Secrets struct {
 
 // SlurmNodes define the desired state of the Slurm nodes
 type SlurmNodes struct {
-	// Slurmdbd represents the Slurm database daemon configuration
+	// Accounting represents the Slurm accounting configuration
 	//
-	// +kubebuilder:validation:optional
+	// TODO: Making accounting optional requires SlurmNode.K8sNodeFilterName to be optional.
+	// +kubebuilder:validation:Required
 	Accounting SlurmNodeAccounting `json:"accounting"`
 
 	// Controller represents the Slurm controller node configuration
@@ -284,10 +285,13 @@ type SlurmNodes struct {
 	Login SlurmNodeLogin `json:"login"`
 
 	// Exporter represents the Slurm exporter configuration
-	Exporter SlurmExporter `json:"exporter,omitempty"`
+	//
+	// TODO: Making exporter optional requires SlurmNode.K8sNodeFilterName to be optional.
+	// +kubebuilder:validation:Required
+	Exporter SlurmExporter `json:"exporter"`
 }
 
-// Slurmdbd represents the Slurm database daemon configuration
+// SlurmNodeAccounting represents the Slurm accounting configuration
 type SlurmNodeAccounting struct {
 	SlurmNode `json:",inline"`
 
@@ -295,20 +299,22 @@ type SlurmNodeAccounting struct {
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
-	Enabled bool `json:"enabled"`
-	// Slurmdbd represents the Slurm control daemon configuration
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Slurmdbd represents the Slurm database daemon configuration
 	//
 	// +kubebuilder:validation:Optional
-	Slurmdbd NodeContainer `json:"slurmdbd"`
+	Slurmdbd NodeContainer `json:"slurmdbd,omitempty"`
 
 	// Munge represents the Slurm munge configuration
 	//
 	// +kubebuilder:validation:Optional
-	Munge NodeContainer `json:"munge"`
+	Munge NodeContainer `json:"munge,omitempty"`
+
 	// ExternalDB represents the external database configuration of connection string
 	//
 	// +kubebuilder:validation:Optional
-	ExternalDB ExternalDB `json:"externalDB"`
+	ExternalDB ExternalDB `json:"externalDB,omitempty"`
 }
 
 // ExternalDB represents the external database configuration of connection string
@@ -705,7 +711,7 @@ const (
 	ConditionClusterControllersAvailable = "ControllersAvailable"
 	ConditionClusterWorkersAvailable     = "WorkersAvailable"
 	ConditionClusterLoginAvailable       = "LoginAvailable"
-	ConditionClusterAccountingAvailable  = "SlurmdbdAvailable"
+	ConditionClusterAccountingAvailable  = "AccountingAvailable"
 
 	PhaseClusterReconciling  = "Reconciling"
 	PhaseClusterNotAvailable = "Not available"
@@ -730,6 +736,7 @@ type SlurmClusterStatus struct {
 // +kubebuilder:printcolumn:name="Controllers",type=integer,JSONPath=`.spec.slurmNodes.controller.size`,description="The number of controller nodes"
 // +kubebuilder:printcolumn:name="Workers",type=integer,JSONPath=`.spec.slurmNodes.worker.size`,description="The number of worker nodes"
 // +kubebuilder:printcolumn:name="Login",type=integer,JSONPath=`.spec.slurmNodes.login.size`,description="The number of login nodes"
+// +kubebuilder:printcolumn:name="Accounting",type=boolean,JSONPath=`.spec.slurmNodes.accounting.enabled`,description="Whether accounting is enabled"
 type SlurmCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
