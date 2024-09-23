@@ -34,7 +34,7 @@ controllerManager:
       isPrometheusCrdInstalled: "false"
       slurmOperatorWatchNamespaces: '*'
     image:
-      repository: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/slurm-operator
+      repository: ghcr.io/nebius/soperator/slurm-operator
       tag: 1.14.1
     imagePullPolicy: Always
     resources:
