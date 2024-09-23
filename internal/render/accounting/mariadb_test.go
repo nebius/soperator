@@ -49,6 +49,7 @@ func Test_RenderMariaDb(t *testing.T) {
 	nodeFilterName := "cpu"
 	accounting := &values.SlurmAccounting{
 		MariaDb: slurmv1.MariaDbOperator{
+
 			Replicas: replicas,
 			Enabled:  true,
 			NodeContainer: slurmv1.NodeContainer{

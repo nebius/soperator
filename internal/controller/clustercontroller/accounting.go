@@ -98,7 +98,6 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
-
 					desired, err := accounting.RenderService(
 						clusterValues.Namespace,
 						clusterValues.Name,
@@ -116,7 +115,6 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						return errors.Wrap(err, "reconciling accounting Deployment")
 					}
 					stepLogger.Info("Reconciled")
-
 					return nil
 				},
 			},
@@ -125,7 +123,6 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
-
 					desired, err := accounting.RenderDeployment(
 						clusterValues.Namespace,
 						clusterValues.Name,

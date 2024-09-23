@@ -366,7 +366,7 @@ type MariaDbOperator struct {
 	NodeContainer      `json:",inline"`
 	PodSecurityContext *corev1.PodSecurityContext     `json:"podSecurityContext,omitempty"`
 	SecurityContext    *corev1.SecurityContext        `json:"securityContext,omitempty"`
-	Replicas           int32                          `json:"replicas"`
+	Replicas           int32                          `json:"replicas,omitempty"`
 	Metrics            *mariadv1alpha1.MariadbMetrics `json:"metrics,omitempty"`
 	Replication        *mariadv1alpha1.Replication    `json:"replication,omitempty"`
 	Storage            mariadv1alpha1.Storage         `json:"storage,omitempty"`
