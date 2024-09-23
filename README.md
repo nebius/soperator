@@ -101,11 +101,6 @@ users' one.
 
 
 
-### Observability
-This solution implements integration with a monitoring stack that can be installed separately (though we provide Helm
-charts for that). It consists of gathering various Slurm statistics and hardware utilization metrics. Users can observe
-this information on the dashboards we provide as well.
-
 
 
 ## ❌ Limitations
