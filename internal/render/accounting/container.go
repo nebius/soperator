@@ -2,6 +2,7 @@ package accounting
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -29,16 +30,17 @@ func renderContainerAccounting(container values.Container) corev1.Container {
 			RenderVolumeMountSlurmdbdConfigs(),
 			RenderVolumeMountSlurmdbdSpool(),
 		},
-		ReadinessProbe: &corev1.Probe{
+		LivenessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{
-						"/bin/sh",
-						"-c",
-						"/usr/bin/sacct > /dev/null && exit 0 || exit 1",
-					},
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.IntOrString(intstr.FromInt(int(container.Port))),
 				},
 			},
+			FailureThreshold:    5,
+			InitialDelaySeconds: 15,
+			PeriodSeconds:       10,
+			SuccessThreshold:    1,
+			TimeoutSeconds:      1,
 		},
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{

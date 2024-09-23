@@ -103,14 +103,6 @@ periodicChecks:
 slurmNodes:
   accounting:
     enabled: false
-    externalDB:
-      enabled: false
-      # host: ""
-      # port: 3306
-      # user: ""
-      # passwordSecretKeyRef:
-      #   name: ""
-      #   key: ""
     k8sNodeFilterName: "no-gpu"
     slurmdbd:
       port: 6819
@@ -123,6 +115,79 @@ slurmNodes:
         cpu: "1000m"
         memory: "1Gi"
         ephemeralStorage: "5Gi"
+    externalDB:
+      enabled: false
+      # host: ""
+      # port: 3306
+      # user: ""
+      # passwordSecretKeyRef:
+      #   name: ""
+      #   key: ""
+    mariaDbOpertor:
+      enabled: false
+      resources:
+        cpu: "1000m"
+        memory: "1Gi"
+        ephemeralStorage: "5Gi"
+      replicas: 1
+      replication: {}
+      # enabled: false
+      # primary: {}
+      # probesEnabled: false
+      # replica: {}
+      # syncBinlog: false
+      storage: {}
+      # ephemeral: false
+      # resizeInUseVolumes: false
+      # size: {}
+      # storageClassName: ""
+      # volumeClaimTemplate: ""
+      # waitForVolumeResize: false
+      podSecurityContext: {}
+      # fsGroup: 2000
+      # runAsUser: 1000
+      # runAsGroup: 3000
+      # runAsNonRoot: true
+      # supplementalGroups: [1000]
+      securityContext: {}
+      # runAsUser: 1000
+      # runAsGroup: 3000
+      # runAsNonRoot: true
+      # capabilities:
+      #   add: ["NET_ADMIN", "SYS_TIME"]
+      metrics:
+        enabled: false
+        serviceMonitor:
+          enabled: false
+          # jobLabel: ""
+          # interval: ""
+          # scrapeTimeout: ""
+      exporter: {}
+      # affinity: {}
+      # args: []
+      # env: []
+      # envFrom: []
+      # image: ""
+      # imagePullPolicy: ""
+      # imagePullSecrets: []
+      # initContainers: []
+      # livenessProbe: {}
+      # nodeSelector: {}
+      # podMetadata: {}
+      # securityContext: {}
+      # serviceAccountName: ""
+      # sidecarContainers: []
+      # tolerations: []
+      # resources: {}
+      # volumeMounts: []
+      # volumes: []
+      # resources: {}
+      #   limits:
+      #     cpu: "100m"
+      #     memory: "128Mi"
+      #   requests:
+      #     cpu: "50m"
+      #     memory: "64Mi"
   controller:
     size: 2
     k8sNodeFilterName: "no-gpu"

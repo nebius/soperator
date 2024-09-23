@@ -114,7 +114,7 @@ var (
 			},
 			Enabled: true,
 		},
-		MariaDb: slurmv1.MariaDbOpeator{
+		MariaDb: slurmv1.MariaDbOperator{
 			Enabled: false,
 		},
 		Enabled: true,

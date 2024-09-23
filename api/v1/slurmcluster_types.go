@@ -319,7 +319,7 @@ type SlurmNodeAccounting struct {
 	// MariaDbOpeator represents the MariaDB CRD configuration
 	//
 	// +kubebuilder:validation:Optional
-	MariaDbOpeator MariaDbOpeator `json:"mariaDbOpeator"`
+	MariaDbOperator MariaDbOperator `json:"mariadbOperator,omitempty"`
 }
 
 // ExternalDB represents the external database configuration of connection string
@@ -359,16 +359,17 @@ type PasswordSecretKeyRef struct {
 	Key string `json:"key"`
 }
 
-type MariaDbOpeator struct {
+type MariaDbOperator struct {
 	// +kubebuilder:validation:Optional
 	Enabled bool `json:"enabled"`
 
-	NodeContainer `json:",inline"`
-
-	Replicas    int32                          `json:"replicas"`
-	Metrics     *mariadv1alpha1.MariadbMetrics `json:"metrics,omitempty"`
-	Replication *mariadv1alpha1.Replication    `json:"replication,omitempty"`
-	Storage     mariadv1alpha1.Storage         `json:"storage,omitempty"`
+	NodeContainer      `json:",inline"`
+	PodSecurityContext *corev1.PodSecurityContext     `json:"podSecurityContext,omitempty"`
+	SecurityContext    *corev1.SecurityContext        `json:"securityContext,omitempty"`
+	Replicas           int32                          `json:"replicas,omitempty"`
+	Metrics            *mariadv1alpha1.MariadbMetrics `json:"metrics,omitempty"`
+	Replication        *mariadv1alpha1.Replication    `json:"replication,omitempty"`
+	Storage            mariadv1alpha1.Storage         `json:"storage,omitempty"`
 }
 
 // SlurmNodeController defines the configuration for the Slurm controller node
