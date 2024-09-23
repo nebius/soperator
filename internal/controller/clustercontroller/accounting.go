@@ -136,7 +136,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.Info("Rendered")
 
-					deps, err := r.getAccountingDeploymentDependencies(stepCtx, clusterValues)
+					deps, err := r.getAccountingDeploymentDependencies(ctx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
 						return errors.Wrap(err, "retrieving dependencies for accounting Deployment")
