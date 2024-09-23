@@ -101,7 +101,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					desired, err := accounting.RenderService(
 						clusterValues.Namespace,
 						clusterValues.Name,
-						clusterValues.NodeAccounting,
+						&clusterValues.NodeAccounting,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
@@ -137,12 +137,6 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.Info("Rendered")
 
-					deps, err := r.getAccountingDeploymentDependencies(ctx, clusterValues)
-					if err != nil {
-						stepLogger.Error(err, "Failed to retrieve dependencies")
-						return errors.Wrap(err, "retrieving dependencies for accounting Deployment")
-					}
-					stepLogger.Info("Retrieved dependencies")
 					deps, err := r.getAccountingDeploymentDependencies(ctx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
