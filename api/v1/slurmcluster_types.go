@@ -319,7 +319,7 @@ type SlurmNodeAccounting struct {
 	// MariaDbOpeator represents the MariaDB CRD configuration
 	//
 	// +kubebuilder:validation:Optional
-	MariaDbOperator MariaDbOperator `json:"MariaDbOperator"`
+	MariaDbOperator MariaDbOperator `json:"mariadbOperator,omitempty"`
 }
 
 // ExternalDB represents the external database configuration of connection string
