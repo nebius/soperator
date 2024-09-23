@@ -14,7 +14,7 @@ func Test_RenderMariaDbGrant(t *testing.T) {
 	namespace := "test-namespace"
 	clusterName := "test-cluster"
 	accounting := &values.SlurmAccounting{
-		MariaDb: slurmv1.MariaDbOpeator{
+		MariaDb: slurmv1.MariaDbOperator{
 			Enabled: true,
 		},
 	}
