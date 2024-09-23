@@ -17,6 +17,11 @@ volume:
     name: "controller-spool"
     size: "30Gi"
     filestoreDeviceName: "controller-spool"
+  accounting:
+    enabled: true
+    name: "accounting"
+    size: "128Gi"
+    filestoreDeviceName: "accounting"
   jailSubMounts: []
 #  jailSubMounts:
 #    - name: "mlperf-sd"
