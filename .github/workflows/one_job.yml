@@ -2,6 +2,11 @@ name: Build All in one job
 
 on:
   push:
+    paths-ignore:
+      - 'docs/**'
+      - 'LICENSE'
+      - 'PROJECT'
+      - 'README.md'
 
 permissions:
   contents: read
