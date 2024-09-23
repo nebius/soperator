@@ -147,8 +147,10 @@ That is, to install in other clouds, use the instructions for on-premise Kuberne
 
 ### On-Premise Kubernetes
 > [!IMPORTANT]
-> Your Kubernetes cluster must use the [Cilium network plugin
-> ](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/).
+> When using the soperator, it is important that the CNI supports preserving the client source IP. 
+> Therefore, if kube-proxy is configured in IPVS mode, or if you're using CNI-plugins like kube-router or Antrea Proxy, the operator will not work. 
+> This operator has been tested with [Cilium network plugin](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/) 
+> running in [kube-proxy replacement mode](https://docs.cilium.io/en/stable/network/kubernetes/kubeproxy-free/#kubernetes-without-kube-proxy).
 
 In general, you need to follow these steps:
 1. Decide on the shared storage technology you would like to use. At least one shared file system is necessary, because
