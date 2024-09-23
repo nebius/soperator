@@ -8,6 +8,11 @@ for file in /mnt/slurm-configs/*; do
     touch "/etc/slurm/$filename" && mount --bind "$file" "/etc/slurm/$filename"
 done
 
+for file in /mnt/slurm-secrets/*; do
+    filename=$(basename "$file")
+    touch "/etc/slurm/$filename" && mount --bind "$file" "/etc/slurm/$filename"
+done
+
 echo "Set permissions for shared /var/spool/slurmdbd"
 chmod 755 /var/spool/slurmdbd # It changes permissions of this shared directory in other containers as well
 

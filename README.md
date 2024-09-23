@@ -1,20 +1,24 @@
 # Soperator – Kubernetes Operator for Slurm
 [//]: # (Badges)
-[![tag-machine-learning](https://img.shields.io/badge/machine_learning-blue)](#)
-[![tag-model-training](https://img.shields.io/badge/model_training-deepskyblue)](#)
-[![tag-high-performance-computing](https://img.shields.io/badge/high--performance_computing-lightseagreen)](#)
-<br/>
-[![github-release](https://img.shields.io/github/v/release/nebius/soperator)](#)
-[![github-release-date](https://img.shields.io/github/release-date/nebius/soperator)](#)
-[![github-last-commit](https://img.shields.io/github/last-commit/nebius/soperator)](#)
-<br/>
-[![github-license](https://img.shields.io/github/license/nebius/soperator)](#-license)
+<div align="center">
+
+[![tag-machine-learning](https://img.shields.io/badge/machine_learning-blue?style=for-the-badge)](#)
+[![tag-model-training](https://img.shields.io/badge/model_training-deepskyblue?style=for-the-badge)](#)
+[![tag-high-performance-computing](https://img.shields.io/badge/high--performance_computing-lightseagreen?style=for-the-badge)](#)
+
+</div>
+
+<div align="center">
+
+[![github-last-commit](https://img.shields.io/github/last-commit/nebius/soperator?style=for-the-badge)](#)
+[![github-license](https://img.shields.io/github/license/nebius/soperator?style=for-the-badge)](#-license)
+
+</div>
 
 [//]: # (Short description)
 Run Slurm in Kubernetes and enjoy the benefits of both systems.
 
-![Slurm in Kubernetes](docs/images/slurm_in_k8s_diagram.svg)
-
+<img src="docs/images/slurm_in_k8s_diagram.svg" alt="Slurm in Kubernetes" width="100%" height="auto"/>
 
 
 ## 📋 Table of Contents
@@ -49,7 +53,7 @@ That's why we decided to marry these systems following the "Kubernetes-first" ap
 operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/) - a piece of software that runs and manages
 Slurm clusters represented via Kubernetes resources.
 
-![Solution Architecture](docs/images/architecture_diagram.svg)
+<img src="docs/images/architecture_diagram.svg" alt="Solution Architecture" width="100%" height="auto"/>
 
 This allowed us to reuse Kubernetes' autoscaling and self-healing in Slurm, and implement several unique features, while
 maintaining the usual way of interacting with it.
@@ -109,10 +113,10 @@ this information on the dashboards we provide as well.
   done it yet.
 - **Scaling clusters down**. Only scaling up works flawlessly. Scaling down remains deleted nodes in the controller
   view. However, they can be removed manually using `scontrol`.
-- **Single-partition cluster**. The Slurm's ability to split clusters into several partitions isn't supported now.
+- **Single-partition clusters**. The Slurm's ability to split clusters into several partitions isn't supported now.
 - **Software versions**. The list of software versions we currently support is quite short.
-    - Linux distribution: Ubuntu [20.04](https://releases.ubuntu.com/focal/) and [22.04
-      ](https://releases.ubuntu.com/jammy/).
+    - Linux distribution: Ubuntu [20.04](https://releases.ubuntu.com/focal/) and
+      [22.04](https://releases.ubuntu.com/jammy/).
     - Slurm: versions `23.11.6` and `24.05.3`.
     - CUDA: version [12.2.2](https://developer.nvidia.com/cuda-12-2-2-download-archive).
     - Kubernetes: >= [1.28](https://kubernetes.io/blog/2023/08/15/kubernetes-v1-28-release/).
@@ -147,16 +151,19 @@ That is, to install in other clouds, use the instructions for on-premise Kuberne
 
 ### On-Premise Kubernetes
 > [!IMPORTANT]
-> When using the soperator, it is important that the CNI supports preserving the client source IP. 
-> Therefore, if kube-proxy is configured in IPVS mode, or if you're using CNI-plugins like kube-router or Antrea Proxy, the operator will not work. 
-> This operator has been tested with [Cilium network plugin](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/) 
-> running in [kube-proxy replacement mode](https://docs.cilium.io/en/stable/network/kubernetes/kubeproxy-free/#kubernetes-without-kube-proxy).
+> When using the soperator, it is important that the CNI supports preserving the client source IP.
+> Therefore, if kube-proxy is configured in IPVS mode, or if you're using CNI-plugins like kube-router or Antrea Proxy,
+the operator will not work.
+> This operator has been tested with
+[Cilium network plugin](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/)
+> running in
+[kube-proxy replacement mode](https://docs.cilium.io/en/stable/network/kubernetes/kubeproxy-free/#kubernetes-without-kube-proxy).
 
 In general, you need to follow these steps:
 1. Decide on the shared storage technology you would like to use. At least one shared file system is necessary, because
    it will store that very environment shared among all Slurm nodes. The only thing the Soperator will require of you is
-   the [PVC](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) name. Consider using [NFS
-   ](https://kubernetes.io/docs/concepts/storage/volumes/#nfs) as the simplest option, or something more advanced
+   the [PVC](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) name. Consider using
+   [NFS](https://kubernetes.io/docs/concepts/storage/volumes/#nfs) as the simplest option, or something more advanced
    like [OpenEBS](https://openebs.io/) or [GlusterFS](https://www.gluster.org/).
 2. Install the [NVIDIA GPU operator](https://github.com/NVIDIA/gpu-operator).
 3. If you use InfiniBand, install the [NVIDIA Network operator](https://github.com/Mellanox/network-operator).
@@ -187,8 +194,8 @@ In general, you need to follow these steps:
 - 💡 **More system checks**. Soperator only checks GPUs at the moment, but there are more things to check: software
   issues, storage performance, network connectivity, etc. So we're going to continue adding new checks.
 - 💡 **Jail backups**. This implies backing up the shared storage to improve durability.
-- 💡 **Automatic external checkpointing**. We consider using NVIDIA's [cuda-checkpoint
-  ](https://github.com/NVIDIA/cuda-checkpoint) for dumping and resuming job processes externally.
+- 💡 **Automatic external checkpointing**. We consider using NVIDIA's
+  [cuda-checkpoint](https://github.com/NVIDIA/cuda-checkpoint) for dumping and resuming job processes externally.
 
 
 
@@ -206,8 +213,8 @@ It includes, among other things:
 If you like this project, **star in on GitHub**. So we will see that the community is interested in it and continue
 developing it further, openly and publicly.
 
-If you failed to install Soperator to your Kubernetes cluster or encounter any other issue with it, create a [GitHub
-issue](https://github.com/nebius/soperator/issues) and write details about your problem. We will try to help.
+If you failed to install Soperator to your Kubernetes cluster or encounter any other issue with it, create a
+[GitHub issue](https://github.com/nebius/soperator/issues) and write details about your problem. We will try to help.
 
 > [!NOTE]
 > This project is very new and quite raw - it was started in May 2024. And if it already works stably in Nebius, this
