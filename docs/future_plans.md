@@ -28,7 +28,7 @@ we grant only required Linux capabilities & set up more detailed policies for Ap
 
 
 ### On-demand nodes
-Soperator already makes it much easier to scale your Slurm cluster, but we're not stopping on this. We want to 
+Soperator already makes it much easier to scale your Slurm cluster, but we're not stopping on this. We want to
 automatically bootstrap new compute nodes (within configured limits) when there are queued jobs that need them.
 
 This will allow users to use only those resources that they need at a time.
@@ -39,23 +39,24 @@ Thanks to Slurm’s topology feature, we can support detailed configuration of t
 to schedule jobs with the maximum efficiency.
 
 We're going to implement automatic network observation and make Slurm schedule jobs on nodes with the shortest network
-path. This will allow users to complete computations faster (especially for model training with its huge amount of 
+path. This will allow users to complete computations faster (especially for model training with its huge amount of
 data exchange between nodes).
 
 
 ### Automatic replacement of underperforming K8s nodes
-Right now, our solution only drains Slurm nodes that fail health checks, leaving it up to the user to deal with them. 
+Right now, our solution only drains Slurm nodes that fail health checks, leaving it up to the user to deal with them.
 We’re planning to implement fully automatic replacement of such nodes that will be transparent to Slurm users.
 
 
 ### Jail backups
-While the shared-root feature makes your life easier, it also increases the risk of breaking the filesystem for the 
+While the shared-root feature makes your life easier, it also increases the risk of breaking the filesystem for the
 entire cluster. So we’re going to backup jails periodically to improve the durability of our Slurm clusters.
 
 
 ### Automatic external checkpointing
-There is a promising (though still experimental) NVIDIA project [cuda-checkpoint
-](https://github.com/nvidia/cuda-checkpoint). It allows users to take external checkpoints of Linux processes that use 
+There is a promising (though still experimental) NVIDIA project
+[cuda-checkpoint](https://github.com/nvidia/cuda-checkpoint).
+It allows users to take external checkpoints of Linux processes that use
 GPUs, saving them to the filesystem, so they can resume these processes later.
 
 Integrating cuda-checkpoint with Slurm could free users from writing complex application-level code for checkpointing.
@@ -64,20 +65,20 @@ We're going to give this project a try.
 
 
 ### More hardware health checks
-Running NCCL tests for benchmarking GPUs is good but not sufficient. We're going to implement other checks as 
+Running NCCL tests for benchmarking GPUs is good but not sufficient. We're going to implement other checks as
 well. This includes checking the filesystem & network, as well as other kinds of GPU checks.
 
 
 ### Multi-jail clusters
 We think it might be useful for some users to have clusters with multiple "jail" environments.
 
-If we implement this, when starting a job, you will be able to choose in which jail to execute it by setting a special 
+If we implement this, when starting a job, you will be able to choose in which jail to execute it by setting a special
 command argument.
 
 
 ### Setups with node-local jails or without jail
-If some users will find the shared-root feature too expensive due to loss of the file system performance, we will 
-support node-local jails. Nothing should change except for the fact that you'll need to prepare filesystems of new 
+If some users will find the shared-root feature too expensive due to loss of the file system performance, we will
+support node-local jails. Nothing should change except for the fact that you'll need to prepare filesystems of new
 nodes on your own.
 
 
