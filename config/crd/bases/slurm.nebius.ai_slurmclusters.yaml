@@ -1427,8 +1427,54 @@ spec:
 
                       TODO: Making accounting optional requires SlurmNode.K8sNodeFilterName to be optional.
                     properties:
-                      MariaDbOperator:
-                        description: MariaDbOperator represents the MariaDB CRD configuration
+                      enabled:
+                        default: false
+                        description: Enabled defines whether the SlurmDBD is enabled
+                        type: boolean
+                      externalDB:
+                        description: ExternalDB represents the external database configuration
+                          of connection string
+                        properties:
+                          enabled:
+                            default: false
+                            description: Enabled defines whether the external database
+                              is enabled
+                            type: boolean
+                          host:
+                            description: Host for connection string to the SlurmDBD
+                              database
+                            type: string
+                          passwordSecretKeyRef:
+                            description: SecretRef defines the reference to the secret
+                              with the password key for the external database
+                            properties:
+                              key:
+                                description: Key defines the key of password in the
+                                  secret (do not put here the password, just name
+                                  of the key in the secret)
+                                type: string
+                              name:
+                                description: Name defines the name of the secret
+                                type: string
+                            type: object
+                          port:
+                            default: 3306
+                            description: Port for connection string to the SlurmDBD
+                              database
+                            format: int32
+                            type: integer
+                          user:
+                            description: Key defines the key of username and password
+                              in the secret
+                            type: string
+                        type: object
+                      k8sNodeFilterName:
+                        description: |-
+                          K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
+                          Must correspond to the name of one of [K8sNodeFilter]
+                        type: string
+                      mariadbOperator:
+                        description: MariaDbOpeator represents the MariaDB CRD configuration
                         properties:
                           enabled:
                             type: boolean
@@ -8178,54 +8224,7 @@ spec:
                             type: object
                         required:
                         - image
-                        - replicas
                         type: object
-                      enabled:
-                        default: false
-                        description: Enabled defines whether the SlurmDBD is enabled
-                        type: boolean
-                      externalDB:
-                        description: ExternalDB represents the external database configuration
-                          of connection string
-                        properties:
-                          enabled:
-                            default: false
-                            description: Enabled defines whether the external database
-                              is enabled
-                            type: boolean
-                          host:
-                            description: Host for connection string to the SlurmDBD
-                              database
-                            type: string
-                          passwordSecretKeyRef:
-                            description: SecretRef defines the reference to the secret
-                              with the password key for the external database
-                            properties:
-                              key:
-                                description: Key defines the key of password in the
-                                  secret (do not put here the password, just name
-                                  of the key in the secret)
-                                type: string
-                              name:
-                                description: Name defines the name of the secret
-                                type: string
-                            type: object
-                          port:
-                            default: 3306
-                            description: Port for connection string to the SlurmDBD
-                              database
-                            format: int32
-                            type: integer
-                          user:
-                            description: Key defines the key of username and password
-                              in the secret
-                            type: string
-                        type: object
-                      k8sNodeFilterName:
-                        description: |-
-                          K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
-                          Must correspond to the name of one of [K8sNodeFilter]
-                        type: string
                       munge:
                         description: Munge represents the Slurm munge configuration
                         properties:
