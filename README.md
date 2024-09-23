@@ -16,7 +16,8 @@
 </div>
 
 [//]: # (Short description)
-Run Slurm in Kubernetes and enjoy the benefits of both systems.
+Run Slurm in Kubernetes and enjoy the benefits of both systems. You can learn more about Soperator, its prerequisites,
+and architecture in the [Medium article](https://medium.com/p/e7a41f307d14).
 
 <img src="docs/images/slurm_in_k8s_diagram.svg" alt="Slurm in Kubernetes" width="100%" height="auto"/>
 
@@ -55,8 +56,6 @@ and manages Slurm clusters as Kubernetes resources.
 
 This allowed us to reuse the autoscaling and self-healing of Kubernetes in Slurm, and implement some unique features,
 while maintaining the usual way of interacting with it.
-
-[//]: # (TODO: Refer to the Soperator blog post)
 
 
 
