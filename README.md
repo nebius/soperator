@@ -4,10 +4,7 @@
 [![tag-model-training](https://img.shields.io/badge/model_training-deepskyblue)](#)
 [![tag-high-performance-computing](https://img.shields.io/badge/high--performance_computing-lightseagreen)](#)
 <br/>
-[![github-release](https://img.shields.io/github/v/release/nebius/soperator)](#)
-[![github-release-date](https://img.shields.io/github/release-date/nebius/soperator)](#)
 [![github-last-commit](https://img.shields.io/github/last-commit/nebius/soperator)](#)
-<br/>
 [![github-license](https://img.shields.io/github/license/nebius/soperator)](#-license)
 
 [//]: # (Short description)
@@ -109,7 +106,7 @@ this information on the dashboards we provide as well.
   done it yet.
 - **Scaling clusters down**. Only scaling up works flawlessly. Scaling down remains deleted nodes in the controller
   view. However, they can be removed manually using `scontrol`.
-- **Single-partition cluster**. The Slurm's ability to split clusters into several partitions isn't supported now.
+- **Single-partition clusters**. The Slurm's ability to split clusters into several partitions isn't supported now.
 - **Software versions**. The list of software versions we currently support is quite short.
     - Linux distribution: Ubuntu [20.04](https://releases.ubuntu.com/focal/) and [22.04
       ](https://releases.ubuntu.com/jammy/).
