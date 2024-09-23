@@ -88,12 +88,12 @@ Soperator takes this even further, continuously bringing the entire cluster up t
 
 
 ### Isolation of user actions
-All user actions are isolated within a dedicated container-like environment, so that an action can’t break the
+All user actions are isolated within a dedicated container-like environment, so that an action can't break the
 Slurm cluster itself by accident. This defines a clear boundary between operator and user responsibility.
 
 
 ## ❌ Limitations
-- **GPUs are required**. Although support for CPU-only clusters or partitions seems pretty straightforward, we haven’t
+- **GPUs are required**. Although support for CPU-only clusters or partitions seems pretty straightforward, we haven't
   implemented it yet.
 - **Unreliable scale-downs**. Clusters only scale up correctly. Scaling down leaves deleted nodes in the controller
   view; you can remove them manually using `scontrol`.
