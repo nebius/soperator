@@ -3,4 +3,4 @@ resources:
 images:
   - name: controller
     newName: ghcr.io/nebius/soperator/slurm-operator
-    newTag: 1.13.5
+    newTag: 1.14.1
