@@ -13,9 +13,9 @@ We currently only provide a terraform recipe for Nebius cloud.
 
 
 ### Scaling clusters down
-While you can easily change the number of worker nodes by tweaking a value in the YAML manifest, it only works smoothly 
-when scaling up. If you try to scale the cluster down, you’ll find that the deleted nodes remain in the Slurm 
-controller’s memory (and show up in `sinfo` output, for example). You can manually remove them (using `scontrol`) if 
+While you can easily change the number of worker nodes by tweaking a value in the YAML manifest, it only works smoothly
+when scaling up. If you try to scale the cluster down, you’ll find that the deleted nodes remain in the Slurm
+controller’s memory (and show up in `sinfo` output, for example). You can manually remove them (using `scontrol`) if
 they bug you.
 
 It doesn't interfere users to launch their jobs and will be fixed soon.
@@ -24,20 +24,20 @@ It doesn't interfere users to launch their jobs and will be fixed soon.
 ### Single-partition clusters
 The Slurm's ability to split clusters into several partitions (= job queues) isn't supported now.
 
-We'll implement it if there is a demand. The idea is that nodes in different partitions will be able to vary (e.g. 
+We'll implement it if there is a demand. The idea is that nodes in different partitions will be able to vary (e.g.
 equipped with different GPU models, use different container images, have different storages mounted, etc.)
 
 
 ### Software versions
 Our list of supported software versions is pretty short right now:
-    - Linux distribution: Ubuntu [20.04](https://releases.ubuntu.com/focal/) and [22.04
-      ](https://releases.ubuntu.com/jammy/).
-    - Slurm: versions `23.11.6` and `24.05.3`.
-    - CUDA: version [12.2.2](https://developer.nvidia.com/cuda-12-2-2-download-archive).
-    - Kubernetes: >= [1.28](https://kubernetes.io/blog/2023/08/15/kubernetes-v1-28-release/).
-    - Versions of some preinstalled software packages can't be changed.
+- Linux distribution: Ubuntu [20.04](https://releases.ubuntu.com/focal/) and
+[22.04](https://releases.ubuntu.com/jammy/).
+- Slurm: versions `23.11.6` and `24.05.3`.
+- CUDA: version [12.2.2](https://developer.nvidia.com/cuda-12-2-2-download-archive).
+- Kubernetes: >= [1.28](https://kubernetes.io/blog/2023/08/15/kubernetes-v1-28-release/).
+- Versions of some preinstalled software packages can't be changed.
 
-Other versions may also be supported, but we haven't checked it yet. It would be cool if someone from the community 
+Other versions may also be supported, but we haven't checked it yet. It would be cool if someone from the community
 tried to launch Soperator on a different setup and leave a feedback.
 
 
@@ -49,7 +49,7 @@ Such software versions must be explicitly supported in container images Soperato
 
 
 ### Slurm configuration is limited by what the operator can do
-While setting some configuration options for Slurm should indeed be done by Soperator, there are such ones that some 
+While setting some configuration options for Slurm should indeed be done by Soperator, there are such ones that some
 people would like to customize themselves. Not all of this is supported.
 
 
@@ -62,4 +62,3 @@ Try this solution as it is and if something doesn't work, let us know, we will f
 
 ### Slurm integration with LDAP isn't supported
 You can only use Linux users & groups for now.
-
