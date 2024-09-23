@@ -70,8 +70,8 @@ chart() {
   helm package -d "${RELEASE_PATH}" "${HELM_PATH}/${CHART_NAME}"
 
   if [ -n "${release}" ]; then
-    echo "Pushing ${CHART_TARGET} to Container registry..."
-    helm push "${RELEASE_PATH}/${CHART_TARGET}" "oci://ghcr.io/nebius"
+    echo "Pushing helm-${CHART_TARGET} to Container registry..."
+    helm push "${RELEASE_PATH}/helm-${CHART_TARGET}" "oci://ghcr.io/nebius/soperator"
   fi
 
   echo '---'
