@@ -92,12 +92,12 @@ Soperator takes this even further, continuously bringing the entire cluster up t
 
 
 ### Isolation of user actions
-All user actions are isolated within a dedicated container-like environment, so that an action can’t break the
+All user actions are isolated within a dedicated container-like environment, so that an action can't break the
 Slurm cluster itself by accident. This defines a clear boundary between operator and user responsibility.
 
 
 ## ❌ Limitations
-- **GPUs are required**. Although support for CPU-only clusters or partitions seems pretty straightforward, we haven’t
+- **GPUs are required**. Although support for CPU-only clusters or partitions seems pretty straightforward, we haven't
   implemented it yet.
 - **Single-partition clusters**. Slurm's ability to split clusters into several partitions isn't supported now.
 - **Software versions**. The list of software versions we currently support is quite short.
