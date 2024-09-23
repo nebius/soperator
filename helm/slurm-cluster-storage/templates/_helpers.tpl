@@ -106,7 +106,7 @@
 ---
 */}}
 
-{{/* Controller accounting volume */}}
+{{/* Accounting database volume */}}
 {{- define "slurm-cluster-storage.volume.accounting.name" -}}
     {{- required "Accounting volume name is required." .Values.volume.accounting.name | trim | kebabcase -}}
 {{- end }}
