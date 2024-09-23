@@ -111,27 +111,27 @@
     {{- required "Accounting volume name is required." .Values.volume.accounting.name | trim | kebabcase -}}
 {{- end }}
 
-{{/* Controller accounting PV name */}}
+{{/* Accounting database  PV name */}}
 {{- define "slurm-cluster-storage.volume.accounting.pv" -}}
     {{- cat (include "slurm-cluster-storage.volume.accounting.name" .) "pv" | kebabcase | quote -}}
 {{- end }}
 
-{{/* Controller accounting mount name */}}
+{{/* Accounting database  mount name */}}
 {{- define "slurm-cluster-storage.volume.accounting.mount" -}}
     {{- cat (include "slurm-cluster-storage.volume.accounting.name" .) "mount" | kebabcase | quote -}}
 {{- end }}
 
-{{/* Controller accounting storage class name */}}
+{{/* Accounting database  storage class name */}}
 {{- define "slurm-cluster-storage.volume.accounting.storageClass" -}}
     {{- include "slurm-cluster-storage.class.local.name" . -}}
 {{- end }}
 
-{{/* Controller accounting size */}}
+{{/* Accounting database  size */}}
 {{- define "slurm-cluster-storage.volume.accounting.size" -}}
     {{- required "Accounting volume size is required." .Values.volume.accounting.size -}}
 {{- end }}
 
-{{/* Controller accounting device name */}}
+{{/* Accounting database  device name */}}
 {{- define "slurm-cluster-storage.volume.accounting.device" -}}
     {{- required "Accounting Filestore device name is required." .Values.volume.accounting.filestoreDeviceName | trim | kebabcase -}}
 {{- end }}
