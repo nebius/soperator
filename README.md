@@ -137,14 +137,7 @@ Everything specific to Nebius Cloud is contained in a separate repository:
 [//]: # (TODO: Change repo in the link when it's moved to Nebius SA library)
 
 
-### Other Clouds
-We don't provide terraform recipes for other clouds at the moment. However, you can implement them by analogy with the
-Nebius one.
-
-That is, to install in other clouds, use the instructions for on-premise Kubernetes.
-
-
-### On-Premise Kubernetes
+### Other clouds and on-premises
 > [!IMPORTANT]
 > When using the soperator, it is important that the CNI supports preserving the client source IP.
 > Therefore, if kube-proxy is configured in IPVS mode, or if you're using CNI-plugins like kube-router or Antrea Proxy,
