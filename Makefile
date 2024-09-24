@@ -107,6 +107,8 @@ helm: kustomize helmify yq ## Update soperator Helm chart
 	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir $(CHART_OPERATOR_PATH)
 	rm -f $(CHART_PATH)/operatorAppVersion
 	cp -r $(CHART_OPERATOR_PATH)/crds/* $(CHART_OPERATOR_CRDS_PATH)/templates/
+	@$(YQ) -i ".name = \"helm-soperator\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
+	@$(SED_COMMAND) '/^#/d' "$(CHART_OPERATOR_PATH)/Chart.yaml"
 
 .PHONY: get-version
 get-version:
