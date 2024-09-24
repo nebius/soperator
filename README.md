@@ -19,7 +19,7 @@
 Run Slurm in Kubernetes and enjoy the benefits of both systems. You can learn more about Soperator, its prerequisites,
 and architecture in the [Medium article](https://medium.com/p/e7a41f307d14).
 
-<img src="docs/images/slurm_in_k8s_diagram.svg" alt="Slurm in Kubernetes" width="100%" height="auto"/>
+<img src="docs/images/layers_diagram.png" alt="Slurm in Kubernetes" width="100%" height="auto"/>
 
 
 ## 📋 Table of contents
