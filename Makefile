@@ -21,8 +21,8 @@ SHELL = /usr/bin/env bash -o pipefail
 GENPATH = "./api/v1;./internal/controller/..."
 
 CHART_PATH            		= helm
-CHART_OPERATOR_PATH   		= $(CHART_PATH)/slurm-operator
-CHART_OPERATOR_CRDS_PATH   	= $(CHART_PATH)/slurm-operator-crds
+CHART_OPERATOR_PATH   		= $(CHART_PATH)/soperator
+CHART_OPERATOR_CRDS_PATH   	= $(CHART_PATH)/soperator-crds
 CHART_CLUSTER_PATH    		= $(CHART_PATH)/slurm-cluster
 CHART_STORAGE_PATH    		= $(CHART_PATH)/slurm-cluster-storage
 
@@ -102,11 +102,13 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
 .PHONY: helm
-helm: kustomize helmify yq ## Update slurm-operator Helm chart
+helm: kustomize helmify yq ## Update soperator Helm chart
 	rm -rf $(CHART_OPERATOR_PATH)
 	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir $(CHART_OPERATOR_PATH)
 	rm -f $(CHART_PATH)/operatorAppVersion
 	cp -r $(CHART_OPERATOR_PATH)/crds/* $(CHART_OPERATOR_CRDS_PATH)/templates/
+	@$(YQ) -i ".name = \"helm-soperator\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
+	@$(SED_COMMAND) '/^#/d' "$(CHART_OPERATOR_PATH)/Chart.yaml"
 
 .PHONY: get-version
 get-version:
@@ -174,11 +176,11 @@ sync-version: yq ## Sync versions from file
 	@echo "{{- end }}"                                             >> $(CHART_CLUSTER_PATH)/templates/_registry_helpers.tpl
 	@# endregion helm/slurm-cluster/templates/_registry_helpers.tpl
 
-	@# region helm/slurm-operator/values.yaml
-	@echo 'Syncing helm/slurm-operator/values.yaml'
-	@$(YQ) -i ".controllerManager.manager.image.repository = \"$(IMAGE_REPO)/slurm-operator\"" "helm/slurm-operator/values.yaml"
-	@$(YQ) -i ".controllerManager.manager.image.tag = \"$(OPERATOR_IMAGE_TAG)\"" "helm/slurm-operator/values.yaml"
-	@# endregion helm/slurm-operator/values.yaml
+	@# region helm/soperator/values.yaml
+	@echo 'Syncing helm/soperator/values.yaml'
+	@$(YQ) -i ".controllerManager.manager.image.repository = \"$(IMAGE_REPO)/slurm-operator\"" "helm/soperator/values.yaml"
+	@$(YQ) -i ".controllerManager.manager.image.tag = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator/values.yaml"
+	@# endregion helm/soperator/values.yaml
 
 	@# region internal/consts
 	@echo "Syncing $(GO_CONST_VERSION_FILE)"
