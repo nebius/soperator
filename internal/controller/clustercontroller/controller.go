@@ -46,7 +46,7 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err := r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling controller security limits configmap")
 					}
@@ -66,7 +66,7 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err := r.Service.Reconcile(ctx, cluster, &desired); err != nil {
+					if err := r.Service.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling controller Service")
 					}
@@ -96,14 +96,14 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					deps, err := r.getControllersStatefulSetDependencies(ctx, clusterValues)
+					deps, err := r.getControllersStatefulSetDependencies(stepCtx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
 						return errors.Wrap(err, "retrieving dependencies for controller StatefulSet")
 					}
 					stepLogger.Info("Retrieved dependencies")
 
-					if err = r.StatefulSet.Reconcile(ctx, cluster, &desired, deps...); err != nil {
+					if err = r.StatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling controller StatefulSet")
 					}

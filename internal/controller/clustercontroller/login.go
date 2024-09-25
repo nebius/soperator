@@ -49,7 +49,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err = r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling login SSH configs ConfigMap")
 					}
@@ -73,7 +73,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err = r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling login SshRootPublicKeys ConfigMap")
 					}
@@ -90,7 +90,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 
 					desired := corev1.Secret{}
 					if getErr := r.Get(
-						ctx,
+						stepCtx,
 						types.NamespacedName{
 							Namespace: clusterValues.Namespace,
 							Name:      clusterValues.Secrets.SshdKeysName,
@@ -112,7 +112,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 
-					if err := r.Secret.Reconcile(ctx, cluster, &desired); err != nil {
+					if err := r.Secret.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling login SSHDKeys Secrets")
 					}
@@ -131,7 +131,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err := r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling login security limits configmap")
 					}
@@ -150,7 +150,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err := r.Service.Reconcile(ctx, cluster, &desired); err != nil {
+					if err := r.Service.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling login Service")
 					}
@@ -180,14 +180,14 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					deps, err := r.getLoginStatefulSetDependencies(ctx, clusterValues)
+					deps, err := r.getLoginStatefulSetDependencies(stepCtx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
 						return errors.Wrap(err, "retrieving dependencies for login StatefulSet")
 					}
 					stepLogger.Info("Retrieved dependencies")
 
-					if err = r.StatefulSet.Reconcile(ctx, cluster, &desired, deps...); err != nil {
+					if err = r.StatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling login StatefulSet")
 					}

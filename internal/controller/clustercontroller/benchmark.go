@@ -42,7 +42,7 @@ func (r SlurmClusterReconciler) ReconcileNCCLBenchmark(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err := r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling nccl benchmark security limits configmap")
 					}
@@ -74,14 +74,14 @@ func (r SlurmClusterReconciler) ReconcileNCCLBenchmark(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					deps, err := r.getNCCLBenchmarkDependencies(ctx, clusterValues)
+					deps, err := r.getNCCLBenchmarkDependencies(stepCtx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
 						return errors.Wrap(err, "retrieving dependencies for NCCLBenchmark CronJob")
 					}
 					stepLogger.Info("Retrieved dependencies")
 
-					if err = r.CronJob.Reconcile(ctx, cluster, &desired, deps...); err != nil {
+					if err = r.CronJob.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling NCCL benchmark CronJob")
 					}

@@ -59,7 +59,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 
 					secretNameAcc := clusterValues.NodeAccounting.ExternalDB.PasswordSecretKeyRef.Name
 					err = r.Get(
-						ctx,
+						stepCtx,
 						types.NamespacedName{
 							Namespace: clusterValues.Namespace,
 							Name:      secretNameAcc,
@@ -83,7 +83,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.Info("Rendered")
 
-					if err = r.Secret.Reconcile(ctx, cluster, desired); err != nil {
+					if err = r.Secret.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling accounting Secret")
 					}
@@ -110,7 +110,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.Info("Rendered")
 
-					if err = r.Service.Reconcile(ctx, cluster, desired); err != nil {
+					if err = r.Service.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling accounting Deployment")
 					}
@@ -139,14 +139,14 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.Info("Rendered")
 
-					deps, err := r.getAccountingDeploymentDependencies(ctx, clusterValues)
+					deps, err := r.getAccountingDeploymentDependencies(stepCtx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
 						return errors.Wrap(err, "retrieving dependencies for accounting Deployment")
 					}
 					stepLogger.Info("Retrieved dependencies")
 
-					if err = r.Deployment.Reconcile(ctx, cluster, desired, deps...); err != nil {
+					if err = r.Deployment.Reconcile(stepCtx, cluster, desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling accounting Deployment")
 					}

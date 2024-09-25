@@ -37,7 +37,7 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 					stepLogger.Info("Reconciling")
 
 					desired := batchv1.Job{}
-					if getErr := r.Get(ctx,
+					if getErr := r.Get(stepCtx,
 						client.ObjectKey{
 							Namespace: clusterValues.Namespace,
 							Name:      clusterValues.PopulateJail.Name,
@@ -65,21 +65,21 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 						stepLogger.Info("Rendered")
 
-						if err = r.Job.Reconcile(ctx, cluster, &desired); err != nil {
+						if err = r.Job.Reconcile(stepCtx, cluster, &desired); err != nil {
 							stepLogger.Error(err, "Failed to reconcile")
 							return errors.Wrap(err, "reconciling Populate jail Job")
 						}
 						stepLogger.Info("Reconciled")
 					}
 
-					if pollErr := wait.PollUntilContextCancel(ctx,
+					if pollErr := wait.PollUntilContextCancel(stepCtx,
 						10*time.Second,
 						true,
 						func(pollCtx context.Context) (done bool, err error) {
 							stepLogger.Info("Waiting")
 
 							job := batchv1.Job{}
-							if err = r.Get(ctx,
+							if err = r.Get(stepCtx,
 								client.ObjectKey{
 									Namespace: clusterValues.Namespace,
 									Name:      clusterValues.PopulateJail.Name,
