@@ -8,7 +8,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -288,18 +287,26 @@ func (r SlurmClusterReconciler) ValidateWorkers(
 		targetReplicas = *existing.Spec.Replicas
 	}
 	if existing.Status.AvailableReplicas != targetReplicas {
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   slurmv1.ConditionClusterWorkersAvailable,
-			Status: metav1.ConditionFalse, Reason: "NotAvailable",
-			Message: "Slurm workers are not available yet",
-		})
+		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+			status.SetCondition(metav1.Condition{
+				Type:   slurmv1.ConditionClusterWorkersAvailable,
+				Status: metav1.ConditionFalse, Reason: "NotAvailable",
+				Message: "Slurm workers are not available yet",
+			})
+		}); err != nil {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 10}, nil
 	} else {
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   slurmv1.ConditionClusterWorkersAvailable,
-			Status: metav1.ConditionTrue, Reason: "Available",
-			Message: "Slurm workers are available",
-		})
+		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+			status.SetCondition(metav1.Condition{
+				Type:   slurmv1.ConditionClusterWorkersAvailable,
+				Status: metav1.ConditionTrue, Reason: "Available",
+				Message: "Slurm workers are available",
+			})
+		}); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, nil

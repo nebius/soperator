@@ -2,6 +2,7 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -725,6 +726,13 @@ type SlurmClusterStatus struct {
 
 	// +kubebuilder:validation:Optional
 	Phase *string `json:"phase,omitempty"`
+}
+
+func (s *SlurmClusterStatus) SetCondition(condition metav1.Condition) {
+	if s.Conditions == nil {
+		s.Conditions = make([]metav1.Condition, 0)
+	}
+	meta.SetStatusCondition(&s.Conditions, condition)
 }
 
 //+kubebuilder:object:root=true
