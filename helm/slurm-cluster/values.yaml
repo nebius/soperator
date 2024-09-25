@@ -3,6 +3,8 @@ clusterName: "slurm1"
 annotations: {}
 # Whether to gracefully stop the cluster. Setting it to false after cluster has been paused starts the cluster back
 pause: false
+# Slurm cluster type. Can be now gpu or cpu
+clusterType: gpu
 # K8s node filters used in Slurm node specifications. Define which nodes should be used to schedule pods to
 k8sNodeFilters:
   - name: gpu
