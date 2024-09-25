@@ -77,6 +77,9 @@ spec:
           # True if the Prometheus CRD is installed in the cluster kubernetes (default false)
           - name: IS_PROMETHEUS_CRD_INSTALLED
             value: "false"
+          # True if the MariaDB CRD is installed in the cluster kubernetes (default false)
+          - name: IS_MARIADB_CRD_INSTALLED
+            value: "false"
           - name: SLURM_OPERATOR_WATCH_NAMESPACES
             value: "*"
         image: controller:1.14.3
