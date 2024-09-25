@@ -325,6 +325,10 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 }
 
 func (r *SlurmClusterReconciler) setUpConditions(cluster *slurmv1.SlurmCluster) {
+	if cluster.Status.Conditions == nil {
+		cluster.Status.Conditions = []metav1.Condition{}
+	}
+
 	meta.SetStatusCondition(
 		&cluster.Status.Conditions,
 		metav1.Condition{
