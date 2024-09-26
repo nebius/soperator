@@ -102,7 +102,7 @@ periodicChecks:
     k8sNodeFilterName: "no-gpu"
 slurmNodes:
   accounting:
-    enabled: false
+    enabled: true
     k8sNodeFilterName: "no-gpu"
     slurmdbd:
       port: 6819
@@ -157,12 +157,15 @@ slurmNodes:
       #   add: ["NET_ADMIN", "SYS_TIME"]
       metrics:
         enabled: false
-        serviceMonitor:
-          enabled: false
+        # username: ""
+        # serviceMonitor: {}
           # jobLabel: ""
           # interval: ""
           # scrapeTimeout: ""
-      exporter: {}
+        # exporter: {}
+        # passwordSecretKeyRef: {}
+          # name: ""
+          # key: ""
       # affinity: {}
       # args: []
       # env: []

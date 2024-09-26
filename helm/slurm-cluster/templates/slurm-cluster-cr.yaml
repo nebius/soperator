@@ -96,7 +96,7 @@ spec:
           memory: {{ required ".Values.slurmNodes.accounting.mariadbOperator.resources.memory must be provided." .Values.slurmNodes.accounting.mariadbOperator.resources.memory | quote}}
           ephemeral-storage: {{ required ".Values.slurmNodes.accounting.mariadbOperator.resources.ephemeralStorage must be provided." .Values.slurmNodes.accounting.mariadbOperator.resources.ephemeralStorage | quote}}
         replicas: {{ int .Values.slurmNodes.accounting.mariadbOperator.replicas }}
-        metrics: {{ .Values.slurmNodes.accounting.mariadbOperator.metrics }}
+        metrics: {{ toYaml .Values.slurmNodes.accounting.mariadbOperator.metrics | nindent 10 }}
         podSecurityContext: {{ toYaml .Values.slurmNodes.accounting.mariadbOperator.podSecurityContext | nindent 10 }}
         securityContext: {{ toYaml .Values.slurmNodes.accounting.mariadbOperator.securityContext | nindent 10 }}
         replication: {{ toYaml .Values.slurmNodes.accounting.mariadbOperator.replication | nindent 10 }}
