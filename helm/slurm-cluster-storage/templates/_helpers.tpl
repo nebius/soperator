@@ -106,6 +106,40 @@
 ---
 */}}
 
+{{/* Accounting database volume */}}
+{{- define "slurm-cluster-storage.volume.accounting.name" -}}
+    {{- required "Accounting volume name is required." .Values.volume.accounting.name | trim | kebabcase -}}
+{{- end }}
+
+{{/* Accounting database  PV name */}}
+{{- define "slurm-cluster-storage.volume.accounting.pv" -}}
+    {{- cat (include "slurm-cluster-storage.volume.accounting.name" .) "pv" | kebabcase | quote -}}
+{{- end }}
+
+{{/* Accounting database  mount name */}}
+{{- define "slurm-cluster-storage.volume.accounting.mount" -}}
+    {{- cat (include "slurm-cluster-storage.volume.accounting.name" .) "mount" | kebabcase | quote -}}
+{{- end }}
+
+{{/* Accounting database  storage class name */}}
+{{- define "slurm-cluster-storage.volume.accounting.storageClass" -}}
+    {{- include "slurm-cluster-storage.class.local.name" . -}}
+{{- end }}
+
+{{/* Accounting database  size */}}
+{{- define "slurm-cluster-storage.volume.accounting.size" -}}
+    {{- required "Accounting volume size is required." .Values.volume.accounting.size -}}
+{{- end }}
+
+{{/* Accounting database  device name */}}
+{{- define "slurm-cluster-storage.volume.accounting.device" -}}
+    {{- required "Accounting Filestore device name is required." .Values.volume.accounting.filestoreDeviceName | trim | kebabcase -}}
+{{- end }}
+
+{{/*
+---
+*/}}
+
 {{/* Jail submount volume */}}
 {{- define "slurm-cluster-storage.volume.jail-submount.name" -}}
     {{- cat "jail-submount" (required "Jail submount name is required." .name) | trim | kebabcase -}}

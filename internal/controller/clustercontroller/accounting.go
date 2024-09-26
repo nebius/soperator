@@ -16,6 +16,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/check"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/accounting"
@@ -32,8 +34,9 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 	logger := log.FromContext(ctx)
 	isAccountingEnabled := clusterValues.NodeAccounting.Enabled
 	isExternalDBEnabled := clusterValues.NodeAccounting.ExternalDB.Enabled
+	isMariaDBEnabled := clusterValues.NodeAccounting.MariaDb.Enabled
 
-	if !isAccountingEnabled || !isExternalDBEnabled {
+	if !isAccountingEnabled || (!isExternalDBEnabled && !isMariaDBEnabled) {
 		logger.Info("Slurm Accounting is disabled. Skipping reconciliation")
 		return nil
 	}
@@ -51,25 +54,20 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					var secret = &corev1.Secret{}
 					var err error
 
-					isSecretNameEmpty := clusterValues.NodeAccounting.ExternalDB.PasswordSecretKeyRef.Name == ""
-					if isSecretNameEmpty {
-						stepLogger.Error(err, "Secret name is empty")
-						return errors.Wrap(err, "secret name is empty")
+					if isExternalDBEnabled {
+						err = r.handleExternalDB(stepCtx, clusterValues, secret)
+						if err != nil {
+							return err
+						}
 					}
 
-					secretNameAcc := clusterValues.NodeAccounting.ExternalDB.PasswordSecretKeyRef.Name
-					err = r.Get(
-						stepCtx,
-						types.NamespacedName{
-							Namespace: clusterValues.Namespace,
-							Name:      secretNameAcc,
-						},
-						secret,
-					)
-					if err != nil {
-						stepLogger.Error(err, fmt.Sprintf("Failed to get Secret %s", secretNameAcc))
-						return errors.Wrap(err, fmt.Sprintf("getting Secret %s", secretNameAcc))
+					if isMariaDBEnabled {
+						err = r.handleMariaDB(stepCtx, clusterValues, secret)
+						if err != nil {
+							return err
+						}
 					}
+
 					desired, err := accounting.RenderSecret(
 						clusterValues.Namespace,
 						clusterValues.Name,
@@ -80,6 +78,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						stepLogger.Error(err, "Failed to render")
 						return errors.Wrap(err, "rendering accounting Secret")
 					}
+
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.Info("Rendered")
 
@@ -87,17 +86,17 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling accounting Secret")
 					}
-					stepLogger.Info("Reconciled")
 
+					stepLogger.Info("Reconciled")
 					return nil
 				},
 			},
+
 			utils.MultiStepExecutionStep{
 				Name: "Slurm Service",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
-
 					desired, err := accounting.RenderService(
 						clusterValues.Namespace,
 						clusterValues.Name,
@@ -115,7 +114,6 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						return errors.Wrap(err, "reconciling accounting Deployment")
 					}
 					stepLogger.Info("Reconciled")
-
 					return nil
 				},
 			},
@@ -124,7 +122,6 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
-
 					desired, err := accounting.RenderDeployment(
 						clusterValues.Namespace,
 						clusterValues.Name,
@@ -139,7 +136,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.Info("Rendered")
 
-					deps, err := r.getAccountingDeploymentDependencies(stepCtx, clusterValues)
+					deps, err := r.getAccountingDeploymentDependencies(ctx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
 						return errors.Wrap(err, "retrieving dependencies for accounting Deployment")
@@ -151,7 +148,69 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						return errors.Wrap(err, "reconciling accounting Deployment")
 					}
 					stepLogger.Info("Reconciled")
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm MariaDB Database",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
 
+					if !check.IsMariaDbOperatorCRDInstalled {
+						stepLogger.Info("MariaDB Operator CRD is not installed. Skipping MariaDB reconciliation")
+						return nil
+					}
+
+					desired, err := accounting.RenderMariaDb(
+						clusterValues.Namespace,
+						clusterValues.Name,
+						&clusterValues.NodeAccounting,
+						clusterValues.NodeFilters,
+					)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering accounting Deployment")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
+					stepLogger.Info("Rendered")
+
+					if err = r.MariaDb.Reconcile(ctx, cluster, desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling accounting Deployment")
+					}
+					stepLogger.Info("Reconciled")
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm MariaDB Grant",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					if !check.IsMariaDbOperatorCRDInstalled {
+						stepLogger.Info("MariaDB Operator CRD is not installed. Skipping MariaDB reconciliation")
+						return nil
+					}
+
+					desired, err := accounting.RenderMariaDbGrant(
+						clusterValues.Namespace,
+						clusterValues.Name,
+						&clusterValues.NodeAccounting,
+					)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering accounting Deployment")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
+					stepLogger.Info("Rendered")
+
+					if err = r.MariaDbGrant.Reconcile(ctx, cluster, desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling accounting Deployment")
+					}
+					stepLogger.Info("Reconciled")
 					return nil
 				},
 			},
@@ -163,6 +222,57 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 		return errors.Wrap(err, "reconciling Slurm Accounting")
 	}
 	logger.Info("Reconciled Slurm Accounting")
+	return nil
+}
+
+func (r SlurmClusterReconciler) handleExternalDB(
+	ctx context.Context,
+	clusterValues *values.SlurmCluster,
+	secret *corev1.Secret) error {
+	logger := log.FromContext(ctx)
+
+	isSecretNameEmpty := clusterValues.NodeAccounting.ExternalDB.PasswordSecretKeyRef.Name == ""
+	if isSecretNameEmpty {
+		logger.Error(nil, "Secret name is empty")
+		return errors.New("secret name is empty")
+	}
+
+	secretNameAcc := clusterValues.NodeAccounting.ExternalDB.PasswordSecretKeyRef.Name
+	err := r.Get(
+		ctx,
+		types.NamespacedName{
+			Namespace: clusterValues.Namespace,
+			Name:      secretNameAcc,
+		},
+		secret,
+	)
+	if err != nil {
+		logger.Error(err, fmt.Sprintf("Failed to get Secret %s", secretNameAcc))
+		return errors.Wrap(err, fmt.Sprintf("getting Secret %s", secretNameAcc))
+	}
+
+	return nil
+}
+
+func (r SlurmClusterReconciler) handleMariaDB(
+	ctx context.Context,
+	clusterValues *values.SlurmCluster,
+	secret *corev1.Secret) error {
+	logger := log.FromContext(ctx)
+
+	err := r.Get(
+		ctx,
+		types.NamespacedName{
+			Namespace: clusterValues.Namespace,
+			Name:      consts.MariaDbSecretName,
+		},
+		secret,
+	)
+	if err != nil {
+		logger.Error(err, "Failed to get Secret")
+		return errors.Wrap(err, "getting Secret")
+	}
+
 	return nil
 }
 

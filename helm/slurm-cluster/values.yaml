@@ -102,15 +102,7 @@ periodicChecks:
     k8sNodeFilterName: "no-gpu"
 slurmNodes:
   accounting:
-    enabled: false
-    externalDB:
-      enabled: false
-      # host: ""
-      # port: 3306
-      # user: ""
-      # passwordSecretKeyRef:
-      #   name: ""
-      #   key: ""
+    enabled: true
     k8sNodeFilterName: "no-gpu"
     slurmdbd:
       port: 6819
@@ -123,6 +115,82 @@ slurmNodes:
         cpu: "1000m"
         memory: "1Gi"
         ephemeralStorage: "5Gi"
+    externalDB:
+      enabled: false
+      # host: ""
+      # port: 3306
+      # user: ""
+      # passwordSecretKeyRef:
+      #   name: ""
+      #   key: ""
+    mariadbOperator:
+      enabled: false
+      resources:
+        cpu: "1000m"
+        memory: "1Gi"
+        ephemeralStorage: "5Gi"
+      replicas: 1
+      replication: {}
+      # enabled: false
+      # primary: {}
+      # probesEnabled: false
+      # replica: {}
+      # syncBinlog: false
+      storage: {}
+      # ephemeral: false
+      # resizeInUseVolumes: false
+      # size: {}
+      # storageClassName: ""
+      # volumeClaimTemplate: ""
+      # waitForVolumeResize: false
+      podSecurityContext: {}
+      # fsGroup: 2000
+      # runAsUser: 1000
+      # runAsGroup: 3000
+      # runAsNonRoot: true
+      # supplementalGroups: [1000]
+      securityContext: {}
+      # runAsUser: 1000
+      # runAsGroup: 3000
+      # runAsNonRoot: true
+      # capabilities:
+      #   add: ["NET_ADMIN", "SYS_TIME"]
+      metrics:
+        enabled: false
+        # username: ""
+        # serviceMonitor: {}
+          # jobLabel: ""
+          # interval: ""
+          # scrapeTimeout: ""
+        # exporter: {}
+        # passwordSecretKeyRef: {}
+          # name: ""
+          # key: ""
+      # affinity: {}
+      # args: []
+      # env: []
+      # envFrom: []
+      # image: ""
+      # imagePullPolicy: ""
+      # imagePullSecrets: []
+      # initContainers: []
+      # livenessProbe: {}
+      # nodeSelector: {}
+      # podMetadata: {}
+      # securityContext: {}
+      # serviceAccountName: ""
+      # sidecarContainers: []
+      # tolerations: []
+      # resources: {}
+      # volumeMounts: []
+      # volumes: []
+      # resources: {}
+      #   limits:
+      #     cpu: "100m"
+      #     memory: "128Mi"
+      #   requests:
+      #     cpu: "50m"
+      #     memory: "64Mi"
   controller:
     size: 2
     k8sNodeFilterName: "no-gpu"
@@ -243,3 +311,4 @@ images:
   ncclBenchmark: "ghcr.io/nebius/soperator/nccl_benchmark:1.14.3-jammy-slurm24.05.2"
   slurmdbd: "ghcr.io/nebius/soperator/controller_slurmdbd:1.14.3-jammy-slurm24.05.2"
   exporter: "ghcr.io/nebius/soperator/exporter:1.14.3-jammy-slurm24.05.2"
+  mariaDB: "docker-registry1.mariadb.com/library/mariadb:11.4.3"

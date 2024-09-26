@@ -112,6 +112,10 @@ var (
 				Name: secretName,
 				Key:  passwordKey,
 			},
+			Enabled: true,
+		},
+		MariaDb: slurmv1.MariaDbOperator{
+			Enabled: false,
 		},
 		Enabled: true,
 	}
