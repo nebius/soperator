@@ -49,7 +49,7 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 							if desired != nil {
 								stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 							}
-							err = r.PodMonitor.Reconcile(ctx, cluster, desired)
+							err = r.PodMonitor.Reconcile(stepCtx, cluster, desired)
 							if err != nil {
 								stepLogger.Error(err, "Failed to reconcile")
 								return errors.Wrap(err, "reconciling PodMonitor")
@@ -76,7 +76,7 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 								podTemplateName := *clusterValues.SlurmExporter.PodTemplateNameRef
 
 								err := r.Get(
-									ctx,
+									stepCtx,
 									types.NamespacedName{
 										Namespace: clusterValues.Namespace,
 										Name:      podTemplateName,
@@ -102,7 +102,7 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 							if desired != nil {
 								logger = logger.WithValues(logfield.ResourceKV(desired)...)
 							}
-							err = r.Deployment.Reconcile(ctx, cluster, desired)
+							err = r.Deployment.Reconcile(stepCtx, cluster, desired)
 							if err != nil {
 								stepLogger.Error(err, "Failed to reconcile")
 								return errors.Wrap(err, "reconciling Slurm Exporter Deployment")

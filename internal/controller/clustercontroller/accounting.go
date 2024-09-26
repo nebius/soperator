@@ -9,7 +9,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -60,7 +59,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 
 					secretNameAcc := clusterValues.NodeAccounting.ExternalDB.PasswordSecretKeyRef.Name
 					err = r.Get(
-						ctx,
+						stepCtx,
 						types.NamespacedName{
 							Namespace: clusterValues.Namespace,
 							Name:      secretNameAcc,
@@ -84,7 +83,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.Info("Rendered")
 
-					if err = r.Secret.Reconcile(ctx, cluster, desired); err != nil {
+					if err = r.Secret.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling accounting Secret")
 					}
@@ -111,7 +110,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.Info("Rendered")
 
-					if err = r.Service.Reconcile(ctx, cluster, desired); err != nil {
+					if err = r.Service.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling accounting Deployment")
 					}
@@ -140,14 +139,14 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.Info("Rendered")
 
-					deps, err := r.getAccountingDeploymentDependencies(ctx, clusterValues)
+					deps, err := r.getAccountingDeploymentDependencies(stepCtx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
 						return errors.Wrap(err, "retrieving dependencies for accounting Deployment")
 					}
 					stepLogger.Info("Retrieved dependencies")
 
-					if err = r.Deployment.Reconcile(ctx, cluster, desired, deps...); err != nil {
+					if err = r.Deployment.Reconcile(stepCtx, cluster, desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling accounting Deployment")
 					}
@@ -197,18 +196,26 @@ func (r SlurmClusterReconciler) ValidateAccounting(
 		targetReplicas = *existing.Spec.Replicas
 	}
 	if existing.Status.AvailableReplicas != targetReplicas {
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   slurmv1.ConditionClusterAccountingAvailable,
-			Status: metav1.ConditionFalse, Reason: "NotAvailable",
-			Message: "Slurm accounting is not available yet",
-		})
+		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+			status.SetCondition(metav1.Condition{
+				Type:   slurmv1.ConditionClusterAccountingAvailable,
+				Status: metav1.ConditionFalse, Reason: "NotAvailable",
+				Message: "Slurm accounting is not available yet",
+			})
+		}); err != nil {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 10}, nil
 	} else {
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   slurmv1.ConditionClusterAccountingAvailable,
-			Status: metav1.ConditionTrue, Reason: "Available",
-			Message: "Slurm accounting is available",
-		})
+		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+			status.SetCondition(metav1.Condition{
+				Type:   slurmv1.ConditionClusterAccountingAvailable,
+				Status: metav1.ConditionTrue, Reason: "Available",
+				Message: "Slurm accounting is available",
+			})
+		}); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, nil

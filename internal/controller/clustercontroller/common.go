@@ -45,7 +45,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err = r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling ConfigMap with Slurm configs")
 					}
@@ -72,7 +72,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 								podTemplateName := *clusterValues.Telemetry.OpenTelemetryCollector.PodTemplateNameRef
 
 								if err := r.Get(
-									ctx,
+									stepCtx,
 									types.NamespacedName{
 										Namespace: clusterValues.Namespace,
 										Name:      podTemplateName,
@@ -100,7 +100,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 								stepLogger.Info("Rendered")
 							}
 
-							err = r.Otel.Reconcile(ctx, cluster, desired)
+							err = r.Otel.Reconcile(stepCtx, cluster, desired)
 							if err != nil {
 								stepLogger.Error(err, "Failed to reconcile")
 								return errors.Wrap(err, "reconciling OpenTelemetry Collector")
@@ -120,7 +120,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 
 					desired := corev1.Secret{}
 					if getErr := r.Get(
-						ctx,
+						stepCtx,
 						types.NamespacedName{
 							Namespace: clusterValues.Namespace,
 							Name:      naming.BuildSecretMungeKeyName(clusterValues.Name),
@@ -142,7 +142,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 
-					if err := r.Secret.Reconcile(ctx, cluster, &desired); err != nil {
+					if err := r.Secret.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling Munge Key Secret")
 					}
