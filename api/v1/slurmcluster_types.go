@@ -325,6 +325,11 @@ type SlurmNodeAccounting struct {
 	//
 	// +kubebuilder:validation:Optional
 	SlurmdbdConfig SlurmdbdConfig `json:"slurmdbdConfig,omitempty"`
+
+	// SlurmConfig represents the Slurm accounting configuration in slurm.conf
+	//
+	// +kubebuilder:validation:Optional
+	SlurmConfig AccountingSlurmConf `json:"slurmConfig,omitempty"`
 }
 
 // ExternalDB represents the external database configuration of connection string
@@ -423,6 +428,36 @@ type SlurmdbdConfig struct {
 	// +kubebuilder:validation:Enum="AuditRPCs";"DB_ARCHIVE";"DB_ASSOC";"DB_EVENT";"DB_JOB";"DB_QOS";"DB_QUERY";"DB_RESERVATION";"DB_RESOURCE";"DB_STEP";"DB_TRES";"DB_USAGE";"Network"
 	// +kubebuilder:validation
 	DebugFlags string `json:"debugFlags,omitempty"`
+}
+
+type AccountingSlurmConf struct {
+	// +kubebuilder:validation:Optional
+	AccountingStorageTRES string `json:"accountingStorageTRES,omitempty"`
+	// +kubebuilder:validation:Optional
+	AccountingStoreFlags string `json:"accountingStoreFlags,omitempty"`
+	// +kubebuilder:validation:Optional
+	AcctGatherInterconnectType string `json:"acctGatherInterconnectType,omitempty"`
+	// +kubebuilder:validation:Optional
+	AcctGatherFilesystemType string `json:"acctGatherFilesystemType,omitempty"`
+	// +kubebuilder:validation:Optional
+	AcctGatherProfileType string `json:"acctGatherProfileType,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum="jobacct_gather/linux";"jobacct_gather/cgroup";"jobacct_gather/none"
+	JobAcctGatherType string `json:"jobAcctGatherType,omitempty"`
+	// +kubebuilder:validation:Optional
+	JobAcctGatherFrequency string `json:"jobAcctGatherFrequency,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum="NoShared";"UsePss";"OverMemoryKill";"DisableGPUAcct"
+	JobAcctGatherParams string `json:"jobAcctGatherParams,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=0
+	PriorityWeightAge int16 `json:"priorityWeightAge,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=0
+	PriorityWeightFairshare int16 `json:"priorityWeightFairshare,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=0
+	PriorityWeightTRES int16 `json:"priorityWeightTRES,omitempty"`
 }
 
 // SlurmNodeController defines the configuration for the Slurm controller node

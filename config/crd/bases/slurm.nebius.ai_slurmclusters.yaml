@@ -8258,6 +8258,45 @@ spec:
                         description: Size defines the number of node instances
                         format: int32
                         type: integer
+                      slurmConfig:
+                        description: SlurmConfig represents the Slurm accounting configuration
+                          in slurm.conf
+                        properties:
+                          accountingStorageTRES:
+                            type: string
+                          accountingStoreFlags:
+                            type: string
+                          acctGatherFilesystemType:
+                            type: string
+                          acctGatherInterconnectType:
+                            type: string
+                          acctGatherProfileType:
+                            type: string
+                          jobAcctGatherFrequency:
+                            type: string
+                          jobAcctGatherParams:
+                            enum:
+                            - NoShared
+                            - UsePss
+                            - OverMemoryKill
+                            - DisableGPUAcct
+                            type: string
+                          jobAcctGatherType:
+                            enum:
+                            - jobacct_gather/linux
+                            - jobacct_gather/cgroup
+                            - jobacct_gather/none
+                            type: string
+                          priorityWeightAge:
+                            default: 0
+                            type: integer
+                          priorityWeightFairshare:
+                            default: 0
+                            type: integer
+                          priorityWeightTRES:
+                            default: 0
+                            type: integer
+                        type: object
                       slurmdbd:
                         description: Slurmdbd represents the Slurm database daemon
                           configuration

@@ -22,6 +22,7 @@ type SlurmAccounting struct {
 	ExternalDB     slurmv1.ExternalDB
 	MariaDb        slurmv1.MariaDbOperator
 	SlurmdbdConfig slurmv1.SlurmdbdConfig
+	SlurmConfig    slurmv1.AccountingSlurmConf
 	VolumeJail     slurmv1.NodeVolume
 }
 
@@ -48,6 +49,7 @@ func buildAccountingFrom(clusterName string, accounting *slurmv1.SlurmNodeAccoun
 		ExternalDB:     accounting.ExternalDB,
 		MariaDb:        accounting.MariaDbOperator,
 		SlurmdbdConfig: accounting.SlurmdbdConfig,
+		SlurmConfig:    accounting.SlurmConfig,
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),
 		},
