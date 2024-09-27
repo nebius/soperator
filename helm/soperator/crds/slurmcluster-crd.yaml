@@ -8287,6 +8287,109 @@ spec:
                         required:
                         - image
                         type: object
+                      slurmdbdConfig:
+                        description: SlurmdbdConfig represents some the SlurmDBD.conf
+                          configuration
+                        properties:
+                          archiveEvents:
+                            default: "yes"
+                            enum:
+                            - "yes"
+                            - "no"
+                            type: string
+                          archiveJobs:
+                            default: "yes"
+                            enum:
+                            - "yes"
+                            - "no"
+                            type: string
+                          archiveResvs:
+                            default: "yes"
+                            enum:
+                            - "yes"
+                            - "no"
+                            type: string
+                          archiveSteps:
+                            default: "no"
+                            enum:
+                            - "yes"
+                            - "no"
+                            type: string
+                          archiveSuspend:
+                            default: "no"
+                            enum:
+                            - "yes"
+                            - "no"
+                            type: string
+                          archiveTXN:
+                            default: "no"
+                            enum:
+                            - "yes"
+                            - "no"
+                            type: string
+                          archiveUsage:
+                            default: "yes"
+                            enum:
+                            - "yes"
+                            - "no"
+                            type: string
+                          debugFlags:
+                            enum:
+                            - AuditRPCs
+                            - DB_ARCHIVE
+                            - DB_ASSOC
+                            - DB_EVENT
+                            - DB_JOB
+                            - DB_QOS
+                            - DB_QUERY
+                            - DB_RESERVATION
+                            - DB_RESOURCE
+                            - DB_STEP
+                            - DB_TRES
+                            - DB_USAGE
+                            - Network
+                            type: string
+                          debugLevel:
+                            default: info
+                            enum:
+                            - quiet
+                            - fatal
+                            - error
+                            - info
+                            - verbose
+                            - debug
+                            - debug2
+                            - debug3
+                            - debug4
+                            - debug5
+                            type: string
+                          privateData:
+                            type: string
+                          purgeEventAfter:
+                            default: 1month
+                            type: string
+                          purgeJobAfter:
+                            default: 12month
+                            type: string
+                          purgeResvAfter:
+                            default: 1month
+                            type: string
+                          purgeStepAfter:
+                            default: 1month
+                            type: string
+                          purgeSuspendAfter:
+                            default: 1month
+                            type: string
+                          purgeTXNAfter:
+                            default: 12month
+                            type: string
+                          purgeUsageAfter:
+                            default: 24month
+                            type: string
+                          tcpTimeout:
+                            default: 2
+                            type: integer
+                        type: object
                     required:
                     - k8sNodeFilterName
                     type: object

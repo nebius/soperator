@@ -89,11 +89,9 @@ func checkSecret(accounting *values.SlurmAccounting, secret *corev1.Secret) ([]b
 
 func generateSlurdbdConfig(clusterName string, accounting *values.SlurmAccounting, passwordName []byte) renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
-	// TODO: Add support switch ExternalDB and MariaDB CRD. Now we just support ExternalDB
 	// Unmodifiable parameters
 	res.AddProperty("AuthType", "auth/"+consts.Munge)
 	// TODO: Add debug level to CRD and make it configurable
-	res.AddProperty("DebugLevel", consts.SlurmDefaultDebugLevel)
 	res.AddProperty("SlurmUser", consts.SlurmUser)
 	res.AddProperty("LogFile", consts.SlurmLogFile)
 	res.AddProperty("PidFile", consts.SlurmdbdPidFile)
@@ -112,22 +110,29 @@ func generateSlurdbdConfig(clusterName string, accounting *values.SlurmAccountin
 		res.AddProperty("StoragePort", accounting.ExternalDB.Port)
 	}
 
-	// TODO: make it configurable through CRD
 	// Modifiable parameters
-	res.AddProperty("ArchiveEvents", "yes")
-	res.AddProperty("ArchiveJobs", "yes")
-	res.AddProperty("ArchiveResvs", "yes")
-	res.AddProperty("ArchiveSteps", "no")
-	res.AddProperty("ArchiveSuspend", "no")
-	res.AddProperty("ArchiveTXN", "no")
-	res.AddProperty("ArchiveUsage", "no")
-	res.AddProperty("PurgeEventAfter", "1month")
-	res.AddProperty("PurgeJobAfter", "12month")
-	res.AddProperty("PurgeResvAfter", "1month")
-	res.AddProperty("PurgeStepAfter", "1month")
-	res.AddProperty("PurgeSuspendAfter", "1month")
-	res.AddProperty("PurgeTXNAfter", "12month")
-	res.AddProperty("PurgeUsageAfter", "24month")
+	res.AddProperty("ArchiveEvents", accounting.SlurmdbdConfig.ArchiveEvents)
+	res.AddProperty("ArchiveJobs", accounting.SlurmdbdConfig.ArchiveJobs)
+	res.AddProperty("ArchiveResvs", accounting.SlurmdbdConfig.ArchiveResvs)
+	res.AddProperty("ArchiveSteps", accounting.SlurmdbdConfig.ArchiveSteps)
+	res.AddProperty("ArchiveSuspend", accounting.SlurmdbdConfig.ArchiveSuspend)
+	res.AddProperty("ArchiveTXN", accounting.SlurmdbdConfig.ArchiveTXN)
+	res.AddProperty("ArchiveUsage", accounting.SlurmdbdConfig.ArchiveUsage)
+	res.AddProperty("DebugLevel", accounting.SlurmdbdConfig.DebugLevel)
+	res.AddProperty("TCPTimeout", accounting.SlurmdbdConfig.TCPTimeout)
+	res.AddProperty("PurgeEventAfter", accounting.SlurmdbdConfig.PurgeEventAfter)
+	res.AddProperty("PurgeJobAfter", accounting.SlurmdbdConfig.PurgeJobAfter)
+	res.AddProperty("PurgeResvAfter", accounting.SlurmdbdConfig.PurgeResvAfter)
+	res.AddProperty("PurgeStepAfter", accounting.SlurmdbdConfig.PurgeStepAfter)
+	res.AddProperty("PurgeSuspendAfter", accounting.SlurmdbdConfig.PurgeSuspendAfter)
+	res.AddProperty("PurgeTXNAfter", accounting.SlurmdbdConfig.PurgeTXNAfter)
+	res.AddProperty("PurgeUsageAfter", accounting.SlurmdbdConfig.PurgeUsageAfter)
+	if accounting.SlurmdbdConfig.PrivateData != "" {
+		res.AddProperty("PrivateData", accounting.SlurmdbdConfig.PrivateData)
+	}
+	if accounting.SlurmdbdConfig.DebugFlags != "" {
+		res.AddProperty("DebugFlags", accounting.SlurmdbdConfig.DebugFlags)
+	}
 
 	return res
 }

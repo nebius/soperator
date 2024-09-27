@@ -104,6 +104,7 @@ slurmNodes:
   accounting:
     enabled: true
     k8sNodeFilterName: "no-gpu"
+    slurmdbdConfig: {}
     slurmdbd:
       port: 6819
       resources:
@@ -159,13 +160,13 @@ slurmNodes:
         enabled: false
         # username: ""
         # serviceMonitor: {}
-          # jobLabel: ""
-          # interval: ""
-          # scrapeTimeout: ""
+        # jobLabel: ""
+        # interval: ""
+        # scrapeTimeout: ""
         # exporter: {}
         # passwordSecretKeyRef: {}
-          # name: ""
-          # key: ""
+        # name: ""
+        # key: ""
       # affinity: {}
       # args: []
       # env: []

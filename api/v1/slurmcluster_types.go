@@ -321,6 +321,10 @@ type SlurmNodeAccounting struct {
 	//
 	// +kubebuilder:validation:Optional
 	MariaDbOperator MariaDbOperator `json:"mariadbOperator,omitempty"`
+	// SlurmdbdConfig represents some the SlurmDBD.conf configuration
+	//
+	// +kubebuilder:validation:Optional
+	SlurmdbdConfig SlurmdbdConfig `json:"slurmdbdConfig,omitempty"`
 }
 
 // ExternalDB represents the external database configuration of connection string
@@ -371,6 +375,54 @@ type MariaDbOperator struct {
 	Metrics            *mariadv1alpha1.MariadbMetrics `json:"metrics,omitempty"`
 	Replication        *mariadv1alpha1.Replication    `json:"replication,omitempty"`
 	Storage            mariadv1alpha1.Storage         `json:"storage,omitempty"`
+}
+
+type SlurmdbdConfig struct {
+	// +kubebuilder:validation:Enum="yes";"no"
+	// +kubebuilder:default="yes"
+	ArchiveEvents string `json:"archiveEvents,omitempty"`
+	// +kubebuilder:validation:Enum="yes";"no"
+	// +kubebuilder:default="yes"
+	ArchiveJobs string `json:"archiveJobs,omitempty"`
+	// +kubebuilder:validation:Enum="yes";"no"
+	// +kubebuilder:default="yes"
+	ArchiveResvs string `json:"archiveResvs,omitempty"`
+	// +kubebuilder:validation:Enum="yes";"no"
+	// +kubebuilder:default="no"
+	ArchiveSteps string `json:"archiveSteps,omitempty"`
+	// +kubebuilder:validation:Enum="yes";"no"
+	// +kubebuilder:default="no"
+	ArchiveSuspend string `json:"archiveSuspend,omitempty"`
+	// +kubebuilder:validation:Enum="yes";"no"
+	// +kubebuilder:default="no"
+	ArchiveTXN string `json:"archiveTXN,omitempty"`
+	// +kubebuilder:validation:Enum="yes";"no"
+	// +kubebuilder:default="yes"
+	ArchiveUsage string `json:"archiveUsage,omitempty"`
+	// +kubebuilder:validation:Enum="quiet";"fatal";"error";"info";"verbose";"debug";"debug2";"debug3";"debug4";"debug5"
+	// +kubebuilder:default="info"
+	DebugLevel string `json:"debugLevel,omitempty"`
+	// +kubebuilder:default=2
+	TCPTimeout int16 `json:"tcpTimeout,omitempty"`
+	// +kubebuilder:default="1month"
+	PurgeEventAfter string `json:"purgeEventAfter,omitempty"`
+	// +kubebuilder:default="12month"
+	PurgeJobAfter string `json:"purgeJobAfter,omitempty"`
+	// +kubebuilder:default="1month"
+	PurgeResvAfter string `json:"purgeResvAfter,omitempty"`
+	// +kubebuilder:default="1month"
+	PurgeStepAfter string `json:"purgeStepAfter,omitempty"`
+	// +kubebuilder:default="1month"
+	PurgeSuspendAfter string `json:"purgeSuspendAfter,omitempty"`
+	// +kubebuilder:default="12month"
+	PurgeTXNAfter string `json:"purgeTXNAfter,omitempty"`
+	// +kubebuilder:default="24month"
+	PurgeUsageAfter string `json:"purgeUsageAfter,omitempty"`
+	// +kubebuilder:validation:Optional
+	PrivateData string `json:"privateData,omitempty"`
+	// +kubebuilder:validation:Enum="AuditRPCs";"DB_ARCHIVE";"DB_ASSOC";"DB_EVENT";"DB_JOB";"DB_QOS";"DB_QUERY";"DB_RESERVATION";"DB_RESOURCE";"DB_STEP";"DB_TRES";"DB_USAGE";"Network"
+	// +kubebuilder:validation
+	DebugFlags string `json:"debugFlags,omitempty"`
 }
 
 // SlurmNodeController defines the configuration for the Slurm controller node
