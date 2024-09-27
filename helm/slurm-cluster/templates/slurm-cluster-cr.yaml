@@ -78,6 +78,7 @@ spec:
           memory: {{ required ".Values.slurmNodes.accounting.slurmdbd.resources.memory must be provided." .Values.slurmNodes.accounting.slurmdbd.resources.memory | quote}}
           ephemeral-storage: {{ required ".Values.slurmNodes.accounting.slurmdbd.resources.ephemeralStorage must be provided." .Values.slurmNodes.accounting.slurmdbd.resources.ephemeralStorage | quote}}
       enabled: {{ default false .Values.slurmNodes.accounting.enabled }}
+      slurmdbdConfig: {{ toYaml .Values.slurmNodes.accounting.slurmdbdConfig | nindent 8 }}
       {{- if .Values.slurmNodes.accounting.externalDB.enabled }}
       externalDB:
         enabled: {{ default false .Values.slurmNodes.accounting.externalDB.enabled }}

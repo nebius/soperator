@@ -30,8 +30,8 @@ controllerManager:
         drop:
           - ALL
     env:
-      isOpentelemetryCollectorCrdInstalled: "false"
       isMariadbCrdInstalled: "false"
+      isOpentelemetryCollectorCrdInstalled: "false"
       isPrometheusCrdInstalled: "false"
       slurmOperatorWatchNamespaces: '*'
     image:

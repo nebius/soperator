@@ -104,6 +104,23 @@ slurmNodes:
   accounting:
     enabled: true
     k8sNodeFilterName: "no-gpu"
+    slurmdbdConfig: {}
+        # archiveEvents: "yes"
+        # archiveJobs: "yes"
+        # archiveSteps: "yes"
+        # archiveSuspend: "yes"
+        # archiveResv: "yes"
+        # archiveUsage: "yes"
+        # archiveTXN: "yes"
+        # debugLevel: "info"
+        # tcpTimeout: "120"
+        # purgeEventAfter: "1month"
+        # purgeJobAfter: "1month"
+        # purgeStepAfter: "1month"
+        # purgeSuspendAfter: "12month"
+        # purgeResvAfter: "1month"
+        # purgeUsageAfter: "1month"
+        # debugFlags: "DB_ARCHIVE"
     slurmdbd:
       port: 6819
       resources:
@@ -159,13 +176,13 @@ slurmNodes:
         enabled: false
         # username: ""
         # serviceMonitor: {}
-          # jobLabel: ""
-          # interval: ""
-          # scrapeTimeout: ""
+        # jobLabel: ""
+        # interval: ""
+        # scrapeTimeout: ""
         # exporter: {}
         # passwordSecretKeyRef: {}
-          # name: ""
-          # key: ""
+        # name: ""
+        # key: ""
       # affinity: {}
       # args: []
       # env: []

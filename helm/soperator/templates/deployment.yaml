@@ -49,8 +49,7 @@ spec:
           value: {{ quote .Values.controllerManager.manager.env.isPrometheusCrdInstalled
             }}
         - name: IS_MARIADB_CRD_INSTALLED
-          value: {{ quote .Values.controllerManager.manager.env.isMariadbCrdInstalled
-            }}
+          value: {{ quote .Values.controllerManager.manager.env.isMariadbCrdInstalled }}
         - name: SLURM_OPERATOR_WATCH_NAMESPACES
           value: {{ quote .Values.controllerManager.manager.env.slurmOperatorWatchNamespaces
             }}

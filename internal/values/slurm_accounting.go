@@ -17,11 +17,12 @@ type SlurmAccounting struct {
 	ContainerAccounting Container
 	ContainerMunge      Container
 
-	Service    Service
-	Deployment Deployment
-	ExternalDB slurmv1.ExternalDB
-	MariaDb    slurmv1.MariaDbOperator
-	VolumeJail slurmv1.NodeVolume
+	Service        Service
+	Deployment     Deployment
+	ExternalDB     slurmv1.ExternalDB
+	MariaDb        slurmv1.MariaDbOperator
+	SlurmdbdConfig slurmv1.SlurmdbdConfig
+	VolumeJail     slurmv1.NodeVolume
 }
 
 func buildAccountingFrom(clusterName string, accounting *slurmv1.SlurmNodeAccounting) SlurmAccounting {
@@ -44,8 +45,9 @@ func buildAccountingFrom(clusterName string, accounting *slurmv1.SlurmNodeAccoun
 		Deployment: buildDeploymentFrom(
 			naming.BuildDeploymentName(consts.ComponentTypeAccounting),
 		),
-		ExternalDB: accounting.ExternalDB,
-		MariaDb:    accounting.MariaDbOperator,
+		ExternalDB:     accounting.ExternalDB,
+		MariaDb:        accounting.MariaDbOperator,
+		SlurmdbdConfig: accounting.SlurmdbdConfig,
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),
 		},
