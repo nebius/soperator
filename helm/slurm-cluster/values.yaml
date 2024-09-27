@@ -104,7 +104,7 @@ slurmNodes:
   accounting:
     enabled: true
     k8sNodeFilterName: "no-gpu"
-    slurmdbdConfig: {}
+    # slurmdbdConfig: {}
     slurmdbd:
       port: 6819
       resources:
