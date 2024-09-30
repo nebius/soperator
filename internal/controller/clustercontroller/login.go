@@ -320,5 +320,20 @@ func (r SlurmClusterReconciler) getLoginStatefulSetDependencies(
 	}
 	res = append(res, sshConfigsConfigMap)
 
+	if clusterValues.NodeAccounting.Enabled {
+		slurmdbdSecret := &corev1.Secret{}
+		if err := r.Get(
+			ctx,
+			types.NamespacedName{
+				Namespace: clusterValues.Namespace,
+				Name:      naming.BuildSecretSlurmdbdConfigsName(clusterValues.Name),
+			},
+			slurmdbdSecret,
+		); err != nil {
+			return []metav1.Object{}, err
+		}
+		res = append(res, slurmdbdSecret)
+	}
+
 	return res, nil
 }
