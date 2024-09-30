@@ -8273,7 +8273,8 @@ spec:
                           acctGatherProfileType:
                             type: string
                           jobAcctGatherFrequency:
-                            type: string
+                            default: 30
+                            type: integer
                           jobAcctGatherParams:
                             enum:
                             - NoShared
