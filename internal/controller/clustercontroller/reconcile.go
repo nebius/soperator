@@ -226,9 +226,6 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 			if err = r.ReconcileCommon(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
-			if err = r.ReconcileAccounting(ctx, cluster, clusterValues); err != nil {
-				return ctrl.Result{}, err
-			}
 			if err = r.ReconcileNCCLBenchmark(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -242,6 +239,9 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 				if err = r.ReconcileLogin(ctx, cluster, clusterValues); err != nil {
 					return ctrl.Result{}, err
 				}
+			}
+			if err = r.ReconcileAccounting(ctx, cluster, clusterValues); err != nil {
+				return ctrl.Result{}, err
 			}
 			if err = r.ReconcileExporter(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
@@ -548,13 +548,14 @@ func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Func
 			Objects: []client.Object{
 				&corev1.Service{},
 				&appsv1.StatefulSet{},
+				&appsv1.Deployment{},
 				&corev1.PersistentVolumeClaim{},
-				&corev1.ConfigMap{},
 				&batchv1.Job{},
 				&batchv1.CronJob{},
-				&corev1.Secret{},
 				&rbacv1.Role{},
 				&rbacv1.RoleBinding{},
+				&corev1.ConfigMap{},
+				&corev1.Secret{},
 			},
 			Predicate: predicate.GenerationChangedPredicate{},
 		},
