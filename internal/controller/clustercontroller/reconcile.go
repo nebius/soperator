@@ -222,10 +222,10 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 			if err = r.ReconcilePopulateJail(ctx, clusterValues, cluster); err != nil {
 				return ctrl.Result{}, err
 			}
-			if err = r.ReconcileAccounting(ctx, cluster, clusterValues); err != nil {
+			if err = r.ReconcileCommon(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
-			if err = r.ReconcileCommon(ctx, cluster, clusterValues); err != nil {
+			if err = r.ReconcileAccounting(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
 			if err = r.ReconcileNCCLBenchmark(ctx, cluster, clusterValues); err != nil {
