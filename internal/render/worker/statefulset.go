@@ -48,9 +48,8 @@ func RenderStatefulSet(
 		consts.DefaultContainerAnnotationName: consts.ContainerNameSlurmd,
 	}
 
-	var initContainers []corev1.Container
-	if clusterType == consts.ClusterTypeGPU {
-		initContainers = append(initContainers, renderContainerToolkitValidation(&worker.ContainerToolkitValidation))
+	initContainers := []corev1.Container{
+		renderContainerToolkitValidation(&worker.ContainerToolkitValidation),
 	}
 
 	return appsv1.StatefulSet{

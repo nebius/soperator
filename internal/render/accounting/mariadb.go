@@ -94,7 +94,6 @@ func RenderMariaDb(
 				NodeSelector:       nodeFilter.NodeSelector,
 				Affinity:           affinityConfig,
 				PodSecurityContext: mariaDb.PodSecurityContext,
-
 			},
 			Metrics: mariaDb.Metrics,
 			MyCnf:   ptr.To(consts.MariaDbDefaultMyCnf),
