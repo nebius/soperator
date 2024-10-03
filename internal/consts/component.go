@@ -19,12 +19,13 @@ func (b baseComponentType) String() string {
 }
 
 var (
-	ComponentTypeCommon       ComponentType = baseComponentType{"common"}
-	ComponentTypeController   ComponentType = baseComponentType{"controller"}
-	ComponentTypeAccounting   ComponentType = baseComponentType{"accounting"}
-	ComponentTypeWorker       ComponentType = baseComponentType{"worker"}
-	ComponentTypeLogin        ComponentType = baseComponentType{"login"}
-	ComponentTypeBenchmark    ComponentType = baseComponentType{"nccl-benchmark"}
-	ComponentTypePopulateJail ComponentType = baseComponentType{"populate-jail"}
-	ComponentTypeExporter     ComponentType = baseComponentType{"exporter"}
+	ComponentTypeCommon          ComponentType = baseComponentType{"common"}
+	ComponentTypeController      ComponentType = baseComponentType{"controller"}
+	ComponentTypeAccounting      ComponentType = baseComponentType{"accounting"}
+	ComponentTypeWorker          ComponentType = baseComponentType{"worker"}
+	ComponentTypeLogin           ComponentType = baseComponentType{"login"}
+	ComponentTypeBenchmark       ComponentType = baseComponentType{"nccl-benchmark"}
+	ComponentTypePopulateJail    ComponentType = baseComponentType{"populate-jail"}
+	ComponentTypeExporter        ComponentType = baseComponentType{"exporter"}
+	ComponentTypeMariaDbOperator ComponentType = baseComponentType{"mariadb-operator"}
 )

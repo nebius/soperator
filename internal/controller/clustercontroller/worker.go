@@ -8,7 +8,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -50,7 +49,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err = r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling worker NCCL topology ConfigMap")
 					}
@@ -74,7 +73,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err = r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling worker Sysctl ConfigMap")
 					}
@@ -94,7 +93,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err := r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling worker security limits configmap")
 					}
@@ -114,7 +113,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err := r.Service.Reconcile(ctx, cluster, &desired); err != nil {
+					if err := r.Service.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling worker Service")
 					}
@@ -145,14 +144,14 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					deps, err := r.getWorkersStatefulSetDependencies(ctx, clusterValues)
+					deps, err := r.getWorkersStatefulSetDependencies(stepCtx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
 						return errors.Wrap(err, "retrieving dependencies for worker StatefulSet")
 					}
 					stepLogger.Info("Retrieved dependencies")
 
-					if err = r.StatefulSet.Reconcile(ctx, cluster, &desired, deps...); err != nil {
+					if err = r.StatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling worker StatefulSet")
 					}
@@ -172,7 +171,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err := r.ServiceAccount.Reconcile(ctx, cluster, &desired); err != nil {
+					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling worker ServiceAccount")
 					}
@@ -193,7 +192,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 						stepLogger.Info("Rendered")
 
-						if err := r.Role.Reconcile(ctx, cluster, &desired); err != nil {
+						if err := r.Role.Reconcile(stepCtx, cluster, &desired); err != nil {
 							stepLogger.Error(err, "Failed to reconcile")
 							return errors.Wrap(err, "reconciling worker Role")
 						}
@@ -203,7 +202,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						// Without explicit deletion through reconciliation,
 						// The Role will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
 						stepLogger.Info("Removing")
-						if err := r.Role.Reconcile(ctx, cluster, nil); err != nil {
+						if err := r.Role.Reconcile(stepCtx, cluster, nil); err != nil {
 							stepLogger.Error(err, "Failed to remove")
 							return errors.Wrap(err, "removing worker Role")
 						}
@@ -226,7 +225,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 						stepLogger.Info("Rendered")
 
-						if err := r.RoleBinding.Reconcile(ctx, cluster, &desired); err != nil {
+						if err := r.RoleBinding.Reconcile(stepCtx, cluster, &desired); err != nil {
 							stepLogger.Error(err, "Failed to reconcile")
 							return errors.Wrap(err, "reconciling worker RoleBinding")
 						}
@@ -236,7 +235,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						// Without explicit deletion through reconciliation,
 						// Еhe RoleBinding will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
 						stepLogger.Info("Removing")
-						if err := r.RoleBinding.Reconcile(ctx, cluster, nil); err != nil {
+						if err := r.RoleBinding.Reconcile(stepCtx, cluster, nil); err != nil {
 							stepLogger.Error(err, "Failed to remove")
 							return errors.Wrap(err, "removing worker Role")
 						}
@@ -288,18 +287,26 @@ func (r SlurmClusterReconciler) ValidateWorkers(
 		targetReplicas = *existing.Spec.Replicas
 	}
 	if existing.Status.AvailableReplicas != targetReplicas {
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   slurmv1.ConditionClusterWorkersAvailable,
-			Status: metav1.ConditionFalse, Reason: "NotAvailable",
-			Message: "Slurm workers are not available yet",
-		})
+		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+			status.SetCondition(metav1.Condition{
+				Type:   slurmv1.ConditionClusterWorkersAvailable,
+				Status: metav1.ConditionFalse, Reason: "NotAvailable",
+				Message: "Slurm workers are not available yet",
+			})
+		}); err != nil {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 10}, nil
 	} else {
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   slurmv1.ConditionClusterWorkersAvailable,
-			Status: metav1.ConditionTrue, Reason: "Available",
-			Message: "Slurm workers are available",
-		})
+		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+			status.SetCondition(metav1.Condition{
+				Type:   slurmv1.ConditionClusterWorkersAvailable,
+				Status: metav1.ConditionTrue, Reason: "Available",
+				Message: "Slurm workers are available",
+			})
+		}); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, nil
@@ -336,6 +343,21 @@ func (r SlurmClusterReconciler) getWorkersStatefulSetDependencies(
 		return []metav1.Object{}, err
 	}
 	res = append(res, mungeKeySecret)
+
+	if clusterValues.NodeAccounting.Enabled {
+		slurmdbdSecret := &corev1.Secret{}
+		if err := r.Get(
+			ctx,
+			types.NamespacedName{
+				Namespace: clusterValues.Namespace,
+				Name:      naming.BuildSecretSlurmdbdConfigsName(clusterValues.Name),
+			},
+			slurmdbdSecret,
+		); err != nil {
+			return []metav1.Object{}, err
+		}
+		res = append(res, slurmdbdSecret)
+	}
 
 	return res, nil
 }

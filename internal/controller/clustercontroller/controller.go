@@ -8,7 +8,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -47,7 +46,7 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err := r.ConfigMap.Reconcile(ctx, cluster, &desired); err != nil {
+					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling controller security limits configmap")
 					}
@@ -67,7 +66,7 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err := r.Service.Reconcile(ctx, cluster, &desired); err != nil {
+					if err := r.Service.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling controller Service")
 					}
@@ -97,14 +96,14 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					deps, err := r.getControllersStatefulSetDependencies(ctx, clusterValues)
+					deps, err := r.getControllersStatefulSetDependencies(stepCtx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
 						return errors.Wrap(err, "retrieving dependencies for controller StatefulSet")
 					}
 					stepLogger.Info("Retrieved dependencies")
 
-					if err = r.StatefulSet.Reconcile(ctx, cluster, &desired, deps...); err != nil {
+					if err = r.StatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling controller StatefulSet")
 					}
@@ -154,18 +153,26 @@ func (r SlurmClusterReconciler) ValidateControllers(
 		targetReplicas = *existing.Spec.Replicas
 	}
 	if existing.Status.AvailableReplicas != targetReplicas {
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   slurmv1.ConditionClusterControllersAvailable,
-			Status: metav1.ConditionFalse, Reason: "NotAvailable",
-			Message: "Slurm controllers are not available yet",
-		})
+		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+			status.SetCondition(metav1.Condition{
+				Type:   slurmv1.ConditionClusterControllersAvailable,
+				Status: metav1.ConditionFalse, Reason: "NotAvailable",
+				Message: "Slurm controllers are not available yet",
+			})
+		}); err != nil {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 10}, nil
 	} else {
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   slurmv1.ConditionClusterControllersAvailable,
-			Status: metav1.ConditionTrue, Reason: "Available",
-			Message: "Slurm controllers are available",
-		})
+		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+			status.SetCondition(metav1.Condition{
+				Type:   slurmv1.ConditionClusterControllersAvailable,
+				Status: metav1.ConditionTrue, Reason: "Available",
+				Message: "Slurm controllers are available",
+			})
+		}); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, nil
@@ -202,6 +209,21 @@ func (r SlurmClusterReconciler) getControllersStatefulSetDependencies(
 		return []metav1.Object{}, err
 	}
 	res = append(res, mungeKeySecret)
+
+	if clusterValues.NodeAccounting.Enabled {
+		slurmdbdSecret := &corev1.Secret{}
+		if err := r.Get(
+			ctx,
+			types.NamespacedName{
+				Namespace: clusterValues.Namespace,
+				Name:      naming.BuildSecretSlurmdbdConfigsName(clusterValues.Name),
+			},
+			slurmdbdSecret,
+		); err != nil {
+			return []metav1.Object{}, err
+		}
+		res = append(res, slurmdbdSecret)
+	}
 
 	return res, nil
 }

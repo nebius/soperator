@@ -1,6 +1,6 @@
 {{/* Name of the cluster */}}
 {{- define "slurm-cluster.name" -}}
-    {{- default .Chart.Name .Values.clusterName | kebabcase | trunc 63 | trimSuffix "-" }}
+    {{- default .Chart.Name .Values.clusterName | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/* Create chart name and version as used by the chart label */}}

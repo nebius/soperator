@@ -102,16 +102,35 @@ periodicChecks:
     k8sNodeFilterName: "no-gpu"
 slurmNodes:
   accounting:
-    enabled: false
-    externalDB:
-      enabled: false
-      # host: ""
-      # port: 3306
-      # user: ""
-      # passwordSecretKeyRef:
-      #   name: ""
-      #   key: ""
+    enabled: true
     k8sNodeFilterName: "no-gpu"
+    slurmConfig: {}
+    # accountingStorageTRES: gres/gpu,license/iop1
+    # accountingStoreFlags: job_comment,job_env,job_extra,job_script,no_stdio
+    # acctGatherInterconnectType: "acct_gather_interconnect/ofed"
+    # acctGatherFilesystemType: acct_gather_filesystem/lustre
+    # jobAcctGatherType: jobacct_gather/cgroup
+    # jobAcctGatherFrequency: 30
+    # priorityWeightAge: 1
+    # priorityWeightFairshare: 1
+    # priorityWeightTRES: 1
+    slurmdbdConfig: {}
+    # archiveEvents: "yes"
+    # archiveJobs: "yes"
+    # archiveSteps: "yes"
+    # archiveSuspend: "yes"
+    # archiveResv: "yes"
+    # archiveUsage: "yes"
+    # archiveTXN: "yes"
+    # debugLevel: "info"
+    # tcpTimeout: "120"
+    # purgeEventAfter: "1month"
+    # purgeJobAfter: "1month"
+    # purgeStepAfter: "1month"
+    # purgeSuspendAfter: "12month"
+    # purgeResvAfter: "1month"
+    # purgeUsageAfter: "1month"
+    # debugFlags: "DB_ARCHIVE"
     slurmdbd:
       port: 6819
       resources:
@@ -123,6 +142,82 @@ slurmNodes:
         cpu: "1000m"
         memory: "1Gi"
         ephemeralStorage: "5Gi"
+    externalDB:
+      enabled: false
+      # host: ""
+      # port: 3306
+      # user: ""
+      # passwordSecretKeyRef:
+      #   name: ""
+      #   key: ""
+    mariadbOperator:
+      enabled: false
+      resources:
+        cpu: "1000m"
+        memory: "1Gi"
+        ephemeralStorage: "5Gi"
+      replicas: 1
+      replication: {}
+      # enabled: false
+      # primary: {}
+      # probesEnabled: false
+      # replica: {}
+      # syncBinlog: false
+      storage: {}
+      # ephemeral: false
+      # resizeInUseVolumes: false
+      # size: {}
+      # storageClassName: ""
+      # volumeClaimTemplate: ""
+      # waitForVolumeResize: false
+      podSecurityContext: {}
+      # fsGroup: 2000
+      # runAsUser: 1000
+      # runAsGroup: 3000
+      # runAsNonRoot: true
+      # supplementalGroups: [1000]
+      securityContext: {}
+      # runAsUser: 1000
+      # runAsGroup: 3000
+      # runAsNonRoot: true
+      # capabilities:
+      #   add: ["NET_ADMIN", "SYS_TIME"]
+      metrics:
+        enabled: false
+        # username: ""
+        # serviceMonitor: {}
+        # jobLabel: ""
+        # interval: ""
+        # scrapeTimeout: ""
+        # exporter: {}
+        # passwordSecretKeyRef: {}
+        # name: ""
+        # key: ""
+      # affinity: {}
+      # args: []
+      # env: []
+      # envFrom: []
+      # image: ""
+      # imagePullPolicy: ""
+      # imagePullSecrets: []
+      # initContainers: []
+      # livenessProbe: {}
+      # nodeSelector: {}
+      # podMetadata: {}
+      # securityContext: {}
+      # serviceAccountName: ""
+      # sidecarContainers: []
+      # tolerations: []
+      # resources: {}
+      # volumeMounts: []
+      # volumes: []
+      # resources: {}
+      #   limits:
+      #     cpu: "100m"
+      #     memory: "128Mi"
+      #   requests:
+      #     cpu: "50m"
+      #     memory: "64Mi"
   controller:
     size: 2
     k8sNodeFilterName: "no-gpu"
@@ -235,11 +330,12 @@ telemetry: {}
 #   otelCollectorPort: 8429
 
 images:
-  slurmctld: "ghcr.io/nebius/soperator/controller_slurmctld:1.14.2-jammy-slurm24.05.2"
-  slurmd: "ghcr.io/nebius/soperator/worker_slurmd:1.14.2-jammy-slurm24.05.2"
-  sshd: "ghcr.io/nebius/soperator/login_sshd:1.14.2-jammy-slurm24.05.2"
-  munge: "ghcr.io/nebius/soperator/munge:1.14.2-jammy-slurm24.05.2"
-  populateJail: "ghcr.io/nebius/soperator/populate_jail:1.14.2-jammy-slurm24.05.2"
-  ncclBenchmark: "ghcr.io/nebius/soperator/nccl_benchmark:1.14.2-jammy-slurm24.05.2"
-  slurmdbd: "ghcr.io/nebius/soperator/controller_slurmdbd:1.14.2-jammy-slurm24.05.2"
-  exporter: "ghcr.io/nebius/soperator/exporter:1.14.2-jammy-slurm24.05.2"
+  slurmctld: "ghcr.io/nebius/soperator/controller_slurmctld:1.14.3-jammy-slurm24.05.2"
+  slurmd: "ghcr.io/nebius/soperator/worker_slurmd:1.14.3-jammy-slurm24.05.2"
+  sshd: "ghcr.io/nebius/soperator/login_sshd:1.14.3-jammy-slurm24.05.2"
+  munge: "ghcr.io/nebius/soperator/munge:1.14.3-jammy-slurm24.05.2"
+  populateJail: "ghcr.io/nebius/soperator/populate_jail:1.14.3-jammy-slurm24.05.2"
+  ncclBenchmark: "ghcr.io/nebius/soperator/nccl_benchmark:1.14.3-jammy-slurm24.05.2"
+  slurmdbd: "ghcr.io/nebius/soperator/controller_slurmdbd:1.14.3-jammy-slurm24.05.2"
+  exporter: "ghcr.io/nebius/soperator/exporter:1.14.3-jammy-slurm24.05.2"
+  mariaDB: "docker-registry1.mariadb.com/library/mariadb:11.4.3"

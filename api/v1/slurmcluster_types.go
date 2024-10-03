@@ -2,9 +2,11 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	mariadv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
 
@@ -315,6 +317,19 @@ type SlurmNodeAccounting struct {
 	//
 	// +kubebuilder:validation:Optional
 	ExternalDB ExternalDB `json:"externalDB,omitempty"`
+	// MariaDbOpeator represents the MariaDB CRD configuration
+	//
+	// +kubebuilder:validation:Optional
+	MariaDbOperator MariaDbOperator `json:"mariadbOperator,omitempty"`
+	// SlurmdbdConfig represents some the SlurmDBD.conf configuration
+	//
+	// +kubebuilder:validation:Optional
+	SlurmdbdConfig SlurmdbdConfig `json:"slurmdbdConfig,omitempty"`
+
+	// SlurmConfig represents the Slurm accounting configuration in slurm.conf
+	//
+	// +kubebuilder:validation:Optional
+	SlurmConfig AccountingSlurmConf `json:"slurmConfig,omitempty"`
 }
 
 // ExternalDB represents the external database configuration of connection string
@@ -352,6 +367,98 @@ type PasswordSecretKeyRef struct {
 	//
 	// +kubebuilder:validation:Optional
 	Key string `json:"key"`
+}
+
+type MariaDbOperator struct {
+	// +kubebuilder:validation:Optional
+	Enabled bool `json:"enabled"`
+
+	NodeContainer      `json:",inline"`
+	PodSecurityContext *corev1.PodSecurityContext     `json:"podSecurityContext,omitempty"`
+	SecurityContext    *corev1.SecurityContext        `json:"securityContext,omitempty"`
+	Replicas           int32                          `json:"replicas,omitempty"`
+	Metrics            *mariadv1alpha1.MariadbMetrics `json:"metrics,omitempty"`
+	Replication        *mariadv1alpha1.Replication    `json:"replication,omitempty"`
+	Storage            mariadv1alpha1.Storage         `json:"storage,omitempty"`
+}
+
+type SlurmdbdConfig struct {
+	// +kubebuilder:validation:Enum="yes";"no"
+	// +kubebuilder:default="yes"
+	ArchiveEvents string `json:"archiveEvents,omitempty"`
+	// +kubebuilder:validation:Enum="yes";"no"
+	// +kubebuilder:default="yes"
+	ArchiveJobs string `json:"archiveJobs,omitempty"`
+	// +kubebuilder:validation:Enum="yes";"no"
+	// +kubebuilder:default="yes"
+	ArchiveResvs string `json:"archiveResvs,omitempty"`
+	// +kubebuilder:validation:Enum="yes";"no"
+	// +kubebuilder:default="no"
+	ArchiveSteps string `json:"archiveSteps,omitempty"`
+	// +kubebuilder:validation:Enum="yes";"no"
+	// +kubebuilder:default="no"
+	ArchiveSuspend string `json:"archiveSuspend,omitempty"`
+	// +kubebuilder:validation:Enum="yes";"no"
+	// +kubebuilder:default="no"
+	ArchiveTXN string `json:"archiveTXN,omitempty"`
+	// +kubebuilder:validation:Enum="yes";"no"
+	// +kubebuilder:default="yes"
+	ArchiveUsage string `json:"archiveUsage,omitempty"`
+	// +kubebuilder:validation:Enum="quiet";"fatal";"error";"info";"verbose";"debug";"debug2";"debug3";"debug4";"debug5"
+	// +kubebuilder:default="info"
+	DebugLevel string `json:"debugLevel,omitempty"`
+	// +kubebuilder:default=2
+	TCPTimeout int16 `json:"tcpTimeout,omitempty"`
+	// +kubebuilder:default="1month"
+	PurgeEventAfter string `json:"purgeEventAfter,omitempty"`
+	// +kubebuilder:default="12month"
+	PurgeJobAfter string `json:"purgeJobAfter,omitempty"`
+	// +kubebuilder:default="1month"
+	PurgeResvAfter string `json:"purgeResvAfter,omitempty"`
+	// +kubebuilder:default="1month"
+	PurgeStepAfter string `json:"purgeStepAfter,omitempty"`
+	// +kubebuilder:default="1month"
+	PurgeSuspendAfter string `json:"purgeSuspendAfter,omitempty"`
+	// +kubebuilder:default="12month"
+	PurgeTXNAfter string `json:"purgeTXNAfter,omitempty"`
+	// +kubebuilder:default="24month"
+	PurgeUsageAfter string `json:"purgeUsageAfter,omitempty"`
+	// +kubebuilder:validation:Optional
+	PrivateData string `json:"privateData,omitempty"`
+	// +kubebuilder:validation:Enum="AuditRPCs";"DB_ARCHIVE";"DB_ASSOC";"DB_EVENT";"DB_JOB";"DB_QOS";"DB_QUERY";"DB_RESERVATION";"DB_RESOURCE";"DB_STEP";"DB_TRES";"DB_USAGE";"Network"
+	// +kubebuilder:validation
+	DebugFlags string `json:"debugFlags,omitempty"`
+}
+
+type AccountingSlurmConf struct {
+	// +kubebuilder:validation:Optional
+	AccountingStorageTRES string `json:"accountingStorageTRES,omitempty"`
+	// +kubebuilder:validation:Optional
+	AccountingStoreFlags string `json:"accountingStoreFlags,omitempty"`
+	// +kubebuilder:validation:Optional
+	AcctGatherInterconnectType string `json:"acctGatherInterconnectType,omitempty"`
+	// +kubebuilder:validation:Optional
+	AcctGatherFilesystemType string `json:"acctGatherFilesystemType,omitempty"`
+	// +kubebuilder:validation:Optional
+	AcctGatherProfileType string `json:"acctGatherProfileType,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum="jobacct_gather/linux";"jobacct_gather/cgroup";"jobacct_gather/none"
+	JobAcctGatherType string `json:"jobAcctGatherType,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=30
+	JobAcctGatherFrequency int `json:"jobAcctGatherFrequency,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum="NoShared";"UsePss";"OverMemoryKill";"DisableGPUAcct"
+	JobAcctGatherParams string `json:"jobAcctGatherParams,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=0
+	PriorityWeightAge int16 `json:"priorityWeightAge,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=0
+	PriorityWeightFairshare int16 `json:"priorityWeightFairshare,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=0
+	PriorityWeightTRES int16 `json:"priorityWeightTRES,omitempty"`
 }
 
 // SlurmNodeController defines the configuration for the Slurm controller node
@@ -725,6 +832,13 @@ type SlurmClusterStatus struct {
 
 	// +kubebuilder:validation:Optional
 	Phase *string `json:"phase,omitempty"`
+}
+
+func (s *SlurmClusterStatus) SetCondition(condition metav1.Condition) {
+	if s.Conditions == nil {
+		s.Conditions = make([]metav1.Condition, 0)
+	}
+	meta.SetStatusCondition(&s.Conditions, condition)
 }
 
 //+kubebuilder:object:root=true
