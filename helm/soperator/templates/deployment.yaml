@@ -1,24 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "slurm-operator.fullname" . }}-controller-manager
+  name: {{ include "soperator.fullname" . }}-controller-manager
   labels:
     app.kubernetes.io/component: manager
     app.kubernetes.io/created-by: slurm-operator
     app.kubernetes.io/part-of: slurm-operator
     control-plane: controller-manager
-  {{- include "slurm-operator.labels" . | nindent 4 }}
+  {{- include "soperator.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.controllerManager.replicas }}
   selector:
     matchLabels:
       control-plane: controller-manager
-    {{- include "slurm-operator.selectorLabels" . | nindent 6 }}
+    {{- include "soperator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
         control-plane: controller-manager
-      {{- include "slurm-operator.selectorLabels" . | nindent 8 }}
+      {{- include "soperator.selectorLabels" . | nindent 8 }}
       annotations:
         kubectl.kubernetes.io/default-container: manager
     spec:
@@ -42,6 +42,12 @@ spec:
         command:
         - /usr/bin/slurm_operator
         env:
+        - name: IS_OPENTELEMETRY_COLLECTOR_CRD_INSTALLED
+          value: {{ quote .Values.controllerManager.manager.env.isOpentelemetryCollectorCrdInstalled
+            }}
+        - name: IS_PROMETHEUS_CRD_INSTALLED
+          value: {{ quote .Values.controllerManager.manager.env.isPrometheusCrdInstalled
+            }}
         - name: SLURM_OPERATOR_WATCH_NAMESPACES
           value: {{ quote .Values.controllerManager.manager.env.slurmOperatorWatchNamespaces
             }}
@@ -69,5 +75,5 @@ spec:
           | nindent 10 }}
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: {{ include "slurm-operator.fullname" . }}-controller-manager
+      serviceAccountName: {{ include "soperator.fullname" . }}-controller-manager
       terminationGracePeriodSeconds: 10

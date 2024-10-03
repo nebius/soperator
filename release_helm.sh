@@ -42,9 +42,6 @@ RELEASE_PATH="helm-releases"
 
 mkdir -p $RELEASE_PATH
 
-# https://console.nebius.ai/folders/bje82q7sm8njm3c4rrlq/container-registry/registries/crnefnj17i4kqgt3up94/overview
-CONTAINER_REGISTRY_ID='crnefnj17i4kqgt3up94'
-
 chart() {
   CHART_NAME=${1} && shift 1
   CHART_VERSION=${1} && shift 1
@@ -73,8 +70,8 @@ chart() {
   helm package -d "${RELEASE_PATH}" "${HELM_PATH}/${CHART_NAME}"
 
   if [ -n "${release}" ]; then
-    echo "Pushing ${CHART_TARGET} to Container registry..."
-    helm push "${RELEASE_PATH}/${CHART_TARGET}" "oci://cr.ai.nebius.cloud/${CONTAINER_REGISTRY_ID}"
+    echo "Pushing helm-${CHART_TARGET} to Container registry..."
+    helm push "${RELEASE_PATH}/helm-${CHART_TARGET}" "oci://ghcr.io/nebius/soperator"
   fi
 
   echo '---'

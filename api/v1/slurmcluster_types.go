@@ -1,19 +1,3 @@
-/*
-Copyright 2024.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package v1
 
 import (
@@ -279,6 +263,12 @@ type Secrets struct {
 
 // SlurmNodes define the desired state of the Slurm nodes
 type SlurmNodes struct {
+	// Accounting represents the Slurm accounting configuration
+	//
+	// TODO: Making accounting optional requires SlurmNode.K8sNodeFilterName to be optional.
+	// +kubebuilder:validation:Required
+	Accounting SlurmNodeAccounting `json:"accounting"`
+
 	// Controller represents the Slurm controller node configuration
 	//
 	// +kubebuilder:validation:Required
@@ -293,6 +283,75 @@ type SlurmNodes struct {
 	//
 	// +kubebuilder:validation:Required
 	Login SlurmNodeLogin `json:"login"`
+
+	// Exporter represents the Slurm exporter configuration
+	//
+	// TODO: Making exporter optional requires SlurmNode.K8sNodeFilterName to be optional.
+	// +kubebuilder:validation:Required
+	Exporter SlurmExporter `json:"exporter"`
+}
+
+// SlurmNodeAccounting represents the Slurm accounting configuration
+type SlurmNodeAccounting struct {
+	SlurmNode `json:",inline"`
+
+	// Enabled defines whether the SlurmDBD is enabled
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Slurmdbd represents the Slurm database daemon configuration
+	//
+	// +kubebuilder:validation:Optional
+	Slurmdbd NodeContainer `json:"slurmdbd,omitempty"`
+
+	// Munge represents the Slurm munge configuration
+	//
+	// +kubebuilder:validation:Optional
+	Munge NodeContainer `json:"munge,omitempty"`
+
+	// ExternalDB represents the external database configuration of connection string
+	//
+	// +kubebuilder:validation:Optional
+	ExternalDB ExternalDB `json:"externalDB,omitempty"`
+}
+
+// ExternalDB represents the external database configuration of connection string
+type ExternalDB struct {
+	// Enabled defines whether the external database is enabled
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled"`
+	// Host for connection string to the SlurmDBD database
+	//
+	// +kubebuilder:validation:Optional
+	Host string `json:"host"`
+	// Port for connection string to the SlurmDBD database
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=3306
+	Port int32 `json:"port"`
+	// Key defines the key of username and password in the secret
+	//
+	// +kubebuilder:validation:Optional
+	User string `json:"user"`
+	// SecretRef defines the reference to the secret with the password key for the external database
+	//
+	// +kubebuilder:validation:Optional
+	PasswordSecretKeyRef PasswordSecretKeyRef `json:"passwordSecretKeyRef"`
+}
+
+type PasswordSecretKeyRef struct {
+	// Name defines the name of the secret
+	//
+	// +kubebuilder:validation:Optional
+	Name string `json:"name"`
+	// Key defines the key of password in the secret (do not put here the password, just name of the key in the secret)
+	//
+	// +kubebuilder:validation:Optional
+	Key string `json:"key"`
 }
 
 // SlurmNodeController defines the configuration for the Slurm controller node
@@ -329,7 +388,6 @@ type SlurmNodeControllerVolumes struct {
 }
 
 // SlurmNodeWorker defines the configuration for the Slurm worker node
-// +kubebuilder:validation:XValidation:rule="self.slurmd.resources.memory > self.volumes.sharedMemorySize",message="resources memory of slurmd must be bigger than sharedMemorySize"
 type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
 
@@ -438,6 +496,52 @@ type SlurmNodeLoginVolumes struct {
 	JailSubMounts []NodeVolumeJailSubMount `json:"jailSubMounts"`
 }
 
+// SlurmExporter defines the configuration for the Slurm exporter
+type SlurmExporter struct {
+	SlurmNode `json:",inline"`
+	// It has to be set to true if Prometheus Operator is used
+	//
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled,omitempty"`
+	// It references the PodMonitor configuration
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={jobLabel: "slurm-exporter", interval: "30s", scrapeTimeout: "20s"}
+	PodMonitorConfig PodMonitorConfig `json:"podMonitorConfig,omitempty"`
+	// Exporter represents the Slurm exporter daemon configuration
+	//
+	// +kubebuilder:validation:Required
+	Exporter ExporterContainer `json:"exporter,omitempty"`
+
+	// Munge represents the Slurm munge configuration
+	//
+	// +kubebuilder:validation:Required
+	Munge NodeContainer `json:"munge"`
+
+	// Volumes represents the volume configurations for the controller node
+	//
+	// +kubebuilder:validation:Required
+	Volumes SlurmExporterVolumes `json:"volumes"`
+}
+
+// ExporterContainer defines the configuration for one of node containers
+type ExporterContainer struct {
+	NodeContainer `json:",inline"`
+
+	// It references the PodTemplate with the Slurm Exporter configuration
+	//
+	// +kubebuilder:validation:Optional
+	PodTemplateNameRef *string `json:"podTemplateNameRef,omitempty"`
+}
+
+// SlurmExporterVolumes define the volumes for the Slurm controller node
+type SlurmExporterVolumes struct {
+	// Jail represents the jail data volume configuration
+	//
+	// +kubebuilder:validation:Required
+	Jail NodeVolume `json:"jail"`
+}
+
 // SlurmNode represents the common configuration for a Slurm node.
 type SlurmNode struct {
 	// Size defines the number of node instances
@@ -471,8 +575,7 @@ type NodeContainer struct {
 	// format of a string should be: '* <soft|hard> <item> <value>'
 	// example: '* soft nofile 1024'
 	//
-	// +kubebuilder:validation:Pattern=`(^\s*\*\s+(soft|hard)\s+\w+\s+\d+\s*$)?`
-	// +kubebuilder:validation:XValidation:rule="self == '' || self.split('\\n').all(line.matches('^\\\\s*\\\\*\\\\s+(soft|hard)\\\\s+\\\\w+\\\\s+\\\\d+\\\\s*$'))",message="Each line must match the pattern '* <soft|hard> <item> <value>'"
+	// +kubebuilder:validation:Optional
 	SecurityLimitsConfig string `json:"securityLimitsConfig,omitempty"`
 }
 
@@ -515,13 +618,7 @@ type Telemetry struct {
 	//
 	// +kubebuilder:validation:Optional
 	OpenTelemetryCollector *MetricsOpenTelemetryCollector `json:"openTelemetryCollector,omitempty"`
-
-	// It has to be set to true if Prometheus Operator CRD is used
-	//
-	// +kubebuilder:validation:Optional
-	Prometheus *MetricsPrometheus `json:"prometheus,omitempty"`
-
-	// It has to be set to true if Kubernetes events for Slurm jobs are sent
+	//It has to be set to true if Kubernetes events for Slurm jobs are sent
 	//
 	// +kubebuilder:validation:Optional
 	JobsTelemetry *JobsTelemetry `json:"jobsTelemetry,omitempty"`
@@ -548,30 +645,7 @@ type MetricsOpenTelemetryCollector struct {
 	OtelCollectorPort int32 `json:"otelCollectorPort,omitempty"`
 }
 
-type MetricsPrometheus struct {
-	// It has to be set to true if Prometheus Operator is used
-	//
-	// +kubebuilder:default=false
-	Enabled bool `json:"enabled,omitempty"`
-	// Specifies image for Slurm Exporter
-	//
-	// +kubebuilder:validation:Optional
-	ImageSlurmExporter *string `json:"imageSlurmExporter,omitempty"`
-	// It references the PodTemplate with the Slurm Exporter configuration
-	//
-	// +kubebuilder:validation:Optional
-	PodTemplateNameRef *string `json:"podTemplateNameRef,omitempty"`
-	// Resources defines the [corev1.ResourceRequirements] for the container the Slurm Exporter
-	//
-	// +kubebuilder:validation:Optional
-	ResourcesSlurmExporter corev1.ResourceList `json:"resources,omitempty"`
-	// It references the PodMonitor configuration
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={jobLabel: "slurm-exporter", interval: "30s", scrapeTimeout: "20s"}
-	PodMonitorConfig PodMonitorConfig `json:"podMonitorConfig,omitempty"`
-}
-
+// JobsTelemetry
 // XValidation: both OtelCollectorGrpcHost and OtelCollectorHttpHost cannot have values at the same time
 //
 // +kubebuilder:validation:XValidation:rule="!(has(self.otelCollectorGrpcHost) && has(self.otelCollectorHttpHost))",message="Both OtelCollectorGrpcHost and OtelCollectorHttpHost cannot be set at the same time."
@@ -606,7 +680,7 @@ type JobsTelemetry struct {
 	OtelCollectorPath string `json:"otelCollectorPath,omitempty"`
 }
 
-// PodMonitor defines a prometheus PodMonitor object.
+// PodMonitorConfig defines a prometheus PodMonitor object.
 type PodMonitorConfig struct {
 	// JobLabel to add to the PodMonitor object. If not set, the default value is "slurm-exporter"
 	//
@@ -637,6 +711,7 @@ const (
 	ConditionClusterControllersAvailable = "ControllersAvailable"
 	ConditionClusterWorkersAvailable     = "WorkersAvailable"
 	ConditionClusterLoginAvailable       = "LoginAvailable"
+	ConditionClusterAccountingAvailable  = "AccountingAvailable"
 
 	PhaseClusterReconciling  = "Reconciling"
 	PhaseClusterNotAvailable = "Not available"
@@ -661,6 +736,7 @@ type SlurmClusterStatus struct {
 // +kubebuilder:printcolumn:name="Controllers",type=integer,JSONPath=`.spec.slurmNodes.controller.size`,description="The number of controller nodes"
 // +kubebuilder:printcolumn:name="Workers",type=integer,JSONPath=`.spec.slurmNodes.worker.size`,description="The number of worker nodes"
 // +kubebuilder:printcolumn:name="Login",type=integer,JSONPath=`.spec.slurmNodes.login.size`,description="The number of login nodes"
+// +kubebuilder:printcolumn:name="Accounting",type=boolean,JSONPath=`.spec.slurmNodes.accounting.enabled`,description="Whether accounting is enabled"
 type SlurmCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

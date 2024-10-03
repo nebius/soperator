@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
+ARG BASE_IMAGE=ghcr.io/asteny/cuda_base:12.2.2
 
 FROM $BASE_IMAGE AS worker_slurmd
 

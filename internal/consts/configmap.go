@@ -1,7 +1,8 @@
 package consts
 
 const (
-	slurmConfigs = slurmPrefix + "configs"
+	slurmConfigs   = slurmPrefix + "configs"
+	slurmdbdSecret = "slurm-secrets"
 )
 
 const (
@@ -12,10 +13,11 @@ const (
 	ConfigMapNameNCCLTopology      = ncclTopology
 	ConfigMapNameSysctl            = sysctl
 
-	ConfigMapKeySlurmConfig  = "slurm.conf"
-	ConfigMapKeyCGroupConfig = "cgroup.conf"
-	ConfigMapKeySpankConfig  = "plugstack.conf"
-	ConfigMapKeyGresConfig   = "gres.conf"
+	ConfigMapKeySlurmConfig    = "slurm.conf"
+	ConfigMapKeyCGroupConfig   = "cgroup.conf"
+	ConfigMapKeySpankConfig    = "plugstack.conf"
+	ConfigMapKeyGresConfig     = "gres.conf"
+	ConfigMapKeySlurmdbdConfig = "slurmdbd.conf"
 
 	ConfigMapKeySshdConfig              = SshdName + "_config"
 	ConfigMapKeySshRootPublicKeysConfig = authorizedKeys

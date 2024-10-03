@@ -45,7 +45,7 @@ volumeSources:
 #      readOnly: true
 #  - name: mlperf-sd
 #    persistentVolumeClaim:
-#      claimName: "mlperf-sd-pvc"
+#      claimName: "jail-submount-mlperf-sd-pvc"
 #      readOnly: false
 
 # Secret references needed for Slurm cluster operation
@@ -101,6 +101,28 @@ periodicChecks:
     # Name of the k8s node filter
     k8sNodeFilterName: "no-gpu"
 slurmNodes:
+  accounting:
+    enabled: false
+    externalDB:
+      enabled: false
+      # host: ""
+      # port: 3306
+      # user: ""
+      # passwordSecretKeyRef:
+      #   name: ""
+      #   key: ""
+    k8sNodeFilterName: "no-gpu"
+    slurmdbd:
+      port: 6819
+      resources:
+        cpu: "1000m"
+        memory: "3Gi"
+        ephemeralStorage: "10Gi"
+    munge:
+      resources:
+        cpu: "1000m"
+        memory: "1Gi"
+        ephemeralStorage: "5Gi"
   controller:
     size: 2
     k8sNodeFilterName: "no-gpu"
@@ -123,6 +145,7 @@ slurmNodes:
   worker:
     size: 2
     k8sNodeFilterName: "gpu"
+    cgroupVersion: v2
     slurmd:
       port: 6818
       resources:
@@ -178,10 +201,27 @@ slurmNodes:
       jail:
         volumeSourceName: "jail"
       jailSubMounts: []
-#      jailSubMounts:
-#        - name: "mlcommons-sd-bench-data"
-#          mountPath: "/mlperf-sd"
-#          volumeSourceName: "mlperf-sd"
+      #      jailSubMounts:
+      #        - name: "mlcommons-sd-bench-data"
+      #          mountPath: "/mlperf-sd"
+      #          volumeSourceName: "mlperf-sd"
+  exporter:
+    enabled: true
+    size: 1
+    k8sNodeFilterName: "no-gpu"
+    exporter:
+      resources:
+        cpu: "250m"
+        memory: "256Mi"
+        ephemeralStorage: "500Mi"
+    munge:
+      resources:
+        cpu: "1000m"
+        memory: "1Gi"
+        ephemeralStorage: "5Gi"
+    volumes:
+      jail:
+        volumeSourceName: "jail"
 telemetry: {}
 # jobsTelemetry:
 #   otelCollectorHttpHost: vmsingle-slurm.monitoring-system.svc.cluster.local
@@ -193,14 +233,13 @@ telemetry: {}
 #   enabled: true
 #   replicasOtelCollector: 1
 #   otelCollectorPort: 8429
-# prometheus:
-#   enabled: true
-#   imageSlurmExporter: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/exporter:1.9.2-jammy-slurm24.05.2-185df658
+
 images:
-  slurmctld: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/controller_slurmctld:1.12.2-jammy-slurm24.05.2"
-  slurmd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/worker_slurmd:1.12.2-jammy-slurm24.05.2"
-  sshd: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/login_sshd:1.12.2-jammy-slurm24.05.2"
-  munge: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/munge:1.12.2-jammy-slurm24.05.2"
-  populateJail: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/populate_jail:1.12.2-jammy-slurm24.05.2"
-  ncclBenchmark: "cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/nccl_benchmark:1.12.2-jammy-slurm24.05.2"
-  slurmdbd: cr.nemax.nebius.cloud/crnlu9nio77sg3p8n5bi/controller_slurmdbd:1.12.2-jammy-slurm24.05.2
+  slurmctld: "ghcr.io/nebius/soperator/controller_slurmctld:1.14.2-jammy-slurm24.05.2"
+  slurmd: "ghcr.io/nebius/soperator/worker_slurmd:1.14.2-jammy-slurm24.05.2"
+  sshd: "ghcr.io/nebius/soperator/login_sshd:1.14.2-jammy-slurm24.05.2"
+  munge: "ghcr.io/nebius/soperator/munge:1.14.2-jammy-slurm24.05.2"
+  populateJail: "ghcr.io/nebius/soperator/populate_jail:1.14.2-jammy-slurm24.05.2"
+  ncclBenchmark: "ghcr.io/nebius/soperator/nccl_benchmark:1.14.2-jammy-slurm24.05.2"
+  slurmdbd: "ghcr.io/nebius/soperator/controller_slurmdbd:1.14.2-jammy-slurm24.05.2"
+  exporter: "ghcr.io/nebius/soperator/exporter:1.14.2-jammy-slurm24.05.2"
