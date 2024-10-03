@@ -7,7 +7,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -25,9 +24,11 @@ func Test_RenderContainerExporter(t *testing.T) {
 	}
 
 	containerParams := &values.SlurmExporter{
-		MetricsPrometheus: slurmv1.MetricsPrometheus{
-			ImageSlurmExporter:     ptr.To(imageExporter),
-			ResourcesSlurmExporter: resourceExporter,
+		ExporterContainer: slurmv1.ExporterContainer{
+			NodeContainer: slurmv1.NodeContainer{
+				Image:     imageExporter,
+				Resources: resourceExporter,
+			},
 		},
 	}
 

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/values"
@@ -28,9 +29,6 @@ func Test_RenderContainerNCCLBenchmark(t *testing.T) {
 	}
 
 	metrics := &slurmv1.Telemetry{
-		Prometheus: &slurmv1.MetricsPrometheus{
-			Enabled: true,
-		},
 		OpenTelemetryCollector: &slurmv1.MetricsOpenTelemetryCollector{
 			Enabled:               true,
 			ReplicasOtelCollector: 1,
@@ -100,9 +98,6 @@ func Test_RenderContainerNCCLBenchmark_Default(t *testing.T) {
 	}
 
 	metrics := &slurmv1.Telemetry{
-		Prometheus: &slurmv1.MetricsPrometheus{
-			Enabled: true,
-		},
 		OpenTelemetryCollector: &slurmv1.MetricsOpenTelemetryCollector{
 			Enabled:               true,
 			ReplicasOtelCollector: 1,
