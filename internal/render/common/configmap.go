@@ -54,6 +54,9 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("AuthType", "auth/"+consts.Munge)
 	res.AddProperty("CredType", "cred/"+consts.Munge)
 	res.AddComment("")
+	if cluster.ClusterType == consts.ClusterTypeGPU {
+		res.AddProperty("GresTypes", "gpu")
+	}
 	res.AddProperty("MailProg", "/usr/bin/true")
 	res.AddProperty("PluginDir", "/usr/lib/x86_64-linux-gnu/"+consts.Slurm)
 	res.AddProperty("ProctrackType", "proctrack/cgroup")
@@ -169,7 +172,6 @@ func generateGresConfig(clusterType consts.ClusterType) renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
 	res.AddComment("Gres config")
 	if clusterType == consts.ClusterTypeGPU {
-		res.AddProperty("GresTypes", "gpu")
 		res.AddProperty("AutoDetect", "nvml")
 	}
 	return res

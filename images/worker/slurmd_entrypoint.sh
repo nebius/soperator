@@ -60,7 +60,7 @@ if [ "$SLURM_CLUSTER_TYPE" = "gpu" ]; then
         ln -s libnvidia-ml.so.1 libnvidia-ml.so
     popd
 else
-    echo "Detect available CPUs"
+    echo "Skipping GPU detection"
 fi
 
 # Hack with logs: multilog will write log in stdout and in log file, and rotate log file
