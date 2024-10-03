@@ -24,6 +24,7 @@ const (
 
 const (
 	VolumeNameSlurmConfigs   = slurmConfigs
+	VolumeNameSlurmdbdSecret = slurmdbdSecret
 	VolumeNameSpool          = spool
 	VolumeNameJail           = jail
 	VolumeNameJailSnapshot   = jail + "-snapshot"
@@ -43,7 +44,9 @@ const (
 	VolumeNameCgroup         = "cgroup"
 
 	VolumeMountPathSlurmConfigs      = "/mnt/" + slurmConfigs
+	VolumeMountPathSlurmdbdSecret    = "/mnt/" + slurmdbdSecret
 	VolumeMountPathSpool             = "/var/" + spool
+	VolumeMountPathSpoolSlurmdbd     = "/var/spool/slurmdbd"
 	VolumeMountPathJail              = "/mnt/" + jail
 	VolumeMountPathJailSnapshot      = "/jail"
 	VolumeMountPathJailUpper         = "/mnt/" + jail + ".upper"

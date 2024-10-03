@@ -1,12 +1,12 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "slurm-operator.fullname" . }}-proxy-role
+  name: {{ include "soperator.fullname" . }}-proxy-role
   labels:
     app.kubernetes.io/component: kube-rbac-proxy
     app.kubernetes.io/created-by: slurm-operator
     app.kubernetes.io/part-of: slurm-operator
-  {{- include "slurm-operator.labels" . | nindent 4 }}
+  {{- include "soperator.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - authentication.k8s.io
@@ -24,17 +24,17 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "slurm-operator.fullname" . }}-proxy-rolebinding
+  name: {{ include "soperator.fullname" . }}-proxy-rolebinding
   labels:
     app.kubernetes.io/component: kube-rbac-proxy
     app.kubernetes.io/created-by: slurm-operator
     app.kubernetes.io/part-of: slurm-operator
-  {{- include "slurm-operator.labels" . | nindent 4 }}
+  {{- include "soperator.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: '{{ include "slurm-operator.fullname" . }}-proxy-role'
+  name: '{{ include "soperator.fullname" . }}-proxy-role'
 subjects:
 - kind: ServiceAccount
-  name: '{{ include "slurm-operator.fullname" . }}-controller-manager'
+  name: '{{ include "soperator.fullname" . }}-controller-manager'
   namespace: '{{ .Release.Namespace }}'
