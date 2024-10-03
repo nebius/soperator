@@ -170,8 +170,6 @@ In general, you need to follow these steps:
 
 
 ## 📈 Future plans
-- 🛠 **CPU-only clusters**. Some Slurm users don't need GPU computations, so we are working on supporting CPU-only
-  clusters.
 - 💡 **On-demand nodes**. The easy scaling can be improved further by provisioning new Kubernetes nodes only when
   there are queued jobs that need them.
 - 💡 **Network topology-aware job scheduling**. Thanks to the Slurm topology feature, we can support detailed
