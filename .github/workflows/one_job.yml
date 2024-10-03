@@ -2,9 +2,17 @@ name: Build All in one job
 
 on:
   push:
+    paths-ignore:
+      - 'docs/**'
+      - 'LICENSE'
+      - 'PROJECT'
+      - 'README.md'
 
 permissions:
   contents: read
+  packages: write
+  attestations: write
+  id-token: write
 
 jobs:
   pre-build:
@@ -59,6 +67,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
 
+      - name: Log in to the Github Container registry
+        uses: docker/login-action@3b8fed7e4b60203b2aa0ecc6c6d6d91d12c06760
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run all
         run: |
           UNSTABLE=${{ needs.pre-build.outputs.unstable }}
@@ -76,6 +91,9 @@ jobs:
 
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld DOCKERFILE=controller/slurmctld.dockerfile
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld
+
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd DOCKERFILE=accounting/slurmdbd.dockerfile
+          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd
 
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd DOCKERFILE=login/sshd.dockerfile
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd

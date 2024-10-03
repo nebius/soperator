@@ -67,7 +67,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddProperty("SlurmdSpoolDir", naming.BuildVolumeMountSpoolPath(consts.SlurmdName))
 	res.AddComment("")
-	res.AddProperty("SlurmUser", "root")
+	res.AddProperty("SlurmUser", consts.SlurmUser)
 	res.AddComment("")
 	res.AddProperty("StateSaveLocation", naming.BuildVolumeMountSpoolPath(consts.SlurmctldName))
 	res.AddComment("")
@@ -100,16 +100,23 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("LOGGING AND ACCOUNTING")
 	res.AddProperty("JobCompType", "jobcomp/none")
 	res.AddProperty("JobAcctGatherFrequency", 30)
-	res.AddProperty("SlurmctldDebug", "debug3")
-	res.AddProperty("SlurmctldLogFile", "/dev/null")
-	res.AddProperty("SlurmdDebug", "debug3")
-	res.AddProperty("SlurmdLogFile", "/dev/null")
+	res.AddProperty("SlurmctldDebug", consts.SlurmDefaultDebugLevel)
+	res.AddProperty("SlurmctldLogFile", consts.SlurmLogFile)
+	res.AddProperty("SlurmdDebug", consts.SlurmDefaultDebugLevel)
+	res.AddProperty("SlurmdLogFile", consts.SlurmLogFile)
 	res.AddComment("")
 	res.AddComment("COMPUTE NODES")
 	res.AddComment("We're using the \"dynamic nodes\" feature: https://slurm.schedmd.com/dynamic_nodes.html")
 	res.AddProperty("MaxNodeCount", "512")
 	res.AddProperty("PartitionName", "main Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
-
+	if cluster.NodeAccounting.Enabled {
+		res.AddComment("")
+		res.AddComment("ACCOUNTING")
+		res.AddProperty("AccountingStorageType", "accounting_storage/slurmdbd")
+		res.AddProperty("AccountingStorageHost", naming.BuildServiceName(consts.ComponentTypeAccounting, cluster.Name))
+		res.AddProperty("AccountingStorageUser", consts.HostnameAccounting)
+		res.AddProperty("AccountingStoragePort", consts.DefaultAccountingPort)
+	}
 	return res
 }
 
