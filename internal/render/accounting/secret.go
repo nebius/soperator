@@ -35,7 +35,7 @@ func RenderSecret(
 	secretName := naming.BuildSecretSlurmdbdConfigsName(clusterName)
 	labels := common.RenderLabels(consts.ComponentTypeAccounting, clusterName)
 	data := map[string][]byte{
-		consts.ConfigMapKeySlurmdbdConfig: []byte(generateSlurdbdConfig(accounting, passwordName).Render()),
+		consts.ConfigMapKeySlurmdbdConfig: []byte(generateSlurdbdConfig(clusterName, accounting, passwordName).Render()),
 	}
 
 	return &corev1.Secret{
@@ -57,17 +57,27 @@ func checkSecret(accounting *values.SlurmAccounting, secret *corev1.Secret) ([]b
 		return nil, errors.New(ErrSecretDataEmpty)
 	}
 
-	if accounting.ExternalDB.User == "" {
-		return nil, errors.New(ErrDBUserEmpty)
-	}
+	var passwordName []byte
+	var exists bool
 
-	if accounting.ExternalDB.Host == "" {
-		return nil, errors.New(ErrDBHostEmpty)
-	}
+	if accounting.ExternalDB.Enabled {
+		if accounting.ExternalDB.User == "" {
+			return nil, errors.New(ErrDBUserEmpty)
+		}
 
-	passwordName, exists := secret.Data[accounting.ExternalDB.PasswordSecretKeyRef.Key]
-	if !exists {
-		return nil, errors.New(ErrPasswordKeyMissing)
+		if accounting.ExternalDB.Host == "" {
+			return nil, errors.New(ErrDBHostEmpty)
+		}
+
+		passwordName, exists = secret.Data[accounting.ExternalDB.PasswordSecretKeyRef.Key]
+		if !exists {
+			return nil, errors.New(ErrPasswordKeyMissing)
+		}
+	} else if accounting.MariaDb.Enabled {
+		passwordName, exists = secret.Data[consts.MariaDbPasswordKey]
+		if !exists {
+			return nil, errors.New(ErrPasswordKeyMissing)
+		}
 	}
 
 	if len(passwordName) == 0 {
@@ -77,13 +87,11 @@ func checkSecret(accounting *values.SlurmAccounting, secret *corev1.Secret) ([]b
 	return passwordName, nil
 }
 
-func generateSlurdbdConfig(accounting *values.SlurmAccounting, passwordName []byte) renderutils.ConfigFile {
+func generateSlurdbdConfig(clusterName string, accounting *values.SlurmAccounting, passwordName []byte) renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
-	// TODO: Add support switch ExternalDB and MariaDB CRD. Now we just support ExternalDB
 	// Unmodifiable parameters
 	res.AddProperty("AuthType", "auth/"+consts.Munge)
 	// TODO: Add debug level to CRD and make it configurable
-	res.AddProperty("DebugLevel", consts.SlurmDefaultDebugLevel)
 	res.AddProperty("SlurmUser", consts.SlurmUser)
 	res.AddProperty("LogFile", consts.SlurmLogFile)
 	res.AddProperty("PidFile", consts.SlurmdbdPidFile)
@@ -91,26 +99,40 @@ func generateSlurdbdConfig(accounting *values.SlurmAccounting, passwordName []by
 	res.AddProperty("DbdPort", consts.DefaultAccountingPort)
 	res.AddProperty("StorageLoc", "slurm_acct_db")
 	res.AddProperty("StorageType", "accounting_storage/mysql")
-	res.AddProperty("StorageUser", accounting.ExternalDB.User)
 	res.AddProperty("StoragePass", string(passwordName))
-	res.AddProperty("StorageHost", accounting.ExternalDB.Host)
-	res.AddProperty("StoragePort", accounting.ExternalDB.Port)
-	// TODO: make it configurable through CRD
+	if accounting.MariaDb.Enabled {
+		res.AddProperty("StorageUser", consts.MariaDbUsername)
+		res.AddProperty("StorageHost", naming.BuildMariaDbName(clusterName))
+		res.AddProperty("StoragePort", accounting.MariaDb.Port)
+	} else {
+		res.AddProperty("StorageUser", accounting.ExternalDB.User)
+		res.AddProperty("StorageHost", accounting.ExternalDB.Host)
+		res.AddProperty("StoragePort", accounting.ExternalDB.Port)
+	}
+
 	// Modifiable parameters
-	res.AddProperty("ArchiveEvents", "yes")
-	res.AddProperty("ArchiveJobs", "yes")
-	res.AddProperty("ArchiveResvs", "yes")
-	res.AddProperty("ArchiveSteps", "no")
-	res.AddProperty("ArchiveSuspend", "no")
-	res.AddProperty("ArchiveTXN", "no")
-	res.AddProperty("ArchiveUsage", "no")
-	res.AddProperty("PurgeEventAfter", "1month")
-	res.AddProperty("PurgeJobAfter", "12month")
-	res.AddProperty("PurgeResvAfter", "1month")
-	res.AddProperty("PurgeStepAfter", "1month")
-	res.AddProperty("PurgeSuspendAfter", "1month")
-	res.AddProperty("PurgeTXNAfter", "12month")
-	res.AddProperty("PurgeUsageAfter", "24month")
+	res.AddProperty("ArchiveEvents", accounting.SlurmdbdConfig.ArchiveEvents)
+	res.AddProperty("ArchiveJobs", accounting.SlurmdbdConfig.ArchiveJobs)
+	res.AddProperty("ArchiveResvs", accounting.SlurmdbdConfig.ArchiveResvs)
+	res.AddProperty("ArchiveSteps", accounting.SlurmdbdConfig.ArchiveSteps)
+	res.AddProperty("ArchiveSuspend", accounting.SlurmdbdConfig.ArchiveSuspend)
+	res.AddProperty("ArchiveTXN", accounting.SlurmdbdConfig.ArchiveTXN)
+	res.AddProperty("ArchiveUsage", accounting.SlurmdbdConfig.ArchiveUsage)
+	res.AddProperty("DebugLevel", accounting.SlurmdbdConfig.DebugLevel)
+	res.AddProperty("TCPTimeout", accounting.SlurmdbdConfig.TCPTimeout)
+	res.AddProperty("PurgeEventAfter", accounting.SlurmdbdConfig.PurgeEventAfter)
+	res.AddProperty("PurgeJobAfter", accounting.SlurmdbdConfig.PurgeJobAfter)
+	res.AddProperty("PurgeResvAfter", accounting.SlurmdbdConfig.PurgeResvAfter)
+	res.AddProperty("PurgeStepAfter", accounting.SlurmdbdConfig.PurgeStepAfter)
+	res.AddProperty("PurgeSuspendAfter", accounting.SlurmdbdConfig.PurgeSuspendAfter)
+	res.AddProperty("PurgeTXNAfter", accounting.SlurmdbdConfig.PurgeTXNAfter)
+	res.AddProperty("PurgeUsageAfter", accounting.SlurmdbdConfig.PurgeUsageAfter)
+	if accounting.SlurmdbdConfig.PrivateData != "" {
+		res.AddProperty("PrivateData", accounting.SlurmdbdConfig.PrivateData)
+	}
+	if accounting.SlurmdbdConfig.DebugFlags != "" {
+		res.AddProperty("DebugFlags", accounting.SlurmdbdConfig.DebugFlags)
+	}
 
 	return res
 }

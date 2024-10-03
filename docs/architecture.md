@@ -44,7 +44,7 @@ The process of changing controlled resources in response to changes in the manif
 
 The operator is essentially a one endless loop that checks if everything corresponds to the configured state and fixes
 found inconsistencies. However, the loop itself isn't written by us, Soperator only implements some functions which are
-called from this loop in react to specific events.
+called from this loop in reaction to specific events.
 
 We use [Kubebuilder SDK](https://github.com/kubernetes-sigs/kubebuilder) that frees
 developers from writing boilerplate code. Some functionality can be added using config files and special annotations

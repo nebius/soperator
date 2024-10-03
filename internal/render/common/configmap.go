@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -97,9 +98,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("SelectType", "select/cons_tres")
 	res.AddProperty("SelectTypeParameters", "CR_Core_Memory")
 	res.AddComment("")
-	res.AddComment("LOGGING AND ACCOUNTING")
-	res.AddProperty("JobCompType", "jobcomp/none")
-	res.AddProperty("JobAcctGatherFrequency", 30)
+	res.AddComment("LOGGING")
 	res.AddProperty("SlurmctldDebug", consts.SlurmDefaultDebugLevel)
 	res.AddProperty("SlurmctldLogFile", consts.SlurmLogFile)
 	res.AddProperty("SlurmdDebug", consts.SlurmDefaultDebugLevel)
@@ -116,6 +115,25 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		res.AddProperty("AccountingStorageHost", naming.BuildServiceName(consts.ComponentTypeAccounting, cluster.Name))
 		res.AddProperty("AccountingStorageUser", consts.HostnameAccounting)
 		res.AddProperty("AccountingStoragePort", consts.DefaultAccountingPort)
+		res.AddProperty("JobCompType", "jobcomp/none")
+
+		// In slurm.conf, the accounting section has many optional values
+		// that can be added or removed, and to avoid writing many if statements, we decided to use a reflector.
+		v := reflect.ValueOf(cluster.NodeAccounting.SlurmConfig)
+		typeOfS := v.Type()
+		for i := 0; i < v.NumField(); i++ {
+			field := v.Field(i)
+			if !isZero(field) {
+				key := typeOfS.Field(i).Name
+				switch field.Kind() {
+				case reflect.String:
+					res.AddProperty(key, field.String())
+				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+					res.AddProperty(key, field.Int())
+				}
+
+			}
+		}
 	}
 	return res
 }
@@ -150,6 +168,17 @@ func generateGresConfig() renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
 	res.AddProperty("AutoDetect", "nvml")
 	return res
+}
+
+func isZero(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.String:
+		return v.Len() == 0
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int() == 0
+	}
+
+	return false
 }
 
 // region Security limits
