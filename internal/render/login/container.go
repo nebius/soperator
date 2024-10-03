@@ -13,6 +13,7 @@ import (
 
 // renderContainerSshd renders [corev1.Container] for sshd
 func renderContainerSshd(
+	clusterType consts.ClusterType,
 	container *values.Container,
 	jailSubMounts []slurmv1.NodeVolumeJailSubMount,
 ) corev1.Container {
@@ -28,8 +29,14 @@ func renderContainerSshd(
 	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
 
 	return corev1.Container{
-		Name:            consts.ContainerNameSshd,
-		Image:           container.Image,
+		Name:  consts.ContainerNameSshd,
+		Image: container.Image,
+		Env: []corev1.EnvVar{
+			{
+				Name:  "SLURM_CLUSTER_TYPE",
+				Value: clusterType.String(),
+			},
+		},
 		ImagePullPolicy: corev1.PullAlways, // TODO use digest and set to corev1.PullIfNotPresent
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,

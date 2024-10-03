@@ -30,7 +30,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) (corev1.ConfigMap
 			consts.ConfigMapKeySlurmConfig:  generateSlurmConfig(cluster).Render(),
 			consts.ConfigMapKeyCGroupConfig: generateCGroupConfig(cluster).Render(),
 			consts.ConfigMapKeySpankConfig:  generateSpankConfig().Render(),
-			consts.ConfigMapKeyGresConfig:   generateGresConfig().Render(),
+			consts.ConfigMapKeyGresConfig:   generateGresConfig(cluster.ClusterType).Render(),
 		},
 	}, nil
 }
@@ -54,7 +54,9 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("AuthType", "auth/"+consts.Munge)
 	res.AddProperty("CredType", "cred/"+consts.Munge)
 	res.AddComment("")
-	res.AddProperty("GresTypes", "gpu")
+	if cluster.ClusterType == consts.ClusterTypeGPU {
+		res.AddProperty("GresTypes", "gpu")
+	}
 	res.AddProperty("MailProg", "/usr/bin/true")
 	res.AddProperty("PluginDir", "/usr/lib/x86_64-linux-gnu/"+consts.Slurm)
 	res.AddProperty("ProctrackType", "proctrack/cgroup")
@@ -84,7 +86,9 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("HEALTH CHECKS")
 	res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
 	res.AddProperty("HealthCheckInterval", 30)
-	res.AddProperty("HealthCheckProgram", "/usr/bin/gpu_healthcheck.sh")
+	if cluster.ClusterType == consts.ClusterTypeGPU {
+		res.AddProperty("HealthCheckProgram", "/usr/bin/gpu_healthcheck.sh")
+	}
 	res.AddProperty("HealthCheckNodeState", "ANY")
 	res.AddComment("")
 	res.AddProperty("InactiveLimit", 0)
@@ -164,9 +168,12 @@ func generateSpankConfig() renderutils.ConfigFile {
 	return res
 }
 
-func generateGresConfig() renderutils.ConfigFile {
+func generateGresConfig(clusterType consts.ClusterType) renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
-	res.AddProperty("AutoDetect", "nvml")
+	res.AddComment("Gres config")
+	if clusterType == consts.ClusterTypeGPU {
+		res.AddProperty("AutoDetect", "nvml")
+	}
 	return res
 }
 

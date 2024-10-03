@@ -8,7 +8,7 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-func renderContainerPopulateJail(populateJail *values.PopulateJail) corev1.Container {
+func renderContainerPopulateJail(clusterType consts.ClusterType, populateJail *values.PopulateJail) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountJail(),
 	}
@@ -24,7 +24,13 @@ func renderContainerPopulateJail(populateJail *values.PopulateJail) corev1.Conta
 		Image:           populateJail.ContainerPopulateJail.Image,
 		ImagePullPolicy: corev1.PullAlways, // TODO use digest and set to corev1.PullIfNotPresent
 		Env: []corev1.EnvVar{
-			{Name: "OVERWRITE", Value: overwriteEnv},
+			{
+				Name:  "OVERWRITE",
+				Value: overwriteEnv},
+			{
+				Name:  "SLURM_CLUSTER_TYPE",
+				Value: clusterType.String(),
+			},
 		},
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{

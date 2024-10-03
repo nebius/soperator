@@ -58,7 +58,7 @@ pushd "${jaildir}"
         fi
     done <<< "$submounts"
 
-    if [ -n "$worker" ]; then
+    if [ -n "$worker" ] && [ "$CLUSTER_TYPE" = "gpu" ]; then
         echo "Run nvidia-container-cli to propagate NVIDIA drivers, CUDA, NVML and other GPU-related stuff to the jail"
         nvidia-container-cli \
             --user \
@@ -90,7 +90,7 @@ pushd "${jaildir}"
         mount --bind /var/spool/slurmd var/spool/slurmd/
     fi
 
-    if [ -z "$worker" ]; then
+    if [ -z "$worker" ] && [ "$CLUSTER_TYPE" = "gpu" ]; then
         while [ ! -f "etc/gpu_libs_installed.flag" ]; do
             echo "Waiting for GPU libs to be propagated to the jail from a worker node"
             sleep 10

@@ -3,6 +3,8 @@ clusterName: "slurm1"
 annotations: {}
 # Whether to gracefully stop the cluster. Setting it to false after cluster has been paused starts the cluster back
 pause: false
+# Slurm cluster type. Can be now gpu or cpu
+clusterType: gpu
 # K8s node filters used in Slurm node specifications. Define which nodes should be used to schedule pods to
 k8sNodeFilters:
   - name: gpu
@@ -330,12 +332,12 @@ telemetry: {}
 #   otelCollectorPort: 8429
 
 images:
-  slurmctld: "ghcr.io/nebius/soperator/controller_slurmctld:1.14.3-jammy-slurm24.05.2"
-  slurmd: "ghcr.io/nebius/soperator/worker_slurmd:1.14.3-jammy-slurm24.05.2"
-  sshd: "ghcr.io/nebius/soperator/login_sshd:1.14.3-jammy-slurm24.05.2"
-  munge: "ghcr.io/nebius/soperator/munge:1.14.3-jammy-slurm24.05.2"
-  populateJail: "ghcr.io/nebius/soperator/populate_jail:1.14.3-jammy-slurm24.05.2"
-  ncclBenchmark: "ghcr.io/nebius/soperator/nccl_benchmark:1.14.3-jammy-slurm24.05.2"
-  slurmdbd: "ghcr.io/nebius/soperator/controller_slurmdbd:1.14.3-jammy-slurm24.05.2"
-  exporter: "ghcr.io/nebius/soperator/exporter:1.14.3-jammy-slurm24.05.2"
+  slurmctld: "ghcr.io/nebius/soperator/controller_slurmctld:1.14.4-jammy-slurm24.05.2"
+  slurmd: "ghcr.io/nebius/soperator/worker_slurmd:1.14.4-jammy-slurm24.05.2"
+  sshd: "ghcr.io/nebius/soperator/login_sshd:1.14.4-jammy-slurm24.05.2"
+  munge: "ghcr.io/nebius/soperator/munge:1.14.4-jammy-slurm24.05.2"
+  populateJail: "ghcr.io/nebius/soperator/populate_jail:1.14.4-jammy-slurm24.05.2"
+  ncclBenchmark: "ghcr.io/nebius/soperator/nccl_benchmark:1.14.4-jammy-slurm24.05.2"
+  slurmdbd: "ghcr.io/nebius/soperator/controller_slurmdbd:1.14.4-jammy-slurm24.05.2"
+  exporter: "ghcr.io/nebius/soperator/exporter:1.14.4-jammy-slurm24.05.2"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:11.4.3"

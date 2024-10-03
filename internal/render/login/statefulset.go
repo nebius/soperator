@@ -19,6 +19,7 @@ import (
 func RenderStatefulSet(
 	namespace,
 	clusterName string,
+	clusterType consts.ClusterType,
 	nodeFilters []slurmv1.K8sNodeFilter,
 	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
@@ -81,7 +82,7 @@ func RenderStatefulSet(
 					NodeSelector: nodeFilter.NodeSelector,
 					Tolerations:  nodeFilter.Tolerations,
 					Containers: []corev1.Container{
-						renderContainerSshd(&login.ContainerSshd, login.JailSubMounts),
+						renderContainerSshd(clusterType, &login.ContainerSshd, login.JailSubMounts),
 						common.RenderContainerMunge(&login.ContainerMunge),
 					},
 					Volumes: volumes,

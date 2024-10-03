@@ -59,6 +59,13 @@ spec:
           spec:
             description: SlurmClusterSpec defines the desired state of SlurmCluster
             properties:
+              clusterType:
+                default: gpu
+                description: ClusterType define type of slurm worker nodes
+                enum:
+                - gpu
+                - cpu
+                type: string
               crVersion:
                 description: CRVersion defines the version of the Operator the Custom
                   Resource belongs to
