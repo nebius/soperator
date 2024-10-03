@@ -25,6 +25,7 @@ type SlurmCluster struct {
 	Secrets       slurmv1.Secrets
 
 	NodeController SlurmController
+	NodeAccounting SlurmAccounting
 	NodeWorker     SlurmWorker
 	NodeLogin      SlurmLogin
 	Telemetry      *slurmv1.Telemetry
@@ -46,10 +47,11 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		VolumeSources:  buildVolumeSourcesFrom(cluster.Spec.VolumeSources),
 		Secrets:        buildSecretsFrom(&cluster.Spec.Secrets),
 		NodeController: buildSlurmControllerFrom(cluster.Name, &cluster.Spec.SlurmNodes.Controller),
+		NodeAccounting: buildAccountingFrom(cluster.Name, &cluster.Spec.SlurmNodes.Accounting),
 		NodeWorker:     buildSlurmWorkerFrom(cluster.Name, &cluster.Spec.SlurmNodes.Worker, &cluster.Spec.NCCLSettings),
 		NodeLogin:      buildSlurmLoginFrom(cluster.Name, &cluster.Spec.SlurmNodes.Login),
 		Telemetry:      cluster.Spec.Telemetry,
-		SlurmExporter:  buildSlurmExporterFrom(cluster.Name, cluster.Spec.Telemetry, &cluster.Spec.SlurmNodes.Controller),
+		SlurmExporter:  buildSlurmExporterFrom(&cluster.Spec.SlurmNodes.Exporter),
 	}
 
 	if err := res.Validate(ctx); err != nil {

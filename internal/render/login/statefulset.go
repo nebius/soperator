@@ -73,6 +73,7 @@ func RenderStatefulSet(
 						fmt.Sprintf(
 							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
 						): consts.AnnotationApparmorValueUnconfined,
+						consts.DefaultContainerAnnotationName: consts.ContainerNameSshd,
 					},
 				},
 				Spec: corev1.PodSpec{

@@ -1,6 +1,6 @@
 apiVersion: v2
-name: slurm-cluster
+name: helm-slurm-cluster
 description: A Helm chart for Kubernetes
 type: application
-version: "1.12.2"
-appVersion: "1.12.2"
+version: "1.14.3"
+appVersion: "1.14.3"
