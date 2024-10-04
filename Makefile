@@ -32,7 +32,9 @@ VERSION               		= $(shell cat VERSION)
 
 IMAGE_VERSION		  = $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)
 GO_CONST_VERSION_FILE = internal/consts/version.go
-IMAGE_REPO			  = ghcr.io/nebius/soperator
+GITHUB_REPO			  = ghcr.io/nebius/soperator
+NEBIUS_REPO			  = cr.eu-north1.nebius.cloud/soperator
+IMAGE_REPO			  = $(GITHUB_REPO)
 
 OPERATOR_IMAGE_TAG  = $(VERSION)
 
@@ -49,6 +51,7 @@ ifeq ($(UNSTABLE), true)
     SHORT_SHA 					= $(shell echo -n "$(USER_MAIL)-$(VERSION)" | $(SHA_CMD) | cut -c1-8)
     OPERATOR_IMAGE_TAG  		= $(VERSION)-$(SHORT_SHA)
     IMAGE_VERSION		  		= $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
+    IMAGE_REPO			  		= $(NEBIUS_REPO)-unstable
 endif
 
 .PHONY: all
@@ -222,11 +225,20 @@ ifndef IMAGE_NAME
 	$(error IMAGE_NAME is not set, docker image can not be pushed)
 endif
 	docker push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+ifeq ($(UNSTABLE), false)
+	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(NEBIUS_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+	docker push "$(NEBIUS_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+endif
 
 .PHONY: release-helm
 release-helm: ## Build & push helm docker image
 	mkdir -p "helm-releases"
-	./release_helm.sh -afyr -v "${OPERATOR_IMAGE_TAG}"
+	@echo "helm release for unstable version"
+	./release_helm.sh  -v "${OPERATOR_IMAGE_TAG}" -u "$(IMAGE_REPO)"
+ifeq ($(UNSTABLE), false)
+	@echo "helm release for stable version"
+	./release_helm.sh -v "${OPERATOR_IMAGE_TAG}" -u "$(NEBIUS_REPO)"
+endif
 	rm -rf /helm-releases/*
 
 ##@ Deployment
