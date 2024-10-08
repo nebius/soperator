@@ -125,7 +125,4 @@ jobs:
           make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
 
           echo "Pushing Helm charts"
-          make release-helm OPERATOR_IMAGE_TAG="$OPERATOR_IMAGE_TAG"
-
-          # Temporary debug output
-          git status
+          make release-helm UNSTABLE="${UNSTABLE}" OPERATOR_IMAGE_TAG="$OPERATOR_IMAGE_TAG"
