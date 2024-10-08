@@ -34,7 +34,7 @@ IMAGE_VERSION		  = $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)
 GO_CONST_VERSION_FILE = internal/consts/version.go
 GITHUB_REPO			  = ghcr.io/nebius/soperator
 NEBIUS_REPO			  = cr.eu-north1.nebius.cloud/soperator
-IMAGE_REPO			  = $(GITHUB_REPO)
+IMAGE_REPO			  = $(NEBIUS_REPO)
 
 OPERATOR_IMAGE_TAG  = $(VERSION)
 
@@ -51,7 +51,7 @@ ifeq ($(UNSTABLE), true)
     SHORT_SHA 					= $(shell echo -n "$(USER_MAIL)-$(VERSION)" | $(SHA_CMD) | cut -c1-8)
     OPERATOR_IMAGE_TAG  		= $(VERSION)-$(SHORT_SHA)
     IMAGE_VERSION		  		= $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
-    IMAGE_REPO			  		= $(NEBIUS_REPO)-unstable
+    IMAGE_REPO			  		= $(IMAGE_REPO)-unstable
 endif
 
 .PHONY: all
@@ -226,8 +226,8 @@ ifndef IMAGE_NAME
 endif
 	docker push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 ifeq ($(UNSTABLE), false)
-	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(NEBIUS_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
-	docker push "$(NEBIUS_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+	docker push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 endif
 
 .PHONY: release-helm
