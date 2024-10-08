@@ -2,5 +2,5 @@
 
 {{/* Container registry with stable Docker images */}}
 {{- define "slurm-cluster.containerRegistry" -}}
-    {{- "ghcr.io/nebius/soperator" -}}
+    {{- "cr.eu-north1.nebius.cloud/soperator" -}}
 {{- end }}
