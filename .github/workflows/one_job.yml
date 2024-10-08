@@ -55,7 +55,7 @@ jobs:
         run: echo "UNSTABLE - is ${{ needs.pre-build.outputs.unstable }}"
 
       - name: Checkout repository
-        uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
 
       - name: Install GO
         uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
@@ -68,7 +68,7 @@ jobs:
         uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
 
       - name: Log in to the Github Container registry
-        uses: docker/login-action@3b8fed7e4b60203b2aa0ecc6c6d6d91d12c06760
+        uses: docker/login-action@1f36f5b7a2d2f7bfd524795fc966e6d88c37baa9
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
