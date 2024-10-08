@@ -122,6 +122,11 @@ func setVersionsRecursive(resource metav1.Object, deps ...metav1.Object) error {
 			if err != nil {
 				return errors.Wrap(err, "setting Job pod template versions annotation")
 			}
+		case *appsv1.Deployment:
+			err = setVersionsAnnotation(&o.Spec.Template, deps...)
+			if err != nil {
+				return errors.Wrap(err, "setting Deployment pod template versions annotation")
+			}
 		}
 
 		return nil

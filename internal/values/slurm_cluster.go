@@ -4,17 +4,20 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 )
 
 type SlurmCluster struct {
 	types.NamespacedName
 
-	CRVersion string
-	Pause     bool
+	CRVersion   string
+	Pause       bool
+	ClusterType consts.ClusterType
 
 	PopulateJail PopulateJail
 
@@ -34,6 +37,14 @@ type SlurmCluster struct {
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD
 func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (*SlurmCluster, error) {
+	logger := log.FromContext(ctx)
+
+	clusterType, err := consts.StringToClusterType(cluster.Spec.ClusterType)
+	if err != nil {
+		logger.Error(err, "Failed to get cluster type")
+		return nil, errors.Wrap(err, "getting cluster type")
+	}
+
 	res := &SlurmCluster{
 		NamespacedName: types.NamespacedName{
 			Namespace: cluster.Namespace,
@@ -41,6 +52,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		},
 		CRVersion:      buildCRVersionFrom(ctx, cluster.Spec.CRVersion),
 		Pause:          cluster.Spec.Pause,
+		ClusterType:    clusterType,
 		NCCLBenchmark:  buildSlurmNCCLBenchmarkFrom(cluster.Name, &cluster.Spec.PeriodicChecks.NCCLBenchmark),
 		PopulateJail:   buildSlurmPopulateJailFrom(cluster.Name, &cluster.Spec.PopulateJail),
 		NodeFilters:    buildNodeFiltersFrom(cluster.Spec.K8sNodeFilters),
@@ -55,7 +67,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 	}
 
 	if err := res.Validate(ctx); err != nil {
-		log.FromContext(ctx).Error(err, "SlurmCluster validation failed")
+		logger.Error(err, "SlurmCluster validation failed")
 		return res, fmt.Errorf("failed to validate SlurmCluster: %w", err)
 	}
 

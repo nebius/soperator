@@ -55,7 +55,7 @@ jobs:
         run: echo "UNSTABLE - is ${{ needs.pre-build.outputs.unstable }}"
 
       - name: Checkout repository
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
 
       - name: Install GO
         uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
@@ -125,7 +125,4 @@ jobs:
           make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
 
           echo "Pushing Helm charts"
-          make release-helm OPERATOR_IMAGE_TAG="$OPERATOR_IMAGE_TAG"
-
-          # Temporary debug output
-          git status
+          make release-helm UNSTABLE="${UNSTABLE}" OPERATOR_IMAGE_TAG="$OPERATOR_IMAGE_TAG"

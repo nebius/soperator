@@ -7,8 +7,11 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-var IsOpenTelemetryCollectorCRDInstalled = false
-var IsPrometheusOperatorCRDInstalled = false
+var (
+	IsOpenTelemetryCollectorCRDInstalled = false
+	IsPrometheusOperatorCRDInstalled     = false
+	IsMariaDbOperatorCRDInstalled        = false
+)
 
 func IsOtelCRDInstalled() bool {
 	IsOpenTelemetryCollectorCRDInstalled = os.Getenv("IS_OPENTELEMETRY_COLLECTOR_CRD_INSTALLED") == "true"
@@ -20,8 +23,14 @@ func IsPrometheusCRDInstalled() bool {
 	return IsPrometheusOperatorCRDInstalled
 }
 
+func IsMariaDbCRDInstalled() bool {
+	IsMariaDbOperatorCRDInstalled = os.Getenv("IS_MARIADB_CRD_INSTALLED") == "true"
+	return IsMariaDbOperatorCRDInstalled
+}
+
 func IsPrometheusEnabled(exporter *values.SlurmExporter) bool {
 	if exporter != nil && exporter.Enabled {
+
 		return true
 	}
 	return false

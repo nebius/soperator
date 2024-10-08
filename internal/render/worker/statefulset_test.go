@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/worker"
@@ -40,9 +41,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 			},
 		},
 	}
-	secret := &slurmv1.Secrets{
-		SshdKeysName: "test-user",
-	}
+
 	voluemSource := []slurmv1.VolumeSource{
 		{
 			Name: "test-volume-source",
@@ -66,7 +65,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 		},
 	}
 
-	result, err := worker.RenderStatefulSet(testNamespace, testCluster, nodeFilter, secret, voluemSource, workerCGroupV1)
+	result, err := worker.RenderStatefulSet(testNamespace, testCluster, consts.ClusterTypeGPU, nodeFilter, voluemSource, workerCGroupV1)
 	assert.NoError(t, err)
 
 	assert.Equal(t, consts.ContainerNameSlurmd, result.Spec.Template.Spec.Containers[0].Name)
@@ -77,7 +76,8 @@ func Test_RenderStatefulSet(t *testing.T) {
 	workerCGroupV2 := workerCGroupV1
 	workerCGroupV2.CgroupVersion = consts.CGroupV2
 
-	result, err = worker.RenderStatefulSet(testNamespace, testCluster, nodeFilter, secret, voluemSource, workerCGroupV2)
+	result, err = worker.RenderStatefulSet(testNamespace, testCluster, consts.ClusterTypeCPU, nodeFilter, voluemSource, workerCGroupV2)
 	assert.NoError(t, err)
-	assert.Equal(t, consts.CGroupV2Env, result.Spec.Template.Spec.Containers[0].Env[3].Name)
+	assert.Equal(t, consts.CGroupV2Env, result.Spec.Template.Spec.Containers[0].Env[4].Name)
+	assert.True(t, len(result.Spec.Template.Spec.InitContainers) == 1)
 }

@@ -19,7 +19,7 @@
 Run Slurm in Kubernetes and enjoy the benefits of both systems. You can learn more about Soperator, its prerequisites,
 and architecture in the [Medium article](https://medium.com/p/e7a41f307d14).
 
-<img src="docs/images/slurm_in_k8s_diagram.svg" alt="Slurm in Kubernetes" width="100%" height="auto"/>
+<img src="docs/images/layers_diagram.png" alt="Slurm in Kubernetes" width="100%" height="auto"/>
 
 
 ## 📋 Table of contents
@@ -94,6 +94,16 @@ Soperator takes this even further, continuously bringing the entire cluster up t
 All user actions are isolated within a dedicated container-like environment, so that an action can't break the
 Slurm cluster itself by accident. This defines a clear boundary between operator and user responsibility.
 
+### Accounting
+Slurm's accounting system records detailed job information such as:
+
+- CPU and memory consumption
+- User and group identities
+- Job start/end times
+- Resource requests and allocations
+
+This helps cluster administrators and users monitor resource utilization, enforce quotas, and generate usage reports for performance optimization or billing purposes.
+
 
 ## ❌ Limitations
 - **GPUs are required**. Although support for CPU-only clusters or partitions seems pretty straightforward, we haven't
@@ -160,9 +170,6 @@ In general, you need to follow these steps:
 
 
 ## 📈 Future plans
-- 🛠 **Slurm accounting**. We're working on bringing all the benefits of Slurm accounting to this solution.
-- 🛠 **CPU-only clusters**. Some Slurm users don't need GPU computations, so we are working on supporting CPU-only
-  clusters.
 - 💡 **On-demand nodes**. The easy scaling can be improved further by provisioning new Kubernetes nodes only when
   there are queued jobs that need them.
 - 💡 **Network topology-aware job scheduling**. Thanks to the Slurm topology feature, we can support detailed

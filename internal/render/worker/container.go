@@ -49,6 +49,7 @@ func renderContainerSlurmd(
 	container *values.Container,
 	jailSubMounts []slurmv1.NodeVolumeJailSubMount,
 	clusterName string,
+	clusterType consts.ClusterType,
 	cgroupVersion string,
 ) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
@@ -69,7 +70,7 @@ func renderContainerSlurmd(
 		Name:            consts.ContainerNameSlurmd,
 		Image:           container.Image,
 		ImagePullPolicy: corev1.PullAlways, // TODO use digest and set to corev1.PullIfNotPresent
-		Env:             renderSlurmdEnv(clusterName, cgroupVersion),
+		Env:             renderSlurmdEnv(clusterName, cgroupVersion, clusterType),
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,
 			ContainerPort: container.Port,
@@ -107,7 +108,7 @@ func renderContainerSlurmd(
 	}
 }
 
-func renderSlurmdEnv(clusterName, cgroupVersion string) []corev1.EnvVar {
+func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.ClusterType) []corev1.EnvVar {
 	envVar := []corev1.EnvVar{
 		{
 			Name: "K8S_POD_NAME",
@@ -116,16 +117,22 @@ func renderSlurmdEnv(clusterName, cgroupVersion string) []corev1.EnvVar {
 					FieldPath: "metadata.name",
 				},
 			},
-		}, {
+		},
+		{
 			Name: "K8S_POD_NAMESPACE",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
 					FieldPath: "metadata.namespace",
 				},
 			},
-		}, {
+		},
+		{
 			Name:  "K8S_SERVICE_NAME",
 			Value: naming.BuildServiceName(consts.ComponentTypeWorker, clusterName),
+		},
+		{
+			Name:  "SLURM_CLUSTER_TYPE",
+			Value: clusterType.String(),
 		},
 	}
 	if cgroupVersion == consts.CGroupV2 {

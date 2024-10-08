@@ -30,12 +30,13 @@ controllerManager:
         drop:
           - ALL
     env:
+      isMariadbCrdInstalled: "false"
       isOpentelemetryCollectorCrdInstalled: "false"
       isPrometheusCrdInstalled: "false"
       slurmOperatorWatchNamespaces: '*'
     image:
       repository: ghcr.io/nebius/soperator/slurm-operator
-      tag: 1.14.2
+      tag: 1.14.4
     imagePullPolicy: Always
     resources:
       limits:
