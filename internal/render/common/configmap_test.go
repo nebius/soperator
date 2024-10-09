@@ -61,10 +61,7 @@ func TestRenderConfigMapSecurityLimits(t *testing.T) {
 				},
 			},
 			componentType: consts.ComponentTypeLogin,
-			expectedData: `*       soft    memlock     unlimited
-*       hard    memlock     unlimited
-*       soft    nofile      1048576
-*       hard    nofile      1048576`,
+			expectedData:  "#Empty security limits file",
 			expectedLabel: consts.ComponentTypeLogin.String(),
 		},
 		{
@@ -95,10 +92,7 @@ func TestRenderConfigMapSecurityLimits(t *testing.T) {
 				},
 			},
 			componentType: consts.ComponentTypeWorker,
-			expectedData: `*       soft    memlock     unlimited
-*       hard    memlock     unlimited
-*       soft    nofile      1048576
-*       hard    nofile      1048576`,
+			expectedData:  "#Empty security limits file",
 			expectedLabel: consts.ComponentTypeWorker.String(),
 		},
 		{

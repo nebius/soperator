@@ -83,6 +83,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("MaxJobCount", 1000) // Keep 1000 last jobs in controller memory
 	res.AddProperty("MinJobAge", 86400)  // Don't remove jobs from controller memory after some time
 	res.AddComment("")
+	res.AddProperty("PropagateResourceLimits", "NONE") // Don't propagate ulimits from the login node by default
+	res.AddComment("")
 	res.AddComment("HEALTH CHECKS")
 	res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
 	res.AddProperty("HealthCheckInterval", 30)
@@ -229,12 +231,8 @@ func RenderConfigMapSecurityLimits(componentType consts.ComponentType, cluster *
 }
 
 func generateDefaultSecurityLimitsConfig() renderutils.ConfigFile {
-	res := &renderutils.MultilineStringConfig{}
-	res.AddLine("*       soft    memlock     unlimited")
-	res.AddLine("*       hard    memlock     unlimited")
-	res.AddLine("*       soft    nofile      1048576")
-	res.AddLine("*       hard    nofile      1048576")
-	return res
+	// TODO: It's turned out that these limits do nothing, so we should drop this logic from the operator
+	return generateEmptySecurityLimitsConfig()
 }
 
 func generateEmptySecurityLimitsConfig() renderutils.ConfigFile {
