@@ -1,0 +1,101 @@
+name: "Create release with automatic changelog"
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    permissions:
+      pull-requests: read
+      contents: write  # for softprops/action-gh-release to create GitHub release
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
+        with:
+          fetch-depth: 0
+
+      - name: Get Version
+        id: get_version
+        run: |
+          echo "VERSION=$(cat VERSION)" >> $GITHUB_ENV
+
+      - name: Tag commit
+        uses: pxpm/github-tag-action@1.0.1
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          tag: ${{ env.VERSION }}
+
+      - name: Generate changelog
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v5
+        with:
+          mode: "PR"
+          fromTag: "1.14.2"
+          configurationJson: |
+            {
+              "template": "#{{CHANGELOG}}\n\nContributors:\n#{{CONTRIBUTORS}}",
+              "categories": [
+                {
+                    "key": "features",
+                    "title": "## 🚀 Features",
+                    "labels": ["feat", "feature"]
+                },
+                {
+                    "key": "tests",
+                    "title": "## 🧪 Tests",
+                    "labels": ["test"]
+                },
+                {
+                    "key": "fixes",
+                    "title": "## 🐛 Fixes",
+                    "labels": ["fix", "bug"]
+                },
+                {
+                    "key": "dependencies",
+                    "title": "## 📦 Dependencies",
+                    "labels": ["dependencies", "deps"]
+                },
+                {
+                    "key": "docs",
+                    "title": "## 📔Docs",
+                    "labels": ["doc", "docs"]
+                },
+                {
+                    "key": "other",
+                    "title": "## Other",
+                    "labels": []
+                }
+              ],
+              "ignore_labels": [
+                  "ignore-for-release"
+              ],
+              "label_extractor": [
+                {
+                  "pattern": "^(other|docs|doc|dependencies|deps|feat|feature|fix|bug|test|.*)",
+                  "target": "$1"
+                }
+              ],
+              "base_branches": ["dev"]
+            }
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release with changelog
+        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.0.8
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: ${{ env.VERSION }}
+          draft: false
+          prerelease: false
+          body: |
+            ${{steps.changelog.outputs.changelog}}
+            
+            **Categorized prs** | **Uncategorized prs** | **Commits** | **Str added** | **Str deleted**
+            :---: | :---: | :---: | :---: | :---:
+             ${{steps.changelog.outputs.categorized_prs}} | ${{steps.changelog.outputs.uncategorized_prs}} | ${{steps.changelog.outputs.commits}} | ${{steps.changelog.outputs.additions}} | ${{steps.changelog.outputs.deletions}}
