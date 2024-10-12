@@ -30,6 +30,30 @@ for file in /mnt/slurm-configs/*; do
     touch "/etc/slurm/$filename" && mount --bind "$file" "/etc/slurm/$filename"
 done
 
+echo "Make ulimits as big as possible"
+set_ulimit() {
+    local limit_option=$1
+    local limit_value=$2
+    ulimit $limit_option $limit_value || { echo "ulimit $limit_option: exit code: $?"; }
+}
+set_ulimit -HSR unlimited  # (-R) Max real-time non-blocking time
+set_ulimit -HSc unlimited  # (-c) Max core file size
+set_ulimit -HSd unlimited  # (-d) Max "data" segment size
+set_ulimit -HSe unlimited  # (-e) Max scheduling priority
+set_ulimit -HSf unlimited  # (-f) Max file size
+set_ulimit -HSi unlimited  # (-i) Max number of pending signals
+set_ulimit -HSl unlimited  # (-l) Max locked memory size (is necessary for Infiniband RDMA to work)
+set_ulimit -HSm unlimited  # (-m) Max physical memory usage
+set_ulimit -HSn 1048576    # (-n) Max number of open files
+# READ-ONLY                # (-p) Max pipe size
+set_ulimit -HSq unlimited  # (-q) Max POSIX message queue size
+set_ulimit -HSr unlimited  # (-r) Max real-time priority
+set_ulimit -HSs unlimited  # (-s) Max stack size
+set_ulimit -HSt unlimited  # (-t) Max CPU time
+set_ulimit -HSu unlimited  # (-u) Max number of user processes
+set_ulimit -HSv unlimited  # (-v) Max virtual memory size
+set_ulimit -HSx unlimited  # (-x) Max number of file locks
+
 echo "Apply sysctl limits from /etc/sysctl.conf"
 sysctl -p
 
