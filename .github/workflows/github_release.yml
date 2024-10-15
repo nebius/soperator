@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  build:
+  release:
     permissions:
       pull-requests: read
       contents: write  # for softprops/action-gh-release to create GitHub release
@@ -35,7 +35,6 @@ jobs:
         uses: mikepenz/release-changelog-builder-action@v5
         with:
           mode: "PR"
-          fromTag: "1.14.2"
           configurationJson: |
             {
               "template": "#{{CHANGELOG}}\n\nContributors:\n#{{CONTRIBUTORS}}",
