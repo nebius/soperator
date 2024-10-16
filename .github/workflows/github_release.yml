@@ -79,6 +79,13 @@ jobs:
                   "target": "$1"
                 }
               ],
+              "tag_resolver": {
+                "method": "semver",
+                "filter": {
+                  "pattern": "^\d+\.\d+\.\d+",
+                  "flags": "gu"
+                }
+              },
               "base_branches": ["dev"]
             }
           token: ${{ secrets.GITHUB_TOKEN }}
