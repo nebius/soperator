@@ -51,14 +51,19 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Check if version synced
-        run: make test-version-sync
-
       - name: Debug vars
         run: echo "UNSTABLE - is ${{ needs.pre-build.outputs.unstable }}"
 
       - name: Checkout repository
         uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
+        with:
+          fetch-depth: 0
+
+      - name: Check if version synced
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            make test-version-sync
+          fi
 
       - name: Install GO
         uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
