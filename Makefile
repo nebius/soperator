@@ -36,6 +36,10 @@ GITHUB_REPO			  = ghcr.io/nebius/soperator
 NEBIUS_REPO			  = cr.eu-north1.nebius.cloud/soperator
 IMAGE_REPO			  = $(NEBIUS_REPO)
 
+# For version sync test
+VALUES_VERSION 		  = $(shell $(YQ) '.images.slurmctld' helm/slurm-cluster/values.yaml | awk -F':' '{print $$2}' | awk -F'-' '{print $$1}')
+
+
 OPERATOR_IMAGE_TAG  = $(VERSION)
 
 ifeq ($(shell uname), Darwin)
@@ -120,6 +124,17 @@ ifeq ($(UNSTABLE), true)
 else
 	@echo '$(VERSION)'
 endif
+
+.PHONY: test-version-sync
+test-version-sync:
+	@if [ "$(VERSION)" != "$(VALUES_VERSION)" ]; then \
+		echo "Version in version file and helm/slurm-cluster different!"; \
+		echo "VERSION is - $(VERSION)"; \
+		echo "VALUES_VERSION is - $(VALUES_VERSION)"; \
+		exit 1; \
+	else \
+		echo "Version test passed: versions is: $(VERSION)"; \
+	fi
 
 .PHONY: get-operator-tag-version
 get-operator-tag-version:
