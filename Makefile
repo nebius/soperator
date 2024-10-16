@@ -126,7 +126,7 @@ else
 endif
 
 .PHONY: test-version-sync
-test-version-sync:
+test-version-sync: yq
 	@if [ "$(VERSION)" != "$(VALUES_VERSION)" ]; then \
 		echo "Version in version file and helm/slurm-cluster different!"; \
 		echo "VERSION is - $(VERSION)"; \
