@@ -200,25 +200,6 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 			},
 		},
 		utils.MultiStepExecutionStep{
-			Name: "SshdServiceLoadBalancerIP specified",
-			Func: func(stepCtx context.Context) error {
-				if c.NodeLogin.Service.Type != corev1.ServiceTypeLoadBalancer {
-					return nil
-				}
-				if c.NodeLogin.Service.LoadBalancerIP != "" {
-					return nil
-				}
-
-				err := fmt.Errorf("SshdServiceLoadBalancerIP is not specified, but SshdServiceType %q is used", string(corev1.ServiceTypeLoadBalancer))
-				log.FromContext(stepCtx).Error(
-					err,
-					"SshdServiceLoadBalancerIP is not specified",
-					"Slurm.LoginNode.SshdServiceType", string(c.NodeLogin.Service.Type),
-				)
-				return err
-			},
-		},
-		utils.MultiStepExecutionStep{
 			Name: "SshdServiceNodePort specified",
 			Func: func(stepCtx context.Context) error {
 				if c.NodeLogin.Service.Type != corev1.ServiceTypeNodePort {
