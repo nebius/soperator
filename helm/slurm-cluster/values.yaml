@@ -285,8 +285,9 @@ slurmNodes:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICL8scMKnwu+Y9S6XDACacZ54+qu+YRo2y4Ieddd username2"
     # Either `LoadBalancer` or `NodePort`
     sshdServiceType: "NodePort"
-    # Required in case of sshdServiceType == `LoadBalancer`
-    sshdServiceLoadBalancerIP: <your-ip-here>
+    # Could be needed in case of sshdServiceType == `LoadBalancer`
+    # sshdServiceLoadBalancerIP: "192.168.0.1"
+    sshdServiceLoadBalancerIP: ""
     # Required in case of sshdServiceType == `NodePort`
     sshdServiceNodePort: 30022
     munge:
