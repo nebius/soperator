@@ -34,7 +34,7 @@ jobs:
         id: get-version
         run: |
           VERSION="$(cat VERSION)"
-          echo "version='${VERSION}'" >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
 
       - name: Push new tag
         uses: pxpm/github-tag-action@07a0f099a1db2ef2c50367665450b9f6ef3b6e9d # 1.0.1
@@ -127,9 +127,9 @@ jobs:
           prerelease: false
           body: |
             Changes made since version `${{ steps.changelog.outputs.fromTag }}` prior to version `${{ steps.changelog.outputs.toTag }}`:
-            
+
             ${{ steps.changelog.outputs.changelog }}
-            
+
             | 📁 **Categorized PRs** | 📂 **Uncategorized PRs** | 📥 **Commits** | ➕ **Lines added** | ➖ **Lines deleted** |
             | :---: | :---: | :---: | :---: | :---: |
             | ${{ steps.changelog.outputs.categorized_prs }} | ${{ steps.changelog.outputs.uncategorized_prs }} | ${{ steps.changelog.outputs.commits }} | ${{ steps.changelog.outputs.additions }} | ${{ steps.changelog.outputs.deletions }} |
