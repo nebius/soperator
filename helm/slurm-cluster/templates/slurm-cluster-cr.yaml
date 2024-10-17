@@ -177,7 +177,7 @@ spec:
       sshdServiceAnnotations: {}
       {{- /*external-dns.alpha.kubernetes.io/hostname: "{{ include "slurm-cluster.name" . }}.slurm-operator.msp-dev.nemax.nebius.cloud."*/ -}}
       {{- if eq .Values.slurmNodes.login.sshdServiceType "LoadBalancer" }}
-      sshdServiceLoadBalancerIP: {{ required "slurmNodes.login.sshdServiceLoadBalancerIP is required in case of slurmNodes.login.sshdServiceType == `LoadBalancer`" .Values.slurmNodes.login.sshdServiceLoadBalancerIP | quote }}
+      sshdServiceLoadBalancerIP: {{ .Values.slurmNodes.login.sshdServiceLoadBalancerIP | quote }}
       {{- end }}
       {{- if eq .Values.slurmNodes.login.sshdServiceType "NodePort" }}
       sshdServiceNodePort: {{ required "slurmNodes.login.sshdServiceNodePort is required in case of slurmNodes.login.sshdServiceType == `NodePort`" .Values.slurmNodes.login.sshdServiceNodePort }}
