@@ -284,7 +284,7 @@ slurmNodes:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzxkjzPQ4EyZSjan4MLGFSA18idpZicoKW7Hfff username1"
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICL8scMKnwu+Y9S6XDACacZ54+qu+YRo2y4Ieddd username2"
     # Either `LoadBalancer` or `NodePort`
-    sshdServiceType: "NodePort"
+    sshdServiceType: "LoadBalancer"
     # Could be needed in case of sshdServiceType == `LoadBalancer`
     # sshdServiceLoadBalancerIP: "192.168.0.1"
     sshdServiceLoadBalancerIP: ""
@@ -333,12 +333,12 @@ telemetry: {}
 #   otelCollectorPort: 8429
 
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.14.9-jammy-slurm24.05.2"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.14.9-jammy-slurm24.05.2"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.14.9-jammy-slurm24.05.2"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.14.9-jammy-slurm24.05.2"
-  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.14.9-jammy-slurm24.05.2"
-  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.14.9-jammy-slurm24.05.2"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.14.9-jammy-slurm24.05.2"
-  exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.14.9-jammy-slurm24.05.2"
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.14.10-jammy-slurm24.05.2"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.14.10-jammy-slurm24.05.2"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.14.10-jammy-slurm24.05.2"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.14.10-jammy-slurm24.05.2"
+  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.14.10-jammy-slurm24.05.2"
+  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.14.10-jammy-slurm24.05.2"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.14.10-jammy-slurm24.05.2"
+  exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.14.10-jammy-slurm24.05.2"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:11.4.3"
