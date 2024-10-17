@@ -3,6 +3,7 @@ name: Build All in one job
 on:
   push:
     paths-ignore:
+      - '.github/**'
       - 'docs/**'
       - 'LICENSE'
       - 'PROJECT'
