@@ -210,6 +210,9 @@ sync-version: yq ## Sync versions from file
 	@echo ')'                                               >> $(GO_CONST_VERSION_FILE)
 	@# endregion internal/consts
 
+.PHONY: sync-version-from-scratch
+sync-version-from-scratch: generate manifests helm sync-version ## Regenerates all resources and syncs versions to them
+
 ##@ Build
 
 .PHONY: build
