@@ -284,7 +284,7 @@ slurmNodes:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzxkjzPQ4EyZSjan4MLGFSA18idpZicoKW7Hfff username1"
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICL8scMKnwu+Y9S6XDACacZ54+qu+YRo2y4Ieddd username2"
     # Either `LoadBalancer` or `NodePort`
-    sshdServiceType: "NodePort"
+    sshdServiceType: "LoadBalancer"
     # Could be needed in case of sshdServiceType == `LoadBalancer`
     # sshdServiceLoadBalancerIP: "192.168.0.1"
     sshdServiceLoadBalancerIP: ""
