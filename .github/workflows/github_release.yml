@@ -1,40 +1,73 @@
-name: "Create release with automatic changelog"
+name: "Create GitHub release with automatic changelog"
 
 on:
   push:
     branches:
       - main
+    paths-ignore:
+      - '.github/**'
+      - '.dockerignore'
+      - '.editorconfig'
+      - '.gitignore'
 
 jobs:
-  release:
+  tag:
+    name: Push new tag
+
     permissions:
-      pull-requests: read
-      contents: write  # for softprops/action-gh-release to create GitHub release
+      contents: write
 
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
         with:
           fetch-depth: 0
 
-      - name: Get Version
-        id: get_version
-        run: |
-          echo "VERSION=$(cat VERSION)" >> $GITHUB_ENV
+      - name: Get previous tag
+        id: get-previous-tag
+        uses: actions-ecosystem/action-get-latest-tag@b7c32daec3395a9616f88548363a42652b22d435 # v1.6.0
+        with:
+          semver_only: true
 
-      - name: Tag commit
-        uses: pxpm/github-tag-action@1.0.1
+      - name: Get version
+        id: get-version
+        run: |
+          VERSION="$(cat VERSION)"
+          echo "version='${VERSION}'" >> "${GITHUB_OUTPUT}"
+
+      - name: Push new tag
+        uses: pxpm/github-tag-action@07a0f099a1db2ef2c50367665450b9f6ef3b6e9d # 1.0.1
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
-          tag: ${{ env.VERSION }}
+          tag: ${{ steps.get-version.outputs.version }}
+
+    outputs:
+      previous-tag: ${{ steps.get-previous-tag.outputs.tag }}
+      new-tag: ${{ steps.get-version.outputs.version }}
+
+  release:
+    name: Create release
+    needs: tag
+
+    permissions:
+      pull-requests: read
+      contents: write
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
+        with:
+          fetch-depth: 0
 
       - name: Generate changelog
         id: changelog
-        uses: mikepenz/release-changelog-builder-action@v5
+        uses: mikepenz/release-changelog-builder-action@f3fc77b47b74e78971fffecb2102ae6eac9a44d6 # v5
         with:
           mode: "PR"
+          fromTag: ${{ needs.tag.outputs.previous-tag }}
+          toTag: ${{ needs.tag.outputs.new-tag }}
           configurationJson: |
             {
               "template": "#{{CHANGELOG}}\n\nContributors:\n#{{CONTRIBUTORS}}",
@@ -79,13 +112,6 @@ jobs:
                   "target": "$1"
                 }
               ],
-              "tag_resolver": {
-                "method": "semver",
-                "filter": {
-                  "pattern": "^(app.*|v.*)",
-                  "flags": "gu"
-                }
-              },
               "base_branches": ["dev"]
             }
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -95,13 +121,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ env.VERSION }}
-          name: ${{ env.VERSION }}
+          tag_name: ${{ needs.tag.outputs.new-tag }}
+          name: ${{ needs.tag.outputs.new-tag }}
           draft: false
           prerelease: false
           body: |
-            ${{steps.changelog.outputs.changelog}}
+            Changes made since version `${{ steps.changelog.outputs.fromTag }}` prior to version `${{ steps.changelog.outputs.toTag }}`:
             
-            **Categorized prs** | **Uncategorized prs** | **Commits** | **Str added** | **Str deleted**
-            :---: | :---: | :---: | :---: | :---:
-             ${{steps.changelog.outputs.categorized_prs}} | ${{steps.changelog.outputs.uncategorized_prs}} | ${{steps.changelog.outputs.commits}} | ${{steps.changelog.outputs.additions}} | ${{steps.changelog.outputs.deletions}}
+            ${{ steps.changelog.outputs.changelog }}
+            
+            | 📁 **Categorized PRs** | 📂 **Uncategorized PRs** | 📥 **Commits** | ➕ **Lines added** | ➖ **Lines deleted** |
+            | :---: | :---: | :---: | :---: | :---: |
+            | ${{ steps.changelog.outputs.categorized_prs }} | ${{ steps.changelog.outputs.uncategorized_prs }} | ${{ steps.changelog.outputs.commits }} | ${{ steps.changelog.outputs.additions }} | ${{ steps.changelog.outputs.deletions }} |
