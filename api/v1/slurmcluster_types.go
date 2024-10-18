@@ -81,12 +81,12 @@ type PartitionConfiguration struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="default"
 	ConfigType string `json:"configType,omitempty"`
-	// RawConfig define partition configuration as raw multi string started with PartitionName
+	// RawConfig define partition configuration as list of string started with PartitionName
 	// Example for custom ConfigType:
-	// PartitionName=low_priority Nodes=worker-[0-15] Default=YES MaxTime=INFINITE State=UP PriorityTier=1
-	// PartitionName=high_priority  Nodes=worker-[10-20] Default=NO MaxTime=INFINITE State=UP PriorityTier=2
+	// - PartitionName=low_priority Nodes=worker-[0-15] Default=YES MaxTime=INFINITE State=UP PriorityTier=1
+	// - PartitionName=high_priority  Nodes=worker-[10-20] Default=NO MaxTime=INFINITE State=UP PriorityTier=2
 	// +kubebuilder:validation:Optional
-	RawConfig string `json:"rawConfig,omitempty"`
+	RawConfig []string `json:"rawConfig,omitempty"`
 }
 
 type NCCLSettings struct {

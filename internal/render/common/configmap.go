@@ -1,7 +1,6 @@
 package common
 
 import (
-	"bufio"
 	"fmt"
 	"reflect"
 	"strings"
@@ -123,10 +122,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	case "default":
 		res.AddProperty("PartitionName", "main Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
 	case "custom":
-		scanner := bufio.NewScanner(strings.NewReader(cluster.PartitionConfiguration.RawConfig))
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-
+		for _, l := range cluster.PartitionConfiguration.RawConfig {
+			line := strings.TrimSpace(l)
 			if strings.HasPrefix(line, "PartitionName") {
 				clearLine := strings.Replace(line, "PartitionName=", "", 1)
 				res.AddProperty("PartitionName", clearLine)
