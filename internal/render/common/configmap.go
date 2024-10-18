@@ -125,9 +125,12 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	case "custom":
 		scanner := bufio.NewScanner(strings.NewReader(cluster.PartitionConfiguration.RawConfig))
 		for scanner.Scan() {
-			line := scanner.Text()
-			clearLine := strings.Replace(line, "PartitionName=", "", 1)
-			res.AddProperty("PartitionName", clearLine)
+			line := strings.TrimSpace(scanner.Text())
+
+			if strings.HasPrefix(line, "PartitionName") {
+				clearLine := strings.Replace(line, "PartitionName=", "", 1)
+				res.AddProperty("PartitionName", clearLine)
+			}
 		}
 	}
 	if cluster.NodeAccounting.Enabled {

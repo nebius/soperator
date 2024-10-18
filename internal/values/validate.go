@@ -1,10 +1,8 @@
 package values
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/strings/slices"
@@ -20,21 +18,6 @@ import (
 // Returns true if valid. Otherwise, false.
 func (c *SlurmCluster) Validate(ctx context.Context) error {
 	logger := log.FromContext(ctx)
-	// PartitionConfiguration
-	{
-		if c.PartitionConfiguration.ConfigType == "custom" {
-			scanner := bufio.NewScanner(strings.NewReader(c.PartitionConfiguration.RawConfig))
-			for scanner.Scan() {
-				line := scanner.Text()
-				if !strings.HasPrefix(line, "PartitionName") {
-					err := fmt.Errorf("partition configuration should start with PartitionName")
-					logger.Error(err, "partition configuration is invalid")
-					return err
-				}
-
-			}
-		}
-	}
 
 	// Node filters
 	{
