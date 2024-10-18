@@ -1,8 +1,10 @@
 package common
 
 import (
+	"bufio"
 	"fmt"
 	"reflect"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -113,7 +115,21 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("COMPUTE NODES")
 	res.AddComment("We're using the \"dynamic nodes\" feature: https://slurm.schedmd.com/dynamic_nodes.html")
 	res.AddProperty("MaxNodeCount", "512")
-	res.AddProperty("PartitionName", "main Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
+	res.AddComment("Partition Configuration")
+	res.AddProperty("JobRequeue", 1)
+	res.AddProperty("PreemptMode", "REQUEUE")
+	res.AddProperty("PreemptType", "preempt/partition_prio")
+	switch cluster.PartitionConfiguration.ConfigType {
+	case "default":
+		res.AddProperty("PartitionName", "main Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
+	case "custom":
+		scanner := bufio.NewScanner(strings.NewReader(cluster.PartitionConfiguration.RawConfig))
+		for scanner.Scan() {
+			line := scanner.Text()
+			clearLine := strings.Replace(line, "PartitionName=", "", 1)
+			res.AddProperty("PartitionName", clearLine)
+		}
+	}
 	if cluster.NodeAccounting.Enabled {
 		res.AddComment("")
 		res.AddComment("ACCOUNTING")

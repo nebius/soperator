@@ -68,6 +68,24 @@ type SlurmClusterSpec struct {
 	//
 	// +kubebuilder:validation:Optional
 	Telemetry *Telemetry `json:"telemetry,omitempty"`
+
+	// PartitionConfiguration define partition configuration of slurm worker nodes
+	// https://slurm.schedmd.com/slurm.conf.html#SECTION_PARTITION-CONFIGURATION
+	// +kubebuilder:validation:Optional
+	PartitionConfiguration PartitionConfiguration `json:"partitionConfiguration,omitempty"`
+}
+
+type PartitionConfiguration struct {
+	// ConfigType
+	// +kubebuilder:validation:Enum=default;custom
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="default"
+	ConfigType string `json:"configType,omitempty"`
+	// RawConfig define partition configuration as raw multi string started with PartitionName
+	// Example:
+	// PartitionName=low_priority Nodes=worker-[0-9] Default=YES MaxTime=INFINITE State=UP PriorityTier=1
+	// PartitionName=hi_priority  Nodes=worker-[10-20] Default=NO MaxTime=INFINITE State=UP PriorityTier=2
+	RawConfig string `json:"rawConfig,omitempty"`
 }
 
 type NCCLSettings struct {
