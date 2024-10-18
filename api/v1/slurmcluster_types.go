@@ -85,6 +85,7 @@ type PartitionConfiguration struct {
 	// Example:
 	// PartitionName=low_priority Nodes=worker-[0-9] Default=YES MaxTime=INFINITE State=UP PriorityTier=1
 	// PartitionName=hi_priority  Nodes=worker-[10-20] Default=NO MaxTime=INFINITE State=UP PriorityTier=2
+	// +kubebuilder:validation:Optional
 	RawConfig string `json:"rawConfig,omitempty"`
 }
 
