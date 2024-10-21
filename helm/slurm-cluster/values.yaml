@@ -5,6 +5,16 @@ annotations: {}
 pause: false
 # Slurm cluster type. Can be now gpu or cpu
 clusterType: gpu
+# partitionConfiguration define partition configuration of slurm worker nodes
+# https://slurm.schedmd.com/slurm.conf.html#SECTION_PARTITION-CONFIGURATION
+partitionConfiguration:
+  # Could be default or custom
+  configType: "default"
+  # configuration as list string started with PartitionName
+  # Example for custom ConfigType:
+  rawConfig: []
+#    - PartitionName=low_priority Nodes=worker-[0-15] Default=YES MaxTime=INFINITE State=UP PriorityTier=1
+#    - PartitionName=high_priority  Nodes=worker-[10-20] Default=NO MaxTime=INFINITE State=UP PriorityTier=2
 # K8s node filters used in Slurm node specifications. Define which nodes should be used to schedule pods to
 k8sNodeFilters:
   - name: gpu
@@ -333,12 +343,12 @@ telemetry: {}
 #   otelCollectorPort: 8429
 
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.14.10-jammy-slurm24.05.2"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.14.10-jammy-slurm24.05.2"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.14.10-jammy-slurm24.05.2"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.14.10-jammy-slurm24.05.2"
-  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.14.10-jammy-slurm24.05.2"
-  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.14.10-jammy-slurm24.05.2"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.14.10-jammy-slurm24.05.2"
-  exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.14.10-jammy-slurm24.05.2"
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.14.11-jammy-slurm24.05.2"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.14.11-jammy-slurm24.05.2"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.14.11-jammy-slurm24.05.2"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.14.11-jammy-slurm24.05.2"
+  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.14.11-jammy-slurm24.05.2"
+  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.14.11-jammy-slurm24.05.2"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.14.11-jammy-slurm24.05.2"
+  exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.14.11-jammy-slurm24.05.2"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:11.4.3"
