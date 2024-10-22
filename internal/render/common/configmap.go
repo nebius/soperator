@@ -80,6 +80,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("CliFilterPlugins", "cli_filter/user_defaults")
 	res.AddComment("")
 	res.AddProperty("LaunchParameters", "use_interactive_step")
+	res.AddComment("Scrontab")
+	res.AddProperty("ScronParameters", "enable,explicit_scancel")
 	res.AddComment("")
 	res.AddProperty("MaxJobCount", 1000) // Keep 1000 last jobs in controller memory
 	res.AddProperty("MinJobAge", 86400)  // Don't remove jobs from controller memory after some time
@@ -119,8 +121,6 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("PreemptMode", "REQUEUE")
 	res.AddProperty("PreemptType", "preempt/partition_prio")
 	switch cluster.PartitionConfiguration.ConfigType {
-	case "default":
-		res.AddProperty("PartitionName", "main Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
 	case "custom":
 		for _, l := range cluster.PartitionConfiguration.RawConfig {
 			line := strings.TrimSpace(l)
@@ -129,6 +129,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 				res.AddProperty("PartitionName", clearLine)
 			}
 		}
+	default:
+		res.AddProperty("PartitionName", "main Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
 	}
 	if cluster.NodeAccounting.Enabled {
 		res.AddComment("")
