@@ -3,6 +3,7 @@ package common
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -79,6 +80,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("CliFilterPlugins", "cli_filter/user_defaults")
 	res.AddComment("")
 	res.AddProperty("LaunchParameters", "use_interactive_step")
+	res.AddComment("Scrontab")
+	res.AddProperty("ScronParameters", "enable,explicit_scancel")
 	res.AddComment("")
 	res.AddProperty("MaxJobCount", 1000) // Keep 1000 last jobs in controller memory
 	res.AddProperty("MinJobAge", 86400)  // Don't remove jobs from controller memory after some time
@@ -113,7 +116,22 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("COMPUTE NODES")
 	res.AddComment("We're using the \"dynamic nodes\" feature: https://slurm.schedmd.com/dynamic_nodes.html")
 	res.AddProperty("MaxNodeCount", "512")
-	res.AddProperty("PartitionName", "main Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
+	res.AddComment("Partition Configuration")
+	res.AddProperty("JobRequeue", 1)
+	res.AddProperty("PreemptMode", "REQUEUE")
+	res.AddProperty("PreemptType", "preempt/partition_prio")
+	switch cluster.PartitionConfiguration.ConfigType {
+	case "custom":
+		for _, l := range cluster.PartitionConfiguration.RawConfig {
+			line := strings.TrimSpace(l)
+			if strings.HasPrefix(line, "PartitionName") {
+				clearLine := strings.Replace(line, "PartitionName=", "", 1)
+				res.AddProperty("PartitionName", clearLine)
+			}
+		}
+	default:
+		res.AddProperty("PartitionName", "main Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
+	}
 	if cluster.NodeAccounting.Enabled {
 		res.AddComment("")
 		res.AddComment("ACCOUNTING")

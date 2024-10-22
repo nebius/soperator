@@ -15,6 +15,10 @@ spec:
   crVersion: {{ .Chart.Version }}
   pause: {{ .Values.pause }}
   clusterType: {{ .Values.clusterType }}
+  partitionConfiguration:
+    configType: {{ (default "default" .Values.partitionConfiguration.configType) }}
+    rawConfig:
+      {{- default list .Values.partitionConfiguration.rawConfig | toYaml | nindent 6 }}
   k8sNodeFilters:
     {{- range .Values.k8sNodeFilters }}
     - name: {{ .name }}

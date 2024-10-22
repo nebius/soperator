@@ -50,7 +50,13 @@ func (r *MariaDbGrantReconciler) Reconcile(
 func (r *MariaDbGrantReconciler) patch(existing, desired client.Object) (client.Patch, error) {
 	patchImpl := func(dst, src *mariadv1alpha1.Grant) client.Patch {
 		res := client.MergeFrom(dst.DeepCopy())
-		dst.Spec = src.Spec
+		dst.Spec.Username = src.Spec.Username
+		dst.Spec.Host = src.Spec.Host
+		dst.Spec.Database = src.Spec.Database
+		dst.Spec.Table = src.Spec.Table
+		dst.Spec.Privileges = src.Spec.Privileges
+		dst.Spec.GrantOption = src.Spec.GrantOption
+		dst.Spec.MariaDBRef = src.Spec.MariaDBRef
 		return res
 	}
 	return patchImpl(existing.(*mariadv1alpha1.Grant), desired.(*mariadv1alpha1.Grant)), nil
