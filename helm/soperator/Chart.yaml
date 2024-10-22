@@ -2,5 +2,5 @@ apiVersion: v2
 name: helm-soperator
 description: A Helm chart for Kubernetes
 type: application
-version: 1.14.12
-appVersion: "1.14.12"
+version: 1.14.11
+appVersion: "1.14.11"
