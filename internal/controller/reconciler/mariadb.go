@@ -53,7 +53,6 @@ func (r *MariaDbReconciler) patch(existing, desired client.Object) (client.Patch
 		dst.Spec.Image = src.Spec.Image
 		dst.Spec.Replicas = src.Spec.Replicas
 		dst.Spec.Port = src.Spec.Port
-		dst.Spec.Storage = src.Spec.Storage
 		dst.Spec.Database = src.Spec.Database
 		dst.Spec.Username = src.Spec.Username
 		dst.Spec.PasswordSecretKeyRef = src.Spec.PasswordSecretKeyRef
@@ -65,6 +64,11 @@ func (r *MariaDbReconciler) patch(existing, desired client.Object) (client.Patch
 		dst.Spec.Resources = src.Spec.Resources
 		dst.Spec.SecurityContext = src.Spec.SecurityContext
 		dst.Spec.PodSecurityContext = src.Spec.PodSecurityContext
+		dst.Spec.Storage.Ephemeral = src.Spec.Storage.Ephemeral
+		dst.Spec.Storage.StorageClassName = src.Spec.Storage.StorageClassName
+		dst.Spec.Storage.VolumeClaimTemplate = src.Spec.Storage.VolumeClaimTemplate
+		dst.Spec.Storage.Size = src.Spec.Storage.Size
+
 		return res
 	}
 	return patchImpl(existing.(*mariadv1alpha1.MariaDB), desired.(*mariadv1alpha1.MariaDB)), nil
