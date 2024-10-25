@@ -77,8 +77,8 @@ fi
 
 job_name="nccl_test"
 ntasks_per_node=1
-# Get only responding nodes
-ready_nodes=$(sinfo --Node -h -o "%N" -r)
+# Get only responding nodes uniq for all slurm partitions
+ready_nodes=$(sinfo --Node -h -o "%N" -r | uniq)
 
 run_job_on_node() {
   local node=$1
