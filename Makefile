@@ -52,6 +52,7 @@ else
     USER_MAIL					= $(shell git log -1 --pretty=format:'%ae')
 endif
 ifeq ($(UNSTABLE), true)
+	USER_MAIL					= $(shell git log -1 --pretty=format:'%ae')
     SHORT_SHA 					= $(shell echo -n "$(USER_MAIL)-$(VERSION)" | $(SHA_CMD) | cut -c1-8)
     OPERATOR_IMAGE_TAG  		= $(VERSION)-$(SHORT_SHA)
     IMAGE_VERSION		  		= $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
@@ -299,11 +300,11 @@ HELMIFY        ?= $(LOCALBIN)/helmify
 YQ             ?= $(LOCALBIN)/yq
 
 ## Tool Versions
-KUSTOMIZE_VERSION        ?= v5.3.0
+KUSTOMIZE_VERSION        ?= v5.5.0
 CONTROLLER_TOOLS_VERSION ?= v0.14.0
 ENVTEST_VERSION          ?= release-0.17
 GOLANGCI_LINT_VERSION    ?= v1.57.2
-HELMIFY_VERSION          ?= 0.4.11
+HELMIFY_VERSION          ?= 0.4.13
 YQ_VERSION               ?= 4.44.1
 
 .PHONY: kustomize

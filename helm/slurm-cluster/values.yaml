@@ -300,6 +300,8 @@ slurmNodes:
     sshdServiceLoadBalancerIP: ""
     # Required in case of sshdServiceType == `NodePort`
     sshdServiceNodePort: 30022
+    # Annotations to be configure on login service
+    sshdServiceAnnotations: {}
     munge:
       resources:
         cpu: "500m"
@@ -343,12 +345,12 @@ telemetry: {}
 #   otelCollectorPort: 8429
 
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.14.13-jammy-slurm24.05.2"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.14.13-jammy-slurm24.05.2"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.14.13-jammy-slurm24.05.2"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.14.13-jammy-slurm24.05.2"
-  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.14.13-jammy-slurm24.05.2"
-  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.14.13-jammy-slurm24.05.2"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.14.13-jammy-slurm24.05.2"
-  exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.14.13-jammy-slurm24.05.2"
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.14.14-jammy-slurm24.05.2"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.14.14-jammy-slurm24.05.2"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.14.14-jammy-slurm24.05.2"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.14.14-jammy-slurm24.05.2"
+  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.14.14-jammy-slurm24.05.2"
+  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.14.14-jammy-slurm24.05.2"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.14.14-jammy-slurm24.05.2"
+  exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.14.14-jammy-slurm24.05.2"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:11.4.3"
