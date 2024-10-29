@@ -300,11 +300,11 @@ HELMIFY        ?= $(LOCALBIN)/helmify
 YQ             ?= $(LOCALBIN)/yq
 
 ## Tool Versions
-KUSTOMIZE_VERSION        ?= v5.3.0
+KUSTOMIZE_VERSION        ?= v5.5.0
 CONTROLLER_TOOLS_VERSION ?= v0.14.0
 ENVTEST_VERSION          ?= release-0.17
 GOLANGCI_LINT_VERSION    ?= v1.57.2
-HELMIFY_VERSION          ?= 0.4.11
+HELMIFY_VERSION          ?= 0.4.13
 YQ_VERSION               ?= 4.44.1
 
 .PHONY: kustomize
