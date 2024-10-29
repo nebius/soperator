@@ -178,7 +178,8 @@ spec:
       sshRootPublicKeys:
         {{- default list .Values.slurmNodes.login.sshRootPublicKeys | toYaml | nindent 8 }}
       sshdServiceType: {{ default "LoadBalancer" .Values.slurmNodes.login.sshdServiceType | quote }}
-      sshdServiceAnnotations: {}
+      sshdServiceAnnotations:
+      {{- .Values.slurmNodes.login.sshdServiceAnnotations | toYaml | nindent 8 }}
       {{- /*external-dns.alpha.kubernetes.io/hostname: "{{ include "slurm-cluster.name" . }}.slurm-operator.msp-dev.nemax.nebius.cloud."*/ -}}
       {{- if eq .Values.slurmNodes.login.sshdServiceType "LoadBalancer" }}
       sshdServiceLoadBalancerIP: {{ .Values.slurmNodes.login.sshdServiceLoadBalancerIP | quote }}
