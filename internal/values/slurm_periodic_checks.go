@@ -24,7 +24,7 @@ func buildSlurmNCCLBenchmarkFrom(clusterName string, ncclBenchmark *slurmv1.NCCL
 		Name:          naming.BuildCronJobNCCLBenchmarkName(clusterName),
 		ContainerNCCLBenchmark: Container{
 			Name:          consts.ContainerNameNCCLBenchmark,
-			NodeContainer: slurmv1.NodeContainer{Image: ncclBenchmark.Image},
+			NodeContainer: slurmv1.NodeContainer{Image: ncclBenchmark.Image, ImagePullPolicy: ncclBenchmark.ImagePullPolicy},
 		},
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),

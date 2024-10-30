@@ -110,6 +110,13 @@ type PopulateJail struct {
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
+	// ImagePullPolicy defines the image pull policy
+	//
+	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="IfNotPresent"
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
 	// K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
 	// Must correspond to the name of one of [K8sNodeFilter]
 	//
@@ -174,6 +181,13 @@ type NCCLBenchmark struct {
 	//
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
+
+	// ImagePullPolicy defines the image pull policy
+	//
+	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="IfNotPresent"
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
 	// NCCLArguments define nccl settings
 	//
@@ -692,6 +706,13 @@ type NodeContainer struct {
 	//
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
+
+	// ImagePullPolicy defines the image pull policy
+	//
+	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="IfNotPresent"
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
 	// Port defines the port the container exposes
 	//

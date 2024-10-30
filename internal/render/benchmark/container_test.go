@@ -44,6 +44,7 @@ func Test_RenderContainerNCCLBenchmark(t *testing.T) {
 	}
 
 	ncclBenchmark.ContainerNCCLBenchmark.Image = "test-image"
+	ncclBenchmark.ContainerNCCLBenchmark.ImagePullPolicy = "IfNotPresent"
 	ncclBenchmark.NCCLArguments.MinBytes = "1024"
 	ncclBenchmark.NCCLArguments.MaxBytes = "2048"
 	ncclBenchmark.NCCLArguments.StepFactor = "2"
@@ -57,7 +58,7 @@ func Test_RenderContainerNCCLBenchmark(t *testing.T) {
 
 	assert.Equal(t, consts.ContainerNameNCCLBenchmark, container.Name)
 	assert.Equal(t, "test-image", container.Image)
-	assert.Equal(t, corev1.PullAlways, container.ImagePullPolicy)
+	assert.Equal(t, corev1.PullIfNotPresent, container.ImagePullPolicy)
 	assert.Equal(t, "1024", getEnvVarValue(container, "NCCL_MIN_BYTES"))
 	assert.Equal(t, "2048", getEnvVarValue(container, "NCCL_MAX_BYTES"))
 	assert.Equal(t, "2", getEnvVarValue(container, "NCCL_STEP_FACTOR"))

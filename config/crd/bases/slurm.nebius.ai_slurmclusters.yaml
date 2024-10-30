@@ -1147,6 +1147,14 @@ spec:
                       image:
                         description: Image defines the nccl container image
                         type: string
+                      imagePullPolicy:
+                        default: IfNotPresent
+                        description: ImagePullPolicy defines the image pull policy
+                        enum:
+                        - Always
+                        - Never
+                        - IfNotPresent
+                        type: string
                       k8sNodeFilterName:
                         description: |-
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
@@ -1213,6 +1221,14 @@ spec:
                 properties:
                   image:
                     description: Image defines the populate jail container image
+                    type: string
+                  imagePullPolicy:
+                    default: IfNotPresent
+                    description: ImagePullPolicy defines the image pull policy
+                    enum:
+                    - Always
+                    - Never
+                    - IfNotPresent
                     type: string
                   jailSnapshotVolume:
                     description: |-
@@ -1509,6 +1525,14 @@ spec:
                             type: boolean
                           image:
                             description: Image defines the container image
+                            type: string
+                          imagePullPolicy:
+                            default: IfNotPresent
+                            description: ImagePullPolicy defines the image pull policy
+                            enum:
+                            - Always
+                            - Never
+                            - IfNotPresent
                             type: string
                           metrics:
                             description: MariadbMetrics defines the metrics for a
@@ -8260,6 +8284,14 @@ spec:
                           image:
                             description: Image defines the container image
                             type: string
+                          imagePullPolicy:
+                            default: IfNotPresent
+                            description: ImagePullPolicy defines the image pull policy
+                            enum:
+                            - Always
+                            - Never
+                            - IfNotPresent
+                            type: string
                           port:
                             description: Port defines the port the container exposes
                             format: int32
@@ -8333,6 +8365,14 @@ spec:
                         properties:
                           image:
                             description: Image defines the container image
+                            type: string
+                          imagePullPolicy:
+                            default: IfNotPresent
+                            description: ImagePullPolicy defines the image pull policy
+                            enum:
+                            - Always
+                            - Never
+                            - IfNotPresent
                             type: string
                           port:
                             description: Port defines the port the container exposes
@@ -8477,6 +8517,14 @@ spec:
                           image:
                             description: Image defines the container image
                             type: string
+                          imagePullPolicy:
+                            default: IfNotPresent
+                            description: ImagePullPolicy defines the image pull policy
+                            enum:
+                            - Always
+                            - Never
+                            - IfNotPresent
+                            type: string
                           port:
                             description: Port defines the port the container exposes
                             format: int32
@@ -8510,6 +8558,14 @@ spec:
                         properties:
                           image:
                             description: Image defines the container image
+                            type: string
+                          imagePullPolicy:
+                            default: IfNotPresent
+                            description: ImagePullPolicy defines the image pull policy
+                            enum:
+                            - Always
+                            - Never
+                            - IfNotPresent
                             type: string
                           port:
                             description: Port defines the port the container exposes
@@ -8991,6 +9047,14 @@ spec:
                           image:
                             description: Image defines the container image
                             type: string
+                          imagePullPolicy:
+                            default: IfNotPresent
+                            description: ImagePullPolicy defines the image pull policy
+                            enum:
+                            - Always
+                            - Never
+                            - IfNotPresent
+                            type: string
                           podTemplateNameRef:
                             description: It references the PodTemplate with the Slurm
                               Exporter configuration
@@ -9028,6 +9092,14 @@ spec:
                         properties:
                           image:
                             description: Image defines the container image
+                            type: string
+                          imagePullPolicy:
+                            default: IfNotPresent
+                            description: ImagePullPolicy defines the image pull policy
+                            enum:
+                            - Always
+                            - Never
+                            - IfNotPresent
                             type: string
                           port:
                             description: Port defines the port the container exposes
@@ -9505,6 +9577,14 @@ spec:
                           image:
                             description: Image defines the container image
                             type: string
+                          imagePullPolicy:
+                            default: IfNotPresent
+                            description: ImagePullPolicy defines the image pull policy
+                            enum:
+                            - Always
+                            - Never
+                            - IfNotPresent
+                            type: string
                           port:
                             description: Port defines the port the container exposes
                             format: int32
@@ -9543,6 +9623,14 @@ spec:
                         properties:
                           image:
                             description: Image defines the container image
+                            type: string
+                          imagePullPolicy:
+                            default: IfNotPresent
+                            description: ImagePullPolicy defines the image pull policy
+                            enum:
+                            - Always
+                            - Never
+                            - IfNotPresent
                             type: string
                           port:
                             description: Port defines the port the container exposes
@@ -9862,6 +9950,14 @@ spec:
                           image:
                             description: Image defines the container image
                             type: string
+                          imagePullPolicy:
+                            default: IfNotPresent
+                            description: ImagePullPolicy defines the image pull policy
+                            enum:
+                            - Always
+                            - Never
+                            - IfNotPresent
+                            type: string
                           port:
                             description: Port defines the port the container exposes
                             format: int32
@@ -9894,6 +9990,14 @@ spec:
                         properties:
                           image:
                             description: Image defines the container image
+                            type: string
+                          imagePullPolicy:
+                            default: IfNotPresent
+                            description: ImagePullPolicy defines the image pull policy
+                            enum:
+                            - Always
+                            - Never
+                            - IfNotPresent
                             type: string
                           port:
                             description: Port defines the port the container exposes

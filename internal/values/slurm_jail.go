@@ -26,7 +26,7 @@ func buildSlurmPopulateJailFrom(clusterName string, populateJail *slurmv1.Popula
 		Name:         naming.BuildPopulateJailJobName(clusterName),
 		ContainerPopulateJail: Container{
 			Name:          consts.ContainerNamePopulateJail,
-			NodeContainer: slurmv1.NodeContainer{Image: populateJail.Image},
+			NodeContainer: slurmv1.NodeContainer{Image: populateJail.Image, ImagePullPolicy: populateJail.ImagePullPolicy},
 		},
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),

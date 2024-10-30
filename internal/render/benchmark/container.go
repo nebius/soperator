@@ -64,7 +64,7 @@ func renderContainerNCCLBenchmark(
 	return corev1.Container{
 		Name:            ncclBenchmark.ContainerNCCLBenchmark.Name,
 		Image:           ncclBenchmark.Image,
-		ImagePullPolicy: corev1.PullAlways, // TODO use digest and set to corev1.PullIfNotPresent
+		ImagePullPolicy: ncclBenchmark.ContainerNCCLBenchmark.ImagePullPolicy,
 		Env: []corev1.EnvVar{
 			{
 				Name:  "NCCL_MIN_BYTES",
