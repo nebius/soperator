@@ -27,6 +27,7 @@ func RenderSecret(
 	clusterName string,
 	accounting *values.SlurmAccounting,
 	secret *corev1.Secret,
+	isRESTenabled bool,
 ) (*corev1.Secret, error) {
 	passwordName, err := checkSecret(accounting, secret)
 	if err != nil {
@@ -35,7 +36,9 @@ func RenderSecret(
 	secretName := naming.BuildSecretSlurmdbdConfigsName(clusterName)
 	labels := common.RenderLabels(consts.ComponentTypeAccounting, clusterName)
 	data := map[string][]byte{
-		consts.ConfigMapKeySlurmdbdConfig: []byte(generateSlurdbdConfig(clusterName, accounting, passwordName).Render()),
+		consts.ConfigMapKeySlurmdbdConfig: []byte(generateSlurdbdConfig(
+			clusterName, accounting, passwordName, isRESTenabled).Render(),
+		),
 	}
 
 	return &corev1.Secret{
@@ -87,7 +90,12 @@ func checkSecret(accounting *values.SlurmAccounting, secret *corev1.Secret) ([]b
 	return passwordName, nil
 }
 
-func generateSlurdbdConfig(clusterName string, accounting *values.SlurmAccounting, passwordName []byte) renderutils.ConfigFile {
+func generateSlurdbdConfig(
+	clusterName string,
+	accounting *values.SlurmAccounting,
+	passwordName []byte,
+	isRESTenabled bool,
+) renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
 	// Unmodifiable parameters
 	res.AddProperty("AuthType", "auth/"+consts.Munge)
@@ -108,6 +116,12 @@ func generateSlurdbdConfig(clusterName string, accounting *values.SlurmAccountin
 		res.AddProperty("StorageUser", accounting.ExternalDB.User)
 		res.AddProperty("StorageHost", accounting.ExternalDB.Host)
 		res.AddProperty("StoragePort", accounting.ExternalDB.Port)
+	}
+	if isRESTenabled {
+		res.AddComment("")
+		res.AddComment("REST API settings")
+		res.AddProperty("AuthAltTypes", "auth/jwt")
+		res.AddProperty("AuthAltParameters", "jwt_key="+consts.SlurmdbdRESTJWTKeyPath)
 	}
 
 	// Modifiable parameters

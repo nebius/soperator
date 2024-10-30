@@ -5,12 +5,12 @@ const (
 	ContainerNameAccounting        = AccountingName
 	ContainerNameMunge             = Munge
 	ContainerNameSlurmd            = SlurmdName
+	ContainerNameREST              = Slurmrestd
 	ContainerNameSshd              = SshdName
 	ContainerNameToolkitValidation = "toolkit-validation"
 	ContainerNameNCCLBenchmark     = ncclBenchmark
 	ContainerNamePopulateJail      = populateJail
 	ContainerNameExporter          = Exporter
-	ContainerNameCgroupMaker       = CgroupMaker
 
 	ContainerSecurityContextCapabilitySysAdmin = "SYS_ADMIN"
 

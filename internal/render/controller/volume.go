@@ -19,6 +19,7 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeMungeSocket(),
 		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeController),
+		common.RenderVolumeRESTJWTKey(clusterName),
 	}
 
 	// Spool and Jail could be specified by template spec or by volume source name

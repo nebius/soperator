@@ -57,7 +57,7 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 	}
 
 	result, err := accounting.BasePodTemplateSpec(
-		defaultNamespace, defaultNameCluster, acc, defaultNodeFilter, defaultVolumeSources, matchLabels,
+		defaultNameCluster, acc, defaultNodeFilter, defaultVolumeSources, matchLabels,
 	)
 	assert.NoError(t, err)
 

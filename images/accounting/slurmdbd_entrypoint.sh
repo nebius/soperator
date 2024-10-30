@@ -2,6 +2,10 @@
 
 set -e # Exit immediately if any command returns a non-zero error code
 
+echo "Bind-mount REST JWT key from K8S secret"
+touch /var/spool/slurmdbd/jwt_hs256.key
+mount --bind /mnt/rest-jwt-key/rest_jwt.key /var/spool/slurmdbd/jwt_hs256.key
+
 echo "Bind-mount slurm configs from K8S config map"
 for file in /mnt/slurm-configs/*; do
     filename=$(basename "$file")

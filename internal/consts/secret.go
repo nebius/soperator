@@ -5,6 +5,9 @@ const (
 	SecretMungeKeyFileName = Munge + ".key"
 	SecretMungeKeyFileMode = int32(0400)
 
+	SecretRESTJWTKeyFileName = "rest_jwt.key"
+	SecretRESTJWTKeyFileMode = int32(0400)
+
 	SecretSshdKeysPrivateFileMode  = int32(0600)
 	SecretSshdKeysPublicFileMode   = int32(0644)
 	SecretSshdKeysName             = "sshd-keys"

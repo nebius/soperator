@@ -15,6 +15,7 @@ import (
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/render/otel"
+	"nebius.ai/slurm-operator/internal/render/rest"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
@@ -31,6 +32,45 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 		return utils.ExecuteMultiStep(ctx,
 			"Reconciliation of common resources",
 			utils.MultiStepExecutionStrategyCollectErrors,
+			utils.MultiStepExecutionStep{
+				Name: "Slurm JWT secret key for REST API",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					desired := corev1.Secret{}
+					if getErr := r.Get(
+						stepCtx,
+						types.NamespacedName{
+							Namespace: clusterValues.Namespace,
+							Name:      naming.BuildSecretSlurmRESTSecretName(clusterValues.Name),
+						},
+						&desired,
+					); getErr != nil {
+						if !apierrors.IsNotFound(getErr) {
+							stepLogger.Error(getErr, "Failed to get")
+							return errors.Wrap(getErr, "getting REST JWT Key Secret")
+						}
+
+						renderedDesired, err := rest.RenderSecret(clusterValues.Name, clusterValues.Namespace)
+						if err != nil {
+							stepLogger.Error(err, "Failed to render")
+							return errors.Wrap(err, "rendering REST JWT secret key")
+						}
+						desired = *renderedDesired.DeepCopy()
+						stepLogger.Info("Rendered")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+
+					if err := r.Secret.Reconcile(stepCtx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling REST JWT secret key")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
 			utils.MultiStepExecutionStep{
 				Name: "Slurm configs ConfigMap",
 				Func: func(stepCtx context.Context) error {

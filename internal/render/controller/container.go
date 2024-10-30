@@ -27,6 +27,7 @@ func renderContainerSlurmctld(container *values.Container) corev1.Container {
 			common.RenderVolumeMountJail(),
 			common.RenderVolumeMountMungeSocket(),
 			common.RenderVolumeMountSecurityLimits(),
+			common.RenderVolumeMountRESTJWTKey(),
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{

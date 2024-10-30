@@ -201,6 +201,13 @@ func BuildSecretSlurmdbdConfigsName(clusterName string) string {
 	}.String()
 }
 
+func BuildSecretSlurmRESTSecretName(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.SecretSlurmRESTJWTKey,
+	}.String()
+}
+
 func BuildMariaDbName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,
