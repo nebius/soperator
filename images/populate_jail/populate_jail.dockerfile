@@ -1,6 +1,6 @@
 ARG BASE_IMAGE=ubuntu:jammy
 
-# Frist stage: untap jail_rootfs.tar
+# First stage: untap jail_rootfs.tar
 FROM $BASE_IMAGE AS untaped
 COPY jail_rootfs.tar /jail_rootfs.tar
 RUN mkdir /jail && tar -xvf /jail_rootfs.tar -C /jail && rm /jail_rootfs.tar
