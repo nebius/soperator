@@ -41,7 +41,7 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
-{{ .Values.scheduling.cpuOnly.matchExpressions | toYaml | indent 18 }}
+{{ .Values.scheduling.accounting.matchExpressions | toYaml | indent 18 }}
       tolerations:
-{{ .Values.scheduling.cpuOnly.tolerations | toYaml | indent 8 }}
+{{ .Values.scheduling.accounting.tolerations | toYaml | indent 8 }}
 {{- end }}

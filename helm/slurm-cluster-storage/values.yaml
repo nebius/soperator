@@ -23,30 +23,47 @@ volume:
     size: "128Gi"
     filestoreDeviceName: "accounting"
   jailSubMounts: []
-#  jailSubMounts:
-#    - name: "mlperf-sd"
-#      size: "1500Gi"
-#      filestoreDeviceName: "mlperf-sd"
+  # jailSubMounts:
+  #   - name: "mlperf-sd"
+  #     size: "1500Gi"
+  #     filestoreDeviceName: "mlperf-sd"
 
 scheduling:
-  cpuOnly:
+  accounting:
     matchExpressions: []
-#    matchExpressions:
-#      - key: nebius.com/node-group-id
-#        operator: In
-#        values:
-#          - "<CPU Node group ID>"
+    # matchExpressions:
+    #   - key: nebius.com/node-group-id
+    #     operator: In
+    #     values:
+    #       - "<CPU Node group ID>"
     tolerations: []
-  cpuAndGpu:
+    # tolerations:
+    #   - key: nvidia.com/gpu
+    #     operator: Exists
+    #     effect: NoSchedule
+
+  controller:
     matchExpressions: []
-#    matchExpressions:
-#      - key: nebius.com/node-group-id
-#        operator: In
-#        values:
-#          - "<GPU Node group ID>"
-#          - "<CPU Node group ID>"
+    # matchExpressions:
+    #   - key: nebius.com/node-group-id
+    #     operator: In
+    #     values:
+    #       - "<CPU Node group ID>"
     tolerations: []
-#    tolerations:
-#      - key: nvidia.com/gpu
-#        operator: Exists
-#        effect: NoSchedule
+    # tolerations:
+    #   - key: nvidia.com/gpu
+    #     operator: Exists
+    #     effect: NoSchedule
+
+  worker:
+    matchExpressions: []
+    # matchExpressions:
+    #   - key: nebius.com/node-group-id
+    #     operator: In
+    #     values:
+    #       - "<CPU Node group ID>"
+    tolerations: []
+    # tolerations:
+    #   - key: nvidia.com/gpu
+    #     operator: Exists
+    #     effect: NoSchedule

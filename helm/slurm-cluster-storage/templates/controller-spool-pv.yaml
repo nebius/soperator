@@ -22,4 +22,4 @@ spec:
     required:
       nodeSelectorTerms:
         - matchExpressions:
-{{ .Values.scheduling.cpuOnly.matchExpressions | toYaml | indent 12 }}
+{{ .Values.scheduling.controller.matchExpressions | toYaml | indent 12 }}

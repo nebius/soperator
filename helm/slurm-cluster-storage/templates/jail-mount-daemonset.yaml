@@ -53,6 +53,6 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
-{{ .Values.scheduling.cpuAndGpu.matchExpressions | toYaml | indent 18 }}
+{{ .Values.scheduling.worker.matchExpressions | toYaml | indent 18 }}
       tolerations:
-{{ .Values.scheduling.cpuAndGpu.tolerations | toYaml | indent 8 }}
+{{ .Values.scheduling.worker.tolerations | toYaml | indent 8 }}

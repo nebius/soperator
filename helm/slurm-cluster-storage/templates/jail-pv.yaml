@@ -24,4 +24,4 @@ spec:
     required:
       nodeSelectorTerms:
         - matchExpressions:
-{{ .Values.scheduling.cpuAndGpu.matchExpressions | toYaml | indent 12 }}
+{{ .Values.scheduling.worker.matchExpressions | toYaml | indent 12 }}
