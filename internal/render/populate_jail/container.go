@@ -22,7 +22,7 @@ func renderContainerPopulateJail(clusterType consts.ClusterType, populateJail *v
 	return corev1.Container{
 		Name:            populateJail.ContainerPopulateJail.Name,
 		Image:           populateJail.ContainerPopulateJail.Image,
-		ImagePullPolicy: corev1.PullAlways, // TODO use digest and set to corev1.PullIfNotPresent
+		ImagePullPolicy: populateJail.ContainerPopulateJail.ImagePullPolicy,
 		Env: []corev1.EnvVar{
 			{
 				Name:  "OVERWRITE",

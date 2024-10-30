@@ -20,7 +20,7 @@ func renderContainerToolkitValidation(container *values.Container) corev1.Contai
 	return corev1.Container{
 		Name:            consts.ContainerNameToolkitValidation,
 		Image:           container.Image,
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		ImagePullPolicy: container.ImagePullPolicy,
 		Command: []string{
 			"sh",
 		},
@@ -69,7 +69,7 @@ func renderContainerSlurmd(
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
 		Image:           container.Image,
-		ImagePullPolicy: corev1.PullAlways, // TODO use digest and set to corev1.PullIfNotPresent
+		ImagePullPolicy: container.ImagePullPolicy,
 		Env:             renderSlurmdEnv(clusterName, cgroupVersion, clusterType),
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,

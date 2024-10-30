@@ -18,7 +18,7 @@ func renderContainerAccounting(container values.Container) corev1.Container {
 	return corev1.Container{
 		Name:            consts.ContainerNameAccounting,
 		Image:           container.Image,
-		ImagePullPolicy: corev1.PullAlways, // TODO use digest and set to corev1.PullIfNotPresent
+		ImagePullPolicy: container.ImagePullPolicy,
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,
 			ContainerPort: container.Port,

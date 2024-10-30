@@ -15,7 +15,7 @@ func RenderContainerMunge(container *values.Container) corev1.Container {
 	return corev1.Container{
 		Name:            consts.ContainerNameMunge,
 		Image:           container.Image,
-		ImagePullPolicy: corev1.PullAlways, // TODO use digest and set to corev1.PullIfNotPresent
+		ImagePullPolicy: container.ImagePullPolicy,
 		VolumeMounts: []corev1.VolumeMount{
 			RenderVolumeMountMungeKey(),
 			RenderVolumeMountJail(),
