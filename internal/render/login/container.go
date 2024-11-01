@@ -60,7 +60,9 @@ func renderContainerSshd(
 			},
 		},
 		Resources: corev1.ResourceRequirements{
-			Limits:   container.Resources,
+			Limits: corev1.ResourceList{
+				corev1.ResourceMemory: *container.Resources.Memory(),
+			},
 			Requests: container.Resources,
 		},
 	}

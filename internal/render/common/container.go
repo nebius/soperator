@@ -52,8 +52,10 @@ func RenderContainerMunge(container *values.Container) corev1.Container {
 					consts.ContainerSecurityContextCapabilitySysAdmin,
 				}}},
 		Resources: corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceMemory: *container.Resources.Memory(),
+			},
 			Requests: container.Resources,
-			Limits:   container.Resources,
 		},
 	}
 }
