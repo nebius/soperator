@@ -45,7 +45,9 @@ func renderContainerSlurmctld(container *values.Container) corev1.Container {
 			},
 		},
 		Resources: corev1.ResourceRequirements{
-			Limits:   container.Resources,
+			Limits: corev1.ResourceList{
+				corev1.ResourceMemory: *container.Resources.Memory(),
+			},
 			Requests: container.Resources,
 		},
 	}
