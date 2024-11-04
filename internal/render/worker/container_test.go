@@ -30,18 +30,21 @@ func Test_RenderContainerSlurmd(t *testing.T) {
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Port:            8080,
 					Resources: corev1.ResourceList{
-						corev1.ResourceMemory: resource.MustParse("1Gi"),
-						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory:           resource.MustParse("1Gi"),
+						corev1.ResourceCPU:              resource.MustParse("100m"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
 					},
 				},
 				Name: containerName,
 			},
 			wantLimits: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse("1Gi"),
+				corev1.ResourceMemory:           resource.MustParse("1Gi"),
+				corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
 			},
 			wantReqs: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse("1Gi"),
-				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory:           resource.MustParse("1Gi"),
+				corev1.ResourceCPU:              resource.MustParse("100m"),
+				corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
 			},
 		},
 		{
@@ -54,12 +57,8 @@ func Test_RenderContainerSlurmd(t *testing.T) {
 				},
 				Name: containerName,
 			},
-			wantLimits: corev1.ResourceList{
-				corev1.ResourceMemory: resource.Quantity{
-					Format: resource.BinarySI,
-				},
-			},
-			wantReqs: nil,
+			wantLimits: corev1.ResourceList{},
+			wantReqs:   nil,
 		},
 	}
 

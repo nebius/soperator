@@ -27,7 +27,8 @@ func renderContainerSshd(
 		renderVolumeMountSshRootKeys(),
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
-
+	// Create a copy of the container's limits and add non-CPU resources from Requests
+	limits := common.CopyNonCPULimits(container.Resources)
 	return corev1.Container{
 		Name:  consts.ContainerNameSshd,
 		Image: container.Image,
@@ -60,9 +61,7 @@ func renderContainerSshd(
 			},
 		},
 		Resources: corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceMemory: *container.Resources.Memory(),
-			},
+			Limits:   limits,
 			Requests: container.Resources,
 		},
 	}

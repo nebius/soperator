@@ -12,6 +12,8 @@ import (
 
 // RenderContainerMunge renders [corev1.Container] for munge
 func RenderContainerMunge(container *values.Container) corev1.Container {
+	// Create a copy of the container's limits and add non-CPU resources from Requests
+	limits := CopyNonCPULimits(container.Resources)
 	return corev1.Container{
 		Name:            consts.ContainerNameMunge,
 		Image:           container.Image,
@@ -52,9 +54,7 @@ func RenderContainerMunge(container *values.Container) corev1.Container {
 					consts.ContainerSecurityContextCapabilitySysAdmin,
 				}}},
 		Resources: corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceMemory: *container.Resources.Memory(),
-			},
+			Limits:   limits,
 			Requests: container.Resources,
 		},
 	}

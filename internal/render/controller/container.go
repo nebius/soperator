@@ -10,6 +10,8 @@ import (
 
 // renderContainerSlurmctld renders [corev1.Container] for slurmctld
 func renderContainerSlurmctld(container *values.Container) corev1.Container {
+	// Create a copy of the container's limits and add non-CPU resources from Requests
+	limits := common.CopyNonCPULimits(container.Resources)
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmctld,
 		Image:           container.Image,
@@ -45,9 +47,7 @@ func renderContainerSlurmctld(container *values.Container) corev1.Container {
 			},
 		},
 		Resources: corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceMemory: *container.Resources.Memory(),
-			},
+			Limits:   limits,
 			Requests: container.Resources,
 		},
 	}
