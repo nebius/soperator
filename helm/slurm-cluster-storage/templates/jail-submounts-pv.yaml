@@ -24,6 +24,6 @@ spec:
     required:
       nodeSelectorTerms:
         - matchExpressions:
-{{ $.Values.scheduling.worker.matchExpressions | toYaml | indent 12 }}
+{{ $.Values.storage.jail.matchExpressions | toYaml | indent 12 }}
 ---
 {{- end }}

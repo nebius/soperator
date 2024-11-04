@@ -20,5 +20,5 @@ spec:
     required:
       nodeSelectorTerms:
         - matchExpressions:
-{{ .Values.scheduling.accounting.matchExpressions | toYaml | indent 12 }}
+{{ .Values.storage.accounting.matchExpressions | toYaml | indent 12 }}
 {{- end }}
