@@ -67,6 +67,7 @@ import (
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=k8s.mariadb.com,resources=mariadbs,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=k8s.mariadb.com,resources=grants,verbs=get;list;watch;update;patch;delete;create
+//+kubebuilder:rbac:groups=security-profiles-operator.x-k8s.io,resources=apparmorprofiles,verbs=get;list;watch;update;patch;delete;create
 
 // SlurmClusterReconciler reconciles a SlurmCluster object
 type SlurmClusterReconciler struct {
@@ -74,20 +75,21 @@ type SlurmClusterReconciler struct {
 
 	WatchNamespaces WatchNamespaces
 
-	ConfigMap      *reconciler.ConfigMapReconciler
-	Secret         *reconciler.SecretReconciler
-	CronJob        *reconciler.CronJobReconciler
-	Job            *reconciler.JobReconciler
-	Service        *reconciler.ServiceReconciler
-	StatefulSet    *reconciler.StatefulSetReconciler
-	ServiceAccount *reconciler.ServiceAccountReconciler
-	Role           *reconciler.RoleReconciler
-	RoleBinding    *reconciler.RoleBindingReconciler
-	Otel           *reconciler.OtelReconciler
-	PodMonitor     *reconciler.PodMonitorReconciler
-	Deployment     *reconciler.DeploymentReconciler
-	MariaDb        *reconciler.MariaDbReconciler
-	MariaDbGrant   *reconciler.MariaDbGrantReconciler
+	ConfigMap       *reconciler.ConfigMapReconciler
+	Secret          *reconciler.SecretReconciler
+	CronJob         *reconciler.CronJobReconciler
+	Job             *reconciler.JobReconciler
+	Service         *reconciler.ServiceReconciler
+	StatefulSet     *reconciler.StatefulSetReconciler
+	ServiceAccount  *reconciler.ServiceAccountReconciler
+	Role            *reconciler.RoleReconciler
+	RoleBinding     *reconciler.RoleBindingReconciler
+	Otel            *reconciler.OtelReconciler
+	PodMonitor      *reconciler.PodMonitorReconciler
+	Deployment      *reconciler.DeploymentReconciler
+	MariaDb         *reconciler.MariaDbReconciler
+	MariaDbGrant    *reconciler.MariaDbGrantReconciler
+	AppArmorProfile *reconciler.AppArmorProfileReconciler
 }
 
 func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *SlurmClusterReconciler {
@@ -110,6 +112,7 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 		Deployment:      reconciler.NewDeploymentReconciler(r),
 		MariaDb:         reconciler.NewMariaDbReconciler(r),
 		MariaDbGrant:    reconciler.NewMariaDbGrantReconciler(r),
+		AppArmorProfile: reconciler.NewAppArmorProfileReconciler(r),
 	}
 }
 

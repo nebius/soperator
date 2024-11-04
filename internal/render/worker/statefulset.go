@@ -8,6 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -38,15 +39,7 @@ func RenderStatefulSet(
 		return appsv1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
-	annotations := map[string]string{
-		fmt.Sprintf(
-			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmd,
-		): consts.AnnotationApparmorValueUnconfined,
-		fmt.Sprintf(
-			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-		): consts.AnnotationApparmorValueUnconfined,
-		consts.DefaultContainerAnnotationName: consts.ContainerNameSlurmd,
-	}
+	annotations := BuildAnnotations(clusterName)
 
 	var initContainers []corev1.Container
 	if clusterType == consts.ClusterTypeGPU {
@@ -109,4 +102,22 @@ func RenderStatefulSet(
 			},
 		},
 	}, nil
+}
+
+// BuildAnnotations returns a map of annotations for the Slurm worker pods
+func BuildAnnotations(clusterName string) map[string]string {
+	annotations := map[string]string{
+		consts.DefaultContainerAnnotationName: consts.ContainerNameSlurmd,
+	}
+
+	// Always set the annotation for ContainerNameMunge to unconfined
+	annotations[fmt.Sprintf("%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge)] = consts.AnnotationApparmorValueUnconfined
+
+	if check.IsSecurityProfileCRDInstalled {
+		annotations[fmt.Sprintf("%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmd)] = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileWorkerName(clusterName))
+	} else {
+		annotations[fmt.Sprintf("%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmd)] = consts.AnnotationApparmorValueUnconfined
+	}
+
+	return annotations
 }

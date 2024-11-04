@@ -72,8 +72,10 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 	assert.Equal(t, expected.Spec.Containers[0].Image, result.Spec.Containers[0].Image)
 	assert.Equal(t, expected.Spec.Containers[1].Image, result.Spec.Containers[1].Image)
 
-	assert.Equal(t, expected.Spec.Containers[0].Resources, result.Spec.Containers[0].Resources)
-	assert.Equal(t, expected.Spec.Containers[1].Resources, result.Spec.Containers[1].Resources)
+	assert.Equal(t, expected.Spec.Containers[0].Resources.Limits, result.Spec.Containers[0].Resources.Limits)
+	assert.Equal(t, expected.Spec.Containers[0].Resources.Requests, result.Spec.Containers[0].Resources.Requests)
+	assert.Equal(t, expected.Spec.Containers[1].Resources.Limits, result.Spec.Containers[1].Resources.Limits)
+	assert.Equal(t, expected.Spec.Containers[1].Resources.Requests, result.Spec.Containers[1].Resources.Requests)
 
 	assert.Equal(t, expected.Spec.NodeSelector, result.Spec.NodeSelector)
 	assert.Equal(t, expected.Spec.Affinity, result.Spec.Affinity)

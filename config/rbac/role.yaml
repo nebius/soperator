@@ -224,6 +224,18 @@ rules:
   - patch
   - watch
 - apiGroups:
+  - security-profiles-operator.x-k8s.io
+  resources:
+  - apparmorprofiles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - slurm.nebius.ai
   resources:
   - slurmclusters

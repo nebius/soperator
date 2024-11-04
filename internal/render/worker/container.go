@@ -65,8 +65,6 @@ func renderContainerSlurmd(
 		renderVolumeMountSysctl(),
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
-	// Create a copy of the container's limits and add non-CPU resources from Requests
-	limits := common.CopyNonCPUResources(container.Resources)
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
 		Image:           container.Image,

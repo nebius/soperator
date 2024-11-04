@@ -40,6 +40,7 @@ import (
 	mariadv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	apparmorprofileapi "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/check"
@@ -63,6 +64,9 @@ func init() {
 	}
 	if check.IsMariaDbCRDInstalled() {
 		utilruntime.Must(mariadv1alpha1.AddToScheme(scheme))
+	}
+	if check.IsSecurityProfileInstalled() {
+		utilruntime.Must(apparmorprofileapi.AddToScheme(scheme))
 	}
 
 	utilruntime.Must(slurmv1.AddToScheme(scheme))

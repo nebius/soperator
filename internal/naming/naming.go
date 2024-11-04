@@ -207,3 +207,10 @@ func BuildMariaDbName(clusterName string) string {
 		entity:      consts.MariaDbClusterSuffix,
 	}.String()
 }
+
+func BuildAppArmorProfileWorkerName(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.AppArmorProfileWorkerName,
+	}.String()
+}

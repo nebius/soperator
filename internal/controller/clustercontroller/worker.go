@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -116,6 +117,30 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					if err := r.Service.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling worker Service")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Worker AppArmor Profile",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					if !check.IsSecurityProfileCRDInstalled {
+						stepLogger.Info("Security Profiles CRD is not installed, skipping reconciliation")
+						return nil
+					}
+					stepLogger.Info("Reconciling")
+
+					desired := worker.RenderAppArmorProfile(clusterValues)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
+					stepLogger.Info("Rendered")
+
+					if err := r.AppArmorProfile.Reconcile(stepCtx, cluster, desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling worker AppArmor Profile")
 					}
 					stepLogger.Info("Reconciled")
 
