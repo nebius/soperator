@@ -16,3 +16,19 @@ func CopyNonCPUResources(resourceList corev1.ResourceList) corev1.ResourceList {
 	}
 	return limits
 }
+
+type RenderOption func(*renderOptions)
+
+type renderOptions struct {
+	guaranteed bool
+}
+
+// GuaranteedPod is a RenderOption that sets the guaranteed flag
+// Needed for setting the limits of the container to the same values as the requests.
+// This is useful for slurm worker cgroupv2 support.
+// It's neccessary for cpuset https://kubernetes.io/docs/tasks/administer-cluster/cpu-management-policies/#static-policy
+func GuaranteedPod(guaranteed bool) RenderOption {
+	return func(opts *renderOptions) {
+		opts.guaranteed = guaranteed
+	}
+}
