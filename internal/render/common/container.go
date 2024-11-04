@@ -13,7 +13,7 @@ import (
 // RenderContainerMunge renders [corev1.Container] for munge
 func RenderContainerMunge(container *values.Container) corev1.Container {
 	// Create a copy of the container's limits and add non-CPU resources from Requests
-	limits := CopyNonCPULimits(container.Resources)
+	limits := CopyNonCPUResources(container.Resources)
 	return corev1.Container{
 		Name:            consts.ContainerNameMunge,
 		Image:           container.Image,

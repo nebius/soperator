@@ -43,7 +43,7 @@ func RenderMariaDb(
 
 	affinityConfig := getAffinityConfig(nodeFilter.Affinity, antiAffinityEnabled)
 	// Create a copy of the container's limits and add non-CPU resources from Requests
-	limits := common.CopyNonCPULimits(mariaDb.Resources)
+	limits := common.CopyNonCPUResources(mariaDb.Resources)
 
 	return &mariadv1alpha1.MariaDB{
 		ObjectMeta: metav1.ObjectMeta{

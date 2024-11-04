@@ -12,7 +12,7 @@ import (
 
 func RenderContainerExporter(containerParams *values.SlurmExporter) corev1.Container {
 	// Create a copy of the container's limits and add non-CPU resources from Requests
-	limits := common.CopyNonCPULimits(containerParams.ExporterContainer.Resources)
+	limits := common.CopyNonCPUResources(containerParams.ExporterContainer.Resources)
 	return corev1.Container{
 		Name:            consts.ContainerNameExporter,
 		Image:           containerParams.ExporterContainer.Image,
