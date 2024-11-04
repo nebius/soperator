@@ -13,7 +13,7 @@ import (
 // RenderContainerMunge renders [corev1.Container] for munge
 func RenderContainerMunge(container *values.Container, opts ...RenderOption) corev1.Container {
 
-	// No all munge containers need to have guaranteed resources
+	// Not all resources are guaranteed to be set in the container.Resources field.
 	options := renderOptions{
 		guaranteed: false,
 	}
