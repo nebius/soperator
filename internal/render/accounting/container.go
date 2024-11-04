@@ -15,7 +15,6 @@ func renderContainerAccounting(container values.Container) corev1.Container {
 		container.Port = consts.DefaultAccountingPort
 	}
 	container.NodeContainer.Resources.Storage()
-
 	// Create a copy of the container's limits and add non-CPU resources from Requests
 	limits := common.CopyNonCPUResources(container.Resources)
 	return corev1.Container{
