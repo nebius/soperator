@@ -15,7 +15,7 @@ func RenderContainerMunge(container *values.Container, opts ...RenderOption) cor
 
 	// No all munge containers need to have guaranteed resources
 	options := renderOptions{
-		guaranteed: false, // default value
+		guaranteed: false,
 	}
 
 	for _, opt := range opts {
