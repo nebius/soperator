@@ -11,9 +11,24 @@ import (
 )
 
 // RenderContainerMunge renders [corev1.Container] for munge
-func RenderContainerMunge(container *values.Container) corev1.Container {
-	// Create a copy of the container's limits and add non-CPU resources from Requests
-	limits := CopyNonCPUResources(container.Resources)
+func RenderContainerMunge(container *values.Container, opts ...RenderOption) corev1.Container {
+
+	// Not all resources are guaranteed to be set in the container.Resources field.
+	options := renderOptions{
+		guaranteed: false,
+	}
+
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	limits := container.Resources
+
+	if !options.guaranteed {
+		// Create a copy of the container's limits and add non-CPU resources from Requests
+		limits = CopyNonCPUResources(container.Resources)
+	}
+
 	return corev1.Container{
 		Name:            consts.ContainerNameMunge,
 		Image:           container.Image,
