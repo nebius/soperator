@@ -55,7 +55,7 @@ func RenderPopulateJailJob(
 					Annotations: map[string]string{
 						fmt.Sprintf(
 							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNamePopulateJail,
-						): consts.AnnotationApparmorValueUnconfined,
+						): populateJail.ContainerPopulateJail.AppArmorProfile,
 					},
 				},
 				Spec: corev1.PodSpec{

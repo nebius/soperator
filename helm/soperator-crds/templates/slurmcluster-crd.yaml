@@ -1520,6 +1520,11 @@ spec:
                       mariadbOperator:
                         description: MariaDbOpeator represents the MariaDB CRD configuration
                         properties:
+                          appArmorProfile:
+                            default: unconfined
+                            description: AppArmorProfile defines the AppArmor profile
+                              for the Slurm worker node
+                            type: string
                           enabled:
                             type: boolean
                           image:
@@ -8280,6 +8285,11 @@ spec:
                       munge:
                         description: Munge represents the Slurm munge configuration
                         properties:
+                          appArmorProfile:
+                            default: unconfined
+                            description: AppArmorProfile defines the AppArmor profile
+                              for the Slurm worker node
+                            type: string
                           image:
                             description: Image defines the container image
                             type: string
@@ -8362,6 +8372,11 @@ spec:
                         description: Slurmdbd represents the Slurm database daemon
                           configuration
                         properties:
+                          appArmorProfile:
+                            default: unconfined
+                            description: AppArmorProfile defines the AppArmor profile
+                              for the Slurm worker node
+                            type: string
                           image:
                             description: Image defines the container image
                             type: string
@@ -8513,6 +8528,11 @@ spec:
                       munge:
                         description: Munge represents the Slurm munge configuration
                         properties:
+                          appArmorProfile:
+                            default: unconfined
+                            description: AppArmorProfile defines the AppArmor profile
+                              for the Slurm worker node
+                            type: string
                           image:
                             description: Image defines the container image
                             type: string
@@ -8555,6 +8575,11 @@ spec:
                         description: Slurmctld represents the Slurm control daemon
                           configuration
                         properties:
+                          appArmorProfile:
+                            default: unconfined
+                            description: AppArmorProfile defines the AppArmor profile
+                              for the Slurm worker node
+                            type: string
                           image:
                             description: Image defines the container image
                             type: string
@@ -9043,6 +9068,11 @@ spec:
                         description: Exporter represents the Slurm exporter daemon
                           configuration
                         properties:
+                          appArmorProfile:
+                            default: unconfined
+                            description: AppArmorProfile defines the AppArmor profile
+                              for the Slurm worker node
+                            type: string
                           image:
                             description: Image defines the container image
                             type: string
@@ -9089,6 +9119,11 @@ spec:
                       munge:
                         description: Munge represents the Slurm munge configuration
                         properties:
+                          appArmorProfile:
+                            default: unconfined
+                            description: AppArmorProfile defines the AppArmor profile
+                              for the Slurm worker node
+                            type: string
                           image:
                             description: Image defines the container image
                             type: string
@@ -9573,6 +9608,11 @@ spec:
                       munge:
                         description: Munge represents the Slurm munge configuration
                         properties:
+                          appArmorProfile:
+                            default: unconfined
+                            description: AppArmorProfile defines the AppArmor profile
+                              for the Slurm worker node
+                            type: string
                           image:
                             description: Image defines the container image
                             type: string
@@ -9620,6 +9660,11 @@ spec:
                       sshd:
                         description: Sshd represents the SSH daemon service configuration
                         properties:
+                          appArmorProfile:
+                            default: unconfined
+                            description: AppArmorProfile defines the AppArmor profile
+                              for the Slurm worker node
+                            type: string
                           image:
                             description: Image defines the container image
                             type: string
@@ -9946,6 +9991,11 @@ spec:
                       munge:
                         description: Munge represents the Slurm munge configuration
                         properties:
+                          appArmorProfile:
+                            default: unconfined
+                            description: AppArmorProfile defines the AppArmor profile
+                              for the Slurm worker node
+                            type: string
                           image:
                             description: Image defines the container image
                             type: string
@@ -9987,6 +10037,11 @@ spec:
                       slurmd:
                         description: Slurmd represents the Slurm daemon service configuration
                         properties:
+                          appArmorProfile:
+                            default: unconfined
+                            description: AppArmorProfile defines the AppArmor profile
+                              for the Slurm worker node
+                            type: string
                           image:
                             description: Image defines the container image
                             type: string
