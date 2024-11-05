@@ -52,7 +52,7 @@ func RenderNCCLBenchmarkCronJob(
 							Annotations: map[string]string{
 								fmt.Sprintf(
 									"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameNCCLBenchmark,
-								): consts.AnnotationApparmorValueUnconfined,
+								): ncclBenchmark.ContainerNCCLBenchmark.AppArmorProfile,
 							},
 						},
 						Spec: corev1.PodSpec{

@@ -51,10 +51,10 @@ func BasePodTemplateSpec(
 			Annotations: map[string]string{
 				fmt.Sprintf(
 					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameAccounting,
-				): consts.AnnotationApparmorValueUnconfined,
+				): accounting.ContainerAccounting.AppArmorProfile,
 				fmt.Sprintf(
 					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-				): consts.AnnotationApparmorValueUnconfined,
+				): accounting.ContainerMunge.AppArmorProfile,
 				consts.DefaultContainerAnnotationName: consts.ContainerNameAccounting,
 			},
 		},

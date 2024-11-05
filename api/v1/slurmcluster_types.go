@@ -730,6 +730,12 @@ type NodeContainer struct {
 	//
 	// +kubebuilder:validation:Optional
 	SecurityLimitsConfig string `json:"securityLimitsConfig,omitempty"`
+
+	// AppArmorProfile defines the AppArmor profile for the Slurm worker node
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="unconfined"
+	AppArmorProfile string `json:"appArmorProfile,omitempty"`
 }
 
 // NodeVolume defines the configuration for a node volume.

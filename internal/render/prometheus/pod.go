@@ -50,10 +50,10 @@ func BasePodTemplateSpec(
 			Annotations: map[string]string{
 				fmt.Sprintf(
 					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameExporter,
-				): consts.AnnotationApparmorValueUnconfined,
+				): valuesExporter.AppArmorProfile,
 				fmt.Sprintf(
 					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-				): consts.AnnotationApparmorValueUnconfined,
+				): valuesExporter.ContainerMunge.AppArmorProfile,
 			},
 		},
 		Spec: corev1.PodSpec{
