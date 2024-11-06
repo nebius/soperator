@@ -28,7 +28,7 @@ volume:
   #     size: "1500Gi"
   #     filestoreDeviceName: "mlperf-sd"
 
-scheduling:
+storage:
   accounting:
     matchExpressions: []
     # matchExpressions:
@@ -42,7 +42,7 @@ scheduling:
     #     operator: Exists
     #     effect: NoSchedule
 
-  controller:
+  controllerSpool:
     matchExpressions: []
     # matchExpressions:
     #   - key: nebius.com/node-group-id
@@ -55,7 +55,7 @@ scheduling:
     #     operator: Exists
     #     effect: NoSchedule
 
-  worker:
+  jail:
     matchExpressions: []
     # matchExpressions:
     #   - key: nebius.com/node-group-id
