@@ -9,6 +9,10 @@ ln -s /mnt/jail/etc/shadow /etc/shadow
 ln -s /mnt/jail/etc/gshadow /etc/gshadow
 chown -h 0:42 /etc/{shadow,gshadow}
 
+echo "Bind-mount REST JWT secret key from K8S secret"
+touch /var/spool/slurmctld/jwt_hs256.key
+mount --bind /mnt/rest-jwt-key/rest_jwt.key /var/spool/slurmctld/jwt_hs256.key
+
 echo "Bind-mount slurm configs from K8S config map"
 for file in /mnt/slurm-configs/*; do
     filename=$(basename "$file")

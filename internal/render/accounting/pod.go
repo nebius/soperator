@@ -14,7 +14,6 @@ import (
 )
 
 func BasePodTemplateSpec(
-	namespace,
 	clusterName string,
 	accounting *values.SlurmAccounting,
 	nodeFilters []slurmv1.K8sNodeFilter,
@@ -25,9 +24,10 @@ func BasePodTemplateSpec(
 		common.RenderVolumeJailFromSource(volumeSources, *accounting.VolumeJail.VolumeSourceName),
 		common.RenderVolumeSlurmConfigs(clusterName),
 		common.RenderVolumeMungeKey(clusterName),
+		common.RenderVolumeRESTJWTKey(clusterName),
 		common.RenderVolumeMungeSocket(),
 		RenderVolumeSlurmdbdConfigs(clusterName),
-		RenderVolumeSlurmdbdSpool(clusterName, accounting),
+		RenderVolumeSlurmdbdSpool(accounting),
 	}
 
 	var affinity *corev1.Affinity = nil

@@ -330,6 +330,24 @@ type SlurmNodes struct {
 	// TODO: Making exporter optional requires SlurmNode.K8sNodeFilterName to be optional.
 	// +kubebuilder:validation:Required
 	Exporter SlurmExporter `json:"exporter"`
+
+	Rest SlurmRest `json:"rest"`
+}
+
+// SlurmRest represents the Slur REST API configuration
+type SlurmRest struct {
+	SlurmNode `json:",inline"`
+
+	// Enabled defines whether the SlurmRest is enabled
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled,omitempty"`
+
+	// SlurmRestNode represents the Slurm REST API daemon configuration
+	//
+	// +kubebuilder:validation:Optional
+	SlurmRestNode NodeContainer `json:"rest,omitempty"`
 }
 
 // SlurmNodeAccounting represents the Slurm accounting configuration
@@ -680,7 +698,7 @@ type ExporterContainer struct {
 	PodTemplateNameRef *string `json:"podTemplateNameRef,omitempty"`
 }
 
-// SlurmExporterVolumes define the volumes for the Slurm controller node
+// SlurmExporterVolumes define the volumes for the Slurm exporter node
 type SlurmExporterVolumes struct {
 	// Jail represents the jail data volume configuration
 	//

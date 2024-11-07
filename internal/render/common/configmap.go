@@ -158,6 +158,12 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 
 			}
 		}
+		if cluster.NodeRest.Enabled {
+			res.AddComment("")
+			res.AddComment("REST API")
+			res.AddProperty("AuthAltTypes", "auth/jwt")
+			res.AddProperty("AuthAltParameters", "jwt_key="+consts.RESTJWTKeyPath)
+		}
 	}
 	return res
 }

@@ -4,9 +4,9 @@ const (
 	SlurmctldName  = "slurmctld"
 	AccountingName = "accounting"
 	SlurmdName     = "slurmd"
+	Slurmrestd     = "slurmrestd"
 	SshdName       = "sshd"
 	Exporter       = "exporter"
-	CgroupMaker    = "cgroup-maker"
 
 	ncclBenchmark = "nccl-benchmark"
 	populateJail  = "populate-jail"

@@ -1,4 +1,4 @@
-package accounting
+package rest
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -9,35 +9,29 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-// renderContainerAccounting renders [corev1.Container] for slurmctld
-func renderContainerAccounting(container values.Container) corev1.Container {
-	if container.Port == 0 {
-		container.Port = consts.DefaultAccountingPort
+// renderContainerREST renders [corev1.Container] for slurmrestd
+func renderContainerREST(containerParams values.Container) corev1.Container {
+	if containerParams.Port == 0 {
+		containerParams.Port = consts.DefaultRESTPort
 	}
-	container.NodeContainer.Resources.Storage()
-
-	// Create a copy of the container's limits and add non-CPU resources from Requests
-	limits := common.CopyNonCPUResources(container.Resources)
+	containerParams.NodeContainer.Resources.Storage()
 	return corev1.Container{
-		Name:            consts.ContainerNameAccounting,
-		Image:           container.Image,
-		ImagePullPolicy: container.ImagePullPolicy,
+		Name:            consts.ContainerNameREST,
+		Image:           containerParams.Image,
+		ImagePullPolicy: containerParams.ImagePullPolicy,
 		Ports: []corev1.ContainerPort{{
-			Name:          container.Name,
-			ContainerPort: container.Port,
+			Name:          containerParams.Name,
+			ContainerPort: containerParams.Port,
 			Protocol:      corev1.ProtocolTCP,
 		}},
 		VolumeMounts: []corev1.VolumeMount{
 			common.RenderVolumeMountSlurmConfigs(),
-			common.RenderVolumeMountMungeSocket(),
-			common.RenderVolumeMountRESTJWTKey(),
-			RenderVolumeMountSlurmdbdConfigs(),
-			RenderVolumeMountSlurmdbdSpool(),
 		},
+		// TODO: Http check?
 		LivenessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{
-					Port: intstr.FromInt32(container.Port),
+					Port: intstr.FromInt32(containerParams.Port),
 				},
 			},
 			FailureThreshold:    5,
@@ -54,8 +48,10 @@ func renderContainerAccounting(container values.Container) corev1.Container {
 			},
 		},
 		Resources: corev1.ResourceRequirements{
-			Limits:   limits,
-			Requests: container.Resources,
+			Limits: corev1.ResourceList{
+				corev1.ResourceMemory: *containerParams.Resources.Memory(),
+			},
+			Requests: containerParams.Resources,
 		},
 	}
 }
