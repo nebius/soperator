@@ -68,10 +68,10 @@ func RenderStatefulSet(
 					Annotations: map[string]string{
 						fmt.Sprintf(
 							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmctld,
-						): consts.AnnotationApparmorValueUnconfined,
+						): controller.ContainerSlurmctld.AppArmorProfile,
 						fmt.Sprintf(
 							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-						): consts.AnnotationApparmorValueUnconfined,
+						): controller.ContainerMunge.AppArmorProfile,
 						consts.DefaultContainerAnnotationName: consts.ContainerNameSlurmctld,
 					},
 				},

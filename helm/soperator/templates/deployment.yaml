@@ -75,7 +75,7 @@ spec:
           }}
         securityContext: {{- toYaml .Values.controllerManager.manager.containerSecurityContext
           | nindent 10 }}
-      securityContext:
-        runAsNonRoot: true
+      securityContext: {{- toYaml .Values.controllerManager.podSecurityContext | nindent
+        8 }}
       serviceAccountName: {{ include "soperator.fullname" . }}-controller-manager
       terminationGracePeriodSeconds: 10

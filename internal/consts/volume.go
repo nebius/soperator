@@ -8,6 +8,8 @@ const (
 	mungePrefix = Munge + "-"
 	mungeKey    = mungePrefix + "key"
 
+	RESTJWTKey = "rest-jwt-key"
+
 	nvidia = "nvidia"
 	boot   = "boot"
 
@@ -30,6 +32,7 @@ const (
 	VolumeNameJailSnapshot   = jail + "-snapshot"
 	VolumeNameMungeSocket    = mungePrefix + "socket"
 	VolumeNameMungeKey       = mungeKey
+	VolumenameRESTJWTKey     = RESTJWTKey
 	VolumeNameNvidia         = nvidia
 	VolumeNameBoot           = boot
 	VolumeNameSSHConfigs     = sshConfigs
@@ -40,8 +43,6 @@ const (
 	VolumeNameNCCLTopology   = ncclTopology
 	VolumeNameSharedMemory   = "dev-shm"
 	VolumeNameSysctl         = sysctl
-	VolumeNameProc           = "proc"
-	VolumeNameCgroup         = "cgroup"
 
 	VolumeMountPathSlurmConfigs      = "/mnt/" + slurmConfigs
 	VolumeMountPathSlurmdbdSecret    = "/mnt/" + slurmdbdSecret
@@ -52,6 +53,7 @@ const (
 	VolumeMountPathJailUpper         = "/mnt/" + jail + ".upper"
 	VolumeMountPathMungeSocket       = "/run/" + Munge
 	VolumeMountPathMungeKey          = "/mnt/" + mungeKey
+	VolumeMountPathRESTJWTKey        = "/mnt/" + RESTJWTKey
 	VolumeMountPathNvidia            = "/run/" + nvidia
 	VolumeMountPathBoot              = "/" + boot
 	VolumeMountPathSSHConfigs        = "/mnt/" + sshConfigs
@@ -63,6 +65,4 @@ const (
 	VolumeMountPathSharedMemory      = "/dev/shm"
 	VolumeMountPathSysctl            = "/etc/" + sysctlConfFile
 	VolumeMountSubPathSysctl         = sysctlConfFile
-	VolumeMountPathProc              = "/proc"
-	VolumeMountPathCgroup            = "/sys/fs/cgroup"
 )

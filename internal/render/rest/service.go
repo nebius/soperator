@@ -1,0 +1,32 @@
+package rest
+
+import (
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/render/common"
+	"nebius.ai/slurm-operator/internal/values"
+)
+
+// RenderService renders new [corev1.Service] serving Slurm REST API
+func RenderService(namespace, clusterName string, rest *values.SlurmREST) (*corev1.Service, error) {
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rest.Service.Name,
+			Namespace: namespace,
+			Labels:    common.RenderLabels(consts.ComponentTypeAccounting, clusterName),
+		},
+		Spec: corev1.ServiceSpec{
+			Type:      rest.Service.Type,
+			Selector:  common.RenderMatchLabels(consts.ComponentTypeAccounting, clusterName),
+			ClusterIP: "",
+			Ports: []corev1.ServicePort{{
+				Protocol:   rest.Service.Protocol,
+				Port:       rest.ContainerREST.Port,
+				TargetPort: intstr.FromString(rest.ContainerREST.Name),
+			}},
+		},
+	}, nil
+}

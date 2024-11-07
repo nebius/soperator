@@ -93,11 +93,6 @@ RUN chmod +x /opt/bin/install_slurm_plugins.sh && \
 # Update linker cache
 RUN ldconfig
 
-# Delete users & home because they will be linked from jail
-RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
-RUN rm -rf /home
-
-
 COPY --from=exporter_builder /app/prometheus-slurm-exporter /opt/bin/
 
 ENTRYPOINT ["/opt/bin/prometheus-slurm-exporter"]

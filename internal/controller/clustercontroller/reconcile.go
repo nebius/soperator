@@ -242,6 +242,9 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 					return ctrl.Result{}, err
 				}
 			}
+			if err = r.ReconcileREST(ctx, cluster, clusterValues); err != nil {
+				return ctrl.Result{}, err
+			}
 			if err = r.ReconcileExporter(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}

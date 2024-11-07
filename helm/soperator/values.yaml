@@ -36,7 +36,7 @@ controllerManager:
       slurmOperatorWatchNamespaces: '*'
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/slurm-operator
-      tag: 1.14.14
+      tag: 1.15.1
     imagePullPolicy: Always
     resources:
       limits:
@@ -44,6 +44,8 @@ controllerManager:
       requests:
         cpu: 100m
         memory: 64Mi
+  podSecurityContext:
+    runAsNonRoot: true
   replicas: 1
   serviceAccount:
     annotations: {}

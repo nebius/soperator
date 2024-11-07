@@ -43,17 +43,12 @@ VALUES_VERSION 		  = $(shell $(YQ) '.images.slurmctld' helm/slurm-cluster/values
 OPERATOR_IMAGE_TAG  = $(VERSION)
 
 ifeq ($(shell uname), Darwin)
-    SHA_CMD = shasum -a 256
     SED_COMMAND = sed -i '' -e
-    USER_MAIL					= $(shell git config user.email)
 else
-    SHA_CMD = sha256sum
     SED_COMMAND = sed -i -e
-    USER_MAIL					= $(shell git log -1 --pretty=format:'%ae')
 endif
 ifeq ($(UNSTABLE), true)
-	USER_MAIL					= $(shell git log -1 --pretty=format:'%ae')
-    SHORT_SHA 					= $(shell echo -n "$(USER_MAIL)-$(VERSION)" | $(SHA_CMD) | cut -c1-8)
+    SHORT_SHA 					= $(shell git rev-parse --short=8 HEAD)
     OPERATOR_IMAGE_TAG  		= $(VERSION)-$(SHORT_SHA)
     IMAGE_VERSION		  		= $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
     IMAGE_REPO			  		= $(NEBIUS_REPO)-unstable
@@ -177,6 +172,7 @@ sync-version: yq ## Sync versions from file
 	@echo 'Syncing helm/slurm-cluster/values.yaml'
 	@$(YQ) -i ".images.ncclBenchmark = \"$(IMAGE_REPO)/nccl_benchmark:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.slurmctld = \"$(IMAGE_REPO)/controller_slurmctld:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.slurmrestd = \"$(IMAGE_REPO)/slurmrestd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.slurmdbd = \"$(IMAGE_REPO)/controller_slurmdbd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.slurmd = \"$(IMAGE_REPO)/worker_slurmd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.sshd = \"$(IMAGE_REPO)/login_sshd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"

@@ -11,10 +11,12 @@ import (
 )
 
 func RenderContainerExporter(containerParams *values.SlurmExporter) corev1.Container {
+	// Create a copy of the container's limits and add non-CPU resources from Requests
+	limits := common.CopyNonCPUResources(containerParams.ExporterContainer.Resources)
 	return corev1.Container{
 		Name:            consts.ContainerNameExporter,
 		Image:           containerParams.ExporterContainer.Image,
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		ImagePullPolicy: containerParams.ExporterContainer.ImagePullPolicy,
 		Ports: []corev1.ContainerPort{
 			{
 				Name:          consts.ContainerPortNameExporter,
@@ -24,9 +26,7 @@ func RenderContainerExporter(containerParams *values.SlurmExporter) corev1.Conta
 		Resources: corev1.ResourceRequirements{
 			Requests: containerParams.ExporterContainer.Resources,
 			// We do not want to use limits for cpu
-			Limits: corev1.ResourceList{
-				corev1.ResourceMemory: *containerParams.ExporterContainer.Resources.Memory(),
-			},
+			Limits: limits,
 		},
 		Env: []corev1.EnvVar{
 			{

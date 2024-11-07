@@ -31,7 +31,6 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 						},
 						Limits: corev1.ResourceList{
 							corev1.ResourceMemory: resource.MustParse(memory),
-							corev1.ResourceCPU:    resource.MustParse(cpu),
 						},
 					},
 					Ports: []corev1.ContainerPort{
@@ -58,7 +57,7 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 	}
 
 	result, err := accounting.BasePodTemplateSpec(
-		defaultNamespace, defaultNameCluster, acc, defaultNodeFilter, defaultVolumeSources, matchLabels,
+		defaultNameCluster, acc, defaultNodeFilter, defaultVolumeSources, matchLabels,
 	)
 	assert.NoError(t, err)
 

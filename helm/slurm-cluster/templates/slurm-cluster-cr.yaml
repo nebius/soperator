@@ -44,6 +44,8 @@ spec:
     sshdKeysName: {{ include "slurm-cluster.secret.sshdKeysName" . }}
   populateJail:
     image: {{ required "populateJail image" .Values.images.populateJail | quote }}
+    imagePullPolicy: {{ default "IfNotPresent" .Values.populateJail.imagePullPolicy | quote }}
+    appArmorProfile: {{ default "unconfined" .Values.populateJail.appArmorProfile | quote }}
     k8sNodeFilterName: {{ required "Populate Jail job k8s node filter name must be provided." .Values.populateJail.k8sNodeFilterName | quote }}
     {{- if .Values.populateJail.jailSnapshotVolume }}
     jailSnapshotVolume:
@@ -61,6 +63,8 @@ spec:
       successfulJobsHistoryLimit: {{ default 3 .Values.periodicChecks.ncclBenchmark.successfulJobsHistoryLimit }}
       failedJobsHistoryLimit: {{ default 3 .Values.periodicChecks.ncclBenchmark.failedJobsHistoryLimit }}
       image: {{ required "NCCl benchmark image" .Values.images.ncclBenchmark | quote }}
+      imagePullPolicy: {{ default "IfNotPresent" .Values.periodicChecks.ncclBenchmark.imagePullPolicy | quote }}
+      appArmorProfile: {{ default "unconfined" .Values.periodicChecks.ncclBenchmark.appArmorProfile | quote }}
       ncclArguments:
         minBytes: {{ (default "512Mb" .Values.periodicChecks.ncclBenchmark.ncclArguments.minBytes) | quote }}
         maxBytes: {{ (default "8Gb" .Values.periodicChecks.ncclBenchmark.ncclArguments.maxBytes) | quote }}
@@ -76,6 +80,8 @@ spec:
       k8sNodeFilterName: {{ required ".Values.slurmNodes.accounting.k8sNodeFilterName must be provided." .Values.slurmNodes.accounting.k8sNodeFilterName | quote }}
       slurmdbd:
         image: {{ required "slurmd image" .Values.images.slurmdbd | quote }}
+        imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.accounting.slurmdbd.imagePullPolicy | quote }}
+        appArmorProfile: {{ default "unconfined" .Values.slurmNodes.accounting.slurmdbd.appArmorProfile | quote }}
       {{- if .Values.slurmNodes.accounting.enabled }}
         port: {{ default 6819 .Values.slurmNodes.accounting.slurmdbd.port }}
         resources:
@@ -111,6 +117,8 @@ spec:
       {{- end }}
       munge:
         image: {{ required "munge image" .Values.images.munge | quote }}
+        imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.accounting.munge.imagePullPolicy | quote }}
+        appArmorProfile: {{ default "unconfined" .Values.slurmNodes.accounting.munge.appArmorProfile | quote }}
         resources:
           cpu: {{ required ".Values.slurmNodes.accounting.munge.resources.cpu must be provided." .Values.slurmNodes.accounting.munge.resources.cpu | quote}}
           memory: {{ required ".Values.slurmNodes.accounting.munge.resources.memory must be provided." .Values.slurmNodes.accounting.munge.resources.memory | quote}}
@@ -121,6 +129,8 @@ spec:
       k8sNodeFilterName: {{ required ".Values.slurmNodes.controller.k8sNodeFilterName must be provided." .Values.slurmNodes.controller.k8sNodeFilterName | quote }}
       slurmctld:
         image: {{ required "slurmctld image" .Values.images.slurmctld | quote }}
+        imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.controller.slurmctld.imagePullPolicy | quote }}
+        appArmorProfile: {{ default "unconfined" .Values.slurmNodes.controller.slurmctld.appArmorProfile | quote }}
         port: {{ default 6817 .Values.slurmNodes.controller.slurmctld.port }}
         resources:
           cpu: {{ required ".Values.slurmNodes.controller.slurmctld.resources.cpu must be provided." .Values.slurmNodes.controller.slurmctld.resources.cpu | quote}}
@@ -128,6 +138,8 @@ spec:
           ephemeral-storage: {{ required ".Values.slurmNodes.controller.slurmctld.resources.ephemeralStorage must be provided." .Values.slurmNodes.controller.slurmctld.resources.ephemeralStorage | quote}}
       munge:
         image: {{ required "munge image" .Values.images.munge | quote }}
+        imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.controller.munge.imagePullPolicy | quote }}
+        appArmorProfile: {{ default "unconfined" .Values.slurmNodes.controller.munge.appArmorProfile | quote }}
         resources:
           cpu: {{ required ".Values.slurmNodes.controller.munge.resources.cpu must be provided." .Values.slurmNodes.controller.munge.resources.cpu | quote}}
           memory: {{ required ".Values.slurmNodes.controller.munge.resources.memory must be provided." .Values.slurmNodes.controller.munge.resources.memory | quote}}
@@ -143,6 +155,8 @@ spec:
       k8sNodeFilterName: {{ required ".Values.slurmNodes.worker.k8sNodeFilterName must be provided." .Values.slurmNodes.worker.k8sNodeFilterName | quote }}
       slurmd:
         image: {{ required "slurmd image" .Values.images.slurmd | quote }}
+        imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.worker.slurmd.imagePullPolicy | quote }}
+        appArmorProfile: {{ default "unconfined" .Values.slurmNodes.worker.slurmd.appArmorProfile | quote }}
         port: {{ default 6818 .Values.slurmNodes.worker.slurmd.port }}
         resources:
           cpu: {{ required ".Values.slurmNodes.worker.slurmd.resources.cpu must be provided." .Values.slurmNodes.worker.slurmd.resources.cpu | quote}}
@@ -151,6 +165,8 @@ spec:
           nvidia.com/gpu: {{ required ".Values.slurmNodes.worker.slurmd.resources.gpu must be provided." .Values.slurmNodes.worker.slurmd.resources.gpu | quote }}
       munge:
         image: {{ required "munge image" .Values.images.munge | quote }}
+        imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.worker.munge.imagePullPolicy | quote }}
+        appArmorProfile: {{ default "unconfined" .Values.slurmNodes.worker.munge.appArmorProfile | quote }}
         resources:
           cpu: {{ required ".Values.slurmNodes.worker.munge.resources.cpu must be provided." .Values.slurmNodes.worker.munge.resources.cpu | quote}}
           memory: {{ required ".Values.slurmNodes.worker.munge.resources.memory must be provided." .Values.slurmNodes.worker.munge.resources.memory | quote}}
@@ -170,6 +186,8 @@ spec:
       k8sNodeFilterName: {{ required ".Values.slurmNodes.login.k8sNodeFilterName must be provided." .Values.slurmNodes.login.k8sNodeFilterName | quote }}
       sshd:
         image: {{ required "sshd image" .Values.images.sshd | quote }}
+        imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.login.sshd.imagePullPolicy | quote }}
+        appArmorProfile: {{ default "unconfined" .Values.slurmNodes.login.sshd.appArmorProfile | quote }}
         port: {{ default 22 .Values.slurmNodes.login.sshd.port }}
         resources:
           cpu: {{ required ".Values.slurmNodes.login.sshd.resources.cpu must be provided." .Values.slurmNodes.login.sshd.resources.cpu | quote}}
@@ -189,6 +207,8 @@ spec:
       {{- end }}
       munge:
         image: {{ required "sshd munge" .Values.images.munge | quote }}
+        imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.login.munge.imagePullPolicy | quote }}
+        appArmorProfile: {{ default "unconfined" .Values.slurmNodes.login.munge.appArmorProfile | quote }}
         resources:
           cpu: {{ required ".Values.slurmNodes.login.munge.resources.cpu must be provided." .Values.slurmNodes.login.munge.resources.cpu | quote}}
           memory: {{ required ".Values.slurmNodes.login.munge.resources.memory must be provided." .Values.slurmNodes.login.munge.resources.memory | quote}}
@@ -204,8 +224,12 @@ spec:
       k8sNodeFilterName: {{ required ".Values.slurmNodes.exporter.k8sNodeFilterName must be provided." .Values.slurmNodes.exporter.k8sNodeFilterName | quote }}
       exporter:
         image: {{ required "exporter image" .Values.images.exporter | quote }}
+        imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.exporter.imagePullPolicy | quote }}
+        appArmorProfile: {{ default "unconfined" .Values.slurmNodes.exporter.appArmorProfile | quote }}
       munge:
         image: {{ required "munge image" .Values.images.munge | quote }}
+        imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.exporter.munge.imagePullPolicy | quote }}
+        appArmorProfile: {{ default "unconfined" .Values.slurmNodes.exporter.munge.appArmorProfile | quote }}
         resources:
           cpu: {{ required ".Values.slurmNodes.controller.munge.resources.cpu must be provided." .Values.slurmNodes.controller.munge.resources.cpu | quote}}
           memory: {{ required ".Values.slurmNodes.controller.munge.resources.memory must be provided." .Values.slurmNodes.controller.munge.resources.memory | quote}}
@@ -213,6 +237,16 @@ spec:
       volumes:
         jail:
           {{- required ".Values.slurmNodes.exporter.volumes.jail must be provided." .Values.slurmNodes.exporter.volumes.jail | toYaml | nindent 10 }}
+    rest:
+      enabled: {{ .Values.slurmNodes.rest.enabled }}
+      size: {{ required ".Values.slurmNodes.rest.size must be provided." .Values.slurmNodes.rest.size }}
+      k8sNodeFilterName: {{ required ".Values.slurmNodes.rest.k8sNodeFilterName must be provided." .Values.slurmNodes.rest.k8sNodeFilterName | quote }}
+      rest:
+        image: {{ required "rest image" .Values.images.slurmrestd | quote }}
+        resources:
+          cpu: {{ required ".Values.slurmNodes.rest.rest.resources.cpu must be provided." .Values.slurmNodes.rest.rest.resources.cpu | quote}}
+          memory: {{ required ".Values.slurmNodes.rest.rest.resources.memory must be provided." .Values.slurmNodes.rest.rest.resources.memory | quote}}
+          ephemeral-storage: {{ required ".Values.slurmNodes.rest.rest.resources.ephemeralStorage must be provided." .Values.slurmNodes.rest.rest.resources.ephemeralStorage | quote}}
   {{- if .Values.telemetry }}
   telemetry:
     {{- if .Values.telemetry.jobsTelemetry }}

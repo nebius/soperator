@@ -30,6 +30,7 @@ type SlurmCluster struct {
 
 	NodeController SlurmController
 	NodeAccounting SlurmAccounting
+	NodeRest       SlurmREST
 	NodeWorker     SlurmWorker
 	NodeLogin      SlurmLogin
 	Telemetry      *slurmv1.Telemetry
@@ -62,6 +63,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		Secrets:                buildSecretsFrom(&cluster.Spec.Secrets),
 		NodeController:         buildSlurmControllerFrom(cluster.Name, &cluster.Spec.SlurmNodes.Controller),
 		NodeAccounting:         buildAccountingFrom(cluster.Name, &cluster.Spec.SlurmNodes.Accounting),
+		NodeRest:               buildRestFrom(cluster.Name, &cluster.Spec.SlurmNodes.Rest),
 		NodeWorker:             buildSlurmWorkerFrom(cluster.Name, &cluster.Spec.SlurmNodes.Worker, &cluster.Spec.NCCLSettings),
 		NodeLogin:              buildSlurmLoginFrom(cluster.Name, &cluster.Spec.SlurmNodes.Login),
 		Telemetry:              cluster.Spec.Telemetry,

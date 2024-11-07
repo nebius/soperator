@@ -10,10 +10,12 @@ import (
 
 // renderContainerSlurmctld renders [corev1.Container] for slurmctld
 func renderContainerSlurmctld(container *values.Container) corev1.Container {
+	// Create a copy of the container's limits and add non-CPU resources from Requests
+	limits := common.CopyNonCPUResources(container.Resources)
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmctld,
 		Image:           container.Image,
-		ImagePullPolicy: corev1.PullAlways, // TODO use digest and set to corev1.PullIfNotPresent
+		ImagePullPolicy: container.ImagePullPolicy,
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,
 			ContainerPort: container.Port,
@@ -25,6 +27,7 @@ func renderContainerSlurmctld(container *values.Container) corev1.Container {
 			common.RenderVolumeMountJail(),
 			common.RenderVolumeMountMungeSocket(),
 			common.RenderVolumeMountSecurityLimits(),
+			common.RenderVolumeMountRESTJWTKey(),
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
@@ -45,7 +48,7 @@ func renderContainerSlurmctld(container *values.Container) corev1.Container {
 			},
 		},
 		Resources: corev1.ResourceRequirements{
-			Limits:   container.Resources,
+			Limits:   limits,
 			Requests: container.Resources,
 		},
 	}

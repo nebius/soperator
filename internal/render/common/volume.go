@@ -268,3 +268,35 @@ func RenderVolumeMountSecurityLimits() corev1.VolumeMount {
 }
 
 // endregion security limits
+
+// region REST JWT key
+
+// RenderVolumeRESTJWTKey renders [corev1.Volume] containing REST JWT key file
+func RenderVolumeRESTJWTKey(clusterName string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumenameRESTJWTKey,
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: naming.BuildSecretSlurmRESTSecretName(clusterName),
+				Items: []corev1.KeyToPath{
+					{
+						Key:  consts.SecretRESTJWTKeyFileName,
+						Path: consts.SecretRESTJWTKeyFileName,
+						Mode: ptr.To(consts.SecretRESTJWTKeyFileMode),
+					},
+				},
+			},
+		},
+	}
+}
+
+// RenderVolumeMountRESTJWTKey renders [corev1.VolumeMount] defining the mounting path for REST JWT key file
+func RenderVolumeMountRESTJWTKey() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumenameRESTJWTKey,
+		MountPath: consts.VolumeMountPathRESTJWTKey,
+		ReadOnly:  true,
+	}
+}
+
+// endregion REST JWT key

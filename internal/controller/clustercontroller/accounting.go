@@ -73,6 +73,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						clusterValues.Name,
 						&clusterValues.NodeAccounting,
 						secret,
+						clusterValues.NodeRest.Enabled,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
@@ -93,7 +94,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 			},
 
 			utils.MultiStepExecutionStep{
-				Name: "Slurm Service",
+				Name: "Slurm accounting service",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
@@ -111,7 +112,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 
 					if err = r.Service.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling accounting Deployment")
+						return errors.Wrap(err, "reconciling accounting service")
 					}
 					stepLogger.Info("Reconciled")
 					return nil

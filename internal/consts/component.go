@@ -22,6 +22,7 @@ var (
 	ComponentTypeCommon          ComponentType = baseComponentType{"common"}
 	ComponentTypeController      ComponentType = baseComponentType{"controller"}
 	ComponentTypeAccounting      ComponentType = baseComponentType{"accounting"}
+	ComponentTypeREST            ComponentType = baseComponentType{"rest"}
 	ComponentTypeWorker          ComponentType = baseComponentType{"worker"}
 	ComponentTypeLogin           ComponentType = baseComponentType{"login"}
 	ComponentTypeBenchmark       ComponentType = baseComponentType{"nccl-benchmark"}

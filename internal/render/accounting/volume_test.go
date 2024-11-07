@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -36,10 +37,10 @@ func Test_RenderVolumeSlurmdbd(t *testing.T) {
 			},
 		},
 	}
-	volume := accounting.RenderVolumeSlurmdbdSpool(defaultNameCluster, &testAcc)
+	volume := accounting.RenderVolumeSlurmdbdSpool(&testAcc)
 	assert.Equal(t, consts.VolumeNameSpool, volume.Name)
 	assert.Equal(t, corev1.StorageMediumDefault, volume.VolumeSource.EmptyDir.Medium)
 	assert.Equal(t, &sizeGi, volume.VolumeSource.EmptyDir.SizeLimit)
-	volumeEmpty := accounting.RenderVolumeSlurmdbdSpool(defaultNameCluster, acc)
+	volumeEmpty := accounting.RenderVolumeSlurmdbdSpool(acc)
 	assert.Equal(t, &resource.Quantity{Format: "BinarySI"}, volumeEmpty.VolumeSource.EmptyDir.SizeLimit)
 }

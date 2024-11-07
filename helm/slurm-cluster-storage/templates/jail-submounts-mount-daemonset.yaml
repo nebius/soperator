@@ -41,8 +41,8 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
-{{ $.Values.scheduling.cpuAndGpu.matchExpressions | toYaml | indent 18 }}
+{{ $.Values.storage.jail.matchExpressions | toYaml | indent 18 }}
       tolerations:
-{{ $.Values.scheduling.cpuAndGpu.tolerations | toYaml | indent 8}}
+{{ $.Values.storage.jail.tolerations | toYaml | indent 8}}
 ---
 {{- end }}

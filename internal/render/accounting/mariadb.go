@@ -10,7 +10,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	consts "nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/utils"
@@ -42,6 +42,8 @@ func RenderMariaDb(
 	}
 
 	affinityConfig := getAffinityConfig(nodeFilter.Affinity, antiAffinityEnabled)
+	// Create a copy of the container's limits and add non-CPU resources from Requests
+	limits := common.CopyNonCPUResources(mariaDb.Resources)
 
 	return &mariadv1alpha1.MariaDB{
 		ObjectMeta: metav1.ObjectMeta{
@@ -80,9 +82,7 @@ func RenderMariaDb(
 			},
 			ContainerTemplate: mariadv1alpha1.ContainerTemplate{
 				Resources: &corev1.ResourceRequirements{
-					Limits: corev1.ResourceList{
-						corev1.ResourceMemory: *mariaDb.Resources.Memory(),
-					},
+					Limits: limits,
 					Requests: corev1.ResourceList{
 						corev1.ResourceMemory: *mariaDb.Resources.Memory(),
 						corev1.ResourceCPU:    *mariaDb.Resources.Cpu(),
@@ -93,6 +93,7 @@ func RenderMariaDb(
 			PodTemplate: mariadv1alpha1.PodTemplate{
 				NodeSelector:       nodeFilter.NodeSelector,
 				Affinity:           affinityConfig,
+				Tolerations:        nodeFilter.Tolerations,
 				PodSecurityContext: mariaDb.PodSecurityContext,
 			},
 			Metrics: mariaDb.Metrics,

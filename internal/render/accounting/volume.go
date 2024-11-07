@@ -3,6 +3,7 @@ package accounting
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
+
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/values"
@@ -37,7 +38,7 @@ func RenderVolumeMountSlurmdbdSpool() corev1.VolumeMount {
 	}
 }
 
-func RenderVolumeSlurmdbdSpool(clusterName string, accounting *values.SlurmAccounting) corev1.Volume {
+func RenderVolumeSlurmdbdSpool(accounting *values.SlurmAccounting) corev1.Volume {
 	return corev1.Volume{
 		Name: consts.VolumeNameSpool,
 		VolumeSource: corev1.VolumeSource{
