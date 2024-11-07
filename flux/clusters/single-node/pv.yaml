@@ -1,0 +1,147 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: jail-submount-quickcheck-pv
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 150Mi
+  hostPath:
+    path: /var/lib/rancher/k3s/storage/jail-submount-quickcheck-pv_default_local-path-pvc
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - orbstack
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-path
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: jail-pv
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 150Mi
+  hostPath:
+    path: /var/lib/rancher/k3s/storage/jail-pv_default_local-path-pvc
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - orbstack
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-path
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: controller-spool-pv
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 150Mi
+  hostPath:
+    path: /var/lib/rancher/k3s/storage/controller-spool-pv_default_local-path-pvc
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - orbstack
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-path
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: accounting-pv
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 150Mi
+  hostPath:
+    path: /var/lib/rancher/k3s/storage/accounting-pv_default_local-path-pvc
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/os
+          operator: In
+          values:
+          - linux
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-path
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jail-pvc
+  namespace: slurm
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 150Mi
+  storageClassName: local-path
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: controller-spool-pvc
+  namespace: slurm
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 150Mi
+  storageClassName: local-path
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: accounting-pvc
+  namespace: slurm
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 150Mi
+  storageClassName: local-path
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jail-submount-quickcheck-pvc
+  namespace: slurm
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 150Mi
+  storageClassName: local-path

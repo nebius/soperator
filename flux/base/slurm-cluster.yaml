@@ -1,0 +1,38 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: slurm-cluster
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: soperator
+  targetNamespace: slurm
+  releaseName: slurm-cluster
+  suspend: ${slurm_cluster_suspended}
+  install:
+    createNamespace: true
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  driftDetection:
+    mode: warn
+  interval: 5m
+  timeout: 5m
+  chart:
+    spec:
+      chart: helm-slurm-cluster
+      version: "${soperator_version}"
+      sourceRef:
+        kind: HelmRepository
+        name: soperator
+      interval: 5m
+  valuesFrom:
+    - kind: ConfigMap
+      name: slurm-vars
+    - kind: Secret
+      name: ssh-public-key-secret
+      optional: true

@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base/soperator-repo.yaml
+  - ../../base/soperator.yaml
+  - ../../base/slurm-cluster.yaml
+  - ./pv.yaml
+configMapGenerator:
+  - name: slurm-vars
+    namespace: flux-system
+    files:
+      - values.yaml=slurm-vars.yaml
+    options:
+      disableNameSuffixHash: true
+patches:
+  - target:
+      group: source.toolkit.fluxcd.io
+      version: v1
+      kind: HelmRepository
+      name: soperator
+    path: ./patch.yaml

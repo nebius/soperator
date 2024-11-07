@@ -1,0 +1,40 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: soperator
+  namespace: flux-system
+spec:
+  targetNamespace: soperator-system
+  releaseName: soperator
+  suspend: ${soperator_suspended}
+  install:
+    createNamespace: true
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  driftDetection:
+    mode: warn
+  interval: 5m
+  timeout: 5m
+  chart:
+    spec:
+      chart: helm-soperator
+      version: "${soperator_version}"
+      sourceRef:
+        kind: HelmRepository
+        name: soperator
+      interval: 5m
+  valuesFrom:
+    - kind: ConfigMap
+      name: soperator-vars
+      optional: true
+  values:
+  - controllerManager:
+      manager:
+        env:
+          isPrometheusCrdInstalled: "${monitoring_enabled}"
+          isMariadbCrdInstalled: "${accounting_enabled}"
