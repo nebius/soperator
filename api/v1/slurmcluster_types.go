@@ -134,6 +134,12 @@ type PopulateJail struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	Overwrite bool `json:"overwrite"`
+
+	// AppArmorProfile defines the AppArmor profile for the Slurm node
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="unconfined"
+	AppArmorProfile string `json:"appArmorProfile,omitempty"`
 }
 
 // PeriodicChecks define the k8s CronJobs performing cluster checks
@@ -749,7 +755,7 @@ type NodeContainer struct {
 	// +kubebuilder:validation:Optional
 	SecurityLimitsConfig string `json:"securityLimitsConfig,omitempty"`
 
-	// AppArmorProfile defines the AppArmor profile for the Slurm worker node
+	// AppArmorProfile defines the AppArmor profile for the Slurm containers
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="unconfined"
