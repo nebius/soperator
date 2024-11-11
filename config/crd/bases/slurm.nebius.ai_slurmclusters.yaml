@@ -1123,6 +1123,11 @@ spec:
                           in seconds
                         format: int64
                         type: integer
+                      appArmorProfile:
+                        default: unconfined
+                        description: AppArmorProfile defines the AppArmor profile
+                          for the Slurm node
+                        type: string
                       enabled:
                         default: true
                         description: Enabled defines whether the CronJob should be

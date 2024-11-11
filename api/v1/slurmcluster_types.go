@@ -210,6 +210,12 @@ type NCCLBenchmark struct {
 	//
 	// +kubebuilder:validation:Required
 	K8sNodeFilterName string `json:"k8sNodeFilterName"`
+
+	// AppArmorProfile defines the AppArmor profile for the Slurm node
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="unconfined"
+	AppArmorProfile string `json:"appArmorProfile,omitempty"`
 }
 
 // NCCLArguments define nccl settings for periodic nccl benchmark
