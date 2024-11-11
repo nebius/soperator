@@ -61,9 +61,9 @@ volumeSources:
 #      readOnly: false
 
 # Secret references needed for Slurm cluster operation
-secrets:
+secrets: {}
   # Secret reference required for login sshd. If secret name empty - operator generate own secret with keys
-  sshdKeysName: ""
+  # sshdKeysName: ""
 # Job performing initial jail file system population
 populateJail:
   imagePullPolicy: "IfNotPresent"
