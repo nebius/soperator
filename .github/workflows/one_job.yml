@@ -5,6 +5,7 @@ on:
     paths-ignore:
       - '.github/**'
       - 'docs/**'
+      - 'CODEOWNERS'
       - 'LICENSE'
       - 'PROJECT'
       - 'README.md'
