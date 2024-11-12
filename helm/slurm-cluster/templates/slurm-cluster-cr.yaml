@@ -40,8 +40,7 @@ spec:
     - name: {{ .name | quote }}
       {{- omit . "name" | toYaml | nindent 6 }}
     {{- end }}
-  secrets:
-    sshdKeysName: {{ include "slurm-cluster.secret.sshdKeysName" . }}
+  secrets: {{ toYaml .Values.secrets | nindent 4 }}
   populateJail:
     image: {{ required "populateJail image" .Values.images.populateJail | quote }}
     imagePullPolicy: {{ default "IfNotPresent" .Values.populateJail.imagePullPolicy | quote }}

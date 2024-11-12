@@ -1123,6 +1123,11 @@ spec:
                           in seconds
                         format: int64
                         type: integer
+                      appArmorProfile:
+                        default: unconfined
+                        description: AppArmorProfile defines the AppArmor profile
+                          for the Slurm node
+                        type: string
                       enabled:
                         default: true
                         description: Enabled defines whether the CronJob should be
@@ -1219,6 +1224,11 @@ spec:
                 description: PopulateJail defines the k8s Job that performs initial
                   jail file system population
                 properties:
+                  appArmorProfile:
+                    default: unconfined
+                    description: AppArmorProfile defines the AppArmor profile for
+                      the Slurm node
+                    type: string
                   image:
                     description: Image defines the populate jail container image
                     type: string
@@ -1524,7 +1534,7 @@ spec:
                           appArmorProfile:
                             default: unconfined
                             description: AppArmorProfile defines the AppArmor profile
-                              for the Slurm worker node
+                              for the Slurm containers
                             type: string
                           enabled:
                             type: boolean
@@ -8289,7 +8299,7 @@ spec:
                           appArmorProfile:
                             default: unconfined
                             description: AppArmorProfile defines the AppArmor profile
-                              for the Slurm worker node
+                              for the Slurm containers
                             type: string
                           image:
                             description: Image defines the container image
@@ -8376,7 +8386,7 @@ spec:
                           appArmorProfile:
                             default: unconfined
                             description: AppArmorProfile defines the AppArmor profile
-                              for the Slurm worker node
+                              for the Slurm containers
                             type: string
                           image:
                             description: Image defines the container image
@@ -8532,7 +8542,7 @@ spec:
                           appArmorProfile:
                             default: unconfined
                             description: AppArmorProfile defines the AppArmor profile
-                              for the Slurm worker node
+                              for the Slurm containers
                             type: string
                           image:
                             description: Image defines the container image
@@ -8579,7 +8589,7 @@ spec:
                           appArmorProfile:
                             default: unconfined
                             description: AppArmorProfile defines the AppArmor profile
-                              for the Slurm worker node
+                              for the Slurm containers
                             type: string
                           image:
                             description: Image defines the container image
@@ -9072,7 +9082,7 @@ spec:
                           appArmorProfile:
                             default: unconfined
                             description: AppArmorProfile defines the AppArmor profile
-                              for the Slurm worker node
+                              for the Slurm containers
                             type: string
                           image:
                             description: Image defines the container image
@@ -9123,7 +9133,7 @@ spec:
                           appArmorProfile:
                             default: unconfined
                             description: AppArmorProfile defines the AppArmor profile
-                              for the Slurm worker node
+                              for the Slurm containers
                             type: string
                           image:
                             description: Image defines the container image
@@ -9612,7 +9622,7 @@ spec:
                           appArmorProfile:
                             default: unconfined
                             description: AppArmorProfile defines the AppArmor profile
-                              for the Slurm worker node
+                              for the Slurm containers
                             type: string
                           image:
                             description: Image defines the container image
@@ -9664,7 +9674,7 @@ spec:
                           appArmorProfile:
                             default: unconfined
                             description: AppArmorProfile defines the AppArmor profile
-                              for the Slurm worker node
+                              for the Slurm containers
                             type: string
                           image:
                             description: Image defines the container image
@@ -9993,7 +10003,7 @@ spec:
                           appArmorProfile:
                             default: unconfined
                             description: AppArmorProfile defines the AppArmor profile
-                              for the Slurm worker node
+                              for the Slurm containers
                             type: string
                           image:
                             description: Image defines the container image
@@ -10057,7 +10067,7 @@ spec:
                           appArmorProfile:
                             default: unconfined
                             description: AppArmorProfile defines the AppArmor profile
-                              for the Slurm worker node
+                              for the Slurm containers
                             type: string
                           image:
                             description: Image defines the container image
@@ -10103,7 +10113,7 @@ spec:
                           appArmorProfile:
                             default: unconfined
                             description: AppArmorProfile defines the AppArmor profile
-                              for the Slurm worker node
+                              for the Slurm containers
                             type: string
                           image:
                             description: Image defines the container image
