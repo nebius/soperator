@@ -2,6 +2,7 @@
 
 # Complement jaildir by bind-mounting virtual filesystems, users, and NVIDIA binaries from the host filesystem
 
+set -x # Print actual command when before
 set -e # Exit immediately if any command returns a non-zero error code
 
 usage() { echo "usage: ${0} -j <path_to_jail_dir> -u <path_to_upper_jail_dir> [-w] [-h]" >&2; exit 1; }
@@ -52,9 +53,14 @@ pushd "${jaildir}"
     while IFS= read -r path; do
         if [ -n "$path" ]; then
             echo "Bind-mount jail submount ${path}"
-            mkdir -p "${path}"
-            chmod 777 "${upperdir}/${path}" # TODO: Support setting configurable permissions for jail submounts
-            mount --bind "${upperdir}/${path}" "${path}"
+            if [ -d "${upperdir}/${path}" ]; then
+                mkdir -p "${path}" # TODO: Support setting configurable permissions for jail submounts, this should be implemented in K8S VolumeMount
+                mount --bind "${upperdir}/${path}" "${path}"
+            elif [ -f "${upperdir}/${path}" ]; then
+                # make sure mount point exists
+                mkdir -p "$(dirname "${path}")/" && touch "${path}"
+                mount --bind "${upperdir}/${path}" "${path}"
+            fi
         fi
     done <<< "$submounts"
 
