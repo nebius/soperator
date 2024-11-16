@@ -2,7 +2,7 @@
 
 # Complement jaildir by bind-mounting virtual filesystems, users, and NVIDIA binaries from the host filesystem
 
-set -x # Print actual command when before
+set -x # Print actual command before executing it
 set -e # Exit immediately if any command returns a non-zero error code
 
 usage() { echo "usage: ${0} -j <path_to_jail_dir> -u <path_to_upper_jail_dir> [-w] [-h]" >&2; exit 1; }
