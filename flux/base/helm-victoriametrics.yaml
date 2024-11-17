@@ -1,0 +1,53 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: victoriametrics
+  namespace: flux-system
+spec:
+  dependsOn:
+  - name: cert-manager
+  targetNamespace: monitoring-system
+  releaseName: victoriametrics
+  suspend: ${monitoring_suspended}
+  install:
+    createNamespace: true
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  driftDetection:
+    mode: warn
+  interval: 5m
+  timeout: 5m
+  chart:
+    spec:
+      chart: victoria-metrics-operator
+      version: "${victoriametrics_version}"
+      sourceRef:
+        kind: HelmRepository
+        name: victoriametrics
+      interval: 5m
+  valuesFrom:
+    - kind: ConfigMap
+      name: victoriametrics-vars
+      optional: true
+  values:
+    replicaCount: 1
+    createCRD: true
+
+    operator:
+      enable_converter_ownership: true
+      disable_prometheus_converter: false
+
+    podDisruptionBudget:
+      enabled: false
+
+    admissionWebhooks:
+      enabled: true
+      certManager:
+        enabled: true
+      enabledCRDValidation:
+        vmsingle: true

@@ -1,0 +1,30 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: soperator
+  namespace: flux-system
+spec:
+  interval: 5m0s
+  url: https://github.com/nebius/soperator
+  ref:
+    branch: dev
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: soperator-base
+  namespace: flux-system
+spec:
+  interval: 5m
+  sourceRef:
+    kind: GitRepository
+    name: soperator
+  path: ./flux/clusters/single-node
+  prune: true
+  wait: true
+  timeout: 5m
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: apps-variables

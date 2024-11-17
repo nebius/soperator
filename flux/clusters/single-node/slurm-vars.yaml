@@ -1,0 +1,162 @@
+clusterName: slurm
+clusterType: "cpu"
+
+partitionConfiguration:
+  configType: default
+  rawConfig: []
+
+k8sNodeFilters:
+  - name: no-gpu
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: kubernetes.io/os
+                  operator: In
+                  values:
+                    - linux
+
+volumeSources:
+- name: jail
+  persistentVolumeClaim:
+    claimName: jail-pvc
+    readOnly: false
+- name: controller-spool
+  persistentVolumeClaim:
+    claimName: controller-spool-pvc
+    readOnly: false
+- emptyDir:
+    sizeLimit: 100Mi
+  name: worker-spool
+- name: jail-submount-quickcheck
+  persistentVolumeClaim:
+    claimName: jail-submount-quickcheck-pvc
+    readOnly: false
+
+populateJail:
+  k8sNodeFilterName: no-gpu
+  image: ${registry}/populate_jail:${slurm_version}
+  imagePullPolicy: ${image_pull_policy}
+  overwrite: false
+
+ncclSettings:
+  topologyData: ""
+  topologyType: auto
+
+periodicChecks:
+  ncclBenchmark:
+    activeDeadlineSeconds: 1800
+    enabled: false
+    failedJobsHistoryLimit: 3
+    failureActions:
+      setSlurmNodeDrainState: true
+  image: ${registry}/populate_jail:${slurm_version}
+  imagePullPolicy: ${image_pull_policy}
+  k8sNodeFilterName: no-gpu
+  ncclArguments:
+    maxBytes: 8Gb
+    minBytes: 512Mb
+    stepFactor: "2"
+    thresholdMoreThan: "420"
+    timeout: "20:00"
+    useInfiniband: false
+  schedule: 0 */3 * * *
+  successfulJobsHistoryLimit: 3
+
+slurmNodes:
+  accounting:
+    enabled: ${accounting_enabled}
+    k8sNodeFilterName: no-gpu
+    mariadbOperator:
+      enabled: ${accounting_enabled}
+      metrics:
+        enabled: ${monitoring_enabled}
+      storage:
+        ephemeral: true
+    munge:
+      resources:
+        cpu: 10m
+        memory: 50Mi
+      image: ${registry}/munge:${slurm_version}
+      imagePullPolicy: ${image_pull_policy}
+    slurmdbd:
+      image: ${registry}/controller_slurmdbd:${slurm_version}
+      imagePullPolicy: ${image_pull_policy}
+  controller:
+    size: 1
+    k8sNodeFilterName: no-gpu
+    munge:
+      resources:
+        cpu: 10m
+        memory: 50Mi
+      image: ${registry}/munge:${slurm_version}
+      imagePullPolicy: ${image_pull_policy}
+    slurmctld:
+      resources:
+        cpu: 100m
+        memory: 200Mi
+  login:
+    sshd:
+      resources:
+        cpu: 10m
+        memory: 100Mi
+      image: ${registry}/sshd:${slurm_version}
+      imagePullPolicy: ${image_pull_policy}
+    munge:
+      resources:
+        cpu: 10m
+        memory: 50Mi
+      image: ${registry}/munge:${slurm_version}
+      imagePullPolicy: ${image_pull_policy}
+    size: 1
+    k8sNodeFilterName: no-gpu
+    sshdServiceType: NodePort
+    sshdServiceAnnotations: {}
+    sshdServiceNodePort: 30022
+    volumes:
+      jail:
+        volumeSourceName: jail
+      jailSubMounts:
+      - mountPath: /quickcheck
+        name: quickcheck
+        volumeSourceName: jail-submount-quickcheck
+  worker:
+    size: 1
+    k8sNodeFilterName: no-gpu
+    cgroupVersion: v2
+    munge:
+      resources:
+        cpu: 10m
+        memory: 50Mi
+      image: ${registry}/munge:${slurm_version}
+    slurmd:
+      resources:
+        cpu: 100m
+        ephemeralStorage: 150Mi
+        memory: 200Mi
+        gpu: "0"
+      image: ${registry}/worker_slurmd:${slurm_version}
+    volumes:
+      jail:
+        volumeSourceName: jail
+      jailSubMounts:
+      - mountPath: /quickcheck
+        name: quickcheck
+        volumeSourceName: jail-submount-quickcheck
+      sharedMemorySize: 100Mi
+      spool:
+        volumeClaimTemplateSpec:
+          accessModes:
+          - ReadWriteOnce
+          resources:
+            requests:
+              storage: 150Mi
+          storageClassName: local-path
+
+  exporter:
+    enabled: ${monitoring_enabled}
+    k8sNodeFilterName: no-gpu
+    volumes:
+      jail:
+        volumeSourceName: "jail"

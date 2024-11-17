@@ -1,0 +1,60 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: prometheus-stack
+  namespace: flux-system
+spec:
+  dependsOn:
+  - name: cert-manager
+  targetNamespace: monitoring-system
+  releaseName: prometheus-stack
+  suspend: ${monitoring_suspended}
+  install:
+    createNamespace: true
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  driftDetection:
+    mode: warn
+  interval: 5m
+  timeout: 5m
+  chart:
+    spec:
+      chart: kube-prometheus-stack
+      version: "${prometheus_stack_version}"
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-stack
+      interval: 5m
+  valuesFrom:
+    - kind: ConfigMap
+      name: prometheus-stack-vars
+      optional: true
+  values:
+    prometheusOperator:
+      enabled: false
+
+    alertmanager:
+      enabled: false
+
+    grafana:
+      enabled: true
+      alertmanager:
+        enabled: false
+      sidecar:
+        datasources:
+          url: http://vmsingle-slurm.monitoring-system.svc.cluster.local.:8429
+      defaultDashboardsEnabled: false
+
+    kubeStateMetrics:
+      enabled: true
+
+    nodeExporter:
+      enabled: true
+
+    prometheus:
+      enabled: false

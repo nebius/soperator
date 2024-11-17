@@ -1,0 +1,162 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: slurm-monitor
+  namespace: flux-system
+spec:
+  dependsOn:
+  - name: cert-manager
+  - name: victoriametrics
+  targetNamespace: monitoring-system
+  releaseName: slurm-monitor
+  suspend: ${monitoring_suspended}
+  install:
+    createNamespace: true
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  driftDetection:
+    mode: warn
+  interval: 5m
+  timeout: 5m
+  chart:
+    spec:
+      chart: raw
+      version: "${bedag_version}"
+      sourceRef:
+        kind: HelmRepository
+        name: bedag
+      interval: 5m
+  valuesFrom:
+    - kind: ConfigMap
+      name: slurm-monitor-vars
+      optional: true
+  values:
+    resources:
+      - apiVersion: operator.victoriametrics.com/v1beta1
+        kind: VMSingle
+        metadata:
+          name: slurm
+        spec:
+          replicaCount: 1
+          retentionPeriod: "30"
+          extraArgs:
+            dedup.minScrapeInterval: 30s
+
+      - apiVersion: operator.victoriametrics.com/v1beta1
+        kind: VLogs
+        metadata:
+          name: slurm
+        spec:
+          replicaCount: 1
+          retentionPeriod: "30"
+
+      - apiVersion: operator.victoriametrics.com/v1beta1
+        kind: VMAgent
+        metadata:
+          name: select-all
+        spec:
+          remoteWrite:
+            - url: "http://vmsingle-slurm.monitoring-system.svc.cluster.local.:8429/api/v1/write"
+          scrapeInterval: 30s
+          selectAllByDefault: true
+
+      - apiVersion: v1
+        kind: Service
+        metadata:
+          name: kubelet-metrics
+          labels:
+            k8s-app: kubelet
+        spec:
+          selector:
+            app.kubernetes.io/name: prometheus-node-exporter
+          ports:
+            - port: 10250
+              targetPort: 10250
+              protocol: TCP
+              name: https-metrics
+          clusterIP: None
+
+      - apiVersion: monitoring.coreos.com/v1
+        kind: ServiceMonitor
+        metadata:
+          name: kubelet
+        spec:
+          attachMetadata:
+            node: false
+          endpoints:
+          - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+            honorLabels: true
+            honorTimestamps: true
+            port: https-metrics
+            relabelings:
+            - action: replace
+              sourceLabels:
+              - __metrics_path__
+              targetLabel: metrics_path
+            scheme: https
+            tlsConfig:
+              caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              insecureSkipVerify: true
+          - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+            honorLabels: true
+            honorTimestamps: true
+            metricRelabelings:
+            - action: drop
+              regex: container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)
+              sourceLabels:
+              - __name__
+            - action: drop
+              regex: container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)
+              sourceLabels:
+              - __name__
+            - action: drop
+              regex: container_memory_(mapped_file|swap)
+              sourceLabels:
+              - __name__
+            - action: drop
+              regex: container_(file_descriptors|tasks_state|threads_max)
+              sourceLabels:
+              - __name__
+            - action: drop
+              regex: container_spec.*
+              sourceLabels:
+              - __name__
+            - action: drop
+              regex: .+;
+              sourceLabels:
+              - id
+              - pod
+            path: /metrics/cadvisor
+            port: https-metrics
+            relabelings:
+            - action: replace
+              sourceLabels:
+              - __metrics_path__
+              targetLabel: metrics_path
+            scheme: https
+            tlsConfig:
+              caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              insecureSkipVerify: true
+          - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+            honorLabels: true
+            honorTimestamps: true
+            path: /metrics/probes
+            port: https-metrics
+            relabelings:
+            - action: replace
+              sourceLabels:
+              - __metrics_path__
+              targetLabel: metrics_path
+            scheme: https
+            tlsConfig:
+              caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              insecureSkipVerify: true
+          jobLabel: k8s-app
+          selector:
+            matchLabels:
+              k8s-app: kubelet

@@ -1,0 +1,35 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cert-manager
+  namespace: flux-system
+spec:
+  targetNamespace: cert-manager
+  releaseName: cert-manager
+  suspend: ${cert_manager_suspended}
+  install:
+    createNamespace: true
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  driftDetection:
+    mode: warn
+  interval: 5m
+  timeout: 5m
+  chart:
+    spec:
+      chart: cert-manager
+      version: "${cert_manager_version}"
+      sourceRef:
+        kind: HelmRepository
+        name: cert-manager
+      interval: 5m
+  values:
+    crds:
+      enabled: true
+    prometheus:
+      enabled: false
