@@ -9,6 +9,7 @@ on:
       - 'LICENSE'
       - 'PROJECT'
       - 'README.md'
+      - 'images/jail/gpubench/**'
 
 permissions:
   contents: read
