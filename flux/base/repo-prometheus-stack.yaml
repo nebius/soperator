@@ -1,0 +1,9 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: prometheus-stack
+  namespace: flux-system
+spec:
+  type: default
+  interval: 5m
+  url: "https://prometheus-community.github.io/helm-charts"
