@@ -156,7 +156,8 @@ In general, you need to follow these steps:
 2. Install the [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator).
 3. If you use InfiniBand, install the [NVIDIA Network Operator](https://github.com/Mellanox/network-operator).
 4. Install Soperator by applying the [soperator](helm/soperator) Helm chart.
-5. Create a Slurm cluster by applying the [slurm-cluster](helm/slurm-cluster) Helm chart.
+5. Create a Slurm cluster in a namespace with the same name as the slurm cluster by 
+   applying the [slurm-cluster](helm/slurm-cluster) Helm chart.
 6. Wait until the `slurm.nebius.ai/SlurmCluster` resource becomes `Available`.
 
 [//]: # (TODO: Refer to Helm OCI images instead of file directories when the repo is open)
