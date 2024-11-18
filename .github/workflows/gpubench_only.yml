@@ -1,0 +1,92 @@
+name: Build gpubench only
+
+on:
+  push:
+    paths:
+      - 'images/jail/gpubench/**'
+
+permissions:
+  contents: read
+  packages: write
+  attestations: write
+  id-token: write
+
+jobs:
+  pre-build:
+    runs-on: self-hosted
+
+    outputs:
+      UNSTABLE: ${{ steps.set-env.outputs.unstable }}
+  
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@91182cccc01eb5e619899d80e4e971d6181294a7 # v2.10.1
+        with:
+          egress-policy: audit
+
+      - name: Set environment to global output variables based on branch
+        id: set-env
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "unstable=false" >> $GITHUB_OUTPUT
+          else
+            echo "unstable=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Print UNSTABLE from output
+        run: |
+          echo "Branch is - ${{ github.ref }}"
+          echo "UNSTABLE - ${{ steps.set-env.outputs.unstable }}"
+  gpubench_only:
+    runs-on: self-hosted
+    needs: pre-build
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@91182cccc01eb5e619899d80e4e971d6181294a7 # v2.10.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install GO
+        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+            go-version-file: 'go.mod'
+
+      - name: Debug vars
+        run: |
+          echo "UNSTABLE - is ${{ needs.pre-build.outputs.unstable }}"
+          make get-version UNSTABLE=${{ needs.pre-build.outputs.unstable }}
+
+      - name: Check if version synced
+        run: make test-version-sync
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349 # v3.7.1
+
+      - name: Log in to the Github Container registry
+        uses: docker/login-action@7ca345011ac4304463197fac0e56eab1bc7e6af0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Run gpu bench tests
+        run: |
+          UNSTABLE=${{ needs.pre-build.outputs.unstable }}
+          IMAGE_VERSION=$(make get-image-version UNSTABLE=${UNSTABLE})
+          VERSION=$(make get-version UNSTABLE=${UNSTABLE})
+          OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
+
+          echo "Running gpubench tests"
+          cd ./images/jail/gpubench/
+          go test
+          cd -
+
+          echo "Removing previous jail rootfs tar archive"
+          rm -rf images/jail_rootfs.tar
+
+          echo "Building tarball for jail"
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=jail DOCKERFILE=jail/jail.dockerfile DOCKER_OUTPUT="--output type=tar,dest=jail_rootfs.tar"
