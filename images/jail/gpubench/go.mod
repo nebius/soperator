@@ -1,8 +1,7 @@
 module nebius.ai/slurm-operator/gpubench
 
 go 1.22.0
-
-toolchain go1.22.5
+toolchain go1.22.9
 
 require (
 	github.com/sirupsen/logrus v1.9.3
@@ -13,7 +12,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.32.0
 	go.opentelemetry.io/otel/sdk v1.32.0
 	go.opentelemetry.io/otel/sdk/metric v1.32.0
-	google.golang.org/grpc v1.67.1
+	google.golang.org/grpc v1.68.0
 	k8s.io/api v0.31.2
 	k8s.io/apimachinery v0.31.2
 	k8s.io/client-go v0.31.1
