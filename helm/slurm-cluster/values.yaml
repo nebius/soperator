@@ -107,7 +107,7 @@ periodicChecks:
       # Threshold for benchmark result that must be guaranteed. CronJob will fail if the result is less than the threshold
       thresholdMoreThan: "400"
       # UseInfiniband defines using NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring env variables for test
-      useInfiniband: false
+      useInfiniband: true
     # Actions performed on benchmark failure
     failureActions:
       # Whether to drain Slurm node in case of benchmark failure
