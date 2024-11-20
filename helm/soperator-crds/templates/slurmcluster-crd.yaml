@@ -1194,7 +1194,7 @@ spec:
                               special format
                             type: string
                           useInfiniband:
-                            default: false
+                            default: true
                             description: |-
                               UseInfiniband defines using NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring env variables for test
                               https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html
