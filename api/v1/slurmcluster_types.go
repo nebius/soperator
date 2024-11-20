@@ -255,7 +255,7 @@ type NCCLArguments struct {
 	// https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
+	// +kubebuilder:default=true
 	UseInfiniband bool `json:"useInfiniband,omitempty"`
 }
 
