@@ -5,7 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	mariadv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -32,7 +32,7 @@ func NewMariaDbGrantReconciler(r *Reconciler) *MariaDbGrantReconciler {
 func (r *MariaDbGrantReconciler) Reconcile(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
-	desired *mariadv1alpha1.Grant,
+	desired *mariadbv1alpha1.Grant,
 	deps ...metav1.Object,
 ) error {
 	if desired == nil {
@@ -48,7 +48,7 @@ func (r *MariaDbGrantReconciler) Reconcile(
 }
 
 func (r *MariaDbGrantReconciler) patch(existing, desired client.Object) (client.Patch, error) {
-	patchImpl := func(dst, src *mariadv1alpha1.Grant) client.Patch {
+	patchImpl := func(dst, src *mariadbv1alpha1.Grant) client.Patch {
 		res := client.MergeFrom(dst.DeepCopy())
 		dst.Spec.Username = src.Spec.Username
 		dst.Spec.Host = src.Spec.Host
@@ -59,5 +59,5 @@ func (r *MariaDbGrantReconciler) patch(existing, desired client.Object) (client.
 		dst.Spec.MariaDBRef = src.Spec.MariaDBRef
 		return res
 	}
-	return patchImpl(existing.(*mariadv1alpha1.Grant), desired.(*mariadv1alpha1.Grant)), nil
+	return patchImpl(existing.(*mariadbv1alpha1.Grant), desired.(*mariadbv1alpha1.Grant)), nil
 }

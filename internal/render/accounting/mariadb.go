@@ -3,7 +3,7 @@ package accounting
 import (
 	"errors"
 
-	mariadv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,7 +22,7 @@ func RenderMariaDb(
 	clusterName string,
 	accounting *values.SlurmAccounting,
 	nodeFilters []slurmv1.K8sNodeFilter,
-) (*mariadv1alpha1.MariaDB, error) {
+) (*mariadbv1alpha1.MariaDB, error) {
 
 	if !accounting.MariaDb.Enabled {
 		return nil, errors.New("MariaDb is not enabled")
@@ -45,22 +45,22 @@ func RenderMariaDb(
 	// Create a copy of the container's limits and add non-CPU resources from Requests
 	limits := common.CopyNonCPUResources(mariaDb.Resources)
 
-	return &mariadv1alpha1.MariaDB{
+	return &mariadbv1alpha1.MariaDB{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildMariaDbName(clusterName),
 			Namespace: namespace,
 			Labels:    labels,
 		},
-		Spec: mariadv1alpha1.MariaDBSpec{
+		Spec: mariadbv1alpha1.MariaDBSpec{
 			Image:    mariaDb.Image,
 			Replicas: replicas,
 			Port:     port,
 			Storage:  mariaDb.Storage,
 			Database: ptr.To(consts.MariaDbDatabase),
 			Username: ptr.To(consts.MariaDbUsername),
-			PasswordSecretKeyRef: &mariadv1alpha1.GeneratedSecretKeyRef{
-				SecretKeySelector: corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
+			PasswordSecretKeyRef: &mariadbv1alpha1.GeneratedSecretKeyRef{
+				SecretKeySelector: mariadbv1alpha1.SecretKeySelector{
+					LocalObjectReference: mariadbv1alpha1.LocalObjectReference{
 						Name: consts.MariaDbSecretName,
 					},
 					Key: consts.MariaDbPasswordKey,
@@ -68,20 +68,20 @@ func RenderMariaDb(
 				Generate: true,
 			},
 			RootEmptyPassword: ptr.To(false),
-			RootPasswordSecretKeyRef: mariadv1alpha1.GeneratedSecretKeyRef{
-				SecretKeySelector: corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
+			RootPasswordSecretKeyRef: mariadbv1alpha1.GeneratedSecretKeyRef{
+				SecretKeySelector: mariadbv1alpha1.SecretKeySelector{
+					LocalObjectReference: mariadbv1alpha1.LocalObjectReference{
 						Name: consts.MariaDbSecretRootName,
 					},
 					Key: consts.MariaDbPasswordKey,
 				},
 				Generate: true,
 			},
-			Service: &mariadv1alpha1.ServiceTemplate{
+			Service: &mariadbv1alpha1.ServiceTemplate{
 				Type: corev1.ServiceTypeClusterIP,
 			},
-			ContainerTemplate: mariadv1alpha1.ContainerTemplate{
-				Resources: &corev1.ResourceRequirements{
+			ContainerTemplate: mariadbv1alpha1.ContainerTemplate{
+				Resources: &mariadbv1alpha1.ResourceRequirements{
 					Limits: limits,
 					Requests: corev1.ResourceList{
 						corev1.ResourceMemory: *mariaDb.Resources.Memory(),
@@ -90,7 +90,7 @@ func RenderMariaDb(
 				},
 				SecurityContext: mariaDb.SecurityContext,
 			},
-			PodTemplate: mariadv1alpha1.PodTemplate{
+			PodTemplate: mariadbv1alpha1.PodTemplate{
 				NodeSelector:       nodeFilter.NodeSelector,
 				Affinity:           affinityConfig,
 				Tolerations:        nodeFilter.Tolerations,
@@ -120,21 +120,146 @@ func getMariaDbConfig(mariaDb slurmv1.MariaDbOperator) (int32, int32, *bool) {
 	return port, replicas, antiAffinityEnabled
 }
 
-func getAffinityConfig(affinity *corev1.Affinity, antiAffinityEnabled *bool) *mariadv1alpha1.AffinityConfig {
-	affinityConfig := &mariadv1alpha1.AffinityConfig{
+func getAffinityConfig(affinity *corev1.Affinity, antiAffinityEnabled *bool) *mariadbv1alpha1.AffinityConfig {
+	affinityConfig := &mariadbv1alpha1.AffinityConfig{
 		AntiAffinityEnabled: antiAffinityEnabled,
 	}
 
 	if affinity != nil {
 		switch {
 		case affinity.NodeAffinity != nil:
-			affinityConfig.NodeAffinity = affinity.NodeAffinity
-		case affinity.PodAffinity != nil:
-			affinityConfig.PodAffinity = affinity.PodAffinity
+			affinityConfig.NodeAffinity = ConvertCoreV1ToMariaDBV1Alpha1NodeAffinity(affinity.NodeAffinity)
 		case affinity.PodAntiAffinity != nil:
-			affinityConfig.PodAntiAffinity = affinity.PodAntiAffinity
+			affinityConfig.PodAntiAffinity = ConvertCoreV1ToMariaDBV1Alpha1PodAntiAffinity(affinity.PodAntiAffinity)
 		}
 	}
 
 	return affinityConfig
+}
+
+// ConvertCoreV1ToMariaDBV1Alpha1PodAntiAffinity converts *corev1.PodAntiAffinity to *mariadbv1alpha1.PodAntiAffinity
+func ConvertCoreV1ToMariaDBV1Alpha1PodAntiAffinity(corePodAntiAffinity *corev1.PodAntiAffinity) *mariadbv1alpha1.PodAntiAffinity {
+	if corePodAntiAffinity == nil {
+		return nil
+	}
+
+	mariadbPodAntiAffinity := &mariadbv1alpha1.PodAntiAffinity{}
+
+	// Convert PreferredDuringSchedulingIgnoredDuringExecution
+	for _, preferred := range corePodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+		mariadbPodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			mariadbPodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			mariadbv1alpha1.WeightedPodAffinityTerm{
+				Weight: preferred.Weight,
+				PodAffinityTerm: mariadbv1alpha1.PodAffinityTerm{
+					LabelSelector: ConvertLabelSelector(preferred.PodAffinityTerm.LabelSelector),
+					TopologyKey:   preferred.PodAffinityTerm.TopologyKey, // Exclude Namespaces
+				},
+			},
+		)
+	}
+
+	// Convert RequiredDuringSchedulingIgnoredDuringExecution
+	for _, required := range corePodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
+		mariadbPodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			mariadbPodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			mariadbv1alpha1.PodAffinityTerm{
+				LabelSelector: ConvertLabelSelector(required.LabelSelector),
+				TopologyKey:   required.TopologyKey, // Exclude Namespaces
+			},
+		)
+	}
+
+	return mariadbPodAntiAffinity
+}
+
+// ConvertLabelSelector converts *metav1.LabelSelector to *mariadbv1alpha1.LabelSelector
+func ConvertLabelSelector(selector *metav1.LabelSelector) *mariadbv1alpha1.LabelSelector {
+	if selector == nil {
+		return nil
+	}
+
+	return &mariadbv1alpha1.LabelSelector{
+		MatchLabels:      selector.MatchLabels,
+		MatchExpressions: ConvertLabelSelectorRequirements(selector.MatchExpressions),
+	}
+}
+
+// ConvertLabelSelectorRequirements converts []metav1.LabelSelectorRequirement to []mariadbv1alpha1.LabelSelectorRequirement
+func ConvertLabelSelectorRequirements(requirements []metav1.LabelSelectorRequirement) []mariadbv1alpha1.LabelSelectorRequirement {
+	if requirements == nil {
+		return nil
+	}
+
+	var convertedRequirements []mariadbv1alpha1.LabelSelectorRequirement
+	for _, req := range requirements {
+		convertedRequirements = append(convertedRequirements, mariadbv1alpha1.LabelSelectorRequirement{
+			Key:      req.Key,
+			Operator: req.Operator, // Directly assign req.Operator
+			Values:   req.Values,
+		})
+	}
+
+	return convertedRequirements
+}
+
+// ConvertCoreV1ToMariaDBV1Alpha1NodeAffinity converts *corev1.NodeAffinity to *mariadbv1alpha1.NodeAffinity
+func ConvertCoreV1ToMariaDBV1Alpha1NodeAffinity(coreNodeAffinity *corev1.NodeAffinity) *mariadbv1alpha1.NodeAffinity {
+	if coreNodeAffinity == nil {
+		return nil
+	}
+
+	return &mariadbv1alpha1.NodeAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution:  ConvertNodeSelector(coreNodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution),
+		PreferredDuringSchedulingIgnoredDuringExecution: ConvertPreferredSchedulingTerms(coreNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution),
+	}
+}
+
+// ConvertNodeSelector converts *corev1.NodeSelector to *mariadbv1alpha1.NodeSelector
+func ConvertNodeSelector(coreNodeSelector *corev1.NodeSelector) *mariadbv1alpha1.NodeSelector {
+	if coreNodeSelector == nil {
+		return nil
+	}
+
+	var terms []mariadbv1alpha1.NodeSelectorTerm
+	for _, term := range coreNodeSelector.NodeSelectorTerms {
+		terms = append(terms, ConvertNodeSelectorTerm(term))
+	}
+
+	return &mariadbv1alpha1.NodeSelector{
+		NodeSelectorTerms: terms,
+	}
+}
+
+// ConvertNodeSelectorTerm converts corev1.NodeSelectorTerm to mariadbv1alpha1.NodeSelectorTerm
+func ConvertNodeSelectorTerm(term corev1.NodeSelectorTerm) mariadbv1alpha1.NodeSelectorTerm {
+	return mariadbv1alpha1.NodeSelectorTerm{
+		MatchExpressions: ConvertNodeSelectorRequirements(term.MatchExpressions),
+		MatchFields:      ConvertNodeSelectorRequirements(term.MatchFields),
+	}
+}
+
+// ConvertNodeSelectorRequirements converts []corev1.NodeSelectorRequirement to []mariadbv1alpha1.NodeSelectorRequirement
+func ConvertNodeSelectorRequirements(reqs []corev1.NodeSelectorRequirement) []mariadbv1alpha1.NodeSelectorRequirement {
+	var converted []mariadbv1alpha1.NodeSelectorRequirement
+	for _, req := range reqs {
+		converted = append(converted, mariadbv1alpha1.NodeSelectorRequirement{
+			Key:      req.Key,
+			Operator: req.Operator, // Convert Operator to string
+			Values:   req.Values,
+		})
+	}
+	return converted
+}
+
+// ConvertPreferredSchedulingTerms converts []corev1.PreferredSchedulingTerm to []mariadbv1alpha1.PreferredSchedulingTerm
+func ConvertPreferredSchedulingTerms(terms []corev1.PreferredSchedulingTerm) []mariadbv1alpha1.PreferredSchedulingTerm {
+	var converted []mariadbv1alpha1.PreferredSchedulingTerm
+	for _, term := range terms {
+		converted = append(converted, mariadbv1alpha1.PreferredSchedulingTerm{
+			Weight:     term.Weight,
+			Preference: ConvertNodeSelectorTerm(term.Preference),
+		})
+	}
+	return converted
 }

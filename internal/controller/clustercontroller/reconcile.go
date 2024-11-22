@@ -39,7 +39,7 @@ import (
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 
-	mariadv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
@@ -585,8 +585,8 @@ func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Func
 		{
 			Check: check.IsMariaDbOperatorCRDInstalled,
 			Objects: []client.Object{
-				&mariadv1alpha1.MariaDB{},
-				&mariadv1alpha1.Grant{},
+				&mariadbv1alpha1.MariaDB{},
+				&mariadbv1alpha1.Grant{},
 			},
 			Predicate: predicate.GenerationChangedPredicate{},
 		},
@@ -599,9 +599,10 @@ var (
 )
 
 func getDefaultOptions(maxConcurrency int, cacheSyncTimeout time.Duration) controller.Options {
+	rateLimiters := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](2*time.Second, 2*time.Minute)
 	optionsInit.Do(func() {
 		defaultOptions = &controller.Options{
-			RateLimiter:             workqueue.NewItemExponentialFailureRateLimiter(2*time.Second, 2*time.Minute),
+			RateLimiter:             rateLimiters,
 			CacheSyncTimeout:        cacheSyncTimeout,
 			MaxConcurrentReconciles: maxConcurrency,
 		}
