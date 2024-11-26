@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -63,6 +64,18 @@ func Test_RenderStatefulSet(t *testing.T) {
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To("test-volume-source"),
 		},
+		ContainerSlurmd: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image:           "test-image",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Port:            8080,
+				Resources: corev1.ResourceList{
+					corev1.ResourceMemory:           resource.MustParse("1Gi"),
+					corev1.ResourceCPU:              resource.MustParse("100m"),
+					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
 	}
 
 	result, err := worker.RenderStatefulSet(testNamespace, testCluster, consts.ClusterTypeGPU, nodeFilter, voluemSource, workerCGroupV1)
@@ -78,6 +91,6 @@ func Test_RenderStatefulSet(t *testing.T) {
 
 	result, err = worker.RenderStatefulSet(testNamespace, testCluster, consts.ClusterTypeCPU, nodeFilter, voluemSource, workerCGroupV2)
 	assert.NoError(t, err)
-	assert.Equal(t, consts.CGroupV2Env, result.Spec.Template.Spec.Containers[0].Env[4].Name)
+	assert.Equal(t, consts.CGroupV2Env, result.Spec.Template.Spec.Containers[0].Env[5].Name)
 	assert.True(t, len(result.Spec.Template.Spec.InitContainers) == 0)
 }

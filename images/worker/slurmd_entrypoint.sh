@@ -10,6 +10,7 @@ if [ -n "${CGROUP_V2}" ]; then
         echo "cgroup v2 detected, creating cgroup for ${CGROUP_PATH}"
         mkdir -p /sys/fs/cgroup/${CGROUP_PATH}/system.slice
         mkdir -p /sys/fs/cgroup/${CGROUP_PATH}/../system.slice
+        cat /sys/fs/cgroup/${CGROUP_PATH}/memory.max  > /sys/fs/cgroup/${CGROUP_PATH}/system.slice/memory.max 
     else
         echo "cgroup v2 detected, but cgroup path is empty"
         exit 1
@@ -24,7 +25,7 @@ ln -s /mnt/jail/etc/gshadow /etc/gshadow
 chown -h 0:42 /etc/{shadow,gshadow}
 
 echo "Link home from jail because slurmd uses it"
-ln -s /mnt/jail/home /home
+ln -s /mnt/jail/home /home 
 
 echo "Bind-mount slurm configs from K8S config map"
 for file in /mnt/slurm-configs/*; do
@@ -96,5 +97,5 @@ exec /usr/sbin/slurmd \
   -D \
   -Z \
   --conf \
-  "NodeHostname=${K8S_POD_NAME} NodeAddr=${K8S_POD_NAME}.${K8S_SERVICE_NAME}.${K8S_POD_NAMESPACE}.svc.cluster.local Gres=${GRES}" \
+  "NodeHostname=${K8S_POD_NAME} NodeAddr=${K8S_POD_NAME}.${K8S_SERVICE_NAME}.${K8S_POD_NAMESPACE}.svc.cluster.local RealMemory=${SLURM_REAL_MEMORY} Gres=${GRES}" \
   2>&1 | tee >(multilog s100000000 n5 /var/log/slurm/multilog)

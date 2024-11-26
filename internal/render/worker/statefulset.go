@@ -53,6 +53,17 @@ func RenderStatefulSet(
 		initContainers = append(initContainers, renderContainerToolkitValidation(&worker.ContainerToolkitValidation))
 	}
 
+	slurmdContainer, err := renderContainerSlurmd(
+		&worker.ContainerSlurmd,
+		worker.JailSubMounts,
+		clusterName,
+		clusterType,
+		worker.CgroupVersion,
+	)
+	if err != nil {
+		return appsv1.StatefulSet{}, fmt.Errorf("rendering container slurmd: %w", err)
+	}
+
 	return appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      worker.StatefulSet.Name,
@@ -90,13 +101,7 @@ func RenderStatefulSet(
 					Tolerations:        nodeFilter.Tolerations,
 					InitContainers:     initContainers,
 					Containers: []corev1.Container{
-						renderContainerSlurmd(
-							&worker.ContainerSlurmd,
-							worker.JailSubMounts,
-							clusterName,
-							clusterType,
-							worker.CgroupVersion,
-						),
+						slurmdContainer,
 						common.RenderContainerMunge(&worker.ContainerMunge),
 					},
 					Volumes: volumes,
