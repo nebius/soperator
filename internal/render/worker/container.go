@@ -52,7 +52,7 @@ func renderContainerSlurmd(
 	clusterName string,
 	clusterType consts.ClusterType,
 	cgroupVersion string,
-) (corev1.Container, error) {
+) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountSlurmConfigs(),
 		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
@@ -110,7 +110,7 @@ func renderContainerSlurmd(
 			ProcMount: ptr.To(corev1.UnmaskedProcMount),
 		},
 		Resources: resources,
-	}, nil
+	}
 }
 
 func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.ClusterType, realMemory int64) []corev1.EnvVar {

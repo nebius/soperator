@@ -53,7 +53,7 @@ func RenderStatefulSet(
 		initContainers = append(initContainers, renderContainerToolkitValidation(&worker.ContainerToolkitValidation))
 	}
 
-	slurmdContainer, err := renderContainerSlurmd(
+	slurmdContainer := renderContainerSlurmd(
 		&worker.ContainerSlurmd,
 		worker.JailSubMounts,
 		clusterName,
