@@ -4,13 +4,12 @@ set -e # Exit immediately if any command returns a non-zero error code
 
 echo "Starting slurmd entrypoint script"
 if [ -n "${CGROUP_V2}" ]; then
-    CGROUP_PATH=$(cat /proc/self/cgroup | awk -F'/' '{print "/"$2"/"$3"/"$4}')
+    CGROUP_PATH=$(cat /proc/self/cgroup | sed 's/^0:://')
 
     if [ -n "${CGROUP_PATH}" ]; then
         echo "cgroup v2 detected, creating cgroup for ${CGROUP_PATH}"
-        mkdir -p /sys/fs/cgroup/${CGROUP_PATH}/system.slice
         mkdir -p /sys/fs/cgroup/${CGROUP_PATH}/../system.slice
-        cat /sys/fs/cgroup/${CGROUP_PATH}/memory.max  > /sys/fs/cgroup/${CGROUP_PATH}/system.slice/memory.max 
+        mkdir -p /sys/fs/cgroup/${CGROUP_PATH}/../../system.slice
     else
         echo "cgroup v2 detected, but cgroup path is empty"
         exit 1
