@@ -1,3 +1,4 @@
+{{- include "validateAccountingConfig" . -}}
 apiVersion: slurm.nebius.ai/v1
 kind: SlurmCluster
 metadata:

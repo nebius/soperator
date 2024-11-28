@@ -23,3 +23,11 @@
     {{- end }}
     {{- include "slurm-cluster.selectorLabels" . | trim | nindent 0 }}
 {{- end }}
+
+{{- define "validateAccountingConfig" -}}
+{{- if .Values.slurmNodes.accounting.enabled -}}
+  {{- if not (or .Values.slurmNodes.accounting.externalDB.enabled .Values.slurmNodes.accounting.mariadbOperator.enabled) -}}
+    {{- fail "If slurmNodes.accounting.enabled is true, either slurmNodes.accounting.externalDB.enabled or slurmNodes.accounting.mariadbOperator.enabled must be true." -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
