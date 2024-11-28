@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/naming"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -52,7 +53,7 @@ func renderContainerSlurmd(
 	clusterName string,
 	clusterType consts.ClusterType,
 	cgroupVersion string,
-) corev1.Container {
+) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountSlurmConfigs(),
 		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
@@ -70,6 +71,11 @@ func renderContainerSlurmd(
 	resources := corev1.ResourceRequirements{
 		Limits:   container.Resources,
 		Requests: container.Resources,
+	}
+
+	err := check.CheckResourceRequests(resources)
+	if err != nil {
+		return corev1.Container{}, fmt.Errorf("checking resource requests: %w", err)
 	}
 
 	realMemory := renderRealMemorySlurmd(resources)
@@ -110,7 +116,7 @@ func renderContainerSlurmd(
 			ProcMount: ptr.To(corev1.UnmaskedProcMount),
 		},
 		Resources: resources,
-	}
+	}, nil
 }
 
 func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.ClusterType, realMemory int64) []corev1.EnvVar {

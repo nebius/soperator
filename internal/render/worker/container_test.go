@@ -65,8 +65,10 @@ func Test_RenderContainerSlurmd(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := renderContainerSlurmd(tt.container, nil, "test-cluster", consts.ClusterTypeGPU, "v1")
-
+			got, err := renderContainerSlurmd(tt.container, nil, "test-cluster", consts.ClusterTypeGPU, "v1")
+			if err != nil && tt.wantLimits != nil {
+				t.Errorf("renderContainerSlurmd() error = %v, want nil", err)
+			}
 			if !reflect.DeepEqual(got.Resources.Limits, tt.wantLimits) {
 				t.Errorf("renderContainerSlurmd() Limits = %v, want %v", got.Resources.Limits, tt.wantLimits)
 			}
