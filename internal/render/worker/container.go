@@ -2,11 +2,13 @@ package worker
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/naming"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -51,7 +53,7 @@ func renderContainerSlurmd(
 	clusterName string,
 	clusterType consts.ClusterType,
 	cgroupVersion string,
-) corev1.Container {
+) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountSlurmConfigs(),
 		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
@@ -66,11 +68,23 @@ func renderContainerSlurmd(
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
 
+	resources := corev1.ResourceRequirements{
+		Limits:   container.Resources,
+		Requests: container.Resources,
+	}
+
+	err := check.CheckResourceRequests(resources)
+	if err != nil {
+		return corev1.Container{}, fmt.Errorf("checking resource requests: %w", err)
+	}
+
+	realMemory := renderRealMemorySlurmd(resources)
+
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
-		Env:             renderSlurmdEnv(clusterName, cgroupVersion, clusterType),
+		Env:             renderSlurmdEnv(clusterName, cgroupVersion, clusterType, realMemory),
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,
 			ContainerPort: container.Port,
@@ -101,14 +115,11 @@ func renderContainerSlurmd(
 			},
 			ProcMount: ptr.To(corev1.UnmaskedProcMount),
 		},
-		Resources: corev1.ResourceRequirements{
-			Limits:   container.Resources,
-			Requests: container.Resources,
-		},
-	}
+		Resources: resources,
+	}, nil
 }
 
-func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.ClusterType) []corev1.EnvVar {
+func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.ClusterType, realMemory int64) []corev1.EnvVar {
 	envVar := []corev1.EnvVar{
 		{
 			Name: "K8S_POD_NAME",
@@ -134,6 +145,10 @@ func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.Clust
 			Name:  "SLURM_CLUSTER_TYPE",
 			Value: clusterType.String(),
 		},
+		{
+			Name:  "SLURM_REAL_MEMORY",
+			Value: strconv.FormatInt(realMemory, 10),
+		},
 	}
 	if cgroupVersion == consts.CGroupV2 {
 		envVar = append(envVar, corev1.EnvVar{
@@ -142,4 +157,13 @@ func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.Clust
 		})
 	}
 	return envVar
+}
+
+// Convert to bytes and then to megabytes for real memory value
+func renderRealMemorySlurmd(resources corev1.ResourceRequirements) int64 {
+	// Convert the memory quantity to bytes
+	memoryInBytes := resources.Requests.Memory().Value()
+	// Convert bytes to megabytes (DecimalSI uses 1000 for conversions)
+	memoryInMegabytes := memoryInBytes / 1_000_000 // 1 MB = 1,000,000 bytes
+	return memoryInMegabytes
 }
