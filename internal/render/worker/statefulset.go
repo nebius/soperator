@@ -60,9 +60,6 @@ func RenderStatefulSet(
 		clusterType,
 		worker.CgroupVersion,
 	)
-	if err != nil {
-		return appsv1.StatefulSet{}, fmt.Errorf("rendering container slurmd: %w", err)
-	}
 
 	return appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
