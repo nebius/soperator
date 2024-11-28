@@ -36,7 +36,7 @@ controllerManager:
       slurmOperatorWatchNamespaces: '*'
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/slurm-operator
-      tag: 1.15.3
+      tag: 1.15.4
     imagePullPolicy: Always
     resources:
       limits:
