@@ -9,7 +9,6 @@ if [ -n "${CGROUP_V2}" ]; then
     if [ -n "${CGROUP_PATH}" ]; then
         echo "cgroup v2 detected, creating cgroup for ${CGROUP_PATH}"
         mkdir -p /sys/fs/cgroup/${CGROUP_PATH}/../system.slice
-        mkdir -p /sys/fs/cgroup/${CGROUP_PATH}/../../system.slice
     else
         echo "cgroup v2 detected, but cgroup path is empty"
         exit 1

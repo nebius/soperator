@@ -72,13 +72,13 @@ func renderContainerSlurmd(
 		Requests: container.Resources,
 	}
 
-	readlMemory := renderRealMemorySlurmd(resources)
+	realMemory := renderRealMemorySlurmd(resources)
 
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
-		Env:             renderSlurmdEnv(clusterName, cgroupVersion, clusterType, readlMemory),
+		Env:             renderSlurmdEnv(clusterName, cgroupVersion, clusterType, realMemory),
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,
 			ContainerPort: container.Port,
