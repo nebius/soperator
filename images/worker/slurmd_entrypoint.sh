@@ -23,7 +23,7 @@ ln -s /mnt/jail/etc/gshadow /etc/gshadow
 chown -h 0:42 /etc/{shadow,gshadow}
 
 echo "Link home from jail because slurmd uses it"
-ln -s /mnt/jail/home /home 
+ln -s /mnt/jail/home /home
 
 echo "Bind-mount slurm configs from K8S config map"
 for file in /mnt/slurm-configs/*; do
