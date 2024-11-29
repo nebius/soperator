@@ -159,11 +159,10 @@ func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.Clust
 	return envVar
 }
 
-// Convert to bytes and then to megabytes for real memory value
 func renderRealMemorySlurmd(resources corev1.ResourceRequirements) int64 {
 	// Convert the memory quantity to bytes
 	memoryInBytes := resources.Requests.Memory().Value()
-	// Convert bytes to megabytes (DecimalSI uses 1000 for conversions)
-	memoryInMegabytes := memoryInBytes / 1_000_000 // 1 MB = 1,000,000 bytes
-	return memoryInMegabytes
+	// Convert bytes to mebibytes (1 MiB = 1,048,576 bytes)
+	memoryInMebibytes := memoryInBytes / 1_048_576 // 1 MiB = 1,048,576 bytes
+	return memoryInMebibytes
 }
