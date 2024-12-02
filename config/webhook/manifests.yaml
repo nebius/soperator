@@ -1,0 +1,23 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: validate-secrets
+webhooks:
+  - name: validate.secrets.nebius.ai
+    clientConfig:
+      service:
+        name: webhook-service
+        namespace: system
+        path: "/validate--v1-secret"
+      caBundle: ""
+    rules:
+      - operations: ["CREATE", "UPDATE", "DELETE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["secrets"]
+    objectSelector:
+      matchLabels:
+        slurm.nebius.ai/validate: "true"
+    failurePolicy: Fail
+    admissionReviewVersions: ["v1", "v1beta1"]
+    sideEffects: None

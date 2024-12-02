@@ -45,6 +45,10 @@ func RenderMariaDb(
 	// Create a copy of the container's limits and add non-CPU resources from Requests
 	limits := common.CopyNonCPUResources(mariaDb.Resources)
 
+	// If the MariaDB secret is protected, the mariadb-operator will not generate the secret
+	// it will be the soperator's responsibility to generate the secret
+	generateSecret := func(isProtected bool) bool { return !isProtected }(mariaDb.ProtectedSecret)
+
 	return &mariadbv1alpha1.MariaDB{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildMariaDbName(clusterName),
@@ -65,7 +69,7 @@ func RenderMariaDb(
 					},
 					Key: consts.MariaDbPasswordKey,
 				},
-				Generate: true,
+				Generate: generateSecret,
 			},
 			RootEmptyPassword: ptr.To(false),
 			RootPasswordSecretKeyRef: mariadbv1alpha1.GeneratedSecretKeyRef{
@@ -75,7 +79,7 @@ func RenderMariaDb(
 					},
 					Key: consts.MariaDbPasswordKey,
 				},
-				Generate: true,
+				Generate: generateSecret,
 			},
 			Service: &mariadbv1alpha1.ServiceTemplate{
 				Type: corev1.ServiceTypeClusterIP,
