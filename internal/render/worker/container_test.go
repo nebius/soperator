@@ -83,7 +83,7 @@ func Test_RenderRealMemorySlurmd(t *testing.T) {
 		name           string
 		container      corev1.ResourceRequirements
 		resourceMemory string // Original memory resource as a string (e.g., "512Mi", "1G")
-		expectError    bool
+		expectedValue  int64  // Expected memory value in mebibytes
 	}{
 		{
 			name: "Valid memory resource - 512Mi",
@@ -96,7 +96,7 @@ func Test_RenderRealMemorySlurmd(t *testing.T) {
 				},
 			},
 			resourceMemory: "512Mi", // Input memory value
-			expectError:    false,
+			expectedValue:  512,     // Expected value in MiB
 		},
 		{
 			name: "Valid memory resource - 1G",
@@ -109,33 +109,37 @@ func Test_RenderRealMemorySlurmd(t *testing.T) {
 				},
 			},
 			resourceMemory: "1G", // Input memory value
-			expectError:    false,
+			expectedValue:  953,  // Expected value in MiB (1G = 1024MB, 1024MB / 1.048576 = 953MiB)
+		},
+		{
+			name: "Valid memory resource - 1000MB",
+			container: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("1000M"),
+				},
+				Requests: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("1000M"),
+				},
+			},
+			resourceMemory: "1000M", // Input memory value
+			expectedValue:  953,     // Expected value in MiB (1000MB / 1.048576 = 953MiB)
 		},
 		{
 			name:           "No memory resource",
 			container:      corev1.ResourceRequirements{},
 			resourceMemory: "", // No memory specified
-			expectError:    true,
+			expectedValue:  0,  // Expected value in MiB
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Dynamically parse and calculate the expected value
-			var expectedValue int64
-			if tt.resourceMemory != "" {
-				// Parse the resource memory value
-				quantity := resource.MustParse(tt.resourceMemory)
-				memoryInBytes, _ := quantity.AsInt64()
-				expectedValue = memoryInBytes / 1_000_000 // Convert bytes to MB
-			}
-
 			// Call the function under test
 			value := renderRealMemorySlurmd(tt.container)
 
 			// Validate the value
-			if !tt.expectError && value != expectedValue {
-				t.Errorf("renderRealMemorySlurmd() = %v, expectedValue %v (from %s)", value, expectedValue, tt.resourceMemory)
+			if value != tt.expectedValue {
+				t.Errorf("renderRealMemorySlurmd() = %v, expectedValue %v (from %s)", value, tt.expectedValue, tt.resourceMemory)
 			}
 		})
 	}
