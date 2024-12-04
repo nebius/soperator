@@ -6,7 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	mariadv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
 
@@ -277,7 +277,6 @@ type K8sNodeFilter struct {
 	Name string `json:"name"`
 
 	// Affinity defines the desired affinity for the node
-	//
 	// NOTE: Affinity could not be set if NodeSelector is specified
 	//
 	// +kubebuilder:validation:Optional
@@ -443,12 +442,12 @@ type MariaDbOperator struct {
 	Enabled bool `json:"enabled"`
 
 	NodeContainer      `json:",inline"`
-	PodSecurityContext *corev1.PodSecurityContext     `json:"podSecurityContext,omitempty"`
-	SecurityContext    *corev1.SecurityContext        `json:"securityContext,omitempty"`
-	Replicas           int32                          `json:"replicas,omitempty"`
-	Metrics            *mariadv1alpha1.MariadbMetrics `json:"metrics,omitempty"`
-	Replication        *mariadv1alpha1.Replication    `json:"replication,omitempty"`
-	Storage            mariadv1alpha1.Storage         `json:"storage,omitempty"`
+	PodSecurityContext *mariadbv1alpha1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+	SecurityContext    *mariadbv1alpha1.SecurityContext    `json:"securityContext,omitempty"`
+	Replicas           int32                               `json:"replicas,omitempty"`
+	Metrics            *mariadbv1alpha1.MariadbMetrics     `json:"metrics,omitempty"`
+	Replication        *mariadbv1alpha1.Replication        `json:"replication,omitempty"`
+	Storage            mariadbv1alpha1.Storage             `json:"storage,omitempty"`
 }
 
 type SlurmdbdConfig struct {

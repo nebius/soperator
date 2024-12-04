@@ -37,7 +37,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	mariadv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
@@ -62,7 +62,7 @@ func init() {
 		utilruntime.Must(prometheusv1.AddToScheme(scheme))
 	}
 	if check.IsMariaDbCRDInstalled() {
-		utilruntime.Must(mariadv1alpha1.AddToScheme(scheme))
+		utilruntime.Must(mariadbv1alpha1.AddToScheme(scheme))
 	}
 
 	utilruntime.Must(slurmv1.AddToScheme(scheme))

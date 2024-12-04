@@ -5,7 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	mariadv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -32,7 +32,7 @@ func NewMariaDbReconciler(r *Reconciler) *MariaDbReconciler {
 func (r *MariaDbReconciler) Reconcile(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
-	desired *mariadv1alpha1.MariaDB,
+	desired *mariadbv1alpha1.MariaDB,
 	deps ...metav1.Object,
 ) error {
 	if desired == nil {
@@ -48,7 +48,7 @@ func (r *MariaDbReconciler) Reconcile(
 }
 
 func (r *MariaDbReconciler) patch(existing, desired client.Object) (client.Patch, error) {
-	patchImpl := func(dst, src *mariadv1alpha1.MariaDB) client.Patch {
+	patchImpl := func(dst, src *mariadbv1alpha1.MariaDB) client.Patch {
 		res := client.MergeFrom(dst.DeepCopy())
 		dst.Spec.Image = src.Spec.Image
 		dst.Spec.Replicas = src.Spec.Replicas
@@ -71,5 +71,5 @@ func (r *MariaDbReconciler) patch(existing, desired client.Object) (client.Patch
 
 		return res
 	}
-	return patchImpl(existing.(*mariadv1alpha1.MariaDB), desired.(*mariadv1alpha1.MariaDB)), nil
+	return patchImpl(existing.(*mariadbv1alpha1.MariaDB), desired.(*mariadbv1alpha1.MariaDB)), nil
 }

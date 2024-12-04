@@ -144,12 +144,12 @@ func (in *MariaDbOperator) DeepCopyInto(out *MariaDbOperator) {
 	in.NodeContainer.DeepCopyInto(&out.NodeContainer)
 	if in.PodSecurityContext != nil {
 		in, out := &in.PodSecurityContext, &out.PodSecurityContext
-		*out = new(corev1.PodSecurityContext)
+		*out = new(v1alpha1.PodSecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.SecurityContext != nil {
 		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(corev1.SecurityContext)
+		*out = new(v1alpha1.SecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Metrics != nil {
