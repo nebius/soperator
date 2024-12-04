@@ -64,10 +64,12 @@ spec:
           }}
         securityContext: {{- toYaml .Values.controllerManager.manager.containerSecurityContext
           | nindent 10 }}
+        {{- if .Values.certManager.enabled }}
         volumeMounts:
         - mountPath: /tmp/k8s-webhook-server/serving-certs
           name: cert
           readOnly: true
+        {{- end }}
       - args: {{- toYaml .Values.controllerManager.kubeRbacProxy.args | nindent 8 }}
         env:
         - name: KUBERNETES_CLUSTER_DOMAIN
@@ -87,8 +89,10 @@ spec:
         runAsNonRoot: true
       serviceAccountName: {{ include "soperator.fullname" . }}-controller-manager
       terminationGracePeriodSeconds: 10
+      {{- if .Values.certManager.enabled }}
       volumes:
       - name: cert
         secret:
           defaultMode: 420
           secretName: webhook-server-cert
+      {{- end }}
