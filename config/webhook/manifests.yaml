@@ -17,7 +17,7 @@ webhooks:
         resources: ["secrets"]
     objectSelector:
       matchLabels:
-        slurm.nebius.ai/validate: "true"
+        slurm.nebius.ai/webhook: "true"
     failurePolicy: Fail
     admissionReviewVersions: ["v1", "v1beta1"]
     sideEffects: None
