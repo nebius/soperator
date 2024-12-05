@@ -105,13 +105,9 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
 .PHONY: helm
-helm: kustomize helmify yq ## Update soperator Helm chart
-	rm -rf $(CHART_OPERATOR_PATH)
-	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir $(CHART_OPERATOR_PATH)
-	rm -f $(CHART_PATH)/operatorAppVersion
-	cp -r $(CHART_OPERATOR_PATH)/crds/* $(CHART_OPERATOR_CRDS_PATH)/templates/
-	@$(YQ) -i ".name = \"helm-soperator\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
-	@$(SED_COMMAND) '/^#/d' "$(CHART_OPERATOR_PATH)/Chart.yaml"
+helm: kustomize generate yq ## Update soperator Helm chart
+	$(KUSTOMIZE) build config/crd > $(CHART_OPERATOR_PATH)/crds/slurmcluster-crd.yaml 
+	$(KUSTOMIZE) build config/crd > $(CHART_OPERATOR_CRDS_PATH)/templates/slurmcluster-crd.yaml
 
 .PHONY: get-version
 get-version:
