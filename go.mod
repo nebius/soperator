@@ -6,7 +6,7 @@ toolchain go1.23.3
 
 require (
 	github.com/go-logr/logr v1.4.2
-	github.com/onsi/ginkgo/v2 v2.21.0
+	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.35.1
 	github.com/open-telemetry/opentelemetry-operator v0.103.0
 	github.com/pkg/errors v0.9.1
