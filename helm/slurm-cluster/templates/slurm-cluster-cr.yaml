@@ -89,6 +89,7 @@ spec:
           memory: {{ required ".Values.slurmNodes.accounting.slurmdbd.resources.memory must be provided." .Values.slurmNodes.accounting.slurmdbd.resources.memory | quote}}
           ephemeral-storage: {{ required ".Values.slurmNodes.accounting.slurmdbd.resources.ephemeralStorage must be provided." .Values.slurmNodes.accounting.slurmdbd.resources.ephemeralStorage | quote}}
       enabled: {{ default false .Values.slurmNodes.accounting.enabled }}
+        {{- default list .Values.slurmNodes.accounting.protectedSecrets | toYaml | nindent 8 }}
       slurmdbdConfig: {{ toYaml .Values.slurmNodes.accounting.slurmdbdConfig | nindent 8 }}
       slurmConfig: {{ toYaml .Values.slurmNodes.accounting.slurmConfig | nindent 8 }}
       {{- if .Values.slurmNodes.accounting.externalDB.enabled }}
@@ -103,6 +104,7 @@ spec:
       {{- if .Values.slurmNodes.accounting.mariadbOperator.enabled }}
       mariadbOperator:
         enabled: {{ default false .Values.slurmNodes.accounting.mariadbOperator.enabled }}
+        protectedSecrets: {{ .Values.slurmNodes.accounting.protectedSecrets }}
         image: {{ required "mariadb image" .Values.images.mariaDB | quote }}
         resources:
           cpu: {{ required ".Values.slurmNodes.accounting.mariadbOperator.resources.cpu must be provided." .Values.slurmNodes.accounting.mariadbOperator.resources.cpu | quote}}

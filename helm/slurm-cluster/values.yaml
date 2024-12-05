@@ -172,6 +172,7 @@ slurmNodes:
       #   key: ""
     mariadbOperator:
       enabled: false
+      protectedSecret: false
       resources:
         cpu: "1000m"
         memory: "1Gi"
