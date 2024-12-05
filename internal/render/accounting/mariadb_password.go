@@ -29,7 +29,8 @@ func RenderSecretMariaDb(
 		consts.AnnotationClusterName: clusterName,
 	}
 	labels := map[string]string{
-		consts.LabelNameKey: consts.LabelNameValue,
+		consts.LabelNameKey:     consts.LabelNameValue,
+		consts.LabelValidateKey: consts.LabelValidateValue,
 	}
 
 	data := map[string][]byte{
