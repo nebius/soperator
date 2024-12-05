@@ -441,6 +441,13 @@ type MariaDbOperator struct {
 	// +kubebuilder:validation:Optional
 	Enabled bool `json:"enabled"`
 
+	// If enabled, secret cannot be deleted until custom resource slurmcluster is deleted
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	// +kubebuilder:validation:Immutable
+	ProtectedSecret bool `json:"protectedSecret"`
+
 	NodeContainer      `json:",inline"`
 	PodSecurityContext *mariadbv1alpha1.PodSecurityContext `json:"podSecurityContext,omitempty"`
 	SecurityContext    *mariadbv1alpha1.SecurityContext    `json:"securityContext,omitempty"`

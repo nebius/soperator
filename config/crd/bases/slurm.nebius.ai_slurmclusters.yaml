@@ -2201,6 +2201,11 @@ spec:
                             description: Port defines the port the container exposes
                             format: int32
                             type: integer
+                          protectedSecret:
+                            default: false
+                            description: If enabled, secret cannot be deleted until
+                              custom resource slurmcluster is deleted
+                            type: boolean
                           replicas:
                             format: int32
                             type: integer

@@ -55,3 +55,11 @@ metricsService:
       protocol: TCP
       targetPort: https
   type: ClusterIP
+webhookService:
+  ports:
+    - port: 443
+      protocol: TCP
+      targetPort: 9443
+  type: ClusterIP
+certManager:
+  enabled: false

@@ -17,4 +17,6 @@ const (
 
 	LabelManagedByKey   = "app.kubernetes.io/managed-by"
 	LabelManagedByValue = slurmOperator
+	LabelValidateKey    = "slurm.nebius.ai/webhook"
+	LabelValidateValue  = "true"
 )
