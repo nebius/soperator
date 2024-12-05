@@ -103,7 +103,7 @@ spec:
       {{- if .Values.slurmNodes.accounting.mariadbOperator.enabled }}
       mariadbOperator:
         enabled: {{ default false .Values.slurmNodes.accounting.mariadbOperator.enabled }}
-        protectedSecrets: {{ .Values.slurmNodes.accounting.protectedSecrets }}
+        protectedSecrets: {{ .Values.slurmNodes.accounting.mariadbOperator.protectedSecrets }}
         image: {{ required "mariadb image" .Values.images.mariaDB | quote }}
         resources:
           cpu: {{ required ".Values.slurmNodes.accounting.mariadbOperator.resources.cpu must be provided." .Values.slurmNodes.accounting.mariadbOperator.resources.cpu | quote}}
