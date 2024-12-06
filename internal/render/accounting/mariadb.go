@@ -100,8 +100,10 @@ func RenderMariaDb(
 				Tolerations:        nodeFilter.Tolerations,
 				PodSecurityContext: mariaDb.PodSecurityContext,
 			},
-			Metrics: mariaDb.Metrics,
-			MyCnf:   ptr.To(consts.MariaDbDefaultMyCnf),
+			Metrics: &mariadbv1alpha1.MariadbMetrics{
+				Enabled: mariaDb.Metrics.Enabled,
+			},
+			MyCnf: ptr.To(consts.MariaDbDefaultMyCnf),
 		},
 	}, nil
 }
