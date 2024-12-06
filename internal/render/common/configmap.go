@@ -55,6 +55,21 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("AuthType", "auth/"+consts.Munge)
 	res.AddProperty("CredType", "cred/"+consts.Munge)
 	res.AddComment("")
+	res.AddComment("SlurnConfig Spec")
+	v := reflect.ValueOf(cluster.SlurmConfig)
+	t := reflect.TypeOf(cluster.SlurmConfig)
+
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		fieldName := t.Field(i).Name
+
+		if field.Kind() == reflect.String && field.String() == "" {
+			continue
+		}
+
+		res.AddProperty(fieldName, field.Interface())
+	}
+	res.AddComment("")
 	if cluster.ClusterType == consts.ClusterTypeGPU {
 		res.AddProperty("GresTypes", "gpu")
 	}
