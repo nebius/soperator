@@ -486,9 +486,15 @@ type MariaDbOperator struct {
 	PodSecurityContext *mariadbv1alpha1.PodSecurityContext `json:"podSecurityContext,omitempty"`
 	SecurityContext    *mariadbv1alpha1.SecurityContext    `json:"securityContext,omitempty"`
 	Replicas           int32                               `json:"replicas,omitempty"`
-	Metrics            *mariadbv1alpha1.MariadbMetrics     `json:"metrics,omitempty"`
+	Metrics            MariadbMetrics                      `json:"metrics,omitempty"`
 	Replication        *mariadbv1alpha1.Replication        `json:"replication,omitempty"`
 	Storage            mariadbv1alpha1.Storage             `json:"storage,omitempty"`
+}
+
+type MariadbMetrics struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
+	Enabled bool `json:"enabled,omitempty"`
 }
 
 type SlurmdbdConfig struct {
