@@ -1473,58 +1473,16 @@ spec:
                   Not all options are supported.
                 properties:
                   completeWait:
-                    default: 0
+                    default: 5
                     description: The time to wait, in seconds, when any job is in
                       the COMPLETING state before any additional jobs are scheduled.
                     format: int32
                     type: integer
                   debugFlags:
-                    default: ""
+                    default: Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs
                     description: Defines specific subsystems which should provide
                       more detailed event logging.
-                    enum:
-                    - Accrue
-                    - Agent
-                    - AuditRPCs
-                    - Backfill
-                    - BackfillMap
-                    - BurstBuffer
-                    - Cgroup
-                    - ConMgr
-                    - CPU_Bind
-                    - CpuFrequency
-                    - Data
-                    - DBD_Agent
-                    - Dependency
-                    - Elasticsearch
-                    - Energy
-                    - Federation
-                    - FrontEnd
-                    - Gres
-                    - Hetjob
-                    - Gang
-                    - GLOB_SILENCE
-                    - JobAccountGather
-                    - JobComp
-                    - JobContainer
-                    - License
-                    - Network
-                    - NetworkRaw
-                    - NodeFeatures
-                    - NO_CONF_HASH
-                    - Power
-                    - Priority
-                    - Profile
-                    - Protocol
-                    - Reservation
-                    - Route
-                    - Script
-                    - SelectType
-                    - Steps
-                    - Switch
-                    - TLS
-                    - TraceJobs
-                    - Triggers
+                    pattern: ^((Accrue|Agent|AuditRPCs|Backfill|BackfillMap|BurstBuffer|Cgroup|ConMgr|CPU_Bind|CpuFrequency|Data|DBD_Agent|Dependency|Elasticsearch|Energy|Federation|FrontEnd|Gres|Hetjob|Gang|GLOB_SILENCE|JobAccountGather|JobComp|JobContainer|License|Network|NetworkRaw|NodeFeatures|NO_CONF_HASH|Power|Priority|Profile|Protocol|Reservation|Route|Script|SelectType|Steps|Switch|TLS|TraceJobs|Triggers)(,)?)+$
                     type: string
                   defCpuPerGPU:
                     default: 16
@@ -1537,6 +1495,10 @@ spec:
                       node in mebibytes.
                     format: int32
                     type: integer
+                  taskPluginParam:
+                    default: Verbose
+                    pattern: ^((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+$
+                    type: string
                 type: object
               slurmNodes:
                 description: SlurmNodes define the desired state of Slurm nodes

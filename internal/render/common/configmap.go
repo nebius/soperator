@@ -56,12 +56,19 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("CredType", "cred/"+consts.Munge)
 	res.AddComment("")
 	res.AddComment("SlurnConfig Spec")
-	if cluster.SlurmConfig.DebugFlags != "" {
-		res.AddProperty("DebugFlags", cluster.SlurmConfig.DebugFlags)
+	v := reflect.ValueOf(cluster.SlurmConfig)
+	t := reflect.TypeOf(cluster.SlurmConfig)
+
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		fieldName := t.Field(i).Name
+
+		if field.Kind() == reflect.String && field.String() == "" {
+			continue
+		}
+
+		res.AddProperty(fieldName, field.Interface())
 	}
-	res.AddProperty("DefMemPerNode", cluster.SlurmConfig.DefMemPerNode)
-	res.AddProperty("DefCpuPerGPU", cluster.SlurmConfig.DefCpuPerGPU)
-	res.AddProperty("CompleteWait", cluster.SlurmConfig.CompleteWait)
 	res.AddComment("")
 	if cluster.ClusterType == consts.ClusterTypeGPU {
 		res.AddProperty("GresTypes", "gpu")
