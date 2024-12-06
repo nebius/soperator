@@ -105,7 +105,7 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
 .PHONY: helm
-helm: generate ## Update soperator Helm chart
+helm: generate manifests ## Update soperator Helm chart
 	$(KUSTOMIZE) build config/crd > $(CHART_OPERATOR_PATH)/crds/slurmcluster-crd.yaml 
 	$(KUSTOMIZE) build config/crd > $(CHART_OPERATOR_CRDS_PATH)/templates/slurmcluster-crd.yaml
 	mv $(CHART_OPERATOR_PATH)/values.yaml $(CHART_OPERATOR_PATH)/values.yaml.bak
