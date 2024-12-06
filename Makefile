@@ -105,9 +105,12 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
 .PHONY: helm
-helm: kustomize generate yq ## Update soperator Helm chart
+helm: generate ## Update soperator Helm chart
 	$(KUSTOMIZE) build config/crd > $(CHART_OPERATOR_PATH)/crds/slurmcluster-crd.yaml 
 	$(KUSTOMIZE) build config/crd > $(CHART_OPERATOR_CRDS_PATH)/templates/slurmcluster-crd.yaml
+	mv $(CHART_OPERATOR_PATH)/values.yaml $(CHART_OPERATOR_PATH)/values.yaml.bak
+	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/rbac/soperator-helm  | $(HELMIFY) $(CHART_OPERATOR_PATH)
+	mv $(CHART_OPERATOR_PATH)/values.yaml.bak $(CHART_OPERATOR_PATH)/values.yaml
 
 .PHONY: get-version
 get-version:
