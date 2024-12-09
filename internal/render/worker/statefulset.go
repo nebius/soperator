@@ -48,7 +48,10 @@ func RenderStatefulSet(
 		consts.DefaultContainerAnnotationName: consts.ContainerNameSlurmd,
 	}
 
-	var initContainers []corev1.Container
+	// Since 1.28 is native sidecar support, we can use the native restart policy
+	initContainers := []corev1.Container{
+		common.RenderContainerMunge(&worker.ContainerMunge),
+	}
 	if clusterType == consts.ClusterTypeGPU {
 		initContainers = append(initContainers, renderContainerToolkitValidation(&worker.ContainerToolkitValidation))
 	}
@@ -102,7 +105,6 @@ func RenderStatefulSet(
 					InitContainers:     initContainers,
 					Containers: []corev1.Container{
 						slurmdContainer,
-						common.RenderContainerMunge(&worker.ContainerMunge),
 					},
 					Volumes: volumes,
 					DNSConfig: &corev1.PodDNSConfig{

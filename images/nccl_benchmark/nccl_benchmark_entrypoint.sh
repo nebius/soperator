@@ -21,6 +21,7 @@ mount --bind /mnt/munge-key/munge.key /etc/munge/munge.key
 echo "Starting munge"
 munged --num-threads="$MUNGE_NUM_THREADS" --key-file="$MUNGE_KEY_FILE" --pid-file="$MUNGE_PID_FILE" -S "$MUNGE_SOCKET_FILE"
 
+# TODO: Since 1.28 kubernetes supports native sidecar containers. We can remove it in feature releases
 echo "Waiting until munge started"
 while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done
 

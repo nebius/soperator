@@ -77,7 +77,7 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 		Spec: corev1.PodSpec{
 			NodeSelector: defaultNodeFilter[0].NodeSelector,
 			Affinity:     defaultNodeFilter[0].Affinity,
-			Containers: []corev1.Container{
+			InitContainers: []corev1.Container{
 				{
 					Name:  consts.ContainerNameMunge,
 					Image: imageMunge,
@@ -96,6 +96,8 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 						},
 					},
 				},
+			},
+			Containers: []corev1.Container{
 				{
 					Name:  consts.ContainerNameExporter,
 					Image: imageExporter,
@@ -117,17 +119,17 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 
 	assert.Equal(t, expected.Labels, result.Labels)
 
-	// expected.Spec.Containers[0].Name == munge
-	// expected.Spec.Containers[1].Name == exporter
+	// expected.Spec.InitContainers[0].Name == munge
+	// expected.Spec.Containers[0].Name == exporter
 
-	assert.Equal(t, expected.Spec.Containers[0].Name, result.Spec.Containers[0].Name)
+	assert.Equal(t, expected.Spec.InitContainers[0].Name, result.Spec.InitContainers[0].Name)
 	assert.Equal(t, expected.Spec.Containers[0].Name, result.Spec.Containers[0].Name)
 
+	assert.Equal(t, expected.Spec.InitContainers[0].Image, result.Spec.InitContainers[0].Image)
 	assert.Equal(t, expected.Spec.Containers[0].Image, result.Spec.Containers[0].Image)
-	assert.Equal(t, expected.Spec.Containers[1].Image, result.Spec.Containers[1].Image)
 
+	assert.Equal(t, expected.Spec.InitContainers[0].Resources, result.Spec.InitContainers[0].Resources)
 	assert.Equal(t, expected.Spec.Containers[0].Resources, result.Spec.Containers[0].Resources)
-	assert.Equal(t, expected.Spec.Containers[1].Resources, result.Spec.Containers[1].Resources)
 
 	assert.Equal(t, expected.Spec.NodeSelector, result.Spec.NodeSelector)
 	assert.Equal(t, expected.Spec.Affinity, result.Spec.Affinity)
@@ -194,7 +196,7 @@ func Test_RenderPodTemplateSpec(t *testing.T) {
 				RunAsUser:  &[]int64{1000}[0],
 				RunAsGroup: &[]int64{1000}[0],
 			},
-			Containers: []corev1.Container{
+			InitContainers: []corev1.Container{
 				{
 					Name:  consts.ContainerNameMunge,
 					Image: imageMunge,
@@ -204,6 +206,8 @@ func Test_RenderPodTemplateSpec(t *testing.T) {
 						},
 					},
 				},
+			},
+			Containers: []corev1.Container{
 				{
 					Name:  consts.ContainerNameExporter,
 					Image: newImageExporter,
@@ -217,17 +221,17 @@ func Test_RenderPodTemplateSpec(t *testing.T) {
 
 	assert.Equal(t, expected.Labels, result.Labels)
 
-	// expected.Spec.Containers[0].Name == munge
-	// expected.Spec.Containers[1].Name == exporter
+	// expected.Spec.InitContainers[0].Name == munge
+	// expected.Spec.Containers[0].Name == exporter
 
+	assert.Equal(t, expected.Spec.InitContainers[0].Name, result.Spec.InitContainers[0].Name)
 	assert.Equal(t, expected.Spec.Containers[0].Name, result.Spec.Containers[0].Name)
-	assert.Equal(t, expected.Spec.Containers[1].Name, result.Spec.Containers[1].Name)
 
+	assert.Equal(t, expected.Spec.InitContainers[0].Image, result.Spec.InitContainers[0].Image)
 	assert.Equal(t, expected.Spec.Containers[0].Image, result.Spec.Containers[0].Image)
-	assert.Equal(t, expected.Spec.Containers[1].Image, result.Spec.Containers[1].Image)
 
 	assert.Equal(t, expected.Spec.OS, result.Spec.OS)
 	assert.Equal(t, expected.Spec.SecurityContext, result.Spec.SecurityContext)
 
-	assert.Equal(t, expected.Spec.Containers[1].Args, result.Spec.Containers[1].Args)
+	assert.Equal(t, expected.Spec.Containers[0].Args, result.Spec.Containers[0].Args)
 }

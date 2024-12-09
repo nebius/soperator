@@ -82,9 +82,10 @@ func Test_RenderStatefulSet(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, consts.ContainerNameSlurmd, result.Spec.Template.Spec.Containers[0].Name)
-	assert.Equal(t, consts.ContainerNameMunge, result.Spec.Template.Spec.Containers[1].Name)
-	assert.Equal(t, consts.ContainerNameToolkitValidation, result.Spec.Template.Spec.InitContainers[0].Name)
-	assert.True(t, len(result.Spec.Template.Spec.InitContainers) == 1)
+	assert.Equal(t, consts.ContainerNameMunge, result.Spec.Template.Spec.InitContainers[0].Name)
+	assert.Equal(t, consts.ContainerNameToolkitValidation, result.Spec.Template.Spec.InitContainers[1].Name)
+	assert.True(t, len(result.Spec.Template.Spec.InitContainers) == 2)
+	assert.True(t, len(result.Spec.Template.Spec.Containers) == 1)
 
 	workerCGroupV2 := workerCGroupV1
 	workerCGroupV2.CgroupVersion = consts.CGroupV2
@@ -92,5 +93,5 @@ func Test_RenderStatefulSet(t *testing.T) {
 	result, err = worker.RenderStatefulSet(testNamespace, testCluster, consts.ClusterTypeCPU, nodeFilter, voluemSource, workerCGroupV2)
 	assert.NoError(t, err)
 	assert.Equal(t, consts.CGroupV2Env, result.Spec.Template.Spec.Containers[0].Env[5].Name)
-	assert.True(t, len(result.Spec.Template.Spec.InitContainers) == 0)
+	assert.True(t, len(result.Spec.Template.Spec.InitContainers) == 1)
 }

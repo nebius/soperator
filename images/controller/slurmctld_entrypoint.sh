@@ -22,6 +22,7 @@ done
 echo "Set permissions for shared /var/spool/slurmctld"
 chmod 755 /var/spool/slurmctld # It changes permissions of this shared directory in other containers as well
 
+# TODO: Since 1.28 kubernetes supports native sidecar containers. We can remove it in feature releases
 echo "Waiting until munge started"
 while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done
 
