@@ -116,7 +116,6 @@ This helps cluster administrators and users monitor resource utilization, enforc
     - CUDA: version [12.2.2](https://developer.nvidia.com/cuda-12-2-2-download-archive).
     - Kubernetes: >= [1.29](https://kubernetes.io/blog/2023/08/15/kubernetes-v1-28-release/).
     - Versions of some preinstalled software packages can't be changed.
- - Kubernetes: Starting from version 1.28 and above.
 
 ## 🚀 Installation
 The steps required to deploy Soperator to your Kubernetes cluster depend on whether you are using Kubernetes
