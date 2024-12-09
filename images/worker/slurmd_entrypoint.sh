@@ -89,6 +89,12 @@ else
     echo "Skipping GPU detection"
 fi
 
+WORKER_SPEC="NodeHostname=${K8S_POD_NAME} InstanceId=${INSTANCE_ID} NodeAddr=${K8S_POD_NAME}.${K8S_SERVICE_NAME}.${K8S_POD_NAMESPACE}.svc.cluster.local Gres=${GRES}"
+echo "WORKER_SPEC is ${WORKER_SPEC}"
+
+echo "Update previous node config if exists"
+scontrol update nodename=${K8S_POD_NAME} ${WORKER_SPEC} | true
+
 # Hack with logs: multilog will write log in stdout and in log file, and rotate log file
 # # s100000000 (bytes) - 100MB, n5 - 5 files
 echo "Start slurmd daemon"
@@ -96,5 +102,5 @@ exec /usr/sbin/slurmd \
   -D \
   -Z \
   --conf \
-  "NodeHostname=${K8S_POD_NAME} NodeAddr=${K8S_POD_NAME}.${K8S_SERVICE_NAME}.${K8S_POD_NAMESPACE}.svc.cluster.local RealMemory=${SLURM_REAL_MEMORY} Gres=${GRES}" \
+  "${WORKER_SPEC} RealMemory=${SLURM_REAL_MEMORY}" \
   2>&1 | tee >(multilog s100000000 n5 /var/log/slurm/multilog)
