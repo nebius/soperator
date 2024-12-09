@@ -29,7 +29,7 @@ func RenderContainerMunge(container *values.Container, opts ...RenderOption) cor
 		limits = CopyNonCPUResources(container.Resources)
 	}
 
-	// Since 1.28 is native sidecar support, we can use the native restart policy
+	// Since 1.29 is native sidecar support, we can use the native restart policy
 	restartPolicy := corev1.ContainerRestartPolicy("Always")
 
 	return corev1.Container{

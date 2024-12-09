@@ -48,7 +48,7 @@ func RenderStatefulSet(
 		consts.DefaultContainerAnnotationName: consts.ContainerNameSlurmd,
 	}
 
-	// Since 1.28 is native sidecar support, we can use the native restart policy
+	// Since 1.29 is native sidecar support, we can use the native restart policy
 	initContainers := []corev1.Container{
 		common.RenderContainerMunge(&worker.ContainerMunge),
 	}
