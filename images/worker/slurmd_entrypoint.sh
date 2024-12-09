@@ -64,6 +64,7 @@ ldconfig
 echo "Complement jail rootfs"
 /opt/bin/slurm/complement_jail.sh -j /mnt/jail -u /mnt/jail.upper -w
 
+# TODO: Since 1.29 kubernetes supports native sidecar containers. We can remove it in feature releases
 echo "Waiting until munge is started"
 while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done
 

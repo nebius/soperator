@@ -81,9 +81,11 @@ func RenderStatefulSet(
 					Affinity:     nodeFilter.Affinity,
 					NodeSelector: nodeFilter.NodeSelector,
 					Tolerations:  nodeFilter.Tolerations,
+					InitContainers: []corev1.Container{
+						common.RenderContainerMunge(&login.ContainerMunge),
+					},
 					Containers: []corev1.Container{
 						renderContainerSshd(clusterType, &login.ContainerSshd, login.JailSubMounts),
-						common.RenderContainerMunge(&login.ContainerMunge),
 					},
 					Volumes: volumes,
 					DNSConfig: &corev1.PodDNSConfig{

@@ -62,8 +62,10 @@ func BasePodTemplateSpec(
 			Affinity:     affinity,
 			NodeSelector: nodeSelector,
 			Hostname:     consts.HostnameAccounting,
-			Containers: []corev1.Container{
+			InitContainers: []corev1.Container{
 				common.RenderContainerMunge(&accounting.ContainerMunge),
+			},
+			Containers: []corev1.Container{
 				renderContainerAccounting(accounting.ContainerAccounting),
 			},
 			Volumes: volumes,
