@@ -80,6 +80,16 @@ func renderContainerSlurmd(
 
 	realMemory := renderRealMemorySlurmd(resources)
 
+	// There is no option put InstanceId when slurmd daemon starting. You can add it only with update
+	// https://slurm.schedmd.com/scontrol.html#SECTION_NODES---SPECIFICATIONS-FOR-UPDATE-COMMAND
+	// https://slurm.schedmd.com/slurm.conf.html#SECTION_NODE-CONFIGURATION
+	//postUpdateCommand := []string{
+	//	"/usr/bin/scontrol",
+	//	"update",
+	//	"nodename=${K8S_POD_NAME}",
+	//	"InstanceId=${INSTANCE_ID}",
+	//}
+
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
 		Image:           container.Image,
@@ -116,6 +126,13 @@ func renderContainerSlurmd(
 			ProcMount: ptr.To(corev1.UnmaskedProcMount),
 		},
 		Resources: resources,
+		//Lifecycle: &corev1.Lifecycle{
+		//	PostStart: &corev1.LifecycleHandler{
+		//		Exec: &corev1.ExecAction{
+		//			Command: postUpdateCommand,
+		//		},
+		//	},
+		//},
 	}, nil
 }
 
@@ -134,6 +151,14 @@ func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.Clust
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
 					FieldPath: "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name: "INSTANCE_ID",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "spec.nodeName",
 				},
 			},
 		},
