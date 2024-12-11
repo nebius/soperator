@@ -138,6 +138,14 @@ func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.Clust
 			},
 		},
 		{
+			Name: "INSTANCE_ID",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "spec.nodeName",
+				},
+			},
+		},
+		{
 			Name:  "K8S_SERVICE_NAME",
 			Value: naming.BuildServiceName(consts.ComponentTypeWorker, clusterName),
 		},

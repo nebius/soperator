@@ -92,6 +92,6 @@ func Test_RenderStatefulSet(t *testing.T) {
 
 	result, err = worker.RenderStatefulSet(testNamespace, testCluster, consts.ClusterTypeCPU, nodeFilter, voluemSource, workerCGroupV2)
 	assert.NoError(t, err)
-	assert.Equal(t, consts.CGroupV2Env, result.Spec.Template.Spec.Containers[0].Env[5].Name)
+	assert.Equal(t, consts.CGroupV2Env, result.Spec.Template.Spec.Containers[0].Env[6].Name)
 	assert.True(t, len(result.Spec.Template.Spec.InitContainers) == 1)
 }
