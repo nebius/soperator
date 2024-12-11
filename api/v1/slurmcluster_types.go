@@ -612,6 +612,10 @@ type SlurmNodeControllerVolumes struct {
 // SlurmNodeWorker defines the configuration for the Slurm worker node
 type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
+	// Sshd represents the SSH daemon for slurm worker nodes
+	//
+	// +kubebuilder:validation:Optional
+	SlurmNodeWorkerSshd `json:"sshd,omitempty"`
 
 	// Slurmd represents the Slurm daemon service configuration
 	//
@@ -633,6 +637,18 @@ type SlurmNodeWorker struct {
 	// +kubebuilder:default="v2"
 	// +kubebuilder:validation:Enum="v1";"v2"
 	CgroupVersion string `json:"cgroupVersion,omitempty"`
+}
+
+type SlurmNodeWorkerSshd struct {
+	// Enabled defines whether the SSH sidecar is enabled on the worker node
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
+	Enabled bool `json:"enabled,omitempty"`
+	// Sshd represents the SSH daemon service configuration
+	//
+	// +kubebuilder:validation:Optional
+	NodeContainer `json:",inline"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node

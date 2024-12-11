@@ -43,7 +43,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 		},
 	}
 
-	voluemSource := []slurmv1.VolumeSource{
+	volumeSource := []slurmv1.VolumeSource{
 		{
 			Name: "test-volume-source",
 			VolumeSource: corev1.VolumeSource{
@@ -52,46 +52,99 @@ func Test_RenderStatefulSet(t *testing.T) {
 		},
 	}
 
-	// Define a test worker
-	workerCGroupV1 := &values.SlurmWorker{
-		CgroupVersion: consts.CGroupV1,
-		SlurmNode: slurmv1.SlurmNode{
-			K8sNodeFilterName: "cpu",
-		},
-		VolumeSpool: slurmv1.NodeVolume{
-			VolumeSourceName: ptr.To("test-volume-source"),
-		},
-		VolumeJail: slurmv1.NodeVolume{
-			VolumeSourceName: ptr.To("test-volume-source"),
-		},
-		ContainerSlurmd: values.Container{
-			NodeContainer: slurmv1.NodeContainer{
-				Image:           "test-image",
-				ImagePullPolicy: corev1.PullIfNotPresent,
-				Port:            8080,
-				Resources: corev1.ResourceList{
-					corev1.ResourceMemory:           resource.MustParse("1Gi"),
-					corev1.ResourceCPU:              resource.MustParse("100m"),
-					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+	createWorker := func(sshdEnabled bool) *values.SlurmWorker {
+		return &values.SlurmWorker{
+			CgroupVersion: consts.CGroupV1,
+			SlurmNode: slurmv1.SlurmNode{
+				K8sNodeFilterName: "cpu",
+			},
+			VolumeSpool: slurmv1.NodeVolume{
+				VolumeSourceName: ptr.To("test-volume-source"),
+			},
+			VolumeJail: slurmv1.NodeVolume{
+				VolumeSourceName: ptr.To("test-volume-source"),
+			},
+			ContainerSlurmd: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image:           "test-image",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Port:            8080,
+					Resources: corev1.ResourceList{
+						corev1.ResourceMemory:           resource.MustParse("1Gi"),
+						corev1.ResourceCPU:              resource.MustParse("100m"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+					},
 				},
 			},
+			SshdEnabled: sshdEnabled,
+		}
+	}
+
+	secret := &slurmv1.Secrets{
+		SshdKeysName: "test-sshd-keys",
+	}
+
+	tests := []struct {
+		name           string
+		worker         *values.SlurmWorker
+		secrets        *slurmv1.Secrets
+		clusterType    consts.ClusterType
+		expectedEnvVar string
+		expectedInitCt int
+	}{
+		{
+			name:           "CGROUP V1 GPU SSHD Disabled",
+			worker:         createWorker(false),
+			secrets:        secret,
+			clusterType:    consts.ClusterTypeGPU,
+			expectedEnvVar: "",
+			expectedInitCt: 2,
+		},
+		{
+			name:           "CGROUP V1 GPU SSHD Enabled",
+			worker:         createWorker(true),
+			secrets:        secret,
+			clusterType:    consts.ClusterTypeGPU,
+			expectedEnvVar: "",
+			expectedInitCt: 3,
+		},
+		{
+			name:           "CGROUP V1 CPU SSHD Disabled",
+			worker:         createWorker(false),
+			secrets:        secret,
+			clusterType:    consts.ClusterTypeCPU,
+			expectedEnvVar: "",
+			expectedInitCt: 1,
+		},
+		{
+			name:           "CGROUP V1 CPU SSHD Enabled",
+			worker:         createWorker(true),
+			secrets:        secret,
+			clusterType:    consts.ClusterTypeCPU,
+			expectedEnvVar: "",
+			expectedInitCt: 2,
+		},
+		{
+			name:           "CGROUP V2",
+			worker:         createWorker(true),
+			secrets:        secret,
+			clusterType:    consts.ClusterTypeCPU,
+			expectedEnvVar: consts.CGroupV2Env,
+			expectedInitCt: 2,
 		},
 	}
 
-	result, err := worker.RenderStatefulSet(testNamespace, testCluster, consts.ClusterTypeGPU, nodeFilter, voluemSource, workerCGroupV1)
-	assert.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := worker.RenderStatefulSet(testNamespace, testCluster, tt.clusterType, nodeFilter, tt.secrets, volumeSource, tt.worker)
+			assert.NoError(t, err)
 
-	assert.Equal(t, consts.ContainerNameSlurmd, result.Spec.Template.Spec.Containers[0].Name)
-	assert.Equal(t, consts.ContainerNameMunge, result.Spec.Template.Spec.InitContainers[0].Name)
-	assert.Equal(t, consts.ContainerNameToolkitValidation, result.Spec.Template.Spec.InitContainers[1].Name)
-	assert.True(t, len(result.Spec.Template.Spec.InitContainers) == 2)
-	assert.True(t, len(result.Spec.Template.Spec.Containers) == 1)
-
-	workerCGroupV2 := workerCGroupV1
-	workerCGroupV2.CgroupVersion = consts.CGroupV2
-
-	result, err = worker.RenderStatefulSet(testNamespace, testCluster, consts.ClusterTypeCPU, nodeFilter, voluemSource, workerCGroupV2)
-	assert.NoError(t, err)
-	assert.Equal(t, consts.CGroupV2Env, result.Spec.Template.Spec.Containers[0].Env[6].Name)
-	assert.True(t, len(result.Spec.Template.Spec.InitContainers) == 1)
+			assert.Equal(t, consts.ContainerNameSlurmd, result.Spec.Template.Spec.Containers[0].Name)
+			if tt.clusterType == consts.ClusterTypeGPU {
+				assert.Equal(t, consts.ContainerNameToolkitValidation, result.Spec.Template.Spec.InitContainers[1].Name)
+			}
+			assert.Equal(t, tt.expectedInitCt, len(result.Spec.Template.Spec.InitContainers))
+			assert.Equal(t, consts.ContainerNameMunge, result.Spec.Template.Spec.InitContainers[0].Name)
+		})
+	}
 }

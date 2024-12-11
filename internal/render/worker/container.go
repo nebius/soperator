@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
 	"nebius.ai/slurm-operator/internal/check"
@@ -173,4 +174,58 @@ func renderRealMemorySlurmd(resources corev1.ResourceRequirements) int64 {
 	// Convert bytes to mebibytes (1 MiB = 1,048,576 bytes)
 	memoryInMebibytes := memoryInBytes / 1_048_576 // 1 MiB = 1,048,576 bytes
 	return memoryInMebibytes
+}
+
+func renderContainerSshd(
+	sshdEnabled bool,
+	container *values.Container,
+) *corev1.Container {
+	if !sshdEnabled {
+		return nil
+	}
+
+	if container.Port == 0 {
+		container.Port = consts.DefaultSshdPort
+	}
+
+	restartPolicy := corev1.ContainerRestartPolicy("Always")
+
+	volumeMounts := []corev1.VolumeMount{
+		common.RenderVolumeMountJail(),
+		common.RenderVolumeMountSshdKeys(),
+		common.RenderVolumeMountSshConfigs(),
+	}
+	limits := common.CopyNonCPUResources(container.Resources)
+
+	return &corev1.Container{
+		Name:            consts.ContainerNameSshd,
+		Image:           container.Image,
+		ImagePullPolicy: container.ImagePullPolicy,
+		RestartPolicy:   &restartPolicy,
+		Ports: []corev1.ContainerPort{{
+			Name:          container.Name,
+			ContainerPort: container.Port,
+			Protocol:      corev1.ProtocolTCP,
+		}},
+		VolumeMounts: volumeMounts,
+		ReadinessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.FromInt32(container.Port),
+				},
+			},
+		},
+		SecurityContext: &corev1.SecurityContext{
+			Privileged: ptr.To(true),
+			Capabilities: &corev1.Capabilities{
+				Add: []corev1.Capability{
+					consts.ContainerSecurityContextCapabilitySysAdmin,
+				},
+			},
+		},
+		Resources: corev1.ResourceRequirements{
+			Limits:   limits,
+			Requests: container.Resources,
+		},
+	}
 }

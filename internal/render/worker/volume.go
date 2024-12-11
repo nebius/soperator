@@ -16,6 +16,7 @@ import (
 
 func renderVolumesAndClaimTemplateSpecs(
 	clusterName string,
+	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	worker *values.SlurmWorker,
 ) (volumes []corev1.Volume, pvcTemplateSpecs []values.PVCTemplateSpec, err error) {
@@ -24,6 +25,8 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeMungeSocket(),
 		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeWorker),
+		common.RenderVolumeSshdKeys(secrets.SshdKeysName),
+		common.RenderVolumeSshConfigs(clusterName),
 		renderVolumeNvidia(),
 		renderVolumeBoot(),
 		renderVolumeNCCLTopology(clusterName),

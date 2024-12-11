@@ -8,4 +8,5 @@ const (
 	SSHDMaxStartups         = "10:30:60"
 	SSHDLoginGraceTime      = "9000"
 	SSHDMaxAuthTries        = "4"
+	DefaultSshdPort         = 22
 )

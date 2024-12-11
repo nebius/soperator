@@ -27,6 +27,8 @@ type SlurmWorker struct {
 	VolumeJail       slurmv1.NodeVolume
 	JailSubMounts    []slurmv1.NodeVolumeJailSubMount
 	SharedMemorySize *resource.Quantity
+	SshdEnabled      bool
+	ContainerSshd    Container
 }
 
 func buildSlurmWorkerFrom(
@@ -61,6 +63,11 @@ func buildSlurmWorkerFrom(
 		VolumeJail:       *worker.Volumes.Jail.DeepCopy(),
 		SharedMemorySize: worker.Volumes.SharedMemorySize,
 		CgroupVersion:    worker.CgroupVersion,
+		SshdEnabled:      worker.SlurmNodeWorkerSshd.Enabled,
+		ContainerSshd: buildContainerFrom(
+			worker.SlurmNodeWorkerSshd.NodeContainer,
+			consts.ContainerNameSshd,
+		),
 	}
 	for _, jailSubMount := range worker.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()

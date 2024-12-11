@@ -15,7 +15,8 @@ func RenderPodMonitor(
 	clusterName, namespace string,
 	exporterValues *values.SlurmExporter,
 ) (*prometheusv1.PodMonitor, error) {
-	if exporterValues == nil || &exporterValues.PodMonitorConfig == nil || !exporterValues.Enabled {
+
+	if exporterValues == nil || !exporterValues.Enabled {
 		return nil, errors.New("prometheus PodMonitor is not enabled")
 	}
 

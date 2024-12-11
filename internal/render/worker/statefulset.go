@@ -21,6 +21,7 @@ func RenderStatefulSet(
 	clusterName string,
 	clusterType consts.ClusterType,
 	nodeFilters []slurmv1.K8sNodeFilter,
+	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	worker *values.SlurmWorker,
 ) (appsv1.StatefulSet, error) {
@@ -33,7 +34,7 @@ func RenderStatefulSet(
 		func(f slurmv1.K8sNodeFilter) string { return f.Name },
 	)
 
-	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecs(clusterName, volumeSources, worker)
+	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecs(clusterName, secrets, volumeSources, worker)
 	if err != nil {
 		return appsv1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
@@ -52,9 +53,12 @@ func RenderStatefulSet(
 	initContainers := []corev1.Container{
 		common.RenderContainerMunge(&worker.ContainerMunge),
 	}
+
 	if clusterType == consts.ClusterTypeGPU {
 		initContainers = append(initContainers, renderContainerToolkitValidation(&worker.ContainerToolkitValidation))
 	}
+
+	initContainers = appendIfNotNil(initContainers, renderContainerSshd(worker.SshdEnabled, &worker.ContainerSshd))
 
 	slurmdContainer, err := renderContainerSlurmd(
 		&worker.ContainerSlurmd,
@@ -116,4 +120,11 @@ func RenderStatefulSet(
 			},
 		},
 	}, nil
+}
+
+func appendIfNotNil(containers []corev1.Container, container *corev1.Container) []corev1.Container {
+	if container != nil {
+		containers = append(containers, *container)
+	}
+	return containers
 }

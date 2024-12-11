@@ -134,6 +134,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						clusterValues.Name,
 						clusterValues.ClusterType,
 						clusterValues.NodeFilters,
+						&clusterValues.Secrets,
 						clusterValues.VolumeSources,
 						&clusterValues.NodeWorker,
 					)
