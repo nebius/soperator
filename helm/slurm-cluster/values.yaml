@@ -266,6 +266,7 @@ slurmNodes:
     size: 2
     k8sNodeFilterName: "gpu"
     cgroupVersion: v2
+    enableGDRCopy: false
     slurmd:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"

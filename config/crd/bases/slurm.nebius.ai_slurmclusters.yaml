@@ -3721,6 +3721,12 @@ spec:
                         - v1
                         - v2
                         type: string
+                      enableGDRCopy:
+                        default: false
+                        description: |-
+                          EnableGDRCopy driver propagation into containers (this feature must also be enabled in NVIDIA GPU operator)
+                          https://developer.nvidia.com/gdrcopy
+                        type: boolean
                       k8sNodeFilterName:
                         description: |-
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.

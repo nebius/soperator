@@ -53,6 +53,7 @@ func renderContainerSlurmd(
 	clusterName string,
 	clusterType consts.ClusterType,
 	cgroupVersion string,
+	enableGDRCopy bool,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountSlurmConfigs(),
@@ -84,7 +85,7 @@ func renderContainerSlurmd(
 		Name:            consts.ContainerNameSlurmd,
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
-		Env:             renderSlurmdEnv(clusterName, cgroupVersion, clusterType, realMemory),
+		Env:             renderSlurmdEnv(clusterName, cgroupVersion, clusterType, realMemory, enableGDRCopy),
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,
 			ContainerPort: container.Port,
@@ -119,7 +120,7 @@ func renderContainerSlurmd(
 	}, nil
 }
 
-func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.ClusterType, realMemory int64) []corev1.EnvVar {
+func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.ClusterType, realMemory int64, enableGDRCopy bool) []corev1.EnvVar {
 	envVar := []corev1.EnvVar{
 		{
 			Name: "K8S_POD_NAME",
@@ -154,6 +155,12 @@ func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.Clust
 		envVar = append(envVar, corev1.EnvVar{
 			Name:  consts.CGroupV2Env,
 			Value: "true",
+		})
+	}
+	if enableGDRCopy {
+		envVar = append(envVar, corev1.EnvVar{
+			Name:  consts.NVIDIAGDRCopy,
+			Value: "enabled",
 		})
 	}
 	return envVar

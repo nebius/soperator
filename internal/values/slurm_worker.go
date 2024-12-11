@@ -19,6 +19,7 @@ type SlurmWorker struct {
 	ContainerMunge             Container
 
 	CgroupVersion string
+	EnableGDRCopy bool
 
 	Service     Service
 	StatefulSet StatefulSet
@@ -61,6 +62,7 @@ func buildSlurmWorkerFrom(
 		VolumeJail:       *worker.Volumes.Jail.DeepCopy(),
 		SharedMemorySize: worker.Volumes.SharedMemorySize,
 		CgroupVersion:    worker.CgroupVersion,
+		EnableGDRCopy:    worker.EnableGDRCopy,
 	}
 	for _, jailSubMount := range worker.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()

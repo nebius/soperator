@@ -76,7 +76,9 @@ RUN apt update && \
         libdrm-dev \
         zip \
         unzip \
-        rsync
+        rsync \
+        numactl \
+        htop
 
 # Install python
 COPY common/scripts/install_python.sh /opt/bin/
@@ -156,6 +158,24 @@ RUN wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/
     tar -xvzf /tmp/nccl-tests-perf.tar.gz -C /usr/bin && \
     rm -rf /tmp/nccl-tests-perf.tar.gz
 
+# Install GDRCopy libraries & executables
+COPY common/scripts/install_gdrcopy.sh /opt/bin/
+RUN chmod +x /opt/bin/install_gdrcopy.sh && \
+    /opt/bin/install_gdrcopy.sh && \
+    rm /opt/bin/install_gdrcopy.sh
+
+# Install AWS CLI
+COPY common/scripts/install_awscli.sh /opt/bin/
+RUN chmod +x /opt/bin/install_awscli.sh && \
+    /opt/bin/install_awscli.sh && \
+    rm /opt/bin/install_awscli.sh
+
+# Install Rclone
+COPY common/scripts/install_rclone.sh /opt/bin/
+RUN chmod +x /opt/bin/install_rclone.sh && \
+    /opt/bin/install_rclone.sh && \
+    rm /opt/bin/install_rclone.sh
+
 # Copy binary that performs GPU benchmark
 COPY --from=gpubench_builder /app/gpubench /usr/bin/
 
@@ -166,7 +186,8 @@ RUN mkdir -m 555 /mnt/host
 RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
 COPY jail/init-users/* /etc/
 RUN chmod 644 /etc/passwd /etc/group && chown 0:0 /etc/passwd /etc/group && \
-    chmod 640 /etc/shadow /etc/gshadow && chown 0:42 /etc/shadow /etc/gshadow
+    chmod 640 /etc/shadow /etc/gshadow && chown 0:42 /etc/shadow /etc/gshadow && \
+    chmod 440 /etc/sudoers && chown 0:0 /etc/sudoers
 
 # Adjust the default $HOME directory content
 RUN cd /etc/skel && \

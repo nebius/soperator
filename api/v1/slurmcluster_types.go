@@ -633,6 +633,13 @@ type SlurmNodeWorker struct {
 	// +kubebuilder:default="v2"
 	// +kubebuilder:validation:Enum="v1";"v2"
 	CgroupVersion string `json:"cgroupVersion,omitempty"`
+
+	// EnableGDRCopy driver propagation into containers (this feature must also be enabled in NVIDIA GPU operator)
+	// https://developer.nvidia.com/gdrcopy
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	EnableGDRCopy bool `json:"enableGDRCopy,omitempty"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node
