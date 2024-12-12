@@ -47,6 +47,7 @@ RUN apt-get update && \
         daemontools \
         libncurses5-dev \
         libdrm-dev \
+        sudo \
         supervisor \
         openssh-server
 

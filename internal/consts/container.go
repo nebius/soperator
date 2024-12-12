@@ -11,6 +11,8 @@ const (
 	ContainerNameNCCLBenchmark     = ncclBenchmark
 	ContainerNamePopulateJail      = populateJail
 	ContainerNameExporter          = Exporter
+	ContainerNameNodeSysctl        = "node-sysctl"
+	ContainerNameNodeSysctlSleep   = "node-sysctl-sleep"
 
 	ContainerSecurityContextCapabilitySysAdmin = "SYS_ADMIN"
 

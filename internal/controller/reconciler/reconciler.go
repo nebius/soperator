@@ -184,6 +184,8 @@ func (r Reconciler) reconcile(
 				existing = &corev1.Service{}
 			case *appsv1.StatefulSet:
 				existing = &appsv1.StatefulSet{}
+			case *appsv1.DaemonSet:
+				existing = &appsv1.DaemonSet{}
 			case *corev1.ServiceAccount:
 				existing = &corev1.ServiceAccount{}
 			case *rbacv1.Role:
