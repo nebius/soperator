@@ -301,7 +301,7 @@ func RenderVolumeMountRESTJWTKey() corev1.VolumeMount {
 
 // endregion REST JWT key
 
-// region SSH
+// region SSHD
 
 // region configs
 
