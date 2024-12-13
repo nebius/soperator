@@ -319,7 +319,7 @@ func RenderVolumeSshConfigs(clusterName string) corev1.Volume {
 	}
 }
 
-// renderVolumeMountSshConfigs renders [corev1.VolumeMount] defining the mounting path for SSH configs
+// renderVolumeMountSshConfigs renders [corev1.VolumeMount] defining the mounting path for SSHD configs
 func RenderVolumeMountSshConfigs() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      consts.VolumeNameSSHConfigs,
@@ -332,7 +332,7 @@ func RenderVolumeMountSshConfigs() corev1.VolumeMount {
 
 // region root keys
 
-// renderVolumeSshRootKeys renders [corev1.Volume] containing SSH root keys contents
+// renderVolumeSshRootKeys renders [corev1.Volume] containing SSHD root keys contents
 func RenderVolumeSshRootKeys(clusterName string) corev1.Volume {
 	return corev1.Volume{
 		Name: consts.VolumeNameSSHRootKeys,
@@ -347,7 +347,7 @@ func RenderVolumeSshRootKeys(clusterName string) corev1.Volume {
 	}
 }
 
-// renderVolumeMountSshRootKeys renders [corev1.VolumeMount] defining the mounting path for SSH root keys
+// renderVolumeMountSshRootKeys renders [corev1.VolumeMount] defining the mounting path for SSHDrenderContainerSshd root keys
 func RenderVolumeMountSshRootKeys() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      consts.VolumeNameSSHRootKeys,

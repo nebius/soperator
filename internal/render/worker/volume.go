@@ -27,6 +27,7 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeWorker),
 		common.RenderVolumeSshdKeys(secrets.SshdKeysName),
 		common.RenderVolumeSshConfigs(clusterName),
+		common.RenderVolumeSshRootKeys(clusterName),
 		renderVolumeNvidia(),
 		renderVolumeBoot(),
 		renderVolumeNCCLTopology(clusterName),

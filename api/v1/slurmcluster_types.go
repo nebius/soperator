@@ -645,8 +645,6 @@ type SlurmNodeWorkerSshd struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=true
 	Enabled bool `json:"enabled,omitempty"`
-	// Sshd represents the SSH daemon service configuration
-	//
 	// +kubebuilder:validation:Optional
 	NodeContainer `json:",inline"`
 }

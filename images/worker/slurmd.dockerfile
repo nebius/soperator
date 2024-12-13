@@ -125,5 +125,4 @@ RUN chmod +x /opt/bin/slurm/sshd_entrypoint.sh
 
 # Hack for sshd in worker node to work with CDI and GPU operator.
 COPY worker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-CMD ["/usr/bin/supervisord"]
-ENTRYPOINT ["/opt/bin/slurm/slurmd_entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/supervisord"]
