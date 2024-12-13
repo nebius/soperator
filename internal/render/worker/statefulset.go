@@ -24,6 +24,7 @@ func RenderStatefulSet(
 	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	worker *values.SlurmWorker,
+	supervisordConfigMap *corev1.ConfigMap,
 ) (appsv1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeWorker, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeWorker, clusterName)
@@ -35,7 +36,7 @@ func RenderStatefulSet(
 	)
 
 	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecs(
-		clusterName, secrets, volumeSources, worker,
+		clusterName, secrets, volumeSources, worker, supervisordConfigMap,
 	)
 	if err != nil {
 		return appsv1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
@@ -66,6 +67,7 @@ func RenderStatefulSet(
 		clusterType,
 		worker.CgroupVersion,
 		worker.EnableGDRCopy,
+		supervisordConfigMap,
 	)
 	if err != nil {
 		return appsv1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)

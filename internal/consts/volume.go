@@ -25,24 +25,25 @@ const (
 )
 
 const (
-	VolumeNameSlurmConfigs   = slurmConfigs
-	VolumeNameSlurmdbdSecret = slurmdbdSecret
-	VolumeNameSpool          = spool
-	VolumeNameJail           = jail
-	VolumeNameJailSnapshot   = jail + "-snapshot"
-	VolumeNameMungeSocket    = mungePrefix + "socket"
-	VolumeNameMungeKey       = mungeKey
-	VolumenameRESTJWTKey     = RESTJWTKey
-	VolumeNameNvidia         = nvidia
-	VolumeNameBoot           = boot
-	VolumeNameSSHConfigs     = sshConfigs
-	VolumeNameSSHRootKeys    = sshRootKeys
-	VolumeNameSSHDKeys       = "sshd-keys"
-	VolumeMountPathSSHDKeys  = "/etc/ssh/sshd_keys"
-	VolumeNameSecurityLimits = securityLimits
-	VolumeNameNCCLTopology   = ncclTopology
-	VolumeNameSharedMemory   = "dev-shm"
-	VolumeNameSysctl         = sysctl
+	VolumeNameSlurmConfigs         = slurmConfigs
+	VolumeNameSlurmdbdSecret       = slurmdbdSecret
+	VolumeNameSpool                = spool
+	VolumeNameJail                 = jail
+	VolumeNameJailSnapshot         = jail + "-snapshot"
+	VolumeNameMungeSocket          = mungePrefix + "socket"
+	VolumeNameMungeKey             = mungeKey
+	VolumenameRESTJWTKey           = RESTJWTKey
+	VolumeNameNvidia               = nvidia
+	VolumeNameBoot                 = boot
+	VolumeNameSSHConfigs           = sshConfigs
+	VolumeNameSSHRootKeys          = sshRootKeys
+	VolumeNameSSHDKeys             = "sshd-keys"
+	VolumeMountPathSSHDKeys        = "/etc/ssh/sshd_keys"
+	VolumeNameSecurityLimits       = securityLimits
+	VolumeNameNCCLTopology         = ncclTopology
+	VolumeNameSharedMemory         = "dev-shm"
+	VolumeNameSysctl               = sysctl
+	VolumeNameSupervisordConfigMap = "supervisord-config"
 
 	VolumeMountPathSlurmConfigs      = "/mnt/" + slurmConfigs
 	VolumeMountPathSlurmdbdSecret    = "/mnt/" + slurmdbdSecret
@@ -65,4 +66,5 @@ const (
 	VolumeMountPathSharedMemory      = "/dev/shm"
 	VolumeMountPathSysctl            = "/etc/" + sysctlConfFile
 	VolumeMountSubPathSysctl         = sysctlConfFile
+	VolumeMountPathSupervisordConfig = "/etc/supervisor/conf.d/"
 )

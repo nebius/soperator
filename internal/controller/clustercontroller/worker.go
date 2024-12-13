@@ -129,6 +129,25 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
 
+					var superviserdConfigMap *corev1.ConfigMap = nil
+					if clusterValues.NodeWorker.SupervisordConfigMapRefName != "" {
+						configMapName := clusterValues.NodeWorker.SupervisordConfigMapRefName
+						superviserdConfigMap = &corev1.ConfigMap{}
+
+						err := r.Get(
+							stepCtx,
+							types.NamespacedName{
+								Namespace: clusterValues.Namespace,
+								Name:      configMapName,
+							},
+							superviserdConfigMap,
+						)
+						if err != nil {
+							stepLogger.Error(err, "Failed to get Supervisord ConfigMap")
+							return errors.Wrap(err, "getting Supervisord ConfigMap")
+						}
+					}
+
 					desired, err := worker.RenderStatefulSet(
 						clusterValues.Namespace,
 						clusterValues.Name,
@@ -137,6 +156,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						&clusterValues.Secrets,
 						clusterValues.VolumeSources,
 						&clusterValues.NodeWorker,
+						superviserdConfigMap,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
@@ -358,6 +378,22 @@ func (r SlurmClusterReconciler) getWorkersStatefulSetDependencies(
 			return []metav1.Object{}, err
 		}
 		res = append(res, slurmdbdSecret)
+	}
+
+	if clusterValues.NodeWorker.SupervisordConfigMapRefName != "" {
+		superviserdConfigMap := &corev1.ConfigMap{}
+		err := r.Get(
+			ctx,
+			types.NamespacedName{
+				Namespace: clusterValues.Namespace,
+				Name:      clusterValues.NodeWorker.SupervisordConfigMapRefName,
+			},
+			superviserdConfigMap,
+		)
+		if err != nil {
+			return []metav1.Object{}, err
+		}
+		res = append(res, superviserdConfigMap)
 	}
 
 	return res, nil

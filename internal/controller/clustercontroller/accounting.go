@@ -104,9 +104,8 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					}
 
 					var secret = &corev1.Secret{}
-					var err error
 
-					err = r.handleMariaDB(stepCtx, clusterValues, consts.MariaDbSecretName, secret)
+					err := r.handleMariaDB(stepCtx, clusterValues, consts.MariaDbSecretName, secret)
 
 					if apierrors.IsNotFound(err) {
 						desired, err := accounting.RenderSecretMariaDb(
@@ -141,9 +140,8 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					}
 
 					var secret = &corev1.Secret{}
-					var err error
 
-					err = r.handleMariaDB(stepCtx, clusterValues, consts.MariaDbSecretRootName, secret)
+					err := r.handleMariaDB(stepCtx, clusterValues, consts.MariaDbSecretRootName, secret)
 
 					if apierrors.IsNotFound(err) {
 						desired, err := accounting.RenderSecretMariaDb(

@@ -54,6 +54,7 @@ func renderContainerSlurmd(
 	clusterType consts.ClusterType,
 	cgroupVersion string,
 	enableGDRCopy bool,
+	supervisordConfigMap *corev1.ConfigMap,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountSlurmConfigs(),
@@ -71,6 +72,9 @@ func renderContainerSlurmd(
 		renderVolumeMountSysctl(),
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
+	if supervisordConfigMap != nil {
+		volumeMounts = append(volumeMounts, renderVolumeMountSupervisordConfigMap())
+	}
 
 	resources := corev1.ResourceRequirements{
 		Limits:   container.Resources,
@@ -121,6 +125,14 @@ func renderContainerSlurmd(
 		},
 		Resources: resources,
 	}, nil
+}
+
+func renderVolumeMountSupervisordConfigMap() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSupervisordConfigMap,
+		MountPath: consts.VolumeMountPathSupervisordConfig,
+		ReadOnly:  true,
+	}
 }
 
 func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.ClusterType, realMemory int64, enableGDRCopy bool) []corev1.EnvVar {

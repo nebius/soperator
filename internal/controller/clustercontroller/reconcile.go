@@ -447,7 +447,8 @@ func (r *SlurmClusterReconciler) patchStatus(ctx context.Context, cluster *slurm
 type statusPatcher func(status *slurmv1.SlurmClusterStatus)
 
 const (
-	podTemplateField = ".spec.metrics.podTemplateNameRef"
+	podTemplateField = ".spec.slurmNodes.exporter.exporter.podTemplateNameRef"
+	configmapField   = ".spec.slurmNodes.worker.supervisordConfigMapRefName"
 )
 
 func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency int, cacheSyncTimeout time.Duration) error {
@@ -463,6 +464,12 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 	controllerBuilder.Watches(
 		&corev1.PodTemplate{},
 		handler.EnqueueRequestsFromMapFunc(r.findObjectsForPodTemplate),
+		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+	)
+
+	controllerBuilder.Watches(
+		&corev1.ConfigMap{},
+		handler.EnqueueRequestsFromMapFunc(r.findObjectsForConfigMap),
 		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 	)
 
@@ -519,6 +526,29 @@ func (r *SlurmClusterReconciler) findObjectsForPodTemplate(ctx context.Context, 
 	listOps := &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(podTemplateField, podTemplate.GetName()),
 		Namespace:     podTemplate.GetNamespace(),
+	}
+	err := r.List(ctx, attachedSlurmClusters, listOps)
+	if err != nil {
+		return []reconcile.Request{}
+	}
+
+	requests := make([]reconcile.Request, len(attachedSlurmClusters.Items))
+	for i, item := range attachedSlurmClusters.Items {
+		requests[i] = reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.GetName(),
+				Namespace: item.GetNamespace(),
+			},
+		}
+	}
+	return requests
+}
+
+func (r *SlurmClusterReconciler) findObjectsForConfigMap(ctx context.Context, configmap client.Object) []reconcile.Request {
+	attachedSlurmClusters := &slurmv1.SlurmClusterList{}
+	listOps := &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(configmapField, configmap.GetName()),
+		Namespace:     configmap.GetNamespace(),
 	}
 	err := r.List(ctx, attachedSlurmClusters, listOps)
 	if err != nil {

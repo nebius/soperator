@@ -640,6 +640,11 @@ type SlurmNodeWorker struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	EnableGDRCopy bool `json:"enableGDRCopy,omitempty"`
+
+	// SupervisordConfigMapRefName for supervisord configuration
+	//
+	// +kubebuilder:validation:Optional
+	SupervisordConfigMapRefName string `json:"supervisordConfigMapRefName,omitempty"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node

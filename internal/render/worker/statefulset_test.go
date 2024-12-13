@@ -127,7 +127,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := worker.RenderStatefulSet(testNamespace, testCluster, tt.clusterType, nodeFilter, tt.secrets, volumeSource, tt.worker)
+			result, err := worker.RenderStatefulSet(testNamespace, testCluster, tt.clusterType, nodeFilter, tt.secrets, volumeSource, tt.worker, nil)
 			assert.NoError(t, err)
 
 			assert.Equal(t, consts.ContainerNameSlurmd, result.Spec.Template.Spec.Containers[0].Name)

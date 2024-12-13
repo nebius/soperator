@@ -3819,6 +3819,9 @@ spec:
                         required:
                         - image
                         type: object
+                      supervisordConfigMapRefName:
+                        description: SupervisordConfigMapRefName for supervisord configuration
+                        type: string
                       volumes:
                         description: Volumes represents the volume configurations
                           for the worker node

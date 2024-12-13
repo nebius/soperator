@@ -24,10 +24,11 @@ type SlurmWorker struct {
 	Service     Service
 	StatefulSet StatefulSet
 
-	VolumeSpool      slurmv1.NodeVolume
-	VolumeJail       slurmv1.NodeVolume
-	JailSubMounts    []slurmv1.NodeVolumeJailSubMount
-	SharedMemorySize *resource.Quantity
+	VolumeSpool                 slurmv1.NodeVolume
+	VolumeJail                  slurmv1.NodeVolume
+	JailSubMounts               []slurmv1.NodeVolumeJailSubMount
+	SharedMemorySize            *resource.Quantity
+	SupervisordConfigMapRefName string
 }
 
 func buildSlurmWorkerFrom(
@@ -58,11 +59,12 @@ func buildSlurmWorkerFrom(
 			naming.BuildStatefulSetName(consts.ComponentTypeWorker, clusterName),
 			worker.SlurmNode.Size,
 		),
-		VolumeSpool:      *worker.Volumes.Spool.DeepCopy(),
-		VolumeJail:       *worker.Volumes.Jail.DeepCopy(),
-		SharedMemorySize: worker.Volumes.SharedMemorySize,
-		CgroupVersion:    worker.CgroupVersion,
-		EnableGDRCopy:    worker.EnableGDRCopy,
+		VolumeSpool:                 *worker.Volumes.Spool.DeepCopy(),
+		VolumeJail:                  *worker.Volumes.Jail.DeepCopy(),
+		SharedMemorySize:            worker.Volumes.SharedMemorySize,
+		CgroupVersion:               worker.CgroupVersion,
+		EnableGDRCopy:               worker.EnableGDRCopy,
+		SupervisordConfigMapRefName: worker.SupervisordConfigMapRefName,
 	}
 	for _, jailSubMount := range worker.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()
