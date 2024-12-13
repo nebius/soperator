@@ -46,7 +46,9 @@ RUN apt-get update && \
         kmod \
         daemontools \
         libncurses5-dev \
-        libdrm-dev
+        libdrm-dev \
+        supervisor \
+        openssh-server
 
 # Install PMIx
 COPY common/scripts/install_pmix.sh /opt/bin/
@@ -116,4 +118,12 @@ RUN mkdir -p /var/log/slurm/multilog && \
 # Copy & run the entrypoint script
 COPY worker/slurmd_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh
+
+# Copy the sshd configuration file
+COPY worker/sshd_entrypoint.sh /opt/bin/slurm/
+RUN chmod +x /opt/bin/slurm/sshd_entrypoint.sh
+
+# Hack for sshd in worker node to work with CDI and GPU operator.
+COPY worker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+CMD ["/usr/bin/supervisord"]
 ENTRYPOINT ["/opt/bin/slurm/slurmd_entrypoint.sh"]
