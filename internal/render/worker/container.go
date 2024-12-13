@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
 
 	"nebius.ai/slurm-operator/internal/check"
@@ -183,4 +184,54 @@ func renderRealMemorySlurmd(resources corev1.ResourceRequirements) int64 {
 	// Convert bytes to mebibytes (1 MiB = 1,048,576 bytes)
 	memoryInMebibytes := memoryInBytes / 1_048_576 // 1 MiB = 1,048,576 bytes
 	return memoryInMebibytes
+}
+
+// renderContainerNodeSysctl renders [corev1.Container] for modify k8s node sysctl
+func renderContainerNodeSysctl() corev1.Container {
+	return corev1.Container{
+		Name:  consts.ContainerNameNodeSysctl,
+		Image: "busybox:latest",
+		SecurityContext: &corev1.SecurityContext{
+			Privileged: ptr.To(true)},
+		Resources: corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("10m"),
+				corev1.ResourceMemory: resource.MustParse("8Mi"),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("10m"),
+				corev1.ResourceMemory: resource.MustParse("8Mi"),
+			},
+		},
+		Command: []string{
+			"/bin/sh",
+			"-c",
+			"sysctl -w kernel.unprivileged_userns_clone=1",
+		},
+	}
+}
+
+// renderContainerNodeSysctlSleep renders [corev1.Container] for reconciliation of sysctl
+func renderContainerNodeSysctlSleep() corev1.Container {
+	return corev1.Container{
+		Name:  consts.ContainerNameNodeSysctlSleep,
+		Image: "busybox:latest",
+		SecurityContext: &corev1.SecurityContext{
+			Privileged: ptr.To(true)},
+		Resources: corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("10m"),
+				corev1.ResourceMemory: resource.MustParse("8Mi"),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("10m"),
+				corev1.ResourceMemory: resource.MustParse("8Mi"),
+			},
+		},
+		Command: []string{
+			"/bin/sh",
+			"-c",
+			"sleep 3600",
+		},
+	}
 }

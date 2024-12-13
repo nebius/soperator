@@ -102,7 +102,7 @@ RUN chmod +x /opt/bin/install_enroot.sh && \
     rm /opt/bin/install_enroot.sh
 
 # Copy enroot configuration
-COPY jail/enroot-conf/enroot.conf /etc/enroot/
+COPY jail/enroot/enroot.conf /etc/enroot/
 RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
 
 # Create directory for enroot runtime data that will be mounted from the host
