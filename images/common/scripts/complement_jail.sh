@@ -85,6 +85,15 @@ pushd "${jaildir}"
         mount --bind /usr/share/enroot/enroot-data usr/share/enroot/enroot-data
     fi
 
+    if ! getcap usr/bin/enroot-mksquashovlfs | grep -q 'cap_sys_admin+pe'; then
+        echo "Set capabilities for enroot-mksquashovlfs to run containers without privileges"
+        setcap cap_sys_admin+pe usr/bin/enroot-mksquashovlfs
+    fi
+    if ! getcap usr/bin/enroot-aufs2ovlfs | grep -q 'cap_sys_admin,cap_mknod+pe'; then
+        echo "Set capabilities for enroot-aufs2ovlfs to run containers without privileges"
+        setcap cap_sys_admin,cap_mknod+pe usr/bin/enroot-aufs2ovlfs
+    fi
+
     echo "Bind-mount slurm configs"
     for file in /mnt/slurm-configs/*; do
         filename=$(basename "$file")

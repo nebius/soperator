@@ -3,8 +3,7 @@
 set -e
 
 if [[ $# -eq 0 ]] || [[ "$*" == *"-h"* ]] || [[ "$*" == *"--help"* ]]; then
-    echo "Usage: createuser <username> [--with-password] [--without-sudo] [--without-docker]"
-    echo "       [--without-ssh-key] [<args for adduser...>]"
+    echo "Usage: createuser <username> [--with-password] [--without-sudo] [--without-docker] [<args for adduser...>]"
     exit 0
 fi
 
@@ -46,18 +45,29 @@ if [[ "$*" != *"--without-docker"* ]]; then
     add_to_group docker
 fi
 
-if [ -n "$ssh_public_key" ]; then
-    home_dir=$(eval echo "~$username")
-    ssh_dir="$home_dir/.ssh"
-    if [ ! -d "$ssh_dir" ]; then
-        mkdir -p "$ssh_dir"
-        chown "$username:$username" "$ssh_dir"
-        chmod 700 "$ssh_dir"
-    fi
+home_dir=$(eval echo "~$username")
+ssh_dir="$home_dir/.ssh"
+authorized_keys="$ssh_dir/authorized_keys"
+internal_key="$ssh_dir/id_ecdsa"
 
-    authorized_keys="$ssh_dir/authorized_keys"
-    echo "Saving SSH key to '${authorized_keys}'"
-    echo "$ssh_public_key" >> "$authorized_keys"
+if [ ! -d "$ssh_dir" ]; then
+    mkdir -p "$ssh_dir"
+    chown "$username:$username" "$ssh_dir"
+    chmod 700 "$ssh_dir"
+fi
+
+if [ ! -f "$authorized_keys" ]; then
+    touch "$authorized_keys"
     chown "$username:$username" "$authorized_keys"
     chmod 600 "$authorized_keys"
 fi
+
+if [ -n "$ssh_public_key" ]; then
+    echo "Saving SSH key to '${authorized_keys}' ..."
+    echo "$ssh_public_key" >> "$authorized_keys"
+fi
+
+echo "Generating an internal SSH key pair ..."
+ssh-keygen -t ecdsa -f "$internal_key" -N ''
+chown "$username:$username" "$internal_key" "$internal_key.pub"
+cat "$internal_key.pub" >> "$authorized_keys"

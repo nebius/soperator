@@ -14,7 +14,7 @@ echo "Delete everything from jail directory"
 rm -rf /mnt/jail/*
 
 echo "Rclone and rsync jail rootfs into jail directory"
-rclone copy /jail /mnt/jail --progress --multi-thread-streams="$(nproc)" --links
+rclone copy /jail /mnt/jail --progress --transfers="$(nproc)" --links
 rsync --verbose --archive --one-file-system --xattrs --numeric-ids --sparse --acls --hard-links /jail/ /mnt/jail/
 
 echo "Set permissions for jail directory"

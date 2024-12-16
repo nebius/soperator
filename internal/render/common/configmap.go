@@ -266,7 +266,6 @@ func RenderConfigMapSecurityLimits(componentType consts.ComponentType, cluster *
 
 func generateUnlimitedSecurityLimitsConfig() renderutils.ConfigFile {
 	res := &renderutils.MultilineStringConfig{}
-	res.AddLine("#Empty security limits file")
 	res.AddLine("# Set core file size to unlimited (-c)")
 	res.AddLine("*    soft    core        unlimited")
 	res.AddLine("*    hard    core        unlimited")

@@ -1,6 +1,6 @@
 {
   "hosts": [
-    "unix:///var/run/docker.sock",
+    "unix:///var/run/docker.sock"
   ],
   "runtimes": {
     "nvidia": {
