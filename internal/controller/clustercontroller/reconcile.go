@@ -239,6 +239,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 			if err = r.ReconcileWorkers(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
+			// TODO: Drop this check because Slurm clusters can't exist without Login nodes
 			if clusterValues.NodeLogin.Size > 0 {
 				if err = r.ReconcileLogin(ctx, cluster, clusterValues); err != nil {
 					return ctrl.Result{}, err
@@ -449,7 +450,8 @@ func (r *SlurmClusterReconciler) patchStatus(ctx context.Context, cluster *slurm
 type statusPatcher func(status *slurmv1.SlurmClusterStatus)
 
 const (
-	podTemplateField = ".spec.metrics.podTemplateNameRef"
+	podTemplateField = ".spec.slurmNodes.exporter.exporter.podTemplateNameRef"
+	configmapField   = ".spec.slurmNodes.worker.supervisordConfigMapRefName"
 )
 
 func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency int, cacheSyncTimeout time.Duration) error {
@@ -465,6 +467,12 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 	controllerBuilder.Watches(
 		&corev1.PodTemplate{},
 		handler.EnqueueRequestsFromMapFunc(r.findObjectsForPodTemplate),
+		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+	)
+
+	controllerBuilder.Watches(
+		&corev1.ConfigMap{},
+		handler.EnqueueRequestsFromMapFunc(r.findObjectsForConfigMap),
 		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 	)
 
@@ -508,7 +516,7 @@ func (r *SlurmClusterReconciler) createServiceAccountPredicate() predicate.Funcs
 }
 
 /*
-Because we have already created an index on the `podTemplate` reference field, this mapping function is quite straight forward.
+Because we have already created an index on the `podTemplate` reference field, this mapping function is quite straightforward.
 We first need to list out all `SlurmCluster` that use `podTemplate` given in the mapping function.
 This is done by merely submitting a List request using our indexed field as the field selector.
 
@@ -521,6 +529,29 @@ func (r *SlurmClusterReconciler) findObjectsForPodTemplate(ctx context.Context, 
 	listOps := &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(podTemplateField, podTemplate.GetName()),
 		Namespace:     podTemplate.GetNamespace(),
+	}
+	err := r.List(ctx, attachedSlurmClusters, listOps)
+	if err != nil {
+		return []reconcile.Request{}
+	}
+
+	requests := make([]reconcile.Request, len(attachedSlurmClusters.Items))
+	for i, item := range attachedSlurmClusters.Items {
+		requests[i] = reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.GetName(),
+				Namespace: item.GetNamespace(),
+			},
+		}
+	}
+	return requests
+}
+
+func (r *SlurmClusterReconciler) findObjectsForConfigMap(ctx context.Context, configmap client.Object) []reconcile.Request {
+	attachedSlurmClusters := &slurmv1.SlurmClusterList{}
+	listOps := &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(configmapField, configmap.GetName()),
+		Namespace:     configmap.GetNamespace(),
 	}
 	err := r.List(ctx, attachedSlurmClusters, listOps)
 	if err != nil {

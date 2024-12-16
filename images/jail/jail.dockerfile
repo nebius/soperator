@@ -176,6 +176,17 @@ RUN chmod +x /opt/bin/install_rclone.sh && \
     /opt/bin/install_rclone.sh && \
     rm /opt/bin/install_rclone.sh
 
+# Install Docker CLI
+COPY common/scripts/install_docker_cli.sh /opt/bin/
+RUN chmod +x /opt/bin/install_docker_cli.sh && \
+    /opt/bin/install_docker_cli.sh && \
+    rm /opt/bin/install_docker_cli.sh
+
+# Replace the real Docker CLI with a wrapper script
+RUN mv /usr/bin/docker /usr/bin/docker.real
+COPY jail/scripts/docker.sh /usr/bin/docker
+RUN chmod +x /usr/bin/docker
+
 # Copy binary that performs GPU benchmark
 COPY --from=gpubench_builder /app/gpubench /usr/bin/
 

@@ -155,6 +155,9 @@ spec:
       enableGDRCopy: {{ default false .Values.slurmNodes.worker.enableGDRCopy }}
       size: {{ required ".Values.slurmNodes.worker.size must be provided." .Values.slurmNodes.worker.size }}
       k8sNodeFilterName: {{ required ".Values.slurmNodes.worker.k8sNodeFilterName must be provided." .Values.slurmNodes.worker.k8sNodeFilterName | quote }}
+      {{- if .Values.slurmNodes.worker.supervisordConfigMapRefName }}
+      supervisordConfigMapRefName: {{ .Values.slurmNodes.worker.supervisordConfigMapRefName | quote }}
+      {{- end }}
       slurmd:
         image: {{ required "slurmd image" .Values.images.slurmd | quote }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.worker.slurmd.imagePullPolicy | quote }}
@@ -165,6 +168,9 @@ spec:
           memory: {{ required ".Values.slurmNodes.worker.slurmd.resources.memory must be provided." .Values.slurmNodes.worker.slurmd.resources.memory | quote}}
           ephemeral-storage: {{ required ".Values.slurmNodes.worker.slurmd.resources.ephemeralStorage must be provided." .Values.slurmNodes.worker.slurmd.resources.ephemeralStorage | quote}}
           nvidia.com/gpu: {{ required ".Values.slurmNodes.worker.slurmd.resources.gpu must be provided." .Values.slurmNodes.worker.slurmd.resources.gpu | quote }}
+        {{- if .Values.slurmNodes.worker.slurmd.securityLimitsConfig }}
+        securityLimitsConfig: {{ .Values.slurmNodes.worker.slurmd.securityLimitsConfig }}
+        {{- end }}
       munge:
         image: {{ required "munge image" .Values.images.munge | quote }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.worker.munge.imagePullPolicy | quote }}

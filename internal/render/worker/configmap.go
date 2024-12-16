@@ -159,4 +159,64 @@ func generateSysctlConfig() renderutils.ConfigFile {
 
 // endregion Sysctl
 
-// region Security limits
+// region Supervisord
+
+// RenderConfigMapSupervisord renders new [corev1.ConfigMap] containing supervisord config file
+func RenderConfigMapSupervisord(cluster *values.SlurmCluster) corev1.ConfigMap {
+	data := generateSupervisordConfig().Render()
+	return corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.NodeWorker.SupervisordConfigMapName,
+			Namespace: cluster.Namespace,
+			Labels:    common.RenderLabels(consts.ComponentTypeWorker, cluster.Name),
+		},
+		Data: map[string]string{
+			consts.ConfigMapKeySupervisord: data,
+		},
+	}
+}
+
+func generateSupervisordConfig() renderutils.ConfigFile {
+	res := &renderutils.MultilineStringConfig{}
+	res.AddLine("[supervisord]")
+	res.AddLine("nodaemon=true")
+	res.AddLine("logfile=/dev/null ; Output only to stdout/stderr")
+	res.AddLine("logfile_maxbytes=0")
+	res.AddLine("pidfile=/var/run/supervisord.pid")
+	res.AddLine("")
+	res.AddLine("[program:slurmd]")
+	res.AddLine("priority=1")
+	res.AddLine("stdout_logfile=/dev/fd/1")
+	res.AddLine("stdout_logfile_maxbytes=0")
+	res.AddLine("stderr_logfile=/dev/fd/2")
+	res.AddLine("stderr_logfile_maxbytes=0")
+	res.AddLine("redirect_stderr=true")
+	res.AddLine("command=/opt/bin/slurm/slurmd_entrypoint.sh")
+	res.AddLine("autostart=true")
+	res.AddLine("autorestart=true")
+	res.AddLine("startretries=5")
+	res.AddLine("stopasgroup=true ; Send SIGTERM to all child processes of supervisord")
+	res.AddLine("killasgroup=true ; Send SIGKILL to all child processes of supervisord")
+	res.AddLine("stopsignal=SIGTERM ; Signal to send to the program to stop it")
+	res.AddLine("stopwaitsecs=10 ; Wait for the process to stop before sending a SIGKILL")
+	res.AddLine("")
+	res.AddLine("[program:sshd]")
+	res.AddLine("priority=10")
+	res.AddLine("stdout_logfile=/dev/fd/1")
+	res.AddLine("stdout_logfile_maxbytes=0")
+	res.AddLine("stderr_logfile=/dev/fd/2")
+	res.AddLine("stderr_logfile_maxbytes=0")
+	res.AddLine("redirect_stderr=true")
+	res.AddLine("command=/opt/bin/slurm/sshd_entrypoint.sh")
+	res.AddLine("autostart=true")
+	res.AddLine("autorestart=true")
+	res.AddLine("startretries=5")
+	res.AddLine("stopasgroup=true ; Send SIGTERM to all child processes of supervisord")
+	res.AddLine("killasgroup=true ; Send SIGKILL to all child processes of supervisord")
+	res.AddLine("stopsignal=SIGTERM ; Signal to send to the program to stop it")
+	res.AddLine("stopwaitsecs=10 ; Wait for the process to stop before sending a SIGKILL")
+
+	return res
+}
+
+// endregion Supervisord

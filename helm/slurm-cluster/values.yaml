@@ -267,6 +267,7 @@ slurmNodes:
     k8sNodeFilterName: "gpu"
     cgroupVersion: v2
     enableGDRCopy: false
+    supervisordConfigMapRefName: ""
     slurmd:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
@@ -276,6 +277,7 @@ slurmNodes:
         memory: "1220Gi"
         ephemeralStorage: "55Gi"
         gpu: 8
+      securityLimitsConfig: ""
     munge:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"

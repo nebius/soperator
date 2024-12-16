@@ -70,6 +70,7 @@ func renderContainerSlurmd(
 		renderVolumeMountNCCLTopology(),
 		renderVolumeMountSharedMemory(),
 		renderVolumeMountSysctl(),
+		renderVolumeMountSupervisordConfigMap(),
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
 
@@ -122,6 +123,14 @@ func renderContainerSlurmd(
 		},
 		Resources: resources,
 	}, nil
+}
+
+func renderVolumeMountSupervisordConfigMap() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSupervisordConfigMap,
+		MountPath: consts.VolumeMountPathSupervisordConfig,
+		ReadOnly:  true,
+	}
 }
 
 func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.ClusterType, realMemory int64, enableGDRCopy bool) []corev1.EnvVar {
