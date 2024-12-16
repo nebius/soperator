@@ -40,3 +40,4 @@ nogroup:x:65534:
 _ssh:x:101:
 crontab:x:102:
 messagebus:x:105:
+docker:x:999:

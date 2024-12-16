@@ -130,6 +130,33 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 			},
 
 			utils.MultiStepExecutionStep{
+				Name: "Slurm Worker Supervisord ConfigMap",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					generateDefault := clusterValues.NodeWorker.SupervisordConfigMapDefault
+					if generateDefault {
+						stepLogger.Info("Generate default ConfigMap")
+						desired := worker.RenderConfigMapSupervisord(clusterValues)
+						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+						stepLogger.Info("Rendered")
+
+						if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+							stepLogger.Error(err, "Failed to reconcile")
+							return errors.Wrap(err, "reconciling worker supervisord configmap")
+						}
+					} else {
+						stepLogger.Info("Use custom ConfigMap")
+					}
+
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+
+			utils.MultiStepExecutionStep{
 				Name: "Slurm Worker Service",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
@@ -384,6 +411,22 @@ func (r SlurmClusterReconciler) getWorkersStatefulSetDependencies(
 			return []metav1.Object{}, err
 		}
 		res = append(res, slurmdbdSecret)
+	}
+
+	if clusterValues.NodeWorker.SupervisordConfigMapName != "" {
+		superviserdConfigMap := &corev1.ConfigMap{}
+		err := r.Get(
+			ctx,
+			types.NamespacedName{
+				Namespace: clusterValues.Namespace,
+				Name:      clusterValues.NodeWorker.SupervisordConfigMapName,
+			},
+			superviserdConfigMap,
+		)
+		if err != nil {
+			return []metav1.Object{}, err
+		}
+		res = append(res, superviserdConfigMap)
 	}
 
 	return res, nil

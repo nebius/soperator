@@ -623,6 +623,11 @@ type SlurmNodeWorker struct {
 	// +kubebuilder:validation:Required
 	Munge NodeContainer `json:"munge"`
 
+	// SupervisordConfigMapRefName is the name of the supervisord config, which runs in slurmd container
+	//
+	// +kubebuilder:validation:Optional
+	SupervisordConfigMapRefName string `json:"supervisordConfigMapRefName,omitempty"`
+
 	// Volumes represents the volume configurations for the worker node
 	//
 	// +kubebuilder:validation:Required

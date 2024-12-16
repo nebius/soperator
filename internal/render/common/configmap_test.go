@@ -92,7 +92,7 @@ func TestRenderConfigMapSecurityLimits(t *testing.T) {
 				},
 			},
 			componentType: consts.ComponentTypeWorker,
-			expectedData:  "#Empty security limits file",
+			expectedData:  generateUnlimitedSecurityLimitsConfig().Render(),
 			expectedLabel: consts.ComponentTypeWorker.String(),
 		},
 		{

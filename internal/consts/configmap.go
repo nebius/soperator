@@ -12,6 +12,7 @@ const (
 	ConfigMapNameSecurityLimits    = securityLimits
 	ConfigMapNameNCCLTopology      = ncclTopology
 	ConfigMapNameSysctl            = sysctl
+	ConfigMapNameSupervisord       = supervisord
 
 	ConfigMapKeySlurmConfig    = "slurm.conf"
 	ConfigMapKeyCGroupConfig   = "cgroup.conf"
@@ -24,4 +25,5 @@ const (
 	ConfigMapKeySecurityLimits          = securityLimitsConfFile
 	ConfigMapKeyNCCLTopology            = "virtualTopology.xml"
 	ConfigMapKeySysctl                  = sysctlConfFile
+	ConfigMapKeySupervisord             = supervisordConfFile
 )

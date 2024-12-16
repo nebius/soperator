@@ -18,6 +18,9 @@ type SlurmWorker struct {
 	ContainerSlurmd            Container
 	ContainerMunge             Container
 
+	SupervisordConfigMapDefault bool
+	SupervisordConfigMapName    string
+
 	CgroupVersion string
 	EnableGDRCopy bool
 
@@ -35,6 +38,11 @@ func buildSlurmWorkerFrom(
 	worker *slurmv1.SlurmNodeWorker,
 	ncclSettings *slurmv1.NCCLSettings,
 ) SlurmWorker {
+	supervisordConfigName := worker.SupervisordConfigMapRefName
+	supervisordConfigDefault := supervisordConfigName == ""
+	if supervisordConfigDefault {
+		supervisordConfigName = naming.BuildConfigMapSupervisordName(clusterName)
+	}
 	res := SlurmWorker{
 		SlurmNode:    *worker.SlurmNode.DeepCopy(),
 		NCCLSettings: *ncclSettings.DeepCopy(),
@@ -53,7 +61,9 @@ func buildSlurmWorkerFrom(
 			worker.Munge,
 			consts.ContainerNameMunge,
 		),
-		Service: buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeWorker, clusterName)),
+		SupervisordConfigMapDefault: supervisordConfigDefault,
+		SupervisordConfigMapName:    supervisordConfigName,
+		Service:                     buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeWorker, clusterName)),
 		StatefulSet: buildStatefulSetFrom(
 			naming.BuildStatefulSetName(consts.ComponentTypeWorker, clusterName),
 			worker.SlurmNode.Size,
