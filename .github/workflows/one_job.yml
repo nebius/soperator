@@ -11,6 +11,9 @@ on:
       - 'README.md'
       - 'SECURITY.md'
       - 'images/jail/gpubench/**'
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
