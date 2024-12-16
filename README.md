@@ -101,6 +101,7 @@ Slurm's accounting system records detailed job information such as:
 - User and group identities
 - Job start/end times
 - Resource requests and allocations
+- If `protectedSecret` is set to `true`, the user secret for MariaDB will not be deleted after the MariaDB CR is deleted
 
 This helps cluster administrators and users monitor resource utilization, enforce quotas, and generate usage reports for performance optimization or billing purposes.
 
