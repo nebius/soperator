@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	mariadv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
@@ -184,6 +184,8 @@ func (r Reconciler) reconcile(
 				existing = &corev1.Service{}
 			case *appsv1.StatefulSet:
 				existing = &appsv1.StatefulSet{}
+			case *appsv1.DaemonSet:
+				existing = &appsv1.DaemonSet{}
 			case *corev1.ServiceAccount:
 				existing = &corev1.ServiceAccount{}
 			case *rbacv1.Role:
@@ -196,10 +198,10 @@ func (r Reconciler) reconcile(
 				existing = &appsv1.Deployment{}
 			case *prometheusv1.PodMonitor:
 				existing = &prometheusv1.PodMonitor{}
-			case *mariadv1alpha1.MariaDB:
-				existing = &mariadv1alpha1.MariaDB{}
-			case *mariadv1alpha1.Grant:
-				existing = &mariadv1alpha1.Grant{}
+			case *mariadbv1alpha1.MariaDB:
+				existing = &mariadbv1alpha1.MariaDB{}
+			case *mariadbv1alpha1.Grant:
+				existing = &mariadbv1alpha1.Grant{}
 			default:
 				return errors.New(fmt.Sprintf("unimplemented resolver for resource type %T", desired))
 			}

@@ -36,7 +36,7 @@ controllerManager:
       slurmOperatorWatchNamespaces: '*'
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/slurm-operator
-      tag: 1.15.3
+      tag: 1.16.0
     imagePullPolicy: Always
     resources:
       limits:
@@ -44,8 +44,6 @@ controllerManager:
       requests:
         cpu: 100m
         memory: 64Mi
-  podSecurityContext:
-    runAsNonRoot: true
   replicas: 1
   serviceAccount:
     annotations: {}
@@ -57,3 +55,11 @@ metricsService:
       protocol: TCP
       targetPort: https
   type: ClusterIP
+webhookService:
+  ports:
+    - port: 443
+      protocol: TCP
+      targetPort: 9443
+  type: ClusterIP
+certManager:
+  enabled: false

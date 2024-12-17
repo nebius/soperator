@@ -35,6 +35,7 @@ type SlurmCluster struct {
 	NodeLogin      SlurmLogin
 	Telemetry      *slurmv1.Telemetry
 	SlurmExporter  SlurmExporter
+	SlurmConfig    slurmv1.SlurmConfig
 }
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD
@@ -68,6 +69,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		NodeLogin:              buildSlurmLoginFrom(cluster.Name, &cluster.Spec.SlurmNodes.Login),
 		Telemetry:              cluster.Spec.Telemetry,
 		SlurmExporter:          buildSlurmExporterFrom(&cluster.Spec.SlurmNodes.Exporter),
+		SlurmConfig:            cluster.Spec.SlurmConfig,
 	}
 
 	if err := res.Validate(ctx); err != nil {

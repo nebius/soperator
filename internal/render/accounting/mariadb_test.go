@@ -30,15 +30,43 @@ func Test_GetMariaDbConfig(t *testing.T) {
 
 func Test_GetAffinityConfig(t *testing.T) {
 	affinity := &corev1.Affinity{
-		NodeAffinity: &corev1.NodeAffinity{},
+		NodeAffinity: &corev1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{
+					{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      "kubernetes.io/e2e-az-name",
+								Operator: corev1.NodeSelectorOpIn,
+								Values:   []string{"e2e-az1", "e2e-az2"},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	antiAffinityEnabled := false
 
 	affinityConfig := getAffinityConfig(affinity, &antiAffinityEnabled)
 
-	assert.Equal(t, affinity.NodeAffinity, affinityConfig.NodeAffinity)
 	assert.Equal(t, &antiAffinityEnabled, affinityConfig.AntiAffinityEnabled)
+	assert.Equal(
+		t,
+		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key,
+		affinityConfig.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key,
+	)
+	assert.Equal(
+		t,
+		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Operator,
+		affinityConfig.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Operator,
+	)
+	assert.Equal(
+		t,
+		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values,
+		affinityConfig.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values,
+	)
 }
 
 func Test_RenderMariaDb(t *testing.T) {

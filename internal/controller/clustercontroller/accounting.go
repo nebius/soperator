@@ -35,6 +35,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 	isAccountingEnabled := clusterValues.NodeAccounting.Enabled
 	isExternalDBEnabled := clusterValues.NodeAccounting.ExternalDB.Enabled
 	isMariaDBEnabled := clusterValues.NodeAccounting.MariaDb.Enabled
+	isProtectedSecret := clusterValues.NodeAccounting.MariaDb.ProtectedSecret
 
 	if !isAccountingEnabled || (!isExternalDBEnabled && !isMariaDBEnabled) {
 		logger.Info("Slurm Accounting is disabled. Skipping reconciliation")
@@ -62,7 +63,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					}
 
 					if isMariaDBEnabled {
-						err = r.handleMariaDB(stepCtx, clusterValues, secret)
+						err = r.handleMariaDB(stepCtx, clusterValues, consts.MariaDbSecretName, secret)
 						if err != nil {
 							return err
 						}
@@ -92,7 +93,77 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					return nil
 				},
 			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Secret MariaDB password",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+					if !isMariaDBEnabled || !isProtectedSecret {
+						stepLogger.Info("Reconciled")
+						return nil
+					}
 
+					var secret = &corev1.Secret{}
+
+					err := r.handleMariaDB(stepCtx, clusterValues, consts.MariaDbSecretName, secret)
+
+					if apierrors.IsNotFound(err) {
+						desired, err := accounting.RenderSecretMariaDb(
+							clusterValues.Namespace,
+							consts.MariaDbSecretName,
+							clusterValues.Name,
+						)
+						if err != nil {
+							stepLogger.Error(err, "Failed to render")
+							return errors.Wrap(err, "rendering mariadb password Secret")
+						}
+						stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
+						stepLogger.Info("Rendered")
+
+						if err = r.Secret.Reconcile(stepCtx, cluster, desired); err != nil {
+							stepLogger.Error(err, "Failed to reconcile")
+							return errors.Wrap(err, "reconciling mariadb password Secret")
+						}
+					}
+					return err
+				},
+			},
+
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Secret MariaDB root password",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+					if !isMariaDBEnabled || !isProtectedSecret {
+						stepLogger.Info("Reconciled")
+						return nil
+					}
+
+					var secret = &corev1.Secret{}
+
+					err := r.handleMariaDB(stepCtx, clusterValues, consts.MariaDbSecretRootName, secret)
+
+					if apierrors.IsNotFound(err) {
+						desired, err := accounting.RenderSecretMariaDb(
+							clusterValues.Namespace,
+							consts.MariaDbSecretRootName,
+							clusterValues.Name,
+						)
+						if err != nil {
+							stepLogger.Error(err, "Failed to render")
+							return errors.Wrap(err, "rendering mariadb root password Secret")
+						}
+						stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
+						stepLogger.Info("Rendered")
+
+						if err = r.Secret.Reconcile(stepCtx, cluster, desired); err != nil {
+							stepLogger.Error(err, "Failed to reconcile")
+							return errors.Wrap(err, "reconciling mariadb root password Secret")
+						}
+					}
+					return err
+				},
+			},
 			utils.MultiStepExecutionStep{
 				Name: "Slurm accounting service",
 				Func: func(stepCtx context.Context) error {
@@ -258,6 +329,7 @@ func (r SlurmClusterReconciler) handleExternalDB(
 func (r SlurmClusterReconciler) handleMariaDB(
 	ctx context.Context,
 	clusterValues *values.SlurmCluster,
+	secretName string,
 	secret *corev1.Secret) error {
 	logger := log.FromContext(ctx)
 
@@ -265,7 +337,7 @@ func (r SlurmClusterReconciler) handleMariaDB(
 		ctx,
 		types.NamespacedName{
 			Namespace: clusterValues.Namespace,
-			Name:      consts.MariaDbSecretName,
+			Name:      secretName,
 		},
 		secret,
 	)

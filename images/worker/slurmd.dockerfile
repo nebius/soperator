@@ -46,7 +46,10 @@ RUN apt-get update && \
         kmod \
         daemontools \
         libncurses5-dev \
-        libdrm-dev
+        libdrm-dev \
+        sudo \
+        supervisor \
+        openssh-server
 
 # Install PMIx
 COPY common/scripts/install_pmix.sh /opt/bin/
@@ -80,11 +83,23 @@ RUN chmod +x /opt/bin/install_container_toolkit.sh && \
     /opt/bin/install_container_toolkit.sh && \
     rm /opt/bin/install_container_toolkit.sh
 
+# Copy NVIDIA Container Toolkit config
+COPY worker/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
+
 # Install nvtop GPU monitoring utility
 COPY common/scripts/install_nvtop.sh /opt/bin/
 RUN chmod +x /opt/bin/install_nvtop.sh && \
     /opt/bin/install_nvtop.sh && \
     rm /opt/bin/install_nvtop.sh
+
+# Install Docker
+COPY common/scripts/install_docker.sh /opt/bin/
+RUN chmod +x /opt/bin/install_docker.sh && \
+    /opt/bin/install_docker.sh && \
+    rm /opt/bin/install_docker.sh
+
+# Copy Docker daemon config
+COPY worker/docker/daemon.json /etc/docker/daemon.json
 
 # Create node-local directories for enroot runtime data
 RUN mkdir -p -m 777 /usr/share/enroot/enroot-data && \
@@ -113,7 +128,13 @@ RUN mkdir -p /var/log/slurm/multilog && \
     touch /var/log/slurm/multilog/current && \
     ln -s /var/log/slurm/multilog/current /var/log/slurm/slurmd.log
 
-# Copy & run the entrypoint script
+# Copy slurmd entrypoint script
 COPY worker/slurmd_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh
-ENTRYPOINT ["/opt/bin/slurm/slurmd_entrypoint.sh"]
+
+# Copy sshd entrypoint script
+COPY worker/sshd_entrypoint.sh /opt/bin/slurm/
+RUN chmod +x /opt/bin/slurm/sshd_entrypoint.sh
+
+# Start supervisord that manages both slurmd and sshd as child processes
+ENTRYPOINT ["/usr/bin/supervisord"]

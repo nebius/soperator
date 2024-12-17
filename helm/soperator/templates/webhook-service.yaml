@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "soperator.fullname" . }}-webhook-service
+  labels:
+  {{- include "soperator.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.webhookService.type }}
+  selector:
+    control-plane: controller-manager
+  {{- include "soperator.selectorLabels" . | nindent 4 }}
+  ports:
+  {{- .Values.webhookService.ports | toYaml | nindent 2 }}

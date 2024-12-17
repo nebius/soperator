@@ -101,6 +101,7 @@ Slurm's accounting system records detailed job information such as:
 - User and group identities
 - Job start/end times
 - Resource requests and allocations
+- If `protectedSecret` is set to `true`, the user secret for MariaDB will not be deleted after the MariaDB CR is deleted
 
 This helps cluster administrators and users monitor resource utilization, enforce quotas, and generate usage reports for performance optimization or billing purposes.
 
@@ -114,9 +115,8 @@ This helps cluster administrators and users monitor resource utilization, enforc
       [22.04](https://releases.ubuntu.com/jammy/).
     - Slurm: versions `23.11.6` and `24.05.3`.
     - CUDA: version [12.2.2](https://developer.nvidia.com/cuda-12-2-2-download-archive).
-    - Kubernetes: >= [1.28](https://kubernetes.io/blog/2023/08/15/kubernetes-v1-28-release/).
+    - Kubernetes: >= [1.29](https://kubernetes.io/blog/2023/08/15/kubernetes-v1-28-release/).
     - Versions of some preinstalled software packages can't be changed.
-
 
 
 ## 🚀 Installation

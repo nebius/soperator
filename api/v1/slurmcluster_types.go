@@ -6,7 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	mariadv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
 
@@ -73,6 +73,40 @@ type SlurmClusterSpec struct {
 	// https://slurm.schedmd.com/slurm.conf.html#SECTION_PARTITION-CONFIGURATION
 	// +kubebuilder:validation:Optional
 	PartitionConfiguration PartitionConfiguration `json:"partitionConfiguration,omitempty"`
+
+	// SlurmConfig represents the Slurm configuration in slurm.conf. Not all options are supported.
+	//
+	// +kubebuilder:validation:Optional
+	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
+}
+
+// SlurmConfig represents the Slurm configuration in slurm.conf
+type SlurmConfig struct {
+	// Default real memory size available per allocated node in mebibytes.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=1228800
+	DefMemPerNode int32 `json:"defMemPerNode,omitempty"`
+	// Default count of CPUs allocated per allocated GPU
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=16
+	DefCpuPerGPU int32 `json:"defCpuPerGPU,omitempty"`
+	// The time to wait, in seconds, when any job is in the COMPLETING state before any additional jobs are scheduled.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=5
+	CompleteWait int32 `json:"completeWait,omitempty"`
+	// Defines specific subsystems which should provide more detailed event logging.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs"
+	// +kubebuilder:validation:Pattern="^((Accrue|Agent|AuditRPCs|Backfill|BackfillMap|BurstBuffer|Cgroup|ConMgr|CPU_Bind|CpuFrequency|Data|DBD_Agent|Dependency|Elasticsearch|Energy|Federation|FrontEnd|Gres|Hetjob|Gang|GLOB_SILENCE|JobAccountGather|JobComp|JobContainer|License|Network|NetworkRaw|NodeFeatures|NO_CONF_HASH|Power|Priority|Profile|Protocol|Reservation|Route|Script|SelectType|Steps|Switch|TLS|TraceJobs|Triggers)(,)?)+$"
+	DebugFlags string `json:"debugFlags,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="Verbose"
+	// +kubebuilder:validation:Pattern="^((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+$"
+	TaskPluginParam string `json:"taskPluginParam,omitempty"`
 }
 
 type PartitionConfiguration struct {
@@ -277,7 +311,6 @@ type K8sNodeFilter struct {
 	Name string `json:"name"`
 
 	// Affinity defines the desired affinity for the node
-	//
 	// NOTE: Affinity could not be set if NodeSelector is specified
 	//
 	// +kubebuilder:validation:Optional
@@ -442,13 +475,26 @@ type MariaDbOperator struct {
 	// +kubebuilder:validation:Optional
 	Enabled bool `json:"enabled"`
 
+	// If enabled, secret cannot be deleted until custom resource slurmcluster is deleted
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	// +kubebuilder:validation:Immutable
+	ProtectedSecret bool `json:"protectedSecret"`
+
 	NodeContainer      `json:",inline"`
-	PodSecurityContext *corev1.PodSecurityContext     `json:"podSecurityContext,omitempty"`
-	SecurityContext    *corev1.SecurityContext        `json:"securityContext,omitempty"`
-	Replicas           int32                          `json:"replicas,omitempty"`
-	Metrics            *mariadv1alpha1.MariadbMetrics `json:"metrics,omitempty"`
-	Replication        *mariadv1alpha1.Replication    `json:"replication,omitempty"`
-	Storage            mariadv1alpha1.Storage         `json:"storage,omitempty"`
+	PodSecurityContext *mariadbv1alpha1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+	SecurityContext    *mariadbv1alpha1.SecurityContext    `json:"securityContext,omitempty"`
+	Replicas           int32                               `json:"replicas,omitempty"`
+	Metrics            MariadbMetrics                      `json:"metrics,omitempty"`
+	Replication        *mariadbv1alpha1.Replication        `json:"replication,omitempty"`
+	Storage            mariadbv1alpha1.Storage             `json:"storage,omitempty"`
+}
+
+type MariadbMetrics struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
+	Enabled bool `json:"enabled,omitempty"`
 }
 
 type SlurmdbdConfig struct {
@@ -577,6 +623,11 @@ type SlurmNodeWorker struct {
 	// +kubebuilder:validation:Required
 	Munge NodeContainer `json:"munge"`
 
+	// SupervisordConfigMapRefName is the name of the supervisord config, which runs in slurmd container
+	//
+	// +kubebuilder:validation:Optional
+	SupervisordConfigMapRefName string `json:"supervisordConfigMapRefName,omitempty"`
+
 	// Volumes represents the volume configurations for the worker node
 	//
 	// +kubebuilder:validation:Required
@@ -587,6 +638,13 @@ type SlurmNodeWorker struct {
 	// +kubebuilder:default="v2"
 	// +kubebuilder:validation:Enum="v1";"v2"
 	CgroupVersion string `json:"cgroupVersion,omitempty"`
+
+	// EnableGDRCopy driver propagation into containers (this feature must also be enabled in NVIDIA GPU operator)
+	// https://developer.nvidia.com/gdrcopy
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	EnableGDRCopy bool `json:"enableGDRCopy,omitempty"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node

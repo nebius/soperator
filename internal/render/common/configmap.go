@@ -55,6 +55,21 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("AuthType", "auth/"+consts.Munge)
 	res.AddProperty("CredType", "cred/"+consts.Munge)
 	res.AddComment("")
+	res.AddComment("SlurnConfig Spec")
+	v := reflect.ValueOf(cluster.SlurmConfig)
+	t := reflect.TypeOf(cluster.SlurmConfig)
+
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		fieldName := t.Field(i).Name
+
+		if field.Kind() == reflect.String && field.String() == "" {
+			continue
+		}
+
+		res.AddProperty(fieldName, field.Interface())
+	}
+	res.AddComment("")
 	if cluster.ClusterType == consts.ClusterTypeGPU {
 		res.AddProperty("GresTypes", "gpu")
 	}
@@ -222,18 +237,13 @@ func RenderConfigMapSecurityLimits(componentType consts.ComponentType, cluster *
 	switch componentType {
 	case consts.ComponentTypeLogin:
 		data = cluster.NodeLogin.ContainerSshd.NodeContainer.SecurityLimitsConfig
-		if data == "" {
-			data = generateDefaultSecurityLimitsConfig().Render()
-		}
 	case consts.ComponentTypeWorker:
 		data = cluster.NodeWorker.ContainerSlurmd.NodeContainer.SecurityLimitsConfig
 		if data == "" {
-			data = generateDefaultSecurityLimitsConfig().Render()
+			data = generateUnlimitedSecurityLimitsConfig().Render()
 		}
 	case consts.ComponentTypeController:
 		data = cluster.NodeController.ContainerSlurmctld.NodeContainer.SecurityLimitsConfig
-	//case consts.ComponentTypeExporter:
-	//	data = cluster.SlurmExporter.
 	case consts.ComponentTypeBenchmark:
 		data = cluster.NCCLBenchmark.ContainerNCCLBenchmark.NodeContainer.SecurityLimitsConfig
 	}
@@ -254,9 +264,54 @@ func RenderConfigMapSecurityLimits(componentType consts.ComponentType, cluster *
 	}
 }
 
-func generateDefaultSecurityLimitsConfig() renderutils.ConfigFile {
-	// TODO: It's turned out that these limits do nothing, so we should drop this logic from the operator
-	return generateEmptySecurityLimitsConfig()
+func generateUnlimitedSecurityLimitsConfig() renderutils.ConfigFile {
+	res := &renderutils.MultilineStringConfig{}
+	res.AddLine("# Set core file size to unlimited (-c)")
+	res.AddLine("*    soft    core        unlimited")
+	res.AddLine("*    hard    core        unlimited")
+	res.AddLine("# Set data segment size to unlimited (-d)")
+	res.AddLine("*    soft    data        unlimited")
+	res.AddLine("*    hard    data        unlimited")
+	res.AddLine("# Set file size to unlimited (-f)")
+	res.AddLine("*    soft    fsize       unlimited")
+	res.AddLine("*    hard    fsize       unlimited")
+	res.AddLine("# Set pending signals to unlimited (-i)")
+	res.AddLine("*    soft    sigpending  unlimited")
+	res.AddLine("*    hard    sigpending  unlimited")
+	res.AddLine("# Set locked-in-memory size to unlimited (-l)")
+	res.AddLine("*    soft    memlock     unlimited")
+	res.AddLine("*    hard    memlock     unlimited")
+	res.AddLine("# Set resident set size (physical memory usage) to unlimited (-m)")
+	res.AddLine("*    soft    rss         unlimited")
+	res.AddLine("*    hard    rss         unlimited")
+	res.AddLine("# Set the number of open files to 1048576 (-n)")
+	res.AddLine("*    soft    nofile      1048576")
+	res.AddLine("*    hard    nofile      1048576")
+	res.AddLine("# Set POSIX message queue size to unlimited (-q)")
+	res.AddLine("*    soft    msgqueue    unlimited")
+	res.AddLine("*    hard    msgqueue    unlimited")
+	res.AddLine("# Set real-time priority to unlimited (-r)")
+	res.AddLine("*    soft    rtprio      unlimited")
+	res.AddLine("*    hard    rtprio      unlimited")
+	res.AddLine("# Set stack size to unlimited (-s)")
+	res.AddLine("*    soft    stack       unlimited")
+	res.AddLine("*    hard    stack       unlimited")
+	res.AddLine("# Set CPU time to unlimited (-t)")
+	res.AddLine("*    soft    cpu         unlimited")
+	res.AddLine("*    hard    cpu         unlimited")
+	res.AddLine("# Set the number of user processes to unlimited (-u)")
+	res.AddLine("*    soft    nproc       unlimited")
+	res.AddLine("*    hard    nproc       unlimited")
+	res.AddLine("# Set virtual memory size to unlimited (-v)")
+	res.AddLine("*    soft    as          unlimited")
+	res.AddLine("*    hard    as          unlimited")
+	res.AddLine("# Set the number of file locks to unlimited (-x)")
+	res.AddLine("*    soft    locks       unlimited")
+	res.AddLine("*    hard    locks       unlimited")
+	res.AddLine("# Set max scheduling priority to -20 (-e)")
+	res.AddLine("*    soft    nice        -20")
+	res.AddLine("*    hard    nice        -20")
+	return res
 }
 
 func generateEmptySecurityLimitsConfig() renderutils.ConfigFile {

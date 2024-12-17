@@ -2,11 +2,14 @@ package worker
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
 
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/naming"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -51,26 +54,43 @@ func renderContainerSlurmd(
 	clusterName string,
 	clusterType consts.ClusterType,
 	cgroupVersion string,
-) corev1.Container {
+	enableGDRCopy bool,
+) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountSlurmConfigs(),
 		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
 		common.RenderVolumeMountJail(),
 		common.RenderVolumeMountMungeSocket(),
 		common.RenderVolumeMountSecurityLimits(),
+		common.RenderVolumeMountSshdKeys(),
+		common.RenderVolumeMountSshConfigs(),
+		common.RenderVolumeMountSshRootKeys(),
 		renderVolumeMountNvidia(),
 		renderVolumeMountBoot(),
 		renderVolumeMountNCCLTopology(),
 		renderVolumeMountSharedMemory(),
 		renderVolumeMountSysctl(),
+		renderVolumeMountSupervisordConfigMap(),
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
+
+	resources := corev1.ResourceRequirements{
+		Limits:   container.Resources,
+		Requests: container.Resources,
+	}
+
+	err := check.CheckResourceRequests(resources)
+	if err != nil {
+		return corev1.Container{}, fmt.Errorf("checking resource requests: %w", err)
+	}
+
+	realMemory := renderRealMemorySlurmd(resources)
 
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
-		Env:             renderSlurmdEnv(clusterName, cgroupVersion, clusterType),
+		Env:             renderSlurmdEnv(clusterName, cgroupVersion, clusterType, realMemory, enableGDRCopy),
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,
 			ContainerPort: container.Port,
@@ -101,14 +121,19 @@ func renderContainerSlurmd(
 			},
 			ProcMount: ptr.To(corev1.UnmaskedProcMount),
 		},
-		Resources: corev1.ResourceRequirements{
-			Limits:   container.Resources,
-			Requests: container.Resources,
-		},
+		Resources: resources,
+	}, nil
+}
+
+func renderVolumeMountSupervisordConfigMap() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSupervisordConfigMap,
+		MountPath: consts.VolumeMountPathSupervisordConfig,
+		ReadOnly:  true,
 	}
 }
 
-func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.ClusterType) []corev1.EnvVar {
+func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.ClusterType, realMemory int64, enableGDRCopy bool) []corev1.EnvVar {
 	envVar := []corev1.EnvVar{
 		{
 			Name: "K8S_POD_NAME",
@@ -127,12 +152,24 @@ func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.Clust
 			},
 		},
 		{
+			Name: "INSTANCE_ID",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "spec.nodeName",
+				},
+			},
+		},
+		{
 			Name:  "K8S_SERVICE_NAME",
 			Value: naming.BuildServiceName(consts.ComponentTypeWorker, clusterName),
 		},
 		{
 			Name:  "SLURM_CLUSTER_TYPE",
 			Value: clusterType.String(),
+		},
+		{
+			Name:  "SLURM_REAL_MEMORY",
+			Value: strconv.FormatInt(realMemory, 10),
 		},
 	}
 	if cgroupVersion == consts.CGroupV2 {
@@ -141,5 +178,69 @@ func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.Clust
 			Value: "true",
 		})
 	}
+	if enableGDRCopy {
+		envVar = append(envVar, corev1.EnvVar{
+			Name:  consts.NVIDIAGDRCopy,
+			Value: "enabled",
+		})
+	}
 	return envVar
+}
+
+func renderRealMemorySlurmd(resources corev1.ResourceRequirements) int64 {
+	// Convert the memory quantity to bytes
+	memoryInBytes := resources.Requests.Memory().Value()
+	// Convert bytes to mebibytes (1 MiB = 1,048,576 bytes)
+	memoryInMebibytes := memoryInBytes / 1_048_576 // 1 MiB = 1,048,576 bytes
+	return memoryInMebibytes
+}
+
+// renderContainerNodeSysctl renders [corev1.Container] for modify k8s node sysctl
+func renderContainerNodeSysctl() corev1.Container {
+	return corev1.Container{
+		Name:  consts.ContainerNameNodeSysctl,
+		Image: "busybox:latest",
+		SecurityContext: &corev1.SecurityContext{
+			Privileged: ptr.To(true)},
+		Resources: corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("10m"),
+				corev1.ResourceMemory: resource.MustParse("8Mi"),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("10m"),
+				corev1.ResourceMemory: resource.MustParse("8Mi"),
+			},
+		},
+		Command: []string{
+			"/bin/sh",
+			"-c",
+			"sysctl -w kernel.unprivileged_userns_clone=1",
+		},
+	}
+}
+
+// renderContainerNodeSysctlSleep renders [corev1.Container] for reconciliation of sysctl
+func renderContainerNodeSysctlSleep() corev1.Container {
+	return corev1.Container{
+		Name:  consts.ContainerNameNodeSysctlSleep,
+		Image: "busybox:latest",
+		SecurityContext: &corev1.SecurityContext{
+			Privileged: ptr.To(true)},
+		Resources: corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("10m"),
+				corev1.ResourceMemory: resource.MustParse("8Mi"),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("10m"),
+				corev1.ResourceMemory: resource.MustParse("8Mi"),
+			},
+		},
+		Command: []string{
+			"/bin/sh",
+			"-c",
+			"sleep 3600",
+		},
+	}
 }

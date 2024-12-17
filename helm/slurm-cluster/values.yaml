@@ -118,7 +118,7 @@ periodicChecks:
     appArmorProfile: "unconfined"
 slurmNodes:
   accounting:
-    enabled: true
+    enabled: false
     k8sNodeFilterName: "no-gpu"
     slurmConfig: {}
     # accountingStorageTRES: gres/gpu,license/iop1
@@ -172,6 +172,7 @@ slurmNodes:
       #   key: ""
     mariadbOperator:
       enabled: false
+      protectedSecret: false
       resources:
         cpu: "1000m"
         memory: "1Gi"
@@ -265,6 +266,8 @@ slurmNodes:
     size: 2
     k8sNodeFilterName: "gpu"
     cgroupVersion: v2
+    enableGDRCopy: false
+    supervisordConfigMapRefName: ""
     slurmd:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
@@ -274,6 +277,7 @@ slurmNodes:
         memory: "1220Gi"
         ephemeralStorage: "55Gi"
         gpu: 8
+      securityLimitsConfig: ""
     munge:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
@@ -380,13 +384,13 @@ telemetry: {}
 #   otelCollectorPort: 8429
 
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.15.3-jammy-slurm24.05.2"
-  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.15.3-jammy-slurm24.05.2"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.15.3-jammy-slurm24.05.2"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.15.3-jammy-slurm24.05.2"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.15.3-jammy-slurm24.05.2"
-  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.15.3-jammy-slurm24.05.2"
-  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.15.3-jammy-slurm24.05.2"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.15.3-jammy-slurm24.05.2"
-  exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.15.3-jammy-slurm24.05.2"
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.16.0-jammy-slurm24.05.2"
+  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.16.0-jammy-slurm24.05.2"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.16.0-jammy-slurm24.05.2"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.16.0-jammy-slurm24.05.2"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.16.0-jammy-slurm24.05.2"
+  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.16.0-jammy-slurm24.05.2"
+  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.16.0-jammy-slurm24.05.2"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.16.0-jammy-slurm24.05.2"
+  exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.16.0-jammy-slurm24.05.2"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:11.4.3"

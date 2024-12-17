@@ -16,6 +16,7 @@ import (
 
 func renderVolumesAndClaimTemplateSpecs(
 	clusterName string,
+	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	worker *values.SlurmWorker,
 ) (volumes []corev1.Volume, pvcTemplateSpecs []values.PVCTemplateSpec, err error) {
@@ -24,11 +25,15 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeMungeSocket(),
 		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeWorker),
+		common.RenderVolumeSshdKeys(secrets.SshdKeysName),
+		common.RenderVolumeSshConfigs(clusterName),
+		common.RenderVolumeSshRootKeys(clusterName),
 		renderVolumeNvidia(),
 		renderVolumeBoot(),
 		renderVolumeNCCLTopology(clusterName),
 		renderVolumeSharedMemory(worker.SharedMemorySize),
 		renderVolumeSysctl(clusterName),
+		renderSupervisordConfigMap(worker.SupervisordConfigMapName),
 	}
 
 	// Spool and Jail could be specified by template spec or by volume source name
@@ -75,6 +80,19 @@ func renderVolumesAndClaimTemplateSpecs(
 	}
 
 	return volumes, pvcTemplateSpecs, nil
+}
+
+func renderSupervisordConfigMap(name string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSupervisordConfigMap,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: name,
+				},
+			},
+		},
+	}
 }
 
 // endregion Volumes & claims

@@ -1,0 +1,90 @@
+{
+  "hosts": [
+    "unix:///var/run/docker.sock"
+  ],
+  "runtimes": {
+    "nvidia": {
+      "path": "/usr/bin/nvidia-container-runtime",
+      "runtimeArgs": []
+    }
+  },
+  "default-runtime": "nvidia",
+  "default-shm-size": "256gb",
+  "default-ulimits": {
+    "core": {
+      "Name": "core",
+      "Hard": -1,
+      "Soft": -1
+    },
+    "data": {
+      "Name": "data",
+      "Hard": -1,
+      "Soft": -1
+    },
+    "fsize": {
+      "Name": "fsize",
+      "Hard": -1,
+      "Soft": -1
+    },
+    "locks": {
+      "Name": "locks",
+      "Hard": -1,
+      "Soft": -1
+    },
+    "memlock": {
+      "Name": "memlock",
+      "Hard": -1,
+      "Soft": -1
+    },
+    "msgqueue": {
+      "Name": "msgqueue",
+      "Hard": -1,
+      "Soft": -1
+    },
+    "nice": {
+      "Name": "nice",
+      "Hard": -1,
+      "Soft": -1
+    },
+    "nofile": {
+      "Name": "nofile",
+      "Hard": 1048576,
+      "Soft": 1048576
+    },
+    "nproc": {
+      "Name": "nproc",
+      "Hard": -1,
+      "Soft": -1
+    },
+    "rss": {
+      "Name": "rss",
+      "Hard": -1,
+      "Soft": -1
+    },
+    "rtprio": {
+      "Name": "rtprio",
+      "Hard": -1,
+      "Soft": -1
+    },
+    "sigpending": {
+      "Name": "sigpending",
+      "Hard": -1,
+      "Soft": -1
+    },
+    "stack": {
+      "Name": "stack",
+      "Hard": -1,
+      "Soft": -1
+    },
+    "cpu": {
+      "Name": "cpu",
+      "Hard": -1,
+      "Soft": -1
+    },
+    "as": {
+      "Name": "as",
+      "Hard": -1,
+      "Soft": -1
+    }
+  }
+}

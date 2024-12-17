@@ -21,6 +21,7 @@ func RenderStatefulSet(
 	clusterName string,
 	clusterType consts.ClusterType,
 	nodeFilters []slurmv1.K8sNodeFilter,
+	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	worker *values.SlurmWorker,
 ) (appsv1.StatefulSet, error) {
@@ -33,7 +34,9 @@ func RenderStatefulSet(
 		func(f slurmv1.K8sNodeFilter) string { return f.Name },
 	)
 
-	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecs(clusterName, volumeSources, worker)
+	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecs(
+		clusterName, secrets, volumeSources, worker,
+	)
 	if err != nil {
 		return appsv1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
@@ -48,9 +51,24 @@ func RenderStatefulSet(
 		consts.DefaultContainerAnnotationName: consts.ContainerNameSlurmd,
 	}
 
-	var initContainers []corev1.Container
+	// Since 1.29 is native sidecar support, we can use the native restart policy
+	initContainers := []corev1.Container{
+		common.RenderContainerMunge(&worker.ContainerMunge),
+	}
 	if clusterType == consts.ClusterTypeGPU {
 		initContainers = append(initContainers, renderContainerToolkitValidation(&worker.ContainerToolkitValidation))
+	}
+
+	slurmdContainer, err := renderContainerSlurmd(
+		&worker.ContainerSlurmd,
+		worker.JailSubMounts,
+		clusterName,
+		clusterType,
+		worker.CgroupVersion,
+		worker.EnableGDRCopy,
+	)
+	if err != nil {
+		return appsv1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
 	}
 
 	return appsv1.StatefulSet{
@@ -90,14 +108,7 @@ func RenderStatefulSet(
 					Tolerations:        nodeFilter.Tolerations,
 					InitContainers:     initContainers,
 					Containers: []corev1.Container{
-						renderContainerSlurmd(
-							&worker.ContainerSlurmd,
-							worker.JailSubMounts,
-							clusterName,
-							clusterType,
-							worker.CgroupVersion,
-						),
-						common.RenderContainerMunge(&worker.ContainerMunge),
+						slurmdContainer,
 					},
 					Volumes: volumes,
 					DNSConfig: &corev1.PodDNSConfig{

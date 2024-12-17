@@ -105,13 +105,12 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
 .PHONY: helm
-helm: kustomize helmify yq ## Update soperator Helm chart
-	rm -rf $(CHART_OPERATOR_PATH)
-	$(KUSTOMIZE) build config/default | $(HELMIFY) --crd-dir $(CHART_OPERATOR_PATH)
-	rm -f $(CHART_PATH)/operatorAppVersion
-	cp -r $(CHART_OPERATOR_PATH)/crds/* $(CHART_OPERATOR_CRDS_PATH)/templates/
-	@$(YQ) -i ".name = \"helm-soperator\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
-	@$(SED_COMMAND) '/^#/d' "$(CHART_OPERATOR_PATH)/Chart.yaml"
+helm: generate manifests ## Update soperator Helm chart
+	$(KUSTOMIZE) build config/crd > $(CHART_OPERATOR_PATH)/crds/slurmcluster-crd.yaml 
+	$(KUSTOMIZE) build config/crd > $(CHART_OPERATOR_CRDS_PATH)/templates/slurmcluster-crd.yaml
+	mv $(CHART_OPERATOR_PATH)/values.yaml $(CHART_OPERATOR_PATH)/values.yaml.bak
+	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/rbac/soperator-helm  | $(HELMIFY) $(CHART_OPERATOR_PATH)
+	mv $(CHART_OPERATOR_PATH)/values.yaml.bak $(CHART_OPERATOR_PATH)/values.yaml
 
 .PHONY: get-version
 get-version:
@@ -297,11 +296,11 @@ YQ             ?= $(LOCALBIN)/yq
 
 ## Tool Versions
 KUSTOMIZE_VERSION        ?= v5.5.0
-CONTROLLER_TOOLS_VERSION ?= v0.14.0
+CONTROLLER_TOOLS_VERSION ?= v0.16.4
 ENVTEST_VERSION          ?= release-0.17
 GOLANGCI_LINT_VERSION    ?= v1.57.2
 HELMIFY_VERSION          ?= 0.4.13
-YQ_VERSION               ?= 4.44.1
+YQ_VERSION               ?= 4.44.3
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.

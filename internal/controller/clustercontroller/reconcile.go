@@ -39,7 +39,7 @@ import (
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 
-	mariadv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
@@ -67,6 +67,7 @@ import (
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=k8s.mariadb.com,resources=mariadbs,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=k8s.mariadb.com,resources=grants,verbs=get;list;watch;update;patch;delete;create
+//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;update;patch;delete;create
 
 // SlurmClusterReconciler reconciles a SlurmCluster object
 type SlurmClusterReconciler struct {
@@ -80,6 +81,7 @@ type SlurmClusterReconciler struct {
 	Job            *reconciler.JobReconciler
 	Service        *reconciler.ServiceReconciler
 	StatefulSet    *reconciler.StatefulSetReconciler
+	DaemonSet      *reconciler.DaemonSetReconciler
 	ServiceAccount *reconciler.ServiceAccountReconciler
 	Role           *reconciler.RoleReconciler
 	RoleBinding    *reconciler.RoleBindingReconciler
@@ -102,6 +104,7 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 		Job:             reconciler.NewJobReconciler(r),
 		Service:         reconciler.NewServiceReconciler(r),
 		StatefulSet:     reconciler.NewStatefulSetReconciler(r),
+		DaemonSet:       reconciler.NewDaemonSetReconciler(r),
 		ServiceAccount:  reconciler.NewServiceAccountReconciler(r),
 		Role:            reconciler.NewRoleReconciler(r),
 		RoleBinding:     reconciler.NewRoleBindingReconciler(r),
@@ -237,6 +240,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 			if err = r.ReconcileWorkers(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
+			// TODO: Drop this check because Slurm clusters can't exist without Login nodes
 			if clusterValues.NodeLogin.Size > 0 {
 				if err = r.ReconcileLogin(ctx, cluster, clusterValues); err != nil {
 					return ctrl.Result{}, err
@@ -447,7 +451,8 @@ func (r *SlurmClusterReconciler) patchStatus(ctx context.Context, cluster *slurm
 type statusPatcher func(status *slurmv1.SlurmClusterStatus)
 
 const (
-	podTemplateField = ".spec.metrics.podTemplateNameRef"
+	podTemplateField = ".spec.slurmNodes.exporter.exporter.podTemplateNameRef"
+	configmapField   = ".spec.slurmNodes.worker.supervisordConfigMapRefName"
 )
 
 func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency int, cacheSyncTimeout time.Duration) error {
@@ -463,6 +468,12 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 	controllerBuilder.Watches(
 		&corev1.PodTemplate{},
 		handler.EnqueueRequestsFromMapFunc(r.findObjectsForPodTemplate),
+		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+	)
+
+	controllerBuilder.Watches(
+		&corev1.ConfigMap{},
+		handler.EnqueueRequestsFromMapFunc(r.findObjectsForConfigMap),
 		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 	)
 
@@ -506,7 +517,7 @@ func (r *SlurmClusterReconciler) createServiceAccountPredicate() predicate.Funcs
 }
 
 /*
-Because we have already created an index on the `podTemplate` reference field, this mapping function is quite straight forward.
+Because we have already created an index on the `podTemplate` reference field, this mapping function is quite straightforward.
 We first need to list out all `SlurmCluster` that use `podTemplate` given in the mapping function.
 This is done by merely submitting a List request using our indexed field as the field selector.
 
@@ -519,6 +530,29 @@ func (r *SlurmClusterReconciler) findObjectsForPodTemplate(ctx context.Context, 
 	listOps := &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(podTemplateField, podTemplate.GetName()),
 		Namespace:     podTemplate.GetNamespace(),
+	}
+	err := r.List(ctx, attachedSlurmClusters, listOps)
+	if err != nil {
+		return []reconcile.Request{}
+	}
+
+	requests := make([]reconcile.Request, len(attachedSlurmClusters.Items))
+	for i, item := range attachedSlurmClusters.Items {
+		requests[i] = reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.GetName(),
+				Namespace: item.GetNamespace(),
+			},
+		}
+	}
+	return requests
+}
+
+func (r *SlurmClusterReconciler) findObjectsForConfigMap(ctx context.Context, configmap client.Object) []reconcile.Request {
+	attachedSlurmClusters := &slurmv1.SlurmClusterList{}
+	listOps := &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(configmapField, configmap.GetName()),
+		Namespace:     configmap.GetNamespace(),
 	}
 	err := r.List(ctx, attachedSlurmClusters, listOps)
 	if err != nil {
@@ -585,8 +619,8 @@ func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Func
 		{
 			Check: check.IsMariaDbOperatorCRDInstalled,
 			Objects: []client.Object{
-				&mariadv1alpha1.MariaDB{},
-				&mariadv1alpha1.Grant{},
+				&mariadbv1alpha1.MariaDB{},
+				&mariadbv1alpha1.Grant{},
 			},
 			Predicate: predicate.GenerationChangedPredicate{},
 		},
@@ -599,9 +633,10 @@ var (
 )
 
 func getDefaultOptions(maxConcurrency int, cacheSyncTimeout time.Duration) controller.Options {
+	rateLimiters := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](2*time.Second, 2*time.Minute)
 	optionsInit.Do(func() {
 		defaultOptions = &controller.Options{
-			RateLimiter:             workqueue.NewItemExponentialFailureRateLimiter(2*time.Second, 2*time.Minute),
+			RateLimiter:             rateLimiters,
 			CacheSyncTimeout:        cacheSyncTimeout,
 			MaxConcurrentReconciles: maxConcurrency,
 		}

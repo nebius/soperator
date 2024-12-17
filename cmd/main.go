@@ -37,7 +37,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	mariadv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
@@ -45,6 +45,7 @@ import (
 	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
+	webhookcorev1 "nebius.ai/slurm-operator/internal/webhook/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -62,7 +63,7 @@ func init() {
 		utilruntime.Must(prometheusv1.AddToScheme(scheme))
 	}
 	if check.IsMariaDbCRDInstalled() {
-		utilruntime.Must(mariadv1alpha1.AddToScheme(scheme))
+		utilruntime.Must(mariadbv1alpha1.AddToScheme(scheme))
 	}
 
 	utilruntime.Must(slurmv1.AddToScheme(scheme))
@@ -192,6 +193,13 @@ func main() {
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", reflect.TypeOf(slurmv1.SlurmCluster{}).Name())
 		os.Exit(1)
+	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err = webhookcorev1.SetupSecretWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Secret")
+			os.Exit(1)
+		}
 	}
 	//+kubebuilder:scaffold:builder
 

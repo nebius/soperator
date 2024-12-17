@@ -71,6 +71,8 @@ spec:
         args:
         - --leader-elect
         env:
+          - name: ENABLE_WEBHOOKS
+            value: "true"
           # True if the OpenTelemetry Collector CRD is installed in the cluster kubernetes (default false)
           - name: IS_OPENTELEMETRY_COLLECTOR_CRD_INSTALLED
             value: "false"
@@ -82,7 +84,7 @@ spec:
             value: "false"
           - name: SLURM_OPERATOR_WATCH_NAMESPACES
             value: "*"
-        image: controller:1.15.3
+        image: controller:1.16.0
         imagePullPolicy: Always
         name: manager
         securityContext:
