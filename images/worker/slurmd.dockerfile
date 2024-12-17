@@ -133,8 +133,8 @@ COPY worker/slurmd_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh
 
 # Copy supervisord entrypoint script
-COPY worker/supervisord.sh /opt/bin/slurm/
-RUN chmod +x /opt/bin/slurm/supervisord.sh
+COPY worker/supervisord_entrypoint.sh /opt/bin/slurm/
+RUN chmod +x /opt/bin/slurm/supervisord_entrypoint.sh
 
 # Start supervisord that manages both slurmd and sshd as child processes
-ENTRYPOINT ["/opt/bin/slurm/supervisord.sh"]
+ENTRYPOINT ["/opt/bin/slurm/supervisord_entrypoint.sh"]
