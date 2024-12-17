@@ -104,7 +104,7 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Pattern="^((Accrue|Agent|AuditRPCs|Backfill|BackfillMap|BurstBuffer|Cgroup|ConMgr|CPU_Bind|CpuFrequency|Data|DBD_Agent|Dependency|Elasticsearch|Energy|Federation|FrontEnd|Gres|Hetjob|Gang|GLOB_SILENCE|JobAccountGather|JobComp|JobContainer|License|Network|NetworkRaw|NodeFeatures|NO_CONF_HASH|Power|Priority|Profile|Protocol|Reservation|Route|Script|SelectType|Steps|Switch|TLS|TraceJobs|Triggers)(,)?)+$"
 	DebugFlags string `json:"debugFlags,omitempty"`
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="Verbose"
+	// +kubebuilder:default="Verbose,OOMKillStep"
 	// +kubebuilder:validation:Pattern="^((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+$"
 	TaskPluginParam string `json:"taskPluginParam,omitempty"`
 }

@@ -1497,7 +1497,7 @@ spec:
                     format: int32
                     type: integer
                   taskPluginParam:
-                    default: Verbose
+                    default: Verbose,OOMKillStep
                     pattern: ^((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+$
                     type: string
                 type: object
