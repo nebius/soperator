@@ -81,7 +81,8 @@ if [ "$SLURM_CLUSTER_TYPE" = "gpu" ]; then
     #   GPU 2: NVIDIA V100-SXM4-16GB (UUID: <...>)
     # the GRES variable will be equal to "gpu:nvidia_a100-sxm4-80gb:2,gpu:nvidia_v100-sxm2-16gb:1".
     # See Slurm docs: https://slurm.schedmd.com/gres.html#AutoDetect
-    GRES="$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -e 's/ /_/g' -e 's/.*/\L&/' | sort | uniq -c | awk '{print "gpu:" $2 ":" $1}' | paste -sd ',' -)"
+    export GRES="$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -e 's/ /_/g' -e 's/.*/\L&/' | sort | uniq -c | awk '{print "gpu:" $2 ":" $1}' | paste -sd ',' -)"
+    
     echo "Detected GRES is $GRES"
 
     echo "Create NVML symlink with the name expected by Slurm"
