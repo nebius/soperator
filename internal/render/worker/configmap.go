@@ -207,7 +207,7 @@ func generateSupervisordConfig() renderutils.ConfigFile {
 	res.AddLine("stderr_logfile=/dev/fd/2")
 	res.AddLine("stderr_logfile_maxbytes=0")
 	res.AddLine("redirect_stderr=true")
-	res.AddLine("command=/opt/bin/slurm/sshd_entrypoint.sh")
+	res.AddLine("command=/usr/sbin/sshd -D -e -f /mnt/ssh-configs/sshd_config")
 	res.AddLine("autostart=true")
 	res.AddLine("autorestart=true")
 	res.AddLine("startretries=5")

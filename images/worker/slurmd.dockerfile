@@ -132,9 +132,9 @@ RUN mkdir -p /var/log/slurm/multilog && \
 COPY worker/slurmd_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh
 
-# Copy sshd entrypoint script
-COPY worker/sshd_entrypoint.sh /opt/bin/slurm/
-RUN chmod +x /opt/bin/slurm/sshd_entrypoint.sh
+# Copy supervisord entrypoint script
+COPY worker/supervisord.sh /opt/bin/slurm/
+RUN chmod +x /opt/bin/slurm/supervisord.sh
 
 # Start supervisord that manages both slurmd and sshd as child processes
-ENTRYPOINT ["/usr/bin/supervisord"]
+ENTRYPOINT ["/opt/bin/slurm/supervisord.sh"]
