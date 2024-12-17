@@ -97,10 +97,6 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("LaunchParameters", "use_interactive_step")
 	res.AddComment("Scrontab")
 	res.AddProperty("ScronParameters", "enable,explicit_scancel")
-	res.AddComment("")
-	res.AddProperty("MaxJobCount", 1000) // Keep 1000 last jobs in controller memory
-	res.AddProperty("MinJobAge", 86400)  // Don't remove jobs from controller memory after some time
-	res.AddComment("")
 	res.AddProperty("PropagateResourceLimits", "NONE") // Don't propagate ulimits from the login node by default
 	res.AddComment("")
 	res.AddComment("HEALTH CHECKS")

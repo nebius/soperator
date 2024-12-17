@@ -1470,6 +1470,15 @@ spec:
                     type: string
                 type: object
               slurmConfig:
+                default:
+                  completeWait: 5
+                  debugFlags: Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs
+                  defCpuPerGPU: 16
+                  defMemPerNode: 1228800
+                  maxJobCount: 10000
+                  minJobAge: 86400
+                  taskPlugin: task/cgroup,task/affinity
+                  taskPluginParam: Verbose
                 description: SlurmConfig represents the Slurm configuration in slurm.conf.
                   Not all options are supported.
                 properties:
@@ -1496,8 +1505,26 @@ spec:
                       node in mebibytes.
                     format: int32
                     type: integer
+                  maxJobCount:
+                    default: 10000
+                    description: Keep N last jobs in controller memory
+                    format: int32
+                    type: integer
+                  minJobAge:
+                    default: 86400
+                    description: Don't remove jobs from controller memory after some
+                      time
+                    format: int32
+                    type: integer
+                  taskPlugin:
+                    default: task/cgroup,task/affinity
+                    description: Identifies the type of task launch plugin (e.g. pinning
+                      tasks to specific processors)
+                    pattern: ^((task/affinity|task/cgroup|task/none)(,)?)+$
+                    type: string
                   taskPluginParam:
                     default: Verbose
+                    description: Additional parameters for the task plugin
                     pattern: ^((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+$
                     type: string
                 type: object

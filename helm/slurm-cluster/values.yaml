@@ -116,6 +116,14 @@ periodicChecks:
     k8sNodeFilterName: "no-gpu"
     imagePullPolicy: "IfNotPresent"
     appArmorProfile: "unconfined"
+slurmConfig: {}
+  # defMemPerNode: 1228800
+  # defCpuPerGPU: 16
+  # completeWait: 5
+  # debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs"
+  # taskPluginParam: "Verbose"
+  # maxJobCount: 10000
+  # minJobAge: 86400
 slurmNodes:
   accounting:
     enabled: false
