@@ -90,6 +90,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddProperty("StateSaveLocation", naming.BuildVolumeMountSpoolPath(consts.SlurmctldName))
 	res.AddComment("")
+	res.AddProperty("TaskPlugin", "task/cgroup,task/affinity")
+	res.AddComment("")
 	res.AddProperty("CliFilterPlugins", "cli_filter/user_defaults")
 	res.AddComment("")
 	res.AddProperty("LaunchParameters", "use_interactive_step")

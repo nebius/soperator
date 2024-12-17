@@ -77,7 +77,7 @@ type SlurmClusterSpec struct {
 	// SlurmConfig represents the Slurm configuration in slurm.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", taskPluginParam: "Verbose", taskPlugin: "task/cgroup,task/affinity", maxJobCount: 10000, minJobAge: 86400}
+	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", taskPluginParam: "Verbose", maxJobCount: 10000, minJobAge: 86400}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 }
 
@@ -104,12 +104,6 @@ type SlurmConfig struct {
 	// +kubebuilder:default="Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs"
 	// +kubebuilder:validation:Pattern="^((Accrue|Agent|AuditRPCs|Backfill|BackfillMap|BurstBuffer|Cgroup|ConMgr|CPU_Bind|CpuFrequency|Data|DBD_Agent|Dependency|Elasticsearch|Energy|Federation|FrontEnd|Gres|Hetjob|Gang|GLOB_SILENCE|JobAccountGather|JobComp|JobContainer|License|Network|NetworkRaw|NodeFeatures|NO_CONF_HASH|Power|Priority|Profile|Protocol|Reservation|Route|Script|SelectType|Steps|Switch|TLS|TraceJobs|Triggers)(,)?)+$"
 	DebugFlags string `json:"debugFlags,omitempty"`
-	// Identifies the type of task launch plugin (e.g. pinning tasks to specific processors)
-	//
-	// +kubebuilder:validation:Pattern="^((task/affinity|task/cgroup|task/none)(,)?)+$"
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="task/cgroup,task/affinity"
-	TaskPlugin string `json:"taskPlugin,omitempty"`
 	// Additional parameters for the task plugin
 	//
 	// +kubebuilder:validation:Optional

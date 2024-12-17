@@ -122,7 +122,6 @@ slurmConfig: {}
   # completeWait: 5
   # debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs"
   # taskPluginParam: "Verbose"
-  # taskPlugin: "task/cgroup,task/affinity"
   # maxJobCount: 10000
   # minJobAge: 86400
 slurmNodes:
