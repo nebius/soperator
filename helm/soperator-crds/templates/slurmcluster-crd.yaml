@@ -1469,6 +1469,14 @@ spec:
                     type: string
                 type: object
               slurmConfig:
+                default:
+                  completeWait: 5
+                  debugFlags: Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs
+                  defCpuPerGPU: 16
+                  defMemPerNode: 1228800
+                  maxJobCount: 10000
+                  minJobAge: 86400
+                  taskPluginParam: Verbose
                 description: SlurmConfig represents the Slurm configuration in slurm.conf.
                   Not all options are supported.
                 properties:
@@ -1495,8 +1503,20 @@ spec:
                       node in mebibytes.
                     format: int32
                     type: integer
+                  maxJobCount:
+                    default: 10000
+                    description: Keep N last jobs in controller memory
+                    format: int32
+                    type: integer
+                  minJobAge:
+                    default: 86400
+                    description: Don't remove jobs from controller memory after some
+                      time
+                    format: int32
+                    type: integer
                   taskPluginParam:
                     default: Verbose
+                    description: Additional parameters for the task plugin
                     pattern: ^((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+$
                     type: string
                 type: object
@@ -2056,8 +2076,7 @@ spec:
                             default: 0
                             type: integer
                           priorityWeightTRES:
-                            default: 0
-                            type: integer
+                            type: string
                         type: object
                       slurmdbd:
                         description: Slurmdbd represents the Slurm database daemon
@@ -3777,6 +3796,11 @@ spec:
                         description: Size defines the number of node instances
                         format: int32
                         type: integer
+                      slurmNodeExtra:
+                        description: |-
+                          SlurmNodeExtra defines the string that will be set to the "Extra" field of the corresponding Slurm node. It can
+                          use any environment variables that are available in the slurmd container when it starts.
+                        type: string
                       slurmd:
                         description: Slurmd represents the Slurm daemon service configuration
                         properties:

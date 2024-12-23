@@ -55,6 +55,7 @@ func renderContainerSlurmd(
 	clusterType consts.ClusterType,
 	cgroupVersion string,
 	enableGDRCopy bool,
+	slurmNodeExtra string,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountSlurmConfigs(),
@@ -90,7 +91,14 @@ func renderContainerSlurmd(
 		Name:            consts.ContainerNameSlurmd,
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
-		Env:             renderSlurmdEnv(clusterName, cgroupVersion, clusterType, realMemory, enableGDRCopy),
+		Env: renderSlurmdEnv(
+			clusterName,
+			cgroupVersion,
+			clusterType,
+			realMemory,
+			enableGDRCopy,
+			slurmNodeExtra,
+		),
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,
 			ContainerPort: container.Port,
@@ -133,7 +141,13 @@ func renderVolumeMountSupervisordConfigMap() corev1.VolumeMount {
 	}
 }
 
-func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.ClusterType, realMemory int64, enableGDRCopy bool) []corev1.EnvVar {
+func renderSlurmdEnv(
+	clusterName, cgroupVersion string,
+	clusterType consts.ClusterType,
+	realMemory int64,
+	enableGDRCopy bool,
+	slurmNodeExtra string,
+) []corev1.EnvVar {
 	envVar := []corev1.EnvVar{
 		{
 			Name: "K8S_POD_NAME",
@@ -170,6 +184,10 @@ func renderSlurmdEnv(clusterName, cgroupVersion string, clusterType consts.Clust
 		{
 			Name:  "SLURM_REAL_MEMORY",
 			Value: strconv.FormatInt(realMemory, 10),
+		},
+		{
+			Name:  "SLURM_NODE_EXTRA",
+			Value: slurmNodeExtra,
 		},
 	}
 	if cgroupVersion == consts.CGroupV2 {

@@ -77,6 +77,7 @@ type SlurmClusterSpec struct {
 	// SlurmConfig represents the Slurm configuration in slurm.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", taskPluginParam: "Verbose", maxJobCount: 10000, minJobAge: 86400}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 }
 
@@ -86,27 +87,39 @@ type SlurmConfig struct {
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=1228800
-	DefMemPerNode int32 `json:"defMemPerNode,omitempty"`
+	DefMemPerNode *int32 `json:"defMemPerNode,omitempty"`
 	// Default count of CPUs allocated per allocated GPU
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=16
-	DefCpuPerGPU int32 `json:"defCpuPerGPU,omitempty"`
+	DefCpuPerGPU *int32 `json:"defCpuPerGPU,omitempty"`
 	// The time to wait, in seconds, when any job is in the COMPLETING state before any additional jobs are scheduled.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=5
-	CompleteWait int32 `json:"completeWait,omitempty"`
+	CompleteWait *int32 `json:"completeWait,omitempty"`
 	// Defines specific subsystems which should provide more detailed event logging.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs"
 	// +kubebuilder:validation:Pattern="^((Accrue|Agent|AuditRPCs|Backfill|BackfillMap|BurstBuffer|Cgroup|ConMgr|CPU_Bind|CpuFrequency|Data|DBD_Agent|Dependency|Elasticsearch|Energy|Federation|FrontEnd|Gres|Hetjob|Gang|GLOB_SILENCE|JobAccountGather|JobComp|JobContainer|License|Network|NetworkRaw|NodeFeatures|NO_CONF_HASH|Power|Priority|Profile|Protocol|Reservation|Route|Script|SelectType|Steps|Switch|TLS|TraceJobs|Triggers)(,)?)+$"
-	DebugFlags string `json:"debugFlags,omitempty"`
+	DebugFlags *string `json:"debugFlags,omitempty"`
+	// Additional parameters for the task plugin
+	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="Verbose"
 	// +kubebuilder:validation:Pattern="^((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+$"
-	TaskPluginParam string `json:"taskPluginParam,omitempty"`
+	TaskPluginParam *string `json:"taskPluginParam,omitempty"`
+	// Keep N last jobs in controller memory
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=10000
+	MaxJobCount *int32 `json:"maxJobCount,omitempty"`
+	// Don't remove jobs from controller memory after some time
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=86400
+	MinJobAge *int32 `json:"minJobAge,omitempty"`
 }
 
 type PartitionConfiguration struct {
@@ -547,33 +560,32 @@ type SlurmdbdConfig struct {
 
 type AccountingSlurmConf struct {
 	// +kubebuilder:validation:Optional
-	AccountingStorageTRES string `json:"accountingStorageTRES,omitempty"`
+	AccountingStorageTRES *string `json:"accountingStorageTRES,omitempty"`
 	// +kubebuilder:validation:Optional
-	AccountingStoreFlags string `json:"accountingStoreFlags,omitempty"`
+	AccountingStoreFlags *string `json:"accountingStoreFlags,omitempty"`
 	// +kubebuilder:validation:Optional
-	AcctGatherInterconnectType string `json:"acctGatherInterconnectType,omitempty"`
+	AcctGatherInterconnectType *string `json:"acctGatherInterconnectType,omitempty"`
 	// +kubebuilder:validation:Optional
-	AcctGatherFilesystemType string `json:"acctGatherFilesystemType,omitempty"`
+	AcctGatherFilesystemType *string `json:"acctGatherFilesystemType,omitempty"`
 	// +kubebuilder:validation:Optional
-	AcctGatherProfileType string `json:"acctGatherProfileType,omitempty"`
+	AcctGatherProfileType *string `json:"acctGatherProfileType,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum="jobacct_gather/linux";"jobacct_gather/cgroup";"jobacct_gather/none"
-	JobAcctGatherType string `json:"jobAcctGatherType,omitempty"`
+	JobAcctGatherType *string `json:"jobAcctGatherType,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=30
-	JobAcctGatherFrequency int `json:"jobAcctGatherFrequency,omitempty"`
+	JobAcctGatherFrequency *int `json:"jobAcctGatherFrequency,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum="NoShared";"UsePss";"OverMemoryKill";"DisableGPUAcct"
-	JobAcctGatherParams string `json:"jobAcctGatherParams,omitempty"`
+	JobAcctGatherParams *string `json:"jobAcctGatherParams,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=0
-	PriorityWeightAge int16 `json:"priorityWeightAge,omitempty"`
+	PriorityWeightAge *int16 `json:"priorityWeightAge,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=0
-	PriorityWeightFairshare int16 `json:"priorityWeightFairshare,omitempty"`
+	PriorityWeightFairshare *int16 `json:"priorityWeightFairshare,omitempty"`
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=0
-	PriorityWeightTRES int16 `json:"priorityWeightTRES,omitempty"`
+	PriorityWeightTRES *string `json:"priorityWeightTRES,omitempty"`
 }
 
 // SlurmNodeController defines the configuration for the Slurm controller node
@@ -645,6 +657,12 @@ type SlurmNodeWorker struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	EnableGDRCopy bool `json:"enableGDRCopy,omitempty"`
+
+	// SlurmNodeExtra defines the string that will be set to the "Extra" field of the corresponding Slurm node. It can
+	// use any environment variables that are available in the slurmd container when it starts.
+	//
+	// +kubebuilder:validation:Optional
+	SlurmNodeExtra string `json:"slurmNodeExtra,omitempty"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node

@@ -4,7 +4,7 @@ package consts
 
 const (
 	SSHDClientAliveInterval = "9000" // 30 minute
-	SSHDClientAliveCountMax = "3"
+	SSHDClientAliveCountMax = "10"
 	SSHDMaxStartups         = "10:30:60"
 	SSHDLoginGraceTime      = "9000"
 	SSHDMaxAuthTries        = "4"

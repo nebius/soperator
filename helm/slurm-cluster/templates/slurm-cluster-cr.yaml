@@ -13,6 +13,10 @@ metadata:
     {{- .  | toYaml | nindent 4 }}
   {{- end }}
 spec:
+  {{- if .Values.slurmConfig }}
+  slurmConfig:
+    {{- toYaml .Values.slurmConfig | nindent 4 }}
+  {{- end }}
   crVersion: {{ .Chart.Version }}
   pause: {{ .Values.pause }}
   clusterType: {{ .Values.clusterType }}
@@ -153,6 +157,9 @@ spec:
     worker:
       cgroupVersion: {{ .Values.slurmNodes.worker.cgroupVersion | quote }}
       enableGDRCopy: {{ default false .Values.slurmNodes.worker.enableGDRCopy }}
+      {{- if .Values.slurmNodes.worker.slurmNodeExtra }}
+      slurmNodeExtra: {{ .Values.slurmNodes.worker.slurmNodeExtra | quote }}
+      {{- end }}
       size: {{ required ".Values.slurmNodes.worker.size must be provided." .Values.slurmNodes.worker.size }}
       k8sNodeFilterName: {{ required ".Values.slurmNodes.worker.k8sNodeFilterName must be provided." .Values.slurmNodes.worker.k8sNodeFilterName | quote }}
       {{- if .Values.slurmNodes.worker.supervisordConfigMapRefName }}

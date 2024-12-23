@@ -7,7 +7,6 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/utils"
 )
@@ -18,8 +17,8 @@ func RenderDaemonSet(
 	K8sNodeFilterName string,
 	nodeFilters []slurmv1.K8sNodeFilter,
 ) appsv1.DaemonSet {
-	labels := common.RenderLabels(consts.ComponentTypeWorker, clusterName)
-	matchLabels := common.RenderMatchLabels(consts.ComponentTypeWorker, clusterName)
+	labels := common.RenderLabels(consts.ComponentTypeNodeSysctlDaemonSet, clusterName)
+	matchLabels := common.RenderMatchLabels(consts.ComponentTypeNodeSysctlDaemonSet, clusterName)
 
 	nodeFilter := utils.MustGetBy(
 		nodeFilters,
@@ -46,14 +45,9 @@ func RenderDaemonSet(
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
-					Affinity:     nodeFilter.Affinity,
-					NodeSelector: nodeFilter.NodeSelector,
-					Tolerations:  nodeFilter.Tolerations,
-					DNSConfig: &corev1.PodDNSConfig{
-						Searches: []string{
-							naming.BuildServiceFQDN(consts.ComponentTypeWorker, namespace, clusterName),
-						},
-					},
+					Affinity:       nodeFilter.Affinity,
+					NodeSelector:   nodeFilter.NodeSelector,
+					Tolerations:    nodeFilter.Tolerations,
 					InitContainers: initContainers,
 					Containers: []corev1.Container{
 						renderContainerNodeSysctlSleep(),
