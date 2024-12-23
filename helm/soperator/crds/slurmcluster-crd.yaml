@@ -1476,7 +1476,6 @@ spec:
                   defMemPerNode: 1228800
                   maxJobCount: 10000
                   minJobAge: 86400
-                  taskPlugin: task/cgroup,task/affinity
                   taskPluginParam: Verbose
                 description: SlurmConfig represents the Slurm configuration in slurm.conf.
                   Not all options are supported.
@@ -1515,12 +1514,6 @@ spec:
                       time
                     format: int32
                     type: integer
-                  taskPlugin:
-                    default: task/cgroup,task/affinity
-                    description: Identifies the type of task launch plugin (e.g. pinning
-                      tasks to specific processors)
-                    pattern: ^((task/affinity|task/cgroup|task/none)(,)?)+$
-                    type: string
                   taskPluginParam:
                     default: Verbose
                     description: Additional parameters for the task plugin
@@ -3804,6 +3797,11 @@ spec:
                         description: Size defines the number of node instances
                         format: int32
                         type: integer
+                      slurmNodeExtra:
+                        description: |-
+                          SlurmNodeExtra defines the string that will be set to the "Extra" field of the corresponding Slurm node. It can
+                          use any environment variables that are available in the slurmd container when it starts.
+                        type: string
                       slurmd:
                         description: Slurmd represents the Slurm daemon service configuration
                         properties:

@@ -21,8 +21,9 @@ type SlurmWorker struct {
 	SupervisordConfigMapDefault bool
 	SupervisordConfigMapName    string
 
-	CgroupVersion string
-	EnableGDRCopy bool
+	CgroupVersion  string
+	EnableGDRCopy  bool
+	SlurmNodeExtra string
 
 	Service     Service
 	StatefulSet StatefulSet
@@ -73,6 +74,7 @@ func buildSlurmWorkerFrom(
 		SharedMemorySize: worker.Volumes.SharedMemorySize,
 		CgroupVersion:    worker.CgroupVersion,
 		EnableGDRCopy:    worker.EnableGDRCopy,
+		SlurmNodeExtra:   worker.SlurmNodeExtra,
 	}
 	for _, jailSubMount := range worker.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()

@@ -658,6 +658,12 @@ type SlurmNodeWorker struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	EnableGDRCopy bool `json:"enableGDRCopy,omitempty"`
+
+	// SlurmNodeExtra defines the string that will be set to the "Extra" field of the corresponding Slurm node. It can
+	// use any environment variables that are available in the slurmd container when it starts.
+	//
+	// +kubebuilder:validation:Optional
+	SlurmNodeExtra string `json:"slurmNodeExtra,omitempty"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node
