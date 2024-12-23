@@ -66,6 +66,7 @@ func RenderStatefulSet(
 		clusterType,
 		worker.CgroupVersion,
 		worker.EnableGDRCopy,
+		worker.SlurmNodeExtra,
 	)
 	if err != nil {
 		return appsv1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
