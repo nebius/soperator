@@ -56,19 +56,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("CredType", "cred/"+consts.Munge)
 	res.AddComment("")
 	res.AddComment("SlurnConfig Spec")
-	v := reflect.ValueOf(cluster.SlurmConfig)
-	t := reflect.TypeOf(cluster.SlurmConfig)
-
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		fieldName := t.Field(i).Name
-
-		if field.Kind() == reflect.String && field.String() == "" {
-			continue
-		}
-
-		res.AddProperty(fieldName, field.Interface())
-	}
+	addSlurmConfigProperties(res, cluster.SlurmConfig)
 	res.AddComment("")
 	if cluster.ClusterType == consts.ClusterTypeGPU {
 		res.AddProperty("GresTypes", "gpu")
@@ -97,6 +85,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("LaunchParameters", "use_interactive_step")
 	res.AddComment("Scrontab")
 	res.AddProperty("ScronParameters", "enable,explicit_scancel")
+	res.AddComment("")
 	res.AddProperty("PropagateResourceLimits", "NONE") // Don't propagate ulimits from the login node by default
 	res.AddComment("")
 	res.AddComment("HEALTH CHECKS")
@@ -154,21 +143,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 
 		// In slurm.conf, the accounting section has many optional values
 		// that can be added or removed, and to avoid writing many if statements, we decided to use a reflector.
-		v := reflect.ValueOf(cluster.NodeAccounting.SlurmConfig)
-		typeOfS := v.Type()
-		for i := 0; i < v.NumField(); i++ {
-			field := v.Field(i)
-			if !isZero(field) {
-				key := typeOfS.Field(i).Name
-				switch field.Kind() {
-				case reflect.String:
-					res.AddProperty(key, field.String())
-				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-					res.AddProperty(key, field.Int())
-				}
+		addSlurmConfigProperties(res, cluster.NodeAccounting.SlurmConfig)
 
-			}
-		}
 		if cluster.NodeRest.Enabled {
 			res.AddComment("")
 			res.AddComment("REST API")
@@ -177,6 +153,46 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		}
 	}
 	return res
+}
+
+// addSlurmConfigProperties adds properties from the given struct to the config file
+func addSlurmConfigProperties(res *renderutils.PropertiesConfig, config interface{}) {
+	v := reflect.ValueOf(config)
+	if v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return
+		}
+		v = v.Elem()
+	}
+
+	if v.Kind() != reflect.Struct {
+		return
+	}
+
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		fieldName := t.Field(i).Name
+
+		if field.Kind() == reflect.Pointer {
+			if field.IsNil() {
+				continue
+			}
+			field = field.Elem()
+		}
+
+		if field.Kind() == reflect.String {
+			if field.String() != "" {
+				res.AddProperty(fieldName, field.String())
+			}
+			continue
+		}
+
+		if field.Kind() == reflect.Int32 || field.Kind() == reflect.Int16 {
+			res.AddProperty(fieldName, field.Int())
+			continue
+		}
+	}
 }
 
 func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
@@ -212,17 +228,6 @@ func generateGresConfig(clusterType consts.ClusterType) renderutils.ConfigFile {
 		res.AddProperty("AutoDetect", "nvml")
 	}
 	return res
-}
-
-func isZero(v reflect.Value) bool {
-	switch v.Kind() {
-	case reflect.String:
-		return v.Len() == 0
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return v.Int() == 0
-	}
-
-	return false
 }
 
 // region Security limits

@@ -2076,8 +2076,7 @@ spec:
                             default: 0
                             type: integer
                           priorityWeightTRES:
-                            default: 0
-                            type: integer
+                            type: string
                         type: object
                       slurmdbd:
                         description: Slurmdbd represents the Slurm database daemon
