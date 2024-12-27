@@ -21,6 +21,9 @@ type SlurmWorker struct {
 	SupervisordConfigMapDefault bool
 	SupervisordConfigMapName    string
 
+	IsSSHDConfigMapDefault bool
+	SSHDConfigMapName      string
+
 	CgroupVersion  string
 	EnableGDRCopy  bool
 	SlurmNodeExtra string
@@ -44,6 +47,13 @@ func buildSlurmWorkerFrom(
 	if supervisordConfigDefault {
 		supervisordConfigName = naming.BuildConfigMapSupervisordName(clusterName)
 	}
+
+	sshdConfigMapName := worker.SSHDConfigMapRefName
+	isSSHDConfigDefault := sshdConfigMapName == ""
+	if isSSHDConfigDefault {
+		sshdConfigMapName = naming.BuildConfigMapSSHDConfigsName(clusterName)
+	}
+
 	res := SlurmWorker{
 		SlurmNode:    *worker.SlurmNode.DeepCopy(),
 		NCCLSettings: *ncclSettings.DeepCopy(),
@@ -69,12 +79,14 @@ func buildSlurmWorkerFrom(
 			naming.BuildStatefulSetName(consts.ComponentTypeWorker, clusterName),
 			worker.SlurmNode.Size,
 		),
-		VolumeSpool:      *worker.Volumes.Spool.DeepCopy(),
-		VolumeJail:       *worker.Volumes.Jail.DeepCopy(),
-		SharedMemorySize: worker.Volumes.SharedMemorySize,
-		CgroupVersion:    worker.CgroupVersion,
-		EnableGDRCopy:    worker.EnableGDRCopy,
-		SlurmNodeExtra:   worker.SlurmNodeExtra,
+		VolumeSpool:            *worker.Volumes.Spool.DeepCopy(),
+		VolumeJail:             *worker.Volumes.Jail.DeepCopy(),
+		SharedMemorySize:       worker.Volumes.SharedMemorySize,
+		CgroupVersion:          worker.CgroupVersion,
+		EnableGDRCopy:          worker.EnableGDRCopy,
+		SlurmNodeExtra:         worker.SlurmNodeExtra,
+		SSHDConfigMapName:      sshdConfigMapName,
+		IsSSHDConfigMapDefault: isSSHDConfigDefault,
 	}
 	for _, jailSubMount := range worker.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()

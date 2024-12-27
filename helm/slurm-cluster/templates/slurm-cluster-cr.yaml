@@ -165,6 +165,9 @@ spec:
       {{- if .Values.slurmNodes.worker.supervisordConfigMapRefName }}
       supervisordConfigMapRefName: {{ .Values.slurmNodes.worker.supervisordConfigMapRefName | quote }}
       {{- end }}
+      {{- if .Values.slurmNodes.worker.sshdConfigMapRefName }}
+      sshdConfigMapRefName: {{ .Values.slurmNodes.worker.sshdConfigMapRefName | quote }}
+      {{- end }}
       slurmd:
         image: {{ required "slurmd image" .Values.images.slurmd | quote }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.worker.slurmd.imagePullPolicy | quote }}

@@ -277,6 +277,7 @@ slurmNodes:
     enableGDRCopy: false
     slurmNodeExtra: ""
     supervisordConfigMapRefName: ""
+    sshdConfigMapRefName: ""
     slurmd:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"

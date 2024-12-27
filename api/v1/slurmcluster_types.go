@@ -640,6 +640,11 @@ type SlurmNodeWorker struct {
 	// +kubebuilder:validation:Optional
 	SupervisordConfigMapRefName string `json:"supervisordConfigMapRefName,omitempty"`
 
+	// SSHDConfigMapRefName is the name of the SSHD config, which runs in slurmd container
+	//
+	// +kubebuilder:validation:Optional
+	SSHDConfigMapRefName string `json:"sshdConfigMapRefName,omitempty"`
+
 	// Volumes represents the volume configurations for the worker node
 	//
 	// +kubebuilder:validation:Required
@@ -712,6 +717,11 @@ type SlurmNodeLogin struct {
 	//
 	// +kubebuilder:validation:Optional
 	SshdServiceAnnotations map[string]string `json:"sshdServiceAnnotations,omitempty"`
+
+	// SSHDConfigMapRefName is the name of the SSHD config, which runs in login container
+	//
+	// +kubebuilder:validation:Optional
+	SSHDConfigMapRefName string `json:"sshdConfigMapRefName,omitempty"`
 
 	// SshRootPublicKeys represents the list of public authorized_keys for SSH connection to Slurm login nodes
 	//

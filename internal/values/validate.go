@@ -172,11 +172,11 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 	// Secrets
 	{
 		loginNodeCount := c.NodeLogin.Size
-		if loginNodeCount > 0 && c.NodeLogin.SshRootPublicKeys == nil {
-			err := fmt.Errorf("SshRootPublicKeys are invalid. login node size %d (used) is specified, but SSH public keys are not provided", loginNodeCount)
+		if loginNodeCount > 0 && c.NodeLogin.SSHRootPublicKeys == nil {
+			err := fmt.Errorf("SSHRootPublicKeys are invalid. login node size %d (used) is specified, but SSH public keys are not provided", loginNodeCount)
 			logger.Error(
 				err,
-				"SshRootPublicKeys are invalid. login nodes are used, but SSH public keys are not provided",
+				"SSHRootPublicKeys are invalid. login nodes are used, but SSH public keys are not provided",
 				"Slurm.LoginNode.Count", loginNodeCount,
 			)
 			return err

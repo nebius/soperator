@@ -7,7 +7,7 @@ const (
 
 const (
 	ConfigMapNameSlurmConfigs      = slurmConfigs
-	ConfigMapNameSSHConfigs        = sshConfigs
+	ConfigMapNameSSHDConfigs       = sshConfigs
 	ConfigMapNameSshRootPublicKeys = sshRootKeys
 	ConfigMapNameSecurityLimits    = securityLimits
 	ConfigMapNameNCCLTopology      = ncclTopology

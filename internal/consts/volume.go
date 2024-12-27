@@ -37,7 +37,7 @@ const (
 	VolumenameRESTJWTKey           = RESTJWTKey
 	VolumeNameNvidia               = nvidia
 	VolumeNameBoot                 = boot
-	VolumeNameSSHConfigs           = sshConfigs
+	VolumeNameSSHDConfigs          = sshConfigs
 	VolumeNameSSHRootKeys          = sshRootKeys
 	VolumeNameSSHDKeys             = "sshd-keys"
 	VolumeMountPathSSHDKeys        = "/etc/ssh/sshd_keys"
