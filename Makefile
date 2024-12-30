@@ -26,7 +26,7 @@ CHART_OPERATOR_CRDS_PATH   	= $(CHART_PATH)/soperator-crds
 CHART_CLUSTER_PATH    		= $(CHART_PATH)/slurm-cluster
 CHART_STORAGE_PATH    		= $(CHART_PATH)/slurm-cluster-storage
 
-SLURM_VERSION		  		= 24.05.2
+SLURM_VERSION		  		= 24.05.5
 UBUNTU_VERSION		  		= jammy
 VERSION               		= $(shell cat VERSION)
 

@@ -86,11 +86,6 @@ if [ "$SLURM_CLUSTER_TYPE" = "gpu" ]; then
     export GRES="$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -e 's/ /_/g' -e 's/.*/\L&/' | sort | uniq -c | awk '{print "gpu:" $2 ":" $1}' | paste -sd ',' -)"
     
     echo "Detected GRES is $GRES"
-
-    echo "Create NVML symlink with the name expected by Slurm"
-    pushd /usr/lib/x86_64-linux-gnu
-        ln -s libnvidia-ml.so.1 libnvidia-ml.so
-    popd
 else
     echo "Skipping GPU detection"
 fi
