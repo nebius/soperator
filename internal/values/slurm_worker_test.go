@@ -19,7 +19,7 @@ func TestBuildSlurmWorkerFrom(t *testing.T) {
 	}
 	ncclSettings := &slurmv1.NCCLSettings{}
 
-	result := buildSlurmWorkerFrom(clusterName, worker, ncclSettings)
+	result := buildSlurmWorkerFrom(clusterName, worker, ncclSettings, false)
 
 	if result.SlurmNode != *worker.SlurmNode.DeepCopy() {
 		t.Errorf("Expected SlurmNode to be %v, but got %v", *worker.SlurmNode.DeepCopy(), result.SlurmNode)

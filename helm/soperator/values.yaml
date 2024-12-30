@@ -32,6 +32,7 @@ controllerManager:
     env:
       isMariadbCrdInstalled: "false"
       isOpentelemetryCollectorCrdInstalled: "false"
+      isApparmorCrdInstalled: "false"
       isPrometheusCrdInstalled: "false"
       slurmOperatorWatchNamespaces: '*'
     image:

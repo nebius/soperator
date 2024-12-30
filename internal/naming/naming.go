@@ -71,6 +71,13 @@ func BuildServiceHostFQDN(
 	return hostName, hostFQDN
 }
 
+func BuildAppArmorProfileName(clusterName, namespace string) string {
+	return namedEntity{
+		clusterName: fmt.Sprintf("soperator-cluster-%s", clusterName),
+		entity:      fmt.Sprintf("ns-%s", namespace),
+	}.String()
+}
+
 func BuildStatefulSetName(componentType consts.ComponentType, clusterName string) string {
 	return namedEntity{
 		componentType: &componentType,

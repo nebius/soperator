@@ -17,6 +17,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
@@ -202,6 +203,8 @@ func (r Reconciler) reconcile(
 				existing = &mariadbv1alpha1.MariaDB{}
 			case *mariadbv1alpha1.Grant:
 				existing = &mariadbv1alpha1.Grant{}
+			case *apparmor.AppArmorProfile:
+				existing = &apparmor.AppArmorProfile{}
 			default:
 				return errors.New(fmt.Sprintf("unimplemented resolver for resource type %T", desired))
 			}

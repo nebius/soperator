@@ -22,9 +22,11 @@ type SlurmLogin struct {
 
 	VolumeJail    slurmv1.NodeVolume
 	JailSubMounts []slurmv1.NodeVolumeJailSubMount
+
+	UseDefaultAppArmorProfile bool
 }
 
-func buildSlurmLoginFrom(clusterName string, login *slurmv1.SlurmNodeLogin) SlurmLogin {
+func buildSlurmLoginFrom(clusterName string, login *slurmv1.SlurmNodeLogin, useDefaultAppArmorProfile bool) SlurmLogin {
 	svc := buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeLogin, clusterName))
 	svc.Type = login.SshdServiceType
 	svc.Annotations = login.SshdServiceAnnotations
@@ -52,10 +54,11 @@ func buildSlurmLoginFrom(clusterName string, login *slurmv1.SlurmNodeLogin) Slur
 			naming.BuildStatefulSetName(consts.ComponentTypeLogin, clusterName),
 			login.SlurmNode.Size,
 		),
-		SSHDConfigMapName:      sshdConfigMapName,
-		IsSSHDConfigMapDefault: isSSHDConfigDefault,
-		SSHRootPublicKeys:      login.SshRootPublicKeys,
-		VolumeJail:             *login.Volumes.Jail.DeepCopy(),
+		SSHDConfigMapName:         sshdConfigMapName,
+		IsSSHDConfigMapDefault:    isSSHDConfigDefault,
+		SSHRootPublicKeys:         login.SshRootPublicKeys,
+		VolumeJail:                *login.Volumes.Jail.DeepCopy(),
+		UseDefaultAppArmorProfile: useDefaultAppArmorProfile,
 	}
 	for _, jailSubMount := range login.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()

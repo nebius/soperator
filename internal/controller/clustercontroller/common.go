@@ -191,6 +191,34 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					return nil
 				},
 			},
+			utils.MultiStepExecutionStep{
+				Name: "AppArmor profiles",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+					if !check.IsAppArmorCRDInstalled() {
+						stepLogger.Info("AppArmor CRD is not installed, skipping AppArmor profile reconciliation")
+						return nil
+					}
+					if !clusterValues.NodeLogin.UseDefaultAppArmorProfile || !clusterValues.NodeWorker.UseDefaultAppArmorProfile {
+						stepLogger.Info("Default AppArmor profile is not set, skipping AppArmor profile reconciliation")
+						return nil
+					}
+
+					desired := common.RenderAppArmorProfile(
+						clusterValues,
+					)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
+					stepLogger.Info("Rendered")
+
+					if err := r.AppArmorProfile.Reconcile(stepCtx, cluster, desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling AppArmor profiles")
+					}
+					stepLogger.Info("Reconciled")
+					return nil
+				},
+			},
 		)
 	}
 

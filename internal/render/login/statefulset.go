@@ -66,16 +66,8 @@ func RenderStatefulSet(
 			),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-					Annotations: map[string]string{
-						fmt.Sprintf(
-							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSshd,
-						): login.ContainerSshd.AppArmorProfile,
-						fmt.Sprintf(
-							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-						): login.ContainerMunge.AppArmorProfile,
-						consts.DefaultContainerAnnotationName: consts.ContainerNameSshd,
-					},
+					Labels:      labels,
+					Annotations: renderAnnotations(login, clusterName, namespace),
 				},
 				Spec: corev1.PodSpec{
 					Affinity:     nodeFilter.Affinity,
@@ -97,4 +89,26 @@ func RenderStatefulSet(
 			},
 		},
 	}, nil
+}
+
+func renderAnnotations(login *values.SlurmLogin, clusterName, namespace string) map[string]string {
+	mungeAppArmorProfile := login.ContainerMunge.AppArmorProfile
+	sshAppArmorProfile := login.ContainerSshd.AppArmorProfile
+
+	if login.UseDefaultAppArmorProfile {
+		sshAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
+		mungeAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
+	}
+
+	annotations := map[string]string{
+		fmt.Sprintf(
+			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSshd,
+		): sshAppArmorProfile,
+		fmt.Sprintf(
+			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
+		): mungeAppArmorProfile,
+		consts.DefaultContainerAnnotationName: consts.ContainerNameSshd,
+	}
+
+	return annotations
 }

@@ -47,6 +47,8 @@ func (r *StatefulSetReconciler) patch(existing, desired client.Object) (client.P
 	patchImpl := func(dst, src *appsv1.StatefulSet) client.Patch {
 		res := client.MergeFrom(dst.DeepCopy())
 
+		dst.Spec.Template.ObjectMeta.Labels = src.Spec.Template.ObjectMeta.Labels
+		dst.Spec.Template.ObjectMeta.Annotations = src.Spec.Template.ObjectMeta.Annotations
 		dst.Spec.Replicas = src.Spec.Replicas
 		dst.Spec.UpdateStrategy = src.Spec.UpdateStrategy
 		dst.Spec.VolumeClaimTemplates = append([]corev1.PersistentVolumeClaim{}, src.Spec.VolumeClaimTemplates...)

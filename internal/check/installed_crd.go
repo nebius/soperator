@@ -11,6 +11,7 @@ var (
 	IsOpenTelemetryCollectorCRDInstalled = false
 	IsPrometheusOperatorCRDInstalled     = false
 	IsMariaDbOperatorCRDInstalled        = false
+	IsAppArmorOperatorCRDInstalled       = false
 )
 
 func IsOtelCRDInstalled() bool {
@@ -26,6 +27,11 @@ func IsPrometheusCRDInstalled() bool {
 func IsMariaDbCRDInstalled() bool {
 	IsMariaDbOperatorCRDInstalled = os.Getenv("IS_MARIADB_CRD_INSTALLED") == "true"
 	return IsMariaDbOperatorCRDInstalled
+}
+
+func IsAppArmorCRDInstalled() bool {
+	IsAppArmorOperatorCRDInstalled = os.Getenv("IS_APPARMOR_CRD_INSTALLED") == "true"
+	return IsAppArmorOperatorCRDInstalled
 }
 
 func IsPrometheusEnabled(exporter *values.SlurmExporter) bool {
