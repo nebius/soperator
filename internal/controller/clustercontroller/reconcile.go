@@ -459,6 +459,9 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 	if err := r.setupPodTemplateIndexer(mgr); err != nil {
 		return err
 	}
+	if err := r.setupConfigMapIndexer(mgr); err != nil {
+		return err
+	}
 
 	saPredicate := r.createServiceAccountPredicate()
 
@@ -499,6 +502,16 @@ func (r *SlurmClusterReconciler) setupPodTemplateIndexer(mgr ctrl.Manager) error
 			return nil
 		}
 		return []string{*slurmCluster.Spec.Telemetry.OpenTelemetryCollector.PodTemplateNameRef}
+	})
+}
+
+func (r *SlurmClusterReconciler) setupConfigMapIndexer(mgr ctrl.Manager) error {
+	return mgr.GetFieldIndexer().IndexField(context.Background(), &slurmv1.SlurmCluster{}, configmapField, func(rawObj client.Object) []string {
+		slurmCluster := rawObj.(*slurmv1.SlurmCluster)
+		if slurmCluster.Spec.SlurmNodes.Worker.SupervisordConfigMapRefName == "" {
+			return nil
+		}
+		return []string{slurmCluster.Spec.SlurmNodes.Worker.SupervisordConfigMapRefName}
 	})
 }
 
