@@ -29,13 +29,22 @@ func renderContainerSlurmctld(container *values.Container) corev1.Container {
 			common.RenderVolumeMountSecurityLimits(),
 			common.RenderVolumeMountRESTJWTKey(),
 		},
+		StartupProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"scontrol",
+						"ping",
+					},
+				},
+			},
+		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
 					Command: []string{
-						"/bin/sh",
-						"-c",
-						"/usr/bin/sinfo > /dev/null && exit 0 || exit 1",
+						"scontrol",
+						"ping",
 					},
 				},
 			},

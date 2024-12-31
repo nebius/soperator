@@ -34,14 +34,26 @@ func renderContainerAccounting(container values.Container) corev1.Container {
 			RenderVolumeMountSlurmdbdConfigs(),
 			RenderVolumeMountSlurmdbdSpool(),
 		},
-		LivenessProbe: &corev1.Probe{
+		StartupProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{
 					Port: intstr.FromInt32(container.Port),
 				},
 			},
 			FailureThreshold:    5,
-			InitialDelaySeconds: 15,
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       10,
+			SuccessThreshold:    1,
+			TimeoutSeconds:      10,
+		},
+		ReadinessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.FromInt32(container.Port),
+				},
+			},
+			FailureThreshold:    3,
+			InitialDelaySeconds: 1,
 			PeriodSeconds:       10,
 			SuccessThreshold:    1,
 			TimeoutSeconds:      1,

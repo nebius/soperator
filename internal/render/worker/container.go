@@ -105,17 +105,42 @@ func renderContainerSlurmd(
 			Protocol:      corev1.ProtocolTCP,
 		}},
 		VolumeMounts: volumeMounts,
+		StartupProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"scontrol",
+						"show",
+						"slurmd",
+					},
+				},
+			},
+			PeriodSeconds: 1,
+		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
 					Command: []string{
-						"/bin/sh",
-						"-c",
-						"/usr/bin/sinfo > /dev/null && exit 0 || exit 1",
+						"scontrol",
+						"show",
+						"slurmd",
 					},
 				},
 			},
-			PeriodSeconds: 30,
+			PeriodSeconds: 1,
+		},
+		// PreStop lifecycle hook to update the node state to down in case of worker deletion
+		// Node will not be deleted from the slurm cluster if the job is still running
+		Lifecycle: &corev1.Lifecycle{
+			PreStop: &corev1.LifecycleHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"/bin/bash",
+						"-c",
+						"scontrol update nodename=$(hostname) state=down reason=preStop && scontrol delete nodename=$(hostname);",
+					},
+				},
+			},
 		},
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: ptr.To(true),
