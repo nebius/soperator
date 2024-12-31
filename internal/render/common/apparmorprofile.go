@@ -45,19 +45,41 @@ profile %s flags=(attach_disconnected,mediate_deleted) {
 
   /** lrixw,
 
-  # set /usr/lib/**/libnvidia-* w, when bump slurm 24.05.5 or higher
-  deny /usr/lib/**/libnvidia-[^m]* w,
-  deny /mnt/jail/usr/lib/**/libnvidia-[^m]* w,
 
-  deny /usr/lib/**/libcuda.so* w,
-  deny /usr/lib/**/libcudadebugger.so* w,
-  deny /usr/lib/**/libcudadebugger.so* w,
-  deny /usr/bin/nvidia-smir w,
-  deny /usr/bin/nvidia-debugdumpr w,
-  deny /usr/bin/nvidia-persistencedr w,
-  deny /usr/bin/nv-fabricmanagerr w,
-  deny /usr/bin/nvidia-cuda-mps-controlr w,
+  # remove [^m], when bump slurm 24.05.5 or higher
+  
+  deny /mnt/jail/usr/lib/x86_64-linux-gnu/libnvidia-[^m]* w,
+  deny /mnt/jail/usr/lib/x86_64-linux-gnu/libcuda.so* w,
+  deny /mnt/jail/usr/lib/x86_64-linux-gnu/libcudadebugger.so* w,
+
+  deny /usr/lib/x86_64-linux-gnu/libnvidia-[^m]* w,
+  deny /usr/lib/x86_64-linux-gnu/libcuda.so* w,
+  deny /usr/lib/x86_64-linux-gnu/libcudadebugger.so* w,
+
+  deny /lib/x86_64-linux-gnu/libnvidia-[^m]* w,
+  deny /lib/x86_64-linux-gnu/libcuda.so* w,
+  deny /lib/x86_64-linux-gnu/libcudadebugger.so* w,
+
+  deny /usr/local/lib/x86_64-linux-gnu/libnvidia-[^m]* w,
+  deny /usr/local/lib/x86_64-linux-gnu/libcuda.so* w,
+  deny /usr/local/lib/x86_64-linux-gnu/libcudadebugger.so* w,
+
+  deny /usr/local/nvidia/lib/x86_64-linux-gnu/libnvidia-[^m]* w,
+  deny /usr/local/nvidia/lib/x86_64-linux-gnu/libcuda.so* w,
+  deny /usr/local/nvidia/lib/x86_64-linux-gnu/libcudadebugger.so* w,
+
+  deny /usr/local/nvidia/lib64/libnvidia-[^m]* w,
+  deny /usr/local/nvidia/lib64/libcuda.so* w,
+  deny /usr/local/nvidia/lib64/libcudadebugger.so* w,
+
+  deny /usr/bin/nvidia-smi w,
+  deny /usr/bin/nvidia-debugdump w,
+  deny /usr/bin/nvidia-persistenced w,
+  deny /usr/bin/nv-fabricmanager w,
+  deny /usr/bin/nvidia-cuda-mps-control w,
   deny /usr/bin/nvidia-cuda-mps-server w,
+
+
   deny /lib/firmware/nvidia/**/gsp_*.bin w,
 }`, naming.BuildAppArmorProfileName(clusterName, namespace))
 }
