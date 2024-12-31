@@ -105,18 +105,6 @@ func renderContainerSlurmd(
 			Protocol:      corev1.ProtocolTCP,
 		}},
 		VolumeMounts: volumeMounts,
-		StartupProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{
-						"scontrol",
-						"show",
-						"slurmd",
-					},
-				},
-			},
-			PeriodSeconds: 1,
-		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
