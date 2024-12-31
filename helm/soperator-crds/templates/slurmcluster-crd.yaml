@@ -4406,7 +4406,7 @@ spec:
                 type: object
               useDefaultAppArmorProfile:
                 default: true
-                description: Generate and se default AppArmor profile for the Slurm
+                description: Generate and set default AppArmor profile for the Slurm
                   worker and login nodes.
                 type: boolean
               volumeSources:
