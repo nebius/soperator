@@ -65,6 +65,11 @@ func (in *AccountingSlurmConf) DeepCopyInto(out *AccountingSlurmConf) {
 		*out = new(int16)
 		**out = **in
 	}
+	if in.PriorityWeightQOS != nil {
+		in, out := &in.PriorityWeightQOS, &out.PriorityWeightQOS
+		*out = new(int16)
+		**out = **in
+	}
 	if in.PriorityWeightTRES != nil {
 		in, out := &in.PriorityWeightTRES, &out.PriorityWeightTRES
 		*out = new(string)
