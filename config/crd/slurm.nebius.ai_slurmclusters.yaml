@@ -1149,6 +1149,9 @@ spec:
                           priorityWeightFairshare:
                             default: 0
                             type: integer
+                          priorityWeightQOS:
+                            default: 0
+                            type: integer
                           priorityWeightTRES:
                             default: 0
                             type: integer

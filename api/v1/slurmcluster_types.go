@@ -585,6 +585,9 @@ type AccountingSlurmConf struct {
 	// +kubebuilder:default=0
 	PriorityWeightFairshare *int16 `json:"priorityWeightFairshare,omitempty"`
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=0
+	PriorityWeightQOS *int16 `json:"priorityWeightQOS,omitempty"`
+	// +kubebuilder:validation:Optional
 	PriorityWeightTRES *string `json:"priorityWeightTRES,omitempty"`
 }
 

@@ -137,6 +137,7 @@ slurmNodes:
     # jobAcctGatherFrequency: 30
     # priorityWeightAge: 1
     # priorityWeightFairshare: 1
+    # priorityWeightQOS: 1
     # priorityWeightTRES: 1
     slurmdbdConfig: {}
     # archiveEvents: "yes"
