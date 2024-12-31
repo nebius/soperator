@@ -44,9 +44,20 @@ profile %s flags=(attach_disconnected,mediate_deleted) {
   unix,
 
   /** lrixw,
-  
+
   # set /usr/lib/**/libnvidia-* w, when bump slurm 24.05.5 or higher
   deny /usr/lib/**/libnvidia-[^m]* w,
-  deny /mnt/jail/usr/lib/**/libnvidia--[^m]* w,
+  deny /mnt/jail/usr/lib/**/libnvidia-[^m]* w,
+
+  deny /usr/lib/**/libcuda.so* w,
+  deny /usr/lib/**/libcudadebugger.so* w,
+  deny /usr/lib/**/libcudadebugger.so* w,
+  deny /usr/bin/nvidia-smir w,
+  deny /usr/bin/nvidia-debugdumpr w,
+  deny /usr/bin/nvidia-persistencedr w,
+  deny /usr/bin/nv-fabricmanagerr w,
+  deny /usr/bin/nvidia-cuda-mps-controlr w,
+  deny /usr/bin/nvidia-cuda-mps-server w,
+  deny /lib/firmware/nvidia/**/gsp_*.bin w,
 }`, naming.BuildAppArmorProfileName(clusterName, namespace))
 }
