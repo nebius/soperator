@@ -129,6 +129,8 @@ func renderContainerSlurmd(
 			},
 			PeriodSeconds: 1,
 		},
+		// PreStop lifecycle hook to update the node state to down in case of worker deletion
+		// Node will not be deleted from the slurm cluster if the job is still running
 		Lifecycle: &corev1.Lifecycle{
 			PreStop: &corev1.LifecycleHandler{
 				Exec: &corev1.ExecAction{
