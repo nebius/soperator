@@ -222,7 +222,6 @@ func renderContainerNodeSysctl() corev1.Container {
 			Privileged: ptr.To(true)},
 		Resources: corev1.ResourceRequirements{
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("10m"),
 				corev1.ResourceMemory: resource.MustParse("8Mi"),
 			},
 			Requests: corev1.ResourceList{
@@ -244,10 +243,20 @@ func renderContainerNodeSysctlSleep() corev1.Container {
 		Name:  consts.ContainerNameNodeSysctlSleep,
 		Image: "busybox:latest",
 		SecurityContext: &corev1.SecurityContext{
-			Privileged: ptr.To(true)},
+			Privileged:               ptr.To(false),
+			RunAsUser:                ptr.To(int64(65534)),
+			RunAsGroup:               ptr.To(int64(65534)),
+			RunAsNonRoot:             ptr.To(true),
+			ReadOnlyRootFilesystem:   ptr.To(true),
+			AllowPrivilegeEscalation: ptr.To(false),
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{
+					"ALL",
+				},
+			},
+		},
 		Resources: corev1.ResourceRequirements{
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("10m"),
 				corev1.ResourceMemory: resource.MustParse("8Mi"),
 			},
 			Requests: corev1.ResourceList{
@@ -258,7 +267,7 @@ func renderContainerNodeSysctlSleep() corev1.Container {
 		Command: []string{
 			"/bin/sh",
 			"-c",
-			"sleep 3600",
+			"sleep infinity",
 		},
 	}
 }
