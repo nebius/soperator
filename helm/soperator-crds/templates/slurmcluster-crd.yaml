@@ -4407,7 +4407,7 @@ spec:
               useDefaultAppArmorProfile:
                 default: true
                 description: Generate and set default AppArmor profile for the Slurm
-                  worker and login nodes.
+                  worker and login nodes. The Security Profiles Operator must be installed.
                 type: boolean
               volumeSources:
                 description: VolumeSources define the sources for the volumes
