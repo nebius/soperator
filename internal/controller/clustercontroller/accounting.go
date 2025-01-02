@@ -120,9 +120,10 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 						stepLogger.Info("Rendered")
 
-						if err = r.Secret.Reconcile(stepCtx, cluster, desired); err != nil {
-							stepLogger.Error(err, "Failed to reconcile")
-							return errors.Wrap(err, "reconciling mariadb password Secret")
+						err = r.Create(ctx, desired)
+						if err != nil {
+							stepLogger.Error(err, "Failed to create")
+							return errors.Wrap(err, "creating mariadb password Secret")
 						}
 					}
 					return err
@@ -156,9 +157,10 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 						stepLogger.Info("Rendered")
 
-						if err = r.Secret.Reconcile(stepCtx, cluster, desired); err != nil {
-							stepLogger.Error(err, "Failed to reconcile")
-							return errors.Wrap(err, "reconciling mariadb root password Secret")
+						err = r.Create(ctx, desired)
+						if err != nil {
+							stepLogger.Error(err, "Failed to create")
+							return errors.Wrap(err, "creating mariadb root password Secret")
 						}
 					}
 					return err
