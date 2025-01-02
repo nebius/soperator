@@ -16,7 +16,9 @@ type SlurmLogin struct {
 	Service     Service
 	StatefulSet StatefulSet
 
-	SshRootPublicKeys []string
+	IsSSHDConfigMapDefault bool
+	SSHDConfigMapName      string
+	SSHRootPublicKeys      []string
 
 	VolumeJail    slurmv1.NodeVolume
 	JailSubMounts []slurmv1.NodeVolumeJailSubMount
@@ -28,6 +30,12 @@ func buildSlurmLoginFrom(clusterName string, login *slurmv1.SlurmNodeLogin) Slur
 	svc.Annotations = login.SshdServiceAnnotations
 	svc.LoadBalancerIP = login.SshdServiceLoadBalancerIP
 	svc.NodePort = login.SshdServiceNodePort
+
+	sshdConfigMapName := login.SSHDConfigMapRefName
+	isSSHDConfigDefault := sshdConfigMapName == ""
+	if isSSHDConfigDefault {
+		sshdConfigMapName = naming.BuildConfigMapSSHDConfigsName(clusterName)
+	}
 
 	res := SlurmLogin{
 		SlurmNode: *login.SlurmNode.DeepCopy(),
@@ -44,8 +52,10 @@ func buildSlurmLoginFrom(clusterName string, login *slurmv1.SlurmNodeLogin) Slur
 			naming.BuildStatefulSetName(consts.ComponentTypeLogin, clusterName),
 			login.SlurmNode.Size,
 		),
-		SshRootPublicKeys: login.SshRootPublicKeys,
-		VolumeJail:        *login.Volumes.Jail.DeepCopy(),
+		SSHDConfigMapName:      sshdConfigMapName,
+		IsSSHDConfigMapDefault: isSSHDConfigDefault,
+		SSHRootPublicKeys:      login.SshRootPublicKeys,
+		VolumeJail:             *login.Volumes.Jail.DeepCopy(),
 	}
 	for _, jailSubMount := range login.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()

@@ -23,8 +23,8 @@ func renderContainerSshd(
 		common.RenderVolumeMountMungeSocket(),
 		common.RenderVolumeMountSecurityLimits(),
 		common.RenderVolumeMountSshdKeys(),
-		common.RenderVolumeMountSshConfigs(),
-		common.RenderVolumeMountSshRootKeys(),
+		common.RenderVolumeMountSshdConfigs(),
+		common.RenderVolumeMountSshdRootKeys(),
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
 	// Create a copy of the container's limits and add non-CPU resources from Requests

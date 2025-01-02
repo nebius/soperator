@@ -9,8 +9,7 @@ import (
 )
 
 const (
-	entityService     = "svc"
-	entityStatefulSet = "sts"
+	entityService = "svc"
 )
 
 type namedEntity struct {
@@ -103,10 +102,10 @@ func BuildSecretMungeKeyName(clusterName string) string {
 
 // region Login
 
-func BuildConfigMapSSHConfigsName(clusterName string) string {
+func BuildConfigMapSSHDConfigsName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,
-		entity:      consts.ConfigMapNameSSHConfigs,
+		entity:      consts.ConfigMapNameSSHDConfigs,
 	}.String()
 }
 

@@ -451,8 +451,10 @@ func (r *SlurmClusterReconciler) patchStatus(ctx context.Context, cluster *slurm
 type statusPatcher func(status *slurmv1.SlurmClusterStatus)
 
 const (
-	podTemplateField = ".spec.slurmNodes.exporter.exporter.podTemplateNameRef"
-	configmapField   = ".spec.slurmNodes.worker.supervisordConfigMapRefName"
+	podTemplateField          = ".spec.slurmNodes.exporter.exporter.podTemplateNameRef"
+	supervisordConfigMapField = ".spec.slurmNodes.worker.supervisordConfigMapRefName"
+	sshdLoginConfigMapField   = ".spec.slurmNodes.login.sshdConfigMapRefName"
+	sshdWorkerConfigMapField  = ".spec.slurmNodes.worker.sshdConfigMapRefName"
 )
 
 func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency int, cacheSyncTimeout time.Duration) error {
@@ -506,13 +508,32 @@ func (r *SlurmClusterReconciler) setupPodTemplateIndexer(mgr ctrl.Manager) error
 }
 
 func (r *SlurmClusterReconciler) setupConfigMapIndexer(mgr ctrl.Manager) error {
-	return mgr.GetFieldIndexer().IndexField(context.Background(), &slurmv1.SlurmCluster{}, configmapField, func(rawObj client.Object) []string {
-		slurmCluster := rawObj.(*slurmv1.SlurmCluster)
-		if slurmCluster.Spec.SlurmNodes.Worker.SupervisordConfigMapRefName == "" {
-			return nil
+	indexers := map[string]func(*slurmv1.SlurmCluster) string{
+		supervisordConfigMapField: func(sc *slurmv1.SlurmCluster) string {
+			return sc.Spec.SlurmNodes.Worker.SupervisordConfigMapRefName
+		},
+		sshdLoginConfigMapField: func(sc *slurmv1.SlurmCluster) string {
+			return sc.Spec.SlurmNodes.Login.SSHDConfigMapRefName
+		},
+		sshdWorkerConfigMapField: func(sc *slurmv1.SlurmCluster) string {
+			return sc.Spec.SlurmNodes.Worker.SSHDConfigMapRefName
+		},
+	}
+
+	for field, extractFunc := range indexers {
+		err := mgr.GetFieldIndexer().IndexField(context.Background(), &slurmv1.SlurmCluster{}, field, func(rawObj client.Object) []string {
+			slurmCluster := rawObj.(*slurmv1.SlurmCluster)
+			value := extractFunc(slurmCluster)
+			if value == "" {
+				return nil
+			}
+			return []string{value}
+		})
+		if err != nil {
+			return err
 		}
-		return []string{slurmCluster.Spec.SlurmNodes.Worker.SupervisordConfigMapRefName}
-	})
+	}
+	return nil
 }
 
 func (r *SlurmClusterReconciler) createServiceAccountPredicate() predicate.Funcs {
@@ -561,26 +582,41 @@ func (r *SlurmClusterReconciler) findObjectsForPodTemplate(ctx context.Context, 
 	return requests
 }
 
-func (r *SlurmClusterReconciler) findObjectsForConfigMap(ctx context.Context, configmap client.Object) []reconcile.Request {
-	attachedSlurmClusters := &slurmv1.SlurmClusterList{}
-	listOps := &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(configmapField, configmap.GetName()),
-		Namespace:     configmap.GetNamespace(),
+func (r *SlurmClusterReconciler) findObjectsForConfigMap(
+	ctx context.Context,
+	configmap client.Object,
+) []reconcile.Request {
+	configMap, ok := configmap.(*corev1.ConfigMap)
+	if !ok {
+		return nil
 	}
-	err := r.List(ctx, attachedSlurmClusters, listOps)
-	if err != nil {
-		return []reconcile.Request{}
+	attachedSlurmClusters := &slurmv1.SlurmClusterList{}
+	matchingFields := []string{
+		supervisordConfigMapField,
+		sshdLoginConfigMapField,
+		sshdWorkerConfigMapField,
 	}
 
-	requests := make([]reconcile.Request, len(attachedSlurmClusters.Items))
-	for i, item := range attachedSlurmClusters.Items {
-		requests[i] = reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      item.GetName(),
-				Namespace: item.GetNamespace(),
-			},
+	var requests []reconcile.Request
+
+	for _, field := range matchingFields {
+		listOpts := []client.ListOption{
+			client.MatchingFields{field: configMap.Name},
+			client.InNamespace(configMap.Namespace),
+		}
+		if err := r.Client.List(ctx, attachedSlurmClusters, listOpts...); err != nil {
+			continue
+		}
+		for _, slurmCluster := range attachedSlurmClusters.Items {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: slurmCluster.Namespace,
+					Name:      slurmCluster.Name,
+				},
+			})
 		}
 	}
+
 	return requests
 }
 

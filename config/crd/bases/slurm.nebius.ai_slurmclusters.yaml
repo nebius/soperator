@@ -3397,6 +3397,10 @@ spec:
                         required:
                         - image
                         type: object
+                      sshdConfigMapRefName:
+                        description: SSHDConfigMapRefName is the name of the SSHD
+                          config, which runs in login container
+                        type: string
                       sshdServiceAnnotations:
                         additionalProperties:
                           type: string
@@ -3847,6 +3851,10 @@ spec:
                         required:
                         - image
                         type: object
+                      sshdConfigMapRefName:
+                        description: SSHDConfigMapRefName is the name of the SSHD
+                          config, which runs in slurmd container
+                        type: string
                       supervisordConfigMapRefName:
                         description: SupervisordConfigMapRefName is the name of the
                           supervisord config, which runs in slurmd container

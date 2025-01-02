@@ -161,9 +161,9 @@ func generateSysctlConfig() renderutils.ConfigFile {
 
 // region Supervisord
 
-// RenderConfigMapSupervisord renders new [corev1.ConfigMap] containing supervisord config file
-func RenderConfigMapSupervisord(cluster *values.SlurmCluster) corev1.ConfigMap {
-	data := generateSupervisordConfig().Render()
+// RenderDefaultConfigMapSupervisord renders new [corev1.ConfigMap] containing supervisord config file
+func RenderDefaultConfigMapSupervisord(cluster *values.SlurmCluster) corev1.ConfigMap {
+	data := generateDefaultSupervisordConfig().Render()
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.NodeWorker.SupervisordConfigMapName,
@@ -176,7 +176,7 @@ func RenderConfigMapSupervisord(cluster *values.SlurmCluster) corev1.ConfigMap {
 	}
 }
 
-func generateSupervisordConfig() renderutils.ConfigFile {
+func generateDefaultSupervisordConfig() renderutils.ConfigFile {
 	res := &renderutils.MultilineStringConfig{}
 	res.AddLine("[supervisord]")
 	res.AddLine("nodaemon=true")

@@ -36,22 +36,28 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 			"Reconciliation of Slurm Login",
 			utils.MultiStepExecutionStrategyCollectErrors,
 			utils.MultiStepExecutionStep{
-				Name: "Slurm Login SSH configs ConfigMap",
+				Name: "Slurm Login SSHD ConfigMap",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
 
-					desired, err := login.RenderConfigMapSSHConfigs(clusterValues)
+					if !clusterValues.NodeLogin.IsSSHDConfigMapDefault {
+						stepLogger.Info("Use custom SSHD ConfigMap from reference")
+						stepLogger.Info("Reconciled")
+						return nil
+					}
+
+					desired, err := common.RenderDefaultConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeLogin)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering login SSH configs ConfigMap")
+						return errors.Wrap(err, "rendering login default SSHD ConfigMap")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
 					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling login SSH configs ConfigMap")
+						return errors.Wrap(err, "reconciling login default SSHD ConfigMap")
 					}
 					stepLogger.Info("Reconciled")
 
@@ -68,20 +74,21 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					desired, err := login.RenderSshRootPublicKeysConfig(clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering login SshRootPublicKeys ConfigMap")
+						return errors.Wrap(err, "rendering login SSHRootPublicKeys ConfigMap")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
 					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling login SshRootPublicKeys ConfigMap")
+						return errors.Wrap(err, "reconciling login SSHRootPublicKeys ConfigMap")
 					}
 					stepLogger.Info("Reconciled")
 
 					return nil
 				},
 			},
+
 			utils.MultiStepExecutionStep{
 				Name: "Slurm Login sshd keys Secret",
 				Func: func(stepCtx context.Context) error {
@@ -102,7 +109,12 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 							return errors.Wrap(getErr, "getting login SSHDKeys Secrets")
 						}
 
-						renderedDesired, err := login.RenderSSHDKeysSecret(clusterValues.Name, clusterValues.Namespace, clusterValues.Secrets.SshdKeysName)
+						renderedDesired, err := common.RenderSSHDKeysSecret(
+							clusterValues.Name,
+							clusterValues.Namespace,
+							clusterValues.Secrets.SshdKeysName,
+							consts.ComponentTypeLogin,
+						)
 						if err != nil {
 							stepLogger.Error(err, "Failed to render")
 							return errors.Wrap(err, "rendering login SSHDKeys Secrets")
@@ -121,6 +133,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					return nil
 				},
 			},
+
 			utils.MultiStepExecutionStep{
 				Name: "Slurm Login Security limits ConfigMap",
 				Func: func(stepCtx context.Context) error {
@@ -313,7 +326,7 @@ func (r SlurmClusterReconciler) getLoginStatefulSetDependencies(
 		ctx,
 		types.NamespacedName{
 			Namespace: clusterValues.Namespace,
-			Name:      naming.BuildConfigMapSSHConfigsName(clusterValues.Name),
+			Name:      naming.BuildConfigMapSSHDConfigsName(clusterValues.Name),
 		},
 		sshConfigsConfigMap,
 	); err != nil {
@@ -334,6 +347,22 @@ func (r SlurmClusterReconciler) getLoginStatefulSetDependencies(
 			return []metav1.Object{}, err
 		}
 		res = append(res, slurmdbdSecret)
+	}
+
+	if clusterValues.NodeLogin.SSHDConfigMapName != "" {
+		sshdConfigMap := &corev1.ConfigMap{}
+		err := r.Get(
+			ctx,
+			types.NamespacedName{
+				Namespace: clusterValues.Namespace,
+				Name:      clusterValues.NodeLogin.SSHDConfigMapName,
+			},
+			sshdConfigMap,
+		)
+		if err != nil {
+			return []metav1.Object{}, err
+		}
+		res = append(res, sshdConfigMap)
 	}
 
 	return res, nil

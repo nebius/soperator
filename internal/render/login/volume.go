@@ -21,8 +21,8 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeMungeSocket(),
 		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeLogin),
 		common.RenderVolumeSshdKeys(secrets.SshdKeysName),
-		common.RenderVolumeSshConfigs(clusterName),
-		common.RenderVolumeSshRootKeys(clusterName),
+		common.RenderVolumeSshdConfigs(login.SSHDConfigMapName),
+		common.RenderVolumeSshdRootKeys(clusterName),
 	}
 
 	// Jail could be specified by template spec or by volume source name
