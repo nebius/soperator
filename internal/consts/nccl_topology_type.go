@@ -17,15 +17,13 @@ func (b baseNCCLType) String() string {
 }
 
 var (
-	NCCLTypeAuto           NCCLType = baseNCCLType{"auto"}
-	NCCLTypeH100GPUCluster NCCLType = baseNCCLType{"H100 GPU cluster"}
-	NCCLTypeCustom         NCCLType = baseNCCLType{"custom"}
+	NCCLTypeAuto   NCCLType = baseNCCLType{"auto"}
+	NCCLTypeCustom NCCLType = baseNCCLType{"custom"}
 )
 
 var ncclTypeMap = map[string]NCCLType{
-	"auto":             NCCLTypeAuto,
-	"H100 GPU cluster": NCCLTypeH100GPUCluster,
-	"custom":           NCCLTypeCustom,
+	"auto":   NCCLTypeAuto,
+	"custom": NCCLTypeCustom,
 }
 
 func StringToNCCLType(s string) (NCCLType, error) {

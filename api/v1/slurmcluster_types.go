@@ -140,7 +140,7 @@ type NCCLSettings struct {
 
 	// TopologyType define type of NCCL GPU topology
 	//
-	// +kubebuilder:validation:Enum="H100 GPU cluster";auto;custom
+	// +kubebuilder:validation:Enum=auto;custom
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="auto"
 	TopologyType string `json:"topologyType,omitempty"`

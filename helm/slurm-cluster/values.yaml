@@ -76,7 +76,7 @@ populateJail:
   #    volumeSourceName: "jail-snapshot"
   overwrite: false
 ncclSettings:
-  # TopologyType define type of NCCL GPU topology Enum: H100 GPU cluster, auto, custom
+  # TopologyType define type of NCCL GPU topology Enum: auto, custom
   topologyType: "auto"
   # TopologyData defines NCCL GPU topology
   topologyData: ""
