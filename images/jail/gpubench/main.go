@@ -153,7 +153,12 @@ func main() {
 		if *pushEvents {
 			eventGenerator.generateEvent(ctx, currentNode, failExecuteMsg, v1.EventTypeWarning, gpuBenchmarkFinished)
 		}
-		log.WithField("error", err).Fatal(failExecuteMsg)
+		log.WithFields(
+			logrus.Fields{
+				"error":  err,
+				"output": string(output),
+			},
+		).Fatal(failExecuteMsg)
 	}
 	succedExuteMsg := "Succed to execute all_reduce_perf"
 	if *pushEvents {
