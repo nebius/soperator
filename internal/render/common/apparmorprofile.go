@@ -48,10 +48,6 @@ profile %s flags=(attach_disconnected,mediate_deleted) {
 
   # remove [^m], when bump slurm 24.05.5 or higher
   
-  deny /mnt/jail/usr/lib/x86_64-linux-gnu/libnvidia-[^m]* w,
-  deny /mnt/jail/usr/lib/x86_64-linux-gnu/libcuda.so* w,
-  deny /mnt/jail/usr/lib/x86_64-linux-gnu/libcudadebugger.so* w,
-
   deny /usr/lib/x86_64-linux-gnu/libnvidia-[^m]* w,
   deny /usr/lib/x86_64-linux-gnu/libcuda.so* w,
   deny /usr/lib/x86_64-linux-gnu/libcudadebugger.so* w,
