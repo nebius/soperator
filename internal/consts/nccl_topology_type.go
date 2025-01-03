@@ -22,9 +22,8 @@ var (
 )
 
 var ncclTypeMap = map[string]NCCLType{
-	"auto":             NCCLTypeAuto,
-	"H100 GPU cluster": NCCLTypeAuto,
-	"custom":           NCCLTypeCustom,
+	"auto":   NCCLTypeAuto,
+	"custom": NCCLTypeCustom,
 }
 
 func StringToNCCLType(s string) (NCCLType, error) {

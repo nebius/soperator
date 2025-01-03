@@ -119,7 +119,6 @@ spec:
                     default: auto
                     description: TopologyType define type of NCCL GPU topology
                     enum:
-                    - H100 GPU cluster
                     - auto
                     - custom
                     type: string
