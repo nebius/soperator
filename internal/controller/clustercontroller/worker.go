@@ -47,6 +47,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						clusterValues.Name,
 						clusterValues.NodeWorker.K8sNodeFilterName,
 						clusterValues.NodeFilters,
+						clusterValues.NodeWorker.Maintenance,
 					)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")

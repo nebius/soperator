@@ -18,9 +18,10 @@ type SlurmController struct {
 
 	VolumeSpool slurmv1.NodeVolume
 	VolumeJail  slurmv1.NodeVolume
+	Maintenance *consts.MaintenanceMode
 }
 
-func buildSlurmControllerFrom(clusterName string, controller *slurmv1.SlurmNodeController) SlurmController {
+func buildSlurmControllerFrom(clusterName string, maintenance *consts.MaintenanceMode, controller *slurmv1.SlurmNodeController) SlurmController {
 	return SlurmController{
 		SlurmNode: *controller.SlurmNode.DeepCopy(),
 		ContainerSlurmctld: buildContainerFrom(
@@ -38,5 +39,6 @@ func buildSlurmControllerFrom(clusterName string, controller *slurmv1.SlurmNodeC
 		),
 		VolumeSpool: *controller.Volumes.Spool.DeepCopy(),
 		VolumeJail:  *controller.Volumes.Jail.DeepCopy(),
+		Maintenance: maintenance,
 	}
 }

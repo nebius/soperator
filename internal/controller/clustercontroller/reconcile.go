@@ -226,8 +226,10 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 	res, err := r.runWithPhase(ctx, cluster,
 		ptr.To(slurmv1.PhaseClusterReconciling),
 		func() (ctrl.Result, error) {
-			if err = r.ReconcilePopulateJail(ctx, clusterValues, cluster); err != nil {
-				return ctrl.Result{}, err
+			if !check.IsModeSkipPopulateJail(clusterValues.PopulateJail.Maintenance) {
+				if err = r.ReconcilePopulateJail(ctx, clusterValues, cluster); err != nil {
+					return ctrl.Result{}, err
+				}
 			}
 			if err = r.ReconcileCommon(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err

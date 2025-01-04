@@ -16,10 +16,11 @@ type SlurmExporter struct {
 	slurmv1.ExporterContainer
 	ContainerMunge Container
 
-	VolumeJail slurmv1.NodeVolume
+	VolumeJail  slurmv1.NodeVolume
+	Maintenance *consts.MaintenanceMode
 }
 
-func buildSlurmExporterFrom(exporter *slurmv1.SlurmExporter) SlurmExporter {
+func buildSlurmExporterFrom(maintenance *consts.MaintenanceMode, exporter *slurmv1.SlurmExporter) SlurmExporter {
 	return SlurmExporter{
 		SlurmNode:         *exporter.SlurmNode.DeepCopy(),
 		Enabled:           exporter.Enabled,
@@ -32,5 +33,6 @@ func buildSlurmExporterFrom(exporter *slurmv1.SlurmExporter) SlurmExporter {
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),
 		},
+		Maintenance: maintenance,
 	}
 }

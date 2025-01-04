@@ -16,7 +16,6 @@ type SlurmCluster struct {
 	types.NamespacedName
 
 	CRVersion              string
-	Pause                  bool
 	ClusterType            consts.ClusterType
 	PartitionConfiguration PartitionConfiguration
 
@@ -54,11 +53,10 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 			Name:      cluster.Name,
 		},
 		CRVersion:              buildCRVersionFrom(ctx, cluster.Spec.CRVersion),
-		Pause:                  cluster.Spec.Pause,
 		ClusterType:            clusterType,
 		PartitionConfiguration: buildPartitionConfiguration(&cluster.Spec.PartitionConfiguration),
 		NCCLBenchmark:          buildSlurmNCCLBenchmarkFrom(cluster.Name, &cluster.Spec.PeriodicChecks.NCCLBenchmark),
-		PopulateJail:           buildSlurmPopulateJailFrom(cluster.Name, &cluster.Spec.PopulateJail),
+		PopulateJail:           buildSlurmPopulateJailFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.PopulateJail),
 		NodeFilters:            buildNodeFiltersFrom(cluster.Spec.K8sNodeFilters),
 		VolumeSources:          buildVolumeSourcesFrom(cluster.Spec.VolumeSources),
 		Secrets:                buildSecretsFrom(&cluster.Spec.Secrets),

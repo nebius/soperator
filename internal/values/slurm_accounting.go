@@ -24,9 +24,10 @@ type SlurmAccounting struct {
 	SlurmdbdConfig slurmv1.SlurmdbdConfig
 	SlurmConfig    slurmv1.AccountingSlurmConf
 	VolumeJail     slurmv1.NodeVolume
+	Maintenance    *consts.MaintenanceMode
 }
 
-func buildAccountingFrom(clusterName string, accounting *slurmv1.SlurmNodeAccounting) SlurmAccounting {
+func buildAccountingFrom(clusterName string, maintenance *consts.MaintenanceMode, accounting *slurmv1.SlurmNodeAccounting) SlurmAccounting {
 	containerAcc := buildContainerFrom(
 		accounting.Slurmdbd,
 		consts.ContainerNameAccounting,
@@ -53,5 +54,6 @@ func buildAccountingFrom(clusterName string, accounting *slurmv1.SlurmNodeAccoun
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),
 		},
+		Maintenance: maintenance,
 	}
 }

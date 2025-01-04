@@ -6,8 +6,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/utils"
@@ -37,6 +39,11 @@ func RenderStatefulSet(
 		return appsv1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
+	replicas := &controller.StatefulSet.Replicas
+	if check.IsMaintenanceActive(controller.Maintenance) {
+		replicas = ptr.To(consts.ZeroReplicas)
+	}
+
 	return appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      controller.StatefulSet.Name,
@@ -46,7 +53,7 @@ func RenderStatefulSet(
 		Spec: appsv1.StatefulSetSpec{
 			PodManagementPolicy: consts.PodManagementPolicy,
 			ServiceName:         controller.Service.Name,
-			Replicas:            &controller.StatefulSet.Replicas,
+			Replicas:            replicas,
 			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{

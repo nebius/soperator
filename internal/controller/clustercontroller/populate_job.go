@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/render/populate_jail"
 	"nebius.ai/slurm-operator/internal/utils"
@@ -36,42 +37,60 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
 
+					isMaintenanceStopMode := check.IsModeDownscaleAndDeletePopulate(clusterValues.PopulateJail.Maintenance)
 					desired := batchv1.Job{}
-					if getErr := r.Get(stepCtx,
+					getErr := r.Get(stepCtx,
 						client.ObjectKey{
 							Namespace: clusterValues.Namespace,
 							Name:      clusterValues.PopulateJail.Name,
 						},
 						&desired,
-					); getErr != nil {
-						if !apierrors.IsNotFound(getErr) {
-							stepLogger.Error(getErr, "Failed to get")
-							return errors.Wrap(getErr, "getting Populate jail Job")
+					)
+					if getErr == nil {
+						stepLogger.Info("Already exists")
+						if isMaintenanceStopMode {
+							stepLogger.Info("Deleting")
+							if err := r.Delete(stepCtx, &desired); err != nil {
+								stepLogger.Error(err, "Failed to delete")
+								return errors.Wrap(err, "deleting Populate jail Job")
+							}
+							stepLogger.Info("Deleted")
 						}
-
-						renderedDesired, err := populate_jail.RenderPopulateJailJob(
-							clusterValues.Namespace,
-							clusterValues.Name,
-							clusterValues.ClusterType,
-							clusterValues.NodeFilters,
-							clusterValues.VolumeSources,
-							&clusterValues.PopulateJail,
-						)
-						if err != nil {
-							stepLogger.Error(err, "Failed to render")
-							return errors.Wrap(err, "rendering Populate jail Job")
-						}
-						desired = *renderedDesired.DeepCopy()
-
-						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-						stepLogger.Info("Rendered")
-
-						if err = r.Job.Reconcile(stepCtx, cluster, &desired); err != nil {
-							stepLogger.Error(err, "Failed to reconcile")
-							return errors.Wrap(err, "reconciling Populate jail Job")
-						}
-						stepLogger.Info("Reconciled")
+						return nil
 					}
+
+					if !apierrors.IsNotFound(getErr) && !isMaintenanceStopMode {
+						stepLogger.Error(getErr, "Failed to get")
+						return errors.Wrap(getErr, "getting Populate jail Job")
+					}
+
+					if isMaintenanceStopMode {
+						stepLogger.Info("Skipping creation due to MaintenanceStopMode")
+						return nil
+					}
+
+					renderedDesired, err := populate_jail.RenderPopulateJailJob(
+						clusterValues.Namespace,
+						clusterValues.Name,
+						clusterValues.ClusterType,
+						clusterValues.NodeFilters,
+						clusterValues.VolumeSources,
+						&clusterValues.PopulateJail,
+					)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering Populate jail Job")
+					}
+					desired = *renderedDesired.DeepCopy()
+
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
+
+					if err = r.Job.Reconcile(stepCtx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling Populate jail Job")
+					}
+					stepLogger.Info("Reconciled")
 
 					if pollErr := wait.PollUntilContextCancel(stepCtx,
 						10*time.Second,

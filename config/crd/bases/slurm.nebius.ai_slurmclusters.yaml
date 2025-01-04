@@ -1065,6 +1065,18 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+              maintenance:
+                default: none
+                description: |-
+                  Maintenance defines the maintenance window for the cluster
+                  None - no maintenance. downscale - scale controller, login, worker, accounting to 0.
+                  downscaleAndDeletePopulate - scale all to 0 and delete populateJail job. Develop - skip populateJail job.
+                enum:
+                - none
+                - downscale
+                - downscaleAndDeletePopulateJail
+                - skipPopulateJail
+                type: string
               ncclSettings:
                 description: NCCLSettings
                 properties:
@@ -1101,11 +1113,6 @@ spec:
                       type: string
                     type: array
                 type: object
-              pause:
-                description: |-
-                  Pause defines whether to gracefully stop the cluster.
-                  Setting it to false after cluster has been paused starts the cluster back
-                type: boolean
               periodicChecks:
                 description: PeriodicChecks define the k8s CronJobs performing cluster
                   checks

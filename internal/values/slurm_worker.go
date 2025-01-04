@@ -36,10 +36,12 @@ type SlurmWorker struct {
 	JailSubMounts             []slurmv1.NodeVolumeJailSubMount
 	SharedMemorySize          *resource.Quantity
 	UseDefaultAppArmorProfile bool
+	Maintenance               *consts.MaintenanceMode
 }
 
 func buildSlurmWorkerFrom(
 	clusterName string,
+	maintenance *consts.MaintenanceMode,
 	worker *slurmv1.SlurmNodeWorker,
 	ncclSettings *slurmv1.NCCLSettings,
 	useDefaultAppArmorProfile bool,
@@ -90,6 +92,7 @@ func buildSlurmWorkerFrom(
 		SlurmNodeExtra:            worker.SlurmNodeExtra,
 		SSHDConfigMapName:         sshdConfigMapName,
 		IsSSHDConfigMapDefault:    isSSHDConfigDefault,
+		Maintenance:               maintenance,
 	}
 	for _, jailSubMount := range worker.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()
