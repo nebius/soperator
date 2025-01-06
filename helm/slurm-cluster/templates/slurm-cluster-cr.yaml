@@ -17,6 +17,7 @@ spec:
   slurmConfig:
     {{- toYaml .Values.slurmConfig | nindent 4 }}
   {{- end }}
+  maintenance: {{ default "none" .Values.maintenance | quote  }}
   crVersion: {{ .Chart.Version }}
   useDefaultAppArmorProfile: {{ .Values.useDefaultAppArmorProfile }}
   pause: {{ .Values.pause }}

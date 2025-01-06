@@ -23,9 +23,12 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="gpu"
 	ClusterType string `json:"clusterType,omitempty"`
-	// Maintenance defines the maintenance window for the cluster
-	// None - no maintenance. downscale - scale controller, login, worker, accounting to 0.
-	// downscaleAndDeletePopulateJail - scale all to 0 and delete populateJail job. skipPopulateJail - skip populateJail job.
+	// Maintenance defines the maintenance window for the cluster.
+	// It can have the following values:
+	// - none: No maintenance is performed. The cluster operates normally.
+	// - downscale: Scales down all components to 0.
+	// - downscaleAndDeletePopulateJail: Scales down all components to 0 and deletes the kubernetes Kind Jobs populateJail.
+	// - skipPopulateJail: Skips the execution of the populateJail job during maintenance.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum=none;downscale;downscaleAndDeletePopulateJail;skipPopulateJail
