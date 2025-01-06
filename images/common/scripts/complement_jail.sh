@@ -80,10 +80,8 @@ pushd "${jaildir}"
         touch "etc/gpu_libs_installed.flag"
     fi
 
-    if [ -n "$worker" ]; then
-        echo "Bind-mount enroot data directory because if should be node-local"
-        mount --bind /usr/share/enroot/enroot-data usr/share/enroot/enroot-data
-    fi
+    echo "Bind-mount enroot data directory because it should be node-local"
+    mount --bind /usr/share/enroot/enroot-data usr/share/enroot/enroot-data
 
     if ! getcap usr/bin/enroot-mksquashovlfs | grep -q 'cap_sys_admin+pe'; then
         echo "Set capabilities for enroot-mksquashovlfs to run containers without privileges"
