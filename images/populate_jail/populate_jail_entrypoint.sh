@@ -11,7 +11,7 @@ if [ "$OVERWRITE" != "1" ] && [ -d /mnt/jail/dev ]; then
 fi
 
 echo "Delete everything from jail directory"
-rm -rf /mnt/jail/*
+rm -rf -- /mnt/jail/..?* /mnt/jail/.[!.]* /mnt/jail/*
 
 echo "Rclone and rsync jail rootfs into jail directory"
 rclone copy /jail /mnt/jail --progress --transfers="$(nproc)" --links
