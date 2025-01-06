@@ -66,17 +66,19 @@ pushd "${jaildir}"
 
     if [ -n "$worker" ] && [ "$SLURM_CLUSTER_TYPE" = "gpu" ]; then
         echo "Run nvidia-container-cli to propagate NVIDIA drivers, CUDA, NVML and other GPU-related stuff to the jail"
-        nvidia-container-cli \
-            --user \
-            --debug=/dev/stderr \
-            --no-pivot \
-            configure \
-            --no-cgroups \
-            --ldconfig="@$(command -v ldconfig.real || command -v ldconfig)" \
-            --device=all \
-            --utility \
-            --compute \
-            "${jaildir}"
+        flock etc/complement_jail_nvidia_container_cli.lock -c "
+            nvidia-container-cli \
+                --user \
+                --debug=/dev/stderr \
+                --no-pivot \
+                configure \
+                --no-cgroups \
+                --ldconfig=\"@$(command -v ldconfig.real || command -v ldconfig)\" \
+                --device=all \
+                --utility \
+                --compute \
+                \"${jaildir}\"
+        "
         touch "etc/gpu_libs_installed.flag"
     fi
 
@@ -85,11 +87,11 @@ pushd "${jaildir}"
 
     if ! getcap usr/bin/enroot-mksquashovlfs | grep -q 'cap_sys_admin+pe'; then
         echo "Set capabilities for enroot-mksquashovlfs to run containers without privileges"
-        setcap cap_sys_admin+pe usr/bin/enroot-mksquashovlfs
+        flock etc/complement_jail_setcap_enroot_mksquashovlfs.lock -c "setcap cap_sys_admin+pe usr/bin/enroot-mksquashovlfs"
     fi
     if ! getcap usr/bin/enroot-aufs2ovlfs | grep -q 'cap_sys_admin,cap_mknod+pe'; then
         echo "Set capabilities for enroot-aufs2ovlfs to run containers without privileges"
-        setcap cap_sys_admin,cap_mknod+pe usr/bin/enroot-aufs2ovlfs
+        flock etc/complement_jail_setcap_enroot_aufs2ovlfs.lock -c "setcap cap_sys_admin,cap_mknod+pe usr/bin/enroot-aufs2ovlfs"
     fi
 
     echo "Bind-mount slurm configs"
@@ -116,6 +118,6 @@ pushd "${jaildir}"
 
     if [ -n "$worker" ]; then
         echo "Update linker cache inside the jail"
-        chroot "${jaildir}" /usr/sbin/ldconfig
+        flock etc/complement_jail_ldconfig.lock -c "chroot \"${jaildir}\" /usr/sbin/ldconfig"
     fi
 popd
