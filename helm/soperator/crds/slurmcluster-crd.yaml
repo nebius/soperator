@@ -1139,7 +1139,7 @@ spec:
                           scheduled
                         type: boolean
                       failedJobsHistoryLimit:
-                        default: 3
+                        default: 16
                         description: FailedJobsHistoryLimit defines the number of
                           failed finished jobs to retain
                         format: int32

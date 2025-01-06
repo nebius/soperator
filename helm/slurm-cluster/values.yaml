@@ -98,7 +98,7 @@ periodicChecks:
     # CronJob timeout in seconds. By default, equals to 30 min
     activeDeadlineSeconds: 1800
     # Number of successful finished jobs to retain
-    successfulJobsHistoryLimit: 3
+    successfulJobsHistoryLimit: 24
     # Number of failed finished jobs to retain
     failedJobsHistoryLimit: 3
     # NCCL test settings

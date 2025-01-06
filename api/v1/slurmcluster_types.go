@@ -237,7 +237,7 @@ type NCCLBenchmark struct {
 	// FailedJobsHistoryLimit defines the number of failed finished jobs to retain
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=3
+	// +kubebuilder:default=16
 	FailedJobsHistoryLimit int32 `json:"failedJobsHistoryLimit,omitempty"`
 
 	// Image defines the nccl container image
