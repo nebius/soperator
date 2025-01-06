@@ -78,7 +78,9 @@ RUN apt update && \
         unzip \
         rsync \
         numactl \
-        htop
+        htop \
+        rdma-core \
+        ibverbs-utils
 
 # Install python
 COPY common/scripts/install_python.sh /opt/bin/

@@ -49,7 +49,9 @@ RUN apt-get update && \
         libdrm-dev \
         sudo \
         supervisor \
-        openssh-server
+        openssh-server \
+        rdma-core \
+        ibverbs-utils
 
 # Install PMIx
 COPY common/scripts/install_pmix.sh /opt/bin/
