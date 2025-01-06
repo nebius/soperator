@@ -1,0 +1,10 @@
+#!/bin/sh
+
+USER="$(whoami)"
+LOGGED_IN_USERS=$(last -F | awk '/still logged in/ {print $1, $5, $6, $7, $8}' | grep -vE "^${USER}")
+if [ -z "$LOGGED_IN_USERS" ]; then
+  printf "\nNo other users are currently logged in \n"
+else
+  printf "\nOther users currently logged in: \n"
+  printf "%s\n" "$LOGGED_IN_USERS" | awk '{printf " * %s - since %s %s %s %s\n", $1, $2, $3, $4, $5}'
+fi

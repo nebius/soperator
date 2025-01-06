@@ -894,6 +894,20 @@ type NodeVolumeJailSubMount struct {
 	// +kubebuilder:validation:Required
 	MountPath string `json:"mountPath"`
 
+	// SubPath points to a specific entry inside the volume.
+	// Corresponds to the subPath field in the K8s volumeMount structure.
+	// See official docs for details: https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=""
+	SubPath string `json:"subPath"`
+
+	// ReadOnly defines whether the mount point should be read-only
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	ReadOnly bool `json:"readOnly"`
+
 	// VolumeSourceName defines the name of the volume source for the sub-mount.
 	// Must correspond to the name of one of [VolumeSource]
 	//

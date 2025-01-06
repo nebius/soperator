@@ -211,5 +211,10 @@ RUN cd /etc/skel && \
 COPY jail/scripts/createuser.sh /usr/bin/createuser
 RUN chmod +x /usr/bin/createuser
 
+# Replace SSH "message of the day" scripts
+RUN rm -rf /etc/update-motd.d/*
+COPY jail/motd/ /etc/update-motd.d/
+RUN chmod +x /etc/update-motd.d/*
+
 # Update linker cache
 RUN ldconfig

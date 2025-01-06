@@ -3661,6 +3661,18 @@ spec:
                                 name:
                                   description: Name defines the name of the sub-mount
                                   type: string
+                                readOnly:
+                                  default: false
+                                  description: ReadOnly defines whether the mount
+                                    point should be read-only
+                                  type: boolean
+                                subPath:
+                                  default: ""
+                                  description: |-
+                                    SubPath points to a specific entry inside the volume.
+                                    Corresponds to the subPath field in the K8s volumeMount structure.
+                                    See official docs for details: https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath
+                                  type: string
                                 volumeSourceName:
                                   description: |-
                                     VolumeSourceName defines the name of the volume source for the sub-mount.
@@ -4097,6 +4109,18 @@ spec:
                                   type: string
                                 name:
                                   description: Name defines the name of the sub-mount
+                                  type: string
+                                readOnly:
+                                  default: false
+                                  description: ReadOnly defines whether the mount
+                                    point should be read-only
+                                  type: boolean
+                                subPath:
+                                  default: ""
+                                  description: |-
+                                    SubPath points to a specific entry inside the volume.
+                                    Corresponds to the subPath field in the K8s volumeMount structure.
+                                    See official docs for details: https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath
                                   type: string
                                 volumeSourceName:
                                   description: |-

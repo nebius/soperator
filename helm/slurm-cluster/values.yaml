@@ -317,6 +317,8 @@ slurmNodes:
       #      jailSubMounts:
       #        - name: "mlcommons-sd-bench-data"
       #          mountPath: "/mlperf-sd"
+      #          subPath: ""
+      #          readOnly: false
       #          volumeSourceName: "mlperf-sd"
   login:
     size: 2

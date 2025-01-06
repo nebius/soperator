@@ -206,6 +206,8 @@ func RenderVolumeMountJailSubMount(subMount slurmv1.NodeVolumeJailSubMount) core
 	return corev1.VolumeMount{
 		Name:      subMount.Name,
 		MountPath: path.Join(consts.VolumeMountPathJailUpper, subMount.MountPath),
+		SubPath:   subMount.SubPath,
+		ReadOnly:  subMount.ReadOnly,
 	}
 }
 
