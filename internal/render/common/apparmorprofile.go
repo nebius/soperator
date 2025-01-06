@@ -48,6 +48,17 @@ profile %s flags=(attach_disconnected,mediate_deleted) {
 
   # remove [^m], when bump slurm 24.05.5 or higher
   
+  deny /usr/lib/x86_64-linux-gnu/libEGL_* w,
+  deny /usr/lib/x86_64-linux-gnu/libGLES* w,
+  deny /usr/lib/x86_64-linux-gnu/libGLX_nvidia* w,
+  deny /usr/lib/x86_64-linux-gnu/libcuda* w,
+  deny /usr/lib/x86_64-linux-gnu/libnvcuvid* w,
+  deny /usr/lib/x86_64-linux-gnu/gbm/nvidia-* w,
+  deny /usr/lib/x86_64-linux-gnu/nvidia/wine/_nvngx.dll w,
+  deny /usr/lib/x86_64-linux-gnu/nvidia/wine/nvngx.dll w,
+  deny /usr/lib/x86_64-linux-gnu/nvidia/xorg/libglxserver_nvidia* w,
+  deny /usr/lib/x86_64-linux-gnu/nvidia/xorg/nvidia_drv.so w,
+  deny /usr/lib/x86_64-linux-gnu/vdpau/libvdpau_nvidia
   deny /usr/lib/x86_64-linux-gnu/libnvidia-[^m]* w,
   deny /usr/lib/x86_64-linux-gnu/libcuda.so* w,
   deny /usr/lib/x86_64-linux-gnu/libcudadebugger.so* w,
