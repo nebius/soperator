@@ -1485,7 +1485,7 @@ spec:
                   defMemPerNode: 1228800
                   maxJobCount: 10000
                   minJobAge: 86400
-                  taskPluginParam: Verbose
+                  taskPluginParam: ""
                 description: SlurmConfig represents the Slurm configuration in slurm.conf.
                   Not all options are supported.
                 properties:
@@ -1524,9 +1524,9 @@ spec:
                     format: int32
                     type: integer
                   taskPluginParam:
-                    default: Verbose
+                    default: ""
                     description: Additional parameters for the task plugin
-                    pattern: ^((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+$
+                    pattern: ^(|((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+)$
                     type: string
                 type: object
               slurmNodes:
