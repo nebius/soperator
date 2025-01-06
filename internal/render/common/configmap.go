@@ -345,7 +345,6 @@ func RenderDefaultConfigMapSSHDConfigs(
 
 func generateDefaultSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res := &renderutils.MultilineStringConfig{}
-	res.AddLine("LogLevel INFO")
 	res.AddLine(fmt.Sprintf("Port %d", cluster.NodeLogin.ContainerSshd.Port))
 	res.AddLine("PermitRootLogin yes")
 	res.AddLine("PasswordAuthentication no")
@@ -364,6 +363,10 @@ func generateDefaultSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigF
 	res.AddLine("MaxStartups " + consts.SSHDMaxStartups)
 	res.AddLine("LoginGraceTime " + consts.SSHDLoginGraceTime)
 	res.AddLine("MaxAuthTries " + consts.SSHDMaxAuthTries)
+	res.AddLine("LogLevel DEBUG3")
+	res.AddLine("")
+	res.AddLine("Match User *")
+	res.AddLine("    LogLevel INFO")
 	return res
 }
 
