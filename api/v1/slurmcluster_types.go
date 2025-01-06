@@ -25,7 +25,7 @@ type SlurmClusterSpec struct {
 	ClusterType string `json:"clusterType,omitempty"`
 	// Maintenance defines the maintenance window for the cluster
 	// None - no maintenance. downscale - scale controller, login, worker, accounting to 0.
-	// downscaleAndDeletePopulate - scale all to 0 and delete populateJail job. Develop - skip populateJail job.
+	// downscaleAndDeletePopulateJail - scale all to 0 and delete populateJail job. skipPopulateJail - skip populateJail job.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum=none;downscale;downscaleAndDeletePopulateJail;skipPopulateJail
