@@ -27,7 +27,7 @@ type SlurmLogin struct {
 	Maintenance               *consts.MaintenanceMode
 }
 
-func buildSlurmLoginFrom(clusterName string, login *slurmv1.SlurmNodeLogin, useDefaultAppArmorProfile bool, maintenance *consts.MaintenanceMode) SlurmLogin {
+func buildSlurmLoginFrom(clusterName string, maintenance *consts.MaintenanceMode, login *slurmv1.SlurmNodeLogin, useDefaultAppArmorProfile bool) SlurmLogin {
 	svc := buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeLogin, clusterName))
 	svc.Type = login.SshdServiceType
 	svc.Annotations = login.SshdServiceAnnotations
