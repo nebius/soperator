@@ -5,6 +5,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -22,12 +23,17 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="gpu"
 	ClusterType string `json:"clusterType,omitempty"`
-
-	// Pause defines whether to gracefully stop the cluster.
-	// Setting it to false after cluster has been paused starts the cluster back
+	// Maintenance defines the maintenance window for the cluster.
+	// It can have the following values:
+	// - none: No maintenance is performed. The cluster operates normally.
+	// - downscale: Scales down all components to 0.
+	// - downscaleAndDeletePopulateJail: Scales down all components to 0 and deletes the kubernetes Kind Jobs populateJail.
+	// - skipPopulateJail: Skips the execution of the populateJail job during maintenance.
 	//
 	// +kubebuilder:validation:Optional
-	Pause bool `json:"pause,omitempty"` // TODO cluster pausing/resuming
+	// +kubebuilder:validation:Enum=none;downscale;downscaleAndDeletePopulateJail;skipPopulateJail
+	// +kubebuilder:default="none"
+	Maintenance *consts.MaintenanceMode `json:"maintenance,omitempty"`
 
 	// NCCLSettings
 	// +kubebuilder:validation:Optional

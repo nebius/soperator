@@ -4,7 +4,9 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 )
 
 func TestBuildSlurmWorkerFrom(t *testing.T) {
@@ -19,7 +21,7 @@ func TestBuildSlurmWorkerFrom(t *testing.T) {
 	}
 	ncclSettings := &slurmv1.NCCLSettings{}
 
-	result := buildSlurmWorkerFrom(clusterName, worker, ncclSettings, false)
+	result := buildSlurmWorkerFrom(clusterName, ptr.To(consts.ModeNone), worker, ncclSettings, false)
 
 	if result.SlurmNode != *worker.SlurmNode.DeepCopy() {
 		t.Errorf("Expected SlurmNode to be %v, but got %v", *worker.SlurmNode.DeepCopy(), result.SlurmNode)

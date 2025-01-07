@@ -3,8 +3,13 @@ clusterName: "slurm1"
 annotations: {}
 # Add appArmor profile to the cluster
 useDefaultAppArmorProfile: true
-# Whether to gracefully stop the cluster. Setting it to false after cluster has been paused starts the cluster back
-pause: false
+# Maintenance defines the maintenance window for the cluster.
+# It can have the following values:
+# - none: No maintenance is performed. The cluster operates normally.
+# - downscale: Scales down all components to 0.
+# - downscaleAndDeletePopulateJail: Scales down all components to 0 and deletes the kubernetes Kind Jobs populateJail.
+# - skipPopulateJail: Skips the execution of the populateJail job during maintenance.
+maintenance: "none"
 # Slurm cluster type. Can be now gpu or cpu
 clusterType: gpu
 # partitionConfiguration define partition configuration of slurm worker nodes

@@ -49,7 +49,7 @@ func TestBuildAccountingFrom(t *testing.T) {
 		},
 	}
 
-	result := buildAccountingFrom(defaultNameCluster, accounting)
+	result := buildAccountingFrom(defaultNameCluster, ptr.To(consts.ModeNone), accounting)
 
 	assert.Equal(t, *accounting.SlurmNode.DeepCopy(), result.SlurmNode)
 	assert.Equal(t, buildContainerFrom(accounting.Munge, consts.ContainerNameMunge).Name, result.ContainerMunge.Name)

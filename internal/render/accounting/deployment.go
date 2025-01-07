@@ -3,8 +3,10 @@ package accounting
 import (
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -32,6 +34,12 @@ func RenderDeployment(
 		return nil, err
 	}
 
+	replicas := &accounting.Deployment.Replicas
+
+	if check.IsMaintenanceActive(accounting.Maintenance) {
+		replicas = ptr.To(consts.ZeroReplicas)
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildDeploymentName(consts.ComponentTypeAccounting),
@@ -41,7 +49,7 @@ func RenderDeployment(
 		Spec: appsv1.DeploymentSpec{
 			// in Deployment mode replicas should be 1.
 			// Because of accounting requires a single instance.
-			Replicas: &accounting.Deployment.Replicas,
+			Replicas: replicas,
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RecreateDeploymentStrategyType,
 			},

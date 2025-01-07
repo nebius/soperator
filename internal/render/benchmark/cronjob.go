@@ -45,7 +45,7 @@ func RenderNCCLBenchmarkCronJob(
 				Spec: batchv1.JobSpec{
 					Parallelism:  ptr.To(int32(1)),
 					Completions:  ptr.To(int32(1)),
-					BackoffLimit: ptr.To(int32(0)),
+					BackoffLimit: ptr.To(consts.ZeroReplicas),
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: labels,

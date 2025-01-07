@@ -18,9 +18,11 @@ type PopulateJail struct {
 	VolumeJail slurmv1.NodeVolume
 
 	Overwrite bool
+
+	Maintenance *consts.MaintenanceMode
 }
 
-func buildSlurmPopulateJailFrom(clusterName string, populateJail *slurmv1.PopulateJail) PopulateJail {
+func buildSlurmPopulateJailFrom(clusterName string, maintenance *consts.MaintenanceMode, populateJail *slurmv1.PopulateJail) PopulateJail {
 	return PopulateJail{
 		PopulateJail: *populateJail.DeepCopy(),
 		Name:         naming.BuildPopulateJailJobName(clusterName),
@@ -35,6 +37,7 @@ func buildSlurmPopulateJailFrom(clusterName string, populateJail *slurmv1.Popula
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),
 		},
-		Overwrite: populateJail.Overwrite,
+		Overwrite:   populateJail.Overwrite,
+		Maintenance: maintenance,
 	}
 }

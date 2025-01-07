@@ -1064,6 +1064,21 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+              maintenance:
+                default: none
+                description: |-
+                  Maintenance defines the maintenance window for the cluster.
+                  It can have the following values:
+                  - none: No maintenance is performed. The cluster operates normally.
+                  - downscale: Scales down all components to 0.
+                  - downscaleAndDeletePopulateJail: Scales down all components to 0 and deletes the kubernetes Kind Jobs populateJail.
+                  - skipPopulateJail: Skips the execution of the populateJail job during maintenance.
+                enum:
+                - none
+                - downscale
+                - downscaleAndDeletePopulateJail
+                - skipPopulateJail
+                type: string
               ncclSettings:
                 description: NCCLSettings
                 properties:
@@ -1100,11 +1115,6 @@ spec:
                       type: string
                     type: array
                 type: object
-              pause:
-                description: |-
-                  Pause defines whether to gracefully stop the cluster.
-                  Setting it to false after cluster has been paused starts the cluster back
-                type: boolean
               periodicChecks:
                 description: PeriodicChecks define the k8s CronJobs performing cluster
                   checks

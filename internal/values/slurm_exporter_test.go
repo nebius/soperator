@@ -4,8 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 )
 
 func Test_BuildSlurmExporterFrom(t *testing.T) {
@@ -18,7 +20,7 @@ func Test_BuildSlurmExporterFrom(t *testing.T) {
 		},
 	}
 
-	result := buildSlurmExporterFrom(exporter)
+	result := buildSlurmExporterFrom(ptr.To(consts.ModeNone), exporter)
 
 	assert.NotNil(t, result.ExporterContainer)
 	assert.NotNil(t, result.SlurmNode)
@@ -38,7 +40,7 @@ func Test_BuildSlurmExporterFromWithNilTelemetry(t *testing.T) {
 			t.Errorf("The code panicked: %v", r)
 		}
 	}()
-	buildSlurmExporterFrom(exporter)
+	buildSlurmExporterFrom(ptr.To(consts.ModeNone), exporter)
 }
 
 func Test_BuildSlurmExporterFromWithNilPrometheus(t *testing.T) {
@@ -55,5 +57,5 @@ func Test_BuildSlurmExporterFromWithNilPrometheus(t *testing.T) {
 			t.Errorf("The code panicked: %v", r)
 		}
 	}()
-	buildSlurmExporterFrom(exporter)
+	buildSlurmExporterFrom(ptr.To(consts.ModeNone), exporter)
 }
