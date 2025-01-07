@@ -37,6 +37,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 	isExternalDBEnabled := clusterValues.NodeAccounting.ExternalDB.Enabled
 	isMariaDBEnabled := clusterValues.NodeAccounting.MariaDb.Enabled
 	isProtectedSecret := clusterValues.NodeAccounting.MariaDb.ProtectedSecret
+	isDBEnabled := isExternalDBEnabled || isMariaDBEnabled
 
 	reconcileAccountingImpl := func() error {
 		return utils.ExecuteMultiStep(ctx,
@@ -48,7 +49,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
 
-					if !isAccountingEnabled || (!isExternalDBEnabled && !isMariaDBEnabled) {
+					if !isAccountingEnabled && !isDBEnabled {
 						logger.Info("Slurm Accounting is disabled. Skipping reconciliation	of Slurmdbd Configs Secret")
 						return nil
 					}
@@ -100,7 +101,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
 
-					if !isAccountingEnabled || (!isExternalDBEnabled && !isMariaDBEnabled) {
+					if !isAccountingEnabled && !isDBEnabled {
 						logger.Info("Slurm Accounting is disabled. Skipping reconciliation of MariaDB password Secret")
 						return nil
 					}
@@ -143,7 +144,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
 
-					if !isAccountingEnabled || (!isExternalDBEnabled && !isMariaDBEnabled) {
+					if !isAccountingEnabled && !isDBEnabled {
 						logger.Info("Slurm Accounting is disabled. Skipping reconciliation MariaDB root password")
 						return nil
 					}

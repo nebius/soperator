@@ -29,13 +29,14 @@ func (r SlurmClusterReconciler) ReconcileREST(
 	isAccountingEnabled := clusterValues.NodeAccounting.Enabled
 	isExternalDBEnabled := clusterValues.NodeAccounting.ExternalDB.Enabled
 	isMariaDBEnabled := clusterValues.NodeAccounting.MariaDb.Enabled
+	isDBEnabled := isAccountingEnabled && (isExternalDBEnabled || isMariaDBEnabled)
 
 	if !isRESTEnabled {
 		logger.Info("Slurm REST API is disabled. Skipping reconciliation")
 		return nil
 	}
 
-	if !isAccountingEnabled || (!isExternalDBEnabled && !isMariaDBEnabled) {
+	if !isAccountingEnabled && !isDBEnabled {
 		logger.Info("Slurm Accounting is disabled. Skipping REST API reconciliation")
 		return nil
 	}
