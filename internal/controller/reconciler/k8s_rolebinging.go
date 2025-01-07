@@ -58,14 +58,22 @@ func (r *RoleBindingReconciler) deleteRoleBindingIfOwnedByController(
 	if err != nil {
 		return errors.Wrap(err, "getting Worker RoleBinding")
 	}
-	// Check if the controller is the owner of the RoleBinding
-	isOwner := isControllerOwnerRoleBinding(roleBinding, cluster)
-	if !isOwner {
-		// The controller is not the owner of the RoleBinding, nothing to do
+
+	if !metav1.IsControlledBy(roleBinding, cluster) {
+		log.FromContext(ctx).Info("RoleBinding is not owned by controller, skipping deletion")
 		return nil
 	}
-	// The controller is the owner of the RoleBinding, delete it
-	return r.deleteRoleBindingOwnedByController(ctx, cluster, roleBinding)
+
+	if err := r.Delete(ctx, roleBinding); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.FromContext(ctx).Info("RoleBinding is already deleted")
+			return nil
+		}
+		return errors.Wrap(err, "deleting RoleBinding")
+	}
+
+	log.FromContext(ctx).Info("RoleBinding deleted")
+	return nil
 }
 
 func (r *RoleBindingReconciler) getRoleBinding(ctx context.Context, cluster *slurmv1.SlurmCluster) (*rbacv1.RoleBinding, error) {
@@ -78,43 +86,7 @@ func (r *RoleBindingReconciler) getRoleBinding(ctx context.Context, cluster *slu
 		},
 		roleBinding,
 	)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// roleBinding doesn't exist, nothing to do
-			return roleBinding, nil
-		}
-		// Other error occurred
-		return nil, errors.Wrap(err, "getting Worker RoleBinding")
-	}
-	return roleBinding, nil
-}
-
-// Function to check if the controller is the owner
-func isControllerOwnerRoleBinding(roleBinding *rbacv1.RoleBinding, cluster *slurmv1.SlurmCluster) bool {
-	// Check if the controller is the owner of the Role
-	for _, ownerRef := range roleBinding.GetOwnerReferences() {
-		if ownerRef.Kind == slurmv1.SlurmClusterKind && ownerRef.Name == cluster.Name {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (r *RoleBindingReconciler) deleteRoleBindingOwnedByController(
-	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
-	roleBinding *rbacv1.RoleBinding,
-) error {
-	// Delete the Role
-	err := r.Client.Delete(ctx, roleBinding)
-	if err != nil {
-		log.FromContext(ctx).
-			WithValues("cluster", cluster.Name).
-			Error(err, "Failed to delete Worker RoleBinding")
-		return errors.Wrap(err, "deleting Worker RoleBinding")
-	}
-	return nil
+	return roleBinding, err
 }
 
 func (r *RoleBindingReconciler) patch(existing, desired client.Object) (client.Patch, error) {

@@ -242,7 +242,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err := r.Service.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.Service.Reconcile(stepCtx, cluster, &desired, nil); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling worker Service")
 					}

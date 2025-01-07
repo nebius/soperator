@@ -58,14 +58,21 @@ func (r *RoleReconciler) deleteRoleIfOwnedByController(
 	if err != nil {
 		return errors.Wrap(err, "getting Worker Role")
 	}
-	// Check if the controller is the owner of the Role
-	isOwner := isControllerOwnerRole(role, cluster)
-	if !isOwner {
-		// The controller is not the owner of the Role, nothing to do
+
+	if !metav1.IsControlledBy(role, cluster) {
+		log.FromContext(ctx).Info("Role is not owned by controller, skipping deletion")
 		return nil
 	}
-	// The controller is the owner of the Role, delete it
-	return r.deleteRoleOwnedByController(ctx, cluster, role)
+
+	if err := r.Delete(ctx, role); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.FromContext(ctx).Info("Role not found, skipping deletion")
+			return nil
+		}
+		return errors.Wrap(err, "deleting Worker Role")
+	}
+	log.FromContext(ctx).Info("Role deleted")
+	return nil
 }
 
 func (r *RoleReconciler) getRole(ctx context.Context, cluster *slurmv1.SlurmCluster) (*rbacv1.Role, error) {
@@ -80,41 +87,11 @@ func (r *RoleReconciler) getRole(ctx context.Context, cluster *slurmv1.SlurmClus
 	)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			// Role doesn't exist, nothing to do
-			return role, nil
+			return nil, nil
 		}
-		// Other error occurred
-		return nil, errors.Wrap(err, "getting Role")
+		return nil, err
 	}
 	return role, nil
-}
-
-// Function to check if the controller is the owner
-func isControllerOwnerRole(role *rbacv1.Role, cluster *slurmv1.SlurmCluster) bool {
-	// Check if the controller is the owner of the Role
-	for _, ownerRef := range role.GetOwnerReferences() {
-		if ownerRef.Kind == slurmv1.SlurmClusterKind && ownerRef.Name == cluster.Name {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (r *RoleReconciler) deleteRoleOwnedByController(
-	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
-	role *rbacv1.Role,
-) error {
-	// Delete the Role
-	err := r.Client.Delete(ctx, role)
-	if err != nil {
-		log.FromContext(ctx).
-			WithValues("cluster", cluster.Name).
-			Error(err, "Failed to delete Worker Role")
-		return errors.Wrap(err, "deleting Worker  Role")
-	}
-	return nil
 }
 
 func (r *RoleReconciler) patch(existing, desired client.Object) (client.Patch, error) {
