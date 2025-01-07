@@ -163,7 +163,8 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err := r.Service.Reconcile(stepCtx, cluster, &desired); err != nil {
+					var loginNamePtr *string = nil
+					if err := r.Service.Reconcile(stepCtx, cluster, &desired, loginNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling login Service")
 					}

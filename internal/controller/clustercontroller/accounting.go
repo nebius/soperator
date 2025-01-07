@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -37,11 +38,6 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 	isMariaDBEnabled := clusterValues.NodeAccounting.MariaDb.Enabled
 	isProtectedSecret := clusterValues.NodeAccounting.MariaDb.ProtectedSecret
 
-	if !isAccountingEnabled || (!isExternalDBEnabled && !isMariaDBEnabled) {
-		logger.Info("Slurm Accounting is disabled. Skipping reconciliation")
-		return nil
-	}
-
 	reconcileAccountingImpl := func() error {
 		return utils.ExecuteMultiStep(ctx,
 			"Reconciliation of Accounting",
@@ -51,6 +47,11 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
+
+					if !isAccountingEnabled || (!isExternalDBEnabled && !isMariaDBEnabled) {
+						logger.Info("Slurm Accounting is disabled. Skipping reconciliation	of Slurmdbd Configs Secret")
+						return nil
+					}
 
 					var secret = &corev1.Secret{}
 					var err error
@@ -98,6 +99,12 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
+
+					if !isAccountingEnabled || (!isExternalDBEnabled && !isMariaDBEnabled) {
+						logger.Info("Slurm Accounting is disabled. Skipping reconciliation of MariaDB password Secret")
+						return nil
+					}
+
 					if !isMariaDBEnabled || !isProtectedSecret {
 						stepLogger.Info("Reconciled")
 						return nil
@@ -135,6 +142,12 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
+
+					if !isAccountingEnabled || (!isExternalDBEnabled && !isMariaDBEnabled) {
+						logger.Info("Slurm Accounting is disabled. Skipping reconciliation MariaDB root password")
+						return nil
+					}
+
 					if !isMariaDBEnabled || !isProtectedSecret {
 						stepLogger.Info("Reconciled")
 						return nil
@@ -171,7 +184,25 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
-					desired, err := accounting.RenderService(
+
+					var err error
+					var desired *corev1.Service
+					var accountingServiceNamePtr *string = nil
+
+					if !isAccountingEnabled {
+						stepLogger.Info("Removing")
+						accountingServiceName := naming.BuildServiceName(consts.ComponentTypeAccounting, clusterValues.Name)
+						accountingServiceNamePtr = &accountingServiceName
+
+						if err = r.Service.Reconcile(stepCtx, cluster, desired, accountingServiceNamePtr); err != nil {
+							stepLogger.Error(err, "Failed to reconcile")
+							return errors.Wrap(err, "reconciling accounting service")
+						}
+						stepLogger.Info("Reconciled")
+						return nil
+					}
+
+					desired, err = accounting.RenderService(
 						clusterValues.Namespace,
 						clusterValues.Name,
 						&clusterValues.NodeAccounting,
@@ -183,7 +214,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.Info("Rendered")
 
-					if err = r.Service.Reconcile(stepCtx, cluster, desired); err != nil {
+					if err = r.Service.Reconcile(stepCtx, cluster, desired, accountingServiceNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling accounting service")
 					}
@@ -196,7 +227,23 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
-					desired, err := accounting.RenderDeployment(
+
+					var err error
+					var desired *appsv1.Deployment
+					var deploymentNamePtr *string = nil
+
+					if !isAccountingEnabled {
+						stepLogger.Info("Removing")
+						deploymentName := naming.BuildDeploymentName(consts.ComponentTypeAccounting)
+						deploymentNamePtr = &deploymentName
+						if err = r.Deployment.Reconcile(stepCtx, cluster, desired, deploymentNamePtr); err != nil {
+							stepLogger.Error(err, "Failed to reconcile")
+							return errors.Wrap(err, "reconciling accounting Deployment")
+						}
+						stepLogger.Info("Reconciled")
+						return nil
+					}
+					desired, err = accounting.RenderDeployment(
 						clusterValues.Namespace,
 						clusterValues.Name,
 						&clusterValues.NodeAccounting,
@@ -217,7 +264,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					}
 					stepLogger.Info("Retrieved dependencies")
 
-					if err = r.Deployment.Reconcile(stepCtx, cluster, desired, deps...); err != nil {
+					if err = r.Deployment.Reconcile(stepCtx, cluster, desired, deploymentNamePtr, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling accounting Deployment")
 					}
@@ -236,7 +283,23 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						return nil
 					}
 
-					desired, err := accounting.RenderMariaDb(
+					var err error
+					var desired *mariadbv1alpha1.MariaDB
+					var mariaDbNamePtr *string = nil
+
+					if !isMariaDBEnabled || !isAccountingEnabled {
+						stepLogger.Info("Removing")
+						mariaDbName := naming.BuildMariaDbName(clusterValues.Name)
+						mariaDbNamePtr = &mariaDbName
+						if err = r.MariaDb.Reconcile(stepCtx, cluster, desired, mariaDbNamePtr); err != nil {
+							stepLogger.Error(err, "Failed to reconcile")
+							return errors.Wrap(err, "reconciling accounting mariadb")
+						}
+						stepLogger.Info("Reconciled")
+						return nil
+					}
+
+					desired, err = accounting.RenderMariaDb(
 						clusterValues.Namespace,
 						clusterValues.Name,
 						&clusterValues.NodeAccounting,
@@ -244,14 +307,14 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering accounting Deployment")
+						return errors.Wrap(err, "rendering accounting mariadb")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.Info("Rendered")
 
-					if err = r.MariaDb.Reconcile(ctx, cluster, desired); err != nil {
+					if err = r.MariaDb.Reconcile(ctx, cluster, desired, mariaDbNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling accounting Deployment")
+						return errors.Wrap(err, "reconciling accounting mariadb")
 					}
 					stepLogger.Info("Reconciled")
 					return nil
@@ -268,21 +331,37 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						return nil
 					}
 
-					desired, err := accounting.RenderMariaDbGrant(
+					var err error
+					var desired *mariadbv1alpha1.Grant
+					var mariaDbGrantNamePtr *string = nil
+
+					if !isMariaDBEnabled || !isAccountingEnabled {
+						stepLogger.Info("Removing")
+						mariaDbGrantName := naming.BuildMariaDbName(clusterValues.Name)
+						mariaDbGrantNamePtr = &mariaDbGrantName
+						if err = r.MariaDbGrant.Reconcile(stepCtx, cluster, desired, mariaDbGrantNamePtr); err != nil {
+							stepLogger.Error(err, "Failed to reconcile")
+							return errors.Wrap(err, "reconciling accounting mariadb grant")
+						}
+						stepLogger.Info("Reconciled")
+						return nil
+					}
+
+					desired, err = accounting.RenderMariaDbGrant(
 						clusterValues.Namespace,
 						clusterValues.Name,
 						&clusterValues.NodeAccounting,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering accounting Deployment")
+						return errors.Wrap(err, "rendering accounting mariadb grant")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.Info("Rendered")
 
-					if err = r.MariaDbGrant.Reconcile(ctx, cluster, desired); err != nil {
+					if err = r.MariaDbGrant.Reconcile(ctx, cluster, desired, mariaDbGrantNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling accounting Deployment")
+						return errors.Wrap(err, "reconciling accounting mariadb grant")
 					}
 					stepLogger.Info("Reconciled")
 					return nil

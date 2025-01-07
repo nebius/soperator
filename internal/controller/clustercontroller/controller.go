@@ -66,7 +66,8 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err := r.Service.Reconcile(stepCtx, cluster, &desired); err != nil {
+					var controllerNamePtr *string = nil
+					if err := r.Service.Reconcile(stepCtx, cluster, &desired, controllerNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling controller Service")
 					}
