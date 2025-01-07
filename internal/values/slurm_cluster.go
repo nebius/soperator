@@ -65,11 +65,16 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		NodeController:         buildSlurmControllerFrom(cluster.Name, &cluster.Spec.SlurmNodes.Controller),
 		NodeAccounting:         buildAccountingFrom(cluster.Name, &cluster.Spec.SlurmNodes.Accounting),
 		NodeRest:               buildRestFrom(cluster.Name, &cluster.Spec.SlurmNodes.Rest),
-		NodeWorker:             buildSlurmWorkerFrom(cluster.Name, &cluster.Spec.SlurmNodes.Worker, &cluster.Spec.NCCLSettings),
-		NodeLogin:              buildSlurmLoginFrom(cluster.Name, &cluster.Spec.SlurmNodes.Login),
-		Telemetry:              cluster.Spec.Telemetry,
-		SlurmExporter:          buildSlurmExporterFrom(&cluster.Spec.SlurmNodes.Exporter),
-		SlurmConfig:            cluster.Spec.SlurmConfig,
+		NodeWorker: buildSlurmWorkerFrom(
+			cluster.Name,
+			&cluster.Spec.SlurmNodes.Worker,
+			&cluster.Spec.NCCLSettings,
+			cluster.Spec.UseDefaultAppArmorProfile,
+		),
+		NodeLogin:     buildSlurmLoginFrom(cluster.Name, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
+		Telemetry:     cluster.Spec.Telemetry,
+		SlurmExporter: buildSlurmExporterFrom(&cluster.Spec.SlurmNodes.Exporter),
+		SlurmConfig:   cluster.Spec.SlurmConfig,
 	}
 
 	if err := res.Validate(ctx); err != nil {

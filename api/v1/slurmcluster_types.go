@@ -79,6 +79,10 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", taskPluginParam: "Verbose", maxJobCount: 10000, minJobAge: 86400}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
+	// Generate and set default AppArmor profile for the Slurm worker and login nodes. The Security Profiles Operator must be installed.
+	//
+	// +kubebuilder:default=true
+	UseDefaultAppArmorProfile bool `json:"useDefaultAppArmorProfile,omitempty"`
 }
 
 // SlurmConfig represents the Slurm configuration in slurm.conf

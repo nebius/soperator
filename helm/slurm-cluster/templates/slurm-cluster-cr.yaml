@@ -18,6 +18,7 @@ spec:
     {{- toYaml .Values.slurmConfig | nindent 4 }}
   {{- end }}
   crVersion: {{ .Chart.Version }}
+  useDefaultAppArmorProfile: {{ .Values.useDefaultAppArmorProfile }}
   pause: {{ .Values.pause }}
   clusterType: {{ .Values.clusterType }}
   partitionConfiguration:

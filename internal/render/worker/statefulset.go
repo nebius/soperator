@@ -41,16 +41,6 @@ func RenderStatefulSet(
 		return appsv1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
-	annotations := map[string]string{
-		fmt.Sprintf(
-			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmd,
-		): worker.ContainerSlurmd.AppArmorProfile,
-		fmt.Sprintf(
-			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-		): worker.ContainerMunge.AppArmorProfile,
-		consts.DefaultContainerAnnotationName: consts.ContainerNameSlurmd,
-	}
-
 	// Since 1.29 is native sidecar support, we can use the native restart policy
 	initContainers := []corev1.Container{
 		common.RenderContainerMunge(&worker.ContainerMunge),
@@ -100,7 +90,7 @@ func RenderStatefulSet(
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
-					Annotations: annotations,
+					Annotations: renderAnnotations(worker, clusterName, namespace),
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: naming.BuildServiceAccountWorkerName(clusterName),
@@ -121,4 +111,26 @@ func RenderStatefulSet(
 			},
 		},
 	}, nil
+}
+
+func renderAnnotations(worker *values.SlurmWorker, clusterName, namespace string) map[string]string {
+	mungeAppArmorProfile := worker.ContainerMunge.AppArmorProfile
+	workerAppArmorProfile := worker.ContainerSlurmd.AppArmorProfile
+
+	if worker.UseDefaultAppArmorProfile {
+		workerAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
+		mungeAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
+	}
+
+	annotations := map[string]string{
+		fmt.Sprintf(
+			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmd,
+		): workerAppArmorProfile,
+		fmt.Sprintf(
+			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
+		): mungeAppArmorProfile,
+		consts.DefaultContainerAnnotationName: consts.ContainerNameSlurmd,
+	}
+
+	return annotations
 }
