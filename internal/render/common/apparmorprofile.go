@@ -58,7 +58,7 @@ profile %s flags=(attach_disconnected,mediate_deleted) {
   deny /usr/lib/x86_64-linux-gnu/nvidia/wine/nvngx.dll w,
   deny /usr/lib/x86_64-linux-gnu/nvidia/xorg/libglxserver_nvidia* w,
   deny /usr/lib/x86_64-linux-gnu/nvidia/xorg/nvidia_drv.so w,
-  deny /usr/lib/x86_64-linux-gnu/vdpau/libvdpau_nvidia
+  deny /usr/lib/x86_64-linux-gnu/vdpau/libvdpau_nvidia w,
   deny /usr/lib/x86_64-linux-gnu/libnvidia-[^m]* w,
   deny /usr/lib/x86_64-linux-gnu/libcuda.so* w,
   deny /usr/lib/x86_64-linux-gnu/libcudadebugger.so* w,
@@ -85,8 +85,6 @@ profile %s flags=(attach_disconnected,mediate_deleted) {
   deny /usr/bin/nv-fabricmanager w,
   deny /usr/bin/nvidia-cuda-mps-control w,
   deny /usr/bin/nvidia-cuda-mps-server w,
-
-
   deny /lib/firmware/nvidia/**/gsp_*.bin w,
 }`, naming.BuildAppArmorProfileName(clusterName, namespace))
 }
