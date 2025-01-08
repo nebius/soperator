@@ -87,7 +87,7 @@ type SlurmClusterSpec struct {
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 	// Generate and set default AppArmor profile for the Slurm worker and login nodes. The Security Profiles Operator must be installed.
 	//
-	// +kubebuilder:default=true
+	// +kubebuilder:default=false
 	UseDefaultAppArmorProfile bool `json:"useDefaultAppArmorProfile,omitempty"`
 }
 

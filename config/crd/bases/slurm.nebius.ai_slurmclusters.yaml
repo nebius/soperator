@@ -4844,7 +4844,7 @@ spec:
                     type: object
                 type: object
               useDefaultAppArmorProfile:
-                default: true
+                default: false
                 description: Generate and set default AppArmor profile for the Slurm
                   worker and login nodes. The Security Profiles Operator must be installed.
                 type: boolean
