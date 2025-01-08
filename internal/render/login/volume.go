@@ -42,10 +42,19 @@ func renderVolumesAndClaimTemplateSpecs(
 
 	// Jail sub-mounts
 	for _, subMount := range login.JailSubMounts {
-		volumes = append(
-			volumes,
-			common.RenderVolumeFromSource(volumeSources, subMount.VolumeSourceName, subMount.Name),
-		)
+		if v, s, err := common.AddVolumeOrSpec(
+			subMount.VolumeSourceName,
+			func(sourceName string) corev1.Volume {
+				return common.RenderVolumeFromSource(volumeSources, *subMount.VolumeSourceName, subMount.Name)
+			},
+			subMount.VolumeClaimTemplateSpec,
+			subMount.Name,
+		); err != nil {
+			return nil, nil, err
+		} else {
+			volumes = append(volumes, v...)
+			pvcTemplateSpecs = append(pvcTemplateSpecs, s...)
+		}
 	}
 
 	return volumes, pvcTemplateSpecs, nil

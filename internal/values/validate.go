@@ -107,11 +107,11 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 		}
 		// worker jail sub-mounts
 		for _, subMount := range c.NodeWorker.JailSubMounts {
-			volumeSourceNamesRaw = append(volumeSourceNamesRaw, &subMount.VolumeSourceName)
+			volumeSourceNamesRaw = append(volumeSourceNamesRaw, subMount.VolumeSourceName)
 		}
 		// login jail sub-mounts
 		for _, subMount := range c.NodeLogin.JailSubMounts {
-			volumeSourceNamesRaw = append(volumeSourceNamesRaw, &subMount.VolumeSourceName)
+			volumeSourceNamesRaw = append(volumeSourceNamesRaw, subMount.VolumeSourceName)
 		}
 		for _, volumeSourceName := range volumeSourceNamesRaw {
 			if volumeSourceName == nil {

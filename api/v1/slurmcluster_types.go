@@ -911,8 +911,13 @@ type NodeVolumeJailSubMount struct {
 	// VolumeSourceName defines the name of the volume source for the sub-mount.
 	// Must correspond to the name of one of [VolumeSource]
 	//
-	// +kubebuilder:validation:Required
-	VolumeSourceName string `json:"volumeSourceName"`
+	// +kubebuilder:validation:Optional
+	VolumeSourceName *string `json:"volumeSourceName"`
+
+	// VolumeClaimTemplateSpec defines the [corev1.PersistentVolumeClaim] template specification
+	//
+	// +kubebuilder:validation:Optional
+	VolumeClaimTemplateSpec *corev1.PersistentVolumeClaimSpec `json:"volumeClaimTemplateSpec,omitempty"`
 }
 
 type Telemetry struct {
