@@ -6,6 +6,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/utils"
@@ -16,6 +17,7 @@ func RenderDaemonSet(
 	clusterName,
 	K8sNodeFilterName string,
 	nodeFilters []slurmv1.K8sNodeFilter,
+	maintenance *consts.MaintenanceMode,
 ) appsv1.DaemonSet {
 	labels := common.RenderLabels(consts.ComponentTypeNodeSysctlDaemonSet, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeNodeSysctlDaemonSet, clusterName)
@@ -28,6 +30,12 @@ func RenderDaemonSet(
 
 	initContainers := []corev1.Container{
 		renderContainerNodeSysctl(),
+	}
+
+	if check.IsMaintenanceActive(maintenance) {
+		nodeFilter.NodeSelector = map[string]string{
+			"maintenance": "true",
+		}
 	}
 
 	return appsv1.DaemonSet{

@@ -32,11 +32,12 @@ controllerManager:
     env:
       isMariadbCrdInstalled: "false"
       isOpentelemetryCollectorCrdInstalled: "false"
+      isApparmorCrdInstalled: "false"
       isPrometheusCrdInstalled: "false"
       slurmOperatorWatchNamespaces: '*'
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/slurm-operator
-      tag: 1.16.1
+      tag: 1.17.0
     imagePullPolicy: Always
     resources:
       limits:

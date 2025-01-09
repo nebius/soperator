@@ -47,6 +47,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						clusterValues.Name,
 						clusterValues.NodeWorker.K8sNodeFilterName,
 						clusterValues.NodeFilters,
+						clusterValues.NodeWorker.Maintenance,
 					)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
@@ -110,6 +111,81 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 			},
 
 			utils.MultiStepExecutionStep{
+				Name: "Slurm Worker SSHD ConfigMap",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					if !clusterValues.NodeWorker.IsSSHDConfigMapDefault {
+						stepLogger.Info("Use custom SSHD ConfigMap from reference")
+						stepLogger.Info("Reconciled")
+						return nil
+					}
+
+					desired, err := common.RenderDefaultConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeWorker)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering worker default SSHD ConfigMap")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.Info("Rendered")
+
+					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling worker default SSHD ConfigMap")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Worker sshd keys Secret",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.Info("Reconciling")
+
+					desired := corev1.Secret{}
+					if getErr := r.Get(
+						stepCtx,
+						types.NamespacedName{
+							Namespace: clusterValues.Namespace,
+							Name:      clusterValues.Secrets.SshdKeysName,
+						},
+						&desired,
+					); getErr != nil {
+						if !apierrors.IsNotFound(getErr) {
+							stepLogger.Error(getErr, "Failed to get")
+							return errors.Wrap(getErr, "getting worker SSHDKeys Secrets")
+						}
+
+						renderedDesired, err := common.RenderSSHDKeysSecret(
+							clusterValues.Name,
+							clusterValues.Namespace,
+							clusterValues.Secrets.SshdKeysName,
+							consts.ComponentTypeWorker,
+						)
+						if err != nil {
+							stepLogger.Error(err, "Failed to render")
+							return errors.Wrap(err, "rendering worker SSHDKeys Secrets")
+						}
+						desired = *renderedDesired.DeepCopy()
+						stepLogger.Info("Rendered")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+
+					if err := r.Secret.Reconcile(stepCtx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling worker SSHDKeys Secrets")
+					}
+					stepLogger.Info("Reconciled")
+
+					return nil
+				},
+			},
+
+			utils.MultiStepExecutionStep{
 				Name: "Slurm Worker Security limits ConfigMap",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
@@ -138,7 +214,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					generateDefault := clusterValues.NodeWorker.SupervisordConfigMapDefault
 					if generateDefault {
 						stepLogger.Info("Generate default ConfigMap")
-						desired := worker.RenderConfigMapSupervisord(clusterValues)
+						desired := worker.RenderDefaultConfigMapSupervisord(clusterValues)
 						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 						stepLogger.Info("Rendered")
 
@@ -166,7 +242,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.Info("Rendered")
 
-					if err := r.Service.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.Service.Reconcile(stepCtx, cluster, &desired, nil); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling worker Service")
 					}
@@ -427,6 +503,22 @@ func (r SlurmClusterReconciler) getWorkersStatefulSetDependencies(
 			return []metav1.Object{}, err
 		}
 		res = append(res, superviserdConfigMap)
+	}
+
+	if clusterValues.NodeWorker.SSHDConfigMapName != "" {
+		sshdConfigMap := &corev1.ConfigMap{}
+		err := r.Get(
+			ctx,
+			types.NamespacedName{
+				Namespace: clusterValues.Namespace,
+				Name:      clusterValues.NodeWorker.SSHDConfigMapName,
+			},
+			sshdConfigMap,
+		)
+		if err != nil {
+			return []metav1.Object{}, err
+		}
+		res = append(res, sshdConfigMap)
 	}
 
 	return res, nil

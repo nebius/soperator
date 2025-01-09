@@ -13,9 +13,10 @@ type SlurmREST struct {
 	Enabled       bool
 	ContainerREST Container
 	Service       Service
+	Maintenance   *consts.MaintenanceMode
 }
 
-func buildRestFrom(clusterName string, rest *slurmv1.SlurmRest) SlurmREST {
+func buildRestFrom(clusterName string, maintenance *consts.MaintenanceMode, rest *slurmv1.SlurmRest) SlurmREST {
 	containerREST := buildContainerFrom(
 		rest.SlurmRestNode,
 		consts.ContainerNameREST,
@@ -29,5 +30,6 @@ func buildRestFrom(clusterName string, rest *slurmv1.SlurmRest) SlurmREST {
 		Enabled:       rest.Enabled,
 		ContainerREST: containerREST,
 		Service:       buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeREST, clusterName)),
+		Maintenance:   maintenance,
 	}
 }

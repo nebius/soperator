@@ -102,7 +102,8 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 							if desired != nil {
 								logger = logger.WithValues(logfield.ResourceKV(desired)...)
 							}
-							err = r.Deployment.Reconcile(stepCtx, cluster, desired)
+							var exporterNamePtr *string = nil
+							err = r.Deployment.Reconcile(stepCtx, cluster, desired, exporterNamePtr)
 							if err != nil {
 								stepLogger.Error(err, "Failed to reconcile")
 								return errors.Wrap(err, "reconciling Slurm Exporter Deployment")

@@ -1,0 +1,13 @@
+#!/bin/sh
+
+[ -r /etc/lsb-release ] && . /etc/lsb-release
+
+if [ -z "$DISTRIB_DESCRIPTION" ] && [ -x /usr/bin/lsb_release ]; then
+	DISTRIB_DESCRIPTION=$(lsb_release -s -d)
+fi
+
+CPU_ARCH="$(uname -m)"
+HOSTNAME="$(hostname)"
+
+printf "Welcome to Soperator cluster \n\n"
+printf "You are on node %s (%s %s) \n" "${HOSTNAME}" "${DISTRIB_DESCRIPTION}" "${CPU_ARCH}"

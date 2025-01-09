@@ -29,13 +29,14 @@ func (r SlurmClusterReconciler) ReconcileREST(
 	isAccountingEnabled := clusterValues.NodeAccounting.Enabled
 	isExternalDBEnabled := clusterValues.NodeAccounting.ExternalDB.Enabled
 	isMariaDBEnabled := clusterValues.NodeAccounting.MariaDb.Enabled
+	isDBEnabled := isAccountingEnabled && (isExternalDBEnabled || isMariaDBEnabled)
 
 	if !isRESTEnabled {
 		logger.Info("Slurm REST API is disabled. Skipping reconciliation")
 		return nil
 	}
 
-	if !isAccountingEnabled || (!isExternalDBEnabled && !isMariaDBEnabled) {
+	if !isAccountingEnabled && !isDBEnabled {
 		logger.Info("Slurm Accounting is disabled. Skipping REST API reconciliation")
 		return nil
 	}
@@ -60,8 +61,8 @@ func (r SlurmClusterReconciler) ReconcileREST(
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.Info("Rendered")
-
-					if err = r.Service.Reconcile(stepCtx, cluster, desired); err != nil {
+					var restNamePtr *string = nil
+					if err = r.Service.Reconcile(stepCtx, cluster, desired, restNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling REST API service")
 					}
@@ -95,7 +96,8 @@ func (r SlurmClusterReconciler) ReconcileREST(
 					}
 					stepLogger.Info("Retrieved dependencies")
 
-					if err = r.Deployment.Reconcile(stepCtx, cluster, desired, deps...); err != nil {
+					var restNamePtr *string = nil
+					if err = r.Deployment.Reconcile(stepCtx, cluster, desired, restNamePtr, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling REST API Deployment")
 					}

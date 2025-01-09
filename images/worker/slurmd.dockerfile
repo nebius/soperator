@@ -49,7 +49,9 @@ RUN apt-get update && \
         libdrm-dev \
         sudo \
         supervisor \
-        openssh-server
+        openssh-server \
+        rdma-core \
+        ibverbs-utils
 
 # Install PMIx
 COPY common/scripts/install_pmix.sh /opt/bin/
@@ -119,6 +121,9 @@ RUN ldconfig
 # Delete users & home because they will be linked from jail
 RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
 RUN rm -rf /home
+
+# Delete SSH "message of the day" scripts because they aren't needed on worker nodes
+RUN rm -rf /etc/update-motd.d/*
 
 # Expose the port used for accessing slurmd
 EXPOSE 6818

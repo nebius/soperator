@@ -9,8 +9,7 @@ import (
 )
 
 const (
-	entityService     = "svc"
-	entityStatefulSet = "sts"
+	entityService = "svc"
 )
 
 type namedEntity struct {
@@ -72,6 +71,13 @@ func BuildServiceHostFQDN(
 	return hostName, hostFQDN
 }
 
+func BuildAppArmorProfileName(clusterName, namespace string) string {
+	return namedEntity{
+		clusterName: fmt.Sprintf("soperator-cluster-%s", clusterName),
+		entity:      fmt.Sprintf("ns-%s", namespace),
+	}.String()
+}
+
 func BuildStatefulSetName(componentType consts.ComponentType, clusterName string) string {
 	return namedEntity{
 		componentType: &componentType,
@@ -103,10 +109,10 @@ func BuildSecretMungeKeyName(clusterName string) string {
 
 // region Login
 
-func BuildConfigMapSSHConfigsName(clusterName string) string {
+func BuildConfigMapSSHDConfigsName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,
-		entity:      consts.ConfigMapNameSSHConfigs,
+		entity:      consts.ConfigMapNameSSHDConfigs,
 	}.String()
 }
 

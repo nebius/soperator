@@ -33,10 +33,16 @@ func (r *MariaDbGrantReconciler) Reconcile(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
 	desired *mariadbv1alpha1.Grant,
+	name *string,
 	deps ...metav1.Object,
 ) error {
 	if desired == nil {
-		return errors.New("MariaDbGrant is not needed")
+		if name == nil {
+			log.FromContext(ctx).Info("MariaDbGrant is not needed, skipping deletion")
+			return nil
+		}
+		log.FromContext(ctx).Info("Deleting MariaDbGrant, because MariaDbGrant is not needed")
+		return r.deleteIfOwnedByController(ctx, cluster, cluster.Namespace, *name)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
 		log.FromContext(ctx).
@@ -45,6 +51,45 @@ func (r *MariaDbGrantReconciler) Reconcile(
 		return errors.Wrap(err, "reconciling MariaDbGrant ")
 	}
 	return nil
+}
+
+func (r *MariaDbGrantReconciler) deleteIfOwnedByController(
+	ctx context.Context,
+	cluster *slurmv1.SlurmCluster,
+	namespace,
+	name string,
+) error {
+	grant, err := r.getMariaDbGrant(ctx, namespace, name)
+	if err != nil {
+		return errors.Wrap(err, "getting MariaDbGrant")
+	}
+
+	if !metav1.IsControlledBy(grant, cluster) {
+		log.FromContext(ctx).Info("MariaDbGrant is not owned by controller, skipping deletion")
+		return nil
+	}
+
+	if err := r.Client.Delete(ctx, grant); err != nil {
+		return errors.Wrap(err, "deleting MariaDbGrant")
+	}
+	return nil
+}
+
+func (r *MariaDbGrantReconciler) getMariaDbGrant(
+	ctx context.Context,
+	namespace,
+	name string,
+) (*mariadbv1alpha1.Grant, error) {
+	grant := &mariadbv1alpha1.Grant{}
+	err := r.Client.Get(
+		ctx,
+		client.ObjectKey{
+			Namespace: namespace,
+			Name:      name,
+		},
+		grant,
+	)
+	return grant, err
 }
 
 func (r *MariaDbGrantReconciler) patch(existing, desired client.Object) (client.Patch, error) {

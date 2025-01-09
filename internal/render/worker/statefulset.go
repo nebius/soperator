@@ -6,8 +6,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -41,16 +43,6 @@ func RenderStatefulSet(
 		return appsv1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
-	annotations := map[string]string{
-		fmt.Sprintf(
-			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmd,
-		): worker.ContainerSlurmd.AppArmorProfile,
-		fmt.Sprintf(
-			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-		): worker.ContainerMunge.AppArmorProfile,
-		consts.DefaultContainerAnnotationName: consts.ContainerNameSlurmd,
-	}
-
 	// Since 1.29 is native sidecar support, we can use the native restart policy
 	initContainers := []corev1.Container{
 		common.RenderContainerMunge(&worker.ContainerMunge),
@@ -72,6 +64,11 @@ func RenderStatefulSet(
 		return appsv1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
 	}
 
+	replicas := &worker.StatefulSet.Replicas
+	if check.IsMaintenanceActive(worker.Maintenance) {
+		replicas = ptr.To(consts.ZeroReplicas)
+	}
+
 	return appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      worker.StatefulSet.Name,
@@ -81,7 +78,7 @@ func RenderStatefulSet(
 		Spec: appsv1.StatefulSetSpec{
 			PodManagementPolicy: consts.PodManagementPolicy,
 			ServiceName:         worker.Service.Name,
-			Replicas:            &worker.StatefulSet.Replicas,
+			Replicas:            replicas,
 			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
@@ -100,7 +97,7 @@ func RenderStatefulSet(
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
-					Annotations: annotations,
+					Annotations: renderAnnotations(worker, clusterName, namespace),
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: naming.BuildServiceAccountWorkerName(clusterName),
@@ -121,4 +118,26 @@ func RenderStatefulSet(
 			},
 		},
 	}, nil
+}
+
+func renderAnnotations(worker *values.SlurmWorker, clusterName, namespace string) map[string]string {
+	mungeAppArmorProfile := worker.ContainerMunge.AppArmorProfile
+	workerAppArmorProfile := worker.ContainerSlurmd.AppArmorProfile
+
+	if worker.UseDefaultAppArmorProfile {
+		workerAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
+		mungeAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
+	}
+
+	annotations := map[string]string{
+		fmt.Sprintf(
+			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmd,
+		): workerAppArmorProfile,
+		fmt.Sprintf(
+			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
+		): mungeAppArmorProfile,
+		consts.DefaultContainerAnnotationName: consts.ContainerNameSlurmd,
+	}
+
+	return annotations
 }

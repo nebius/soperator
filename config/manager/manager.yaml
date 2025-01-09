@@ -82,9 +82,12 @@ spec:
           # True if the MariaDB CRD is installed in the cluster kubernetes (default false)
           - name: IS_MARIADB_CRD_INSTALLED
             value: "false"
+          # True if the AppArmor CRD is installed in the cluster kubernetes (default false)
+          - name: IS_APPARMOR_CRD_INSTALLED
+            value: "false"
           - name: SLURM_OPERATOR_WATCH_NAMESPACES
             value: "*"
-        image: controller:1.16.1
+        image: controller:1.17.0
         imagePullPolicy: Always
         name: manager
         securityContext:

@@ -21,6 +21,9 @@ type SlurmWorker struct {
 	SupervisordConfigMapDefault bool
 	SupervisordConfigMapName    string
 
+	IsSSHDConfigMapDefault bool
+	SSHDConfigMapName      string
+
 	CgroupVersion  string
 	EnableGDRCopy  bool
 	SlurmNodeExtra string
@@ -28,22 +31,33 @@ type SlurmWorker struct {
 	Service     Service
 	StatefulSet StatefulSet
 
-	VolumeSpool      slurmv1.NodeVolume
-	VolumeJail       slurmv1.NodeVolume
-	JailSubMounts    []slurmv1.NodeVolumeJailSubMount
-	SharedMemorySize *resource.Quantity
+	VolumeSpool               slurmv1.NodeVolume
+	VolumeJail                slurmv1.NodeVolume
+	JailSubMounts             []slurmv1.NodeVolumeJailSubMount
+	SharedMemorySize          *resource.Quantity
+	UseDefaultAppArmorProfile bool
+	Maintenance               *consts.MaintenanceMode
 }
 
 func buildSlurmWorkerFrom(
 	clusterName string,
+	maintenance *consts.MaintenanceMode,
 	worker *slurmv1.SlurmNodeWorker,
 	ncclSettings *slurmv1.NCCLSettings,
+	useDefaultAppArmorProfile bool,
 ) SlurmWorker {
 	supervisordConfigName := worker.SupervisordConfigMapRefName
 	supervisordConfigDefault := supervisordConfigName == ""
 	if supervisordConfigDefault {
 		supervisordConfigName = naming.BuildConfigMapSupervisordName(clusterName)
 	}
+
+	sshdConfigMapName := worker.SSHDConfigMapRefName
+	isSSHDConfigDefault := sshdConfigMapName == ""
+	if isSSHDConfigDefault {
+		sshdConfigMapName = naming.BuildConfigMapSSHDConfigsName(clusterName)
+	}
+
 	res := SlurmWorker{
 		SlurmNode:    *worker.SlurmNode.DeepCopy(),
 		NCCLSettings: *ncclSettings.DeepCopy(),
@@ -69,12 +83,16 @@ func buildSlurmWorkerFrom(
 			naming.BuildStatefulSetName(consts.ComponentTypeWorker, clusterName),
 			worker.SlurmNode.Size,
 		),
-		VolumeSpool:      *worker.Volumes.Spool.DeepCopy(),
-		VolumeJail:       *worker.Volumes.Jail.DeepCopy(),
-		SharedMemorySize: worker.Volumes.SharedMemorySize,
-		CgroupVersion:    worker.CgroupVersion,
-		EnableGDRCopy:    worker.EnableGDRCopy,
-		SlurmNodeExtra:   worker.SlurmNodeExtra,
+		VolumeSpool:               *worker.Volumes.Spool.DeepCopy(),
+		VolumeJail:                *worker.Volumes.Jail.DeepCopy(),
+		SharedMemorySize:          worker.Volumes.SharedMemorySize,
+		CgroupVersion:             worker.CgroupVersion,
+		EnableGDRCopy:             worker.EnableGDRCopy,
+		UseDefaultAppArmorProfile: useDefaultAppArmorProfile,
+		SlurmNodeExtra:            worker.SlurmNodeExtra,
+		SSHDConfigMapName:         sshdConfigMapName,
+		IsSSHDConfigMapDefault:    isSSHDConfigDefault,
+		Maintenance:               maintenance,
 	}
 	for _, jailSubMount := range worker.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()

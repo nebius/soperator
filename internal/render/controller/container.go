@@ -33,9 +33,8 @@ func renderContainerSlurmctld(container *values.Container) corev1.Container {
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
 					Command: []string{
-						"/bin/sh",
-						"-c",
-						"/usr/bin/sinfo > /dev/null && exit 0 || exit 1",
+						"scontrol",
+						"ping",
 					},
 				},
 			},

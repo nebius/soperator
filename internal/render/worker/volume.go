@@ -26,8 +26,8 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeMungeSocket(),
 		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeWorker),
 		common.RenderVolumeSshdKeys(secrets.SshdKeysName),
-		common.RenderVolumeSshConfigs(clusterName),
-		common.RenderVolumeSshRootKeys(clusterName),
+		common.RenderVolumeSshdConfigs(worker.SSHDConfigMapName),
+		common.RenderVolumeSshdRootKeys(clusterName),
 		renderVolumeNvidia(),
 		renderVolumeBoot(),
 		renderVolumeNCCLTopology(clusterName),
@@ -73,10 +73,19 @@ func renderVolumesAndClaimTemplateSpecs(
 
 	// Jail sub-mounts
 	for _, subMount := range worker.JailSubMounts {
-		volumes = append(
-			volumes,
-			common.RenderVolumeFromSource(volumeSources, subMount.VolumeSourceName, subMount.Name),
-		)
+		if v, s, err := common.AddVolumeOrSpec(
+			subMount.VolumeSourceName,
+			func(sourceName string) corev1.Volume {
+				return common.RenderVolumeFromSource(volumeSources, *subMount.VolumeSourceName, subMount.Name)
+			},
+			subMount.VolumeClaimTemplateSpec,
+			subMount.Name,
+		); err != nil {
+			return nil, nil, err
+		} else {
+			volumes = append(volumes, v...)
+			pvcTemplateSpecs = append(pvcTemplateSpecs, s...)
+		}
 	}
 
 	return volumes, pvcTemplateSpecs, nil

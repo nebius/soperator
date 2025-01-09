@@ -6,8 +6,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -37,10 +39,14 @@ func RenderDeploymentExporter(
 	// in Deployment mode replicas should be 1.
 	// in StatefulSet mode replicas should be more than 1.
 	// Because of munge container use pvcs, we can't use template pvc for munge in Deployment mode.
-	replicas := int32(1)
 
 	labels := common.RenderLabels(consts.ComponentTypeExporter, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeExporter, clusterName)
+
+	replicas := ptr.To(consts.SingleReplicas)
+	if check.IsMaintenanceActive(valuesExporter.Maintenance) {
+		replicas = ptr.To(consts.ZeroReplicas)
+	}
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -49,7 +55,7 @@ func RenderDeploymentExporter(
 			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
+			Replicas: replicas,
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RecreateDeploymentStrategyType,
 			},

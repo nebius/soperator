@@ -153,7 +153,12 @@ func main() {
 		if *pushEvents {
 			eventGenerator.generateEvent(ctx, currentNode, failExecuteMsg, v1.EventTypeWarning, gpuBenchmarkFinished)
 		}
-		log.WithField("error", err).Fatal(failExecuteMsg)
+		log.WithFields(
+			logrus.Fields{
+				"error":  err,
+				"output": string(output),
+			},
+		).Fatal(failExecuteMsg)
 	}
 	succedExuteMsg := "Succed to execute all_reduce_perf"
 	if *pushEvents {
@@ -171,7 +176,7 @@ func main() {
 		succeed := 0
 		log.WithField("avg_bandwidth", avgBandwidth).Info(fmt.Sprintf("Avg bus bandwidth: %f", avgBandwidth))
 		messageReason := fmt.Sprintf(
-			"The GPU benchmark ended with an unsatisfactory result for the NCCL test all_reduce_perf: Avg bus bandwidth=%f, min=%f",
+			"Soperator healthcheck: NCCL test all_reduce_perf: Avg bus bandwidth=%fGB/s, min=%fGB/s",
 			avgBandwidth,
 			*limit,
 		)

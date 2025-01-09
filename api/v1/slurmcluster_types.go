@@ -5,6 +5,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -22,12 +23,17 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="gpu"
 	ClusterType string `json:"clusterType,omitempty"`
-
-	// Pause defines whether to gracefully stop the cluster.
-	// Setting it to false after cluster has been paused starts the cluster back
+	// Maintenance defines the maintenance window for the cluster.
+	// It can have the following values:
+	// - none: No maintenance is performed. The cluster operates normally.
+	// - downscale: Scales down all components to 0.
+	// - downscaleAndDeletePopulateJail: Scales down all components to 0 and deletes the kubernetes Kind Jobs populateJail.
+	// - skipPopulateJail: Skips the execution of the populateJail job during maintenance.
 	//
 	// +kubebuilder:validation:Optional
-	Pause bool `json:"pause,omitempty"` // TODO cluster pausing/resuming
+	// +kubebuilder:validation:Enum=none;downscale;downscaleAndDeletePopulateJail;skipPopulateJail
+	// +kubebuilder:default="none"
+	Maintenance *consts.MaintenanceMode `json:"maintenance,omitempty"`
 
 	// NCCLSettings
 	// +kubebuilder:validation:Optional
@@ -77,8 +83,12 @@ type SlurmClusterSpec struct {
 	// SlurmConfig represents the Slurm configuration in slurm.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", taskPluginParam: "Verbose", maxJobCount: 10000, minJobAge: 86400}
+	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", taskPluginParam: "", maxJobCount: 10000, minJobAge: 86400}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
+	// Generate and set default AppArmor profile for the Slurm worker and login nodes. The Security Profiles Operator must be installed.
+	//
+	// +kubebuilder:default=false
+	UseDefaultAppArmorProfile bool `json:"useDefaultAppArmorProfile,omitempty"`
 }
 
 // SlurmConfig represents the Slurm configuration in slurm.conf
@@ -107,8 +117,8 @@ type SlurmConfig struct {
 	// Additional parameters for the task plugin
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="Verbose"
-	// +kubebuilder:validation:Pattern="^((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+$"
+	// +kubebuilder:default=""
+	// +kubebuilder:validation:Pattern="^(|((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+)$"
 	TaskPluginParam *string `json:"taskPluginParam,omitempty"`
 	// Keep N last jobs in controller memory
 	//
@@ -140,7 +150,7 @@ type NCCLSettings struct {
 
 	// TopologyType define type of NCCL GPU topology
 	//
-	// +kubebuilder:validation:Enum="H100 GPU cluster";auto;custom
+	// +kubebuilder:validation:Enum=auto;custom
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="auto"
 	TopologyType string `json:"topologyType,omitempty"`
@@ -227,7 +237,7 @@ type NCCLBenchmark struct {
 	// FailedJobsHistoryLimit defines the number of failed finished jobs to retain
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=3
+	// +kubebuilder:default=16
 	FailedJobsHistoryLimit int32 `json:"failedJobsHistoryLimit,omitempty"`
 
 	// Image defines the nccl container image
@@ -585,6 +595,9 @@ type AccountingSlurmConf struct {
 	// +kubebuilder:default=0
 	PriorityWeightFairshare *int16 `json:"priorityWeightFairshare,omitempty"`
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=0
+	PriorityWeightQOS *int16 `json:"priorityWeightQOS,omitempty"`
+	// +kubebuilder:validation:Optional
 	PriorityWeightTRES *string `json:"priorityWeightTRES,omitempty"`
 }
 
@@ -639,6 +652,11 @@ type SlurmNodeWorker struct {
 	//
 	// +kubebuilder:validation:Optional
 	SupervisordConfigMapRefName string `json:"supervisordConfigMapRefName,omitempty"`
+
+	// SSHDConfigMapRefName is the name of the SSHD config, which runs in slurmd container
+	//
+	// +kubebuilder:validation:Optional
+	SSHDConfigMapRefName string `json:"sshdConfigMapRefName,omitempty"`
 
 	// Volumes represents the volume configurations for the worker node
 	//
@@ -712,6 +730,11 @@ type SlurmNodeLogin struct {
 	//
 	// +kubebuilder:validation:Optional
 	SshdServiceAnnotations map[string]string `json:"sshdServiceAnnotations,omitempty"`
+
+	// SSHDConfigMapRefName is the name of the SSHD config, which runs in login container
+	//
+	// +kubebuilder:validation:Optional
+	SSHDConfigMapRefName string `json:"sshdConfigMapRefName,omitempty"`
 
 	// SshRootPublicKeys represents the list of public authorized_keys for SSH connection to Slurm login nodes
 	//
@@ -871,11 +894,30 @@ type NodeVolumeJailSubMount struct {
 	// +kubebuilder:validation:Required
 	MountPath string `json:"mountPath"`
 
+	// SubPath points to a specific entry inside the volume.
+	// Corresponds to the subPath field in the K8s volumeMount structure.
+	// See official docs for details: https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=""
+	SubPath string `json:"subPath"`
+
+	// ReadOnly defines whether the mount point should be read-only
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	ReadOnly bool `json:"readOnly"`
+
 	// VolumeSourceName defines the name of the volume source for the sub-mount.
 	// Must correspond to the name of one of [VolumeSource]
 	//
-	// +kubebuilder:validation:Required
-	VolumeSourceName string `json:"volumeSourceName"`
+	// +kubebuilder:validation:Optional
+	VolumeSourceName *string `json:"volumeSourceName"`
+
+	// VolumeClaimTemplateSpec defines the [corev1.PersistentVolumeClaim] template specification
+	//
+	// +kubebuilder:validation:Optional
+	VolumeClaimTemplateSpec *corev1.PersistentVolumeClaimSpec `json:"volumeClaimTemplateSpec,omitempty"`
 }
 
 type Telemetry struct {

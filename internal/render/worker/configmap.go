@@ -46,8 +46,6 @@ func generateVirtualTopology(ncclType consts.NCCLType, topologyData string) (ren
 	switch ncclType {
 	case consts.NCCLTypeAuto:
 		return res, nil
-	case consts.NCCLTypeH100GPUCluster:
-		return generateVirtualH100GPUClusterTopology(), nil
 	case consts.NCCLTypeCustom:
 		if topologyData != "" {
 			return renderutils.NewAsIsConfig(topologyData), nil
@@ -56,81 +54,6 @@ func generateVirtualTopology(ncclType consts.NCCLType, topologyData string) (ren
 	default:
 		return res, nil
 	}
-}
-
-func generateVirtualH100GPUClusterTopology() renderutils.ConfigFile {
-	res := &renderutils.MultilineStringConfig{}
-	res.AddLine("<system version=\"1\">")
-	res.AddLine("    <cpu numaid=\"0\" affinity=\"00000000,00000000,0000ffff,ffffffff,ffffffff\" arch=\"x86_64\" vendor=\"GenuineIntel\" familyid=\"6\" modelid=\"106\">")
-	res.AddLine("        <pci busid=\"0000:8a:00.0\" class=\"0x060400\" vendor=\"0x104c\" device=\"0x8232\" subsystem_vendor=\"0x0000\" subsystem_device=\"0x0000\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
-	res.AddLine("            <pci busid=\"0000:8c:00.0\" class=\"0x020700\" vendor=\"0x15b3\" device=\"0x101e\" subsystem_vendor=\"0x15b3\" subsystem_device=\"0x0023\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
-	res.AddLine("                <nic>")
-	res.AddLine("                    <net name=\"mlx5_4\" dev=\"4\" speed=\"400000\" port=\"1\" latency=\"0.000000\" maxconn=\"131072\" gdr=\"1\" coll=\"1\"/>")
-	res.AddLine("                </nic>")
-	res.AddLine("            </pci>")
-	res.AddLine("            <pci busid=\"0000:8d:00.0\" class=\"0x030200\" vendor=\"0x10de\" device=\"0x2330\" subsystem_vendor=\"0x10de\" subsystem_device=\"0x16c1\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\"/>")
-	res.AddLine("        </pci>")
-	res.AddLine("        <pci busid=\"0000:8e:00.0\" class=\"0x060400\" vendor=\"0x104c\" device=\"0x8232\" subsystem_vendor=\"0x0000\" subsystem_device=\"0x0000\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
-	res.AddLine("            <pci busid=\"0000:90:00.0\" class=\"0x020700\" vendor=\"0x15b3\" device=\"0x101e\" subsystem_vendor=\"0x15b3\" subsystem_device=\"0x0023\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
-	res.AddLine("                <nic>")
-	res.AddLine("                    <net name=\"mlx5_5\" dev=\"5\" speed=\"400000\" port=\"1\" latency=\"0.000000\" maxconn=\"131072\" gdr=\"1\" coll=\"1\"/>")
-	res.AddLine("                </nic>")
-	res.AddLine("            </pci>")
-	res.AddLine("            <pci busid=\"0000:91:00.0\" class=\"0x030200\" vendor=\"0x10de\" device=\"0x2330\" subsystem_vendor=\"0x10de\" subsystem_device=\"0x16c1\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\"/>")
-	res.AddLine("        </pci>")
-	res.AddLine("        <pci busid=\"0000:92:00.0\" class=\"0x060400\" vendor=\"0x104c\" device=\"0x8232\" subsystem_vendor=\"0x0000\" subsystem_device=\"0x0000\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
-	res.AddLine("            <pci busid=\"0000:94:00.0\" class=\"0x020700\" vendor=\"0x15b3\" device=\"0x101e\" subsystem_vendor=\"0x15b3\" subsystem_device=\"0x0023\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
-	res.AddLine("                <nic>")
-	res.AddLine("                    <net name=\"mlx5_6\" dev=\"6\" speed=\"400000\" port=\"1\" latency=\"0.000000\" maxconn=\"131072\" gdr=\"1\" coll=\"1\"/>")
-	res.AddLine("                </nic>")
-	res.AddLine("            </pci>")
-	res.AddLine("            <pci busid=\"0000:95:00.0\" class=\"0x030200\" vendor=\"0x10de\" device=\"0x2330\" subsystem_vendor=\"0x10de\" subsystem_device=\"0x16c1\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\"/>")
-	res.AddLine("        </pci>")
-	res.AddLine("        <pci busid=\"0000:96:00.0\" class=\"0x060400\" vendor=\"0x104c\" device=\"0x8232\" subsystem_vendor=\"0x0000\" subsystem_device=\"0x0000\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
-	res.AddLine("            <pci busid=\"0000:98:00.0\" class=\"0x020700\" vendor=\"0x15b3\" device=\"0x101e\" subsystem_vendor=\"0x15b3\" subsystem_device=\"0x0023\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
-	res.AddLine("                <nic>")
-	res.AddLine("                    <net name=\"mlx5_7\" dev=\"7\" speed=\"400000\" port=\"1\" latency=\"0.000000\" maxconn=\"131072\" gdr=\"1\" coll=\"1\"/>")
-	res.AddLine("                </nic>")
-	res.AddLine("            </pci>")
-	res.AddLine("            <pci busid=\"0000:99:00.0\" class=\"0x030200\" vendor=\"0x10de\" device=\"0x2330\" subsystem_vendor=\"0x10de\" subsystem_device=\"0x16c1\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\"/>")
-	res.AddLine("        </pci>")
-	res.AddLine("    </cpu>")
-	res.AddLine("    <cpu numaid=\"1\" affinity=\"ffffffff,ffffffff,ffff0000,00000000,00000000\" arch=\"x86_64\" vendor=\"GenuineIntel\" familyid=\"6\" modelid=\"106\">")
-	res.AddLine("        <pci busid=\"0000:a8:00.0\" class=\"0x060400\" vendor=\"0x104c\" device=\"0x8232\" subsystem_vendor=\"0x0000\" subsystem_device=\"0x0000\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
-	res.AddLine("            <pci busid=\"0000:aa:00.0\" class=\"0x020700\" vendor=\"0x15b3\" device=\"0x101e\" subsystem_vendor=\"0x15b3\" subsystem_device=\"0x0023\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
-	res.AddLine("                <nic>")
-	res.AddLine("                    <net name=\"mlx5_0\" dev=\"0\" speed=\"400000\" port=\"1\" latency=\"0.000000\" maxconn=\"131072\" gdr=\"1\" coll=\"1\"/>")
-	res.AddLine("                </nic>")
-	res.AddLine("            </pci>")
-	res.AddLine("            <pci busid=\"0000:ab:00.0\" class=\"0x030200\" vendor=\"0x10de\" device=\"0x2330\" subsystem_vendor=\"0x10de\" subsystem_device=\"0x16c1\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\"/>")
-	res.AddLine("        </pci>")
-	res.AddLine("        <pci busid=\"0000:ac:00.0\" class=\"0x060400\" vendor=\"0x104c\" device=\"0x8232\" subsystem_vendor=\"0x0000\" subsystem_device=\"0x0000\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
-	res.AddLine("            <pci busid=\"0000:ae:00.0\" class=\"0x020700\" vendor=\"0x15b3\" device=\"0x101e\" subsystem_vendor=\"0x15b3\" subsystem_device=\"0x0023\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
-	res.AddLine("                <nic>")
-	res.AddLine("                    <net name=\"mlx5_1\" dev=\"1\" speed=\"400000\" port=\"1\" latency=\"0.000000\" maxconn=\"131072\" gdr=\"1\" coll=\"1\"/>")
-	res.AddLine("                </nic>")
-	res.AddLine("            </pci>")
-	res.AddLine("            <pci busid=\"0000:af:00.0\" class=\"0x030200\" vendor=\"0x10de\" device=\"0x2330\" subsystem_vendor=\"0x10de\" subsystem_device=\"0x16c1\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\"/>")
-	res.AddLine("        </pci>")
-	res.AddLine("        <pci busid=\"0000:b0:00.0\" class=\"0x060400\" vendor=\"0x104c\" device=\"0x8232\" subsystem_vendor=\"0x0000\" subsystem_device=\"0x0000\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
-	res.AddLine("            <pci busid=\"0000:b2:00.0\" class=\"0x020700\" vendor=\"0x15b3\" device=\"0x101e\" subsystem_vendor=\"0x15b3\" subsystem_device=\"0x0023\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
-	res.AddLine("                <nic>")
-	res.AddLine("                    <net name=\"mlx5_2\" dev=\"2\" speed=\"400000\" port=\"1\" latency=\"0.000000\" maxconn=\"131072\" gdr=\"1\" coll=\"1\"/>")
-	res.AddLine("                </nic>")
-	res.AddLine("            </pci>")
-	res.AddLine("            <pci busid=\"0000:b3:00.0\" class=\"0x030200\" vendor=\"0x10de\" device=\"0x2330\" subsystem_vendor=\"0x10de\" subsystem_device=\"0x16c1\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\"/>")
-	res.AddLine("        </pci>")
-	res.AddLine("        <pci busid=\"0000:b4:00.0\" class=\"0x060400\" vendor=\"0x104c\" device=\"0x8232\" subsystem_vendor=\"0x0000\" subsystem_device=\"0x0000\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
-	res.AddLine("            <pci busid=\"0000:b6:00.0\" class=\"0x020700\" vendor=\"0x15b3\" device=\"0x101e\" subsystem_vendor=\"0x15b3\" subsystem_device=\"0x0023\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\">")
-	res.AddLine("                <nic>")
-	res.AddLine("                    <net name=\"mlx5_3\" dev=\"3\" speed=\"400000\" port=\"1\" latency=\"0.000000\" maxconn=\"131072\" gdr=\"1\" coll=\"1\"/>")
-	res.AddLine("                </nic>")
-	res.AddLine("            </pci>")
-	res.AddLine("            <pci busid=\"0000:b7:00.0\" class=\"0x030200\" vendor=\"0x10de\" device=\"0x2330\" subsystem_vendor=\"0x10de\" subsystem_device=\"0x16c1\" link_speed=\"32.0 GT/s PCIe\" link_width=\"16\"/>")
-	res.AddLine("        </pci>")
-	res.AddLine("    </cpu>")
-	res.AddLine("</system>")
-	return res
 }
 
 // endregion NCCL topology
@@ -161,9 +84,9 @@ func generateSysctlConfig() renderutils.ConfigFile {
 
 // region Supervisord
 
-// RenderConfigMapSupervisord renders new [corev1.ConfigMap] containing supervisord config file
-func RenderConfigMapSupervisord(cluster *values.SlurmCluster) corev1.ConfigMap {
-	data := generateSupervisordConfig().Render()
+// RenderDefaultConfigMapSupervisord renders new [corev1.ConfigMap] containing supervisord config file
+func RenderDefaultConfigMapSupervisord(cluster *values.SlurmCluster) corev1.ConfigMap {
+	data := generateDefaultSupervisordConfig().Render()
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.NodeWorker.SupervisordConfigMapName,
@@ -176,7 +99,7 @@ func RenderConfigMapSupervisord(cluster *values.SlurmCluster) corev1.ConfigMap {
 	}
 }
 
-func generateSupervisordConfig() renderutils.ConfigFile {
+func generateDefaultSupervisordConfig() renderutils.ConfigFile {
 	res := &renderutils.MultilineStringConfig{}
 	res.AddLine("[supervisord]")
 	res.AddLine("nodaemon=true")

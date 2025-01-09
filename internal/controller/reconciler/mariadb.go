@@ -33,10 +33,17 @@ func (r *MariaDbReconciler) Reconcile(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
 	desired *mariadbv1alpha1.MariaDB,
+	name *string,
 	deps ...metav1.Object,
 ) error {
 	if desired == nil {
-		return errors.New("MariaDb is not needed")
+		// If desired is nil, delete the MariaDb
+		if name == nil {
+			log.FromContext(ctx).Info("MariaDb is not needed, skipping deletion")
+			return nil
+		}
+		log.FromContext(ctx).Info("Deleting MariaDb, because MariaDb is not needed")
+		return r.deleteIfOwnedByController(ctx, cluster, cluster.Namespace, *name)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
 		log.FromContext(ctx).
@@ -45,6 +52,34 @@ func (r *MariaDbReconciler) Reconcile(
 		return errors.Wrap(err, "reconciling MariaDb ")
 	}
 	return nil
+}
+
+func (r *MariaDbReconciler) deleteIfOwnedByController(
+	ctx context.Context,
+	cluster *slurmv1.SlurmCluster,
+	namespace,
+	name string,
+) error {
+	mariaDb, err := r.getMariaDb(ctx, namespace, name)
+	if err != nil {
+		return errors.Wrap(err, "getting MariaDb")
+	}
+
+	if !metav1.IsControlledBy(mariaDb, cluster) {
+		log.FromContext(ctx).Info("MariaDb is not owned by controller, skipping deletion")
+		return nil
+	}
+
+	return r.Client.Delete(ctx, mariaDb)
+}
+
+func (r *MariaDbReconciler) getMariaDb(ctx context.Context, namespace, name string) (*mariadbv1alpha1.MariaDB, error) {
+	mariaDb := &mariadbv1alpha1.MariaDB{}
+	err := r.Client.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}, mariaDb)
+	return mariaDb, err
 }
 
 func (r *MariaDbReconciler) patch(existing, desired client.Object) (client.Patch, error) {

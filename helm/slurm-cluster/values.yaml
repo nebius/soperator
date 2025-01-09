@@ -1,8 +1,15 @@
 clusterName: "slurm1"
 # Additional annotations for the cluster
 annotations: {}
-# Whether to gracefully stop the cluster. Setting it to false after cluster has been paused starts the cluster back
-pause: false
+# Add appArmor profile to the cluster
+useDefaultAppArmorProfile: false
+# Maintenance defines the maintenance window for the cluster.
+# It can have the following values:
+# - none: No maintenance is performed. The cluster operates normally.
+# - downscale: Scales down all components to 0.
+# - downscaleAndDeletePopulateJail: Scales down all components to 0 and deletes the kubernetes Kind Jobs populateJail.
+# - skipPopulateJail: Skips the execution of the populateJail job during maintenance.
+maintenance: "none"
 # Slurm cluster type. Can be now gpu or cpu
 clusterType: gpu
 # partitionConfiguration define partition configuration of slurm worker nodes
@@ -76,7 +83,7 @@ populateJail:
   #    volumeSourceName: "jail-snapshot"
   overwrite: false
 ncclSettings:
-  # TopologyType define type of NCCL GPU topology Enum: H100 GPU cluster, auto, custom
+  # TopologyType define type of NCCL GPU topology Enum: auto, custom
   topologyType: "auto"
   # TopologyData defines NCCL GPU topology
   topologyData: ""
@@ -91,7 +98,7 @@ periodicChecks:
     # CronJob timeout in seconds. By default, equals to 30 min
     activeDeadlineSeconds: 1800
     # Number of successful finished jobs to retain
-    successfulJobsHistoryLimit: 3
+    successfulJobsHistoryLimit: 24
     # Number of failed finished jobs to retain
     failedJobsHistoryLimit: 3
     # NCCL test settings
@@ -137,6 +144,7 @@ slurmNodes:
     # jobAcctGatherFrequency: 30
     # priorityWeightAge: 1
     # priorityWeightFairshare: 1
+    # priorityWeightQOS: 1
     # priorityWeightTRES: 1
     slurmdbdConfig: {}
     # archiveEvents: "yes"
@@ -277,6 +285,7 @@ slurmNodes:
     enableGDRCopy: false
     slurmNodeExtra: ""
     supervisordConfigMapRefName: ""
+    sshdConfigMapRefName: ""
     slurmd:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
@@ -308,6 +317,8 @@ slurmNodes:
       #      jailSubMounts:
       #        - name: "mlcommons-sd-bench-data"
       #          mountPath: "/mlperf-sd"
+      #          subPath: ""
+      #          readOnly: false
       #          volumeSourceName: "mlperf-sd"
   login:
     size: 2
@@ -393,13 +404,13 @@ telemetry: {}
 #   otelCollectorPort: 8429
 
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.16.1-jammy-slurm24.05.2"
-  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.16.1-jammy-slurm24.05.2"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.16.1-jammy-slurm24.05.2"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.16.1-jammy-slurm24.05.2"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.16.1-jammy-slurm24.05.2"
-  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.16.1-jammy-slurm24.05.2"
-  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.16.1-jammy-slurm24.05.2"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.16.1-jammy-slurm24.05.2"
-  exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.16.1-jammy-slurm24.05.2"
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.17.0-jammy-slurm24.05.2"
+  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.17.0-jammy-slurm24.05.2"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.17.0-jammy-slurm24.05.2"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.17.0-jammy-slurm24.05.2"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.17.0-jammy-slurm24.05.2"
+  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.17.0-jammy-slurm24.05.2"
+  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.17.0-jammy-slurm24.05.2"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.17.0-jammy-slurm24.05.2"
+  exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.17.0-jammy-slurm24.05.2"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:11.4.3"

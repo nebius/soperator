@@ -206,6 +206,8 @@ func RenderVolumeMountJailSubMount(subMount slurmv1.NodeVolumeJailSubMount) core
 	return corev1.VolumeMount{
 		Name:      subMount.Name,
 		MountPath: path.Join(consts.VolumeMountPathJailUpper, subMount.MountPath),
+		SubPath:   subMount.SubPath,
+		ReadOnly:  subMount.ReadOnly,
 	}
 }
 
@@ -305,24 +307,24 @@ func RenderVolumeMountRESTJWTKey() corev1.VolumeMount {
 
 // region configs
 
-// renderVolumeSshConfigs renders [corev1.Volume] containing SSHD configs contents
-func RenderVolumeSshConfigs(clusterName string) corev1.Volume {
+// RenderVolumeSshdConfigs renders [corev1.Volume] containing SSHD configs contents
+func RenderVolumeSshdConfigs(sshdConfigMapName string) corev1.Volume {
 	return corev1.Volume{
-		Name: consts.VolumeNameSSHConfigs,
+		Name: consts.VolumeNameSSHDConfigs,
 		VolumeSource: corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{
 				LocalObjectReference: corev1.LocalObjectReference{
-					Name: naming.BuildConfigMapSSHConfigsName(clusterName),
+					Name: sshdConfigMapName,
 				},
 			},
 		},
 	}
 }
 
-// renderVolumeMountSshConfigs renders [corev1.VolumeMount] defining the mounting path for SSHD configs
-func RenderVolumeMountSshConfigs() corev1.VolumeMount {
+// RenderVolumeMountSshdConfigs renders [corev1.VolumeMount] defining the mounting path for SSHD configs
+func RenderVolumeMountSshdConfigs() corev1.VolumeMount {
 	return corev1.VolumeMount{
-		Name:      consts.VolumeNameSSHConfigs,
+		Name:      consts.VolumeNameSSHDConfigs,
 		MountPath: consts.VolumeMountPathSSHConfigs,
 		ReadOnly:  true,
 	}
@@ -332,8 +334,8 @@ func RenderVolumeMountSshConfigs() corev1.VolumeMount {
 
 // region root keys
 
-// renderVolumeSshRootKeys renders [corev1.Volume] containing SSHD root keys contents
-func RenderVolumeSshRootKeys(clusterName string) corev1.Volume {
+// RenderVolumeSshdRootKeys renders [corev1.Volume] containing SSHD root keys contents
+func RenderVolumeSshdRootKeys(clusterName string) corev1.Volume {
 	return corev1.Volume{
 		Name: consts.VolumeNameSSHRootKeys,
 		VolumeSource: corev1.VolumeSource{
@@ -347,8 +349,8 @@ func RenderVolumeSshRootKeys(clusterName string) corev1.Volume {
 	}
 }
 
-// renderVolumeMountSshRootKeys renders [corev1.VolumeMount] defining the mounting path for SSHD renderContainerSshd root keys
-func RenderVolumeMountSshRootKeys() corev1.VolumeMount {
+// RenderVolumeMountSshdRootKeys renders [corev1.VolumeMount] defining the mounting path for SSHD renderContainerSshd root keys
+func RenderVolumeMountSshdRootKeys() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      consts.VolumeNameSSHRootKeys,
 		MountPath: consts.VolumeMountPathSSHRootKeys,
@@ -361,7 +363,7 @@ func RenderVolumeMountSshRootKeys() corev1.VolumeMount {
 
 // region sshd keys
 
-// renderVolumeSshdKeys renders [corev1.Volume] containing SSHD key pairs
+// RenderVolumeSshdKeys renders [corev1.Volume] containing SSHD key pairs
 func RenderVolumeSshdKeys(sshdKeysSecretName string) corev1.Volume {
 	return corev1.Volume{
 		Name: consts.VolumeNameSSHDKeys,
@@ -405,7 +407,7 @@ func RenderVolumeSshdKeys(sshdKeysSecretName string) corev1.Volume {
 	}
 }
 
-// renderVolumeMountSshdKeys renders [corev1.VolumeMount] defining the mounting path for SSHD key pairs
+// RenderVolumeMountSshdKeys renders [corev1.VolumeMount] defining the mounting path for SSHD key pairs
 func RenderVolumeMountSshdKeys() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      consts.VolumeNameSSHDKeys,

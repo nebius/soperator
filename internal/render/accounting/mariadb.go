@@ -10,6 +10,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -31,6 +32,10 @@ func RenderMariaDb(
 	mariaDb := accounting.MariaDb
 	labels := common.RenderLabels(consts.ComponentTypeMariaDbOperator, clusterName)
 	port, replicas, antiAffinityEnabled := getMariaDbConfig(mariaDb)
+
+	if check.IsMaintenanceActive(accounting.Maintenance) {
+		replicas = consts.ZeroReplicas
+	}
 
 	nodeFilter, err := utils.GetBy(
 		nodeFilters,

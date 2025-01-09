@@ -64,8 +64,8 @@ func renderContainerSlurmd(
 		common.RenderVolumeMountMungeSocket(),
 		common.RenderVolumeMountSecurityLimits(),
 		common.RenderVolumeMountSshdKeys(),
-		common.RenderVolumeMountSshConfigs(),
-		common.RenderVolumeMountSshRootKeys(),
+		common.RenderVolumeMountSshdConfigs(),
+		common.RenderVolumeMountSshdRootKeys(),
 		renderVolumeMountNvidia(),
 		renderVolumeMountBoot(),
 		renderVolumeMountNCCLTopology(),
@@ -109,13 +109,26 @@ func renderContainerSlurmd(
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
 					Command: []string{
-						"/bin/sh",
-						"-c",
-						"/usr/bin/sinfo > /dev/null && exit 0 || exit 1",
+						"scontrol",
+						"show",
+						"slurmd",
 					},
 				},
 			},
-			PeriodSeconds: 30,
+			PeriodSeconds: 1,
+		},
+		// PreStop lifecycle hook to update the node state to down in case of worker deletion
+		// Node will not be deleted from the slurm cluster if the job is still running
+		Lifecycle: &corev1.Lifecycle{
+			PreStop: &corev1.LifecycleHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"/bin/bash",
+						"-c",
+						"scontrol update nodename=$(hostname) state=down reason=preStop && scontrol delete nodename=$(hostname);",
+					},
+				},
+			},
 		},
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: ptr.To(true),
@@ -222,7 +235,6 @@ func renderContainerNodeSysctl() corev1.Container {
 			Privileged: ptr.To(true)},
 		Resources: corev1.ResourceRequirements{
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("10m"),
 				corev1.ResourceMemory: resource.MustParse("8Mi"),
 			},
 			Requests: corev1.ResourceList{
@@ -244,10 +256,20 @@ func renderContainerNodeSysctlSleep() corev1.Container {
 		Name:  consts.ContainerNameNodeSysctlSleep,
 		Image: "busybox:latest",
 		SecurityContext: &corev1.SecurityContext{
-			Privileged: ptr.To(true)},
+			Privileged:               ptr.To(false),
+			RunAsUser:                ptr.To(int64(65534)),
+			RunAsGroup:               ptr.To(int64(65534)),
+			RunAsNonRoot:             ptr.To(true),
+			ReadOnlyRootFilesystem:   ptr.To(true),
+			AllowPrivilegeEscalation: ptr.To(false),
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{
+					"ALL",
+				},
+			},
+		},
 		Resources: corev1.ResourceRequirements{
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("10m"),
 				corev1.ResourceMemory: resource.MustParse("8Mi"),
 			},
 			Requests: corev1.ResourceList{
@@ -258,7 +280,7 @@ func renderContainerNodeSysctlSleep() corev1.Container {
 		Command: []string{
 			"/bin/sh",
 			"-c",
-			"sleep 3600",
+			"sleep infinity",
 		},
 	}
 }
