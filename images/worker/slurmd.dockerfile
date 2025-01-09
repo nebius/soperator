@@ -1,9 +1,10 @@
-ARG BASE_IMAGE=ghcr.io/asteny/cuda_base:12.2.2
+ARG BASE_IMAGE=nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 FROM $BASE_IMAGE AS worker_slurmd
 
-ARG SLURM_VERSION=24.05.2
-ARG CUDA_VERSION=12.2.2
+ARG SLURM_VERSION=24.05.5
+ARG CUDA_VERSION=12.4.1
+ARG OPENMPI_VERSION=4.1.7a1
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -53,11 +54,14 @@ RUN apt-get update && \
         rdma-core \
         ibverbs-utils
 
-# Install PMIx
-COPY common/scripts/install_pmix.sh /opt/bin/
-RUN chmod +x /opt/bin/install_pmix.sh && \
-    /opt/bin/install_pmix.sh && \
-    rm /opt/bin/install_pmix.sh
+# Install OpenMPI
+COPY common/scripts/install_openmpi.sh /opt/bin/
+RUN chmod +x /opt/bin/install_openmpi.sh && \
+    /opt/bin/install_openmpi.sh && \
+    rm /opt/bin/install_openmpi.sh
+
+ENV LD_LIBRARY_PATH=/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib
+ENV PATH=$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
 # TODO: Install only necessary packages
 # Download and install Slurm packages

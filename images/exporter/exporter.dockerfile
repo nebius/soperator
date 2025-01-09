@@ -29,8 +29,8 @@ RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 # Second stage: Build image for the prometheus-slurm-exporter
 FROM $BASE_IMAGE AS exporter
 
-ARG SLURM_VERSION=24.05.2
-ARG CUDA_VERSION=12.2.2
+ARG SLURM_VERSION=24.05.5
+ARG CUDA_VERSION=12.4.1
 
 # TODO: Install only those dependencies that are required for running slurm exporter
 # Install dependencies
