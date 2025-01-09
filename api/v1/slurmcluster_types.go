@@ -83,11 +83,11 @@ type SlurmClusterSpec struct {
 	// SlurmConfig represents the Slurm configuration in slurm.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", taskPluginParam: "Verbose", maxJobCount: 10000, minJobAge: 86400}
+	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", taskPluginParam: "", maxJobCount: 10000, minJobAge: 86400}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 	// Generate and set default AppArmor profile for the Slurm worker and login nodes. The Security Profiles Operator must be installed.
 	//
-	// +kubebuilder:default=true
+	// +kubebuilder:default=false
 	UseDefaultAppArmorProfile bool `json:"useDefaultAppArmorProfile,omitempty"`
 }
 
@@ -117,8 +117,8 @@ type SlurmConfig struct {
 	// Additional parameters for the task plugin
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="Verbose"
-	// +kubebuilder:validation:Pattern="^((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+$"
+	// +kubebuilder:default=""
+	// +kubebuilder:validation:Pattern="^(|((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+)$"
 	TaskPluginParam *string `json:"taskPluginParam,omitempty"`
 	// Keep N last jobs in controller memory
 	//
@@ -237,7 +237,7 @@ type NCCLBenchmark struct {
 	// FailedJobsHistoryLimit defines the number of failed finished jobs to retain
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=3
+	// +kubebuilder:default=16
 	FailedJobsHistoryLimit int32 `json:"failedJobsHistoryLimit,omitempty"`
 
 	// Image defines the nccl container image
@@ -894,11 +894,30 @@ type NodeVolumeJailSubMount struct {
 	// +kubebuilder:validation:Required
 	MountPath string `json:"mountPath"`
 
+	// SubPath points to a specific entry inside the volume.
+	// Corresponds to the subPath field in the K8s volumeMount structure.
+	// See official docs for details: https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=""
+	SubPath string `json:"subPath"`
+
+	// ReadOnly defines whether the mount point should be read-only
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	ReadOnly bool `json:"readOnly"`
+
 	// VolumeSourceName defines the name of the volume source for the sub-mount.
 	// Must correspond to the name of one of [VolumeSource]
 	//
-	// +kubebuilder:validation:Required
-	VolumeSourceName string `json:"volumeSourceName"`
+	// +kubebuilder:validation:Optional
+	VolumeSourceName *string `json:"volumeSourceName"`
+
+	// VolumeClaimTemplateSpec defines the [corev1.PersistentVolumeClaim] template specification
+	//
+	// +kubebuilder:validation:Optional
+	VolumeClaimTemplateSpec *corev1.PersistentVolumeClaimSpec `json:"volumeClaimTemplateSpec,omitempty"`
 }
 
 type Telemetry struct {

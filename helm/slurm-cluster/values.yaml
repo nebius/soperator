@@ -2,7 +2,7 @@ clusterName: "slurm1"
 # Additional annotations for the cluster
 annotations: {}
 # Add appArmor profile to the cluster
-useDefaultAppArmorProfile: true
+useDefaultAppArmorProfile: false
 # Maintenance defines the maintenance window for the cluster.
 # It can have the following values:
 # - none: No maintenance is performed. The cluster operates normally.
@@ -98,7 +98,7 @@ periodicChecks:
     # CronJob timeout in seconds. By default, equals to 30 min
     activeDeadlineSeconds: 1800
     # Number of successful finished jobs to retain
-    successfulJobsHistoryLimit: 3
+    successfulJobsHistoryLimit: 24
     # Number of failed finished jobs to retain
     failedJobsHistoryLimit: 3
     # NCCL test settings
@@ -317,6 +317,8 @@ slurmNodes:
       #      jailSubMounts:
       #        - name: "mlcommons-sd-bench-data"
       #          mountPath: "/mlperf-sd"
+      #          subPath: ""
+      #          readOnly: false
       #          volumeSourceName: "mlperf-sd"
   login:
     size: 2

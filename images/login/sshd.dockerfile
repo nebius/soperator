@@ -54,6 +54,10 @@ RUN mkdir -p /usr/src/dummy && \
     gcc -shared -o libdummy.so dummy.c && \
     cp libdummy.so /lib/x86_64-linux-gnu/
 
+# Create node-local directories for enroot runtime data
+RUN mkdir -p -m 777 /usr/share/enroot/enroot-data && \
+    mkdir -p -m 755 /run/enroot
+
 # Copy script for complementing jail filesystem in runtime
 COPY common/scripts/complement_jail.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/complement_jail.sh
@@ -64,6 +68,9 @@ RUN ldconfig
 # Delete users & home because they will be linked from jail
 RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
 RUN rm -rf /home
+
+# Delete SSH "message of the day" scripts because they will be linked from jail
+RUN rm -rf /etc/update-motd.d
 
 # Expose the port used for accessing sshd
 EXPOSE 22

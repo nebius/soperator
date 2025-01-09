@@ -97,10 +97,11 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("HealthCheckNodeState", "ANY")
 	res.AddComment("")
 	res.AddProperty("InactiveLimit", 0)
-	res.AddProperty("KillWait", 30)
-	res.AddProperty("SlurmctldTimeout", 120)
-	res.AddProperty("SlurmdTimeout", 300)
-	res.AddProperty("Waittime", 0)
+	res.AddProperty("KillWait", 180)
+	res.AddProperty("UnkillableStepTimeout", 600)
+	res.AddProperty("SlurmctldTimeout", 30)
+	res.AddProperty("SlurmdTimeout", 180)
+	res.AddProperty("WaitTime", 0)
 	res.AddComment("")
 	res.AddComment("SCHEDULING")
 	res.AddProperty("SchedulerType", "sched/backfill")
@@ -344,7 +345,6 @@ func RenderDefaultConfigMapSSHDConfigs(
 
 func generateDefaultSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res := &renderutils.MultilineStringConfig{}
-	res.AddLine("LogLevel INFO")
 	res.AddLine(fmt.Sprintf("Port %d", cluster.NodeLogin.ContainerSshd.Port))
 	res.AddLine("PermitRootLogin yes")
 	res.AddLine("PasswordAuthentication no")
@@ -363,6 +363,10 @@ func generateDefaultSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigF
 	res.AddLine("MaxStartups " + consts.SSHDMaxStartups)
 	res.AddLine("LoginGraceTime " + consts.SSHDLoginGraceTime)
 	res.AddLine("MaxAuthTries " + consts.SSHDMaxAuthTries)
+	res.AddLine("LogLevel DEBUG3")
+	res.AddLine("")
+	res.AddLine("Match User *")
+	res.AddLine("    LogLevel INFO")
 	return res
 }
 

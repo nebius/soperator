@@ -78,7 +78,9 @@ RUN apt update && \
         unzip \
         rsync \
         numactl \
-        htop
+        htop \
+        rdma-core \
+        ibverbs-utils
 
 # Install python
 COPY common/scripts/install_python.sh /opt/bin/
@@ -200,16 +202,27 @@ RUN chmod 644 /etc/passwd /etc/group && chown 0:0 /etc/passwd /etc/group && \
     chmod 640 /etc/shadow /etc/gshadow && chown 0:42 /etc/shadow /etc/gshadow && \
     chmod 440 /etc/sudoers && chown 0:0 /etc/sudoers
 
-# Adjust the default $HOME directory content
-RUN cd /etc/skel && \
-    mkdir -m 755 .slurm && \
-    touch .slurm/defaults && \
-    chmod 644 .slurm/defaults && \
-    cp -r /etc/skel/.slurm /root/
+# Setup the default $HOME directory content
+RUN rm -rf -- /etc/skel/..?* /etc/skel/.[!.]* /etc/skel/*
+COPY jail/skel/ /etc/skel/
+RUN chmod 755 /etc/skel/.slurm && \
+    chmod 644 /etc/skel/.slurm/defaults && \
+    chmod 644 /etc/skel/.bash_logout && \
+    chmod 644 /etc/skel/.bashrc && \
+    chmod 644 /etc/skel/.profile
+
+# Use the same /etc/skel content for /root
+RUN rm -rf -- /root/..?* /root/.[!.]* /root/* && \
+    cp -a /etc/skel/. /root/
 
 # Copy createuser utility script
 COPY jail/scripts/createuser.sh /usr/bin/createuser
 RUN chmod +x /usr/bin/createuser
+
+# Replace SSH "message of the day" scripts
+RUN rm -rf /etc/update-motd.d/*
+COPY jail/motd/ /etc/update-motd.d/
+RUN chmod +x /etc/update-motd.d/*
 
 # Update linker cache
 RUN ldconfig

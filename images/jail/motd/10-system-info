@@ -1,0 +1,25 @@
+#!/bin/sh
+
+printf "\nSystem information as of %s:\n" "$(/bin/date)"
+
+LOAD_AVG_1M=$(awk '{print $1}' /proc/loadavg)
+CPU_CORES=$(nproc)
+CPU_LOAD=$(awk -v load="$LOAD_AVG_1M" -v cores="$CPU_CORES" 'BEGIN { printf "%.1f", (load / cores) * 100 }')
+printf "  CPU load: %s" "${CPU_LOAD}%"
+
+TOTAL_MEM=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+AVAIL_MEM=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
+USED_MEM=$((TOTAL_MEM - AVAIL_MEM))
+MEM_USAGE=$(awk -v used="$USED_MEM" -v total="$TOTAL_MEM" 'BEGIN { printf "%.1f", (used / total) * 100 }')
+printf "\tMemory usage: %s" "${MEM_USAGE}%"
+
+NUM_PROCESSES=$(ps -e --no-headers | wc -l)
+printf "\tProcesses: %s\n" "${NUM_PROCESSES}"
+
+DISK_USAGE_CMD="
+  findmnt -o SIZE,USE%,TARGET --types virtiofs,tmpfs,nfs4,overlay | grep -vE \"/dev|/usr/lib|/secrets\" \
+    | sed 's/SIZE/Size/' | sed 's/USE%/Use%/' | sed 's/TARGET/Directory/' \
+    | sed 's/^/  /'
+"
+printf "  Disk usage:\n"
+chroot /mnt/jail /bin/sh -c "${DISK_USAGE_CMD}" 2>/dev/null
