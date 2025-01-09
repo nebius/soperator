@@ -46,7 +46,7 @@ func (r *PodMonitorReconciler) Reconcile(
 		log.FromContext(ctx).Info(fmt.Sprintf(
 			"Deleting PodMonitor %s-collector, because of PodMonitor is not needed", cluster.Name,
 		))
-		return r.deletePodMonitorIfOwnedByController(ctx, cluster)
+		return r.deleteIfOwnedByController(ctx, cluster)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
 		log.FromContext(ctx).
@@ -57,22 +57,28 @@ func (r *PodMonitorReconciler) Reconcile(
 	return nil
 }
 
-func (r *PodMonitorReconciler) deletePodMonitorIfOwnedByController(
+func (r *PodMonitorReconciler) deleteIfOwnedByController(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
 ) error {
 	podMonitor, err := r.getPodMonitor(ctx, cluster)
+	if apierrors.IsNotFound(err) {
+		log.FromContext(ctx).Info("PodMonitor is not needed, skipping deletion")
+		return nil
+	}
 	if err != nil {
 		return errors.Wrap(err, "getting PodMonitor")
 	}
-	// Check if the controller is the owner of the PodMonitor
-	isOwner := isControllerOwnerPodMonitor(podMonitor, cluster)
-	if !isOwner {
-		// The controller is not the owner of the PodMonitor, nothing to do
+
+	if !metav1.IsControlledBy(podMonitor, cluster) {
+		log.FromContext(ctx).Info("PodMonitor is not owned by controller, skipping deletion")
 		return nil
 	}
-	// The controller is the owner of the PodMonitor, delete it
-	return r.deletePodMonitorOwnedByController(ctx, cluster, podMonitor)
+
+	if err := r.Delete(ctx, podMonitor); err != nil {
+		return errors.Wrap(err, "deleting PodMonitor")
+	}
+	return nil
 }
 
 func (r *PodMonitorReconciler) getPodMonitor(ctx context.Context, cluster *slurmv1.SlurmCluster) (*prometheusv1.PodMonitor, error) {
@@ -94,36 +100,6 @@ func (r *PodMonitorReconciler) getPodMonitor(ctx context.Context, cluster *slurm
 		return nil, errors.Wrap(err, "getting PodMonitor")
 	}
 	return podMonitor, nil
-}
-
-// Function to check if the controller is the owner
-func isControllerOwnerPodMonitor(podMonitor *prometheusv1.PodMonitor, cluster *slurmv1.SlurmCluster) bool {
-	// Check if the controller is the owner of the Role
-	isOwner := false
-	for _, ownerRef := range podMonitor.GetOwnerReferences() {
-		if ownerRef.Kind == slurmv1.SlurmClusterKind && ownerRef.Name == cluster.Name {
-			isOwner = true
-			break
-		}
-	}
-
-	return isOwner
-}
-
-func (r *PodMonitorReconciler) deletePodMonitorOwnedByController(
-	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
-	podMonitor *prometheusv1.PodMonitor,
-) error {
-	// Delete the Role
-	err := r.Client.Delete(ctx, podMonitor)
-	if err != nil {
-		log.FromContext(ctx).
-			WithValues("cluster", cluster.Name).
-			Error(err, "Failed to delete PodMonitor")
-		return errors.Wrap(err, "deleting PodMonitor")
-	}
-	return nil
 }
 
 func (r *PodMonitorReconciler) patch(existing, desired client.Object) (client.Patch, error) {

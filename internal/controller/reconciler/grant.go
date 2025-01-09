@@ -7,6 +7,7 @@ import (
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -60,6 +61,11 @@ func (r *MariaDbGrantReconciler) deleteIfOwnedByController(
 	name string,
 ) error {
 	grant, err := r.getMariaDbGrant(ctx, namespace, name)
+	if apierrors.IsNotFound(err) {
+		log.FromContext(ctx).Info("MariaDbGrant is not found, skipping deletion")
+		return nil
+	}
+
 	if err != nil {
 		return errors.Wrap(err, "getting MariaDbGrant")
 	}

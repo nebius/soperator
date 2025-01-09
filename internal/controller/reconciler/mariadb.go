@@ -7,6 +7,7 @@ import (
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -61,6 +62,10 @@ func (r *MariaDbReconciler) deleteIfOwnedByController(
 	name string,
 ) error {
 	mariaDb, err := r.getMariaDb(ctx, namespace, name)
+	if apierrors.IsNotFound(err) {
+		log.FromContext(ctx).Info("MariaDb is not found, skipping deletion")
+		return nil
+	}
 	if err != nil {
 		return errors.Wrap(err, "getting MariaDb")
 	}

@@ -47,7 +47,7 @@ func (r *DeploymentReconciler) Reconcile(
 		log.FromContext(ctx).Info(fmt.Sprintf(
 			"Deleting Deployment %s-collector, because of Deployment  is not needed", cluster.Name,
 		))
-		return r.deleteDeploymentIfOwnedByController(ctx, cluster, cluster.Namespace, *name)
+		return r.deleteIfOwnedByController(ctx, cluster, cluster.Namespace, *name)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
 		log.FromContext(ctx).
@@ -58,13 +58,18 @@ func (r *DeploymentReconciler) Reconcile(
 	return nil
 }
 
-func (r *DeploymentReconciler) deleteDeploymentIfOwnedByController(
+func (r *DeploymentReconciler) deleteIfOwnedByController(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
 	namespace,
 	name string,
 ) error {
 	deployment, err := r.getDeployment(ctx, namespace, name)
+	if apierrors.IsNotFound(err) {
+		log.FromContext(ctx).Info("Deployment not found, skipping deletion")
+		return nil
+	}
+
 	if err != nil {
 		return errors.Wrap(err, "getting Deployment")
 	}
