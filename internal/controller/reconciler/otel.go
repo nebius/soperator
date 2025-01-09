@@ -45,7 +45,7 @@ func (r *OtelReconciler) Reconcile(
 		// We should use conditions instead. if condition is met and resource exists, delete it
 		// MSP-2715 - task to improve resource deletion
 		log.FromContext(ctx).Info(fmt.Sprintf("Deleting OpenTelemetryCollector %s-collector, because of OpenTelemetryCollector is not needed", cluster.Name))
-		return r.deleteOtelIfOwnedByController(ctx, cluster)
+		return r.deleteIfOwnedByController(ctx, cluster)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
 		log.FromContext(ctx).
@@ -56,18 +56,23 @@ func (r *OtelReconciler) Reconcile(
 	return nil
 }
 
-func (r *OtelReconciler) deleteOtelIfOwnedByController(
+func (r *OtelReconciler) deleteIfOwnedByController(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
 ) error {
 	otel, err := r.getOtel(ctx, cluster)
+	if apierrors.IsNotFound(err) {
+		log.FromContext(ctx).Info("Service not found, skipping deletion")
+		return nil
+	}
+
 	if err != nil {
 		return errors.Wrap(err, "getting OpenTelemetryCollector")
 	}
-	// Check if the controller is the owner of the OpenTelemetryCollector
+
 	isOwner := isControllerOwnerOtel(otel, cluster)
 	if !isOwner {
-		// The controller is not the owner of the OpenTelemetryCollector, nothing to do
+		log.FromContext(ctx).Info("OpenTelemetryCollector is not owned by the controller, skipping deletion")
 		return nil
 	}
 	// The controller is the owner of the OpenTelemetryCollector, delete it

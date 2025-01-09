@@ -39,7 +39,7 @@ func (r *RoleReconciler) Reconcile(
 	if desired == nil {
 		// If desired is nil, delete the Role
 		log.FromContext(ctx).Info(fmt.Sprintf("Deleting Role %s, because of Role is not needed", naming.BuildRoleWorkerName(cluster.Name)))
-		return r.deleteRoleIfOwnedByController(ctx, cluster)
+		return r.deleteIfOwnedByController(ctx, cluster)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
 		log.FromContext(ctx).
@@ -50,11 +50,16 @@ func (r *RoleReconciler) Reconcile(
 	return nil
 }
 
-func (r *RoleReconciler) deleteRoleIfOwnedByController(
+func (r *RoleReconciler) deleteIfOwnedByController(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
 ) error {
 	role, err := r.getRole(ctx, cluster)
+	if apierrors.IsNotFound(err) {
+		log.FromContext(ctx).Info("Service not found, skipping deletion")
+		return nil
+	}
+
 	if err != nil {
 		return errors.Wrap(err, "getting Worker Role")
 	}

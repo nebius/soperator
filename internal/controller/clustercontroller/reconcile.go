@@ -273,41 +273,111 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		ptr.To(slurmv1.PhaseClusterNotAvailable),
 		func() (ctrl.Result, error) {
 			// Common
-			if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-				status.SetCondition(metav1.Condition{
-					Type:   slurmv1.ConditionClusterCommonAvailable,
-					Status: metav1.ConditionTrue, Reason: "Available",
-					Message: "Slurm common components are available",
+			switch {
+			case check.IsMaintenanceActive(clusterValues.NodeRest.Maintenance):
+				err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:    slurmv1.ConditionClusterCommonAvailable,
+						Status:  metav1.ConditionFalse,
+						Reason:  "Maintenance",
+						Message: "Slurm common components are in maintenance",
+					})
 				})
-			}); err != nil {
-				return ctrl.Result{}, err
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+			default:
+				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:   slurmv1.ConditionClusterCommonAvailable,
+						Status: metav1.ConditionTrue, Reason: "Available",
+						Message: "Slurm common components are available",
+					})
+				}); err != nil {
+					return ctrl.Result{}, err
+				}
 			}
 
 			// Controllers
-			if res, err := r.ValidateControllers(ctx, cluster, clusterValues); err != nil {
-				logger.Error(err, "Failed to validate Slurm controllers")
-				return ctrl.Result{}, errors.Wrap(err, "validating Slurm controllers")
-			} else if res.Requeue {
-				return res, nil
+			switch {
+			case check.IsMaintenanceActive(clusterValues.NodeController.Maintenance):
+				err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:    slurmv1.ConditionClusterControllersAvailable,
+						Status:  metav1.ConditionFalse,
+						Reason:  "Maintenance",
+						Message: "Slurm controllers are in maintenance",
+					})
+				})
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+			default:
+				if res, err := r.ValidateControllers(ctx, cluster, clusterValues); err != nil {
+					logger.Error(err, "Failed to validate Slurm controllers")
+					return ctrl.Result{}, errors.Wrap(err, "validating Slurm controllers")
+				} else if res.Requeue {
+					return res, nil
+				}
 			}
 
 			// Workers
-			if res, err := r.ValidateWorkers(ctx, cluster, clusterValues); err != nil {
-				logger.Error(err, "Failed to validate Slurm workers")
-				return ctrl.Result{}, errors.Wrap(err, "validating Slurm workers")
-			} else if res.Requeue {
-				return res, nil
+			switch {
+			case check.IsMaintenanceActive(clusterValues.NodeWorker.Maintenance):
+				err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:    slurmv1.ConditionClusterWorkersAvailable,
+						Status:  metav1.ConditionFalse,
+						Reason:  "Maintenance",
+						Message: "Slurm workers are in maintenance",
+					})
+				})
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+
+			case clusterValues.NodeWorker.Size > 0:
+				if res, err := r.ValidateWorkers(ctx, cluster, clusterValues); err != nil {
+					logger.Error(err, "Failed to validate Slurm workers")
+					return ctrl.Result{}, errors.Wrap(err, "validating Slurm workers")
+				} else if res.Requeue {
+					return res, nil
+				}
+			default:
+				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:   slurmv1.ConditionClusterWorkersAvailable,
+						Status: metav1.ConditionFalse, Reason: "NotAvailable",
+						Message: "Slurm workers are disabled",
+					})
+				}); err != nil {
+					return ctrl.Result{}, err
+				}
 			}
 
 			// Login
-			if clusterValues.NodeLogin.Size > 0 {
+			switch {
+			case check.IsMaintenanceActive(clusterValues.NodeLogin.Maintenance):
+				err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:    slurmv1.ConditionClusterLoginAvailable,
+						Status:  metav1.ConditionFalse,
+						Reason:  "Maintenance",
+						Message: "Slurm login is in maintenance",
+					})
+				})
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+
+			case clusterValues.NodeLogin.Size > 0:
 				if res, err := r.ValidateLogin(ctx, cluster, clusterValues); err != nil {
 					logger.Error(err, "Failed to validate Slurm login")
 					return ctrl.Result{}, errors.Wrap(err, "validating Slurm login")
 				} else if res.Requeue {
 					return res, nil
 				}
-			} else {
+			default:
 				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
 					status.SetCondition(metav1.Condition{
 						Type:   slurmv1.ConditionClusterLoginAvailable,
@@ -320,22 +390,41 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 			}
 
 			// Accounting
-			if clusterValues.NodeAccounting.Enabled {
-				if res, err := r.ValidateAccounting(ctx, cluster, clusterValues); err != nil {
-					logger.Error(err, "Failed to validate Slurm accounting")
-					return ctrl.Result{}, errors.Wrap(err, "validating Slurm accounting")
-				} else if res.Requeue {
-					return res, nil
-				}
-			} else {
-				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+			switch {
+			case check.IsMaintenanceActive(clusterValues.NodeAccounting.Maintenance):
+				err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
 					status.SetCondition(metav1.Condition{
-						Type:   slurmv1.ConditionClusterAccountingAvailable,
-						Status: metav1.ConditionFalse, Reason: "NotAvailable",
+						Type:    slurmv1.ConditionClusterAccountingAvailable,
+						Status:  metav1.ConditionFalse,
+						Reason:  "Maintenance",
+						Message: "Slurm accounting is in maintenance",
+					})
+				})
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+
+			case !clusterValues.NodeAccounting.Enabled:
+				err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:    slurmv1.ConditionClusterAccountingAvailable,
+						Status:  metav1.ConditionFalse,
+						Reason:  "NotAvailable",
 						Message: "Slurm accounting is disabled",
 					})
-				}); err != nil {
+				})
+				if err != nil {
 					return ctrl.Result{}, err
+				}
+
+			default:
+				res, err := r.ValidateAccounting(ctx, cluster, clusterValues)
+				if err != nil {
+					logger.Error(err, "Failed to validate Slurm accounting")
+					return ctrl.Result{}, errors.Wrap(err, "validating Slurm accounting")
+				}
+				if res.Requeue {
+					return res, nil
 				}
 			}
 

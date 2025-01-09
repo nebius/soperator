@@ -39,7 +39,7 @@ func (r *RoleBindingReconciler) Reconcile(
 	if desired == nil {
 		// If desired is nil, delete the Role Binding
 		log.FromContext(ctx).Info(fmt.Sprintf("Deleting RoleBinding %s, because of RoleBinding is not needed", naming.BuildRoleBindingWorkerName(cluster.Name)))
-		return r.deleteRoleBindingIfOwnedByController(ctx, cluster)
+		return r.deleteIfOwnedByController(ctx, cluster)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
 		log.FromContext(ctx).
@@ -50,11 +50,15 @@ func (r *RoleBindingReconciler) Reconcile(
 	return nil
 }
 
-func (r *RoleBindingReconciler) deleteRoleBindingIfOwnedByController(
+func (r *RoleBindingReconciler) deleteIfOwnedByController(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
 ) error {
 	roleBinding, err := r.getRoleBinding(ctx, cluster)
+	if apierrors.IsNotFound(err) {
+		log.FromContext(ctx).Info("RoleBinding is not found, skipping deletion")
+		return nil
+	}
 	if err != nil {
 		return errors.Wrap(err, "getting Worker RoleBinding")
 	}
