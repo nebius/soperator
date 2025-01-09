@@ -28,10 +28,11 @@ type SlurmClusterSpec struct {
 	// - none: No maintenance is performed. The cluster operates normally.
 	// - downscale: Scales down all components to 0.
 	// - downscaleAndDeletePopulateJail: Scales down all components to 0 and deletes the kubernetes Kind Jobs populateJail.
+	// - downscaleAndOverwritePopulateJail: Scales down all components to 0 and overwrite populateJail (same as overwrite=true).
 	// - skipPopulateJail: Skips the execution of the populateJail job during maintenance.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Enum=none;downscale;downscaleAndDeletePopulateJail;skipPopulateJail
+	// +kubebuilder:validation:Enum=none;downscale;downscaleAndDeletePopulateJail;downscaleAndOverwritePopulateJail;skipPopulateJail
 	// +kubebuilder:default="none"
 	Maintenance *consts.MaintenanceMode `json:"maintenance,omitempty"`
 
@@ -1000,6 +1001,7 @@ const (
 	ConditionClusterWorkersAvailable     = "WorkersAvailable"
 	ConditionClusterLoginAvailable       = "LoginAvailable"
 	ConditionClusterAccountingAvailable  = "AccountingAvailable"
+	ConditionClusterPopulateJailMode     = "PopulateJailMode"
 
 	PhaseClusterReconciling  = "Reconciling"
 	PhaseClusterNotAvailable = "Not available"

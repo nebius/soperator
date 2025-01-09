@@ -1073,11 +1073,13 @@ spec:
                   - none: No maintenance is performed. The cluster operates normally.
                   - downscale: Scales down all components to 0.
                   - downscaleAndDeletePopulateJail: Scales down all components to 0 and deletes the kubernetes Kind Jobs populateJail.
+                  - downscaleAndOverwritePopulateJail: Scales down all components to 0 and overwrite populateJail (same as overwrite=true).
                   - skipPopulateJail: Skips the execution of the populateJail job during maintenance.
                 enum:
                 - none
                 - downscale
                 - downscaleAndDeletePopulateJail
+                - downscaleAndOverwritePopulateJail
                 - skipPopulateJail
                 type: string
               ncclSettings:

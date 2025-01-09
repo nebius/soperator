@@ -3,10 +3,11 @@ package consts
 type MaintenanceMode string
 
 const (
-	ModeNone                       MaintenanceMode = "none"
-	ModeDownscale                  MaintenanceMode = "downscale"
-	ModeDownscaleAndDeletePopulate MaintenanceMode = "downscaleAndDeletePopulateJail"
-	ModeSkipPopulateJail           MaintenanceMode = "skipPopulateJail"
+	ModeNone                          MaintenanceMode = "none"
+	ModeDownscale                     MaintenanceMode = "downscale"
+	ModeDownscaleAndDeletePopulate    MaintenanceMode = "downscaleAndDeletePopulateJail"
+	ModeDownscaleAndOverwritePopulate MaintenanceMode = "downscaleAndOverwritePopulateJail"
+	ModeSkipPopulate                  MaintenanceMode = "skipPopulateJail"
 )
 
 const (
