@@ -4025,6 +4025,10 @@ spec:
                         required:
                         - image
                         type: object
+                      priorityClass:
+                        description: PriorityClass defines the priority class for
+                          the Slurm worker node
+                        type: string
                       size:
                         description: Size defines the number of node instances
                         format: int32

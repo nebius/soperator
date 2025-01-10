@@ -682,6 +682,11 @@ type SlurmNodeWorker struct {
 	//
 	// +kubebuilder:validation:Optional
 	SlurmNodeExtra string `json:"slurmNodeExtra,omitempty"`
+
+	// PriorityClass defines the priority class for the Slurm worker node
+	//
+	// +kubebuilder:validation:Optional
+	PriorityClass string `json:"priorityClass,omitempty"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node

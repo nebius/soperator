@@ -11,7 +11,7 @@ controllerManager:
         drop:
           - ALL
     image:
-      repository: cr.nemax.nebius.cloud/mirror/io/gcr/kubebuilder/kube-rbac-proxy
+      repository: gcr.io/kubebuilder/kube-rbac-proxy
       tag: v0.15.0
     resources:
       limits:
