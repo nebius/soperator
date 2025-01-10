@@ -27,6 +27,7 @@ type SlurmWorker struct {
 	CgroupVersion  string
 	EnableGDRCopy  bool
 	SlurmNodeExtra string
+	PriorityClass  string
 
 	Service     Service
 	StatefulSet StatefulSet
@@ -88,6 +89,7 @@ func buildSlurmWorkerFrom(
 		SharedMemorySize:          worker.Volumes.SharedMemorySize,
 		CgroupVersion:             worker.CgroupVersion,
 		EnableGDRCopy:             worker.EnableGDRCopy,
+		PriorityClass:             worker.PriorityClass,
 		UseDefaultAppArmorProfile: useDefaultAppArmorProfile,
 		SlurmNodeExtra:            worker.SlurmNodeExtra,
 		SSHDConfigMapName:         sshdConfigMapName,

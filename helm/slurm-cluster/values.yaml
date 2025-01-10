@@ -284,6 +284,7 @@ slurmNodes:
     k8sNodeFilterName: "gpu"
     cgroupVersion: v2
     enableGDRCopy: false
+    priorityClass: ""
     slurmNodeExtra: ""
     supervisordConfigMapRefName: ""
     sshdConfigMapRefName: ""
