@@ -7,12 +7,14 @@ import (
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/check"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/render/populate_jail"
 	"nebius.ai/slurm-operator/internal/utils"
@@ -37,7 +39,9 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.Info("Reconciling")
 
-					isMaintenanceStopMode := check.IsModeDownscaleAndDeletePopulate(clusterValues.PopulateJail.Maintenance)
+					isMaintenanceStopMode := check.IsModeDownscaleAndDeletePopulate(
+						clusterValues.PopulateJail.Maintenance)
+
 					desired := batchv1.Job{}
 					getErr := r.Get(stepCtx,
 						client.ObjectKey{
@@ -55,6 +59,15 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 								return errors.Wrap(err, "deleting Populate jail Job")
 							}
 							stepLogger.Info("Deleted")
+						}
+						if check.IsModeDownscaleAndOverwritePopulate(clusterValues.PopulateJail.Maintenance) {
+							if isConditionNonOverwrite(cluster.Status.Conditions) {
+								if err := r.Delete(stepCtx, &desired); err != nil {
+									stepLogger.Error(err, "Failed to delete")
+									return errors.Wrap(err, "deleting Populate jail Job")
+								}
+								stepLogger.Info("Successfully deleted Populate Jail Job")
+							}
 						}
 						return nil
 					}
@@ -138,4 +151,13 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 	logger.Info("Reconciled Populate jail Job")
 
 	return nil
+}
+
+func isConditionNonOverwrite(conditions []metav1.Condition) bool {
+	for _, condition := range conditions {
+		if condition.Type == slurmv1.ConditionClusterPopulateJailMode {
+			return condition.Reason != string(consts.ModeDownscaleAndOverwritePopulate)
+		}
+	}
+	return false
 }

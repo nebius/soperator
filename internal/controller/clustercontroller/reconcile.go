@@ -3,6 +3,7 @@ package clustercontroller
 import (
 	"context"
 	errorsStd "errors"
+	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -33,6 +34,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/check"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controller/state"
 	"nebius.ai/slurm-operator/internal/logfield"
@@ -292,6 +294,60 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 						Type:   slurmv1.ConditionClusterCommonAvailable,
 						Status: metav1.ConditionTrue, Reason: "Available",
 						Message: "Slurm common components are available",
+					})
+				}); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+
+			// Popolate Jail
+			switch {
+			case check.IsModeSkipPopulateJail(clusterValues.PopulateJail.Maintenance):
+				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:   slurmv1.ConditionClusterPopulateJailMode,
+						Status: metav1.ConditionTrue, Reason: string(consts.ModeSkipPopulate),
+						Message: "Populate Jail is skipped",
+					})
+				}); err != nil {
+					return ctrl.Result{}, err
+				}
+			case check.IsModeDownscaleAndDeletePopulate(clusterValues.PopulateJail.Maintenance):
+				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:   slurmv1.ConditionClusterPopulateJailMode,
+						Status: metav1.ConditionTrue, Reason: string(consts.ModeDownscaleAndDeletePopulate),
+						Message: "Populate Jail is deleted",
+					})
+				}); err != nil {
+					return ctrl.Result{}, err
+				}
+			case check.IsModeDownscaleAndOverwritePopulate(clusterValues.PopulateJail.Maintenance):
+				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:   slurmv1.ConditionClusterPopulateJailMode,
+						Status: metav1.ConditionTrue, Reason: string(consts.ModeDownscaleAndOverwritePopulate),
+						Message: "Populate Jail is overwritten",
+					})
+				}); err != nil {
+					return ctrl.Result{}, err
+				}
+			case !check.IsMaintenanceActive(clusterValues.PopulateJail.Maintenance):
+				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:   slurmv1.ConditionClusterPopulateJailMode,
+						Status: metav1.ConditionTrue, Reason: string(consts.ModeNone),
+						Message: fmt.Sprintf("Populate Jail maintenanceMode is %s", consts.ModeNone),
+					})
+				}); err != nil {
+					return ctrl.Result{}, err
+				}
+			default:
+				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:   slurmv1.ConditionClusterPopulateJailMode,
+						Status: metav1.ConditionUnknown, Reason: "Unknown",
+						Message: "Unknown Populate Jail maintenanceMode",
 					})
 				}); err != nil {
 					return ctrl.Result{}, err
