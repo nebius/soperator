@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -23,12 +22,4 @@ func (c *fakeGoneClient) Get(ctx context.Context, key client.ObjectKey, obj clie
 			Message: "the resource is gone",
 		},
 	}
-}
-
-type fakeErrorClient struct {
-	client.Client
-}
-
-func (c *fakeErrorClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
-	return errors.New("delete error")
 }

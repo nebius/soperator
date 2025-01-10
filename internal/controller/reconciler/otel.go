@@ -40,10 +40,6 @@ func (r *OtelReconciler) Reconcile(
 	deps ...metav1.Object,
 ) error {
 	if desired == nil {
-		// If desired is nil, delete the OpenTelemetryCollector
-		// TODO: Using error or desired is nil presence as an indicator for resource deletion doesn't seem good
-		// We should use conditions instead. if condition is met and resource exists, delete it
-		// MSP-2715 - task to improve resource deletion
 		log.FromContext(ctx).Info(fmt.Sprintf("Deleting OpenTelemetryCollector %s-collector, because of OpenTelemetryCollector is not needed", cluster.Name))
 		return r.deleteIfOwnedByController(ctx, cluster)
 	}
@@ -70,13 +66,16 @@ func (r *OtelReconciler) deleteIfOwnedByController(
 		return errors.Wrap(err, "getting OpenTelemetryCollector")
 	}
 
-	isOwner := isControllerOwnerOtel(otel, cluster)
-	if !isOwner {
-		log.FromContext(ctx).Info("OpenTelemetryCollector is not owned by the controller, skipping deletion")
+	if !metav1.IsControlledBy(otel, cluster) {
+		log.FromContext(ctx).Info("Service is not owned by controller, skipping deletion")
 		return nil
 	}
-	// The controller is the owner of the OpenTelemetryCollector, delete it
-	return r.deleteOtelOwnedByController(ctx, cluster, otel)
+
+	if err := r.Delete(ctx, otel); err != nil {
+		return errors.Wrap(err, "deleting Service")
+	}
+
+	return nil
 }
 
 func (r *OtelReconciler) getOtel(ctx context.Context, cluster *slurmv1.SlurmCluster) (*otelv1beta1.OpenTelemetryCollector, error) {
@@ -89,45 +88,7 @@ func (r *OtelReconciler) getOtel(ctx context.Context, cluster *slurmv1.SlurmClus
 		},
 		otel,
 	)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// otel doesn't exist, nothing to do
-			return otel, nil
-		}
-		// Other error occurred
-		return nil, errors.Wrap(err, "getting Worker OpenTelemetryCollector")
-	}
-	return otel, nil
-}
-
-// Function to check if the controller is the owner
-func isControllerOwnerOtel(otel *otelv1beta1.OpenTelemetryCollector, cluster *slurmv1.SlurmCluster) bool {
-	// Check if the controller is the owner of the Role
-	isOwner := false
-	for _, ownerRef := range otel.GetOwnerReferences() {
-		if ownerRef.Kind == slurmv1.SlurmClusterKind && ownerRef.Name == cluster.Name {
-			isOwner = true
-			break
-		}
-	}
-
-	return isOwner
-}
-
-func (r *OtelReconciler) deleteOtelOwnedByController(
-	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
-	otel *otelv1beta1.OpenTelemetryCollector,
-) error {
-	// Delete the Role
-	err := r.Client.Delete(ctx, otel)
-	if err != nil {
-		log.FromContext(ctx).
-			WithValues("cluster", cluster.Name).
-			Error(err, "Failed to delete Worker OpenTelemetryCollector")
-		return errors.Wrap(err, "deleting Worker OpenTelemetryCollector")
-	}
-	return nil
+	return otel, err
 }
 
 func (r *OtelReconciler) patch(existing, desired client.Object) (client.Patch, error) {
