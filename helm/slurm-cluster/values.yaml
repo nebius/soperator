@@ -99,9 +99,9 @@ periodicChecks:
     # CronJob timeout in seconds. By default, equals to 30 min
     activeDeadlineSeconds: 1800
     # Number of successful finished jobs to retain
-    successfulJobsHistoryLimit: 24
+    successfulJobsHistoryLimit: 3
     # Number of failed finished jobs to retain
-    failedJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 24
     # NCCL test settings
     ncclArguments:
       # Minimum memory size to start NCCL with
