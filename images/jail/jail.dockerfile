@@ -1,5 +1,5 @@
 # BASE_IMAGE defined here for second multistage build
-ARG BASE_IMAGE=ghcr.io/asteny/cuda_base:12.2.2
+ARG BASE_IMAGE=nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 # First stage: Build the gpubench application
 FROM golang:1.22 AS gpubench_builder
@@ -23,12 +23,13 @@ RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 #######################################################################################################################
 # Second stage: Build jail image
 
-ARG BASE_IMAGE=ghcr.io/asteny/cuda_base:12.2.2
+ARG BASE_IMAGE=nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 FROM $BASE_IMAGE AS jail
 
-ARG SLURM_VERSION=24.05.2
-ARG CUDA_VERSION=12.2.2
+ARG SLURM_VERSION=24.05.5
+ARG CUDA_VERSION=12.4.1
+ARG OPENMPI_VERSION=4.1.7a1
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -80,7 +81,9 @@ RUN apt update && \
         numactl \
         htop \
         rdma-core \
-        ibverbs-utils
+        ibverbs-utils \
+        libpmix2 \
+        libpmix-dev
 
 # Install python
 COPY common/scripts/install_python.sh /opt/bin/
@@ -110,15 +113,18 @@ RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
 # Create directory for enroot runtime data that will be mounted from the host
 RUN mkdir -p -m 777 /usr/share/enroot/enroot-data
 
-# Install PMIx
-COPY common/scripts/install_pmix.sh /opt/bin/
-RUN chmod +x /opt/bin/install_pmix.sh && \
-    /opt/bin/install_pmix.sh && \
-    rm /opt/bin/install_pmix.sh
+# Install OpenMPI
+COPY common/scripts/install_openmpi.sh /opt/bin/
+RUN chmod +x /opt/bin/install_openmpi.sh && \
+    /opt/bin/install_openmpi.sh && \
+    rm /opt/bin/install_openmpi.sh
+
+ENV LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib
+ENV PATH=$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
 # TODO: Install only necessary packages
 # Download and install Slurm packages
-RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libpmi0 slurm-smd-libpmi2-0 slurm-smd-libslurm-perl slurm-smd; do \
+RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libslurm-perl slurm-smd; do \
         wget -q -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
         echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
@@ -147,13 +153,6 @@ COPY common/scripts/install_nvtop.sh /opt/bin/
 RUN chmod +x /opt/bin/install_nvtop.sh && \
     /opt/bin/install_nvtop.sh && \
     rm /opt/bin/install_nvtop.sh
-
-# Download and install NCCL packages
-RUN wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/libnccl2_2.22.3-1+cuda12.2_amd64.deb && \
-    wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/libnccl-dev_2.22.3-1+cuda12.2_amd64.deb && \
-    dpkg -i /tmp/libnccl2_2.22.3-1+cuda12.2_amd64.deb && \
-    dpkg -i /tmp/libnccl-dev_2.22.3-1+cuda12.2_amd64.deb && \
-    rm -rf /tmp/*.deb
 
 # Download NCCL tests executables
 RUN wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/nccl-tests-perf.tar.gz && \
