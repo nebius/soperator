@@ -107,8 +107,8 @@ This helps cluster administrators and users monitor resource utilization, enforc
 
 
 ## ❌ Limitations
-- **GPUs are required**. Although support for CPU-only clusters or partitions seems pretty straightforward, we haven't
-  implemented it yet.
+- **GPU-only or CPU-only**.The cluster of Slurm can currently be either GPU-only or CPU-only. 
+  Support for mixed configurations based on nodesets (e.g., separate GPU and CPU nodesets) has not been implemented yet.
 - **Single-partition clusters**. Slurm's ability to split clusters into several partitions isn't supported now.
 - **Software versions**. The list of software versions we currently support is quite short.
  - Linux: Ubuntu [20.04](https://releases.ubuntu.com/focal/) and
