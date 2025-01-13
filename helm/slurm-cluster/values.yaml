@@ -137,16 +137,16 @@ slurmNodes:
     enabled: false
     k8sNodeFilterName: "no-gpu"
     slurmConfig: {}
-    # accountingStorageTRES: gres/gpu,license/iop1
+    # accountingStorageTRES: "gres/gpu,license/iop1"
     # accountingStoreFlags: job_comment,job_env,job_extra,job_script,no_stdio
     # acctGatherInterconnectType: "acct_gather_interconnect/ofed"
-    # acctGatherFilesystemType: acct_gather_filesystem/lustre
-    # jobAcctGatherType: jobacct_gather/cgroup
+    # acctGatherFilesystemType: "acct_gather_filesystem/lustre"
+    # jobAcctGatherType: "jobacct_gather/cgroup"
     # jobAcctGatherFrequency: 30
     # priorityWeightAge: 1
     # priorityWeightFairshare: 1
     # priorityWeightQOS: 1
-    # priorityWeightTRES: 1
+    # priorityWeightTRES: ""
     slurmdbdConfig: {}
     # archiveEvents: "yes"
     # archiveJobs: "yes"
@@ -156,7 +156,7 @@ slurmNodes:
     # archiveUsage: "yes"
     # archiveTXN: "yes"
     # debugLevel: "info"
-    # tcpTimeout: "120"
+    # tcpTimeout: 120
     # purgeEventAfter: "1month"
     # purgeJobAfter: "1month"
     # purgeStepAfter: "1month"
