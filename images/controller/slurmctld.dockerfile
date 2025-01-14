@@ -43,15 +43,6 @@ RUN apt-get update && \
         lsof \
         daemontools
 
-# Install OpenMPI
-COPY common/scripts/install_openmpi.sh /opt/bin/
-RUN chmod +x /opt/bin/install_openmpi.sh && \
-    /opt/bin/install_openmpi.sh && \
-    rm /opt/bin/install_openmpi.sh
-
-ENV LD_LIBRARY_PATH=/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib
-ENV PATH=$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
-
 # TODO: Install only necessary packages
 # Download and install Slurm packages
 RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libslurm-perl slurm-smd-slurmctld slurm-smd; do \
