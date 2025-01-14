@@ -33,7 +33,9 @@ RUN apt-get update && \
         squashfs-tools \
         zstd \
         software-properties-common \
-        vim
+        vim \
+        libpmix2 \
+        libpmix-dev
 
 # TODO: Install only necessary packages
 # Download and install Slurm packages
