@@ -2056,6 +2056,8 @@ spec:
                           in slurm.conf
                         properties:
                           accountingStorageTRES:
+                            default: Billing,CPU,Mem,Node,VMem
+                            pattern: ^((Billing|CPU|Mem|VMem|Node|Energy|Pages|FS/Disk|FS/Lustre|Gres/gpu|Gres/gpu:tesla|Gres/gpu:volta)(,)?)+$
                             type: string
                           accountingStoreFlags:
                             type: string
@@ -2076,6 +2078,7 @@ spec:
                             - DisableGPUAcct
                             type: string
                           jobAcctGatherType:
+                            default: jobacct_gather/cgroup
                             enum:
                             - jobacct_gather/linux
                             - jobacct_gather/cgroup

@@ -571,6 +571,8 @@ type SlurmdbdConfig struct {
 
 type AccountingSlurmConf struct {
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Pattern="^((Billing|CPU|Mem|VMem|Node|Energy|Pages|FS/Disk|FS/Lustre|Gres/gpu|Gres/gpu:tesla|Gres/gpu:volta)(,)?)+$"
+	// +kubebuilder:default="Billing,CPU,Mem,Node,VMem"
 	AccountingStorageTRES *string `json:"accountingStorageTRES,omitempty"`
 	// +kubebuilder:validation:Optional
 	AccountingStoreFlags *string `json:"accountingStoreFlags,omitempty"`
@@ -582,6 +584,7 @@ type AccountingSlurmConf struct {
 	AcctGatherProfileType *string `json:"acctGatherProfileType,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum="jobacct_gather/linux";"jobacct_gather/cgroup";"jobacct_gather/none"
+	// +kubebuilder:default="jobacct_gather/cgroup"
 	JobAcctGatherType *string `json:"jobAcctGatherType,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=30
