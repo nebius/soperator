@@ -143,3 +143,31 @@ func generateDefaultSupervisordConfig() renderutils.ConfigFile {
 }
 
 // endregion Supervisord
+
+// region UnkillableStepProgram
+
+// RenderDefaultConfigMapUnkillableStepProgram renders new [corev1.ConfigMap] containing unkillable step program
+func RenderDefaultConfigMapUnkillableStepProgram(cluster *values.SlurmCluster) corev1.ConfigMap {
+	return corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.NodeWorker.UnkillableStepProgramRefName,
+			Namespace: cluster.Namespace,
+			Labels:    common.RenderLabels(consts.ComponentTypeWorker, cluster.Name),
+		},
+		Data: map[string]string{
+			consts.ConfigMapKeyUnkillableStepProgram: generateUnkillableStepProgramRefConfig().Render(),
+		},
+	}
+}
+
+// generateUnkillableStepProgramRefConfig generates unkillable step program config
+func generateUnkillableStepProgramRefConfig() renderutils.ConfigFile {
+	res := &renderutils.MultilineStringConfig{}
+	res.AddLine("#!/bin/bash")
+	res.AddLine("echo 'Unkillable step program'")
+	res.AddLine("scontrol update nodename=$(hostname) state=down reason='Uninterruptible job detected, rebooting…' && scontrol delete nodename=$(hostname))")
+	res.AddLine("reboot -f")
+	return res
+}
+
+// endregion UnkillableStepProgram

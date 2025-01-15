@@ -34,6 +34,7 @@ func renderVolumesAndClaimTemplateSpecs(
 		renderVolumeSharedMemory(worker.SharedMemorySize),
 		renderVolumeSysctl(clusterName),
 		renderSupervisordConfigMap(worker.SupervisordConfigMapName),
+		renderConfigMapUnkillableStepProgram(worker.UnkillableStepProgramRefName),
 	}
 
 	// Spool and Jail could be specified by template spec or by volume source name
@@ -94,6 +95,19 @@ func renderVolumesAndClaimTemplateSpecs(
 func renderSupervisordConfigMap(name string) corev1.Volume {
 	return corev1.Volume{
 		Name: consts.VolumeNameSupervisordConfigMap,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: name,
+				},
+			},
+		},
+	}
+}
+
+func renderConfigMapUnkillableStepProgram(name string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameUnkillableStepProgramCM,
 		VolumeSource: corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{
 				LocalObjectReference: corev1.LocalObjectReference{

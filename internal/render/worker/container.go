@@ -72,6 +72,7 @@ func renderContainerSlurmd(
 		renderVolumeMountSharedMemory(),
 		renderVolumeMountSysctl(),
 		renderVolumeMountSupervisordConfigMap(),
+		renderVolumeUkillableStepProgram(),
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
 
@@ -150,6 +151,14 @@ func renderVolumeMountSupervisordConfigMap() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      consts.VolumeNameSupervisordConfigMap,
 		MountPath: consts.VolumeMountPathSupervisordConfig,
+		ReadOnly:  true,
+	}
+}
+
+func renderVolumeUkillableStepProgram() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameUnkillableStepProgramCM,
+		MountPath: consts.VolumeMountPathUnkillableStepProgram,
 		ReadOnly:  true,
 	}
 }

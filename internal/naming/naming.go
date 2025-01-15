@@ -163,6 +163,17 @@ func BuildConfigMapSupervisordName(clusterName string) string {
 	}.String()
 }
 
+func BuildConfigMapUnkillableStepProgramName(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.ConfigMapNameUnkillableStep,
+	}.String()
+}
+
+func BuildPathUnkillableStepProgramName(path, fileName string) string {
+	return fmt.Sprintf("%s/%s", path, fileName)
+}
+
 // endregion Worker
 
 // region NCCLBenchmark

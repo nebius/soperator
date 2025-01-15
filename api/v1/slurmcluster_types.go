@@ -131,6 +131,11 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=86400
 	MinJobAge *int32 `json:"minJobAge,omitempty"`
+	// The time to wait, in seconds, when any job is in the COMPLETING state before any additional jobs are scheduled.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=600
+	UnkillableStepTimeout int32 `json:"unkillableStepTimeout,omitempty"`
 }
 
 type PartitionConfiguration struct {
@@ -690,6 +695,12 @@ type SlurmNodeWorker struct {
 	//
 	// +kubebuilder:validation:Optional
 	PriorityClass string `json:"priorityClass,omitempty"`
+
+	// UnkillableStepProgramRefName defines the reference to the ConfigMap with the script.
+	// If the processes in a job step are determined to be unkillable for a period of time specified by the UnkillableStepTimeout variable.
+	//
+	// +kubebuilder:validation:Optional
+	UnkillableStepProgramRefName string `json:"unkillableStepProgramRefName,omitempty"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node

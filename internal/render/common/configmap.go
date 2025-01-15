@@ -99,7 +99,9 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddProperty("InactiveLimit", 0)
 	res.AddProperty("KillWait", 180)
-	res.AddProperty("UnkillableStepTimeout", 600)
+	res.AddProperty("UnkillableStepProgram", naming.BuildPathUnkillableStepProgramName(
+		consts.VolumeMountPathUnkillableStepProgram, consts.ConfigMapKeyUnkillableStepProgram),
+	)
 	res.AddProperty("SlurmctldTimeout", 30)
 	res.AddProperty("SlurmdTimeout", 180)
 	res.AddProperty("WaitTime", 0)

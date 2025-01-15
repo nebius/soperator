@@ -13,6 +13,7 @@ const (
 	ConfigMapNameNCCLTopology      = ncclTopology
 	ConfigMapNameSysctl            = sysctl
 	ConfigMapNameSupervisord       = supervisord
+	ConfigMapNameUnkillableStep    = unkillableStepProgram
 
 	ConfigMapKeySlurmConfig    = "slurm.conf"
 	ConfigMapKeyCGroupConfig   = "cgroup.conf"
@@ -26,4 +27,5 @@ const (
 	ConfigMapKeyNCCLTopology            = "virtualTopology.xml"
 	ConfigMapKeySysctl                  = sysctlConfFile
 	ConfigMapKeySupervisord             = supervisordConfFile
+	ConfigMapKeyUnkillableStepProgram   = "unkillable_step_program.sh"
 )

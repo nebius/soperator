@@ -32,12 +32,13 @@ type SlurmWorker struct {
 	Service     Service
 	StatefulSet StatefulSet
 
-	VolumeSpool               slurmv1.NodeVolume
-	VolumeJail                slurmv1.NodeVolume
-	JailSubMounts             []slurmv1.NodeVolumeJailSubMount
-	SharedMemorySize          *resource.Quantity
-	UseDefaultAppArmorProfile bool
-	Maintenance               *consts.MaintenanceMode
+	VolumeSpool                  slurmv1.NodeVolume
+	VolumeJail                   slurmv1.NodeVolume
+	JailSubMounts                []slurmv1.NodeVolumeJailSubMount
+	SharedMemorySize             *resource.Quantity
+	UseDefaultAppArmorProfile    bool
+	Maintenance                  *consts.MaintenanceMode
+	UnkillableStepProgramRefName string
 }
 
 func buildSlurmWorkerFrom(
@@ -51,6 +52,12 @@ func buildSlurmWorkerFrom(
 	supervisordConfigDefault := supervisordConfigName == ""
 	if supervisordConfigDefault {
 		supervisordConfigName = naming.BuildConfigMapSupervisordName(clusterName)
+	}
+
+	unkillableStepProgramCMName := worker.UnkillableStepProgramRefName
+	unkillableStepProgramDefault := unkillableStepProgramCMName == ""
+	if unkillableStepProgramDefault {
+		unkillableStepProgramCMName = naming.BuildConfigMapUnkillableStepProgramName(clusterName)
 	}
 
 	sshdConfigMapName := worker.SSHDConfigMapRefName
@@ -84,17 +91,18 @@ func buildSlurmWorkerFrom(
 			naming.BuildStatefulSetName(consts.ComponentTypeWorker, clusterName),
 			worker.SlurmNode.Size,
 		),
-		VolumeSpool:               *worker.Volumes.Spool.DeepCopy(),
-		VolumeJail:                *worker.Volumes.Jail.DeepCopy(),
-		SharedMemorySize:          worker.Volumes.SharedMemorySize,
-		CgroupVersion:             worker.CgroupVersion,
-		EnableGDRCopy:             worker.EnableGDRCopy,
-		PriorityClass:             worker.PriorityClass,
-		UseDefaultAppArmorProfile: useDefaultAppArmorProfile,
-		SlurmNodeExtra:            worker.SlurmNodeExtra,
-		SSHDConfigMapName:         sshdConfigMapName,
-		IsSSHDConfigMapDefault:    isSSHDConfigDefault,
-		Maintenance:               maintenance,
+		VolumeSpool:                  *worker.Volumes.Spool.DeepCopy(),
+		VolumeJail:                   *worker.Volumes.Jail.DeepCopy(),
+		SharedMemorySize:             worker.Volumes.SharedMemorySize,
+		CgroupVersion:                worker.CgroupVersion,
+		EnableGDRCopy:                worker.EnableGDRCopy,
+		PriorityClass:                worker.PriorityClass,
+		UseDefaultAppArmorProfile:    useDefaultAppArmorProfile,
+		SlurmNodeExtra:               worker.SlurmNodeExtra,
+		SSHDConfigMapName:            sshdConfigMapName,
+		IsSSHDConfigMapDefault:       isSSHDConfigDefault,
+		Maintenance:                  maintenance,
+		UnkillableStepProgramRefName: unkillableStepProgramCMName,
 	}
 	for _, jailSubMount := range worker.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()

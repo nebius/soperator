@@ -606,6 +606,7 @@ const (
 	supervisordConfigMapField = ".spec.slurmNodes.worker.supervisordConfigMapRefName"
 	sshdLoginConfigMapField   = ".spec.slurmNodes.login.sshdConfigMapRefName"
 	sshdWorkerConfigMapField  = ".spec.slurmNodes.worker.sshdConfigMapRefName"
+	unkillableStepProgramRef  = ".spec.slurmNodes.worker.unkillableStepProgramRef"
 )
 
 func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency int, cacheSyncTimeout time.Duration) error {
@@ -668,6 +669,9 @@ func (r *SlurmClusterReconciler) setupConfigMapIndexer(mgr ctrl.Manager) error {
 		},
 		sshdWorkerConfigMapField: func(sc *slurmv1.SlurmCluster) string {
 			return sc.Spec.SlurmNodes.Worker.SSHDConfigMapRefName
+		},
+		unkillableStepProgramRef: func(sc *slurmv1.SlurmCluster) string {
+			return sc.Spec.SlurmNodes.Worker.UnkillableStepProgramRefName
 		},
 	}
 
@@ -746,6 +750,7 @@ func (r *SlurmClusterReconciler) findObjectsForConfigMap(
 		supervisordConfigMapField,
 		sshdLoginConfigMapField,
 		sshdWorkerConfigMapField,
+		unkillableStepProgramRef,
 	}
 
 	var requests []reconcile.Request
