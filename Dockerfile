@@ -1,4 +1,4 @@
-FROM golang:1.23@sha256:a6927f462c29ef917d9de1621c8e9ca5286948da4ea770f51f835a56c70cabc3 AS operator_builder
+FROM golang:1.23@sha256:585103a29aa6d4c98bbb45d2446e1fdf41441698bbdf707d1801f5708e479f04 AS operator_builder
 
 ARG GO_LDFLAGS=""
 ARG BUILD_TIME
