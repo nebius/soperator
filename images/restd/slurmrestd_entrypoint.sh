@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e # Exit immediately if any command returns a non-zero error code
+set -x # Print actual command before executing it
 
 echo "Bind-mount slurm configs from K8S config map"
 for file in /mnt/slurm-configs/*; do

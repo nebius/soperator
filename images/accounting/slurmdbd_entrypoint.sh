@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e # Exit immediately if any command returns a non-zero error code
+set -x # Print actual command before executing it
 
 echo "Bind-mount REST JWT key from K8S secret"
 touch /var/spool/slurmdbd/jwt_hs256.key

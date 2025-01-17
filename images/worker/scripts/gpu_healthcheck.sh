@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -x # Print actual command before executing it
 
 # Run GPU healthcheck
 output=$(/usr/bin/nvidia-smi 2>&1)

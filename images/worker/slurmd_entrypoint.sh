@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e # Exit immediately if any command returns a non-zero error code
+set -x # Print actual command before executing it
 
 echo "Evaluate variables in the Slurm node 'Extra' field"
 evaluated_extra=$(eval echo "$SLURM_NODE_EXTRA")
