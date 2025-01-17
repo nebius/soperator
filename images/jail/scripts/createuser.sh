@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -x # Print actual command before executing it
 
 if [[ $# -eq 0 ]] || [[ "$*" == *"-h"* ]] || [[ "$*" == *"--help"* ]]; then
     echo "Usage: createuser <username> [--with-password] [--without-sudo] [--without-docker] [<args for adduser...>]"

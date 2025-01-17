@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -x # Print actual command before executing it
 
 while getopts ":b:e:f:g:t:l:d:u:h:p:n:s:m:w:c:q:" opt; do
   case ${opt} in
