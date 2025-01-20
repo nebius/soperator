@@ -1,28 +1,3 @@
-# BASE_IMAGE defined here for second multistage build
-ARG BASE_IMAGE=nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
-
-# First stage: Build the gpubench application
-FROM golang:1.22 AS gpubench_builder
-
-ARG GO_LDFLAGS=""
-ARG CGO_ENABLED=0
-ARG GOOS=linux
-ARG GOARCH=amd64
-
-WORKDIR /app
-
-COPY jail/gpubench/go.mod jail/gpubench/go.sum ./
-
-RUN go mod download
-
-COPY jail/gpubench/main.go .
-
-RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
-    go build -o gpubench .
-
-#######################################################################################################################
-# Second stage: Build jail image
-
 ARG BASE_IMAGE=nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 FROM $BASE_IMAGE AS jail
@@ -187,9 +162,6 @@ RUN chmod +x /opt/bin/install_docker_cli.sh && \
 RUN mv /usr/bin/docker /usr/bin/docker.real
 COPY jail/scripts/docker.sh /usr/bin/docker
 RUN chmod +x /usr/bin/docker
-
-# Copy binary that performs GPU benchmark
-COPY --from=gpubench_builder /app/gpubench /usr/bin/
 
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host

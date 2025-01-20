@@ -8,7 +8,7 @@ if [ -n "${CGROUP_V2}" ]; then
 
     if [ -n "${CGROUP_PATH}" ]; then
         echo "cgroup v2 detected, creating cgroup for ${CGROUP_PATH}"
-        mkdir -p /sys/fs/cgroup/${CGROUP_PATH}/../system.slice
+        mkdir -p /sys/fs/cgroup/"${CGROUP_PATH}"/../system.slice
         # TODO: uncomment this line when 24.11 will be tested. It is OOMKillStep for taskPluginParam
         # echo "1" > /sys/fs/cgroup/${CGROUP_PATH}/../system.slice/memory.oom.group
     else
@@ -32,6 +32,10 @@ for file in /mnt/slurm-configs/*; do
     filename=$(basename "$file")
     touch "/etc/slurm/$filename" && mount --bind "$file" "/etc/slurm/$filename"
 done
+
+echo "Bind-mount gpubenchmark from container ot jail"
+touch /mnt/jail/usr/bin/gpubench
+mount --bind /usr/bin/gpubench /mnt/jail/usr/bin/gpubench
 
 echo "Make ulimits as big as possible"
 set_ulimit() {

@@ -1,3 +1,28 @@
+# BASE_IMAGE defined here for second multistage build
+ARG BASE_IMAGE=nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+
+# First stage: Build the gpubench application
+FROM golang:1.22 AS gpubench_builder
+
+ARG GO_LDFLAGS=""
+ARG CGO_ENABLED=0
+ARG GOOS=linux
+ARG GOARCH=amd64
+
+WORKDIR /app
+
+COPY jail/gpubench/go.mod jail/gpubench/go.sum ./
+
+RUN go mod download
+
+COPY jail/gpubench/main.go .
+
+RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
+    go build -o gpubench .
+
+#######################################################################################################################
+# Second stage: Build worker image
+
 ARG BASE_IMAGE=nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 FROM $BASE_IMAGE AS worker_slurmd
@@ -133,6 +158,9 @@ RUN rm -rf /etc/update-motd.d/*
 
 # Expose the port used for accessing slurmd
 EXPOSE 6818
+
+# Copy binary that performs GPU benchmark
+COPY --from=gpubench_builder /app/gpubench /usr/bin/
 
 # Create dir and file for multilog hack
 RUN mkdir -p /var/log/slurm/multilog && \
