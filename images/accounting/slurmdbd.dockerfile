@@ -53,13 +53,6 @@ RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-l
 
 RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
 
-# Install slurm plugins
-COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
-COPY common/scripts/install_slurm_plugins.sh /opt/bin/
-RUN chmod +x /opt/bin/install_slurm_plugins.sh && \
-    /opt/bin/install_slurm_plugins.sh && \
-    rm /opt/bin/install_slurm_plugins.sh
-
 # Update linker cache
 RUN ldconfig
 

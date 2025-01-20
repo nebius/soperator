@@ -103,12 +103,18 @@ RUN wget -q -P /tmp https://github.com/nebius/slurm-deb-packages/releases/downlo
 
 RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
 
-# Install slurm plugins
+# Install slurm сhroot plugin
 COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
-COPY common/scripts/install_slurm_plugins.sh /opt/bin/
-RUN chmod +x /opt/bin/install_slurm_plugins.sh && \
-    /opt/bin/install_slurm_plugins.sh && \
-    rm /opt/bin/install_slurm_plugins.sh
+COPY common/scripts/install_chroot_plugin.sh /opt/bin/
+RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
+    /opt/bin/install_chroot_plugin.sh && \
+    rm /opt/bin/install_chroot_plugin.sh
+
+# Install slurm pyxis plugin
+COPY common/scripts/install_pyxis_plugin.sh /opt/bin/
+RUN chmod +x /opt/bin/install_pyxis_plugin.sh && \
+    /opt/bin/install_pyxis_plugin.sh && \
+    rm /opt/bin/install_pyxis_plugin.sh
 
 # Install nvidia-container-toolkit
 COPY common/scripts/install_container_toolkit.sh /opt/bin/

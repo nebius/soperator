@@ -37,6 +37,10 @@ echo "Bind-mount gpubenchmark from container ot jail"
 touch /mnt/jail/usr/bin/gpubench
 mount --bind /usr/bin/gpubench /mnt/jail/usr/bin/gpubench
 
+echo "Bind-mount slurm chroot plugin from container at jail"
+touch /mnt/jail/usr/lib/x86_64-linux-gnu/slurm/chroot.so
+mount --bind /usr/lib/x86_64-linux-gnu/slurm/chroot.so /mnt/jail/usr/lib/x86_64-linux-gnu/slurm/chroot.so
+
 echo "Make ulimits as big as possible"
 set_ulimit() {
     local limit_option=$1
