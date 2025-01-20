@@ -48,7 +48,11 @@ func (r *StatefulSetReconciler) patch(existing, desired client.Object) (client.P
 		res := client.MergeFrom(dst.DeepCopy())
 
 		dst.Spec.Template.ObjectMeta.Labels = src.Spec.Template.ObjectMeta.Labels
-		dst.Spec.Template.ObjectMeta.Annotations = src.Spec.Template.ObjectMeta.Annotations
+		// Copy annotations from the desired StatefulSet to the existing StatefulSet
+		// This is necessary because after the StatefulSet is created, patches recreate map of annotations and StatefulSet loses its annotations
+		for k, v := range src.Spec.Template.ObjectMeta.Annotations {
+			dst.Spec.Template.ObjectMeta.Annotations[k] = v
+		}
 		dst.Spec.Replicas = src.Spec.Replicas
 		dst.Spec.UpdateStrategy = src.Spec.UpdateStrategy
 		dst.Spec.VolumeClaimTemplates = append([]corev1.PersistentVolumeClaim{}, src.Spec.VolumeClaimTemplates...)
