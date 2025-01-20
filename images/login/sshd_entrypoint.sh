@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -e # Exit immediately if any command returns a non-zero error code
-set -x # Print actual command before executing it
 
 echo "Link users from jail"
 ln -s /mnt/jail/etc/passwd /etc/passwd

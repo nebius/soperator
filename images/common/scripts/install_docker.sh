@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -e # Exit immediately if any command returns a non-zero error code
-set -x # Print actual command before executing it
 
 # Add Docker's official GPG key
 apt update -y
