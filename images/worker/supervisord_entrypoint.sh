@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -e # Exit immediately if any command returns a non-zero error code
-set -x # Print actual command before executing it
 
 echo "Starting slurmd entrypoint script"
 if [ -n "${CGROUP_V2}" ]; then
@@ -9,7 +8,7 @@ if [ -n "${CGROUP_V2}" ]; then
 
     if [ -n "${CGROUP_PATH}" ]; then
         echo "cgroup v2 detected, creating cgroup for ${CGROUP_PATH}"
-        mkdir -p /sys/fs/cgroup/"${CGROUP_PATH}"/../system.slice
+        mkdir -p /sys/fs/cgroup/${CGROUP_PATH}/../system.slice
         # TODO: uncomment this line when 24.11 will be tested. It is OOMKillStep for taskPluginParam
         # echo "1" > /sys/fs/cgroup/${CGROUP_PATH}/../system.slice/memory.oom.group
     else
