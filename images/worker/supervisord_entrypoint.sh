@@ -34,6 +34,7 @@ for file in /mnt/slurm-configs/*; do
 done
 
 echo "Bind-mount gpubenchmark from container ot jail"
+touch /mnt/jail/usr/bin/gpubench
 mount --bind /usr/bin/gpubench /mnt/jail/usr/bin/gpubench
 
 echo "Make ulimits as big as possible"
