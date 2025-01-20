@@ -6,8 +6,8 @@ gcc -fPIC -shared -o /usr/src/chroot-plugin/chroot.so /usr/src/chroot-plugin/chr
 
 # Download, compile and install pyxis SPANK plugin
 cd /usr/src && \
-    wget https://github.com/NVIDIA/pyxis/archive/refs/tags/v0.19.0.tar.gz && \
-    tar -xzvf v0.19.0.tar.gz && \
-    rm v0.19.0.tar.gz && \
-    cd pyxis-0.19.0 && \
+    wget https://github.com/itechdima/pyxis/archive/refs/heads/disable-concurrent-pull-and-keep-squashfs.tar.gz && \
+    tar -xzvf disable-concurrent-pull-and-keep-squashfs.tar.gz && \
+    rm disable-concurrent-pull-and-keep-squashfs.tar.gz && \
+    cd pyxis-disable-concurrent-pull-and-keep-squashfs && \
     make install prefix=/usr libdir=/usr/lib/x86_64-linux-gnu
