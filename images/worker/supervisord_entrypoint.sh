@@ -33,8 +33,8 @@ for file in /mnt/slurm-configs/*; do
     touch "/etc/slurm/$filename" && mount --bind "$file" "/etc/slurm/$filename"
 done
 
-echo "Link gpubenchmark from container ot jail"
-ln -s /usr/bin/gpubench /mnt/jail/usr/bin/gpubench
+echo "Bind-mount gpubenchmark from container ot jail"
+mount --bind /usr/bin/gpubench /mnt/jail/usr/bin/gpubench
 
 echo "Make ulimits as big as possible"
 set_ulimit() {
