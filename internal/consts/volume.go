@@ -71,5 +71,5 @@ const (
 	VolumeMountPathSysctl                = "/etc/" + sysctlConfFile
 	VolumeMountSubPathSysctl             = sysctlConfFile
 	VolumeMountPathSupervisordConfig     = "/etc/supervisor/conf.d/"
-	VolumeMountPathUnkillableStepProgram = "/etc/unkillable-step-program/"
+	VolumeMountPathUnkillableStepProgram = "/etc/unkillable-step-program"
 )

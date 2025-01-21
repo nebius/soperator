@@ -100,6 +100,7 @@ func renderSupervisordConfigMap(name string) corev1.Volume {
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: name,
 				},
+				DefaultMode: ptr.To(int32(0777)),
 			},
 		},
 	}

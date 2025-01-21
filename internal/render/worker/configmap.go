@@ -164,9 +164,28 @@ func RenderDefaultConfigMapUnkillableStepProgram(cluster *values.SlurmCluster) c
 func generateUnkillableStepProgramRefConfig() renderutils.ConfigFile {
 	res := &renderutils.MultilineStringConfig{}
 	res.AddLine("#!/bin/bash")
-	res.AddLine("echo 'Unkillable step program'")
-	res.AddLine("scontrol update nodename=$(hostname) state=down reason='Uninterruptible job detected, rebooting…' && scontrol delete nodename=$(hostname))")
-	res.AddLine("reboot -f")
+	res.AddLine("")
+	res.AddLine("job_id=$1")
+	res.AddLine("step_id=$2")
+	res.AddLine("uid=$3")
+	res.AddLine("")
+	res.AddLine("log_file=\"/var/log/slurm/unkillable_tasks.log\"")
+	res.AddLine("echo \"$(date): Обнаружена незавершаемая задача\" >> $log_file")
+	res.AddLine("echo \"Job ID: $job_id\" >> $log_file")
+	res.AddLine("echo \"Step ID: $step_id\" >> $log_file")
+	res.AddLine("echo \"User ID: $uid\" >> $log_file")
+	res.AddLine("")
+	res.AddLine("pids=$(scontrol show job $job_id | grep -oP 'Pid=\\K\\d+')")
+	res.AddLine("")
+	res.AddLine("for pid in $pids; do")
+	res.AddLine("    kill -9 $pid")
+	res.AddLine("    if [ $? -eq 0 ]; then")
+	res.AddLine("        echo \"Proccess $pid killed\" >> $log_file")
+	res.AddLine("    else")
+	res.AddLine("        echo \"Proccess $pid unkilled\" >> $log_file")
+	res.AddLine("    fi")
+	res.AddLine("done")
+	res.AddLine("")
 	return res
 }
 

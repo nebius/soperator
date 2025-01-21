@@ -1531,6 +1531,12 @@ spec:
                     description: Additional parameters for the task plugin
                     pattern: ^(|((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+)$
                     type: string
+                  unkillableStepTimeout:
+                    default: 600
+                    description: The time to wait, in seconds, when any job is in
+                      the COMPLETING state before any additional jobs are scheduled.
+                    format: int32
+                    type: integer
                 type: object
               slurmNodes:
                 description: SlurmNodes define the desired state of Slurm nodes
@@ -4090,6 +4096,11 @@ spec:
                       supervisordConfigMapRefName:
                         description: SupervisordConfigMapRefName is the name of the
                           supervisord config, which runs in slurmd container
+                        type: string
+                      unkillableStepProgramRefName:
+                        description: |-
+                          UnkillableStepProgramRefName defines the reference to the ConfigMap with the script.
+                          If the processes in a job step are determined to be unkillable for a period of time specified by the UnkillableStepTimeout variable.
                         type: string
                       volumes:
                         description: Volumes represents the volume configurations
