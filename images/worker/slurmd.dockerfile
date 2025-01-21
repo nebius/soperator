@@ -11,11 +11,11 @@ ARG GOARCH=amd64
 
 WORKDIR /app
 
-COPY jail/gpubench/go.mod jail/gpubench/go.sum ./
+COPY worker/gpubench/go.mod worker/gpubench/go.sum ./
 
 RUN go mod download
 
-COPY jail/gpubench/main.go .
+COPY worker/gpubench/main.go .
 
 RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
     go build -o gpubench .
@@ -139,6 +139,22 @@ RUN chmod +x /opt/bin/install_docker.sh && \
 
 # Copy Docker daemon config
 COPY worker/docker/daemon.json /etc/docker/daemon.json
+
+# Install parallel because it's required for enroot operation
+COPY common/scripts/install_parallel.sh /opt/bin/
+RUN chmod +x /opt/bin/install_parallel.sh && \
+    /opt/bin/install_parallel.sh && \
+    rm /opt/bin/install_parallel.sh
+
+# Install enroot
+COPY common/scripts/install_enroot.sh /opt/bin/
+RUN chmod +x /opt/bin/install_enroot.sh && \
+    /opt/bin/install_enroot.sh && \
+    rm /opt/bin/install_enroot.sh
+
+# Copy enroot configuration
+COPY common/enroot/enroot.conf /etc/enroot/
+RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
 
 # Create node-local directories for enroot runtime data
 RUN mkdir -p -m 777 /usr/share/enroot/enroot-data && \

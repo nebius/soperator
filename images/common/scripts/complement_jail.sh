@@ -86,6 +86,18 @@ pushd "${jaildir}"
     touch usr/lib/x86_64-linux-gnu/slurm/chroot.so
     mount --bind /usr/lib/x86_64-linux-gnu/slurm/chroot.so usr/lib/x86_64-linux-gnu/slurm/chroot.so
 
+    echo "Bind-mount /etc/enroot, /usr/share/enroot and /usr/lib/enroot"
+    mkdir -p etc/enroot usr/share/enroot usr/lib/enroot
+    mount --bind /etc/enroot etc/enroot
+    mount --bind /usr/share/enroot usr/share/enroot
+    mount --bind /usr/lib/enroot usr/lib/enroot
+
+    echo "Bind-mount enroot binaries"
+        for file in /usr/bin/enroot*; do
+            filename=$(basename "$file")
+            touch "usr/bin/$filename" && mount --bind "$file" "usr/bin/$filename"
+        done
+
     echo "Bind-mount enroot data directory because it should be node-local"
     mount --bind /usr/share/enroot/enroot-data usr/share/enroot/enroot-data
 

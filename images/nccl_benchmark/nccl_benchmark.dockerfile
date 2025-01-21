@@ -54,6 +54,19 @@ RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
     /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
+# Install slurm pyxis plugin
+COPY common/scripts/install_pyxis_plugin.sh /opt/bin/
+RUN chmod +x /opt/bin/install_pyxis_plugin.sh && \
+    /opt/bin/install_pyxis_plugin.sh && \
+    rm /opt/bin/install_pyxis_plugin.sh
+
+# Install parallel because it's used in the benchmark script
+COPY common/scripts/install_parallel.sh /opt/bin/
+RUN chmod +x /opt/bin/install_parallel.sh && \
+    /opt/bin/install_parallel.sh && \
+    rm /opt/bin/install_parallel.sh
+
+
 # Install munge
 COPY common/scripts/install_munge.sh /opt/bin/
 RUN chmod +x /opt/bin/install_munge.sh && \
@@ -62,12 +75,6 @@ RUN chmod +x /opt/bin/install_munge.sh && \
 
 # We run munge in the same container so we need to create the /run/munge directory
 RUN mkdir -m 755 /run/munge
-
-# Install parallel because it's used in the benchmark script
-COPY common/scripts/install_parallel.sh /opt/bin/
-RUN chmod +x /opt/bin/install_parallel.sh && \
-    /opt/bin/install_parallel.sh && \
-    rm /opt/bin/install_parallel.sh
 
 # Copy srun_perf script that schedules jobs with GPU benchmark
 COPY nccl_benchmark/scripts/srun_perf.sh /usr/bin/srun_perf.sh

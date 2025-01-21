@@ -75,19 +75,6 @@ RUN chmod +x /opt/bin/install_parallel.sh && \
     /opt/bin/install_parallel.sh && \
     rm /opt/bin/install_parallel.sh
 
-# Install enroot
-COPY common/scripts/install_enroot.sh /opt/bin/
-RUN chmod +x /opt/bin/install_enroot.sh && \
-    /opt/bin/install_enroot.sh && \
-    rm /opt/bin/install_enroot.sh
-
-# Copy enroot configuration
-COPY jail/enroot/enroot.conf /etc/enroot/
-RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
-
-# Create directory for enroot runtime data that will be mounted from the host
-RUN mkdir -p -m 777 /usr/share/enroot/enroot-data
-
 # Install OpenMPI
 COPY common/scripts/install_openmpi.sh /opt/bin/
 RUN chmod +x /opt/bin/install_openmpi.sh && \
