@@ -82,6 +82,10 @@ pushd "${jaildir}"
         touch "etc/gpu_libs_installed.flag"
     fi
 
+    echo "Bind-mount slurm chroot plugin from container at jail"
+    touch usr/lib/x86_64-linux-gnu/slurm/chroot.so
+    mount --bind /usr/lib/x86_64-linux-gnu/slurm/chroot.so usr/lib/x86_64-linux-gnu/slurm/chroot.so
+
     echo "Bind-mount enroot data directory because it should be node-local"
     mount --bind /usr/share/enroot/enroot-data usr/share/enroot/enroot-data
 

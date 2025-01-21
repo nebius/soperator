@@ -2,6 +2,9 @@ ARG BASE_IMAGE=ubuntu:jammy
 
 FROM $BASE_IMAGE AS login_sshd
 
+ARG SLURM_VERSION=24.05.5
+ARG CUDA_VERSION=12.4.1
+
 ARG DEBIAN_FRONTEND=noninteractive
 
 # TODO: Install only those dependencies that are required for running sshd + useful utilities
@@ -53,6 +56,23 @@ RUN mkdir -p /usr/src/dummy && \
     echo "int main() { return 0; }" > dummy.c && \
     gcc -shared -o libdummy.so dummy.c && \
     cp libdummy.so /lib/x86_64-linux-gnu/
+
+# TODO: Install only necessary packages
+# Download and install Slurm packages
+RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libslurm-perl slurm-smd; do \
+        wget -q -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
+        echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
+        { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
+    done
+
+RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
+
+# Install slurm сhroot plugin
+COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
+COPY common/scripts/install_chroot_plugin.sh /opt/bin/
+RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
+    /opt/bin/install_chroot_plugin.sh && \
+    rm /opt/bin/install_chroot_plugin.sh
 
 # Create node-local directories for enroot runtime data
 RUN mkdir -p -m 777 /usr/share/enroot/enroot-data && \
