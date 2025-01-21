@@ -15,10 +15,6 @@ ln -s /mnt/jail/etc/update-motd.d /etc/update-motd.d
 echo "Link home from jail to use SSH keys from there"
 ln -s /mnt/jail/home /home
 
-echo "Bind-mount slurm chroot plugin from container at jail"
-touch /mnt/jail/usr/lib/x86_64-linux-gnu/slurm/chroot.so
-mount --bind /usr/lib/x86_64-linux-gnu/slurm/chroot.so /mnt/jail/usr/lib/x86_64-linux-gnu/slurm/chroot.so
-
 echo "Create privilege separation directory /var/run/sshd"
 mkdir -p /var/run/sshd
 

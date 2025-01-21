@@ -19,10 +19,6 @@ for file in /mnt/slurm-configs/*; do
     touch "/etc/slurm/$filename" && mount --bind "$file" "/etc/slurm/$filename"
 done
 
-echo "Bind-mount slurm chroot plugin from container at jail"
-touch /mnt/jail/usr/lib/x86_64-linux-gnu/slurm/chroot.so
-mount --bind /usr/lib/x86_64-linux-gnu/slurm/chroot.so /mnt/jail/usr/lib/x86_64-linux-gnu/slurm/chroot.so
-
 echo "Set permissions for shared /var/spool/slurmctld"
 chmod 755 /var/spool/slurmctld # It changes permissions of this shared directory in other containers as well
 
