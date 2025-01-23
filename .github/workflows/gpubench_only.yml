@@ -3,7 +3,7 @@ name: Build gpubench only
 on:
   push:
     paths:
-      - 'images/jail/gpubench/**'
+      - 'images/worker/gpubench/**'
 
 permissions:
   contents: read

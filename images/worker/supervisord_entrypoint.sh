@@ -41,7 +41,7 @@ echo "Make ulimits as big as possible"
 set_ulimit() {
     local limit_option=$1
     local limit_value=$2
-    ulimit $limit_option $limit_value || { echo "ulimit $limit_option: exit code: $?"; }
+    ulimit "$limit_option" "$limit_value" || { echo "ulimit $limit_option: exit code: $?"; }
 }
 set_ulimit -HSR unlimited  # (-R) Max real-time non-blocking time
 set_ulimit -HSc unlimited  # (-c) Max core file size
