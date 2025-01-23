@@ -97,6 +97,10 @@ func (r *ServiceReconciler) patch(existing, desired client.Object) (client.Patch
 	patchImpl := func(dst, src *corev1.Service) client.Patch {
 		res := client.MergeFrom(dst.DeepCopy())
 
+		for k, v := range src.Annotations {
+			dst.Annotations[k] = v
+		}
+
 		dst.Spec.Type = src.Spec.Type
 		dst.Spec.Ports = append([]corev1.ServicePort{}, src.Spec.Ports...)
 
