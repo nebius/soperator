@@ -81,12 +81,9 @@ jobs:
           OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
 
           echo "Running gpubench tests"
-          cd ./images/jail/gpubench/
+          cd ./images/worker/gpubench/
           go test
           cd -
-
-          echo "Removing previous jail rootfs tar archive"
-          rm -rf images/jail_rootfs.tar
 
           echo "Building tarball for jail"
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=jail DOCKERFILE=jail/jail.dockerfile DOCKER_OUTPUT="--output type=tar,dest=jail_rootfs.tar"

@@ -10,7 +10,7 @@ on:
       - 'PROJECT'
       - 'README.md'
       - 'SECURITY.md'
-      - 'images/jail/gpubench/**'
+      - 'images/worker/gpubench/**'
   pull_request:
     branches:
       - main

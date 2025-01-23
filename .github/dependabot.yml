@@ -19,7 +19,7 @@ updates:
     target-branch: "dev"
 
   - package-ecosystem: gomod
-    directory: /images/jail/gpubench
+    directory: /images/worker/gpubench
     schedule:
       interval: daily
     target-branch: "dev"
