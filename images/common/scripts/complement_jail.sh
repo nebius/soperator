@@ -93,10 +93,10 @@ pushd "${jaildir}"
     mount --bind /usr/lib/enroot usr/lib/enroot
 
     echo "Bind-mount enroot binaries"
-        for file in /usr/bin/enroot*; do
-            filename=$(basename "$file")
-            touch "usr/bin/$filename" && mount --bind "$file" "usr/bin/$filename"
-        done
+    for file in /usr/bin/enroot*; do
+        filename=$(basename "$file")
+        touch "usr/bin/$filename" && mount --bind "$file" "usr/bin/$filename"
+    done
 
     echo "Bind-mount enroot data directory because it should be node-local"
     mount --bind /usr/share/enroot/enroot-data usr/share/enroot/enroot-data
