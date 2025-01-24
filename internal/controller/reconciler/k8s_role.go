@@ -92,13 +92,7 @@ func (r *RoleReconciler) getRole(ctx context.Context, cluster *slurmv1.SlurmClus
 		},
 		role,
 	)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return role, nil
+	return role, err
 }
 
 func (r *RoleReconciler) patch(existing, desired client.Object) (client.Patch, error) {
