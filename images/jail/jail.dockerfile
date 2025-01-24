@@ -94,12 +94,6 @@ RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-l
 
 RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
 
-# Install slurm pyxis plugin
-COPY common/scripts/install_pyxis_plugin.sh /opt/bin/
-RUN chmod +x /opt/bin/install_pyxis_plugin.sh && \
-    /opt/bin/install_pyxis_plugin.sh && \
-    rm /opt/bin/install_pyxis_plugin.sh
-
 # Create directory for bind-mounting it from the host. It's needed for sbatch to work
 RUN mkdir -m 755 -p /var/spool/slurmd
 

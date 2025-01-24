@@ -110,6 +110,26 @@ RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
     /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
+# Install parallel because it's required for enroot operation
+COPY common/scripts/install_parallel.sh /opt/bin/
+RUN chmod +x /opt/bin/install_parallel.sh && \
+    /opt/bin/install_parallel.sh && \
+    rm /opt/bin/install_parallel.sh
+
+# Install enroot
+COPY common/scripts/install_enroot.sh /opt/bin/
+RUN chmod +x /opt/bin/install_enroot.sh && \
+    /opt/bin/install_enroot.sh && \
+    rm /opt/bin/install_enroot.sh
+
+# Copy enroot configuration
+COPY common/enroot/enroot.conf /etc/enroot/
+RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
+
+# Create node-local directories for enroot runtime data
+RUN mkdir -p -m 777 /usr/share/enroot/enroot-data && \
+    mkdir -p -m 755 /run/enroot
+
 # Install slurm pyxis plugin
 COPY common/scripts/install_pyxis_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_pyxis_plugin.sh && \
@@ -139,26 +159,6 @@ RUN chmod +x /opt/bin/install_docker.sh && \
 
 # Copy Docker daemon config
 COPY worker/docker/daemon.json /etc/docker/daemon.json
-
-# Install parallel because it's required for enroot operation
-COPY common/scripts/install_parallel.sh /opt/bin/
-RUN chmod +x /opt/bin/install_parallel.sh && \
-    /opt/bin/install_parallel.sh && \
-    rm /opt/bin/install_parallel.sh
-
-# Install enroot
-COPY common/scripts/install_enroot.sh /opt/bin/
-RUN chmod +x /opt/bin/install_enroot.sh && \
-    /opt/bin/install_enroot.sh && \
-    rm /opt/bin/install_enroot.sh
-
-# Copy enroot configuration
-COPY common/enroot/enroot.conf /etc/enroot/
-RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
-
-# Create node-local directories for enroot runtime data
-RUN mkdir -p -m 777 /usr/share/enroot/enroot-data && \
-    mkdir -p -m 755 /run/enroot
 
 # Copy GPU healthcheck script
 COPY worker/scripts/gpu_healthcheck.sh /usr/bin/gpu_healthcheck.sh

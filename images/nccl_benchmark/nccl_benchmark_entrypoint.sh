@@ -22,6 +22,12 @@ echo "Bind-mount slurm chroot plugin from container at jail"
 touch /mnt/jail/usr/lib/x86_64-linux-gnu/slurm/chroot.so
 mount --bind /usr/lib/x86_64-linux-gnu/slurm/chroot.so /mnt/jail/usr/lib/x86_64-linux-gnu/slurm/chroot.so
 
+echo "Bind-mount pyxis plugin from container at jail"
+touch usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
+mount --bind /usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
+mkdir -p usr/share/pyxis
+mount --bind /usr/share/pyxis usr/share/pyxis
+
 echo "Starting munge"
 munged --num-threads="$MUNGE_NUM_THREADS" --key-file="$MUNGE_KEY_FILE" --pid-file="$MUNGE_PID_FILE" -S "$MUNGE_SOCKET_FILE"
 
