@@ -72,7 +72,7 @@ func (r Reconciler) EnsureDeployed(
 		return errors.Wrap(err, "getting existing resource")
 	}
 
-	logger.Info("Creating new resource")
+	logger.V(1).Info("Creating new resource")
 	{
 		if err = ctrl.SetControllerReference(owner, desired, r.Scheme); err != nil {
 			logger.Error(err, "Failed to set controller reference")
@@ -133,7 +133,7 @@ func (r Reconciler) EnsureUpdated(
 	}
 
 	if !maps.Equal(updatedDepVersions, existingDepVersions) {
-		logger.Info("Updating resource")
+		logger.V(1).Info("Updating resource")
 
 		if err = ctrl.SetControllerReference(owner, desired, r.Scheme); err != nil {
 			logger.Error(err, "Failed to set controller reference")
@@ -149,7 +149,7 @@ func (r Reconciler) EnsureUpdated(
 	}
 
 	logger = logger.WithValues(logfield.ResourceKV(existing)...)
-	logger.Info("Patching resource")
+	logger.V(1).Info("Patching resource")
 	if err = r.Patch(ctx, existing, patch); err != nil {
 		logger.Error(err, "Failed to patch resource")
 		return errors.Wrap(err, "patching resource")

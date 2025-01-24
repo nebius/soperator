@@ -36,13 +36,14 @@ func (r *RoleReconciler) Reconcile(
 	desired *rbacv1.Role,
 	deps ...metav1.Object,
 ) error {
+	logger := log.FromContext(ctx)
 	if desired == nil {
 		// If desired is nil, delete the Role
-		log.FromContext(ctx).Info(fmt.Sprintf("Deleting Role %s, because of Role is not needed", naming.BuildRoleWorkerName(cluster.Name)))
+		logger.V(1).Info(fmt.Sprintf("Deleting Role %s, because of Role is not needed", naming.BuildRoleWorkerName(cluster.Name)))
 		return r.deleteIfOwnedByController(ctx, cluster)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
-		log.FromContext(ctx).
+		logger.V(1).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile Worker Role")
 		return errors.Wrap(err, "reconciling Worker Role")
@@ -54,9 +55,10 @@ func (r *RoleReconciler) deleteIfOwnedByController(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
 ) error {
+	logger := log.FromContext(ctx)
 	role, err := r.getRole(ctx, cluster)
 	if apierrors.IsNotFound(err) {
-		log.FromContext(ctx).Info("Service not found, skipping deletion")
+		logger.V(1).Info("Service not found, skipping deletion")
 		return nil
 	}
 
@@ -65,18 +67,18 @@ func (r *RoleReconciler) deleteIfOwnedByController(
 	}
 
 	if !metav1.IsControlledBy(role, cluster) {
-		log.FromContext(ctx).Info("Role is not owned by controller, skipping deletion")
+		logger.V(1).Info("Role is not owned by controller, skipping deletion")
 		return nil
 	}
 
 	if err := r.Delete(ctx, role); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.FromContext(ctx).Info("Role not found, skipping deletion")
+			logger.V(1).Info("Role not found, skipping deletion")
 			return nil
 		}
 		return errors.Wrap(err, "deleting Worker Role")
 	}
-	log.FromContext(ctx).Info("Role deleted")
+	logger.V(1).Info("Role deleted")
 	return nil
 }
 

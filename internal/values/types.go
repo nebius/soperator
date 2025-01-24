@@ -85,7 +85,7 @@ func buildCRVersionFrom(ctx context.Context, crVersion string) string {
 	logger := log.FromContext(ctx)
 
 	if crVersion == "" {
-		logger.Info(
+		logger.V(1).Info(
 			"CR version is empty, using default",
 			"Slurm.CR.DefaultVersion", consts.VersionCR)
 		return consts.VersionCR
