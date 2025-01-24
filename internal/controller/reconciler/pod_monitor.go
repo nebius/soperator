@@ -38,18 +38,19 @@ func (r *PodMonitorReconciler) Reconcile(
 	desired *prometheusv1.PodMonitor,
 	deps ...metav1.Object,
 ) error {
+	logger := log.FromContext(ctx)
 	if desired == nil {
 		// If desired is nil, delete the PodMonitor
 		// TODO: Using error or desired is nil presence as an indicator for resource deletion doesn't seem good
 		// We should use conditions instead. if condition is met and resource exists, delete it
 		// MSP-2715 - task to improve resource deletion
-		log.FromContext(ctx).Info(fmt.Sprintf(
+		logger.V(1).Info(fmt.Sprintf(
 			"Deleting PodMonitor %s-collector, because of PodMonitor is not needed", cluster.Name,
 		))
 		return r.deleteIfOwnedByController(ctx, cluster)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
-		log.FromContext(ctx).
+		logger.V(1).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile PodMonitor")
 		return errors.Wrap(err, "reconciling PodMonitor")
@@ -61,9 +62,10 @@ func (r *PodMonitorReconciler) deleteIfOwnedByController(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
 ) error {
+	logger := log.FromContext(ctx)
 	podMonitor, err := r.getPodMonitor(ctx, cluster)
 	if apierrors.IsNotFound(err) {
-		log.FromContext(ctx).Info("PodMonitor is not needed, skipping deletion")
+		logger.V(1).Info("PodMonitor is not needed, skipping deletion")
 		return nil
 	}
 	if err != nil {
@@ -71,7 +73,7 @@ func (r *PodMonitorReconciler) deleteIfOwnedByController(
 	}
 
 	if !metav1.IsControlledBy(podMonitor, cluster) {
-		log.FromContext(ctx).Info("PodMonitor is not owned by controller, skipping deletion")
+		logger.V(1).Info("PodMonitor is not owned by controller, skipping deletion")
 		return nil
 	}
 

@@ -39,8 +39,9 @@ func (r *OtelReconciler) Reconcile(
 	desired *otelv1beta1.OpenTelemetryCollector,
 	deps ...metav1.Object,
 ) error {
+	logger := log.FromContext(ctx)
 	if desired == nil {
-		log.FromContext(ctx).Info(fmt.Sprintf("Deleting OpenTelemetryCollector %s-collector, because of OpenTelemetryCollector is not needed", cluster.Name))
+		logger.V(1).Info(fmt.Sprintf("Deleting OpenTelemetryCollector %s-collector, because of OpenTelemetryCollector is not needed", cluster.Name))
 		return r.deleteIfOwnedByController(ctx, cluster)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
@@ -56,9 +57,10 @@ func (r *OtelReconciler) deleteIfOwnedByController(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
 ) error {
+	logger := log.FromContext(ctx)
 	otel, err := r.getOtel(ctx, cluster)
 	if apierrors.IsNotFound(err) {
-		log.FromContext(ctx).Info("Service not found, skipping deletion")
+		logger.V(1).Info("Service not found, skipping deletion")
 		return nil
 	}
 
@@ -67,7 +69,7 @@ func (r *OtelReconciler) deleteIfOwnedByController(
 	}
 
 	if !metav1.IsControlledBy(otel, cluster) {
-		log.FromContext(ctx).Info("Service is not owned by controller, skipping deletion")
+		logger.V(1).Info("Service is not owned by controller, skipping deletion")
 		return nil
 	}
 

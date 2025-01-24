@@ -140,7 +140,7 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	err := r.Get(ctx, req.NamespacedName, slurmCluster)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.Info("SlurmCluster resource not found. Ignoring since object must be deleted")
+			logger.V(1).Info("SlurmCluster resource not found. Ignoring since object must be deleted")
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -165,7 +165,7 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		innerErr := r.Get(ctx, req.NamespacedName, cluster)
 		if innerErr != nil {
 			if apierrors.IsNotFound(innerErr) {
-				logger.Info("SlurmCluster resource not found. Ignoring since object must be deleted")
+				logger.V(1).Info("SlurmCluster resource not found. Ignoring since object must be deleted")
 				return nil
 			}
 			// Error reading the object - requeue the request.
@@ -191,7 +191,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		kind := cluster.GetObjectKind()
 		key := client.ObjectKeyFromObject(cluster)
 		if state.ReconciliationState.Present(kind, key) {
-			logger.Info("Reconciliation skipped, as object is already present in reconciliation state",
+			logger.V(1).Info("Reconciliation skipped, as object is already present in reconciliation state",
 				"kind", kind.GroupVersionKind().String(),
 				"key", key.String(),
 			)
@@ -199,14 +199,14 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		}
 
 		state.ReconciliationState.Set(kind, key)
-		logger.Info("Reconciliation state set for object",
+		logger.V(1).Info("Reconciliation state set for object",
 			"kind", kind.GroupVersionKind().String(),
 			"key", key.String(),
 		)
 
 		defer func() {
 			state.ReconciliationState.Remove(kind, key)
-			logger.Info("Reconciliation state removed for object",
+			logger.V(1).Info("Reconciliation state removed for object",
 				"kind", kind.GroupVersionKind().String(),
 				"key", key.String(),
 			)

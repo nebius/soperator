@@ -183,7 +183,7 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 		}
 
 		if c.Secrets.SshdKeysName == "" {
-			logger.Info("SshdKeysName is empty. Using default name")
+			logger.V(1).Info("SshdKeysName is empty. Using default name")
 			c.Secrets.SshdKeysName = naming.BuildSecretSSHDKeysName(c.Name)
 		}
 	}

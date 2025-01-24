@@ -32,12 +32,12 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 				Name: "PodMonitor",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					if check.IsPrometheusOperatorCRDInstalled {
-						stepLogger.Info("Prometheus Operator CRD is installed")
+						stepLogger.V(1).Info("Prometheus Operator CRD is installed")
 						if check.IsPrometheusEnabled(&clusterValues.SlurmExporter) {
-							stepLogger.Info("Prometheus is enabled")
+							stepLogger.V(1).Info("Prometheus is enabled")
 							desired, err := slurmprometheus.RenderPodMonitor(
 								clusterValues.Name,
 								clusterValues.Namespace,
@@ -54,7 +54,7 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 								stepLogger.Error(err, "Failed to reconcile")
 								return errors.Wrap(err, "reconciling PodMonitor")
 							}
-							stepLogger.Info("Reconciled")
+							stepLogger.V(1).Info("Reconciled")
 						}
 					}
 
@@ -65,11 +65,11 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 				Name: "Slurm Exporter",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 					if check.IsPrometheusOperatorCRDInstalled {
-						stepLogger.Info("Prometheus Operator CRD is installed")
+						stepLogger.V(1).Info("Prometheus Operator CRD is installed")
 						if check.IsPrometheusEnabled(&clusterValues.SlurmExporter) {
-							stepLogger.Info("Prometheus is enabled")
+							stepLogger.V(1).Info("Prometheus is enabled")
 							var foundPodTemplate *corev1.PodTemplate = nil
 
 							if clusterValues.SlurmExporter.PodTemplateNameRef != nil {
@@ -108,7 +108,7 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 								stepLogger.Error(err, "Failed to reconcile")
 								return errors.Wrap(err, "reconciling Slurm Exporter Deployment")
 							}
-							stepLogger.Info("Reconciled")
+							stepLogger.V(1).Info("Reconciled")
 						}
 					}
 					return nil
@@ -121,6 +121,6 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 		logger.Error(err, "Failed to reconcile exporter resources")
 		return errors.Wrap(err, "reconciling exporter resources")
 	}
-	logger.Info("Reconciled exporter resources")
+	logger.V(1).Info("Reconciled exporter resources")
 	return nil
 }

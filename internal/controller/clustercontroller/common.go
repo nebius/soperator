@@ -36,7 +36,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 				Name: "Slurm JWT secret key for REST API",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					desired := corev1.Secret{}
 					if getErr := r.Get(
@@ -58,7 +58,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 							return errors.Wrap(err, "rendering REST JWT secret key")
 						}
 						desired = *renderedDesired.DeepCopy()
-						stepLogger.Info("Rendered")
+						stepLogger.V(1).Info("Rendered")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 
@@ -66,7 +66,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling REST JWT secret key")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 
 					return nil
 				},
@@ -75,7 +75,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 				Name: "Slurm configs ConfigMap",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					desired, err := common.RenderConfigMapSlurmConfigs(clusterValues)
 					if err != nil {
@@ -83,13 +83,13 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 						return errors.Wrap(err, "rendering ConfigMap with Slurm configs")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 
 					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling ConfigMap with Slurm configs")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 
 					return nil
 				},
@@ -98,7 +98,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 				Name: "OpenTelemetry Collector",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					if check.IsOtelCRDInstalled() {
 						if check.IsOtelEnabled(clusterValues.Telemetry) {
@@ -137,7 +137,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 
 							if desired != nil {
 								stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-								stepLogger.Info("Rendered")
+								stepLogger.V(1).Info("Rendered")
 							}
 
 							err = r.Otel.Reconcile(stepCtx, cluster, desired)
@@ -146,7 +146,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 								return errors.Wrap(err, "reconciling OpenTelemetry Collector")
 							}
 
-							stepLogger.Info("Reconciled")
+							stepLogger.V(1).Info("Reconciled")
 						}
 					}
 					return nil
@@ -156,7 +156,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 				Name: "Munge key Secret",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					desired := corev1.Secret{}
 					if getErr := r.Get(
@@ -178,7 +178,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 							return errors.Wrap(err, "rendering Munge Key Secret")
 						}
 						desired = *renderedDesired.DeepCopy()
-						stepLogger.Info("Rendered")
+						stepLogger.V(1).Info("Rendered")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 
@@ -186,7 +186,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling Munge Key Secret")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 
 					return nil
 				},
@@ -195,13 +195,13 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 				Name: "AppArmor profiles",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 					if !check.IsAppArmorCRDInstalled() {
-						stepLogger.Info("AppArmor CRD is not installed, skipping AppArmor profile reconciliation")
+						stepLogger.V(1).Info("AppArmor CRD is not installed, skipping AppArmor profile reconciliation")
 						return nil
 					}
 					if !clusterValues.NodeLogin.UseDefaultAppArmorProfile || !clusterValues.NodeWorker.UseDefaultAppArmorProfile {
-						stepLogger.Info("Default AppArmor profile is not set, skipping AppArmor profile reconciliation")
+						stepLogger.V(1).Info("Default AppArmor profile is not set, skipping AppArmor profile reconciliation")
 						return nil
 					}
 
@@ -209,13 +209,13 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 						clusterValues,
 					)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 
 					if err := r.AppArmorProfile.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling AppArmor profiles")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 					return nil
 				},
 			},

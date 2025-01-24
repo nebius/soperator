@@ -36,17 +36,17 @@ func (r SlurmClusterReconciler) ReconcileNCCLBenchmark(
 				Name: "Slurm NCCL Benchmark Security limits ConfigMap",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					desired := common.RenderConfigMapSecurityLimits(consts.ComponentTypeBenchmark, clusterValues)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 
 					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling nccl benchmark security limits configmap")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 
 					return nil
 				},
@@ -56,7 +56,7 @@ func (r SlurmClusterReconciler) ReconcileNCCLBenchmark(
 				Name: "NCCL benchmark CronJob",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					desired, err := benchmark.RenderNCCLBenchmarkCronJob(
 						clusterValues.Namespace,
@@ -72,20 +72,20 @@ func (r SlurmClusterReconciler) ReconcileNCCLBenchmark(
 						return errors.Wrap(err, "rendering NCCL benchmark CronJob")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 
 					deps, err := r.getNCCLBenchmarkDependencies(stepCtx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
 						return errors.Wrap(err, "retrieving dependencies for NCCLBenchmark CronJob")
 					}
-					stepLogger.Info("Retrieved dependencies")
+					stepLogger.V(1).Info("Retrieved dependencies")
 
 					if err = r.CronJob.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling NCCL benchmark CronJob")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 
 					return nil
 				},

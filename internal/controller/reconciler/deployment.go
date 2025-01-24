@@ -38,19 +38,20 @@ func (r *DeploymentReconciler) Reconcile(
 	name *string,
 	deps ...metav1.Object,
 ) error {
+	logger := log.FromContext(ctx)
 	if desired == nil {
 		// If desired is nil, delete the Deployment
 		if name == nil {
-			log.FromContext(ctx).Info("Deployment is not needed, skipping deletion")
+			logger.V(1).Info("Deployment is not needed, skipping deletion")
 			return nil
 		}
-		log.FromContext(ctx).Info(fmt.Sprintf(
+		logger.V(1).Info(fmt.Sprintf(
 			"Deleting Deployment %s-collector, because of Deployment  is not needed", cluster.Name,
 		))
 		return r.deleteIfOwnedByController(ctx, cluster, cluster.Namespace, *name)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
-		log.FromContext(ctx).
+		logger.V(1).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile Deployment ")
 		return errors.Wrap(err, "reconciling Deployment ")
@@ -64,9 +65,10 @@ func (r *DeploymentReconciler) deleteIfOwnedByController(
 	namespace,
 	name string,
 ) error {
+	logger := log.FromContext(ctx)
 	deployment, err := r.getDeployment(ctx, namespace, name)
 	if apierrors.IsNotFound(err) {
-		log.FromContext(ctx).Info("Deployment not found, skipping deletion")
+		logger.V(1).Info("Deployment not found, skipping deletion")
 		return nil
 	}
 
@@ -75,18 +77,18 @@ func (r *DeploymentReconciler) deleteIfOwnedByController(
 	}
 
 	if !metav1.IsControlledBy(deployment, cluster) {
-		log.FromContext(ctx).Info("Deployment is not owned by controller, skipping deletion")
+		logger.V(1).Info("Deployment is not owned by controller, skipping deletion")
 		return nil
 	}
 
 	if err := r.Delete(ctx, deployment); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.FromContext(ctx).Info("Deployment already deleted")
+			logger.V(1).Info("Deployment already deleted")
 			return nil
 		}
 		return errors.Wrap(err, "deleting Deployment")
 	}
-	log.FromContext(ctx).Info("Deployment deleted")
+	logger.V(1).Info("Deployment deleted")
 	return nil
 }
 
