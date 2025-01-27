@@ -2,6 +2,7 @@ package checkcontroller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -78,9 +79,9 @@ func (r *CheckControllerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
 	}
 
-	unschedulableNodes, errs := r.processMatchingNodes(ctx, matchingNodes, req.Namespace)
-	if len(errs) > 0 {
-		return ctrl.Result{RequeueAfter: r.reconcileTimeout}, fmt.Errorf("errors occurred: %v", errs)
+	unschedulableNodes, err := r.processMatchingNodes(ctx, matchingNodes, req.Namespace)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: r.reconcileTimeout}, fmt.Errorf("errors occurred: %v", err)
 	}
 
 	logger.V(1).Info("Updating conditions on nodes")
@@ -92,7 +93,7 @@ func (r *CheckControllerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
 }
 
-func (r *CheckControllerReconciler) processMatchingNodes(ctx context.Context, nodes []string, namespace string) (map[string]*corev1.Node, []error) {
+func (r *CheckControllerReconciler) processMatchingNodes(ctx context.Context, nodes []string, namespace string) (map[string]*corev1.Node, error) {
 	var errs []error
 
 	unschedulableNodes := map[string]*corev1.Node{}
@@ -123,17 +124,14 @@ func (r *CheckControllerReconciler) processMatchingNodes(ctx context.Context, no
 		}
 	}
 
-	return unschedulableNodes, errs
+	return unschedulableNodes, errors.Join(errs...)
 }
 
 // checkIfNodeNeedsReboot checks if the node with the given name needs to be rebooted.
 func (r *CheckControllerReconciler) checkIfNodeNeedsReboot(ctx context.Context, node *corev1.Node) (bool, error) {
 	logger := log.FromContext(ctx).WithName("CheckIfNodeNeedsReboot").WithValues("nodeName", node.Name)
 
-	conditionExist, err := r.CheckNodeCondition(ctx, node, SlurmNodeCondition, corev1.ConditionTrue)
-	if err != nil {
-		return false, fmt.Errorf("error checking node condition: %w", err)
-	}
+	conditionExist := r.CheckNodeCondition(ctx, node, SlurmNodeCondition, corev1.ConditionTrue)
 	if conditionExist {
 		logger.V(1).Info("Node condition exists")
 		return false, nil
@@ -185,7 +183,7 @@ func (r *CheckControllerReconciler) DrainNodeIfNeeded(ctx context.Context, node 
 	logger.V(1).Info("Marking node as unschedulable")
 	node.Spec.Unschedulable = true
 	if err := r.Update(ctx, node); err != nil {
-		return fmt.Errorf("failed to update nodeto unschedulable: %w", err)
+		return fmt.Errorf("failed to update node to unschedulable: %w", err)
 	}
 
 	logger.V(1).Info("Node drained and marked as unschedulable")
@@ -198,13 +196,15 @@ func (r *CheckControllerReconciler) CreateRebooterPodIfNeeded(ctx context.Contex
 
 	logger.V(1).Info("Checking for existing rebooter pod")
 	existingPod, err := r.GetRebooterPod(ctx, nodeName, namespace)
-	if err == nil && existingPod != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("error getting rebooter pod: %w", err)
+	}
+	if existingPod != nil {
 		logger.Info("Rebooter pod exists", "podName", existingPod.Name)
 		err = r.Delete(ctx, existingPod)
 		if err != nil {
 			return fmt.Errorf("failed to delete existing rebooter pod: %w", err)
 		}
-		return nil
 	}
 
 	logger.V(1).Info("Creating rebooter pod")
@@ -236,6 +236,18 @@ func (r *CheckControllerReconciler) SetNodeConditionIfNotExists(
 ) error {
 	logger := log.FromContext(ctx).WithName("SetNodeConditionIfNotExists").WithValues("nodeName", node.Name)
 
+	newNodeCondition := corev1.NodeCondition{
+		Type:    conditionType,
+		Status:  status,
+		Message: message,
+		LastTransitionTime: metav1.Time{
+			Time: time.Now(),
+		},
+		LastHeartbeatTime: metav1.Time{
+			Time: time.Now(),
+		},
+	}
+
 	// The field node.Status.Conditions belongs to the status of the Node resource.
 	// In Kubernetes, the status is considered a "system-owned" object and cannot be
 	// modified using a regular Update call.
@@ -247,45 +259,26 @@ func (r *CheckControllerReconciler) SetNodeConditionIfNotExists(
 				return nil
 			}
 			logger.V(1).Info("Updating existing condition to %s", status)
-			node.Status.Conditions[i] = corev1.NodeCondition{
-				Type:    conditionType,
-				Status:  status,
-				Message: message,
-				LastTransitionTime: metav1.Time{
-					Time: time.Now(),
-				},
-				LastHeartbeatTime: metav1.Time{
-					Time: time.Now(),
-				},
-			}
+			node.Status.Conditions[i] = newNodeCondition
+
 			return r.Status().Update(ctx, node)
 		}
 	}
 
 	logger.V(1).Info("Adding new condition to node")
-	node.Status.Conditions = append(node.Status.Conditions, corev1.NodeCondition{
-		Type:    conditionType,
-		Status:  status,
-		Message: message,
-		LastTransitionTime: metav1.Time{
-			Time: time.Now(),
-		},
-		LastHeartbeatTime: metav1.Time{
-			Time: time.Now(),
-		},
-	})
+	node.Status.Conditions = append(node.Status.Conditions, newNodeCondition)
 	return r.Status().Update(ctx, node)
 }
 
 // GetPodNodeName gets the node name of the pod with the given name in the given namespace.
-func (r *CheckControllerReconciler) GetPodNodeName(ctx context.Context, nodeName, namespace string) (string, error) {
+func (r *CheckControllerReconciler) GetPodNodeName(ctx context.Context, podName, namespace string) (string, error) {
 	pod := &corev1.Pod{}
-	err := r.Get(ctx, client.ObjectKey{Name: nodeName, Namespace: namespace}, pod)
+	err := r.Get(ctx, client.ObjectKey{Name: podName, Namespace: namespace}, pod)
 	if err != nil {
 		return "", fmt.Errorf("error getting pod: %w", err)
 	}
 	if pod.Spec.NodeName == "" {
-		return "", fmt.Errorf("pod has no node name")
+		return "", fmt.Errorf("pod has no pod name")
 	}
 	return pod.Spec.NodeName, nil
 }
@@ -426,7 +419,7 @@ func ShouldSkipEviction(pod corev1.Pod) bool {
 // evictPod evicts the given pod using the Kubernetes eviction API.
 func (r *CheckControllerReconciler) EvictPod(ctx context.Context, pod *corev1.Pod) error {
 	logger := log.FromContext(ctx).WithName("evictPod")
-	logger.V(1).Info("Evicting pod", "podName", pod.Name, "namespace", pod.Namespace)
+	logger.V(1).Info("Evicting pod", "pod name", pod.Name, "namespace", pod.Namespace)
 
 	eviction := &policyv1.Eviction{
 		ObjectMeta: metav1.ObjectMeta{
@@ -438,28 +431,28 @@ func (r *CheckControllerReconciler) EvictPod(ctx context.Context, pod *corev1.Po
 	if err := r.Client.SubResource("eviction").Create(ctx, pod, eviction); err != nil {
 		if apierrors.IsTooManyRequests(err) {
 			logger.V(1).Info("Pod eviction is rate-limited, retrying", "podName", pod.Name)
-			return nil
+			return err
 		}
-		logger.Error(err, "Failed to evict pod", "podName", pod.Name)
+		logger.Error(err, "Failed to evict pod", "pod name", pod.Name)
 		return err
 	}
 
-	logger.V(1).Info("Successfully evicted pod", "podName", pod.Name)
+	logger.V(1).Info("Successfully evicted pod", "pod name", pod.Name)
 	return nil
 }
 
 // checkNodeCondition checks if the node with the given name has a custom condition set.
 func (r *CheckControllerReconciler) CheckNodeCondition(
 	ctx context.Context, node *corev1.Node, nodeConditionType corev1.NodeConditionType, conditionStatus corev1.ConditionStatus,
-) (bool, error) {
+) bool {
 
 	for _, condition := range node.Status.Conditions {
 		if condition.Type == nodeConditionType && condition.Status == conditionStatus {
-			return true, nil
+			return true
 		}
 	}
 
-	return false, nil
+	return false
 }
 
 // IsNodeDrained checks if the node with the given name is drained.
