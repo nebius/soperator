@@ -111,14 +111,11 @@ func (r *CheckControllerReconciler) processMatchingNodes(ctx context.Context, no
 		}
 		unschedulableNodes[node.Name] = node
 
-		needsReboot, err := r.checkIfNodeNeedsReboot(ctx, node)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("error checking if node needs reboot: %w", err))
-			continue
-		}
+		needsReboot := r.checkIfNodeNeedsReboot(ctx, node)
 		if !needsReboot {
 			continue
 		}
+
 		if err := r.rebootNode(ctx, node, workerName, namespace); err != nil {
 			errs = append(errs, fmt.Errorf("error rebooting node: %w", err))
 		}
@@ -128,22 +125,16 @@ func (r *CheckControllerReconciler) processMatchingNodes(ctx context.Context, no
 }
 
 // checkIfNodeNeedsReboot checks if the node with the given name needs to be rebooted.
-func (r *CheckControllerReconciler) checkIfNodeNeedsReboot(ctx context.Context, node *corev1.Node) (bool, error) {
+func (r *CheckControllerReconciler) checkIfNodeNeedsReboot(ctx context.Context, node *corev1.Node) bool {
 	logger := log.FromContext(ctx).WithName("CheckIfNodeNeedsReboot").WithValues("nodeName", node.Name)
 
 	conditionExist := r.CheckNodeCondition(ctx, node, SlurmNodeCondition, corev1.ConditionTrue)
 	if conditionExist {
 		logger.V(1).Info("Node condition exists")
-		return false, nil
+		return false
 	}
 
-	logger.V(1).Info("Checking if node is drained")
-	if !r.IsNodeDrained(node) {
-		logger.V(1).Info("Node is not drained")
-		return false, nil
-	}
-
-	return false, nil
+	return true
 }
 
 // rebootNode reboots the node with the given name in the given namespace.
