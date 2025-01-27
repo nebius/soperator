@@ -1,9 +1,7 @@
 #!/bin/bash
 
-# Download, compile and install pyxis SPANK plugin
-cd /usr/src && \
-    wget https://github.com/NVIDIA/pyxis/archive/refs/tags/v0.19.0.tar.gz && \
-    tar -xzvf v0.19.0.tar.gz && \
-    rm v0.19.0.tar.gz && \
-    cd pyxis-0.19.0 && \
-    make install prefix=/usr libdir=/usr/lib/x86_64-linux-gnu
+PYXIS_VERSION=0.20.0
+
+wget -q -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/12.4.1-jammy-slurm24.05.5/nvslurm-plugin-pyxis_"$PYXIS_VERSION"-1_amd64.deb
+dpkg -i /tmp/nvslurm-plugin-pyxis_"$PYXIS_VERSION"-1_amd64.deb
+rm -rf /tmp/nvslurm-plugin-pyxis_"$PYXIS_VERSION"-1_amd64.deb

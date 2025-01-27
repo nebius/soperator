@@ -110,6 +110,12 @@ pushd "${jaildir}"
         flock etc/complement_jail_setcap_enroot_aufs2ovlfs.lock -c "setcap cap_sys_admin,cap_mknod+pe usr/bin/enroot-aufs2ovlfs"
     fi
 
+    echo "Bind-mount pyxis plugin from container at jail"
+    touch usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
+    mount --bind /usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
+    mkdir -p usr/share/pyxis
+    mount --bind /usr/share/pyxis usr/share/pyxis
+
     echo "Bind-mount slurm configs"
     for file in /mnt/slurm-configs/*; do
         filename=$(basename "$file")
