@@ -27,7 +27,7 @@ import (
 //+kubebuilder:rbac:groups=core,resources=nodes/status,verbs=get;update
 
 var (
-	controllerName     = "checkcontroller"
+	ControllerName     = "checkcontroller"
 	SlurmNodeCondition = corev1.NodeConditionType("SlurmDown")
 )
 
@@ -47,7 +47,7 @@ func NewCheckControllerReconciler(client client.Client, scheme *runtime.Scheme, 
 }
 
 func (r *CheckControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx).WithName(controllerName)
+	logger := log.FromContext(ctx).WithName(ControllerName)
 	logger.Info(fmt.Sprintf("Reconciling %s/%s", req.Namespace, req.Name))
 
 	logger.V(1).Info("Running scontrol command")

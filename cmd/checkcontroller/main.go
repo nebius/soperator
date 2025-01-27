@@ -44,8 +44,7 @@ import (
 )
 
 var (
-	controllerName = "checkcontroller"
-	scheme         = runtime.NewScheme()
+	scheme = runtime.NewScheme()
 )
 
 func init() {
@@ -184,10 +183,10 @@ func main() {
 	if err = checkcontroller.NewCheckControllerReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(controllerName),
+		mgr.GetEventRecorderFor(checkcontroller.ControllerName),
 		reconcileTimeout,
 	).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", controllerName)
+		setupLog.Error(err, "unable to create controller", checkcontroller.ControllerName)
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
