@@ -27,21 +27,106 @@ var (
 type RebooterReconciler struct {
 	*reconciler.Reconciler
 	reconcileTimeout time.Duration
+	nodeName         string
 }
 
-func NewRebooterReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder, reconcileTimeout time.Duration) *RebooterReconciler {
+func NewRebooterReconciler(
+	client client.Client,
+	scheme *runtime.Scheme,
+	recorder record.EventRecorder,
+	reconcileTimeout time.Duration,
+	nodeName string,
+) *RebooterReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 	return &RebooterReconciler{
 		Reconciler:       r,
 		reconcileTimeout: reconcileTimeout,
+		nodeName:         nodeName,
 	}
 }
 
 func (r *RebooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
 	logger.Info(fmt.Sprintf("Reconciling %s", req.Name))
+	node := &corev1.Node{}
+	err := r.Get(ctx, client.ObjectKey{Name: r.nodeName}, node)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: r.reconcileTimeout}, fmt.Errorf("failed to get node %s: %w", r.nodeName, err)
+	}
+
+	if r.checkIfNodeNeedsDrain(ctx, node) {
+		logger.Info("Node needs drain")
+
+		if err := r.DrainNode(ctx, node); err != nil {
+			return ctrl.Result{RequeueAfter: r.reconcileTimeout}, fmt.Errorf("failed to drain node %s: %w", r.nodeName, err)
+		}
+	}
+
+	if r.checkIfNodeNeedsReboot(ctx, node) {
+		logger.Info("Node needs reboot")
+
+		if err := r.RebootNode(ctx, node); err != nil {
+			return ctrl.Result{RequeueAfter: r.reconcileTimeout}, fmt.Errorf("failed to reboot node %s: %w", r.nodeName, err)
+		}
+	}
 
 	return ctrl.Result{}, nil
+}
+
+// checkIfNodeNeedsReboot checks if the node with the given name needs to be rebooted.
+func (r *RebooterReconciler) checkIfNodeNeedsReboot(ctx context.Context, node *corev1.Node) bool {
+	logger := log.FromContext(ctx).WithName("CheckIfNodeNeedsReboot").WithValues("nodeName", node.Name)
+
+	conditionExist := r.CheckNodeCondition(ctx, node, consts.SlurmNodeReboot, corev1.ConditionTrue)
+	if !conditionExist {
+		logger.V(1).Info("Node condition exists")
+		return false
+	}
+
+	return true
+}
+
+// checkIfNodeNeedsDrain checks if the node with the given name needs to be drained.
+func (r *RebooterReconciler) checkIfNodeNeedsDrain(ctx context.Context, node *corev1.Node) bool {
+	logger := log.FromContext(ctx).WithName("CheckIfNodeNeedsDrain").WithValues("nodeName", node.Name)
+
+	conditionExist := r.CheckNodeCondition(ctx, node, consts.SlurmNodeDrain, corev1.ConditionTrue)
+	if !conditionExist {
+		logger.V(1).Info("Node condition exists")
+		return false
+	}
+
+	return true
+}
+
+// checkNodeCondition checks if the node with the given name has a custom condition set.
+func (r *RebooterReconciler) CheckNodeCondition(
+	ctx context.Context, node *corev1.Node, nodeConditionType corev1.NodeConditionType, conditionStatus corev1.ConditionStatus,
+) bool {
+
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == nodeConditionType && condition.Status == conditionStatus {
+			return true
+		}
+	}
+
+	return false
+}
+
+// RebootNode reboots the node with the given name.
+func (r *RebooterReconciler) RebootNode(ctx context.Context, node *corev1.Node) error {
+	logger := log.FromContext(ctx).WithName("RebootNode").WithValues("nodeName", node.Name)
+	logger.Info("Rebooting node")
+	// TODO: Implement reboot logic
+	return nil
+}
+
+// DrainNode drains the node with the given name.
+func (r *RebooterReconciler) DrainNode(ctx context.Context, node *corev1.Node) error {
+	logger := log.FromContext(ctx).WithName("DrainNode").WithValues("nodeName", node.Name)
+	logger.Info("Draining node")
+	// TODO: Implement reboot logic
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

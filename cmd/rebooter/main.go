@@ -177,6 +177,7 @@ func main() {
 		mgr.GetScheme(),
 		mgr.GetEventRecorderFor(rebooter.ControllerName),
 		reconcileTimeout,
+		nodeName,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout, nodeName); err != nil {
 		setupLog.Error(err, "unable to create controller", rebooter.ControllerName)
 		os.Exit(1)
