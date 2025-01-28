@@ -2,7 +2,7 @@
 ARG BASE_IMAGE=nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 # First stage: Build the gpubench application
-FROM golang:1.22 AS gpubench_builder
+FROM golang:1.23 AS gpubench_builder
 
 ARG GO_LDFLAGS=""
 ARG CGO_ENABLED=0
