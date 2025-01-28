@@ -15,14 +15,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 )
 
 var (
-	ControllerName  = "rebooter"
-	SlurmNodeDrain  = corev1.NodeConditionType("SlurmNodeDrain")
-	SlurmNodeReboot = corev1.NodeConditionType("SlurmNodeReboot")
+	ControllerName = "rebooter"
 )
 
 type RebooterReconciler struct {
@@ -91,16 +90,16 @@ func (r *RebooterReconciler) SetupWithManager(
 				// based on the conditions changing
 				var oldDrainCondition, newDrainCondition, oldRebootCondition, newRebootCondition *corev1.NodeCondition
 				for i := range oldNode.Status.Conditions {
-					if oldNode.Status.Conditions[i].Type == SlurmNodeDrain {
+					if oldNode.Status.Conditions[i].Type == consts.SlurmNodeDrain {
 						oldDrainCondition = &oldNode.Status.Conditions[i]
-					} else if oldNode.Status.Conditions[i].Type == SlurmNodeReboot {
+					} else if oldNode.Status.Conditions[i].Type == consts.SlurmNodeReboot {
 						oldRebootCondition = &oldNode.Status.Conditions[i]
 					}
 				}
 				for i := range newNode.Status.Conditions {
-					if newNode.Status.Conditions[i].Type == SlurmNodeDrain {
+					if newNode.Status.Conditions[i].Type == consts.SlurmNodeDrain {
 						newDrainCondition = &newNode.Status.Conditions[i]
-					} else if newNode.Status.Conditions[i].Type == SlurmNodeReboot {
+					} else if newNode.Status.Conditions[i].Type == consts.SlurmNodeReboot {
 						newRebootCondition = &newNode.Status.Conditions[i]
 					}
 				}
