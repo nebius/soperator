@@ -4,7 +4,6 @@ import (
 	"context"
 	errorsStd "errors"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -77,8 +76,6 @@ import (
 type SlurmClusterReconciler struct {
 	*reconciler.Reconciler
 
-	WatchNamespaces WatchNamespaces
-
 	ConfigMap       *reconciler.ConfigMapReconciler
 	Secret          *reconciler.SecretReconciler
 	CronJob         *reconciler.CronJobReconciler
@@ -99,10 +96,8 @@ type SlurmClusterReconciler struct {
 
 func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *SlurmClusterReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
-	watchNamespacesEnv := os.Getenv("SLURM_OPERATOR_WATCH_NAMESPACES")
 	return &SlurmClusterReconciler{
 		Reconciler:      r,
-		WatchNamespaces: NewWatchNamespaces(watchNamespacesEnv),
 		ConfigMap:       reconciler.NewConfigMapReconciler(r),
 		Secret:          reconciler.NewSecretReconciler(r),
 		CronJob:         reconciler.NewCronJobReconciler(r),
@@ -130,11 +125,6 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		logfield.ClusterName, req.Name,
 	)
 	log.IntoContext(ctx, logger)
-
-	// If the namespace isn't watched, we have nothing to do
-	if !r.WatchNamespaces.IsWatched(req.NamespacedName.Namespace) {
-		return ctrl.Result{}, nil
-	}
 
 	slurmCluster := &slurmv1.SlurmCluster{}
 	err := r.Get(ctx, req.NamespacedName, slurmCluster)
