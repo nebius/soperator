@@ -3,23 +3,20 @@ package rebooter
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
 )
 
 var (
@@ -130,23 +127,6 @@ func (r *RebooterReconciler) SetupWithManager(
 				return e.Object.GetName() == nodeName
 			},
 		})).
-		WithOptions(controllerOptions(maxConcurrency, cacheSyncTimeout)).
+		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
 		Complete(r)
-}
-
-var (
-	optionsInit    sync.Once
-	defaultOptions *controller.Options
-)
-
-func controllerOptions(maxConcurrency int, cacheSyncTimeout time.Duration) controller.Options {
-	rateLimiters := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](2*time.Second, 2*time.Minute)
-	optionsInit.Do(func() {
-		defaultOptions = &controller.Options{
-			RateLimiter:             rateLimiters,
-			CacheSyncTimeout:        cacheSyncTimeout,
-			MaxConcurrentReconciles: maxConcurrency,
-		}
-	})
-	return *defaultOptions
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	errorsStd "errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -19,12 +18,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -36,6 +33,7 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controller/state"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
@@ -633,7 +631,7 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 		}
 	}
 
-	controllerBuilder.WithOptions(getDefaultOptions(maxConcurrency, cacheSyncTimeout))
+	controllerBuilder.WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout))
 
 	return controllerBuilder.Complete(r)
 }
@@ -822,21 +820,4 @@ func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Func
 			Predicate: predicate.GenerationChangedPredicate{},
 		},
 	}
-}
-
-var (
-	optionsInit    sync.Once
-	defaultOptions *controller.Options
-)
-
-func getDefaultOptions(maxConcurrency int, cacheSyncTimeout time.Duration) controller.Options {
-	rateLimiters := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](2*time.Second, 2*time.Minute)
-	optionsInit.Do(func() {
-		defaultOptions = &controller.Options{
-			RateLimiter:             rateLimiters,
-			CacheSyncTimeout:        cacheSyncTimeout,
-			MaxConcurrentReconciles: maxConcurrency,
-		}
-	})
-	return *defaultOptions
 }
