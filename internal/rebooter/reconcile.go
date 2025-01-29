@@ -2,10 +2,12 @@ package rebooter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -19,6 +21,10 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 )
+
+//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;
+//+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
+//+kubebuilder:rbac:groups=core,resources=nodes/status,verbs=get;update
 
 var (
 	ControllerName = "rebooter"
@@ -45,58 +51,96 @@ func NewRebooterReconciler(
 	}
 }
 
+// PodNotEvictableError represents an error indicating that a pod is not evictable.
+type PodNotEvictableError struct {
+	PodName string
+}
+
+func (e *PodNotEvictableError) Error() string {
+	return fmt.Sprintf("pod %s is not evictable", e.PodName)
+}
+
 func (r *RebooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
 	logger.Info(fmt.Sprintf("Reconciling %s", req.Name))
 	node := &corev1.Node{}
-	err := r.Get(ctx, client.ObjectKey{Name: r.nodeName}, node)
-	if err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: r.nodeName}, node); err != nil {
 		return ctrl.Result{RequeueAfter: r.reconcileTimeout}, fmt.Errorf("failed to get node %s: %w", r.nodeName, err)
 	}
 
-	if r.checkIfNodeNeedsDrain(ctx, node) {
-		logger.Info("Node needs drain")
-
-		if err := r.DrainNode(ctx, node); err != nil {
+	nodeActions := r.GetActions(ctx, node)
+	logger.V(1).Info("Node actions", "actions", nodeActions)
+	if nodeActions.Drain {
+		if err := r.DrainNodeIfNeeded(ctx, node); err != nil {
+			var podErr *PodNotEvictableError
+			if !errors.As(err, &podErr) {
+				logger.Info("Reenqueueing reconciliation", "requeueAfter", r.reconcileTimeout, podErr.PodName, "is not evicted")
+				return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
+			}
 			return ctrl.Result{RequeueAfter: r.reconcileTimeout}, fmt.Errorf("failed to drain node %s: %w", r.nodeName, err)
 		}
+		if err := r.SetNodeConditionIfNotExists(
+			ctx, node, consts.SlurmNodeDrain, corev1.ConditionFalse, consts.ReasonDrained, consts.MessageDrained,
+		); err != nil {
+			return ctrl.Result{RequeueAfter: r.reconcileTimeout}, fmt.Errorf("failed to set node condition for node %s: %w", r.nodeName, err)
+		}
 	}
-
-	if r.checkIfNodeNeedsReboot(ctx, node) {
-		logger.Info("Node needs reboot")
-
+	if nodeActions.Reboot {
 		if err := r.RebootNode(ctx, node); err != nil {
 			return ctrl.Result{RequeueAfter: r.reconcileTimeout}, fmt.Errorf("failed to reboot node %s: %w", r.nodeName, err)
 		}
 	}
 
+	logger.Info("Reconciliation completed")
 	return ctrl.Result{}, nil
 }
 
-// checkIfNodeNeedsReboot checks if the node with the given name needs to be rebooted.
-func (r *RebooterReconciler) checkIfNodeNeedsReboot(ctx context.Context, node *corev1.Node) bool {
-	logger := log.FromContext(ctx).WithName("CheckIfNodeNeedsReboot").WithValues("nodeName", node.Name)
+type NodeActions struct {
+	Reboot bool
+	Drain  bool
+}
 
-	conditionExist := r.CheckNodeCondition(ctx, node, consts.SlurmNodeReboot, corev1.ConditionTrue)
-	if !conditionExist {
-		logger.V(1).Info("Node condition exists")
-		return false
+// GetActions returns the actions that need to be taken on the node with the given name.
+func (r *RebooterReconciler) GetActions(ctx context.Context, node *corev1.Node) NodeActions {
+	logger := log.FromContext(ctx).WithName("GetActions").WithValues("nodeName", node.Name)
+	actions := NodeActions{}
+	logger.V(1).Info("Checking if node needs to be drained")
+	if r.checkIfNodeNeedsDrain(ctx, node) {
+		logger.V(1).Info("Node needs drain")
+		actions.Drain = true
 	}
 
-	return true
+	logger.V(1).Info("Checking if node needs to be rebooted")
+	if r.checkIfNodeNeedsReboot(ctx, node) {
+		logger.V(1).Info("Node needs reboot")
+		// If the node needs to be rebooted, it also needs to be drained.
+		actions.Drain = true
+		actions.Reboot = true
+	}
+	return actions
 }
 
 // checkIfNodeNeedsDrain checks if the node with the given name needs to be drained.
 func (r *RebooterReconciler) checkIfNodeNeedsDrain(ctx context.Context, node *corev1.Node) bool {
 	logger := log.FromContext(ctx).WithName("CheckIfNodeNeedsDrain").WithValues("nodeName", node.Name)
 
-	conditionExist := r.CheckNodeCondition(ctx, node, consts.SlurmNodeDrain, corev1.ConditionTrue)
-	if !conditionExist {
-		logger.V(1).Info("Node condition exists")
-		return false
+	if r.CheckNodeCondition(ctx, node, consts.SlurmNodeDrain, corev1.ConditionTrue) {
+		logger.V(1).Info("Need to drain node")
+		return true
 	}
 
-	return true
+	return false
+}
+
+// checkIfNodeNeedsReboot checks if the node with the given name needs to be rebooted.
+func (r *RebooterReconciler) checkIfNodeNeedsReboot(ctx context.Context, node *corev1.Node) bool {
+	logger := log.FromContext(ctx).WithName("CheckIfNodeNeedsReboot").WithValues("nodeName", node.Name)
+
+	if r.CheckNodeCondition(ctx, node, consts.SlurmNodeReboot, corev1.ConditionTrue) {
+		logger.V(1).Info("Need to reboot node")
+		return true
+	}
+	return false
 }
 
 // checkNodeCondition checks if the node with the given name has a custom condition set.
@@ -113,18 +157,176 @@ func (r *RebooterReconciler) CheckNodeCondition(
 	return false
 }
 
+// DrainNodeIfNeeded drains the node with the given name if it is not already drained.
+func (r *RebooterReconciler) DrainNodeIfNeeded(ctx context.Context, node *corev1.Node) error {
+	logger := log.FromContext(ctx).WithName("DrainNodeIfNeeded").WithValues("nodeName", node.Name)
+	if err := r.SetNodeConditionIfNotExists(
+		ctx, node, consts.SlurmNodeDrain, corev1.ConditionTrue, consts.ReasonDraining, consts.MessageDraining,
+	); err != nil {
+		return fmt.Errorf("failed to set node condition for node %s: %w", node.Name, err)
+	}
+	if !r.IsNodeUnschedulabled(node) {
+		logger.V(1).Info("Node is not unschedulable")
+		if err := r.MarkNodeUnschedulable(ctx, node); err != nil {
+			return fmt.Errorf("failed to mark node %s as unschedulable: %w", node.Name, err)
+		}
+	}
+
+	logger.V(1).Info("Setting NoExecute taint on node")
+	if err := r.TaintNodeWithNoExecute(ctx, node); err != nil {
+		return fmt.Errorf("failed to taint node %s with NoExecute: %w", node.Name, err)
+	}
+
+	logger.V(1).Info("Evicting pods from node")
+	if err := r.AreAllPodsEvicted(ctx, node.Name); err != nil {
+		return err
+	}
+
+	logger.V(1).Info("Node drained and marked as unschedulable")
+	return nil
+}
+
+// IsNodeDrained checks if the node with the given name is drained.
+func (r *RebooterReconciler) IsNodeUnschedulabled(node *corev1.Node) bool {
+	return node.Spec.Unschedulable
+}
+
+// MarkNodeUnschedulable marks the node with the given name as unschedulable.
+func (r *RebooterReconciler) MarkNodeUnschedulable(ctx context.Context, node *corev1.Node) error {
+	logger := log.FromContext(ctx).WithName("MarkNodeUnschedulable").WithValues("nodeName", node.Name)
+	logger.V(1).Info("Marking node as unschedulable")
+
+	node.Spec.Unschedulable = true
+	if err := r.Update(ctx, node); err != nil {
+		return fmt.Errorf("failed to update node %s to unschedulable: %w", node.Name, err)
+	}
+	return nil
+}
+
+// TaintNodeWithNoExecute taints the node with the given name with the NoExecute effect.
+// NoSchedule means that no new Pods will be scheduled on the tainted node
+// unless they have a matching toleration. Pods currently running on the node are not evicted.
+func (r *RebooterReconciler) TaintNodeWithNoExecute(ctx context.Context, node *corev1.Node) error {
+	logger := log.FromContext(ctx).WithName("taintNodeWithNoExecute")
+	logger.V(1).Info("Adding NoExecute taint to node", "node name", node.Name)
+
+	taint := corev1.Taint{
+		Key:    "node.kubernetes.io/NoExecute",
+		Value:  "true",
+		Effect: corev1.TaintEffectNoExecute,
+	}
+
+	node.Spec.Taints = append(node.Spec.Taints, taint)
+
+	if err := r.Client.Update(ctx, node); err != nil {
+		logger.Error(err, "Failed to update node with NoExecute taint", "node name", node.Name)
+		return err
+	}
+
+	logger.V(1).Info("Successfully added NoExecute taint to node", "node name", node.Name)
+	return nil
+}
+
+// AreAllPodsEvicted checks if all pods on the node with the given name are evicted.
+func (r *RebooterReconciler) AreAllPodsEvicted(ctx context.Context, nodeName string) error {
+	logger := log.FromContext(ctx).WithName("EvictPodsFromNode").WithValues("nodeName", nodeName)
+	logger.V(1).Info("Listing pods on node")
+
+	podList := &corev1.PodList{}
+	if err := r.List(ctx, podList, client.MatchingFields{"spec.nodeName": nodeName}); err != nil {
+		return fmt.Errorf("failed to list pods on node %s: %w", nodeName, err)
+	}
+
+	for _, pod := range podList.Items {
+		if IsControlledByDaemonSet(pod) {
+			logger.V(1).Info("Skipping eviction for pod managed by DaemonSet", "podName", pod.Name)
+			continue
+		}
+
+		if HasTolerationForNoExecute(pod) {
+			logger.V(1).Info("Skipping eviction for pod with NoExecute toleration", "podName", pod.Name)
+			continue
+		}
+		return &PodNotEvictableError{PodName: pod.Name}
+	}
+
+	return nil
+}
+
+// IsControlledByDaemonSet checks if the pod is controlled by a DaemonSet.
+// DaemonSet pods should not be evicted. This is because DaemonSet pods are
+// expected to run on all nodes and evicting them would cause them to be
+// rescheduled on the same node.
+func IsControlledByDaemonSet(pod corev1.Pod) bool {
+	for _, ownerRef := range pod.OwnerReferences {
+		if ownerRef.Kind == "DaemonSet" {
+			return true
+		}
+	}
+	return false
+}
+
+// HasTolerationForNoExecute checks if the pod has a toleration for NoExecute taint.
+// Pods with a toleration for NoExecute taint never get evicted.
+func HasTolerationForNoExecute(pod corev1.Pod) bool {
+	for _, toleration := range pod.Spec.Tolerations {
+		if toleration.Effect == corev1.TaintEffectNoExecute {
+			return true
+		}
+	}
+	return false
+}
+
+// SetNodeConditionIfNotExists sets a custom condition on the node with the given name if it does not already exist.
+func (r *RebooterReconciler) SetNodeConditionIfNotExists(
+	ctx context.Context,
+	node *corev1.Node,
+	conditionType corev1.NodeConditionType,
+	status corev1.ConditionStatus,
+	reason consts.ReasonConditionType,
+	message consts.MessageConditionType,
+) error {
+	logger := log.FromContext(ctx).WithName("SetNodeConditionIfNotExists").WithValues("nodeName", node.Name)
+
+	newNodeCondition := corev1.NodeCondition{
+		Type:    conditionType,
+		Status:  status,
+		Reason:  string(reason),
+		Message: string(message),
+		LastTransitionTime: metav1.Time{
+			Time: time.Now(),
+		},
+		LastHeartbeatTime: metav1.Time{
+			Time: time.Now(),
+		},
+	}
+
+	// The field node.Status.Conditions belongs to the status of the Node resource.
+	// In Kubernetes, the status is considered a "system-owned" object and cannot be
+	// modified using a regular Update call.
+	// Instead, changes to the status must be made using the Status().Update method.
+	for i, cond := range node.Status.Conditions {
+		if cond.Type == conditionType {
+			if cond.Status == status {
+				logger.V(1).Info(fmt.Sprintf("Node already has condition %s set to %s", conditionType, status))
+				return nil
+			}
+			logger.V(1).Info("Updating existing condition to %s", status)
+			node.Status.Conditions[i] = newNodeCondition
+
+			return r.Status().Update(ctx, node)
+		}
+	}
+
+	logger.V(1).Info("Adding new condition to node")
+	node.Status.Conditions = append(node.Status.Conditions, newNodeCondition)
+	return r.Status().Update(ctx, node)
+}
+
 // RebootNode reboots the node with the given name.
 func (r *RebooterReconciler) RebootNode(ctx context.Context, node *corev1.Node) error {
 	logger := log.FromContext(ctx).WithName("RebootNode").WithValues("nodeName", node.Name)
 	logger.Info("Rebooting node")
-	// TODO: Implement reboot logic
-	return nil
-}
-
-// DrainNode drains the node with the given name.
-func (r *RebooterReconciler) DrainNode(ctx context.Context, node *corev1.Node) error {
-	logger := log.FromContext(ctx).WithName("DrainNode").WithValues("nodeName", node.Name)
-	logger.Info("Draining node")
 	// TODO: Implement reboot logic
 	return nil
 }
