@@ -253,3 +253,81 @@ func TestTaintNodeWithNoExecute(t *testing.T) {
 		t.Errorf("taint effect is not correct")
 	}
 }
+
+func TestIsNodeTaintedWithNoExecute(t *testing.T) {
+	tests := []struct {
+		name     string
+		node     *corev1.Node
+		expected bool
+	}{
+		{
+			name: "Node with NoExecute taint",
+			node: &corev1.Node{
+				Spec: corev1.NodeSpec{
+					Taints: []corev1.Taint{
+						{
+							Key:    "node.kubernetes.io/NoExecute",
+							Value:  "true",
+							Effect: corev1.TaintEffectNoExecute,
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Node without NoExecute taint",
+			node: &corev1.Node{
+				Spec: corev1.NodeSpec{
+					Taints: []corev1.Taint{
+						{
+							Key:    "node.kubernetes.io/NoSchedule",
+							Value:  "true",
+							Effect: corev1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Node with multiple taints including NoExecute",
+			node: &corev1.Node{
+				Spec: corev1.NodeSpec{
+					Taints: []corev1.Taint{
+						{
+							Key:    "node.kubernetes.io/NoSchedule",
+							Value:  "true",
+							Effect: corev1.TaintEffectNoSchedule,
+						},
+						{
+							Key:    "node.kubernetes.io/NoExecute",
+							Value:  "true",
+							Effect: corev1.TaintEffectNoExecute,
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Node with no taints",
+			node: &corev1.Node{
+				Spec: corev1.NodeSpec{
+					Taints: []corev1.Taint{},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &RebooterReconciler{}
+			result := r.IsNodeTaintedWithNoExecute(context.Background(), tt.node)
+			if result != tt.expected {
+				t.Errorf("IsNodeTaintedWithNoExecute() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
