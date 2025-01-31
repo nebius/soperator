@@ -168,7 +168,7 @@ func main() {
 	}
 
 	// Rebooter is a daemonset and should only reconcile the node it is running on
-	nodeName := os.Getenv("NODE_NAME")
+	nodeName := os.Getenv("REBOOTER_NODE_NAME")
 	if nodeName == "" {
 		setupLog.Error(fmt.Errorf("NODE_NAME environment variable is not set"), "unable to start manager")
 		os.Exit(1)
