@@ -7,7 +7,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/kubereboot/kured/pkg/reboot"
 	"github.com/mackerelio/go-osstat/uptime"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -67,7 +69,7 @@ func (r *RebooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	logger.Info(fmt.Sprintf("Reconciling %s", req.Name))
 	node := &corev1.Node{}
 	if err := r.Get(ctx, client.ObjectKey{Name: r.nodeName}, node); err != nil {
-		return ctrl.Result{RequeueAfter: r.reconcileTimeout}, fmt.Errorf("failed to get node %s: %w", r.nodeName, err)
+		return ctrl.Result{}, fmt.Errorf("failed to get node %s: %w", r.nodeName, err)
 	}
 
 	nodeActions := r.GetActions(ctx, node)
@@ -81,17 +83,20 @@ func (r *RebooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 				logger.Info("Reenqueueing reconciliation", "requeueAfter", r.reconcileTimeout, podErr.PodName, "is not evicted")
 				return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
 			}
-			return ctrl.Result{RequeueAfter: r.reconcileTimeout}, fmt.Errorf("failed to drain node %s: %w", r.nodeName, err)
+			return ctrl.Result{}, fmt.Errorf("failed to drain node %s: %w", r.nodeName, err)
+		}
+		if err := r.Get(ctx, client.ObjectKey{Name: r.nodeName}, node); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to get node %s: %w", r.nodeName, err)
 		}
 		if err := r.SetNodeConditionIfNotExists(
 			ctx, node, consts.SlurmNodeDrain, corev1.ConditionFalse, consts.ReasonDrained, consts.MessageDrained,
 		); err != nil {
-			return ctrl.Result{RequeueAfter: r.reconcileTimeout}, fmt.Errorf("failed to set node condition for node %s: %w", r.nodeName, err)
+			return ctrl.Result{}, fmt.Errorf("failed to set node condition for node %s: %w", r.nodeName, err)
 		}
 	}
 	if nodeActions.Reboot {
 		if err := r.RebootNode(ctx, node); err != nil {
-			return ctrl.Result{RequeueAfter: r.reconcileTimeout}, fmt.Errorf("failed to reboot node %s: %w", r.nodeName, err)
+			return ctrl.Result{}, fmt.Errorf("failed to reboot node %s: %w", r.nodeName, err)
 		}
 	}
 
@@ -258,7 +263,7 @@ func (r *RebooterReconciler) TaintNodeWithNoExecute(ctx context.Context, node *c
 
 	node.Spec.Taints = append(node.Spec.Taints, taint)
 
-	if err := r.Client.Update(ctx, node); err != nil {
+	if err := r.Update(ctx, node); err != nil {
 		logger.Error(err, "Failed to update node with NoExecute taint", "node name", node.Name)
 		return err
 	}
@@ -289,12 +294,10 @@ func (r *RebooterReconciler) AreAllPodsEvicted(ctx context.Context, nodeName str
 
 	for _, pod := range podList.Items {
 		if IsControlledByDaemonSet(pod) {
-			logger.Info("Skipping eviction for pod managed by DaemonSet", "podName", pod.Name)
 			continue
 		}
 
 		if HasTolerationForNoExecute(pod) {
-			logger.Info("Skipping eviction for pod with NoExecute toleration", "podName", pod.Name)
 			continue
 		}
 		return &PodNotEvictableError{PodName: pod.Name}
@@ -364,20 +367,30 @@ func (r *RebooterReconciler) SetNodeConditionIfNotExists(
 			logger.Info("Updating existing condition on node")
 			node.Status.Conditions[i] = newNodeCondition
 
-			return r.Status().Update(ctx, node)
+			return r.UpdateStatus(ctx, node)
 		}
 	}
 
 	logger.Info("Adding new condition to node")
 	node.Status.Conditions = append(node.Status.Conditions, newNodeCondition)
-	return r.Status().Update(ctx, node)
+	return r.UpdateStatus(ctx, node)
 }
 
 // RebootNode reboots the node with the given name.
 func (r *RebooterReconciler) RebootNode(ctx context.Context, node *corev1.Node) error {
 	logger := log.FromContext(ctx).WithName("RebootNodeIfNeeded").WithValues("nodeName", node.Name)
 	logger.Info("Starting node reboot")
-	// TODO: Implement node reboot logic here
+
+	rebootCommand := "reboot -f"
+	rebootCmd, err := reboot.NewCommandRebooter(rebootCommand)
+	if err != nil {
+		return fmt.Errorf("failed to create reboot command: %w", err)
+	}
+
+	if err := rebootCmd.Reboot(); err != nil {
+		return fmt.Errorf("failed to reboot node %s: %w", node.Name, err)
+	}
+
 	return nil
 }
 
@@ -465,4 +478,28 @@ func (r *RebooterReconciler) SetupWithManager(
 		})).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
 		Complete(r)
+}
+
+// This workaround is needed because kube-apiserver expects up-to-date objects for the following update operations.
+// And this why we modify the object in-place.
+func (r *RebooterReconciler) Update(ctx context.Context, node *corev1.Node, opts ...client.UpdateOption) error {
+	if err := r.Client.Update(ctx, node, opts...); err != nil {
+		return fmt.Errorf("failed to update object: %w", err)
+	}
+
+	if err := r.Get(ctx, client.ObjectKey{Name: node.GetName()}, node); err != nil {
+		return fmt.Errorf("failed to get updated node: %w", err)
+	}
+	return nil
+}
+
+func (r *RebooterReconciler) UpdateStatus(ctx context.Context, node *corev1.Node, opts ...client.SubResourceUpdateOption) error {
+	if err := r.Client.Status().Update(ctx, node, opts...); err != nil {
+		return fmt.Errorf("failed to update object status: %w", err)
+	}
+
+	if err := r.Get(ctx, client.ObjectKey{Name: node.GetName()}, node); err != nil {
+		return fmt.Errorf("failed to get updated node: %w", err)
+	}
+	return nil
 }

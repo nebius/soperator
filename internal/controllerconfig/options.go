@@ -15,7 +15,7 @@ var (
 )
 
 func ControllerOptions(maxConcurrency int, cacheSyncTimeout time.Duration) controller.Options {
-	rateLimiters := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](2*time.Second, 2*time.Minute)
+	rateLimiters := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](30*time.Second, 5*time.Minute)
 	optionsInit.Do(func() {
 		defaultOptions = &controller.Options{
 			RateLimiter:             rateLimiters,
