@@ -120,6 +120,9 @@ jobs:
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd DOCKERFILE=restd/slurmrestd.dockerfile
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd
 
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter DOCKERFILE=rebooter.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+
           echo "Common images were built"
 
           echo "Removing previous jail rootfs tar archive"
