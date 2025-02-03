@@ -148,7 +148,7 @@ func TestSetNodeSchedulable(t *testing.T) {
 		t.Fatalf("failed to create node: %v", err)
 	}
 
-	err = r.SetNodeSchedulable(ctx, node, true)
+	err = r.SetNodeUnschedulable(ctx, node, true)
 	if err != nil {
 		t.Errorf("markNodeUnschedulable returned an error: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestSetNodeConditionIfNotExists(t *testing.T) {
 		t.Fatalf("failed to create node: %v", err)
 	}
 
-	err = r.SetNodeConditionIfNotExists(ctx, node, consts.SlurmNodeDrain, corev1.ConditionTrue, consts.ReasonDrained, consts.MessageDrained)
+	err = r.SetNodeConditionIfNotExists(ctx, node, consts.SlurmNodeDrain, corev1.ConditionTrue, consts.ReasonNodeDrained, consts.MessageDrained)
 	if err != nil {
 		t.Errorf("setNodeCondition returned an error: %v", err)
 	}
@@ -207,7 +207,7 @@ func TestSetNodeConditionIfNotExists(t *testing.T) {
 	if updatedNode.Status.Conditions[0].Status != corev1.ConditionTrue {
 		t.Errorf("node condition status is not correct")
 	}
-	if updatedNode.Status.Conditions[0].Reason != string(consts.ReasonDrained) {
+	if updatedNode.Status.Conditions[0].Reason != string(consts.ReasonNodeDrained) {
 		t.Errorf("node condition reason is not correct")
 	}
 }

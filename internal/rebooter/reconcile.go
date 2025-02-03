@@ -64,46 +64,42 @@ func (e *PodNotEvictableError) Error() string {
 	return fmt.Sprintf("pod %s is not evictable", e.PodName)
 }
 
+type NodeActions struct {
+	Reboot bool
+	Drain  bool
+}
+
 func (r *RebooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
 	logger.Info(fmt.Sprintf("Reconciling %s", req.Name))
-	node := &corev1.Node{}
-	if err := r.Get(ctx, client.ObjectKey{Name: r.nodeName}, node); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get node %s: %w", r.nodeName, err)
+
+	node, err := r.getNode(ctx)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	nodeActions := r.GetActions(ctx, node)
 	logger.V(1).Info("Node actions", "actions", nodeActions)
-	if nodeActions.Drain {
-		if err := r.DrainNodeIfNeeded(ctx, node); err != nil {
-			// If some pods are not evicted, requeue the reconciliation.
-			// It's better to requeue the reconciliation than to leave the node in an inconsistent state.
-			var podErr *PodNotEvictableError
-			if !errors.As(err, &podErr) {
-				logger.Info("Reenqueueing reconciliation due to failed pod eviction")
-				return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
-			}
-			return ctrl.Result{}, fmt.Errorf("failed to drain node %s: %w", r.nodeName, err)
-		}
-		if err := r.SetNodeConditionIfNotExists(
-			ctx, node, consts.SlurmNodeDrain, corev1.ConditionFalse, consts.ReasonDrained, consts.MessageDrained,
-		); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to set node condition for node %s: %w", r.nodeName, err)
-		}
+
+	if err := r.handleNodeDrain(ctx, node, nodeActions); err != nil {
+		return r.handleDrainError(ctx, err)
 	}
-	if nodeActions.Reboot {
-		if err := r.RebootNode(ctx, node); err != nil {
-			return ctrl.Result{}, err
-		}
+
+	if result, err := r.handleNodeReboot(ctx, node, nodeActions); err != nil {
+		return result, err
 	}
 
 	logger.Info("Reconciliation completed")
 	return ctrl.Result{}, nil
 }
 
-type NodeActions struct {
-	Reboot bool
-	Drain  bool
+// getNode returns the node with the given name.
+func (r *RebooterReconciler) getNode(ctx context.Context) (*corev1.Node, error) {
+	node := &corev1.Node{}
+	if err := r.Get(ctx, client.ObjectKey{Name: r.nodeName}, node); err != nil {
+		return nil, fmt.Errorf("failed to get node %s: %w", r.nodeName, err)
+	}
+	return node, nil
 }
 
 // GetActions returns the actions that need to be taken on the node with the given name.
@@ -126,6 +122,42 @@ func (r *RebooterReconciler) GetActions(ctx context.Context, node *corev1.Node) 
 	return actions
 }
 
+// handleNodeDrain drains the node with the given name if needed.
+func (r *RebooterReconciler) handleNodeDrain(ctx context.Context, node *corev1.Node, nodeActions NodeActions) error {
+	if nodeActions.Drain {
+		if err := r.DrainNodeIfNeeded(ctx, node); err != nil {
+			log.FromContext(ctx).V(1).Info("Failed to drain node", "error", err)
+			return err
+		}
+		if err := r.setNodeCondition(ctx, node, consts.SlurmNodeDrain, corev1.ConditionFalse, consts.ReasonNodeDrained, consts.MessageDrained); err != nil {
+			return err
+		}
+	}
+	if err := r.setNodeCondition(ctx, node, consts.SlurmNodeDrain, corev1.ConditionFalse, consts.ReasonNodeScheduled, consts.MessageDrained); err != nil {
+		return err
+	}
+	if r.IsNodeUnschedulabled(node) {
+		setNodeUnschedulable := false
+		if err := r.SetNodeUnschedulable(ctx, node, setNodeUnschedulable); err != nil {
+			return fmt.Errorf("failed to mark node %s as schedulable: %w", node.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// handleDrainError handles the error that occurred during the node draining process.
+func (r *RebooterReconciler) handleDrainError(ctx context.Context, err error) (ctrl.Result, error) {
+	var podErr *PodNotEvictableError
+	// If some pods are not evicted, requeue the reconciliation.
+	// It's better to requeue the reconciliation than to leave the nod in an inconsistent state.
+	if errors.As(err, &podErr) {
+		log.FromContext(ctx).V(1).Info("Reenqueueing reconciliation due to failed pod eviction")
+		return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
+	}
+	return ctrl.Result{}, fmt.Errorf("failed to drain node: %w", err)
+}
+
 // checkIfNodeNeedsDrain checks if the node with the given name needs to be drained.
 func (r *RebooterReconciler) checkIfNodeNeedsDrain(ctx context.Context, node *corev1.Node) bool {
 	logger := log.FromContext(ctx).WithName("CheckIfNodeNeedsDrain").WithValues("nodeName", node.Name).V(1)
@@ -136,6 +168,22 @@ func (r *RebooterReconciler) checkIfNodeNeedsDrain(ctx context.Context, node *co
 	}
 
 	return false
+}
+
+// handleNodeReboot reboots the node with the given name if needed.
+func (r *RebooterReconciler) handleNodeReboot(ctx context.Context, node *corev1.Node, nodeActions NodeActions) (ctrl.Result, error) {
+	if nodeActions.Reboot {
+		if err := r.RebootNode(ctx, node); err != nil {
+			return ctrl.Result{}, err
+		}
+		if err := r.setNodeCondition(ctx, node, consts.SlurmNodeReboot, corev1.ConditionFalse, consts.ReasonNodeRebooted, consts.MessageRebooted); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+	if err := r.setNodeCondition(ctx, node, consts.SlurmNodeReboot, corev1.ConditionFalse, consts.ReasonNodeNoRebootNeeded, consts.MessageRebooted); err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, nil
 }
 
 // checkIfNodeNeedsReboot checks if the node with the given name needs to be rebooted.
@@ -209,15 +257,15 @@ func (r *RebooterReconciler) GetNodeConditions(
 // In future releases, a full node drain mechanism may be introduced if needed.
 func (r *RebooterReconciler) DrainNodeIfNeeded(ctx context.Context, node *corev1.Node) error {
 	logger := log.FromContext(ctx).WithName("DrainNodeIfNeeded").WithValues("nodeName", node.Name).V(1)
-	if err := r.SetNodeConditionIfNotExists(
-		ctx, node, consts.SlurmNodeDrain, corev1.ConditionTrue, consts.ReasonDraining, consts.MessageDraining,
+	if err := r.setNodeCondition(
+		ctx, node, consts.SlurmNodeDrain, corev1.ConditionTrue, consts.ReasonNodeDraining, consts.MessageDraining,
 	); err != nil {
-		return fmt.Errorf("failed to set node condition for node %s: %w", node.Name, err)
+		return err
 	}
 	if !r.IsNodeUnschedulabled(node) {
 		logger.Info("Node is not unschedulable")
-		setNodeSchedulable := true
-		if err := r.SetNodeSchedulable(ctx, node, setNodeSchedulable); err != nil {
+		setNodeUnschedulable := true
+		if err := r.SetNodeUnschedulable(ctx, node, setNodeUnschedulable); err != nil {
 			return fmt.Errorf("failed to mark node %s as unschedulable: %w", node.Name, err)
 		}
 	}
@@ -242,14 +290,14 @@ func (r *RebooterReconciler) IsNodeUnschedulabled(node *corev1.Node) bool {
 	return node.Spec.Unschedulable
 }
 
-// SetNodeSchedulable sets the node with the given name as schedulable or unschedulable.
-func (r *RebooterReconciler) SetNodeSchedulable(ctx context.Context, node *corev1.Node, unschedulable bool) error {
-	logger := log.FromContext(ctx).WithName("SetNodeSchedulable").WithValues("nodeName", node.Name).V(1)
+// SetNodeUnschedulable sets the node with the given name as schedulable or unschedulable.
+func (r *RebooterReconciler) SetNodeUnschedulable(ctx context.Context, node *corev1.Node, unschedulable bool) error {
+	logger := log.FromContext(ctx).WithName("SetNodeUnschedulable").WithValues("nodeName", node.Name).V(1)
 	logger.Info("Setting node schedulable status", "unschedulable", unschedulable)
 
 	node.Spec.Unschedulable = unschedulable
 	if err := r.Update(ctx, node); err != nil {
-		return fmt.Errorf("failed to update node %s to unschedulable: %w", node.Name, err)
+		return fmt.Errorf("failed to update node %s to  is %v: %w", node.Name, unschedulable, err)
 	}
 	return nil
 }
@@ -341,6 +389,21 @@ func HasTolerationForNoExecute(pod corev1.Pod) bool {
 	return false
 }
 
+// SetNodeCondition sets a custom condition on the node with the given name.
+func (r *RebooterReconciler) setNodeCondition(
+	ctx context.Context,
+	node *corev1.Node,
+	conditionType corev1.NodeConditionType,
+	status corev1.ConditionStatus,
+	reason consts.ReasonConditionType,
+	message consts.MessageConditionType,
+) error {
+	if err := r.SetNodeConditionIfNotExists(ctx, node, conditionType, status, reason, message); err != nil {
+		return fmt.Errorf("failed to set node condition for node %s: %w", r.nodeName, err)
+	}
+	return nil
+}
+
 // SetNodeConditionIfNotExists sets a custom condition on the node with the given name if it does not already exist.
 func (r *RebooterReconciler) SetNodeConditionIfNotExists(
 	ctx context.Context,
@@ -375,10 +438,12 @@ func (r *RebooterReconciler) SetNodeConditionIfNotExists(
 				logger.Info(fmt.Sprintf("Node already has condition %s set to %s", conditionType, status))
 				return nil
 			}
+
 			logger.Info("Updating existing condition on node")
+			patch := client.MergeFrom(node.DeepCopy())
 			node.Status.Conditions[i] = newNodeCondition
 
-			return r.Status().Patch(ctx, node, client.MergeFrom(node))
+			return r.Status().Patch(ctx, node, patch)
 		}
 	}
 
