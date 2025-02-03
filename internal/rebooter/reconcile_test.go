@@ -125,7 +125,7 @@ func TestCheckNodeCondition(t *testing.T) {
 	}
 }
 
-func TestMarkNodeUnschedulable(t *testing.T) {
+func TestSetNodeSchedulable(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
 
@@ -148,7 +148,7 @@ func TestMarkNodeUnschedulable(t *testing.T) {
 		t.Fatalf("failed to create node: %v", err)
 	}
 
-	err = r.MarkNodeUnschedulable(ctx, node)
+	err = r.SetNodeSchedulable(ctx, node, true)
 	if err != nil {
 		t.Errorf("markNodeUnschedulable returned an error: %v", err)
 	}

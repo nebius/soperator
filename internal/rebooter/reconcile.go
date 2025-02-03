@@ -216,7 +216,8 @@ func (r *RebooterReconciler) DrainNodeIfNeeded(ctx context.Context, node *corev1
 	}
 	if !r.IsNodeUnschedulabled(node) {
 		logger.Info("Node is not unschedulable")
-		if err := r.MarkNodeUnschedulable(ctx, node); err != nil {
+		setNodeSchedulable := true
+		if err := r.SetNodeSchedulable(ctx, node, setNodeSchedulable); err != nil {
 			return fmt.Errorf("failed to mark node %s as unschedulable: %w", node.Name, err)
 		}
 	}
@@ -241,12 +242,12 @@ func (r *RebooterReconciler) IsNodeUnschedulabled(node *corev1.Node) bool {
 	return node.Spec.Unschedulable
 }
 
-// MarkNodeUnschedulable marks the node with the given name as unschedulable.
-func (r *RebooterReconciler) MarkNodeUnschedulable(ctx context.Context, node *corev1.Node) error {
-	logger := log.FromContext(ctx).WithName("MarkNodeUnschedulable").WithValues("nodeName", node.Name).V(1)
-	logger.Info("Marking node as unschedulable")
+// SetNodeSchedulable sets the node with the given name as schedulable or unschedulable.
+func (r *RebooterReconciler) SetNodeSchedulable(ctx context.Context, node *corev1.Node, unschedulable bool) error {
+	logger := log.FromContext(ctx).WithName("SetNodeSchedulable").WithValues("nodeName", node.Name).V(1)
+	logger.Info("Setting node schedulable status", "unschedulable", unschedulable)
 
-	node.Spec.Unschedulable = true
+	node.Spec.Unschedulable = unschedulable
 	if err := r.Update(ctx, node); err != nil {
 		return fmt.Errorf("failed to update node %s to unschedulable: %w", node.Name, err)
 	}
@@ -377,7 +378,7 @@ func (r *RebooterReconciler) SetNodeConditionIfNotExists(
 			logger.Info("Updating existing condition on node")
 			node.Status.Conditions[i] = newNodeCondition
 
-			return r.UpdateStatus(ctx, node)
+			return r.Status().Patch(ctx, node, client.MergeFrom(node))
 		}
 	}
 
