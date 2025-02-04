@@ -125,7 +125,7 @@ func TestCheckNodeCondition(t *testing.T) {
 	}
 }
 
-func TestMarkNodeUnschedulable(t *testing.T) {
+func TestSetNodeSchedulable(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
 
@@ -148,7 +148,7 @@ func TestMarkNodeUnschedulable(t *testing.T) {
 		t.Fatalf("failed to create node: %v", err)
 	}
 
-	err = r.MarkNodeUnschedulable(ctx, node)
+	err = r.SetNodeUnschedulable(ctx, node, true)
 	if err != nil {
 		t.Errorf("markNodeUnschedulable returned an error: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestSetNodeConditionIfNotExists(t *testing.T) {
 		t.Fatalf("failed to create node: %v", err)
 	}
 
-	err = r.SetNodeConditionIfNotExists(ctx, node, consts.SlurmNodeDrain, corev1.ConditionTrue, consts.ReasonDrained, consts.MessageDrained)
+	err = r.SetNodeConditionIfNotExists(ctx, node, consts.SlurmNodeDrain, corev1.ConditionTrue, consts.ReasonNodeDrained, consts.MessageDrained)
 	if err != nil {
 		t.Errorf("setNodeCondition returned an error: %v", err)
 	}
@@ -207,7 +207,7 @@ func TestSetNodeConditionIfNotExists(t *testing.T) {
 	if updatedNode.Status.Conditions[0].Status != corev1.ConditionTrue {
 		t.Errorf("node condition status is not correct")
 	}
-	if updatedNode.Status.Conditions[0].Reason != string(consts.ReasonDrained) {
+	if updatedNode.Status.Conditions[0].Reason != string(consts.ReasonNodeDrained) {
 		t.Errorf("node condition reason is not correct")
 	}
 }
@@ -235,9 +235,10 @@ func TestTaintNodeWithNoExecute(t *testing.T) {
 		t.Fatalf("failed to create node: %v", err)
 	}
 
-	err = r.TaintNodeWithNoExecute(ctx, node)
+	// Test adding the taint
+	err = r.TaintNodeWithNoExecute(ctx, node, true)
 	if err != nil {
-		t.Errorf("taintNodeWithNoExecute returned an error: %v", err)
+		t.Errorf("TaintNodeWithNoExecute returned an error: %v", err)
 	}
 
 	updatedNode := &corev1.Node{}
@@ -251,6 +252,21 @@ func TestTaintNodeWithNoExecute(t *testing.T) {
 	}
 	if updatedNode.Spec.Taints[0].Effect != corev1.TaintEffectNoExecute {
 		t.Errorf("taint effect is not correct")
+	}
+
+	// Test removing the taint
+	err = r.TaintNodeWithNoExecute(ctx, node, false)
+	if err != nil {
+		t.Errorf("TaintNodeWithNoExecute returned an error: %v", err)
+	}
+
+	err = fakeClient.Get(ctx, types.NamespacedName{Name: "test-node"}, updatedNode)
+	if err != nil {
+		t.Fatalf("failed to get updated node: %v", err)
+	}
+
+	if len(updatedNode.Spec.Taints) != 0 {
+		t.Errorf("node was not untainted")
 	}
 }
 

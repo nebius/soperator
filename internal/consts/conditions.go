@@ -11,10 +11,12 @@ type ReasonConditionType string
 type MessageConditionType string
 
 const (
-	ReasonDraining  ReasonConditionType = "Draining"
-	ReasonDrained   ReasonConditionType = "Drained"
-	ReasonRebooting ReasonConditionType = "Rebooting"
-	ReasonRebooted  ReasonConditionType = "Rebooted"
+	ReasonNodeDraining       ReasonConditionType = "NodeDraining"
+	ReasonNodeDrained        ReasonConditionType = "NodeDrained"
+	ReasonNodeUndrained      ReasonConditionType = "NodeUndrained"
+	ReasonNodeRebooting      ReasonConditionType = "NodeRebooting"
+	ReasonNodeRebooted       ReasonConditionType = "NodeRebooted"
+	ReasonNodeNoRebootNeeded ReasonConditionType = "NodeNoRebootNeeded"
 )
 
 const (
@@ -22,4 +24,5 @@ const (
 	MessageDrained   MessageConditionType = "Node has been drained"
 	MessageRebooting MessageConditionType = "Node is rebooting"
 	MessageRebooted  MessageConditionType = "Node has been rebooted"
+	MessageUndrained MessageConditionType = "Node has been undrained"
 )
