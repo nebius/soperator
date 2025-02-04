@@ -235,9 +235,10 @@ func TestTaintNodeWithNoExecute(t *testing.T) {
 		t.Fatalf("failed to create node: %v", err)
 	}
 
-	err = r.TaintNodeWithNoExecute(ctx, node)
+	// Test adding the taint
+	err = r.TaintNodeWithNoExecute(ctx, node, true)
 	if err != nil {
-		t.Errorf("taintNodeWithNoExecute returned an error: %v", err)
+		t.Errorf("TaintNodeWithNoExecute returned an error: %v", err)
 	}
 
 	updatedNode := &corev1.Node{}
@@ -251,6 +252,21 @@ func TestTaintNodeWithNoExecute(t *testing.T) {
 	}
 	if updatedNode.Spec.Taints[0].Effect != corev1.TaintEffectNoExecute {
 		t.Errorf("taint effect is not correct")
+	}
+
+	// Test removing the taint
+	err = r.TaintNodeWithNoExecute(ctx, node, false)
+	if err != nil {
+		t.Errorf("TaintNodeWithNoExecute returned an error: %v", err)
+	}
+
+	err = fakeClient.Get(ctx, types.NamespacedName{Name: "test-node"}, updatedNode)
+	if err != nil {
+		t.Fatalf("failed to get updated node: %v", err)
+	}
+
+	if len(updatedNode.Spec.Taints) != 0 {
+		t.Errorf("node was not untainted")
 	}
 }
 

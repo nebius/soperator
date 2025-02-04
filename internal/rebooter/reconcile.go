@@ -65,8 +65,9 @@ func (e *PodNotEvictableError) Error() string {
 }
 
 type NodeActions struct {
-	Reboot bool
-	Drain  bool
+	Reboot  bool
+	Drain   bool
+	Undrain bool
 }
 
 func (r *RebooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -85,12 +86,16 @@ func (r *RebooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return r.handleDrainError(ctx, err)
 	}
 
-	if result, err := r.handleNodeReboot(ctx, node, nodeActions); err != nil {
-		return result, err
+	if err := r.handleNodeReboot(ctx, node, nodeActions); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if err := r.handleNodeUnDrain(ctx, node, nodeActions); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	logger.Info("Reconciliation completed")
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
 }
 
 // getNode returns the node with the given name.
@@ -119,6 +124,11 @@ func (r *RebooterReconciler) GetActions(ctx context.Context, node *corev1.Node) 
 		actions.Drain = true
 		actions.Reboot = true
 	}
+
+	logger.Info("Checking if node needs to be undrained")
+	if !actions.Drain && !actions.Reboot {
+		actions.Undrain = true
+	}
 	return actions
 }
 
@@ -129,17 +139,8 @@ func (r *RebooterReconciler) handleNodeDrain(ctx context.Context, node *corev1.N
 			log.FromContext(ctx).V(1).Info("Failed to drain node", "error", err)
 			return err
 		}
-		if err := r.setNodeCondition(ctx, node, consts.SlurmNodeDrain, corev1.ConditionFalse, consts.ReasonNodeDrained, consts.MessageDrained); err != nil {
+		if err := r.setNodeCondition(ctx, node, consts.SlurmNodeDrain, corev1.ConditionTrue, consts.ReasonNodeDrained, consts.MessageDrained); err != nil {
 			return err
-		}
-	}
-	if err := r.setNodeCondition(ctx, node, consts.SlurmNodeDrain, corev1.ConditionFalse, consts.ReasonNodeScheduled, consts.MessageDrained); err != nil {
-		return err
-	}
-	if r.IsNodeUnschedulabled(node) {
-		setNodeUnschedulable := false
-		if err := r.SetNodeUnschedulable(ctx, node, setNodeUnschedulable); err != nil {
-			return fmt.Errorf("failed to mark node %s as schedulable: %w", node.Name, err)
 		}
 	}
 
@@ -158,6 +159,42 @@ func (r *RebooterReconciler) handleDrainError(ctx context.Context, err error) (c
 	return ctrl.Result{}, fmt.Errorf("failed to drain node: %w", err)
 }
 
+// handleNodeUnDrain undrains the node with the given name if needed.
+func (r *RebooterReconciler) handleNodeUnDrain(ctx context.Context, node *corev1.Node, nodeActions NodeActions) error {
+	if nodeActions.Undrain {
+		if err := r.UndrainNodeIfNeeded(ctx, node); err != nil {
+			log.FromContext(ctx).V(1).Info("Failed to undrain node", "error", err)
+			return err
+		}
+		if err := r.setNodeCondition(ctx, node, consts.SlurmNodeDrain, corev1.ConditionFalse, consts.ReasonNodeUndrained, consts.MessageUndrained); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// UndrainNodeIfNeeded undrains the node with the given name if needed.
+func (r *RebooterReconciler) UndrainNodeIfNeeded(ctx context.Context, node *corev1.Node) error {
+	logger := log.FromContext(ctx).WithName("UndrainNodeIfNeeded").WithValues("nodeName", node.Name).V(1)
+
+	logger.Info("Marking node as schedulable")
+	if !r.IsNodeUnschedulabled(node) {
+		setNodeUnschedulable := false
+		if err := r.SetNodeUnschedulable(ctx, node, setNodeUnschedulable); err != nil {
+			return fmt.Errorf("failed to mark node %s as schedulable: %w", node.Name, err)
+		}
+	}
+
+	logger.Info("Removing NoExecute taint from node")
+	addTaint := false
+	if err := r.TaintNodeWithNoExecute(ctx, node, addTaint); err != nil {
+		return fmt.Errorf("failed to remove NoExecute taint from node %s: %w", node.Name, err)
+	}
+
+	logger.Info("Node undrained")
+	return nil
+}
+
 // checkIfNodeNeedsDrain checks if the node with the given name needs to be drained.
 func (r *RebooterReconciler) checkIfNodeNeedsDrain(ctx context.Context, node *corev1.Node) bool {
 	logger := log.FromContext(ctx).WithName("CheckIfNodeNeedsDrain").WithValues("nodeName", node.Name).V(1)
@@ -171,19 +208,19 @@ func (r *RebooterReconciler) checkIfNodeNeedsDrain(ctx context.Context, node *co
 }
 
 // handleNodeReboot reboots the node with the given name if needed.
-func (r *RebooterReconciler) handleNodeReboot(ctx context.Context, node *corev1.Node, nodeActions NodeActions) (ctrl.Result, error) {
+func (r *RebooterReconciler) handleNodeReboot(ctx context.Context, node *corev1.Node, nodeActions NodeActions) error {
 	if nodeActions.Reboot {
 		if err := r.RebootNode(ctx, node); err != nil {
-			return ctrl.Result{}, err
+			return err
 		}
 		if err := r.setNodeCondition(ctx, node, consts.SlurmNodeReboot, corev1.ConditionFalse, consts.ReasonNodeRebooted, consts.MessageRebooted); err != nil {
-			return ctrl.Result{}, err
+			return err
 		}
 	}
 	if err := r.setNodeCondition(ctx, node, consts.SlurmNodeReboot, corev1.ConditionFalse, consts.ReasonNodeNoRebootNeeded, consts.MessageRebooted); err != nil {
-		return ctrl.Result{}, err
+		return err
 	}
-	return ctrl.Result{}, nil
+	return nil
 }
 
 // checkIfNodeNeedsReboot checks if the node with the given name needs to be rebooted.
@@ -272,7 +309,8 @@ func (r *RebooterReconciler) DrainNodeIfNeeded(ctx context.Context, node *corev1
 
 	// TODO: Implement a full node drain mechanism if needed.
 	logger.Info("Setting NoExecute taint on node")
-	if err := r.TaintNodeWithNoExecute(ctx, node); err != nil {
+	addTaint := true
+	if err := r.TaintNodeWithNoExecute(ctx, node, addTaint); err != nil {
 		return fmt.Errorf("failed to taint node %s with NoExecute: %w", node.Name, err)
 	}
 
@@ -302,12 +340,12 @@ func (r *RebooterReconciler) SetNodeUnschedulable(ctx context.Context, node *cor
 	return nil
 }
 
-// TaintNodeWithNoExecute taints the node with the given name with the NoExecute effect.
+// TaintNodeWithNoExecute taints or untaints the node with the given name with the NoExecute effect.
 // NoSchedule means that no new Pods will be scheduled on the tainted node
 // unless they have a matching toleration. Pods currently running on the node are not evicted.
-func (r *RebooterReconciler) TaintNodeWithNoExecute(ctx context.Context, node *corev1.Node) error {
+func (r *RebooterReconciler) TaintNodeWithNoExecute(ctx context.Context, node *corev1.Node, addTaint bool) error {
 	logger := log.FromContext(ctx).WithName("taintNodeWithNoExecute").V(1)
-	logger.Info("Adding NoExecute taint to node", "node name", node.Name)
+	logger.Info("Modifying NoExecute taint on node", "node name", node.Name, "addTaint", addTaint)
 
 	taint := corev1.Taint{
 		Key:    "node.kubernetes.io/NoExecute",
@@ -315,19 +353,34 @@ func (r *RebooterReconciler) TaintNodeWithNoExecute(ctx context.Context, node *c
 		Effect: corev1.TaintEffectNoExecute,
 	}
 
-	if r.IsNodeTaintedWithNoExecute(ctx, node) {
-		logger.Info("Node already has NoExecute taint", "node name", node.Name)
-		return nil
+	if addTaint {
+		if r.IsNodeTaintedWithNoExecute(ctx, node) {
+			logger.Info("Node already has NoExecute taint", "node name", node.Name)
+			return nil
+		}
+		node.Spec.Taints = append(node.Spec.Taints, taint)
+		logger.Info("Adding NoExecute taint to node", "node name", node.Name)
+	} else {
+		newTaints := []corev1.Taint{}
+		for _, t := range node.Spec.Taints {
+			if t.Key != taint.Key || t.Effect != taint.Effect {
+				newTaints = append(newTaints, t)
+			}
+		}
+		if len(newTaints) == len(node.Spec.Taints) {
+			logger.Info("Node does not have NoExecute taint", "node name", node.Name)
+			return nil
+		}
+		node.Spec.Taints = newTaints
+		logger.Info("Removing NoExecute taint from node", "node name", node.Name)
 	}
 
-	node.Spec.Taints = append(node.Spec.Taints, taint)
-
 	if err := r.Update(ctx, node); err != nil {
-		logger.Error(err, "Failed to update node with NoExecute taint", "node name", node.Name)
+		logger.Error(err, "Failed to update node with NoExecute taint modification", "node name", node.Name)
 		return err
 	}
 
-	logger.Info("Successfully added NoExecute taint to node", "node name", node.Name)
+	logger.Info("Successfully modified NoExecute taint on node", "node name", node.Name)
 	return nil
 }
 
