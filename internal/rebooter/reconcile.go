@@ -178,7 +178,7 @@ func (r *RebooterReconciler) UndrainNodeIfNeeded(ctx context.Context, node *core
 	logger := log.FromContext(ctx).WithName("UndrainNodeIfNeeded").WithValues("nodeName", node.Name).V(1)
 
 	logger.Info("Marking node as schedulable")
-	if !r.IsNodeUnschedulabled(node) {
+	if r.IsNodeUnschedulabled(node) {
 		setNodeUnschedulable := false
 		if err := r.SetNodeUnschedulable(ctx, node, setNodeUnschedulable); err != nil {
 			return fmt.Errorf("failed to mark node %s as schedulable: %w", node.Name, err)
