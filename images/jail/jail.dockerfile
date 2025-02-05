@@ -115,10 +115,8 @@ RUN chmod +x /opt/bin/install_container_toolkit.sh && \
     rm /opt/bin/install_container_toolkit.sh
 
 # Install nvtop GPU monitoring utility
-COPY common/scripts/install_nvtop.sh /opt/bin/
-RUN chmod +x /opt/bin/install_nvtop.sh && \
-    /opt/bin/install_nvtop.sh && \
-    rm /opt/bin/install_nvtop.sh
+RUN add-apt-repository ppa:flexiondotorg/nvtop && \
+    apt install -y nvtop
 
 # Download NCCL tests executables
 RUN wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/nccl-tests-perf.tar.gz && \
