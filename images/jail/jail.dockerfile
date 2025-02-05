@@ -5,6 +5,7 @@ FROM $BASE_IMAGE AS jail
 ARG SLURM_VERSION=24.05.5
 ARG CUDA_VERSION=12.4.1
 ARG OPENMPI_VERSION=4.1.7a1
+ARG DEB_REPO="https://github.com/nebius/slurm-deb-packages/releases/download"
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -60,6 +61,16 @@ RUN apt update && \
         libpmix2 \
         libpmix-dev
 
+# Hacks with NVIDIA drivers
+# Download and install mock packages
+RUN for pkg in cuda-drivers_9999.9999.9999_amd64.deb nvidia-open_9999.9999.9999_amd64.deb; do \
+        wget -q -P /tmp $DEB_REPO/cuda_mocks/${pkg} && echo "${pkg} successfully downloaded" || { echo "Failed to download ${pkg}"; exit 1; }; \
+    done
+RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
+RUN apt install -y cuda=12.4.1-1
+COPY jail/pin_packages/cuda-pins /etc/apt/preferences.d/
+RUN apt update
+
 # Install python
 COPY common/scripts/install_python.sh /opt/bin/
 RUN chmod +x /opt/bin/install_python.sh && \
@@ -87,7 +98,7 @@ ENV PATH=$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 # TODO: Install only necessary packages
 # Download and install Slurm packages
 RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libslurm-perl slurm-smd; do \
-        wget -q -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
+        wget -q -P /tmp $DEB_REPO/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
         echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
     done
