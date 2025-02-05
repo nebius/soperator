@@ -242,7 +242,10 @@ RUN chmod 755 /etc/skel/.slurm && \
     chmod 644 /etc/skel/.slurm/defaults && \
     chmod 644 /etc/skel/.bash_logout && \
     chmod 644 /etc/skel/.bashrc && \
-    chmod 644 /etc/skel/.profile
+    chmod 644 /etc/skel/.profile && \
+    chmod 755 /etc/skel/.config && \
+    chmod 755 /etc/skel/.config/enroot && \
+    chmod 644 /etc/skel/.config/enroot/.credentials
 
 # Use the same /etc/skel content for /root
 RUN rm -rf -- /root/..?* /root/.[!.]* /root/* && \
