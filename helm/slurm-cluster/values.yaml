@@ -416,3 +416,4 @@ images:
   slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.17.0-jammy-slurm24.05.5"
   exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.17.0-jammy-slurm24.05.5"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:11.4.3"
+  rebooter: "cr.eu-north1.nebius.cloud/soperator/rebooter:1.17.0"

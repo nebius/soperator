@@ -250,6 +250,29 @@ func renderContainerNodeSysctl() corev1.Container {
 	}
 }
 
+func renderContainerRebooter(rebooter slurmv1.Rebooter) corev1.Container {
+	return corev1.Container{
+		Name:            consts.ContainerNameRebooter,
+		Image:           rebooter.Image,
+		ImagePullPolicy: rebooter.ImagePullPolicy,
+		SecurityContext: &corev1.SecurityContext{
+			// Privileged rights needed for rebooting the node
+			Privileged:             ptr.To(true),
+			RunAsUser:              ptr.To(int64(0)),
+			ReadOnlyRootFilesystem: ptr.To(true),
+		},
+		Resources: corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceMemory: *rebooter.Resources.Memory(),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    *rebooter.Resources.Cpu(),
+				corev1.ResourceMemory: *rebooter.Resources.Memory(),
+			},
+		},
+	}
+}
+
 // renderContainerNodeSysctlSleep renders [corev1.Container] for reconciliation of sysctl
 func renderContainerNodeSysctlSleep() corev1.Container {
 	return corev1.Container{

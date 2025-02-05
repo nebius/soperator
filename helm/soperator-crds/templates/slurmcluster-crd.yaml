@@ -4031,6 +4031,63 @@ spec:
                         description: PriorityClass defines the priority class for
                           the Slurm worker node
                         type: string
+                      rebooter:
+                        description: |-
+                          It's alpha feature and will be moved to separate CRD in the future
+                          Rebooter defines the configuration for the Slurm worker node rebooter
+                        properties:
+                          enabled:
+                            default: false
+                            description: enabled defines whether the rebooter is enabled
+                            type: boolean
+                          evictionMethod:
+                            default: evict
+                            description: |-
+                              evictionMethod defines the method of eviction for the Slurm worker node
+                              Must be one of [drain, evict]. Now only evict is supported
+                            enum:
+                            - evict
+                            type: string
+                          image:
+                            description: Image defines the rebooter container image
+                            type: string
+                          imagePullPolicy:
+                            default: IfNotPresent
+                            description: imagePullPolicy defines the image pull policy
+                            enum:
+                            - Always
+                            - Never
+                            - IfNotPresent
+                            type: string
+                          logLevel:
+                            default: info
+                            description: logLevel defines the log level for the rebooter
+                            enum:
+                            - debug
+                            - info
+                            - warn
+                            - error
+                            type: string
+                          namespace:
+                            description: |-
+                              Namespace defines the namespace where the rebooter will be deployed
+                              By default, the same namespace as the soperator
+                            type: string
+                          resources:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: Resources defines the [corev1.ResourceRequirements]
+                              for the container
+                            type: object
+                          serviceAccountName:
+                            description: serviceAccountName defines the service account
+                              name for the rebooter
+                            type: string
+                        type: object
                       size:
                         description: Size defines the number of node instances
                         format: int32

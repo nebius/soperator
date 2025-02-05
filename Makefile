@@ -18,7 +18,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 # Limit the scope of generation otherwise it will try to generate configs for non-controller code
-GENPATH = "./api/v1;./internal/controller/..."
+GENPATH = "./api/v1;"
 
 CHART_PATH            		= helm
 CHART_OPERATOR_PATH   		= $(CHART_PATH)/soperator
@@ -78,8 +78,9 @@ help: ## Display this help.
 
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths=$(GENPATH) output:crd:artifacts:config=config/crd/bases
-
+	$(CONTROLLER_GEN) crd webhook paths=$(GENPATH) output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./internal/controller/clustercontroller/..." output:artifacts:config=config/rbac/clustercontroller/
+	$(CONTROLLER_GEN) rbac:roleName=rebooter-role paths="./internal/rebooter/..." output:artifacts:config=config/rbac/rebooter/
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object paths=$(GENPATH)
