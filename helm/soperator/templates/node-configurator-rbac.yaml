@@ -1,8 +1,9 @@
----
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: rebooter-role
+  name: {{ include "soperator.fullname" . }}-node-configurator-role
+  labels:
+  {{- include "soperator.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - ""

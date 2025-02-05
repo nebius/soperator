@@ -23,17 +23,17 @@ kind: ClusterRoleBinding
 metadata:
   labels:
     app.kubernetes.io/name: clusterrolebinding
-    app.kubernetes.io/instance: rebooter-rolebinding
+    app.kubernetes.io/instance: node-configurator-rolebinding
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: slurm-operator
     app.kubernetes.io/part-of: slurm-operator
     app.kubernetes.io/managed-by: kustomize
-  name: rebooter-rolebinding
+  name: node-configurator-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: rebooter-role
+  name: node-configurator-role
 subjects:
 - kind: ServiceAccount
-  name: rebooter
+  name: node-configurator
   namespace: system

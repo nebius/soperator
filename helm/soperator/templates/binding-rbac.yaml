@@ -28,8 +28,8 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: '{{ include "soperator.fullname" . }}-rebooter-role'
+  name: '{{ include "soperator.fullname" . }}-node-configurator-role'
 subjects:
 - kind: ServiceAccount
-  name: '{{ include "soperator.fullname" . }}-controller-rebooter'
+  name: '{{ include "soperator.fullname" . }}-controller-node-configurator'
   namespace: '{{ .Release.Namespace }}'

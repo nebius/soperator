@@ -80,7 +80,7 @@ help: ## Display this help.
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) crd webhook paths=$(GENPATH) output:crd:artifacts:config=config/crd/bases
 	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./internal/controller/clustercontroller/..." output:artifacts:config=config/rbac/clustercontroller/
-	$(CONTROLLER_GEN) rbac:roleName=rebooter-role paths="./internal/rebooter/..." output:artifacts:config=config/rbac/rebooter/
+	$(CONTROLLER_GEN) rbac:roleName=node-configurator-role paths="./internal/rebooter/..." output:artifacts:config=config/rbac/node-configurator/
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object paths=$(GENPATH)
