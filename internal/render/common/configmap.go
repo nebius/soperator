@@ -368,6 +368,9 @@ func generateDefaultSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigF
 	res.AddLine("MaxAuthTries " + consts.SSHDMaxAuthTries)
 	res.AddLine("LogLevel DEBUG3")
 	res.AddLine("")
+	res.AddLine("Match User root")
+	res.AddLine("    AuthorizedKeysFile /root/.ssh/authorized_keys " + consts.VolumeMountPathJail + "/root/.ssh/authorized_keys")
+	res.AddLine("")
 	res.AddLine("Match User *")
 	res.AddLine("    LogLevel INFO")
 	return res
