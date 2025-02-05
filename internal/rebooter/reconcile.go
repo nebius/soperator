@@ -34,24 +34,31 @@ var (
 	ControllerName = "rebooter"
 )
 
+type RebooterParams struct {
+	ReconcileTimeout time.Duration
+	NodeName         string
+	EvictionMethod   consts.RebooterMethod
+}
+
 type RebooterReconciler struct {
 	*reconciler.Reconciler
 	reconcileTimeout time.Duration
 	nodeName         string
+	evictionMethod   consts.RebooterMethod
 }
 
 func NewRebooterReconciler(
 	client client.Client,
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
-	reconcileTimeout time.Duration,
-	nodeName string,
+	rebooterParams RebooterParams,
 ) *RebooterReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 	return &RebooterReconciler{
 		Reconciler:       r,
-		reconcileTimeout: reconcileTimeout,
-		nodeName:         nodeName,
+		reconcileTimeout: rebooterParams.ReconcileTimeout,
+		nodeName:         rebooterParams.NodeName,
+		evictionMethod:   rebooterParams.EvictionMethod,
 	}
 }
 
@@ -306,12 +313,18 @@ func (r *RebooterReconciler) DrainNodeIfNeeded(ctx context.Context, node *corev1
 			return fmt.Errorf("failed to mark node %s as unschedulable: %w", node.Name, err)
 		}
 	}
-
+	if r.evictionMethod == consts.RebooterEvict {
+		logger.Info("Setting NoExecute taint on node")
+		addTaint := true
+		if err := r.TaintNodeWithNoExecute(ctx, node, addTaint); err != nil {
+			return fmt.Errorf("failed to taint node %s with NoExecute: %w", node.Name, err)
+		}
+	}
 	// TODO: Implement a full node drain mechanism if needed.
-	logger.Info("Setting NoExecute taint on node")
-	addTaint := true
-	if err := r.TaintNodeWithNoExecute(ctx, node, addTaint); err != nil {
-		return fmt.Errorf("failed to taint node %s with NoExecute: %w", node.Name, err)
+	// This part should be implemented later when the full node drain mechanism is required.
+	if r.evictionMethod == consts.RebooterDrain {
+		logger.Info("Full node drain mechanism is not implemented yet")
+		return nil
 	}
 
 	logger.Info("Evicting pods from node")

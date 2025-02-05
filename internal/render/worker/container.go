@@ -261,6 +261,10 @@ func renderContainerRebooter(rebooter slurmv1.Rebooter) corev1.Container {
 			RunAsUser:              ptr.To(int64(0)),
 			ReadOnlyRootFilesystem: ptr.To(true),
 		},
+		Args: []string{
+			"-log-level",
+			rebooter.LogLevel,
+		},
 		Resources: corev1.ResourceRequirements{
 			Limits: corev1.ResourceList{
 				corev1.ResourceMemory: *rebooter.Resources.Memory(),
@@ -268,6 +272,12 @@ func renderContainerRebooter(rebooter slurmv1.Rebooter) corev1.Container {
 			Requests: corev1.ResourceList{
 				corev1.ResourceCPU:    *rebooter.Resources.Cpu(),
 				corev1.ResourceMemory: *rebooter.Resources.Memory(),
+			},
+		},
+		Env: []corev1.EnvVar{
+			{
+				Name:  consts.RebooterMethodEnv,
+				Value: rebooter.EvictionMethod,
 			},
 		},
 	}
