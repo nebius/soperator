@@ -116,8 +116,6 @@ pushd "${jaildir}"
     echo "Bind-mount pyxis plugin from container to the jail"
     touch usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
     mount --bind /usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
-    mkdir -p usr/share/pyxis
-    mount --bind /usr/share/pyxis usr/share/pyxis
 
     echo "Bind-mount slurm configs"
     for file in /mnt/slurm-configs/*; do

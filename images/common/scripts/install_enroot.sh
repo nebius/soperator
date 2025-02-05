@@ -12,7 +12,3 @@ apt clean
 # Prepare env for running enroot
 mkdir -m 777 /usr/share/enroot/enroot-data
 mkdir -m 755 /run/enroot
-
-# Set capabilities for running containers without privileges
-setcap cap_sys_admin+pe /usr/bin/enroot-mksquashovlfs
-setcap cap_sys_admin,cap_mknod+pe /usr/bin/enroot-aufs2ovlfs
