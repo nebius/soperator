@@ -59,15 +59,19 @@ RUN apt update && \
         rdma-core \
         ibverbs-utils \
         libpmix2 \
-        libpmix-dev
+        libpmix-dev && \
+    apt clean
 
 # Hacks with NVIDIA drivers
 # Download and install mock packages
 RUN for pkg in cuda-drivers_9999.9999.9999_amd64.deb nvidia-open_9999.9999.9999_amd64.deb; do \
         wget -q -P /tmp $DEB_REPO/cuda_mocks/${pkg} && echo "${pkg} successfully downloaded" || { echo "Failed to download ${pkg}"; exit 1; }; \
     done
-RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
-RUN apt install -y cuda=12.4.1-1
+RUN apt install -y /tmp/*.deb && \
+    rm -rf /tmp/*.deb && \
+    apt clean
+RUN apt install -y cuda=12.4.1-1 && \
+    apt clean
 COPY jail/pin_packages/cuda-pins /etc/apt/preferences.d/
 RUN apt update
 
@@ -103,7 +107,9 @@ RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-l
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
     done
 
-RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
+RUN apt install -y /tmp/*.deb && \
+    rm -rf /tmp/*.deb && \
+    apt clean
 
 # Create directory for bind-mounting it from the host. It's needed for sbatch to work
 RUN mkdir -m 755 -p /var/spool/slurmd
@@ -116,7 +122,13 @@ RUN chmod +x /opt/bin/install_container_toolkit.sh && \
 
 # Install nvtop GPU monitoring utility
 RUN add-apt-repository ppa:flexiondotorg/nvtop && \
-    apt install -y nvtop
+    apt install -y nvtop && \
+    apt clean
+
+# Install dcgmi tools
+# https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/dcgm-diagnostics.html
+RUN apt install -y datacenter-gpu-manager-4-cuda12 && \
+    apt clean
 
 # Download NCCL tests executables
 RUN wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/nccl-tests-perf.tar.gz && \
