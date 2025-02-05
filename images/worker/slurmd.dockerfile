@@ -145,12 +145,6 @@ RUN chmod +x /opt/bin/install_container_toolkit.sh && \
 # Copy NVIDIA Container Toolkit config
 COPY worker/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
 
-# Install nvtop GPU monitoring utility
-COPY common/scripts/install_nvtop.sh /opt/bin/
-RUN chmod +x /opt/bin/install_nvtop.sh && \
-    /opt/bin/install_nvtop.sh && \
-    rm /opt/bin/install_nvtop.sh
-
 # Install Docker
 COPY common/scripts/install_docker.sh /opt/bin/
 RUN chmod +x /opt/bin/install_docker.sh && \

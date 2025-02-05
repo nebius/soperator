@@ -82,7 +82,7 @@ pushd "${jaildir}"
         touch "etc/gpu_libs_installed.flag"
     fi
 
-    echo "Bind-mount slurm chroot plugin from container at jail"
+    echo "Bind-mount slurm chroot plugin from container to the jail"
     touch usr/lib/x86_64-linux-gnu/slurm/chroot.so
     mount --bind /usr/lib/x86_64-linux-gnu/slurm/chroot.so usr/lib/x86_64-linux-gnu/slurm/chroot.so
 
@@ -110,7 +110,7 @@ pushd "${jaildir}"
         flock etc/complement_jail_setcap_enroot_aufs2ovlfs.lock -c "setcap cap_sys_admin,cap_mknod+pe usr/bin/enroot-aufs2ovlfs"
     fi
 
-    echo "Bind-mount pyxis plugin from container at jail"
+    echo "Bind-mount pyxis plugin from container to the jail"
     touch usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
     mount --bind /usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
     mkdir -p usr/share/pyxis
@@ -127,6 +127,7 @@ pushd "${jaildir}"
         mount --bind /var/spool/slurmd var/spool/slurmd/
     fi
 
+    # For login node with cluster type GPU
     if [ -z "$worker" ] && [ "$SLURM_CLUSTER_TYPE" = "gpu" ]; then
         while [ ! -f "etc/gpu_libs_installed.flag" ]; do
             echo "Waiting for GPU libs to be propagated to the jail from a worker node"
@@ -138,6 +139,7 @@ pushd "${jaildir}"
         done
     fi
 
+    # For $worker node only
     if [ -n "$worker" ]; then
         echo "Update linker cache inside the jail"
         flock etc/complement_jail_ldconfig.lock -c "chroot \"${jaildir}\" /usr/sbin/ldconfig"
