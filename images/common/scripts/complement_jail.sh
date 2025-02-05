@@ -32,8 +32,8 @@ pushd "${jaildir}"
     echo "Bind-mount cgroup filesystem"
     mount --rbind /sys/fs/cgroup sys/fs/cgroup
 
-    echo "Remount /tmp"
-    mount -t tmpfs tmpfs tmp/
+    echo "Bind-mount /tmp"
+    mount --bind /tmp tmp/
 
     echo "Bind-mount /var/log because it should be node-local"
     mount --bind /var/log var/log
@@ -97,9 +97,6 @@ pushd "${jaildir}"
         filename=$(basename "$file")
         touch "usr/bin/$filename" && mount --bind "$file" "usr/bin/$filename"
     done
-
-    echo "Bind-mount enroot data directory because it should be node-local"
-    mount --bind /usr/share/enroot/enroot-data usr/share/enroot/enroot-data
 
     if ! getcap usr/bin/enroot-mksquashovlfs | grep -q 'cap_sys_admin+pe'; then
         echo "Set capabilities for enroot-mksquashovlfs to run containers without privileges"

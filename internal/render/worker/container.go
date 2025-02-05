@@ -66,6 +66,8 @@ func renderContainerSlurmd(
 		common.RenderVolumeMountSshdKeys(),
 		common.RenderVolumeMountSshdConfigs(),
 		common.RenderVolumeMountSshdRootKeys(),
+		common.RenderVolumeMountInMemory(),
+		common.RenderVolumeMountTmpDisk(),
 		renderVolumeMountNvidia(),
 		renderVolumeMountBoot(),
 		renderVolumeMountNCCLTopology(),
