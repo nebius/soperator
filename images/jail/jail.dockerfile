@@ -186,6 +186,9 @@ RUN chmod +x /opt/bin/install_container_toolkit.sh && \
     /opt/bin/install_container_toolkit.sh && \
     rm /opt/bin/install_container_toolkit.sh
 
+# Copy NVIDIA Container Toolkit config
+COPY common/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
+
 # Install nvtop GPU monitoring utility
 RUN add-apt-repository ppa:flexiondotorg/nvtop && \
     apt install -y nvtop && \

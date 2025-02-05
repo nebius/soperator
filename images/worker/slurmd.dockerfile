@@ -142,7 +142,7 @@ RUN chmod +x /opt/bin/install_container_toolkit.sh && \
     rm /opt/bin/install_container_toolkit.sh
 
 # Copy NVIDIA Container Toolkit config
-COPY worker/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
+COPY common/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
 
 # Install Docker
 COPY common/scripts/install_docker.sh /opt/bin/
