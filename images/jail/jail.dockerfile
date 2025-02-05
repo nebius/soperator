@@ -119,6 +119,7 @@ RUN apt update && \
         iputils-ping \
         dnsutils \
         telnet \
+        netcat \
         strace \
         sudo \
         tree \
