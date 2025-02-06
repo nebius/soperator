@@ -242,11 +242,7 @@ func (r *RebooterReconciler) checkIfNodeNeedsReboot(ctx context.Context, nodeCon
 		logger.Info("Node already rebooted")
 		return false
 	}
-	isStatusTrue := nodeCondition.Status == corev1.ConditionTrue
-	needsReboot := r.IsUptimeGreaterThanLastTransition(ctx, nodeCondition.LastTransitionTime)
-
-	logger.WithValues("nodeCondition", nodeCondition).Info("Checking if node needs reboot")
-	return isStatusTrue && needsReboot
+	return r.CheckNodeCondition(ctx, nodeCondition, consts.SlurmNodeReboot, corev1.ConditionTrue)
 }
 
 // IsUptimeGreaterThanLastTransition checks if the uptime of the node is greater than the last transition time.
