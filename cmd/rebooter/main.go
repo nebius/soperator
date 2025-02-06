@@ -180,13 +180,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	envEvictionMethod := os.Getenv(consts.RebooterMethodEnv)
-	if envEvictionMethod == "" {
-		rebooterParams.EvictionMethod = consts.RebooterEvict
-	} else {
-		rebooterParams.EvictionMethod = consts.RebooterMethod(envEvictionMethod)
+	switch envEvictionMethod := os.Getenv(consts.RebooterMethodEnv) {
+	case string(consts.RebooterDrain):
+	    setupLog.Error("Drain method is not implemented yet")
+	    os.Exit(1)
+	case string(consts.RebooterEvict):
+	    fallthrough
+	default:
+	    rebooterParams.EvictionMethod = consts.RebooterEvict
 	}
-
 	if err = rebooter.NewRebooterReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
