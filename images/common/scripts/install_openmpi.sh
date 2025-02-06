@@ -8,3 +8,4 @@ wget https://linux.mellanox.com/public/repo/mlnx_ofed/$OFED_VERSION/"$DISTRO"/me
 wget -qO - https://www.mellanox.com/downloads/ofed/RPM-GPG-KEY-Mellanox | apt-key add -
 apt update
 apt install openmpi="$OPENMPI_VERSION"
+apt clean

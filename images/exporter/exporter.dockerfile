@@ -12,7 +12,8 @@ ARG VERSION_EXPORTER=0.20
 RUN apt-get update && \
     apt -y install \
         wget \
-        unzip
+        unzip && \
+    apt clean
 
 WORKDIR /app
 
@@ -71,7 +72,8 @@ RUN apt-get update && \
         kmod \
         daemontools \
         libncurses5-dev \
-        libdrm-dev
+        libdrm-dev && \
+    apt clean
 
 # TODO: Install only necessary packages
 # Download and install Slurm packages
@@ -81,7 +83,9 @@ RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-l
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
     done
 
-RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
+RUN apt install -y /tmp/*.deb && \
+    rm -rf /tmp/*.deb && \
+    apt clean
 
 # Install slurm сhroot plugin
 COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/

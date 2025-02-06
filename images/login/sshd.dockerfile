@@ -39,7 +39,8 @@ RUN apt-get update && \
         strace \
         vim \
         tree \
-        lsof
+        lsof && \
+    apt clean
 
 # Install OpenSSH server
 RUN apt install -y openssh-server
@@ -65,7 +66,9 @@ RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-l
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
     done
 
-RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
+RUN apt install -y /tmp/*.deb && \
+    rm -rf /tmp/*.deb && \
+    apt clean
 
 # Install slurm сhroot plugin
 COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/

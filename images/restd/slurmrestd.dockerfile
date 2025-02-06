@@ -38,7 +38,8 @@ RUN apt-get update && \
         vim \
         tree \
         lsof \
-        daemontools
+        daemontools && \
+    apt clean
 
 
 # Download and install Slurm packages
@@ -48,7 +49,9 @@ RUN for pkg in slurm-smd slurm-smd-slurmrestd; do \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
     done
 
-RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
+RUN apt install -y /tmp/*.deb \
+    && rm -rf /tmp/*.deb && \
+    apt clean
 
 # Expose the port used for accessing slurmrestd
 EXPOSE 6820

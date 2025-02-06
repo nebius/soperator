@@ -1,5 +1,5 @@
 # BASE_IMAGE defined here for second multistage build
-ARG BASE_IMAGE=nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+ARG BASE_IMAGE=ubuntu:jammy
 
 # First stage: Build the gpubench application
 FROM golang:1.23 AS gpubench_builder
@@ -23,7 +23,7 @@ RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 #######################################################################################################################
 # Second stage: Build worker image
 
-ARG BASE_IMAGE=nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+ARG BASE_IMAGE=ubuntu:jammy
 
 FROM $BASE_IMAGE AS worker_slurmd
 
@@ -79,7 +79,8 @@ RUN apt-get update && \
         rdma-core \
         ibverbs-utils \
         libpmix2 \
-        libpmix-dev
+        libpmix-dev && \
+    apt clean
 
 # Install OpenMPI
 COPY common/scripts/install_openmpi.sh /opt/bin/
@@ -101,7 +102,9 @@ RUN wget -q -P /tmp https://github.com/nebius/slurm-deb-packages/releases/downlo
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
     done
 
-RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
+RUN apt install -y /tmp/*.deb && \
+    rm -rf /tmp/*.deb && \
+    apt clean
 
 # Install slurm сhroot plugin
 COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/

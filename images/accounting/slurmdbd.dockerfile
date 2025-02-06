@@ -40,7 +40,8 @@ RUN apt-get update && \
         vim \
         tree \
         lsof \
-        daemontools
+        daemontools && \
+    apt clean
 
 
 # TODO: Install only necessary packages
@@ -51,7 +52,9 @@ RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-l
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
     done
 
-RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
+RUN apt install -y /tmp/*.deb && \
+    rm -rf /tmp/*.deb && \
+    apt clean
 
 # Update linker cache
 RUN ldconfig
