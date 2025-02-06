@@ -120,9 +120,8 @@ func (r *RebooterReconciler) GetActions(ctx context.Context, node *corev1.Node) 
 	actions := NodeActions{}
 
 	nodeDrainCondition := r.GetNodeConditions(ctx, node, consts.SlurmNodeDrain)
-	if nodeDrainCondition != nil {
-		logger.Info("Checking if node needs to be drained")
-		if r.checkIfNodeNeedsDrain(ctx, nodeDrainCondition) {
+	logger.Info("Checking if node needs to be drained")
+	if nodeDrainCondition != nil && r.checkIfNodeNeedsDrain(ctx, nodeDrainCondition) {
 			logger.V(1).Info("Node needs drain")
 			actions.Drain = true
 		}
