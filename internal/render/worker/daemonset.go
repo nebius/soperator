@@ -33,7 +33,7 @@ func RenderDaemonSet(
 
 	return appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      naming.BuildDemonsetName(consts.ComponentTypeNodeConfigurator),
+			Name:      naming.BuildDaemonSetName(consts.ComponentTypeNodeConfigurator),
 			Namespace: rebooter.Namespace,
 			Labels:    labels,
 		},
