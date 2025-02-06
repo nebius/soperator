@@ -1,7 +1,9 @@
 #!/bin/bash
 
 # Install munge
-apt update && apt install -y munge libmunge-dev
+apt update
+apt install -y munge libmunge-dev
+apt clean
 
 # Fix permissions
 chmod -R 700 /etc/munge /var/log/munge

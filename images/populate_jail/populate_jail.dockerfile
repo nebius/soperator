@@ -3,14 +3,18 @@ ARG BASE_IMAGE=ubuntu:jammy
 # First stage: untap jail_rootfs.tar
 FROM $BASE_IMAGE AS untaped
 COPY jail_rootfs.tar /jail_rootfs.tar
-RUN mkdir /jail && tar -xvf /jail_rootfs.tar -C /jail && rm /jail_rootfs.tar
+RUN mkdir /jail && \
+    tar -xvf /jail_rootfs.tar -C /jail && \
+    rm /jail_rootfs.tar
 
 # Second stage: copy untaped jail environment to the target
 FROM $BASE_IMAGE AS populate_jail
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-RUN apt update && apt install -y rclone rsync
+RUN apt update && \
+    apt install -y rclone rsync && \
+    apt clean
 
 COPY --from=untaped /jail /jail
 
