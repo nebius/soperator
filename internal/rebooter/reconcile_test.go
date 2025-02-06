@@ -119,7 +119,7 @@ func TestCheckNodeCondition(t *testing.T) {
 			err := fakeClient.Create(ctx, tc.node)
 			assert.NoError(t, err)
 
-			result := r.CheckNodeCondition(ctx, tc.node, tc.typeCondition, tc.statusCondition)
+			result := r.CheckNodeCondition(ctx, &tc.node.Status.Conditions[0], tc.typeCondition, tc.statusCondition)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
