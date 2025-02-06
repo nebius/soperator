@@ -128,9 +128,8 @@ func (r *RebooterReconciler) GetActions(ctx context.Context, node *corev1.Node) 
 	}
 
 	nodeRebootCondition := r.GetNodeConditions(ctx, node, consts.SlurmNodeReboot)
-	if nodeRebootCondition != nil {
-		logger.Info("Checking if node needs to be rebooted")
-		if r.checkIfNodeNeedsReboot(ctx, nodeRebootCondition) {
+	logger.Info("Checking if node needs to be rebooted")
+    if nodeRebootCondition != nil && if r.checkIfNodeNeedsReboot(ctx, nodeRebootCondition) {
 			if !r.IsUptimeGreaterThanLastTransition(ctx, nodeRebootCondition.LastTransitionTime) {
 				logger.Info("Node does not need to be rebooted")
 				r.setNodeCondition(ctx, node, consts.SlurmNodeReboot, corev1.ConditionTrue, consts.ReasonNodeRebooted, consts.MessageRebooted)
