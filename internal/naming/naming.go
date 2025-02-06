@@ -93,7 +93,7 @@ func BuildDeploymentName(componentType consts.ComponentType) string {
 	}.String()
 }
 
-func BuildDemonsetName(componentType consts.ComponentType) string {
+func BuildDaemonSetName(componentType consts.ComponentType) string {
 	return namedEntity{
 		componentType: &componentType,
 		entity:        "",
