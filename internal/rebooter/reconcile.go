@@ -89,14 +89,18 @@ func (r *RebooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	nodeActions := r.GetActions(ctx, node)
 	logger.V(1).Info("Node actions", "actions", nodeActions)
 
+	logger.V(1).Info("Starting handling node drain")
 	if err := r.handleNodeDrain(ctx, node, nodeActions); err != nil {
+		logger.V(1).Info("Failed to drain node", "error", err)
 		return r.handleDrainError(ctx, err)
 	}
 
+	logger.V(1).Info("Starting handling node reboot")
 	if err := r.handleNodeReboot(ctx, node, nodeActions); err != nil {
 		return ctrl.Result{}, err
 	}
 
+	logger.V(1).Info("Starting handling node undrain")
 	if err := r.handleNodeUnDrain(ctx, node, nodeActions); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -128,16 +132,18 @@ func (r *RebooterReconciler) GetActions(ctx context.Context, node *corev1.Node) 
 
 	nodeRebootCondition := r.GetNodeConditions(ctx, node, consts.SlurmNodeReboot)
 	logger.Info("Checking if node needs to be rebooted")
-	if nodeRebootCondition != nil && r.checkIfNodeNeedsReboot(ctx, nodeRebootCondition) {
+	if nodeRebootCondition != nil {
 		if !r.IsUptimeGreaterThanLastTransition(ctx, nodeRebootCondition.LastTransitionTime) {
 			logger.Info("Node does not need to be rebooted")
 			r.setNodeCondition(ctx, node, consts.SlurmNodeReboot, corev1.ConditionTrue, consts.ReasonNodeRebooted, consts.MessageRebooted)
 			return actions
 		}
-		logger.V(1).Info("Node needs reboot")
-		// If the node needs to be rebooted, it also needs to be drained.
-		actions.Drain = true
-		actions.Reboot = true
+		if r.checkIfNodeNeedsReboot(ctx, nodeRebootCondition) {
+			logger.V(1).Info("Node needs reboot")
+			// If the node needs to be rebooted, it also needs to be drained.
+			actions.Drain = true
+			actions.Reboot = true
+		}
 	}
 
 	logger.Info("Checking if node needs to be undrained")
@@ -224,9 +230,6 @@ func (r *RebooterReconciler) handleNodeReboot(ctx context.Context, node *corev1.
 		if err := r.RebootNode(ctx, node); err != nil {
 			return err
 		}
-		if err := r.setNodeCondition(ctx, node, consts.SlurmNodeReboot, corev1.ConditionTrue, consts.ReasonNodeRebooted, consts.MessageRebooted); err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -239,11 +242,7 @@ func (r *RebooterReconciler) checkIfNodeNeedsReboot(ctx context.Context, nodeCon
 		logger.Info("Node already rebooted")
 		return false
 	}
-	isStatusTrue := nodeCondition.Status == corev1.ConditionTrue
-	needsReboot := r.IsUptimeGreaterThanLastTransition(ctx, nodeCondition.LastTransitionTime)
-
-	logger.WithValues("nodeCondition", nodeCondition).Info("Checking if node needs reboot")
-	return isStatusTrue && needsReboot
+	return r.CheckNodeCondition(ctx, nodeCondition, consts.SlurmNodeReboot, corev1.ConditionTrue)
 }
 
 // IsUptimeGreaterThanLastTransition checks if the uptime of the node is greater than the last transition time.
@@ -497,9 +496,10 @@ func (r *RebooterReconciler) SetNodeConditionIfNotExists(
 	// Instead, changes to the status must be made using the Status().Update method.
 	for i, cond := range node.Status.Conditions {
 		if cond.Type == conditionType {
-			if cond.Status == status {
+
+			if cond.Status == status && cond.Reason == string(reason) {
 				logger.Info(fmt.Sprintf("Node already has condition %s set to %s", conditionType, status))
-				return nil
+				newNodeCondition.LastTransitionTime = cond.LastTransitionTime
 			}
 
 			logger.Info("Updating existing condition on node")
