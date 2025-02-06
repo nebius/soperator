@@ -122,24 +122,22 @@ func (r *RebooterReconciler) GetActions(ctx context.Context, node *corev1.Node) 
 	nodeDrainCondition := r.GetNodeConditions(ctx, node, consts.SlurmNodeDrain)
 	logger.Info("Checking if node needs to be drained")
 	if nodeDrainCondition != nil && r.checkIfNodeNeedsDrain(ctx, nodeDrainCondition) {
-			logger.V(1).Info("Node needs drain")
-			actions.Drain = true
-		}
+		logger.V(1).Info("Node needs drain")
+		actions.Drain = true
 	}
 
 	nodeRebootCondition := r.GetNodeConditions(ctx, node, consts.SlurmNodeReboot)
 	logger.Info("Checking if node needs to be rebooted")
-    if nodeRebootCondition != nil && if r.checkIfNodeNeedsReboot(ctx, nodeRebootCondition) {
-			if !r.IsUptimeGreaterThanLastTransition(ctx, nodeRebootCondition.LastTransitionTime) {
-				logger.Info("Node does not need to be rebooted")
-				r.setNodeCondition(ctx, node, consts.SlurmNodeReboot, corev1.ConditionTrue, consts.ReasonNodeRebooted, consts.MessageRebooted)
-				return actions
-			}
-			logger.V(1).Info("Node needs reboot")
-			// If the node needs to be rebooted, it also needs to be drained.
-			actions.Drain = true
-			actions.Reboot = true
+	if nodeRebootCondition != nil && r.checkIfNodeNeedsReboot(ctx, nodeRebootCondition) {
+		if !r.IsUptimeGreaterThanLastTransition(ctx, nodeRebootCondition.LastTransitionTime) {
+			logger.Info("Node does not need to be rebooted")
+			r.setNodeCondition(ctx, node, consts.SlurmNodeReboot, corev1.ConditionTrue, consts.ReasonNodeRebooted, consts.MessageRebooted)
+			return actions
 		}
+		logger.V(1).Info("Node needs reboot")
+		// If the node needs to be rebooted, it also needs to be drained.
+		actions.Drain = true
+		actions.Reboot = true
 	}
 
 	logger.Info("Checking if node needs to be undrained")

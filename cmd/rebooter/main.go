@@ -173,21 +173,23 @@ func main() {
 	}
 
 	// Rebooter is a daemonset and should only reconcile the node it is running on
-	rebooterParams.NodeName = os.Getenv(consts.RebooterMethodEnv)
+	rebooterParams.NodeName = os.Getenv(consts.RebooterNodeNameEnv)
 	if rebooterParams.NodeName == "" {
 		errorStr := fmt.Errorf("%s environment variable is not set", consts.RebooterMethodEnv)
 		setupLog.Error(errorStr, "unable to start manager")
 		os.Exit(1)
 	}
 
-	switch envEvictionMethod := os.Getenv(consts.RebooterMethodEnv) {
+	envEvictionMethod := os.Getenv(consts.RebooterMethodEnv)
+	switch envEvictionMethod {
 	case string(consts.RebooterDrain):
-	    setupLog.Error("Drain method is not implemented yet")
-	    os.Exit(1)
+		// TODO: Implement drain method
+		setupLog.Error(fmt.Errorf("drain method is not supported"), "unable to start manager")
+		os.Exit(1)
 	case string(consts.RebooterEvict):
-	    fallthrough
+		fallthrough
 	default:
-	    rebooterParams.EvictionMethod = consts.RebooterEvict
+		rebooterParams.EvictionMethod = consts.RebooterEvict
 	}
 	if err = rebooter.NewRebooterReconciler(
 		mgr.GetClient(),
