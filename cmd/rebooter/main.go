@@ -38,6 +38,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/rebooter"
 	//+kubebuilder:scaffold:imports
 )
@@ -167,20 +168,35 @@ func main() {
 		os.Exit(1)
 	}
 
+	rebooterParams := rebooter.RebooterParams{
+		ReconcileTimeout: reconcileTimeout,
+	}
+
 	// Rebooter is a daemonset and should only reconcile the node it is running on
-	nodeName := os.Getenv("REBOOTER_NODE_NAME")
-	if nodeName == "" {
-		setupLog.Error(fmt.Errorf("NODE_NAME environment variable is not set"), "unable to start manager")
+	rebooterParams.NodeName = os.Getenv(consts.RebooterNodeNameEnv)
+	if rebooterParams.NodeName == "" {
+		errorStr := fmt.Errorf("%s environment variable is not set", consts.RebooterMethodEnv)
+		setupLog.Error(errorStr, "unable to start manager")
 		os.Exit(1)
 	}
 
+	envEvictionMethod := os.Getenv(consts.RebooterMethodEnv)
+	switch envEvictionMethod {
+	case string(consts.RebooterDrain):
+		// TODO: Implement drain method
+		setupLog.Error(fmt.Errorf("drain method is not supported"), "unable to start manager")
+		os.Exit(1)
+	case string(consts.RebooterEvict):
+		fallthrough
+	default:
+		rebooterParams.EvictionMethod = consts.RebooterEvict
+	}
 	if err = rebooter.NewRebooterReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		mgr.GetEventRecorderFor(rebooter.ControllerName),
-		reconcileTimeout,
-		nodeName,
-	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout, nodeName); err != nil {
+		rebooterParams,
+	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout, rebooterParams.NodeName); err != nil {
 		setupLog.Error(err, "unable to create controller", rebooter.ControllerName)
 		os.Exit(1)
 	}

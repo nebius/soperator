@@ -42,8 +42,13 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
+					// TODO: It is workround will be removed after create new CRD NodeConfigurator
+					if clusterValues.NodeWorker.Rebooter.Namespace == "" {
+						clusterValues.NodeWorker.Rebooter.Namespace = clusterValues.Namespace
+					}
+
 					desired := worker.RenderDaemonSet(
-						clusterValues.Namespace,
+						clusterValues.NodeWorker.Rebooter,
 						clusterValues.Name,
 						clusterValues.NodeWorker.K8sNodeFilterName,
 						clusterValues.NodeFilters,

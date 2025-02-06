@@ -19,4 +19,7 @@ const (
 	LabelManagedByValue = slurmOperator
 	LabelValidateKey    = "slurm.nebius.ai/webhook"
 	LabelValidateValue  = "true"
+
+	LabelNodeConfiguratorKey   = "slurm.nebius.ai/node-configurator"
+	LabelNodeConfiguratorValue = "true"
 )

@@ -19,15 +19,15 @@ func (b baseComponentType) String() string {
 }
 
 var (
-	ComponentTypeCommon              ComponentType = baseComponentType{"common"}
-	ComponentTypeController          ComponentType = baseComponentType{"controller"}
-	ComponentTypeAccounting          ComponentType = baseComponentType{"accounting"}
-	ComponentTypeREST                ComponentType = baseComponentType{"rest"}
-	ComponentTypeWorker              ComponentType = baseComponentType{"worker"}
-	ComponentTypeNodeSysctlDaemonSet ComponentType = baseComponentType{"node-sysctl-daemon-set"}
-	ComponentTypeLogin               ComponentType = baseComponentType{"login"}
-	ComponentTypeBenchmark           ComponentType = baseComponentType{"nccl-benchmark"}
-	ComponentTypePopulateJail        ComponentType = baseComponentType{"populate-jail"}
-	ComponentTypeExporter            ComponentType = baseComponentType{"exporter"}
-	ComponentTypeMariaDbOperator     ComponentType = baseComponentType{"mariadb-operator"}
+	ComponentTypeCommon           ComponentType = baseComponentType{"common"}
+	ComponentTypeController       ComponentType = baseComponentType{"controller"}
+	ComponentTypeAccounting       ComponentType = baseComponentType{"accounting"}
+	ComponentTypeREST             ComponentType = baseComponentType{"rest"}
+	ComponentTypeWorker           ComponentType = baseComponentType{"worker"}
+	ComponentTypeNodeConfigurator ComponentType = baseComponentType{"node-configurator"}
+	ComponentTypeLogin            ComponentType = baseComponentType{"login"}
+	ComponentTypeBenchmark        ComponentType = baseComponentType{"nccl-benchmark"}
+	ComponentTypePopulateJail     ComponentType = baseComponentType{"populate-jail"}
+	ComponentTypeExporter         ComponentType = baseComponentType{"exporter"}
+	ComponentTypeMariaDbOperator  ComponentType = baseComponentType{"mariadb-operator"}
 )
