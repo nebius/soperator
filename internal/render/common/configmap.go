@@ -219,7 +219,8 @@ func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 func generateSpankConfig() renderutils.ConfigFile {
 	res := &renderutils.MultilineStringConfig{}
 	res.AddLine(fmt.Sprintf("required chroot.so %s", consts.VolumeMountPathJail))
-	res.AddLine("required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1")
+	// TODO: make `container_image_save` and `expose_enroot_logs` configurable
+	res.AddLine("required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 expose_enroot_logs=1 container_image_save=/var/cache/enroot-container-images/")
 	return res
 }
 

@@ -110,6 +110,9 @@ pushd "${jaildir}"
         flock etc/complement_jail_setcap_enroot_aufs2ovlfs.lock -c "setcap cap_sys_admin,cap_mknod+pe usr/bin/enroot-aufs2ovlfs"
     fi
 
+    echo "Shared folder for pyxis output /var/cache/enroot-container-images"
+    mkdir -m 1777 -p var/cache/enroot-container-images
+
     echo "Bind-mount pyxis plugin from container to the jail"
     touch usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
     mount --bind /usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
