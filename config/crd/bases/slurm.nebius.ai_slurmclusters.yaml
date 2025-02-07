@@ -1486,6 +1486,8 @@ spec:
                   debugFlags: Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs
                   defCpuPerGPU: 16
                   defMemPerNode: 1228800
+                  epilog: ""
+                  prolog: ""
                   maxJobCount: 10000
                   minJobAge: 86400
                   taskPluginParam: ""
@@ -1515,6 +1517,14 @@ spec:
                       node in mebibytes.
                     format: int32
                     type: integer
+                  epilog:
+                    default: ""
+                    description: The Epilog script runs after a job completes
+                    type: string
+                  prolog:
+                    default: ""
+                    description: The Prolog script runs before a job starts on the compute node
+                    type: string
                   maxJobCount:
                     default: 10000
                     description: Keep N last jobs in controller memory
