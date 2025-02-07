@@ -1,3 +1,4 @@
 ## Append samples of your project ##
-resources: []
+resources:
+- slurm_v1alpha1_nodeconfigurator.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples
