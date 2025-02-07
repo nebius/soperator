@@ -43,10 +43,8 @@ import (
 	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/controller"
 	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
 	webhookcorev1 "nebius.ai/slurm-operator/internal/webhook/v1"
 	//+kubebuilder:scaffold:imports
@@ -74,7 +72,8 @@ func init() {
 
 	utilruntime.Must(slurmv1.AddToScheme(scheme))
 
-	utilruntime.Must(slurmv1alpha1.AddToScheme(scheme))
+	// TODO: uncomment the following line to add the NodeConfigurator CRD to the scheme
+	// utilruntime.Must(slurmv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -219,13 +218,14 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	if err = (&controller.NodeConfiguratorReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NodeConfigurator")
-		os.Exit(1)
-	}
+	// TODO: uncomment the following lines to add the NodeConfigurator controller to the manager
+	// if err = (&controller.NodeConfiguratorReconciler{
+	// 	Client: mgr.GetClient(),
+	// 	Scheme: mgr.GetScheme(),
+	// }).SetupWithManager(mgr); err != nil {
+	// 	setupLog.Error(err, "unable to create controller", "controller", "NodeConfigurator")
+	// 	os.Exit(1)
+	// }
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
