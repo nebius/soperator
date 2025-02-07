@@ -28,7 +28,9 @@ func RenderDaemonSet(
 	initContainers := renderInitContainers()
 	containers := renderContainers(rebooter)
 	nodeFilter = setMaintenanceNodeSelector(nodeFilter, maintenance)
-	nodeFilter = setPodAntiAffinity(nodeFilter)
+	if rebooter.Enabled {
+		nodeFilter = setPodAntiAffinity(nodeFilter)
+	}
 	rebooter.ServiceAccountName = setDefaultServiceAccountName(rebooter.ServiceAccountName)
 
 	return appsv1.DaemonSet{
