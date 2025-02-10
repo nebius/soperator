@@ -319,7 +319,8 @@ type NCCLArguments struct {
 	// +kubebuilder:default="0"
 	ThresholdMoreThan string `json:"thresholdMoreThan,omitempty"`
 
-	// UseInfiniband defines using NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring env variables for test
+	// UseInfiniband defines using NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring env variables for test.
+	// According to NVIDIA these env vars should be used only for debugging.
 	// https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html
 	//
 	// +kubebuilder:validation:Optional
