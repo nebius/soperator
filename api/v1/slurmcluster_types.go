@@ -84,7 +84,7 @@ type SlurmClusterSpec struct {
 	// SlurmConfig represents the Slurm configuration in slurm.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", taskPluginParam: "", maxJobCount: 10000, minJobAge: 86400}
+	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", epilog: "", prolog: "", taskPluginParam: "", maxJobCount: 10000, minJobAge: 86400}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 	// Generate and set default AppArmor profile for the Slurm worker and login nodes. The Security Profiles Operator must be installed.
 	//
@@ -115,6 +115,16 @@ type SlurmConfig struct {
 	// +kubebuilder:default="Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs"
 	// +kubebuilder:validation:Pattern="^((Accrue|Agent|AuditRPCs|Backfill|BackfillMap|BurstBuffer|Cgroup|ConMgr|CPU_Bind|CpuFrequency|Data|DBD_Agent|Dependency|Elasticsearch|Energy|Federation|FrontEnd|Gres|Hetjob|Gang|GLOB_SILENCE|JobAccountGather|JobComp|JobContainer|License|Network|NetworkRaw|NodeFeatures|NO_CONF_HASH|Power|Priority|Profile|Protocol|Reservation|Route|Script|SelectType|Steps|Switch|TLS|TraceJobs|Triggers)(,)?)+$"
 	DebugFlags *string `json:"debugFlags,omitempty"`
+	// Defines specific file to run the epilog when job ends. Default value is no epilog
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=""
+	Epilog *string `json:"epilog,omitempty"`
+	// Defines specific file to run the prolog when job starts. Default value is no prolog
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=""
+	Prolog *string `json:"prolog,omitempty"`
 	// Additional parameters for the task plugin
 	//
 	// +kubebuilder:validation:Optional

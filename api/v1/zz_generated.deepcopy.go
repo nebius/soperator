@@ -678,6 +678,16 @@ func (in *SlurmConfig) DeepCopyInto(out *SlurmConfig) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.Epilog != nil {
+		in, out := &in.Epilog, &out.Epilog
+		*out = new(string)
+		**out = **in
+	}
+	if in.Prolog != nil {
+		in, out := &in.Prolog, &out.Prolog
+		*out = new(string)
+		**out = **in
+	}
 	if in.TaskPluginParam != nil {
 		in, out := &in.TaskPluginParam, &out.TaskPluginParam
 		*out = new(string)

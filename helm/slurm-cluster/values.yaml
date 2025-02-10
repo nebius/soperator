@@ -129,6 +129,8 @@ slurmConfig: {}
 # defCpuPerGPU: 16
 # completeWait: 5
 # debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs"
+# epilog: "/path/to/epilog.sh"
+# prolog: "/path/to/prolog.sh"
 # taskPluginParam: "Verbose"
 # maxJobCount: 10000
 # minJobAge: 86400
