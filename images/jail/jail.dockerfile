@@ -1,11 +1,90 @@
-ARG BASE_IMAGE=nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+FROM ubuntu:22.04 AS cuda
 
-FROM $BASE_IMAGE AS jail
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+ENV LANG=en_US.UTF-8
+
+RUN apt-get update &&  \
+    apt-get install -y --no-install-recommends \
+      gnupg2  \
+      ca-certificates \
+      locales \
+      tzdata \
+      wget && \
+    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb && \
+    dpkg -i cuda-keyring_1.1-1_all.deb && \
+    rm -rf cuda-keyring_1.1-1_all.deb && \
+    ln -snf /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
+    locale-gen en_US.UTF-8 && \
+    dpkg-reconfigure locales tzdata && \
+    apt clean
+
+ENV LANG="en_US.UTF-8" \
+	LC_CTYPE="en_US.UTF-8" \
+	LC_NUMERIC="en_US.UTF-8" \
+	LC_TIME="en_US.UTF-8" \
+	LC_COLLATE="en_US.UTF-8" \
+	LC_MONETARY="en_US.UTF-8" \
+	LC_MESSAGES="en_US.UTF-8" \
+	LC_PAPER="en_US.UTF-8" \
+	LC_NAME="en_US.UTF-8" \
+	LC_ADDRESS="en_US.UTF-8" \
+	LC_TELEPHONE="en_US.UTF-8" \
+	LC_MEASUREMENT="en_US.UTF-8" \
+	LC_IDENTIFICATION="en_US.UTF-8"
+
+ENV PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
+ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64
+
+# nvidia-container-runtime
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+# download and install mock packages for nvidia drivers https://github.com/nebius/soperator/issues/384
+ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
+RUN for pkg in cuda-drivers_9999.9999.9999_amd64.deb nvidia-open_9999.9999.9999_amd64.deb; do \
+        wget -q -P /tmp "$PACKAGES_REPO_URL/cuda_mocks/${pkg}" && \
+        echo "${pkg} successfully downloaded" || { echo "Failed to download ${pkg}"; exit 1; }; \
+        dpkg -i "/tmp/${pkg}" && \
+        rm -rf "/tmp/${pkg}"; \
+    done
+
+RUN apt update && \
+    apt install -y \
+        cuda=12.4.1-1 \
+        libcublas-dev-12-4 \
+        libcudnn9-cuda-12=9.1.0.70-1 \
+        libcudnn9-dev-cuda-12=9.1.0.70-1 \
+        libnccl-dev=2.21.5-1+cuda12.4 \
+        libnccl2=2.21.5-1+cuda12.4 && \
+    apt clean
+COPY jail/pin_packages/cuda-pins /etc/apt/preferences.d/
+RUN apt update
+
+RUN apt-mark hold \
+      libcublas-12-4 \
+      libcublas-dev-12-4 \
+      libcudnn9-cuda-12 \
+      libnccl-dev=2.21.5-1+cuda12.4 \
+      libnccl2
+
+ENV LIBRARY_PATH=/usr/local/cuda/lib64/stubs
+
+# Download NCCL tests executables
+ARG CUDA_VERSION=12.4.1
+ARG SLURM_VERSION=24.05.5
+RUN wget -P /tmp $PACKAGES_REPO_URL/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/nccl-tests-perf.tar.gz && \
+    tar -xvzf /tmp/nccl-tests-perf.tar.gz -C /usr/bin && \
+    rm -rf /tmp/nccl-tests-perf.tar.gz
+
+#######################################################################################################################
+
+FROM cuda AS jail
 
 ARG SLURM_VERSION=24.05.5
 ARG CUDA_VERSION=12.4.1
 ARG OPENMPI_VERSION=4.1.7a1
-ARG DEB_REPO="https://github.com/nebius/slurm-deb-packages/releases/download"
+ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -62,19 +141,6 @@ RUN apt update && \
         libpmix-dev && \
     apt clean
 
-# Hacks with NVIDIA drivers
-# Download and install mock packages
-RUN for pkg in cuda-drivers_9999.9999.9999_amd64.deb nvidia-open_9999.9999.9999_amd64.deb; do \
-        wget -q -P /tmp $DEB_REPO/cuda_mocks/${pkg} && echo "${pkg} successfully downloaded" || { echo "Failed to download ${pkg}"; exit 1; }; \
-    done
-RUN apt install -y /tmp/*.deb && \
-    rm -rf /tmp/*.deb && \
-    apt clean
-RUN apt install -y cuda=12.4.1-1 && \
-    apt clean
-COPY jail/pin_packages/cuda-pins /etc/apt/preferences.d/
-RUN apt update
-
 # Install python
 COPY common/scripts/install_python.sh /opt/bin/
 RUN chmod +x /opt/bin/install_python.sh && \
@@ -102,7 +168,7 @@ ENV PATH=$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 # TODO: Install only necessary packages
 # Download and install Slurm packages
 RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libslurm-perl slurm-smd; do \
-        wget -q -P /tmp $DEB_REPO/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
+        wget -q -P /tmp $PACKAGES_REPO_URL/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
         echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
     done
@@ -129,11 +195,6 @@ RUN add-apt-repository ppa:flexiondotorg/nvtop && \
 # https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/dcgm-diagnostics.html
 RUN apt install -y datacenter-gpu-manager-4-cuda12 && \
     apt clean
-
-# Download NCCL tests executables
-RUN wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/nccl-tests-perf.tar.gz && \
-    tar -xvzf /tmp/nccl-tests-perf.tar.gz -C /usr/bin && \
-    rm -rf /tmp/nccl-tests-perf.tar.gz
 
 # Install GDRCopy libraries & executables
 COPY common/scripts/install_gdrcopy.sh /opt/bin/
