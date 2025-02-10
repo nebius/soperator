@@ -11,9 +11,7 @@ on:
       - 'README.md'
       - 'SECURITY.md'
       - 'images/worker/gpubench/**'
-  pull_request:
-    branches:
-      - main
+
 
 permissions:
   contents: read
