@@ -6,6 +6,7 @@ toolchain go1.23.3
 
 require (
 	github.com/go-logr/logr v1.4.2
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/kubereboot/kured v0.0.0-20241106074119-94e73465adc3
 	github.com/mackerelio/go-osstat v0.2.5
 	github.com/onsi/ginkgo/v2 v2.22.2
