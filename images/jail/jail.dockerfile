@@ -49,6 +49,7 @@ RUN for pkg in cuda-drivers_9999.9999.9999_amd64.deb nvidia-open_9999.9999.9999_
         rm -rf "/tmp/${pkg}"; \
     done
 
+# About CUDA packages https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#meta-packages
 RUN apt update && \
     apt install -y \
         cuda=12.4.1-1 \
