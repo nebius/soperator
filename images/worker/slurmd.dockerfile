@@ -91,18 +91,13 @@ RUN chmod +x /opt/bin/install_openmpi.sh && \
 ENV LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib
 ENV PATH=$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
-# TODO: Install only necessary packages
 # Download and install Slurm packages
-RUN wget -q -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/slurm-smd-torque_$SLURM_VERSION-1_all.deb && \
-    echo "slurm-smd-torque_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
-    { echo "Failed to download slurm-smd-torque_$SLURM_VERSION-1_amd64.deb"; exit 1; } && \
-    for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libslurm-perl slurm-smd-slurmd slurm-smd-sview slurm-smd; do \
+RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd slurm-smd-slurmd; do \
         wget -q -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
         echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
-    done
-
-RUN apt install -y /tmp/*.deb && \
+    done && \
+    apt install -y /tmp/*.deb && \
     rm -rf /tmp/*.deb && \
     apt clean
 
@@ -155,11 +150,16 @@ COPY worker/docker/daemon.json /etc/docker/daemon.json
 
 # Copy GPU healthcheck script
 COPY worker/scripts/gpu_healthcheck.sh /usr/bin/gpu_healthcheck.sh
-RUN chmod +x /usr/bin/gpu_healthcheck.sh
 
 # Copy script for complementing jail filesystem in runtime
 COPY common/scripts/complement_jail.sh /opt/bin/slurm/
-RUN chmod +x /opt/bin/slurm/complement_jail.sh
+
+# Copy script for bind-mounting slurm into the jail
+COPY common/scripts/bind_slurm_common.sh /opt/bin/slurm/
+
+RUN chmod +x /usr/bin/gpu_healthcheck.sh && \
+    chmod +x /opt/bin/slurm/complement_jail.sh && \
+    chmod +x /opt/bin/slurm/bind_slurm_common.sh
 
 # Update linker cache
 RUN ldconfig
@@ -184,11 +184,12 @@ RUN mkdir -p /var/log/slurm/multilog && \
 
 # Copy slurmd entrypoint script
 COPY worker/slurmd_entrypoint.sh /opt/bin/slurm/
-RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh
 
 # Copy supervisord entrypoint script
 COPY worker/supervisord_entrypoint.sh /opt/bin/slurm/
-RUN chmod +x /opt/bin/slurm/supervisord_entrypoint.sh
+
+RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh && \
+    chmod +x /opt/bin/slurm/supervisord_entrypoint.sh
 
 # Start supervisord that manages both slurmd and sshd as child processes
 ENTRYPOINT ["/opt/bin/slurm/supervisord_entrypoint.sh"]
