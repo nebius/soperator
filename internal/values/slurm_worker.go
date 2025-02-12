@@ -38,7 +38,6 @@ type SlurmWorker struct {
 	SharedMemorySize          *resource.Quantity
 	UseDefaultAppArmorProfile bool
 	Maintenance               *consts.MaintenanceMode
-	Rebooter                  slurmv1.Rebooter
 }
 
 func buildSlurmWorkerFrom(
@@ -96,7 +95,6 @@ func buildSlurmWorkerFrom(
 		SSHDConfigMapName:         sshdConfigMapName,
 		IsSSHDConfigMapDefault:    isSSHDConfigDefault,
 		Maintenance:               maintenance,
-		Rebooter:                  worker.Rebooter,
 	}
 	for _, jailSubMount := range worker.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()
