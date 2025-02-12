@@ -76,6 +76,11 @@ func NewToken(client client.Client) *Token {
 	}
 }
 
+// GetMeta returns token's TokenMeta.
+func (t *Token) GetMeta() *TokenMeta {
+	return t.meta
+}
+
 // For specifies the Slurm cluster and username for which the token will be issued.
 //
 // Required.

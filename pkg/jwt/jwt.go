@@ -6,6 +6,7 @@ import (
 
 type (
 	Token         = jwt.Token
+	TokenMeta     = jwt.TokenMeta
 	TokenRegistry = jwt.TokenRegistry
 )
 
