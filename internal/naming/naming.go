@@ -93,10 +93,10 @@ func BuildDeploymentName(componentType consts.ComponentType) string {
 	}.String()
 }
 
-func BuildDaemonSetName(componentType consts.ComponentType) string {
+func BuildDaemonSetName(componentName, entity string) string {
 	return namedEntity{
-		componentType: &componentType,
-		entity:        "",
+		clusterName: componentName,
+		entity:      entity,
 	}.String()
 }
 

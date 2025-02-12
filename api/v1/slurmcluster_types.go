@@ -700,63 +700,6 @@ type SlurmNodeWorker struct {
 	//
 	// +kubebuilder:validation:Optional
 	PriorityClass string `json:"priorityClass,omitempty"`
-	// It's alpha feature and will be moved to separate CRD in the future
-	// Rebooter defines the configuration for the Slurm worker node rebooter
-	//
-	// +kubebuilder:validation:Optional
-	Rebooter Rebooter `json:"rebooter"`
-}
-
-// Rebooter defines the configuration for the Slurm worker node rebooter
-type Rebooter struct {
-	// enabled defines whether the rebooter is enabled
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	Enabled bool `json:"enabled"`
-
-	// Image defines the rebooter container image
-	//
-	// +kubebuilder:validation:Optional
-	Image string `json:"image"`
-
-	// imagePullPolicy defines the image pull policy
-	//
-	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="IfNotPresent"
-	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
-
-	// Resources defines the [corev1.ResourceRequirements] for the container
-	//
-	// +kubebuilder:validation:Optional
-	Resources corev1.ResourceList `json:"resources,omitempty"`
-
-	// evictionMethod defines the method of eviction for the Slurm worker node
-	// Must be one of [drain, evict]. Now only evict is supported
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Enum="evict"
-	// +kubebuilder:default="evict"
-	EvictionMethod string `json:"evictionMethod,omitempty"`
-
-	// logLevel defines the log level for the rebooter
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="info"
-	// +kubebuilder:validation:Enum="debug";"info";"warn";"error"
-	LogLevel string `json:"logLevel,omitempty"`
-
-	// Namespace defines the namespace where the rebooter will be deployed
-	// By default, the same namespace as the soperator
-	//
-	// +kubebuilder:validation:Optional
-	Namespace string `json:"namespace,omitempty"`
-
-	// serviceAccountName defines the service account name for the rebooter
-	//
-	// +kubebuilder:validation:Optional
-	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node

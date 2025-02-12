@@ -80,7 +80,6 @@ type SlurmClusterReconciler struct {
 	Job             *reconciler.JobReconciler
 	Service         *reconciler.ServiceReconciler
 	StatefulSet     *reconciler.StatefulSetReconciler
-	DaemonSet       *reconciler.DaemonSetReconciler
 	ServiceAccount  *reconciler.ServiceAccountReconciler
 	Role            *reconciler.RoleReconciler
 	RoleBinding     *reconciler.RoleBindingReconciler
@@ -102,7 +101,6 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 		Job:             reconciler.NewJobReconciler(r),
 		Service:         reconciler.NewServiceReconciler(r),
 		StatefulSet:     reconciler.NewStatefulSetReconciler(r),
-		DaemonSet:       reconciler.NewDaemonSetReconciler(r),
 		ServiceAccount:  reconciler.NewServiceAccountReconciler(r),
 		Role:            reconciler.NewRoleReconciler(r),
 		RoleBinding:     reconciler.NewRoleBindingReconciler(r),

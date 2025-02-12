@@ -1487,9 +1487,9 @@ spec:
                   defCpuPerGPU: 16
                   defMemPerNode: 1228800
                   epilog: ""
-                  prolog: ""
                   maxJobCount: 10000
                   minJobAge: 86400
+                  prolog: ""
                   taskPluginParam: ""
                 description: SlurmConfig represents the Slurm configuration in slurm.conf.
                   Not all options are supported.
@@ -1519,11 +1519,8 @@ spec:
                     type: integer
                   epilog:
                     default: ""
-                    description: The Epilog script runs after a job completes
-                    type: string
-                  prolog:
-                    default: ""
-                    description: The Prolog script runs before a job starts on the compute node
+                    description: Defines specific file to run the epilog when job
+                      ends. Default value is no epilog
                     type: string
                   maxJobCount:
                     default: 10000
@@ -1536,6 +1533,11 @@ spec:
                       time
                     format: int32
                     type: integer
+                  prolog:
+                    default: ""
+                    description: Defines specific file to run the prolog when job
+                      starts. Default value is no prolog
+                    type: string
                   taskPluginParam:
                     default: ""
                     description: Additional parameters for the task plugin
@@ -4042,63 +4044,6 @@ spec:
                         description: PriorityClass defines the priority class for
                           the Slurm worker node
                         type: string
-                      rebooter:
-                        description: |-
-                          It's alpha feature and will be moved to separate CRD in the future
-                          Rebooter defines the configuration for the Slurm worker node rebooter
-                        properties:
-                          enabled:
-                            default: false
-                            description: enabled defines whether the rebooter is enabled
-                            type: boolean
-                          evictionMethod:
-                            default: evict
-                            description: |-
-                              evictionMethod defines the method of eviction for the Slurm worker node
-                              Must be one of [drain, evict]. Now only evict is supported
-                            enum:
-                            - evict
-                            type: string
-                          image:
-                            description: Image defines the rebooter container image
-                            type: string
-                          imagePullPolicy:
-                            default: IfNotPresent
-                            description: imagePullPolicy defines the image pull policy
-                            enum:
-                            - Always
-                            - Never
-                            - IfNotPresent
-                            type: string
-                          logLevel:
-                            default: info
-                            description: logLevel defines the log level for the rebooter
-                            enum:
-                            - debug
-                            - info
-                            - warn
-                            - error
-                            type: string
-                          namespace:
-                            description: |-
-                              Namespace defines the namespace where the rebooter will be deployed
-                              By default, the same namespace as the soperator
-                            type: string
-                          resources:
-                            additionalProperties:
-                              anyOf:
-                              - type: integer
-                              - type: string
-                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                              x-kubernetes-int-or-string: true
-                            description: Resources defines the [corev1.ResourceRequirements]
-                              for the container
-                            type: object
-                          serviceAccountName:
-                            description: serviceAccountName defines the service account
-                              name for the rebooter
-                            type: string
-                        type: object
                       size:
                         description: Size defines the number of node instances
                         format: int32
