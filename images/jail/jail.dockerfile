@@ -68,6 +68,9 @@ RUN apt-mark hold \
       libnccl-dev=2.21.5-1+cuda12.4 \
       libnccl2
 
+RUN echo "export PATH=\$PATH:/usr/local/cuda/bin" > /etc/profile.d/path_cuda.sh && \
+    . /etc/profile.d/path_cuda.sh
+
 ENV LIBRARY_PATH=/usr/local/cuda/lib64/stubs
 
 # Download NCCL tests executables
