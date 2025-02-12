@@ -108,7 +108,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("SCHEDULING")
 	res.AddProperty("SchedulerType", "sched/backfill")
 	res.AddProperty("SelectType", "select/cons_tres")
-	res.AddProperty("SelectTypeParameters", "CR_Core_Memory")
+	res.AddProperty("SelectTypeParameters", "CR_Core_Memory,CR_CORE_DEFAULT_DIST_BLOCK") // TODO: Make it configurable
 	res.AddComment("")
 	res.AddComment("LOGGING")
 	res.AddProperty("SlurmctldDebug", consts.SlurmDefaultDebugLevel)
