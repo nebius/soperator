@@ -16,11 +16,11 @@ func RenderService(namespace, clusterName string, rest *values.SlurmREST) (*core
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rest.Service.Name,
 			Namespace: namespace,
-			Labels:    common.RenderLabels(consts.ComponentTypeAccounting, clusterName),
+			Labels:    common.RenderLabels(consts.ComponentTypeREST, clusterName),
 		},
 		Spec: corev1.ServiceSpec{
 			Type:      rest.Service.Type,
-			Selector:  common.RenderMatchLabels(consts.ComponentTypeAccounting, clusterName),
+			Selector:  common.RenderMatchLabels(consts.ComponentTypeREST, clusterName),
 			ClusterIP: "",
 			Ports: []corev1.ServicePort{{
 				Protocol:   rest.Service.Protocol,
