@@ -32,6 +32,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) (corev1.ConfigMap
 			consts.ConfigMapKeyCGroupConfig: generateCGroupConfig(cluster).Render(),
 			consts.ConfigMapKeySpankConfig:  generateSpankConfig().Render(),
 			consts.ConfigMapKeyGresConfig:   generateGresConfig(cluster.ClusterType).Render(),
+			consts.ConfigMapKeyMPIConfig:    generateMPIConfig(cluster).Render(),
 		},
 	}, nil
 }
@@ -230,6 +231,15 @@ func generateGresConfig(clusterType consts.ClusterType) renderutils.ConfigFile {
 	res.AddComment("Gres config")
 	if clusterType == consts.ClusterTypeGPU {
 		res.AddProperty("AutoDetect", "nvml")
+	}
+	return res
+}
+
+func generateMPIConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
+	res := &renderutils.PropertiesConfig{}
+	res.AddComment("PMIx config")
+	if cluster.MPIConfig.PMIxEnv != "" {
+		res.AddProperty("PMIxEnv", cluster.MPIConfig.PMIxEnv)
 	}
 	return res
 }

@@ -86,6 +86,13 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", epilog: "", prolog: "", taskPluginParam: "", maxJobCount: 10000, minJobAge: 86400}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
+
+	// MPIConfig represents the PMIx configuration in mpi.conf. Not all options are supported.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={pmixEnv: "OMPI_MCA_btl_tcp_if_include=eth0"}
+	MPIConfig MPIConfig `json:"mpiConfig,omitempty"`
+
 	// Generate and set default AppArmor profile for the Slurm worker and login nodes. The Security Profiles Operator must be installed.
 	//
 	// +kubebuilder:default=false
@@ -141,6 +148,16 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=86400
 	MinJobAge *int32 `json:"minJobAge,omitempty"`
+}
+
+type MPIConfig struct {
+	// Semicolon separated list of environment variables to be set in job environments to be used by PMIx.
+	// Defaults to "OMPI_MCA_btl_tcp_if_include=eth0" to avoid "lo" and "docker" interfaces to be selected by OpenMPI.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="OMPI_MCA_btl_tcp_if_include=eth0"
+	// +kubebuilder:validation:Optional
+	PMIxEnv string `json:"pmixEnv,omitempty"`
 }
 
 type PartitionConfiguration struct {

@@ -1081,6 +1081,19 @@ spec:
                 - downscaleAndOverwritePopulateJail
                 - skipPopulateJail
                 type: string
+              mpiConfig:
+                default:
+                  pmixEnv: OMPI_MCA_btl_tcp_if_include=eth0
+                description: MPIConfig represents the PMIx configuration in mpi.conf.
+                  Not all options are supported.
+                properties:
+                  pmixEnv:
+                    default: OMPI_MCA_btl_tcp_if_include=eth0
+                    description: |-
+                      Semicolon separated list of environment variables to be set in job environments to be used by PMIx.
+                      Defaults to "OMPI_MCA_btl_tcp_if_include=eth0" to avoid "lo" and "docker" interfaces to be selected by OpenMPI.
+                    type: string
+                type: object
               ncclSettings:
                 description: NCCLSettings
                 properties:
@@ -1487,9 +1500,9 @@ spec:
                   defCpuPerGPU: 16
                   defMemPerNode: 1228800
                   epilog: ""
-                  prolog: ""
                   maxJobCount: 10000
                   minJobAge: 86400
+                  prolog: ""
                   taskPluginParam: ""
                 description: SlurmConfig represents the Slurm configuration in slurm.conf.
                   Not all options are supported.
@@ -1519,11 +1532,8 @@ spec:
                     type: integer
                   epilog:
                     default: ""
-                    description: The Epilog script runs after a job completes
-                    type: string
-                  prolog:
-                    default: ""
-                    description: The Prolog script runs before a job starts on the compute node
+                    description: Defines specific file to run the epilog when job
+                      ends. Default value is no epilog
                     type: string
                   maxJobCount:
                     default: 10000
@@ -1536,6 +1546,11 @@ spec:
                       time
                     format: int32
                     type: integer
+                  prolog:
+                    default: ""
+                    description: Defines specific file to run the prolog when job
+                      starts. Default value is no prolog
+                    type: string
                   taskPluginParam:
                     default: ""
                     description: Additional parameters for the task plugin
