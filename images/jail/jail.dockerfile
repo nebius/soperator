@@ -137,6 +137,7 @@ RUN apt update && \
         rsync \
         numactl \
         htop \
+        hwloc \
         rdma-core \
         ibverbs-utils \
         libpmix2 \
