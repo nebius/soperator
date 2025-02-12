@@ -1,0 +1,49 @@
+linters:
+  presets:
+    - bugs
+    - complexity
+    - error
+    - format
+    - import
+    - metalinter
+    - module
+    - performance
+    - style
+    - test
+    - unused
+  disable:
+    - depguard
+    - ineffassign
+    - funlen
+    - forcetypeassert
+    - testpackage
+    - tagliatelle
+    - godot
+    - misspell
+    - goconst
+    - dupl
+    - gci
+    - whitespace
+    - gochecknoinits
+    - gocognit
+    - nestif
+    - gocyclo
+    - maintidx
+    - godox
+    - gofumpt
+    - gomnd
+    - lll
+    - nlreturn
+    - nolintlint
+    - wsl
+    - prealloc
+  fast: true
+
+output:
+  formats:
+    - format: colored-line-number
+
+run:
+  relative-path-mode: gomod
+  allow-parallel-runners: true
+  allow-serial-runners: true
