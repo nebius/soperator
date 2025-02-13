@@ -68,6 +68,9 @@ RUN apt-mark hold \
       libnccl-dev=2.21.5-1+cuda12.4 \
       libnccl2
 
+RUN echo "export PATH=\$PATH:/usr/local/cuda/bin" > /etc/profile.d/path_cuda.sh && \
+    . /etc/profile.d/path_cuda.sh
+
 ENV LIBRARY_PATH=/usr/local/cuda/lib64/stubs
 
 # Download NCCL tests executables
@@ -83,7 +86,6 @@ FROM cuda AS jail
 
 ARG SLURM_VERSION=24.05.5
 ARG CUDA_VERSION=12.4.1
-ARG OPENMPI_VERSION=4.1.7a1
 ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -108,7 +110,6 @@ RUN apt update && \
         libjson-c-dev \
         liblz4-dev \
         libmunge-dev \
-        libopenmpi-dev \
         libpam0g-dev \
         libssl-dev \
         libtool \
@@ -119,6 +120,7 @@ RUN apt update && \
         iputils-ping \
         dnsutils \
         telnet \
+        netcat \
         strace \
         sudo \
         tree \
@@ -135,6 +137,7 @@ RUN apt update && \
         rsync \
         numactl \
         htop \
+        hwloc \
         rdma-core \
         ibverbs-utils \
         libpmix2 \
@@ -147,9 +150,6 @@ RUN chmod +x /opt/bin/install_python.sh && \
     /opt/bin/install_python.sh && \
     rm /opt/bin/install_python.sh
 
-# Install mpi4py
-RUN pip install -U pip wheel build && pip install mpi4py
-
 # Install parallel because it's required for enroot operation
 COPY common/scripts/install_parallel.sh /opt/bin/
 RUN chmod +x /opt/bin/install_parallel.sh && \
@@ -161,9 +161,6 @@ COPY common/scripts/install_openmpi.sh /opt/bin/
 RUN chmod +x /opt/bin/install_openmpi.sh && \
     /opt/bin/install_openmpi.sh && \
     rm /opt/bin/install_openmpi.sh
-
-ENV LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib
-ENV PATH=$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
 # TODO: Install only necessary packages
 # Download and install Slurm packages
@@ -185,6 +182,9 @@ COPY common/scripts/install_container_toolkit.sh /opt/bin/
 RUN chmod +x /opt/bin/install_container_toolkit.sh && \
     /opt/bin/install_container_toolkit.sh && \
     rm /opt/bin/install_container_toolkit.sh
+
+# Copy NVIDIA Container Toolkit config
+COPY common/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
 
 # Install nvtop GPU monitoring utility
 RUN add-apt-repository ppa:flexiondotorg/nvtop && \
@@ -242,7 +242,10 @@ RUN chmod 755 /etc/skel/.slurm && \
     chmod 644 /etc/skel/.slurm/defaults && \
     chmod 644 /etc/skel/.bash_logout && \
     chmod 644 /etc/skel/.bashrc && \
-    chmod 644 /etc/skel/.profile
+    chmod 644 /etc/skel/.profile && \
+    chmod 755 /etc/skel/.config && \
+    chmod 755 /etc/skel/.config/enroot && \
+    chmod 644 /etc/skel/.config/enroot/.credentials
 
 # Use the same /etc/skel content for /root
 RUN rm -rf -- /root/..?* /root/.[!.]* /root/* && \

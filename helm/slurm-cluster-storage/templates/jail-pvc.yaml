@@ -3,6 +3,8 @@ kind: PersistentVolumeClaim
 metadata:
   namespace: {{ .Release.Namespace }}
   name: {{ include "slurm-cluster-storage.volume.jail.pvc" . }}
+  annotations:
+    k8up.io/backup: 'true'
 spec:
   storageClassName: {{ include "slurm-cluster-storage.volume.jail.storageClass" . }}
   resources:

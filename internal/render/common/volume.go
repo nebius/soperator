@@ -213,38 +213,7 @@ func RenderVolumeMountJailSubMount(subMount slurmv1.NodeVolumeJailSubMount) core
 
 // endregion JailSubMounts
 
-func RenderVolumeFromSource(sources []slurmv1.VolumeSource, sourceName, volumeName string) corev1.Volume {
-	return corev1.Volume{
-		Name: volumeName,
-		VolumeSource: utils.MustGetBy(
-			sources,
-			sourceName,
-			func(s slurmv1.VolumeSource) string { return s.Name },
-		).VolumeSource,
-	}
-}
-
-func AddVolumeOrSpec(
-	volumeSourceName *string,
-	volumeCreator func(sourceName string) corev1.Volume,
-	pvcTemplateSpec *corev1.PersistentVolumeClaimSpec,
-	specName string,
-) (volumes []corev1.Volume, pvcTemplateSpecs []values.PVCTemplateSpec, err error) {
-	if (volumeSourceName != nil && pvcTemplateSpec != nil) || (volumeSourceName == nil && pvcTemplateSpec == nil) {
-		return nil, nil, errors.New("only one of VolumeSourceName or VolumeClaimTemplateSpec should be set")
-	}
-
-	if volumeSourceName != nil {
-		volumes = append(volumes, volumeCreator(*volumeSourceName))
-	}
-	if pvcTemplateSpec != nil {
-		pvcTemplateSpecs = append(pvcTemplateSpecs, values.PVCTemplateSpec{Name: specName, Spec: pvcTemplateSpec})
-	}
-
-	return volumes, pvcTemplateSpecs, nil
-}
-
-// region security limits
+// region SecurityLimits
 
 // RenderVolumeSecurityLimits renders [corev1.Volume] containing security limits config contents
 func RenderVolumeSecurityLimits(clusterName string, componentType consts.ComponentType) corev1.Volume {
@@ -269,7 +238,7 @@ func RenderVolumeMountSecurityLimits() corev1.VolumeMount {
 	}
 }
 
-// endregion security limits
+// endregion SecurityLimits
 
 // region REST JWT key
 
@@ -419,3 +388,82 @@ func RenderVolumeMountSshdKeys() corev1.VolumeMount {
 // endregion sshd keys
 
 // endregion SSHD
+
+// region InMemory
+
+// RenderVolumeInMemory renders [corev1.Volume] which content is stored in shared memory (tmpfs).
+func RenderVolumeInMemory() corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameInMemorySubmount,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{
+				Medium: corev1.StorageMediumMemory,
+			},
+		},
+	}
+}
+
+// RenderVolumeMountInMemory renders [corev1.VolumeMount] defining the mounting path for tmpfs volume.
+func RenderVolumeMountInMemory() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameInMemorySubmount,
+		MountPath: consts.VolumeMountPathInMemorySubmount,
+	}
+}
+
+// endregion InMemory
+
+// region TmpDisk
+
+// RenderVolumeTmpDisk renders [corev1.Volume] which content is stored in a node-local ephemeral filesystem.
+func RenderVolumeTmpDisk() corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameTmpDisk,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{
+				Medium: corev1.StorageMediumDefault,
+			},
+		},
+	}
+}
+
+// RenderVolumeMountTmpDisk renders [corev1.VolumeMount] defining the mounting path for TmpDisk.
+func RenderVolumeMountTmpDisk() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameTmpDisk,
+		MountPath: consts.VolumeMountPathTmpDisk,
+	}
+}
+
+// endregion TmpDisk
+
+func RenderVolumeFromSource(sources []slurmv1.VolumeSource, sourceName, volumeName string) corev1.Volume {
+	return corev1.Volume{
+		Name: volumeName,
+		VolumeSource: utils.MustGetBy(
+			sources,
+			sourceName,
+			func(s slurmv1.VolumeSource) string { return s.Name },
+		).VolumeSource,
+	}
+}
+
+func AddVolumeOrSpec(
+	volumeSourceName *string,
+	volumeCreator func(sourceName string) corev1.Volume,
+	pvcTemplateSpec *corev1.PersistentVolumeClaimSpec,
+	specName string,
+) (volumes []corev1.Volume, pvcTemplateSpecs []values.PVCTemplateSpec, err error) {
+	if (volumeSourceName != nil && pvcTemplateSpec != nil) || (volumeSourceName == nil && pvcTemplateSpec == nil) {
+		return nil, nil, errors.New("only one of VolumeSourceName or VolumeClaimTemplateSpec should be set")
+	}
+
+	if volumeSourceName != nil {
+		volumes = append(volumes, volumeCreator(*volumeSourceName))
+	}
+	if pvcTemplateSpec != nil {
+		pvcTemplateSpecs = append(pvcTemplateSpecs, values.PVCTemplateSpec{Name: specName, Spec: pvcTemplateSpec})
+	}
+
+	return volumes, pvcTemplateSpecs, nil
+}

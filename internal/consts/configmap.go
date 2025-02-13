@@ -18,6 +18,7 @@ const (
 	ConfigMapKeyCGroupConfig   = "cgroup.conf"
 	ConfigMapKeySpankConfig    = "plugstack.conf"
 	ConfigMapKeyGresConfig     = "gres.conf"
+	ConfigMapKeyMPIConfig      = "mpi.conf"
 	ConfigMapKeySlurmdbdConfig = "slurmdbd.conf"
 
 	ConfigMapKeySshdConfig              = SshdName + "_config"

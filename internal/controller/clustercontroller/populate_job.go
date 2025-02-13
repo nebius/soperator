@@ -59,6 +59,7 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 								return errors.Wrap(err, "deleting Populate jail Job")
 							}
 							stepLogger.V(1).Info("Deleted")
+							return nil
 						}
 						if check.IsModeDownscaleAndOverwritePopulate(clusterValues.PopulateJail.Maintenance) {
 							if isConditionNonOverwrite(cluster.Status.Conditions) {
@@ -68,8 +69,8 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 								}
 								stepLogger.V(1).Info("Successfully deleted Populate Jail Job")
 							}
+							return nil
 						}
-						return nil
 					}
 
 					if !apierrors.IsNotFound(getErr) && !isMaintenanceStopMode {

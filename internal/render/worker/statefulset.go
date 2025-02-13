@@ -133,7 +133,6 @@ func renderAnnotations(worker *values.SlurmWorker, clusterName, namespace string
 
 	if worker.UseDefaultAppArmorProfile {
 		workerAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
-		mungeAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
 	}
 
 	annotations := map[string]string{

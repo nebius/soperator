@@ -32,6 +32,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) (corev1.ConfigMap
 			consts.ConfigMapKeyCGroupConfig: generateCGroupConfig(cluster).Render(),
 			consts.ConfigMapKeySpankConfig:  generateSpankConfig().Render(),
 			consts.ConfigMapKeyGresConfig:   generateGresConfig(cluster.ClusterType).Render(),
+			consts.ConfigMapKeyMPIConfig:    generateMPIConfig(cluster).Render(),
 		},
 	}, nil
 }
@@ -107,7 +108,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("SCHEDULING")
 	res.AddProperty("SchedulerType", "sched/backfill")
 	res.AddProperty("SelectType", "select/cons_tres")
-	res.AddProperty("SelectTypeParameters", "CR_Core_Memory")
+	res.AddProperty("SelectTypeParameters", "CR_Core_Memory,CR_CORE_DEFAULT_DIST_BLOCK") // TODO: Make it configurable
 	res.AddComment("")
 	res.AddComment("LOGGING")
 	res.AddProperty("SlurmctldDebug", consts.SlurmDefaultDebugLevel)
@@ -230,6 +231,15 @@ func generateGresConfig(clusterType consts.ClusterType) renderutils.ConfigFile {
 	res.AddComment("Gres config")
 	if clusterType == consts.ClusterTypeGPU {
 		res.AddProperty("AutoDetect", "nvml")
+	}
+	return res
+}
+
+func generateMPIConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
+	res := &renderutils.PropertiesConfig{}
+	res.AddComment("PMIx config")
+	if cluster.MPIConfig.PMIxEnv != "" {
+		res.AddProperty("PMIxEnv", cluster.MPIConfig.PMIxEnv)
 	}
 	return res
 }
@@ -367,6 +377,9 @@ func generateDefaultSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigF
 	res.AddLine("LoginGraceTime " + consts.SSHDLoginGraceTime)
 	res.AddLine("MaxAuthTries " + consts.SSHDMaxAuthTries)
 	res.AddLine("LogLevel DEBUG3")
+	res.AddLine("")
+	res.AddLine("Match User root")
+	res.AddLine("    AuthorizedKeysFile /root/.ssh/authorized_keys " + consts.VolumeMountPathJail + "/root/.ssh/authorized_keys")
 	res.AddLine("")
 	res.AddLine("Match User *")
 	res.AddLine("    LogLevel INFO")

@@ -104,7 +104,6 @@ func renderAnnotations(login *values.SlurmLogin, clusterName, namespace string) 
 
 	if login.UseDefaultAppArmorProfile {
 		sshAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
-		mungeAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
 	}
 
 	annotations := map[string]string{

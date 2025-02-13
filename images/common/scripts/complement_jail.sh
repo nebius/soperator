@@ -32,8 +32,8 @@ pushd "${jaildir}"
     echo "Bind-mount cgroup filesystem"
     mount --rbind /sys/fs/cgroup sys/fs/cgroup
 
-    echo "Remount /tmp"
-    mount -t tmpfs tmpfs tmp/
+    echo "Bind-mount /tmp"
+    mount --bind /tmp tmp/
 
     echo "Bind-mount /var/log because it should be node-local"
     mount --bind /var/log var/log
@@ -98,9 +98,6 @@ pushd "${jaildir}"
         touch "usr/bin/$filename" && mount --bind "$file" "usr/bin/$filename"
     done
 
-    echo "Bind-mount enroot data directory because it should be node-local"
-    mount --bind /usr/share/enroot/enroot-data usr/share/enroot/enroot-data
-
     if ! getcap usr/bin/enroot-mksquashovlfs | grep -q 'cap_sys_admin+pe'; then
         echo "Set capabilities for enroot-mksquashovlfs to run containers without privileges"
         flock etc/complement_jail_setcap_enroot_mksquashovlfs.lock -c "setcap cap_sys_admin+pe usr/bin/enroot-mksquashovlfs"
@@ -116,8 +113,6 @@ pushd "${jaildir}"
     echo "Bind-mount pyxis plugin from container to the jail"
     touch usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
     mount --bind /usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
-    mkdir -p usr/share/pyxis
-    mount --bind /usr/share/pyxis usr/share/pyxis
 
     echo "Bind-mount slurm configs"
     for file in /mnt/slurm-configs/*; do

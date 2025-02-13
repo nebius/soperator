@@ -46,6 +46,8 @@ const (
 	VolumeNameSharedMemory         = "dev-shm"
 	VolumeNameSysctl               = sysctl
 	VolumeNameSupervisordConfigMap = "supervisord-config"
+	VolumeNameInMemorySubmount     = "in-memory"
+	VolumeNameTmpDisk              = "tmp-disk"
 
 	VolumeMountPathSlurmConfigs      = "/mnt/" + slurmConfigs
 	VolumeMountPathSlurmdbdSecret    = "/mnt/" + slurmdbdSecret
@@ -69,4 +71,6 @@ const (
 	VolumeMountPathSysctl            = "/etc/" + sysctlConfFile
 	VolumeMountSubPathSysctl         = sysctlConfFile
 	VolumeMountPathSupervisordConfig = "/etc/supervisor/conf.d/"
+	VolumeMountPathInMemorySubmount  = VolumeMountPathJailUpper + "/mnt/memory"
+	VolumeMountPathTmpDisk           = "/tmp"
 )

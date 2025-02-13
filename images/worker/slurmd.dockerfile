@@ -129,10 +129,6 @@ RUN chmod +x /opt/bin/install_enroot.sh && \
 COPY common/enroot/enroot.conf /etc/enroot/
 RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
 
-# Create node-local directories for enroot runtime data
-RUN mkdir -p -m 777 /usr/share/enroot/enroot-data && \
-    mkdir -p -m 755 /run/enroot
-
 # Install slurm pyxis plugin
 COPY common/scripts/install_pyxis_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_pyxis_plugin.sh && \
@@ -146,7 +142,7 @@ RUN chmod +x /opt/bin/install_container_toolkit.sh && \
     rm /opt/bin/install_container_toolkit.sh
 
 # Copy NVIDIA Container Toolkit config
-COPY worker/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
+COPY common/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
 
 # Install Docker
 COPY common/scripts/install_docker.sh /opt/bin/
