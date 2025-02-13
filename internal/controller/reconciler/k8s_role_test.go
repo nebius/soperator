@@ -61,7 +61,7 @@ func Test_GetRole(t *testing.T) {
 				},
 			},
 			existingRB: nil,
-			expectErr:  false,
+			expectErr:  true,
 		},
 		{
 			name: "Error getting Role",

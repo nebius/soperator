@@ -1073,13 +1073,28 @@ spec:
                   - none: No maintenance is performed. The cluster operates normally.
                   - downscale: Scales down all components to 0.
                   - downscaleAndDeletePopulateJail: Scales down all components to 0 and deletes the kubernetes Kind Jobs populateJail.
+                  - downscaleAndOverwritePopulateJail: Scales down all components to 0 and overwrite populateJail (same as overwrite=true).
                   - skipPopulateJail: Skips the execution of the populateJail job during maintenance.
                 enum:
                 - none
                 - downscale
                 - downscaleAndDeletePopulateJail
+                - downscaleAndOverwritePopulateJail
                 - skipPopulateJail
                 type: string
+              mpiConfig:
+                default:
+                  pmixEnv: OMPI_MCA_btl_tcp_if_include=eth0
+                description: MPIConfig represents the PMIx configuration in mpi.conf.
+                  Not all options are supported.
+                properties:
+                  pmixEnv:
+                    default: OMPI_MCA_btl_tcp_if_include=eth0
+                    description: |-
+                      Semicolon separated list of environment variables to be set in job environments to be used by PMIx.
+                      Defaults to "OMPI_MCA_btl_tcp_if_include=eth0" to avoid "lo" and "docker" interfaces to be selected by OpenMPI.
+                    type: string
+                type: object
               ncclSettings:
                 description: NCCLSettings
                 properties:
@@ -1203,7 +1218,8 @@ spec:
                           useInfiniband:
                             default: true
                             description: |-
-                              UseInfiniband defines using NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring env variables for test
+                              UseInfiniband defines using NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring env variables for test.
+                              According to NVIDIA these env vars should be used only for debugging.
                               https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html
                             type: boolean
                         type: object
@@ -1484,8 +1500,10 @@ spec:
                   debugFlags: Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs
                   defCpuPerGPU: 16
                   defMemPerNode: 1228800
+                  epilog: ""
                   maxJobCount: 10000
                   minJobAge: 86400
+                  prolog: ""
                   taskPluginParam: ""
                 description: SlurmConfig represents the Slurm configuration in slurm.conf.
                   Not all options are supported.
@@ -1513,6 +1531,11 @@ spec:
                       node in mebibytes.
                     format: int32
                     type: integer
+                  epilog:
+                    default: ""
+                    description: Defines specific file to run the epilog when job
+                      ends. Default value is no epilog
+                    type: string
                   maxJobCount:
                     default: 10000
                     description: Keep N last jobs in controller memory
@@ -1524,6 +1547,11 @@ spec:
                       time
                     format: int32
                     type: integer
+                  prolog:
+                    default: ""
+                    description: Defines specific file to run the prolog when job
+                      starts. Default value is no prolog
+                    type: string
                   taskPluginParam:
                     default: ""
                     description: Additional parameters for the task plugin
@@ -2054,6 +2082,8 @@ spec:
                           in slurm.conf
                         properties:
                           accountingStorageTRES:
+                            default: Billing,CPU,Mem,Node,VMem
+                            pattern: ^((Billing|CPU|Mem|VMem|Node|Energy|Pages|FS/Disk|FS/Lustre|Gres/gpu|Gres/gpu:tesla|Gres/gpu:volta)(,)?)+$
                             type: string
                           accountingStoreFlags:
                             type: string
@@ -2074,6 +2104,7 @@ spec:
                             - DisableGPUAcct
                             type: string
                           jobAcctGatherType:
+                            default: jobacct_gather/cgroup
                             enum:
                             - jobacct_gather/linux
                             - jobacct_gather/cgroup
@@ -4023,6 +4054,67 @@ spec:
                         required:
                         - image
                         type: object
+                      priorityClass:
+                        description: PriorityClass defines the priority class for
+                          the Slurm worker node
+                        type: string
+                      rebooter:
+                        description: |-
+                          It's alpha feature and will be moved to separate CRD in the future
+                          Rebooter defines the configuration for the Slurm worker node rebooter
+                        properties:
+                          enabled:
+                            default: false
+                            description: enabled defines whether the rebooter is enabled
+                            type: boolean
+                          evictionMethod:
+                            default: evict
+                            description: |-
+                              evictionMethod defines the method of eviction for the Slurm worker node
+                              Must be one of [drain, evict]. Now only evict is supported
+                            enum:
+                            - evict
+                            type: string
+                          image:
+                            description: Image defines the rebooter container image
+                            type: string
+                          imagePullPolicy:
+                            default: IfNotPresent
+                            description: imagePullPolicy defines the image pull policy
+                            enum:
+                            - Always
+                            - Never
+                            - IfNotPresent
+                            type: string
+                          logLevel:
+                            default: info
+                            description: logLevel defines the log level for the rebooter
+                            enum:
+                            - debug
+                            - info
+                            - warn
+                            - error
+                            type: string
+                          namespace:
+                            description: |-
+                              Namespace defines the namespace where the rebooter will be deployed
+                              By default, the same namespace as the soperator
+                            type: string
+                          resources:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: Resources defines the [corev1.ResourceRequirements]
+                              for the container
+                            type: object
+                          serviceAccountName:
+                            description: serviceAccountName defines the service account
+                              name for the rebooter
+                            type: string
+                        type: object
                       size:
                         description: Size defines the number of node instances
                         format: int32
@@ -4857,6 +4949,8 @@ spec:
                       description: |-
                         awsElasticBlockStore represents an AWS Disk resource that is attached to a
                         kubelet's host machine and then exposed to the pod.
+                        Deprecated: AWSElasticBlockStore is deprecated. All operations for the in-tree
+                        awsElasticBlockStore type are redirected to the ebs.csi.aws.com CSI driver.
                         More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
                       properties:
                         fsType:
@@ -4888,8 +4982,10 @@ spec:
                       - volumeID
                       type: object
                     azureDisk:
-                      description: azureDisk represents an Azure Data Disk mount on
-                        the host and bind mount to the pod.
+                      description: |-
+                        azureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+                        Deprecated: AzureDisk is deprecated. All operations for the in-tree azureDisk type
+                        are redirected to the disk.csi.azure.com CSI driver.
                       properties:
                         cachingMode:
                           description: 'cachingMode is the Host Caching mode: None,
@@ -4927,8 +5023,10 @@ spec:
                       - diskURI
                       type: object
                     azureFile:
-                      description: azureFile represents an Azure File Service mount
-                        on the host and bind mount to the pod.
+                      description: |-
+                        azureFile represents an Azure File Service mount on the host and bind mount to the pod.
+                        Deprecated: AzureFile is deprecated. All operations for the in-tree azureFile type
+                        are redirected to the file.csi.azure.com CSI driver.
                       properties:
                         readOnly:
                           description: |-
@@ -4947,8 +5045,9 @@ spec:
                       - shareName
                       type: object
                     cephfs:
-                      description: cephFS represents a Ceph FS mount on the host that
-                        shares a pod's lifetime
+                      description: |-
+                        cephFS represents a Ceph FS mount on the host that shares a pod's lifetime.
+                        Deprecated: CephFS is deprecated and the in-tree cephfs type is no longer supported.
                       properties:
                         monitors:
                           description: |-
@@ -5000,6 +5099,8 @@ spec:
                     cinder:
                       description: |-
                         cinder represents a cinder volume attached and mounted on kubelets host machine.
+                        Deprecated: Cinder is deprecated. All operations for the in-tree cinder type
+                        are redirected to the cinder.csi.openstack.org CSI driver.
                         More info: https://examples.k8s.io/mysql-cinder-pd/README.md
                       properties:
                         fsType:
@@ -5109,8 +5210,7 @@ spec:
                       x-kubernetes-map-type: atomic
                     csi:
                       description: csi (Container Storage Interface) represents ephemeral
-                        storage that is handled by certain external CSI drivers (Beta
-                        feature).
+                        storage that is handled by certain external CSI drivers.
                       properties:
                         driver:
                           description: |-
@@ -5576,6 +5676,7 @@ spec:
                       description: |-
                         flexVolume represents a generic volume resource that is
                         provisioned/attached using an exec based plugin.
+                        Deprecated: FlexVolume is deprecated. Consider using a CSIDriver instead.
                       properties:
                         driver:
                           description: driver is the name of the driver to use for
@@ -5621,9 +5722,9 @@ spec:
                       - driver
                       type: object
                     flocker:
-                      description: flocker represents a Flocker volume attached to
-                        a kubelet's host machine. This depends on the Flocker control
-                        service being running
+                      description: |-
+                        flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running.
+                        Deprecated: Flocker is deprecated and the in-tree flocker type is no longer supported.
                       properties:
                         datasetName:
                           description: |-
@@ -5639,6 +5740,8 @@ spec:
                       description: |-
                         gcePersistentDisk represents a GCE Disk resource that is attached to a
                         kubelet's host machine and then exposed to the pod.
+                        Deprecated: GCEPersistentDisk is deprecated. All operations for the in-tree
+                        gcePersistentDisk type are redirected to the pd.csi.storage.gke.io CSI driver.
                         More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk
                       properties:
                         fsType:
@@ -5674,7 +5777,7 @@ spec:
                     gitRepo:
                       description: |-
                         gitRepo represents a git repository at a particular revision.
-                        DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an
+                        Deprecated: GitRepo is deprecated. To provision a container with a git repo, mount an
                         EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir
                         into the Pod's container.
                       properties:
@@ -5698,6 +5801,7 @@ spec:
                     glusterfs:
                       description: |-
                         glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime.
+                        Deprecated: Glusterfs is deprecated and the in-tree glusterfs type is no longer supported.
                         More info: https://examples.k8s.io/volumes/glusterfs/README.md
                       properties:
                         endpoints:
@@ -5905,8 +6009,9 @@ spec:
                       - claimName
                       type: object
                     photonPersistentDisk:
-                      description: photonPersistentDisk represents a PhotonController
-                        persistent disk attached and mounted on kubelets host machine
+                      description: |-
+                        photonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine.
+                        Deprecated: PhotonPersistentDisk is deprecated and the in-tree photonPersistentDisk type is no longer supported.
                       properties:
                         fsType:
                           description: |-
@@ -5922,8 +6027,11 @@ spec:
                       - pdID
                       type: object
                     portworxVolume:
-                      description: portworxVolume represents a portworx volume attached
-                        and mounted on kubelets host machine
+                      description: |-
+                        portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
+                        Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
+                        are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate
+                        is on.
                       properties:
                         fsType:
                           description: |-
@@ -6288,8 +6396,9 @@ spec:
                           x-kubernetes-list-type: atomic
                       type: object
                     quobyte:
-                      description: quobyte represents a Quobyte mount on the host
-                        that shares a pod's lifetime
+                      description: |-
+                        quobyte represents a Quobyte mount on the host that shares a pod's lifetime.
+                        Deprecated: Quobyte is deprecated and the in-tree quobyte type is no longer supported.
                       properties:
                         group:
                           description: |-
@@ -6328,6 +6437,7 @@ spec:
                     rbd:
                       description: |-
                         rbd represents a Rados Block Device mount on the host that shares a pod's lifetime.
+                        Deprecated: RBD is deprecated and the in-tree rbd type is no longer supported.
                         More info: https://examples.k8s.io/volumes/rbd/README.md
                       properties:
                         fsType:
@@ -6400,8 +6510,9 @@ spec:
                       - monitors
                       type: object
                     scaleIO:
-                      description: scaleIO represents a ScaleIO persistent volume
-                        attached and mounted on Kubernetes nodes.
+                      description: |-
+                        scaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
+                        Deprecated: ScaleIO is deprecated and the in-tree scaleIO type is no longer supported.
                       properties:
                         fsType:
                           default: xfs
@@ -6533,8 +6644,9 @@ spec:
                           type: string
                       type: object
                     storageos:
-                      description: storageOS represents a StorageOS volume attached
-                        and mounted on Kubernetes nodes.
+                      description: |-
+                        storageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.
+                        Deprecated: StorageOS is deprecated and the in-tree storageos type is no longer supported.
                       properties:
                         fsType:
                           description: |-
@@ -6579,8 +6691,10 @@ spec:
                           type: string
                       type: object
                     vsphereVolume:
-                      description: vsphereVolume represents a vSphere volume attached
-                        and mounted on kubelets host machine
+                      description: |-
+                        vsphereVolume represents a vSphere volume attached and mounted on kubelets host machine.
+                        Deprecated: VsphereVolume is deprecated. All operations for the in-tree vsphereVolume type
+                        are redirected to the csi.vsphere.vmware.com CSI driver.
                       properties:
                         fsType:
                           description: |-

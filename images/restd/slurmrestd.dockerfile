@@ -2,8 +2,8 @@ ARG BASE_IMAGE=ubuntu:jammy
 
 FROM $BASE_IMAGE AS slurmrestd
 
-ARG SLURM_VERSION=24.05.2
-ARG CUDA_VERSION=12.2.2
+ARG SLURM_VERSION=24.05.5
+ARG CUDA_VERSION=12.4.1
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -38,7 +38,8 @@ RUN apt-get update && \
         vim \
         tree \
         lsof \
-        daemontools
+        daemontools && \
+    apt clean
 
 
 # Download and install Slurm packages
@@ -48,7 +49,9 @@ RUN for pkg in slurm-smd slurm-smd-slurmrestd; do \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
     done
 
-RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
+RUN apt install -y /tmp/*.deb \
+    && rm -rf /tmp/*.deb && \
+    apt clean
 
 # Expose the port used for accessing slurmrestd
 EXPOSE 6820

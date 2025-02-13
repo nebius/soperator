@@ -27,6 +27,7 @@ type SlurmWorker struct {
 	CgroupVersion  string
 	EnableGDRCopy  bool
 	SlurmNodeExtra string
+	PriorityClass  string
 
 	Service     Service
 	StatefulSet StatefulSet
@@ -37,6 +38,7 @@ type SlurmWorker struct {
 	SharedMemorySize          *resource.Quantity
 	UseDefaultAppArmorProfile bool
 	Maintenance               *consts.MaintenanceMode
+	Rebooter                  slurmv1.Rebooter
 }
 
 func buildSlurmWorkerFrom(
@@ -88,11 +90,13 @@ func buildSlurmWorkerFrom(
 		SharedMemorySize:          worker.Volumes.SharedMemorySize,
 		CgroupVersion:             worker.CgroupVersion,
 		EnableGDRCopy:             worker.EnableGDRCopy,
+		PriorityClass:             worker.PriorityClass,
 		UseDefaultAppArmorProfile: useDefaultAppArmorProfile,
 		SlurmNodeExtra:            worker.SlurmNodeExtra,
 		SSHDConfigMapName:         sshdConfigMapName,
 		IsSSHDConfigMapDefault:    isSSHDConfigDefault,
 		Maintenance:               maintenance,
+		Rebooter:                  worker.Rebooter,
 	}
 	for _, jailSubMount := range worker.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()

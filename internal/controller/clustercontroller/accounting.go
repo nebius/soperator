@@ -47,10 +47,10 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 				Name: "Slurm Secret Slurmdbd Configs",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					if !isAccountingEnabled && !isDBEnabled {
-						logger.Info("Slurm Accounting is disabled. Skipping reconciliation	of Slurmdbd Configs Secret")
+						logger.V(1).Info("Slurm Accounting is disabled. Skipping reconciliation	of Slurmdbd Configs Secret")
 						return nil
 					}
 
@@ -84,14 +84,14 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					}
 
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 
 					if err = r.Secret.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling accounting Secret")
 					}
 
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 					return nil
 				},
 			},
@@ -99,15 +99,15 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 				Name: "Slurm Secret MariaDB password",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					if !isAccountingEnabled && !isDBEnabled {
-						logger.Info("Slurm Accounting is disabled. Skipping reconciliation of MariaDB password Secret")
+						logger.V(1).Info("Slurm Accounting is disabled. Skipping reconciliation of MariaDB password Secret")
 						return nil
 					}
 
 					if !isMariaDBEnabled || !isProtectedSecret {
-						stepLogger.Info("Reconciled")
+						stepLogger.V(1).Info("Reconciled")
 						return nil
 					}
 
@@ -126,7 +126,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 							return errors.Wrap(err, "rendering mariadb password Secret")
 						}
 						stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-						stepLogger.Info("Rendered")
+						stepLogger.V(1).Info("Rendered")
 
 						err = r.Create(ctx, desired)
 						if err != nil {
@@ -142,15 +142,15 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 				Name: "Slurm Secret MariaDB root password",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					if !isAccountingEnabled && !isDBEnabled {
-						logger.Info("Slurm Accounting is disabled. Skipping reconciliation MariaDB root password")
+						logger.V(1).Info("Slurm Accounting is disabled. Skipping reconciliation MariaDB root password")
 						return nil
 					}
 
 					if !isMariaDBEnabled || !isProtectedSecret {
-						stepLogger.Info("Reconciled")
+						stepLogger.V(1).Info("Reconciled")
 						return nil
 					}
 
@@ -169,7 +169,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 							return errors.Wrap(err, "rendering mariadb root password Secret")
 						}
 						stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-						stepLogger.Info("Rendered")
+						stepLogger.V(1).Info("Rendered")
 
 						err = r.Create(ctx, desired)
 						if err != nil {
@@ -184,14 +184,14 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 				Name: "Slurm accounting service",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					var err error
 					var desired *corev1.Service
 					var accountingServiceNamePtr *string = nil
 
 					if !isAccountingEnabled {
-						stepLogger.Info("Removing")
+						stepLogger.V(1).Info("Removing")
 						accountingServiceName := naming.BuildServiceName(consts.ComponentTypeAccounting, clusterValues.Name)
 						accountingServiceNamePtr = &accountingServiceName
 
@@ -199,7 +199,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 							stepLogger.Error(err, "Failed to reconcile")
 							return errors.Wrap(err, "reconciling accounting service")
 						}
-						stepLogger.Info("Reconciled")
+						stepLogger.V(1).Info("Reconciled")
 						return nil
 					}
 
@@ -213,63 +213,60 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						return errors.Wrap(err, "rendering accounting Service")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 
 					if err = r.Service.Reconcile(stepCtx, cluster, desired, accountingServiceNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling accounting service")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 					return nil
 				},
 			},
 			utils.MultiStepExecutionStep{
-				Name: "Slurm Deployment",
+				Name: "Slurm MariaDB Grant",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
-					var err error
-					var desired *appsv1.Deployment
-					var deploymentNamePtr *string = nil
-
-					if !isAccountingEnabled {
-						stepLogger.Info("Removing")
-						deploymentName := naming.BuildDeploymentName(consts.ComponentTypeAccounting)
-						deploymentNamePtr = &deploymentName
-						if err = r.Deployment.Reconcile(stepCtx, cluster, desired, deploymentNamePtr); err != nil {
-							stepLogger.Error(err, "Failed to reconcile")
-							return errors.Wrap(err, "reconciling accounting Deployment")
-						}
-						stepLogger.Info("Reconciled")
+					if !check.IsMariaDbOperatorCRDInstalled {
+						stepLogger.V(1).Info("MariaDB Operator CRD is not installed. Skipping MariaDB reconciliation")
 						return nil
 					}
-					desired, err = accounting.RenderDeployment(
+
+					var err error
+					var desired *mariadbv1alpha1.Grant
+					var mariaDbGrantNamePtr *string = nil
+
+					if !isMariaDBEnabled || !isAccountingEnabled {
+						stepLogger.V(1).Info("Removing")
+						mariaDbGrantName := naming.BuildMariaDbName(clusterValues.Name)
+						mariaDbGrantNamePtr = &mariaDbGrantName
+						if err = r.MariaDbGrant.Reconcile(stepCtx, cluster, desired, mariaDbGrantNamePtr); err != nil {
+							stepLogger.Error(err, "Failed to reconcile")
+							return errors.Wrap(err, "reconciling accounting mariadb grant")
+						}
+						stepLogger.V(1).Info("Reconciled")
+						return nil
+					}
+
+					desired, err = accounting.RenderMariaDbGrant(
 						clusterValues.Namespace,
 						clusterValues.Name,
 						&clusterValues.NodeAccounting,
-						clusterValues.NodeFilters,
-						clusterValues.VolumeSources,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering accounting Deployment")
+						return errors.Wrap(err, "rendering accounting mariadb grant")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 
-					deps, err := r.getAccountingDeploymentDependencies(ctx, clusterValues)
-					if err != nil {
-						stepLogger.Error(err, "Failed to retrieve dependencies")
-						return errors.Wrap(err, "retrieving dependencies for accounting Deployment")
-					}
-					stepLogger.Info("Retrieved dependencies")
-
-					if err = r.Deployment.Reconcile(stepCtx, cluster, desired, deploymentNamePtr, deps...); err != nil {
+					if err = r.MariaDbGrant.Reconcile(ctx, cluster, desired, mariaDbGrantNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling accounting Deployment")
+						return errors.Wrap(err, "reconciling accounting mariadb grant")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 					return nil
 				},
 			},
@@ -277,10 +274,10 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 				Name: "Slurm MariaDB Database",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					if !check.IsMariaDbOperatorCRDInstalled {
-						stepLogger.Info("MariaDB Operator CRD is not installed. Skipping MariaDB reconciliation")
+						stepLogger.V(1).Info("MariaDB Operator CRD is not installed. Skipping MariaDB reconciliation")
 						return nil
 					}
 
@@ -289,14 +286,14 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					var mariaDbNamePtr *string = nil
 
 					if !isMariaDBEnabled || !isAccountingEnabled {
-						stepLogger.Info("Removing")
+						stepLogger.V(1).Info("Removing")
 						mariaDbName := naming.BuildMariaDbName(clusterValues.Name)
 						mariaDbNamePtr = &mariaDbName
 						if err = r.MariaDb.Reconcile(stepCtx, cluster, desired, mariaDbNamePtr); err != nil {
 							stepLogger.Error(err, "Failed to reconcile")
 							return errors.Wrap(err, "reconciling accounting mariadb")
 						}
-						stepLogger.Info("Reconciled")
+						stepLogger.V(1).Info("Reconciled")
 						return nil
 					}
 
@@ -311,60 +308,63 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						return errors.Wrap(err, "rendering accounting mariadb")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 
 					if err = r.MariaDb.Reconcile(ctx, cluster, desired, mariaDbNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling accounting mariadb")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 					return nil
 				},
 			},
 			utils.MultiStepExecutionStep{
-				Name: "Slurm MariaDB Grant",
+				Name: "Slurm Deployment",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
-
-					if !check.IsMariaDbOperatorCRDInstalled {
-						stepLogger.Info("MariaDB Operator CRD is not installed. Skipping MariaDB reconciliation")
-						return nil
-					}
+					stepLogger.V(1).Info("Reconciling")
 
 					var err error
-					var desired *mariadbv1alpha1.Grant
-					var mariaDbGrantNamePtr *string = nil
+					var desired *appsv1.Deployment
+					var deploymentNamePtr *string = nil
 
-					if !isMariaDBEnabled || !isAccountingEnabled {
-						stepLogger.Info("Removing")
-						mariaDbGrantName := naming.BuildMariaDbName(clusterValues.Name)
-						mariaDbGrantNamePtr = &mariaDbGrantName
-						if err = r.MariaDbGrant.Reconcile(stepCtx, cluster, desired, mariaDbGrantNamePtr); err != nil {
+					if !isAccountingEnabled {
+						stepLogger.V(1).Info("Removing")
+						deploymentName := naming.BuildDeploymentName(consts.ComponentTypeAccounting)
+						deploymentNamePtr = &deploymentName
+						if err = r.Deployment.Reconcile(stepCtx, cluster, desired, deploymentNamePtr); err != nil {
 							stepLogger.Error(err, "Failed to reconcile")
-							return errors.Wrap(err, "reconciling accounting mariadb grant")
+							return errors.Wrap(err, "reconciling accounting Deployment")
 						}
-						stepLogger.Info("Reconciled")
+						stepLogger.V(1).Info("Reconciled")
 						return nil
 					}
-
-					desired, err = accounting.RenderMariaDbGrant(
+					desired, err = accounting.RenderDeployment(
 						clusterValues.Namespace,
 						clusterValues.Name,
 						&clusterValues.NodeAccounting,
+						clusterValues.NodeFilters,
+						clusterValues.VolumeSources,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering accounting mariadb grant")
+						return errors.Wrap(err, "rendering accounting Deployment")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 
-					if err = r.MariaDbGrant.Reconcile(ctx, cluster, desired, mariaDbGrantNamePtr); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling accounting mariadb grant")
+					deps, err := r.getAccountingDeploymentDependencies(ctx, clusterValues)
+					if err != nil {
+						stepLogger.Error(err, "Failed to retrieve dependencies")
+						return errors.Wrap(err, "retrieving dependencies for accounting Deployment")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Retrieved dependencies")
+
+					if err = r.Deployment.Reconcile(stepCtx, cluster, desired, deploymentNamePtr, deps...); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling accounting Deployment")
+					}
+					stepLogger.V(1).Info("Reconciled")
 					return nil
 				},
 			},
@@ -437,53 +437,101 @@ func (r SlurmClusterReconciler) ValidateAccounting(
 	cluster *slurmv1.SlurmCluster,
 	clusterValues *values.SlurmCluster,
 ) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
+	existingDeployment := &appsv1.Deployment{}
+	existingMariaDb := &mariadbv1alpha1.MariaDB{}
+	existingMariaDbGrant := &mariadbv1alpha1.Grant{}
 
-	existing := &appsv1.Deployment{}
-	err := r.Get(
-		ctx,
-		types.NamespacedName{
-			Namespace: clusterValues.Namespace,
-			Name:      clusterValues.NodeAccounting.Deployment.Name,
-		},
-		existing,
-	)
+	existingDeployment, err := getTypedResource(ctx, r.Client, clusterValues.Namespace, clusterValues.NodeAccounting.Deployment.Name, existingDeployment)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
-		}
-		logger.Error(err, "Failed to get accounting Deployment")
-		return ctrl.Result{}, errors.Wrap(err, "getting accounting Deployment")
+		message := "Failed to get Deployment"
+		return r.updateStatus(ctx, cluster, slurmv1.ConditionClusterAccountingAvailable, metav1.ConditionUnknown, "Unknown", message, 10*time.Second)
 	}
 
 	targetReplicas := clusterValues.NodeAccounting.Deployment.Replicas
-	if existing.Spec.Replicas != nil {
-		targetReplicas = *existing.Spec.Replicas
+	if existingDeployment.Spec.Replicas != nil {
+		targetReplicas = *existingDeployment.Spec.Replicas
 	}
-	if existing.Status.AvailableReplicas != targetReplicas {
-		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-			status.SetCondition(metav1.Condition{
-				Type:   slurmv1.ConditionClusterAccountingAvailable,
-				Status: metav1.ConditionFalse, Reason: "NotAvailable",
-				Message: "Slurm accounting is not available yet",
-			})
-		}); err != nil {
-			return ctrl.Result{}, err
+
+	if clusterValues.NodeAccounting.MariaDb.Enabled {
+		existingMariaDb, mariadbErr := getTypedResource(ctx, r.Client, clusterValues.Namespace, naming.BuildMariaDbName(clusterValues.Name), existingMariaDb)
+		if mariadbErr != nil || existingMariaDb == nil {
+			message := "Failed to get MariaDB"
+			return r.updateStatus(ctx, cluster, slurmv1.ConditionClusterAccountingAvailable, metav1.ConditionUnknown, "Unknown", message, 10*time.Second)
 		}
-		return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 10}, nil
-	} else {
-		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-			status.SetCondition(metav1.Condition{
-				Type:   slurmv1.ConditionClusterAccountingAvailable,
-				Status: metav1.ConditionTrue, Reason: "Available",
-				Message: "Slurm accounting is available",
-			})
-		}); err != nil {
-			return ctrl.Result{}, err
+		existingMariaDbGrant, mariadbGrantErr := getTypedResource(ctx, r.Client, clusterValues.Namespace, naming.BuildMariaDbName(clusterValues.Name), existingMariaDbGrant)
+		if mariadbGrantErr != nil || existingMariaDbGrant == nil {
+			message := "Failed to get MariaDB Grant"
+			return r.updateStatus(ctx, cluster, slurmv1.ConditionClusterAccountingAvailable, metav1.ConditionUnknown, "Unknown", message, 10*time.Second)
 		}
 	}
 
+	switch {
+	case !isConditionReady(existingMariaDb.Status.Conditions, mariadbv1alpha1.ConditionTypeReady):
+		message := "MariaDB is not ready"
+		return r.updateStatus(ctx, cluster, slurmv1.ConditionClusterAccountingAvailable, metav1.ConditionFalse, "NotAvailable", message, 10*time.Second)
+	case !isConditionReady(existingMariaDbGrant.Status.Conditions, mariadbv1alpha1.ConditionTypeReady):
+		message := "MariaDB Grant is not ready"
+		return r.updateStatus(ctx, cluster, slurmv1.ConditionClusterAccountingAvailable, metav1.ConditionFalse, "NotAvailable", message, 10*time.Second)
+	case existingDeployment.Status.AvailableReplicas == 0:
+		message := "Slurm accounting is not available yet"
+		return r.updateStatus(ctx, cluster, slurmv1.ConditionClusterAccountingAvailable, metav1.ConditionFalse, "NotAvailable", message, 10*time.Second)
+	case existingDeployment.Status.AvailableReplicas != targetReplicas:
+		message := fmt.Sprintf("Slurm accounting available replicas: %d, but target replicas: %d", existingDeployment.Status.AvailableReplicas, targetReplicas)
+		return r.updateStatus(ctx, cluster, slurmv1.ConditionClusterAccountingAvailable, metav1.ConditionFalse, "NotAvailable", message, 10*time.Second)
+	}
+
+	return r.updateStatus(ctx, cluster, slurmv1.ConditionClusterAccountingAvailable, metav1.ConditionTrue, "Available", "Slurm accounting is available", 0)
+}
+
+func getTypedResource[T client.Object](
+	ctx context.Context,
+	getter client.Reader,
+	namespace, name string,
+	obj T,
+) (T, error) {
+	err := getter.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, obj)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			var zeroValue T // This creates the zero value for type T
+			return zeroValue, nil
+		}
+		return obj, errors.Wrap(err, "failed to get resource")
+	}
+	return obj, nil
+}
+
+func (r SlurmClusterReconciler) updateStatus(
+	ctx context.Context,
+	cluster *slurmv1.SlurmCluster,
+	conditionType string,
+	conditionStatus metav1.ConditionStatus,
+	reason, message string,
+	requeueAfter time.Duration,
+) (ctrl.Result, error) {
+	if err := r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+		status.SetCondition(metav1.Condition{
+			Type:    conditionType,
+			Status:  conditionStatus,
+			Reason:  reason,
+			Message: message,
+		})
+	}); err != nil {
+		return ctrl.Result{}, err
+	}
+	if conditionStatus != metav1.ConditionTrue {
+		return ctrl.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
+	}
+
 	return ctrl.Result{}, nil
+}
+
+func isConditionReady(conditions []metav1.Condition, conditionType string) bool {
+	for _, condition := range conditions {
+		if condition.Type == conditionType && condition.Status == metav1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
 
 func (r SlurmClusterReconciler) getAccountingDeploymentDependencies(

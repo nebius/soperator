@@ -8,6 +8,7 @@ useDefaultAppArmorProfile: false
 # - none: No maintenance is performed. The cluster operates normally.
 # - downscale: Scales down all components to 0.
 # - downscaleAndDeletePopulateJail: Scales down all components to 0 and deletes the kubernetes Kind Jobs populateJail.
+# - downscaleAndOverwritePopulateJail: Scales down all components to 0 and overwrite populateJail (same as overwrite=true).
 # - skipPopulateJail: Skips the execution of the populateJail job during maintenance.
 maintenance: "none"
 # Slurm cluster type. Can be now gpu or cpu
@@ -98,9 +99,9 @@ periodicChecks:
     # CronJob timeout in seconds. By default, equals to 30 min
     activeDeadlineSeconds: 1800
     # Number of successful finished jobs to retain
-    successfulJobsHistoryLimit: 24
+    successfulJobsHistoryLimit: 3
     # Number of failed finished jobs to retain
-    failedJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 24
     # NCCL test settings
     ncclArguments:
       # Minimum memory size to start NCCL with
@@ -128,6 +129,8 @@ slurmConfig: {}
 # defCpuPerGPU: 16
 # completeWait: 5
 # debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs"
+# epilog: "/path/to/epilog.sh"
+# prolog: "/path/to/prolog.sh"
 # taskPluginParam: "Verbose"
 # maxJobCount: 10000
 # minJobAge: 86400
@@ -136,16 +139,16 @@ slurmNodes:
     enabled: false
     k8sNodeFilterName: "no-gpu"
     slurmConfig: {}
-    # accountingStorageTRES: gres/gpu,license/iop1
+    # accountingStorageTRES: "gres/gpu,license/iop1"
     # accountingStoreFlags: job_comment,job_env,job_extra,job_script,no_stdio
     # acctGatherInterconnectType: "acct_gather_interconnect/ofed"
-    # acctGatherFilesystemType: acct_gather_filesystem/lustre
-    # jobAcctGatherType: jobacct_gather/cgroup
+    # acctGatherFilesystemType: "acct_gather_filesystem/lustre"
+    # jobAcctGatherType: "jobacct_gather/cgroup"
     # jobAcctGatherFrequency: 30
     # priorityWeightAge: 1
     # priorityWeightFairshare: 1
     # priorityWeightQOS: 1
-    # priorityWeightTRES: 1
+    # priorityWeightTRES: ""
     slurmdbdConfig: {}
     # archiveEvents: "yes"
     # archiveJobs: "yes"
@@ -155,7 +158,7 @@ slurmNodes:
     # archiveUsage: "yes"
     # archiveTXN: "yes"
     # debugLevel: "info"
-    # tcpTimeout: "120"
+    # tcpTimeout: 120
     # purgeEventAfter: "1month"
     # purgeJobAfter: "1month"
     # purgeStepAfter: "1month"
@@ -283,6 +286,7 @@ slurmNodes:
     k8sNodeFilterName: "gpu"
     cgroupVersion: v2
     enableGDRCopy: false
+    priorityClass: ""
     slurmNodeExtra: ""
     supervisordConfigMapRefName: ""
     sshdConfigMapRefName: ""
@@ -404,13 +408,14 @@ telemetry: {}
 #   otelCollectorPort: 8429
 
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.17.0-jammy-slurm24.05.2"
-  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.17.0-jammy-slurm24.05.2"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.17.0-jammy-slurm24.05.2"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.17.0-jammy-slurm24.05.2"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.17.0-jammy-slurm24.05.2"
-  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.17.0-jammy-slurm24.05.2"
-  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.17.0-jammy-slurm24.05.2"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.17.0-jammy-slurm24.05.2"
-  exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.17.0-jammy-slurm24.05.2"
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.18.0-jammy-slurm24.05.5"
+  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.18.0-jammy-slurm24.05.5"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.18.0-jammy-slurm24.05.5"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.18.0-jammy-slurm24.05.5"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.18.0-jammy-slurm24.05.5"
+  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.18.0-jammy-slurm24.05.5"
+  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.18.0-jammy-slurm24.05.5"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.18.0-jammy-slurm24.05.5"
+  exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.18.0-jammy-slurm24.05.5"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:11.4.3"
+  rebooter: "cr.eu-north1.nebius.cloud/soperator/rebooter:1.17.0"

@@ -7,12 +7,14 @@ import (
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/check"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/render/populate_jail"
 	"nebius.ai/slurm-operator/internal/utils"
@@ -35,9 +37,11 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 				Name: "Populate jail Job",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
-					isMaintenanceStopMode := check.IsModeDownscaleAndDeletePopulate(clusterValues.PopulateJail.Maintenance)
+					isMaintenanceStopMode := check.IsModeDownscaleAndDeletePopulate(
+						clusterValues.PopulateJail.Maintenance)
+
 					desired := batchv1.Job{}
 					getErr := r.Get(stepCtx,
 						client.ObjectKey{
@@ -47,16 +51,26 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 						&desired,
 					)
 					if getErr == nil {
-						stepLogger.Info("Already exists")
+						stepLogger.V(1).Info("Already exists")
 						if isMaintenanceStopMode {
-							stepLogger.Info("Deleting")
+							stepLogger.V(1).Info("Deleting")
 							if err := r.Delete(stepCtx, &desired); err != nil {
 								stepLogger.Error(err, "Failed to delete")
 								return errors.Wrap(err, "deleting Populate jail Job")
 							}
-							stepLogger.Info("Deleted")
+							stepLogger.V(1).Info("Deleted")
+							return nil
 						}
-						return nil
+						if check.IsModeDownscaleAndOverwritePopulate(clusterValues.PopulateJail.Maintenance) {
+							if isConditionNonOverwrite(cluster.Status.Conditions) {
+								if err := r.Delete(stepCtx, &desired); err != nil {
+									stepLogger.Error(err, "Failed to delete")
+									return errors.Wrap(err, "deleting Populate jail Job")
+								}
+								stepLogger.V(1).Info("Successfully deleted Populate Jail Job")
+							}
+							return nil
+						}
 					}
 
 					if !apierrors.IsNotFound(getErr) && !isMaintenanceStopMode {
@@ -65,7 +79,7 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 					}
 
 					if isMaintenanceStopMode {
-						stepLogger.Info("Skipping creation due to MaintenanceStopMode")
+						stepLogger.V(1).Info("Skipping creation due to MaintenanceStopMode")
 						return nil
 					}
 
@@ -84,19 +98,19 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 					desired = *renderedDesired.DeepCopy()
 
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 
 					if err = r.Job.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling Populate jail Job")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 
 					if pollErr := wait.PollUntilContextCancel(stepCtx,
 						10*time.Second,
 						true,
 						func(pollCtx context.Context) (done bool, err error) {
-							stepLogger.Info("Waiting")
+							stepLogger.V(1).Info("Waiting")
 
 							job := batchv1.Job{}
 							if err = r.Get(stepCtx,
@@ -112,10 +126,10 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 							stepLogger = stepLogger.WithValues(logfield.ResourceKV(&job)...)
 
 							if job.Status.Succeeded > 0 {
-								stepLogger.Info("Succeeded")
+								stepLogger.V(1).Info("Succeeded")
 								return true, nil
 							} else {
-								stepLogger.Info("Not succeeded yet")
+								stepLogger.V(1).Info("Not succeeded yet")
 								return false, nil
 							}
 						},
@@ -123,7 +137,7 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 						stepLogger.Error(pollErr, "Failed to wait")
 						return errors.Wrap(pollErr, "waiting Populate jail Job")
 					}
-					stepLogger.Info("Completed")
+					stepLogger.V(1).Info("Completed")
 
 					return nil
 				},
@@ -138,4 +152,13 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 	logger.Info("Reconciled Populate jail Job")
 
 	return nil
+}
+
+func isConditionNonOverwrite(conditions []metav1.Condition) bool {
+	for _, condition := range conditions {
+		if condition.Type == slurmv1.ConditionClusterPopulateJailMode {
+			return condition.Reason != string(consts.ModeDownscaleAndOverwritePopulate)
+		}
+	}
+	return false
 }

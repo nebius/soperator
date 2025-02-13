@@ -9,6 +9,7 @@ import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func RenderPodMonitor(
@@ -41,7 +42,7 @@ func RenderPodMonitor(
 					Interval:             metricsSpec.Interval,
 					ScrapeTimeout:        metricsSpec.ScrapeTimeout,
 					Path:                 consts.ContainerPathExporter,
-					Port:                 consts.ContainerPortNameExporter,
+					Port:                 ptr.To(consts.ContainerPortNameExporter),
 					Scheme:               consts.ContainerSchemeExporter,
 					MetricRelabelConfigs: metricsSpec.MetricRelabelConfigs,
 					RelabelConfigs:       metricsSpec.RelabelConfig,

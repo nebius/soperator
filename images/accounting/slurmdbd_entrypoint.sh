@@ -12,6 +12,7 @@ for file in /mnt/slurm-configs/*; do
     touch "/etc/slurm/$filename" && mount --bind "$file" "/etc/slurm/$filename"
 done
 
+echo "Bind-mount slurm configs with secrets from K8S secrets"
 for file in /mnt/slurm-secrets/*; do
     filename=$(basename "$file")
     touch "/etc/slurm/$filename" && mount --bind "$file" "/etc/slurm/$filename"

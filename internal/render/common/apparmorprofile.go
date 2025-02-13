@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/values"
 
@@ -45,13 +46,9 @@ profile %s flags=(attach_disconnected,mediate_deleted) {
 
   /** lrixw,
 
-
-  # remove [^m], when bump slurm 24.05.5 or higher
-  
   deny /usr/lib/x86_64-linux-gnu/libEGL_* w,
   deny /usr/lib/x86_64-linux-gnu/libGLES* w,
   deny /usr/lib/x86_64-linux-gnu/libGLX_nvidia* w,
-  deny /usr/lib/x86_64-linux-gnu/libcuda* w,
   deny /usr/lib/x86_64-linux-gnu/libnvcuvid* w,
   deny /usr/lib/x86_64-linux-gnu/gbm/nvidia-* w,
   deny /usr/lib/x86_64-linux-gnu/nvidia/wine/_nvngx.dll w,
@@ -59,25 +56,25 @@ profile %s flags=(attach_disconnected,mediate_deleted) {
   deny /usr/lib/x86_64-linux-gnu/nvidia/xorg/libglxserver_nvidia* w,
   deny /usr/lib/x86_64-linux-gnu/nvidia/xorg/nvidia_drv.so w,
   deny /usr/lib/x86_64-linux-gnu/vdpau/libvdpau_nvidia w,
-  deny /usr/lib/x86_64-linux-gnu/libnvidia-[^m]* w,
-  deny /usr/lib/x86_64-linux-gnu/libcuda.so* w,
-  deny /usr/lib/x86_64-linux-gnu/libcudadebugger.so* w,
+  deny /usr/lib/x86_64-linux-gnu/libnvidia-*.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
+  deny /usr/lib/x86_64-linux-gnu/libcuda.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
+  deny /usr/lib/x86_64-linux-gnu/libcudadebugger.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
 
-  deny /lib/x86_64-linux-gnu/libnvidia-[^m]* w,
-  deny /lib/x86_64-linux-gnu/libcuda.so* w,
-  deny /lib/x86_64-linux-gnu/libcudadebugger.so* w,
+  deny /lib/x86_64-linux-gnu/libnvidia-*.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
+  deny /usr/local/lib/x86_64-linux-gnu/libcuda.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
+  deny /lib/x86_64-linux-gnu/libcudadebugger.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
 
-  deny /usr/local/lib/x86_64-linux-gnu/libnvidia-[^m]* w,
-  deny /usr/local/lib/x86_64-linux-gnu/libcuda.so* w,
-  deny /usr/local/lib/x86_64-linux-gnu/libcudadebugger.so* w,
+  deny /usr/local/lib/x86_64-linux-gnu/libnvidia-*.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
+  deny /usr/local/lib/x86_64-linux-gnu/libcuda.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
+  deny /usr/local/lib/x86_64-linux-gnu/libcudadebugger.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
 
-  deny /usr/local/nvidia/lib/x86_64-linux-gnu/libnvidia-[^m]* w,
-  deny /usr/local/nvidia/lib/x86_64-linux-gnu/libcuda.so* w,
-  deny /usr/local/nvidia/lib/x86_64-linux-gnu/libcudadebugger.so* w,
+  deny /usr/local/nvidia/lib/x86_64-linux-gnu/libnvidia-*.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
+  deny /usr/local/nvidia/lib/x86_64-linux-gnu/libcuda.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
+  deny /usr/local/nvidia/lib/x86_64-linux-gnu/libcudadebugger.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
 
-  deny /usr/local/nvidia/lib64/libnvidia-[^m]* w,
-  deny /usr/local/nvidia/lib64/libcuda.so* w,
-  deny /usr/local/nvidia/lib64/libcudadebugger.so* w,
+  deny /usr/local/nvidia/lib64/libnvidia-*.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
+  deny /usr/local/nvidia/lib64/libcuda.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
+  deny /usr/local/nvidia/lib64/libcudadebugger.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
 
   deny /usr/bin/nvidia-smi w,
   deny /usr/bin/nvidia-debugdump w,

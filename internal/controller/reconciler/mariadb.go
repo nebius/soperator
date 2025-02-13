@@ -7,6 +7,7 @@ import (
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -36,17 +37,18 @@ func (r *MariaDbReconciler) Reconcile(
 	name *string,
 	deps ...metav1.Object,
 ) error {
+	logger := log.FromContext(ctx)
 	if desired == nil {
 		// If desired is nil, delete the MariaDb
 		if name == nil {
-			log.FromContext(ctx).Info("MariaDb is not needed, skipping deletion")
+			logger.V(1).Info("MariaDb is not needed, skipping deletion")
 			return nil
 		}
-		log.FromContext(ctx).Info("Deleting MariaDb, because MariaDb is not needed")
+		logger.V(1).Info("Deleting MariaDb, because MariaDb is not needed")
 		return r.deleteIfOwnedByController(ctx, cluster, cluster.Namespace, *name)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
-		log.FromContext(ctx).
+		logger.V(1).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile MariaDb ")
 		return errors.Wrap(err, "reconciling MariaDb ")
@@ -60,13 +62,18 @@ func (r *MariaDbReconciler) deleteIfOwnedByController(
 	namespace,
 	name string,
 ) error {
+	logger := log.FromContext(ctx)
 	mariaDb, err := r.getMariaDb(ctx, namespace, name)
+	if apierrors.IsNotFound(err) {
+		logger.V(1).Info("MariaDb is not found, skipping deletion")
+		return nil
+	}
 	if err != nil {
 		return errors.Wrap(err, "getting MariaDb")
 	}
 
 	if !metav1.IsControlledBy(mariaDb, cluster) {
-		log.FromContext(ctx).Info("MariaDb is not owned by controller, skipping deletion")
+		logger.V(1).Info("MariaDb is not owned by controller, skipping deletion")
 		return nil
 	}
 

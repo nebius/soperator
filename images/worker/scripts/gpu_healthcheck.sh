@@ -3,8 +3,8 @@
 set -e
 
 # Run GPU healthcheck
-output=$(/usr/bin/nvidia-smi 2>&1)
-exit_code=$?
+exit_code=0
+output=$(/usr/bin/nvidia-smi 2>&1) || exit_code=$?
 
 current_node=$(hostname)
 node_info=$(scontrol show node "$current_node")

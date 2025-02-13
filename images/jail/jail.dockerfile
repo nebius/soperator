@@ -1,34 +1,92 @@
-# BASE_IMAGE defined here for second multistage build
-ARG BASE_IMAGE=ghcr.io/asteny/cuda_base:12.2.2
+FROM ubuntu:22.04 AS cuda
 
-# First stage: Build the gpubench application
-FROM golang:1.22 AS gpubench_builder
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+ENV LANG=en_US.UTF-8
 
-ARG GO_LDFLAGS=""
-ARG CGO_ENABLED=0
-ARG GOOS=linux
-ARG GOARCH=amd64
+RUN apt-get update &&  \
+    apt-get install -y --no-install-recommends \
+      gnupg2  \
+      ca-certificates \
+      locales \
+      tzdata \
+      wget && \
+    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb && \
+    dpkg -i cuda-keyring_1.1-1_all.deb && \
+    rm -rf cuda-keyring_1.1-1_all.deb && \
+    ln -snf /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
+    locale-gen en_US.UTF-8 && \
+    dpkg-reconfigure locales tzdata && \
+    apt clean
 
-WORKDIR /app
+ENV LANG="en_US.UTF-8" \
+	LC_CTYPE="en_US.UTF-8" \
+	LC_NUMERIC="en_US.UTF-8" \
+	LC_TIME="en_US.UTF-8" \
+	LC_COLLATE="en_US.UTF-8" \
+	LC_MONETARY="en_US.UTF-8" \
+	LC_MESSAGES="en_US.UTF-8" \
+	LC_PAPER="en_US.UTF-8" \
+	LC_NAME="en_US.UTF-8" \
+	LC_ADDRESS="en_US.UTF-8" \
+	LC_TELEPHONE="en_US.UTF-8" \
+	LC_MEASUREMENT="en_US.UTF-8" \
+	LC_IDENTIFICATION="en_US.UTF-8"
 
-COPY jail/gpubench/go.mod jail/gpubench/go.sum ./
+ENV PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
+ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64
 
-RUN go mod download
+# nvidia-container-runtime
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
-COPY jail/gpubench/main.go .
+# download and install mock packages for nvidia drivers https://github.com/nebius/soperator/issues/384
+ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
+RUN for pkg in cuda-drivers_9999.9999.9999_amd64.deb nvidia-open_9999.9999.9999_amd64.deb; do \
+        wget -q -P /tmp "$PACKAGES_REPO_URL/cuda_mocks/${pkg}" && \
+        echo "${pkg} successfully downloaded" || { echo "Failed to download ${pkg}"; exit 1; }; \
+        dpkg -i "/tmp/${pkg}" && \
+        rm -rf "/tmp/${pkg}"; \
+    done
 
-RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
-    go build -o gpubench .
+RUN apt update && \
+    apt install -y \
+        cuda=12.4.1-1 \
+        libcublas-dev-12-4 \
+        libcudnn9-cuda-12=9.1.0.70-1 \
+        libcudnn9-dev-cuda-12=9.1.0.70-1 \
+        libnccl-dev=2.21.5-1+cuda12.4 \
+        libnccl2=2.21.5-1+cuda12.4 && \
+    apt clean
+COPY jail/pin_packages/cuda-pins /etc/apt/preferences.d/
+RUN apt update
+
+RUN apt-mark hold \
+      libcublas-12-4 \
+      libcublas-dev-12-4 \
+      libcudnn9-cuda-12 \
+      libnccl-dev=2.21.5-1+cuda12.4 \
+      libnccl2
+
+RUN echo "export PATH=\$PATH:/usr/local/cuda/bin" > /etc/profile.d/path_cuda.sh && \
+    . /etc/profile.d/path_cuda.sh
+
+ENV LIBRARY_PATH=/usr/local/cuda/lib64/stubs
+
+# Download NCCL tests executables
+ARG CUDA_VERSION=12.4.1
+ARG SLURM_VERSION=24.05.5
+RUN wget -P /tmp $PACKAGES_REPO_URL/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/nccl-tests-perf.tar.gz && \
+    tar -xvzf /tmp/nccl-tests-perf.tar.gz -C /usr/bin && \
+    rm -rf /tmp/nccl-tests-perf.tar.gz
 
 #######################################################################################################################
-# Second stage: Build jail image
 
-ARG BASE_IMAGE=ghcr.io/asteny/cuda_base:12.2.2
+FROM cuda AS jail
 
-FROM $BASE_IMAGE AS jail
-
-ARG SLURM_VERSION=24.05.2
-ARG CUDA_VERSION=12.2.2
+ARG SLURM_VERSION=24.05.5
+ARG CUDA_VERSION=12.4.1
+ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -52,7 +110,6 @@ RUN apt update && \
         libjson-c-dev \
         liblz4-dev \
         libmunge-dev \
-        libopenmpi-dev \
         libpam0g-dev \
         libssl-dev \
         libtool \
@@ -63,6 +120,7 @@ RUN apt update && \
         iputils-ping \
         dnsutils \
         telnet \
+        netcat \
         strace \
         sudo \
         tree \
@@ -79,8 +137,12 @@ RUN apt update && \
         rsync \
         numactl \
         htop \
+        hwloc \
         rdma-core \
-        ibverbs-utils
+        ibverbs-utils \
+        libpmix2 \
+        libpmix-dev && \
+    apt clean
 
 # Install python
 COPY common/scripts/install_python.sh /opt/bin/
@@ -88,50 +150,29 @@ RUN chmod +x /opt/bin/install_python.sh && \
     /opt/bin/install_python.sh && \
     rm /opt/bin/install_python.sh
 
-# Install mpi4py
-RUN pip install -U pip wheel build && pip install mpi4py
-
 # Install parallel because it's required for enroot operation
 COPY common/scripts/install_parallel.sh /opt/bin/
 RUN chmod +x /opt/bin/install_parallel.sh && \
     /opt/bin/install_parallel.sh && \
     rm /opt/bin/install_parallel.sh
 
-# Install enroot
-COPY common/scripts/install_enroot.sh /opt/bin/
-RUN chmod +x /opt/bin/install_enroot.sh && \
-    /opt/bin/install_enroot.sh && \
-    rm /opt/bin/install_enroot.sh
-
-# Copy enroot configuration
-COPY jail/enroot/enroot.conf /etc/enroot/
-RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
-
-# Create directory for enroot runtime data that will be mounted from the host
-RUN mkdir -p -m 777 /usr/share/enroot/enroot-data
-
-# Install PMIx
-COPY common/scripts/install_pmix.sh /opt/bin/
-RUN chmod +x /opt/bin/install_pmix.sh && \
-    /opt/bin/install_pmix.sh && \
-    rm /opt/bin/install_pmix.sh
+# Install OpenMPI
+COPY common/scripts/install_openmpi.sh /opt/bin/
+RUN chmod +x /opt/bin/install_openmpi.sh && \
+    /opt/bin/install_openmpi.sh && \
+    rm /opt/bin/install_openmpi.sh
 
 # TODO: Install only necessary packages
 # Download and install Slurm packages
-RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libpmi0 slurm-smd-libpmi2-0 slurm-smd-libslurm-perl slurm-smd; do \
-        wget -q -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
+RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libslurm-perl slurm-smd; do \
+        wget -q -P /tmp $PACKAGES_REPO_URL/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
         echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
     done
 
-RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
-
-# Install slurm plugins
-COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
-COPY common/scripts/install_slurm_plugins.sh /opt/bin/
-RUN chmod +x /opt/bin/install_slurm_plugins.sh && \
-    /opt/bin/install_slurm_plugins.sh && \
-    rm /opt/bin/install_slurm_plugins.sh
+RUN apt install -y /tmp/*.deb && \
+    rm -rf /tmp/*.deb && \
+    apt clean
 
 # Create directory for bind-mounting it from the host. It's needed for sbatch to work
 RUN mkdir -m 755 -p /var/spool/slurmd
@@ -142,23 +183,18 @@ RUN chmod +x /opt/bin/install_container_toolkit.sh && \
     /opt/bin/install_container_toolkit.sh && \
     rm /opt/bin/install_container_toolkit.sh
 
+# Copy NVIDIA Container Toolkit config
+COPY common/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
+
 # Install nvtop GPU monitoring utility
-COPY common/scripts/install_nvtop.sh /opt/bin/
-RUN chmod +x /opt/bin/install_nvtop.sh && \
-    /opt/bin/install_nvtop.sh && \
-    rm /opt/bin/install_nvtop.sh
+RUN add-apt-repository ppa:flexiondotorg/nvtop && \
+    apt install -y nvtop && \
+    apt clean
 
-# Download and install NCCL packages
-RUN wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/libnccl2_2.22.3-1+cuda12.2_amd64.deb && \
-    wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/libnccl-dev_2.22.3-1+cuda12.2_amd64.deb && \
-    dpkg -i /tmp/libnccl2_2.22.3-1+cuda12.2_amd64.deb && \
-    dpkg -i /tmp/libnccl-dev_2.22.3-1+cuda12.2_amd64.deb && \
-    rm -rf /tmp/*.deb
-
-# Download NCCL tests executables
-RUN wget -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/nccl-tests-perf.tar.gz && \
-    tar -xvzf /tmp/nccl-tests-perf.tar.gz -C /usr/bin && \
-    rm -rf /tmp/nccl-tests-perf.tar.gz
+# Install dcgmi tools
+# https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/dcgm-diagnostics.html
+RUN apt install -y datacenter-gpu-manager-4-cuda12 && \
+    apt clean
 
 # Install GDRCopy libraries & executables
 COPY common/scripts/install_gdrcopy.sh /opt/bin/
@@ -189,9 +225,6 @@ RUN mv /usr/bin/docker /usr/bin/docker.real
 COPY jail/scripts/docker.sh /usr/bin/docker
 RUN chmod +x /usr/bin/docker
 
-# Copy binary that performs GPU benchmark
-COPY --from=gpubench_builder /app/gpubench /usr/bin/
-
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host
 
@@ -209,7 +242,10 @@ RUN chmod 755 /etc/skel/.slurm && \
     chmod 644 /etc/skel/.slurm/defaults && \
     chmod 644 /etc/skel/.bash_logout && \
     chmod 644 /etc/skel/.bashrc && \
-    chmod 644 /etc/skel/.profile
+    chmod 644 /etc/skel/.profile && \
+    chmod 755 /etc/skel/.config && \
+    chmod 755 /etc/skel/.config/enroot && \
+    chmod 644 /etc/skel/.config/enroot/.credentials
 
 # Use the same /etc/skel content for /root
 RUN rm -rf -- /root/..?* /root/.[!.]* /root/* && \

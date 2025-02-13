@@ -7,6 +7,7 @@ import (
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -36,16 +37,17 @@ func (r *MariaDbGrantReconciler) Reconcile(
 	name *string,
 	deps ...metav1.Object,
 ) error {
+	logger := log.FromContext(ctx)
 	if desired == nil {
 		if name == nil {
-			log.FromContext(ctx).Info("MariaDbGrant is not needed, skipping deletion")
+			logger.V(1).Info("MariaDbGrant is not needed, skipping deletion")
 			return nil
 		}
-		log.FromContext(ctx).Info("Deleting MariaDbGrant, because MariaDbGrant is not needed")
+		logger.V(1).Info("Deleting MariaDbGrant, because MariaDbGrant is not needed")
 		return r.deleteIfOwnedByController(ctx, cluster, cluster.Namespace, *name)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
-		log.FromContext(ctx).
+		logger.V(1).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile MariaDbGrant ")
 		return errors.Wrap(err, "reconciling MariaDbGrant ")
@@ -59,13 +61,19 @@ func (r *MariaDbGrantReconciler) deleteIfOwnedByController(
 	namespace,
 	name string,
 ) error {
+	logger := log.FromContext(ctx)
 	grant, err := r.getMariaDbGrant(ctx, namespace, name)
+	if apierrors.IsNotFound(err) {
+		logger.V(1).Info("MariaDbGrant is not found, skipping deletion")
+		return nil
+	}
+
 	if err != nil {
 		return errors.Wrap(err, "getting MariaDbGrant")
 	}
 
 	if !metav1.IsControlledBy(grant, cluster) {
-		log.FromContext(ctx).Info("MariaDbGrant is not owned by controller, skipping deletion")
+		logger.V(1).Info("MariaDbGrant is not owned by controller, skipping deletion")
 		return nil
 	}
 

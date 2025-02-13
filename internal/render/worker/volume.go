@@ -28,6 +28,8 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeSshdKeys(secrets.SshdKeysName),
 		common.RenderVolumeSshdConfigs(worker.SSHDConfigMapName),
 		common.RenderVolumeSshdRootKeys(clusterName),
+		common.RenderVolumeInMemory(),
+		common.RenderVolumeTmpDisk(),
 		renderVolumeNvidia(),
 		renderVolumeBoot(),
 		renderVolumeNCCLTopology(clusterName),

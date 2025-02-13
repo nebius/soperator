@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -35,17 +36,18 @@ func (r *ServiceReconciler) Reconcile(
 	name *string,
 	deps ...metav1.Object,
 ) error {
+	logger := log.FromContext(ctx)
 	if desired == nil {
 		// If desired is nil, delete the Service
 		if name == nil {
-			log.FromContext(ctx).Info("Service is not needed, skipping deletion")
+			logger.V(1).Info("Service is not needed, skipping deletion")
 			return nil
 		}
-		log.FromContext(ctx).Info(fmt.Sprintf("Deleting Service %s, because Service is not needed", *name))
+		logger.V(1).Info(fmt.Sprintf("Deleting Service %s, because Service is not needed", *name))
 		return r.deleteIfOwnedByController(ctx, cluster, cluster.Namespace, *name)
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
-		log.FromContext(ctx).
+		logger.V(1).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile Service")
 		return errors.Wrap(err, "reconciling Service")
@@ -59,13 +61,18 @@ func (r *ServiceReconciler) deleteIfOwnedByController(
 	namespace,
 	name string,
 ) error {
+	logger := log.FromContext(ctx)
 	service, err := r.getService(ctx, namespace, name)
+	if apierrors.IsNotFound(err) {
+		logger.V(1).Info("Service not found, skipping deletion")
+		return nil
+	}
 	if err != nil {
 		return errors.Wrap(err, "getting Service")
 	}
 
 	if !metav1.IsControlledBy(service, cluster) {
-		log.FromContext(ctx).Info("Service is not owned by controller, skipping deletion")
+		logger.V(1).Info("Service is not owned by controller, skipping deletion")
 		return nil
 	}
 
@@ -91,6 +98,10 @@ func (r *ServiceReconciler) getService(ctx context.Context, namespace, name stri
 func (r *ServiceReconciler) patch(existing, desired client.Object) (client.Patch, error) {
 	patchImpl := func(dst, src *corev1.Service) client.Patch {
 		res := client.MergeFrom(dst.DeepCopy())
+
+		for k, v := range src.Annotations {
+			dst.Annotations[k] = v
+		}
 
 		dst.Spec.Type = src.Spec.Type
 		dst.Spec.Ports = append([]corev1.ServicePort{}, src.Spec.Ports...)

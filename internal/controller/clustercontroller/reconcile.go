@@ -3,8 +3,7 @@ package clustercontroller
 import (
 	"context"
 	errorsStd "errors"
-	"os"
-	"sync"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -19,12 +18,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -33,8 +30,10 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/check"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controller/state"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
@@ -75,8 +74,6 @@ import (
 type SlurmClusterReconciler struct {
 	*reconciler.Reconciler
 
-	WatchNamespaces WatchNamespaces
-
 	ConfigMap       *reconciler.ConfigMapReconciler
 	Secret          *reconciler.SecretReconciler
 	CronJob         *reconciler.CronJobReconciler
@@ -97,10 +94,8 @@ type SlurmClusterReconciler struct {
 
 func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *SlurmClusterReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
-	watchNamespacesEnv := os.Getenv("SLURM_OPERATOR_WATCH_NAMESPACES")
 	return &SlurmClusterReconciler{
 		Reconciler:      r,
-		WatchNamespaces: NewWatchNamespaces(watchNamespacesEnv),
 		ConfigMap:       reconciler.NewConfigMapReconciler(r),
 		Secret:          reconciler.NewSecretReconciler(r),
 		CronJob:         reconciler.NewCronJobReconciler(r),
@@ -129,16 +124,11 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	)
 	log.IntoContext(ctx, logger)
 
-	// If the namespace isn't watched, we have nothing to do
-	if !r.WatchNamespaces.IsWatched(req.NamespacedName.Namespace) {
-		return ctrl.Result{}, nil
-	}
-
 	slurmCluster := &slurmv1.SlurmCluster{}
 	err := r.Get(ctx, req.NamespacedName, slurmCluster)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.Info("SlurmCluster resource not found. Ignoring since object must be deleted")
+			logger.V(1).Info("SlurmCluster resource not found. Ignoring since object must be deleted")
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -163,7 +153,7 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		innerErr := r.Get(ctx, req.NamespacedName, cluster)
 		if innerErr != nil {
 			if apierrors.IsNotFound(innerErr) {
-				logger.Info("SlurmCluster resource not found. Ignoring since object must be deleted")
+				logger.V(1).Info("SlurmCluster resource not found. Ignoring since object must be deleted")
 				return nil
 			}
 			// Error reading the object - requeue the request.
@@ -189,7 +179,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		kind := cluster.GetObjectKind()
 		key := client.ObjectKeyFromObject(cluster)
 		if state.ReconciliationState.Present(kind, key) {
-			logger.Info("Reconciliation skipped, as object is already present in reconciliation state",
+			logger.V(1).Info("Reconciliation skipped, as object is already present in reconciliation state",
 				"kind", kind.GroupVersionKind().String(),
 				"key", key.String(),
 			)
@@ -197,14 +187,14 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		}
 
 		state.ReconciliationState.Set(kind, key)
-		logger.Info("Reconciliation state set for object",
+		logger.V(1).Info("Reconciliation state set for object",
 			"kind", kind.GroupVersionKind().String(),
 			"key", key.String(),
 		)
 
 		defer func() {
 			state.ReconciliationState.Remove(kind, key)
-			logger.Info("Reconciliation state removed for object",
+			logger.V(1).Info("Reconciliation state removed for object",
 				"kind", kind.GroupVersionKind().String(),
 				"key", key.String(),
 			)
@@ -273,41 +263,165 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		ptr.To(slurmv1.PhaseClusterNotAvailable),
 		func() (ctrl.Result, error) {
 			// Common
-			if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-				status.SetCondition(metav1.Condition{
-					Type:   slurmv1.ConditionClusterCommonAvailable,
-					Status: metav1.ConditionTrue, Reason: "Available",
-					Message: "Slurm common components are available",
+			switch {
+			case check.IsMaintenanceActive(clusterValues.NodeRest.Maintenance):
+				err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:    slurmv1.ConditionClusterCommonAvailable,
+						Status:  metav1.ConditionFalse,
+						Reason:  "Maintenance",
+						Message: "Slurm common components are in maintenance",
+					})
 				})
-			}); err != nil {
-				return ctrl.Result{}, err
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+			default:
+				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:   slurmv1.ConditionClusterCommonAvailable,
+						Status: metav1.ConditionTrue, Reason: "Available",
+						Message: "Slurm common components are available",
+					})
+				}); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+
+			// Popolate Jail
+			switch {
+			case check.IsModeSkipPopulateJail(clusterValues.PopulateJail.Maintenance):
+				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:   slurmv1.ConditionClusterPopulateJailMode,
+						Status: metav1.ConditionTrue, Reason: string(consts.ModeSkipPopulate),
+						Message: "Populate Jail is skipped",
+					})
+				}); err != nil {
+					return ctrl.Result{}, err
+				}
+			case check.IsModeDownscaleAndDeletePopulate(clusterValues.PopulateJail.Maintenance):
+				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:   slurmv1.ConditionClusterPopulateJailMode,
+						Status: metav1.ConditionTrue, Reason: string(consts.ModeDownscaleAndDeletePopulate),
+						Message: "Populate Jail is deleted",
+					})
+				}); err != nil {
+					return ctrl.Result{}, err
+				}
+			case check.IsModeDownscaleAndOverwritePopulate(clusterValues.PopulateJail.Maintenance):
+				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:   slurmv1.ConditionClusterPopulateJailMode,
+						Status: metav1.ConditionTrue, Reason: string(consts.ModeDownscaleAndOverwritePopulate),
+						Message: "Populate Jail is overwritten",
+					})
+				}); err != nil {
+					return ctrl.Result{}, err
+				}
+			case !check.IsMaintenanceActive(clusterValues.PopulateJail.Maintenance):
+				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:   slurmv1.ConditionClusterPopulateJailMode,
+						Status: metav1.ConditionTrue, Reason: string(consts.ModeNone),
+						Message: fmt.Sprintf("Populate Jail maintenanceMode is %s", consts.ModeNone),
+					})
+				}); err != nil {
+					return ctrl.Result{}, err
+				}
+			default:
+				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:   slurmv1.ConditionClusterPopulateJailMode,
+						Status: metav1.ConditionUnknown, Reason: "Unknown",
+						Message: "Unknown Populate Jail maintenanceMode",
+					})
+				}); err != nil {
+					return ctrl.Result{}, err
+				}
 			}
 
 			// Controllers
-			if res, err := r.ValidateControllers(ctx, cluster, clusterValues); err != nil {
-				logger.Error(err, "Failed to validate Slurm controllers")
-				return ctrl.Result{}, errors.Wrap(err, "validating Slurm controllers")
-			} else if res.Requeue {
-				return res, nil
+			switch {
+			case check.IsMaintenanceActive(clusterValues.NodeController.Maintenance):
+				err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:    slurmv1.ConditionClusterControllersAvailable,
+						Status:  metav1.ConditionFalse,
+						Reason:  "Maintenance",
+						Message: "Slurm controllers are in maintenance",
+					})
+				})
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+			default:
+				if res, err := r.ValidateControllers(ctx, cluster, clusterValues); err != nil {
+					logger.Error(err, "Failed to validate Slurm controllers")
+					return ctrl.Result{}, errors.Wrap(err, "validating Slurm controllers")
+				} else if res.Requeue {
+					return res, nil
+				}
 			}
 
 			// Workers
-			if res, err := r.ValidateWorkers(ctx, cluster, clusterValues); err != nil {
-				logger.Error(err, "Failed to validate Slurm workers")
-				return ctrl.Result{}, errors.Wrap(err, "validating Slurm workers")
-			} else if res.Requeue {
-				return res, nil
+			switch {
+			case check.IsMaintenanceActive(clusterValues.NodeWorker.Maintenance):
+				err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:    slurmv1.ConditionClusterWorkersAvailable,
+						Status:  metav1.ConditionFalse,
+						Reason:  "Maintenance",
+						Message: "Slurm workers are in maintenance",
+					})
+				})
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+
+			case clusterValues.NodeWorker.Size > 0:
+				if res, err := r.ValidateWorkers(ctx, cluster, clusterValues); err != nil {
+					logger.Error(err, "Failed to validate Slurm workers")
+					return ctrl.Result{}, errors.Wrap(err, "validating Slurm workers")
+				} else if res.Requeue {
+					return res, nil
+				}
+			default:
+				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:   slurmv1.ConditionClusterWorkersAvailable,
+						Status: metav1.ConditionFalse, Reason: "NotAvailable",
+						Message: "Slurm workers are disabled",
+					})
+				}); err != nil {
+					return ctrl.Result{}, err
+				}
 			}
 
 			// Login
-			if clusterValues.NodeLogin.Size > 0 {
+			switch {
+			case check.IsMaintenanceActive(clusterValues.NodeLogin.Maintenance):
+				err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:    slurmv1.ConditionClusterLoginAvailable,
+						Status:  metav1.ConditionFalse,
+						Reason:  "Maintenance",
+						Message: "Slurm login is in maintenance",
+					})
+				})
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+
+			case clusterValues.NodeLogin.Size > 0:
 				if res, err := r.ValidateLogin(ctx, cluster, clusterValues); err != nil {
 					logger.Error(err, "Failed to validate Slurm login")
 					return ctrl.Result{}, errors.Wrap(err, "validating Slurm login")
 				} else if res.Requeue {
 					return res, nil
 				}
-			} else {
+			default:
 				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
 					status.SetCondition(metav1.Condition{
 						Type:   slurmv1.ConditionClusterLoginAvailable,
@@ -320,22 +434,41 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 			}
 
 			// Accounting
-			if clusterValues.NodeAccounting.Enabled {
-				if res, err := r.ValidateAccounting(ctx, cluster, clusterValues); err != nil {
-					logger.Error(err, "Failed to validate Slurm accounting")
-					return ctrl.Result{}, errors.Wrap(err, "validating Slurm accounting")
-				} else if res.Requeue {
-					return res, nil
-				}
-			} else {
-				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+			switch {
+			case check.IsMaintenanceActive(clusterValues.NodeAccounting.Maintenance):
+				err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
 					status.SetCondition(metav1.Condition{
-						Type:   slurmv1.ConditionClusterAccountingAvailable,
-						Status: metav1.ConditionFalse, Reason: "NotAvailable",
+						Type:    slurmv1.ConditionClusterAccountingAvailable,
+						Status:  metav1.ConditionFalse,
+						Reason:  "Maintenance",
+						Message: "Slurm accounting is in maintenance",
+					})
+				})
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+
+			case !clusterValues.NodeAccounting.Enabled:
+				err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:    slurmv1.ConditionClusterAccountingAvailable,
+						Status:  metav1.ConditionFalse,
+						Reason:  "NotAvailable",
 						Message: "Slurm accounting is disabled",
 					})
-				}); err != nil {
+				})
+				if err != nil {
 					return ctrl.Result{}, err
+				}
+
+			default:
+				res, err := r.ValidateAccounting(ctx, cluster, clusterValues)
+				if err != nil {
+					logger.Error(err, "Failed to validate Slurm accounting")
+					return ctrl.Result{}, errors.Wrap(err, "validating Slurm accounting")
+				}
+				if res.Requeue {
+					return res, nil
 				}
 			}
 
@@ -498,7 +631,7 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 		}
 	}
 
-	controllerBuilder.WithOptions(getDefaultOptions(maxConcurrency, cacheSyncTimeout))
+	controllerBuilder.WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout))
 
 	return controllerBuilder.Complete(r)
 }
@@ -687,21 +820,4 @@ func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Func
 			Predicate: predicate.GenerationChangedPredicate{},
 		},
 	}
-}
-
-var (
-	optionsInit    sync.Once
-	defaultOptions *controller.Options
-)
-
-func getDefaultOptions(maxConcurrency int, cacheSyncTimeout time.Duration) controller.Options {
-	rateLimiters := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](2*time.Second, 2*time.Minute)
-	optionsInit.Do(func() {
-		defaultOptions = &controller.Options{
-			RateLimiter:             rateLimiters,
-			CacheSyncTimeout:        cacheSyncTimeout,
-			MaxConcurrentReconciles: maxConcurrency,
-		}
-	})
-	return *defaultOptions
 }

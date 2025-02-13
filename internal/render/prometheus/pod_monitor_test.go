@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	consts "nebius.ai/slurm-operator/internal/consts"
@@ -47,7 +48,7 @@ func Test_RenderPodMonitor(t *testing.T) {
 					Interval:      prometheusv1.Duration(interval),
 					ScrapeTimeout: prometheusv1.Duration(scrapeTimeout),
 					Path:          consts.ContainerPathExporter,
-					Port:          consts.ContainerPortNameExporter,
+					Port:          ptr.To(consts.ContainerPortNameExporter),
 					Scheme:        consts.ContainerSchemeExporter,
 				},
 			},

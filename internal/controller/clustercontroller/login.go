@@ -39,11 +39,11 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 				Name: "Slurm Login SSHD ConfigMap",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					if !clusterValues.NodeLogin.IsSSHDConfigMapDefault {
-						stepLogger.Info("Use custom SSHD ConfigMap from reference")
-						stepLogger.Info("Reconciled")
+						stepLogger.V(1).Info("Use custom SSHD ConfigMap from reference")
+						stepLogger.V(1).Info("Reconciled")
 						return nil
 					}
 
@@ -53,13 +53,13 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 						return errors.Wrap(err, "rendering login default SSHD ConfigMap")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 
 					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling login default SSHD ConfigMap")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 
 					return nil
 				},
@@ -69,7 +69,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 				Name: "Slurm Login SSH root public keys ConfigMap",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					desired, err := login.RenderSshRootPublicKeysConfig(clusterValues)
 					if err != nil {
@@ -77,13 +77,13 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 						return errors.Wrap(err, "rendering login SSHRootPublicKeys ConfigMap")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 
 					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling login SSHRootPublicKeys ConfigMap")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 
 					return nil
 				},
@@ -93,7 +93,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 				Name: "Slurm Login sshd keys Secret",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					desired := corev1.Secret{}
 					if getErr := r.Get(
@@ -120,7 +120,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 							return errors.Wrap(err, "rendering login SSHDKeys Secrets")
 						}
 						desired = *renderedDesired.DeepCopy()
-						stepLogger.Info("Rendered")
+						stepLogger.V(1).Info("Rendered")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 
@@ -128,7 +128,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling login SSHDKeys Secrets")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 
 					return nil
 				},
@@ -138,17 +138,17 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 				Name: "Slurm Login Security limits ConfigMap",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					desired := common.RenderConfigMapSecurityLimits(consts.ComponentTypeLogin, clusterValues)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 
 					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling login security limits configmap")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 
 					return nil
 				},
@@ -157,18 +157,18 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 				Name: "Slurm Login Service",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					desired := login.RenderService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeLogin)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 
 					var loginNamePtr *string = nil
 					if err := r.Service.Reconcile(stepCtx, cluster, &desired, loginNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling login Service")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 
 					return nil
 				},
@@ -177,7 +177,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 				Name: "Slurm Login StatefulSet",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					desired, err := login.RenderStatefulSet(
 						clusterValues.Namespace,
@@ -193,20 +193,20 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 						return errors.Wrap(err, "rendering login StatefulSet")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 
 					deps, err := r.getLoginStatefulSetDependencies(stepCtx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
 						return errors.Wrap(err, "retrieving dependencies for login StatefulSet")
 					}
-					stepLogger.Info("Retrieved dependencies")
+					stepLogger.V(1).Info("Retrieved dependencies")
 
 					if err = r.StatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling login StatefulSet")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 
 					return nil
 				},
@@ -218,7 +218,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 		logger.Error(err, "Failed to reconcile Slurm Login")
 		return errors.Wrap(err, "reconciling Slurm Login")
 	}
-	logger.Info("Reconciled Slurm Login")
+	logger.V(1).Info("Reconciled Slurm Login")
 	return nil
 }
 

@@ -3,6 +3,7 @@ package populate_jail
 import (
 	corev1 "k8s.io/api/core/v1"
 
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/values"
@@ -16,9 +17,10 @@ func renderContainerPopulateJail(clusterType consts.ClusterType, populateJail *v
 		volumeMounts = append(volumeMounts, common.RenderVolumeMountJailSnapshot())
 	}
 	overwriteEnv := "0"
-	if populateJail.Overwrite {
+	if populateJail.Overwrite || check.IsModeDownscaleAndOverwritePopulate(populateJail.Maintenance) {
 		overwriteEnv = "1"
 	}
+
 	return corev1.Container{
 		Name:            populateJail.ContainerPopulateJail.Name,
 		Image:           populateJail.ContainerPopulateJail.Image,

@@ -69,6 +69,28 @@ func RenderStatefulSet(
 		replicas = ptr.To(consts.ZeroReplicas)
 	}
 
+	spec := corev1.PodSpec{
+		PriorityClassName:  worker.PriorityClass,
+		ServiceAccountName: naming.BuildServiceAccountWorkerName(clusterName),
+		Affinity:           nodeFilter.Affinity,
+		NodeSelector:       nodeFilter.NodeSelector,
+		Tolerations:        nodeFilter.Tolerations,
+		InitContainers:     initContainers,
+		Containers: []corev1.Container{
+			slurmdContainer,
+		},
+		Volumes: volumes,
+		DNSConfig: &corev1.PodDNSConfig{
+			Searches: []string{
+				naming.BuildServiceFQDN(consts.ComponentTypeWorker, namespace, clusterName),
+			},
+		},
+	}
+
+	if worker.PriorityClass != "" {
+		spec.PriorityClassName = worker.PriorityClass
+	}
+
 	return appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      worker.StatefulSet.Name,
@@ -99,22 +121,7 @@ func RenderStatefulSet(
 					Labels:      labels,
 					Annotations: renderAnnotations(worker, clusterName, namespace),
 				},
-				Spec: corev1.PodSpec{
-					ServiceAccountName: naming.BuildServiceAccountWorkerName(clusterName),
-					Affinity:           nodeFilter.Affinity,
-					NodeSelector:       nodeFilter.NodeSelector,
-					Tolerations:        nodeFilter.Tolerations,
-					InitContainers:     initContainers,
-					Containers: []corev1.Container{
-						slurmdContainer,
-					},
-					Volumes: volumes,
-					DNSConfig: &corev1.PodDNSConfig{
-						Searches: []string{
-							naming.BuildServiceFQDN(consts.ComponentTypeWorker, namespace, clusterName),
-						},
-					},
-				},
+				Spec: spec,
 			},
 		},
 	}, nil
@@ -126,7 +133,6 @@ func renderAnnotations(worker *values.SlurmWorker, clusterName, namespace string
 
 	if worker.UseDefaultAppArmorProfile {
 		workerAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
-		mungeAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
 	}
 
 	annotations := map[string]string{

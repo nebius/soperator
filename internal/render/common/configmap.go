@@ -32,6 +32,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) (corev1.ConfigMap
 			consts.ConfigMapKeyCGroupConfig: generateCGroupConfig(cluster).Render(),
 			consts.ConfigMapKeySpankConfig:  generateSpankConfig().Render(),
 			consts.ConfigMapKeyGresConfig:   generateGresConfig(cluster.ClusterType).Render(),
+			consts.ConfigMapKeyMPIConfig:    generateMPIConfig(cluster).Render(),
 		},
 	}, nil
 }
@@ -61,6 +62,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	if cluster.ClusterType == consts.ClusterTypeGPU {
 		res.AddProperty("GresTypes", "gpu")
 	}
+	res.AddProperty("MpiDefault", "pmix")
 	res.AddProperty("MailProg", "/usr/bin/true")
 	res.AddProperty("PluginDir", "/usr/lib/x86_64-linux-gnu/"+consts.Slurm)
 	res.AddProperty("ProctrackType", "proctrack/cgroup")
@@ -106,7 +108,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("SCHEDULING")
 	res.AddProperty("SchedulerType", "sched/backfill")
 	res.AddProperty("SelectType", "select/cons_tres")
-	res.AddProperty("SelectTypeParameters", "CR_Core_Memory")
+	res.AddProperty("SelectTypeParameters", "CR_Core_Memory,CR_CORE_DEFAULT_DIST_BLOCK") // TODO: Make it configurable
 	res.AddComment("")
 	res.AddComment("LOGGING")
 	res.AddProperty("SlurmctldDebug", consts.SlurmDefaultDebugLevel)
@@ -218,7 +220,9 @@ func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 func generateSpankConfig() renderutils.ConfigFile {
 	res := &renderutils.MultilineStringConfig{}
 	res.AddLine(fmt.Sprintf("required chroot.so %s", consts.VolumeMountPathJail))
-	res.AddLine("required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1")
+	// TODO: make `container_image_save` and `expose_enroot_logs` configurable
+	// TODO: enable `expose_enroot_logs` once #413 is resolved.
+	res.AddLine("required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 container_image_save=/var/cache/enroot-container-images/")
 	return res
 }
 
@@ -227,6 +231,15 @@ func generateGresConfig(clusterType consts.ClusterType) renderutils.ConfigFile {
 	res.AddComment("Gres config")
 	if clusterType == consts.ClusterTypeGPU {
 		res.AddProperty("AutoDetect", "nvml")
+	}
+	return res
+}
+
+func generateMPIConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
+	res := &renderutils.PropertiesConfig{}
+	res.AddComment("PMIx config")
+	if cluster.MPIConfig.PMIxEnv != "" {
+		res.AddProperty("PMIxEnv", cluster.MPIConfig.PMIxEnv)
 	}
 	return res
 }
@@ -364,6 +377,9 @@ func generateDefaultSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigF
 	res.AddLine("LoginGraceTime " + consts.SSHDLoginGraceTime)
 	res.AddLine("MaxAuthTries " + consts.SSHDMaxAuthTries)
 	res.AddLine("LogLevel DEBUG3")
+	res.AddLine("")
+	res.AddLine("Match User root")
+	res.AddLine("    AuthorizedKeysFile /root/.ssh/authorized_keys " + consts.VolumeMountPathJail + "/root/.ssh/authorized_keys")
 	res.AddLine("")
 	res.AddLine("Match User *")
 	res.AddLine("    LogLevel INFO")

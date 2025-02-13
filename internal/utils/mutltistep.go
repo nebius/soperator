@@ -43,7 +43,7 @@ func ExecuteMultiStep(ctx context.Context, name string, strategy MultiStepExecut
 	))
 	logger := log.FromContext(executionCtx)
 
-	logger.Info("Executing steps")
+	logger.V(1).Info("Executing steps")
 	switch strategy {
 	case MultiStepExecutionStrategyFailAtFirstError:
 		err = executeFailAtFirstError(executionCtx, steps...)
@@ -57,7 +57,7 @@ func ExecuteMultiStep(ctx context.Context, name string, strategy MultiStepExecut
 		logger.Error(err, "Failed to execute steps")
 		return errors.Wrap(err, "failed to execute steps")
 	} else {
-		logger.Info("Executed steps")
+		logger.V(1).Info("Executed steps")
 	}
 
 	return nil
@@ -73,7 +73,7 @@ func executeFailAtFirstError(ctx context.Context, steps ...MultiStepExecutionSte
 		))
 		stepLogger := log.FromContext(stepCtx)
 
-		stepLogger.Info("Executing step")
+		stepLogger.V(1).Info("Executing step")
 		err := step.Func(stepCtx)
 		if err != nil {
 			stepLogger.Error(err, "Failed step. Stopping execution of the following steps")
@@ -94,7 +94,7 @@ func executeCollectErrors(ctx context.Context, steps ...MultiStepExecutionStep) 
 		))
 		stepLogger := log.FromContext(stepCtx)
 
-		stepLogger.Info("Executing step")
+		stepLogger.V(1).Info("Executing step")
 		err := step.Func(stepCtx)
 		if err != nil {
 			stepLogger.Error(err, "Failed step. Executing the following steps")

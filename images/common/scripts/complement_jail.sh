@@ -32,8 +32,8 @@ pushd "${jaildir}"
     echo "Bind-mount cgroup filesystem"
     mount --rbind /sys/fs/cgroup sys/fs/cgroup
 
-    echo "Remount /tmp"
-    mount -t tmpfs tmpfs tmp/
+    echo "Bind-mount /tmp"
+    mount --bind /tmp tmp/
 
     echo "Bind-mount /var/log because it should be node-local"
     mount --bind /var/log var/log
@@ -82,8 +82,21 @@ pushd "${jaildir}"
         touch "etc/gpu_libs_installed.flag"
     fi
 
-    echo "Bind-mount enroot data directory because it should be node-local"
-    mount --bind /usr/share/enroot/enroot-data usr/share/enroot/enroot-data
+    echo "Bind-mount slurm chroot plugin from container to the jail"
+    touch usr/lib/x86_64-linux-gnu/slurm/chroot.so
+    mount --bind /usr/lib/x86_64-linux-gnu/slurm/chroot.so usr/lib/x86_64-linux-gnu/slurm/chroot.so
+
+    echo "Bind-mount /etc/enroot, /usr/share/enroot and /usr/lib/enroot"
+    mkdir -p etc/enroot usr/share/enroot usr/lib/enroot
+    mount --bind /etc/enroot etc/enroot
+    mount --bind /usr/share/enroot usr/share/enroot
+    mount --bind /usr/lib/enroot usr/lib/enroot
+
+    echo "Bind-mount enroot binaries"
+    for file in /usr/bin/enroot*; do
+        filename=$(basename "$file")
+        touch "usr/bin/$filename" && mount --bind "$file" "usr/bin/$filename"
+    done
 
     if ! getcap usr/bin/enroot-mksquashovlfs | grep -q 'cap_sys_admin+pe'; then
         echo "Set capabilities for enroot-mksquashovlfs to run containers without privileges"
@@ -93,6 +106,13 @@ pushd "${jaildir}"
         echo "Set capabilities for enroot-aufs2ovlfs to run containers without privileges"
         flock etc/complement_jail_setcap_enroot_aufs2ovlfs.lock -c "setcap cap_sys_admin,cap_mknod+pe usr/bin/enroot-aufs2ovlfs"
     fi
+
+    echo "Shared folder for pyxis output /var/cache/enroot-container-images"
+    mkdir -m 1777 -p var/cache/enroot-container-images
+
+    echo "Bind-mount pyxis plugin from container to the jail"
+    touch usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
+    mount --bind /usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
 
     echo "Bind-mount slurm configs"
     for file in /mnt/slurm-configs/*; do
@@ -105,6 +125,7 @@ pushd "${jaildir}"
         mount --bind /var/spool/slurmd var/spool/slurmd/
     fi
 
+    # For login node with cluster type GPU
     if [ -z "$worker" ] && [ "$SLURM_CLUSTER_TYPE" = "gpu" ]; then
         while [ ! -f "etc/gpu_libs_installed.flag" ]; do
             echo "Waiting for GPU libs to be propagated to the jail from a worker node"
@@ -116,6 +137,7 @@ pushd "${jaildir}"
         done
     fi
 
+    # For $worker node only
     if [ -n "$worker" ]; then
         echo "Update linker cache inside the jail"
         flock etc/complement_jail_ldconfig.lock -c "chroot \"${jaildir}\" /usr/sbin/ldconfig"

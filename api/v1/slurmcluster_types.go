@@ -28,10 +28,11 @@ type SlurmClusterSpec struct {
 	// - none: No maintenance is performed. The cluster operates normally.
 	// - downscale: Scales down all components to 0.
 	// - downscaleAndDeletePopulateJail: Scales down all components to 0 and deletes the kubernetes Kind Jobs populateJail.
+	// - downscaleAndOverwritePopulateJail: Scales down all components to 0 and overwrite populateJail (same as overwrite=true).
 	// - skipPopulateJail: Skips the execution of the populateJail job during maintenance.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Enum=none;downscale;downscaleAndDeletePopulateJail;skipPopulateJail
+	// +kubebuilder:validation:Enum=none;downscale;downscaleAndDeletePopulateJail;downscaleAndOverwritePopulateJail;skipPopulateJail
 	// +kubebuilder:default="none"
 	Maintenance *consts.MaintenanceMode `json:"maintenance,omitempty"`
 
@@ -83,8 +84,15 @@ type SlurmClusterSpec struct {
 	// SlurmConfig represents the Slurm configuration in slurm.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", taskPluginParam: "", maxJobCount: 10000, minJobAge: 86400}
+	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", epilog: "", prolog: "", taskPluginParam: "", maxJobCount: 10000, minJobAge: 86400}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
+
+	// MPIConfig represents the PMIx configuration in mpi.conf. Not all options are supported.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={pmixEnv: "OMPI_MCA_btl_tcp_if_include=eth0"}
+	MPIConfig MPIConfig `json:"mpiConfig,omitempty"`
+
 	// Generate and set default AppArmor profile for the Slurm worker and login nodes. The Security Profiles Operator must be installed.
 	//
 	// +kubebuilder:default=false
@@ -114,6 +122,16 @@ type SlurmConfig struct {
 	// +kubebuilder:default="Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs"
 	// +kubebuilder:validation:Pattern="^((Accrue|Agent|AuditRPCs|Backfill|BackfillMap|BurstBuffer|Cgroup|ConMgr|CPU_Bind|CpuFrequency|Data|DBD_Agent|Dependency|Elasticsearch|Energy|Federation|FrontEnd|Gres|Hetjob|Gang|GLOB_SILENCE|JobAccountGather|JobComp|JobContainer|License|Network|NetworkRaw|NodeFeatures|NO_CONF_HASH|Power|Priority|Profile|Protocol|Reservation|Route|Script|SelectType|Steps|Switch|TLS|TraceJobs|Triggers)(,)?)+$"
 	DebugFlags *string `json:"debugFlags,omitempty"`
+	// Defines specific file to run the epilog when job ends. Default value is no epilog
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=""
+	Epilog *string `json:"epilog,omitempty"`
+	// Defines specific file to run the prolog when job starts. Default value is no prolog
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=""
+	Prolog *string `json:"prolog,omitempty"`
 	// Additional parameters for the task plugin
 	//
 	// +kubebuilder:validation:Optional
@@ -130,6 +148,16 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=86400
 	MinJobAge *int32 `json:"minJobAge,omitempty"`
+}
+
+type MPIConfig struct {
+	// Semicolon separated list of environment variables to be set in job environments to be used by PMIx.
+	// Defaults to "OMPI_MCA_btl_tcp_if_include=eth0" to avoid "lo" and "docker" interfaces to be selected by OpenMPI.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="OMPI_MCA_btl_tcp_if_include=eth0"
+	// +kubebuilder:validation:Optional
+	PMIxEnv string `json:"pmixEnv,omitempty"`
 }
 
 type PartitionConfiguration struct {
@@ -308,7 +336,8 @@ type NCCLArguments struct {
 	// +kubebuilder:default="0"
 	ThresholdMoreThan string `json:"thresholdMoreThan,omitempty"`
 
-	// UseInfiniband defines using NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring env variables for test
+	// UseInfiniband defines using NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring env variables for test.
+	// According to NVIDIA these env vars should be used only for debugging.
 	// https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html
 	//
 	// +kubebuilder:validation:Optional
@@ -570,6 +599,8 @@ type SlurmdbdConfig struct {
 
 type AccountingSlurmConf struct {
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Pattern="^((Billing|CPU|Mem|VMem|Node|Energy|Pages|FS/Disk|FS/Lustre|Gres/gpu|Gres/gpu:tesla|Gres/gpu:volta)(,)?)+$"
+	// +kubebuilder:default="Billing,CPU,Mem,Node,VMem"
 	AccountingStorageTRES *string `json:"accountingStorageTRES,omitempty"`
 	// +kubebuilder:validation:Optional
 	AccountingStoreFlags *string `json:"accountingStoreFlags,omitempty"`
@@ -581,6 +612,7 @@ type AccountingSlurmConf struct {
 	AcctGatherProfileType *string `json:"acctGatherProfileType,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum="jobacct_gather/linux";"jobacct_gather/cgroup";"jobacct_gather/none"
+	// +kubebuilder:default="jobacct_gather/cgroup"
 	JobAcctGatherType *string `json:"jobAcctGatherType,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=30
@@ -681,6 +713,68 @@ type SlurmNodeWorker struct {
 	//
 	// +kubebuilder:validation:Optional
 	SlurmNodeExtra string `json:"slurmNodeExtra,omitempty"`
+
+	// PriorityClass defines the priority class for the Slurm worker node
+	//
+	// +kubebuilder:validation:Optional
+	PriorityClass string `json:"priorityClass,omitempty"`
+	// It's alpha feature and will be moved to separate CRD in the future
+	// Rebooter defines the configuration for the Slurm worker node rebooter
+	//
+	// +kubebuilder:validation:Optional
+	Rebooter Rebooter `json:"rebooter"`
+}
+
+// Rebooter defines the configuration for the Slurm worker node rebooter
+type Rebooter struct {
+	// enabled defines whether the rebooter is enabled
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled"`
+
+	// Image defines the rebooter container image
+	//
+	// +kubebuilder:validation:Optional
+	Image string `json:"image"`
+
+	// imagePullPolicy defines the image pull policy
+	//
+	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="IfNotPresent"
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// Resources defines the [corev1.ResourceRequirements] for the container
+	//
+	// +kubebuilder:validation:Optional
+	Resources corev1.ResourceList `json:"resources,omitempty"`
+
+	// evictionMethod defines the method of eviction for the Slurm worker node
+	// Must be one of [drain, evict]. Now only evict is supported
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum="evict"
+	// +kubebuilder:default="evict"
+	EvictionMethod string `json:"evictionMethod,omitempty"`
+
+	// logLevel defines the log level for the rebooter
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="info"
+	// +kubebuilder:validation:Enum="debug";"info";"warn";"error"
+	LogLevel string `json:"logLevel,omitempty"`
+
+	// Namespace defines the namespace where the rebooter will be deployed
+	// By default, the same namespace as the soperator
+	//
+	// +kubebuilder:validation:Optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// serviceAccountName defines the service account name for the rebooter
+	//
+	// +kubebuilder:validation:Optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node
@@ -1019,6 +1113,7 @@ const (
 	ConditionClusterWorkersAvailable     = "WorkersAvailable"
 	ConditionClusterLoginAvailable       = "LoginAvailable"
 	ConditionClusterAccountingAvailable  = "AccountingAvailable"
+	ConditionClusterPopulateJailMode     = "PopulateJailMode"
 
 	PhaseClusterReconciling  = "Reconciling"
 	PhaseClusterNotAvailable = "Not available"

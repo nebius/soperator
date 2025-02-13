@@ -1,0 +1,9 @@
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: NodeConfigurator
+metadata:
+  labels:
+    app.kubernetes.io/name: slurm-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: nodeconfigurator-sample
+spec:
+  # TODO(user): Add fields here

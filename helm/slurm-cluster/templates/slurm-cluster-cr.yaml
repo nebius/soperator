@@ -159,6 +159,7 @@ spec:
     worker:
       cgroupVersion: {{ .Values.slurmNodes.worker.cgroupVersion | quote }}
       enableGDRCopy: {{ default false .Values.slurmNodes.worker.enableGDRCopy }}
+      priorityClass: {{ default (include "slurm-cluster.name" .) .Values.slurmNodes.worker.priorityClass | quote }}
       {{- if .Values.slurmNodes.worker.slurmNodeExtra }}
       slurmNodeExtra: {{ .Values.slurmNodes.worker.slurmNodeExtra | quote }}
       {{- end }}

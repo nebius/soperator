@@ -3,9 +3,11 @@
 # It should be run by config/default
 resources:
 - bases/slurm.nebius.ai_slurmclusters.yaml
+#- bases/slurm.nebius.ai_nodeconfigurators.yaml
+
 #+kubebuilder:scaffold:crdkustomizeresource
 
-patches:
+patches: []
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.
 # patches here are for enabling the conversion webhook for each CRD
 #+kubebuilder:scaffold:crdkustomizewebhookpatch

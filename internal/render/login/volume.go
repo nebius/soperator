@@ -23,6 +23,8 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeSshdKeys(secrets.SshdKeysName),
 		common.RenderVolumeSshdConfigs(login.SSHDConfigMapName),
 		common.RenderVolumeSshdRootKeys(clusterName),
+		common.RenderVolumeInMemory(),
+		common.RenderVolumeTmpDisk(),
 	}
 
 	// Jail could be specified by template spec or by volume source name

@@ -12,6 +12,7 @@ const (
 	ContainerNamePopulateJail      = populateJail
 	ContainerNameExporter          = Exporter
 	ContainerNameNodeSysctl        = "node-sysctl"
+	ContainerNameRebooter          = "rebooter"
 	ContainerNameNodeSysctlSleep   = "node-sysctl-sleep"
 
 	ContainerSecurityContextCapabilitySysAdmin = "SYS_ADMIN"

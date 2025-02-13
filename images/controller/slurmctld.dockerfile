@@ -2,8 +2,9 @@ ARG BASE_IMAGE=ubuntu:jammy
 
 FROM $BASE_IMAGE AS controller_slurmctld
 
-ARG SLURM_VERSION=24.05.2
-ARG CUDA_VERSION=12.2.2
+ARG SLURM_VERSION=24.05.5
+ARG CUDA_VERSION=12.4.1
+ARG OPENMPI_VERSION=4.1.7a1
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -40,30 +41,20 @@ RUN apt-get update && \
         vim \
         tree \
         lsof \
-        daemontools
-
-# Install PMIx
-COPY common/scripts/install_pmix.sh /opt/bin/
-RUN chmod +x /opt/bin/install_pmix.sh && \
-    /opt/bin/install_pmix.sh && \
-    rm /opt/bin/install_pmix.sh
+        daemontools && \
+    apt clean
 
 # TODO: Install only necessary packages
 # Download and install Slurm packages
-RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libpmi0 slurm-smd-libpmi2-0 slurm-smd-libslurm-perl slurm-smd-slurmctld slurm-smd; do \
+RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libslurm-perl slurm-smd-slurmctld slurm-smd; do \
         wget -q -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
         echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
     done
 
-RUN apt install -y /tmp/*.deb && rm -rf /tmp/*.deb
-
-# Install slurm plugins
-COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
-COPY common/scripts/install_slurm_plugins.sh /opt/bin/
-RUN chmod +x /opt/bin/install_slurm_plugins.sh && \
-    /opt/bin/install_slurm_plugins.sh && \
-    rm /opt/bin/install_slurm_plugins.sh
+RUN apt install -y /tmp/*.deb && \
+    rm -rf /tmp/*.deb && \
+    apt clean
 
 # Update linker cache
 RUN ldconfig

@@ -32,12 +32,12 @@ func (r SlurmClusterReconciler) ReconcileREST(
 	isDBEnabled := isAccountingEnabled && (isExternalDBEnabled || isMariaDBEnabled)
 
 	if !isRESTEnabled {
-		logger.Info("Slurm REST API is disabled. Skipping reconciliation")
+		logger.V(1).Info("Slurm REST API is disabled. Skipping reconciliation")
 		return nil
 	}
 
 	if !isAccountingEnabled && !isDBEnabled {
-		logger.Info("Slurm Accounting is disabled. Skipping REST API reconciliation")
+		logger.V(1).Info("Slurm Accounting is disabled. Skipping REST API reconciliation")
 		return nil
 	}
 
@@ -49,7 +49,7 @@ func (r SlurmClusterReconciler) ReconcileREST(
 				Name: "Slurm REST API Service",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 					desired, err := rest.RenderService(
 						clusterValues.Namespace,
 						clusterValues.Name,
@@ -60,13 +60,13 @@ func (r SlurmClusterReconciler) ReconcileREST(
 						return errors.Wrap(err, "rendering REST API service")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 					var restNamePtr *string = nil
 					if err = r.Service.Reconcile(stepCtx, cluster, desired, restNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling REST API service")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 					return nil
 				},
 			},
@@ -74,7 +74,7 @@ func (r SlurmClusterReconciler) ReconcileREST(
 				Name: "REST API",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.Info("Reconciling")
+					stepLogger.V(1).Info("Reconciling")
 
 					desired, err := rest.RenderDeploymentREST(
 						clusterValues.Name,
@@ -87,21 +87,21 @@ func (r SlurmClusterReconciler) ReconcileREST(
 						return errors.Wrap(err, "rendering ConfigMap with Slurm configs")
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-					stepLogger.Info("Rendered")
+					stepLogger.V(1).Info("Rendered")
 
 					deps, err := r.getRESTDeploymentDependencies(ctx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
 						return errors.Wrap(err, "retrieving dependencies for REST API Deployment")
 					}
-					stepLogger.Info("Retrieved dependencies")
+					stepLogger.V(1).Info("Retrieved dependencies")
 
 					var restNamePtr *string = nil
 					if err = r.Deployment.Reconcile(stepCtx, cluster, desired, restNamePtr, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling REST API Deployment")
 					}
-					stepLogger.Info("Reconciled")
+					stepLogger.V(1).Info("Reconciled")
 
 					return nil
 				},
@@ -113,7 +113,7 @@ func (r SlurmClusterReconciler) ReconcileREST(
 		logger.Error(err, "Failed to reconcile REST resources")
 		return errors.Wrap(err, "reconciling REST resources")
 	}
-	logger.Info("Reconciled REST resources")
+	logger.V(1).Info("Reconciled REST resources")
 	return nil
 }
 

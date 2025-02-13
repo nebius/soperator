@@ -18,7 +18,7 @@ SLURM_STATS_CMD="
       printf \"%s\\n\" \"\${QUEUE}\" | sed 's/^/  /'
     fi
   else
-    printf \"Slurm controllers:\\n\"
+    printf \"\\nSlurm controllers:\\n\"
     echo \"\${CONTROLLERS}\" | sed 's/^/  /'
   fi
 "
