@@ -12,3 +12,15 @@ const (
 	SlurmLogFile           = "/dev/null"
 	SlurmDefaultDebugLevel = "debug3"
 )
+
+const (
+	SlurmNodeReasonKillTaskFailed       string = "Kill task failed"
+	SlurmNodeReasonMaintenanceScheduled string = "Maintenance scheduled"
+	SlurmNodeReasonDegraded             string = "Compute node is degraded"
+)
+
+var SlurmNodeReasonsMap = map[string]struct{}{
+	SlurmNodeReasonKillTaskFailed:       {},
+	SlurmNodeReasonMaintenanceScheduled: {},
+	SlurmNodeReasonDegraded:             {},
+}
