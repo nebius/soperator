@@ -1,0 +1,27 @@
+{
+    "cSpell.words": [
+        "apimachinery",
+        "apparmorprofile",
+        "checkcontroller",
+        "clustercontroller",
+        "corev1",
+        "healthz",
+        "kubebuilder",
+        "mariadbv1alpha1",
+        "metav1",
+        "nebius",
+        "otelv1beta1",
+        "outpkg",
+        "prometheusv1",
+        "Rebooter",
+        "schedulable",
+        "scontrol",
+        "slurm",
+        "slurmapi",
+        "slurmapispec",
+        "slurmv1",
+        "stretchr",
+        "Undrain",
+        "undrains"
+    ]
+}
