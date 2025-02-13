@@ -3,20 +3,27 @@ package consts
 import corev1 "k8s.io/api/core/v1"
 
 const (
-	SlurmNodeDrain  = corev1.NodeConditionType("SlurmNodeDrain")
-	SlurmNodeReboot = corev1.NodeConditionType("SlurmNodeReboot")
+	SlurmNodeDrain  corev1.NodeConditionType = "SlurmNodeDrain"
+	SlurmNodeReboot corev1.NodeConditionType = "SlurmNodeReboot"
+
+	K8SNodeDegraded             corev1.NodeConditionType = "NodeDegraded"
+	K8SNodeMaintenanceScheduled corev1.NodeConditionType = "NodeMaintenanceScheduled"
 )
 
 type ReasonConditionType string
 type MessageConditionType string
 
 const (
+	ReasonNodeNeedDrain      ReasonConditionType = "NodeNeedDrain"
 	ReasonNodeDraining       ReasonConditionType = "NodeDraining"
 	ReasonNodeDrained        ReasonConditionType = "NodeDrained"
 	ReasonNodeUndrained      ReasonConditionType = "NodeUndrained"
+	ReasonNodeNeedReboot     ReasonConditionType = "NodeNeedReboot"
 	ReasonNodeRebooting      ReasonConditionType = "NodeRebooting"
 	ReasonNodeRebooted       ReasonConditionType = "NodeRebooted"
 	ReasonNodeNoRebootNeeded ReasonConditionType = "NodeNoRebootNeeded"
+
+	ReasonSlurmNodeDegraded ReasonConditionType = "SlurmNodeDegraded"
 )
 
 const (
@@ -25,4 +32,6 @@ const (
 	MessageRebooting MessageConditionType = "Node is rebooting"
 	MessageRebooted  MessageConditionType = "Node has been rebooted"
 	MessageUndrained MessageConditionType = "Node has been undrained"
+
+	MessageSlurmNodeDegraded MessageConditionType = "Some slurm nodes on the k8s nod are degraded"
 )
