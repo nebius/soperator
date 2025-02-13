@@ -28,7 +28,7 @@ type TokenMeta struct {
 // String implements fmt.Stringer interface.
 // Use it to get the key for the token.
 func (m TokenMeta) String() string {
-	res := fmt.Sprintf("%s/%s:%s", m.cluster, m.username, m.username)
+	res := fmt.Sprintf("%s/%s:%s", m.cluster.Namespace, m.cluster.Name, m.username)
 
 	if m.annotations == nil {
 		return res
