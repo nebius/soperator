@@ -76,8 +76,7 @@ ENV LIBRARY_PATH=/usr/local/cuda/lib64/stubs
 
 # Download NCCL tests executables
 ARG CUDA_VERSION=12.4.1
-ARG SLURM_VERSION=24.05.5
-RUN wget -P /tmp $PACKAGES_REPO_URL/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/nccl-tests-perf.tar.gz && \
+RUN wget -P /tmp $PACKAGES_REPO_URL/nccl_tests_$CUDA_VERSION/nccl-tests-perf.tar.gz && \
     tar -xvzf /tmp/nccl-tests-perf.tar.gz -C /usr/bin && \
     rm -rf /tmp/nccl-tests-perf.tar.gz
 
