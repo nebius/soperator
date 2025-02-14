@@ -2956,7 +2956,7 @@ spec:
                 default:
                   enabled: true
                 description: |-
-                  Rebooter controller wich will reboot and drain node by some node conditions
+                  Rebooter controller which will reboot and drain node by some node conditions
                   in same time can be used rebooter or nodeConfigurator
                 properties:
                   affinity:
@@ -6454,12 +6454,12 @@ spec:
                                 - type: string
                                 description: Size of the PVCs to be mounted by MariaDB.
                                   Required if not provided in 'VolumeClaimTemplate'.
-                                  It superseeds the storage size specified in 'VolumeClaimTemplate'.
+                                  It supersedes the storage size specified in 'VolumeClaimTemplate'.
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
                               storageClassName:
                                 description: |-
-                                  StorageClassName to be used to provision the PVCS. It superseeds the 'StorageClassName' specified in 'VolumeClaimTemplate'.
+                                  StorageClassName to be used to provision the PVCS. It supersedes the 'StorageClassName' specified in 'VolumeClaimTemplate'.
                                   If not provided, the default 'StorageClass' configured in the cluster is used.
                                 type: string
                               volumeClaimTemplate:
