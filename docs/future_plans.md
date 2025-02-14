@@ -9,7 +9,7 @@
 Soperator doesn't manage `slurmdbd` daemons and databases for storing accounting data (dividing users into accounts,
 departments and organizations, QoS & priorities configuration, storing job history & batch scripts, etc.)
 
-We're already working on brining accounting to this solution. Various databases will be supported, and Soperator will
+We're already working on bringing accounting to this solution. Various databases will be supported, and Soperator will
 use MariaDB by default.
 
 

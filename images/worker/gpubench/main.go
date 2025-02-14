@@ -160,7 +160,7 @@ func main() {
 			},
 		).Fatal(failExecuteMsg)
 	}
-	succedExuteMsg := "Succed to execute all_reduce_perf"
+	succedExuteMsg := "Succeed to execute all_reduce_perf"
 	if *pushEvents {
 		eventGenerator.generateEvent(ctx, currentNode, succedExuteMsg, v1.EventTypeNormal, gpuBenchmarkExecuted)
 	}

@@ -2957,7 +2957,7 @@ spec:
                 default:
                   enabled: true
                 description: |-
-                  Rebooter controller wich will reboot and drain node by some node conditions
+                  Rebooter controller which will reboot and drain node by some node conditions
                   in same time can be used rebooter or nodeConfigurator
                 properties:
                   affinity:
