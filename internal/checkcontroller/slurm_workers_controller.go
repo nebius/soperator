@@ -17,27 +17,23 @@ import (
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
 
-type issuer interface {
-	Issue(ctx context.Context) (string, error)
-}
-
 type slurmWorkersController struct {
 	client.Client
-	issuer          issuer
 	slurmAPIClients map[types.NamespacedName]slurmapi.Client
 }
 
-func newSlurmWorkersController(r client.Client, issuer issuer) *slurmWorkersController {
+// TODO: change clients init to jwtController.
+func newSlurmWorkersController(r client.Client, slurmAPIClients map[types.NamespacedName]slurmapi.Client) *slurmWorkersController {
+
 	// TODO: populate clients
 	return &slurmWorkersController{
 		Client:          r,
-		issuer:          issuer,
-		slurmAPIClients: make(map[types.NamespacedName]slurmapi.Client),
+		slurmAPIClients: slurmAPIClients,
 	}
 }
 
 func (c *slurmWorkersController) reconcile(ctx context.Context, req ctrl.Request) error {
-	k8sNode, err := c.getK8SNode(ctx, req.Name)
+	k8sNode, err := getK8SNode(ctx, c.Client, req.Name)
 	if err != nil {
 		return err
 	}
@@ -337,14 +333,6 @@ func (c *slurmWorkersController) undrainSlurmNode(
 	}
 
 	return nil
-}
-
-func (c *slurmWorkersController) getK8SNode(ctx context.Context, nodeName string) (*corev1.Node, error) {
-	k8sNode := &corev1.Node{}
-	if err := c.Get(ctx, client.ObjectKey{Name: nodeName}, k8sNode); err != nil {
-		return nil, fmt.Errorf("get node %s: %w", nodeName, err)
-	}
-	return k8sNode, nil
 }
 
 func (c *slurmWorkersController) getSlurmNode(

@@ -25,6 +25,8 @@ func DefaultHTTPClient() *http.Client {
 
 type client struct {
 	api.ClientWithResponsesInterface
+
+	tokenIssuer tokenIssuer
 }
 
 type tokenIssuer interface {
@@ -36,27 +38,33 @@ func NewClient(server string, tokenIssuer tokenIssuer, httpClient *http.Client) 
 		httpClient = DefaultHTTPClient()
 	}
 
-	headerFunc := func(ctx context.Context, req *http.Request) error {
-		token, err := tokenIssuer.Issue(ctx)
-		if err != nil {
-			return fmt.Errorf("unable to issue jwt: %w", err)
-		}
-
-		req.Header.Add(headerSlurmUserToken, token)
-		req.Header.Add(headerContentType, headerApplicationJson)
-		return nil
+	apiClient := &client{
+		tokenIssuer: tokenIssuer,
 	}
 
 	c, err := api.NewClientWithResponses(
 		server,
 		api.WithHTTPClient(httpClient),
-		api.WithRequestEditorFn(headerFunc),
+		api.WithRequestEditorFn(apiClient.setHeaders),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create client: %v", err)
 	}
 
-	return &client{c}, nil
+	apiClient.ClientWithResponsesInterface = c
+
+	return apiClient, nil
+}
+
+func (c *client) setHeaders(ctx context.Context, req *http.Request) error {
+	token, err := c.tokenIssuer.Issue(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to issue jwt: %w", err)
+	}
+
+	req.Header.Add(headerSlurmUserToken, token)
+	req.Header.Add(headerContentType, headerApplicationJson)
+	return nil
 }
 
 func (c *client) ListNodes(ctx context.Context) ([]Node, error) {

@@ -30,6 +30,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -40,6 +41,8 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/checkcontroller"
+	"nebius.ai/slurm-operator/internal/jwt"
+	"nebius.ai/slurm-operator/internal/slurmapi"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -180,10 +183,27 @@ func main() {
 		os.Exit(1)
 	}
 
+	jwtToken := jwt.NewToken(mgr.GetClient()).For(types.NamespacedName{
+		Namespace: "soperator",
+		Name:      "soperator",
+	}, "root").WithRegistry(jwt.NewTokenRegistry().Build())
+	slurmapiClient, err := slurmapi.NewClient("http://soperator-rest-svc.soperator:6820", jwtToken, slurmapi.DefaultHTTPClient())
+	if err != nil {
+		setupLog.Error(err, "unable to create slurm api client")
+		os.Exit(1)
+	}
+	slurmapiClients := map[types.NamespacedName]slurmapi.Client{
+		{
+			Namespace: "soperator",
+			Name:      "soperator",
+		}: slurmapiClient,
+	}
+
 	if err = checkcontroller.NewCheckControllerReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		mgr.GetEventRecorderFor(checkcontroller.ControllerName),
+		slurmapiClients,
 		reconcileTimeout,
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", checkcontroller.ControllerName)
