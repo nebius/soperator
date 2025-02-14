@@ -11,3 +11,7 @@ const (
 	RebooterEvict RebooterMethod = "evict"
 	RebooterDrain RebooterMethod = "drain"
 )
+
+const (
+	NodeConfiguratorName = "node-configurator"
+)

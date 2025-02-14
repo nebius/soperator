@@ -37,37 +37,6 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 			utils.MultiStepExecutionStrategyCollectErrors,
 
 			utils.MultiStepExecutionStep{
-				Name: "K8s Node sysctl DaemonSet",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling")
-
-					// TODO: It is workround will be removed after create new CRD NodeConfigurator
-					if clusterValues.NodeWorker.Rebooter.Namespace == "" {
-						clusterValues.NodeWorker.Rebooter.Namespace = clusterValues.Namespace
-					}
-
-					desired := worker.RenderDaemonSet(
-						clusterValues.NodeWorker.Rebooter,
-						clusterValues.Name,
-						clusterValues.NodeWorker.K8sNodeFilterName,
-						clusterValues.NodeFilters,
-						clusterValues.NodeWorker.Maintenance,
-					)
-					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.V(1).Info("Rendered")
-
-					if err := r.DaemonSet.Reconcile(stepCtx, cluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling worker DaemonSet")
-					}
-					stepLogger.V(1).Info("Reconciled")
-
-					return nil
-				},
-			},
-
-			utils.MultiStepExecutionStep{
 				Name: "Slurm Worker NCCL topology ConfigMap",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
