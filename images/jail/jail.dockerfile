@@ -87,6 +87,7 @@ FROM cuda AS jail
 ARG SLURM_VERSION=24.05.5
 ARG CUDA_VERSION=12.4.1
 ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
+ARG GDRCOPY_VERSION=2.4.4
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -197,10 +198,12 @@ RUN apt install -y datacenter-gpu-manager-4-cuda12 && \
     apt clean
 
 # Install GDRCopy libraries & executables
-COPY common/scripts/install_gdrcopy.sh /opt/bin/
-RUN chmod +x /opt/bin/install_gdrcopy.sh && \
-    /opt/bin/install_gdrcopy.sh && \
-    rm /opt/bin/install_gdrcopy.sh
+RUN wget -q -P /tmp ${PACKAGES_REPO_URL}/gdrcopy-${GDRCOPY_VERSION}/gdrcopy_${GDRCOPY_VERSION}_amd64.Ubuntu22_04.deb || { echo "Failed to download gdrcopy"; exit 1; } && \
+    wget -q -P /tmp ${PACKAGES_REPO_URL}/gdrcopy-${GDRCOPY_VERSION}/gdrcopy-tests_${GDRCOPY_VERSION}_amd64.Ubuntu22_04+cuda12.4.deb || { echo "Failed to download gdrcopy-tests"; exit 1; } && \
+    wget -q -P /tmp ${PACKAGES_REPO_URL}/gdrcopy-${GDRCOPY_VERSION}/libgdrapi_${GDRCOPY_VERSION}_amd64.Ubuntu22_04.deb || { echo "Failed to download libgdrapi"; exit 1; } && \
+    apt install -y /tmp/*.deb && \
+    rm -rf /tmp/*.deb && \
+    apt clean
 
 # Install AWS CLI
 COPY common/scripts/install_awscli.sh /opt/bin/
