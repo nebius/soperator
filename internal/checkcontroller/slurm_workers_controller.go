@@ -24,9 +24,9 @@ type slurmWorkersController struct {
 }
 
 // TODO: change clients init to jwtController.
-func newSlurmWorkersController(r client.Client, slurmAPIClients map[types.NamespacedName]slurmapi.Client) *slurmWorkersController {
+func newSlurmWorkersController(c client.Client, slurmAPIClients map[types.NamespacedName]slurmapi.Client) *slurmWorkersController {
 	return &slurmWorkersController{
-		Client:          r,
+		Client:          c,
 		slurmAPIClients: slurmAPIClients,
 	}
 }

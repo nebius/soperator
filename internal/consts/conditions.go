@@ -7,7 +7,7 @@ const (
 	SlurmNodeReboot corev1.NodeConditionType = "SlurmNodeReboot"
 
 	K8SNodeDegraded             corev1.NodeConditionType = "NodeDegraded"
-	K8SNodeMaintenanceScheduled corev1.NodeConditionType = "NodeMaintenanceScheduled"
+	K8SNodeMaintenanceScheduled corev1.NodeConditionType = "MaintenanceScheduled"
 )
 
 type ReasonConditionType string
@@ -33,5 +33,6 @@ const (
 	MessageRebooted  MessageConditionType = "Node has been rebooted"
 	MessageUndrained MessageConditionType = "Node has been undrained"
 
-	MessageSlurmNodeDegraded MessageConditionType = "Some slurm nodes on the k8s nod are degraded"
+	MessageSlurmNodeDegraded    MessageConditionType = "Some slurm nodes on the k8s nod are degraded"
+	MessageMaintenanceScheduled MessageConditionType = "Maintenance is scheduled on k8s node"
 )
