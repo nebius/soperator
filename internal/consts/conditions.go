@@ -35,4 +35,5 @@ const (
 
 	MessageSlurmNodeDegraded    MessageConditionType = "Some slurm nodes on the k8s nod are degraded"
 	MessageMaintenanceScheduled MessageConditionType = "Maintenance is scheduled on k8s node"
+	MessageNodeIsRebooted       MessageConditionType = "Node is rebooted"
 )

@@ -22,8 +22,7 @@ func newK8SNodesController(c client.Client) *k8sNodesController {
 }
 
 func (c *k8sNodesController) reconcile(ctx context.Context, req ctrl.Request) error {
-	logger := log.FromContext(ctx).WithName("k8sNodesController.reconcile").V(1).
-		WithValues("k8sNode", req.Name)
+	logger := log.FromContext(ctx).WithName("k8sNodesController.reconcile")
 
 	logger.Info("starting k8s nodes reconcilation")
 	k8sNode, err := getK8SNode(ctx, c.Client, req.Name)
@@ -42,8 +41,7 @@ func (c *k8sNodesController) reconcile(ctx context.Context, req ctrl.Request) er
 }
 
 func (c *k8sNodesController) processDrainCondition(ctx context.Context, k8sNode *corev1.Node) error {
-	logger := log.FromContext(ctx).WithName("processDrainCondition").V(1).
-		WithValues("k8sNode", k8sNode.Name)
+	logger := log.FromContext(ctx).WithName("processDrainCondition")
 	logger.Info("processing drain condition")
 
 	var (
@@ -81,13 +79,12 @@ func (c *k8sNodesController) processDrainCondition(ctx context.Context, k8sNode 
 		return nil
 	}
 
-	logger.Info("deleting k8s node")
+	logger.V(1).Info("deleting k8s node")
 	return c.deleteK8SNode(ctx, k8sNode)
 }
 
 func (c *k8sNodesController) processRebootCondition(ctx context.Context, k8sNode *corev1.Node) error {
-	logger := log.FromContext(ctx).WithName("processRebootCondition").V(1).
-		WithValues("k8sNode", k8sNode.Name)
+	logger := log.FromContext(ctx).WithName("processRebootCondition")
 	logger.Info("processing reboot condition")
 
 	var (
@@ -128,26 +125,28 @@ func (c *k8sNodesController) processRebootCondition(ctx context.Context, k8sNode
 		newNodeCondition(
 			consts.SlurmNodeReboot,
 			corev1.ConditionFalse,
-			"",
-			"",
+			consts.ReasonNodeRebooted,
+			consts.MessageNodeIsRebooted,
 		),
 		newNodeCondition(
 			consts.SlurmNodeDrain,
 			corev1.ConditionFalse,
-			"",
-			"",
+			consts.ReasonNodeRebooted,
+			consts.MessageNodeIsRebooted,
 		),
 		newNodeCondition(
 			consts.K8SNodeDegraded,
 			corev1.ConditionFalse,
-			"",
-			"",
+			consts.ReasonNodeRebooted,
+			consts.MessageNodeIsRebooted,
 		),
 	)
 }
 
 func (c *k8sNodesController) deleteK8SNode(ctx context.Context, k8sNode *corev1.Node) error {
-	if err := c.Client.Delete(ctx, k8sNode); err != nil {
+	if err := c.Client.Delete(ctx, k8sNode); client.IgnoreNotFound(err) != nil {
+		// If the error is not found that means that during reconcilation
+		// that node was deleted. We don't need an error in that case.
 		return fmt.Errorf("delete k8s node: %w", err)
 	}
 	return nil

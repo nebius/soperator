@@ -58,15 +58,15 @@ func NewCheckControllerReconciler(
 
 func (r *CheckControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
-	logger.Info(fmt.Sprintf("Reconciling %s/%s", req.Namespace, req.Name))
+	logger.Info(fmt.Sprintf("Reconciling %s", req.Name))
 
-	logger.V(1).Info("Running slurm workers controller")
+	logger.Info("Running slurm workers controller")
 	if err := r.slurmWorkersController.reconcile(ctx, req); err != nil {
 		logger.V(1).Error(err, "Reconcile slurm workers controller produced an error")
 		return ctrl.Result{RequeueAfter: r.reconcileTimeout}, err
 	}
 
-	logger.V(1).Info("Running k8s nodes controller")
+	logger.Info("Running k8s nodes controller")
 	if err := r.k8sNodesController.reconcile(ctx, req); err != nil {
 		logger.V(1).Error(err, "Reconcile k8s nodes controller produced an error")
 		return ctrl.Result{RequeueAfter: r.reconcileTimeout}, err
@@ -146,7 +146,13 @@ func setK8SNodeCondition(
 	nodeName string,
 	condition corev1.NodeCondition,
 ) error {
-	logger := log.FromContext(ctx).WithName("SetNodeCondition").WithValues("nodeName", nodeName).V(1)
+	logger := log.FromContext(ctx).WithName("SetNodeCondition").V(1).
+		WithValues(
+			"nodeName", nodeName,
+			"conditionType", condition.Type,
+			"conditionStatus", condition.Status,
+			"conditionReason", condition.Reason,
+		)
 
 	node, err := getK8SNode(ctx, c, nodeName)
 	if err != nil {
@@ -161,7 +167,7 @@ func setK8SNodeCondition(
 		if cond.Type == condition.Type {
 
 			if cond.Status == condition.Status && cond.Reason == string(condition.Reason) {
-				logger.Info(fmt.Sprintf("Node already has condition %s, set to %s", condition.Type, condition.Status))
+				logger.Info("Node already has condition")
 				// TODO: update the LastHeartbeatTime
 				return nil
 			}
