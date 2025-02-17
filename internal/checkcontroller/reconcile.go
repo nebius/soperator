@@ -36,7 +36,8 @@ type CheckControllerReconciler struct {
 	*reconciler.Reconciler
 	reconcileTimeout time.Duration
 
-	slurmWorkersController slurmWorkersController
+	slurmWorkersController *slurmWorkersController
+	k8sNodesController     *k8sNodesController
 }
 
 func NewCheckControllerReconciler(
@@ -50,7 +51,8 @@ func NewCheckControllerReconciler(
 	return &CheckControllerReconciler{
 		Reconciler:             r,
 		reconcileTimeout:       reconcileTimeout,
-		slurmWorkersController: *newSlurmWorkersController(client, slurmAPIClients),
+		slurmWorkersController: newSlurmWorkersController(client, slurmAPIClients),
+		k8sNodesController:     newK8SNodesController(client),
 	}
 }
 
@@ -61,10 +63,15 @@ func (r *CheckControllerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	logger.V(1).Info("Running slurm workers controller")
 	if err := r.slurmWorkersController.reconcile(ctx, req); err != nil {
 		logger.V(1).Error(err, "Reconcile slurm workers controller produced an error")
-		return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
+		return ctrl.Result{RequeueAfter: r.reconcileTimeout}, err
 	}
 
-	// TODO: Add logic in future
+	logger.V(1).Info("Running k8s nodes controller")
+	if err := r.k8sNodesController.reconcile(ctx, req); err != nil {
+		logger.V(1).Error(err, "Reconcile k8s nodes controller produced an error")
+		return ctrl.Result{RequeueAfter: r.reconcileTimeout}, err
+	}
+
 	return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
 }
 
@@ -150,7 +157,7 @@ func setK8SNodeCondition(
 	// In Kubernetes, the status is considered a "system-owned" object and cannot be
 	// modified using a regular Update call.
 	// Instead, changes to the status must be made using the Status().Update method.
-	for _, cond := range node.Status.Conditions {
+	for i, cond := range node.Status.Conditions {
 		if cond.Type == condition.Type {
 
 			if cond.Status == condition.Status && cond.Reason == string(condition.Reason) {
@@ -161,6 +168,7 @@ func setK8SNodeCondition(
 
 			logger.Info("Updating existing condition on node")
 			patch := client.MergeFrom(node.DeepCopy())
+			node.Status.Conditions[i] = condition
 
 			return c.Status().Patch(ctx, node, patch)
 		}
@@ -172,6 +180,20 @@ func setK8SNodeCondition(
 		return fmt.Errorf("failed to update object status: %w", err)
 	}
 
+	return nil
+}
+
+func setK8SNodeConditions(
+	ctx context.Context,
+	c client.Client,
+	nodeName string,
+	conditions ...corev1.NodeCondition,
+) error {
+	for _, cond := range conditions {
+		if err := setK8SNodeCondition(ctx, c, nodeName, cond); err != nil {
+			return fmt.Errorf("set k8s node condition: %w", err)
+		}
+	}
 	return nil
 }
 
