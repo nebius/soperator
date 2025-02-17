@@ -3,6 +3,7 @@ package checkcontroller
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -99,33 +100,24 @@ func (r *CheckControllerReconciler) SetupWithManager(mgr ctrl.Manager,
 				// Extract the desired conditions from both old and new nodes
 				// and compare them to determine if reconciliation is needed
 				// based on the conditions changing
-				var oldDrainCondition, newDrainCondition, oldRebootCondition, newRebootCondition *corev1.NodeCondition
-				for i := range oldNode.Status.Conditions {
-					if oldNode.Status.Conditions[i].Type == consts.SlurmNodeDrain {
-						oldDrainCondition = &oldNode.Status.Conditions[i]
-					} else if oldNode.Status.Conditions[i].Type == consts.SlurmNodeReboot {
-						oldRebootCondition = &oldNode.Status.Conditions[i]
+				populateConditions := func(conditions []corev1.NodeCondition) map[corev1.NodeConditionType]corev1.NodeCondition {
+					condMap := make(map[corev1.NodeConditionType]corev1.NodeCondition)
+
+					for _, condition := range conditions {
+						switch condition.Type {
+						case consts.SlurmNodeDrain, consts.SlurmNodeReboot, consts.K8SNodeMaintenanceScheduled, consts.K8SNodeDegraded:
+							condition := condition
+							condMap[condition.Type] = condition
+						}
 					}
-				}
-				for i := range newNode.Status.Conditions {
-					if newNode.Status.Conditions[i].Type == consts.SlurmNodeDrain {
-						newDrainCondition = &newNode.Status.Conditions[i]
-					} else if newNode.Status.Conditions[i].Type == consts.SlurmNodeReboot {
-						newRebootCondition = &newNode.Status.Conditions[i]
-					}
+
+					return condMap
 				}
 
-				// Trigger reconciliation if the Drain condition has changed
-				if oldDrainCondition == nil || newDrainCondition == nil || oldDrainCondition.Status != newDrainCondition.Status {
-					return true
-				}
+				oldConditions := populateConditions(oldNode.Status.Conditions)
+				newConditions := populateConditions(newNode.Status.Conditions)
 
-				// Trigger reconciliation if the Reboot condition has changed
-				if oldRebootCondition == nil || newRebootCondition == nil || oldRebootCondition.Status != newRebootCondition.Status {
-					return true
-				}
-
-				return false
+				return !maps.Equal(oldConditions, newConditions)
 			},
 			CreateFunc: func(e event.CreateEvent) bool {
 				return true
