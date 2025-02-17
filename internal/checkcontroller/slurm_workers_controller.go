@@ -32,8 +32,7 @@ func newSlurmWorkersController(c client.Client, slurmAPIClients map[types.Namesp
 }
 
 func (c *slurmWorkersController) reconcile(ctx context.Context, req ctrl.Request) error {
-	logger := log.FromContext(ctx).WithName("slurmWorkersController.reconcile").V(1).
-		WithValues("k8sNode", req.Name)
+	logger := log.FromContext(ctx).WithName("slurmWorkersController.reconcile")
 
 	logger.Info("reconciling k8s node")
 	k8sNode, err := getK8SNode(ctx, c.Client, req.Name)
@@ -50,7 +49,7 @@ func (c *slurmWorkersController) reconcile(ctx context.Context, req ctrl.Request
 		return err
 	}
 
-	logger.Info(fmt.Sprintf("found %d degraded nodes", len(degradedNodes)))
+	logger.V(1).Info(fmt.Sprintf("found %d degraded nodes", len(degradedNodes)))
 	var errs []error
 	for slurmClusterName, nodes := range degradedNodes {
 		for _, node := range nodes {
@@ -298,7 +297,7 @@ func (c *slurmWorkersController) drainSlurmNode(
 	slurmClusterName types.NamespacedName,
 	slurmNodeName, reason string,
 ) error {
-	logger := log.FromContext(ctx).WithName("drainSlurmNode").V(1).
+	logger := log.FromContext(ctx).WithName("drainSlurmNode").
 		WithValues(
 			"slurmNodeName", slurmNodeName,
 			"drainReason", reason,
@@ -324,7 +323,7 @@ func (c *slurmWorkersController) drainSlurmNode(
 		return fmt.Errorf("post drain returned errors: %v", *resp.JSON200.Errors)
 	}
 
-	logger.Info("slurm node state is updated to DRAIN")
+	logger.V(1).Info("slurm node state is updated to DRAIN")
 	return nil
 }
 
@@ -332,7 +331,7 @@ func (c *slurmWorkersController) slurmNodesFullyDrained(
 	ctx context.Context,
 	k8sNodeName string,
 ) (bool, error) {
-	logger := log.FromContext(ctx).WithName("slurmNodesFullyDrained").V(1)
+	logger := log.FromContext(ctx).WithName("slurmNodesFullyDrained")
 
 	logger.Info("checking that slurm nodes are fully drained")
 	podList := &corev1.PodList{}
@@ -354,12 +353,12 @@ func (c *slurmWorkersController) slurmNodesFullyDrained(
 			if err != nil {
 				return false, err
 			}
-			logger.Info("slurm node", "nodeStates", node.States, "kekuspekus", node)
+			logger.Info("slurm node", "nodeStates", node.States)
 			if !node.IsIdleDrained() {
 				logger.Info("slurm node is not fully drained", "nodeStates", node.States)
 				return false, nil
 			}
-			logger.Info("slurm node is fully drained", "nodeStates", node.States, "kekuspekus", node)
+			logger.V(1).Info("slurm node is fully drained", "nodeStates", node.States)
 		}
 	}
 
@@ -396,7 +395,7 @@ func (c *slurmWorkersController) undrainSlurmNode(
 		return fmt.Errorf("post undrain returned errors: %v", *resp.JSON200.Errors)
 	}
 
-	logger.Info("slurm node state is updated to RESUME")
+	logger.V(1).Info("slurm node state is updated to RESUME")
 	return nil
 }
 
