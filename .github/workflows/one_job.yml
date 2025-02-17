@@ -69,8 +69,19 @@ jobs:
           echo "UNSTABLE - is ${{ needs.pre-build.outputs.unstable }}"
           make get-version UNSTABLE=${{ needs.pre-build.outputs.unstable }}
 
-      - name: Check if version synced
-        run: make test-version-sync
+      - name: Run make sync-version-from-scratch
+        run: |
+          make kustomize helmify yq
+          make sync-version-from-scratch
+
+      - name: Check for uncommitted changes
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "❌ Uncommitted changes detected after make sync-version-from-scratch"
+            git diff
+            exit 1
+          fi
+        shell: bash
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3.9.0

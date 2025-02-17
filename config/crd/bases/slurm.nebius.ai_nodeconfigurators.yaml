@@ -4184,11 +4184,11 @@ spec:
                         type: integer
                     type: object
                   logFormat:
-                    description: logFormat defines the log format for the node-configurator
+                    description: LogFormat defines the log format for the node-configurator
                     type: string
                   logLevel:
                     default: info
-                    description: LogFormat defines the log level for the node-configurator
+                    description: LogLevel defines the log level for the node-configurator
                     enum:
                     - debug
                     - info
@@ -4532,12 +4532,12 @@ spec:
                 - type
                 x-kubernetes-list-type: map
               observedGeneration:
-                description: observedGeneration defines current generation picked
+                description: ObservedGeneration defines current generation picked
                   by operator for the reconcile
                 format: int64
                 type: integer
               reason:
-                description: reason defines human readable error reason
+                description: Reason defines human readable error reason
                 type: string
               updateStatus:
                 description: UpdateStatus defines a status for update rollout
