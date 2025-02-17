@@ -33,7 +33,7 @@ for file in /mnt/slurm-configs/*; do
     touch "/etc/slurm/$filename" && mount --bind "$file" "/etc/slurm/$filename"
 done
 
-echo "Bind-mount gpubenchmark from container ot jail"
+echo "Bind-mount gpubenchmark from container to jail"
 touch /mnt/jail/usr/bin/gpubench
 mount --bind /usr/bin/gpubench /mnt/jail/usr/bin/gpubench
 

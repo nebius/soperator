@@ -286,7 +286,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 				}
 			}
 
-			// Popolate Jail
+			// Populate Jail
 			switch {
 			case check.IsModeSkipPopulateJail(clusterValues.PopulateJail.Maintenance):
 				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {

@@ -25,7 +25,7 @@ import (
 
 // NodeConfiguratorSpec defines the desired state of NodeConfigurator.
 type NodeConfiguratorSpec struct {
-	// Rebooter controller wich will reboot and drain node by some node conditions
+	// Rebooter controller which will reboot and drain node by some node conditions
 	// in same time can be used rebooter or nodeConfigurator
 	//
 	// +kubebuilder:validation:Optional
