@@ -13,44 +13,44 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
 
-type issuer interface {
-	Issue(ctx context.Context) (string, error)
-}
-
 type slurmWorkersController struct {
 	client.Client
-	issuer          issuer
 	slurmAPIClients map[types.NamespacedName]slurmapi.Client
 }
 
-func newSlurmWorkersController(r client.Client, issuer issuer) *slurmWorkersController {
-	// TODO: populate clients
+// TODO: change clients init to jwtController.
+func newSlurmWorkersController(r client.Client, slurmAPIClients map[types.NamespacedName]slurmapi.Client) *slurmWorkersController {
 	return &slurmWorkersController{
 		Client:          r,
-		issuer:          issuer,
-		slurmAPIClients: make(map[types.NamespacedName]slurmapi.Client),
+		slurmAPIClients: slurmAPIClients,
 	}
 }
 
 func (c *slurmWorkersController) reconcile(ctx context.Context, req ctrl.Request) error {
-	k8sNode, err := c.getK8SNode(ctx, req.Name)
+	logger := log.FromContext(ctx).WithName("slurmWorkersController.reconcile").V(1).
+		WithValues("k8sNode", req.Name)
+
+	logger.Info("reconciling k8s node")
+	k8sNode, err := getK8SNode(ctx, c.Client, req.Name)
 	if err != nil {
 		return err
 	}
 
-	if err := c.processComputeMaintenance(ctx, k8sNode); err != nil {
+	if err := c.processK8SNodeMaintenance(ctx, k8sNode); err != nil {
 		return err
 	}
 
-	degradedNodes, err := c.findDegradedNodes(ctx)
+	degradedNodes, err := c.findDegradedNodes(ctx, k8sNode.Name)
 	if err != nil {
 		return err
 	}
 
+	logger.Info(fmt.Sprintf("found %d degraded nodes", len(degradedNodes)))
 	var errs []error
 	for slurmClusterName, nodes := range degradedNodes {
 		for _, node := range nodes {
@@ -63,7 +63,9 @@ func (c *slurmWorkersController) reconcile(ctx context.Context, req ctrl.Request
 	return errors.Join(errs...)
 }
 
-func (c *slurmWorkersController) findDegradedNodes(ctx context.Context) (map[types.NamespacedName][]slurmapi.Node, error) {
+// TODO: filter also slurmNodes by supported slurm clusters
+// in case when 2 slurm nodes are on the same k8s node.
+func (c *slurmWorkersController) findDegradedNodes(ctx context.Context, k8sNodeName string) (map[types.NamespacedName][]slurmapi.Node, error) {
 	degradedNodes := make(map[types.NamespacedName][]slurmapi.Node)
 
 	for slurmClusterName, slurmAPIClient := range c.slurmAPIClients {
@@ -73,6 +75,10 @@ func (c *slurmWorkersController) findDegradedNodes(ctx context.Context) (map[typ
 		}
 
 		for _, node := range slurmNodes {
+			if node.InstanceID != k8sNodeName {
+				// Skip, will process during another node reconcilation
+				continue
+			}
 			if _, ok := node.States[slurmapispec.V0041NodeStateDRAIN]; !ok {
 				// Node is not drained, skipping
 				continue
@@ -111,8 +117,7 @@ func (c *slurmWorkersController) processDegradedNode(
 	case consts.SlurmNodeReasonKillTaskFailed, consts.SlurmNodeReasonDegraded:
 		return c.processKillTaskFailed(ctx, k8sNode, slurmClusterName, node)
 	case consts.SlurmNodeReasonMaintenanceScheduled:
-		// should not be drained
-		return c.undrainSlurmNode(ctx, slurmClusterName, node.Name)
+		return c.processSlurmNodeMaintenance(ctx, k8sNode, slurmClusterName, node.Name)
 	default:
 		return fmt.Errorf("unknown node reason: node name %s, reason %s, instance id %s",
 			node.Name, node.Reason, node.InstanceID)
@@ -168,7 +173,49 @@ func (c *slurmWorkersController) processKillTaskFailed(
 	return drainWithCondition()
 }
 
-func (c *slurmWorkersController) processComputeMaintenance(ctx context.Context, k8sNode *corev1.Node) error {
+func (c *slurmWorkersController) processK8SNodeMaintenance(ctx context.Context, k8sNode *corev1.Node) error {
+	drainFn := func() error {
+		return c.drainSlurmNodesWithConditionUpdate(
+			ctx,
+			k8sNode.Name,
+			consts.SlurmNodeReasonMaintenanceScheduled,
+			newNodeCondition(
+				consts.SlurmNodeDrain,
+				corev1.ConditionTrue,
+				consts.ReasonNodeDraining,
+				"",
+			),
+		)
+	}
+
+	return c.processMaintenance(ctx, k8sNode, drainFn, nil)
+}
+
+func (c *slurmWorkersController) processSlurmNodeMaintenance(
+	ctx context.Context,
+	k8sNode *corev1.Node,
+	slurmClusterName types.NamespacedName,
+	slurmNodeName string) error {
+
+	undrainFn := func() error {
+		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNodeName)
+	}
+
+	return c.processMaintenance(ctx, k8sNode, nil, undrainFn)
+}
+
+func (c *slurmWorkersController) processMaintenance(
+	_ context.Context,
+	k8sNode *corev1.Node,
+	drainFn, undrainFn func() error,
+) error {
+	if drainFn == nil {
+		drainFn = func() error { return nil }
+	}
+	if undrainFn == nil {
+		undrainFn = func() error { return nil }
+	}
+
 	var maintenanceCondition corev1.NodeCondition
 	for _, cond := range k8sNode.Status.Conditions {
 		if cond.Type == consts.K8SNodeMaintenanceScheduled {
@@ -178,20 +225,10 @@ func (c *slurmWorkersController) processComputeMaintenance(ctx context.Context, 
 	}
 
 	if maintenanceCondition == (corev1.NodeCondition{}) || maintenanceCondition.Status == corev1.ConditionFalse {
-		return nil
+		return undrainFn()
 	}
 
-	return c.drainSlurmNodesWithConditionUpdate(
-		ctx,
-		k8sNode.Name,
-		consts.SlurmNodeReasonMaintenanceScheduled,
-		newNodeCondition(
-			consts.SlurmNodeDrain,
-			corev1.ConditionTrue,
-			consts.ReasonNodeDraining,
-			"",
-		),
-	)
+	return drainFn()
 }
 
 func (c *slurmWorkersController) drainSlurmNodesWithConditionUpdate(
@@ -243,7 +280,7 @@ func (c *slurmWorkersController) drainSlurmNodes(
 		if strings.Contains(pod.Name, "worker-") {
 			slurmClusterName := types.NamespacedName{
 				Namespace: pod.Namespace,
-				Name:      pod.Annotations[consts.LabelInstanceKey],
+				Name:      pod.Labels[consts.LabelInstanceKey],
 			}
 
 			err := c.drainSlurmNode(ctx, slurmClusterName, pod.Name, reason)
@@ -261,6 +298,13 @@ func (c *slurmWorkersController) drainSlurmNode(
 	slurmClusterName types.NamespacedName,
 	slurmNodeName, reason string,
 ) error {
+	logger := log.FromContext(ctx).WithName("drainSlurmNode").V(1).
+		WithValues(
+			"slurmNodeName", slurmNodeName,
+			"drainReason", reason,
+			"slurmCluster", slurmClusterName,
+		)
+	logger.Info("draining slurm node")
 
 	slurmAPIClient, ok := c.slurmAPIClients[slurmClusterName]
 	if !ok {
@@ -276,10 +320,11 @@ func (c *slurmWorkersController) drainSlurmNode(
 	if err != nil {
 		return fmt.Errorf("post drain slurm node: %w", err)
 	}
-	if resp.JSON200.Errors != nil {
-		return fmt.Errorf("post drain returned errors: %v", resp.JSON200.Errors)
+	if resp.JSON200.Errors != nil && len(*resp.JSON200.Errors) != 0 {
+		return fmt.Errorf("post drain returned errors: %v", *resp.JSON200.Errors)
 	}
 
+	logger.Info("slurm node state is updated to DRAIN")
 	return nil
 }
 
@@ -287,7 +332,9 @@ func (c *slurmWorkersController) slurmNodesFullyDrained(
 	ctx context.Context,
 	k8sNodeName string,
 ) (bool, error) {
+	logger := log.FromContext(ctx).WithName("slurmNodesFullyDrained").V(1)
 
+	logger.Info("checking that slurm nodes are fully drained")
 	podList := &corev1.PodList{}
 	if err := c.List(ctx, podList, client.MatchingFields{"spec.nodeName": k8sNodeName}); err != nil {
 		return false, fmt.Errorf("list pods on node %s: %w", k8sNodeName, err)
@@ -295,21 +342,28 @@ func (c *slurmWorkersController) slurmNodesFullyDrained(
 
 	for _, pod := range podList.Items {
 		if strings.Contains(pod.Name, "worker-") {
+			logger = logger.WithValues("slurmNode", pod.Name, "instanceKey", pod.Labels[consts.LabelInstanceKey])
+			logger.Info("found slurm node")
+
 			slurmClusterName := types.NamespacedName{
 				Namespace: pod.Namespace,
-				Name:      pod.Annotations[consts.LabelInstanceKey],
+				Name:      pod.Labels[consts.LabelInstanceKey],
 			}
 
 			node, err := c.getSlurmNode(ctx, slurmClusterName, pod.Name)
 			if err != nil {
 				return false, err
 			}
+			logger.Info("slurm node", "nodeStates", node.States, "kekuspekus", node)
 			if !node.IsIdleDrained() {
+				logger.Info("slurm node is not fully drained", "nodeStates", node.States)
 				return false, nil
 			}
+			logger.Info("slurm node is fully drained", "nodeStates", node.States, "kekuspekus", node)
 		}
 	}
 
+	logger.Info("all slurm nodes are fully drained")
 	return true, nil
 }
 
@@ -318,6 +372,12 @@ func (c *slurmWorkersController) undrainSlurmNode(
 	slurmClusterName types.NamespacedName,
 	slurmNodeName string,
 ) error {
+	logger := log.FromContext(ctx).WithName("undrainSlurmNode").V(1).
+		WithValues(
+			"slurmNodeName", slurmNodeName,
+			"slurmCluster", slurmClusterName,
+		)
+	logger.Info("undraining slurm node")
 
 	slurmAPIClient, ok := c.slurmAPIClients[slurmClusterName]
 	if !ok {
@@ -332,19 +392,12 @@ func (c *slurmWorkersController) undrainSlurmNode(
 	if err != nil {
 		return fmt.Errorf("post undrain slurm node: %w", err)
 	}
-	if resp.JSON200.Errors != nil {
-		return fmt.Errorf("post undrain returned errors: %v", resp.JSON200.Errors)
+	if resp.JSON200.Errors != nil && len(*resp.JSON200.Errors) != 0 {
+		return fmt.Errorf("post undrain returned errors: %v", *resp.JSON200.Errors)
 	}
 
+	logger.Info("slurm node state is updated to RESUME")
 	return nil
-}
-
-func (c *slurmWorkersController) getK8SNode(ctx context.Context, nodeName string) (*corev1.Node, error) {
-	k8sNode := &corev1.Node{}
-	if err := c.Get(ctx, client.ObjectKey{Name: nodeName}, k8sNode); err != nil {
-		return nil, fmt.Errorf("get node %s: %w", nodeName, err)
-	}
-	return k8sNode, nil
 }
 
 func (c *slurmWorkersController) getSlurmNode(

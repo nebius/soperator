@@ -39,7 +39,7 @@ func validateAPINode(node slurmapispec.V0041Node) error {
 		errs = append(errs, errors.New("node doesn't have instance id"))
 	}
 
-	if node.Reason != nil && (node.ReasonChangedAt == nil || node.ReasonChangedAt.Number == nil) {
+	if node.Reason != nil && len(*node.Reason) != 0 && (node.ReasonChangedAt == nil || node.ReasonChangedAt.Number == nil) {
 		errs = append(errs, errors.New("node doesn't have reasonChangedAt or reasonChangedAt.number, but has reason"))
 	}
 
@@ -65,7 +65,7 @@ func NodeFromAPI(node slurmapispec.V0041Node) (Node, error) {
 		States:      nodeStates,
 	}
 
-	if node.Reason != nil {
+	if node.Reason != nil && len(*node.Reason) != 0 {
 		res.Reason = &NodeReason{
 			Reason:    *node.Reason,
 			ChangedAt: time.Unix(*node.ReasonChangedAt.Number, 0),
