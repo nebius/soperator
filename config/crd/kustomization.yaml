@@ -3,7 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/slurm.nebius.ai_slurmclusters.yaml
-#- bases/slurm.nebius.ai_nodeconfigurators.yaml
+- bases/slurm.nebius.ai_nodeconfigurators.yaml
 
 #+kubebuilder:scaffold:crdkustomizeresource
 
