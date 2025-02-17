@@ -103,6 +103,7 @@ func main() {
 
 		reconcileTimeout time.Duration
 		maxConcurrency   int
+		cacheSyncTimeout time.Duration
 	)
 
 	var watchNsCacheByName = make(map[string]cache.Config)
@@ -126,6 +127,7 @@ func main() {
 	flag.StringVar(&logLevel, "log-level", "debug", "Log level: debug, info, warn, error, dpanic, panic, fatal")
 	flag.DurationVar(&reconcileTimeout, "reconcile-timeout", 5*time.Minute, "The maximum duration allowed for a single reconcile")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
+	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 5*time.Minute, "The maximum duration allowed for caching sync")
 
 	opts := getZapOpts(logFormat, logLevel)
 	ctrl.SetLogger(zap.New(opts...))
@@ -208,7 +210,7 @@ func main() {
 		mgr.GetEventRecorderFor(checkcontroller.ControllerName),
 		slurmapiClients,
 		reconcileTimeout,
-	).SetupWithManager(mgr); err != nil {
+	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create controller", checkcontroller.ControllerName)
 		os.Exit(1)
 	}

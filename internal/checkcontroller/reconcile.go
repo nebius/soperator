@@ -13,11 +13,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
 
@@ -75,7 +77,8 @@ func getK8SNode(ctx context.Context, c client.Client, nodeName string) (*corev1.
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *CheckControllerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *CheckControllerReconciler) SetupWithManager(mgr ctrl.Manager,
+	maxConcurrency int, cacheSyncTimeout time.Duration) error {
 	ctx := context.Background()
 
 	// Index pods by node name. This is used to list and evict pods from a specific node.
@@ -86,8 +89,55 @@ func (r *CheckControllerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return fmt.Errorf("failed to setup field indexer: %w", err)
 	}
 
+	// TODO: common code for predicates
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Node{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		For(&corev1.Node{}, builder.WithPredicates(predicate.Funcs{
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				oldNode := e.ObjectOld.(*corev1.Node)
+				newNode := e.ObjectNew.(*corev1.Node)
+
+				// Extract the desired conditions from both old and new nodes
+				// and compare them to determine if reconciliation is needed
+				// based on the conditions changing
+				var oldDrainCondition, newDrainCondition, oldRebootCondition, newRebootCondition *corev1.NodeCondition
+				for i := range oldNode.Status.Conditions {
+					if oldNode.Status.Conditions[i].Type == consts.SlurmNodeDrain {
+						oldDrainCondition = &oldNode.Status.Conditions[i]
+					} else if oldNode.Status.Conditions[i].Type == consts.SlurmNodeReboot {
+						oldRebootCondition = &oldNode.Status.Conditions[i]
+					}
+				}
+				for i := range newNode.Status.Conditions {
+					if newNode.Status.Conditions[i].Type == consts.SlurmNodeDrain {
+						newDrainCondition = &newNode.Status.Conditions[i]
+					} else if newNode.Status.Conditions[i].Type == consts.SlurmNodeReboot {
+						newRebootCondition = &newNode.Status.Conditions[i]
+					}
+				}
+
+				// Trigger reconciliation if the Drain condition has changed
+				if oldDrainCondition == nil || newDrainCondition == nil || oldDrainCondition.Status != newDrainCondition.Status {
+					return true
+				}
+
+				// Trigger reconciliation if the Reboot condition has changed
+				if oldRebootCondition == nil || newRebootCondition == nil || oldRebootCondition.Status != newRebootCondition.Status {
+					return true
+				}
+
+				return false
+			},
+			CreateFunc: func(e event.CreateEvent) bool {
+				return true
+			},
+			DeleteFunc: func(e event.DeleteEvent) bool {
+				return false
+			},
+			GenericFunc: func(e event.GenericEvent) bool {
+				return true
+			},
+		})).
+		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
 		Complete(r)
 }
 
@@ -113,6 +163,7 @@ func setK8SNodeCondition(
 
 			if cond.Status == condition.Status && cond.Reason == string(condition.Reason) {
 				logger.Info(fmt.Sprintf("Node already has condition %s, set to %s", condition.Type, condition.Status))
+				// TODO: update the LastHeartbeatTime
 				return nil
 			}
 
