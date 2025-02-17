@@ -30,6 +30,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -40,6 +41,8 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/checkcontroller"
+	"nebius.ai/slurm-operator/internal/jwt"
+	"nebius.ai/slurm-operator/internal/slurmapi"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -104,11 +107,10 @@ func main() {
 
 	var watchNsCacheByName = make(map[string]cache.Config)
 
-	ns := os.Getenv("WATCH_NAMESPACE")
-	if ns != "" {
+	ns := os.Getenv("SLURM_OPERATOR_WATCH_NAMESPACES")
+	if ns != "" && ns != "*" {
+		watchNsCacheByName = make(map[string]cache.Config)
 		watchNsCacheByName[ns] = cache.Config{}
-	} else {
-		watchNsCacheByName["default"] = cache.Config{}
 	}
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
@@ -180,10 +182,31 @@ func main() {
 		os.Exit(1)
 	}
 
+	slurmAPIServer := os.Getenv("SLURM_API_SERVER")
+	if len(slurmAPIServer) == 0 {
+		slurmAPIServer = "http://localhost:6820"
+	}
+
+	// TODO: init jwt controller
+	slurmClusterName := types.NamespacedName{
+		Namespace: "soperator",
+		Name:      "soperator",
+	}
+	jwtToken := jwt.NewToken(mgr.GetClient()).For(slurmClusterName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
+	slurmapiClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
+	if err != nil {
+		setupLog.Error(err, "unable to create slurm api client")
+		os.Exit(1)
+	}
+	slurmapiClients := map[types.NamespacedName]slurmapi.Client{
+		slurmClusterName: slurmapiClient,
+	}
+
 	if err = checkcontroller.NewCheckControllerReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		mgr.GetEventRecorderFor(checkcontroller.ControllerName),
+		slurmapiClients,
 		reconcileTimeout,
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", checkcontroller.ControllerName)
