@@ -3,7 +3,7 @@ package check
 import "nebius.ai/slurm-operator/internal/consts"
 
 func IsMaintenanceActive(maintenance *consts.MaintenanceMode) bool {
-	return maintenance != nil && *maintenance != consts.ModeNone
+	return maintenance != nil && *maintenance != consts.ModeNone && *maintenance != consts.ModeSkipPopulate
 }
 
 func IsModeDownscaleAndDeletePopulate(maintenance *consts.MaintenanceMode) bool {
