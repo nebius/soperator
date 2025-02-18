@@ -73,7 +73,7 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 						}
 					}
 
-					if !apierrors.IsNotFound(getErr) && !isMaintenanceStopMode {
+					if getErr != nil && !apierrors.IsNotFound(getErr) && !isMaintenanceStopMode {
 						stepLogger.Error(getErr, "Failed to get")
 						return errors.Wrap(getErr, "getting Populate jail Job")
 					}
