@@ -140,6 +140,6 @@ pushd "${jaildir}"
     # For $worker node only
     if [ -n "$worker" ]; then
         echo "Update linker cache inside the jail"
-        flock etc/complement_jail_ldconfig.lock -c "chroot \"${jaildir}\" /usr/sbin/ldconfig"
+        flock --nonblock etc/complement_jail_ldconfig.lock -c "chroot \"${jaildir}\" /usr/sbin/ldconfig" || true
     fi
 popd
