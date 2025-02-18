@@ -1540,6 +1540,13 @@ spec:
                     description: Keep N last jobs in controller memory
                     format: int32
                     type: integer
+                  messageTimeout:
+                    default: 30
+                    description: |-
+                      MessageTimeout specifies the permitted time for a round-trip communication to complete in seconds.
+                      See https://slurm.schedmd.com/slurm.conf.html#OPT_MessageTimeout.
+                    format: int32
+                    type: integer
                   minJobAge:
                     default: 86400
                     description: Don't remove jobs from controller memory after some
