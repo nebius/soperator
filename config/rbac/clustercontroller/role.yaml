@@ -137,6 +137,7 @@ rules:
   resources:
   - nodeconfigurators
   - slurmclusters
+  - soperatorchecks
   verbs:
   - create
   - delete
@@ -150,6 +151,7 @@ rules:
   resources:
   - nodeconfigurators/finalizers
   - slurmclusters/finalizers
+  - soperatorchecks/finalizers
   verbs:
   - update
 - apiGroups:
@@ -157,6 +159,7 @@ rules:
   resources:
   - nodeconfigurators/status
   - slurmclusters/status
+  - soperatorchecks/status
   verbs:
   - get
   - patch
