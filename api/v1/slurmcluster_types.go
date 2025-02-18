@@ -148,6 +148,12 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=86400
 	MinJobAge *int32 `json:"minJobAge,omitempty"`
+	// MessageTimeout specifies the permitted time for a round-trip communication to complete in seconds.
+	// See https://slurm.schedmd.com/slurm.conf.html#OPT_MessageTimeout.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=30
+	MessageTimeout *int32 `json:"messageTimeout,omitempty"`
 }
 
 type MPIConfig struct {
