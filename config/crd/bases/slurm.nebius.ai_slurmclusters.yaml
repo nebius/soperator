@@ -1541,6 +1541,13 @@ spec:
                     description: Keep N last jobs in controller memory
                     format: int32
                     type: integer
+                  messageTimeout:
+                    default: 30
+                    description: |-
+                      MessageTimeout specifies the permitted time for a round-trip communication to complete in seconds.
+                      See https://slurm.schedmd.com/slurm.conf.html#OPT_MessageTimeout.
+                    format: int32
+                    type: integer
                   minJobAge:
                     default: 86400
                     description: Don't remove jobs from controller memory after some
@@ -1907,12 +1914,12 @@ spec:
                                 - type: string
                                 description: Size of the PVCs to be mounted by MariaDB.
                                   Required if not provided in 'VolumeClaimTemplate'.
-                                  It supersedes the storage size specified in 'VolumeClaimTemplate'.
+                                  It superseeds the storage size specified in 'VolumeClaimTemplate'.
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
                               storageClassName:
                                 description: |-
-                                  StorageClassName to be used to provision the PVCS. It supersedes the 'StorageClassName' specified in 'VolumeClaimTemplate'.
+                                  StorageClassName to be used to provision the PVCS. It superseeds the 'StorageClassName' specified in 'VolumeClaimTemplate'.
                                   If not provided, the default 'StorageClass' configured in the cluster is used.
                                 type: string
                               volumeClaimTemplate:
