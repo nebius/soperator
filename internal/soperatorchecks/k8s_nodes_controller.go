@@ -24,7 +24,7 @@ func newK8SNodesController(c client.Client) *k8sNodesController {
 func (c *k8sNodesController) reconcile(ctx context.Context, req ctrl.Request) error {
 	logger := log.FromContext(ctx).WithName("k8sNodesController.reconcile")
 
-	logger.Info("starting k8s nodes reconcilation")
+	logger.Info("starting k8s nodes reconciliation")
 	k8sNode, err := getK8SNode(ctx, c.Client, req.Name)
 	if err != nil {
 		return fmt.Errorf("get k8s node: %w", err)
@@ -145,7 +145,7 @@ func (c *k8sNodesController) processRebootCondition(ctx context.Context, k8sNode
 
 func (c *k8sNodesController) deleteK8SNode(ctx context.Context, k8sNode *corev1.Node) error {
 	if err := c.Client.Delete(ctx, k8sNode); client.IgnoreNotFound(err) != nil {
-		// If the error is not found that means that during reconcilation
+		// If the error is not found that means that during reconciliation
 		// that node was deleted. We don't need an error in that case.
 		return fmt.Errorf("delete k8s node: %w", err)
 	}
