@@ -1,0 +1,34 @@
+nodeConfigurator:
+  enabled: false
+  env: []
+  image:
+    repository: busybox
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  nodeSelector: {}
+  resources: {}
+  livenessProbe: {}
+  readinessProbe: {}
+  tolerations: []
+  affinity: {}
+  priorityClassName: ""
+  serviceAccountName: ""
+rebooter:
+  enabled: true
+  evictionMethod: "evict"
+  logLevel: "info"
+  logFormat: "json"
+  env: []
+  image:
+    repository: "cr.eu-north1.nebius.cloud/soperator/rebooter"
+    tag: "1.18.2"
+    pullPolicy: IfNotPresent
+  nodeSelector: {}
+  resources: {}
+  livenessProbe: {}
+  readinessProbe: {}
+  tolerations: []
+  affinity: {}
+  priorityClassName: ""
+  serviceAccountName: ""
+initContainers: []

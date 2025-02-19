@@ -23,6 +23,7 @@ GENPATH = "./api/v1;./api/v1alpha1;"
 CHART_PATH            		= helm
 CHART_OPERATOR_PATH   		= $(CHART_PATH)/soperator
 CHART_SOPERATORCHECKS_PATH  = $(CHART_PATH)/soperatorchecks
+CHART_NODECONFIGURATOR_PATH = $(CHART_PATH)/nodeconfigurator
 CHART_OPERATOR_CRDS_PATH   	= $(CHART_PATH)/soperator-crds
 CHART_CLUSTER_PATH    		= $(CHART_PATH)/slurm-cluster
 CHART_STORAGE_PATH    		= $(CHART_PATH)/slurm-cluster-storage
@@ -171,11 +172,13 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_STORAGE_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATORCHECKS_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODECONFIGURATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_CRDS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_STORAGE_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATORCHECKS_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODECONFIGURATOR_PATH)/Chart.yaml"
 	@# endregion helm chart versions
 #
 	@# region helm/slurm-cluster/values.yaml
@@ -190,6 +193,12 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.populateJail = \"$(IMAGE_REPO)/populate_jail:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.exporter = \"$(IMAGE_REPO)/exporter:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@# endregion helm/slurm-cluster/values.yaml
+
+	@# region helm/nodeconfigurator/values.yaml
+	@echo 'Syncing helm/nodeconfigurator/values.yaml'
+	@$(YQ) -i ".rebooter.image.repository = \"$(IMAGE_REPO)/rebooter\"" "helm/nodeconfigurator/values.yaml"
+	@$(YQ) -i ".rebooter.image.tag = \"$(OPERATOR_IMAGE_TAG)\"" "helm/nodeconfigurator/values.yaml"
+	@# endregion helm/nodeconfigurator/values.yaml
 
 	@# region helm/slurm-cluster/templates/_registry_helpers.tpl
 	@echo "Syncing $(CHART_CLUSTER_PATH)/templates/_registry_helpers.tpl"
