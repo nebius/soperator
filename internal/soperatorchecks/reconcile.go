@@ -1,4 +1,4 @@
-package checkcontroller
+package soperatorchecks
 
 import (
 	"context"
@@ -29,10 +29,10 @@ import (
 //+kubebuilder:rbac:groups=core,resources=nodes/status,verbs=get;update
 
 var (
-	ControllerName = "checkcontroller"
+	ControllerName = "soperatorchecks"
 )
 
-type CheckControllerReconciler struct {
+type SoperatorChecksReconciler struct {
 	*reconciler.Reconciler
 	reconcileTimeout time.Duration
 
@@ -40,15 +40,15 @@ type CheckControllerReconciler struct {
 	k8sNodesController     *k8sNodesController
 }
 
-func NewCheckControllerReconciler(
+func NewSoperatorChecksReconciler(
 	client client.Client,
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
 	slurmAPIClients map[types.NamespacedName]slurmapi.Client,
 	reconcileTimeout time.Duration,
-) *CheckControllerReconciler {
+) *SoperatorChecksReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
-	return &CheckControllerReconciler{
+	return &SoperatorChecksReconciler{
 		Reconciler:             r,
 		reconcileTimeout:       reconcileTimeout,
 		slurmWorkersController: newSlurmWorkersController(client, slurmAPIClients),
@@ -56,7 +56,7 @@ func NewCheckControllerReconciler(
 	}
 }
 
-func (r *CheckControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *SoperatorChecksReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
 	logger.Info(fmt.Sprintf("Reconciling %s", req.Name))
 
@@ -85,7 +85,7 @@ func getK8SNode(ctx context.Context, c client.Client, nodeName string) (*corev1.
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *CheckControllerReconciler) SetupWithManager(mgr ctrl.Manager,
+func (r *SoperatorChecksReconciler) SetupWithManager(mgr ctrl.Manager,
 	maxConcurrency int, cacheSyncTimeout time.Duration) error {
 	ctx := context.Background()
 

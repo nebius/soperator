@@ -40,9 +40,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/checkcontroller"
 	"nebius.ai/slurm-operator/internal/jwt"
 	"nebius.ai/slurm-operator/internal/slurmapi"
+	"nebius.ai/slurm-operator/internal/soperatorchecks"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -204,14 +204,14 @@ func main() {
 		slurmClusterName: slurmapiClient,
 	}
 
-	if err = checkcontroller.NewCheckControllerReconciler(
+	if err = soperatorchecks.NewSoperatorChecksReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(checkcontroller.ControllerName),
+		mgr.GetEventRecorderFor(soperatorchecks.ControllerName),
 		slurmapiClients,
 		reconcileTimeout,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", checkcontroller.ControllerName)
+		setupLog.Error(err, "unable to create controller", soperatorchecks.ControllerName)
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

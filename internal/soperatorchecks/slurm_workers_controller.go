@@ -1,4 +1,4 @@
-package checkcontroller
+package soperatorchecks
 
 import (
 	"context"
@@ -75,7 +75,7 @@ func (c *slurmWorkersController) findDegradedNodes(ctx context.Context, k8sNodeN
 
 		for _, node := range slurmNodes {
 			if node.InstanceID != k8sNodeName {
-				// Skip, will process during another node reconcilation
+				// Skip, will process during another node reconciliation
 				continue
 			}
 			if _, ok := node.States[slurmapispec.V0041NodeStateDRAIN]; !ok {
