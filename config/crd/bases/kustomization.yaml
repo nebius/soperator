@@ -1,0 +1,3 @@
+resources:
+- slurm.nebius.ai_slurmclusters.yaml
+- slurm.nebius.ai_nodeconfigurators.yaml
