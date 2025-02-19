@@ -22,7 +22,7 @@ GENPATH = "./api/v1;./api/v1alpha1;"
 
 CHART_PATH            		= helm
 CHART_OPERATOR_PATH   		= $(CHART_PATH)/soperator
-CHART_SOPERATORCHECKS_PATH = $(CHART_PATH)/soperatorchecks
+CHART_SOPERATORCHECKS_PATH  = $(CHART_PATH)/soperatorchecks
 CHART_OPERATOR_CRDS_PATH   	= $(CHART_PATH)/soperator-crds
 CHART_CLUSTER_PATH    		= $(CHART_PATH)/slurm-cluster
 CHART_STORAGE_PATH    		= $(CHART_PATH)/slurm-cluster-storage
