@@ -1,4 +1,3 @@
 resources:
 - ../clustercontroller/role.yaml
 - ../node-configurator/role.yaml
-- ../soperatorchecks/role.yaml
