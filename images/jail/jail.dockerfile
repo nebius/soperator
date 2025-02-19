@@ -85,8 +85,6 @@ RUN wget -P /tmp $PACKAGES_REPO_URL/nccl_tests_$CUDA_VERSION/nccl-tests-perf.tar
 FROM cuda AS jail
 
 ARG SLURM_VERSION=24.05.5
-ARG CUDA_VERSION=12.4.1
-ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
 ARG GDRCOPY_VERSION=2.4.4
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -163,10 +161,10 @@ RUN chmod +x /opt/bin/install_openmpi.sh && \
     /opt/bin/install_openmpi.sh && \
     rm /opt/bin/install_openmpi.sh
 
-# TODO: Install only necessary packages
+ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
 # Download and install Slurm packages
-RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libslurm-perl slurm-smd; do \
-        wget -q -P /tmp $PACKAGES_REPO_URL/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
+RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd; do \
+        wget -q -P /tmp $PACKAGES_REPO_URL/slurm-packages-$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
         echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
     done

@@ -31,7 +31,6 @@ RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 FROM $BASE_IMAGE AS exporter
 
 ARG SLURM_VERSION=24.05.5
-ARG CUDA_VERSION=12.4.1
 
 # TODO: Install only those dependencies that are required for running slurm exporter
 # Install dependencies
@@ -75,9 +74,10 @@ RUN apt-get update && \
         libdrm-dev && \
     apt clean
 
+ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
 # Download and install Slurm packages
 RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd; do \
-        wget -q -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
+        wget -q -P /tmp $PACKAGES_REPO_URL/slurm-packages-$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
         echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
     done && \
