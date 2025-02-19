@@ -46,7 +46,10 @@ func (r *JobReconciler) patch(existing, desired client.Object) (client.Patch, er
 	patchImpl := func(dst, src *batchv1.Job) client.Patch {
 		res := client.MergeFrom(dst.DeepCopy())
 
-		dst.Spec.Template.Spec = src.Spec.Template.Spec
+		// Dst.Spec.Template is immutable, so we need to copy the desired template to the existing one
+		// just mutating the fields we need
+		dst.Spec.Parallelism = src.Spec.Parallelism
+		dst.Spec.Completions = src.Spec.Completions
 
 		return res
 	}
