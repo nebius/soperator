@@ -27,6 +27,8 @@ spec:
         command:
         - /usr/bin/soperatorchecks
         env:
+        - name: SLURM_OPERATOR_WATCH_NAMESPACES
+          value: {{ quote .Values.checks.manager.env.slurmOperatorWatchNamespaces }}
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
         image: {{ .Values.checks.manager.image.repository }}:{{ .Values.checks.manager.image.tag
