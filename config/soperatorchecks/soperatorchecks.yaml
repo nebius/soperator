@@ -76,6 +76,9 @@ spec:
         - /usr/bin/soperatorchecks
         args:
         - --leader-elect
+        env:
+        - name: SLURM_OPERATOR_WATCH_NAMESPACES
+          value: "*"
         image: controller:1.18.2
         imagePullPolicy: Always
         name: manager
