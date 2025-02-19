@@ -4464,6 +4464,10 @@ spec:
                 - enabled
                 type: object
             type: object
+            x-kubernetes-validations:
+            - message: Either rebooter or nodeConfigurator must be enabled, but not
+                both simultaneously.
+              rule: self.rebooter.enabled != self.nodeConfigurator.enabled
           status:
             description: NodeConfiguratorStatus defines the observed state of NodeConfigurator.
             properties:
