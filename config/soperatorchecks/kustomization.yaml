@@ -1,0 +1,7 @@
+resources:
+  - soperatorchecks.yaml
+  - ../rbac/soperatorchecks/role.yaml
+images:
+  - name: controller
+    newName: cr.eu-north1.nebius.cloud/soperator/soperatorchecks
+    newTag: 1.18.2
