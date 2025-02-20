@@ -1,12 +1,12 @@
 checks:
   manager:
     args:
-    - --leader-elect
+      - --leader-elect
     containerSecurityContext:
       allowPrivilegeEscalation: false
       capabilities:
         drop:
-        - ALL
+          - ALL
     env:
       slurmOperatorWatchNamespaces: '*'
     image:
