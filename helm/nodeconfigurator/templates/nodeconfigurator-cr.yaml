@@ -1,5 +1,4 @@
-{{- include "checkConflicts" . -}}    
-
+{{- include "checkConflicts" . -}}
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: NodeConfigurator
 metadata:
@@ -88,7 +87,9 @@ spec:
     {{- if .Values.rebooter.priorityClassName }}
     priorityClassName: {{ .Values.rebooter.priorityClassName | quote }}
     {{- end }}
-    {{- if .Values.rebooter.serviceAccountName }}
+    {{- if .Values.rebooter.generateRBAC }}
+    serviceAccountName: {{ include "nodeconfigurator.name" . }}-{{ .Release.Name }}-sa
+    {{- else if .Values.rebooter.serviceAccountName }}
     serviceAccountName: {{ .Values.rebooter.serviceAccountName | quote }}
     {{- end }}
     {{- if .Values.rebooter.logLevel }}
