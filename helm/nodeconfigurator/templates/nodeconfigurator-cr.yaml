@@ -1,0 +1,104 @@
+{{- include "checkConflicts" . -}}
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: NodeConfigurator
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ include "nodeconfigurator.name" . }}-{{ .Release.Name }}
+  {{- with include "nodeconfigurator.labels" . }}
+  labels:
+    {{- . | nindent 4 -}}
+  {{- end }}
+spec:
+  nodeConfigurator:
+    enabled: {{ .Values.nodeConfigurator.enabled | default true }}
+    {{- if gt (len .Values.nodeConfigurator.env) 0 }}
+    env:
+      {{- toYaml .Values.nodeConfigurator.env | nindent 6 }}
+    {{- end }}
+    image:
+      repository: {{ .Values.nodeConfigurator.image.repository | quote }}
+      tag: {{ .Values.nodeConfigurator.image.tag | quote }}
+      pullPolicy: {{ .Values.nodeConfigurator.image.pullPolicy | quote }}
+    {{- if .Values.nodeConfigurator.nodeSelector }}
+    nodeSelector:
+      {{- toYaml .Values.nodeConfigurator.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.nodeConfigurator.resources }}
+    resources:
+      {{- toYaml .Values.nodeConfigurator.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.nodeConfigurator.livenessProbe }}
+    livenessProbe:
+      {{- toYaml .Values.nodeConfigurator.livenessProbe | nindent 6 }}
+    {{- end }}
+    {{- if .Values.nodeConfigurator.readinessProbe }}
+    readinessProbe:
+      {{- toYaml .Values.nodeConfigurator.readinessProbe | nindent 6 }}
+    {{- end }}
+    {{- if .Values.nodeConfigurator.tolerations }}
+    tolerations:
+      {{- toYaml .Values.nodeConfigurator.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.nodeConfigurator.affinity }}
+    affinity:
+      {{- toYaml .Values.nodeConfigurator.affinity | nindent 6 }}
+    {{- end }}
+    {{- if .Values.nodeConfigurator.priorityClassName }}
+    priorityClassName: {{ .Values.nodeConfigurator.priorityClassName | quote }}
+    {{- end }}
+    {{- if .Values.nodeConfigurator.serviceAccountName }}
+    serviceAccountName: {{ .Values.nodeConfigurator.serviceAccountName | quote }}
+    {{- end }}
+  rebooter:
+    enabled: {{ .Values.rebooter.enabled | default true }}
+    evictionMethod: {{ .Values.rebooter.evictionMethod | quote }}
+    {{- if gt (len .Values.rebooter.env) 0 }}
+    env:
+      {{- toYaml .Values.rebooter.env | nindent 6 }}
+    {{- end }}
+    image:
+      repository: {{ .Values.rebooter.image.repository | quote }}
+      tag: {{ .Values.rebooter.image.tag | quote }}
+      pullPolicy: {{ .Values.rebooter.image.pullPolicy | quote }}
+    {{- if .Values.rebooter.nodeSelector }}
+    nodeSelector:
+      {{- toYaml .Values.rebooter.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.rebooter.resources }}
+    resources:
+      {{- toYaml .Values.rebooter.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.rebooter.livenessProbe }}
+    livenessProbe:
+      {{- toYaml .Values.rebooter.livenessProbe | nindent 6 }}
+    {{- end }}
+    {{- if .Values.rebooter.readinessProbe }}
+    readinessProbe:
+      {{- toYaml .Values.rebooter.readinessProbe | nindent 6 }}
+    {{- end }}
+    {{- if .Values.rebooter.tolerations }}
+    tolerations:
+      {{- toYaml .Values.rebooter.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.rebooter.affinity }}
+    affinity:
+      {{- toYaml .Values.rebooter.affinity | nindent 6 }}
+    {{- end }}
+    {{- if .Values.rebooter.priorityClassName }}
+    priorityClassName: {{ .Values.rebooter.priorityClassName | quote }}
+    {{- end }}
+    {{- if .Values.rebooter.generateRBAC }}
+    serviceAccountName: {{ include "nodeconfigurator.name" . }}-{{ .Release.Name }}-sa
+    {{- else if .Values.rebooter.serviceAccountName }}
+    serviceAccountName: {{ .Values.rebooter.serviceAccountName | quote }}
+    {{- end }}
+    {{- if .Values.rebooter.logLevel }}
+    logLevel: {{ .Values.rebooter.logLevel | quote }}
+    {{- end }}
+    {{- if .Values.rebooter.logFormat }}
+    logFormat: {{ .Values.rebooter.logFormat | quote }}
+    {{- end }}
+  {{- if gt (len .Values.initContainers) 0 }}
+  initContainers:
+    {{- toYaml .Values.initContainers | nindent 6 }}
+  {{- end }}

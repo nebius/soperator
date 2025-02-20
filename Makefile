@@ -18,10 +18,12 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 # Limit the scope of generation otherwise it will try to generate configs for non-controller code
-GENPATH = "./api/v1;"
+GENPATH = "./api/v1;./api/v1alpha1;"
 
 CHART_PATH            		= helm
 CHART_OPERATOR_PATH   		= $(CHART_PATH)/soperator
+CHART_SOPERATORCHECKS_PATH  = $(CHART_PATH)/soperatorchecks
+CHART_NODECONFIGURATOR_PATH = $(CHART_PATH)/nodeconfigurator
 CHART_OPERATOR_CRDS_PATH   	= $(CHART_PATH)/soperator-crds
 CHART_CLUSTER_PATH    		= $(CHART_PATH)/slurm-cluster
 CHART_STORAGE_PATH    		= $(CHART_PATH)/slurm-cluster-storage
@@ -79,8 +81,9 @@ help: ## Display this help.
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) crd webhook paths=$(GENPATH) output:crd:artifacts:config=config/crd/bases
-	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./internal/controller/clustercontroller/..." output:artifacts:config=config/rbac/clustercontroller/
-	$(CONTROLLER_GEN) rbac:roleName=node-configurator-role paths="./internal/rebooter/..." output:artifacts:config=config/rbac/node-configurator/
+	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./internal/controller/..." output:artifacts:config=config/rbac/clustercontroller/
+	$(CONTROLLER_GEN) rbac:roleName=nodeconfigurator-role paths="./internal/rebooter/..." output:artifacts:config=config/rbac/nodeconfigurator/
+	$(CONTROLLER_GEN) rbac:roleName=soperator-checks-role paths="./internal/soperatorchecks/..." output:artifacts:config=config/rbac/soperatorchecks/
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object paths=$(GENPATH)
@@ -107,11 +110,19 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 
 .PHONY: helm
 helm: generate manifests ## Update soperator Helm chart
-	$(KUSTOMIZE) build config/crd > $(CHART_OPERATOR_PATH)/crds/slurmcluster-crd.yaml 
-	$(KUSTOMIZE) build config/crd > $(CHART_OPERATOR_CRDS_PATH)/templates/slurmcluster-crd.yaml
+	$(KUSTOMIZE) build config/crd/bases > $(CHART_OPERATOR_PATH)/crds/slurmcluster-crd.yaml 
+	$(KUSTOMIZE) build config/crd/bases > $(CHART_OPERATOR_CRDS_PATH)/templates/slurmcluster-crd.yaml
+# Because of helmify rewrite a file we need to make backup of values.yaml
 	mv $(CHART_OPERATOR_PATH)/values.yaml $(CHART_OPERATOR_PATH)/values.yaml.bak
-	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/rbac/soperator-helm  | $(HELMIFY) $(CHART_OPERATOR_PATH)
+	mv $(CHART_NODECONFIGURATOR_PATH)/values.yaml $(CHART_NODECONFIGURATOR_PATH)/values.yaml.bak
+	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/rbac/clustercontroller  | $(HELMIFY) $(CHART_OPERATOR_PATH)
+	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/rbac/nodeconfigurator  | $(HELMIFY) $(CHART_NODECONFIGURATOR_PATH)
+	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/soperatorchecks  | $(HELMIFY) $(CHART_SOPERATORCHECKS_PATH)
 	mv $(CHART_OPERATOR_PATH)/values.yaml.bak $(CHART_OPERATOR_PATH)/values.yaml
+	mv $(CHART_NODECONFIGURATOR_PATH)/values.yaml.bak $(CHART_NODECONFIGURATOR_PATH)/values.yaml
+# Because of helmify rewrite a file we need to add the missing if statement
+	@$(SED_COMMAND) '1s|^|{{- if and .Values.rebooter.generateRBAC .Values.rebooter.enabled }}\n|' $(CHART_NODECONFIGURATOR_PATH)/templates/nodeconfigurator-rbac.yaml
+	@echo -e "\n{{- end }}" >> $(CHART_NODECONFIGURATOR_PATH)/templates/nodeconfigurator-rbac.yaml
 
 .PHONY: get-version
 get-version:
@@ -151,6 +162,11 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.[0].newTag = \"$(OPERATOR_IMAGE_TAG)\"" "config/manager/kustomization.yaml"
 	@# endregion config/manager/kustomization.yaml
 
+	@echo 'Syncing config/soperatorchecks/kustomization.yaml'
+	@$(YQ) -i ".images.[0].newName = \"$(IMAGE_REPO)/soperatorchecks\"" "config/soperatorchecks/kustomization.yaml"
+	@$(YQ) -i ".images.[0].newTag = \"$(OPERATOR_IMAGE_TAG)\"" "config/soperatorchecks/kustomization.yaml"
+	@# endregion config/soperatorchecks/kustomization.yaml
+
 	@# region config/manager/manager.yaml
 	@echo 'Syncing config/manager/manager.yaml'
 	@$(SED_COMMAND) "s/image: controller:[^ ]*/image: controller:$(OPERATOR_IMAGE_TAG)/" config/manager/manager.yaml
@@ -162,10 +178,14 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_CRDS_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_STORAGE_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATORCHECKS_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODECONFIGURATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_CRDS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_STORAGE_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATORCHECKS_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODECONFIGURATOR_PATH)/Chart.yaml"
 	@# endregion helm chart versions
 #
 	@# region helm/slurm-cluster/values.yaml
@@ -180,6 +200,12 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.populateJail = \"$(IMAGE_REPO)/populate_jail:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.exporter = \"$(IMAGE_REPO)/exporter:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@# endregion helm/slurm-cluster/values.yaml
+
+	@# region helm/nodeconfigurator/values.yaml
+	@echo 'Syncing helm/nodeconfigurator/values.yaml'
+	@$(YQ) -i ".rebooter.image.repository = \"$(IMAGE_REPO)/rebooter\"" "helm/nodeconfigurator/values.yaml"
+	@$(YQ) -i ".rebooter.image.tag = \"$(OPERATOR_IMAGE_TAG)\"" "helm/nodeconfigurator/values.yaml"
+	@# endregion helm/nodeconfigurator/values.yaml
 
 	@# region helm/slurm-cluster/templates/_registry_helpers.tpl
 	@echo "Syncing $(CHART_CLUSTER_PATH)/templates/_registry_helpers.tpl"
@@ -228,9 +254,7 @@ endif
 ifndef DOCKERFILE
 	$(error DOCKERFILE is not set, docker image cannot be built)
 endif
-ifeq (${IMAGE_NAME},slurm-operator)
-	docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} ${DOCKER_BUILD_PLATFORM} -f ${DOCKERFILE} ${DOCKER_OUTPUT} .
-else ifeq ($(IMAGE_NAME),rebooter)
+ifeq ($(filter ${IMAGE_NAME},slurm-operator rebooter soperatorchecks),${IMAGE_NAME})
 	docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} ${DOCKER_BUILD_PLATFORM} -f ${DOCKERFILE} ${DOCKER_OUTPUT} .
 else
 	cd images && docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} ${DOCKER_BUILD_PLATFORM} -f ${DOCKERFILE} ${DOCKER_OUTPUT} .

@@ -82,7 +82,11 @@ pushd "${jaildir}"
         touch "etc/gpu_libs_installed.flag"
     fi
 
+    echo "Starting slurm packages bind-mounting"
+    /opt/bin/slurm/bind_slurm_common.sh -j ${jaildir}
+
     echo "Bind-mount slurm chroot plugin from container to the jail"
+    mkdir -p usr/lib/x86_64-linux-gnu/slurm
     touch usr/lib/x86_64-linux-gnu/slurm/chroot.so
     mount --bind /usr/lib/x86_64-linux-gnu/slurm/chroot.so usr/lib/x86_64-linux-gnu/slurm/chroot.so
 
@@ -115,6 +119,7 @@ pushd "${jaildir}"
     mount --bind /usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
 
     echo "Bind-mount slurm configs"
+    mkdir -p etc/slurm
     for file in /mnt/slurm-configs/*; do
         filename=$(basename "$file")
         touch "etc/slurm/$filename" && mount --bind "$file" "etc/slurm/$filename"
@@ -137,9 +142,15 @@ pushd "${jaildir}"
         done
     fi
 
-    # For $worker node only
+    # For worker node only
     if [ -n "$worker" ]; then
         echo "Update linker cache inside the jail"
         flock --nonblock etc/complement_jail_ldconfig.lock -c "chroot \"${jaildir}\" /usr/sbin/ldconfig" || true
+
+        # slurmd package tree https://gist.github.com/asteny/9eb5089a10a793834d12a5b2449cc2b9
+        echo "Bind-mount slurmd binaries from container to the jail"
+        touch usr/sbin/slurmd usr/sbin/slurmstepd
+        mount --bind /usr/sbin/slurmd usr/sbin/slurmd
+        mount --bind /usr/sbin/slurmstepd usr/sbin/slurmstepd
     fi
 popd

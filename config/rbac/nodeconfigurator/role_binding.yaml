@@ -1,0 +1,19 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: rrolebinding
+    app.kubernetes.io/instance: nodeconfigurator-rolebinding
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: slurm-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: nodeconfigurator-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nodeconfigurator-role
+subjects:
+- kind: ServiceAccount
+  name: nodeconfigurator
+  namespace: system

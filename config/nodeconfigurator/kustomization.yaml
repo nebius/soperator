@@ -1,0 +1,2 @@
+resources:
+- ../crd/bases/slurm.nebius.ai_nodeconfigurators.yaml

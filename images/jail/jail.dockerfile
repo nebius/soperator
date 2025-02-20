@@ -49,6 +49,7 @@ RUN for pkg in cuda-drivers_9999.9999.9999_amd64.deb nvidia-open_9999.9999.9999_
         rm -rf "/tmp/${pkg}"; \
     done
 
+# About CUDA packages https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#meta-packages
 RUN apt update && \
     apt install -y \
         cuda=12.4.1-1 \
@@ -75,8 +76,7 @@ ENV LIBRARY_PATH=/usr/local/cuda/lib64/stubs
 
 # Download NCCL tests executables
 ARG CUDA_VERSION=12.4.1
-ARG SLURM_VERSION=24.05.5
-RUN wget -P /tmp $PACKAGES_REPO_URL/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/nccl-tests-perf.tar.gz && \
+RUN wget -P /tmp $PACKAGES_REPO_URL/nccl_tests_$CUDA_VERSION/nccl-tests-perf.tar.gz && \
     tar -xvzf /tmp/nccl-tests-perf.tar.gz -C /usr/bin && \
     rm -rf /tmp/nccl-tests-perf.tar.gz
 
@@ -87,6 +87,7 @@ FROM cuda AS jail
 ARG SLURM_VERSION=24.05.5
 ARG CUDA_VERSION=12.4.1
 ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
+ARG GDRCOPY_VERSION=2.4.4
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -197,10 +198,12 @@ RUN apt install -y datacenter-gpu-manager-4-cuda12 && \
     apt clean
 
 # Install GDRCopy libraries & executables
-COPY common/scripts/install_gdrcopy.sh /opt/bin/
-RUN chmod +x /opt/bin/install_gdrcopy.sh && \
-    /opt/bin/install_gdrcopy.sh && \
-    rm /opt/bin/install_gdrcopy.sh
+RUN wget -q -P /tmp ${PACKAGES_REPO_URL}/gdrcopy-${GDRCOPY_VERSION}/gdrcopy_${GDRCOPY_VERSION}_amd64.Ubuntu22_04.deb || { echo "Failed to download gdrcopy"; exit 1; } && \
+    wget -q -P /tmp ${PACKAGES_REPO_URL}/gdrcopy-${GDRCOPY_VERSION}/gdrcopy-tests_${GDRCOPY_VERSION}_amd64.Ubuntu22_04+cuda12.4.deb || { echo "Failed to download gdrcopy-tests"; exit 1; } && \
+    wget -q -P /tmp ${PACKAGES_REPO_URL}/gdrcopy-${GDRCOPY_VERSION}/libgdrapi_${GDRCOPY_VERSION}_amd64.Ubuntu22_04.deb || { echo "Failed to download libgdrapi"; exit 1; } && \
+    apt install -y /tmp/*.deb && \
+    rm -rf /tmp/*.deb && \
+    apt clean
 
 # Install AWS CLI
 COPY common/scripts/install_awscli.sh /opt/bin/

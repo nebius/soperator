@@ -26,7 +26,7 @@ type renderOptions struct {
 // GuaranteedPod is a RenderOption that sets the guaranteed flag
 // Needed for setting the limits of the container to the same values as the requests.
 // This is useful for slurm worker cgroupv2 support.
-// It's neccessary for cpuset https://kubernetes.io/docs/tasks/administer-cluster/cpu-management-policies/#static-policy
+// It's necessary for cpuset https://kubernetes.io/docs/tasks/administer-cluster/cpu-management-policies/#static-policy
 func GuaranteedPod(guaranteed bool) RenderOption {
 	return func(opts *renderOptions) {
 		opts.guaranteed = guaranteed
