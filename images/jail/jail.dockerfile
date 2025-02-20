@@ -167,9 +167,8 @@ RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd; 
         wget -q -P /tmp $PACKAGES_REPO_URL/slurm-packages-$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
         echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
-    done
-
-RUN apt install -y /tmp/*.deb && \
+    done && \
+    apt install -y /tmp/*.deb && \
     rm -rf /tmp/*.deb && \
     apt clean
 

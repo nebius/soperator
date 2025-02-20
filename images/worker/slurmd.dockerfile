@@ -38,12 +38,6 @@ RUN apt-get update && \
     apt -y install \
         wget \
         curl \
-        git \
-        build-essential \
-        bc \
-        python3  \
-        autoconf \
-        pkg-config \
         libssl-dev \
         libpam0g-dev \
         libtool \

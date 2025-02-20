@@ -39,11 +39,6 @@ RUN apt-get update && \
         wget \
         git \
         curl \
-        build-essential \
-        bc \
-        python3 \
-        autoconf \
-        pkg-config \
         libssl-dev \
         libpam0g-dev \
         libtool \
@@ -57,7 +52,6 @@ RUN apt-get update && \
         jq \
         squashfs-tools \
         zstd \
-        software-properties-common \
         iputils-ping \
         dnsutils \
         telnet \
@@ -67,7 +61,6 @@ RUN apt-get update && \
         lsof \
         pciutils \
         iproute2 \
-        infiniband-diags \
         kmod \
         daemontools \
         libncurses5-dev \
