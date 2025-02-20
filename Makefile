@@ -82,7 +82,7 @@ help: ## Display this help.
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) crd webhook paths=$(GENPATH) output:crd:artifacts:config=config/crd/bases
 	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./internal/controller/..." output:artifacts:config=config/rbac/clustercontroller/
-	$(CONTROLLER_GEN) rbac:roleName=node-configurator-role paths="./internal/rebooter/..." output:artifacts:config=config/rbac/node-configurator/
+	$(CONTROLLER_GEN) rbac:roleName=nodeconfigurator-role paths="./internal/rebooter/..." output:artifacts:config=config/rbac/nodeconfigurator/
 	$(CONTROLLER_GEN) rbac:roleName=soperator-checks-role paths="./internal/soperatorchecks/..." output:artifacts:config=config/rbac/soperatorchecks/
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -112,10 +112,17 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 helm: generate manifests ## Update soperator Helm chart
 	$(KUSTOMIZE) build config/crd/bases > $(CHART_OPERATOR_PATH)/crds/slurmcluster-crd.yaml 
 	$(KUSTOMIZE) build config/crd/bases > $(CHART_OPERATOR_CRDS_PATH)/templates/slurmcluster-crd.yaml
+# Because of helmify rewrite a file we need to make backup of values.yaml
 	mv $(CHART_OPERATOR_PATH)/values.yaml $(CHART_OPERATOR_PATH)/values.yaml.bak
-	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/rbac/soperator-helm  | $(HELMIFY) $(CHART_OPERATOR_PATH)
+	mv $(CHART_NODECONFIGURATOR_PATH)/values.yaml $(CHART_NODECONFIGURATOR_PATH)/values.yaml.bak
+	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/rbac/clustercontroller  | $(HELMIFY) $(CHART_OPERATOR_PATH)
+	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/rbac/nodeconfigurator  | $(HELMIFY) $(CHART_NODECONFIGURATOR_PATH)
 	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/soperatorchecks  | $(HELMIFY) $(CHART_SOPERATORCHECKS_PATH)
 	mv $(CHART_OPERATOR_PATH)/values.yaml.bak $(CHART_OPERATOR_PATH)/values.yaml
+	mv $(CHART_NODECONFIGURATOR_PATH)/values.yaml.bak $(CHART_NODECONFIGURATOR_PATH)/values.yaml
+# Because of helmify rewrite a file we need to add the missing if statement
+	@$(SED_COMMAND) '1s|^|{{- if and .Values.rebooter.generateRBAC .Values.rebooter.enabled }}\n|' $(CHART_NODECONFIGURATOR_PATH)/templates/nodeconfigurator-rbac.yaml
+	@echo -e "\n{{- end }}" >> $(CHART_NODECONFIGURATOR_PATH)/templates/nodeconfigurator-rbac.yaml
 
 .PHONY: get-version
 get-version:

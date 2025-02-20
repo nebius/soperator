@@ -15,6 +15,7 @@ nodeConfigurator:
   serviceAccountName: ""
 rebooter:
   enabled: true
+  generateRBAC: true
   evictionMethod: "evict"
   logLevel: "info"
   logFormat: "json"
