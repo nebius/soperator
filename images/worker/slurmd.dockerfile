@@ -28,7 +28,6 @@ ARG BASE_IMAGE=ubuntu:jammy
 FROM $BASE_IMAGE AS worker_slurmd
 
 ARG SLURM_VERSION=24.05.5
-ARG CUDA_VERSION=12.4.1
 ARG OPENMPI_VERSION=4.1.7a1
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -39,12 +38,6 @@ RUN apt-get update && \
     apt -y install \
         wget \
         curl \
-        git \
-        build-essential \
-        bc \
-        python3  \
-        autoconf \
-        pkg-config \
         libssl-dev \
         libpam0g-dev \
         libtool \
@@ -91,9 +84,10 @@ RUN chmod +x /opt/bin/install_openmpi.sh && \
 ENV LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib
 ENV PATH=$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
+ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
 # Download and install Slurm packages
 RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd slurm-smd-slurmd; do \
-        wget -q -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
+        wget -q -P /tmp $PACKAGES_REPO_URL/slurm-packages-$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
         echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
     done && \
