@@ -26,6 +26,7 @@ import (
 
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;delete;update
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
+//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list
 //+kubebuilder:rbac:groups=core,resources=nodes/status,verbs=get;update
 
 var (
