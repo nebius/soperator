@@ -19,7 +19,10 @@ rules:
   - nodes/status
   verbs:
   - get
+  - list
+  - patch
   - update
+  - watch
 - apiGroups:
   - ""
   resources:
