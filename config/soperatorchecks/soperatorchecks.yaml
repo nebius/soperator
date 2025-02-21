@@ -79,6 +79,8 @@ spec:
         env:
         - name: SLURM_OPERATOR_WATCH_NAMESPACES
           value: "*"
+        - name: SLURM_API_SERVER
+          value: "http://soperator-rest-svc.soperator:6820"
         image: controller
         imagePullPolicy: Always
         name: manager
