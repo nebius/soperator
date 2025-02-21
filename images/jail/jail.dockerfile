@@ -1,4 +1,4 @@
-FROM ubuntu:22.04 AS cuda
+FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy AS cuda
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
