@@ -9,6 +9,7 @@ rules:
   - ""
   resources:
   - nodes
+  - secrets
   verbs:
   - get
   - list
@@ -31,10 +32,3 @@ rules:
   - list
   - update
   - watch
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - get
-  - list
