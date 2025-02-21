@@ -33,7 +33,7 @@ require (
 
 require (
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
-	github.com/containers/common v0.59.0 // indirect
+	github.com/containers/common v0.60.4 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
