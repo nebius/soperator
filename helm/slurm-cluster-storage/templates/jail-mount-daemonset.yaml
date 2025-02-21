@@ -20,9 +20,9 @@ spec:
       containers:
         - name: {{ cat "mount-jail" (include "slurm-cluster-storage.volume.jail.type" .) | kebabcase }}
 {{- if eq (include "slurm-cluster-storage.volume.jail.type" .) "filestore" }}
-          image: busybox
+          image: cr.eu-north1.nebius.cloud/soperator/busybox
 {{- else }}
-          image: ubuntu:focal
+          image: cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
 {{- end }}
           command:
             - /bin/sh

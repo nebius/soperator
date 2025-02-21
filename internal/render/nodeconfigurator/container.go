@@ -132,7 +132,7 @@ func createResourceRequirements(limitsMemory, requestsCPU, requestsMemory resour
 func renderContainerNodeSysctl() corev1.Container {
 	return corev1.Container{
 		Name:            consts.ContainerNameNodeSysctl,
-		Image:           "busybox:latest",
+		Image:           "cr.eu-north1.nebius.cloud/soperator/busybox",
 		SecurityContext: createSecurityContext(true, 0, 0, false, true, nil),
 		Resources: createResourceRequirements(
 			resource.MustParse("8Mi"),

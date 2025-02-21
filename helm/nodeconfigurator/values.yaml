@@ -2,7 +2,7 @@ nodeConfigurator:
   enabled: false
   env: []
   image:
-    repository: busybox
+    repository: cr.eu-north1.nebius.cloud/soperator/busybox
     tag: "latest"
     pullPolicy: IfNotPresent
   nodeSelector: {}

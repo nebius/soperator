@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: mount-controller-spool-filestore
-          image: busybox
+          image: cr.eu-north1.nebius.cloud/soperator/busybox
           command:
             - /bin/sh
             - -c

@@ -64,8 +64,8 @@ func buildSlurmWorkerFrom(
 		NCCLSettings: *ncclSettings.DeepCopy(),
 		ContainerToolkitValidation: Container{
 			NodeContainer: slurmv1.NodeContainer{
-				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v23.9.1",
-				ImagePullPolicy: worker.Slurmd.ImagePullPolicy, // for now the same as Slurmd
+				Image:           "cr.eu-north1.nebius.cloud/soperator/gpu-operator-validator:v23.9.1", // Mirrored nvcr.io/nvidia/cloud-native/gpu-operator-validator:v23.9.1
+				ImagePullPolicy: worker.Slurmd.ImagePullPolicy,                                        // for now the same as Slurmd
 			},
 			Name: consts.ContainerNameToolkitValidation,
 		},
