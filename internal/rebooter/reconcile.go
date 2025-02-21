@@ -421,6 +421,11 @@ func (r *RebooterReconciler) AreAllPodsEvicted(ctx context.Context, nodeName str
 		if HasTolerationForNoExecute(pod) {
 			continue
 		}
+
+		if HasTolerationForExists(pod) {
+			continue
+		}
+
 		return &PodNotEvictableError{PodName: pod.Name}
 	}
 
@@ -445,6 +450,17 @@ func IsControlledByDaemonSet(pod corev1.Pod) bool {
 func HasTolerationForNoExecute(pod corev1.Pod) bool {
 	for _, toleration := range pod.Spec.Tolerations {
 		if toleration.Effect == corev1.TaintEffectNoExecute {
+			return true
+		}
+	}
+	return false
+}
+
+// HasTolerationForExists checks if the pod has a toleration with operator Exists.
+// Pods with such a toleration can tolerate any taint with the same key.
+func HasTolerationForExists(pod corev1.Pod) bool {
+	for _, toleration := range pod.Spec.Tolerations {
+		if toleration.Operator == corev1.TolerationOpExists {
 			return true
 		}
 	}

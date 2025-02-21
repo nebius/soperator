@@ -347,3 +347,72 @@ func TestIsNodeTaintedWithNoExecute(t *testing.T) {
 		})
 	}
 }
+
+func TestHasTolerationForExists(t *testing.T) {
+	tests := []struct {
+		name     string
+		pod      corev1.Pod
+		expected bool
+	}{
+		{
+			name: "Pod with Exists toleration",
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Tolerations: []corev1.Toleration{
+						{
+							Operator: corev1.TolerationOpExists,
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Pod without Exists toleration",
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Tolerations: []corev1.Toleration{
+						{
+							Operator: corev1.TolerationOpEqual,
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Pod with multiple tolerations including Exists",
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Tolerations: []corev1.Toleration{
+						{
+							Operator: corev1.TolerationOpEqual,
+						},
+						{
+							Operator: corev1.TolerationOpExists,
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Pod with no tolerations",
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Tolerations: []corev1.Toleration{},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := HasTolerationForExists(tt.pod)
+			if result != tt.expected {
+				t.Errorf("HasTolerationForExists() = %v, expected %v", result, tt.expected)
+			}
+		})
+	}
+}
