@@ -215,16 +215,28 @@ func (c *slurmWorkersController) processMaintenance(
 		undrainFn = func() error { return nil }
 	}
 
-	var maintenanceCondition corev1.NodeCondition
+	var (
+		maintenanceCondition corev1.NodeCondition
+		drainCondition       corev1.NodeCondition
+	)
 	for _, cond := range k8sNode.Status.Conditions {
 		if cond.Type == consts.K8SNodeMaintenanceScheduled {
 			maintenanceCondition = cond
-			break
+			continue
+		}
+		if cond.Type == consts.SlurmNodeDrain {
+			drainCondition = cond
+			continue
 		}
 	}
 
 	if maintenanceCondition == (corev1.NodeCondition{}) || maintenanceCondition.Status == corev1.ConditionFalse {
 		return undrainFn()
+	}
+
+	if drainCondition.LastTransitionTime.Time.After(maintenanceCondition.LastTransitionTime.Time) {
+		// Drain is already processed here.
+		return nil
 	}
 
 	return drainFn()
