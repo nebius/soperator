@@ -72,11 +72,19 @@ func (c *k8sNodesController) processDrainCondition(ctx context.Context, k8sNode 
 		))
 	}
 	if drainCondition.Status != corev1.ConditionTrue ||
-		drainCondition.Reason != string(consts.ReasonNodeDrained) ||
-		maintenanceCondition.Status != corev1.ConditionTrue {
+		drainCondition.Reason != string(consts.ReasonNodeDrained) {
 		// No action needed
 		logger.Info("no action needed")
 		return nil
+	}
+	if maintenanceCondition.Status != corev1.ConditionTrue {
+		logger.Info("setting SlurmNodeDrain: false")
+		return setK8SNodeCondition(ctx, c.Client, k8sNode.Name, newNodeCondition(
+			consts.SlurmNodeDrain,
+			corev1.ConditionFalse,
+			consts.ReasonNodeRebooted,
+			consts.MessageNodeIsRebooted,
+		))
 	}
 
 	logger.V(1).Info("deleting k8s node")
