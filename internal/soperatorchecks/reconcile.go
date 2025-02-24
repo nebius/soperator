@@ -118,7 +118,8 @@ func (r *SoperatorChecksReconciler) SetupWithManager(mgr ctrl.Manager,
 
 					for _, condition := range conditions {
 						switch condition.Type {
-						case consts.SlurmNodeDrain, consts.SlurmNodeReboot, consts.K8SNodeMaintenanceScheduled, consts.K8SNodeDegraded:
+						case consts.SlurmNodeDrain, consts.SlurmNodeReboot, consts.K8SNodeMaintenanceScheduled,
+							consts.SoperatorChecksK8SNodeDegraded, consts.SoperatorChecksK8SNodeMaintenance:
 							condition := condition
 							condMap[condition.Type] = condition
 						}

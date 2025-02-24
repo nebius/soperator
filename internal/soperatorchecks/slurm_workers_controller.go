@@ -136,10 +136,10 @@ func (c *slurmWorkersController) processKillTaskFailed(
 			slurmNode.InstanceID,
 			consts.SlurmNodeReasonDegraded,
 			newNodeCondition(
-				consts.SlurmNodeReboot,
+				consts.SoperatorChecksK8SNodeDegraded,
 				corev1.ConditionTrue,
 				consts.ReasonNodeNeedReboot,
-				"",
+				consts.MessageSlurmNodeDegraded,
 			),
 		); err != nil {
 			return fmt.Errorf("drain slurm nodes: %w", err)
@@ -150,7 +150,7 @@ func (c *slurmWorkersController) processKillTaskFailed(
 
 	var degradedCondition corev1.NodeCondition
 	for _, cond := range k8sNode.Status.Conditions {
-		if cond.Type == consts.K8SNodeDegraded {
+		if cond.Type == consts.SoperatorChecksK8SNodeDegraded {
 			degradedCondition = cond
 			break
 		}
@@ -179,10 +179,10 @@ func (c *slurmWorkersController) processK8SNodeMaintenance(ctx context.Context, 
 			k8sNode.Name,
 			consts.SlurmNodeReasonMaintenanceScheduled,
 			newNodeCondition(
-				consts.SlurmNodeDrain,
+				consts.SoperatorChecksK8SNodeMaintenance,
 				corev1.ConditionTrue,
 				consts.ReasonNodeDraining,
-				"",
+				consts.MessageMaintenanceScheduled,
 			),
 		)
 	}
@@ -217,26 +217,16 @@ func (c *slurmWorkersController) processMaintenance(
 
 	var (
 		maintenanceCondition corev1.NodeCondition
-		drainCondition       corev1.NodeCondition
 	)
 	for _, cond := range k8sNode.Status.Conditions {
 		if cond.Type == consts.K8SNodeMaintenanceScheduled {
 			maintenanceCondition = cond
 			continue
 		}
-		if cond.Type == consts.SlurmNodeDrain {
-			drainCondition = cond
-			continue
-		}
 	}
 
 	if maintenanceCondition == (corev1.NodeCondition{}) || maintenanceCondition.Status == corev1.ConditionFalse {
 		return undrainFn()
-	}
-
-	if drainCondition.LastTransitionTime.Time.After(maintenanceCondition.LastTransitionTime.Time) {
-		// Drain is already processed here.
-		return nil
 	}
 
 	return drainFn()

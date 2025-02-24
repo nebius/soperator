@@ -52,15 +52,14 @@ func (c *k8sNodesController) processDrainCondition(ctx context.Context, k8sNode 
 		if cond.Type == consts.SlurmNodeDrain {
 			drainCondition = cond
 		}
-		if cond.Type == consts.K8SNodeMaintenanceScheduled {
+		if cond.Type == consts.SoperatorChecksK8SNodeMaintenance {
 			maintenanceCondition = cond
 		}
 	}
 
 	logger = logger.WithValues("maintenanceCondition", maintenanceCondition, "drainCondition", drainCondition)
-	if drainCondition == (corev1.NodeCondition{}) {
+	if drainCondition == (corev1.NodeCondition{}) || drainCondition.Status == corev1.ConditionFalse {
 		if maintenanceCondition == (corev1.NodeCondition{}) || maintenanceCondition.Status == corev1.ConditionFalse {
-			// No action needed
 			logger.Info("no action needed: no maintenance condition")
 			return nil
 		}
@@ -72,10 +71,8 @@ func (c *k8sNodesController) processDrainCondition(ctx context.Context, k8sNode 
 			consts.MessageMaintenanceScheduled,
 		))
 	}
-	if drainCondition.Status != corev1.ConditionTrue ||
-		drainCondition.Reason != string(consts.ReasonNodeDrained) {
-		// No action needed
-		logger.Info("no action needed: not drained")
+	if drainCondition.Reason != string(consts.ReasonNodeDrained) {
+		logger.Info("no action needed: still draining")
 		return nil
 	}
 	if maintenanceCondition.Status != corev1.ConditionTrue {
@@ -104,14 +101,13 @@ func (c *k8sNodesController) processRebootCondition(ctx context.Context, k8sNode
 		if cond.Type == consts.SlurmNodeReboot {
 			rebootCondition = cond
 		}
-		if cond.Type == consts.K8SNodeDegraded {
+		if cond.Type == consts.SoperatorChecksK8SNodeDegraded {
 			degradedCondition = cond
 		}
 	}
-	if rebootCondition == (corev1.NodeCondition{}) {
+	if rebootCondition == (corev1.NodeCondition{}) || rebootCondition.Status == corev1.ConditionFalse {
 		if degradedCondition == (corev1.NodeCondition{}) || degradedCondition.Status == corev1.ConditionFalse {
-			// No action needed
-			logger.Info("no action needed")
+			logger.Info("no action needed: no reboot reason")
 			return nil
 		}
 		logger.Info("setting SlurmNodeReboot: true")
@@ -122,10 +118,8 @@ func (c *k8sNodesController) processRebootCondition(ctx context.Context, k8sNode
 			consts.MessageSlurmNodeDegraded,
 		))
 	}
-	if rebootCondition.Status != corev1.ConditionTrue ||
-		rebootCondition.Reason != string(consts.ReasonNodeRebooted) {
-		// No action needed
-		logger.Info("no action needed")
+	if rebootCondition.Reason != string(consts.ReasonNodeRebooted) {
+		logger.Info("no action needed: still rebooting")
 		return nil
 	}
 
@@ -144,7 +138,7 @@ func (c *k8sNodesController) processRebootCondition(ctx context.Context, k8sNode
 			consts.MessageNodeIsRebooted,
 		),
 		newNodeCondition(
-			consts.K8SNodeDegraded,
+			consts.SoperatorChecksK8SNodeDegraded,
 			corev1.ConditionFalse,
 			consts.ReasonNodeRebooted,
 			consts.MessageNodeIsRebooted,
