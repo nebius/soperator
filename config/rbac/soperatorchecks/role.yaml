@@ -8,8 +8,8 @@ rules:
   - ""
   resources:
   - nodes
-  - secrets
   verbs:
+  - delete
   - get
   - list
   - update
@@ -31,6 +31,15 @@ rules:
   verbs:
   - create
   - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
   - get
   - list
   - update
