@@ -39,6 +39,9 @@ type SoperatorChecksReconciler struct {
 
 	slurmWorkersController *slurmWorkersController
 	k8sNodesController     *k8sNodesController
+
+	// TODO: make configurable
+	maxUnavailableNodes int
 }
 
 func NewSoperatorChecksReconciler(
@@ -54,12 +57,23 @@ func NewSoperatorChecksReconciler(
 		reconcileTimeout:       reconcileTimeout,
 		slurmWorkersController: newSlurmWorkersController(client, slurmAPIClients),
 		k8sNodesController:     newK8SNodesController(client),
+		maxUnavailableNodes:    1,
 	}
 }
 
 func (r *SoperatorChecksReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
 	logger.Info(fmt.Sprintf("Reconciling %s", req.Name))
+
+	shouldReconcile, err := r.shouldReconcile(ctx, req)
+	if err != nil {
+		logger.V(1).Error(err, "Check shouldReconcile produced an error")
+		return ctrl.Result{RequeueAfter: r.reconcileTimeout}, err
+	}
+	if !shouldReconcile {
+		logger.Info("Maximum unavailable nodes is reached, skipping reconcilation")
+		return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
+	}
 
 	logger.Info("Running slurm workers controller")
 	if err := r.slurmWorkersController.reconcile(ctx, req); err != nil {
@@ -74,15 +88,6 @@ func (r *SoperatorChecksReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
-}
-
-func getK8SNode(ctx context.Context, c client.Client, nodeName string) (*corev1.Node, error) {
-	node := &corev1.Node{}
-	err := c.Get(ctx, client.ObjectKey{Name: nodeName}, node)
-	if err != nil {
-		return nil, fmt.Errorf("error getting node: %w", err)
-	}
-	return node, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -139,6 +144,45 @@ func (r *SoperatorChecksReconciler) SetupWithManager(mgr ctrl.Manager,
 		})).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
 		Complete(r)
+}
+
+func (r *SoperatorChecksReconciler) shouldReconcile(ctx context.Context, req ctrl.Request) (bool, error) {
+	var (
+		// pagination for big clusters
+		limit     int64 = 64
+		nextToken       = ""
+
+		unavailableNodesCount = 0
+	)
+
+	for {
+		nodes, err := listK8SNodes(ctx, r.Client, limit, nextToken)
+		if err != nil {
+			return false, fmt.Errorf("list k8s nodes: %w", err)
+		}
+
+		for _, node := range nodes.Items {
+			for _, cond := range node.Status.Conditions {
+				if (cond.Type == consts.SlurmNodeDrain || cond.Type == consts.SlurmNodeReboot) &&
+					cond.Status == corev1.ConditionTrue {
+
+					if node.Name == req.Name {
+						// Finish node reconcilation in any case
+						return true, nil
+					}
+
+					unavailableNodesCount++
+					break
+				}
+			}
+		}
+
+		if nodes.ListMeta.Continue == "" {
+			break
+		}
+	}
+
+	return unavailableNodesCount < r.maxUnavailableNodes, nil
 }
 
 func setK8SNodeCondition(
@@ -222,4 +266,23 @@ func newNodeCondition(
 			Time: time.Now(),
 		},
 	}
+}
+
+func getK8SNode(ctx context.Context, c client.Client, nodeName string) (*corev1.Node, error) {
+	node := &corev1.Node{}
+	if err := c.Get(ctx, client.ObjectKey{Name: nodeName}, node); err != nil {
+		return nil, fmt.Errorf("get node: %w", err)
+	}
+	return node, nil
+}
+
+func listK8SNodes(ctx context.Context, c client.Client, limit int64, nextToken string) (corev1.NodeList, error) {
+	nodes := &corev1.NodeList{}
+	if err := c.List(ctx, nodes, &client.ListOptions{
+		Limit:    limit,
+		Continue: nextToken,
+	}); err != nil {
+		return corev1.NodeList{}, fmt.Errorf("list nodes: %w", err)
+	}
+	return *nodes, nil
 }
