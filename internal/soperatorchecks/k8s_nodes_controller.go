@@ -57,10 +57,11 @@ func (c *k8sNodesController) processDrainCondition(ctx context.Context, k8sNode 
 		}
 	}
 
+	logger = logger.WithValues("maintenanceCondition", maintenanceCondition, "drainCondition", drainCondition)
 	if drainCondition == (corev1.NodeCondition{}) {
 		if maintenanceCondition == (corev1.NodeCondition{}) || maintenanceCondition.Status == corev1.ConditionFalse {
 			// No action needed
-			logger.Info("no action needed")
+			logger.Info("no action needed: no maintenance condition")
 			return nil
 		}
 		logger.Info("setting SlurmNodeDrain: true")
@@ -74,7 +75,7 @@ func (c *k8sNodesController) processDrainCondition(ctx context.Context, k8sNode 
 	if drainCondition.Status != corev1.ConditionTrue ||
 		drainCondition.Reason != string(consts.ReasonNodeDrained) {
 		// No action needed
-		logger.Info("no action needed")
+		logger.Info("no action needed: not drained")
 		return nil
 	}
 	if maintenanceCondition.Status != corev1.ConditionTrue {
