@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"os"
@@ -24,11 +25,13 @@ import (
 
 	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -197,21 +200,39 @@ func main() {
 	jwtToken := jwt.NewToken(mgr.GetClient()).For(slurmClusterName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
 	slurmapiClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
 	if err != nil {
-		setupLog.Error(err, "unable to create slurm api client")
 		os.Exit(1)
 	}
 	slurmapiClients := map[types.NamespacedName]slurmapi.Client{
 		slurmClusterName: slurmapiClient,
 	}
 
-	if err = soperatorchecks.NewSoperatorChecksReconciler(
+	ctx := context.Background()
+
+	// Index pods by node name. This is used to list and evict pods from a specific node.
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
+		pod := rawObj.(*corev1.Pod)
+		return []string{pod.Spec.NodeName}
+	}); err != nil {
+		setupLog.Error(err, "unable to setup index field")
+		os.Exit(1)
+	}
+
+	if err = soperatorchecks.NewSlurmNodesController(
 		mgr.GetClient(),
 		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(soperatorchecks.ControllerName),
+		mgr.GetEventRecorderFor(soperatorchecks.SlurmNodesControllerName),
 		slurmapiClients,
 		reconcileTimeout,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", soperatorchecks.ControllerName)
+		setupLog.Error(err, "unable to create controller", soperatorchecks.SlurmNodesControllerName)
+		os.Exit(1)
+	}
+	if err = soperatorchecks.NewK8SNodesController(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		mgr.GetEventRecorderFor(soperatorchecks.K8SNodesControllerName),
+	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+		setupLog.Error(err, "unable to create controller", soperatorchecks.K8SNodesControllerName)
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

@@ -45,3 +45,11 @@ rules:
   - list
   - update
   - watch
+- apiGroups:
+  - slurm.nebius.ai
+  resources:
+  - slurmclusters
+  verbs:
+  - get
+  - list
+  - watch
