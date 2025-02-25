@@ -1,4 +1,4 @@
-module nebius.ai/slurm-operator/gpubench
+module nebius.ai/slurm-operator/image/worker/gpubench
 
 go 1.23.0
 
