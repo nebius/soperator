@@ -29,6 +29,8 @@ spec:
         env:
         - name: SLURM_OPERATOR_WATCH_NAMESPACES
           value: {{ quote .Values.checks.manager.env.slurmOperatorWatchNamespaces }}
+        - name: SLURM_API_SERVER
+          value: {{ quote .Values.checks.manager.env.slurmApiServer }}
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
         image: {{ .Values.checks.manager.image.repository }}:{{ .Values.checks.manager.image.tag

@@ -15,7 +15,7 @@ import (
 	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
 )
 
-func Test_slurmWorkersController_findDegradedNodes(t *testing.T) {
+func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 	tests := []struct {
 		name             string
 		k8sNodeName      string
@@ -81,31 +81,6 @@ func Test_slurmWorkersController_findDegradedNodes(t *testing.T) {
 			wantErr:      true,
 		},
 		{
-			name:        "happy-path/skip/different-k8s-node",
-			k8sNodeName: "k8s-node-1",
-			slurmClusterName: types.NamespacedName{
-				Namespace: "namespace",
-				Name:      "name",
-			},
-			listNodesOut: []slurmapi.Node{
-				{
-					Name:        "node",
-					ClusterName: "slurm-cluster",
-					InstanceID:  "k8s-node-2",
-					States: map[slurmapispec.V0041NodeState]struct{}{
-						slurmapispec.V0041NodeStateDRAIN: {},
-					},
-					Reason: ptr.To(slurmapi.NodeReason{
-						Reason:    consts.SlurmNodeReasonKillTaskFailed,
-						ChangedAt: time.Date(2024, time.March, 1, 1, 1, 1, 1, time.UTC),
-					}),
-				},
-			},
-			listNodesErr: nil,
-			want:         map[types.NamespacedName][]slurmapi.Node{},
-			wantErr:      false,
-		},
-		{
 			name:        "happy-path/skip/not-drained",
 			k8sNodeName: "k8s-node",
 			slurmClusterName: types.NamespacedName{
@@ -160,12 +135,12 @@ func Test_slurmWorkersController_findDegradedNodes(t *testing.T) {
 			apiClient := slurmapifake.NewMockClient(t)
 			apiClient.On("ListNodes", ctx).Return(tt.listNodesOut, tt.listNodesErr)
 
-			c := &slurmWorkersController{
+			c := &SlurmNodesController{
 				slurmAPIClients: map[types.NamespacedName]slurmapi.Client{
 					tt.slurmClusterName: apiClient,
 				},
 			}
-			got, err := c.findDegradedNodes(ctx, tt.k8sNodeName)
+			got, err := c.findDegradedNodes(ctx)
 			require.Equal(t, tt.wantErr, err != nil)
 			if !tt.wantErr {
 				require.EqualValues(t, tt.want, got)

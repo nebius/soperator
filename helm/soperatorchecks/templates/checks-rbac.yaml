@@ -10,8 +10,10 @@ rules:
   resources:
   - nodes
   verbs:
+  - delete
   - get
   - list
+  - update
   - watch
 - apiGroups:
   - ""
@@ -19,7 +21,10 @@ rules:
   - nodes/status
   verbs:
   - get
+  - list
+  - patch
   - update
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -30,4 +35,21 @@ rules:
   - get
   - list
   - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - slurm.nebius.ai
+  resources:
+  - slurmclusters
+  verbs:
+  - get
+  - list
   - watch

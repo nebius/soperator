@@ -6,7 +6,10 @@ const (
 	SlurmNodeDrain  corev1.NodeConditionType = "SlurmNodeDrain"
 	SlurmNodeReboot corev1.NodeConditionType = "SlurmNodeReboot"
 
-	K8SNodeDegraded             corev1.NodeConditionType = "NodeDegraded"
+	// SoperatorChecks related conditions to distinguish what happened to the k8s node.
+	SoperatorChecksK8SNodeDegraded    corev1.NodeConditionType = "SoperatorChecksNodeDegraded"
+	SoperatorChecksK8SNodeMaintenance corev1.NodeConditionType = "SoperatorChecksNodeMaintenance"
+	// External condition to react in soperator checks.
 	K8SNodeMaintenanceScheduled corev1.NodeConditionType = "MaintenanceScheduled"
 )
 

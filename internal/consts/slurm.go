@@ -14,13 +14,13 @@ const (
 )
 
 const (
-	SlurmNodeReasonKillTaskFailed       string = "Kill task failed"
-	SlurmNodeReasonMaintenanceScheduled string = "Maintenance scheduled"
-	SlurmNodeReasonDegraded             string = "Compute node is degraded"
+	SlurmNodeReasonKillTaskFailed  string = "Kill task failed"
+	SlurmNodeReasonNodeReplacement string = "Soperator auto-healing: node replacement process"
+	SlurmNodeReasonNodeReboot      string = "Soperator auto-healing: node reboot process"
 )
 
 var SlurmNodeReasonsMap = map[string]struct{}{
-	SlurmNodeReasonKillTaskFailed:       {},
-	SlurmNodeReasonMaintenanceScheduled: {},
-	SlurmNodeReasonDegraded:             {},
+	SlurmNodeReasonKillTaskFailed:  {},
+	SlurmNodeReasonNodeReplacement: {},
+	SlurmNodeReasonNodeReboot:      {},
 }
