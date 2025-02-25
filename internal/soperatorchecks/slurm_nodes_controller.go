@@ -108,6 +108,8 @@ func (c *SlurmNodesController) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
+	// Set RequeueAfter so SlurmNodesController can perform periodical checks against
+	// slurm nodes to find degraded nodes and k8s nodes to find maintenance.
 	return ctrl.Result{RequeueAfter: c.reconcileTimeout}, nil
 }
 
@@ -161,9 +163,9 @@ func (c *SlurmNodesController) processDegradedNode(
 	}
 
 	switch node.Reason.Reason {
-	case consts.SlurmNodeReasonKillTaskFailed, consts.SlurmNodeReasonDegraded:
+	case consts.SlurmNodeReasonKillTaskFailed, consts.SlurmNodeReasonNodeReboot:
 		return c.processKillTaskFailed(ctx, k8sNode, slurmClusterName, node)
-	case consts.SlurmNodeReasonMaintenanceScheduled:
+	case consts.SlurmNodeReasonNodeReplacement:
 		return c.processSlurmNodeMaintenance(ctx, k8sNode, slurmClusterName, node.Name)
 	default:
 		return fmt.Errorf("unknown node reason: node name %s, reason %s, instance id %s",
@@ -182,7 +184,7 @@ func (c *SlurmNodesController) processKillTaskFailed(
 		if err := c.drainSlurmNodesWithConditionUpdate(
 			ctx,
 			slurmNode.InstanceID,
-			consts.SlurmNodeReasonDegraded,
+			consts.SlurmNodeReasonNodeReboot,
 			newNodeCondition(
 				consts.SoperatorChecksK8SNodeDegraded,
 				corev1.ConditionTrue,
@@ -221,13 +223,10 @@ func (c *SlurmNodesController) processKillTaskFailed(
 }
 
 func (c *SlurmNodesController) processK8SNodesMaintenance(ctx context.Context) error {
-	var (
-		limit     int64 = 64
-		nextToken       = ""
-	)
+	nextToken := ""
 
 	for {
-		listK8SNodesResp, err := listK8SNodes(ctx, c.Client, limit, nextToken)
+		listK8SNodesResp, err := listK8SNodes(ctx, c.Client, consts.DefaultLimit, nextToken)
 		if err != nil {
 			return fmt.Errorf("list k8s nodes: %w", err)
 		}
@@ -237,7 +236,7 @@ func (c *SlurmNodesController) processK8SNodesMaintenance(ctx context.Context) e
 				return c.drainSlurmNodesWithConditionUpdate(
 					ctx,
 					k8sNode.Name,
-					consts.SlurmNodeReasonMaintenanceScheduled,
+					consts.SlurmNodeReasonNodeReplacement,
 					newNodeCondition(
 						consts.SoperatorChecksK8SNodeMaintenance,
 						corev1.ConditionTrue,
