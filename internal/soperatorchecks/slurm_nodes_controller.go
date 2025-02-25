@@ -348,7 +348,7 @@ func (c *SlurmNodesController) drainSlurmNodes(
 
 	var errs []error
 	for _, pod := range podList.Items {
-		if strings.Contains(pod.Name, "worker-") {
+		if _, err := fmt.Sscanf("worker-%d", pod.Name); err == nil {
 			slurmClusterName := types.NamespacedName{
 				Namespace: pod.Namespace,
 				Name:      pod.Labels[consts.LabelInstanceKey],
@@ -412,7 +412,7 @@ func (c *SlurmNodesController) slurmNodesFullyDrained(
 	}
 
 	for _, pod := range podList.Items {
-		if strings.Contains(pod.Name, "worker-") {
+		if _, err := fmt.Sscanf("worker-%d", pod.Name); err == nil {
 			logger = logger.WithValues("slurmNode", pod.Name, "instanceKey", pod.Labels[consts.LabelInstanceKey])
 			logger.Info("found slurm node")
 
