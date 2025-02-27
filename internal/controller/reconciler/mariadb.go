@@ -95,19 +95,14 @@ func (r *MariaDbReconciler) patch(existing, desired client.Object) (client.Patch
 		dst.Spec.Image = src.Spec.Image
 		dst.Spec.Replicas = src.Spec.Replicas
 		dst.Spec.Port = src.Spec.Port
-		dst.Spec.Database = src.Spec.Database
-		dst.Spec.Username = src.Spec.Username
 		dst.Spec.PasswordSecretKeyRef = src.Spec.PasswordSecretKeyRef
 		dst.Spec.RootEmptyPassword = src.Spec.RootEmptyPassword
 		dst.Spec.Service = src.Spec.Service
-		dst.Spec.Affinity = src.Spec.Affinity
 		dst.Spec.Tolerations = src.Spec.Tolerations
 		dst.Spec.NodeSelector = src.Spec.NodeSelector
 		dst.Spec.Resources = src.Spec.Resources
 		dst.Spec.SecurityContext = src.Spec.SecurityContext
 		dst.Spec.PodSecurityContext = src.Spec.PodSecurityContext
-		dst.Spec.Storage.Ephemeral = src.Spec.Storage.Ephemeral
-		dst.Spec.Storage.StorageClassName = src.Spec.Storage.StorageClassName
 		dst.Spec.Storage.VolumeClaimTemplate = src.Spec.Storage.VolumeClaimTemplate
 		dst.Spec.Storage.Size = src.Spec.Storage.Size
 
