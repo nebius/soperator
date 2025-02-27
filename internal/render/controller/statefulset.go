@@ -90,7 +90,7 @@ func RenderStatefulSet(
 						common.RenderContainerMunge(&controller.ContainerMunge),
 					},
 					Containers: []corev1.Container{
-						renderContainerSlurmctld(&controller.ContainerSlurmctld),
+						renderContainerSlurmctld(&controller.ContainerSlurmctld, controller.CustomVolumeMounts),
 					},
 					Volumes: volumes,
 				},

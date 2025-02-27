@@ -670,6 +670,11 @@ type SlurmNodeControllerVolumes struct {
 	//
 	// +kubebuilder:validation:Required
 	Jail NodeVolume `json:"jail"`
+
+	// CustomMounts represents the custom mount configurations
+	//
+	// +kubebuilder:validation:Optional
+	CustomMounts []NodeVolumeMount `json:"customMounts,omitempty"`
 }
 
 // SlurmNodeWorker defines the configuration for the Slurm worker node
@@ -741,7 +746,12 @@ type SlurmNodeWorkerVolumes struct {
 	// JailSubMounts represents the sub-mount configurations within the jail volume
 	//
 	// +kubebuilder:validation:Required
-	JailSubMounts []NodeVolumeJailSubMount `json:"jailSubMounts"`
+	JailSubMounts []NodeVolumeMount `json:"jailSubMounts"`
+
+	// CustomMounts represents the custom mount configurations
+	//
+	// +kubebuilder:validation:Optional
+	CustomMounts []NodeVolumeMount `json:"customMounts,omitempty"`
 
 	// Size of the shared memory for NCCL
 	//
@@ -811,7 +821,12 @@ type SlurmNodeLoginVolumes struct {
 	// JailSubMounts represents the sub-mount configurations within the jail volume
 	//
 	// +kubebuilder:validation:Required
-	JailSubMounts []NodeVolumeJailSubMount `json:"jailSubMounts"`
+	JailSubMounts []NodeVolumeMount `json:"jailSubMounts"`
+
+	// CustomMounts represents the custom mount configurations
+	//
+	// +kubebuilder:validation:Optional
+	CustomMounts []NodeVolumeMount `json:"customMounts,omitempty"`
 }
 
 // SlurmExporter defines the configuration for the Slurm exporter
@@ -925,14 +940,14 @@ type NodeVolume struct {
 	VolumeClaimTemplateSpec *corev1.PersistentVolumeClaimSpec `json:"volumeClaimTemplateSpec,omitempty"`
 }
 
-// NodeVolumeJailSubMount defines the configuration for a sub-mount within a jail volume
-type NodeVolumeJailSubMount struct {
-	// Name defines the name of the sub-mount
+// NodeVolumeMount defines the configuration for a mount
+type NodeVolumeMount struct {
+	// Name defines the name of the mount
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// MountPath defines the path where the sub-mount is mounted
+	// MountPath defines the path where the mount is mounted
 	//
 	// +kubebuilder:validation:Required
 	MountPath string `json:"mountPath"`
@@ -951,7 +966,7 @@ type NodeVolumeJailSubMount struct {
 	// +kubebuilder:default=false
 	ReadOnly bool `json:"readOnly"`
 
-	// VolumeSourceName defines the name of the volume source for the sub-mount.
+	// VolumeSourceName defines the name of the volume source for the mount.
 	// Must correspond to the name of one of [VolumeSource]
 	//
 	// +kubebuilder:validation:Optional

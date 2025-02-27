@@ -84,7 +84,7 @@ func RenderStatefulSet(
 						common.RenderContainerMunge(&login.ContainerMunge),
 					},
 					Containers: []corev1.Container{
-						renderContainerSshd(clusterType, &login.ContainerSshd, login.JailSubMounts),
+						renderContainerSshd(clusterType, &login.ContainerSshd, login.JailSubMounts, login.CustomVolumeMounts),
 					},
 					Volumes: volumes,
 					DNSConfig: &corev1.PodDNSConfig{

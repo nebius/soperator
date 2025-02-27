@@ -22,7 +22,7 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeRESTJWTKey(clusterName),
 	}
 
-	// Spool and Jail could be specified by template spec or by volume source name
+	// Spool, Jail and CustomVolumes could be specified by template spec or by volume source name
 	{
 		if v, s, err := common.AddVolumeOrSpec(
 			controller.VolumeSpool.VolumeSourceName,
@@ -54,6 +54,22 @@ func renderVolumesAndClaimTemplateSpecs(
 		} else {
 			volumes = append(volumes, v...)
 			pvcTemplateSpecs = append(pvcTemplateSpecs, s...)
+		}
+
+		for _, customMount := range controller.CustomVolumeMounts {
+			if v, s, err := common.AddVolumeOrSpec(
+				customMount.VolumeSourceName,
+				func(sourceName string) corev1.Volume {
+					return common.RenderVolumeFromSource(volumeSources, *customMount.VolumeSourceName, customMount.Name)
+				},
+				customMount.VolumeClaimTemplateSpec,
+				customMount.Name,
+			); err != nil {
+				return nil, nil, err
+			} else {
+				volumes = append(volumes, v...)
+				pvcTemplateSpecs = append(pvcTemplateSpecs, s...)
+			}
 		}
 	}
 

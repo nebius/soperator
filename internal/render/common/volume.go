@@ -192,26 +192,26 @@ func RenderVolumeMountMungeKey() corev1.VolumeMount {
 
 // endregion Munge
 
-// region JailSubMounts
+// region VolumeMount
 
-func RenderVolumeMountsForJailSubMounts(subMounts []slurmv1.NodeVolumeJailSubMount) []corev1.VolumeMount {
+func RenderVolumeMounts(mounts []slurmv1.NodeVolumeMount, subMountPath string) []corev1.VolumeMount {
 	var res []corev1.VolumeMount
-	for _, subMount := range subMounts {
-		res = append(res, RenderVolumeMountJailSubMount(subMount))
+	for _, mount := range mounts {
+		res = append(res, RenderVolumeMount(mount, subMountPath))
 	}
 	return res
 }
 
-func RenderVolumeMountJailSubMount(subMount slurmv1.NodeVolumeJailSubMount) corev1.VolumeMount {
+func RenderVolumeMount(mount slurmv1.NodeVolumeMount, subMountPath string) corev1.VolumeMount {
 	return corev1.VolumeMount{
-		Name:      subMount.Name,
-		MountPath: path.Join(consts.VolumeMountPathJailUpper, subMount.MountPath),
-		SubPath:   subMount.SubPath,
-		ReadOnly:  subMount.ReadOnly,
+		Name:      mount.Name,
+		MountPath: path.Join(subMountPath, mount.MountPath),
+		SubPath:   mount.SubPath,
+		ReadOnly:  mount.ReadOnly,
 	}
 }
 
-// endregion JailSubMounts
+// endregion VolumeMount
 
 // region SecurityLimits
 
