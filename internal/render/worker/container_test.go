@@ -68,6 +68,7 @@ func Test_RenderContainerSlurmd(t *testing.T) {
 			got, err := renderContainerSlurmd(
 				tt.container,
 				nil,
+				nil,
 				"test-cluster",
 				consts.ClusterTypeGPU,
 				"v1",

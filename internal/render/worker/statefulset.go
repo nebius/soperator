@@ -54,6 +54,7 @@ func RenderStatefulSet(
 	slurmdContainer, err := renderContainerSlurmd(
 		&worker.ContainerSlurmd,
 		worker.JailSubMounts,
+		worker.CustomVolumeMounts,
 		clusterName,
 		clusterType,
 		worker.CgroupVersion,

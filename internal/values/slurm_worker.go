@@ -34,7 +34,8 @@ type SlurmWorker struct {
 
 	VolumeSpool               slurmv1.NodeVolume
 	VolumeJail                slurmv1.NodeVolume
-	JailSubMounts             []slurmv1.NodeVolumeJailSubMount
+	JailSubMounts             []slurmv1.NodeVolumeMount
+	CustomVolumeMounts        []slurmv1.NodeVolumeMount
 	SharedMemorySize          *resource.Quantity
 	UseDefaultAppArmorProfile bool
 	Maintenance               *consts.MaintenanceMode
@@ -99,6 +100,10 @@ func buildSlurmWorkerFrom(
 	for _, jailSubMount := range worker.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()
 		res.JailSubMounts = append(res.JailSubMounts, subMount)
+	}
+	for _, customVolumeMount := range worker.Volumes.CustomMounts {
+		customMount := *customVolumeMount.DeepCopy()
+		res.CustomVolumeMounts = append(res.CustomVolumeMounts, customMount)
 	}
 
 	return res

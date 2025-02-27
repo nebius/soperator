@@ -49,7 +49,7 @@ func renderContainerToolkitValidation(container *values.Container) corev1.Contai
 // renderContainerSlurmd renders [corev1.Container] for slurmd
 func renderContainerSlurmd(
 	container *values.Container,
-	jailSubMounts []slurmv1.NodeVolumeJailSubMount,
+	jailSubMounts, customMounts []slurmv1.NodeVolumeMount,
 	clusterName string,
 	clusterType consts.ClusterType,
 	cgroupVersion string,
@@ -74,7 +74,8 @@ func renderContainerSlurmd(
 		renderVolumeMountSysctl(),
 		renderVolumeMountSupervisordConfigMap(),
 	}
-	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
+	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(jailSubMounts, consts.VolumeMountPathJailUpper)...)
+	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(customMounts, "")...)
 
 	resources := corev1.ResourceRequirements{
 		Limits:   container.Resources,

@@ -59,5 +59,22 @@ func renderVolumesAndClaimTemplateSpecs(
 		}
 	}
 
+	// Custom mounts
+	for _, customMount := range login.CustomVolumeMounts {
+		if v, s, err := common.AddVolumeOrSpec(
+			customMount.VolumeSourceName,
+			func(sourceName string) corev1.Volume {
+				return common.RenderVolumeFromSource(volumeSources, *customMount.VolumeSourceName, customMount.Name)
+			},
+			customMount.VolumeClaimTemplateSpec,
+			customMount.Name,
+		); err != nil {
+			return nil, nil, err
+		} else {
+			volumes = append(volumes, v...)
+			pvcTemplateSpecs = append(pvcTemplateSpecs, s...)
+		}
+	}
+
 	return volumes, pvcTemplateSpecs, nil
 }

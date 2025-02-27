@@ -16,13 +16,14 @@ type SlurmController struct {
 	Service     Service
 	StatefulSet StatefulSet
 
-	VolumeSpool slurmv1.NodeVolume
-	VolumeJail  slurmv1.NodeVolume
-	Maintenance *consts.MaintenanceMode
+	VolumeSpool        slurmv1.NodeVolume
+	VolumeJail         slurmv1.NodeVolume
+	CustomVolumeMounts []slurmv1.NodeVolumeMount
+	Maintenance        *consts.MaintenanceMode
 }
 
 func buildSlurmControllerFrom(clusterName string, maintenance *consts.MaintenanceMode, controller *slurmv1.SlurmNodeController) SlurmController {
-	return SlurmController{
+	res := SlurmController{
 		SlurmNode: *controller.SlurmNode.DeepCopy(),
 		ContainerSlurmctld: buildContainerFrom(
 			controller.Slurmctld,
@@ -37,8 +38,16 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 			naming.BuildStatefulSetName(consts.ComponentTypeController, clusterName),
 			controller.SlurmNode.Size,
 		),
-		VolumeSpool: *controller.Volumes.Spool.DeepCopy(),
-		VolumeJail:  *controller.Volumes.Jail.DeepCopy(),
-		Maintenance: maintenance,
+		VolumeSpool:        *controller.Volumes.Spool.DeepCopy(),
+		VolumeJail:         *controller.Volumes.Jail.DeepCopy(),
+		CustomVolumeMounts: controller.Volumes.CustomMounts,
+		Maintenance:        maintenance,
 	}
+
+	for _, customVolumeMount := range controller.Volumes.CustomMounts {
+		customMount := *customVolumeMount.DeepCopy()
+		res.CustomVolumeMounts = append(res.CustomVolumeMounts, customMount)
+	}
+
+	return res
 }
