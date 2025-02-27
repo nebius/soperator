@@ -6,16 +6,18 @@ echo "Bind-mount REST JWT key from K8S secret"
 touch /var/spool/slurmdbd/jwt_hs256.key
 mount --bind /mnt/rest-jwt-key/rest_jwt.key /var/spool/slurmdbd/jwt_hs256.key
 
-echo "Bind-mount slurm configs from K8S config map"
-for file in /mnt/slurm-configs/*; do
-    filename=$(basename "$file")
-    touch "/etc/slurm/$filename" && mount --bind "$file" "/etc/slurm/$filename"
-done
+echo "Make overlayfs for slurm configs and secrets to coexist"
+mkdir -p /var/run/slurm-configs-overlay
+mkdir -p /etc/slurm
+mount -t overlay -o lowerdir=/mnt/slurm-configs:/var/run/slurm-configs-overlay overlay /etc/slurm
 
-echo "Bind-mount slurm configs with secrets from K8S secrets"
+# You can't just overlay two k8s config-ish mounts because they both contain `..data` symlink
+# which will interfere in overlay scenario. So overlay on top still requires manual per-file symlinks.
+# It is dirty, but it's the best we can do now to allow proper slurm-configs ConfigMap update handling.
+echo "Symlink slurm configs with secrets from K8S secrets"
 for file in /mnt/slurm-secrets/*; do
     filename=$(basename "$file")
-    touch "/etc/slurm/$filename" && mount --bind "$file" "/etc/slurm/$filename"
+    rm -rf "/var/run/slurm-configs-overlay/$filename" && ln -s "$file" "/var/run/slurm-configs-overlay/$filename"
 done
 
 echo "Set permissions for shared /var/spool/slurmdbd"
