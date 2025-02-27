@@ -166,7 +166,9 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 	if topologyPlugin != "" {
 		res.AddComment("TOPOLOGY")
 		res.AddProperty("TopologyPlugin", topologyPlugin)
-		res.AddProperty("TopologyParam", cluster.SlurmConfig.TopologyParam)
+		if cluster.SlurmConfig.TopologyParam != "" {
+			res.AddProperty("TopologyParam", cluster.SlurmConfig.TopologyParam)
+		}
 	}
 	return res
 }
