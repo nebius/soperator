@@ -31,7 +31,6 @@ func renderContainerAccounting(container values.Container) corev1.Container {
 			common.RenderVolumeMountSlurmConfigs(),
 			common.RenderVolumeMountMungeSocket(),
 			common.RenderVolumeMountRESTJWTKey(),
-			RenderVolumeMountSlurmdbdConfigs(),
 			RenderVolumeMountSlurmdbdSpool(),
 		},
 		ReadinessProbe: &corev1.Probe{

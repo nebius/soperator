@@ -77,7 +77,23 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					desired, err := common.RenderConfigMapSlurmConfigs(clusterValues)
+					topologyConfig := corev1.ConfigMap{}
+					if clusterValues.SlurmTopologyConfigMapRefName != "" {
+						stepLogger = stepLogger.WithValues("topologyConfigMapRefName", clusterValues.SlurmTopologyConfigMapRefName)
+						if getErr := r.Get(
+							stepCtx,
+							types.NamespacedName{
+								Namespace: clusterValues.Namespace,
+								Name:      clusterValues.SlurmTopologyConfigMapRefName,
+							},
+							&topologyConfig,
+						); getErr != nil {
+							stepLogger.Error(getErr, "Failed to get topology config")
+							return errors.Wrap(getErr, "failed to get topology config")
+						}
+					}
+
+					desired, err := common.RenderConfigMapSlurmConfigs(clusterValues, topologyConfig)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
 						return errors.Wrap(err, "rendering ConfigMap with Slurm configs")

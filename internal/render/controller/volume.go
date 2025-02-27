@@ -13,9 +13,13 @@ func renderVolumesAndClaimTemplateSpecs(
 	clusterName string,
 	volumeSources []slurmv1.VolumeSource,
 	controller *values.SlurmController,
+	slurmTopologyConfigMapRefName string,
 ) (volumes []corev1.Volume, pvcTemplateSpecs []values.PVCTemplateSpec, err error) {
 	volumes = []corev1.Volume{
-		common.RenderVolumeSlurmConfigs(clusterName),
+		common.RenderVolumeProjectedSlurmConfigs(
+			clusterName,
+			common.RenderVolumeProjectionSlurmTopologyConfig(slurmTopologyConfigMapRefName),
+		),
 		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeMungeSocket(),
 		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeController),

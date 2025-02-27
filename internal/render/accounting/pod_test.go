@@ -9,7 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"nebius.ai/slurm-operator/internal/consts"
-	accounting "nebius.ai/slurm-operator/internal/render/accounting"
+	"nebius.ai/slurm-operator/internal/render/accounting"
 )
 
 func Test_BasePodTemplateSpec(t *testing.T) {
@@ -59,7 +59,7 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 	}
 
 	result, err := accounting.BasePodTemplateSpec(
-		defaultNameCluster, acc, defaultNodeFilter, defaultVolumeSources, matchLabels,
+		defaultNameCluster, acc, defaultNodeFilter, defaultVolumeSources, matchLabels, slurmTopologyConfigMapRefName,
 	)
 	assert.NoError(t, err)
 

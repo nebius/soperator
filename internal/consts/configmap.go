@@ -1,8 +1,7 @@
 package consts
 
 const (
-	slurmConfigs   = slurmPrefix + "configs"
-	slurmdbdSecret = "slurm-secrets"
+	slurmConfigs = slurmPrefix + "configs"
 )
 
 const (
@@ -20,6 +19,7 @@ const (
 	ConfigMapKeyGresConfig     = "gres.conf"
 	ConfigMapKeyMPIConfig      = "mpi.conf"
 	ConfigMapKeySlurmdbdConfig = "slurmdbd.conf"
+	ConfigMapKeyTopologyConfig = "topology.conf"
 
 	ConfigMapKeySshdConfig              = SshdName + "_config"
 	ConfigMapKeySshRootPublicKeysConfig = authorizedKeys

@@ -20,7 +20,7 @@ import (
 // [consts.ConfigMapKeyCGroupConfig] - cgroup config
 // [consts.ConfigMapKeySpankConfig] - SPANK plugins config
 // [consts.ConfigMapKeyGresConfig] - gres config
-func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) (corev1.ConfigMap, error) {
+func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig corev1.ConfigMap) (corev1.ConfigMap, error) {
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapSlurmConfigsName(cluster.Name),
@@ -28,7 +28,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) (corev1.ConfigMap
 			Labels:    RenderLabels(consts.ComponentTypeController, cluster.Name),
 		},
 		Data: map[string]string{
-			consts.ConfigMapKeySlurmConfig:  generateSlurmConfig(cluster).Render(),
+			consts.ConfigMapKeySlurmConfig:  generateSlurmConfig(cluster, topologyConfig).Render(),
 			consts.ConfigMapKeyCGroupConfig: generateCGroupConfig(cluster).Render(),
 			consts.ConfigMapKeySpankConfig:  generateSpankConfig().Render(),
 			consts.ConfigMapKeyGresConfig:   generateGresConfig(cluster.ClusterType).Render(),
@@ -37,7 +37,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) (corev1.ConfigMap
 	}, nil
 }
 
-func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
+func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.ConfigMap) renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
 
 	res.AddProperty("ClusterName", cluster.Name)
@@ -155,6 +155,14 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 			res.AddProperty("AuthAltParameters", "jwt_key="+consts.RESTJWTKeyPath)
 		}
 	}
+
+	if cluster.SlurmConfig.TopologyPlugin == "" && topologyConfig.Data != nil {
+		if _, ok := topologyConfig.Data[consts.ConfigMapKeyTopologyConfig]; ok {
+			res.AddComment("AUTO TOPOLOGY, triggered by slurmTopologyConfigMapRefName")
+			res.AddProperty("TopologyPlugin", "topology/tree")
+		}
+	}
+
 	return res
 }
 
