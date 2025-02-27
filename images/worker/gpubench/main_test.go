@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -112,4 +115,44 @@ type MockClientset struct {
 // Ensure CoreV1 returns a CoreV1Interface
 func (m *MockClientset) CoreV1() corev1.CoreV1Interface {
 	return &MockCoreV1{}
+}
+
+// Check if the process is running on GPU
+func TestIsRunningProcessOnGPU(t *testing.T) {
+	tests := []struct {
+		name         string
+		mockOutput   string
+		expectResult bool
+		expectError  bool
+	}{
+		{
+			name:         "No processes running",
+			mockOutput:   "",
+			expectResult: false,
+			expectError:  false,
+		},
+		{
+			name:         "Processes running",
+			mockOutput:   "1652624019822, all_reduce_perf\n1652524111113, all_reduce_perf",
+			expectResult: true,
+			expectError:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := exec.Command("echo", tt.mockOutput)
+			var stdout bytes.Buffer
+			cmd.Stdout = &stdout
+			err := cmd.Run()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			result := strings.TrimSpace(stdout.String()) != ""
+			if result != tt.expectResult {
+				t.Errorf("expected %v, got %v", tt.expectResult, result)
+			}
+		})
+	}
 }

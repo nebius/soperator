@@ -96,10 +96,21 @@ func init() {
 }
 
 func main() {
-	_ = fs.Parse(os.Args[1:])
+	fs.Parse(os.Args[1:])
 	log.Info(fmt.Sprintf("Starting %s", nameNCCL))
 	if *debugLog {
 		debugFlags()
+	}
+
+	log.Debug("Checking running processes on GPU")
+	running, err := isRunningProcessOnGPU()
+	if err != nil {
+		log.WithField("error", err).Fatal("Failed to check running processes on GPU")
+	}
+
+	if running != "" {
+		log.Infof("Running processes on GPU: %s", running)
+		os.Exit(0)
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -114,7 +125,8 @@ func main() {
 		}
 		defer func() {
 			if err := shutdownMeterProvider(ctx); err != nil {
-				log.Fatalf("failed to shutdown MeterProvider: %s", err)
+				log.Errorf("Failed to shutdown meter provider: %v", err)
+				os.Exit(1)
 			}
 		}()
 	}
@@ -218,6 +230,23 @@ func debugFlags() {
 	log.Debugf("exporter_endpoint: %s", *exporterEndpoint)
 	log.Debugf("debug: %v", *debugLog)
 	log.Debugf("log_format: %s", *logFormat)
+}
+
+func isRunningProcessOnGPU() (string, error) {
+	cmd := exec.Command(
+		"chroot",
+		"/run/nvidia/driver",
+		"nvidia-smi",
+		"--query-compute-apps=gpu_serial,process_name",
+		"--format=csv,noheader",
+	)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to execute nvidia-smi: %w", err)
+	}
+	outputStr := strings.TrimSpace(string(output))
+	return outputStr, nil
 }
 
 type KubernetesClient interface {
