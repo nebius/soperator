@@ -6,19 +6,8 @@ echo "Bind-mount REST JWT key from K8S secret"
 touch /var/spool/slurmdbd/jwt_hs256.key
 mount --bind /mnt/rest-jwt-key/rest_jwt.key /var/spool/slurmdbd/jwt_hs256.key
 
-echo "Make overlayfs for slurm configs and secrets to coexist"
-mkdir -p /var/run/slurm-configs-overlay
-mkdir -p /etc/slurm
-mount -t overlay -o lowerdir=/mnt/slurm-configs:/var/run/slurm-configs-overlay overlay /etc/slurm
-
-# You can't just overlay two k8s config-ish mounts because they both contain `..data` symlink
-# which will interfere in overlay scenario. So overlay on top still requires manual per-file symlinks.
-# It is dirty, but it's the best we can do now to allow proper slurm-configs ConfigMap update handling.
-echo "Symlink slurm configs with secrets from K8S secrets"
-for file in /mnt/slurm-secrets/*; do
-    filename=$(basename "$file")
-    rm -rf "/var/run/slurm-configs-overlay/$filename" && ln -s "$file" "/var/run/slurm-configs-overlay/$filename"
-done
+echo "Symlink slurm configs from K8S config map"
+rm -rf /etc/slurm && ln -s /mnt/slurm-configs /etc/slurm
 
 echo "Set permissions for shared /var/spool/slurmdbd"
 chmod 755 /var/spool/slurmdbd # It changes permissions of this shared directory in other containers as well
