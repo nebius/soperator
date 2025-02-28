@@ -87,8 +87,15 @@ func RenderVolumeMountSlurmConfigs() corev1.VolumeMount {
 
 // RenderVolumeProjectedSlurmConfigs renders [corev1.Volume] containing Slurm common configs + topology config file
 func RenderVolumeProjectedSlurmConfigs(clusterName string, slurmTopologyConfigMapRefName string) corev1.Volume {
-	sources := make([]corev1.VolumeProjection, 0, 2)
-
+	sources := []corev1.VolumeProjection{
+		{
+			ConfigMap: &corev1.ConfigMapProjection{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: naming.BuildConfigMapSlurmConfigsName(clusterName),
+				},
+			},
+		},
+	}
 	if slurmTopologyConfigMapRefName != "" {
 		sources = append(sources, corev1.VolumeProjection{
 			ConfigMap: &corev1.ConfigMapProjection{
@@ -98,13 +105,6 @@ func RenderVolumeProjectedSlurmConfigs(clusterName string, slurmTopologyConfigMa
 			},
 		})
 	}
-	sources = append(sources, corev1.VolumeProjection{
-		ConfigMap: &corev1.ConfigMapProjection{
-			LocalObjectReference: corev1.LocalObjectReference{
-				Name: naming.BuildConfigMapSlurmConfigsName(clusterName),
-			},
-		},
-	})
 	return corev1.Volume{
 		Name: consts.VolumeNameSlurmConfigs,
 		VolumeSource: corev1.VolumeSource{
