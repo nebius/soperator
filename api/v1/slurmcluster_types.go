@@ -87,6 +87,12 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", epilog: "", prolog: "", taskPluginParam: "", maxJobCount: 10000, minJobAge: 86400}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 
+	// SlurmConfigRaw represents the raw Slurm configuration from slurm.conf.
+	// All options are provided as a raw string.
+	// Soperator does not guarantee the validity of the raw configuration.
+	//
+	// +kubebuilder:validation:Optional
+	SlurmConfigRaw *SlurmConfigRaw `json:"slurmConfigRaw,omitempty"`
 	// MPIConfig represents the PMIx configuration in mpi.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
@@ -154,6 +160,24 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=30
 	MessageTimeout *int32 `json:"messageTimeout,omitempty"`
+}
+
+// SlurmConfigRaw represents the raw Slurm configuration from slurm.conf.
+// All options are provided as a raw string.
+// Soperator does not guarantee the validity of the raw configuration.
+type SlurmConfigRaw struct {
+	// Strategy defines how the raw configuration should be applied to SlurmConfig.
+	// - "patch": Merges the raw configuration with existing SlurmConfig values (default).
+	// - "override": Applies only the raw configuration, ignoring values provided in SlurmConf.
+	//
+	// +kubebuilder:validation:Enum=patch;override
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=patch
+	Strategy string `json:"strategy"`
+	// RawContent contains the raw Slurm configuration.
+	//
+	// +kubebuilder:validation:Required
+	RawContent string `json:"rawContent"`
 }
 
 type MPIConfig struct {

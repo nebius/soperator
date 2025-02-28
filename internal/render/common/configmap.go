@@ -155,6 +155,26 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 			res.AddProperty("AuthAltParameters", "jwt_key="+consts.RESTJWTKeyPath)
 		}
 	}
+
+	// apply raw config
+	if cluster.SlurmConfigRaw != nil {
+		switch cluster.SlurmConfigRaw.Strategy {
+		case consts.SlurmConfigRawStrategyOverride:
+			multilineCfg := &renderutils.MultilineStringConfig{}
+			multilineCfg.AddLine(cluster.SlurmConfigRaw.RawContent)
+			return multilineCfg
+		case consts.SlurmConfigRawStrategyPatch:
+			fallthrough
+		default:
+			res.AddComment("")
+			res.AddComment("RAW CONFIG")
+
+			multilineCfg := &renderutils.MultilineStringConfig{}
+			multilineCfg.AddLine(res.Render())
+			multilineCfg.AddLine(cluster.SlurmConfigRaw.RawContent)
+			return multilineCfg
+		}
+	}
 	return res
 }
 

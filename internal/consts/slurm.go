@@ -24,3 +24,8 @@ var SlurmNodeReasonsMap = map[string]struct{}{
 	SlurmNodeReasonNodeReplacement: {},
 	SlurmNodeReasonNodeReboot:      {},
 }
+
+const (
+	SlurmConfigRawStrategyPatch    = "patch"
+	SlurmConfigRawStrategyOverride = "override"
+)

@@ -35,6 +35,7 @@ type SlurmCluster struct {
 	Telemetry      *slurmv1.Telemetry
 	SlurmExporter  SlurmExporter
 	SlurmConfig    slurmv1.SlurmConfig
+	SlurmConfigRaw *slurmv1.SlurmConfigRaw
 	MPIConfig      slurmv1.MPIConfig
 }
 
@@ -71,11 +72,12 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 			&cluster.Spec.NCCLSettings,
 			cluster.Spec.UseDefaultAppArmorProfile,
 		),
-		NodeLogin:     buildSlurmLoginFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
-		Telemetry:     cluster.Spec.Telemetry,
-		SlurmExporter: buildSlurmExporterFrom(cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Exporter),
-		SlurmConfig:   cluster.Spec.SlurmConfig,
-		MPIConfig:     cluster.Spec.MPIConfig,
+		NodeLogin:      buildSlurmLoginFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
+		Telemetry:      cluster.Spec.Telemetry,
+		SlurmExporter:  buildSlurmExporterFrom(cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Exporter),
+		SlurmConfig:    cluster.Spec.SlurmConfig,
+		SlurmConfigRaw: cluster.Spec.SlurmConfigRaw,
+		MPIConfig:      cluster.Spec.MPIConfig,
 	}
 
 	if err := res.Validate(ctx); err != nil {
