@@ -736,7 +736,6 @@ func (r *SlurmClusterReconciler) findObjectsForConfigMap(
 		supervisordConfigMapField,
 		sshdLoginConfigMapField,
 		sshdWorkerConfigMapField,
-		slurmTopologyConfigMapField,
 	}
 
 	var requests []reconcile.Request
