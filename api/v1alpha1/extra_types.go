@@ -98,3 +98,22 @@ const (
 	UpdateStatusFailed    UpdateStatus = "failed"
 	UpdateStatusSucceeded UpdateStatus = "succeeded"
 )
+
+// ContainerSecuritySpec defines the security configuration for a container
+type ContainerSecuritySpec struct {
+	// SecurityLimitsConfig defines the multiline content of "limits.conf".
+	// A line should have the following format:
+	//	* <soft|hard> <item> <value>
+	//
+	// Example:
+	//	* soft nofile 1024
+	//
+	// +kubebuilder:validation:Optional
+	LimitsConfig string `json:"limitsConfig,omitempty"`
+
+	// AppArmorProfile defines the AppArmor profile for the container
+	//
+	// +kubebuilder:default="unconfined"
+	// +kubebuilder:validation:Optional
+	AppArmorProfile string `json:"appArmorProfile,omitempty"`
+}
