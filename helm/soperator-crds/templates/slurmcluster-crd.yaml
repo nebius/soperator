@@ -2522,15 +2522,23 @@ spec:
                     description: Image defines the node-configurator container image
                     properties:
                       pullPolicy:
-                        description: PullPolicy describes how to pull container image
+                        default: IfNotPresent
+                        description: PullPolicy defines the image pull policy
+                        enum:
+                        - Always
+                        - Never
+                        - IfNotPresent
                         type: string
                       repository:
-                        description: Repository contains name of container image +
-                          it's repository if needed
+                        description: |-
+                          Repository defines the full name (with repository) of container image.
+                          Only the image name could be provided if needed.
                         type: string
                       tag:
-                        description: Tag contains desired container image version
+                        description: Tag defines the image tag
                         type: string
+                    required:
+                    - repository
                     type: object
                   livenessProbe:
                     description: LivenessProbe defines the livenessProbe for the node-configurator
@@ -4021,15 +4029,23 @@ spec:
                     description: Image defines the node-configurator container image
                     properties:
                       pullPolicy:
-                        description: PullPolicy describes how to pull container image
+                        default: IfNotPresent
+                        description: PullPolicy defines the image pull policy
+                        enum:
+                        - Always
+                        - Never
+                        - IfNotPresent
                         type: string
                       repository:
-                        description: Repository contains name of container image +
-                          it's repository if needed
+                        description: |-
+                          Repository defines the full name (with repository) of container image.
+                          Only the image name could be provided if needed.
                         type: string
                       tag:
-                        description: Tag contains desired container image version
+                        description: Tag defines the image tag
                         type: string
+                    required:
+                    - repository
                     type: object
                   livenessProbe:
                     description: LivenessProbe defines the livenessProbe for the node-configurator

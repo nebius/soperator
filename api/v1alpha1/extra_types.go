@@ -5,13 +5,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Image defines container image and it's pull policy
+// Image defines the container image and its pull policy
 type Image struct {
-	// Repository contains name of container image + it's repository if needed
-	Repository string `json:"repository,omitempty"`
-	// Tag contains desired container image version
+	// Repository defines the full name (with repository) of container image.
+	// Only the image name could be provided if needed.
+	//
+	// +kubebuilder:validation:Required
+	Repository string `json:"repository"`
+
+	// Tag defines the image tag
+	//
+	// +kubebuilder:validation:Optional
 	Tag string `json:"tag,omitempty"`
-	// PullPolicy describes how to pull container image
+
+	// PullPolicy defines the image pull policy
+	//
+	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="IfNotPresent"
 	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
 }
 
