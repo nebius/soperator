@@ -970,6 +970,10 @@ spec:
                 description: GPU defines the settings related to GPU support for Slurm
                   workers
                 properties:
+                  enabled:
+                    description: Enabled indicates whether GPU support is enabled
+                      for the NodeSet.
+                    type: boolean
                   nvidia:
                     description: Nvidia contains settings specific to Nvidia GPUs.
                     properties:
@@ -978,10 +982,6 @@ spec:
                           be enabled for Nvidia GPUs
                         type: boolean
                     type: object
-                  supported:
-                    description: Supported indicates whether GPU support is enabled
-                      for the NodeSet.
-                    type: boolean
                 type: object
               munge:
                 description: Slurmd defines the Slurm munge configuration

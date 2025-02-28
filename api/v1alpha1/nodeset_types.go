@@ -121,10 +121,10 @@ type NodeSetSpec struct {
 
 // GPUSpec defines the settings related to GPU support
 type GPUSpec struct {
-	// Supported indicates whether GPU support is enabled for the NodeSet.
+	// Enabled indicates whether GPU support is enabled for the NodeSet.
 	//
 	// +kubebuilder:validation:Optional
-	Supported bool `json:"supported,omitempty"`
+	Enabled bool `json:"enabled,omitempty"`
 
 	// Nvidia contains settings specific to Nvidia GPUs.
 	//
