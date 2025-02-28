@@ -23,11 +23,14 @@ func BasePodTemplateSpec(
 ) (*corev1.PodTemplateSpec, error) {
 	volumes := []corev1.Volume{
 		common.RenderVolumeJailFromSource(volumeSources, *accounting.VolumeJail.VolumeSourceName),
-		common.RenderVolumeProjectedSlurmConfigs(clusterName, slurmTopologyConfigMapRefName),
+		common.RenderVolumeProjectedSlurmConfigs(
+			clusterName,
+			common.RenderVolumeProjectionSlurmTopologyConfig(slurmTopologyConfigMapRefName),
+			RenderVolumeProjecitonSlurmdbdConfigs(clusterName),
+		),
 		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeRESTJWTKey(clusterName),
 		common.RenderVolumeMungeSocket(),
-		RenderVolumeSlurmdbdConfigs(clusterName),
 		RenderVolumeSlurmdbdSpool(accounting),
 	}
 

@@ -86,7 +86,7 @@ func RenderVolumeMountSlurmConfigs() corev1.VolumeMount {
 // region Slurm topology config
 
 // RenderVolumeProjectedSlurmConfigs renders [corev1.Volume] containing Slurm common configs + topology config file
-func RenderVolumeProjectedSlurmConfigs(clusterName string, slurmTopologyConfigMapRefName string) corev1.Volume {
+func RenderVolumeProjectedSlurmConfigs(clusterName string, additionalProjections ...corev1.VolumeProjection) corev1.Volume {
 	sources := []corev1.VolumeProjection{
 		{
 			ConfigMap: &corev1.ConfigMapProjection{
@@ -96,15 +96,7 @@ func RenderVolumeProjectedSlurmConfigs(clusterName string, slurmTopologyConfigMa
 			},
 		},
 	}
-	if slurmTopologyConfigMapRefName != "" {
-		sources = append(sources, corev1.VolumeProjection{
-			ConfigMap: &corev1.ConfigMapProjection{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: slurmTopologyConfigMapRefName,
-				},
-			},
-		})
-	}
+	sources = append(sources, additionalProjections...)
 	return corev1.Volume{
 		Name: consts.VolumeNameSlurmConfigs,
 		VolumeSource: corev1.VolumeSource{
@@ -115,12 +107,15 @@ func RenderVolumeProjectedSlurmConfigs(clusterName string, slurmTopologyConfigMa
 	}
 }
 
-// RenderVolumeMountSlurmTopologyConfig renders [corev1.VolumeMount] defining the mounting path for Slurm topology config path
-func RenderVolumeMountSlurmTopologyConfig() corev1.VolumeMount {
-	return corev1.VolumeMount{
-		Name:      consts.VolumeNameSlurmTopologyConfig,
-		MountPath: consts.VolumeMountPathSlurmConfigs, // intended to be the same as configs, it's a dedicated file
-		ReadOnly:  true,
+// RenderVolumeProjectionSlurmTopologyConfig renders [corev1.VolumeProjection]
+// defining the configmap to overlay in /etc/slurm
+func RenderVolumeProjectionSlurmTopologyConfig(slurmTopologyConfigMapRefName string) corev1.VolumeProjection {
+	return corev1.VolumeProjection{
+		ConfigMap: &corev1.ConfigMapProjection{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: slurmTopologyConfigMapRefName,
+			},
+		},
 	}
 }
 
