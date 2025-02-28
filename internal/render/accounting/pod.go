@@ -19,6 +19,7 @@ func BasePodTemplateSpec(
 	nodeFilters []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
 	matchLabels map[string]string,
+	slurmTopologyConfigMapRefName string,
 ) (*corev1.PodTemplateSpec, error) {
 	volumes := []corev1.Volume{
 		common.RenderVolumeJailFromSource(volumeSources, *accounting.VolumeJail.VolumeSourceName),
@@ -28,6 +29,10 @@ func BasePodTemplateSpec(
 		common.RenderVolumeMungeSocket(),
 		RenderVolumeSlurmdbdConfigs(clusterName),
 		RenderVolumeSlurmdbdSpool(accounting),
+	}
+
+	if slurmTopologyConfigMapRefName != "" {
+		volumes = append(volumes, common.RenderVolumeSlurmTopologyConfig(slurmTopologyConfigMapRefName))
 	}
 
 	var affinity *corev1.Affinity = nil
@@ -66,7 +71,7 @@ func BasePodTemplateSpec(
 				common.RenderContainerMunge(&accounting.ContainerMunge),
 			},
 			Containers: []corev1.Container{
-				renderContainerAccounting(accounting.ContainerAccounting),
+				renderContainerAccounting(accounting.ContainerAccounting, slurmTopologyConfigMapRefName),
 			},
 			Volumes: volumes,
 		},

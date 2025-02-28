@@ -83,6 +83,33 @@ func RenderVolumeMountSlurmConfigs() corev1.VolumeMount {
 
 // endregion Slurm configs
 
+// region Slurm topology config
+
+// RenderVolumeSlurmTopologyConfig renders [corev1.Volume] containing Slurm topology config file
+func RenderVolumeSlurmTopologyConfig(slurmTopologyConfigMapRefName string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSlurmTopologyConfig,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: slurmTopologyConfigMapRefName,
+				},
+			},
+		},
+	}
+}
+
+// RenderVolumeMountSlurmTopologyConfig renders [corev1.VolumeMount] defining the mounting path for Slurm topology config path
+func RenderVolumeMountSlurmTopologyConfig() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSlurmTopologyConfig,
+		MountPath: consts.VolumeMountPathSlurmConfigs, // intended to be the same as configs, it's a dedicated file
+		ReadOnly:  true,
+	}
+}
+
+// endregion Slurm topology config
+
 // region Spool
 
 func RenderVolumeNameSpool(componentType consts.ComponentType) string {

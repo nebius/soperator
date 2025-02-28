@@ -133,4 +133,6 @@ var (
 			passwordKey: []byte("test-password"),
 		},
 	}
+
+	slurmTopologyConfigMapRefName = "topology-config"
 )

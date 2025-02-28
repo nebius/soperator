@@ -28,6 +28,7 @@ const (
 
 const (
 	VolumeNameSlurmConfigs         = slurmConfigs
+	VolumeNameSlurmTopologyConfig  = slurmTopologyConfig
 	VolumeNameSlurmdbdSecret       = slurmdbdSecret
 	VolumeNameSpool                = spool
 	VolumeNameJail                 = jail
@@ -49,28 +50,29 @@ const (
 	VolumeNameInMemorySubmount     = "in-memory"
 	VolumeNameTmpDisk              = "tmp-disk"
 
-	VolumeMountPathSlurmConfigs      = "/mnt/" + slurmConfigs
-	VolumeMountPathSlurmdbdSecret    = "/mnt/" + slurmdbdSecret
-	VolumeMountPathSpool             = "/var/" + spool
-	VolumeMountPathSpoolSlurmdbd     = "/var/spool/slurmdbd"
-	VolumeMountPathJail              = "/mnt/" + jail
-	VolumeMountPathJailSnapshot      = "/jail"
-	VolumeMountPathJailUpper         = "/mnt/" + jail + ".upper"
-	VolumeMountPathMungeSocket       = "/run/" + Munge
-	VolumeMountPathMungeKey          = "/mnt/" + mungeKey
-	VolumeMountPathRESTJWTKey        = "/mnt/" + RESTJWTKey
-	VolumeMountPathNvidia            = "/run/" + nvidia
-	VolumeMountPathBoot              = "/" + boot
-	VolumeMountPathSSHConfigs        = "/mnt/" + sshConfigs
-	VolumeMountPathSSHRootKeys       = "/root/.ssh/" + authorizedKeys
-	VolumeMountSubPathSSHRootKeys    = authorizedKeys
-	VolumeMountPathSecurityLimits    = "/etc/security/" + securityLimitsConfFile
-	VolumeMountSubPathSecurityLimits = securityLimitsConfFile
-	VolumeMountPathNCCLTopology      = "/run/nvidia-topologyd"
-	VolumeMountPathSharedMemory      = "/dev/shm"
-	VolumeMountPathSysctl            = "/etc/" + sysctlConfFile
-	VolumeMountSubPathSysctl         = sysctlConfFile
-	VolumeMountPathSupervisordConfig = "/etc/supervisor/conf.d/"
-	VolumeMountPathInMemorySubmount  = VolumeMountPathJailUpper + "/mnt/memory"
-	VolumeMountPathTmpDisk           = "/tmp"
+	VolumeMountPathSlurmConfigs        = "/mnt/" + slurmConfigs
+	VolumeMountPathSlurmTopologyConfig = "/mnt/" + slurmConfigs // intended to overlay original config
+	VolumeMountPathSlurmdbdSecret      = "/mnt/" + slurmdbdSecret
+	VolumeMountPathSpool               = "/var/" + spool
+	VolumeMountPathSpoolSlurmdbd       = "/var/spool/slurmdbd"
+	VolumeMountPathJail                = "/mnt/" + jail
+	VolumeMountPathJailSnapshot        = "/jail"
+	VolumeMountPathJailUpper           = "/mnt/" + jail + ".upper"
+	VolumeMountPathMungeSocket         = "/run/" + Munge
+	VolumeMountPathMungeKey            = "/mnt/" + mungeKey
+	VolumeMountPathRESTJWTKey          = "/mnt/" + RESTJWTKey
+	VolumeMountPathNvidia              = "/run/" + nvidia
+	VolumeMountPathBoot                = "/" + boot
+	VolumeMountPathSSHConfigs          = "/mnt/" + sshConfigs
+	VolumeMountPathSSHRootKeys         = "/root/.ssh/" + authorizedKeys
+	VolumeMountSubPathSSHRootKeys      = authorizedKeys
+	VolumeMountPathSecurityLimits      = "/etc/security/" + securityLimitsConfFile
+	VolumeMountSubPathSecurityLimits   = securityLimitsConfFile
+	VolumeMountPathNCCLTopology        = "/run/nvidia-topologyd"
+	VolumeMountPathSharedMemory        = "/dev/shm"
+	VolumeMountPathSysctl              = "/etc/" + sysctlConfFile
+	VolumeMountSubPathSysctl           = sysctlConfFile
+	VolumeMountPathSupervisordConfig   = "/etc/supervisor/conf.d/"
+	VolumeMountPathInMemorySubmount    = VolumeMountPathJailUpper + "/mnt/memory"
+	VolumeMountPathTmpDisk             = "/tmp"
 )
