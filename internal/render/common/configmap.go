@@ -28,12 +28,11 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig co
 			Labels:    RenderLabels(consts.ComponentTypeController, cluster.Name),
 		},
 		Data: map[string]string{
-			consts.ConfigMapKeySlurmConfig:    generateSlurmConfig(cluster, topologyConfig).Render(),
-			consts.ConfigMapKeyCGroupConfig:   generateCGroupConfig(cluster).Render(),
-			consts.ConfigMapKeySpankConfig:    generateSpankConfig().Render(),
-			consts.ConfigMapKeyGresConfig:     generateGresConfig(cluster.ClusterType).Render(),
-			consts.ConfigMapKeyMPIConfig:      generateMPIConfig(cluster).Render(),
-			consts.ConfigMapKeyTopologyConfig: generateTopologyConfig(topologyConfig).Render(),
+			consts.ConfigMapKeySlurmConfig:  generateSlurmConfig(cluster, topologyConfig).Render(),
+			consts.ConfigMapKeyCGroupConfig: generateCGroupConfig(cluster).Render(),
+			consts.ConfigMapKeySpankConfig:  generateSpankConfig().Render(),
+			consts.ConfigMapKeyGresConfig:   generateGresConfig(cluster.ClusterType).Render(),
+			consts.ConfigMapKeyMPIConfig:    generateMPIConfig(cluster).Render(),
 		},
 	}, nil
 }
@@ -171,15 +170,6 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 		}
 	}
 	return res
-}
-
-func generateTopologyConfig(topologyConfig corev1.ConfigMap) renderutils.ConfigFile {
-	if topologyConfig.Data != nil {
-		if cfg, ok := topologyConfig.Data[consts.ConfigMapKeyTopologyConfig]; ok {
-			return renderutils.NewAsIsConfig(cfg)
-		}
-	}
-	return renderutils.NewAsIsConfig("")
 }
 
 // addSlurmConfigProperties adds properties from the given struct to the config file
