@@ -10,7 +10,7 @@ import (
 )
 
 // renderContainerAccounting renders [corev1.Container] for slurmctld
-func renderContainerAccounting(container values.Container, slurmTopologyConfigMapRefName string) corev1.Container {
+func renderContainerAccounting(container values.Container) corev1.Container {
 	if container.Port == 0 {
 		container.Port = consts.DefaultAccountingPort
 	}
@@ -18,18 +18,6 @@ func renderContainerAccounting(container values.Container, slurmTopologyConfigMa
 
 	// Create a copy of the container's limits and add non-CPU resources from Requests
 	limits := common.CopyNonCPUResources(container.Resources)
-
-	volumeMounts := []corev1.VolumeMount{
-		common.RenderVolumeMountSlurmConfigs(),
-		common.RenderVolumeMountMungeSocket(),
-		common.RenderVolumeMountRESTJWTKey(),
-		RenderVolumeMountSlurmdbdConfigs(),
-		RenderVolumeMountSlurmdbdSpool(),
-	}
-
-	if slurmTopologyConfigMapRefName != "" {
-		volumeMounts = append(volumeMounts, common.RenderVolumeMountSlurmConfigs())
-	}
 
 	return corev1.Container{
 		Name:            consts.ContainerNameAccounting,
@@ -40,7 +28,13 @@ func renderContainerAccounting(container values.Container, slurmTopologyConfigMa
 			ContainerPort: container.Port,
 			Protocol:      corev1.ProtocolTCP,
 		}},
-		VolumeMounts: volumeMounts,
+		VolumeMounts: []corev1.VolumeMount{
+			common.RenderVolumeMountSlurmConfigs(),
+			common.RenderVolumeMountMungeSocket(),
+			common.RenderVolumeMountRESTJWTKey(),
+			RenderVolumeMountSlurmdbdConfigs(),
+			RenderVolumeMountSlurmdbdSpool(),
+		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{
