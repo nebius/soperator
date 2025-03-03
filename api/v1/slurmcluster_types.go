@@ -5,6 +5,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"nebius.ai/slurm-operator/internal/consts"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
@@ -1093,7 +1094,7 @@ type PodMonitorConfig struct {
 }
 
 const (
-	SlurmClusterKind = "SlurmCluster"
+	KindSlurmCluster = "SlurmCluster"
 
 	ConditionClusterCommonAvailable      = "CommonAvailable"
 	ConditionClusterControllersAvailable = "ControllersAvailable"

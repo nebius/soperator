@@ -10,7 +10,7 @@ func minimalSlurmClusterFixture(namespace string) *slurmv1.SlurmCluster {
 	return &slurmv1.SlurmCluster{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "slurm.nebius.ai/v1",
-			Kind:       slurmv1.SlurmClusterKind,
+			Kind:       slurmv1.KindSlurmCluster,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "minimal-slurm-cluster",
