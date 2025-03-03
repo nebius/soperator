@@ -231,7 +231,7 @@ func main() {
 	if err = (&nodesetcontroller.NodeSetReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeSet")
 		os.Exit(1)
 	}
