@@ -47,7 +47,8 @@ import (
 	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
-	controller "nebius.ai/slurm-operator/internal/controller/nodeconfigurator"
+	"nebius.ai/slurm-operator/internal/controller/nodeconfigurator"
+	"nebius.ai/slurm-operator/internal/controller/nodesetcontroller"
 	webhookcorev1 "nebius.ai/slurm-operator/internal/webhook/v1"
 	//+kubebuilder:scaffold:imports
 )
@@ -220,11 +221,18 @@ func main() {
 		}
 	}
 
-	if err = (&controller.NodeConfiguratorReconciler{
+	if err = (&nodeconfigurator.NodeConfiguratorReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeConfigurator")
+		os.Exit(1)
+	}
+	if err = (&nodesetcontroller.NodeSetReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "NodeSet")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
