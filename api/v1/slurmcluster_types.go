@@ -94,7 +94,8 @@ type SlurmClusterSpec struct {
 	MPIConfig MPIConfig `json:"mpiConfig,omitempty"`
 
 	// SlurmTopologyConfigMapRefName is the name of the slurm topology config.
-	// When exists, TopologyPlugin is also set to `topology/tree` in slurm.conf.
+	// When exists, TopologyPlugin is automatically set to `topology/tree` in slurm.conf
+	// if TopologyPlugin is not explicitly specified in SlurmConfig.
 	//
 	// +kubebuilder:validation:Optional
 	SlurmTopologyConfigMapRefName string `json:"slurmTopologyConfigMapRefName,omitempty"`
