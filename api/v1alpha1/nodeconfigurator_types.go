@@ -23,6 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+const (
+	KindNodeConfigurator = "NodeConfigurator"
+)
+
 // +kubebuilder:validation:XValidation:rule="self.rebooter.enabled != self.nodeConfigurator.enabled",message="Either rebooter or nodeConfigurator must be enabled, but not both simultaneously."
 // NodeConfiguratorSpec defines the desired state of NodeConfigurator.
 type NodeConfiguratorSpec struct {

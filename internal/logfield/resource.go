@@ -15,7 +15,7 @@ func ResourceKV(obj client.Object) []any {
 		kind = t.Name()
 	}
 	return []any{
-		ResourceKind, kind,
-		ResourceName, obj.GetName(),
+		SubResourceKind, kind,
+		SubResourceName, obj.GetName(),
 	}
 }
