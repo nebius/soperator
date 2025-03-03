@@ -86,7 +86,7 @@ func RenderVolumeMountSlurmConfigs() corev1.VolumeMount {
 // region Slurm topology config
 
 // RenderVolumeProjectedSlurmConfigs renders [corev1.Volume] containing Slurm common configs + topology config file
-func RenderVolumeProjectedSlurmConfigs(clusterName string, additionalProjections ...corev1.VolumeProjection) corev1.Volume {
+func RenderVolumeProjectedSlurmConfigs(clusterName string, additionalProjections ...*corev1.VolumeProjection) corev1.Volume {
 	sources := []corev1.VolumeProjection{
 		{
 			ConfigMap: &corev1.ConfigMapProjection{
@@ -96,7 +96,11 @@ func RenderVolumeProjectedSlurmConfigs(clusterName string, additionalProjections
 			},
 		},
 	}
-	sources = append(sources, additionalProjections...)
+	for _, projection := range additionalProjections {
+		if projection != nil {
+			sources = append(sources, *projection)
+		}
+	}
 	return corev1.Volume{
 		Name: consts.VolumeNameSlurmConfigs,
 		VolumeSource: corev1.VolumeSource{
@@ -109,8 +113,11 @@ func RenderVolumeProjectedSlurmConfigs(clusterName string, additionalProjections
 
 // RenderVolumeProjectionSlurmTopologyConfig renders [corev1.VolumeProjection]
 // defining the configmap to overlay in /etc/slurm
-func RenderVolumeProjectionSlurmTopologyConfig(slurmTopologyConfigMapRefName string) corev1.VolumeProjection {
-	return corev1.VolumeProjection{
+func RenderVolumeProjectionSlurmTopologyConfig(slurmTopologyConfigMapRefName string) *corev1.VolumeProjection {
+	if slurmTopologyConfigMapRefName == "" {
+		return nil
+	}
+	return &corev1.VolumeProjection{
 		ConfigMap: &corev1.ConfigMapProjection{
 			LocalObjectReference: corev1.LocalObjectReference{
 				Name: slurmTopologyConfigMapRefName,
