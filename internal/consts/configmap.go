@@ -1,9 +1,7 @@
 package consts
 
 const (
-	slurmConfigs        = slurmPrefix + "configs"
-	slurmTopologyConfig = slurmPrefix + "topology-config"
-	slurmdbdSecret      = "slurm-secrets"
+	slurmConfigs = slurmPrefix + "configs"
 )
 
 const (

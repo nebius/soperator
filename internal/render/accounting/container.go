@@ -18,7 +18,6 @@ func renderContainerAccounting(container values.Container) corev1.Container {
 
 	// Create a copy of the container's limits and add non-CPU resources from Requests
 	limits := common.CopyNonCPUResources(container.Resources)
-
 	return corev1.Container{
 		Name:            consts.ContainerNameAccounting,
 		Image:           container.Image,
