@@ -966,6 +966,20 @@ spec:
                         x-kubernetes-list-type: atomic
                     type: object
                 type: object
+              configMapRefSshd:
+                description: |-
+                  ConfigMapRefSSHD defines the config name of Slurm SSHD.
+                  Specifying a custom name allows providing custom config for the Slurm SSHD.
+
+                  If omitted, the default name and values of config will be used.
+                type: string
+              configMapRefSupervisord:
+                description: |-
+                  ConfigMapRefSupervisord defines the config name of Supervisord for the slurmd container.
+                  Specifying a custom name allows providing custom config for the Supervisord.
+
+                  If omitted, the default name and values of config will be used.
+                type: string
               gpu:
                 description: GPU defines the settings related to GPU support for Slurm
                   workers
@@ -4988,20 +5002,6 @@ spec:
                 - resources
                 - volumes
                 type: object
-              sshd:
-                description: |-
-                  ConfigMapRefSSHD defines the config name of Slurm SSHD.
-                  Specifying a custom name allows providing custom config for the Slurm SSHD.
-
-                  If omitted, the default name and values of config will be used.
-                type: string
-              supervisord:
-                description: |-
-                  ConfigMapRefSupervisord defines the config name of Supervisord for the slurmd container.
-                  Specifying a custom name allows providing custom config for the Supervisord.
-
-                  If omitted, the default name and values of config will be used.
-                type: string
               tolerations:
                 description: Tolerations define the desired tolerations for the K8s
                   nodes to place Slurm workers on
