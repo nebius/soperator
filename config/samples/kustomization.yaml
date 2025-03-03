@@ -2,4 +2,5 @@
 resources:
 - slurm_v1alpha1_activecheck.yaml
 - slurm_v1alpha1_nodeconfigurator.yaml
+- slurm_v1alpha1_nodeset.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples
