@@ -71,6 +71,13 @@ spec:
                 description: CRVersion defines the version of the Operator the Custom
                   Resource belongs to
                 type: string
+              customSlurmConfig:
+                description: |-
+                  CustomSlurmConfig represents the raw Slurm configuration from slurm.conf.
+                  All options are provided as a raw string.
+                  Soperator does not guarantee the validity of the raw configuration.
+                  Raw config is merged with existing SlurmConfig values.
+                type: string
               k8sNodeFilters:
                 description: K8sNodeFilters define the k8s node filters used in Slurm
                   node specifications
@@ -1564,28 +1571,6 @@ spec:
                     description: Additional parameters for the task plugin
                     pattern: ^(|((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+)$
                     type: string
-                type: object
-              slurmConfigRaw:
-                description: |-
-                  SlurmConfigRaw represents the raw Slurm configuration from slurm.conf.
-                  All options are provided as a raw string.
-                  Soperator does not guarantee the validity of the raw configuration.
-                properties:
-                  rawContent:
-                    description: RawContent contains the raw Slurm configuration.
-                    type: string
-                  strategy:
-                    default: patch
-                    description: |-
-                      Strategy defines how the raw configuration should be applied to SlurmConfig.
-                      - "patch": Merges the raw configuration with existing SlurmConfig values (default).
-                      - "override": Applies only the raw configuration, ignoring values provided in SlurmConf.
-                    enum:
-                    - patch
-                    - override
-                    type: string
-                required:
-                - rawContent
                 type: object
               slurmNodes:
                 description: SlurmNodes define the desired state of Slurm nodes

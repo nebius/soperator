@@ -28,11 +28,12 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) (corev1.ConfigMap
 			Labels:    RenderLabels(consts.ComponentTypeController, cluster.Name),
 		},
 		Data: map[string]string{
-			consts.ConfigMapKeySlurmConfig:  generateSlurmConfig(cluster).Render(),
-			consts.ConfigMapKeyCGroupConfig: generateCGroupConfig(cluster).Render(),
-			consts.ConfigMapKeySpankConfig:  generateSpankConfig().Render(),
-			consts.ConfigMapKeyGresConfig:   generateGresConfig(cluster.ClusterType).Render(),
-			consts.ConfigMapKeyMPIConfig:    generateMPIConfig(cluster).Render(),
+			consts.ConfigMapKeySlurmConfig:       generateSlurmConfig(cluster).Render(),
+			consts.ConfigMapKeyCustomSlurmConfig: generateCustomSlurmConfig(cluster).Render(),
+			consts.ConfigMapKeyCGroupConfig:      generateCGroupConfig(cluster).Render(),
+			consts.ConfigMapKeySpankConfig:       generateSpankConfig().Render(),
+			consts.ConfigMapKeyGresConfig:        generateGresConfig(cluster.ClusterType).Render(),
+			consts.ConfigMapKeyMPIConfig:         generateMPIConfig(cluster).Render(),
 		},
 	}, nil
 }
@@ -156,26 +157,19 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		}
 	}
 
-	// apply raw config
-	if cluster.SlurmConfigRaw != nil {
-		switch cluster.SlurmConfigRaw.Strategy {
-		case consts.SlurmConfigRawStrategyOverride:
-			multilineCfg := &renderutils.MultilineStringConfig{}
-			multilineCfg.AddLine(cluster.SlurmConfigRaw.RawContent)
-			return multilineCfg
-		case consts.SlurmConfigRawStrategyPatch:
-			fallthrough
-		default:
-			res.AddComment("")
-			res.AddComment("RAW CONFIG")
+	res.AddComment("")
+	res.AddComment(fmt.Sprintf("Include %s", consts.ConfigMapKeyCustomSlurmConfig))
+	res.AddPropertyWithConnector("include", consts.ConfigMapKeyCustomSlurmConfig, renderutils.SpaceConnector)
 
-			multilineCfg := &renderutils.MultilineStringConfig{}
-			multilineCfg.AddLine(res.Render())
-			multilineCfg.AddLine(cluster.SlurmConfigRaw.RawContent)
-			return multilineCfg
-		}
-	}
 	return res
+}
+
+func generateCustomSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
+	multilineCfg := &renderutils.MultilineStringConfig{}
+	if cluster.CustomSlurmConfig != nil {
+		multilineCfg.AddLine(*cluster.CustomSlurmConfig)
+	}
+	return multilineCfg
 }
 
 // addSlurmConfigProperties adds properties from the given struct to the config file
