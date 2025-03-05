@@ -4638,6 +4638,13 @@ spec:
                 description: CRVersion defines the version of the Operator the Custom
                   Resource belongs to
                 type: string
+              customSlurmConfig:
+                description: |-
+                  CustomSlurmConfig represents the raw Slurm configuration from slurm.conf.
+                  All options are provided as a raw string.
+                  Soperator does not guarantee the validity of the raw configuration.
+                  Raw config is merged with existing SlurmConfig values.
+                type: string
               k8sNodeFilters:
                 description: K8sNodeFilters define the k8s node filters used in Slurm
                   node specifications

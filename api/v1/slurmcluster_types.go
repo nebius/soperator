@@ -87,6 +87,13 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", epilog: "", prolog: "", taskPluginParam: "", maxJobCount: 10000, minJobAge: 86400}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 
+	// CustomSlurmConfig represents the raw Slurm configuration from slurm.conf.
+	// All options are provided as a raw string.
+	// Soperator does not guarantee the validity of the raw configuration.
+	// Raw config is merged with existing SlurmConfig values.
+	//
+	// +kubebuilder:validation:Optional
+	CustomSlurmConfig *string `json:"customSlurmConfig,omitempty"`
 	// MPIConfig represents the PMIx configuration in mpi.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
