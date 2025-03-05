@@ -609,6 +609,11 @@ func (in *SlurmClusterSpec) DeepCopyInto(out *SlurmClusterSpec) {
 	}
 	in.PartitionConfiguration.DeepCopyInto(&out.PartitionConfiguration)
 	in.SlurmConfig.DeepCopyInto(&out.SlurmConfig)
+	if in.CustomSlurmConfig != nil {
+		in, out := &in.CustomSlurmConfig, &out.CustomSlurmConfig
+		*out = new(string)
+		**out = **in
+	}
 	out.MPIConfig = in.MPIConfig
 }
 

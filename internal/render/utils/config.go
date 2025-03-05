@@ -5,6 +5,12 @@ import (
 	"strings"
 )
 
+const (
+	DefaultConnector   = EqualSignConnector
+	EqualSignConnector = "="
+	SpaceConnector     = " "
+)
+
 type ConfigFile interface {
 	Render() string
 }
@@ -20,12 +26,17 @@ type PropertiesConfig struct {
 }
 
 type prop struct {
-	key   string
-	value any
+	key       string
+	value     any
+	connector string
 }
 
 func (c *PropertiesConfig) AddProperty(key string, value any) {
-	c.props = append(c.props, prop{key: key, value: value})
+	c.props = append(c.props, prop{key: key, value: value, connector: DefaultConnector})
+}
+
+func (c *PropertiesConfig) AddPropertyWithConnector(key string, value any, connector string) {
+	c.props = append(c.props, prop{key: key, value: value, connector: connector})
 }
 
 func (c *PropertiesConfig) AddComment(comment string) {
@@ -35,7 +46,7 @@ func (c *PropertiesConfig) AddComment(comment string) {
 func (c *PropertiesConfig) Render() string {
 	var res []string
 	for _, p := range c.props {
-		res = append(res, fmt.Sprintf("%s=%v", p.key, p.value))
+		res = append(res, fmt.Sprintf("%s%s%v", p.key, p.connector, p.value))
 	}
 	return strings.Join(res, "\n")
 }

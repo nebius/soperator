@@ -28,11 +28,12 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig co
 			Labels:    RenderLabels(consts.ComponentTypeController, cluster.Name),
 		},
 		Data: map[string]string{
-			consts.ConfigMapKeySlurmConfig:  generateSlurmConfig(cluster, topologyConfig).Render(),
-			consts.ConfigMapKeyCGroupConfig: generateCGroupConfig(cluster).Render(),
-			consts.ConfigMapKeySpankConfig:  generateSpankConfig().Render(),
-			consts.ConfigMapKeyGresConfig:   generateGresConfig(cluster.ClusterType).Render(),
-			consts.ConfigMapKeyMPIConfig:    generateMPIConfig(cluster).Render(),
+			consts.ConfigMapKeySlurmConfig:       generateSlurmConfig(cluster, topologyConfig).Render(),
+			consts.ConfigMapKeyCustomSlurmConfig: generateCustomSlurmConfig(cluster).Render(),
+			consts.ConfigMapKeyCGroupConfig:      generateCGroupConfig(cluster).Render(),
+			consts.ConfigMapKeySpankConfig:       generateSpankConfig().Render(),
+			consts.ConfigMapKeyGresConfig:        generateGresConfig(cluster.ClusterType).Render(),
+			consts.ConfigMapKeyMPIConfig:         generateMPIConfig(cluster).Render(),
 		},
 	}, nil
 }
@@ -56,7 +57,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 	res.AddProperty("AuthType", "auth/"+consts.Munge)
 	res.AddProperty("CredType", "cred/"+consts.Munge)
 	res.AddComment("")
-	res.AddComment("SlurnConfig Spec")
+	res.AddComment("SlurmConfig Spec")
 	addSlurmConfigProperties(res, cluster.SlurmConfig)
 	res.AddComment("")
 	if cluster.ClusterType == consts.ClusterTypeGPU {
@@ -139,7 +140,11 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 		res.AddComment("")
 		res.AddComment("ACCOUNTING")
 		res.AddProperty("AccountingStorageType", "accounting_storage/slurmdbd")
-		res.AddProperty("AccountingStorageHost", naming.BuildServiceName(consts.ComponentTypeAccounting, cluster.Name))
+		res.AddProperty("AccountingStorageHost", fmt.Sprintf(
+			"%s.%s.svc.cluster.local",
+			naming.BuildServiceName(consts.ComponentTypeAccounting, cluster.Name),
+			cluster.Namespace,
+		))
 		res.AddProperty("AccountingStorageUser", consts.HostnameAccounting)
 		res.AddProperty("AccountingStoragePort", consts.DefaultAccountingPort)
 		res.AddProperty("JobCompType", "jobcomp/none")
@@ -156,14 +161,26 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 		}
 	}
 
-	if cluster.SlurmConfig.TopologyPlugin == "" && topologyConfig.Data != nil {
+  if cluster.SlurmConfig.TopologyPlugin == "" && topologyConfig.Data != nil {
 		if _, ok := topologyConfig.Data[consts.ConfigMapKeyTopologyConfig]; ok {
 			res.AddComment("AUTO TOPOLOGY, triggered by slurmTopologyConfigMapRefName")
 			res.AddProperty("TopologyPlugin", "topology/tree")
 		}
 	}
 
+	res.AddComment("")
+	res.AddComment(fmt.Sprintf("Include %s", consts.ConfigMapKeyCustomSlurmConfig))
+	res.AddPropertyWithConnector("include", consts.ConfigMapKeyCustomSlurmConfig, renderutils.SpaceConnector)
+
 	return res
+}
+
+func generateCustomSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
+	multilineCfg := &renderutils.MultilineStringConfig{}
+	if cluster.CustomSlurmConfig != nil {
+		multilineCfg.AddLine(*cluster.CustomSlurmConfig)
+	}
+	return multilineCfg
 }
 
 // addSlurmConfigProperties adds properties from the given struct to the config file
