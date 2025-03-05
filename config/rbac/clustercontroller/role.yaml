@@ -31,6 +31,26 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - nodes
+  verbs:
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes/status
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - podtemplates
   verbs:
   - get
