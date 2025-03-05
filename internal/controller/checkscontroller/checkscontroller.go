@@ -1,4 +1,4 @@
-package soperatorchecks
+package checkscontroller
 
 import (
 	"context"

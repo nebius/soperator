@@ -1,4 +1,4 @@
-checks:
+checkscontroller:
   manager:
     args:
       - --leader-elect
@@ -11,7 +11,7 @@ checks:
       slurmApiServer: http://soperator-rest-svc.soperator:6820
       slurmOperatorWatchNamespaces: '*'
     image:
-      repository: cr.eu-north1.nebius.cloud/soperator/soperatorchecks
+      repository: cr.eu-north1.nebius.cloud/soperator/checkscontroller
       tag: 1.18.3
     imagePullPolicy: Always
     resources:
@@ -24,3 +24,8 @@ checks:
   serviceAccount:
     annotations: {}
 kubernetesClusterDomain: cluster.local
+checks:
+  manager:
+    image:
+      repository: cr.eu-north1.nebius.cloud/soperator/checkscontroller
+      tag: 1.18.3

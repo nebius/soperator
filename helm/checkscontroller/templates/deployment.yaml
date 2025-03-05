@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "checkscontroller.fullname" . }}-checkscontroller
+  labels:
+    app.kubernetes.io/component: manager
+    app.kubernetes.io/created-by: slurm-operator
+    app.kubernetes.io/part-of: slurm-operator
+    control-plane: checkscontroller
+  {{- include "checkscontroller.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.checkscontroller.replicas }}
+  selector:
+    matchLabels:
+      control-plane: checkscontroller
+    {{- include "checkscontroller.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        control-plane: checkscontroller
+      {{- include "checkscontroller.selectorLabels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+    spec:
+      containers:
+      - args: {{- toYaml .Values.checkscontroller.manager.args | nindent 8 }}
+        command:
+        - /usr/bin/checkscontroller
+        env:
+        - name: SLURM_OPERATOR_WATCH_NAMESPACES
+          value: {{ quote .Values.checkscontroller.manager.env.slurmOperatorWatchNamespaces
+            }}
+        - name: SLURM_API_SERVER
+          value: {{ quote .Values.checkscontroller.manager.env.slurmApiServer }}
+        - name: KUBERNETES_CLUSTER_DOMAIN
+          value: {{ quote .Values.kubernetesClusterDomain }}
+        image: {{ .Values.checkscontroller.manager.image.repository }}:{{ .Values.checkscontroller.manager.image.tag
+          | default .Chart.AppVersion }}
+        imagePullPolicy: {{ .Values.checkscontroller.manager.imagePullPolicy }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources: {{- toYaml .Values.checkscontroller.manager.resources | nindent 10 }}
+        securityContext: {{- toYaml .Values.checkscontroller.manager.containerSecurityContext
+          | nindent 10 }}
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: {{ include "checkscontroller.fullname" . }}-checkscontroller
+      terminationGracePeriodSeconds: 10

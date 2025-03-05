@@ -26,9 +26,12 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the {{ .ProjectName }} itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
-- soperatorchecks_admin_role.yaml
-- soperatorchecks_editor_role.yaml
-- soperatorchecks_viewer_role.yaml
+- activecheck_admin_role.yaml
+- activecheck_editor_role.yaml
+- activecheck_viewer_role.yaml
+- checkscontroller_admin_role.yaml
+- checkscontroller_editor_role.yaml
+- checkscontroller_viewer_role.yaml
 - nodeconfigurator_admin_role.yaml
 - nodeconfigurator_editor_role.yaml
 - nodeconfigurator_viewer_role.yaml

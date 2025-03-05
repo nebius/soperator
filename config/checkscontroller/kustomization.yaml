@@ -1,0 +1,7 @@
+resources:
+  - checkscontroller.yaml
+  - ../rbac/checkscontroller/role.yaml
+images:
+  - name: controller
+    newName: cr.eu-north1.nebius.cloud/soperator/checkscontroller
+    newTag: 1.18.3

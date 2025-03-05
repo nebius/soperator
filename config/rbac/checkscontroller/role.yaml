@@ -1,9 +1,8 @@
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "soperatorchecks.fullname" . }}-checks-role
-  labels:
-  {{- include "soperatorchecks.labels" . | nindent 4 }}
+  name: checkscontroller-role
 rules:
 - apiGroups:
   - ""
@@ -45,6 +44,32 @@ rules:
   - list
   - update
   - watch
+- apiGroups:
+  - slurm.nebius.ai
+  resources:
+  - activechecks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - slurm.nebius.ai
+  resources:
+  - activechecks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - slurm.nebius.ai
+  resources:
+  - activechecks/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - slurm.nebius.ai
   resources:

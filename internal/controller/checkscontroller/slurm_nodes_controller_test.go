@@ -1,4 +1,4 @@
-package soperatorchecks
+package checkscontroller
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
+
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"

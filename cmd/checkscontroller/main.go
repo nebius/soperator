@@ -43,9 +43,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/controller/checkscontroller"
 	"nebius.ai/slurm-operator/internal/jwt"
 	"nebius.ai/slurm-operator/internal/slurmapi"
-	"nebius.ai/slurm-operator/internal/soperatorchecks"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -217,22 +217,29 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = soperatorchecks.NewSlurmNodesController(
+	if err = checkscontroller.NewSlurmNodesController(
 		mgr.GetClient(),
 		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(soperatorchecks.SlurmNodesControllerName),
+		mgr.GetEventRecorderFor(checkscontroller.SlurmNodesControllerName),
 		slurmapiClients,
 		reconcileTimeout,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", soperatorchecks.SlurmNodesControllerName)
+		setupLog.Error(err, "unable to create controller", checkscontroller.SlurmNodesControllerName)
 		os.Exit(1)
 	}
-	if err = soperatorchecks.NewK8SNodesController(
+	if err = checkscontroller.NewK8SNodesController(
 		mgr.GetClient(),
 		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(soperatorchecks.K8SNodesControllerName),
+		mgr.GetEventRecorderFor(checkscontroller.K8SNodesControllerName),
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", soperatorchecks.K8SNodesControllerName)
+		setupLog.Error(err, "unable to create controller", checkscontroller.K8SNodesControllerName)
+		os.Exit(1)
+	}
+	if err = (&checkscontroller.ActiveCheckReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ActiveCheck")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

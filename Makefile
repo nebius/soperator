@@ -22,7 +22,7 @@ GENPATH = "./api/v1;./api/v1alpha1;"
 
 CHART_PATH            		= helm
 CHART_OPERATOR_PATH   		= $(CHART_PATH)/soperator
-CHART_SOPERATORCHECKS_PATH  = $(CHART_PATH)/soperatorchecks
+CHART_CHECKSCONTROLLER_PATH  = $(CHART_PATH)/checkscontroller
 CHART_NODECONFIGURATOR_PATH = $(CHART_PATH)/nodeconfigurator
 CHART_OPERATOR_CRDS_PATH   	= $(CHART_PATH)/soperator-crds
 CHART_CLUSTER_PATH    		= $(CHART_PATH)/slurm-cluster
@@ -83,7 +83,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	$(CONTROLLER_GEN) crd webhook paths=$(GENPATH) output:crd:artifacts:config=config/crd/bases
 	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./internal/controller/..." output:artifacts:config=config/rbac/clustercontroller/
 	$(CONTROLLER_GEN) rbac:roleName=nodeconfigurator-role paths="./internal/rebooter/..." output:artifacts:config=config/rbac/nodeconfigurator/
-	$(CONTROLLER_GEN) rbac:roleName=soperator-checks-role paths="./internal/soperatorchecks/..." output:artifacts:config=config/rbac/soperatorchecks/
+	$(CONTROLLER_GEN) rbac:roleName=checkscontroller-role paths="./internal/controller/checkscontroller/..." output:artifacts:config=config/rbac/checkscontroller/
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object paths=$(GENPATH)
@@ -117,7 +117,7 @@ helm: generate manifests ## Update soperator Helm chart
 	mv $(CHART_NODECONFIGURATOR_PATH)/values.yaml $(CHART_NODECONFIGURATOR_PATH)/values.yaml.bak
 	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/rbac/clustercontroller  | $(HELMIFY) $(CHART_OPERATOR_PATH)
 	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/rbac/nodeconfigurator  | $(HELMIFY) $(CHART_NODECONFIGURATOR_PATH)
-	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/soperatorchecks  | $(HELMIFY) $(CHART_SOPERATORCHECKS_PATH)
+	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/checkscontroller  | $(HELMIFY) $(CHART_CHECKSCONTROLLER_PATH)
 	mv $(CHART_OPERATOR_PATH)/values.yaml.bak $(CHART_OPERATOR_PATH)/values.yaml
 	mv $(CHART_NODECONFIGURATOR_PATH)/values.yaml.bak $(CHART_NODECONFIGURATOR_PATH)/values.yaml
 # Because of helmify rewrite a file we need to add the missing if statement
@@ -162,10 +162,10 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.[0].newTag = \"$(OPERATOR_IMAGE_TAG)\"" "config/manager/kustomization.yaml"
 	@# endregion config/manager/kustomization.yaml
 
-	@echo 'Syncing config/soperatorchecks/kustomization.yaml'
-	@$(YQ) -i ".images.[0].newName = \"$(IMAGE_REPO)/soperatorchecks\"" "config/soperatorchecks/kustomization.yaml"
-	@$(YQ) -i ".images.[0].newTag = \"$(OPERATOR_IMAGE_TAG)\"" "config/soperatorchecks/kustomization.yaml"
-	@# endregion config/soperatorchecks/kustomization.yaml
+	@echo 'Syncing config/checkscontroller/kustomization.yaml'
+	@$(YQ) -i ".images.[0].newName = \"$(IMAGE_REPO)/checkscontroller\"" "config/checkscontroller/kustomization.yaml"
+	@$(YQ) -i ".images.[0].newTag = \"$(OPERATOR_IMAGE_TAG)\"" "config/checkscontroller/kustomization.yaml"
+	@# endregion config/checkscontroller/kustomization.yaml
 
 	@# region config/manager/manager.yaml
 	@echo 'Syncing config/manager/manager.yaml'
@@ -178,13 +178,13 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_CRDS_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_STORAGE_PATH)/Chart.yaml"
-	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATORCHECKS_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CHECKSCONTROLLER_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODECONFIGURATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_CRDS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_STORAGE_PATH)/Chart.yaml"
-	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATORCHECKS_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CHECKSCONTROLLER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODECONFIGURATOR_PATH)/Chart.yaml"
 	@# endregion helm chart versions
 #
@@ -207,11 +207,11 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".rebooter.image.tag = \"$(OPERATOR_IMAGE_TAG)\"" "helm/nodeconfigurator/values.yaml"
 	@# endregion helm/nodeconfigurator/values.yaml
 
-	@# region helm/soperatorchecks/values.yaml
-	@echo 'Syncing helm/soperatorchecks/values.yaml'
-	@$(YQ) -i ".checks.manager.image.repository = \"$(IMAGE_REPO)/soperatorchecks\"" "helm/soperatorchecks/values.yaml"
-	@$(YQ) -i ".checks.manager.image.tag = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperatorchecks/values.yaml"
-	@# endregion helm/soperatorchecks/values.yaml
+	@# region helm/checkscontroller/values.yaml
+	@echo 'Syncing helm/checkscontroller/values.yaml'
+	@$(YQ) -i ".checks.manager.image.repository = \"$(IMAGE_REPO)/checkscontroller\"" "helm/checkscontroller/values.yaml"
+	@$(YQ) -i ".checks.manager.image.tag = \"$(OPERATOR_IMAGE_TAG)\"" "helm/checkscontroller/values.yaml"
+	@# endregion helm/checkscontroller/values.yaml
 
 	@# region helm/slurm-cluster/templates/_registry_helpers.tpl
 	@echo "Syncing $(CHART_CLUSTER_PATH)/templates/_registry_helpers.tpl"
@@ -260,7 +260,7 @@ endif
 ifndef DOCKERFILE
 	$(error DOCKERFILE is not set, docker image cannot be built)
 endif
-ifeq ($(filter ${IMAGE_NAME},slurm-operator rebooter soperatorchecks),${IMAGE_NAME})
+ifeq ($(filter ${IMAGE_NAME},slurm-operator rebooter checkscontroller),${IMAGE_NAME})
 	docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} ${DOCKER_BUILD_PLATFORM} -f ${DOCKERFILE} ${DOCKER_OUTPUT} .
 else
 	cd images && docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} ${DOCKER_BUILD_PLATFORM} -f ${DOCKERFILE} ${DOCKER_OUTPUT} .

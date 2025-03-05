@@ -11,12 +11,12 @@ metadata:
   labels:
     app.kubernetes.io/name: slurm-operator
     app.kubernetes.io/managed-by: kustomize
-  name: soperatorchecks-editor-role
+  name: checkscontroller-editor-role
 rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
-  - soperatorchecks
+  - checkscontroller
   verbs:
   - create
   - delete
@@ -28,6 +28,6 @@ rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
-  - soperatorchecks/status
+  - checkscontroller/status
   verbs:
   - get

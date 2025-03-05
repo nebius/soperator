@@ -11,17 +11,17 @@ metadata:
   labels:
     app.kubernetes.io/name: slurm-operator
     app.kubernetes.io/managed-by: kustomize
-  name: soperatorchecks-admin-role
+  name: activecheck-admin-role
 rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
-  - soperatorchecks
+  - activechecks
   verbs:
   - '*'
 - apiGroups:
   - slurm.nebius.ai
   resources:
-  - soperatorchecks/status
+  - activechecks/status
   verbs:
   - get

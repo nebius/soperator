@@ -11,12 +11,12 @@ metadata:
   labels:
     app.kubernetes.io/name: slurm-operator
     app.kubernetes.io/managed-by: kustomize
-  name: soperatorchecks-viewer-role
+  name: activecheck-viewer-role
 rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
-  - soperatorchecks
+  - activechecks
   verbs:
   - get
   - list
@@ -24,6 +24,6 @@ rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
-  - soperatorchecks/status
+  - activechecks/status
   verbs:
   - get
