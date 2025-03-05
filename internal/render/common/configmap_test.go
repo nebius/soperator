@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -155,6 +156,94 @@ func TestRenderConfigMapSecurityLimits(t *testing.T) {
 			assert.NotNil(t, result)
 			assert.Equal(t, tt.expectedLabel, result.Labels[consts.LabelComponentKey])
 			assert.Equal(t, tt.expectedData, result.Data[consts.ConfigMapKeySecurityLimits])
+		})
+	}
+}
+
+func TestRenderSlurmConfigMapAndTopology(t *testing.T) {
+	tests := []struct {
+		name                     string
+		cluster                  values.SlurmCluster
+		topologyConfig           v1.ConfigMap
+		expectedTopologyPlugin   string
+		unexpectedTopologyPlugin string
+	}{
+		{
+			name: "No topology config",
+			cluster: values.SlurmCluster{
+				SlurmConfig: slurmv1.SlurmConfig{
+					TopologyPlugin: "",
+				},
+				SlurmTopologyConfigMapRefName: "",
+			},
+			topologyConfig:           v1.ConfigMap{},
+			expectedTopologyPlugin:   "",
+			unexpectedTopologyPlugin: "",
+		},
+		{
+			name: "Default topology config",
+			cluster: values.SlurmCluster{
+				SlurmConfig: slurmv1.SlurmConfig{
+					TopologyPlugin: "",
+				},
+				SlurmTopologyConfigMapRefName: "foo",
+			},
+			topologyConfig: v1.ConfigMap{
+				Data: map[string]string{
+					consts.ConfigMapKeyTopologyConfig: "# foo",
+				},
+			},
+			expectedTopologyPlugin:   "topology/tree",
+			unexpectedTopologyPlugin: "",
+		},
+		{
+			name: "Override topology plugin",
+			cluster: values.SlurmCluster{
+				SlurmConfig: slurmv1.SlurmConfig{
+					TopologyPlugin: "topology/block",
+				},
+				SlurmTopologyConfigMapRefName: "foo",
+			},
+			topologyConfig: v1.ConfigMap{
+				Data: map[string]string{
+					consts.ConfigMapKeyTopologyConfig: "# foo",
+				},
+			},
+			expectedTopologyPlugin:   "topology/block",
+			unexpectedTopologyPlugin: "topology/tree",
+		},
+		{
+			name: "ConfigMap exists but topology config inside",
+			cluster: values.SlurmCluster{
+				SlurmConfig: slurmv1.SlurmConfig{
+					TopologyPlugin: "",
+				},
+				SlurmTopologyConfigMapRefName: "foo",
+			},
+			topologyConfig: v1.ConfigMap{
+				Data: map[string]string{},
+			},
+			expectedTopologyPlugin:   "",
+			unexpectedTopologyPlugin: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			result, err := RenderConfigMapSlurmConfigs(&tt.cluster, tt.topologyConfig)
+			assert.Nil(t, err)
+			assert.NotNil(t, result)
+
+			if tt.expectedTopologyPlugin == "" {
+				assert.NotContains(t, result.Data[consts.ConfigMapKeySlurmConfig], "TopologyPlugin")
+			} else {
+				assert.Contains(t, result.Data[consts.ConfigMapKeySlurmConfig], "TopologyPlugin="+tt.expectedTopologyPlugin)
+			}
+
+			if tt.unexpectedTopologyPlugin != "" {
+				assert.NotContains(t, result.Data[consts.ConfigMapKeySlurmConfig], "TopologyPlugin="+tt.unexpectedTopologyPlugin)
+			}
 		})
 	}
 }

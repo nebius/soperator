@@ -8,13 +8,13 @@ import (
 
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
-	accounting "nebius.ai/slurm-operator/internal/render/accounting"
+	"nebius.ai/slurm-operator/internal/render/accounting"
 	"nebius.ai/slurm-operator/internal/render/common"
 )
 
 func Test_RenderDeployment(t *testing.T) {
 
-	deployment, err := accounting.RenderDeployment(defaultNamespace, defaultNameCluster, acc, defaultNodeFilter, defaultVolumeSources)
+	deployment, err := accounting.RenderDeployment(defaultNamespace, defaultNameCluster, acc, defaultNodeFilter, defaultVolumeSources, slurmTopologyConfigMapRefName)
 	assert.NoError(t, err)
 
 	assert.Equal(t, naming.BuildDeploymentName(consts.ComponentTypeAccounting), deployment.Name)

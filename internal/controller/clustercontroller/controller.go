@@ -89,6 +89,7 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 						&clusterValues.Secrets,
 						clusterValues.VolumeSources,
 						&clusterValues.NodeController,
+						clusterValues.SlurmTopologyConfigMapRefName,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")

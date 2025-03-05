@@ -100,6 +100,13 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:default={pmixEnv: "OMPI_MCA_btl_tcp_if_include=eth0"}
 	MPIConfig MPIConfig `json:"mpiConfig,omitempty"`
 
+	// SlurmTopologyConfigMapRefName is the name of the slurm topology config.
+	// When exists, TopologyPlugin is automatically set to `topology/tree` in slurm.conf
+	// if TopologyPlugin is not explicitly specified in SlurmConfig.
+	//
+	// +kubebuilder:validation:Optional
+	SlurmTopologyConfigMapRefName string `json:"slurmTopologyConfigMapRefName,omitempty"`
+
 	// Generate and set default AppArmor profile for the Slurm worker and login nodes. The Security Profiles Operator must be installed.
 	//
 	// +kubebuilder:default=false
@@ -161,6 +168,15 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=30
 	MessageTimeout *int32 `json:"messageTimeout,omitempty"`
+	// TopologyPlugin identifies the plugin to determine network topology for optimizations.
+	// It is set automatically to `topology/tree` if SlurmTopologyConfigMapRefName is specified.
+	//
+	// +kubebuilder:validation:Optional
+	TopologyPlugin string `json:"topologyPlugin,omitempty"`
+	// TopologyParam is list of comma-separated options identifying network topology options.
+	//
+	// +kubebuilder:validation:Optional
+	TopologyParam string `json:"topologyParam,omitempty"`
 }
 
 type MPIConfig struct {

@@ -9,22 +9,18 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-// RenderVolumeMountSlurmConfigs renders [corev1.VolumeMount] defining the mounting path for Slurm config files
-func RenderVolumeMountSlurmdbdConfigs() corev1.VolumeMount {
-	return corev1.VolumeMount{
-		Name:      consts.VolumeNameSlurmdbdSecret,
-		MountPath: consts.VolumeMountPathSlurmdbdSecret,
-		ReadOnly:  true,
-	}
-}
-
-func RenderVolumeSlurmdbdConfigs(clusterName string) corev1.Volume {
-	return corev1.Volume{
-		Name: consts.VolumeNameSlurmdbdSecret,
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName:  naming.BuildSecretSlurmdbdConfigsName(clusterName),
-				DefaultMode: ptr.To(int32(0600)),
+func RenderVolumeProjecitonSlurmdbdConfigs(clusterName string) *corev1.VolumeProjection {
+	return &corev1.VolumeProjection{
+		Secret: &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: naming.BuildSecretSlurmdbdConfigsName(clusterName),
+			},
+			Items: []corev1.KeyToPath{
+				{
+					Key:  consts.SlurmdbdConfFile,
+					Path: consts.SlurmdbdConfFile,
+					Mode: ptr.To(int32(0600)),
+				},
 			},
 		},
 	}
