@@ -49,7 +49,7 @@ RUN for pkg in slurm-smd slurm-smd-slurmrestd; do \
 EXPOSE 6820
 
 # Copy restd conf file (overwrite AuthType)
-COPY restd/slurm_rest.conf /etc/slurm/slurm_rest.conf
+COPY restd/slurm_rest.conf /etc/slurm_rest.conf
 
 # Copy & run the entrypoint script
 COPY restd/slurmrestd_entrypoint.sh /opt/bin/slurm/
