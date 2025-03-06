@@ -628,8 +628,8 @@ type SlurmdbdConfig struct {
 
 type AccountingSlurmConf struct {
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Pattern="^((Billing|CPU|Mem|VMem|Node|Energy|Pages|FS/Disk|FS/Lustre|Gres/gpu|Gres/gpu:tesla|Gres/gpu:volta)(,)?)+$"
-	// +kubebuilder:default="Billing,CPU,Mem,Node,VMem"
+	// +kubebuilder:validation:Pattern="^((Billing|CPU|Mem|VMem|Node|Energy|Pages|FS/Disk|FS/Lustre|Gres/gpu)(,)?)+$"
+	// +kubebuilder:default="CPU,Mem,Node,VMem,Gres/gpu"
 	AccountingStorageTRES *string `json:"accountingStorageTRES,omitempty"`
 	// +kubebuilder:validation:Optional
 	AccountingStoreFlags *string `json:"accountingStoreFlags,omitempty"`

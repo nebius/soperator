@@ -1,12 +1,12 @@
 checks:
   manager:
     args:
-      - --leader-elect
+    - --leader-elect
     containerSecurityContext:
       allowPrivilegeEscalation: false
       capabilities:
         drop:
-          - ALL
+        - ALL
     env:
       slurmApiServer: http://soperator-rest-svc.soperator:6820
       slurmOperatorWatchNamespaces: '*'
