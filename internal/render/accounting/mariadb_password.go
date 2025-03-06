@@ -13,6 +13,7 @@ func RenderSecretMariaDb(
 	namespace,
 	secretName,
 	clusterName string,
+	additionalAnnotations map[string]string,
 ) (*corev1.Secret, error) {
 	generator, err := password.NewGenerator(&password.GeneratorInput{
 		Symbols: "@$^&*()_+-={}|[]<>/",
@@ -27,6 +28,9 @@ func RenderSecretMariaDb(
 
 	annotations := map[string]string{
 		consts.AnnotationClusterName: clusterName,
+	}
+	for k, v := range additionalAnnotations {
+		annotations[k] = v
 	}
 	labels := map[string]string{
 		consts.LabelNameKey:     consts.LabelNameValue,

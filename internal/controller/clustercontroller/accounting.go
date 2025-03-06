@@ -120,6 +120,10 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 							clusterValues.Namespace,
 							consts.MariaDbSecretName,
 							clusterValues.Name,
+							map[string]string{
+								consts.AnnotationReflectorAllowed:           "true",
+								consts.AnnotationReflectorAllowedNamespaces: "*-system",
+							},
 						)
 						if err != nil {
 							stepLogger.Error(err, "Failed to render")
@@ -163,6 +167,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 							clusterValues.Namespace,
 							consts.MariaDbSecretRootName,
 							clusterValues.Name,
+							map[string]string{},
 						)
 						if err != nil {
 							stepLogger.Error(err, "Failed to render")
