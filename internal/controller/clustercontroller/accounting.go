@@ -133,6 +133,15 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 							stepLogger.Error(err, "Failed to create")
 							return errors.Wrap(err, "creating mariadb password Secret")
 						}
+
+						monitoringDuplicate := desired.DeepCopy()
+						monitoringDuplicate.Namespace = consts.MariaDbMonitoringNamespaceName
+
+						err = r.Create(ctx, monitoringDuplicate)
+						if err != nil {
+							stepLogger.Error(err, "Failed to create secret duplicate for monitoring")
+							return errors.Wrap(err, "creating mariadb password secret duplicate for monitoring")
+						}
 					}
 					return err
 				},

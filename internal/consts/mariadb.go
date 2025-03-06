@@ -17,4 +17,5 @@ innodb_buffer_pool_size=32768M
 innodb_log_file_size=64M
 innodb_lock_wait_timeout=900
 max_allowed_packet=16M`
+	MariaDbMonitoringNamespaceName = "monitoring-system"
 )
