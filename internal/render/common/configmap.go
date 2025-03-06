@@ -17,9 +17,10 @@ import (
 // RenderConfigMapSlurmConfigs renders new [corev1.ConfigMap] containing '.conf' files for the following components:
 //
 // [consts.ConfigMapKeySlurmConfig] - Slurm config
-// [consts.ConfigMapKeyCGroupConfig] - cgroup config
+// [consts.ConfigMapKeyCGroupConfig] - Cgroup config
 // [consts.ConfigMapKeySpankConfig] - SPANK plugins config
-// [consts.ConfigMapKeyGresConfig] - gres config
+// [consts.ConfigMapKeyGresConfig] - GRES config
+// [consts.ConfigMapKeyMPIConfig] - PMIx config
 func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig corev1.ConfigMap) (corev1.ConfigMap, error) {
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -100,6 +101,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 	res.AddProperty("HealthCheckNodeState", "ANY")
 	res.AddComment("")
 	res.AddProperty("InactiveLimit", 0)
+	res.AddProperty("KillOnBadExit", 1)
 	res.AddProperty("KillWait", 180)
 	res.AddProperty("UnkillableStepTimeout", 600)
 	res.AddProperty("SlurmctldTimeout", 30)
@@ -119,11 +121,12 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 	res.AddComment("")
 	res.AddComment("COMPUTE NODES")
 	res.AddComment("We're using the \"dynamic nodes\" feature: https://slurm.schedmd.com/dynamic_nodes.html")
-	res.AddProperty("MaxNodeCount", "512")
-	res.AddComment("Partition Configuration")
+	res.AddProperty("MaxNodeCount", "1024")
+	res.AddProperty("MaxArraySize", "1024")
 	res.AddProperty("JobRequeue", 1)
 	res.AddProperty("PreemptMode", "REQUEUE")
 	res.AddProperty("PreemptType", "preempt/partition_prio")
+	res.AddComment("Partition Configuration")
 	switch cluster.PartitionConfiguration.ConfigType {
 	case "custom":
 		for _, l := range cluster.PartitionConfiguration.RawConfig {
