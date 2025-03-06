@@ -65,7 +65,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					}
 
 					if isMariaDBEnabled {
-						err = r.handleMariaDB(stepCtx, clusterValues, consts.MariaDbSecretName, secret)
+						err = r.handleMariaDB(stepCtx, clusterValues, consts.MariaDbSecretName, clusterValues.Namespace, secret)
 						if err != nil {
 							return err
 						}
@@ -112,11 +112,12 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					}
 
 					var secret = &corev1.Secret{}
+					var desired *corev1.Secret = nil
 
-					err := r.handleMariaDB(stepCtx, clusterValues, consts.MariaDbSecretName, secret)
+					err := r.handleMariaDB(stepCtx, clusterValues, consts.MariaDbSecretName, clusterValues.Namespace, secret)
 
 					if apierrors.IsNotFound(err) {
-						desired, err := accounting.RenderSecretMariaDb(
+						desired, err = accounting.RenderSecretMariaDb(
 							clusterValues.Namespace,
 							consts.MariaDbSecretName,
 							clusterValues.Name,
@@ -132,6 +133,16 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						if err != nil {
 							stepLogger.Error(err, "Failed to create")
 							return errors.Wrap(err, "creating mariadb password Secret")
+						}
+					} else {
+						return err
+					}
+
+					var monitoringSecret = &corev1.Secret{}
+					err = r.handleMariaDB(stepCtx, clusterValues, consts.MariaDbSecretName, consts.MariaDbMonitoringNamespaceName, monitoringSecret)
+					if apierrors.IsNotFound(err) {
+						if desired == nil { // original secret was found
+							desired = secret
 						}
 
 						monitoringDuplicate := desired.DeepCopy()
@@ -165,7 +176,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 
 					var secret = &corev1.Secret{}
 
-					err := r.handleMariaDB(stepCtx, clusterValues, consts.MariaDbSecretRootName, secret)
+					err := r.handleMariaDB(stepCtx, clusterValues, consts.MariaDbSecretRootName, clusterValues.Namespace, secret)
 
 					if apierrors.IsNotFound(err) {
 						desired, err := accounting.RenderSecretMariaDb(
@@ -421,13 +432,14 @@ func (r SlurmClusterReconciler) handleMariaDB(
 	ctx context.Context,
 	clusterValues *values.SlurmCluster,
 	secretName string,
+	namespaceName string,
 	secret *corev1.Secret) error {
 	logger := log.FromContext(ctx)
 
 	err := r.Get(
 		ctx,
 		types.NamespacedName{
-			Namespace: clusterValues.Namespace,
+			Namespace: namespaceName,
 			Name:      secretName,
 		},
 		secret,
