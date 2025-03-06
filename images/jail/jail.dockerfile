@@ -140,7 +140,8 @@ RUN apt update && \
         rdma-core \
         ibverbs-utils \
         libpmix2 \
-        libpmix-dev && \
+        libpmix-dev \
+        bsdmainutils && \
     apt clean
 
 # Install python
