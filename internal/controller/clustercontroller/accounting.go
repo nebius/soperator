@@ -122,7 +122,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 							clusterValues.Name,
 							map[string]string{
 								consts.AnnotationReflectorAllowed:           "true",
-								consts.AnnotationReflectorAllowedNamespaces: "*-system",
+								consts.AnnotationReflectorAllowedNamespaces: ".*-system",
 							},
 						)
 						if err != nil {
