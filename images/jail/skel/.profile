@@ -25,3 +25,5 @@ fi
 if [ -d "$HOME/.local/bin" ] ; then
     PATH="$HOME/.local/bin:$PATH"
 fi
+
+export SLURM_TIME_FORMAT='%Y-%m-%d %H:%M:%S.%Z'
