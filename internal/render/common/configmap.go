@@ -161,7 +161,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 		}
 	}
 
-  if cluster.SlurmConfig.TopologyPlugin == "" && topologyConfig.Data != nil {
+	if cluster.SlurmConfig.TopologyPlugin == "" && topologyConfig.Data != nil {
 		if _, ok := topologyConfig.Data[consts.ConfigMapKeyTopologyConfig]; ok {
 			res.AddComment("AUTO TOPOLOGY, triggered by slurmTopologyConfigMapRefName")
 			res.AddProperty("TopologyPlugin", "topology/tree")
@@ -177,6 +177,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 
 func generateCustomSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	multilineCfg := &renderutils.MultilineStringConfig{}
+	multilineCfg.AddLine("# CUSTOM SLURM CONFIG")
 	if cluster.CustomSlurmConfig != nil {
 		multilineCfg.AddLine(*cluster.CustomSlurmConfig)
 	}
