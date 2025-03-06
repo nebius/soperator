@@ -4,4 +4,4 @@ resources:
 images:
   - name: controller
     newName: cr.eu-north1.nebius.cloud/soperator/soperatorchecks
-    newTag: 1.18.3
+    newTag: 1.19.0
