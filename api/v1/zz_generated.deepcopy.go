@@ -902,6 +902,13 @@ func (in *SlurmNodeWorker) DeepCopyInto(out *SlurmNodeWorker) {
 	out.SlurmNode = in.SlurmNode
 	in.Slurmd.DeepCopyInto(&out.Slurmd)
 	in.Munge.DeepCopyInto(&out.Munge)
+	if in.WorkerAnnotations != nil {
+		in, out := &in.WorkerAnnotations, &out.WorkerAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	in.Volumes.DeepCopyInto(&out.Volumes)
 }
 

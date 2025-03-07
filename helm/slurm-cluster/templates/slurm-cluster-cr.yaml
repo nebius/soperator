@@ -171,6 +171,10 @@ spec:
       {{- if .Values.slurmNodes.worker.sshdConfigMapRefName }}
       sshdConfigMapRefName: {{ .Values.slurmNodes.worker.sshdConfigMapRefName | quote }}
       {{- end }}
+      {{- if .Values.slurmNodes.worker.workerAnnotations }}
+      workerAnnotations: 
+      {{- default list .Values.slurmNodes.worker.workerAnnotations | toYaml | nindent 8 }}
+      {{- end }}
       slurmd:
         image: {{ required "slurmd image" .Values.images.slurmd | quote }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.worker.slurmd.imagePullPolicy | quote }}

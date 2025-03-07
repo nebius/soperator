@@ -724,6 +724,11 @@ type SlurmNodeWorker struct {
 	// +kubebuilder:validation:Optional
 	SSHDConfigMapRefName string `json:"sshdConfigMapRefName,omitempty"`
 
+	// WorkerAnnotations represent K8S annotations that should be added to the workers
+	//
+	// +kubebuilder:validation:Optional
+	WorkerAnnotations map[string]string `json:"workerAnnotations,omitempty"`
+
 	// Volumes represents the volume configurations for the worker node
 	//
 	// +kubebuilder:validation:Required

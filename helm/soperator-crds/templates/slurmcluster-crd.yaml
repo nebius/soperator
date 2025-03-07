@@ -9181,6 +9181,12 @@ spec:
                         description: SSHDConfigMapRefName is the name of the SSHD
                           config, which runs in slurmd container
                         type: string
+                      workerAnnotations:
+                        additionalProperties:
+                          type: string
+                        description: WorkerAnnotations represent K8S annotations
+                          that should be added to the worker nodes 
+                        type: object                      
                       supervisordConfigMapRefName:
                         description: SupervisordConfigMapRefName is the name of the
                           supervisord config, which runs in slurmd container

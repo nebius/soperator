@@ -290,6 +290,7 @@ slurmNodes:
     slurmNodeExtra: ""
     supervisordConfigMapRefName: ""
     sshdConfigMapRefName: ""
+    # workerAnnotations: []
     slurmd:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
