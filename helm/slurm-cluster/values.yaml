@@ -281,6 +281,7 @@ slurmNodes:
         volumeSourceName: "controller-spool"
       jail:
         volumeSourceName: "jail"
+      customMounts: []
   worker:
     size: 2
     k8sNodeFilterName: "gpu"
@@ -318,12 +319,17 @@ slurmNodes:
       jail:
         volumeSourceName: "jail"
       jailSubMounts: []
-      #      jailSubMounts:
-      #        - name: "mlcommons-sd-bench-data"
-      #          mountPath: "/mlperf-sd"
-      #          subPath: ""
-      #          readOnly: false
-      #          volumeSourceName: "mlperf-sd"
+      # jailSubMounts:
+      #   - name: "mlcommons-sd-bench-data"
+      #     mountPath: "/mlperf-sd"
+      #     volumeSourceName: "mlperf-sd"
+      customMounts: []
+      # customMounts:
+      #   - name: "slurm-prolog"
+      #     mountPath: "/etc/slurm-scripts/prolog.sh"
+      #     subPath: "prolog.sh"
+      #     readOnly: true
+      #     volumeSourceName: "slurm-prolog"
   login:
     size: 2
     k8sNodeFilterName: "no-gpu"
@@ -359,10 +365,11 @@ slurmNodes:
       jail:
         volumeSourceName: "jail"
       jailSubMounts: []
-      #      jailSubMounts:
-      #        - name: "mlcommons-sd-bench-data"
-      #          mountPath: "/mlperf-sd"
-      #          volumeSourceName: "mlperf-sd"
+      # jailSubMounts:
+      #   - name: "mlcommons-sd-bench-data"
+      #     mountPath: "/mlperf-sd"
+      #     volumeSourceName: "mlperf-sd"
+      customMounts: []
   exporter:
     enabled: true
     size: 1

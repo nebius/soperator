@@ -156,6 +156,8 @@ spec:
           {{- required ".Values.slurmNodes.controller.volumes.spool must be provided." .Values.slurmNodes.controller.volumes.spool | toYaml | nindent 10 }}
         jail:
           {{- required ".Values.slurmNodes.controller.volumes.jail must be provided." .Values.slurmNodes.controller.volumes.jail | toYaml | nindent 10 }}
+        customMounts:
+          {{- default list .Values.slurmNodes.controller.volumes.customMounts | toYaml | nindent 10 }}
     worker:
       cgroupVersion: {{ .Values.slurmNodes.worker.cgroupVersion | quote }}
       enableGDRCopy: {{ default false .Values.slurmNodes.worker.enableGDRCopy }}
@@ -199,6 +201,8 @@ spec:
           {{- required ".Values.slurmNodes.worker.volumes.jail must be provided." .Values.slurmNodes.worker.volumes.jail | toYaml | nindent 10 }}
         jailSubMounts:
           {{- default list .Values.slurmNodes.worker.volumes.jailSubMounts | toYaml | nindent 10 }}
+        customMounts:
+          {{- default list .Values.slurmNodes.worker.volumes.customMounts | toYaml | nindent 10 }}
         {{- if .Values.slurmNodes.worker.volumes.sharedMemorySize }}
         sharedMemorySize: {{ .Values.slurmNodes.worker.volumes.sharedMemorySize | quote }}
         {{- end }}
@@ -239,6 +243,8 @@ spec:
           {{- required ".Values.slurmNodes.login.volumes.jail must be provided." .Values.slurmNodes.login.volumes.jail | toYaml | nindent 10 }}
         jailSubMounts:
           {{- default list .Values.slurmNodes.login.volumes.jailSubMounts | toYaml | nindent 10 }}
+        customMounts:
+          {{- default list .Values.slurmNodes.login.volumes.customMounts | toYaml | nindent 10 }}
     exporter:
       enabled: {{ .Values.slurmNodes.exporter.enabled }}
       size: {{ required ".Values.slurmNodes.exporter.size must be provided." .Values.slurmNodes.exporter.size }}
