@@ -14,6 +14,7 @@ const (
 	ConfigMapNameSupervisord       = supervisord
 
 	ConfigMapKeySlurmConfig       = "slurm.conf"
+	ConfigMapKeyRESTConfig        = "slurm_rest.conf"
 	ConfigMapKeyCustomSlurmConfig = "custom_slurm.conf"
 	ConfigMapKeyCGroupConfig      = "cgroup.conf"
 	ConfigMapKeySpankConfig       = "plugstack.conf"

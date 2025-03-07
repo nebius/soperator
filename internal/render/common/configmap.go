@@ -30,6 +30,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig co
 		},
 		Data: map[string]string{
 			consts.ConfigMapKeySlurmConfig:       generateSlurmConfig(cluster, topologyConfig).Render(),
+			consts.ConfigMapKeyRESTConfig:        generateRESTConfig().Render(),
 			consts.ConfigMapKeyCustomSlurmConfig: generateCustomSlurmConfig(cluster).Render(),
 			consts.ConfigMapKeyCGroupConfig:      generateCGroupConfig(cluster).Render(),
 			consts.ConfigMapKeySpankConfig:       generateSpankConfig().Render(),
@@ -270,6 +271,14 @@ func generateMPIConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	if cluster.MPIConfig.PMIxEnv != "" {
 		res.AddProperty("PMIxEnv", cluster.MPIConfig.PMIxEnv)
 	}
+	return res
+}
+
+func generateRESTConfig() renderutils.ConfigFile {
+	res := &renderutils.PropertiesConfig{}
+	res.AddComment("REST API config")
+	res.AddPropertyWithConnector("include", consts.ConfigMapKeySlurmConfig, renderutils.SpaceConnector)
+	res.AddProperty("AuthType", "auth/jwt")
 	return res
 }
 
