@@ -156,6 +156,7 @@ rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
+  - activechecks
   - nodeconfigurators
   - slurmclusters
   verbs:
@@ -169,6 +170,7 @@ rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
+  - activechecks/finalizers
   - nodeconfigurators/finalizers
   - slurmclusters/finalizers
   verbs:
@@ -176,6 +178,7 @@ rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
+  - activechecks/status
   - nodeconfigurators/status
   - slurmclusters/status
   verbs:

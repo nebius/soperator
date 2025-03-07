@@ -1,3 +1,4 @@
 resources:
-- slurm.nebius.ai_slurmclusters.yaml
+- slurm.nebius.ai_activechecks.yaml
 - slurm.nebius.ai_nodeconfigurators.yaml
+- slurm.nebius.ai_slurmclusters.yaml

@@ -2,9 +2,9 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/slurm.nebius.ai_slurmclusters.yaml
+- bases/slurm.nebius.ai_activechecks.yaml
 - bases/slurm.nebius.ai_nodeconfigurators.yaml
-
+- bases/slurm.nebius.ai_slurmclusters.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patches: []
