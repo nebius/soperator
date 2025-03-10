@@ -9,14 +9,12 @@ const (
 )
 
 const (
-	Namespace   = SlurmCluster + ".namespace"
-	ClusterName = SlurmCluster + ".name"
+	ClusterNamespace = SlurmCluster + ".namespace"
+	ClusterName      = SlurmCluster + ".name"
 
-	ResourceName = SlurmCluster + ".resourceName"
 	ResourceKind = SlurmCluster + ".resourceKind"
-)
+	ResourceName = SlurmCluster + ".resourceName"
 
-const (
-	NodeConfiguratorNamespace = consts.NodeConfiguratorName + ".namespace"
-	NodeConfiguratorName      = consts.NodeConfiguratorName + ".name"
+	SubResourceKind = SlurmCluster + ".subResourceKind"
+	SubResourceName = SlurmCluster + ".subResourceName"
 )

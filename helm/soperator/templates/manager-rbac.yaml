@@ -158,6 +158,7 @@ rules:
   resources:
   - activechecks
   - nodeconfigurators
+  - nodesets
   - slurmclusters
   verbs:
   - create
@@ -172,6 +173,7 @@ rules:
   resources:
   - activechecks/finalizers
   - nodeconfigurators/finalizers
+  - nodesets/finalizers
   - slurmclusters/finalizers
   verbs:
   - update
@@ -180,6 +182,7 @@ rules:
   resources:
   - activechecks/status
   - nodeconfigurators/status
+  - nodesets/status
   - slurmclusters/status
   verbs:
   - get

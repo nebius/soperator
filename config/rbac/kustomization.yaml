@@ -29,10 +29,12 @@ resources:
 - activecheck_admin_role.yaml
 - activecheck_editor_role.yaml
 - activecheck_viewer_role.yaml
+- nodeset_admin_role.yaml
+- nodeset_editor_role.yaml
+- nodeset_viewer_role.yaml
 - soperatorchecks_admin_role.yaml
 - soperatorchecks_editor_role.yaml
 - soperatorchecks_viewer_role.yaml
 - nodeconfigurator_admin_role.yaml
 - nodeconfigurator_editor_role.yaml
 - nodeconfigurator_viewer_role.yaml
-

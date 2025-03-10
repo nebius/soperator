@@ -117,8 +117,10 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 // The reconciling cycle is actually implemented in the auxiliary 'reconcile' method
 func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues(
-		logfield.Namespace, req.Namespace,
+		logfield.ClusterNamespace, req.Namespace,
 		logfield.ClusterName, req.Name,
+		logfield.ResourceKind, slurmv1.KindSlurmCluster,
+		logfield.ResourceName, req.Name,
 	)
 	log.IntoContext(ctx, logger)
 
@@ -606,6 +608,7 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 	saPredicate := r.createServiceAccountPredicate()
 
 	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
+		Named("cluster").
 		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.GenerationChangedPredicate{}))
 
 	controllerBuilder.Watches(
