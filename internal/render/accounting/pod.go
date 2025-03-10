@@ -65,6 +65,7 @@ func BasePodTemplateSpec(
 		Spec: corev1.PodSpec{
 			Affinity:     affinity,
 			NodeSelector: nodeSelector,
+			Tolerations:  nodeFilter.Tolerations,
 			Hostname:     consts.HostnameAccounting,
 			InitContainers: []corev1.Container{
 				common.RenderContainerMunge(&accounting.ContainerMunge),
