@@ -32,26 +32,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - nodes
-  verbs:
-  - delete
-  - get
-  - list
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - nodes/status
-  verbs:
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - podtemplates
   verbs:
   - get
@@ -156,9 +136,6 @@ rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
-  - activechecks
-  - nodeconfigurators
-  - nodesets
   - slurmclusters
   verbs:
   - create
@@ -171,18 +148,12 @@ rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
-  - activechecks/finalizers
-  - nodeconfigurators/finalizers
-  - nodesets/finalizers
   - slurmclusters/finalizers
   verbs:
   - update
 - apiGroups:
   - slurm.nebius.ai
   resources:
-  - activechecks/status
-  - nodeconfigurators/status
-  - nodesets/status
   - slurmclusters/status
   verbs:
   - get

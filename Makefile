@@ -81,8 +81,8 @@ help: ## Display this help.
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) crd webhook paths=$(GENPATH) output:crd:artifacts:config=config/crd/bases
-	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./internal/controller/..." output:artifacts:config=config/rbac/clustercontroller/
 	$(CONTROLLER_GEN) rbac:roleName=nodeconfigurator-role paths="./internal/rebooter/..." output:artifacts:config=config/rbac/nodeconfigurator/
+	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./internal/controller/clustercontroller/..." output:artifacts:config=config/rbac/clustercontroller/
 	$(CONTROLLER_GEN) rbac:roleName=soperator-checks-role paths="./internal/controller/soperatorchecks/..." output:artifacts:config=config/rbac/soperatorchecks/
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -110,7 +110,7 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 
 .PHONY: helm
 helm: generate manifests ## Update soperator Helm chart
-	$(KUSTOMIZE) build config/crd/bases > $(CHART_OPERATOR_PATH)/crds/slurmcluster-crd.yaml 
+	$(KUSTOMIZE) build config/crd/bases > $(CHART_OPERATOR_PATH)/crds/slurmcluster-crd.yaml
 	$(KUSTOMIZE) build config/crd/bases > $(CHART_OPERATOR_CRDS_PATH)/templates/slurmcluster-crd.yaml
 # Because of helmify rewrite a file we need to make backup of values.yaml
 	mv $(CHART_OPERATOR_PATH)/values.yaml $(CHART_OPERATOR_PATH)/values.yaml.bak
