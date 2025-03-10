@@ -1,0 +1,14 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sconfigcontroller-role
+rules:
+- apiGroups:
+  - slurm.nebius.ai
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
