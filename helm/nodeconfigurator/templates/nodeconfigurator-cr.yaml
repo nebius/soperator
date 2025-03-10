@@ -3,7 +3,7 @@ apiVersion: slurm.nebius.ai/v1alpha1
 kind: NodeConfigurator
 metadata:
   namespace: {{ .Release.Namespace }}
-  name: {{ include "nodeconfigurator.name" . }}-{{ .Release.Name }}
+  name: {{ include "nodeconfigurator.name" . }}
   {{- with include "nodeconfigurator.labels" . }}
   labels:
     {{- . | nindent 4 -}}
@@ -88,7 +88,7 @@ spec:
     priorityClassName: {{ .Values.rebooter.priorityClassName | quote }}
     {{- end }}
     {{- if .Values.rebooter.generateRBAC }}
-    serviceAccountName: {{ include "nodeconfigurator.name" . }}-{{ .Release.Name }}-sa
+    serviceAccountName: {{ include "nodeconfigurator.name" . }}-sa
     {{- else if .Values.rebooter.serviceAccountName }}
     serviceAccountName: {{ .Values.rebooter.serviceAccountName | quote }}
     {{- end }}
