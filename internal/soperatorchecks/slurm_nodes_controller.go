@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -29,6 +30,8 @@ import (
 
 var (
 	SlurmNodesControllerName = "soperatorchecks.slurmnodes"
+
+	workerPodNameRegex = regexp.MustCompile(`^worker-\d+$`)
 )
 
 type SlurmNodesController struct {
@@ -179,6 +182,7 @@ func (c *SlurmNodesController) processKillTaskFailed(
 	slurmClusterName types.NamespacedName,
 	slurmNode slurmapi.Node,
 ) error {
+	logger := log.FromContext(ctx).WithName("SlurmNodesController.processKillTaskFailed")
 
 	drainWithCondition := func() error {
 		if err := c.drainSlurmNodesWithConditionUpdate(
@@ -208,17 +212,26 @@ func (c *SlurmNodesController) processKillTaskFailed(
 
 	if degradedCondition == (corev1.NodeCondition{}) {
 		// No degraded condition found
+		logger.V(1).Info("draining because no degraded condition found")
 		return drainWithCondition()
 	}
 
 	if degradedCondition.Status == corev1.ConditionTrue {
 		// Node is still rebooting, skip
+		logger.V(1).Info("skip, still rebooting")
 		return nil
 	}
+
+	logger = logger.WithValues(
+		"reasonChangedAt", slurmNode.Reason.ChangedAt.String(),
+		"conditionTransitionTime", degradedCondition.LastTransitionTime.Time.String(),
+	)
 	if slurmNode.Reason.ChangedAt.Before(degradedCondition.LastTransitionTime.Time) {
+		logger.Info("undraining, slurm node drained before degraded condition changed")
 		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
 	}
 
+	logger.Info("draining, slurm node drained after degraded condition changed")
 	return drainWithCondition()
 }
 
@@ -348,7 +361,7 @@ func (c *SlurmNodesController) drainSlurmNodes(
 
 	var errs []error
 	for _, pod := range podList.Items {
-		if _, err := fmt.Sscanf("worker-%d", pod.Name); err == nil {
+		if workerPodNameRegex.MatchString(pod.Name) {
 			slurmClusterName := types.NamespacedName{
 				Namespace: pod.Namespace,
 				Name:      pod.Labels[consts.LabelInstanceKey],
@@ -412,7 +425,7 @@ func (c *SlurmNodesController) slurmNodesFullyDrained(
 	}
 
 	for _, pod := range podList.Items {
-		if _, err := fmt.Sscanf("worker-%d", pod.Name); err == nil {
+		if workerPodNameRegex.MatchString(pod.Name) {
 			logger = logger.WithValues("slurmNode", pod.Name, "instanceKey", pod.Labels[consts.LabelInstanceKey])
 			logger.Info("found slurm node")
 
