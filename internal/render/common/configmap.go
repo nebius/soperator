@@ -26,7 +26,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig co
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapSlurmConfigsName(cluster.Name),
 			Namespace: cluster.Namespace,
-			Labels:    RenderLabels(consts.ComponentTypeController, cluster.Name),
+			Labels:    renderConfigMapSlurmConfigsLabels(consts.ComponentTypeController, cluster.Name),
 		},
 		Data: map[string]string{
 			consts.ConfigMapKeySlurmConfig:       generateSlurmConfig(cluster, topologyConfig).Render(),
@@ -38,6 +38,13 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig co
 			consts.ConfigMapKeyMPIConfig:         generateMPIConfig(cluster).Render(),
 		},
 	}, nil
+}
+
+func renderConfigMapSlurmConfigsLabels(componentType consts.ComponentType, clusterName string) map[string]string {
+	labels := RenderLabels(componentType, clusterName)
+	labels[consts.LabelSlurmConfigKey] = consts.LabelSlurmConfigValue
+
+	return labels
 }
 
 func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.ConfigMap) renderutils.ConfigFile {
