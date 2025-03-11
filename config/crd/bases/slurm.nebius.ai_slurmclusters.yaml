@@ -2105,8 +2105,8 @@ spec:
                           in slurm.conf
                         properties:
                           accountingStorageTRES:
-                            default: Billing,CPU,Mem,Node,VMem
-                            pattern: ^((Billing|CPU|Mem|VMem|Node|Energy|Pages|FS/Disk|FS/Lustre|Gres/gpu|Gres/gpu:tesla|Gres/gpu:volta)(,)?)+$
+                            default: CPU,Mem,Node,VMem,Gres/gpu
+                            pattern: ^((Billing|CPU|Mem|VMem|Node|Energy|Pages|FS/Disk|FS/Lustre|Gres/gpu)(,)?)+$
                             type: string
                           accountingStoreFlags:
                             type: string

@@ -226,6 +226,10 @@ RUN mv /usr/bin/docker /usr/bin/docker.real
 COPY jail/scripts/docker.sh /usr/bin/docker
 RUN chmod +x /usr/bin/docker
 
+# Create a wrapper script for nvidia-smi that shows running processes (in the host's PID namespace)
+COPY jail/scripts/nvidia_smi_hostpid.sh /usr/bin/nvidia-smi-hostpid
+RUN chmod +x /usr/bin/nvidia-smi-hostpid
+
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host
 

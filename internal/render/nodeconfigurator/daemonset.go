@@ -6,8 +6,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
-	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/naming"
 )
 
 // RenderDaemonSet renders the DaemonSet for the node-configurator
@@ -23,7 +21,7 @@ func RenderDaemonSet(
 
 	return &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      naming.BuildDaemonSetName(nodeConfigurator.Name, consts.NodeConfiguratorName),
+			Name:      nodeConfigurator.Name + "-ds",
 			Namespace: namespace,
 			Labels:    labels,
 		},
