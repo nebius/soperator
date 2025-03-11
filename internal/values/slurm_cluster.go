@@ -37,7 +37,7 @@ type SlurmCluster struct {
 	SlurmConfig                   slurmv1.SlurmConfig
 	CustomSlurmConfig             *string
 	MPIConfig                     slurmv1.MPIConfig
-  SlurmTopologyConfigMapRefName string
+	SlurmTopologyConfigMapRefName string
 }
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD
@@ -73,13 +73,13 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 			&cluster.Spec.NCCLSettings,
 			cluster.Spec.UseDefaultAppArmorProfile,
 		),
-    NodeLogin:                     buildSlurmLoginFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
+		NodeLogin:                     buildSlurmLoginFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
 		Telemetry:                     cluster.Spec.Telemetry,
 		SlurmExporter:                 buildSlurmExporterFrom(cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Exporter),
 		SlurmConfig:                   cluster.Spec.SlurmConfig,
 		CustomSlurmConfig:             cluster.Spec.CustomSlurmConfig,
 		MPIConfig:                     cluster.Spec.MPIConfig,
-    SlurmTopologyConfigMapRefName: cluster.Spec.SlurmTopologyConfigMapRefName,
+		SlurmTopologyConfigMapRefName: cluster.Spec.SlurmTopologyConfigMapRefName,
 	}
 
 	if err := res.Validate(ctx); err != nil {

@@ -354,6 +354,7 @@ slurmNodes:
     sshdServiceNodePort: 30022
     # Annotations to be configure on login service
     sshdServiceAnnotations: {}
+    sshdEntrypointHookScriptPath: ""
     munge:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"

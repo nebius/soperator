@@ -230,6 +230,9 @@ spec:
       {{- if eq .Values.slurmNodes.login.sshdServiceType "NodePort" }}
       sshdServiceNodePort: {{ required "slurmNodes.login.sshdServiceNodePort is required in case of slurmNodes.login.sshdServiceType == `NodePort`" .Values.slurmNodes.login.sshdServiceNodePort }}
       {{- end }}
+      {{- if .Values.slurmNodes.login.sshdEntrypointHookScriptPath }}
+      sshdEntrypointHookScriptPath: {{ .Values.slurmNodes.login.sshdEntrypointHookScriptPath | quote }}
+      {{- end }}
       munge:
         image: {{ required "sshd munge" .Values.images.munge | quote }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.login.munge.imagePullPolicy | quote }}

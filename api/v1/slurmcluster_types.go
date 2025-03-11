@@ -828,6 +828,15 @@ type SlurmNodeLogin struct {
 	// +kubebuilder:default=0
 	SshdServiceNodePort int32 `json:"sshdServiceNodePort,omitempty"`
 
+	// SshdEntrypointHookScriptPath specifies the path to a custom script that will be executed
+	// before the SSH daemon starts. This hook allows starting additional daemons and services,
+	// as well as extending the login node's initialization with custom setup or configuration.
+	// The script must be accessible within the container and will be executed with bash if not
+	// executable.
+	//
+	// +kubebuilder:validation:Optional
+	SshdEntrypointHookScriptPath string `json:"sshdEntrypointHookScriptPath,omitempty"`
+
 	// Volumes represents the volume configurations for the login node
 	//
 	// +kubebuilder:validation:Required

@@ -48,6 +48,11 @@ func RenderStatefulSet(
 		replicas = ptr.To(consts.ZeroReplicas)
 	}
 
+	var args []string
+	if login.SSHDEntrypointHookScriptPath != "" {
+		args = append(args, "--hook-script", login.SSHDEntrypointHookScriptPath)
+	}
+
 	return appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      login.StatefulSet.Name,
@@ -86,7 +91,7 @@ func RenderStatefulSet(
 						common.RenderContainerMunge(&login.ContainerMunge),
 					},
 					Containers: []corev1.Container{
-						renderContainerSshd(clusterType, &login.ContainerSshd, login.JailSubMounts, login.CustomVolumeMounts),
+						renderContainerSshd(clusterType, &login.ContainerSshd, login.JailSubMounts, login.CustomVolumeMounts, args),
 					},
 					Volumes: volumes,
 					DNSConfig: &corev1.PodDNSConfig{

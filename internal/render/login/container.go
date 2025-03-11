@@ -15,7 +15,9 @@ import (
 func renderContainerSshd(
 	clusterType consts.ClusterType,
 	container *values.Container,
-	jailSubMounts, customMounts []slurmv1.NodeVolumeMount,
+	jailSubMounts,
+	customMounts []slurmv1.NodeVolumeMount,
+	args []string,
 ) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountSlurmConfigs(),
@@ -35,6 +37,7 @@ func renderContainerSshd(
 	return corev1.Container{
 		Name:  consts.ContainerNameSshd,
 		Image: container.Image,
+		Args:  args,
 		Env: []corev1.EnvVar{
 			{
 				Name:  "SLURM_CLUSTER_TYPE",
