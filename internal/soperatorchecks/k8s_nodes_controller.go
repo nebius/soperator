@@ -111,7 +111,7 @@ func (c *K8SNodesController) Reconcile(ctx context.Context, req ctrl.Request) (c
 }
 
 func (c *K8SNodesController) processDrainCondition(ctx context.Context, k8sNode *corev1.Node) error {
-	logger := log.FromContext(ctx).WithName("processDrainCondition")
+	logger := log.FromContext(ctx).WithName("K8SNodesController.processDrainCondition")
 	logger.Info("processing drain condition")
 
 	var (
@@ -160,7 +160,7 @@ func (c *K8SNodesController) processDrainCondition(ctx context.Context, k8sNode 
 }
 
 func (c *K8SNodesController) processRebootCondition(ctx context.Context, k8sNode *corev1.Node) error {
-	logger := log.FromContext(ctx).WithName("processRebootCondition")
+	logger := log.FromContext(ctx).WithName("K8SNodesController.processRebootCondition")
 	logger.Info("processing reboot condition")
 
 	var (
