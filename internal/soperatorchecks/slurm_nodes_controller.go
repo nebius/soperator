@@ -227,11 +227,11 @@ func (c *SlurmNodesController) processKillTaskFailed(
 		"conditionTransitionTime", degradedCondition.LastTransitionTime.Time.String(),
 	)
 	if slurmNode.Reason.ChangedAt.Before(degradedCondition.LastTransitionTime.Time) {
-		logger.Info("undraining, slurm node drained before degraded condition changed")
+		logger.V(1).Info("undraining, slurm node drained before degraded condition changed")
 		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
 	}
 
-	logger.Info("draining, slurm node drained after degraded condition changed")
+	logger.V(1).Info("draining, slurm node drained after degraded condition changed")
 	return drainWithCondition()
 }
 
@@ -382,7 +382,7 @@ func (c *SlurmNodesController) drainSlurmNode(
 	slurmClusterName types.NamespacedName,
 	slurmNodeName, reason string,
 ) error {
-	logger := log.FromContext(ctx).WithName("drainSlurmNode").
+	logger := log.FromContext(ctx).WithName("SlurmNodesController.drainSlurmNode").
 		WithValues(
 			"slurmNodeName", slurmNodeName,
 			"drainReason", reason,
@@ -416,7 +416,7 @@ func (c *SlurmNodesController) slurmNodesFullyDrained(
 	ctx context.Context,
 	k8sNodeName string,
 ) (bool, error) {
-	logger := log.FromContext(ctx).WithName("slurmNodesFullyDrained")
+	logger := log.FromContext(ctx).WithName("SlurmNodesController.slurmNodesFullyDrained")
 
 	logger.Info("checking that slurm nodes are fully drained")
 	podList := &corev1.PodList{}
@@ -456,7 +456,7 @@ func (c *SlurmNodesController) undrainSlurmNode(
 	slurmClusterName types.NamespacedName,
 	slurmNodeName string,
 ) error {
-	logger := log.FromContext(ctx).WithName("undrainSlurmNode").V(1).
+	logger := log.FromContext(ctx).WithName("SlurmNodesController.undrainSlurmNode").V(1).
 		WithValues(
 			"slurmNodeName", slurmNodeName,
 			"slurmCluster", slurmClusterName,
