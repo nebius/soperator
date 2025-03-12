@@ -134,11 +134,6 @@ func renderContainerNodeSysctl() corev1.Container {
 		Name:            consts.ContainerNameNodeSysctl,
 		Image:           "cr.eu-north1.nebius.cloud/soperator/busybox",
 		SecurityContext: createSecurityContext(true, 0, 0, false, true, nil),
-		Resources: createResourceRequirements(
-			resource.MustParse("8Mi"),
-			resource.MustParse("10m"),
-			resource.MustParse("8Mi"),
-		),
 		Command: []string{
 			"/bin/sh",
 			"-c",
