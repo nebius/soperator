@@ -180,6 +180,14 @@ func (c *K8SNodesController) processRebootCondition(ctx context.Context, k8sNode
 			logger.Info("no action needed: no reboot reason")
 			return nil
 		}
+
+		if rebootCondition.Status == corev1.ConditionTrue && degradedCondition.Status == corev1.ConditionTrue &&
+			rebootCondition.LastTransitionTime.Time.After(degradedCondition.LastTransitionTime.Time) {
+
+			logger.Info("no action needed: k8s node already was rebooted")
+			return nil
+		}
+
 		logger.Info("setting SlurmNodeReboot: true")
 		return setK8SNodeCondition(ctx, c.Client, k8sNode.Name, newNodeCondition(
 			consts.SlurmNodeReboot,
