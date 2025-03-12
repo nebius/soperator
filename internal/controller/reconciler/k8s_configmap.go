@@ -2,7 +2,6 @@ package reconciler
 
 import (
 	"context"
-	"maps"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -48,7 +47,6 @@ func (r *ConfigMapReconciler) patch(existing, desired client.Object) (client.Pat
 		res := client.MergeFrom(dst.DeepCopy())
 
 		dst.Data = src.Data
-		maps.Copy(dst.Labels, src.Labels)
 
 		return res
 	}
