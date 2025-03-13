@@ -3724,6 +3724,10 @@ spec:
                           SshdServiceType represents the service type for the SSH daemon
                           Must be one of [corev1.ServiceTypeLoadBalancer] or [corev1.ServiceTypeNodePort]
                         type: string
+                      supervisordConfigMapRefName:
+                        description: SupervisordConfigMapRefName is the name of the
+                          supervisord config, which runs in sshd container
+                        type: string
                       volumes:
                         description: Volumes represents the volume configurations
                           for the login node

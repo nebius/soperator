@@ -434,6 +434,31 @@ func RenderVolumeMountSshdKeys() corev1.VolumeMount {
 
 // endregion SSHD
 
+// region Supervisord
+
+func RenderVolumeSupervisordConfig(name string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSupervisordConfigMap,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: name,
+				},
+			},
+		},
+	}
+}
+
+func RenderVolumeMountSupervisordConfig() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSupervisordConfigMap,
+		MountPath: consts.VolumeMountPathSupervisordConfig,
+		ReadOnly:  true,
+	}
+}
+
+// endregion Supervisord
+
 // region InMemory
 
 // RenderVolumeInMemory renders [corev1.Volume] which content is stored in shared memory (tmpfs).

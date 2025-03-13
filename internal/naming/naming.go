@@ -163,6 +163,14 @@ func BuildConfigMapSupervisordName(clusterName string) string {
 	}.String()
 }
 
+func BuildComponentConfigMapSupervisordName(clusterName string, componentType consts.ComponentType) string {
+	return namedEntity{
+		clusterName:   clusterName,
+		componentType: &componentType,
+		entity:        consts.ConfigMapNameSupervisord,
+	}.String()
+}
+
 // endregion Worker
 
 // region NCCLBenchmark

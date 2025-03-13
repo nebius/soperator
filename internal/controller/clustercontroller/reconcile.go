@@ -588,11 +588,12 @@ func (r *SlurmClusterReconciler) patchStatus(ctx context.Context, cluster *slurm
 type statusPatcher func(status *slurmv1.SlurmClusterStatus)
 
 const (
-	podTemplateField            = ".spec.slurmNodes.exporter.exporter.podTemplateNameRef"
-	supervisordConfigMapField   = ".spec.slurmNodes.worker.supervisordConfigMapRefName"
-	sshdLoginConfigMapField     = ".spec.slurmNodes.login.sshdConfigMapRefName"
-	sshdWorkerConfigMapField    = ".spec.slurmNodes.worker.sshdConfigMapRefName"
-	slurmTopologyConfigMapField = ".spec.slurmTopologyConfigMapRefName"
+	podTemplateField                = ".spec.slurmNodes.exporter.exporter.podTemplateNameRef"
+	supervisordWorkerConfigMapField = ".spec.slurmNodes.worker.supervisordConfigMapRefName"
+	supervisordLoginConfigMapField  = ".spec.slurmNodes.login.supervisordConfigMapRefName"
+	sshdLoginConfigMapField         = ".spec.slurmNodes.login.sshdConfigMapRefName"
+	sshdWorkerConfigMapField        = ".spec.slurmNodes.worker.sshdConfigMapRefName"
+	slurmTopologyConfigMapField     = ".spec.slurmTopologyConfigMapRefName"
 )
 
 func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency int, cacheSyncTimeout time.Duration) error {
@@ -647,7 +648,10 @@ func (r *SlurmClusterReconciler) setupPodTemplateIndexer(mgr ctrl.Manager) error
 
 func (r *SlurmClusterReconciler) setupConfigMapIndexer(mgr ctrl.Manager) error {
 	indexers := map[string]func(*slurmv1.SlurmCluster) string{
-		supervisordConfigMapField: func(sc *slurmv1.SlurmCluster) string {
+		supervisordLoginConfigMapField: func(sc *slurmv1.SlurmCluster) string {
+			return sc.Spec.SlurmNodes.Login.SupervisordConfigMapRefName
+		},
+		supervisordWorkerConfigMapField: func(sc *slurmv1.SlurmCluster) string {
 			return sc.Spec.SlurmNodes.Worker.SupervisordConfigMapRefName
 		},
 		sshdLoginConfigMapField: func(sc *slurmv1.SlurmCluster) string {
@@ -733,7 +737,8 @@ func (r *SlurmClusterReconciler) findObjectsForConfigMap(
 	}
 	attachedSlurmClusters := &slurmv1.SlurmClusterList{}
 	matchingFields := []string{
-		supervisordConfigMapField,
+		supervisordLoginConfigMapField,
+		supervisordWorkerConfigMapField,
 		sshdLoginConfigMapField,
 		sshdWorkerConfigMapField,
 	}

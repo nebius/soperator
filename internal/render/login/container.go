@@ -27,6 +27,7 @@ func renderContainerSshd(
 		common.RenderVolumeMountSshdRootKeys(),
 		common.RenderVolumeMountInMemory(),
 		common.RenderVolumeMountTmpDisk(),
+		common.RenderVolumeMountSupervisordConfig(),
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(jailSubMounts, consts.VolumeMountPathJailUpper)...)
 	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(customMounts, "")...)

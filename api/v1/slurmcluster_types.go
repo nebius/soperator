@@ -832,6 +832,11 @@ type SlurmNodeLogin struct {
 	//
 	// +kubebuilder:validation:Required
 	Volumes SlurmNodeLoginVolumes `json:"volumes"`
+
+	// SupervisordConfigMapRefName is the name of the supervisord config, which runs in sshd container
+	//
+	// +kubebuilder:validation:Optional
+	SupervisordConfigMapRefName string `json:"supervisordConfigMapRefName,omitempty"`
 }
 
 // SlurmNodeLoginVolumes defines the volumes for the Slurm login node

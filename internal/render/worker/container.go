@@ -67,12 +67,12 @@ func renderContainerSlurmd(
 		common.RenderVolumeMountSshdRootKeys(),
 		common.RenderVolumeMountInMemory(),
 		common.RenderVolumeMountTmpDisk(),
+		common.RenderVolumeMountSupervisordConfig(),
 		renderVolumeMountNvidia(),
 		renderVolumeMountBoot(),
 		renderVolumeMountNCCLTopology(),
 		renderVolumeMountSharedMemory(),
 		renderVolumeMountSysctl(),
-		renderVolumeMountSupervisordConfigMap(),
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(jailSubMounts, consts.VolumeMountPathJailUpper)...)
 	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(customMounts, "")...)
@@ -146,14 +146,6 @@ func renderContainerSlurmd(
 		},
 		Resources: resources,
 	}, nil
-}
-
-func renderVolumeMountSupervisordConfigMap() corev1.VolumeMount {
-	return corev1.VolumeMount{
-		Name:      consts.VolumeNameSupervisordConfigMap,
-		MountPath: consts.VolumeMountPathSupervisordConfig,
-		ReadOnly:  true,
-	}
 }
 
 func renderSlurmdEnv(

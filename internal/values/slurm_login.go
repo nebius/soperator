@@ -16,6 +16,9 @@ type SlurmLogin struct {
 	Service     Service
 	StatefulSet StatefulSet
 
+	SupervisordConfigMapDefault bool
+	SupervisordConfigMapName    string
+
 	IsSSHDConfigMapDefault bool
 	SSHDConfigMapName      string
 	SSHRootPublicKeys      []string
@@ -34,6 +37,12 @@ func buildSlurmLoginFrom(clusterName string, maintenance *consts.MaintenanceMode
 	svc.Annotations = login.SshdServiceAnnotations
 	svc.LoadBalancerIP = login.SshdServiceLoadBalancerIP
 	svc.NodePort = login.SshdServiceNodePort
+
+	supervisordConfigName := login.SupervisordConfigMapRefName
+	supervisordConfigDefault := supervisordConfigName == ""
+	if supervisordConfigDefault {
+		supervisordConfigName = naming.BuildComponentConfigMapSupervisordName(clusterName, consts.ComponentTypeLogin)
+	}
 
 	sshdConfigMapName := login.SSHDConfigMapRefName
 	isSSHDConfigDefault := sshdConfigMapName == ""
@@ -56,12 +65,14 @@ func buildSlurmLoginFrom(clusterName string, maintenance *consts.MaintenanceMode
 			naming.BuildStatefulSetName(consts.ComponentTypeLogin, clusterName),
 			login.SlurmNode.Size,
 		),
-		SSHDConfigMapName:         sshdConfigMapName,
-		IsSSHDConfigMapDefault:    isSSHDConfigDefault,
-		SSHRootPublicKeys:         login.SshRootPublicKeys,
-		VolumeJail:                *login.Volumes.Jail.DeepCopy(),
-		UseDefaultAppArmorProfile: useDefaultAppArmorProfile,
-		Maintenance:               maintenance,
+		SupervisordConfigMapDefault: supervisordConfigDefault,
+		SupervisordConfigMapName:    supervisordConfigName,
+		SSHDConfigMapName:           sshdConfigMapName,
+		IsSSHDConfigMapDefault:      isSSHDConfigDefault,
+		SSHRootPublicKeys:           login.SshRootPublicKeys,
+		VolumeJail:                  *login.Volumes.Jail.DeepCopy(),
+		UseDefaultAppArmorProfile:   useDefaultAppArmorProfile,
+		Maintenance:                 maintenance,
 	}
 	for _, jailSubMount := range login.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()
