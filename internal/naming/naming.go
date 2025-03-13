@@ -93,13 +93,6 @@ func BuildDeploymentName(componentType consts.ComponentType) string {
 	}.String()
 }
 
-func BuildDaemonSetName(componentType consts.ComponentType) string {
-	return namedEntity{
-		componentType: &componentType,
-		entity:        "",
-	}.String()
-}
-
 func BuildConfigMapSlurmConfigsName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,

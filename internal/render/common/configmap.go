@@ -17,10 +17,11 @@ import (
 // RenderConfigMapSlurmConfigs renders new [corev1.ConfigMap] containing '.conf' files for the following components:
 //
 // [consts.ConfigMapKeySlurmConfig] - Slurm config
-// [consts.ConfigMapKeyCGroupConfig] - cgroup config
+// [consts.ConfigMapKeyCGroupConfig] - Cgroup config
 // [consts.ConfigMapKeySpankConfig] - SPANK plugins config
-// [consts.ConfigMapKeyGresConfig] - gres config
-func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) (corev1.ConfigMap, error) {
+// [consts.ConfigMapKeyGresConfig] - GRES config
+// [consts.ConfigMapKeyMPIConfig] - PMIx config
+func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig corev1.ConfigMap) (corev1.ConfigMap, error) {
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapSlurmConfigsName(cluster.Name),
@@ -28,16 +29,18 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) (corev1.ConfigMap
 			Labels:    RenderLabels(consts.ComponentTypeController, cluster.Name),
 		},
 		Data: map[string]string{
-			consts.ConfigMapKeySlurmConfig:  generateSlurmConfig(cluster).Render(),
-			consts.ConfigMapKeyCGroupConfig: generateCGroupConfig(cluster).Render(),
-			consts.ConfigMapKeySpankConfig:  generateSpankConfig().Render(),
-			consts.ConfigMapKeyGresConfig:   generateGresConfig(cluster.ClusterType).Render(),
-			consts.ConfigMapKeyMPIConfig:    generateMPIConfig(cluster).Render(),
+			consts.ConfigMapKeySlurmConfig:       generateSlurmConfig(cluster, topologyConfig).Render(),
+			consts.ConfigMapKeyRESTConfig:        generateRESTConfig().Render(),
+			consts.ConfigMapKeyCustomSlurmConfig: generateCustomSlurmConfig(cluster).Render(),
+			consts.ConfigMapKeyCGroupConfig:      generateCGroupConfig(cluster).Render(),
+			consts.ConfigMapKeySpankConfig:       generateSpankConfig().Render(),
+			consts.ConfigMapKeyGresConfig:        generateGresConfig(cluster.ClusterType).Render(),
+			consts.ConfigMapKeyMPIConfig:         generateMPIConfig(cluster).Render(),
 		},
 	}, nil
 }
 
-func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
+func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.ConfigMap) renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
 
 	res.AddProperty("ClusterName", cluster.Name)
@@ -56,7 +59,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("AuthType", "auth/"+consts.Munge)
 	res.AddProperty("CredType", "cred/"+consts.Munge)
 	res.AddComment("")
-	res.AddComment("SlurnConfig Spec")
+	res.AddComment("SlurmConfig Spec")
 	addSlurmConfigProperties(res, cluster.SlurmConfig)
 	res.AddComment("")
 	if cluster.ClusterType == consts.ClusterTypeGPU {
@@ -99,6 +102,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("HealthCheckNodeState", "ANY")
 	res.AddComment("")
 	res.AddProperty("InactiveLimit", 0)
+	res.AddProperty("KillOnBadExit", 1)
 	res.AddProperty("KillWait", 180)
 	res.AddProperty("UnkillableStepTimeout", 600)
 	res.AddProperty("SlurmctldTimeout", 30)
@@ -118,11 +122,12 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddComment("COMPUTE NODES")
 	res.AddComment("We're using the \"dynamic nodes\" feature: https://slurm.schedmd.com/dynamic_nodes.html")
-	res.AddProperty("MaxNodeCount", "512")
-	res.AddComment("Partition Configuration")
+	res.AddProperty("MaxNodeCount", "1024")
+	res.AddProperty("MaxArraySize", "1024")
 	res.AddProperty("JobRequeue", 1)
 	res.AddProperty("PreemptMode", "REQUEUE")
 	res.AddProperty("PreemptType", "preempt/partition_prio")
+	res.AddComment("Partition Configuration")
 	switch cluster.PartitionConfiguration.ConfigType {
 	case "custom":
 		for _, l := range cluster.PartitionConfiguration.RawConfig {
@@ -139,7 +144,11 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		res.AddComment("")
 		res.AddComment("ACCOUNTING")
 		res.AddProperty("AccountingStorageType", "accounting_storage/slurmdbd")
-		res.AddProperty("AccountingStorageHost", naming.BuildServiceName(consts.ComponentTypeAccounting, cluster.Name))
+		res.AddProperty("AccountingStorageHost", fmt.Sprintf(
+			"%s.%s.svc.cluster.local",
+			naming.BuildServiceName(consts.ComponentTypeAccounting, cluster.Name),
+			cluster.Namespace,
+		))
 		res.AddProperty("AccountingStorageUser", consts.HostnameAccounting)
 		res.AddProperty("AccountingStoragePort", consts.DefaultAccountingPort)
 		res.AddProperty("JobCompType", "jobcomp/none")
@@ -155,7 +164,28 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 			res.AddProperty("AuthAltParameters", "jwt_key="+consts.RESTJWTKeyPath)
 		}
 	}
+
+	if cluster.SlurmConfig.TopologyPlugin == "" && topologyConfig.Data != nil {
+		if _, ok := topologyConfig.Data[consts.ConfigMapKeyTopologyConfig]; ok {
+			res.AddComment("AUTO TOPOLOGY, triggered by slurmTopologyConfigMapRefName")
+			res.AddProperty("TopologyPlugin", "topology/tree")
+		}
+	}
+
+	res.AddComment("")
+	res.AddComment(fmt.Sprintf("Include %s", consts.ConfigMapKeyCustomSlurmConfig))
+	res.AddPropertyWithConnector("include", consts.ConfigMapKeyCustomSlurmConfig, renderutils.SpaceConnector)
+
 	return res
+}
+
+func generateCustomSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
+	multilineCfg := &renderutils.MultilineStringConfig{}
+	multilineCfg.AddLine("# CUSTOM SLURM CONFIG")
+	if cluster.CustomSlurmConfig != nil {
+		multilineCfg.AddLine(*cluster.CustomSlurmConfig)
+	}
+	return multilineCfg
 }
 
 // addSlurmConfigProperties adds properties from the given struct to the config file
@@ -241,6 +271,14 @@ func generateMPIConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	if cluster.MPIConfig.PMIxEnv != "" {
 		res.AddProperty("PMIxEnv", cluster.MPIConfig.PMIxEnv)
 	}
+	return res
+}
+
+func generateRESTConfig() renderutils.ConfigFile {
+	res := &renderutils.PropertiesConfig{}
+	res.AddComment("REST API config")
+	res.AddPropertyWithConnector("include", consts.ConfigMapKeySlurmConfig, renderutils.SpaceConnector)
+	res.AddProperty("AuthType", "auth/jwt")
 	return res
 }
 

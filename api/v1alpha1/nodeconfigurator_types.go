@@ -17,31 +17,120 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
+// +kubebuilder:validation:XValidation:rule="self.rebooter.enabled != self.nodeConfigurator.enabled",message="Either rebooter or nodeConfigurator must be enabled, but not both simultaneously."
 // NodeConfiguratorSpec defines the desired state of NodeConfigurator.
 type NodeConfiguratorSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Rebooter controller which will reboot and drain node by some node conditions
+	// in same time can be used rebooter or nodeConfigurator
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:={enabled: true}
+	Rebooter Rebooter `json:"rebooter"`
 
-	// Foo is an example field of NodeConfigurator. Edit nodeconfigurator_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// SleepContainer defines container configuration for the node
+	// in same time can be used rebooter or nodeConfigurator
+	//
+	// +kubebuilder:validation:Optional
+	SleepContainer SleepContainer `json:"nodeConfigurator"`
+
+	// InitContainers defines the list of initContainers for the node-configurator
+	// it rewrite the default initContainers
+	//
+	// +kubebuilder:validation:Optional
+	InitContainers []corev1.Container `json:"initContainers,omitempty"`
 }
 
-// NodeConfiguratorStatus defines the observed state of NodeConfigurator.
-type NodeConfiguratorStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+type ContainerConfig struct {
+	// Image defines the node-configurator container image
+	//
+	// +kubebuilder:validation:Optional
+	Image Image `json:"image,omitempty"`
+
+	// Resources defines the [corev1.ResourceRequirements] for the container
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:={}
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// LivenessProbe defines the livenessProbe for the node-configurator
+	//
+	// +kubebuilder:validation:Optional
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// ReadinessProbe defines the readinessProbe for the node-configurator
+	//
+	// +kubebuilder:validation:Optional
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
+
+	// Env defines the list of environment variables for the node-configurator
+	//
+	// +kubebuilder:validation:Optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Tolerations defines the list of tolerations for the node-configurator
+	//
+	// +kubebuilder:validation:Optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// NodeSelector defines the nodeSelector for the node-configurator
+	//
+	// +kubebuilder:validation:Optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Affinity defines the affinity for the node-configurator
+	//
+	// +kubebuilder:validation:Optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 }
 
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
+type PodConfig struct {
+	// PriorityClassName defines the priorityClassName for the pod
+	//
+	// +kubebuilder:validation:Optional
+	PriorityClassName string `json:"priorityClassName,omitempty"`
+
+	// ServiceAccountName defines the service account name for the pod
+	//
+	// +kubebuilder:validation:Optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+}
+
+type Rebooter struct {
+	Enabled         bool `json:"enabled"`
+	ContainerConfig `json:",inline"`
+	PodConfig       `json:",inline"`
+	// EvictionMethod defines the method of eviction for the Slurm worker node
+	// Must be one of [drain, evict]. Now only evict is supported
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum="evict"
+	// +kubebuilder:default="evict"
+	EvictionMethod string `json:"evictionMethod,omitempty"`
+
+	// LogLevel defines the log level for the node-configurator
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="info"
+	// +kubebuilder:validation:Enum="debug";"info";"warn";"error"
+	LogLevel string `json:"logLevel,omitempty"`
+
+	// LogFormat defines the log format for the node-configurator
+	//
+	// +kubebuilder:validation:Optional
+	LogFormat string `json:"logFormat,omitempty"`
+}
+
+type SleepContainer struct {
+	Enabled         bool `json:"enabled"`
+	ContainerConfig `json:",inline"`
+	PodConfig       `json:",inline"`
+}
 
 // NodeConfigurator is the Schema for the nodeconfigurators API.
 type NodeConfigurator struct {
@@ -52,15 +141,30 @@ type NodeConfigurator struct {
 	Status NodeConfiguratorStatus `json:"status,omitempty"`
 }
 
-// DeepCopyObject implements runtime.Object.
-func (n *NodeConfigurator) DeepCopyObject() runtime.Object {
-	panic("unimplemented")
+// NodeConfiguratorStatus defines the observed state of NodeConfigurator.
+type NodeConfiguratorStatus struct {
+	StatusMetadata `json:",inline"`
 }
+
+// GetStatusMetadata returns metadata for object status
+func (cr *NodeConfiguratorStatus) GetStatusMetadata() *StatusMetadata {
+	return &cr.StatusMetadata
+}
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // GetObjectKind implements runtime.Object.
 // Subtle: this method shadows the method (TypeMeta).GetObjectKind of NodeConfigurator.TypeMeta.
 func (n *NodeConfigurator) GetObjectKind() schema.ObjectKind {
-	panic("unimplemented")
+	return &n.TypeMeta
+}
+
+func (n *NodeConfigurator) DeepCopyObject() runtime.Object {
+	if c := n.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
 }
 
 // +kubebuilder:object:root=true
@@ -72,15 +176,10 @@ type NodeConfiguratorList struct {
 	Items           []NodeConfigurator `json:"items"`
 }
 
-// DeepCopyObject implements runtime.Object.
-func (n *NodeConfiguratorList) DeepCopyObject() runtime.Object {
-	panic("unimplemented")
-}
-
 // GetObjectKind implements runtime.Object.
 // Subtle: this method shadows the method (TypeMeta).GetObjectKind of NodeConfiguratorList.TypeMeta.
 func (n *NodeConfiguratorList) GetObjectKind() schema.ObjectKind {
-	panic("unimplemented")
+	return &n.TypeMeta
 }
 
 func init() {

@@ -61,12 +61,13 @@ func RenderMariaDb(
 			Labels:    labels,
 		},
 		Spec: mariadbv1alpha1.MariaDBSpec{
-			Image:    mariaDb.Image,
-			Replicas: replicas,
-			Port:     port,
-			Storage:  mariaDb.Storage,
-			Database: ptr.To(consts.MariaDbDatabase),
-			Username: ptr.To(consts.MariaDbUsername),
+			Image:       mariaDb.Image,
+			Replicas:    replicas,
+			Replication: accounting.MariaDb.Replication,
+			Port:        port,
+			Storage:     mariaDb.Storage,
+			Database:    ptr.To(consts.MariaDbDatabase),
+			Username:    ptr.To(consts.MariaDbUsername),
 			PasswordSecretKeyRef: &mariadbv1alpha1.GeneratedSecretKeyRef{
 				SecretKeySelector: mariadbv1alpha1.SecretKeySelector{
 					LocalObjectReference: mariadbv1alpha1.LocalObjectReference{

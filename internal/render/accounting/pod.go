@@ -19,14 +19,18 @@ func BasePodTemplateSpec(
 	nodeFilters []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
 	matchLabels map[string]string,
+	slurmTopologyConfigMapRefName string,
 ) (*corev1.PodTemplateSpec, error) {
 	volumes := []corev1.Volume{
 		common.RenderVolumeJailFromSource(volumeSources, *accounting.VolumeJail.VolumeSourceName),
-		common.RenderVolumeSlurmConfigs(clusterName),
+		common.RenderVolumeProjectedSlurmConfigs(
+			clusterName,
+			common.RenderVolumeProjectionSlurmTopologyConfig(slurmTopologyConfigMapRefName),
+			RenderVolumeProjecitonSlurmdbdConfigs(clusterName),
+		),
 		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeRESTJWTKey(clusterName),
 		common.RenderVolumeMungeSocket(),
-		RenderVolumeSlurmdbdConfigs(clusterName),
 		RenderVolumeSlurmdbdSpool(accounting),
 	}
 
@@ -61,6 +65,7 @@ func BasePodTemplateSpec(
 		Spec: corev1.PodSpec{
 			Affinity:     affinity,
 			NodeSelector: nodeSelector,
+			Tolerations:  nodeFilter.Tolerations,
 			Hostname:     consts.HostnameAccounting,
 			InitContainers: []corev1.Container{
 				common.RenderContainerMunge(&accounting.ContainerMunge),

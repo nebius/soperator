@@ -27,8 +27,9 @@ const (
 )
 
 const (
+	SlurmdbdConfFile = "slurmdbd.conf"
+
 	VolumeNameSlurmConfigs         = slurmConfigs
-	VolumeNameSlurmdbdSecret       = slurmdbdSecret
 	VolumeNameSpool                = spool
 	VolumeNameJail                 = jail
 	VolumeNameJailSnapshot         = jail + "-snapshot"
@@ -50,7 +51,6 @@ const (
 	VolumeNameTmpDisk              = "tmp-disk"
 
 	VolumeMountPathSlurmConfigs      = "/mnt/" + slurmConfigs
-	VolumeMountPathSlurmdbdSecret    = "/mnt/" + slurmdbdSecret
 	VolumeMountPathSpool             = "/var/" + spool
 	VolumeMountPathSpoolSlurmdbd     = "/var/spool/slurmdbd"
 	VolumeMountPathJail              = "/mnt/" + jail

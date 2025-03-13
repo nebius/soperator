@@ -1,4 +1,4 @@
-FROM ubuntu:22.04 AS cuda
+FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy AS cuda
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
@@ -49,6 +49,7 @@ RUN for pkg in cuda-drivers_9999.9999.9999_amd64.deb nvidia-open_9999.9999.9999_
         rm -rf "/tmp/${pkg}"; \
     done
 
+# About CUDA packages https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#meta-packages
 RUN apt update && \
     apt install -y \
         cuda=12.4.1-1 \
@@ -75,8 +76,7 @@ ENV LIBRARY_PATH=/usr/local/cuda/lib64/stubs
 
 # Download NCCL tests executables
 ARG CUDA_VERSION=12.4.1
-ARG SLURM_VERSION=24.05.5
-RUN wget -P /tmp $PACKAGES_REPO_URL/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/nccl-tests-perf.tar.gz && \
+RUN wget -P /tmp $PACKAGES_REPO_URL/nccl_tests_$CUDA_VERSION/nccl-tests-perf.tar.gz && \
     tar -xvzf /tmp/nccl-tests-perf.tar.gz -C /usr/bin && \
     rm -rf /tmp/nccl-tests-perf.tar.gz
 
@@ -85,8 +85,7 @@ RUN wget -P /tmp $PACKAGES_REPO_URL/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc
 FROM cuda AS jail
 
 ARG SLURM_VERSION=24.05.5
-ARG CUDA_VERSION=12.4.1
-ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
+ARG GDRCOPY_VERSION=2.4.4
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -141,7 +140,8 @@ RUN apt update && \
         rdma-core \
         ibverbs-utils \
         libpmix2 \
-        libpmix-dev && \
+        libpmix-dev \
+        bsdmainutils && \
     apt clean
 
 # Install python
@@ -162,15 +162,14 @@ RUN chmod +x /opt/bin/install_openmpi.sh && \
     /opt/bin/install_openmpi.sh && \
     rm /opt/bin/install_openmpi.sh
 
-# TODO: Install only necessary packages
+ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
 # Download and install Slurm packages
-RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libslurm-perl slurm-smd; do \
-        wget -q -P /tmp $PACKAGES_REPO_URL/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
+RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd; do \
+        wget -q -P /tmp $PACKAGES_REPO_URL/slurm-packages-$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
         echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
-    done
-
-RUN apt install -y /tmp/*.deb && \
+    done && \
+    apt install -y /tmp/*.deb && \
     rm -rf /tmp/*.deb && \
     apt clean
 
@@ -197,10 +196,12 @@ RUN apt install -y datacenter-gpu-manager-4-cuda12 && \
     apt clean
 
 # Install GDRCopy libraries & executables
-COPY common/scripts/install_gdrcopy.sh /opt/bin/
-RUN chmod +x /opt/bin/install_gdrcopy.sh && \
-    /opt/bin/install_gdrcopy.sh && \
-    rm /opt/bin/install_gdrcopy.sh
+RUN wget -q -P /tmp ${PACKAGES_REPO_URL}/gdrcopy-${GDRCOPY_VERSION}/gdrcopy_${GDRCOPY_VERSION}_amd64.Ubuntu22_04.deb || { echo "Failed to download gdrcopy"; exit 1; } && \
+    wget -q -P /tmp ${PACKAGES_REPO_URL}/gdrcopy-${GDRCOPY_VERSION}/gdrcopy-tests_${GDRCOPY_VERSION}_amd64.Ubuntu22_04+cuda12.4.deb || { echo "Failed to download gdrcopy-tests"; exit 1; } && \
+    wget -q -P /tmp ${PACKAGES_REPO_URL}/gdrcopy-${GDRCOPY_VERSION}/libgdrapi_${GDRCOPY_VERSION}_amd64.Ubuntu22_04.deb || { echo "Failed to download libgdrapi"; exit 1; } && \
+    apt install -y /tmp/*.deb && \
+    rm -rf /tmp/*.deb && \
+    apt clean
 
 # Install AWS CLI
 COPY common/scripts/install_awscli.sh /opt/bin/
@@ -224,6 +225,10 @@ RUN chmod +x /opt/bin/install_docker_cli.sh && \
 RUN mv /usr/bin/docker /usr/bin/docker.real
 COPY jail/scripts/docker.sh /usr/bin/docker
 RUN chmod +x /usr/bin/docker
+
+# Create a wrapper script for nvidia-smi that shows running processes (in the host's PID namespace)
+COPY jail/scripts/nvidia_smi_hostpid.sh /usr/bin/nvidia-smi-hostpid
+RUN chmod +x /usr/bin/nvidia-smi-hostpid
 
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host

@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=ubuntu:jammy
+ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
 
 # First stage: Build the prometheus-slurm-exporter from source
 FROM golang:1.22 AS exporter_builder
@@ -31,7 +31,6 @@ RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 FROM $BASE_IMAGE AS exporter
 
 ARG SLURM_VERSION=24.05.5
-ARG CUDA_VERSION=12.4.1
 
 # TODO: Install only those dependencies that are required for running slurm exporter
 # Install dependencies
@@ -40,11 +39,6 @@ RUN apt-get update && \
         wget \
         git \
         curl \
-        build-essential \
-        bc \
-        python3 \
-        autoconf \
-        pkg-config \
         libssl-dev \
         libpam0g-dev \
         libtool \
@@ -58,7 +52,6 @@ RUN apt-get update && \
         jq \
         squashfs-tools \
         zstd \
-        software-properties-common \
         iputils-ping \
         dnsutils \
         telnet \
@@ -68,22 +61,20 @@ RUN apt-get update && \
         lsof \
         pciutils \
         iproute2 \
-        infiniband-diags \
         kmod \
         daemontools \
         libncurses5-dev \
         libdrm-dev && \
     apt clean
 
-# TODO: Install only necessary packages
+ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
 # Download and install Slurm packages
-RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libslurm-perl slurm-smd; do \
-        wget -q -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
+RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd; do \
+        wget -q -P /tmp $PACKAGES_REPO_URL/slurm-packages-$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
         echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
-    done
-
-RUN apt install -y /tmp/*.deb && \
+    done && \
+    apt install -y /tmp/*.deb && \
     rm -rf /tmp/*.deb && \
     apt clean
 

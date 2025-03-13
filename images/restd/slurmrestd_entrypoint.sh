@@ -2,11 +2,8 @@
 
 set -e # Exit immediately if any command returns a non-zero error code
 
-echo "Bind-mount slurm configs from K8S config map"
-for file in /mnt/slurm-configs/*; do
-    filename=$(basename "$file")
-    touch "/etc/slurm/$filename" && mount --bind "$file" "/etc/slurm/$filename"
-done
+echo "Symlink slurm configs from K8S config map"
+rm -rf /etc/slurm && ln -s /mnt/slurm-configs /etc/slurm
 
 chown www-data:www-data /usr/sbin/slurmrestd && chmod 500 /usr/sbin/slurmrestd
 

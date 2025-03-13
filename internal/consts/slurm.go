@@ -10,5 +10,22 @@ const (
 	// TODO: we should rename it. It's not only recommended using root user
 	SlurmUser              = "root"
 	SlurmLogFile           = "/dev/null"
-	SlurmDefaultDebugLevel = "debug3"
+	SlurmDefaultDebugLevel = "info"
+)
+
+const (
+	SlurmNodeReasonKillTaskFailed  string = "Kill task failed"
+	SlurmNodeReasonNodeReplacement string = "Soperator auto-healing: node replacement process"
+	SlurmNodeReasonNodeReboot      string = "Soperator auto-healing: node reboot process"
+)
+
+var SlurmNodeReasonsMap = map[string]struct{}{
+	SlurmNodeReasonKillTaskFailed:  {},
+	SlurmNodeReasonNodeReplacement: {},
+	SlurmNodeReasonNodeReboot:      {},
+}
+
+const (
+	SlurmConfigRawStrategyPatch    = "patch"
+	SlurmConfigRawStrategyOverride = "override"
 )

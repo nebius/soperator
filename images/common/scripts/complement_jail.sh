@@ -55,7 +55,7 @@ pushd "${jaildir}"
             echo "Bind-mount jail submount ${path}"
             if [ -d "${upperdir}/${path}" ]; then
                 mkdir -p "${path}" # TODO: Support setting configurable permissions for jail submounts, this should be implemented in K8S VolumeMount
-                mount --bind "${upperdir}/${path}" "${path}"
+                mount --rbind "${upperdir}/${path}" "${path}"
             elif [ -f "${upperdir}/${path}" ]; then
                 # make sure mount point exists
                 mkdir -p "$(dirname "${path}")/" && touch "${path}"
@@ -82,13 +82,17 @@ pushd "${jaildir}"
         touch "etc/gpu_libs_installed.flag"
     fi
 
+    echo "Bind-mount slurm client"
+    /opt/bin/slurm/bind_slurm_common.sh -j ${jaildir}
+
     echo "Bind-mount slurm chroot plugin from container to the jail"
+    mkdir -p usr/lib/x86_64-linux-gnu/slurm
     touch usr/lib/x86_64-linux-gnu/slurm/chroot.so
     mount --bind /usr/lib/x86_64-linux-gnu/slurm/chroot.so usr/lib/x86_64-linux-gnu/slurm/chroot.so
 
     echo "Bind-mount /etc/enroot, /usr/share/enroot and /usr/lib/enroot"
     mkdir -p etc/enroot usr/share/enroot usr/lib/enroot
-    mount --bind /etc/enroot etc/enroot
+    mount --rbind /etc/enroot etc/enroot
     mount --bind /usr/share/enroot usr/share/enroot
     mount --bind /usr/lib/enroot usr/lib/enroot
 
@@ -107,7 +111,7 @@ pushd "${jaildir}"
         flock etc/complement_jail_setcap_enroot_aufs2ovlfs.lock -c "setcap cap_sys_admin,cap_mknod+pe usr/bin/enroot-aufs2ovlfs"
     fi
 
-    echo "Shared folder for pyxis output /var/cache/enroot-container-images"
+    echo "Create shared directory for caching Pyxis sqshfs files"
     mkdir -m 1777 -p var/cache/enroot-container-images
 
     echo "Bind-mount pyxis plugin from container to the jail"
@@ -115,14 +119,20 @@ pushd "${jaildir}"
     mount --bind /usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
 
     echo "Bind-mount slurm configs"
-    for file in /mnt/slurm-configs/*; do
-        filename=$(basename "$file")
-        touch "etc/slurm/$filename" && mount --bind "$file" "etc/slurm/$filename"
-    done
+    mkdir -p etc/slurm
+    mount --bind /mnt/slurm-configs etc/slurm
 
     if [ -n "$worker" ]; then
         echo "Bind-mount slurmd spool directory from the host because it should be propagated to the jail"
         mount --bind /var/spool/slurmd var/spool/slurmd/
+    fi
+
+    if [ -n "$worker" ]; then
+         # slurmd package tree https://gist.github.com/asteny/9eb5089a10a793834d12a5b2449cc2b9
+         echo "Bind-mount slurmd binaries from container to the jail"
+         touch usr/sbin/slurmd usr/sbin/slurmstepd
+         mount --bind /usr/sbin/slurmd usr/sbin/slurmd
+         mount --bind /usr/sbin/slurmstepd usr/sbin/slurmstepd
     fi
 
     # For login node with cluster type GPU
@@ -137,7 +147,7 @@ pushd "${jaildir}"
         done
     fi
 
-    # For $worker node only
+    # For worker node only
     if [ -n "$worker" ]; then
         echo "Update linker cache inside the jail"
         flock --nonblock etc/complement_jail_ldconfig.lock -c "chroot \"${jaildir}\" /usr/sbin/ldconfig" || true

@@ -87,11 +87,25 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", epilog: "", prolog: "", taskPluginParam: "", maxJobCount: 10000, minJobAge: 86400}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 
+	// CustomSlurmConfig represents the raw Slurm configuration from slurm.conf.
+	// All options are provided as a raw string.
+	// Soperator does not guarantee the validity of the raw configuration.
+	// Raw config is merged with existing SlurmConfig values.
+	//
+	// +kubebuilder:validation:Optional
+	CustomSlurmConfig *string `json:"customSlurmConfig,omitempty"`
 	// MPIConfig represents the PMIx configuration in mpi.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={pmixEnv: "OMPI_MCA_btl_tcp_if_include=eth0"}
 	MPIConfig MPIConfig `json:"mpiConfig,omitempty"`
+
+	// SlurmTopologyConfigMapRefName is the name of the slurm topology config.
+	// When exists, TopologyPlugin is automatically set to `topology/tree` in slurm.conf
+	// if TopologyPlugin is not explicitly specified in SlurmConfig.
+	//
+	// +kubebuilder:validation:Optional
+	SlurmTopologyConfigMapRefName string `json:"slurmTopologyConfigMapRefName,omitempty"`
 
 	// Generate and set default AppArmor profile for the Slurm worker and login nodes. The Security Profiles Operator must be installed.
 	//
@@ -154,6 +168,15 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=30
 	MessageTimeout *int32 `json:"messageTimeout,omitempty"`
+	// TopologyPlugin identifies the plugin to determine network topology for optimizations.
+	// It is set automatically to `topology/tree` if SlurmTopologyConfigMapRefName is specified.
+	//
+	// +kubebuilder:validation:Optional
+	TopologyPlugin string `json:"topologyPlugin,omitempty"`
+	// TopologyParam is list of comma-separated options identifying network topology options.
+	//
+	// +kubebuilder:validation:Optional
+	TopologyParam string `json:"topologyParam,omitempty"`
 }
 
 type MPIConfig struct {
@@ -605,8 +628,8 @@ type SlurmdbdConfig struct {
 
 type AccountingSlurmConf struct {
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Pattern="^((Billing|CPU|Mem|VMem|Node|Energy|Pages|FS/Disk|FS/Lustre|Gres/gpu|Gres/gpu:tesla|Gres/gpu:volta)(,)?)+$"
-	// +kubebuilder:default="Billing,CPU,Mem,Node,VMem"
+	// +kubebuilder:validation:Pattern="^((Billing|CPU|Mem|VMem|Node|Energy|Pages|FS/Disk|FS/Lustre|Gres/gpu)(,)?)+$"
+	// +kubebuilder:default="CPU,Mem,Node,VMem,Gres/gpu"
 	AccountingStorageTRES *string `json:"accountingStorageTRES,omitempty"`
 	// +kubebuilder:validation:Optional
 	AccountingStoreFlags *string `json:"accountingStoreFlags,omitempty"`
@@ -670,6 +693,11 @@ type SlurmNodeControllerVolumes struct {
 	//
 	// +kubebuilder:validation:Required
 	Jail NodeVolume `json:"jail"`
+
+	// CustomMounts represents the custom mount configurations
+	//
+	// +kubebuilder:validation:Optional
+	CustomMounts []NodeVolumeMount `json:"customMounts,omitempty"`
 }
 
 // SlurmNodeWorker defines the configuration for the Slurm worker node
@@ -724,63 +752,6 @@ type SlurmNodeWorker struct {
 	//
 	// +kubebuilder:validation:Optional
 	PriorityClass string `json:"priorityClass,omitempty"`
-	// It's alpha feature and will be moved to separate CRD in the future
-	// Rebooter defines the configuration for the Slurm worker node rebooter
-	//
-	// +kubebuilder:validation:Optional
-	Rebooter Rebooter `json:"rebooter"`
-}
-
-// Rebooter defines the configuration for the Slurm worker node rebooter
-type Rebooter struct {
-	// enabled defines whether the rebooter is enabled
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	Enabled bool `json:"enabled"`
-
-	// Image defines the rebooter container image
-	//
-	// +kubebuilder:validation:Optional
-	Image string `json:"image"`
-
-	// imagePullPolicy defines the image pull policy
-	//
-	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="IfNotPresent"
-	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
-
-	// Resources defines the [corev1.ResourceRequirements] for the container
-	//
-	// +kubebuilder:validation:Optional
-	Resources corev1.ResourceList `json:"resources,omitempty"`
-
-	// evictionMethod defines the method of eviction for the Slurm worker node
-	// Must be one of [drain, evict]. Now only evict is supported
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Enum="evict"
-	// +kubebuilder:default="evict"
-	EvictionMethod string `json:"evictionMethod,omitempty"`
-
-	// logLevel defines the log level for the rebooter
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="info"
-	// +kubebuilder:validation:Enum="debug";"info";"warn";"error"
-	LogLevel string `json:"logLevel,omitempty"`
-
-	// Namespace defines the namespace where the rebooter will be deployed
-	// By default, the same namespace as the soperator
-	//
-	// +kubebuilder:validation:Optional
-	Namespace string `json:"namespace,omitempty"`
-
-	// serviceAccountName defines the service account name for the rebooter
-	//
-	// +kubebuilder:validation:Optional
-	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node
@@ -798,7 +769,12 @@ type SlurmNodeWorkerVolumes struct {
 	// JailSubMounts represents the sub-mount configurations within the jail volume
 	//
 	// +kubebuilder:validation:Required
-	JailSubMounts []NodeVolumeJailSubMount `json:"jailSubMounts"`
+	JailSubMounts []NodeVolumeMount `json:"jailSubMounts"`
+
+	// CustomMounts represents the custom mount configurations
+	//
+	// +kubebuilder:validation:Optional
+	CustomMounts []NodeVolumeMount `json:"customMounts,omitempty"`
 
 	// Size of the shared memory for NCCL
 	//
@@ -868,7 +844,12 @@ type SlurmNodeLoginVolumes struct {
 	// JailSubMounts represents the sub-mount configurations within the jail volume
 	//
 	// +kubebuilder:validation:Required
-	JailSubMounts []NodeVolumeJailSubMount `json:"jailSubMounts"`
+	JailSubMounts []NodeVolumeMount `json:"jailSubMounts"`
+
+	// CustomMounts represents the custom mount configurations
+	//
+	// +kubebuilder:validation:Optional
+	CustomMounts []NodeVolumeMount `json:"customMounts,omitempty"`
 }
 
 // SlurmExporter defines the configuration for the Slurm exporter
@@ -982,14 +963,14 @@ type NodeVolume struct {
 	VolumeClaimTemplateSpec *corev1.PersistentVolumeClaimSpec `json:"volumeClaimTemplateSpec,omitempty"`
 }
 
-// NodeVolumeJailSubMount defines the configuration for a sub-mount within a jail volume
-type NodeVolumeJailSubMount struct {
-	// Name defines the name of the sub-mount
+// NodeVolumeMount defines the configuration for a mount
+type NodeVolumeMount struct {
+	// Name defines the name of the mount
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// MountPath defines the path where the sub-mount is mounted
+	// MountPath defines the path where the mount is mounted
 	//
 	// +kubebuilder:validation:Required
 	MountPath string `json:"mountPath"`
@@ -1008,7 +989,7 @@ type NodeVolumeJailSubMount struct {
 	// +kubebuilder:default=false
 	ReadOnly bool `json:"readOnly"`
 
-	// VolumeSourceName defines the name of the volume source for the sub-mount.
+	// VolumeSourceName defines the name of the volume source for the mount.
 	// Must correspond to the name of one of [VolumeSource]
 	//
 	// +kubebuilder:validation:Optional

@@ -1,0 +1,18 @@
+{{- if and .Values.rebooter.generateRBAC .Values.rebooter.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "nodeconfigurator.fullname" . }}-binding
+  labels:
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: slurm-operator
+  {{- include "nodeconfigurator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: '{{ include "nodeconfigurator.fullname" . }}-nodeconfigurator-role'
+subjects:
+- kind: ServiceAccount
+  name: {{ include "nodeconfigurator.name" . }}-sa
+  namespace: '{{ .Release.Namespace }}'
+{{- end }}

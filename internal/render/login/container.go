@@ -15,7 +15,7 @@ import (
 func renderContainerSshd(
 	clusterType consts.ClusterType,
 	container *values.Container,
-	jailSubMounts []slurmv1.NodeVolumeJailSubMount,
+	jailSubMounts, customMounts []slurmv1.NodeVolumeMount,
 ) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountSlurmConfigs(),
@@ -28,7 +28,8 @@ func renderContainerSshd(
 		common.RenderVolumeMountInMemory(),
 		common.RenderVolumeMountTmpDisk(),
 	}
-	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
+	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(jailSubMounts, consts.VolumeMountPathJailUpper)...)
+	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(customMounts, "")...)
 	// Create a copy of the container's limits and add non-CPU resources from Requests
 	limits := common.CopyNonCPUResources(container.Resources)
 	return corev1.Container{

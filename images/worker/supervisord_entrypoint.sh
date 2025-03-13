@@ -27,13 +27,10 @@ chown -h 0:42 /etc/{shadow,gshadow}
 echo "Link home from jail because slurmd uses it"
 ln -s /mnt/jail/home /home
 
-echo "Bind-mount slurm configs from K8S config map"
-for file in /mnt/slurm-configs/*; do
-    filename=$(basename "$file")
-    touch "/etc/slurm/$filename" && mount --bind "$file" "/etc/slurm/$filename"
-done
+echo "Symlink slurm configs from K8S config map"
+rm -rf /etc/slurm && ln -s /mnt/slurm-configs /etc/slurm
 
-echo "Bind-mount gpubenchmark from container ot jail"
+echo "Bind-mount gpubenchmark from container to jail"
 touch /mnt/jail/usr/bin/gpubench
 mount --bind /usr/bin/gpubench /mnt/jail/usr/bin/gpubench
 

@@ -83,6 +83,51 @@ func RenderVolumeMountSlurmConfigs() corev1.VolumeMount {
 
 // endregion Slurm configs
 
+// region Slurm topology config
+
+// RenderVolumeProjectedSlurmConfigs renders [corev1.Volume] containing Slurm common configs + topology config file
+func RenderVolumeProjectedSlurmConfigs(clusterName string, additionalProjections ...*corev1.VolumeProjection) corev1.Volume {
+	sources := []corev1.VolumeProjection{
+		{
+			ConfigMap: &corev1.ConfigMapProjection{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: naming.BuildConfigMapSlurmConfigsName(clusterName),
+				},
+			},
+		},
+	}
+	for _, projection := range additionalProjections {
+		if projection != nil {
+			sources = append(sources, *projection)
+		}
+	}
+	return corev1.Volume{
+		Name: consts.VolumeNameSlurmConfigs,
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				Sources: sources,
+			},
+		},
+	}
+}
+
+// RenderVolumeProjectionSlurmTopologyConfig renders [corev1.VolumeProjection]
+// defining the configmap to overlay in /etc/slurm
+func RenderVolumeProjectionSlurmTopologyConfig(slurmTopologyConfigMapRefName string) *corev1.VolumeProjection {
+	if slurmTopologyConfigMapRefName == "" {
+		return nil
+	}
+	return &corev1.VolumeProjection{
+		ConfigMap: &corev1.ConfigMapProjection{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: slurmTopologyConfigMapRefName,
+			},
+		},
+	}
+}
+
+// endregion Slurm topology config
+
 // region Spool
 
 func RenderVolumeNameSpool(componentType consts.ComponentType) string {
@@ -192,26 +237,26 @@ func RenderVolumeMountMungeKey() corev1.VolumeMount {
 
 // endregion Munge
 
-// region JailSubMounts
+// region VolumeMount
 
-func RenderVolumeMountsForJailSubMounts(subMounts []slurmv1.NodeVolumeJailSubMount) []corev1.VolumeMount {
+func RenderVolumeMounts(mounts []slurmv1.NodeVolumeMount, subMountPath string) []corev1.VolumeMount {
 	var res []corev1.VolumeMount
-	for _, subMount := range subMounts {
-		res = append(res, RenderVolumeMountJailSubMount(subMount))
+	for _, mount := range mounts {
+		res = append(res, RenderVolumeMount(mount, subMountPath))
 	}
 	return res
 }
 
-func RenderVolumeMountJailSubMount(subMount slurmv1.NodeVolumeJailSubMount) corev1.VolumeMount {
+func RenderVolumeMount(mount slurmv1.NodeVolumeMount, subMountPath string) corev1.VolumeMount {
 	return corev1.VolumeMount{
-		Name:      subMount.Name,
-		MountPath: path.Join(consts.VolumeMountPathJailUpper, subMount.MountPath),
-		SubPath:   subMount.SubPath,
-		ReadOnly:  subMount.ReadOnly,
+		Name:      mount.Name,
+		MountPath: path.Join(subMountPath, mount.MountPath),
+		SubPath:   mount.SubPath,
+		ReadOnly:  mount.ReadOnly,
 	}
 }
 
-// endregion JailSubMounts
+// endregion VolumeMount
 
 // region SecurityLimits
 

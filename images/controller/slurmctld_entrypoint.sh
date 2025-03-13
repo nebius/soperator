@@ -13,11 +13,8 @@ echo "Bind-mount REST JWT secret key from K8S secret"
 touch /var/spool/slurmctld/jwt_hs256.key
 mount --bind /mnt/rest-jwt-key/rest_jwt.key /var/spool/slurmctld/jwt_hs256.key
 
-echo "Bind-mount slurm configs from K8S config map"
-for file in /mnt/slurm-configs/*; do
-    filename=$(basename "$file")
-    touch "/etc/slurm/$filename" && mount --bind "$file" "/etc/slurm/$filename"
-done
+echo "Symlink slurm configs from K8S config map"
+rm -rf /etc/slurm && ln -s /mnt/slurm-configs /etc/slurm
 
 echo "Set permissions for shared /var/spool/slurmctld"
 chmod 755 /var/spool/slurmctld # It changes permissions of this shared directory in other containers as well

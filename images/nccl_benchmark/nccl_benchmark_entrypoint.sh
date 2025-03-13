@@ -9,11 +9,8 @@ ln -s /mnt/jail/etc/shadow /etc/shadow
 ln -s /mnt/jail/etc/gshadow /etc/gshadow
 chown -h 0:42 /etc/{shadow,gshadow}
 
-echo "Bind-mount slurm configs from K8S config map"
-for file in /mnt/slurm-configs/*; do
-    filename=$(basename "$file")
-    touch "/etc/slurm/$filename" && mount --bind "$file" "/etc/slurm/$filename"
-done
+echo "Symlink slurm configs from K8S config map"
+rm -rf /etc/slurm && ln -s /mnt/slurm-configs /etc/slurm
 
 echo "Bind-mount munge key from K8S secret"
 mount --bind /mnt/munge-key/munge.key /etc/munge/munge.key

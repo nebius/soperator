@@ -20,8 +20,9 @@ type SlurmLogin struct {
 	SSHDConfigMapName      string
 	SSHRootPublicKeys      []string
 
-	VolumeJail    slurmv1.NodeVolume
-	JailSubMounts []slurmv1.NodeVolumeJailSubMount
+	VolumeJail         slurmv1.NodeVolume
+	JailSubMounts      []slurmv1.NodeVolumeMount
+	CustomVolumeMounts []slurmv1.NodeVolumeMount
 
 	UseDefaultAppArmorProfile bool
 	Maintenance               *consts.MaintenanceMode
@@ -65,6 +66,10 @@ func buildSlurmLoginFrom(clusterName string, maintenance *consts.MaintenanceMode
 	for _, jailSubMount := range login.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()
 		res.JailSubMounts = append(res.JailSubMounts, subMount)
+	}
+	for _, customVolumeMount := range login.Volumes.CustomMounts {
+		customMount := *customVolumeMount.DeepCopy()
+		res.CustomVolumeMounts = append(res.CustomVolumeMounts, customMount)
 	}
 
 	return res

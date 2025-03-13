@@ -66,6 +66,7 @@ func (r SlurmClusterReconciler) ReconcileNCCLBenchmark(
 						clusterValues.VolumeSources,
 						&clusterValues.NCCLBenchmark,
 						clusterValues.Telemetry,
+						clusterValues.SlurmTopologyConfigMapRefName,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")

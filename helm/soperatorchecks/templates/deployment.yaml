@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "soperatorchecks.fullname" . }}-checks
+  labels:
+    app.kubernetes.io/component: manager
+    app.kubernetes.io/created-by: slurm-operator
+    app.kubernetes.io/part-of: slurm-operator
+    control-plane: soperatorchecks
+  {{- include "soperatorchecks.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.checks.replicas }}
+  selector:
+    matchLabels:
+      control-plane: soperatorchecks
+    {{- include "soperatorchecks.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        control-plane: soperatorchecks
+      {{- include "soperatorchecks.selectorLabels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+    spec:
+      containers:
+      - args: {{- toYaml .Values.checks.manager.args | nindent 8 }}
+        command:
+        - /usr/bin/soperatorchecks
+        env:
+        - name: SLURM_OPERATOR_WATCH_NAMESPACES
+          value: {{ quote .Values.checks.manager.env.slurmOperatorWatchNamespaces }}
+        - name: SLURM_API_SERVER
+          value: {{ quote .Values.checks.manager.env.slurmApiServer }}
+        - name: KUBERNETES_CLUSTER_DOMAIN
+          value: {{ quote .Values.kubernetesClusterDomain }}
+        image: {{ .Values.checks.manager.image.repository }}:{{ .Values.checks.manager.image.tag
+          | default .Chart.AppVersion }}
+        imagePullPolicy: {{ .Values.checks.manager.imagePullPolicy }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources: {{- toYaml .Values.checks.manager.resources | nindent 10 }}
+        securityContext: {{- toYaml .Values.checks.manager.containerSecurityContext | nindent
+          10 }}
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: {{ include "soperatorchecks.fullname" . }}-checks
+      terminationGracePeriodSeconds: 10

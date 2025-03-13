@@ -1,10 +1,8 @@
-ARG BASE_IMAGE=ubuntu:jammy
+ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
 
 FROM $BASE_IMAGE AS controller_slurmctld
 
 ARG SLURM_VERSION=24.05.5
-ARG CUDA_VERSION=12.4.1
-ARG OPENMPI_VERSION=4.1.7a1
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -14,12 +12,6 @@ RUN apt-get update && \
     apt -y install \
         wget \
         curl \
-        git \
-        build-essential \
-        bc \
-        python3  \
-        autoconf \
-        pkg-config \
         libssl-dev \
         libpam0g-dev \
         libtool \
@@ -33,7 +25,6 @@ RUN apt-get update && \
         jq \
         squashfs-tools \
         zstd \
-        software-properties-common \
         iputils-ping \
         dnsutils \
         telnet \
@@ -44,15 +35,14 @@ RUN apt-get update && \
         daemontools && \
     apt clean
 
-# TODO: Install only necessary packages
+ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
 # Download and install Slurm packages
-RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libslurm-perl slurm-smd-slurmctld slurm-smd; do \
-        wget -q -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
+RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd slurm-smd-slurmctld; do \
+        wget -q -P /tmp $PACKAGES_REPO_URL/slurm-packages-$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
         echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
-    done
-
-RUN apt install -y /tmp/*.deb && \
+    done && \
+    apt install -y /tmp/*.deb && \
     rm -rf /tmp/*.deb && \
     apt clean
 

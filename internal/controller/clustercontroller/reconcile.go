@@ -80,7 +80,6 @@ type SlurmClusterReconciler struct {
 	Job             *reconciler.JobReconciler
 	Service         *reconciler.ServiceReconciler
 	StatefulSet     *reconciler.StatefulSetReconciler
-	DaemonSet       *reconciler.DaemonSetReconciler
 	ServiceAccount  *reconciler.ServiceAccountReconciler
 	Role            *reconciler.RoleReconciler
 	RoleBinding     *reconciler.RoleBindingReconciler
@@ -102,7 +101,6 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 		Job:             reconciler.NewJobReconciler(r),
 		Service:         reconciler.NewServiceReconciler(r),
 		StatefulSet:     reconciler.NewStatefulSetReconciler(r),
-		DaemonSet:       reconciler.NewDaemonSetReconciler(r),
 		ServiceAccount:  reconciler.NewServiceAccountReconciler(r),
 		Role:            reconciler.NewRoleReconciler(r),
 		RoleBinding:     reconciler.NewRoleBindingReconciler(r),
@@ -288,7 +286,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 				}
 			}
 
-			// Popolate Jail
+			// Populate Jail
 			switch {
 			case check.IsModeSkipPopulateJail(clusterValues.PopulateJail.Maintenance):
 				if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
@@ -590,10 +588,11 @@ func (r *SlurmClusterReconciler) patchStatus(ctx context.Context, cluster *slurm
 type statusPatcher func(status *slurmv1.SlurmClusterStatus)
 
 const (
-	podTemplateField          = ".spec.slurmNodes.exporter.exporter.podTemplateNameRef"
-	supervisordConfigMapField = ".spec.slurmNodes.worker.supervisordConfigMapRefName"
-	sshdLoginConfigMapField   = ".spec.slurmNodes.login.sshdConfigMapRefName"
-	sshdWorkerConfigMapField  = ".spec.slurmNodes.worker.sshdConfigMapRefName"
+	podTemplateField            = ".spec.slurmNodes.exporter.exporter.podTemplateNameRef"
+	supervisordConfigMapField   = ".spec.slurmNodes.worker.supervisordConfigMapRefName"
+	sshdLoginConfigMapField     = ".spec.slurmNodes.login.sshdConfigMapRefName"
+	sshdWorkerConfigMapField    = ".spec.slurmNodes.worker.sshdConfigMapRefName"
+	slurmTopologyConfigMapField = ".spec.slurmTopologyConfigMapRefName"
 )
 
 func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency int, cacheSyncTimeout time.Duration) error {
@@ -656,6 +655,9 @@ func (r *SlurmClusterReconciler) setupConfigMapIndexer(mgr ctrl.Manager) error {
 		},
 		sshdWorkerConfigMapField: func(sc *slurmv1.SlurmCluster) string {
 			return sc.Spec.SlurmNodes.Worker.SSHDConfigMapRefName
+		},
+		slurmTopologyConfigMapField: func(sc *slurmv1.SlurmCluster) string {
+			return sc.Spec.SlurmTopologyConfigMapRefName
 		},
 	}
 

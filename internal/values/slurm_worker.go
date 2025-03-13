@@ -34,11 +34,11 @@ type SlurmWorker struct {
 
 	VolumeSpool               slurmv1.NodeVolume
 	VolumeJail                slurmv1.NodeVolume
-	JailSubMounts             []slurmv1.NodeVolumeJailSubMount
+	JailSubMounts             []slurmv1.NodeVolumeMount
+	CustomVolumeMounts        []slurmv1.NodeVolumeMount
 	SharedMemorySize          *resource.Quantity
 	UseDefaultAppArmorProfile bool
 	Maintenance               *consts.MaintenanceMode
-	Rebooter                  slurmv1.Rebooter
 }
 
 func buildSlurmWorkerFrom(
@@ -65,8 +65,8 @@ func buildSlurmWorkerFrom(
 		NCCLSettings: *ncclSettings.DeepCopy(),
 		ContainerToolkitValidation: Container{
 			NodeContainer: slurmv1.NodeContainer{
-				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v23.9.1",
-				ImagePullPolicy: worker.Slurmd.ImagePullPolicy, // for now the same as Slurmd
+				Image:           "cr.eu-north1.nebius.cloud/soperator/gpu-operator-validator:v23.9.1", // Mirrored nvcr.io/nvidia/cloud-native/gpu-operator-validator:v23.9.1
+				ImagePullPolicy: worker.Slurmd.ImagePullPolicy,                                        // for now the same as Slurmd
 			},
 			Name: consts.ContainerNameToolkitValidation,
 		},
@@ -96,11 +96,14 @@ func buildSlurmWorkerFrom(
 		SSHDConfigMapName:         sshdConfigMapName,
 		IsSSHDConfigMapDefault:    isSSHDConfigDefault,
 		Maintenance:               maintenance,
-		Rebooter:                  worker.Rebooter,
 	}
 	for _, jailSubMount := range worker.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()
 		res.JailSubMounts = append(res.JailSubMounts, subMount)
+	}
+	for _, customVolumeMount := range worker.Volumes.CustomMounts {
+		customMount := *customVolumeMount.DeepCopy()
+		res.CustomVolumeMounts = append(res.CustomVolumeMounts, customMount)
 	}
 
 	return res

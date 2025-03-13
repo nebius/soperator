@@ -1,9 +1,8 @@
-ARG BASE_IMAGE=ubuntu:jammy
+ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
 
 FROM $BASE_IMAGE AS slurmrestd
 
 ARG SLURM_VERSION=24.05.5
-ARG CUDA_VERSION=12.4.1
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -13,11 +12,6 @@ RUN apt-get update && \
     apt -y install \
         wget \
         curl \
-        git \
-        build-essential \
-        python3  \
-        autoconf \
-        pkg-config \
         libssl-dev \
         libpam0g-dev \
         libtool \
@@ -31,7 +25,6 @@ RUN apt-get update && \
         jq \
         squashfs-tools \
         zstd \
-        software-properties-common \
         iputils-ping \
         dnsutils \
         telnet \
@@ -41,23 +34,19 @@ RUN apt-get update && \
         daemontools && \
     apt clean
 
-
+ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
 # Download and install Slurm packages
 RUN for pkg in slurm-smd slurm-smd-slurmrestd; do \
-        wget -q -P /tmp https://github.com/nebius/slurm-deb-packages/releases/download/$CUDA_VERSION-$(grep 'VERSION_CODENAME' /etc/os-release | cut -d= -f2)-slurm$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
+        wget -q -P /tmp $PACKAGES_REPO_URL/slurm-packages-$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
         echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
-    done
-
-RUN apt install -y /tmp/*.deb \
-    && rm -rf /tmp/*.deb && \
+    done && \
+    apt install -y /tmp/*.deb && \
+    rm -rf /tmp/*.deb && \
     apt clean
 
 # Expose the port used for accessing slurmrestd
 EXPOSE 6820
-
-# Copy restd conf file (owerwrite AuthType)
-COPY restd/slurm_rest.conf /etc/slurm/slurm_rest.conf
 
 # Copy & run the entrypoint script
 COPY restd/slurmrestd_entrypoint.sh /opt/bin/slurm/

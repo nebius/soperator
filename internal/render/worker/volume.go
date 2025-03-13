@@ -19,9 +19,13 @@ func renderVolumesAndClaimTemplateSpecs(
 	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	worker *values.SlurmWorker,
+	slurmTopologyConfigMapRefName string,
 ) (volumes []corev1.Volume, pvcTemplateSpecs []values.PVCTemplateSpec, err error) {
 	volumes = []corev1.Volume{
-		common.RenderVolumeSlurmConfigs(clusterName),
+		common.RenderVolumeProjectedSlurmConfigs(
+			clusterName,
+			common.RenderVolumeProjectionSlurmTopologyConfig(slurmTopologyConfigMapRefName),
+		),
 		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeMungeSocket(),
 		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeWorker),
@@ -82,6 +86,23 @@ func renderVolumesAndClaimTemplateSpecs(
 			},
 			subMount.VolumeClaimTemplateSpec,
 			subMount.Name,
+		); err != nil {
+			return nil, nil, err
+		} else {
+			volumes = append(volumes, v...)
+			pvcTemplateSpecs = append(pvcTemplateSpecs, s...)
+		}
+	}
+
+	// Custom mounts
+	for _, customMount := range worker.CustomVolumeMounts {
+		if v, s, err := common.AddVolumeOrSpec(
+			customMount.VolumeSourceName,
+			func(sourceName string) corev1.Volume {
+				return common.RenderVolumeFromSource(volumeSources, *customMount.VolumeSourceName, customMount.Name)
+			},
+			customMount.VolumeClaimTemplateSpec,
+			customMount.Name,
 		); err != nil {
 			return nil, nil, err
 		} else {

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
 
 	"nebius.ai/slurm-operator/internal/check"
@@ -50,7 +49,7 @@ func renderContainerToolkitValidation(container *values.Container) corev1.Contai
 // renderContainerSlurmd renders [corev1.Container] for slurmd
 func renderContainerSlurmd(
 	container *values.Container,
-	jailSubMounts []slurmv1.NodeVolumeJailSubMount,
+	jailSubMounts, customMounts []slurmv1.NodeVolumeMount,
 	clusterName string,
 	clusterType consts.ClusterType,
 	cgroupVersion string,
@@ -75,7 +74,8 @@ func renderContainerSlurmd(
 		renderVolumeMountSysctl(),
 		renderVolumeMountSupervisordConfigMap(),
 	}
-	volumeMounts = append(volumeMounts, common.RenderVolumeMountsForJailSubMounts(jailSubMounts)...)
+	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(jailSubMounts, consts.VolumeMountPathJailUpper)...)
+	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(customMounts, "")...)
 
 	resources := corev1.ResourceRequirements{
 		Limits:   container.Resources,
@@ -226,96 +226,4 @@ func renderRealMemorySlurmd(resources corev1.ResourceRequirements) int64 {
 	// Convert bytes to mebibytes (1 MiB = 1,048,576 bytes)
 	memoryInMebibytes := memoryInBytes / 1_048_576 // 1 MiB = 1,048,576 bytes
 	return memoryInMebibytes
-}
-
-// renderContainerNodeSysctl renders [corev1.Container] for modify k8s node sysctl
-func renderContainerNodeSysctl() corev1.Container {
-	return corev1.Container{
-		Name:  consts.ContainerNameNodeSysctl,
-		Image: "busybox:latest",
-		SecurityContext: &corev1.SecurityContext{
-			Privileged: ptr.To(true)},
-		Resources: corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse("8Mi"),
-			},
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("10m"),
-				corev1.ResourceMemory: resource.MustParse("8Mi"),
-			},
-		},
-		Command: []string{
-			"/bin/sh",
-			"-c",
-			"sysctl -w kernel.unprivileged_userns_clone=1",
-		},
-	}
-}
-
-func renderContainerRebooter(rebooter slurmv1.Rebooter) corev1.Container {
-	return corev1.Container{
-		Name:            consts.ContainerNameRebooter,
-		Image:           rebooter.Image,
-		ImagePullPolicy: rebooter.ImagePullPolicy,
-		SecurityContext: &corev1.SecurityContext{
-			// Privileged rights needed for rebooting the node
-			Privileged:             ptr.To(true),
-			RunAsUser:              ptr.To(int64(0)),
-			ReadOnlyRootFilesystem: ptr.To(true),
-		},
-		Args: []string{
-			"-log-level",
-			rebooter.LogLevel,
-		},
-		Resources: corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceMemory: *rebooter.Resources.Memory(),
-			},
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    *rebooter.Resources.Cpu(),
-				corev1.ResourceMemory: *rebooter.Resources.Memory(),
-			},
-		},
-		Env: []corev1.EnvVar{
-			{
-				Name:  consts.RebooterMethodEnv,
-				Value: rebooter.EvictionMethod,
-			},
-		},
-	}
-}
-
-// renderContainerNodeSysctlSleep renders [corev1.Container] for reconciliation of sysctl
-func renderContainerNodeSysctlSleep() corev1.Container {
-	return corev1.Container{
-		Name:  consts.ContainerNameNodeSysctlSleep,
-		Image: "busybox:latest",
-		SecurityContext: &corev1.SecurityContext{
-			Privileged:               ptr.To(false),
-			RunAsUser:                ptr.To(int64(65534)),
-			RunAsGroup:               ptr.To(int64(65534)),
-			RunAsNonRoot:             ptr.To(true),
-			ReadOnlyRootFilesystem:   ptr.To(true),
-			AllowPrivilegeEscalation: ptr.To(false),
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{
-					"ALL",
-				},
-			},
-		},
-		Resources: corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse("8Mi"),
-			},
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("10m"),
-				corev1.ResourceMemory: resource.MustParse("8Mi"),
-			},
-		},
-		Command: []string{
-			"/bin/sh",
-			"-c",
-			"sleep infinity",
-		},
-	}
 }

@@ -15,3 +15,8 @@ const (
 	ResourceName = SlurmCluster + ".resourceName"
 	ResourceKind = SlurmCluster + ".resourceKind"
 )
+
+const (
+	NodeConfiguratorNamespace = consts.NodeConfiguratorName + ".namespace"
+	NodeConfiguratorName      = consts.NodeConfiguratorName + ".name"
+)
