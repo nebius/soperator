@@ -47,6 +47,32 @@ rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
+  - activechecks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - slurm.nebius.ai
+  resources:
+  - activechecks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - slurm.nebius.ai
+  resources:
+  - activechecks/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - slurm.nebius.ai
+  resources:
   - slurmclusters
   verbs:
   - get

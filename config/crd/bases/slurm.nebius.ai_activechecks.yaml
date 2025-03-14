@@ -1,0 +1,124 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.4
+  name: activechecks.slurm.nebius.ai
+spec:
+  group: slurm.nebius.ai
+  names:
+    kind: ActiveCheck
+    listKind: ActiveCheckList
+    plural: activechecks
+    singular: activecheck
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ActiveCheck is the Schema for the activechecks API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ActiveCheckSpec defines the desired state of ActiveCheck.
+            properties:
+              podTemplateNameRef:
+                description: PodTemplateNameRef points to a PodTemplate that contains
+                  the pod configuration. Use it to override the default settings.
+                type: string
+              reactions:
+                description: Reactions defines reaction on specific check
+                properties:
+                  DrainSlurmNode:
+                    description: DrainSlurmNode enabling slurm node draining if check
+                      failed
+                    type: boolean
+                  setCondition:
+                    description: SetCondition enabling setting condition to the k8s
+                      node
+                    type: boolean
+                type: object
+              runAfterCreation:
+                default: true
+                description: RunAfterCreation specifies whether the job should run
+                  immediately after the CronJob is created.
+                type: boolean
+              schedule:
+                default: 0 0 1 1 *
+                description: |-
+                  Schedule defines the CronJob schedule.
+                  By default, every year - at 00:00 on day-of-month 1 in January
+                type: string
+              specNCCLTests:
+                description: SpecNCCLTests defines settings for specific type of the
+                  check
+                properties:
+                  args:
+                    description: Args defines raw params string
+                    type: string
+                  checkType:
+                    default: all_reduce_perf
+                    description: CheckType defines the name of the binary that will
+                      be executed during tests.
+                    enum:
+                    - all_gather_perf
+                    - all_reduce_perf
+                    - alltoall_perf
+                    - broadcast_perf
+                    - gather_perf
+                    - hypercube_perf
+                    - reduce_perf
+                    - reduce_scatter_perf
+                    - scatter_perf
+                    - sendrecv_perf
+                    - all_gather_perf_mpi
+                    - all_reduce_perf_mpi
+                    - alltoall_perf_mpi
+                    - broadcast_perf_mpi
+                    - gather_perf_mpi
+                    - hypercube_perf_mpi
+                    - reduce_perf_mpi
+                    - reduce_scatter_perf_mpi
+                    - scatter_perf_mpi
+                    - sendrecv_perf_mpi
+                    type: string
+                  name:
+                    default: nccl-test
+                    description: Name + CheckType defines the name of k8s cronJob
+                    type: string
+                  priority:
+                    default: 10
+                    description: Priority defines the priority of k8s cronJob
+                    format: int32
+                    type: integer
+                type: object
+              suspend:
+                default: true
+                description: Suspend indicates whether the action is suspended.
+                type: boolean
+            type: object
+          status:
+            description: ActiveCheckStatus defines the observed state of ActiveCheck.
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

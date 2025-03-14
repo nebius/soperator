@@ -20,63 +20,42 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
-	"reflect"
 	"time"
 
 	"go.uber.org/zap/zapcore"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
-	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
-	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
-
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
-	"nebius.ai/slurm-operator/internal/check"
-	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
-	"nebius.ai/slurm-operator/internal/controller/nodeconfigurator"
-	"nebius.ai/slurm-operator/internal/controller/nodesetcontroller"
-	webhookcorev1 "nebius.ai/slurm-operator/internal/webhook/v1"
+	"nebius.ai/slurm-operator/internal/controller/sconfigcontroller"
+	"nebius.ai/slurm-operator/internal/jwt"
+	"nebius.ai/slurm-operator/internal/slurmapi"
 	//+kubebuilder:scaffold:imports
 )
 
-var scheme = runtime.NewScheme()
+var (
+	scheme = runtime.NewScheme()
+)
 
 func init() {
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
-	// Check if OpenTelemetryCollector and PodMonitor CRD is installed before adding it to the scheme
-	// This is required to avoid errors when the CRD is not installed before the operator starts
-	if check.IsOtelCRDInstalled() {
-		utilruntime.Must(otelv1beta1.AddToScheme(scheme))
-	}
-	if check.IsPrometheusCRDInstalled() {
-		utilruntime.Must(prometheusv1.AddToScheme(scheme))
-	}
-	if check.IsMariaDbCRDInstalled() {
-		utilruntime.Must(mariadbv1alpha1.AddToScheme(scheme))
-	}
-	if check.IsAppArmorCRDInstalled() {
-		utilruntime.Must(apparmor.AddToScheme(scheme))
-	}
-
-	utilruntime.Must(slurmv1.AddToScheme(scheme))
-
-	utilruntime.Must(slurmv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
+
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(slurmv1.AddToScheme(scheme))
 }
 
 func getZapOpts(logFormat, logLevel string) []zap.Opts {
@@ -123,11 +102,12 @@ func main() {
 		logFormat            string
 		logLevel             string
 
-		cacheSyncTimeout time.Duration
+		reconcileTimeout time.Duration
 		maxConcurrency   int
+		cacheSyncTimeout time.Duration
 	)
 
-	var watchNsCacheByName map[string]cache.Config
+	var watchNsCacheByName = make(map[string]cache.Config)
 
 	ns := os.Getenv("SLURM_OPERATOR_WATCH_NAMESPACES")
 	if ns != "" && ns != "*" {
@@ -137,7 +117,7 @@ func main() {
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", true,
+	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&secureMetrics, "metrics-secure", false,
@@ -145,10 +125,10 @@ func main() {
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.StringVar(&logFormat, "log-format", "json", "Log format: plain or json")
-	flag.StringVar(&logLevel, "log-level", "info", "Log level: debug, info, warn, error, dpanic, panic, fatal")
-	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 5*time.Minute, "The maximum duration allowed for caching sync")
+	flag.StringVar(&logLevel, "log-level", "debug", "Log level: debug, info, warn, error, dpanic, panic, fatal")
+	flag.DurationVar(&reconcileTimeout, "reconcile-timeout", 5*time.Minute, "The maximum duration allowed for a single reconcile")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
-	flag.Parse()
+	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 5*time.Minute, "The maximum duration allowed for caching sync")
 
 	opts := getZapOpts(logFormat, logLevel)
 	ctrl.SetLogger(zap.New(opts...))
@@ -184,7 +164,7 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "e21479ae.nebius.ai",
+		LeaderElectionID:       "vqeyz6an.nebius.ai",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -198,6 +178,10 @@ func main() {
 		// LeaderElectionReleaseOnCancel: true,
 		Cache: cache.Options{
 			DefaultNamespaces: watchNsCacheByName,
+			DefaultLabelSelector: labels.SelectorFromSet(labels.Set{ // TODO: move to app config
+				"app.kubernetes.io/component": "controller",
+				"app.kubernetes.io/instance":  "soperator",
+			}),
 		},
 	})
 	if err != nil {
@@ -205,34 +189,33 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = clustercontroller.NewSlurmClusterReconciler(
-		mgr.GetClient(),
-		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(consts.SlurmCluster+"-controller"),
-	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", reflect.TypeOf(slurmv1.SlurmCluster{}).Name())
-		os.Exit(1)
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = webhookcorev1.SetupSecretWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Secret")
-			os.Exit(1)
-		}
+	slurmAPIServer := os.Getenv("SLURM_API_SERVER")
+	if len(slurmAPIServer) == 0 {
+		slurmAPIServer = "http://localhost:6820"
 	}
 
-	if err = (&nodeconfigurator.NodeConfiguratorReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NodeConfigurator")
+	// TODO: init jwt controller
+	slurmClusterName := types.NamespacedName{
+		Namespace: "soperator",
+		Name:      "soperator",
+	}
+	jwtToken := jwt.NewToken(mgr.GetClient()).For(slurmClusterName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
+	slurmapiClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
+	if err != nil {
 		os.Exit(1)
 	}
-	if err = (&nodesetcontroller.NodeSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NodeSet")
+	slurmapiClients := map[types.NamespacedName]slurmapi.Client{
+		slurmClusterName: slurmapiClient,
+	}
+
+	if err = sconfigcontroller.NewController(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		mgr.GetEventRecorderFor(sconfigcontroller.SConfigControllerName),
+		slurmapiClients,
+		reconcileTimeout,
+	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+		setupLog.Error(err, "unable to create controller", sconfigcontroller.SConfigControllerName)
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

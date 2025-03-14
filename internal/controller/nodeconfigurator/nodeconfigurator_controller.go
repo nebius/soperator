@@ -49,8 +49,9 @@ type NodeConfiguratorReconciler struct {
 // move the current state of the cluster closer to the desired state.
 func (r *NodeConfiguratorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues(
-		logfield.NodeConfiguratorNamespace, req.Namespace,
-		logfield.NodeConfiguratorName, req.Name,
+		logfield.ClusterNamespace, req.Namespace,
+		logfield.ResourceKind, slurmv1alpha1.KindNodeConfigurator,
+		logfield.ResourceName, req.Name,
 	)
 	log.IntoContext(ctx, logger)
 

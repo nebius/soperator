@@ -108,7 +108,7 @@ type NodeSetSpec struct {
 	// If omitted, the default name and values of config will be used.
 	//
 	// +kubebuilder:validation:Optional
-	ConfigMapRefSupervisord string `json:"supervisord,omitempty"`
+	ConfigMapRefSupervisord string `json:"configMapRefSupervisord,omitempty"`
 
 	// ConfigMapRefSSHD defines the config name of Slurm SSHD.
 	// Specifying a custom name allows providing custom config for the Slurm SSHD.
@@ -116,7 +116,7 @@ type NodeSetSpec struct {
 	// If omitted, the default name and values of config will be used.
 	//
 	// +kubebuilder:validation:Optional
-	ConfigMapRefSSHD string `json:"sshd,omitempty"`
+	ConfigMapRefSSHD string `json:"configMapRefSshd,omitempty"`
 }
 
 // GPUSpec defines the settings related to GPU support

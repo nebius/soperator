@@ -43,9 +43,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/controller/soperatorchecks"
 	"nebius.ai/slurm-operator/internal/jwt"
 	"nebius.ai/slurm-operator/internal/slurmapi"
-	"nebius.ai/slurm-operator/internal/soperatorchecks"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -233,6 +233,13 @@ func main() {
 		mgr.GetEventRecorderFor(soperatorchecks.K8SNodesControllerName),
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create controller", soperatorchecks.K8SNodesControllerName)
+		os.Exit(1)
+	}
+	if err = (&soperatorchecks.ActiveCheckReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ActiveCheck")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
