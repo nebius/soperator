@@ -221,6 +221,7 @@ func (r Reconciler) reconcile(
 			logger.Error(err, "Failed to patch")
 			return errors.Wrap(err, "patching")
 		}
+
 		err = r.EnsureUpdated(ctx, cluster, existing, desired, patch, deps...)
 		if err != nil {
 			logger.Error(err, "Failed to update")

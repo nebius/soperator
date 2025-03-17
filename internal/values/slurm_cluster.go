@@ -38,11 +38,13 @@ type SlurmCluster struct {
 	CustomSlurmConfig             *string
 	MPIConfig                     slurmv1.MPIConfig
 	SlurmTopologyConfigMapRefName string
+	SConfigController             SConfigController
 }
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD
 func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (*SlurmCluster, error) {
 	logger := log.FromContext(ctx)
+	logger.V(1).Info(fmt.Sprintf("%+v", cluster.Spec.SConfigController))
 
 	clusterType, err := consts.StringToClusterType(cluster.Spec.ClusterType)
 	if err != nil {
@@ -80,6 +82,11 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		CustomSlurmConfig:             cluster.Spec.CustomSlurmConfig,
 		MPIConfig:                     cluster.Spec.MPIConfig,
 		SlurmTopologyConfigMapRefName: cluster.Spec.SlurmTopologyConfigMapRefName,
+		SConfigController: buildSConfigControllerFrom(
+			cluster.Spec.SConfigController.Node,
+			cluster.Spec.SConfigController.Container,
+			*cluster.Spec.Maintenance,
+		),
 	}
 
 	if err := res.Validate(ctx); err != nil {

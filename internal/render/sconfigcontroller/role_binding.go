@@ -1,4 +1,4 @@
-package worker
+package sconfigcontroller
 
 import (
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -8,25 +8,25 @@ import (
 	"nebius.ai/slurm-operator/internal/render/common"
 )
 
-func RenderRoleBinding(namespace, clusterName string) rbacv1.RoleBinding {
-	labels := common.RenderLabels(consts.ComponentTypeWorker, clusterName)
+func RenderRoleBinding(clusterNamespace, clusterName string) rbacv1.RoleBinding {
+	labels := common.RenderLabels(consts.ComponentTypeSConfigController, clusterName)
 
 	return rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      naming.BuildRoleBindingWorkerName(clusterName),
-			Namespace: namespace,
+			Name:      naming.BuildRoleBindingSConfigControllerName(clusterName),
+			Namespace: clusterNamespace,
 			Labels:    labels,
 		},
 		Subjects: []rbacv1.Subject{
 			{
 				Kind:      rbacv1.ServiceAccountKind,
-				Name:      naming.BuildServiceAccountWorkerName(clusterName),
-				Namespace: namespace,
+				Name:      naming.BuildServiceAccountSconfigControllerName(clusterName),
+				Namespace: clusterNamespace,
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "Role",
-			Name:     naming.BuildRoleWorkerName(clusterName),
+			Name:     naming.BuildRoleSConfigControllerName(clusterName),
 			APIGroup: rbacv1.GroupName,
 		},
 	}

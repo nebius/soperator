@@ -2,10 +2,17 @@ with-expecter: true
 issue-845-fix: True
 resolve-type-alias: False
 packages:
-    nebius.ai/slurm-operator/internal/slurmapi:
-      interfaces:
-        Client:
-          config:          
-            dir: "{{.InterfaceDirRelative}}/fake"
-            outpkg: "fake"
-            filename: "mock_{{ .InterfaceName | camelcase | firstLower }}.go"
+  nebius.ai/slurm-operator/internal/slurmapi:
+    interfaces:
+      Client:
+        config:
+          dir: "{{.InterfaceDirRelative}}/fake"
+          outpkg: "fake"
+          filename: "mock_{{ .InterfaceName | camelcase | firstLower }}.go"
+  nebius.ai/slurm-operator/internal/controller/sconfigcontroller:
+    interfaces:
+      Store:
+        config:
+          dir: "{{.InterfaceDirRelative}}/fake"
+          outpkg: "fake"
+          filename: "mock_{{ .InterfaceName | camelcase | firstLower }}.go"

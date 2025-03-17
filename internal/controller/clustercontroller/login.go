@@ -47,7 +47,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 						return nil
 					}
 
-					desired, err := common.RenderDefaultConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeLogin)
+					desired, err := common.RenderDefaultConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeController)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
 						return errors.Wrap(err, "rendering login default SSHD ConfigMap")

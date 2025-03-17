@@ -227,3 +227,15 @@ func BuildMariaDbName(clusterName string) string {
 		entity:      consts.MariaDbClusterSuffix,
 	}.String()
 }
+
+func BuildServiceAccountSconfigControllerName(clusterName string) string {
+	return clusterName + "-sconfigcontroller-sa"
+}
+
+func BuildRoleBindingSConfigControllerName(clusterName string) string {
+	return clusterName + "-sconfigcontroller-configmaps-role-binding"
+}
+
+func BuildRoleSConfigControllerName(clusterName string) string {
+	return clusterName + "-sconfigcontroller-configmaps-role"
+}

@@ -403,6 +403,16 @@ slurmNodes:
         cpu: "1000m"
         memory: "1Gi"
         ephemeralStorage: "500Mi"
+sConfigController:
+  node:
+    k8sNodeFilterName: "controller"
+    size: 2
+  container:
+    imagePullPolicy: "IfNotPresent"
+    resources:
+      cpu: "250m"
+      memory: "256Mi"
+      ephemeralStorage: "500Mi"
 telemetry: {}
 # jobsTelemetry:
 #   otelCollectorHttpHost: vmsingle-slurm.monitoring-system.svc.cluster.local
@@ -425,5 +435,5 @@ images:
   ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.19.0-jammy-slurm24.05.5"
   slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.19.0-jammy-slurm24.05.5"
   exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.19.0-jammy-slurm24.05.5"
-  mariaDB: "docker-registry1.mariadb.com/library/mariadb:11.4.3"
-  rebooter: "cr.eu-north1.nebius.cloud/soperator/rebooter:1.17.0"
+  sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.19.0
+  mariaDB: docker-registry1.mariadb.com/library/mariadb:11.4.3

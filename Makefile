@@ -20,13 +20,13 @@ SHELL = /usr/bin/env bash -o pipefail
 # Limit the scope of generation otherwise it will try to generate configs for non-controller code
 GENPATH = "./api/v1;./api/v1alpha1;"
 
-CHART_PATH            		= helm
-CHART_OPERATOR_PATH   		= $(CHART_PATH)/soperator
-CHART_SOPERATORCHECKS_PATH  = $(CHART_PATH)/soperatorchecks
-CHART_NODECONFIGURATOR_PATH = $(CHART_PATH)/nodeconfigurator
-CHART_OPERATOR_CRDS_PATH   	= $(CHART_PATH)/soperator-crds
-CHART_CLUSTER_PATH    		= $(CHART_PATH)/slurm-cluster
-CHART_STORAGE_PATH    		= $(CHART_PATH)/slurm-cluster-storage
+CHART_PATH            		 = helm
+CHART_OPERATOR_PATH   		 = $(CHART_PATH)/soperator
+CHART_SOPERATORCHECKS_PATH   = $(CHART_PATH)/soperatorchecks
+CHART_NODECONFIGURATOR_PATH  = $(CHART_PATH)/nodeconfigurator
+CHART_OPERATOR_CRDS_PATH   	 = $(CHART_PATH)/soperator-crds
+CHART_CLUSTER_PATH    		 = $(CHART_PATH)/slurm-cluster
+CHART_STORAGE_PATH    		 = $(CHART_PATH)/slurm-cluster-storage
 
 SLURM_VERSION		  		= 24.05.5
 UBUNTU_VERSION		  		= jammy
@@ -199,6 +199,8 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.munge = \"$(IMAGE_REPO)/munge:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.populateJail = \"$(IMAGE_REPO)/populate_jail:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.exporter = \"$(IMAGE_REPO)/exporter:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.sConfigController = \"$(IMAGE_REPO)/sconfigcontroller:$(VERSION)\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.mariaDB = \"docker-registry1.mariadb.com/library/mariadb:11.4.3\"" "helm/slurm-cluster/values.yaml"
 	@# endregion helm/slurm-cluster/values.yaml
 
 	@# region helm/nodeconfigurator/values.yaml
@@ -260,7 +262,7 @@ endif
 ifndef DOCKERFILE
 	$(error DOCKERFILE is not set, docker image cannot be built)
 endif
-ifeq ($(filter ${IMAGE_NAME},slurm-operator rebooter soperatorchecks),${IMAGE_NAME})
+ifeq ($(filter ${IMAGE_NAME},slurm-operator rebooter soperatorchecks sconfigcontroller),${IMAGE_NAME})
 	docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} ${DOCKER_BUILD_PLATFORM} -f ${DOCKERFILE} ${DOCKER_OUTPUT} .
 else
 	cd images && docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} ${DOCKER_BUILD_PLATFORM} -f ${DOCKERFILE} ${DOCKER_OUTPUT} .
