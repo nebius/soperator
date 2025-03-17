@@ -135,6 +135,8 @@ rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
+  - nodeconfigurators
+  - nodesets
   - slurmclusters
   verbs:
   - create
@@ -147,12 +149,16 @@ rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
+  - nodeconfigurators/finalizers
+  - nodesets/finalizers
   - slurmclusters/finalizers
   verbs:
   - update
 - apiGroups:
   - slurm.nebius.ai
   resources:
+  - nodeconfigurators/status
+  - nodesets/status
   - slurmclusters/status
   verbs:
   - get
