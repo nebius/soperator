@@ -103,6 +103,7 @@ func main() {
 		configsPath          string
 		clusterNamespace     string
 		clusterName          string
+		slurmAPIServer       string
 
 		maxConcurrency   int
 		cacheSyncTimeout time.Duration
@@ -124,6 +125,7 @@ func main() {
 	flag.StringVar(&configsPath, "configs-path", "/mnt/jail/slurm", "Path where to store configs")
 	flag.StringVar(&clusterNamespace, "cluster-namespace", "default", "Soperator cluster namespace")
 	flag.StringVar(&clusterName, "cluster-name", "soperator", "Name of the soperator cluster controller")
+	flag.StringVar(&slurmAPIServer, "slurmapiserver", "http://localhost:6820", "Address of the SlurmAPI")
 	flag.Parse()
 	opts := getZapOpts(logFormat, logLevel)
 	ctrl.SetLogger(zap.New(opts...))
@@ -169,11 +171,6 @@ func main() {
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
-	}
-
-	slurmAPIServer := os.Getenv("SLURM_API_SERVER")
-	if len(slurmAPIServer) == 0 {
-		slurmAPIServer = "http://localhost:6820"
 	}
 
 	jwtToken := jwt.NewToken(mgr.GetClient()).

@@ -23,6 +23,6 @@ const (
 	LabelNodeConfiguratorKey   = "slurm.nebius.ai/node-configurator"
 	LabelNodeConfiguratorValue = "true"
 
-	LabelSlurmConfigKey   = "slurm.nebius.ai/slurm-config"
-	LabelSlurmConfigValue = "general"
+	LabelSConfigControllerSourceKey   = "sconficontroller.slurm.nebius.ai"
+	LabelSConfigControllerSourceValue = "true"
 )

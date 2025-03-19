@@ -154,6 +154,8 @@ func (r *ControllerReconciler) SetupWithManager(mgr ctrl.Manager,
 }
 
 func isValidConfigMap(cm *corev1.ConfigMap) bool {
-	_, ok := cm.Labels[consts.ConfigsLabelSConfigController]
-	return ok
+	if v, ok := cm.Labels[consts.LabelSConfigControllerSourceKey]; ok {
+		return v == "true"
+	}
+	return false
 }

@@ -14333,6 +14333,8 @@ spec:
                     required:
                     - k8sNodeFilterName
                     type: object
+                  slurmAPIServer:
+                    type: string
                 type: object
               secrets:
                 description: Secrets define the [corev1.Secret] references needed

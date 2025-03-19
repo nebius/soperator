@@ -50,7 +50,7 @@ func BasePodTemplateSpec(
 			Affinity:     affinity,
 			NodeSelector: nodeSelector,
 			Containers: []corev1.Container{
-				renderContainerSConfigController(clusterNamespace, clusterName, sConfigController.Container),
+				renderContainerSConfigController(clusterNamespace, clusterName, sConfigController.SlurmAPIServer, sConfigController.Container),
 			},
 			InitContainers: []corev1.Container{
 				renderInitContainerSConfigController(),

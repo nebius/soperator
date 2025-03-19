@@ -10,7 +10,7 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-func renderContainerSConfigController(clusterNamespace, clusterName string, container values.Container) corev1.Container {
+func renderContainerSConfigController(clusterNamespace, clusterName, slurmAPIServer string, container values.Container) corev1.Container {
 	// Create a copy of the container's limits and add non-CPU resources from Requests
 	limits := common.CopyNonCPUResources(container.Resources)
 
@@ -31,6 +31,7 @@ func renderContainerSConfigController(clusterNamespace, clusterName string, cont
 		Args: []string{
 			fmt.Sprintf("--cluster-namespace=%s", clusterNamespace),
 			fmt.Sprintf("--cluster-name=%s", clusterName),
+			fmt.Sprintf("--slurmapiserver=%s", slurmAPIServer),
 		},
 	}
 }

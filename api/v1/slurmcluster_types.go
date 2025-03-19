@@ -196,8 +196,9 @@ type MPIConfig struct {
 }
 
 type SConfigController struct {
-	Node      SlurmNode     `json:"node,omitempty"`
-	Container NodeContainer `json:"container,omitempty"`
+	SlurmAPIServer string        `json:"slurmAPIServer,omitempty"`
+	Node           SlurmNode     `json:"node,omitempty"`
+	Container      NodeContainer `json:"container,omitempty"`
 }
 
 type PartitionConfiguration struct {

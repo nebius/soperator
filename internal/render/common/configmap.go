@@ -42,7 +42,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig co
 
 func renderConfigMapSlurmConfigsLabels(componentType consts.ComponentType, clusterName string) map[string]string {
 	labels := RenderLabels(componentType, clusterName)
-	labels[consts.LabelSlurmConfigKey] = consts.LabelSlurmConfigValue
+	labels[consts.LabelSConfigControllerSourceKey] = consts.LabelSConfigControllerSourceValue
 
 	return labels
 }

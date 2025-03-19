@@ -11,8 +11,9 @@ import (
 type SConfigController struct {
 	slurmv1.SlurmNode
 
-	Container  Container
-	VolumeJail slurmv1.NodeVolume
+	Container      Container
+	VolumeJail     slurmv1.NodeVolume
+	SlurmAPIServer string
 
 	Maintenance consts.MaintenanceMode
 }
@@ -20,6 +21,7 @@ type SConfigController struct {
 func buildSConfigControllerFrom(
 	node slurmv1.SlurmNode,
 	container slurmv1.NodeContainer,
+	slurmAPIServer string,
 	maintenance consts.MaintenanceMode,
 ) SConfigController {
 	containerSConfigController := buildContainerFrom(
@@ -32,7 +34,8 @@ func buildSConfigControllerFrom(
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),
 		},
-		Maintenance: maintenance,
+		SlurmAPIServer: slurmAPIServer,
+		Maintenance:    maintenance,
 	}
 
 	return res
