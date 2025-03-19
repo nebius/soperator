@@ -27,8 +27,8 @@ chown -h 0:42 /etc/{shadow,gshadow}
 echo "Link home from jail because slurmd uses it"
 ln -s /mnt/jail/home /home
 
-echo "Symlink slurm configs from K8S config map"
-rm -rf /etc/slurm && ln -s /mnt/slurm-configs /etc/slurm
+echo "Symlink slurm configs from jail(sconfigcontroller)"
+rm -rf /etc/slurm && ln -s /mnt/jail/slurm /etc/slurm
 
 echo "Bind-mount gpubenchmark from container to jail"
 touch /mnt/jail/usr/bin/gpubench
@@ -85,7 +85,7 @@ if [ "$SLURM_CLUSTER_TYPE" = "gpu" ]; then
     # the GRES variable will be equal to "gpu:nvidia_a100-sxm4-80gb:2,gpu:nvidia_v100-sxm2-16gb:1".
     # See Slurm docs: https://slurm.schedmd.com/gres.html#AutoDetect
     export GRES="$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -e 's/ /_/g' -e 's/.*/\L&/' | sort | uniq -c | awk '{print "gpu:" $2 ":" $1}' | paste -sd ',' -)"
-    
+
     echo "Detected GRES is $GRES"
 else
     echo "Skipping GPU detection"

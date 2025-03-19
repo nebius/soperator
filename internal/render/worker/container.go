@@ -57,7 +57,6 @@ func renderContainerSlurmd(
 	slurmNodeExtra string,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
-		common.RenderVolumeMountSlurmConfigs(),
 		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
 		common.RenderVolumeMountJail(),
 		common.RenderVolumeMountMungeSocket(),

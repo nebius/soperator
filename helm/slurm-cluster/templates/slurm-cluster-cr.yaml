@@ -279,6 +279,7 @@ spec:
           memory: {{ required ".Values.slurmNodes.rest.rest.resources.memory must be provided." .Values.slurmNodes.rest.rest.resources.memory | quote}}
           ephemeral-storage: {{ required ".Values.slurmNodes.rest.rest.resources.ephemeralStorage must be provided." .Values.slurmNodes.rest.rest.resources.ephemeralStorage | quote}}
   sConfigController:
+    slurmAPIServer: {{ .Values.sConfigController.slurmAPIServer }}
     node:
       size: {{ required ".Values.sConfigController.node.size must be provided." .Values.sConfigController.node.size }}
       k8sNodeFilterName: {{ required ".Values.sConfigController.node.k8sNodeFilterName must be provided." .Values.sConfigController.node.k8sNodeFilterName | quote }}

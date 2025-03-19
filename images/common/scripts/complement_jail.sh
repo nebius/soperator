@@ -120,7 +120,7 @@ pushd "${jaildir}"
 
     echo "Bind-mount slurm configs"
     mkdir -p etc/slurm
-    mount --bind /mnt/slurm-configs etc/slurm
+    mount --bind /mnt/jail/slurm etc/slurm
 
     if [ -n "$worker" ]; then
         echo "Bind-mount slurmd spool directory from the host because it should be propagated to the jail"

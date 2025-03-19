@@ -18,7 +18,6 @@ func renderContainerSshd(
 	jailSubMounts, customMounts []slurmv1.NodeVolumeMount,
 ) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
-		common.RenderVolumeMountSlurmConfigs(),
 		common.RenderVolumeMountJail(),
 		common.RenderVolumeMountMungeSocket(),
 		common.RenderVolumeMountSecurityLimits(),
