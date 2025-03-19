@@ -109,10 +109,10 @@ func BuildSecretMungeKeyName(clusterName string) string {
 
 // region Login
 
-func BuildConfigMapSSHDConfigsName(clusterName string) string {
+func BuildConfigMapSSHDConfigsNameLogin(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,
-		entity:      consts.ConfigMapNameSSHDConfigs,
+		entity:      consts.ConfigMapNameSSHDConfigsLogin,
 	}.String()
 }
 
@@ -141,6 +141,12 @@ func BuildConfigMapSecurityLimitsName(componentType consts.ComponentType, cluste
 // endregion Login
 
 // region Worker
+func BuildConfigMapSSHDConfigsNameWorker(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.ConfigMapNameSSHDConfigsWorker,
+	}.String()
+}
 
 func BuildConfigMapNCCLTopologyName(clusterName string) string {
 	return namedEntity{

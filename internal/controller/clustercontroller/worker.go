@@ -96,7 +96,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						return nil
 					}
 
-					desired, err := common.RenderDefaultConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeController)
+					desired, err := worker.RenderConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeWorker)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
 						return errors.Wrap(err, "rendering worker default SSHD ConfigMap")

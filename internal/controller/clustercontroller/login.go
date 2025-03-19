@@ -47,7 +47,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 						return nil
 					}
 
-					desired, err := common.RenderDefaultConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeController)
+					desired, err := login.RenderConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeLogin)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
 						return errors.Wrap(err, "rendering login default SSHD ConfigMap")
@@ -328,7 +328,7 @@ func (r SlurmClusterReconciler) getLoginStatefulSetDependencies(
 		ctx,
 		types.NamespacedName{
 			Namespace: clusterValues.Namespace,
-			Name:      naming.BuildConfigMapSSHDConfigsName(clusterValues.Name),
+			Name:      naming.BuildConfigMapSSHDConfigsNameLogin(clusterValues.Name),
 		},
 		sshConfigsConfigMap,
 	); err != nil {

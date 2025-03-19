@@ -25,10 +25,10 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeMungeSocket(),
 		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeLogin),
 		common.RenderVolumeSshdKeys(secrets.SshdKeysName),
-		common.RenderVolumeSshdConfigs(login.SSHDConfigMapName),
 		common.RenderVolumeSshdRootKeys(clusterName),
 		common.RenderVolumeInMemory(),
 		common.RenderVolumeTmpDisk(),
+		renderVolumeSshdConfigs(login.SSHDConfigMapName),
 	}
 
 	// Jail could be specified by template spec or by volume source name
@@ -82,3 +82,30 @@ func renderVolumesAndClaimTemplateSpecs(
 
 	return volumes, pvcTemplateSpecs, nil
 }
+
+// region configs
+
+// RenderVolumeSshdConfigs renders [corev1.Volume] containing SSHD configs contents
+func renderVolumeSshdConfigs(sshdConfigMapName string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSSHDConfigsLogin,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: sshdConfigMapName,
+				},
+			},
+		},
+	}
+}
+
+// RenderVolumeMountSshdConfigs renders [corev1.VolumeMount] defining the mounting path for SSHD configs
+func renderVolumeMountSshdConfigs() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSSHDConfigsLogin,
+		MountPath: consts.VolumeMountPathSSHConfigs,
+		ReadOnly:  true,
+	}
+}
+
+// endregion configs

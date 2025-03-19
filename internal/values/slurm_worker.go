@@ -59,7 +59,7 @@ func buildSlurmWorkerFrom(
 	sshdConfigMapName := worker.SSHDConfigMapRefName
 	isSSHDConfigDefault := sshdConfigMapName == ""
 	if isSSHDConfigDefault {
-		sshdConfigMapName = naming.BuildConfigMapSSHDConfigsName(clusterName)
+		sshdConfigMapName = naming.BuildConfigMapSSHDConfigsNameWorker(clusterName)
 	}
 
 	res := SlurmWorker{

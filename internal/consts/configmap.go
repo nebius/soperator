@@ -6,7 +6,8 @@ const (
 
 const (
 	ConfigMapNameSlurmConfigs      = slurmConfigs
-	ConfigMapNameSSHDConfigs       = sshConfigs
+	ConfigMapNameSSHDConfigsLogin  = sshConfigs
+	ConfigMapNameSSHDConfigsWorker = sshConfigsWorker
 	ConfigMapNameSshRootPublicKeys = sshRootKeys
 	ConfigMapNameSecurityLimits    = securityLimits
 	ConfigMapNameNCCLTopology      = ncclTopology
