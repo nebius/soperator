@@ -5537,6 +5537,12 @@ spec:
                         - jailSubMounts
                         - spool
                         type: object
+                      workerAnnotations:
+                        additionalProperties:
+                          type: string
+                        description: WorkerAnnotations represent K8S annotations that
+                          should be added to the workers
+                        type: object
                     required:
                     - k8sNodeFilterName
                     - munge

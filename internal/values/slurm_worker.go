@@ -24,6 +24,8 @@ type SlurmWorker struct {
 	IsSSHDConfigMapDefault bool
 	SSHDConfigMapName      string
 
+	WorkerAnnotations map[string]string
+
 	CgroupVersion  string
 	EnableGDRCopy  bool
 	SlurmNodeExtra string
@@ -80,6 +82,7 @@ func buildSlurmWorkerFrom(
 		),
 		SupervisordConfigMapDefault: supervisordConfigDefault,
 		SupervisordConfigMapName:    supervisordConfigName,
+		WorkerAnnotations:           worker.WorkerAnnotations,
 		Service:                     buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeWorker, clusterName)),
 		StatefulSet: buildStatefulSetFrom(
 			naming.BuildStatefulSetName(consts.ComponentTypeWorker, clusterName),
