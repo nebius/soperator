@@ -90,4 +90,4 @@ RUN ldconfig
 
 COPY --from=exporter_builder /app/prometheus-slurm-exporter /opt/bin/
 
-ENTRYPOINT ["/opt/bin/prometheus-slurm-exporter"]
+ENTRYPOINT ["/opt/bin/prometheus-slurm-exporter", "--gpus-acct"]
