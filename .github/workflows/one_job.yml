@@ -2,6 +2,9 @@ name: Build All in one job
 
 on:
   push:
+    # dev branch will be processed in `pull_request`
+    branches-ignore:
+      - dev
     paths-ignore:
       - '.github/**'
       - 'docs/**'
@@ -12,6 +15,21 @@ on:
       - 'SECURITY.md'
       - 'images/worker/gpubench/**'
 
+  # Allow manual trigger for pull requests from forks
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - dev
+    types: [opened, synchronize, reopened]
+    paths-ignore:
+      - '.github/**'
+      - 'docs/**'
+      - 'CODEOWNERS'
+      - 'LICENSE'
+      - 'PROJECT'
+      - 'README.md'
+      - 'SECURITY.md'
+      - 'images/worker/gpubench/**'
 
 permissions:
   contents: read
