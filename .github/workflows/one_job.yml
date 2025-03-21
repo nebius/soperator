@@ -2,9 +2,8 @@ name: Build All in one job
 
 on:
   push:
-    # dev branch will be processed in `pull_request`
-    branches-ignore:
-      - dev
+    branches:
+      - main
     paths-ignore:
       - '.github/**'
       - 'docs/**'
@@ -15,8 +14,7 @@ on:
       - 'SECURITY.md'
       - 'images/worker/gpubench/**'
 
-  # Allow manual trigger for pull requests from forks
-  workflow_dispatch:
+  # pull_request are defined separately to allow to run CI from forks.
   pull_request:
     branches:
       - dev
