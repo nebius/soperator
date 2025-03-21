@@ -131,6 +131,7 @@ func main() {
 	flag.DurationVar(&reconcileTimeout, "reconcile-timeout", 5*time.Minute, "The maximum duration allowed for a single reconcile")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 5*time.Minute, "The maximum duration allowed for caching sync")
+	flag.Parse()
 
 	opts := getZapOpts(logFormat, logLevel)
 	ctrl.SetLogger(zap.New(opts...))
