@@ -93,6 +93,8 @@ func renderContainerSlurmd(
 		Name:            consts.ContainerNameSlurmd,
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
+		Command:         container.Command,
+		Args:            container.Args,
 		Env: renderSlurmdEnv(
 			clusterName,
 			cgroupVersion,

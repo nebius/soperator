@@ -16,6 +16,8 @@ func RenderContainerExporter(containerParams *values.SlurmExporter) corev1.Conta
 	return corev1.Container{
 		Name:            consts.ContainerNameExporter,
 		Image:           containerParams.ExporterContainer.Image,
+		Command:         containerParams.Command,
+		Args:            containerParams.Args,
 		ImagePullPolicy: containerParams.ExporterContainer.ImagePullPolicy,
 		Ports: []corev1.ContainerPort{
 			{

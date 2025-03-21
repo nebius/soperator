@@ -33,8 +33,10 @@ func renderContainerSshd(
 	// Create a copy of the container's limits and add non-CPU resources from Requests
 	limits := common.CopyNonCPUResources(container.Resources)
 	return corev1.Container{
-		Name:  consts.ContainerNameSshd,
-		Image: container.Image,
+		Name:    consts.ContainerNameSshd,
+		Image:   container.Image,
+		Command: container.Command,
+		Args:    container.Args,
 		Env: []corev1.EnvVar{
 			{
 				Name:  "SLURM_CLUSTER_TYPE",

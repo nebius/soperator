@@ -1642,6 +1642,20 @@ spec:
                             description: AppArmorProfile defines the AppArmor profile
                               for the Slurm containers
                             type: string
+                          args:
+                            description: |-
+                              Args defines the arguments to the entrypoint (command).
+                              The container image's CMD is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
+                          command:
+                            description: |-
+                              Command defines the entrypoint array for the container. Not executed within a shell.
+                              The container image's ENTRYPOINT is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
                           enabled:
                             type: boolean
                           image:
@@ -2062,6 +2076,20 @@ spec:
                             description: AppArmorProfile defines the AppArmor profile
                               for the Slurm containers
                             type: string
+                          args:
+                            description: |-
+                              Args defines the arguments to the entrypoint (command).
+                              The container image's CMD is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
+                          command:
+                            description: |-
+                              Command defines the entrypoint array for the container. Not executed within a shell.
+                              The container image's ENTRYPOINT is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
                           image:
                             description: Image defines the container image
                             type: string
@@ -2154,6 +2182,20 @@ spec:
                             description: AppArmorProfile defines the AppArmor profile
                               for the Slurm containers
                             type: string
+                          args:
+                            description: |-
+                              Args defines the arguments to the entrypoint (command).
+                              The container image's CMD is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
+                          command:
+                            description: |-
+                              Command defines the entrypoint array for the container. Not executed within a shell.
+                              The container image's ENTRYPOINT is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
                           image:
                             description: Image defines the container image
                             type: string
@@ -2310,6 +2352,20 @@ spec:
                             description: AppArmorProfile defines the AppArmor profile
                               for the Slurm containers
                             type: string
+                          args:
+                            description: |-
+                              Args defines the arguments to the entrypoint (command).
+                              The container image's CMD is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
+                          command:
+                            description: |-
+                              Command defines the entrypoint array for the container. Not executed within a shell.
+                              The container image's ENTRYPOINT is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
                           image:
                             description: Image defines the container image
                             type: string
@@ -2357,6 +2413,20 @@ spec:
                             description: AppArmorProfile defines the AppArmor profile
                               for the Slurm containers
                             type: string
+                          args:
+                            description: |-
+                              Args defines the arguments to the entrypoint (command).
+                              The container image's CMD is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
+                          command:
+                            description: |-
+                              Command defines the entrypoint array for the container. Not executed within a shell.
+                              The container image's ENTRYPOINT is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
                           image:
                             description: Image defines the container image
                             type: string
@@ -3086,6 +3156,20 @@ spec:
                             description: AppArmorProfile defines the AppArmor profile
                               for the Slurm containers
                             type: string
+                          args:
+                            description: |-
+                              Args defines the arguments to the entrypoint (command).
+                              The container image's CMD is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
+                          command:
+                            description: |-
+                              Command defines the entrypoint array for the container. Not executed within a shell.
+                              The container image's ENTRYPOINT is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
                           image:
                             description: Image defines the container image
                             type: string
@@ -3137,6 +3221,20 @@ spec:
                             description: AppArmorProfile defines the AppArmor profile
                               for the Slurm containers
                             type: string
+                          args:
+                            description: |-
+                              Args defines the arguments to the entrypoint (command).
+                              The container image's CMD is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
+                          command:
+                            description: |-
+                              Command defines the entrypoint array for the container. Not executed within a shell.
+                              The container image's ENTRYPOINT is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
                           image:
                             description: Image defines the container image
                             type: string
@@ -3613,6 +3711,20 @@ spec:
                             description: AppArmorProfile defines the AppArmor profile
                               for the Slurm containers
                             type: string
+                          args:
+                            description: |-
+                              Args defines the arguments to the entrypoint (command).
+                              The container image's CMD is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
+                          command:
+                            description: |-
+                              Command defines the entrypoint array for the container. Not executed within a shell.
+                              The container image's ENTRYPOINT is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
                           image:
                             description: Image defines the container image
                             type: string
@@ -3665,6 +3777,20 @@ spec:
                             description: AppArmorProfile defines the AppArmor profile
                               for the Slurm containers
                             type: string
+                          args:
+                            description: |-
+                              Args defines the arguments to the entrypoint (command).
+                              The container image's CMD is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
+                          command:
+                            description: |-
+                              Command defines the entrypoint array for the container. Not executed within a shell.
+                              The container image's ENTRYPOINT is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
                           image:
                             description: Image defines the container image
                             type: string
@@ -4451,6 +4577,20 @@ spec:
                             description: AppArmorProfile defines the AppArmor profile
                               for the Slurm containers
                             type: string
+                          args:
+                            description: |-
+                              Args defines the arguments to the entrypoint (command).
+                              The container image's CMD is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
+                          command:
+                            description: |-
+                              Command defines the entrypoint array for the container. Not executed within a shell.
+                              The container image's ENTRYPOINT is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
                           image:
                             description: Image defines the container image
                             type: string
@@ -4521,6 +4661,20 @@ spec:
                             description: AppArmorProfile defines the AppArmor profile
                               for the Slurm containers
                             type: string
+                          args:
+                            description: |-
+                              Args defines the arguments to the entrypoint (command).
+                              The container image's CMD is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
+                          command:
+                            description: |-
+                              Command defines the entrypoint array for the container. Not executed within a shell.
+                              The container image's ENTRYPOINT is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
                           image:
                             description: Image defines the container image
                             type: string
@@ -4576,6 +4730,20 @@ spec:
                             description: AppArmorProfile defines the AppArmor profile
                               for the Slurm containers
                             type: string
+                          args:
+                            description: |-
+                              Args defines the arguments to the entrypoint (command).
+                              The container image's CMD is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
+                          command:
+                            description: |-
+                              Command defines the entrypoint array for the container. Not executed within a shell.
+                              The container image's ENTRYPOINT is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
                           image:
                             description: Image defines the container image
                             type: string
