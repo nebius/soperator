@@ -12,6 +12,13 @@ on:
       - 'SECURITY.md'
       - 'images/worker/gpubench/**'
 
+  # Allow manual trigger for pull requests from forks
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - dev
+    types: [opened, synchronize, reopened]
+
 
 permissions:
   contents: read
