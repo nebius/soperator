@@ -63,10 +63,6 @@ func RenderNCCLBenchmarkCronJob(
 							ActiveDeadlineSeconds: &ncclBenchmark.ActiveDeadlineSeconds,
 							RestartPolicy:         corev1.RestartPolicyNever,
 							Volumes: []corev1.Volume{
-								common.RenderVolumeProjectedSlurmConfigs(
-									clusterName,
-									common.RenderVolumeProjectionSlurmTopologyConfig(slurmTopologyConfigMapRefName),
-								),
 								common.RenderVolumeMungeKey(clusterName),
 								common.RenderVolumeJailFromSource(volumeSources, *ncclBenchmark.VolumeJail.VolumeSourceName),
 							},

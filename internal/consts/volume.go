@@ -14,6 +14,8 @@ const (
 	boot   = "boot"
 
 	sshConfigs             = "ssh-configs"
+	sshConfigsLogin        = "ssh-configs"
+	sshConfigsWorker       = "ssh-configs-worker"
 	sshRootKeys            = "ssh-root-keys"
 	authorizedKeys         = "authorized_keys"
 	securityLimits         = "security-limits"
@@ -38,7 +40,8 @@ const (
 	VolumenameRESTJWTKey           = RESTJWTKey
 	VolumeNameNvidia               = nvidia
 	VolumeNameBoot                 = boot
-	VolumeNameSSHDConfigs          = sshConfigs
+	VolumeNameSSHDConfigsLogin     = sshConfigsLogin
+	VolumeNameSSHDConfigsWorker    = sshConfigsWorker
 	VolumeNameSSHRootKeys          = sshRootKeys
 	VolumeNameSSHDKeys             = "sshd-keys"
 	VolumeMountPathSSHDKeys        = "/etc/ssh/sshd_keys"

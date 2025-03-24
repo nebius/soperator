@@ -39,6 +39,9 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 	isProtectedSecret := clusterValues.NodeAccounting.MariaDb.ProtectedSecret
 	isDBEnabled := isExternalDBEnabled || isMariaDBEnabled
 
+	// Important: this service will restart every time slurm-configs ConfigMap changes
+	// We've left this behavior for this service, because it doesn't use Jail, and current realisation require Jail
+	//
 	reconcileAccountingImpl := func() error {
 		return utils.ExecuteMultiStep(ctx,
 			"Reconciliation of Accounting",

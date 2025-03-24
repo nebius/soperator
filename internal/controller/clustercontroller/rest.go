@@ -41,6 +41,9 @@ func (r SlurmClusterReconciler) ReconcileREST(
 		return nil
 	}
 
+	// Important: this service will restart every time slurm-configs ConfigMap changes
+	// We've left this behavior for this service, because it doesn't use Jail, and current realisation require Jail
+	//
 	reconcileRESTImpl := func() error {
 		return utils.ExecuteMultiStep(ctx,
 			"Reconciliation of REST API resources",

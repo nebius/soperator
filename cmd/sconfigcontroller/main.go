@@ -29,7 +29,6 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -101,19 +100,14 @@ func main() {
 		enableHTTP2          bool
 		logFormat            string
 		logLevel             string
+		configsPath          string
+		clusterNamespace     string
+		clusterName          string
+		slurmAPIServer       string
 
-		reconcileTimeout time.Duration
 		maxConcurrency   int
 		cacheSyncTimeout time.Duration
 	)
-
-	var watchNsCacheByName = make(map[string]cache.Config)
-
-	ns := os.Getenv("SLURM_OPERATOR_WATCH_NAMESPACES")
-	if ns != "" && ns != "*" {
-		watchNsCacheByName = make(map[string]cache.Config)
-		watchNsCacheByName[ns] = cache.Config{}
-	}
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -126,10 +120,13 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.StringVar(&logFormat, "log-format", "json", "Log format: plain or json")
 	flag.StringVar(&logLevel, "log-level", "debug", "Log level: debug, info, warn, error, dpanic, panic, fatal")
-	flag.DurationVar(&reconcileTimeout, "reconcile-timeout", 5*time.Minute, "The maximum duration allowed for a single reconcile")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 5*time.Minute, "The maximum duration allowed for caching sync")
-
+	flag.StringVar(&configsPath, "configs-path", "/mnt/jail/slurm", "Path where to store configs")
+	flag.StringVar(&clusterNamespace, "cluster-namespace", "default", "Soperator cluster namespace")
+	flag.StringVar(&clusterName, "cluster-name", "soperator", "Name of the soperator cluster controller")
+	flag.StringVar(&slurmAPIServer, "slurmapiserver", "http://localhost:6820", "Address of the SlurmAPI")
+	flag.Parse()
 	opts := getZapOpts(logFormat, logLevel)
 	ctrl.SetLogger(zap.New(opts...))
 	setupLog := ctrl.Log.WithName("setup")
@@ -164,24 +161,11 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "vqeyz6an.nebius.ai",
-		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
-		// when the Manager ends. This requires the binary to immediately end when the
-		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
-		// speeds up voluntary leader transitions as the new leader don't have to wait
-		// LeaseDuration time first.
-		//
-		// In the default scaffold provided, the program ends immediately after
-		// the manager stops, so would be fine to enable this option. However,
-		// if you are doing or is intended to do any operation such as perform cleanups
-		// after the manager stops then its usage might be unsafe.
-		// LeaderElectionReleaseOnCancel: true,
+		LeaderElectionID:       "vqeyz6ae.nebius.ai",
 		Cache: cache.Options{
-			DefaultNamespaces: watchNsCacheByName,
-			DefaultLabelSelector: labels.SelectorFromSet(labels.Set{ // TODO: move to app config
-				"app.kubernetes.io/component": "controller",
-				"app.kubernetes.io/instance":  "soperator",
-			}),
+			DefaultNamespaces: map[string]cache.Config{
+				clusterNamespace: {},
+			},
 		},
 	})
 	if err != nil {
@@ -189,36 +173,31 @@ func main() {
 		os.Exit(1)
 	}
 
-	slurmAPIServer := os.Getenv("SLURM_API_SERVER")
-	if len(slurmAPIServer) == 0 {
-		slurmAPIServer = "http://localhost:6820"
-	}
+	jwtToken := jwt.NewToken(mgr.GetClient()).
+		For(types.NamespacedName{
+			Namespace: clusterNamespace,
+			Name:      clusterName,
+		}, "root").
+		WithRegistry(jwt.NewTokenRegistry().Build())
 
-	// TODO: init jwt controller
-	slurmClusterName := types.NamespacedName{
-		Namespace: "soperator",
-		Name:      "soperator",
-	}
-	jwtToken := jwt.NewToken(mgr.GetClient()).For(slurmClusterName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
-	slurmapiClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
+	slurmAPIClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
 	if err != nil {
+		setupLog.Error(err, "unable to start Slurm API Client")
 		os.Exit(1)
 	}
-	slurmapiClients := map[types.NamespacedName]slurmapi.Client{
-		slurmClusterName: slurmapiClient,
-	}
+
+	fileStore := sconfigcontroller.NewFileStore(configsPath)
 
 	if err = sconfigcontroller.NewController(
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		mgr.GetEventRecorderFor(sconfigcontroller.SConfigControllerName),
-		slurmapiClients,
-		reconcileTimeout,
+		slurmAPIClient,
+		fileStore,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create controller", sconfigcontroller.SConfigControllerName)
 		os.Exit(1)
 	}
-	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

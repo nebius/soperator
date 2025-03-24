@@ -1,6 +1,8 @@
 package rest
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -29,4 +31,8 @@ func RenderService(namespace, clusterName string, rest *values.SlurmREST) (*core
 			}},
 		},
 	}, nil
+}
+
+func GetServiceURL(namespace string, rest *values.SlurmREST) string {
+	return fmt.Sprintf("http://%s.%s.svc:%d", rest.Service.Name, namespace, rest.ContainerREST.Port)
 }

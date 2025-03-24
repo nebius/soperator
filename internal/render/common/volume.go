@@ -319,33 +319,6 @@ func RenderVolumeMountRESTJWTKey() corev1.VolumeMount {
 
 // region SSHD
 
-// region configs
-
-// RenderVolumeSshdConfigs renders [corev1.Volume] containing SSHD configs contents
-func RenderVolumeSshdConfigs(sshdConfigMapName string) corev1.Volume {
-	return corev1.Volume{
-		Name: consts.VolumeNameSSHDConfigs,
-		VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: sshdConfigMapName,
-				},
-			},
-		},
-	}
-}
-
-// RenderVolumeMountSshdConfigs renders [corev1.VolumeMount] defining the mounting path for SSHD configs
-func RenderVolumeMountSshdConfigs() corev1.VolumeMount {
-	return corev1.VolumeMount{
-		Name:      consts.VolumeNameSSHDConfigs,
-		MountPath: consts.VolumeMountPathSSHConfigs,
-		ReadOnly:  true,
-	}
-}
-
-// endregion configs
-
 // region root keys
 
 // RenderVolumeSshdRootKeys renders [corev1.Volume] containing SSHD root keys contents

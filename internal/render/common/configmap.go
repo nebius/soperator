@@ -26,7 +26,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig co
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapSlurmConfigsName(cluster.Name),
 			Namespace: cluster.Namespace,
-			Labels:    RenderLabels(consts.ComponentTypeController, cluster.Name),
+			Labels:    renderConfigMapSlurmConfigsLabels(consts.ComponentTypeController, cluster.Name),
 		},
 		Data: map[string]string{
 			consts.ConfigMapKeySlurmConfig:       generateSlurmConfig(cluster, topologyConfig).Render(),
@@ -38,6 +38,13 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig co
 			consts.ConfigMapKeyMPIConfig:         generateMPIConfig(cluster).Render(),
 		},
 	}, nil
+}
+
+func renderConfigMapSlurmConfigsLabels(componentType consts.ComponentType, clusterName string) map[string]string {
+	labels := RenderLabels(componentType, clusterName)
+	labels[consts.LabelSConfigControllerSourceKey] = consts.LabelSConfigControllerSourceValue
+
+	return labels
 }
 
 func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.ConfigMap) renderutils.ConfigFile {
@@ -374,54 +381,3 @@ func generateEmptySecurityLimitsConfig() renderutils.ConfigFile {
 }
 
 // endregion Security limits
-
-// region SSHD config
-
-// RenderDefaultConfigMapSSHDConfigs renders new [corev1.ConfigMap] containing sshd config file
-func RenderDefaultConfigMapSSHDConfigs(
-	cluster *values.SlurmCluster,
-	componentType consts.ComponentType,
-) (corev1.ConfigMap, error) {
-	return corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      naming.BuildConfigMapSSHDConfigsName(cluster.Name),
-			Namespace: cluster.Namespace,
-			Labels:    RenderLabels(componentType, cluster.Name),
-		},
-		Data: map[string]string{
-			consts.ConfigMapKeySshdConfig: generateDefaultSshdConfig(cluster).Render(),
-		},
-	}, nil
-}
-
-func generateDefaultSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
-	res := &renderutils.MultilineStringConfig{}
-	res.AddLine(fmt.Sprintf("Port %d", cluster.NodeLogin.ContainerSshd.Port))
-	res.AddLine("PermitRootLogin yes")
-	res.AddLine("PasswordAuthentication no")
-	res.AddLine("ChallengeResponseAuthentication no")
-	res.AddLine("UsePAM yes")
-	res.AddLine("AcceptEnv LANG LC_*")
-	res.AddLine("X11Forwarding no")
-	res.AddLine("AllowTcpForwarding yes")
-	res.AddLine("Subsystem sftp internal-sftp")
-	res.AddLine("HostKey " + consts.VolumeMountPathSSHDKeys + "/" + consts.SecretSshdRSAKeyName)
-	res.AddLine("HostKey " + consts.VolumeMountPathSSHDKeys + "/" + consts.SecretSshdECDSAKeyName)
-	res.AddLine("HostKey " + consts.VolumeMountPathSSHDKeys + "/" + consts.SecretSshdECDSA25519KeyName)
-	res.AddLine("ChrootDirectory " + consts.VolumeMountPathJail)
-	res.AddLine("ClientAliveInterval " + consts.SSHDClientAliveInterval)
-	res.AddLine("ClientAliveCountMax " + consts.SSHDClientAliveCountMax)
-	res.AddLine("MaxStartups " + consts.SSHDMaxStartups)
-	res.AddLine("LoginGraceTime " + consts.SSHDLoginGraceTime)
-	res.AddLine("MaxAuthTries " + consts.SSHDMaxAuthTries)
-	res.AddLine("LogLevel DEBUG3")
-	res.AddLine("")
-	res.AddLine("Match User root")
-	res.AddLine("    AuthorizedKeysFile /root/.ssh/authorized_keys " + consts.VolumeMountPathJail + "/root/.ssh/authorized_keys")
-	res.AddLine("")
-	res.AddLine("Match User *")
-	res.AddLine("    LogLevel INFO")
-	return res
-}
-
-// endregion SSHD config

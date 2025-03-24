@@ -12,7 +12,6 @@ import (
 // renderContainerSlurmctld renders [corev1.Container] for slurmctld
 func renderContainerSlurmctld(container *values.Container, customMounts []slurmv1.NodeVolumeMount) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
-		common.RenderVolumeMountSlurmConfigs(),
 		common.RenderVolumeMountSpool(consts.ComponentTypeController, consts.SlurmctldName),
 		common.RenderVolumeMountJail(),
 		common.RenderVolumeMountMungeSocket(),

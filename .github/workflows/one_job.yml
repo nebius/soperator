@@ -141,7 +141,7 @@ jobs:
 
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=exporter DOCKERFILE=exporter/exporter.dockerfile
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=exporter
-          
+
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd DOCKERFILE=restd/slurmrestd.dockerfile
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd
 
@@ -164,6 +164,11 @@ jobs:
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks DOCKERFILE=soperatorchecks.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
           echo "Pushing image of the soperatorchecks"
           make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+
+          echo "Building image of the sconfigcontroller"
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller DOCKERFILE=sconfigcontroller.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          echo "Pushing image of the sconfigcontroller"
+          make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
 
           echo "Building image of the operator"
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator DOCKERFILE=Dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"

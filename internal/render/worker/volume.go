@@ -22,18 +22,14 @@ func renderVolumesAndClaimTemplateSpecs(
 	slurmTopologyConfigMapRefName string,
 ) (volumes []corev1.Volume, pvcTemplateSpecs []values.PVCTemplateSpec, err error) {
 	volumes = []corev1.Volume{
-		common.RenderVolumeProjectedSlurmConfigs(
-			clusterName,
-			common.RenderVolumeProjectionSlurmTopologyConfig(slurmTopologyConfigMapRefName),
-		),
 		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeMungeSocket(),
 		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeWorker),
 		common.RenderVolumeSshdKeys(secrets.SshdKeysName),
-		common.RenderVolumeSshdConfigs(worker.SSHDConfigMapName),
 		common.RenderVolumeSshdRootKeys(clusterName),
 		common.RenderVolumeInMemory(),
 		common.RenderVolumeTmpDisk(),
+		renderVolumeSshdConfigs(worker.SSHDConfigMapName),
 		renderVolumeNvidia(),
 		renderVolumeBoot(),
 		renderVolumeNCCLTopology(clusterName),
@@ -257,3 +253,30 @@ func renderVolumeMountSysctl() corev1.VolumeMount {
 }
 
 // endregion Sysctl
+
+// region configs
+
+// RenderVolumeSshdConfigs renders [corev1.Volume] containing SSHD configs contents
+func renderVolumeSshdConfigs(sshdConfigMapName string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSSHDConfigsWorker,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: sshdConfigMapName,
+				},
+			},
+		},
+	}
+}
+
+// RenderVolumeMountSshdConfigs renders [corev1.VolumeMount] defining the mounting path for SSHD configs
+func renderVolumeMountSshdConfigs() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSSHDConfigsWorker,
+		MountPath: consts.VolumeMountPathSSHConfigs,
+		ReadOnly:  true,
+	}
+}
+
+// endregion configs

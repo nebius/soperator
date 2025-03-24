@@ -72,7 +72,7 @@ func Test_RenderContainerNCCLBenchmark(t *testing.T) {
 	assert.Equal(t, "false", getEnvVarValue(container, "SEND_OTEL_METRICS_HTTP"))
 	assert.Equal(t, otelCollectorPath, getEnvVarValue(container, "OTEL_COLLECTOR_PATH"))
 	assert.Equal(t, fmt.Sprintf("%s-collector:%d", clusterName, otelCollectorPort), getEnvVarValue(container, "OTEL_COLLECTOR_ENDPOINT"))
-	assert.Len(t, container.VolumeMounts, 3)
+	assert.Len(t, container.VolumeMounts, 2)
 }
 
 func getEnvVarValue(container corev1.Container, name string) string {
@@ -112,5 +112,5 @@ func Test_RenderContainerNCCLBenchmark_Default(t *testing.T) {
 	assert.Equal(t, "false", getEnvVarValue(container, "SEND_OTEL_METRICS_GRPC"))
 	assert.Equal(t, OtelCollectorPath, getEnvVarValue(container, "OTEL_COLLECTOR_PATH"))
 	assert.Equal(t, fmt.Sprintf("localhost:%d", OtelCollectorPort), getEnvVarValue(container, "OTEL_COLLECTOR_ENDPOINT"))
-	assert.Len(t, container.VolumeMounts, 3)
+	assert.Len(t, container.VolumeMounts, 2)
 }

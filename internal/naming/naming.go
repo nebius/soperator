@@ -109,10 +109,10 @@ func BuildSecretMungeKeyName(clusterName string) string {
 
 // region Login
 
-func BuildConfigMapSSHDConfigsName(clusterName string) string {
+func BuildConfigMapSSHDConfigsNameLogin(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,
-		entity:      consts.ConfigMapNameSSHDConfigs,
+		entity:      consts.ConfigMapNameSSHDConfigsLogin,
 	}.String()
 }
 
@@ -141,6 +141,12 @@ func BuildConfigMapSecurityLimitsName(componentType consts.ComponentType, cluste
 // endregion Login
 
 // region Worker
+func BuildConfigMapSSHDConfigsNameWorker(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.ConfigMapNameSSHDConfigsWorker,
+	}.String()
+}
 
 func BuildConfigMapNCCLTopologyName(clusterName string) string {
 	return namedEntity{
@@ -226,4 +232,16 @@ func BuildMariaDbName(clusterName string) string {
 		clusterName: clusterName,
 		entity:      consts.MariaDbClusterSuffix,
 	}.String()
+}
+
+func BuildServiceAccountSconfigControllerName(clusterName string) string {
+	return clusterName + "-sconfigcontroller-sa"
+}
+
+func BuildRoleBindingSConfigControllerName(clusterName string) string {
+	return clusterName + "-sconfigcontroller-configmaps-role-binding"
+}
+
+func BuildRoleSConfigControllerName(clusterName string) string {
+	return clusterName + "-sconfigcontroller-configmaps-role"
 }

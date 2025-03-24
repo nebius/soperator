@@ -108,6 +108,11 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	SlurmTopologyConfigMapRefName string `json:"slurmTopologyConfigMapRefName,omitempty"`
 
+	// SConfigController defines the desired state of controller that watches after configs
+	//
+	// +kubebuilder:validation:Optional
+	SConfigController SConfigController `json:"sConfigController,omitempty"`
+
 	// Generate and set default AppArmor profile for the Slurm worker and login nodes. The Security Profiles Operator must be installed.
 	//
 	// +kubebuilder:default=false
@@ -188,6 +193,11 @@ type MPIConfig struct {
 	// +kubebuilder:default="OMPI_MCA_btl_tcp_if_include=eth0"
 	// +kubebuilder:validation:Optional
 	PMIxEnv string `json:"pmixEnv,omitempty"`
+}
+
+type SConfigController struct {
+	Node      SlurmNode     `json:"node,omitempty"`
+	Container NodeContainer `json:"container,omitempty"`
 }
 
 type PartitionConfiguration struct {

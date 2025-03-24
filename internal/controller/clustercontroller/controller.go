@@ -186,19 +186,6 @@ func (r SlurmClusterReconciler) getControllersStatefulSetDependencies(
 ) ([]metav1.Object, error) {
 	var res []metav1.Object
 
-	slurmConfigsConfigMap := &corev1.ConfigMap{}
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{
-			Namespace: clusterValues.Namespace,
-			Name:      naming.BuildConfigMapSlurmConfigsName(clusterValues.Name),
-		},
-		slurmConfigsConfigMap,
-	); err != nil {
-		return []metav1.Object{}, err
-	}
-	res = append(res, slurmConfigsConfigMap)
-
 	mungeKeySecret := &corev1.Secret{}
 	if err := r.Get(
 		ctx,

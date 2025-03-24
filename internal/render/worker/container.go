@@ -57,16 +57,15 @@ func renderContainerSlurmd(
 	slurmNodeExtra string,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
-		common.RenderVolumeMountSlurmConfigs(),
 		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
 		common.RenderVolumeMountJail(),
 		common.RenderVolumeMountMungeSocket(),
 		common.RenderVolumeMountSecurityLimits(),
 		common.RenderVolumeMountSshdKeys(),
-		common.RenderVolumeMountSshdConfigs(),
 		common.RenderVolumeMountSshdRootKeys(),
 		common.RenderVolumeMountInMemory(),
 		common.RenderVolumeMountTmpDisk(),
+		renderVolumeMountSshdConfigs(),
 		renderVolumeMountNvidia(),
 		renderVolumeMountBoot(),
 		renderVolumeMountNCCLTopology(),

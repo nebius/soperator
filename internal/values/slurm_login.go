@@ -38,7 +38,7 @@ func buildSlurmLoginFrom(clusterName string, maintenance *consts.MaintenanceMode
 	sshdConfigMapName := login.SSHDConfigMapRefName
 	isSSHDConfigDefault := sshdConfigMapName == ""
 	if isSSHDConfigDefault {
-		sshdConfigMapName = naming.BuildConfigMapSSHDConfigsName(clusterName)
+		sshdConfigMapName = naming.BuildConfigMapSSHDConfigsNameLogin(clusterName)
 	}
 
 	res := SlurmLogin{

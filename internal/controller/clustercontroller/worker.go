@@ -96,7 +96,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						return nil
 					}
 
-					desired, err := common.RenderDefaultConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeWorker)
+					desired, err := worker.RenderConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeWorker)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
 						return errors.Wrap(err, "rendering worker default SSHD ConfigMap")
@@ -422,19 +422,6 @@ func (r SlurmClusterReconciler) getWorkersStatefulSetDependencies(
 	clusterValues *values.SlurmCluster,
 ) ([]metav1.Object, error) {
 	var res []metav1.Object
-
-	slurmConfigsConfigMap := &corev1.ConfigMap{}
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{
-			Namespace: clusterValues.Namespace,
-			Name:      naming.BuildConfigMapSlurmConfigsName(clusterValues.Name),
-		},
-		slurmConfigsConfigMap,
-	); err != nil {
-		return []metav1.Object{}, err
-	}
-	res = append(res, slurmConfigsConfigMap)
 
 	mungeKeySecret := &corev1.Secret{}
 	if err := r.Get(

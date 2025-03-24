@@ -20,13 +20,13 @@ import (
 	"context"
 	"time"
 
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -36,17 +36,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-var (
-	SConfigControllerName = "sconfigcontroller"
-)
+const SConfigControllerName = "sconfigcontroller"
+
+type Store interface {
+	Add(name string, content string) error
+}
 
 // SConfigControllerReconciler reconciles a SConfigController object
 type ControllerReconciler struct {
 	*reconciler.Reconciler
+	slurmAPIClient slurmapi.Client
 
-	slurmAPIClients  map[types.NamespacedName]slurmapi.Client
-	reconcileTimeout time.Duration
+	fileStore Store
 }
+
+// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=configmaps,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -60,7 +64,37 @@ type ControllerReconciler struct {
 func (r *ControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	logger.Info("captured changes for ConfigMap", "configMap", req.Name)
+	logger.V(1).Info("Reconciling SConfigController")
+
+	configMap := &corev1.ConfigMap{}
+	if err := r.Get(ctx, req.NamespacedName, configMap); err != nil {
+		logger.V(1).Error(err, "Getting ConfigMap produced an error", "configMap", req.Name)
+		// Return an error if the ConfigMap cannot be found or other errors occur
+		return ctrl.Result{}, err
+	}
+
+	if len(configMap.Data) == 0 {
+		logger.V(1).Info("Got ConfigMap with empty Data", "configMapName", req.NamespacedName.Name)
+		return ctrl.Result{}, nil
+	}
+
+	for configName, configContent := range configMap.Data {
+		logger.V(1).Info("About to save slurm config", "configName", configName)
+
+		err := r.fileStore.Add(configName, configContent)
+		if err != nil {
+			logger.V(1).Error(err, "Adding file to fileStore produced an error", "configName", configName)
+			return ctrl.Result{}, err
+		}
+	}
+
+	logger.V(1).Info("Requesting Slurm API to reconfigure workers")
+
+	_, err := r.slurmAPIClient.SlurmV0041GetReconfigureWithResponse(ctx)
+	if err != nil {
+		logger.V(1).Error(err, "Requesting Slurm API produced an error", "method", "reconfigure")
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -69,15 +103,16 @@ func NewController(
 	client client.Client,
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
-	slurmAPIClients map[types.NamespacedName]slurmapi.Client,
-	reconcileTimeout time.Duration,
+
+	slurmAPIClient slurmapi.Client,
+	fileStore Store,
 ) *ControllerReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
 	return &ControllerReconciler{
-		Reconciler:       r,
-		slurmAPIClients:  slurmAPIClients,
-		reconcileTimeout: reconcileTimeout,
+		Reconciler:     r,
+		slurmAPIClient: slurmAPIClient,
+		fileStore:      fileStore,
 	}
 }
 
@@ -87,31 +122,31 @@ func (r *ControllerReconciler) SetupWithManager(mgr ctrl.Manager,
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.ConfigMap{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
-				cm, ok := e.Object.(*corev1.ConfigMap)
+				configMap, ok := e.Object.(*corev1.ConfigMap)
 				if !ok {
 					return false
 				}
 
-				return isValidConfigMap(cm)
+				return isValidConfigMap(configMap)
 			},
 			UpdateFunc: func(e event.UpdateEvent) bool {
-				cm, ok := e.ObjectNew.(*corev1.ConfigMap)
+				configMap, ok := e.ObjectNew.(*corev1.ConfigMap)
 				if !ok {
 					return false
 				}
 
-				return isValidConfigMap(cm)
+				return isValidConfigMap(configMap)
 			},
 			DeleteFunc: func(e event.DeleteEvent) bool {
 				return false
 			},
 			GenericFunc: func(e event.GenericEvent) bool {
-				cm, ok := e.Object.(*corev1.ConfigMap)
+				configMap, ok := e.Object.(*corev1.ConfigMap)
 				if !ok {
 					return false
 				}
 
-				return isValidConfigMap(cm)
+				return isValidConfigMap(configMap)
 			},
 		})).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
@@ -119,7 +154,8 @@ func (r *ControllerReconciler) SetupWithManager(mgr ctrl.Manager,
 }
 
 func isValidConfigMap(cm *corev1.ConfigMap) bool {
-	_, exists := cm.Data["slurm.conf"] // TODO: move config name to app config
-
-	return exists
+	if v, ok := cm.Labels[consts.LabelSConfigControllerSourceKey]; ok {
+		return v == "true"
+	}
+	return false
 }
