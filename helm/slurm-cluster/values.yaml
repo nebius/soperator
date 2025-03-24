@@ -169,6 +169,8 @@ slurmNodes:
     slurmdbd:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      command: []
+      args: []
       port: 6819
       resources:
         cpu: "1000m"
@@ -264,6 +266,8 @@ slurmNodes:
     slurmctld:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      command: []
+      args: []
       port: 6817
       resources:
         cpu: "1000m"
@@ -272,6 +276,8 @@ slurmNodes:
     munge:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      command: []
+      args: []
       resources:
         cpu: "1000m"
         memory: "1Gi"
@@ -296,6 +302,8 @@ slurmNodes:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
       port: 6818
+      command: []
+      args: []
       resources:
         cpu: "156000m"
         memory: "1220Gi"
@@ -305,6 +313,8 @@ slurmNodes:
     munge:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      command: []
+      args: []
       resources:
         cpu: "2000m"
         memory: "4Gi"
@@ -342,6 +352,8 @@ slurmNodes:
         cpu: "3000m"
         memory: "9Gi"
         ephemeralStorage: "30Gi"
+      command: []
+      args: []
     # Authorized keys required for SSH connection to Slurm login nodes
     sshRootPublicKeys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzxkjzPQ4EyZSjan4MLGFSA18idpZicoKW7Hfff username1"
@@ -358,6 +370,8 @@ slurmNodes:
     munge:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      command: []
+      args: []
       resources:
         cpu: "500m"
         memory: "500Mi"
@@ -378,6 +392,8 @@ slurmNodes:
     exporter:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      command: []
+      args: []
       resources:
         cpu: "250m"
         memory: "256Mi"
@@ -385,6 +401,8 @@ slurmNodes:
     munge:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      command: []
+      args: []
       resources:
         cpu: "1000m"
         memory: "1Gi"
@@ -399,6 +417,8 @@ slurmNodes:
     rest:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      command: []
+      args: []
       resources:
         cpu: "1000m"
         memory: "1Gi"

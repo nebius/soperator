@@ -933,6 +933,18 @@ type NodeContainer struct {
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
+	// Command defines the entrypoint array for the container. Not executed within a shell.
+	// The container image's ENTRYPOINT is used if this is not provided.
+	//
+	// +kubebuilder:validation:Optional
+	Command []string `json:"command,omitempty"`
+
+	// Args defines the arguments to the entrypoint (command).
+	// The container image's CMD is used if this is not provided.
+	//
+	// +kubebuilder:validation:Optional
+	Args []string `json:"args,omitempty"`
+
 	// ImagePullPolicy defines the image pull policy
 	//
 	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
