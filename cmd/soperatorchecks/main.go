@@ -238,11 +238,13 @@ func main() {
 		setupLog.Error(err, "unable to create controller", soperatorchecks.K8SNodesControllerName)
 		os.Exit(1)
 	}
-	if err = (&soperatorchecks.ActiveCheckReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ActiveCheck")
+	if err = soperatorchecks.NewActiveCheckController(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckControllerName),
+		reconcileTimeout,
+	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+		setupLog.Error(err, "unable to create activecheck controller", "controller", "ActiveCheck")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
