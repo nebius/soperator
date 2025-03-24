@@ -183,6 +183,7 @@ slurmNodes:
         cpu: "1000m"
         memory: "1Gi"
         ephemeralStorage: "5Gi"
+    customInitContainers: []
     externalDB:
       enabled: false
       # host: ""
@@ -282,6 +283,7 @@ slurmNodes:
         cpu: "1000m"
         memory: "1Gi"
         ephemeralStorage: "5Gi"
+    customInitContainers: []
     volumes:
       spool:
         volumeSourceName: "controller-spool"
@@ -319,6 +321,7 @@ slurmNodes:
         cpu: "2000m"
         memory: "4Gi"
         ephemeralStorage: "5Gi"
+    customInitContainers: []
     volumes:
       spool:
         volumeClaimTemplateSpec:
@@ -376,6 +379,7 @@ slurmNodes:
         cpu: "500m"
         memory: "500Mi"
         ephemeralStorage: "5Gi"
+    customInitContainers: []
     volumes:
       jail:
         volumeSourceName: "jail"
@@ -407,6 +411,7 @@ slurmNodes:
         cpu: "1000m"
         memory: "1Gi"
         ephemeralStorage: "5Gi"
+    customInitContainers: []
     volumes:
       jail:
         volumeSourceName: "jail"
@@ -423,6 +428,7 @@ slurmNodes:
         cpu: "1000m"
         memory: "1Gi"
         ephemeralStorage: "500Mi"
+    customInitContainers: []
 sConfigController:
   node:
     k8sNodeFilterName: "system"

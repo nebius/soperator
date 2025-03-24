@@ -46,11 +46,12 @@ func BasePodTemplateSpec(
 			},
 		},
 		Spec: corev1.PodSpec{
-			Affinity:     affinity,
-			NodeSelector: nodeSelector,
-			Hostname:     consts.HostnameREST,
-			Containers:   []corev1.Container{renderContainerREST(valuesREST.ContainerREST)},
-			Volumes:      volumes,
+			Affinity:       affinity,
+			NodeSelector:   nodeSelector,
+			Hostname:       consts.HostnameREST,
+			InitContainers: valuesREST.CustomInitContainers,
+			Containers:     []corev1.Container{renderContainerREST(valuesREST.ContainerREST)},
+			Volumes:        volumes,
 		},
 	}, nil
 }

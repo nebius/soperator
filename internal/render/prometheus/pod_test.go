@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	"nebius.ai/slurm-operator/internal/render/common"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -35,16 +36,18 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 	cpu := "100m"
 	var port int32 = 8080
 
-	munge := &values.Container{
-		Name: consts.ContainerNameMunge,
-		NodeContainer: slurmv1.NodeContainer{
-			Image: imageMunge,
-			Resources: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse(memory),
-				corev1.ResourceCPU:    resource.MustParse(cpu),
+	initContainers := []corev1.Container{
+		common.RenderContainerMunge(&values.Container{
+			Name: consts.ContainerNameMunge,
+			NodeContainer: slurmv1.NodeContainer{
+				Image: imageMunge,
+				Resources: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse(memory),
+					corev1.ResourceCPU:    resource.MustParse(cpu),
+				},
+				Port: port,
 			},
-			Port: port,
-		},
+		}),
 	}
 
 	podParams := &values.SlurmExporter{
@@ -115,7 +118,7 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 		},
 	}
 
-	result := slurmprometheus.BasePodTemplateSpec(clusterName, munge, podParams, defaultNodeFilter, volumeSources, matchLabels)
+	result := slurmprometheus.BasePodTemplateSpec(clusterName, initContainers, podParams, defaultNodeFilter, volumeSources, matchLabels)
 
 	assert.Equal(t, expected.Labels, result.Labels)
 
@@ -142,12 +145,14 @@ func Test_RenderPodTemplateSpec(t *testing.T) {
 	imageMunge := "test-muge:latest"
 	var port int32 = 8080
 
-	munge := &values.Container{
-		Name: consts.ContainerNameMunge,
-		NodeContainer: slurmv1.NodeContainer{
-			Image: imageMunge,
-			Port:  port,
-		},
+	initContainers := []corev1.Container{
+		common.RenderContainerMunge(&values.Container{
+			Name: consts.ContainerNameMunge,
+			NodeContainer: slurmv1.NodeContainer{
+				Image: imageMunge,
+				Port:  port,
+			},
+		}),
 	}
 
 	podParams := &values.SlurmExporter{
@@ -217,7 +222,7 @@ func Test_RenderPodTemplateSpec(t *testing.T) {
 		},
 	}
 
-	result := slurmprometheus.RenderPodTemplateSpec(clusterName, munge, podParams, defaultNodeFilter, volumeSources, matchLabels, podTemplateSpec)
+	result := slurmprometheus.RenderPodTemplateSpec(clusterName, initContainers, podParams, defaultNodeFilter, volumeSources, matchLabels, podTemplateSpec)
 
 	assert.Equal(t, expected.Labels, result.Labels)
 

@@ -52,6 +52,7 @@ func RenderStatefulSet(
 	if clusterType == consts.ClusterTypeGPU {
 		initContainers = append(initContainers, renderContainerToolkitValidation(&worker.ContainerToolkitValidation))
 	}
+	initContainers = append(initContainers, worker.CustomInitContainers...)
 
 	slurmdContainer, err := renderContainerSlurmd(
 		&worker.ContainerSlurmd,

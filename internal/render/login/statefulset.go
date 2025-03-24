@@ -82,9 +82,10 @@ func RenderStatefulSet(
 					Affinity:     nodeFilter.Affinity,
 					NodeSelector: nodeFilter.NodeSelector,
 					Tolerations:  nodeFilter.Tolerations,
-					InitContainers: []corev1.Container{
+					InitContainers: append(
+						login.CustomInitContainers,
 						common.RenderContainerMunge(&login.ContainerMunge),
-					},
+					),
 					Containers: []corev1.Container{
 						renderContainerSshd(clusterType, &login.ContainerSshd, login.JailSubMounts, login.CustomVolumeMounts),
 					},
