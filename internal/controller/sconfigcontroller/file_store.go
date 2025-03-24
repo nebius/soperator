@@ -21,12 +21,10 @@ func (s *FileStore) Add(name string, content string) error {
 		return fmt.Errorf("open file: %w", err)
 	}
 
+	defer file.Close()
+
 	if _, err = file.Write([]byte(content)); err != nil {
 		return fmt.Errorf("write file: %w", err)
-	}
-
-	if err = file.Close(); err != nil {
-		return fmt.Errorf("closing file: %w", err)
 	}
 
 	return nil
