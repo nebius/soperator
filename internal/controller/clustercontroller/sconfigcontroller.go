@@ -8,6 +8,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/logfield"
+	"nebius.ai/slurm-operator/internal/render/rest"
 	"nebius.ai/slurm-operator/internal/render/sconfigcontroller"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
@@ -33,6 +34,7 @@ func (r SlurmClusterReconciler) ReconcileSConfigController(
 					desired, err := sconfigcontroller.RenderDeployment(
 						clusterValues.Namespace,
 						clusterValues.Name,
+						rest.GetServiceURL(clusterValues.Namespace, &clusterValues.NodeRest),
 						&clusterValues.SConfigController,
 						clusterValues.NodeFilters,
 						clusterValues.VolumeSources,

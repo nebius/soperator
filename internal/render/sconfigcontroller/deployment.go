@@ -16,6 +16,7 @@ import (
 func RenderDeployment(
 	clusterNamespace string,
 	clusterName string,
+	slurmAPISerer string,
 	sConfigController *values.SConfigController,
 	nodeFilter []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
@@ -26,6 +27,7 @@ func RenderDeployment(
 	podTemplate, err := BasePodTemplateSpec(
 		clusterNamespace,
 		clusterName,
+		slurmAPISerer,
 		sConfigController,
 		nodeFilter,
 		volumeSources,

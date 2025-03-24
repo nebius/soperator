@@ -404,7 +404,6 @@ slurmNodes:
         memory: "1Gi"
         ephemeralStorage: "500Mi"
 sConfigController:
-  slurmAPIServer: "http://soperator-rest-svc.soperator:6820"
   node:
     k8sNodeFilterName: "system"
     size: 1

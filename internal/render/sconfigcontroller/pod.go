@@ -15,6 +15,7 @@ import (
 func BasePodTemplateSpec(
 	clusterNamespace string,
 	clusterName string,
+	slurmAPIServer string,
 	sConfigController *values.SConfigController,
 	nodeFilters []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
@@ -50,7 +51,12 @@ func BasePodTemplateSpec(
 			Affinity:     affinity,
 			NodeSelector: nodeSelector,
 			Containers: []corev1.Container{
-				renderContainerSConfigController(clusterNamespace, clusterName, sConfigController.SlurmAPIServer, sConfigController.Container),
+				renderContainerSConfigController(
+					clusterNamespace,
+					clusterName,
+					slurmAPIServer,
+					sConfigController.Container,
+				),
 			},
 			InitContainers: []corev1.Container{
 				renderInitContainerSConfigController(),

@@ -85,7 +85,6 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		SConfigController: buildSConfigControllerFrom(
 			cluster.Spec.SConfigController.Node,
 			cluster.Spec.SConfigController.Container,
-			cluster.Spec.SConfigController.SlurmAPIServer,
 			*cluster.Spec.Maintenance,
 		),
 	}
