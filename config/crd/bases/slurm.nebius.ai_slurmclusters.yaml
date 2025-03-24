@@ -1505,6 +1505,20 @@ spec:
                         description: AppArmorProfile defines the AppArmor profile
                           for the Slurm containers
                         type: string
+                      args:
+                        description: |-
+                          Args defines the arguments to the entrypoint (command).
+                          The container image's CMD is used if this is not provided.
+                        items:
+                          type: string
+                        type: array
+                      command:
+                        description: |-
+                          Command defines the entrypoint array for the container. Not executed within a shell.
+                          The container image's ENTRYPOINT is used if this is not provided.
+                        items:
+                          type: string
+                        type: array
                       image:
                         description: Image defines the container image
                         type: string
@@ -2008,12 +2022,12 @@ spec:
                                 - type: string
                                 description: Size of the PVCs to be mounted by MariaDB.
                                   Required if not provided in 'VolumeClaimTemplate'.
-                                  It superseeds the storage size specified in 'VolumeClaimTemplate'.
+                                  It supersedes the storage size specified in 'VolumeClaimTemplate'.
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
                               storageClassName:
                                 description: |-
-                                  StorageClassName to be used to provision the PVCS. It superseeds the 'StorageClassName' specified in 'VolumeClaimTemplate'.
+                                  StorageClassName to be used to provision the PVCS. It supersedes the 'StorageClassName' specified in 'VolumeClaimTemplate'.
                                   If not provided, the default 'StorageClass' configured in the cluster is used.
                                 type: string
                               volumeClaimTemplate:
