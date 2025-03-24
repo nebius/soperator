@@ -34,5 +34,5 @@ func RenderService(namespace, clusterName string, rest *values.SlurmREST) (*core
 }
 
 func GetServiceURL(namespace string, rest *values.SlurmREST) string {
-	return fmt.Sprintf("http://%s.%s:%d", rest.Service.Name, namespace, rest.ContainerREST.Port)
+	return fmt.Sprintf("http://%s.%s.svc:%d", rest.Service.Name, namespace, rest.ContainerREST.Port)
 }
