@@ -71,7 +71,7 @@ var (
 	logFormat           = fs.String("log_format", logFormatJSON, "log format (text or json)")
 )
 
-func main() {
+func init() {
 	if *logFormat != logFormatText && *logFormat != logFormatJSON {
 		logrus.WithField("logFormat", *logFormat).Fatal("Invalid log format")
 	}
@@ -82,19 +82,25 @@ func main() {
 		logrus.SetFormatter(&logrus.JSONFormatter{})
 	}
 
-	if *debugLog {
-		logrus.SetLevel(logrus.DebugLevel)
-	} else {
-		logrus.SetLevel(logrus.InfoLevel)
-	}
-
 	currentNode, err = os.Hostname()
 	if err != nil {
 		logrus.WithField("error", err).Fatal("Failed to get hostname")
 	}
 
+	if *debugLog {
+		logrus.SetLevel(logrus.DebugLevel)
+	} else {
+		logrus.SetLevel(logrus.InfoLevel)
+	}
 	log = logrus.WithField("slurmNode", currentNode)
+}
+
+func main() {
+	fs.Parse(os.Args[1:])
 	log.Info(fmt.Sprintf("Starting %s", nameNCCL))
+	if *debugLog {
+		debugFlags()
+	}
 
 	log.Debug("Checking running processes on GPU")
 	running, err := isRunningProcessOnGPU()
@@ -203,6 +209,27 @@ func main() {
 			eventGenerator.generateEvent(ctx, currentNode, benchmarkFinishedMsg, v1.EventTypeNormal, gpuBenchmarkFinished)
 		}
 	}
+}
+
+func debugFlags() {
+	log.Debugf("min_bytes: %s", *minBytes)
+	log.Debugf("max_bytes: %s", *maxBytes)
+	log.Debugf("step_factor: %d", *stepFactor)
+	log.Debugf("limit: %f", *limit)
+	log.Debugf("use_infiniband: %v", *useInfiniband)
+	log.Debugf("drain_state: %v", *drainSlurmNode)
+	log.Debugf("namespace: %s", *namespace)
+	log.Debugf("kube_service_host: %s", *k8sServiceHost)
+	log.Debugf("kube_service_port: %d", *k8sServicePort)
+	log.Debugf("push_events: %v", *pushEvents)
+	log.Debugf("push_metrics_grpc: %v", *pushMetricsGrpc)
+	log.Debugf("push_metrics_http: %v", *pushMetricsHttp)
+	log.Debugf("push_metrics_insecure: %v", *pushMetricsInsecure)
+	log.Debugf("push_metrics_path: %s", *pushMetricsPath)
+	log.Debugf("push_metrics_retry: %v", *pushMetricsRetry)
+	log.Debugf("exporter_endpoint: %s", *exporterEndpoint)
+	log.Debugf("debug: %v", *debugLog)
+	log.Debugf("log_format: %s", *logFormat)
 }
 
 func isRunningProcessOnGPU() (string, error) {

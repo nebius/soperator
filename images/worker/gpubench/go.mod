@@ -1,6 +1,8 @@
 module nebius.ai/slurm-operator/image/worker/gpubench
 
-go 1.24.0
+go 1.23.0
+
+toolchain go1.23.4
 
 require (
 	github.com/sirupsen/logrus v1.9.3
