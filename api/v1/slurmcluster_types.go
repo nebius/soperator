@@ -441,7 +441,7 @@ type Secrets struct {
 
 // SlurmNodes define the desired state of the Slurm nodes
 type SlurmNodes struct {
-	// Accounting represents the Slurm accounting configuration
+	// Accounting represents the Slurm accounting node and database configuration
 	//
 	// TODO: Making accounting optional requires SlurmNode.K8sNodeFilterName to be optional.
 	// +kubebuilder:validation:Required
@@ -462,12 +462,15 @@ type SlurmNodes struct {
 	// +kubebuilder:validation:Required
 	Login SlurmNodeLogin `json:"login"`
 
-	// Exporter represents the Slurm exporter configuration
+	// Exporter represents the Slurm exporter node configuration
 	//
 	// TODO: Making exporter optional requires SlurmNode.K8sNodeFilterName to be optional.
 	// +kubebuilder:validation:Required
 	Exporter SlurmExporter `json:"exporter"`
 
+	// Rest represents the Slurm REST API node configuration
+	//
+	// +kubebuilder:validation:Required
 	Rest SlurmRest `json:"rest"`
 }
 
@@ -918,6 +921,9 @@ type SlurmExporterVolumes struct {
 type SlurmNode struct {
 	// Size defines the number of node instances
 	Size int32 `json:"size,omitempty"`
+
+	// CustomInitContainers represent additional init containers that should be added to created Pods
+	CustomInitContainers []corev1.Container `json:"customInitContainers,omitempty"`
 
 	// K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
 	// Must correspond to the name of one of [K8sNodeFilter]

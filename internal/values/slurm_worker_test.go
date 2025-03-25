@@ -1,6 +1,7 @@
 package values
 
 import (
+	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -23,7 +24,7 @@ func TestBuildSlurmWorkerFrom(t *testing.T) {
 
 	result := buildSlurmWorkerFrom(clusterName, ptr.To(consts.ModeNone), worker, ncclSettings, false)
 
-	if result.SlurmNode != *worker.SlurmNode.DeepCopy() {
+	if !reflect.DeepEqual(result.SlurmNode, worker.SlurmNode) {
 		t.Errorf("Expected SlurmNode to be %v, but got %v", *worker.SlurmNode.DeepCopy(), result.SlurmNode)
 	}
 	if result.NCCLSettings != *ncclSettings.DeepCopy() {

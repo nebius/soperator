@@ -88,9 +88,10 @@ func RenderStatefulSet(
 					Affinity:     nodeFilter.Affinity,
 					NodeSelector: nodeFilter.NodeSelector,
 					Tolerations:  nodeFilter.Tolerations,
-					InitContainers: []corev1.Container{
+					InitContainers: append(
+						controller.CustomInitContainers,
 						common.RenderContainerMunge(&controller.ContainerMunge),
-					},
+					),
 					Containers: []corev1.Container{
 						renderContainerSlurmctld(&controller.ContainerSlurmctld, controller.CustomVolumeMounts),
 					},

@@ -18,7 +18,7 @@ import (
 
 func BasePodTemplateSpec(
 	clusterName string,
-	munge *values.Container,
+	initContainers []corev1.Container,
 	valuesExporter *values.SlurmExporter,
 	nodeFilters []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
@@ -57,11 +57,9 @@ func BasePodTemplateSpec(
 			},
 		},
 		Spec: corev1.PodSpec{
-			Affinity:     affinity,
-			NodeSelector: nodeSelector,
-			InitContainers: []corev1.Container{
-				common.RenderContainerMunge(munge),
-			},
+			Affinity:       affinity,
+			NodeSelector:   nodeSelector,
+			InitContainers: initContainers,
 			Containers: []corev1.Container{
 				RenderContainerExporter(valuesExporter),
 			},
@@ -72,14 +70,14 @@ func BasePodTemplateSpec(
 
 func RenderPodTemplateSpec(
 	clusterName string,
-	munge *values.Container,
+	initContainers []corev1.Container,
 	valuesExporter *values.SlurmExporter,
 	nodeFilters []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
 	matchLabels map[string]string,
 	podTemplateSpec *corev1.PodTemplateSpec,
 ) corev1.PodTemplateSpec {
-	result := BasePodTemplateSpec(clusterName, munge, valuesExporter, nodeFilters, volumeSources, matchLabels)
+	result := BasePodTemplateSpec(clusterName, initContainers, valuesExporter, nodeFilters, volumeSources, matchLabels)
 	if podTemplateSpec != nil {
 		// Convert the structs to JSON
 		originalJSON, err := json.Marshal(result)

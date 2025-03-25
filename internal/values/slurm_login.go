@@ -1,6 +1,7 @@
 package values
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -10,8 +11,9 @@ import (
 type SlurmLogin struct {
 	slurmv1.SlurmNode
 
-	ContainerSshd  Container
-	ContainerMunge Container
+	ContainerSshd        Container
+	ContainerMunge       Container
+	CustomInitContainers []corev1.Container
 
 	Service     Service
 	StatefulSet StatefulSet
@@ -51,7 +53,8 @@ func buildSlurmLoginFrom(clusterName string, maintenance *consts.MaintenanceMode
 			login.Munge,
 			consts.ContainerNameMunge,
 		),
-		Service: svc,
+		CustomInitContainers: login.CustomInitContainers,
+		Service:              svc,
 		StatefulSet: buildStatefulSetFrom(
 			naming.BuildStatefulSetName(consts.ComponentTypeLogin, clusterName),
 			login.SlurmNode.Size,

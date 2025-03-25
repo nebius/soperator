@@ -1,6 +1,7 @@
 package values
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -14,7 +15,8 @@ type SlurmExporter struct {
 	PodMonitorConfig slurmv1.PodMonitorConfig
 
 	slurmv1.ExporterContainer
-	ContainerMunge Container
+	ContainerMunge       Container
+	CustomInitContainers []corev1.Container
 
 	VolumeJail  slurmv1.NodeVolume
 	Maintenance *consts.MaintenanceMode
@@ -30,6 +32,7 @@ func buildSlurmExporterFrom(maintenance *consts.MaintenanceMode, exporter *slurm
 			exporter.Munge,
 			consts.ContainerNameMunge,
 		),
+		CustomInitContainers: exporter.CustomInitContainers,
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),
 		},
