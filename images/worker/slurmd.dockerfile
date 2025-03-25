@@ -2,7 +2,7 @@
 ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
 
 # First stage: Build the gpubench application
-FROM cr.eu-north1.nebius.cloud/soperator/golang:1.23 AS gpubench_builder
+FROM golang:1.24 AS gpubench_builder
 
 ARG GO_LDFLAGS=""
 ARG CGO_ENABLED=0
