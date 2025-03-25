@@ -1,4 +1,4 @@
-FROM golang:1.23@sha256:927112936d6b496ed95f55f362cc09da6e3e624ef868814c56d55bd7323e0959 AS sconfigcontroller_builder
+FROM golang:1.24 AS sconfigcontroller_builder
 
 ARG GO_LDFLAGS=""
 ARG BUILD_TIME
