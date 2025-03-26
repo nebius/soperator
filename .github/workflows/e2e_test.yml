@@ -64,7 +64,7 @@ jobs:
 
       - name: Setup .envrc
         run: |
-          cd terraform-repo/${{ github.event.inputs.path_to_installation }}
+          cd ${{ env.PATH_TO_INSTALLATION }}
           source .envrc
 
       # TODO: add clean-up step before run e2e (in case previous run didn't clean up)
