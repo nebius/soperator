@@ -66,12 +66,10 @@ jobs:
           ref: ${{ env.TERRAFORM_REPO_REF }}
           path: "${{ github.workspace }}/terraform-repo"
 
-      - name: Setup .envrc
+      - name: Run Terratest
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
           source .envrc
+          cd -
 
-      # TODO: add clean-up step before run e2e (in case previous run didn't clean up)
-      - name: Run Terratest
-        run: |
           go test -v -timeout 2h --tags=e2e ./test/e2e/...
