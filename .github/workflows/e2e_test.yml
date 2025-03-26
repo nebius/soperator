@@ -6,7 +6,7 @@ on:
       terraform_repo:
         description: "terraform repository with slurm cluster deployment"
         required: true
-        default: "https://github.com/nebius/nebius-solution-library.git"
+        default: "nebius/nebius-solution-library"
         type: string
       terraform_repo_ref:
         description: "ref of terraform repo to apply"
@@ -34,7 +34,7 @@ jobs:
      - e2e-tests
 
     env:
-      PATH_TO_INSTALLATION: "${{ github.workspace }}terraform-repo/${{ github.event.inputs.path_to_installation }}"
+      PATH_TO_INSTALLATION: "${{ github.workspace }}/terraform-repo/${{ github.event.inputs.path_to_installation }}"
       TERRAFORM_REPO: "${{ github.event.inputs.terraform_repo }}"
       TERRAFORM_REPO_REF: "${{ github.event.inputs.terraform_repo_ref }}"
       NEBIUS_TENANT_ID: ${{ vars.E2E_TEST_NEBIUS_TENANT_ID }}
@@ -60,7 +60,7 @@ jobs:
         with:
           repository: ${{ env.TERRAFORM_REPO }}
           ref: ${{ env.TERRAFORM_REPO_VERSION }}
-          path: "${{ github.workspace }}terraform-repo"
+          path: "${{ github.workspace }}/terraform-repo"
 
       - name: Setup .envrc
         run: |
