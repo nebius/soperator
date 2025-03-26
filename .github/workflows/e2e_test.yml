@@ -42,6 +42,8 @@ jobs:
       NEBIUS_TENANT_ID: ${{ vars.E2E_TEST_NEBIUS_TENANT_ID }}
       NEBIUS_PROJECT_ID: ${{ vars.E2E_TEST_NEBIUS_PROJECT_ID }}
       NEBIUS_REGION: ${{ vars.E2E_TEST_NEBIUS_REGION }}
+      INFINIBAND_FABRIC: ${{ vars.E2E_TEST_INFINIBAND_FABRIC }}
+      SSH_KEYS: ${{ vars.E2E_TEST_SSH_KEYS }}
 
     steps:
       - name: Harden Runner
