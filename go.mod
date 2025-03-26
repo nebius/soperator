@@ -5,7 +5,7 @@ go 1.24.1
 require (
 	github.com/SlinkyProject/slurm-client v0.1.0-20241108145209-7bfdd4923f75
 	github.com/go-logr/logr v1.4.2
-	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/gruntwork-io/terratest v0.48.2
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/hashicorp/hcl/v2 v2.22.0
@@ -75,7 +75,7 @@ require (
 	github.com/ulikunitz/xz v0.5.12 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
-	golang.org/x/mod v0.22.0 // indirect
+	golang.org/x/mod v0.23.0 // indirect
 	golang.org/x/sync v0.12.0 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	sigs.k8s.io/release-utils v0.8.1 // indirect
