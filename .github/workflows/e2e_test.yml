@@ -34,12 +34,12 @@ jobs:
      - e2e-tests
 
     env:
-      PATH_TO_INSTALLATION: "${{ github.workspace }}terraform-repo/${{ .github.event.inputs.path_to_installation }}"
-      TERRAFORM_REPO: "${{ .github.event.inputs.terraform_repo }}"
-      TERRAFORM_REPO_VERSION: "${{ .github.event.inputs.terraform_repo_version }}"
-      NEBIUS_TENANT_ID: ${{ .github.secrets.E2E_TEST_NEBIUS_TENANT_ID }}
-      NEBIUS_PROJECT_ID: ${{ .github.secrets.E2E_TEST_NEBIUS_PROJECT_ID }}
-      NEBIUS_REGION: ${{ .github.secrets.E2E_TEST_NEBIUS_REGION }}
+      PATH_TO_INSTALLATION: "${{ github.workspace }}terraform-repo/${{ github.event.inputs.path_to_installation }}"
+      TERRAFORM_REPO: "${{ github.event.inputs.terraform_repo }}"
+      TERRAFORM_REPO_VERSION: "${{ github.event.inputs.terraform_repo_version }}"
+      NEBIUS_TENANT_ID: ${{ vars.E2E_TEST_NEBIUS_TENANT_ID }}
+      NEBIUS_PROJECT_ID: ${{ vars.E2E_TEST_NEBIUS_PROJECT_ID }}
+      NEBIUS_REGION: ${{ vars.E2E_TEST_NEBIUS_REGION }}
 
     steps:
       - name: Harden Runner
@@ -59,7 +59,7 @@ jobs:
         run: |
           git clone --branch "${{ env.TERRAFORM_REPO_VERSION }}" "${{ env.TERRAFORM_REPO }}" terraform-repo
           
-          cd terraform-repo/${{ .github.event.inputs.path_to_installation }}
+          cd terraform-repo/${{ github.event.inputs.path_to_installation }}
           source .envrc
 
       # TODO: add clean-up step before run e2e (in case previous run didn't clean up)
