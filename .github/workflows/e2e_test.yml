@@ -16,7 +16,7 @@ on:
       path_to_installation:
         description: "path inside terraform repo to terraform module to apply"
         required: true
-        default: "/soperator/installations"
+        default: "/soperator/installations/example"
         type: string
           
 
@@ -32,6 +32,8 @@ jobs:
     runs-on: 
      - self-hosted
      - e2e-tests
+
+    environment: e2e
 
     env:
       PATH_TO_INSTALLATION: "${{ github.workspace }}/terraform-repo/${{ github.event.inputs.path_to_installation }}"
