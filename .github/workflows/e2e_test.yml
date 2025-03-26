@@ -8,8 +8,8 @@ on:
         required: true
         default: "https://github.com/nebius/nebius-solution-library.git"
         type: string
-      terraform_repo_version:
-        description: "version of terraform to apply"
+      terraform_repo_ref:
+        description: "ref of terraform repo to apply"
         required: true
         default: "release/soperator"
         type: string
@@ -36,7 +36,7 @@ jobs:
     env:
       PATH_TO_INSTALLATION: "${{ github.workspace }}terraform-repo/${{ github.event.inputs.path_to_installation }}"
       TERRAFORM_REPO: "${{ github.event.inputs.terraform_repo }}"
-      TERRAFORM_REPO_VERSION: "${{ github.event.inputs.terraform_repo_version }}"
+      TERRAFORM_REPO_REF: "${{ github.event.inputs.terraform_repo_ref }}"
       NEBIUS_TENANT_ID: ${{ vars.E2E_TEST_NEBIUS_TENANT_ID }}
       NEBIUS_PROJECT_ID: ${{ vars.E2E_TEST_NEBIUS_PROJECT_ID }}
       NEBIUS_REGION: ${{ vars.E2E_TEST_NEBIUS_REGION }}
@@ -53,12 +53,17 @@ jobs:
       - name: Install GO
         uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
-            go-version-file: 'go.mod'
+          go-version-file: 'go.mod'
 
       - name: Checkout Terraform repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ env.TERRAFORM_REPO }}
+          ref: ${{ env.TERRAFORM_REPO_VERSION }}
+          path: "${{ github.workspace }}terraform-repo"
+
+      - name: Setup .envrc
         run: |
-          git clone --branch "${{ env.TERRAFORM_REPO_VERSION }}" "${{ env.TERRAFORM_REPO }}" terraform-repo
-          
           cd terraform-repo/${{ github.event.inputs.path_to_installation }}
           source .envrc
 
