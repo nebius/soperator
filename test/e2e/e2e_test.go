@@ -17,9 +17,9 @@ import (
 )
 
 type testConfig struct {
-	PathToTerraform  string   `split_words:"true" required:"true"` // PATH_TO_TERRAFORM
-	InfinibandFabric string   `split_words:"true" required:"true"` // INFINIBAND_FABRIC
-	SSHKeys          []string `split_words:"true" required:"true"` // SSH_KEYS
+	PathToInstallation string   `split_words:"true" required:"true"` // PATH_TO_INSTALLATION
+	InfinibandFabric   string   `split_words:"true" required:"true"` // INFINIBAND_FABRIC
+	SSHKeys            []string `split_words:"true" required:"true"` // SSH_KEYS
 }
 
 func TestTerraform(t *testing.T) {
@@ -28,11 +28,11 @@ func TestTerraform(t *testing.T) {
 	err := envconfig.Process("", &cfg)
 	require.NoError(t, err)
 
-	tfVars := readTFVars(t, fmt.Sprintf("%s/terraform.tfvars", cfg.PathToTerraform))
+	tfVars := readTFVars(t, fmt.Sprintf("%s/terraform.tfvars", cfg.PathToInstallation))
 	tfVars = overrideTestValues(tfVars, cfg)
 
 	terraformOptions := &terraform.Options{
-		TerraformDir: cfg.PathToTerraform,
+		TerraformDir: cfg.PathToInstallation,
 		Vars:         tfVars,
 		RetryableTerraformErrors: map[string]string{
 			"Context deadline exceeded": "retry on context deadline exceeded",
@@ -44,8 +44,18 @@ func TestTerraform(t *testing.T) {
 	terraform.WorkspaceSelectOrNew(t, terraformOptions, "e2e-test")
 	terraform.Destroy(t, terraformOptions)
 
-	defer terraform.Destroy(t, terraformOptions)
-	terraform.Apply(t, terraformOptions)
+	var applyError error
+	defer func() {
+		if applyError != nil {
+			t.Errorf("Failed to apply: %v", err)
+		}
+
+		terraform.Destroy(t, terraformOptions)
+		if applyError != nil {
+			t.FailNow()
+		}
+	}()
+	_, applyError = terraform.ApplyE(t, terraformOptions)
 }
 
 func readTFVars(t *testing.T, tfVarsFilename string) map[string]interface{} {
