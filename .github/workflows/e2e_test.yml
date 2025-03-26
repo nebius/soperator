@@ -2,6 +2,23 @@ name: E2E test soperator
 
 on:
   workflow_dispatch:
+    inputs:
+      terraform_repo:
+        description: "terraform repository with slurm cluster deployment"
+        required: true
+        default: "https://github.com/nebius/nebius-solution-library.git"
+        type: string
+      terraform_repo_version:
+        description: "version of terraform to apply"
+        required: true
+        default: "release/soperator"
+        type: string
+      path_to_installation:
+        description: "path inside terraform repo to terraform module to apply"
+        required: true
+        default: "/soperator/installations"
+        type: string
+          
 
 permissions:
   contents: read
@@ -17,9 +34,12 @@ jobs:
      - e2e-tests
 
     env:
-      TERRAFORM_REPO: "https://github.com/nebius/nebius-solution-library.git"
-      TERRAFORM_BRANCH: "release/soperator"
-      PATH_TO_TERRAFORM: "${{ github.workspace }}/nebius-solution-library/soperator/modules/slurm"
+      PATH_TO_INSTALLATION: "${{ github.workspace }}terraform-repo/${{ .github.event.inputs.path_to_installation }}"
+      TERRAFORM_REPO: "${{ .github.event.inputs.terraform_repo }}"
+      TERRAFORM_REPO_VERSION: "${{ .github.event.inputs.terraform_repo_version }}"
+      NEBIUS_TENANT_ID: ${{ .github.secrets.E2E_TEST_NEBIUS_TENANT_ID }}
+      NEBIUS_PROJECT_ID: ${{ .github.secrets.E2E_TEST_NEBIUS_PROJECT_ID }}
+      NEBIUS_REGION: ${{ .github.secrets.E2E_TEST_NEBIUS_REGION }}
 
     steps:
       - name: Harden Runner
@@ -37,10 +57,12 @@ jobs:
 
       - name: Checkout Terraform repository
         run: |
-          git clone --branch "${{ env.TERRAFORM_BRANCH }}" "${{ env.TERRAFORM_REPO }}" nebius-solution-library
+          git clone --branch "${{ env.TERRAFORM_REPO_VERSION }}" "${{ env.TERRAFORM_REPO }}" terraform-repo
+          
+          cd terraform-repo/${{ .github.event.inputs.path_to_installation }}
+          source .envrc
 
       # TODO: add clean-up step before run e2e (in case previous run didn't clean up)
-
       - name: Run Terratest
         run: |
-          go test -v ./test/e2e
+          go test -v -timeout 2h --tags=e2e ./test/e2e/...
