@@ -68,6 +68,8 @@ jobs:
 
       - name: Run Terratest
         run: |
-          cd ${{ env.PATH_TO_INSTALLATION }} && source .envrc && cd -
+          cd ${{ env.PATH_TO_INSTALLATION }}
+          source .envrc
+          cd -
 
           go test -v -timeout 2h --tags=e2e ./test/e2e/...
