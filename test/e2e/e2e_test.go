@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/terraform"
@@ -31,9 +32,18 @@ func TestTerraform(t *testing.T) {
 	tfVars := readTFVars(t, fmt.Sprintf("%s/terraform.tfvars", cfg.PathToInstallation))
 	tfVars = overrideTestValues(tfVars, cfg)
 
+	envVarsList := os.Environ()
+	envVars := make(map[string]string)
+	for _, envVar := range envVarsList {
+		pair := strings.SplitN(envVar, "=", 2)
+		require.Len(t, pair, 2)
+		envVars[pair[0]] = pair[1]
+	}
+
 	terraformOptions := &terraform.Options{
 		TerraformDir: cfg.PathToInstallation,
 		Vars:         tfVars,
+		EnvVars:      envVars,
 		RetryableTerraformErrors: map[string]string{
 			"Context deadline exceeded": "retry on context deadline exceeded",
 		},
@@ -44,18 +54,8 @@ func TestTerraform(t *testing.T) {
 	terraform.WorkspaceSelectOrNew(t, terraformOptions, "e2e-test")
 	terraform.Destroy(t, terraformOptions)
 
-	var applyError error
-	defer func() {
-		if applyError != nil {
-			t.Errorf("Failed to apply: %v", err)
-		}
-
-		terraform.Destroy(t, terraformOptions)
-		if applyError != nil {
-			t.FailNow()
-		}
-	}()
-	_, applyError = terraform.ApplyE(t, terraformOptions)
+	defer terraform.Destroy(t, terraformOptions)
+	terraform.Apply(t, terraformOptions)
 }
 
 func readTFVars(t *testing.T, tfVarsFilename string) map[string]interface{} {
