@@ -100,12 +100,10 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 	//     block_size_kibibytes = 4
 	//   }
 	// }
-	tfVars["filestore_jail"] = []interface{}{
-		map[string]interface{}{
-			"spec": map[string]interface{}{
-				"size_gibibytes":       2048,
-				"block_size_kibibytes": 4,
-			},
+	tfVars["filestore_jail"] = map[string]interface{}{
+		"spec": map[string]interface{}{
+			"size_gibibytes":       2048,
+			"block_size_kibibytes": 4,
 		},
 	}
 
