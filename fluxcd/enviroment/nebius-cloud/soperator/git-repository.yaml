@@ -1,0 +1,26 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: nebius-cloud
+  namespace: flux-system
+spec:
+  interval: 10m
+  url: https://github.com/nebius/soperator
+  ref:
+    # TODO: Change this to the branch main after the first release
+    branch: 589
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: nebius-cloud
+  namespace: flux-system
+spec:
+  interval: 10m
+  targetNamespace: flux-system
+  sourceRef:
+    kind: GitRepository
+    name: nebius-cloud
+  path: "./fluxcd/enviroment/nebius-cloud/soperator"
+  prune: true
+  timeout: 1m
