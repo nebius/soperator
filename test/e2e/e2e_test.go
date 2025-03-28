@@ -188,7 +188,7 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 }
 
 func applyO11ySecret(t *testing.T, cfg testConfig) {
-	clientConfig, err := clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedConfigDir)
+	clientConfig, err := clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedHomeFile)
 	require.NoError(t, err)
 
 	clientset, err := kubernetes.NewForConfig(clientConfig)
