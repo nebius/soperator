@@ -1,8 +1,3 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: logs-system
----
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
@@ -18,6 +13,8 @@ metadata:
   name: opentelemetry-collector-logs
   namespace: flux-system
 spec:
+  dependsOn:
+    - name: vm-logs
   interval: 10m
   timeout: 10m
   install:
