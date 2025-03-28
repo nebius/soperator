@@ -8,7 +8,7 @@ spec:
   url: https://github.com/nebius/soperator
   ref:
     # TODO: Change this to the branch main after the first release
-    branch: 589
+    branch: dev
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization

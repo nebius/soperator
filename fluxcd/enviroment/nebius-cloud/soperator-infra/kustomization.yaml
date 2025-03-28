@@ -4,3 +4,6 @@ resources:
   - ./git-repository.yaml
   - ../base/
   - ../../../base/victoria-metrics-operator/
+  - ../../../base/victoria-logs
+  - ../../../base/opentelemetry-collector-events
+  - ../../../base/opentelemetry-collector-logs

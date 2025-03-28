@@ -18,8 +18,8 @@ metadata:
   name: vm-stack
   namespace: flux-system
 spec:
-  interval: 5m
-  timeout: 5m
+  interval: 10m
+  timeout: 10m
   install:
     crds: CreateReplace
     remediation:
@@ -30,10 +30,11 @@ spec:
   chart:
     spec:
       chart: victoria-metrics-k8s-stack
+      version: '0.39.*'
       sourceRef:
         kind: HelmRepository
         name: vm
-      interval: 5m
+      interval: 10m
   valuesFrom:
     - kind: ConfigMap
       name: victoria-metrics-operator
