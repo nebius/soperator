@@ -43,6 +43,7 @@ jobs:
       NEBIUS_REGION: ${{ vars.E2E_TEST_NEBIUS_REGION }}
       INFINIBAND_FABRIC: ${{ vars.E2E_TEST_INFINIBAND_FABRIC }}
       SSH_KEYS: ${{ vars.E2E_TEST_SSH_KEYS }}
+      O11Y_ACCESS_TOKEN: ${{ secrets.E2E_O11Y_ACCESS_TOKEN }}
 
     steps:
       - name: Harden Runner

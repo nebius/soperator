@@ -15,12 +15,19 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/stretchr/testify/require"
 	ctyjson "github.com/zclconf/go-cty/cty/json"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type testConfig struct {
-	PathToInstallation string   `split_words:"true" required:"true"` // PATH_TO_INSTALLATION
-	InfinibandFabric   string   `split_words:"true" required:"true"` // INFINIBAND_FABRIC
-	SSHKeys            []string `split_words:"true" required:"true"` // SSH_KEYS
+	PathToInstallation string   `split_words:"true" required:"true"`                // PATH_TO_INSTALLATION
+	InfinibandFabric   string   `split_words:"true" required:"true"`                // INFINIBAND_FABRIC
+	SSHKeys            []string `split_words:"true" required:"true"`                // SSH_KEYS
+	O11yAccessToken    string   `split_words:"true" required:"true"`                // O11Y_ACCESS_TOKEN
+	O11ySecretName     string   `split_words:"true" default:"o11y-writer-sa-token"` // O11Y_SECRET_NAME
+	O11yNamespace      string   `split_words:"true" default:"logs-system"`          // O11Y_NAMESPACE
 }
 
 func TestTerraform(t *testing.T) {
@@ -40,7 +47,7 @@ func TestTerraform(t *testing.T) {
 		envVars[pair[0]] = pair[1]
 	}
 
-	terraformOptions := &terraform.Options{
+	commonOptions := terraform.Options{
 		TerraformDir: cfg.PathToInstallation,
 		Vars:         tfVars,
 		EnvVars:      envVars,
@@ -50,12 +57,21 @@ func TestTerraform(t *testing.T) {
 		MaxRetries: 5,
 	}
 
-	terraform.Init(t, terraformOptions)
-	terraform.WorkspaceSelectOrNew(t, terraformOptions, "e2e-test")
-	terraform.Destroy(t, terraformOptions)
+	terraform.Init(t, &commonOptions)
+	terraform.WorkspaceSelectOrNew(t, &commonOptions, "e2e-test")
+	terraform.Destroy(t, &commonOptions)
 
-	defer terraform.Destroy(t, terraformOptions)
-	terraform.Apply(t, terraformOptions)
+	defer terraform.Destroy(t, &commonOptions)
+
+	// Set up resources in k8s that could not be setup in terraform
+	targetedOptions := commonOptions
+	targetedOptions.Targets = []string{"module.k8s"}
+	terraform.Apply(t, &targetedOptions)
+
+	applyO11ySecret(t, cfg)
+
+	// Final apply
+	terraform.Apply(t, &commonOptions)
 }
 
 func readTFVars(t *testing.T, tfVarsFilename string) map[string]interface{} {
@@ -169,4 +185,30 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 	tfVars["slurm_login_ssh_root_public_keys"] = cfg.SSHKeys
 
 	return tfVars
+}
+
+func applyO11ySecret(t *testing.T, cfg testConfig) {
+	clientConfig, err := clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedConfigDir)
+	require.NoError(t, err)
+
+	clientset, err := kubernetes.NewForConfig(clientConfig)
+	require.NoError(t, err)
+
+	_, err = clientset.CoreV1().Namespaces().Create(t.Context(), &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: cfg.O11yNamespace,
+		},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	_, err = clientset.CoreV1().Secrets("").Create(t.Context(), &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cfg.O11ySecretName,
+			Namespace: cfg.O11yNamespace,
+		},
+		StringData: map[string]string{
+			"accessToken": cfg.O11yAccessToken,
+		},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
 }
