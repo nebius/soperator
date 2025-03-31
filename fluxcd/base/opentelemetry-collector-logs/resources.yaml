@@ -1,0 +1,343 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: opentelemetry-collector-logs
+  namespace: flux-system
+spec:
+  interval: 120m
+  url: https://open-telemetry.github.io/opentelemetry-helm-charts
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: opentelemetry-collector-logs
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: vm-logs
+  interval: 10m
+  timeout: 10m
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+  targetNamespace: logs-system
+  chart:
+    spec:
+      chart: opentelemetry-collector-logs
+      version: '0.117.*'
+      sourceRef:
+        kind: HelmRepository
+        name: vm
+      interval: 10m
+  valuesFrom:
+    - kind: ConfigMap
+      name: opentelemetry-collector-logs
+      valuesKey: values.yaml
+      optional: true
+  values:
+    mode: daemonset
+
+    image:
+      repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
+      pullPolicy: IfNotPresent
+      tag: "0.2.241"
+
+    extraEnvs:
+      - name: K8S_NODE_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: spec.nodeName
+      - name: CLUSTER_NAME
+        value: ${cluster_name}
+      - name: "GOMAXPROCS"
+        value: "1"
+
+    tolerations:
+      - operator: Exists
+      - effect: NoExecute
+        key: node.kubernetes.io/not-ready
+        operator: Exists
+      - effect: NoExecute
+        key: node.kubernetes.io/unreachable
+        operator: Exists
+      - effect: NoSchedule
+        key: node.kubernetes.io/disk-pressure
+        operator: Exists
+      - effect: NoSchedule
+        key: node.kubernetes.io/memory-pressure
+        operator: Exists
+      - effect: NoSchedule
+        key: node.kubernetes.io/pid-pressure
+        operator: Exists
+      - effect: NoSchedule
+        key: node.kubernetes.io/unschedulable
+        operator: Exists
+      - effect: NoSchedule
+        key: node.kubernetes.io/network-unavailable
+        operator: Exists
+      - effect: NoSchedule
+        key: node.cilium.io/agent-not-ready
+        operator: Exists
+
+    clusterRole:
+      create: true
+      rules:
+      - apiGroups: [""]
+        resources: ["pods", "namespaces"]
+        verbs: ["get", "watch", "list"]
+    serviceAccount:
+      create: true
+
+    useGOMEMLIMIT: true
+
+    config:
+      exporters:
+        otlphttp/victoriametrics:
+          compression: gzip
+          encoding: proto
+          logs_endpoint: http://vm-victoria-logs-single-server.logs-system.svc.cluster.local.:9428/insert/opentelemetry/v1/logs
+          retry_on_failure:
+            initial_interval: 200ms
+          timeout: 5s
+        otlp:
+          endpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
+          balancer_name: round_robin
+          compression: snappy
+          retry_on_failure:
+            initial_interval: 200ms
+          timeout: 5s
+          headers:
+            iam-container: project-e00h61cxzwnf6zksvdn77
+          auth:
+            authenticator: bearertokenauth
+      extensions:
+        bearertokenauth:
+          filename: "/o11ytoken/accessToken"
+        health_check:
+          endpoint: '0.0.0.0:13133'
+        file_storage:
+          directory: /var/lib/otelcol
+      processors:
+        transform:
+          log_statements:
+            - context: log
+              error_mode: ignore
+              statements:
+              - set(attributes["cluster"], "$${env:CLUSTER_NAME}")
+              - set(attributes["k8s.node.name"], "$${env:K8S_NODE_NAME}")
+        batch:
+          send_batch_max_size: 700
+          send_batch_size: 250
+        k8sattributes:
+          wait_for_metadata: true
+          wait_for_metadata_timeout: 30s
+          extract:
+            labels:
+              - from: pod
+                key: external-o11y
+                tag_name: external_o11y
+              - from: namespace
+                key: o11y_resource_id
+                tag_name: resource_id
+              - from: namespace
+                key: o11y_service_provider
+                tag_name: service_provider
+            metadata:
+              - k8s.namespace.name
+              - k8s.node.name
+              - k8s.pod.name
+              - k8s.pod.uid
+              - k8s.pod.start_time
+          filter:
+            node_from_env_var: K8S_NODE_NAME
+          passthrough: false
+          pod_association:
+            - sources:
+                - from: resource_attribute
+                  name: k8s.pod.ip
+            - sources:
+                - from: resource_attribute
+                  name: k8s.pod.uid
+            - sources:
+                - from: connection
+        memory_limiter:
+          check_interval: 5s
+          limit_percentage: 80
+          spike_limit_percentage: 25
+      receivers:
+        zipkin: null
+        filelog:
+          exclude:
+            - /var/log/pods/*/otc-container/*.log
+            - /var/log/pods/*/munge/*.log
+            - /var/log/pods/kube-system_hubble-*/**/*.log
+            - /var/log/pods/monitoring-system_*/**/*.log
+            - /var/log/pods/logs-system_*/**/*.log
+          include:
+            - /var/log/pods/*-system_*/**/*.log
+            - /var/log/pods/soperator_*/**/*.log
+          include_file_name: false
+          include_file_path: true
+          operators:
+            - id: get-format
+              routes:
+                - expr: body matches "^[^ Z]+Z"
+                  output: parser-containerd
+                - expr: body matches "^\\{"
+                  output: parser-docker
+              type: router
+            - id: parser-docker
+              type: json_parser
+              output: extract_metadata_from_filepath
+              timestamp:
+                layout: '%Y-%m-%dT%H:%M:%S.%LZ'
+                parse_from: attributes.timestamp
+            - combine_field: attributes.log
+              combine_with: ""
+              id: crio-recombine
+              is_last_entry: attributes.logtag == 'F'
+              max_log_size: 102400
+              output: extract_metadata_from_filepath
+              source_identifier: attributes["log.file.path"]
+              type: recombine
+            - id: parser-containerd
+              regex: ^(?P<time>[^ ^Z]+Z) (?P<stream>stdout|stderr) (?P<logtag>[^ ]*) ?(?P<log>.*)$
+              timestamp:
+                layout: '%Y-%m-%dT%H:%M:%S.%LZ'
+                parse_from: attributes.time
+              type: regex_parser
+            - combine_field: attributes.log
+              combine_with: ""
+              id: containerd-recombine
+              is_last_entry: attributes.logtag == 'F'
+              max_log_size: 102400
+              output: extract_metadata_from_filepath
+              source_identifier: attributes["log.file.path"]
+              type: recombine
+            - id: extract_metadata_from_filepath
+              parse_from: attributes["log.file.path"]
+              regex: ^.*\/(?P<namespace>[^_]+)_(?P<pod_name>[^_]+)_(?P<uid>[a-f0-9\-]+)\/(?P<container_name>[^\._]+)\/(?P<restart_count>\d+)\.log$
+              type: regex_parser
+            - from: attributes.stream
+              to: attributes["log.iostream"]
+              type: move
+            - from: attributes.container_name
+              to: resource["k8s.container.name"]
+              type: move
+            - from: attributes.namespace
+              to: resource["k8s.namespace.name"]
+              type: move
+            - from: attributes.pod_name
+              to: resource["k8s.pod.name"]
+              type: move
+            - from: attributes.restart_count
+              to: resource["k8s.container.restart_count"]
+              type: move
+            - from: attributes.uid
+              to: resource["k8s.pod.uid"]
+              type: move
+            - from: attributes.log
+              to: body
+              type: move
+            - field: attributes.level
+              type: add
+              value: unknown
+            - id: parse-json-logs
+              type: json_parser
+              if: body matches "^\\{.+\\}$"
+              parse_from: body
+              parse_to: attributes
+              severity:
+                parse_from: attributes.level
+                mapping:
+                  debug:
+                    - debug
+                    - DEBUG
+                  info:
+                    - info
+                    - INFO
+                  warn:
+                    - warn
+                    - WARN
+                    - warning
+                    - WARNING
+                  error:
+                    - error
+                    - ERROR
+                  fatal:
+                    - fatal
+                    - FATAL
+          retry_on_failure:
+            enabled: true
+          start_at: end
+          storage: file_storage
+      service:
+        extensions:
+          - health_check
+          - file_storage
+          - bearertokenauth
+        pipelines:
+          traces: null
+          metrics: null
+          logs:
+            exporters:
+              - otlphttp/victoriametrics
+              - otlp
+            processors:
+              - k8sattributes
+              - transform
+              - memory_limiter
+              - batch
+            receivers:
+              - filelog
+    extraVolumes:
+      - name: varlogpods
+        hostPath:
+          path: /var/log/pods
+      - name: varlibotelcol
+        hostPath:
+          path: /var/lib/otelcol
+          type: DirectoryOrCreate
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: o11ytoken
+        secret:
+          secretName: o11y-writer-sa-token
+    extraVolumeMounts:
+      - name: varlogpods
+        mountPath: /var/log/pods
+        readOnly: true
+      - name: varlibdockercontainers
+        mountPath: /var/lib/docker/containers
+        readOnly: true
+      - name: varlibotelcol
+        mountPath: /var/lib/otelcol
+      - mountPath: /o11ytoken
+        name: o11ytoken
+        readOnly: true
+
+    securityContext:
+      runAsGroup: 0
+      runAsUser: 10001
+    initContainers:
+      - name: init-fs
+        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+        command:
+          - sh
+          - '-c'
+          - 'chown -R 10001: /var/lib/otelcol'
+        volumeMounts:
+          - name: varlibotelcol
+            mountPath: /var/lib/otelcol
+
+    rollout:
+      rollingUpdate:
+        maxUnavailable: 50%
+      strategy: RollingUpdate
