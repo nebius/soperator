@@ -151,9 +151,13 @@ COPY common/scripts/complement_jail.sh /opt/bin/slurm/
 # Copy script for bind-mounting slurm into the jail
 COPY common/scripts/bind_slurm_common.sh /opt/bin/slurm/
 
+# Copy script for installing invidia driver libs into the jail
+COPY common/scripts/install_nvidia_libs.sh /opt/bin/slurm/
+
 RUN chmod +x /usr/bin/gpu_healthcheck.sh && \
     chmod +x /opt/bin/slurm/complement_jail.sh && \
-    chmod +x /opt/bin/slurm/bind_slurm_common.sh
+    chmod +x /opt/bin/slurm/bind_slurm_common.sh && \
+    chmod +x /opt/bin/slurm/install_nvidia_libs.sh
 
 # Update linker cache
 RUN ldconfig

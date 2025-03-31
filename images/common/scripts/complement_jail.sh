@@ -65,20 +65,8 @@ pushd "${jaildir}"
     done <<< "$submounts"
 
     if [ -n "$worker" ] && [ "$SLURM_CLUSTER_TYPE" = "gpu" ]; then
-        echo "Run nvidia-container-cli to propagate NVIDIA drivers, CUDA, NVML and other GPU-related stuff to the jail"
-        flock etc/complement_jail_nvidia_container_cli.lock -c "
-            nvidia-container-cli \
-                --user \
-                --debug=/dev/stderr \
-                --no-pivot \
-                configure \
-                --no-cgroups \
-                --ldconfig=\"@$(command -v ldconfig.real || command -v ldconfig)\" \
-                --device=all \
-                --utility \
-                --compute \
-                \"${jaildir}\"
-        "
+        time flock etc/complement_jail_nvidia_container_cli.lock -c \
+          "/opt/bin/slurm/install_nvidia_libs.sh -i etc/complement_jail_nvidia_info.txt -j \"${jaildir}\""
         touch "etc/gpu_libs_installed.flag"
     fi
 
