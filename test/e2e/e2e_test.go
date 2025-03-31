@@ -15,10 +15,6 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/stretchr/testify/require"
 	ctyjson "github.com/zclconf/go-cty/cty/json"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 type testConfig struct {
@@ -52,7 +48,7 @@ func TestTerraform(t *testing.T) {
 		Vars:         tfVars,
 		EnvVars:      envVars,
 		RetryableTerraformErrors: map[string]string{
-			"Context deadline exceeded": "retry on context deadline exceeded",
+			"(?m)^.*context deadline exceeded.*$": "retry on context deadline exceeded",
 		},
 		MaxRetries: 5,
 	}
@@ -63,14 +59,6 @@ func TestTerraform(t *testing.T) {
 
 	defer terraform.Destroy(t, &commonOptions)
 
-	// Set up resources in k8s that could not be setup in terraform
-	targetedOptions := commonOptions
-	targetedOptions.Targets = []string{"module.k8s"}
-	terraform.Apply(t, &targetedOptions)
-
-	applyO11ySecret(t, cfg)
-
-	// Final apply
 	terraform.Apply(t, &commonOptions)
 }
 
@@ -185,30 +173,4 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 	tfVars["slurm_login_ssh_root_public_keys"] = cfg.SSHKeys
 
 	return tfVars
-}
-
-func applyO11ySecret(t *testing.T, cfg testConfig) {
-	clientConfig, err := clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedHomeFile)
-	require.NoError(t, err)
-
-	clientset, err := kubernetes.NewForConfig(clientConfig)
-	require.NoError(t, err)
-
-	_, err = clientset.CoreV1().Namespaces().Create(t.Context(), &v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: cfg.O11yNamespace,
-		},
-	}, metav1.CreateOptions{})
-	require.NoError(t, err)
-
-	_, err = clientset.CoreV1().Secrets("").Create(t.Context(), &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cfg.O11ySecretName,
-			Namespace: cfg.O11yNamespace,
-		},
-		StringData: map[string]string{
-			"accessToken": cfg.O11yAccessToken,
-		},
-	}, metav1.CreateOptions{})
-	require.NoError(t, err)
 }
