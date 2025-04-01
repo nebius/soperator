@@ -7,6 +7,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -62,6 +63,10 @@ func (r *K8SNodesController) SetupWithManager(mgr ctrl.Manager,
 						case consts.SlurmNodeDrain, consts.SlurmNodeReboot, consts.K8SNodeMaintenanceScheduled,
 							consts.SoperatorChecksK8SNodeDegraded, consts.SoperatorChecksK8SNodeMaintenance:
 							condition := condition
+
+							// Ignore LastHeartbeatTime
+							condition.LastHeartbeatTime = v1.Time{}
+
 							condMap[condition.Type] = condition
 						}
 					}
