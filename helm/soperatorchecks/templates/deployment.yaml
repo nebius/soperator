@@ -34,8 +34,7 @@ spec:
         - containerPort: 8443
           name: https
           protocol: TCP
-        resources: {{- toYaml .Values.checks.kubeRbacProxy.resources | nindent
-          10 }}
+        resources: {{- toYaml .Values.checks.kubeRbacProxy.resources | nindent 10 }}
         securityContext: {{- toYaml .Values.checks.kubeRbacProxy.containerSecurityContext
           | nindent 10 }}
       - args: {{- toYaml .Values.checks.manager.args | nindent 8 }}
