@@ -68,7 +68,7 @@ pushd "${jaildir}"
         echo "Run nvidia-container-cli to propagate NVIDIA drivers, CUDA, NVML and other GPU-related stuff to the jail"
 
         # Disable ldconfig to prevent race between the workers.
-        # ldconfig will be run later separately under with flock.
+        # ldconfig is run further in this script under flock.
         readonly FAKE_LDCONFIG=/usr/bin/true
 
         nvidia-container-cli \
