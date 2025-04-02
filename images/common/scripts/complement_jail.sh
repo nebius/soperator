@@ -65,7 +65,7 @@ pushd "${jaildir}"
     done <<< "$submounts"
 
     if [ -n "$worker" ] && [ "$SLURM_CLUSTER_TYPE" = "gpu" ]; then
-        flock etc/complement_jail_nvidia_container_cli.lock -c \
+        time flock etc/complement_jail_nvidia_container_cli.lock -c \
           "/opt/bin/slurm/install_nvidia_libs.sh -i etc/complement_jail_nvidia_info.txt -j \"${jaildir}\""
         touch "etc/gpu_libs_installed.flag"
     fi
