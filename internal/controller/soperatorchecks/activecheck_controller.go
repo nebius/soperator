@@ -95,9 +95,9 @@ func (r *ActiveCheckReconciler) Reconcile(
 		if apierrors.IsNotFound(err) {
 			logger.V(1).Info("SlurmCluster resource not found")
 		}
-		// Error reading the object - requeue the request.
+
 		logger.Error(err, "Failed to get SlurmCluster")
-		return ctrl.Result{Requeue: true}, errors.Wrap(err, "getting SlurmCluster")
+		return ctrl.Result{}, errors.Wrap(err, "getting SlurmCluster")
 	}
 
 	reconcileActiveChecksImpl := func() error {
