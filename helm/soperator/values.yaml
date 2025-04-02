@@ -56,6 +56,18 @@ metricsService:
       protocol: TCP
       targetPort: https
   type: ClusterIP
+  serviceMonitor:
+    # -- Labels to be added to the controller ServiceMonitor
+    additionalLabels: {}
+    # release: kube-prometheus-stack
+    # --  Interval to scrape metrics
+    interval: 30s
+    # -- Timeout if metrics can't be retrieved in given time interval
+    scrapeTimeout: 25s
+    # MetricRelabelConfigs to apply to samples before ingestion.
+    metricRelabelings: []
+    # RelabelConfigs to apply to samples before scraping.
+    relabelings: []
 webhookService:
   ports:
     - port: 443

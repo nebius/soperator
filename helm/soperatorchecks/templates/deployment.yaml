@@ -23,6 +23,20 @@ spec:
         kubectl.kubernetes.io/default-container: manager
     spec:
       containers:
+      - args: {{- toYaml .Values.checks.kubeRbacProxy.args | nindent 8 }}
+        env:
+        - name: KUBERNETES_CLUSTER_DOMAIN
+          value: {{ quote .Values.kubernetesClusterDomain }}
+        image: {{ .Values.checks.kubeRbacProxy.image.repository }}:{{ .Values.checks.kubeRbacProxy.image.tag
+          | default .Chart.AppVersion }}
+        name: kube-rbac-proxy
+        ports:
+        - containerPort: 8443
+          name: https
+          protocol: TCP
+        resources: {{- toYaml .Values.checks.kubeRbacProxy.resources | nindent 10 }}
+        securityContext: {{- toYaml .Values.checks.kubeRbacProxy.containerSecurityContext
+          | nindent 10 }}
       - args: {{- toYaml .Values.checks.manager.args | nindent 8 }}
         command:
         - /usr/bin/soperatorchecks

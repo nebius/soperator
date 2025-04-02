@@ -1,28 +1,28 @@
-{{ if eq .Values.controllerManager.manager.env.isPrometheusCrdInstalled "true" }}
+{{ if .Values.metricsService.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "soperator.fullname" . }}-controller-manager-metrics-service
+  name: {{ include "soperatorchecks.fullname" . }}-checks-metrics-service
   labels:
-  {{- include "soperator.labels" . | nindent 4 }}
+  {{- include "soperatorchecks.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.metricsService.type }}
   selector:
     control-plane: controller-manager
-  {{- include "soperator.selectorLabels" . | nindent 4 }}
+  {{- include "soperatorchecks.selectorLabels" . | nindent 4 }}
   ports:
 	{{- .Values.metricsService.ports | toYaml | nindent 2 }}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "soperator.fullname" . }}-controller-manager-metrics-service
+  name: {{ include "soperatorchecks.fullname" . }}-checks-metrics-service
   labels:
-  {{- include "soperator.labels" . | nindent 4 }}
+  {{- include "soperatorchecks.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      {{- include "soperator.labels" . | nindent 6 }}
+      {{- include "soperatorchecks.labels" . | nindent 6 }}
   namespaceSelector:
     matchNames:
     - {{ .Release.Namespace | quote }}
