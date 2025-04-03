@@ -1,13 +1,11 @@
 package prometheus
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -79,28 +77,11 @@ func RenderPodTemplateSpec(
 ) corev1.PodTemplateSpec {
 	result := BasePodTemplateSpec(clusterName, initContainers, valuesExporter, nodeFilters, volumeSources, matchLabels)
 	if podTemplateSpec != nil {
-		// Convert the structs to JSON
-		originalJSON, err := json.Marshal(result)
-		if err != nil {
-			log.Fatalf("Error marshalling original PodTemplateSpec: %v", err)
-		}
-
-		patchJSON, err := json.Marshal(podTemplateSpec)
-		if err != nil {
-			log.Fatalf("Error marshalling patch PodTemplateSpec: %v", err)
-		}
-
-		mergedJSON, err := strategicpatch.StrategicMergePatch(originalJSON, patchJSON, &corev1.PodTemplateSpec{})
+		var err error
+		result, err = common.MergePodTemplateSpecs(result, podTemplateSpec)
 		if err != nil {
 			log.Fatalf("Error performing strategic merge: %v", err)
 		}
-
-		// Ummarshal the merged JSON back into a struct
-		err = json.Unmarshal(mergedJSON, &result)
-		if err != nil {
-			log.Fatalf("Error unmarshalling merged PodTemplateSpec: %v", err)
-		}
 	}
-
 	return result
 }

@@ -31,4 +31,5 @@ var (
 	ComponentTypeExporter          ComponentType = baseComponentType{"exporter"}
 	ComponentTypeMariaDbOperator   ComponentType = baseComponentType{"mariadb-operator"}
 	ComponentTypeSConfigController ComponentType = baseComponentType{"sconfigcontroller"}
+	ComponentTypeSoperatorChecks   ComponentType = baseComponentType{"soperatorchecks"}
 )

@@ -1,63 +1,159 @@
-/*
-Copyright 2024 Nebius B.V.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package soperatorchecks
 
 import (
 	"context"
+	"time"
 
+	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/controller/reconciler"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
+	"nebius.ai/slurm-operator/internal/logfield"
+	render "nebius.ai/slurm-operator/internal/render/soperatorchecks"
+	"nebius.ai/slurm-operator/internal/utils"
 )
 
-// ActiveCheckReconciler reconciles a ActiveCheck object
+var (
+	SlurmActiveCheckControllerName = "soperatorchecks.activecheck"
+)
+
 type ActiveCheckReconciler struct {
-	client.Client
-	Scheme *runtime.Scheme
+	*reconciler.Reconciler
+	reconcileTimeout time.Duration
+
+	CronJob *reconciler.CronJobReconciler
+}
+
+func NewActiveCheckController(
+	client client.Client,
+	scheme *runtime.Scheme,
+	recorder record.EventRecorder,
+	reconcileTimeout time.Duration,
+) *ActiveCheckReconciler {
+	r := reconciler.NewReconciler(client, scheme, recorder)
+	cronJobReconciler := reconciler.NewCronJobReconciler(r)
+
+	return &ActiveCheckReconciler{
+		Reconciler:       r,
+		reconcileTimeout: reconcileTimeout,
+		CronJob:          cronJobReconciler,
+	}
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *ActiveCheckReconciler) SetupWithManager(
+	mgr ctrl.Manager,
+	maxConcurrency int,
+	cacheSyncTimeout time.Duration,
+) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&slurmv1alpha1.ActiveCheck{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
+		Complete(r)
 }
 
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=activechecks,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=activechecks/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=activechecks/finalizers,verbs=update
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the ActiveCheck object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.2/pkg/reconcile
-func (r *ActiveCheckReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+// Reconcile reconciles all resources necessary for active checks controller
+func (r *ActiveCheckReconciler) Reconcile(
+	ctx context.Context,
+	req ctrl.Request,
+) (ctrl.Result, error) {
+	logger := log.FromContext(ctx).WithName("ActiveCheckController.reconcile")
 
-	// TODO(user): your logic here
+	logger.Info("Reconciling ActiveCheck", "namespace", req.Namespace, "name", req.Name)
 
+	check := &slurmv1alpha1.ActiveCheck{}
+	err := r.Get(ctx, req.NamespacedName, check)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("ActiveCheck resource not found. Ignoring since object must be deleted.")
+			return ctrl.Result{}, nil
+		}
+		logger.Error(err, "Failed to get ActiveCheck")
+		return ctrl.Result{}, err
+	}
+
+	slurmCluster := &slurmv1.SlurmCluster{}
+	err = r.Get(ctx, req.NamespacedName, slurmCluster)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.V(1).Info("SlurmCluster resource not found")
+		}
+
+		logger.Error(err, "Failed to get SlurmCluster")
+		return ctrl.Result{}, errors.Wrap(err, "getting SlurmCluster")
+	}
+
+	reconcileActiveChecksImpl := func() error {
+		return utils.ExecuteMultiStep(ctx,
+			"Reconciliation of active check",
+			utils.MultiStepExecutionStrategyFailAtFirstError,
+
+			utils.MultiStepExecutionStep{
+				Name: "Active check CronJob",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling")
+
+					var foundPodTemplate *corev1.PodTemplate = nil
+
+					if check.Spec.PodTemplateNameRef != nil {
+						podTemplateName := *check.Spec.PodTemplateNameRef
+
+						err := r.Get(
+							stepCtx,
+							types.NamespacedName{
+								Namespace: check.Namespace,
+								Name:      podTemplateName,
+							},
+							foundPodTemplate,
+						)
+						if err != nil {
+							stepLogger.Error(err, "Failed to get PodTemplate")
+							return errors.Wrap(err, "getting PodTemplate")
+						}
+					}
+					desired, err := render.RenderK8sCronJob(check, foundPodTemplate)
+
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return errors.Wrap(err, "rendering Active check CronJob")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("Rendered")
+
+					if err = r.CronJob.Reconcile(stepCtx, slurmCluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling ActiveChecks CronJob")
+					}
+					stepLogger.V(1).Info("Reconciled")
+
+					return nil
+				},
+			},
+		)
+	}
+
+	if err := reconcileActiveChecksImpl(); err != nil {
+		logger.Error(err, "Failed to reconcile ActiveChecks")
+		return ctrl.Result{}, errors.Wrap(err, "reconciling ActiveChecks")
+	}
+
+	logger.Info("Reconciled ActiveChecks")
 	return ctrl.Result{}, nil
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func (r *ActiveCheckReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&slurmv1alpha1.ActiveCheck{}).
-		Named("activecheck").
-		Complete(r)
 }
