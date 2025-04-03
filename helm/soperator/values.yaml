@@ -58,6 +58,7 @@ metricsService:
   type: ClusterIP
   serviceMonitor:
     # -- Labels to be added to the controller ServiceMonitor
+    enabled: false
     additionalLabels: {}
     # release: kube-prometheus-stack
     # --  Interval to scrape metrics

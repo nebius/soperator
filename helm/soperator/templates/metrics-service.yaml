@@ -1,4 +1,4 @@
-{{ if eq .Values.controllerManager.manager.env.isPrometheusCrdInstalled "true" }}
+{{ if .Values.metricsService.serviceMonitor.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
