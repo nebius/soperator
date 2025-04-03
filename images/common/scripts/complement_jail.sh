@@ -66,19 +66,22 @@ pushd "${jaildir}"
 
     if [ -n "$worker" ] && [ "$SLURM_CLUSTER_TYPE" = "gpu" ]; then
         echo "Run nvidia-container-cli to propagate NVIDIA drivers, CUDA, NVML and other GPU-related stuff to the jail"
-        flock etc/complement_jail_nvidia_container_cli.lock -c "
-            nvidia-container-cli \
-                --user \
-                --debug=/dev/stderr \
-                --no-pivot \
-                configure \
-                --no-cgroups \
-                --ldconfig=\"@$(command -v ldconfig.real || command -v ldconfig)\" \
-                --device=all \
-                --utility \
-                --compute \
-                \"${jaildir}\"
-        "
+
+        # Disable ldconfig to prevent race between the workers.
+        # ldconfig is run further in this script under flock.
+        readonly FAKE_LDCONFIG=/usr/bin/true
+
+        nvidia-container-cli \
+            --user \
+            --debug=/dev/stderr \
+            --no-pivot \
+            configure \
+            --no-cgroups \
+            --ldconfig=$FAKE_LDCONFIG \
+            --device=all \
+            --utility \
+            --compute \
+            "${jaildir}"
         touch "etc/gpu_libs_installed.flag"
     fi
 
