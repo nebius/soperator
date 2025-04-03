@@ -138,7 +138,6 @@ func (r *ActiveCheckReconciler) Reconcile(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					// TODO Do we have any dependencies?
 					var deps []metav1.Object
 
 					if err = r.CronJob.Reconcile(stepCtx, slurmCluster, &desired, deps...); err != nil {
