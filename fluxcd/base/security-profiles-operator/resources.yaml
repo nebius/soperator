@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: security-profiles-operator-system
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  type: "oci"
+  name: security-profiles-operator
+  namespace: flux-system
+spec:
+  interval: 120m
+  url: oci://cr.eu-north1.nebius.cloud/e00xdc03sb7gpqfd0a
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: security-profiles-operator
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 10m
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+  targetNamespace: security-profiles-operator-system
+  chart:
+    spec:
+      chart: security-profiles-operator
+      version: '0.9.*'
+      sourceRef:
+        kind: HelmRepository
+        name: vm
+      interval: 10m
+  valuesFrom:
+    - kind: ConfigMap
+      name: security-profiles-operator
+      valuesKey: values.yaml
+      optional: true
+  values:
+    replicaCount: 2
+
+    spoImage:
+      registry: gcr.io
+      repository: k8s-staging-sp-operator/security-profiles-operator
+      tag: v0.8.4
+
+    enableSelinux: false
+    enableLogEnricher: false
+    enableAppArmor: true
+    enableBpfRecorder: false
+    enableProfiling: false
+    verbosity: 0
+    daemon:
+      tolerations:
+      - operator: Exists
+    tolerations:
+    - key: node-role.kubernetes.io/master
+      effect: NoSchedule
+    - key: CriticalAddonsOnly
+      operator: "Exists"
+    - operator: "Exists"
+      effect: NoExecute
+    - operator: "Exists"
+      effect: NoSchedule
