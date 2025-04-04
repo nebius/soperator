@@ -7,3 +7,4 @@ resources:
   - ../../../base/soperatorchecks/
   - ../../../base/slurm-cluster/
   - ../../../base/slurm-cluster-storage/
+  - ../../../base/security-profiles-operator/
