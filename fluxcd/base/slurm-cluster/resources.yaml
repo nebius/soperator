@@ -17,6 +17,7 @@ spec:
   dependsOn:
     - name: soperator
     - name: slurm-cluster-storage
+  releaseName: slurm-cluster
   interval: 10m
   timeout: 10m
   install:

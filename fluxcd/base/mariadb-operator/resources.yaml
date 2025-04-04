@@ -18,6 +18,7 @@ metadata:
   name: mariadb-operator
   namespace: flux-system
 spec:
+  releaseName: mariadb-operator
   dependsOn:
     - name: cert-manager
   interval: 10m

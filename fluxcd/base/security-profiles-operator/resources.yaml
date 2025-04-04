@@ -19,6 +19,7 @@ metadata:
   name: security-profiles-operator
   namespace: flux-system
 spec:
+  releaseName: security-profiles-operator
   interval: 10m
   timeout: 10m
   install:

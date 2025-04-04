@@ -21,6 +21,7 @@ metadata:
 spec:
   dependsOn:
     - name: cert-manager
+  releaseName: soperator
   interval: 10m
   timeout: 10m
   install:

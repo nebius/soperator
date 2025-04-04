@@ -18,6 +18,7 @@ metadata:
   name: vm-logs
   namespace: flux-system
 spec:
+  releaseName: logs
   interval: 10m
   timeout: 10m
   install:
