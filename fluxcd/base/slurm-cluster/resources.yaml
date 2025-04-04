@@ -31,7 +31,7 @@ spec:
       chart: helm-slurm-cluster
       sourceRef:
         kind: HelmRepository
-        name: vm
+        name: slurm-cluster
       interval: 10m
   valuesFrom:
     - kind: ConfigMap
