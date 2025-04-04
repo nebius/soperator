@@ -5,3 +5,5 @@ resources:
   - ../../../base/nodeconfigurator/
   - ../../../base/soperator/
   - ../../../base/soperatorchecks/
+  - ../../../base/slurm-cluster/
+  - ../../../base/slurm-cluster-storage/
