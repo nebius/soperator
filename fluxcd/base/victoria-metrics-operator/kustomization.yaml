@@ -4,11 +4,6 @@ resources:
   - ./resources.yaml
 configMapGenerator:
   - name: kube-state-metrics-config
-    namespace: monitoring
+    namespace: monitoring-system
     files:
       - kube-state-metrics-config.yaml
-    options:
-      labels:
-        app.kubernetes.io/part-of: flux
-        app.kubernetes.io/component: monitoring
-        kustomize.toolkit.fluxcd.io/substitute: disabled
