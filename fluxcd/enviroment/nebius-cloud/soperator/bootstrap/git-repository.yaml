@@ -23,4 +23,4 @@ spec:
   url: https://github.com/nebius/soperator
   ref:
     # TODO: Change this to the branch main after the first release
-    branch: flux-test
+    branch: dev
