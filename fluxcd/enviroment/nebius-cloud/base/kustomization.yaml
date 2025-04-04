@@ -9,3 +9,4 @@ resources:
   - ../../../base/slurm-cluster/
   - ../../../base/slurm-cluster-storage/
   - ../../../base/security-profiles-operator/
+  - ../../../base/mariadb-operator/

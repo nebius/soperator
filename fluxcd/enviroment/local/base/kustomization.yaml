@@ -5,3 +5,10 @@ resources:
   - ../../../base/nodeconfigurator/
   - ../../../base/soperator/
   - ../../../base/soperatorchecks/
+  - ../../../base/cert-manager/
+  - ../../../base/soperator/
+  - ../../../base/soperatorchecks/
+  - ../../../base/slurm-cluster/
+  - ../../../base/slurm-cluster-storage/
+  - ../../../base/security-profiles-operator/
+  - ../../../base/mariadb-operator/
