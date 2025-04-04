@@ -30,7 +30,7 @@ spec:
       version: '0.117.*'
       sourceRef:
         kind: HelmRepository
-        name: vm
+        name: opentelemetry-collector-logs
       interval: 10m
   valuesFrom:
     - kind: ConfigMap

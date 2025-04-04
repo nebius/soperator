@@ -30,7 +30,7 @@ spec:
       chart: helm-nodeconfigurator
       sourceRef:
         kind: HelmRepository
-        name: vm
+        name: nodeconfigurator
       interval: 10m
   valuesFrom:
     - kind: ConfigMap

@@ -33,7 +33,7 @@ spec:
       version: '0.39.*'
       sourceRef:
         kind: HelmRepository
-        name: vm
+        name: vm-stack
       interval: 10m
   valuesFrom:
     - kind: ConfigMap

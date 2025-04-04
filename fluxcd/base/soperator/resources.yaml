@@ -19,6 +19,8 @@ metadata:
   name: soperator
   namespace: flux-system
 spec:
+  dependsOn:
+    - name: cert-manager
   interval: 10m
   timeout: 10m
   install:
@@ -33,7 +35,7 @@ spec:
       chart: helm-soperator
       sourceRef:
         kind: HelmRepository
-        name: vm
+        name: soperator
       interval: 10m
   valuesFrom:
     - kind: ConfigMap
