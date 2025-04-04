@@ -6,10 +6,10 @@ metadata:
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
-  type: "oci"
   name: security-profiles-operator
   namespace: flux-system
 spec:
+  type: "oci"
   interval: 120m
   url: oci://cr.eu-north1.nebius.cloud/e00xdc03sb7gpqfd0a
 ---
