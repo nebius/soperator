@@ -25,13 +25,13 @@ spec:
       retries: 3
   upgrade:
     crds: CreateReplace
-  targetNamespace: soperator-system
+  targetNamespace: soperator
   chart:
     spec:
       chart: helm-slurm-cluster-storage
       sourceRef:
         kind: HelmRepository
-        name: vm
+        name: slurm-cluster-storage
       interval: 10m
   valuesFrom:
     - kind: ConfigMap

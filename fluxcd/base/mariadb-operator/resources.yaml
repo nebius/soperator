@@ -43,6 +43,8 @@ spec:
       valuesKey: values.yaml
       optional: true
   values:
-    cert:
-      certManager:
-        enabled: true
+    webhook:
+      enabled: true
+      cert:
+        certManager:
+          enabled: true
