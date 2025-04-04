@@ -16,6 +16,7 @@ metadata:
 spec:
   dependsOn:
     - name: soperator
+  releaseName: nodeconfigurator
   interval: 10m
   timeout: 10m
   install:

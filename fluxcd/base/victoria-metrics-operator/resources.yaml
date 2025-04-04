@@ -18,6 +18,7 @@ metadata:
   name: vm-stack
   namespace: flux-system
 spec:
+  releaseName: metrics
   interval: 10m
   timeout: 10m
   install:

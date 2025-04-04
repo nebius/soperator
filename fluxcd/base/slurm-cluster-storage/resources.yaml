@@ -1,3 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: soperator
+---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
@@ -16,6 +21,7 @@ metadata:
 spec:
   dependsOn:
     - name: soperator
+  releaseName: slurm-cluster-storage
   interval: 10m
   timeout: 10m
   install:
@@ -24,13 +30,13 @@ spec:
       retries: 3
   upgrade:
     crds: CreateReplace
-  targetNamespace: soperator-system
+  targetNamespace: soperator
   chart:
     spec:
       chart: helm-slurm-cluster-storage
       sourceRef:
         kind: HelmRepository
-        name: vm
+        name: slurm-cluster-storage
       interval: 10m
   valuesFrom:
     - kind: ConfigMap
