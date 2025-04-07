@@ -18,6 +18,7 @@ type SlurmCluster struct {
 	CRVersion              string
 	ClusterType            consts.ClusterType
 	PartitionConfiguration PartitionConfiguration
+	WorkerFeatures         []slurmv1.WorkerFeature
 
 	PopulateJail PopulateJail
 
@@ -60,6 +61,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		CRVersion:              buildCRVersionFrom(ctx, cluster.Spec.CRVersion),
 		ClusterType:            clusterType,
 		PartitionConfiguration: buildPartitionConfiguration(&cluster.Spec.PartitionConfiguration),
+		WorkerFeatures:         cluster.Spec.WorkerFeatures,
 		NCCLBenchmark:          buildSlurmNCCLBenchmarkFrom(cluster.Name, &cluster.Spec.PeriodicChecks.NCCLBenchmark),
 		PopulateJail:           buildSlurmPopulateJailFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.PopulateJail),
 		NodeFilters:            buildNodeFiltersFrom(cluster.Spec.K8sNodeFilters),

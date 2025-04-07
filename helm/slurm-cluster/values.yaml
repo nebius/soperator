@@ -21,8 +21,26 @@ partitionConfiguration:
   # configuration as list string started with PartitionName
   # Example for custom ConfigType:
   rawConfig: []
-#    - PartitionName=low_priority Nodes=worker-[0-15] Default=YES MaxTime=INFINITE State=UP PriorityTier=1
-#    - PartitionName=high_priority  Nodes=worker-[10-20] Default=NO MaxTime=INFINITE State=UP PriorityTier=2
+#    - PartitionName=low_priority Nodes=low_priority Default=YES MaxTime=INFINITE State=UP PriorityTier=1
+#    - PartitionName=high_priority  Nodes=high_priority Default=NO MaxTime=INFINITE State=UP PriorityTier=2
+# If Nodes present, they must not contain node names: use only nodeset values, "ALL" or "".
+# Specifying specific nodes is not supported since Dynamic Nodes are used.
+# For more details, see https://slurm.schedmd.com/dynamic_nodes.html#partitions.
+
+# List of features to be enabled on worker nodes. Each feature object has:
+# - name: (Required) The name of the feature.
+# - hostlist_expr: (Required) A Slurm hostlist expression, e.g. "workers-[0-2,10],workers-[3-5]".
+#   Soperator will run these workers with the feature name.
+# - nodeset_name: (Optional) The Slurm nodeset name to be provisioned using this feature.
+#   This nodeset may be used in conjunction with partitions.
+workerFeatures: []
+#  - name: "low_priority"
+#    hostlistExpr: "worker-[0-9]"
+#    nodesetName: "low_priority"
+#  - name: "high_priority"
+#    hostlistExpr: "worker-[10-12]"
+#    nodesetName: "high_priority"
+
 # K8s node filters used in Slurm node specifications. Define which nodes should be used to schedule pods to
 k8sNodeFilters:
   - name: gpu

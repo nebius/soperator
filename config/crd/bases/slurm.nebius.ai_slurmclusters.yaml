@@ -17735,6 +17735,31 @@ spec:
                   - name
                   type: object
                 type: array
+              workerFeatures:
+                description: WorkerFeatures defines Slurm node features to be used
+                  in the workers and Slurm nodesets to create using these features.
+                items:
+                  properties:
+                    hostlistExpr:
+                      description: |-
+                        HostlistExpr defines a Slurm hostlist expression, e.g. "workers-[0-2,10],workers-[3-5]".
+                        Soperator will run these workers with the feature name.
+                      minLength: 1
+                      type: string
+                    name:
+                      description: Name defines the name of the feature.
+                      minLength: 1
+                      type: string
+                    nodesetName:
+                      description: |-
+                        NodesetName optionally defines the Slurm nodeset name to be provisioned using this feature.
+                        This nodeset maybe be used in conjunction with partitions.
+                      type: string
+                  required:
+                  - hostlistExpr
+                  - name
+                  type: object
+                type: array
             required:
             - k8sNodeFilters
             - periodicChecks
