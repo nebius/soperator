@@ -4,7 +4,6 @@ linters:
     - asciicheck
     - bidichk
     - copyloopvar
-    - cyclop
     - decorder
     - dogsled
     - gocheckcompilerdirectives
@@ -25,6 +24,7 @@ linters:
   disable:
     - depguard
     - dupl
+    - cyclop
     - errcheck
     - forcetypeassert
     - funlen
@@ -57,20 +57,10 @@ linters:
       - common-false-positives
       - legacy
       - std-error-handling
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
 formatters:
   enable:
     - gofmt
     - goimports
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
 
 output:
   formats:
