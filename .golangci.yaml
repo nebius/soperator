@@ -1,47 +1,71 @@
+version: "2"
 linters:
-  presets:
-    - bugs
-    - complexity
-    - error
-    - format
-    - import
-    - metalinter
-    - module
-    - performance
-    - style
-    - test
-    - unused
+  enable:
+    - asciicheck
+    - bidichk
+    - copyloopvar
+    - decorder
+    - dogsled
+    - gocheckcompilerdirectives
+    - goheader
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - grouper
+    - inamedparam
+    - interfacebloat
+    - nakedret
+    - nosprintfhostport
+    - predeclared
+    - promlinter
+    - tagalign
+    - testableexamples
+    - usestdlibvars
   disable:
     - depguard
-    - ineffassign
-    - funlen
-    - forcetypeassert
-    - testpackage
-    - tagliatelle
-    - godot
-    - misspell
-    - goconst
     - dupl
-    - gci
-    - whitespace
+    - cyclop
+    - errcheck
+    - forcetypeassert
+    - funlen
     - gochecknoinits
     - gocognit
-    - nestif
+    - goconst
     - gocyclo
-    - maintidx
+    - godot
     - godox
-    - gofumpt
-    - gomnd
+    - govet
+    - ineffassign
     - lll
+    - maintidx
+    - misspell
+    - mnd
+    - nestif
     - nlreturn
     - nolintlint
-    - wsl
     - prealloc
-  fast: true
+    - staticcheck
+    - tagliatelle
+    - testpackage
+    - unused
+    - whitespace
+    - wsl
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
 output:
   formats:
-    - format: colored-line-number
+    text:
+      path: stdout
 
 run:
   relative-path-mode: gomod
