@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
@@ -17,13 +18,15 @@ func Test_RenderContainerSlurmd(t *testing.T) {
 	containerName := "test-container"
 
 	tests := []struct {
-		name       string
-		container  *values.Container
-		wantLimits corev1.ResourceList
-		wantReqs   corev1.ResourceList
+		name        string
+		container   *values.Container
+		features    []slurmv1.WorkerFeature
+		wantLimits  corev1.ResourceList
+		wantReqs    corev1.ResourceList
+		wantEnvVars map[string]string
 	}{
 		{
-			name: "With Resources",
+			name: "With Resources and features",
 			container: &values.Container{
 				NodeContainer: slurmv1.NodeContainer{
 					Image:           imageName,
@@ -37,6 +40,12 @@ func Test_RenderContainerSlurmd(t *testing.T) {
 				},
 				Name: containerName,
 			},
+			features: []slurmv1.WorkerFeature{
+				{
+					Name:         "f42",
+					HostlistExpr: "worker-[0-10]",
+				},
+			},
 			wantLimits: corev1.ResourceList{
 				corev1.ResourceMemory:           resource.MustParse("1Gi"),
 				corev1.ResourceCPU:              resource.MustParse("100m"),
@@ -46,6 +55,9 @@ func Test_RenderContainerSlurmd(t *testing.T) {
 				corev1.ResourceMemory:           resource.MustParse("1Gi"),
 				corev1.ResourceCPU:              resource.MustParse("100m"),
 				corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+			},
+			wantEnvVars: map[string]string{
+				"SLURM_FEATURE_f42": "worker-[0-10]",
 			},
 		},
 		{
@@ -74,6 +86,7 @@ func Test_RenderContainerSlurmd(t *testing.T) {
 				"v1",
 				false,
 				"{ \"monitoring\": \"https://my-cloud.com/$INSTANCE_ID/monitoring\" }",
+				tt.features,
 			)
 			if err != nil && tt.wantLimits != nil {
 				t.Errorf("renderContainerSlurmd() error = %v, want nil", err)
@@ -84,9 +97,17 @@ func Test_RenderContainerSlurmd(t *testing.T) {
 			if !reflect.DeepEqual(got.Resources.Requests, tt.wantReqs) {
 				t.Errorf("renderContainerSlurmd() Requests = %v, want %v", got.Resources.Requests, tt.wantReqs)
 			}
+			gotEnvVars := make(map[string]string, len(got.Env))
+			for _, env := range got.Env {
+				gotEnvVars[env.Name] = env.Value
+			}
+			for key, value := range tt.wantEnvVars {
+				assert.Equal(t, value, gotEnvVars[key], "env var for key %q mismatch", key)
+			}
 		})
 	}
 }
+
 func Test_RenderRealMemorySlurmd(t *testing.T) {
 	tests := []struct {
 		name           string

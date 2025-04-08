@@ -117,6 +117,11 @@ type SlurmClusterSpec struct {
 	//
 	// +kubebuilder:default=false
 	UseDefaultAppArmorProfile bool `json:"useDefaultAppArmorProfile,omitempty"`
+
+	// WorkerFeatures defines Slurm node features to be used in the workers and Slurm nodesets to create using these features.
+	//
+	// +kubebuilder:validation:Optional
+	WorkerFeatures []WorkerFeature `json:"workerFeatures,omitempty"`
 }
 
 // SlurmConfig represents the Slurm configuration in slurm.conf
@@ -212,6 +217,22 @@ type PartitionConfiguration struct {
 	// - PartitionName=high_priority  Nodes=worker-[10-20] Default=NO MaxTime=INFINITE State=UP PriorityTier=2
 	// +kubebuilder:validation:Optional
 	RawConfig []string `json:"rawConfig,omitempty"`
+}
+
+type WorkerFeature struct {
+	// Name defines the name of the feature.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+	// HostlistExpr defines a Slurm hostlist expression, e.g. "workers-[0-2,10],workers-[3-5]".
+	// Soperator will run these workers with the feature name.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	HostlistExpr string `json:"hostlistExpr,omitempty"`
+	// NodesetName optionally defines the Slurm nodeset name to be provisioned using this feature.
+	// This nodeset maybe be used in conjunction with partitions.
+	// +kubebuilder:validation:Optional
+	NodesetName string `json:"nodesetName,omitempty"`
 }
 
 type NCCLSettings struct {

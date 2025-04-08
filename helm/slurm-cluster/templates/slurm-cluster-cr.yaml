@@ -26,6 +26,12 @@ spec:
     configType: {{ (default "default" .Values.partitionConfiguration.configType) }}
     rawConfig:
       {{- default list .Values.partitionConfiguration.rawConfig | toYaml | nindent 6 }}
+  workerFeatures:
+    {{- range .Values.workerFeatures }}
+    - name: {{ .name | quote }}
+      hostlistExpr: {{ .hostlistExpr | quote }}
+      nodesetName: {{ .nodesetName | quote }}
+    {{- end }}
   k8sNodeFilters:
     {{- range .Values.k8sNodeFilters }}
     - name: {{ .name }}

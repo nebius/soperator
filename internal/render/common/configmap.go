@@ -147,6 +147,15 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 	default:
 		res.AddProperty("PartitionName", "main Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
 	}
+
+	res.AddComment("")
+	res.AddComment("Nodesets")
+	for _, feature := range cluster.WorkerFeatures {
+		if feature.NodesetName != "" {
+			res.AddProperty("Nodeset", fmt.Sprintf("%s Feature=%s", feature.NodesetName, feature.Name))
+		}
+	}
+
 	if cluster.NodeAccounting.Enabled {
 		res.AddComment("")
 		res.AddComment("ACCOUNTING")

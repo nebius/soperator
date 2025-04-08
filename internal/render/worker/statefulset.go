@@ -28,6 +28,7 @@ func RenderStatefulSet(
 	volumeSources []slurmv1.VolumeSource,
 	worker *values.SlurmWorker,
 	slurmTopologyConfigMapRefName string,
+	workerFeatures []slurmv1.WorkerFeature,
 ) (appsv1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeWorker, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeWorker, clusterName)
@@ -63,6 +64,7 @@ func RenderStatefulSet(
 		worker.CgroupVersion,
 		worker.EnableGDRCopy,
 		worker.SlurmNodeExtra,
+		workerFeatures,
 	)
 	if err != nil {
 		return appsv1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)

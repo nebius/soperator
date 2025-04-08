@@ -55,6 +55,7 @@ func renderContainerSlurmd(
 	cgroupVersion string,
 	enableGDRCopy bool,
 	slurmNodeExtra string,
+	workerFeatures []slurmv1.WorkerFeature,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
@@ -101,6 +102,7 @@ func renderContainerSlurmd(
 			realMemory,
 			enableGDRCopy,
 			slurmNodeExtra,
+			workerFeatures,
 		),
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,
@@ -163,6 +165,7 @@ func renderSlurmdEnv(
 	realMemory int64,
 	enableGDRCopy bool,
 	slurmNodeExtra string,
+	workerFeatures []slurmv1.WorkerFeature,
 ) []corev1.EnvVar {
 	envVar := []corev1.EnvVar{
 		{
@@ -216,6 +219,12 @@ func renderSlurmdEnv(
 		envVar = append(envVar, corev1.EnvVar{
 			Name:  consts.NVIDIAGDRCopy,
 			Value: "enabled",
+		})
+	}
+	for _, feature := range workerFeatures {
+		envVar = append(envVar, corev1.EnvVar{
+			Name:  "SLURM_FEATURE_" + feature.Name,
+			Value: feature.HostlistExpr,
 		})
 	}
 	return envVar

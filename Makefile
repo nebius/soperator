@@ -109,7 +109,7 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
 .PHONY: helm
-helm: generate manifests ## Update soperator Helm chart
+helm: generate manifests kustomize helmify ## Update soperator Helm chart
 	$(KUSTOMIZE) build config/crd/bases > $(CHART_OPERATOR_PATH)/crds/slurmcluster-crd.yaml
 	$(KUSTOMIZE) build config/crd/bases > $(CHART_OPERATOR_CRDS_PATH)/templates/slurmcluster-crd.yaml
 # Because of helmify rewrite a file we need to make backup of values.yaml
