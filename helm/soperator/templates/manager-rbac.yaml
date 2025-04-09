@@ -52,6 +52,18 @@ rules:
   - update
   - watch
 - apiGroups:
+  - apps.kruise.io
+  resources:
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - batch
   resources:
   - cronjobs

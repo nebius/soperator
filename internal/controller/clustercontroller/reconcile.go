@@ -6,7 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
+	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	"github.com/pkg/errors"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -27,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/check"
@@ -37,11 +42,6 @@ import (
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
-
-	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
-	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
-	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
 )
 
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch;delete
@@ -61,6 +61,7 @@ import (
 //+kubebuilder:rbac:groups=batch,resources=cronjobs/status,verbs=get;update
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;delete;patch
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;delete;patch
+//+kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=opentelemetry.io,resources=opentelemetrycollectors,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=podmonitors,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=core,resources=podtemplates,verbs=get;list;watch
@@ -74,42 +75,44 @@ import (
 type SlurmClusterReconciler struct {
 	*reconciler.Reconciler
 
-	ConfigMap       *reconciler.ConfigMapReconciler
-	Secret          *reconciler.SecretReconciler
-	CronJob         *reconciler.CronJobReconciler
-	Job             *reconciler.JobReconciler
-	Service         *reconciler.ServiceReconciler
-	StatefulSet     *reconciler.StatefulSetReconciler
-	ServiceAccount  *reconciler.ServiceAccountReconciler
-	Role            *reconciler.RoleReconciler
-	RoleBinding     *reconciler.RoleBindingReconciler
-	Otel            *reconciler.OtelReconciler
-	PodMonitor      *reconciler.PodMonitorReconciler
-	Deployment      *reconciler.DeploymentReconciler
-	MariaDb         *reconciler.MariaDbReconciler
-	MariaDbGrant    *reconciler.MariaDbGrantReconciler
-	AppArmorProfile *reconciler.AppArmorProfileReconciler
+	ConfigMap           *reconciler.ConfigMapReconciler
+	Secret              *reconciler.SecretReconciler
+	CronJob             *reconciler.CronJobReconciler
+	Job                 *reconciler.JobReconciler
+	Service             *reconciler.ServiceReconciler
+	StatefulSet         *reconciler.StatefulSetReconciler
+	AdvancedStatefulSet *reconciler.AdvancedStatefulSetReconciler
+	ServiceAccount      *reconciler.ServiceAccountReconciler
+	Role                *reconciler.RoleReconciler
+	RoleBinding         *reconciler.RoleBindingReconciler
+	Otel                *reconciler.OtelReconciler
+	PodMonitor          *reconciler.PodMonitorReconciler
+	Deployment          *reconciler.DeploymentReconciler
+	MariaDb             *reconciler.MariaDbReconciler
+	MariaDbGrant        *reconciler.MariaDbGrantReconciler
+	AppArmorProfile     *reconciler.AppArmorProfileReconciler
 }
 
 func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *SlurmClusterReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 	return &SlurmClusterReconciler{
-		Reconciler:      r,
-		ConfigMap:       reconciler.NewConfigMapReconciler(r),
-		Secret:          reconciler.NewSecretReconciler(r),
-		CronJob:         reconciler.NewCronJobReconciler(r),
-		Job:             reconciler.NewJobReconciler(r),
-		Service:         reconciler.NewServiceReconciler(r),
-		StatefulSet:     reconciler.NewStatefulSetReconciler(r),
-		ServiceAccount:  reconciler.NewServiceAccountReconciler(r),
-		Role:            reconciler.NewRoleReconciler(r),
-		RoleBinding:     reconciler.NewRoleBindingReconciler(r),
-		Otel:            reconciler.NewOtelReconciler(r),
-		PodMonitor:      reconciler.NewPodMonitorReconciler(r),
-		Deployment:      reconciler.NewDeploymentReconciler(r),
-		MariaDb:         reconciler.NewMariaDbReconciler(r),
-		MariaDbGrant:    reconciler.NewMariaDbGrantReconciler(r),
-		AppArmorProfile: reconciler.NewAppArmorProfileReconciler(r),
+		Reconciler:          r,
+		ConfigMap:           reconciler.NewConfigMapReconciler(r),
+		Secret:              reconciler.NewSecretReconciler(r),
+		CronJob:             reconciler.NewCronJobReconciler(r),
+		Job:                 reconciler.NewJobReconciler(r),
+		Service:             reconciler.NewServiceReconciler(r),
+		StatefulSet:         reconciler.NewStatefulSetReconciler(r),
+		AdvancedStatefulSet: reconciler.NewAdvancedStatefulSetReconciler(r),
+		ServiceAccount:      reconciler.NewServiceAccountReconciler(r),
+		Role:                reconciler.NewRoleReconciler(r),
+		RoleBinding:         reconciler.NewRoleBindingReconciler(r),
+		Otel:                reconciler.NewOtelReconciler(r),
+		PodMonitor:          reconciler.NewPodMonitorReconciler(r),
+		Deployment:          reconciler.NewDeploymentReconciler(r),
+		MariaDb:             reconciler.NewMariaDbReconciler(r),
+		MariaDbGrant:        reconciler.NewMariaDbGrantReconciler(r),
+		AppArmorProfile:     reconciler.NewAppArmorProfileReconciler(r),
 	}
 }
 
@@ -776,7 +779,7 @@ type ResourceCheck struct {
 func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Funcs) []ResourceCheck {
 	return []ResourceCheck{
 		{
-			Check: true,
+			Check: check.ForceTrue,
 			Objects: []client.Object{
 				&corev1.Service{},
 				&appsv1.StatefulSet{},
@@ -788,11 +791,12 @@ func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Func
 				&rbacv1.RoleBinding{},
 				&corev1.ConfigMap{},
 				&corev1.Secret{},
+				&kruisev1b1.StatefulSet{},
 			},
 			Predicate: predicate.GenerationChangedPredicate{},
 		},
 		{
-			Check: true,
+			Check: check.ForceTrue,
 			Objects: []client.Object{
 				&corev1.ServiceAccount{},
 			},
