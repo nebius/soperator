@@ -65,6 +65,7 @@ require (
 	github.com/oapi-codegen/runtime v1.1.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/runtime-spec v1.2.0 // indirect
+	github.com/openkruise/kruise-api v1.8.0 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/seccomp/libseccomp-golang v0.10.0 // indirect
