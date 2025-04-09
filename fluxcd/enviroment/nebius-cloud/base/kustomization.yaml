@@ -3,7 +3,8 @@ kind: Kustomization
 resources:
   - ../../../base/namespaces/
   - ../../../base/fluxcd/
-  - ../../../base/gpu-operator/
+  - ../../../base/nvidia-gpu-operator/
+  - ../../../base/nvidia-network-operator/
   - ../../../base/cert-manager/
   - ../../../base/nodeconfigurator/
   - ../../../base/soperator/
