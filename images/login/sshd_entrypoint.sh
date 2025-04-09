@@ -25,5 +25,10 @@ echo "Complement jail rootfs"
 echo "Waiting until munge started"
 while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done
 
+echo "Run jail /etc/rc.local if exists"
+if [ -f "/mnt/jail/etc/rc.local" ]; then
+    . /mnt/jail/etc/rc.local &
+fi
+
 echo "Start sshd daemon"
 /usr/sbin/sshd -D -e -f /mnt/ssh-configs/sshd_config
