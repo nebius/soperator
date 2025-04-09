@@ -32,6 +32,9 @@ spec:
       hostlistExpr: {{ .hostlistExpr | quote }}
       nodesetName: {{ .nodesetName | quote }}
     {{- end }}
+  healthCheckConfig:
+    healthCheckInterval: {{ default 30 .Values.healthCheckConfig.healthCheckInterval }}
+    healthCheckProgram: {{ default "/usr/bin/gpu_healthcheck.sh" .Values.healthCheckConfig.healthCheckProgram | quote }}
   k8sNodeFilters:
     {{- range .Values.k8sNodeFilters }}
     - name: {{ .name }}
