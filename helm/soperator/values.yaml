@@ -77,3 +77,8 @@ webhookService:
   type: ClusterIP
 certManager:
   enabled: false
+kruise:
+  installOperator: true
+  manager:
+    replicas: 1
+  featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true"

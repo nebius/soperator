@@ -40,6 +40,9 @@ chart() {
   shift 1
   CHART_TARGET="${CHART_NAME}-${CHART_VERSION}.tgz"
 
+  echo "Updating dependencies of chart ${CHART_NAME}."
+  helm dependency update "${HELM_PATH}/${CHART_NAME}"
+
   echo "Packaging chart ${CHART_NAME} as ${CHART_TARGET}."
   helm package -d "${RELEASE_PATH}" "${HELM_PATH}/${CHART_NAME}"
 
