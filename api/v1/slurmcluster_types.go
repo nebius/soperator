@@ -250,6 +250,20 @@ type HealthCheckConfig struct {
 	//
 	// +kubebuilder:validation:Required
 	HealthCheckProgram string `json:"healthCheckProgram,omitempty"`
+
+	// HealthCheckNodeState identifies what node states should execute the HealthCheckProgram.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	HealthCheckNodeState []HealthCheckNodeState `json:"healthCheckNodeState,omitempty"`
+}
+
+type HealthCheckNodeState struct {
+	// State identifies node state on which HealthCheckProgram should be executed.
+	//
+	// +kubebuilder:validation:Enum=ALLOC;ANY;CYCLE;IDLE;NONDRAINED_IDLE;MIXED
+	// +kubebuilder:validation:Required
+	State string `json:"state,omitempty"`
 }
 
 type NCCLSettings struct {

@@ -107,11 +107,17 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 		if cluster.ClusterType == consts.ClusterTypeGPU {
 			res.AddProperty("HealthCheckProgram", "/usr/bin/gpu_healthcheck.sh")
 		}
+		res.AddProperty("HealthCheckNodeState", "ANY")
 	} else {
 		res.AddProperty("HealthCheckInterval", cluster.HealthCheckConfig.HealthCheckInterval)
 		res.AddProperty("HealthCheckProgram", cluster.HealthCheckConfig.HealthCheckProgram)
+
+		var states []string
+		for _, state := range cluster.HealthCheckConfig.HealthCheckNodeState {
+			states = append(states, state.State)
+		}
+		res.AddProperty("HealthCheckNodeState", strings.Join(states, ","))
 	}
-	res.AddProperty("HealthCheckNodeState", "ANY")
 	res.AddComment("")
 	res.AddProperty("InactiveLimit", 0)
 	res.AddProperty("KillOnBadExit", 1)

@@ -36,6 +36,10 @@ spec:
   healthCheckConfig:
     healthCheckInterval: {{ required "Health check interval must be provided." .Values.healthCheckConfig.healthCheckInterval }}
     healthCheckProgram: {{ required "Health check program must be provided." .Values.healthCheckConfig.healthCheckInterval | quote }}
+    healthCheckNodeState:
+      {{- range .Values.healthCheckConfig.healthCheckNodeState }}
+      - state: {{ required "Health check node state must be provided." .state | quote }}
+      {{- end }}
   {{- end }}
   k8sNodeFilters:
     {{- range .Values.k8sNodeFilters }}
