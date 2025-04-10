@@ -79,22 +79,20 @@ spec:
                   Raw config is merged with existing SlurmConfig values.
                 type: string
               healthCheckConfig:
-                default:
-                  healthCheckInterval: 30
-                  healthCheckProgram: /usr/bin/gpu_healthcheck.sh
                 description: HealthCheckConfig defines Slurm health check configuration.
                 properties:
                   healthCheckInterval:
-                    default: 30
                     description: HealthCheckInterval defines interval for health check
                       run in seconds.
                     format: int32
                     type: integer
                   healthCheckProgram:
-                    default: /usr/bin/gpu_healthcheck.sh
                     description: HealthCheckProgram defines program for health check
                       run.
                     type: string
+                required:
+                - healthCheckInterval
+                - healthCheckProgram
                 type: object
               k8sNodeFilters:
                 description: K8sNodeFilters define the k8s node filters used in Slurm

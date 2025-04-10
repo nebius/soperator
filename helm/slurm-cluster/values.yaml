@@ -42,9 +42,8 @@ workerFeatures: []
 #    nodesetName: "high_priority"
 
 # HealthCheckConfig defines Slurm health check configuration.
-healthCheckConfig:
-  healthCheckInterval: 30
-  healthCheckProgram: "/usr/bin/gpu_healthcheck.sh"
+healthCheckConfig: null
+
 # K8s node filters used in Slurm node specifications. Define which nodes should be used to schedule pods to
 k8sNodeFilters:
   - name: gpu

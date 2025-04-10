@@ -19,8 +19,12 @@ type HealthCheckConfig struct {
 	HealthCheckProgram  string
 }
 
-func buildHealthCheckConfig(healthCheckConfig *slurmv1.HealthCheckConfig) HealthCheckConfig {
-	return HealthCheckConfig{
+func buildHealthCheckConfig(healthCheckConfig *slurmv1.HealthCheckConfig) *HealthCheckConfig {
+	if healthCheckConfig == nil {
+		return nil
+	}
+
+	return &HealthCheckConfig{
 		HealthCheckInterval: healthCheckConfig.HealthCheckInterval,
 		HealthCheckProgram:  healthCheckConfig.HealthCheckProgram,
 	}

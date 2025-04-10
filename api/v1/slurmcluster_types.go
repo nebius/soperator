@@ -126,8 +126,7 @@ type SlurmClusterSpec struct {
 	// HealthCheckConfig defines Slurm health check configuration.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={healthCheckInterval: 30, healthCheckProgram: "/usr/bin/gpu_healthcheck.sh"}
-	HealthCheckConfig HealthCheckConfig `json:"healthCheckConfig,omitempty"`
+	HealthCheckConfig *HealthCheckConfig `json:"healthCheckConfig,omitempty"`
 }
 
 // SlurmConfig represents the Slurm configuration in slurm.conf
@@ -243,13 +242,13 @@ type WorkerFeature struct {
 
 type HealthCheckConfig struct {
 	// HealthCheckInterval defines interval for health check run in seconds.
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=30
+	//
+	// +kubebuilder:validation:Required
 	HealthCheckInterval int32 `json:"healthCheckInterval,omitempty"`
 
 	// HealthCheckProgram defines program for health check run.
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="/usr/bin/gpu_healthcheck.sh"
+	//
+	// +kubebuilder:validation:Required
 	HealthCheckProgram string `json:"healthCheckProgram,omitempty"`
 }
 
