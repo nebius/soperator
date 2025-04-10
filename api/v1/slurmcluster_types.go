@@ -244,18 +244,18 @@ type HealthCheckConfig struct {
 	// HealthCheckInterval defines interval for health check run in seconds.
 	//
 	// +kubebuilder:validation:Required
-	HealthCheckInterval int32 `json:"healthCheckInterval,omitempty"`
+	HealthCheckInterval int32 `json:"healthCheckInterval"`
 
 	// HealthCheckProgram defines program for health check run.
 	//
 	// +kubebuilder:validation:Required
-	HealthCheckProgram string `json:"healthCheckProgram,omitempty"`
+	HealthCheckProgram string `json:"healthCheckProgram"`
 
 	// HealthCheckNodeState identifies what node states should execute the HealthCheckProgram.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	HealthCheckNodeState []HealthCheckNodeState `json:"healthCheckNodeState,omitempty"`
+	HealthCheckNodeState []HealthCheckNodeState `json:"healthCheckNodeState"`
 }
 
 type HealthCheckNodeState struct {
@@ -263,7 +263,7 @@ type HealthCheckNodeState struct {
 	//
 	// +kubebuilder:validation:Enum=ALLOC;ANY;CYCLE;IDLE;NONDRAINED_IDLE;MIXED
 	// +kubebuilder:validation:Required
-	State string `json:"state,omitempty"`
+	State string `json:"state"`
 }
 
 type NCCLSettings struct {
