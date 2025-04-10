@@ -55,6 +55,10 @@ func renderContainerSshd(
 					Port: intstr.FromInt32(container.Port),
 				},
 			},
+			TimeoutSeconds:   common.DefaultProbeTimeoutSeconds,
+			PeriodSeconds:    common.DefaultProbePeriodSeconds,
+			SuccessThreshold: common.DefaultProbeSuccessThreshold,
+			FailureThreshold: common.DefaultProbeFailureThreshold,
 		},
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: ptr.To(true),
@@ -68,5 +72,7 @@ func renderContainerSshd(
 			Limits:   limits,
 			Requests: container.Resources,
 		},
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}
 }

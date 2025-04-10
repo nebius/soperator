@@ -2,6 +2,7 @@ package login
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -90,6 +91,7 @@ func renderVolumeSshdConfigs(sshdConfigMapName string) corev1.Volume {
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: sshdConfigMapName,
 				},
+				DefaultMode: ptr.To(common.DefaultFileMode),
 			},
 		},
 	}
