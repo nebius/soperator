@@ -35,7 +35,7 @@ spec:
   {{- if .Values.healthCheckConfig }}
   healthCheckConfig:
     healthCheckInterval: {{ required "Health check interval must be provided." .Values.healthCheckConfig.healthCheckInterval }}
-    healthCheckProgram: {{ required "Health check program must be provided." .Values.healthCheckConfig.healthCheckInterval | quote }}
+    healthCheckProgram: {{ required "Health check program must be provided." .Values.healthCheckConfig.healthCheckProgram | quote }}
     healthCheckNodeState:
       {{- range .Values.healthCheckConfig.healthCheckNodeState }}
       - state: {{ required "Health check node state must be provided." .state | quote }}
