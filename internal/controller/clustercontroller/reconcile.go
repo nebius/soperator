@@ -255,6 +255,8 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 				return ctrl.Result{}, err
 			}
 
+			logger.Info("Reconciled Slurm Cluster")
+
 			return ctrl.Result{}, nil
 		},
 	)
