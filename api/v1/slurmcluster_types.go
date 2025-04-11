@@ -122,6 +122,11 @@ type SlurmClusterSpec struct {
 	//
 	// +kubebuilder:validation:Optional
 	WorkerFeatures []WorkerFeature `json:"workerFeatures,omitempty"`
+
+	// HealthCheckConfig defines Slurm health check configuration.
+	//
+	// +kubebuilder:validation:Optional
+	HealthCheckConfig *HealthCheckConfig `json:"healthCheckConfig,omitempty"`
 }
 
 // SlurmConfig represents the Slurm configuration in slurm.conf
@@ -233,6 +238,32 @@ type WorkerFeature struct {
 	// This nodeset maybe be used in conjunction with partitions.
 	// +kubebuilder:validation:Optional
 	NodesetName string `json:"nodesetName,omitempty"`
+}
+
+type HealthCheckConfig struct {
+	// HealthCheckInterval defines interval for health check run in seconds.
+	//
+	// +kubebuilder:validation:Required
+	HealthCheckInterval int32 `json:"healthCheckInterval"`
+
+	// HealthCheckProgram defines program for health check run.
+	//
+	// +kubebuilder:validation:Required
+	HealthCheckProgram string `json:"healthCheckProgram"`
+
+	// HealthCheckNodeState identifies what node states should execute the HealthCheckProgram.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	HealthCheckNodeState []HealthCheckNodeState `json:"healthCheckNodeState"`
+}
+
+type HealthCheckNodeState struct {
+	// State identifies node state on which HealthCheckProgram should be executed.
+	//
+	// +kubebuilder:validation:Enum=ALLOC;ANY;CYCLE;IDLE;NONDRAINED_IDLE;MIXED
+	// +kubebuilder:validation:Required
+	State string `json:"state"`
 }
 
 type NCCLSettings struct {

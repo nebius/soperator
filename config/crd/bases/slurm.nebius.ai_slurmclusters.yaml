@@ -78,6 +78,44 @@ spec:
                   Soperator does not guarantee the validity of the raw configuration.
                   Raw config is merged with existing SlurmConfig values.
                 type: string
+              healthCheckConfig:
+                description: HealthCheckConfig defines Slurm health check configuration.
+                properties:
+                  healthCheckInterval:
+                    description: HealthCheckInterval defines interval for health check
+                      run in seconds.
+                    format: int32
+                    type: integer
+                  healthCheckNodeState:
+                    description: HealthCheckNodeState identifies what node states
+                      should execute the HealthCheckProgram.
+                    items:
+                      properties:
+                        state:
+                          description: State identifies node state on which HealthCheckProgram
+                            should be executed.
+                          enum:
+                          - ALLOC
+                          - ANY
+                          - CYCLE
+                          - IDLE
+                          - NONDRAINED_IDLE
+                          - MIXED
+                          type: string
+                      required:
+                      - state
+                      type: object
+                    minItems: 1
+                    type: array
+                  healthCheckProgram:
+                    description: HealthCheckProgram defines program for health check
+                      run.
+                    type: string
+                required:
+                - healthCheckInterval
+                - healthCheckNodeState
+                - healthCheckProgram
+                type: object
               k8sNodeFilters:
                 description: K8sNodeFilters define the k8s node filters used in Slurm
                   node specifications
