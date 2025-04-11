@@ -1,11 +1,15 @@
 version: "2"
 linters:
   enable:
+    - asasalint
     - asciicheck
     - bidichk
     - copyloopvar
     - decorder
     - dogsled
+    - durationcheck
+    - errname
+    - govet
     - gocheckcompilerdirectives
     - goheader
     - gomoddirectives
@@ -15,10 +19,14 @@ linters:
     - inamedparam
     - interfacebloat
     - nakedret
+    - nilerr
+    - nilnil
+    - noctx
     - nosprintfhostport
     - predeclared
     - promlinter
     - tagalign
+    - tagliatelle
     - testableexamples
     - usestdlibvars
   disable:
@@ -34,7 +42,6 @@ linters:
     - gocyclo
     - godot
     - godox
-    - govet
     - ineffassign
     - lll
     - maintidx
