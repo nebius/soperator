@@ -14,8 +14,8 @@ metadata:
   namespace: flux-system
 spec:
   releaseName: nvidia-network-operator
-  interval: 10m
-  timeout: 10m
+  interval: 3m
+  timeout: 3m
   install:
     crds: CreateReplace
     remediation:
@@ -30,7 +30,7 @@ spec:
       sourceRef:
         kind: HelmRepository
         name: nvidia-network-operator
-      interval: 10m
+      interval: 3m
   valuesFrom:
     - kind: ConfigMap
       name: nvidia-network-operator
