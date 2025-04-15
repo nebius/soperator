@@ -247,6 +247,15 @@ func main() {
 		setupLog.Error(err, "unable to create activecheck controller", "controller", "ActiveCheck")
 		os.Exit(1)
 	}
+	if err = soperatorchecks.NewActiveCheckJobController(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckJobControllerName),
+		reconcileTimeout,
+	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+		setupLog.Error(err, "unable to create activecheckjob controller", "controller", "ActiveCheckJob")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
