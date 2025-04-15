@@ -8,6 +8,7 @@ linters:
     - decorder # Verify consistency in declaration order (constants, variables, types).
     - dogsled # Detect excessive use of blank identifiers in assignments.
     - durationcheck # Check for two durations multiplied together.
+    - errcheck # Check for unchecked errors in function calls.
     - errname # Enforce consistent error variable naming conventions.
     - govet # Official Go static analysis tool to find bugs and potential issues.
     - gocheckcompilerdirectives # Verify compiler directives like //go:generate.
@@ -32,7 +33,6 @@ linters:
     - depguard # Check for dependencies in go.mod.
     - dupl # Detect duplicate code.
     - cyclop # Detect function with too many branches.
-    - errcheck # Check for unchecked errors in function calls.
     - forcetypeassert # Check for unnecessary type assertions.
     - funlen # Check function length.
     - gochecknoinits # Check for init functions.
