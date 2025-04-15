@@ -132,6 +132,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 	JobStatusKey := fmt.Sprintf("%s/%s", job.Namespace, job.Name)
 	check.Status.Jobs[JobStatusKey] = job.Status
+	shrinkJobMap(&check.Status.Jobs)
 
 	logger = logger.WithValues(logfield.ResourceKV(check)...)
 	logger.V(1).Info("Rendered")
@@ -144,4 +145,17 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 	logger.Info("Reconciled ActiveCheckJob")
 	return ctrl.Result{}, nil
+}
+
+func shrinkJobMap(m *map[string]batchv1.JobStatus) {
+	var keysToRemove []string
+	for key, jobStatus := range *m {
+		if jobStatus.Active == 0 {
+			keysToRemove = append(keysToRemove, key)
+		}
+	}
+
+	for _, key := range keysToRemove {
+		delete(*m, key)
+	}
 }
