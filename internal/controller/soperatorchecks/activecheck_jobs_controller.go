@@ -3,12 +3,10 @@ package soperatorchecks
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -55,39 +53,39 @@ func (r *ActiveCheckJobReconciler) SetupWithManager(mgr ctrl.Manager,
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&batchv1.Job{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
-				configMap, ok := e.Object.(*corev1.ConfigMap)
+				job, ok := e.Object.(*batchv1.Job)
 				if !ok {
 					return false
 				}
 
-				return isValidConfigMap(configMap)
+				return isValidJob(job)
 			},
 			UpdateFunc: func(e event.UpdateEvent) bool {
-				configMap, ok := e.ObjectNew.(*corev1.ConfigMap)
+				job, ok := e.ObjectNew.(*batchv1.Job)
 				if !ok {
 					return false
 				}
 
-				return isValidConfigMap(configMap)
+				return isValidJob(job)
 			},
 			DeleteFunc: func(e event.DeleteEvent) bool {
 				return false
 			},
 			GenericFunc: func(e event.GenericEvent) bool {
-				configMap, ok := e.Object.(*corev1.ConfigMap)
+				job, ok := e.Object.(*batchv1.Job)
 				if !ok {
 					return false
 				}
 
-				return isValidConfigMap(configMap)
+				return isValidJob(job)
 			},
 		})).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
 		Complete(r)
 }
 
-func isValidConfigMap(cm *corev1.ConfigMap) bool {
-	if v, ok := cm.Annotations[consts.LabelComponentKey]; ok {
+func isValidJob(cm *batchv1.Job) bool {
+	if v, ok := cm.Labels[consts.LabelComponentKey]; ok {
 		return v == consts.ComponentTypeSoperatorChecks.String()
 	}
 	return false
@@ -117,16 +115,10 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 
-	activeCheckNamespacedName := job.Annotations[consts.AnnotationActiveCheckKey]
-	parts := strings.SplitN(activeCheckNamespacedName, "/", 2)
-	if len(parts) != 2 {
-		return ctrl.Result{}, fmt.Errorf("invalid input format")
-	}
-	activeCheckNamespace := parts[0]
-	activeCheckName := parts[1]
+	activeCheckName := job.Annotations[consts.AnnotationActiveCheckKey]
 	check := &slurmv1alpha1.ActiveCheck{}
 	err = r.Get(ctx, types.NamespacedName{
-		Namespace: activeCheckNamespace,
+		Namespace: req.Namespace,
 		Name:      activeCheckName,
 	}, check)
 	if err != nil {

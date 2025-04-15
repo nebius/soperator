@@ -1,8 +1,6 @@
 package soperatorchecks
 
 import (
-	"fmt"
-
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,7 +46,7 @@ func RenderK8sCronJob(check *slurmv1alpha1.ActiveCheck, foundPodTemplate *corev1
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						consts.AnnotationActiveCheckKey: fmt.Sprintf("%s/%s", check.Namespace, check.Name),
+						consts.AnnotationActiveCheckKey: check.Name,
 					},
 				},
 			},
