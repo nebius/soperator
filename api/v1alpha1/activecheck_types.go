@@ -107,9 +107,34 @@ type K8sJobSpec struct {
 	Volumes       []corev1.Volume      `json:"volumes,omitempty"`
 }
 
+// ActiveCheckK8sJobsStatus defines the observed state of ActiveCheck k8s jobs.
+type ActiveCheckK8sJobsStatus struct {
+	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
+
+	LastK8sJobScheduleTime   *metav1.Time `json:"lastK8sJobScheduleTime"`
+	LastK8sJobSuccessfulTime *metav1.Time `json:"lastK8sJobSuccessfulTime"`
+
+	LastK8sJobCompletionTime *metav1.Time            `json:"lastK8sJobEndTime"`
+	LastK8sJobName           string                  `json:"lastK8SJobName"`
+	LastK8sJobStatus         ActiveCheckK8sJobStatus `json:"lastK8sJobStatus"`
+}
+
+// ActiveCheckK8sJobStatus defines status for ActiveCheck k8s job.
+type ActiveCheckK8sJobStatus string
+
+const (
+	ActiveCheckK8sJobStatusActive    ActiveCheckK8sJobStatus = "Active"
+	ActiveCheckK8sJobStatusPending   ActiveCheckK8sJobStatus = "Pending"
+	ActiveCheckK8sJobStatusComplete  ActiveCheckK8sJobStatus = "Complete"
+	ActiveCheckK8sJobStatusFailed    ActiveCheckK8sJobStatus = "Failed"
+	ActiveCheckK8sJobStatusSuspended ActiveCheckK8sJobStatus = "Suspended"
+	ActiveCheckK8sJobStatusUnknown   ActiveCheckK8sJobStatus = "Unknown"
+)
+
 // ActiveCheckStatus defines the observed state of ActiveCheck.
 type ActiveCheckStatus struct {
 	StatusMetadata `json:",inline"`
+	K8sJobsStatus  ActiveCheckK8sJobsStatus `json:"k8sJobsStatus,omitempty"`
 }
 
 // +kubebuilder:object:root=true

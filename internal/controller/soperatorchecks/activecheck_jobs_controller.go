@@ -2,12 +2,13 @@ package soperatorchecks
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -104,8 +105,8 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 	logger.Info("Reconciling ActiveCheckJob", "namespace", req.Namespace, "name", req.Name)
 
-	job := &batchv1.Job{}
-	err := r.Get(ctx, req.NamespacedName, job)
+	k8sJob := &batchv1.Job{}
+	err := r.Get(ctx, req.NamespacedName, k8sJob)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logger.Info("ActiveCheckJob resource not found. Ignoring since object must be deleted.")
@@ -115,12 +116,12 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 
-	activeCheckName := job.Annotations[consts.AnnotationActiveCheckKey]
-	check := &slurmv1alpha1.ActiveCheck{}
+	activeCheckName := k8sJob.Annotations[consts.AnnotationActiveCheckKey]
+	activeCheck := &slurmv1alpha1.ActiveCheck{}
 	err = r.Get(ctx, types.NamespacedName{
 		Namespace: req.Namespace,
 		Name:      activeCheckName,
-	}, check)
+	}, activeCheck)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logger.Info("ActiveCheck resource not found. Ignoring since object must be deleted.")
@@ -130,14 +131,37 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 
-	JobStatusKey := fmt.Sprintf("%s/%s", job.Namespace, job.Name)
-	check.Status.Jobs[JobStatusKey] = job.Status
-	shrinkJobMap(&check.Status.Jobs)
+	cronJob := &batchv1.CronJob{}
+	err = r.Get(ctx, types.NamespacedName{
+		Namespace: req.Namespace,
+		Name:      activeCheckName,
+	}, cronJob)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("CronJob resource not found. Ignoring since object must be deleted.")
+			return ctrl.Result{}, nil
+		}
+		logger.Error(err, "Failed to get CronJob")
+		return ctrl.Result{}, err
+	}
 
-	logger = logger.WithValues(logfield.ResourceKV(check)...)
+	activeCheck.Status = slurmv1alpha1.ActiveCheckStatus{
+		K8sJobsStatus: slurmv1alpha1.ActiveCheckK8sJobsStatus{
+			LastTransitionTime: metav1.Now(),
+
+			LastK8sJobScheduleTime:   cronJob.Status.LastScheduleTime,
+			LastK8sJobSuccessfulTime: cronJob.Status.LastSuccessfulTime,
+
+			LastK8sJobCompletionTime: k8sJob.Status.CompletionTime,
+			LastK8sJobName:           k8sJob.Name,
+			LastK8sJobStatus:         getK8sJobStatus(k8sJob),
+		},
+	}
+
+	logger = logger.WithValues(logfield.ResourceKV(activeCheck)...)
 	logger.V(1).Info("Rendered")
 
-	err = r.Status().Update(ctx, check)
+	err = r.Status().Update(ctx, activeCheck)
 	if err != nil {
 		logger.Error(err, "Failed to reconcile ActiveCheckJob")
 		return ctrl.Result{}, errors.Wrap(err, "reconciling ActiveCheckJob")
@@ -147,15 +171,29 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 	return ctrl.Result{}, nil
 }
 
-func shrinkJobMap(m *map[string]batchv1.JobStatus) {
-	var keysToRemove []string
-	for key, jobStatus := range *m {
-		if jobStatus.Active == 0 {
-			keysToRemove = append(keysToRemove, key)
+func getK8sJobStatus(k8sJob *batchv1.Job) slurmv1alpha1.ActiveCheckK8sJobStatus {
+	status := k8sJob.Status
+
+	if status.Active > 0 {
+		return slurmv1alpha1.ActiveCheckK8sJobStatusActive
+	}
+
+	for _, condition := range status.Conditions {
+		if condition.Status == corev1.ConditionTrue {
+			switch condition.Type {
+			case batchv1.JobComplete, batchv1.JobSuccessCriteriaMet:
+				return slurmv1alpha1.ActiveCheckK8sJobStatusComplete
+			case batchv1.JobFailed, batchv1.JobFailureTarget:
+				return slurmv1alpha1.ActiveCheckK8sJobStatusFailed
+			case batchv1.JobSuspended:
+				return slurmv1alpha1.ActiveCheckK8sJobStatusSuspended
+			}
 		}
 	}
 
-	for _, key := range keysToRemove {
-		delete(*m, key)
+	if status.Active == 0 && len(status.Conditions) == 0 {
+		return slurmv1alpha1.ActiveCheckK8sJobStatusPending
 	}
+
+	return slurmv1alpha1.ActiveCheckK8sJobStatusUnknown
 }
