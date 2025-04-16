@@ -22,7 +22,7 @@ spec:
       retries: 3
   upgrade:
     crds: CreateReplace
-  targetNamespace: monitoring-system
+  targetNamespace: logs-system
   chart:
     spec:
       chart: victoria-logs-single

@@ -18,7 +18,7 @@ spec:
     mode: enabled
   chart:
     spec:
-      chart: victoria-metrics-crds
+      chart: victoria-metrics-operator-crds
       version: '0.0.3'
       sourceRef:
         kind: HelmRepository
@@ -167,6 +167,6 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
-  path: "/fluxcd/base/victoria-metrics-operator/kube-state-metrics-config"
+  path: "./fluxcd/base/victoria-metrics-operator/kube-state-metrics-config"
   prune: true
   timeout: 1m
