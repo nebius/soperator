@@ -101,17 +101,6 @@ spec:
           retry_on_failure:
             initial_interval: 200ms
           timeout: 5s
-        otlp:
-          endpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
-          balancer_name: round_robin
-          compression: snappy
-          retry_on_failure:
-            initial_interval: 200ms
-          timeout: 5s
-          headers:
-            iam-container: project-e00h61cxzwnf6zksvdn77
-          auth:
-            authenticator: bearertokenauth
       extensions:
         bearertokenauth:
           filename: "/o11ytoken/accessToken"
@@ -284,7 +273,6 @@ spec:
           logs:
             exporters:
               - otlphttp/victoriametrics
-              - otlp
             processors:
               - k8sattributes
               - transform
@@ -412,24 +400,11 @@ spec:
           retry_on_failure:
             initial_interval: 200ms
           timeout: 5s
-        otlp:
-          endpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
-          balancer_name: round_robin
-          compression: snappy
-          retry_on_failure:
-            initial_interval: 200ms
-          timeout: 5s
-          headers:
-            iam-container: project-e00h61cxzwnf6zksvdn77
-          auth:
-            authenticator: bearertokenauth
       extensions:
         bearertokenauth:
           filename: "/o11ytoken/accessToken"
         health_check:
           endpoint: '0.0.0.0:13133'
-        file_storage:
-          directory: /var/lib/otelcol
       processors:
         transform:
           log_statements:
@@ -503,7 +478,6 @@ spec:
           logs/events:
             exporters:
               - otlphttp/victoriametrics
-              - otlp
             processors:
               - transform
               - memory_limiter
