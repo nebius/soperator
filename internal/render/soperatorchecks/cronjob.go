@@ -52,6 +52,7 @@ func RenderK8sCronJob(check *slurmv1alpha1.ActiveCheck, foundPodTemplate *corev1
 			},
 			SuccessfulJobsHistoryLimit: ptr.To(check.Spec.SuccessfulJobsHistoryLimit),
 			FailedJobsHistoryLimit:     ptr.To(check.Spec.FailedJobsHistoryLimit),
+			ConcurrencyPolicy:          batchv1.ForbidConcurrent,
 		},
 	}, nil
 }
