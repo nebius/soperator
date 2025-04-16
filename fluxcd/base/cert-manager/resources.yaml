@@ -38,8 +38,9 @@ spec:
       valuesKey: values.yaml
       optional: true
   values:
-    leaderElection:
-      namespace: cert-manager-system
+    global:
+      leaderElection:
+        namespace: cert-manager-system
     crds:
       enabled: true
     prometheus:

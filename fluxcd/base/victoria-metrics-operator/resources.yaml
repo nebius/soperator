@@ -38,7 +38,7 @@ metadata:
   namespace: flux-system
 spec:
   dependsOn:
-    - name: victoria-metrics-crds
+    - name: victoria-metrics-operator-crds
     - name: cert-manager
     - name: ns
   releaseName: metrics
