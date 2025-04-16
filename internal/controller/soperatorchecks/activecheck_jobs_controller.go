@@ -145,18 +145,27 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 
-	activeCheck.Status = slurmv1alpha1.ActiveCheckStatus{
-		K8sJobsStatus: slurmv1alpha1.ActiveCheckK8sJobsStatus{
-			LastTransitionTime: metav1.Now(),
+	newStatus := slurmv1alpha1.ActiveCheckK8sJobsStatus{
+		LastK8sJobScheduleTime:   cronJob.Status.LastScheduleTime,
+		LastK8sJobSuccessfulTime: cronJob.Status.LastSuccessfulTime,
 
-			LastK8sJobScheduleTime:   cronJob.Status.LastScheduleTime,
-			LastK8sJobSuccessfulTime: cronJob.Status.LastSuccessfulTime,
-
-			LastK8sJobCompletionTime: k8sJob.Status.CompletionTime,
-			LastK8sJobName:           k8sJob.Name,
-			LastK8sJobStatus:         getK8sJobStatus(k8sJob),
-		},
+		LastK8sJobCompletionTime: k8sJob.Status.CompletionTime,
+		LastK8sJobName:           k8sJob.Name,
+		LastK8sJobStatus:         getK8sJobStatus(k8sJob),
 	}
+
+	newStatusCopy := newStatus.DeepCopy()
+	currentStatusCopy := activeCheck.Status.K8sJobsStatus.DeepCopy()
+	newStatusCopy.LastTransitionTime = metav1.Time{}
+	currentStatusCopy.LastTransitionTime = metav1.Time{}
+
+	if *newStatusCopy == *currentStatusCopy {
+		logger.Info("Reconciled ActiveCheckJob, no update were made")
+		return ctrl.Result{}, nil
+	}
+
+	newStatus.LastTransitionTime = metav1.Now()
+	activeCheck.Status.K8sJobsStatus = newStatus
 
 	logger = logger.WithValues(logfield.ResourceKV(activeCheck)...)
 	logger.V(1).Info("Rendered")
