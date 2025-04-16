@@ -15,8 +15,10 @@ metadata:
   namespace: flux-system
 spec:
   dependsOn:
+    - name: ns
     - name: soperator
     - name: slurm-cluster-storage
+    - name: security-profiles-operator
   releaseName: slurm
   interval: 3m
   timeout: 3m

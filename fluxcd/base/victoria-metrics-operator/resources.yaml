@@ -1,4 +1,45 @@
 apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: victoria-metrics-crds
+  namespace: flux-system
+spec:
+  interval: 24h
+  url: https://github.com/VictoriaMetrics/helm-charts
+  ref:
+    branch: master
+  ignore: |
+    # exclude all
+    /*
+    # include deploy dir
+    !/charts/victoria-metrics-operator/charts/crds
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: victoria-metrics-crds
+  namespace: flux-system
+spec:
+  interval: 60m
+  driftDetection:
+    mode: enabled
+  chart:
+    spec:
+      chart: ./charts/victoria-metrics-operator/charts/crds
+      reconcileStrategy: Revision
+      sourceRef:
+        kind: GitRepository
+        name: victoria-metrics-crds
+        namespace: flux-system
+      interval: 5m
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+---
+apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
   name: vm-stack
@@ -13,15 +54,16 @@ metadata:
   name: vm-stack
   namespace: flux-system
 spec:
+  dependsOn:
+    - name: victoria-metrics-crds
+    - name: cert-manager
   releaseName: metrics
   interval: 3m
   timeout: 3m
   install:
-    crds: CreateReplace
-    remediation:
-      retries: 3
+    crds: Skip
   upgrade:
-    crds: CreateReplace
+    crds: Skip
   targetNamespace: monitoring-system
   chart:
     spec:
@@ -39,14 +81,14 @@ spec:
   values:
     ## disable vm operator crds, managed separetly by gitops-crds repo
     crds:
-      enabled: true
+      enabled: false
     victoria-metrics-operator:
       admissionWebhooks:
         enable: true
       crd:
-        create: true
+        create: false
         cleanup:
-          enabled: true
+          enabled: false
       operator:
         enable_converter_ownership: true
         disable_prometheus_converter: false

@@ -10,11 +10,36 @@ spec:
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
+  name: mariadb-operator-crds
+  namespace: flux-system
+spec:
+  interval: 60m
+  driftDetection:
+    mode: enabled
+  chart:
+    spec:
+      chart: mariadb-operator-crds
+      sourceRef:
+        kind: HelmRepository
+        name: mariadb-operator
+      interval: 3m
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
   name: mariadb-operator
   namespace: flux-system
 spec:
   releaseName: mariadb-operator
   dependsOn:
+    - name: ns
+    - name: mariadb-operator-crds
     - name: cert-manager
   interval: 3m
   timeout: 3m
@@ -32,6 +57,7 @@ spec:
         kind: HelmRepository
         name: mariadb-operator
       interval: 3m
+      version: '0.12.*'
   valuesFrom:
     - kind: ConfigMap
       name: mariadb-operator

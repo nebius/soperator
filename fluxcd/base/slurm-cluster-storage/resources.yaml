@@ -15,6 +15,7 @@ metadata:
   namespace: flux-system
 spec:
   dependsOn:
+    - name: ns
     - name: soperator
   releaseName: slurm-cluster-storage
   interval: 3m
