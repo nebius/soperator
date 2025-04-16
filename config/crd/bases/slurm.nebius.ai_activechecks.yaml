@@ -3130,6 +3130,32 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              k8sJobsStatus:
+                description: ActiveCheckK8sJobsStatus defines the observed state of
+                  ActiveCheck k8s jobs.
+                properties:
+                  lastK8sJobName:
+                    type: string
+                  lastK8sJobScheduleTime:
+                    format: date-time
+                    type: string
+                  lastK8sJobStatus:
+                    description: ActiveCheckK8sJobStatus defines status for ActiveCheck
+                      k8s job.
+                    type: string
+                  lastK8sJobSuccessfulTime:
+                    format: date-time
+                    type: string
+                  lastTransitionTime:
+                    format: date-time
+                    type: string
+                required:
+                - lastK8sJobName
+                - lastK8sJobScheduleTime
+                - lastK8sJobStatus
+                - lastK8sJobSuccessfulTime
+                - lastTransitionTime
+                type: object
               observedGeneration:
                 description: ObservedGeneration defines current generation picked
                   by operator for the reconcile

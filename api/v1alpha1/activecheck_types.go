@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 )
 
 // ActiveCheckSpec defines the desired state of ActiveCheck.
@@ -107,9 +108,21 @@ type K8sJobSpec struct {
 	Volumes       []corev1.Volume      `json:"volumes,omitempty"`
 }
 
+// ActiveCheckK8sJobsStatus defines the observed state of ActiveCheck k8s jobs.
+type ActiveCheckK8sJobsStatus struct {
+	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
+
+	LastK8sJobScheduleTime   *metav1.Time `json:"lastK8sJobScheduleTime"`
+	LastK8sJobSuccessfulTime *metav1.Time `json:"lastK8sJobSuccessfulTime"`
+
+	LastK8sJobName   string                         `json:"lastK8sJobName"`
+	LastK8sJobStatus consts.ActiveCheckK8sJobStatus `json:"lastK8sJobStatus"`
+}
+
 // ActiveCheckStatus defines the observed state of ActiveCheck.
 type ActiveCheckStatus struct {
 	StatusMetadata `json:",inline"`
+	K8sJobsStatus  ActiveCheckK8sJobsStatus `json:"k8sJobsStatus,omitempty"`
 }
 
 // +kubebuilder:object:root=true

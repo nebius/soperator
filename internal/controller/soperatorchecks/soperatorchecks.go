@@ -13,13 +13,14 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 )
 
-//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;delete;update
+//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;delete;update
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;update
 //+kubebuilder:rbac:groups=core,resources=nodes/status,verbs=get;update;patch;watch;list
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;watch;list
 //+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;watch;list;update;create
-// +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
 
 func setK8SNodeCondition(
 	ctx context.Context,

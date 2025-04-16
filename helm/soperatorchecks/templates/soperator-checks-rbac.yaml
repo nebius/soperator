@@ -30,11 +30,8 @@ rules:
   resources:
   - pods
   verbs:
-  - create
-  - delete
   - get
   - list
-  - update
   - watch
 - apiGroups:
   - ""
@@ -56,6 +53,14 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - coordination.k8s.io

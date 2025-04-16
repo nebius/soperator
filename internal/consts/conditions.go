@@ -40,3 +40,15 @@ const (
 	MessageMaintenanceScheduled MessageConditionType = "Maintenance is scheduled on k8s node"
 	MessageNodeIsRebooted       MessageConditionType = "Node is rebooted"
 )
+
+// ActiveCheckK8sJobStatus defines status for ActiveCheck k8s job.
+type ActiveCheckK8sJobStatus string
+
+const (
+	ActiveCheckK8sJobStatusActive    ActiveCheckK8sJobStatus = "Active"
+	ActiveCheckK8sJobStatusPending   ActiveCheckK8sJobStatus = "Pending"
+	ActiveCheckK8sJobStatusComplete  ActiveCheckK8sJobStatus = "Complete"
+	ActiveCheckK8sJobStatusFailed    ActiveCheckK8sJobStatus = "Failed"
+	ActiveCheckK8sJobStatusSuspended ActiveCheckK8sJobStatus = "Suspended"
+	ActiveCheckK8sJobStatusUnknown   ActiveCheckK8sJobStatus = "Unknown"
+)

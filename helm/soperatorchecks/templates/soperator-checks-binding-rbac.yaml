@@ -7,7 +7,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "soperatorchecks.fullname" . }}-checks-role
+  name: {{ include "soperatorchecks.fullname" . }}-soperator-checks-role
 subjects:
 - kind: ServiceAccount
   name: {{ include "soperatorchecks.fullname" . }}-checks
