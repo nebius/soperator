@@ -1,6 +1,7 @@
 module nebius.ai/slurm-operator
 
-go 1.24.1
+go 1.24.2
+
 require (
 	github.com/SlinkyProject/slurm-client v0.1.0-20241108145209-7bfdd4923f75
 	github.com/go-logr/logr v1.4.2
