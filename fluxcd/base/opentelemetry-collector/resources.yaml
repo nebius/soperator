@@ -50,7 +50,7 @@ spec:
           fieldRef:
             fieldPath: spec.nodeName
       - name: CLUSTER_NAME
-        value: ${cluster_name}
+        value: flux
       - name: "GOMAXPROCS"
         value: "1"
 
@@ -125,8 +125,8 @@ spec:
             - context: log
               error_mode: ignore
               statements:
-              - set(attributes["cluster"], "$${env:CLUSTER_NAME}")
-              - set(attributes["k8s.node.name"], "$${env:K8S_NODE_NAME}")
+              - set(attributes["cluster"], "${env:CLUSTER_NAME}")
+              - set(attributes["k8s.node.name"], "${env:K8S_NODE_NAME}")
         batch:
           send_batch_max_size: 700
           send_batch_size: 250
@@ -384,7 +384,7 @@ spec:
           fieldRef:
             fieldPath: spec.nodeName
       - name: CLUSTER_NAME
-        value: ${cluster_name}
+        value: flux
       - name: "GOMAXPROCS"
         value: "1"
 
@@ -445,7 +445,7 @@ spec:
               - set(body, attributes["cache"]["message"])
               - delete_key(attributes, "cache")
               - set(severity_text, "INFO") 
-              - set(attributes["k8s.node.name"], "$${env:K8S_NODE_NAME}")
+              - set(attributes["cluster"], "${env:CLUSTER_NAME}")
         batch:
           send_batch_max_size: 700
           send_batch_size: 250
