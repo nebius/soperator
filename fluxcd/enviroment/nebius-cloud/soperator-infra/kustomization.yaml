@@ -4,5 +4,4 @@ resources:
   - ../base/
   - ../../../base/victoria-metrics-operator/
   - ../../../base/victoria-logs
-  - ../../../base/opentelemetry-collector-events
-  - ../../../base/opentelemetry-collector-logs
+  - ../../../base/opentelemetry-collector

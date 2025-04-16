@@ -15,11 +15,13 @@ metadata:
   namespace: flux-system
 spec:
   dependsOn:
+    - name: ns
     - name: soperator
     - name: slurm-cluster-storage
+    - name: security-profiles-operator
   releaseName: slurm
-  interval: 10m
-  timeout: 10m
+  interval: 3m
+  timeout: 3m
   install:
     crds: CreateReplace
     remediation:
@@ -33,7 +35,7 @@ spec:
       sourceRef:
         kind: HelmRepository
         name: slurm-cluster
-      interval: 10m
+      interval: 3m
   valuesFrom:
     - kind: ConfigMap
       name: slurm-cluster

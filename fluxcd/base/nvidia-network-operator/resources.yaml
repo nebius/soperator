@@ -14,8 +14,8 @@ metadata:
   namespace: flux-system
 spec:
   releaseName: nvidia-network-operator
-  interval: 10m
-  timeout: 10m
+  interval: 3m
+  timeout: 3m
   install:
     crds: CreateReplace
     remediation:
@@ -30,7 +30,7 @@ spec:
       sourceRef:
         kind: HelmRepository
         name: nvidia-network-operator
-      interval: 10m
+      interval: 3m
   valuesFrom:
     - kind: ConfigMap
       name: nvidia-network-operator
@@ -39,7 +39,7 @@ spec:
   values:
     nebius:
       images:
-        ulimitFixer: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/network-operator-v24-4-0/busybox:1.27.2
+        ulimitFixer: cr.eu-north1.nebius.cloud/marketplace/nebius/network-operator-v24-4-0/busybox:1.27.2
       ulimitFixer:
         tolerations: []
 
@@ -55,7 +55,7 @@ spec:
     # Node Feature discovery chart related values
     node-feature-discovery:
       image:
-        repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/network-operator-v24-4-0/node-feature-discovery
+        repository: cr.eu-north1.nebius.cloud/marketplace/nebius/network-operator-v24-4-0/node-feature-discovery
         tag: v0.16.3
       enableNodeFeatureApi: true
       worker:
@@ -120,15 +120,15 @@ spec:
 
       # Image URIs for sriov-network-operator components
       images:
-        operator: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/network-operator-v24-4-0/sriov-network-operator:network-operator-24.4.0
-        sriovConfigDaemon: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/network-operator-v24-4-0/sriov-network-operator-config-daemon:network-operator-24.4.0
-        sriovCni: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/network-operator-v24-4-0/sriov-cni:3e6368077716f6b8368b0e036a1290d1c64cf1fb
-        ibSriovCni: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/network-operator-v24-4-0/ib-sriov-cni:fc002af57a81855542759d0f77d16dacd7e1aa38
-        ovsCni: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/network-operator-v24-4-0/ovs-cni-plugin:6f8174b1a47c47657fe9e59fe448f2a452bb6960
-        rdmaCni: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/network-operator-v24-4-0/rdma-cni:v1.1.0
-        sriovDevicePlugin: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/network-operator-v24-4-0/sriov-network-device-plugin:e6ead1e8f76a407783430ee2666b403db2d76f64
-        resourcesInjector: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/network-operator-v24-4-0/network-resources-injector:8810e6a127366cc1eb829d3f7cb3f866d096946e
-        webhook: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/network-operator-v24-4-0/sriov-network-operator-webhook:network-operator-24.4.0
+        operator: cr.eu-north1.nebius.cloud/marketplace/nebius/network-operator-v24-4-0/sriov-network-operator:network-operator-24.4.0
+        sriovConfigDaemon: cr.eu-north1.nebius.cloud/marketplace/nebius/network-operator-v24-4-0/sriov-network-operator-config-daemon:network-operator-24.4.0
+        sriovCni: cr.eu-north1.nebius.cloud/marketplace/nebius/network-operator-v24-4-0/sriov-cni:3e6368077716f6b8368b0e036a1290d1c64cf1fb
+        ibSriovCni: cr.eu-north1.nebius.cloud/marketplace/nebius/network-operator-v24-4-0/ib-sriov-cni:fc002af57a81855542759d0f77d16dacd7e1aa38
+        ovsCni: cr.eu-north1.nebius.cloud/marketplace/nebius/network-operator-v24-4-0/ovs-cni-plugin:6f8174b1a47c47657fe9e59fe448f2a452bb6960
+        rdmaCni: cr.eu-north1.nebius.cloud/marketplace/nebius/network-operator-v24-4-0/rdma-cni:v1.1.0
+        sriovDevicePlugin: cr.eu-north1.nebius.cloud/marketplace/nebius/network-operator-v24-4-0/sriov-network-device-plugin:e6ead1e8f76a407783430ee2666b403db2d76f64
+        resourcesInjector: cr.eu-north1.nebius.cloud/marketplace/nebius/network-operator-v24-4-0/network-resources-injector:8810e6a127366cc1eb829d3f7cb3f866d096946e
+        webhook: cr.eu-north1.nebius.cloud/marketplace/nebius/network-operator-v24-4-0/sriov-network-operator-webhook:network-operator-24.4.0
       # imagePullSecrest for SR-IOV Network Operator related images
       # imagePullSecrets: []
       sriovOperatorConfig:
@@ -172,7 +172,7 @@ spec:
                   - key: "node-role.kubernetes.io/control-plane"
                     operator: In
                     values: [ "" ]
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex
+      repository: cr.eu-north1.nebius.cloud/marketplace
       image: nebius/network-operator-v24-4-0/network-operator
       # imagePullSecrets: []
       nameOverride: ""
@@ -192,13 +192,13 @@ spec:
     ofedDriver:
       deploy: true
       image: nebius/network-operator-v24-4-0/mofed
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex
+      repository: cr.eu-north1.nebius.cloud/marketplace
       version: 23.10-2.1.3.1-10
       versionFake: 23.10-2.1.3.1-10-ubuntu20.04-amd64
-      full_alternative_image: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/network-operator-v24-4-0/mofed:23.10-2.1.3.1-10-ubuntu22.04-amd64
+      full_alternative_image: cr.eu-north1.nebius.cloud/marketplace/nebius/network-operator-v24-4-0/mofed:23.10-2.1.3.1-10-ubuntu22.04-amd64
       initContainer:
         enable: true
-        repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex
+        repository: cr.eu-north1.nebius.cloud/marketplace
         image: nebius/network-operator-v24-4-0/network-operator-init-container
         version: v0.0.2
       terminationGracePeriodSeconds: 300
@@ -247,7 +247,7 @@ spec:
     rdmaSharedDevicePlugin:
       deploy: false
       image: nebius/network-operator-v24-4-0/k8s-rdma-shared-dev-plugin
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex
+      repository: cr.eu-north1.nebius.cloud/marketplace
       version: 1.4.0
       useCdi: false
       resources:
@@ -258,7 +258,7 @@ spec:
     sriovDevicePlugin:
       deploy: false
       image: nebius/network-operator-v24-4-0/sriov-network-device-plugin
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex
+      repository: cr.eu-north1.nebius.cloud/marketplace
       version: e6ead1e8f76a407783430ee2666b403db2d76f64
       useCdi: false
       resources:
@@ -268,7 +268,7 @@ spec:
     ibKubernetes:
       deploy: false
       image: nebius/network-operator-v24-4-0/ib-kubernetes
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex
+      repository: cr.eu-north1.nebius.cloud/marketplace
       version: v1.0.2
       periodicUpdateSeconds: 5
       pKeyGUIDPoolRangeStart: "02:00:00:00:00:00:00:00"
@@ -278,7 +278,7 @@ spec:
     nvIpam:
       deploy: false
       image: nebius/network-operator-v24-4-0/nvidia-k8s-ipam
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex
+      repository: cr.eu-north1.nebius.cloud/marketplace
       version: v0.1.2
       enableWebhook: false
 
@@ -287,39 +287,39 @@ spec:
       cniPlugins:
         deploy: true
         image: nebius/network-operator-v24-4-0/plugins
-        repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex
+        repository: cr.eu-north1.nebius.cloud/marketplace
         version: v1.3.0
 
       multus:
         deploy: false
         image: nebius/network-operator-v24-4-0/multus-cni
-        repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex
+        repository: cr.eu-north1.nebius.cloud/marketplace
         version: v3.9.3
 
       ipoib:
         deploy: false
         image: nebius/network-operator-v24-4-0/ipoib-cni
-        repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex
+        repository: cr.eu-north1.nebius.cloud/marketplace
         version: 428715a57c0b633e48ec7620f6e3af6863149ccf
 
       ipamPlugin:
         deploy: false
         image: nebius/network-operator-v24-4-0/whereabouts
-        repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex
+        repository: cr.eu-north1.nebius.cloud/marketplace
         version: v0.7.0
 
 
     nicFeatureDiscovery:
       deploy: false
       image: nebius/network-operator-v24-4-0/nic-feature-discovery
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex
+      repository: cr.eu-north1.nebius.cloud/marketplace
       version: v0.0.1
 
 
     docaTelemetryService:
       deploy: false
       image: nebius/network-operator-v24-4-0/doca_telemetry
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex
+      repository: cr.eu-north1.nebius.cloud/marketplace
       version: 1.16.5-doca2.6.0-host
 
     test:

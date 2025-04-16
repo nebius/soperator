@@ -11811,7 +11811,7 @@ spec:
                   type: string
                 type: array
               interval:
-                default: 10m
+                default: 3m
                 description: Interval at which to reconcile the Receiver with its
                   Secret references.
                 pattern: ^([0-9]+(\.[0-9]+)?(ms|s|m|h))+$

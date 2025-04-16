@@ -5,7 +5,31 @@ metadata:
   namespace: flux-system
 spec:
   interval: 120m
-  url: https://victoriametrics.github.io/helm-charts/
+  url: https://victoriametrics.github.io/helm-charts
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: victoria-metrics-operator-crds
+  namespace: flux-system
+spec:
+  interval: 60m
+  driftDetection:
+    mode: enabled
+  chart:
+    spec:
+      chart: victoria-metrics-operator-crds
+      version: '0.0.3'
+      sourceRef:
+        kind: HelmRepository
+        name: vm-stack
+      interval: 3m
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -13,15 +37,17 @@ metadata:
   name: vm-stack
   namespace: flux-system
 spec:
+  dependsOn:
+    - name: victoria-metrics-operator-crds
+    - name: cert-manager
+    - name: ns
   releaseName: metrics
-  interval: 10m
-  timeout: 10m
+  interval: 3m
+  timeout: 3m
   install:
-    crds: CreateReplace
-    remediation:
-      retries: 3
+    crds: Skip
   upgrade:
-    crds: CreateReplace
+    crds: Skip
   targetNamespace: monitoring-system
   chart:
     spec:
@@ -30,7 +56,7 @@ spec:
       sourceRef:
         kind: HelmRepository
         name: vm-stack
-      interval: 10m
+      interval: 3m
   valuesFrom:
     - kind: ConfigMap
       name: victoria-metrics-operator
@@ -39,14 +65,14 @@ spec:
   values:
     ## disable vm operator crds, managed separetly by gitops-crds repo
     crds:
-      enabled: true
+      enabled: false
     victoria-metrics-operator:
       admissionWebhooks:
         enable: true
       crd:
-        create: true
+        create: false
         cleanup:
-          enabled: true
+          enabled: false
       operator:
         enable_converter_ownership: true
         disable_prometheus_converter: false
@@ -130,3 +156,17 @@ spec:
       enabled: false
     alertmanager:
       enabled: false
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: victoria-metrics-operator
+  namespace: flux-system
+spec:
+  interval: 3m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: "./fluxcd/base/victoria-metrics-operator/kube-state-metrics-config"
+  prune: true
+  timeout: 1m

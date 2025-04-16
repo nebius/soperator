@@ -17,14 +17,14 @@ spec:
   dependsOn:
     - name: soperator
   releaseName: nodeconfigurator
-  interval: 10m
-  timeout: 10m
+  interval: 3m
+  timeout: 3m
   install:
-    crds: CreateReplace
+    crds: Skip
     remediation:
       retries: 3
   upgrade:
-    crds: CreateReplace
+    crds: Skip
   targetNamespace: soperator-system
   chart:
     spec:
@@ -32,7 +32,7 @@ spec:
       sourceRef:
         kind: HelmRepository
         name: nodeconfigurator
-      interval: 10m
+      interval: 3m
   valuesFrom:
     - kind: ConfigMap
       name: nodeconfigurator

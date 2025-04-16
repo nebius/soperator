@@ -14,8 +14,8 @@ metadata:
   namespace: flux-system
 spec:
   releaseName: gpu-operator
-  interval: 10m
-  timeout: 10m
+  interval: 3m
+  timeout: 3m
   install:
     crds: CreateReplace
     remediation:
@@ -30,7 +30,7 @@ spec:
       sourceRef:
         kind: HelmRepository
         name: gpu-operator
-      interval: 10m
+      interval: 3m
   valuesFrom:
     - kind: ConfigMap
       name: gpu-operator
@@ -85,7 +85,7 @@ spec:
         maxUnavailable: "1"
 
     validator:
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
       image: gpu-operator-validator
       # If version is not specified, then default is to use chart.AppVersion
       version: "v24.6.2"
@@ -100,7 +100,7 @@ spec:
             value: "false"
 
     operator:
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
       image: gpu-operator
       # If version is not specified, then default is to use chart.AppVersion
       version: "v24.6.2"
@@ -117,7 +117,7 @@ spec:
       upgradeCRD: false
       initContainer:
         image: cuda
-        repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+        repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
         version: 12.6.1-base-ubi8
         imagePullPolicy: IfNotPresent
       tolerations:
@@ -176,15 +176,15 @@ spec:
       # use pre-compiled packages for NVIDIA driver installation.
       # only supported for as a tech-preview feature on ubuntu22.04 kernels.
       usePrecompiled: false
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
       image: driver
       version: "550.54.15"
       full_version: "535.161.08-ubuntu20.04"
-      full_alternative_image: "cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2/driver:535.161.08-ubuntu22.04"
-      full_new_image: "cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2/driver:550.54.15-ubuntu20.04"
-      full_new_alternative_image: "cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2/driver:550.54.15-ubuntu22.04"
-      full_image-550-127-08: "cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2/driver:550.127.08-ubuntu20.04"
-      full_alternative_image-550-127-08: "cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2/driver:550.127.08-ubuntu22.04"
+      full_alternative_image: "cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2/driver:535.161.08-ubuntu22.04"
+      full_new_image: "cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2/driver:550.54.15-ubuntu20.04"
+      full_new_alternative_image: "cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2/driver:550.54.15-ubuntu22.04"
+      full_image-550-127-08: "cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2/driver:550.127.08-ubuntu20.04"
+      full_alternative_image-550-127-08: "cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2/driver:550.127.08-ubuntu22.04"
       imagePullPolicy: IfNotPresent
       imagePullSecrets: [ ]
       startupProbe:
@@ -231,7 +231,7 @@ spec:
           deleteEmptyDir: false
       manager:
         image: k8s-driver-manager
-        repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+        repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
         # When choosing a different version of k8s-driver-manager, DO NOT downgrade to a version lower than v0.6.4
         # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
         version: v0.6.10
@@ -270,7 +270,7 @@ spec:
 
     toolkit:
       enabled: true
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
       image: container-toolkit
       version: v1.16.2-ubuntu20.04
       imagePullPolicy: IfNotPresent
@@ -281,7 +281,7 @@ spec:
 
     devicePlugin:
       enabled: true
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
       image: k8s-device-plugin
       version: v0.16.2-ubi8
       imagePullPolicy: IfNotPresent
@@ -339,7 +339,7 @@ spec:
     dcgm:
       # disabled by default to use embedded nv-hostengine by exporter
       enabled: false
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
       image: dcgm
       version: 3.3.7-1-ubuntu22.04
       imagePullPolicy: IfNotPresent
@@ -349,7 +349,7 @@ spec:
 
     dcgmExporter:
       enabled: true
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
       image: dcgm-exporter
       version: 3.3.7-3.5.0-ubuntu22.04
       imagePullPolicy: IfNotPresent
@@ -379,7 +379,7 @@ spec:
 
     gfd:
       enabled: true
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
       image: k8s-device-plugin
       version: v0.16.2-ubi8
       imagePullPolicy: IfNotPresent
@@ -393,7 +393,7 @@ spec:
 
     migManager:
       enabled: true
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
       image: k8s-mig-manager
       version: v0.8.0-ubuntu20.04
       imagePullPolicy: IfNotPresent
@@ -446,7 +446,7 @@ spec:
 
     nodeStatusExporter:
       enabled: false
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
       image: gpu-operator-validator
       # If version is not specified, then default is to use chart.AppVersion
       version: "v24.6.2"
@@ -466,7 +466,7 @@ spec:
 
     gdrcopy:
       enabled: true
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
       image: gdrdrv
       version: "v2.4.1-1"
       fullVersion: "v2.4.1-1-ubuntu22.04"
@@ -486,7 +486,7 @@ spec:
       #  resources: {}
       driverManager:
         image: k8s-driver-manager
-        repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+        repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
         # When choosing a different version of k8s-driver-manager, DO NOT downgrade to a version lower than v0.6.4
         # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
         version: v0.6.10
@@ -499,7 +499,7 @@ spec:
 
     vgpuDeviceManager:
       enabled: true
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
       image: vgpu-device-manager
       version: "v0.2.7"
       imagePullPolicy: IfNotPresent
@@ -511,7 +511,7 @@ spec:
 
     vfioManager:
       enabled: true
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
       image: cuda
       version: 12.6.1-base-ubi8
       imagePullPolicy: IfNotPresent
@@ -520,7 +520,7 @@ spec:
       resources: { }
       driverManager:
         image: k8s-driver-manager
-        repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+        repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
         # When choosing a different version of k8s-driver-manager, DO NOT downgrade to a version lower than v0.6.4
         # to ensure k8s-driver-manager stays compatible with gpu-operator starting from v24.3.0
         version: v0.6.10
@@ -547,7 +547,7 @@ spec:
             artifacts:
               url: nvcr.io/nvidia/cloud-native/kata-gpu-artifacts:ubuntu22.04-535.86.10-snp
               pullSecret: ""
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
       image: k8s-kata-manager
       version: v0.2.1
       imagePullPolicy: IfNotPresent
@@ -557,7 +557,7 @@ spec:
 
     sandboxDevicePlugin:
       enabled: true
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
       image: kubevirt-gpu-device-plugin
       version: v1.2.9
       imagePullPolicy: IfNotPresent
@@ -569,7 +569,7 @@ spec:
     ccManager:
       enabled: false
       defaultMode: "off"
-      repository: cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2
+      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2
       image: k8s-cc-manager
       version: v0.1.1
       imagePullPolicy: IfNotPresent
@@ -581,7 +581,7 @@ spec:
 
     node-feature-discovery:
       image:
-        repository: "cr.eu-north1.nebius.cloud/e00vzg8t0148cc4zex/nebius/nvidia-gpu-operator-v24-6-2/node-feature-discovery"
+        repository: "cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator-v24-6-2/node-feature-discovery"
         tag: "v0.16.3"
       enableNodeFeatureApi: true
       priorityClassName: system-node-critical

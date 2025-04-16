@@ -2,13 +2,13 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: nebius-cloud
+  name: flux-system
   namespace: flux-system
 spec:
-  interval: 10m
+  interval: 3m
   sourceRef:
     kind: GitRepository
-    name: nebius-cloud
+    name: flux-system
   path: "./fluxcd/enviroment/local/soperator-kind"
   prune: true
   timeout: 1m
@@ -16,10 +16,10 @@ spec:
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
-  name: nebius-cloud
+  name: flux-system
   namespace: flux-system
 spec:
-  interval: 10m
+  interval: 3m
   url: https://github.com/nebius/soperator
   ref:
     # TODO: Change this to the branch main after the first release

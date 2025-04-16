@@ -74,12 +74,12 @@ fluxcd
 To deploy a specific cluster configuration, use [Kustomize](https://kustomize.io/) and apply it with `kubectl`. For example, to deploy the `nebius-cloud-soperator-infra` configuration:
 
 ```bash
-kustomize build --load-restrictor LoadRestrictionsNone fluxcd/clusters/nebius-cloud/soperator-infra/bootstrap | kubectl apply -f -
+kustomize build --load-restrictor LoadRestrictionsNone fluxcd/enviroment/nebius-cloud/soperator-infra/bootstrap | kubectl apply -f -
 ```
 
 In this command:
 - `--load-restrictor LoadRestrictionsNone` allows Kustomize load files from outside their root.
-- `fluxcd/clusters/nebius-cloud/soperator-infra` points to the directory containing the `kustomization.yaml` for that specific environment and cluster type.
+- `fluxcd/enviroment/nebius-cloud/soperator-infra` points to the directory containing the `kustomization.yaml` for that specific environment and cluster type.
 
 ### Hierarchical Rendering with Kustomize
 

@@ -14,23 +14,23 @@ metadata:
   namespace: flux-system
 spec:
   releaseName: logs
-  interval: 10m
-  timeout: 10m
+  interval: 3m
+  timeout: 3m
   install:
     crds: CreateReplace
     remediation:
       retries: 3
   upgrade:
     crds: CreateReplace
-  targetNamespace: monitoring-system
+  targetNamespace: logs-system
   chart:
     spec:
       chart: victoria-logs-single
       version: '0.9.*'
       sourceRef:
         kind: HelmRepository
-        name: vm
-      interval: 10m
+        name: vm-logs
+      interval: 3m
   valuesFrom:
     - kind: ConfigMap
       name: vm-logs
