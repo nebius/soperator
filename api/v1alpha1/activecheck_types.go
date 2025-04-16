@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 )
 
 // ActiveCheckSpec defines the desired state of ActiveCheck.
@@ -114,22 +115,10 @@ type ActiveCheckK8sJobsStatus struct {
 	LastK8sJobScheduleTime   *metav1.Time `json:"lastK8sJobScheduleTime"`
 	LastK8sJobSuccessfulTime *metav1.Time `json:"lastK8sJobSuccessfulTime"`
 
-	LastK8sJobCompletionTime *metav1.Time            `json:"lastK8sJobEndTime"`
-	LastK8sJobName           string                  `json:"lastK8SJobName"`
-	LastK8sJobStatus         ActiveCheckK8sJobStatus `json:"lastK8sJobStatus"`
+	LastK8sJobCompletionTime *metav1.Time                   `json:"lastK8sJobEndTime"`
+	LastK8sJobName           string                         `json:"lastK8SJobName"`
+	LastK8sJobStatus         consts.ActiveCheckK8sJobStatus `json:"lastK8sJobStatus"`
 }
-
-// ActiveCheckK8sJobStatus defines status for ActiveCheck k8s job.
-type ActiveCheckK8sJobStatus string
-
-const (
-	ActiveCheckK8sJobStatusActive    ActiveCheckK8sJobStatus = "Active"
-	ActiveCheckK8sJobStatusPending   ActiveCheckK8sJobStatus = "Pending"
-	ActiveCheckK8sJobStatusComplete  ActiveCheckK8sJobStatus = "Complete"
-	ActiveCheckK8sJobStatusFailed    ActiveCheckK8sJobStatus = "Failed"
-	ActiveCheckK8sJobStatusSuspended ActiveCheckK8sJobStatus = "Suspended"
-	ActiveCheckK8sJobStatusUnknown   ActiveCheckK8sJobStatus = "Unknown"
-)
 
 // ActiveCheckStatus defines the observed state of ActiveCheck.
 type ActiveCheckStatus struct {

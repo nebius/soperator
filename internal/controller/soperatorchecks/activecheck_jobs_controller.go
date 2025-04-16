@@ -180,29 +180,29 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 	return ctrl.Result{}, nil
 }
 
-func getK8sJobStatus(k8sJob *batchv1.Job) slurmv1alpha1.ActiveCheckK8sJobStatus {
+func getK8sJobStatus(k8sJob *batchv1.Job) consts.ActiveCheckK8sJobStatus {
 	status := k8sJob.Status
 
 	if status.Active > 0 {
-		return slurmv1alpha1.ActiveCheckK8sJobStatusActive
+		return consts.ActiveCheckK8sJobStatusActive
 	}
 
 	for _, condition := range status.Conditions {
 		if condition.Status == corev1.ConditionTrue {
 			switch condition.Type {
 			case batchv1.JobComplete, batchv1.JobSuccessCriteriaMet:
-				return slurmv1alpha1.ActiveCheckK8sJobStatusComplete
+				return consts.ActiveCheckK8sJobStatusComplete
 			case batchv1.JobFailed, batchv1.JobFailureTarget:
-				return slurmv1alpha1.ActiveCheckK8sJobStatusFailed
+				return consts.ActiveCheckK8sJobStatusFailed
 			case batchv1.JobSuspended:
-				return slurmv1alpha1.ActiveCheckK8sJobStatusSuspended
+				return consts.ActiveCheckK8sJobStatusSuspended
 			}
 		}
 	}
 
 	if status.Active == 0 && len(status.Conditions) == 0 {
-		return slurmv1alpha1.ActiveCheckK8sJobStatusPending
+		return consts.ActiveCheckK8sJobStatusPending
 	}
 
-	return slurmv1alpha1.ActiveCheckK8sJobStatusUnknown
+	return consts.ActiveCheckK8sJobStatusUnknown
 }
