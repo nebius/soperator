@@ -115,9 +115,8 @@ type ActiveCheckK8sJobsStatus struct {
 	LastK8sJobScheduleTime   *metav1.Time `json:"lastK8sJobScheduleTime"`
 	LastK8sJobSuccessfulTime *metav1.Time `json:"lastK8sJobSuccessfulTime"`
 
-	LastK8sJobCompletionTime *metav1.Time                   `json:"lastK8sJobEndTime"`
-	LastK8sJobName           string                         `json:"lastK8sJobName"`
-	LastK8sJobStatus         consts.ActiveCheckK8sJobStatus `json:"lastK8sJobStatus"`
+	LastK8sJobName   string                         `json:"lastK8sJobName"`
+	LastK8sJobStatus consts.ActiveCheckK8sJobStatus `json:"lastK8sJobStatus"`
 }
 
 // ActiveCheckStatus defines the observed state of ActiveCheck.

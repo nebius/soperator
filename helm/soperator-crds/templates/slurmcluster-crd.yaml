@@ -3133,9 +3133,6 @@ spec:
                 description: ActiveCheckK8sJobsStatus defines the observed state of
                   ActiveCheck k8s jobs.
                 properties:
-                  lastK8sJobEndTime:
-                    format: date-time
-                    type: string
                   lastK8sJobName:
                     type: string
                   lastK8sJobScheduleTime:
@@ -3152,7 +3149,6 @@ spec:
                     format: date-time
                     type: string
                 required:
-                - lastK8sJobEndTime
                 - lastK8sJobName
                 - lastK8sJobScheduleTime
                 - lastK8sJobStatus

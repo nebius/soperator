@@ -149,9 +149,8 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		LastK8sJobScheduleTime:   cronJob.Status.LastScheduleTime,
 		LastK8sJobSuccessfulTime: cronJob.Status.LastSuccessfulTime,
 
-		LastK8sJobCompletionTime: k8sJob.Status.CompletionTime,
-		LastK8sJobName:           k8sJob.Name,
-		LastK8sJobStatus:         getK8sJobStatus(k8sJob),
+		LastK8sJobName:   k8sJob.Name,
+		LastK8sJobStatus: getK8sJobStatus(k8sJob),
 	}
 
 	newStatusCopy := newStatus.DeepCopy()
