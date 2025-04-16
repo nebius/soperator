@@ -29,11 +29,8 @@ rules:
   resources:
   - pods
   verbs:
-  - create
-  - delete
   - get
   - list
-  - update
   - watch
 - apiGroups:
   - ""
@@ -49,8 +46,12 @@ rules:
   resources:
   - cronjobs
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - coordination.k8s.io
