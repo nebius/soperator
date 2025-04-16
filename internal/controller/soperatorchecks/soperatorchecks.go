@@ -19,7 +19,8 @@ import (
 //+kubebuilder:rbac:groups=core,resources=nodes/status,verbs=get;update;patch;watch;list
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;watch;list
 //+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;watch;list;update;create
-// +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;update;patch
 
 func setK8SNodeCondition(
 	ctx context.Context,
