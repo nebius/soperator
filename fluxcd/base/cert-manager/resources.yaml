@@ -15,7 +15,7 @@ metadata:
 spec:
   dependsOn:
     - name: ns
-    - name: cert-manager-crds
+    - name: prometheus-operator-crds
   interval: 3m
   timeout: 3m
   install:
@@ -38,4 +38,11 @@ spec:
       valuesKey: values.yaml
       optional: true
   values:
-    installCRDs: false
+    leaderElection:
+      namespace: cert-manager-system
+    crds:
+      enabled: true
+    prometheus:
+      enabled: true
+      servicemonitor:
+        enabled: false

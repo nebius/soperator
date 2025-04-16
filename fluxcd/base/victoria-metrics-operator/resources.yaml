@@ -1,23 +1,16 @@
 apiVersion: source.toolkit.fluxcd.io/v1
-kind: GitRepository
+kind: HelmRepository
 metadata:
-  name: victoria-metrics-crds
+  name: vm-stack
   namespace: flux-system
 spec:
-  interval: 24h
-  url: https://github.com/VictoriaMetrics/helm-charts
-  ref:
-    branch: master
-  ignore: |
-    # exclude all
-    /*
-    # include deploy dir
-    !/charts/victoria-metrics-operator/charts/crds
+  interval: 120m
+  url: https://victoriametrics.github.io/helm-charts
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: victoria-metrics-crds
+  name: victoria-metrics-operator-crds
   namespace: flux-system
 spec:
   interval: 60m
@@ -25,28 +18,18 @@ spec:
     mode: enabled
   chart:
     spec:
-      chart: ./charts/victoria-metrics-operator/charts/crds
-      reconcileStrategy: Revision
+      chart: victoria-metrics-crds
+      version: '0.0.3'
       sourceRef:
-        kind: GitRepository
-        name: victoria-metrics-crds
-        namespace: flux-system
-      interval: 5m
+        kind: HelmRepository
+        name: vm-stack
+      interval: 3m
   install:
     crds: CreateReplace
     remediation:
       retries: 3
   upgrade:
     crds: CreateReplace
----
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
-  name: vm-stack
-  namespace: flux-system
-spec:
-  interval: 120m
-  url: https://victoriametrics.github.io/helm-charts/
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -57,6 +40,7 @@ spec:
   dependsOn:
     - name: victoria-metrics-crds
     - name: cert-manager
+    - name: ns
   releaseName: metrics
   interval: 3m
   timeout: 3m
