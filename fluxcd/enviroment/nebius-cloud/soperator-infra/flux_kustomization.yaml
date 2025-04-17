@@ -1,0 +1,19 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: custom-configmaps-soperator
+  namespace: flux-system
+spec:
+  interval: 3m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: "./fluxcd/enviroment/nebius-cloud/soperator-infra/custom-configmaps-soperator"
+  prune: true
+  timeout: 1m
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: custom-configmaps-soperator-vars
+        # Use this ConfigMap if it exists, but proceed if it doesn't.

@@ -5,4 +5,4 @@ resources:
   - ../../../base/victoria-metrics-operator/
   - ../../../base/victoria-logs/
   - ../../../base/opentelemetry-collector/
-  - ./custom_configmaps/
+  - ./flux_kustomization.yaml

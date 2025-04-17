@@ -19,3 +19,9 @@ configMapGenerator:
       - prolog.sh
     options:
       disableNameSuffixHash: true
+  - name: motd-nebius-o11y
+    namespace: soperator
+    files:
+      - 95-nebius-o11y
+    options:
+      disableNameSuffixHash: true
