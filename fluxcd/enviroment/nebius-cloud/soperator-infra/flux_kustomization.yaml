@@ -17,3 +17,8 @@ spec:
       - kind: ConfigMap
         name: custom-configmaps-soperator-vars
         # Use this ConfigMap if it exists, but proceed if it doesn't.
+        optional: true
+      - kind: Secret
+        name: custom-configmaps-soperator-vars
+        # Use this ConfigMap if it exists, but proceed if it doesn't.
+        optional: true
