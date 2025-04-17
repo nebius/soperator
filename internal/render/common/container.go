@@ -57,6 +57,10 @@ func RenderContainerMunge(container *values.Container, opts ...RenderOption) cor
 					},
 				},
 			},
+			TimeoutSeconds:   DefaultProbeTimeoutSeconds,
+			PeriodSeconds:    DefaultProbePeriodSeconds,
+			SuccessThreshold: DefaultProbeSuccessThreshold,
+			FailureThreshold: DefaultProbeFailureThreshold,
 		},
 		LivenessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
@@ -68,6 +72,10 @@ func RenderContainerMunge(container *values.Container, opts ...RenderOption) cor
 					},
 				},
 			},
+			TimeoutSeconds:   DefaultProbeTimeoutSeconds,
+			PeriodSeconds:    DefaultProbePeriodSeconds,
+			SuccessThreshold: DefaultProbeSuccessThreshold,
+			FailureThreshold: DefaultProbeFailureThreshold,
 		},
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
@@ -78,5 +86,7 @@ func RenderContainerMunge(container *values.Container, opts ...RenderOption) cor
 			Limits:   limits,
 			Requests: container.Resources,
 		},
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}
 }

@@ -41,8 +41,8 @@ func renderContainerToolkitValidation(container *values.Container) corev1.Contai
 		VolumeMounts: []corev1.VolumeMount{
 			renderVolumeMountNvidia(),
 		},
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-		TerminationMessagePath:   "/dev/termination-log",
 	}
 }
 
@@ -120,7 +120,10 @@ func renderContainerSlurmd(
 					},
 				},
 			},
-			PeriodSeconds: 1,
+			PeriodSeconds:    1,
+			TimeoutSeconds:   common.DefaultProbeTimeoutSeconds,
+			SuccessThreshold: common.DefaultProbeSuccessThreshold,
+			FailureThreshold: common.DefaultProbeFailureThreshold,
 		},
 		// PreStop lifecycle hook to update the node state to down in case of worker deletion
 		// Node will not be deleted from the slurm cluster if the job is still running
@@ -147,7 +150,9 @@ func renderContainerSlurmd(
 			},
 			ProcMount: ptr.To(corev1.UnmaskedProcMount),
 		},
-		Resources: resources,
+		Resources:                resources,
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}, nil
 }
 
@@ -172,7 +177,8 @@ func renderSlurmdEnv(
 			Name: "K8S_POD_NAME",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.name",
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "metadata.name",
 				},
 			},
 		},
@@ -180,7 +186,8 @@ func renderSlurmdEnv(
 			Name: "K8S_POD_NAMESPACE",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.namespace",
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "metadata.namespace",
 				},
 			},
 		},
@@ -188,7 +195,8 @@ func renderSlurmdEnv(
 			Name: "INSTANCE_ID",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "spec.nodeName",
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "spec.nodeName",
 				},
 			},
 		},

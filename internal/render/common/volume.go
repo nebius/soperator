@@ -16,6 +16,10 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
+const (
+	DefaultFileMode = int32(0420)
+)
+
 // region PVC template
 
 func RenderVolumeClaimTemplates(
@@ -34,6 +38,7 @@ func RenderVolumeClaimTemplates(
 			renderVolumeClaimTemplate(componentType, namespace, clusterName, template.Name, *template.Spec),
 		)
 	}
+
 	return res
 }
 
@@ -221,6 +226,7 @@ func RenderVolumeMungeKey(clusterName string) corev1.Volume {
 						Mode: ptr.To(consts.SecretMungeKeyFileMode),
 					},
 				},
+				DefaultMode: ptr.To(DefaultFileMode),
 			},
 		},
 	}
@@ -269,6 +275,7 @@ func RenderVolumeSecurityLimits(clusterName string, componentType consts.Compone
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: naming.BuildConfigMapSecurityLimitsName(componentType, clusterName),
 				},
+				DefaultMode: ptr.To(DefaultFileMode),
 			},
 		},
 	}
@@ -301,6 +308,7 @@ func RenderVolumeRESTJWTKey(clusterName string) corev1.Volume {
 						Mode: ptr.To(consts.SecretRESTJWTKeyFileMode),
 					},
 				},
+				DefaultMode: ptr.To(DefaultFileMode),
 			},
 		},
 	}
@@ -389,6 +397,7 @@ func RenderVolumeSshdKeys(sshdKeysSecretName string) corev1.Volume {
 						Mode: ptr.To(consts.SecretSshdKeysPublicFileMode),
 					},
 				},
+				DefaultMode: ptr.To(DefaultFileMode),
 			},
 		},
 	}

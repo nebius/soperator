@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	"github.com/pkg/errors"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -257,7 +257,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					}
 					stepLogger.V(1).Info("Retrieved dependencies")
 
-					if err = r.StatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
+					if err = r.AdvancedStatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling worker StatefulSet")
 					}
@@ -371,7 +371,7 @@ func (r SlurmClusterReconciler) ValidateWorkers(
 ) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	existing := &appsv1.StatefulSet{}
+	existing := &kruisev1b1.StatefulSet{}
 	err := r.Get(
 		ctx,
 		types.NamespacedName{

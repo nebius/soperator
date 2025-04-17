@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,7 +17,7 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-// RenderStatefulSet renders new [appsv1.StatefulSet] containing Slurm controller pods
+// RenderStatefulSet renders new [kruisev1b1.StatefulSet] containing Slurm controller pods
 func RenderStatefulSet(
 	namespace,
 	clusterName string,
@@ -25,7 +26,7 @@ func RenderStatefulSet(
 	volumeSources []slurmv1.VolumeSource,
 	controller *values.SlurmController,
 	slurmTopologyConfigMapRefName string,
-) (appsv1.StatefulSet, error) {
+) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeController, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeController, clusterName)
 
@@ -38,7 +39,7 @@ func RenderStatefulSet(
 	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecs(
 		clusterName, volumeSources, controller, slurmTopologyConfigMapRefName)
 	if err != nil {
-		return appsv1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
+		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
 	replicas := &controller.StatefulSet.Replicas
@@ -46,20 +47,23 @@ func RenderStatefulSet(
 		replicas = ptr.To(consts.ZeroReplicas)
 	}
 
-	return appsv1.StatefulSet{
+	return kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      controller.StatefulSet.Name,
 			Namespace: namespace,
 			Labels:    labels,
 		},
-		Spec: appsv1.StatefulSetSpec{
+		Spec: kruisev1b1.StatefulSetSpec{
 			PodManagementPolicy: consts.PodManagementPolicy,
 			ServiceName:         controller.Service.Name,
 			Replicas:            replicas,
-			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
-				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-					MaxUnavailable: &controller.StatefulSet.MaxUnavailable,
+				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
+					MaxUnavailable:  &controller.StatefulSet.MaxUnavailable,
+					PodUpdatePolicy: kruisev1b1.RecreatePodUpdateStrategyType,
+					Partition:       ptr.To(int32(0)),
+					MinReadySeconds: ptr.To(int32(0)),
 				},
 			},
 			Selector: &metav1.LabelSelector{
@@ -71,6 +75,9 @@ func RenderStatefulSet(
 				clusterName,
 				pvcTemplateSpecs,
 			),
+			VolumeClaimUpdateStrategy: kruisev1b1.VolumeClaimUpdateStrategy{
+				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
+			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
@@ -95,7 +102,12 @@ func RenderStatefulSet(
 					Containers: []corev1.Container{
 						renderContainerSlurmctld(&controller.ContainerSlurmctld, controller.CustomVolumeMounts),
 					},
-					Volumes: volumes,
+					Volumes:                       volumes,
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					TerminationGracePeriodSeconds: ptr.To(common.DefaultPodTerminationGracePeriodSeconds),
+					SecurityContext:               &corev1.PodSecurityContext{},
+					SchedulerName:                 corev1.DefaultSchedulerName,
+					DNSPolicy:                     corev1.DNSClusterFirst,
 				},
 			},
 		},

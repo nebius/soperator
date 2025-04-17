@@ -8,6 +8,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 )
 
+const (
+	DefaultPodTerminationGracePeriodSeconds = int64(30)
+)
+
 func MergePodTemplateSpecs(
 	baseSpec corev1.PodTemplateSpec,
 	refSpec *corev1.PodTemplateSpec,

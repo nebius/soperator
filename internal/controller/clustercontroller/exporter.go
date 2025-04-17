@@ -121,6 +121,6 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 		logger.Error(err, "Failed to reconcile exporter resources")
 		return errors.Wrap(err, "reconciling exporter resources")
 	}
-	logger.V(1).Info("Reconciled exporter resources")
+	logger.Info("Reconciled exporter resources")
 	return nil
 }

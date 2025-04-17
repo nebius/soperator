@@ -2,6 +2,7 @@ package controller
 
 import (
 	corev1 "k8s.io/api/core/v1"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 
 	"nebius.ai/slurm-operator/internal/consts"
@@ -41,6 +42,10 @@ func renderContainerSlurmctld(container *values.Container, customMounts []slurmv
 					},
 				},
 			},
+			TimeoutSeconds:   common.DefaultProbeTimeoutSeconds,
+			PeriodSeconds:    common.DefaultProbePeriodSeconds,
+			SuccessThreshold: common.DefaultProbeSuccessThreshold,
+			FailureThreshold: common.DefaultProbeFailureThreshold,
 		},
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
@@ -53,5 +58,7 @@ func renderContainerSlurmctld(container *values.Container, customMounts []slurmv
 			Limits:   limits,
 			Requests: container.Resources,
 		},
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}
 }

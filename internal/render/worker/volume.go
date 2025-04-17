@@ -118,6 +118,7 @@ func renderSupervisordConfigMap(name string) corev1.Volume {
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: name,
 				},
+				DefaultMode: ptr.To(common.DefaultFileMode),
 			},
 		},
 	}
@@ -134,6 +135,7 @@ func renderVolumeNvidia() corev1.Volume {
 		VolumeSource: corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: consts.VolumeMountPathNvidia,
+				Type: ptr.To(corev1.HostPathType("")),
 			},
 		},
 	}
@@ -159,6 +161,7 @@ func renderVolumeBoot() corev1.Volume {
 		VolumeSource: corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: consts.VolumeMountPathBoot,
+				Type: ptr.To(corev1.HostPathType("")),
 			},
 		},
 	}
@@ -186,6 +189,7 @@ func renderVolumeNCCLTopology(clusterName string) corev1.Volume {
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: naming.BuildConfigMapNCCLTopologyName(clusterName),
 				},
+				DefaultMode: ptr.To(common.DefaultFileMode),
 			},
 		},
 	}
@@ -238,6 +242,7 @@ func renderVolumeSysctl(clusterName string) corev1.Volume {
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: naming.BuildConfigMapSysctlName(clusterName),
 				},
+				DefaultMode: ptr.To(common.DefaultFileMode),
 			},
 		},
 	}
@@ -265,6 +270,7 @@ func renderVolumeSshdConfigs(sshdConfigMapName string) corev1.Volume {
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: sshdConfigMapName,
 				},
+				DefaultMode: ptr.To(common.DefaultFileMode),
 			},
 		},
 	}

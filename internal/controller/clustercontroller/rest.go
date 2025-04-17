@@ -116,7 +116,7 @@ func (r SlurmClusterReconciler) ReconcileREST(
 		logger.Error(err, "Failed to reconcile REST resources")
 		return errors.Wrap(err, "reconciling REST resources")
 	}
-	logger.V(1).Info("Reconciled REST resources")
+	logger.Info("Reconciled REST resources")
 	return nil
 }
 
