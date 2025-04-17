@@ -3,5 +3,6 @@ kind: Kustomization
 resources:
   - ../base/
   - ../../../base/victoria-metrics-operator/
-  - ../../../base/victoria-logs
-  - ../../../base/opentelemetry-collector
+  - ../../../base/victoria-logs/
+  - ../../../base/opentelemetry-collector/
+  - ./flux_kustomization.yaml

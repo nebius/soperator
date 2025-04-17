@@ -2,7 +2,7 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: nebius-cloud
+  name: flux-system
   namespace: flux-system
 spec:
   interval: 3m
@@ -16,7 +16,7 @@ spec:
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
-  name: nebius-cloud
+  name: flux-system
   namespace: flux-system
 spec:
   interval: 3m
