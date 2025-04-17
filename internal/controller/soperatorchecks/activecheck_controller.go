@@ -89,7 +89,11 @@ func (r *ActiveCheckReconciler) Reconcile(
 	}
 
 	slurmCluster := &slurmv1.SlurmCluster{}
-	err = r.Get(ctx, req.NamespacedName, slurmCluster)
+	slurmClusterNamespacedName := types.NamespacedName{
+		Namespace: req.Namespace,
+		Name:      check.Spec.SlurmClusterRefName,
+	}
+	err = r.Get(ctx, slurmClusterNamespacedName, slurmCluster)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logger.V(1).Info("SlurmCluster resource not found")
