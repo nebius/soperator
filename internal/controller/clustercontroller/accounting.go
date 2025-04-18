@@ -206,15 +206,11 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						return nil
 					}
 
-					desired, err = accounting.RenderService(
+					desired = accounting.RenderService(
 						clusterValues.Namespace,
 						clusterValues.Name,
 						&clusterValues.NodeAccounting,
 					)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering accounting Service")
-					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.V(1).Info("Rendered")
 
