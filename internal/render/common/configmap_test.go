@@ -231,8 +231,7 @@ func TestRenderSlurmConfigMapAndTopology(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			result, err := RenderConfigMapSlurmConfigs(&tt.cluster, tt.topologyConfig)
-			assert.Nil(t, err)
+			result := RenderConfigMapSlurmConfigs(&tt.cluster, tt.topologyConfig)
 			assert.NotNil(t, result)
 
 			if tt.expectedTopologyPlugin == "" {
