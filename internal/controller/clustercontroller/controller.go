@@ -86,7 +86,6 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 						clusterValues.Namespace,
 						clusterValues.Name,
 						clusterValues.NodeFilters,
-						&clusterValues.Secrets,
 						clusterValues.VolumeSources,
 						&clusterValues.NodeController,
 						clusterValues.SlurmTopologyConfigMapRefName,
