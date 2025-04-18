@@ -28,7 +28,14 @@ linters:
     - promlinter # Validate Prometheus metric names against best practices.
     - tagalign # Enforce consistent struct tag alignment for readability.
     - testableexamples # Verify testable examples contain expected output comments.
+    - unparam # Detect unused function parameters.
     - usestdlibvars # Suggest using stdlib variables like http.MethodGet instead of string literals.
+
+  settings:
+    unparam:
+      # Inspect exported functions. Default: false.
+      check-exported: true
+
   disable:
     - depguard # Check for dependencies in go.mod.
     - dupl # Detect duplicate code.
@@ -84,7 +91,7 @@ issues:
   max-same-issues: 0
   # Make issues output unique by line.
   # Default: true
-  uniq-by-line: false
+  uniq-by-line: true
 
 run:
   relative-path-mode: gomod
