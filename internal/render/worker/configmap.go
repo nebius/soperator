@@ -151,7 +151,7 @@ func generateDefaultSupervisordConfig() renderutils.ConfigFile {
 func RenderConfigMapSSHDConfigs(
 	cluster *values.SlurmCluster,
 	componentType consts.ComponentType,
-) (corev1.ConfigMap, error) {
+) corev1.ConfigMap {
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapSSHDConfigsNameWorker(cluster.Name),
@@ -161,7 +161,7 @@ func RenderConfigMapSSHDConfigs(
 		Data: map[string]string{
 			consts.ConfigMapKeySshdConfig: generateSshdConfig(cluster).Render(),
 		},
-	}, nil
+	}
 }
 
 func generateSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
