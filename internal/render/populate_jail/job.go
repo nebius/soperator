@@ -22,7 +22,7 @@ func RenderPopulateJailJob(
 	nodeFilters []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
 	populateJail *values.PopulateJail,
-) (batchv1.Job, error) {
+) batchv1.Job {
 	labels := common.RenderLabels(consts.ComponentTypePopulateJail, clusterName)
 
 	nodeFilter := utils.MustGetBy(
@@ -70,5 +70,5 @@ func RenderPopulateJailJob(
 			Parallelism: ptr.To(int32(1)),
 			Completions: ptr.To(int32(1)),
 		},
-	}, nil
+	}
 }
