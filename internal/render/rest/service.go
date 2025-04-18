@@ -13,7 +13,7 @@ import (
 )
 
 // RenderService renders new [corev1.Service] serving Slurm REST API
-func RenderService(namespace, clusterName string, rest *values.SlurmREST) (*corev1.Service, error) {
+func RenderService(namespace, clusterName string, rest *values.SlurmREST) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rest.Service.Name,
@@ -30,7 +30,7 @@ func RenderService(namespace, clusterName string, rest *values.SlurmREST) (*core
 				TargetPort: intstr.FromString(rest.ContainerREST.Name),
 			}},
 		},
-	}, nil
+	}
 }
 
 func GetServiceURL(namespace string, rest *values.SlurmREST) string {
