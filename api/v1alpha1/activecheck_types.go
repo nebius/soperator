@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"nebius.ai/slurm-operator/internal/consts"
 )
 
@@ -99,7 +100,7 @@ type Reactions struct {
 type K8sJobSpec struct {
 	Image   string   `json:"image,omitempty"`
 	Command []string `json:"command,omitempty"`
-	// ScriptRefName name of configMap with custom script
+	// ScriptRefName name of configMap with custom script. Data expected in the key script.sh inside ConfigMap.
 	// +kubebuilder:validation:Optional
 	ScriptRefName *string              `json:"scriptRefName,omitempty"`
 	Args          []string             `json:"args,omitempty"`

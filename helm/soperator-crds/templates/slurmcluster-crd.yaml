@@ -1112,7 +1112,8 @@ spec:
                   image:
                     type: string
                   scriptRefName:
-                    description: ScriptRefName name of configMap with custom script
+                    description: ScriptRefName name of configMap with custom script.
+                      Data expected in the key script.sh inside ConfigMap.
                     type: string
                   volumeMounts:
                     items:
