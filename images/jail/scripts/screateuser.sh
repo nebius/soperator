@@ -3,7 +3,7 @@
 set -e
 
 if [[ $# -eq 0 ]] || [[ "$*" == *"-h"* ]] || [[ "$*" == *"--help"* ]]; then
-    echo "Usage: createuser <username> [--with-password] [--without-sudo] [--without-docker] [<args for adduser...>]"
+    echo "Usage: screateuser <username> [--with-password] [--without-sudo] [--without-docker] [<args for adduser...>]"
     exit 0
 fi
 
