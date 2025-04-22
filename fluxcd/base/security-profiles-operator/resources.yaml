@@ -27,6 +27,7 @@ spec:
   chart:
     spec:
       chart: security-profiles-operator
+      version: 0.8.4-soperator
       sourceRef:
         kind: HelmRepository
         name: security-profiles-operator
