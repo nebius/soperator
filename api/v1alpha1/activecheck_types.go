@@ -110,9 +110,12 @@ type K8sJobSpec struct {
 
 // ActiveCheckK8sJobsStatus defines the observed state of ActiveCheck k8s jobs.
 type ActiveCheckK8sJobsStatus struct {
+	// +kubebuilder:validation:Optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
 
-	LastK8sJobScheduleTime   *metav1.Time `json:"lastK8sJobScheduleTime"`
+	// +kubebuilder:validation:Optional
+	LastK8sJobScheduleTime *metav1.Time `json:"lastK8sJobScheduleTime"`
+	// +kubebuilder:validation:Optional
 	LastK8sJobSuccessfulTime *metav1.Time `json:"lastK8sJobSuccessfulTime"`
 
 	LastK8sJobName   string                         `json:"lastK8sJobName"`

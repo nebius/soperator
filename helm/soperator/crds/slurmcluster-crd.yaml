@@ -3150,10 +3150,7 @@ spec:
                     type: string
                 required:
                 - lastK8sJobName
-                - lastK8sJobScheduleTime
                 - lastK8sJobStatus
-                - lastK8sJobSuccessfulTime
-                - lastTransitionTime
                 type: object
               observedGeneration:
                 description: ObservedGeneration defines current generation picked

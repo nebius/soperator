@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -147,6 +148,12 @@ func (r *ActiveCheckReconciler) Reconcile(
 					}
 					stepLogger.V(1).Info("Reconciled")
 
+					if check.Spec.RunAfterCreation && check.Status.K8sJobsStatus.LastTransitionTime.IsZero() {
+						if err := r.runAfterCreation(ctx, check, &desired); err != nil {
+							stepLogger.Error(err, "Failed to run after creation")
+							return errors.Wrap(err, "run job after creation")
+						}
+					}
 					return nil
 				},
 			},
@@ -160,4 +167,34 @@ func (r *ActiveCheckReconciler) Reconcile(
 
 	logger.Info("Reconciled ActiveChecks")
 	return ctrl.Result{}, nil
+}
+
+func (r *ActiveCheckReconciler) runAfterCreation(
+	ctx context.Context,
+	check *slurmv1alpha1.ActiveCheck,
+	cronJob *batchv1.CronJob,
+) error {
+	jobName := types.NamespacedName{
+		Name:      render.RenderK8sJobName(check),
+		Namespace: check.Namespace,
+	}
+	err := r.Client.Get(ctx, jobName, &batchv1.Job{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to get job")
+	}
+
+	if err == nil {
+		// Do nothing, job is already present
+		return nil
+	}
+
+	cronJobName := types.NamespacedName{
+		Name:      cronJob.Name,
+		Namespace: cronJob.Namespace,
+	}
+	if err := r.Client.Get(ctx, cronJobName, cronJob); err != nil {
+		return errors.Wrap(err, "failed to get cronJob")
+	}
+
+	return r.Client.Create(ctx, render.RenderK8sJob(check, cronJob))
 }
