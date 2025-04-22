@@ -22,7 +22,6 @@ func RenderStatefulSet(
 	namespace,
 	clusterName string,
 	nodeFilters []slurmv1.K8sNodeFilter,
-	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	controller *values.SlurmController,
 	slurmTopologyConfigMapRefName string,

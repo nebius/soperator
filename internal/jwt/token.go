@@ -53,11 +53,6 @@ type TokenClaims struct {
 	SlurmUsername string `json:"sun,omitempty"`
 }
 
-// GetSlurmUsername returns the Slurm username from the token claims.
-func (c TokenClaims) GetSlurmUsername() (string, error) {
-	return c.SlurmUsername, nil
-}
-
 // Token is a builder for issuing JWT tokens for Slurm clusters.
 type Token struct {
 	client client.Client

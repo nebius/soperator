@@ -368,7 +368,7 @@ func (r *RebooterReconciler) TaintNodeWithNoExecute(ctx context.Context, node *c
 	}
 
 	if addTaint {
-		if r.IsNodeTaintedWithNoExecute(ctx, node) {
+		if r.IsNodeTaintedWithNoExecute(node) {
 			logger.Info("Node already has NoExecute taint", "node name", node.Name)
 			return nil
 		}
@@ -399,7 +399,7 @@ func (r *RebooterReconciler) TaintNodeWithNoExecute(ctx context.Context, node *c
 }
 
 // IsNodeTaintedWithNoExecute check if the taint already exists
-func (r *RebooterReconciler) IsNodeTaintedWithNoExecute(ctx context.Context, node *corev1.Node) bool {
+func (r *RebooterReconciler) IsNodeTaintedWithNoExecute(node *corev1.Node) bool {
 	for _, taint := range node.Spec.Taints {
 		if taint.Key == "node.kubernetes.io/NoExecute" {
 			return true

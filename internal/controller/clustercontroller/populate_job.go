@@ -83,7 +83,7 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 						return nil
 					}
 
-					renderedDesired, err := populate_jail.RenderPopulateJailJob(
+					renderedDesired := populate_jail.RenderPopulateJailJob(
 						clusterValues.Namespace,
 						clusterValues.Name,
 						clusterValues.ClusterType,
@@ -91,16 +91,12 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 						clusterValues.VolumeSources,
 						&clusterValues.PopulateJail,
 					)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering Populate jail Job")
-					}
 					desired = *renderedDesired.DeepCopy()
 
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err = r.Job.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.Job.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling Populate jail Job")
 					}

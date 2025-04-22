@@ -2,6 +2,7 @@ package values
 
 import (
 	corev1 "k8s.io/api/core/v1"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -38,7 +39,7 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 		CustomInitContainers: controller.CustomInitContainers,
 		Service:              buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeController, clusterName)),
 		StatefulSet: buildStatefulSetFrom(
-			naming.BuildStatefulSetName(consts.ComponentTypeController, clusterName),
+			naming.BuildStatefulSetName(consts.ComponentTypeController),
 			controller.SlurmNode.Size,
 		),
 		VolumeSpool:        *controller.Volumes.Spool.DeepCopy(),

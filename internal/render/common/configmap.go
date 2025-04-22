@@ -21,7 +21,7 @@ import (
 // [consts.ConfigMapKeySpankConfig] - SPANK plugins config
 // [consts.ConfigMapKeyGresConfig] - GRES config
 // [consts.ConfigMapKeyMPIConfig] - PMIx config
-func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig corev1.ConfigMap) (corev1.ConfigMap, error) {
+func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig corev1.ConfigMap) corev1.ConfigMap {
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapSlurmConfigsName(cluster.Name),
@@ -37,7 +37,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig co
 			consts.ConfigMapKeyGresConfig:        generateGresConfig(cluster.ClusterType).Render(),
 			consts.ConfigMapKeyMPIConfig:         generateMPIConfig(cluster).Render(),
 		},
-	}, nil
+	}
 }
 
 func renderConfigMapSlurmConfigsLabels(componentType consts.ComponentType, clusterName string) map[string]string {

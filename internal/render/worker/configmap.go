@@ -62,7 +62,7 @@ func generateVirtualTopology(ncclType consts.NCCLType, topologyData string) (ren
 // region Sysctl
 
 // RenderConfigMapSysctl renders new [corev1.ConfigMap] containing sysctl config file
-func RenderConfigMapSysctl(cluster *values.SlurmCluster) (corev1.ConfigMap, error) {
+func RenderConfigMapSysctl(cluster *values.SlurmCluster) corev1.ConfigMap {
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapSysctlName(cluster.Name),
@@ -72,7 +72,7 @@ func RenderConfigMapSysctl(cluster *values.SlurmCluster) (corev1.ConfigMap, erro
 		Data: map[string]string{
 			consts.ConfigMapKeySysctl: generateSysctlConfig().Render(),
 		},
-	}, nil
+	}
 }
 
 func generateSysctlConfig() renderutils.ConfigFile {
@@ -151,7 +151,7 @@ func generateDefaultSupervisordConfig() renderutils.ConfigFile {
 func RenderConfigMapSSHDConfigs(
 	cluster *values.SlurmCluster,
 	componentType consts.ComponentType,
-) (corev1.ConfigMap, error) {
+) corev1.ConfigMap {
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapSSHDConfigsNameWorker(cluster.Name),
@@ -161,7 +161,7 @@ func RenderConfigMapSSHDConfigs(
 		Data: map[string]string{
 			consts.ConfigMapKeySshdConfig: generateSshdConfig(cluster).Render(),
 		},
-	}, nil
+	}
 }
 
 func generateSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {

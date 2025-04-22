@@ -47,15 +47,11 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 						return nil
 					}
 
-					desired, err := login.RenderConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeLogin)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering login default SSHD ConfigMap")
-					}
+					desired := login.RenderConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeLogin)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling login default SSHD ConfigMap")
 					}
@@ -71,15 +67,11 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					desired, err := login.RenderSshRootPublicKeysConfig(clusterValues)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering login SSHRootPublicKeys ConfigMap")
-					}
+					desired := login.RenderSshRootPublicKeysConfig(clusterValues)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling login SSHRootPublicKeys ConfigMap")
 					}

@@ -16,7 +16,7 @@ import (
 // region SSHRootPublicKeys config
 
 // RenderSshRootPublicKeysConfig renders new [corev1.ConfigMap] containing root public keys
-func RenderSshRootPublicKeysConfig(cluster *values.SlurmCluster) (corev1.ConfigMap, error) {
+func RenderSshRootPublicKeysConfig(cluster *values.SlurmCluster) corev1.ConfigMap {
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapSshRootPublicKeysName(cluster.Name),
@@ -26,7 +26,7 @@ func RenderSshRootPublicKeysConfig(cluster *values.SlurmCluster) (corev1.ConfigM
 		Data: map[string]string{
 			consts.ConfigMapKeySshRootPublicKeysConfig: generateSshRootPublicKeysConfig(cluster).Render(),
 		},
-	}, nil
+	}
 }
 
 func generateSshRootPublicKeysConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
@@ -45,7 +45,7 @@ func generateSshRootPublicKeysConfig(cluster *values.SlurmCluster) renderutils.C
 func RenderConfigMapSSHDConfigs(
 	cluster *values.SlurmCluster,
 	componentType consts.ComponentType,
-) (corev1.ConfigMap, error) {
+) corev1.ConfigMap {
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapSSHDConfigsNameLogin(cluster.Name),
@@ -55,7 +55,7 @@ func RenderConfigMapSSHDConfigs(
 		Data: map[string]string{
 			consts.ConfigMapKeySshdConfig: generateSshdConfig(cluster).Render(),
 		},
-	}, nil
+	}
 }
 
 func generateSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {

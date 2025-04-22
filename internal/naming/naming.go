@@ -66,7 +66,7 @@ func BuildServiceHostFQDN(
 	hostIndex int32,
 ) (hostName, hostFQDN string) {
 	// <stsName>-<index>.<svcName>.<namespace>.svc.cluster.local
-	hostName = fmt.Sprintf("%s-%d", BuildStatefulSetName(componentType, clusterName), hostIndex)
+	hostName = fmt.Sprintf("%s-%d", BuildStatefulSetName(componentType), hostIndex)
 	hostFQDN = fmt.Sprintf("%s.%s", hostName, BuildServiceFQDN(componentType, namespace, clusterName))
 	return hostName, hostFQDN
 }
@@ -78,7 +78,7 @@ func BuildAppArmorProfileName(clusterName, namespace string) string {
 	}.String()
 }
 
-func BuildStatefulSetName(componentType consts.ComponentType, clusterName string) string {
+func BuildStatefulSetName(componentType consts.ComponentType) string {
 	return namedEntity{
 		componentType: &componentType,
 		clusterName:   "",

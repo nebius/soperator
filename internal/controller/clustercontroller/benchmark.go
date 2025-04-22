@@ -58,20 +58,15 @@ func (r SlurmClusterReconciler) ReconcileNCCLBenchmark(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					desired, err := benchmark.RenderNCCLBenchmarkCronJob(
+					desired := benchmark.RenderNCCLBenchmarkCronJob(
 						clusterValues.Namespace,
 						clusterValues.Name,
 						clusterValues.NodeFilters,
-						&clusterValues.Secrets,
 						clusterValues.VolumeSources,
 						&clusterValues.NCCLBenchmark,
 						clusterValues.Telemetry,
 						clusterValues.SlurmTopologyConfigMapRefName,
 					)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering NCCL benchmark CronJob")
-					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 

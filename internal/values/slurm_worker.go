@@ -88,7 +88,7 @@ func buildSlurmWorkerFrom(
 		WorkerAnnotations:           worker.WorkerAnnotations,
 		Service:                     buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeWorker, clusterName)),
 		StatefulSet: buildStatefulSetFrom(
-			naming.BuildStatefulSetName(consts.ComponentTypeWorker, clusterName),
+			naming.BuildStatefulSetName(consts.ComponentTypeWorker),
 			worker.SlurmNode.Size,
 		),
 		VolumeSpool:               *worker.Volumes.Spool.DeepCopy(),

@@ -66,15 +66,11 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					desired, err := worker.RenderConfigMapSysctl(clusterValues)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering worker Sysctl ConfigMap")
-					}
+					desired := worker.RenderConfigMapSysctl(clusterValues)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling worker Sysctl ConfigMap")
 					}
@@ -96,15 +92,11 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						return nil
 					}
 
-					desired, err := worker.RenderConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeWorker)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering worker default SSHD ConfigMap")
-					}
+					desired := worker.RenderConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeWorker)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling worker default SSHD ConfigMap")
 					}

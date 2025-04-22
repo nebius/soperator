@@ -15,8 +15,7 @@ func Test_RenderService(t *testing.T) {
 	namespace := "test-namespace"
 	clusterName := "test-cluster"
 
-	service, err := accounting.RenderService(namespace, clusterName, acc)
-	assert.NoError(t, err)
+	service := accounting.RenderService(namespace, clusterName, acc)
 
 	assert.Equal(t, acc.Service.Name, service.Name)
 	assert.Equal(t, namespace, service.Namespace)
