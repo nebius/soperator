@@ -23,6 +23,7 @@ spec:
         kind: HelmRepository
         name: mariadb-operator
       interval: 3m
+      version: '0.38.*'
   install:
     crds: CreateReplace
     remediation:
@@ -57,7 +58,7 @@ spec:
         kind: HelmRepository
         name: mariadb-operator
       interval: 3m
-      version: '0.12.*'
+      version: '0.38.*'
   valuesFrom:
     - kind: ConfigMap
       name: mariadb-operator
