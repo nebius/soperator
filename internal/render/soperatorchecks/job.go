@@ -37,5 +37,5 @@ func RenderK8sJob(check *slurmv1alpha1.ActiveCheck, cronJob *batchv1.CronJob) *b
 }
 
 func RenderK8sJobName(check *slurmv1alpha1.ActiveCheck) string {
-	return fmt.Sprintf("%s-manual-run", check.Spec.Name)
+	return fmt.Sprintf("%s-initial-run", check.Spec.Name)
 }
