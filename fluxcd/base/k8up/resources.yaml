@@ -40,8 +40,19 @@ spec:
       valuesKey: values.yaml
       optional: true
   values:
-    webhook:
-      enabled: true
-      cert:
-        certManager:
-          enabled: true
+    metrics:
+      grafanaDashboard:
+        enabled: true
+        namespace: monitoring-system
+        additionalLabels:
+          grafana_dashboard: "1"
+
+      prometheusRule:
+        enabled: false
+
+      serviceMonitor:
+        enabled: true
+    k8up:
+      envVars:
+      - name: "BACKUP_SKIP_WITHOUT_ANNOTATION"
+        value: "true"
