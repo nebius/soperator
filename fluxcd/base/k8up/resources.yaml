@@ -1,37 +1,47 @@
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
-  name: soperatorchecks
+  name: k8up
   namespace: flux-system
 spec:
-  type: "oci"
   interval: 120m
-  url: oci://cr.eu-north1.nebius.cloud/soperator
+  url: https://k8up-io.github.io/k8up
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: soperatorchecks
+  name: k8up
   namespace: flux-system
 spec:
+  releaseName: k8up
   dependsOn:
-    - name: soperator
-  releaseName: soperatorchecks
+    - name: ns
+    - name: cert-manager
   interval: 3m
   timeout: 3m
   install:
+    crds: Skip
     remediation:
       retries: 3
-  targetNamespace: soperator-system
+  upgrade:
+    crds: Skip
+  targetNamespace: k8up-system
   chart:
     spec:
-      chart: helm-soperatorchecks
+      chart: k8up
       sourceRef:
         kind: HelmRepository
-        name: soperatorchecks
+        name: k8up
       interval: 3m
+      version: '4.8.*'
   valuesFrom:
     - kind: ConfigMap
-      name: soperatorchecks
+      name: k8up
       valuesKey: values.yaml
       optional: true
+  values:
+    webhook:
+      enabled: true
+      cert:
+        certManager:
+          enabled: true
