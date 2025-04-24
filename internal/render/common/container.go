@@ -41,7 +41,6 @@ func RenderContainerMunge(container *values.Container, opts ...RenderOption) cor
 		ImagePullPolicy: container.ImagePullPolicy,
 		VolumeMounts: []corev1.VolumeMount{
 			RenderVolumeMountMungeKey(),
-			RenderVolumeMountJail(),
 			RenderVolumeMountMungeSocket(),
 		},
 		ReadinessProbe: &corev1.Probe{

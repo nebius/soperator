@@ -5,35 +5,76 @@ import (
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/render/common"
 )
 
 func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Container {
-	container := corev1.Container{
-		Name:            check.Spec.Name,
-		Image:           check.Spec.K8sJobSpec.Image,
-		Command:         check.Spec.K8sJobSpec.Command,
-		ImagePullPolicy: corev1.PullIfNotPresent,
-		Env:             check.Spec.K8sJobSpec.Env,
-		SecurityContext: &corev1.SecurityContext{
-			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{
-					consts.ContainerSecurityContextCapabilitySysAdmin,
-				},
-			},
-		},
-		VolumeMounts: check.Spec.K8sJobSpec.VolumeMounts,
+	var container corev1.Container
+
+	slurmVolumeMounts := []corev1.VolumeMount{
+		common.RenderVolumeMountSlurmConfigs(),
+		common.RenderVolumeMountMungeKey(),
+		common.RenderVolumeMountMungeSocket(),
 	}
 
-	if check.Spec.K8sJobSpec.ScriptRefName != nil {
+	if check.Spec.CheckType == "k8sJob" {
+		container = corev1.Container{
+			Name:            check.Spec.Name,
+			Image:           check.Spec.K8sJobSpec.JobContainer.Image,
+			Command:         check.Spec.K8sJobSpec.JobContainer.Command,
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Env:             check.Spec.K8sJobSpec.JobContainer.Env,
+			SecurityContext: &corev1.SecurityContext{
+				Capabilities: &corev1.Capabilities{
+					Add: []corev1.Capability{consts.ContainerSecurityContextCapabilitySysAdmin},
+				},
+			},
+			VolumeMounts: check.Spec.K8sJobSpec.JobContainer.VolumeMounts,
+		}
+
+		if check.Spec.K8sJobSpec.ScriptRefName != nil {
+			scriptVolumeMount := corev1.VolumeMount{
+				Name:      "script-volume",
+				MountPath: "/opt/bin/entrypoint.sh",
+				SubPath:   "entrypoint.sh",
+				ReadOnly:  true,
+			}
+
+			container.VolumeMounts = append(container.VolumeMounts, scriptVolumeMount)
+			container.Command = []string{"/bin/bash", "/opt/bin/entrypoint.sh"}
+		}
+		return container
+	}
+
+	volumeMounts := append(slurmVolumeMounts, check.Spec.SlurmJobSpec.JobContainer.VolumeMounts...)
+
+	container = corev1.Container{
+		Name:            check.Spec.Name,
+		Image:           check.Spec.SlurmJobSpec.JobContainer.Image,
+		Command:         check.Spec.SlurmJobSpec.JobContainer.Command,
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Env:             check.Spec.SlurmJobSpec.JobContainer.Env,
+		SecurityContext: &corev1.SecurityContext{
+			Capabilities: &corev1.Capabilities{
+				Add: []corev1.Capability{consts.ContainerSecurityContextCapabilitySysAdmin},
+			},
+		},
+		VolumeMounts: volumeMounts,
+	}
+
+	if check.Spec.SlurmJobSpec.SbatchScriptRefName != nil {
 		scriptVolumeMount := corev1.VolumeMount{
-			Name:      "script-volume",
-			MountPath: "/opt/bin/entrypoint.sh",
-			SubPath:   "entrypoint.sh",
+			Name:      "sbatch-volume",
+			MountPath: "/opt/bin/sbatch.sh",
+			SubPath:   "sbatch.sh",
 			ReadOnly:  true,
 		}
 
-		container.VolumeMounts = append(container.VolumeMounts, scriptVolumeMount)
-		container.Command = []string{"/bin/bash", "/opt/bin/entrypoint.sh"}
+		container.VolumeMounts = append(volumeMounts, scriptVolumeMount)
+
+		if container.Command == nil {
+			container.Command = []string{"/usr/bin/sbatch", "/opt/bin/sbatch.sh"}
+		}
 	}
 
 	return container

@@ -13,10 +13,6 @@ RUN chmod +x /opt/bin/install_munge.sh && \
 # Update linker cache
 RUN ldconfig
 
-# Delete users & home because they will be linked from jail
-RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
-RUN rm -rf /home
-
 ENV MUNGE_NUM_THREADS=10
 ENV MUNGE_KEY_FILE=/etc/munge/munge.key
 ENV MUNGE_PID_FILE=/run/munge/munged.pid
