@@ -16,7 +16,6 @@ spec:
   releaseName: k8up
   dependsOn:
     - name: ns
-    - name: k8up-crds
     - name: cert-manager
   interval: 3m
   timeout: 3m
