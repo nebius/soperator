@@ -1,6 +1,8 @@
 name: E2E test soperator
 
 on:
+  schedule:
+    - cron: '0 */12 * * *'
   workflow_dispatch:
     inputs:
       terraform_repo:
@@ -35,9 +37,9 @@ jobs:
     environment: e2e
 
     env:
-      PATH_TO_INSTALLATION: "${{ github.workspace }}/terraform-repo/${{ github.event.inputs.path_to_installation }}"
-      TERRAFORM_REPO: "${{ github.event.inputs.terraform_repo }}"
-      TERRAFORM_REPO_REF: "${{ github.event.inputs.terraform_repo_ref }}"
+      PATH_TO_INSTALLATION: "${{ github.workspace }}/terraform-repo/${{ github.event.inputs.path_to_installation || '/soperator/installations/example' }}"
+      TERRAFORM_REPO: "${{ github.event.inputs.terraform_repo || 'nebius/nebius-solution-library' }}"
+      TERRAFORM_REPO_REF: "${{ github.event.inputs.terraform_repo_ref || 'release/soperator' }}"
       NEBIUS_TENANT_ID: ${{ vars.E2E_TEST_NEBIUS_TENANT_ID }}
       NEBIUS_PROJECT_ID: ${{ vars.E2E_TEST_NEBIUS_PROJECT_ID }}
       NEBIUS_REGION: ${{ vars.E2E_TEST_NEBIUS_REGION }}
