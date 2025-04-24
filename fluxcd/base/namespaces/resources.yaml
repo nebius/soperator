@@ -57,3 +57,7 @@ spec:
       kind: Namespace
       metadata:
         name: cert-manager-system
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: k8up-system

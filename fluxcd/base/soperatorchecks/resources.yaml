@@ -20,11 +20,8 @@ spec:
   interval: 3m
   timeout: 3m
   install:
-    crds: CreateReplace
     remediation:
       retries: 3
-  upgrade:
-    crds: CreateReplace
   targetNamespace: soperator-system
   chart:
     spec:

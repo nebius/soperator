@@ -23,11 +23,11 @@ spec:
   interval: 3m
   timeout: 3m
   install:
-    crds: CreateReplace
+    crds: Skip
     remediation:
       retries: 3
   upgrade:
-    crds: CreateReplace
+    crds: Skip
   targetNamespace: soperator
   chart:
     spec:
