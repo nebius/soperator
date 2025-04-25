@@ -8,17 +8,17 @@ spec:
   chart:
     spec:
       chart: raw
-      interval: 3m
+      interval: {{ .Values.ns.interval }}
       sourceRef:
         kind: HelmRepository
         name: bedag
-      version: 2.0.0
+      version: {{ .Values.ns.version }}
   driftDetection:
     mode: enabled
   install:
     remediation:
       retries: 3
-  interval: .Values.helmRelease.interval
+  interval: {{ .Values.ns.interval }}
   values:
     resources:
     - apiVersion: v1
