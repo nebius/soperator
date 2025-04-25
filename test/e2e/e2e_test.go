@@ -49,6 +49,7 @@ func TestTerraform(t *testing.T) {
 		EnvVars:      envVars,
 		RetryableTerraformErrors: map[string]string{
 			"(?m)^.*context deadline exceeded.*$": "retry on context deadline exceeded",
+			"(?m)^.*connection reset by peer.*$":  "retry on conn reset by peer",
 		},
 		MaxRetries: 5,
 	}
