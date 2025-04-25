@@ -1,0 +1,172 @@
+{{- if .Values.opentelemetry.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-opentelemetry-collector-events
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: opentelemetry-collector
+      interval: {{ .Values.opentelemetry.events.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}- opentelemetry-collector
+      version: {{ .Values.opentelemetry.events.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  - name: {{ include "soperator-fluxcd.fullname" . }}-vm-logs
+  install:
+    remediation:
+      retries: 3
+  interval: {{ .Values.opentelemetry.events.interval }}
+  timeout: {{ .Values.opentelemetry.events.timeout }}
+  releaseName: opentelemetry-collector-events
+  targetNamespace: logs-system
+  values:
+  {{- if .Values.opentelemetry.events.values }}
+    {{- toYaml .Values.opentelemetry.events.values | nindent 4 }}
+  {{- else }}
+    clusterRole:
+      create: true
+      rules:
+      - apiGroups:
+        - ""
+        resources:
+        - pods
+        - namespaces
+        verbs:
+        - get
+        - watch
+        - list
+      - apiGroups:
+        - events.k8s.io
+        resources:
+        - events
+        verbs:
+        - watch
+        - list
+    config:
+      exporters:
+        otlphttp/victoriametrics:
+          compression: gzip
+          encoding: proto
+          logs_endpoint: http://vm-victoria-logs-single-server.logs-system.svc.cluster.local.:9428/insert/opentelemetry/v1/logs
+          retry_on_failure:
+            initial_interval: 200ms
+          timeout: 5s
+      extensions:
+        health_check:
+          endpoint: 0.0.0.0:13133
+      processors:
+        batch:
+          send_batch_max_size: 700
+          send_batch_size: 250
+        k8sattributes:
+          extract:
+            labels:
+            - from: pod
+              key: external-o11y
+              tag_name: external_o11y
+            - from: namespace
+              key: o11y_resource_id
+              tag_name: resource_id
+            - from: namespace
+              key: o11y_service_provider
+              tag_name: service_provider
+            metadata:
+            - k8s.namespace.name
+            - k8s.node.name
+            - k8s.pod.name
+            - k8s.pod.uid
+            - k8s.pod.start_time
+          filter:
+            node_from_env_var: K8S_NODE_NAME
+          passthrough: false
+          pod_association:
+          - sources:
+            - from: resource_attribute
+              name: k8s.pod.ip
+          - sources:
+            - from: resource_attribute
+              name: k8s.pod.uid
+          - sources:
+            - from: connection
+          wait_for_metadata: true
+          wait_for_metadata_timeout: 30s
+        memory_limiter:
+          check_interval: 5s
+          limit_percentage: 80
+          spike_limit_percentage: 25
+        transform:
+          log_statements:
+          - context: log
+            error_mode: ignore
+            statements:
+            - set(attributes["cache"], ParseJSON(body.string)) where IsMatch(body.string,
+              "^\\{")
+            - set(attributes["name"], attributes["cache"]["metadata"]["name"])
+            - set(attributes["source"], attributes["cache"]["source"])
+            - set(attributes["timestamp"], attributes["cache"]["lastTimestamp"])
+            - set(attributes["count"], attributes["cache"]["count"])
+            - set(attributes["type"], attributes["cache"]["type"])
+            - set(body, attributes["cache"]["message"])
+            - delete_key(attributes, "cache")
+            - set(severity_text, "INFO")
+            - set(attributes["cluster"], "${env:CLUSTER_NAME}")
+      receivers:
+        k8sobjects:
+          auth_type: serviceAccount
+          objects:
+          - group: events.k8s.io
+            mode: watch
+            name: events
+        zipkin: null
+      service:
+        extensions:
+        - health_check
+        pipelines:
+          logs/events:
+            exporters:
+            - otlphttp/victoriametrics
+            processors:
+            - transform
+            - memory_limiter
+            - batch
+            receivers:
+            - k8sobjects
+          metrics: null
+          traces: null
+    extraEnvs:
+    - name: K8S_NODE_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.nodeName
+    - name: CLUSTER_NAME
+      value: soperator
+    - name: GOMAXPROCS
+      value: "1"
+    image:
+      pullPolicy: IfNotPresent
+      repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
+      tag: 0.2.241
+    mode: deployment
+    rollout:
+      rollingUpdate:
+        maxUnavailable: 50%
+      strategy: RollingUpdate
+    securityContext:
+      runAsGroup: 10001
+      runAsUser: 10001
+    serviceAccount:
+      create: true
+    tolerations: []
+    useGOMEMLIMIT: true
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: opentelemetry-collector-events
+    optional: true
+    valuesKey: values.yaml
+{{- end }}

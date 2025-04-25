@@ -1,0 +1,254 @@
+helmRepository:
+  interval: 1m
+certManager:
+  enabled: true
+  interval: 1m
+  timeout: 3m
+  version: v1.12.*
+  values: null
+k8up:
+  enabled: true
+  interval: 1m
+  timeout: 3m
+  version: 4.8.*
+  values:
+    k8up:
+      envVars:
+        - name: BACKUP_SKIP_WITHOUT_ANNOTATION
+          value: "true"
+      env:
+        K8UP_BACKUP_SKIP_WITHOUT_ANNOTATION: "true"
+      image:
+        repository: ghcr.io/vshn/k8up
+        tag: v4.8.0
+      metrics:
+        grafanaDashboard:
+          additionalLabels:
+            grafana_dashboard: "1"
+          enabled: true
+          namespace: monitoring-system
+        prometheusRule:
+          enabled: false
+        serviceMonitor:
+          enabled: true
+mariadbOperator:
+  enabled: true
+  interval: 1m
+  timeout: 3m
+  version: 0.38.*
+  values: null
+nodeConfigurator:
+  enabled: true
+  interval: 1m
+  timeout: 3m
+  version: 1.19.0
+  values:
+    nodeConfigurator:
+      enabled: false
+    rebooter:
+      enabled: true
+      generateRBAC: true
+      logFormat: json
+      tolerations:
+        - operator: Exists
+opentelemetry:
+  enabled: true
+  logs:
+    version: 0.117.*
+    interval: 1m
+    timeout: 3m
+    values: null
+  events:
+    version: 0.117.*
+    interval: 1m
+    timeout: 3m
+    values: null
+prometheusOperator:
+  enabled: true
+  interval: 1m
+  timeout: 3m
+  version: 0.64.*
+securityProfilesOperator:
+  enabled: true
+  interval: 1m
+  timeout: 3m
+  version: 0.8.4-soperator
+  values:
+    daemon:
+      tolerations:
+        - operator: Exists
+    enableAppArmor: true
+    enableBpfRecorder: false
+    enableLogEnricher: false
+    enableProfiling: false
+    enableSelinux: false
+    replicaCount: 2
+    spoImage:
+      registry: gcr.io
+      repository: k8s-staging-sp-operator/security-profiles-operator
+      tag: v0.8.4
+    tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists
+      - effect: NoSchedule
+        operator: Exists
+    verbosity: 0
+slurmClusterStorage:
+  enabled: true
+  interval: 1m
+  timeout: 3m
+  version: 1.19.0
+slurmCluster:
+  enabled: true
+  interval: 1m
+  timeout: 3m
+  version: 1.19.0
+soperator:
+  enabled: true
+  interval: 1m
+  timeout: 3m
+  version: 1.19.0
+  values:
+    certManager:
+      enabled: true
+    controllerManager:
+      kubeRbacProxy:
+        image:
+          repository: gcr.io/kubebuilder/kube-rbac-proxy
+          tag: v0.15.0
+      manager:
+        env:
+          isApparmorCrdInstalled: true
+          isMariadbCrdInstalled: true
+          isPrometheusCrdInstalled: true
+soperatorChecks:
+  enabled: true
+  interval: 1m
+  timeout: 3m
+  version: 1.19.0
+  values: null
+vmStack:
+  enabled: true
+  crds:
+    interval: 1m
+    timeout: 3m
+    version: 0.0.3
+  interval: 1m
+  timeout: 3m
+  version: 0.39.*
+  values:
+    alertmanager:
+      enabled: false
+    crds:
+      enabled: false
+    defaultRules:
+      groups:
+        etcd:
+          create: false
+        vmcluster:
+          create: false
+      rules:
+        KubeHpaMaxedOut:
+          create: false
+        KubeMemoryOvercommit:
+          create: false
+        TooHighChurnRate24h:
+          create: false
+        TooManyScrapeErrors:
+          create: false
+    grafana:
+      assertNoLeakedSecrets: false
+      plugins:
+        - https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip;grafana-lokiexplore-app
+        - victoriametrics-logs-datasource
+      sidecar:
+        dashboards:
+          searchNamespace: ALL
+        datasources:
+          searchNamespace: ALL
+    kube-state-metrics:
+      prometheusScrape: false
+      selfMonitor:
+        enabled: true
+      vmServiceScrape:
+        spec:
+          endpoints:
+            - honorLabels: true
+              metricRelabelConfigs:
+                - action: labeldrop
+                  regex: (uid|container_id|image_id)
+              port: http
+            - honorLabels: true
+              metricRelabelConfigs:
+                - action: labeldrop
+                  regex: (uid|container_id|image_id)
+              port: metrics
+          jobLabel: app.kubernetes.io/name
+    kubeControllerManager:
+      enabled: false
+    kubeEtcd:
+      enabled: false
+    kubeProxy:
+      enabled: true
+      vmScrape:
+        spec:
+          endpoints:
+            - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+              port: http-metrics
+              scheme: http
+          jobLabel: jobLabel
+          namespaceSelector:
+            matchNames:
+              - kube-system
+    kubeScheduler:
+      enabled: false
+    kubelet:
+      enabled: true
+    prometheus-node-exporter:
+      enabled: true
+    victoria-metrics-operator:
+      admissionWebhooks:
+        enable: true
+      crd:
+        cleanup:
+          enabled: false
+        create: false
+      operator:
+        disable_prometheus_converter: false
+        enable_converter_ownership: true
+    vmagent:
+      spec:
+        extraArgs:
+          promscrape.maxScrapeSize: "33554432"
+    vmalert:
+      enabled: false
+    vmsingle:
+      spec:
+        extraArgs:
+          dedup.minScrapeInterval: 30s
+          maxLabelsPerTimeseries: "40"
+          search.maxQueryLen: "18765"
+          search.maxUniqueTimeseries: "500000"
+        retentionPeriod: 30d
+vmLogs:
+  enabled: true
+  interval: 1m
+  timeout: 3m
+  version: 0.9.*
+  values:
+    dashboards:
+      enabled: true
+      labels:
+        grafana_dashboard: "1"
+    server:
+      persistentVolume:
+        enabled: true
+        size: 10Gi
+      vmServiceScrape:
+        enabled: true
+    vector:
+      enabled: false

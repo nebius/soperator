@@ -1,0 +1,38 @@
+{{- if .Values.nodeConfigurator.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-nodeconfigurator
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: helm-nodeconfigurator
+      interval: {{ .Values.nodeConfigurator.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-nodeconfigurator
+      version: {{ .Values.nodeConfigurator.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  interval: {{ .Values.nodeConfigurator.interval }}
+  timeout: {{ .Values.nodeConfigurator.timeout }}
+  releaseName: nodeconfigurator
+  targetNamespace: soperator-system
+  upgrade:
+    crds: Skip
+  {{- if .Values.nodeConfigurator.values }}
+  values:
+    {{- toYaml .Values.nodeConfigurator.values | nindent 4 }}
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: nodeconfigurator
+    optional: true
+    valuesKey: values.yaml
+{{- end }}

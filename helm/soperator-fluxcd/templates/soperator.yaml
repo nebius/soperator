@@ -1,0 +1,38 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: helm-soperator
+      interval: {{ .Values.soperator.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+      version: {{ .Values.soperator.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  - name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
+  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator-crds
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  interval: {{ .Values.soperator.interval }}
+  timeout: {{ .Values.soperator.timeout }}
+  releaseName: soperator
+  targetNamespace: soperator-system
+  upgrade:
+    crds: Skip
+  {{- if .Values.soperator.values }}
+  values:
+    {{- toYaml .Values.soperator.values | nindent 4 }}
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: soperator
+    optional: true
+    valuesKey: values.yaml

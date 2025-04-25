@@ -1,0 +1,27 @@
+{{- if .Values.mariadbOperator.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-mariadb-operator-crds
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: {{ include "soperator-fluxcd.fullname" . }}-mariadb-operator-crds
+      interval: {{ .Values.mariadbOperator.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-mariadb-operator
+      version: {{ .Values.mariadbOperator.version }}
+  driftDetection:
+    mode: enabled
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  interval: {{ .Values.mariadbOperator.interval }}
+  timeout: {{ .Values.mariadbOperator.timeout }}
+  upgrade:
+    crds: CreateReplace
+{{- end }}
