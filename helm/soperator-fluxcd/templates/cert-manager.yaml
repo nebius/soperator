@@ -1,0 +1,50 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: cert-manager
+      interval: {{ .Values.certManager.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
+      version: {{ .Values.certManager.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- if .Values.prometheusOperator.enabled }}
+  - name: {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds
+  {{- end }}
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  interval: {{ .Values.certManager.interval }}
+  targetNamespace: cert-manager-system
+  timeout: {{ .Values.certManager.timeout }}
+  upgrade:
+    crds: Skip
+  values:
+  {{- if .Values.certManager.values }}
+    {{- toYaml .Values.certManager.values | nindent 4 }}
+  {{- else }}
+    crds:
+      enabled: true
+    global:
+      leaderElection:
+        namespace: cert-manager-system
+    {{- if .Values.prometheusOperator.enabled }}
+    prometheus:
+      enabled: true
+      servicemonitor:
+        enabled: false
+    {{- end }}
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: cert-manager
+    optional: true
+    valuesKey: values.yaml

@@ -1,0 +1,36 @@
+{{- if .Values.securityProfilesOperator.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-security-profiles-operator
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: security-profiles-operator
+      interval: {{ .Values.securityProfilesOperator.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-security-profiles-operator
+      version: {{ .Values.securityProfilesOperator.version }}
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+  interval: {{ .Values.securityProfilesOperator.interval }}
+  timeout: {{ .Values.securityProfilesOperator.timeout }}
+  releaseName: security-profiles-operator
+  targetNamespace: security-profiles-operator-system
+{{- if .Values.securityProfilesOperator.values }}
+  values:
+    {{- toYaml .Values.securityProfilesOperator.values | nindent 4 }}
+{{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: security-profiles-operator
+    optional: true
+    valuesKey: values.yaml
+{{- end }}

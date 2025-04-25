@@ -1,0 +1,32 @@
+{{- if .Values.slurmClusterStorage.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster-storage
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: helm-slurm-cluster-storage
+      interval: {{ .Values.slurmClusterStorage.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}slurm-cluster-storage
+      version: {{ .Values.slurmClusterStorage.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+  install:
+    remediation:
+      retries: 3
+  interval: {{ .Values.slurmClusterStorage.interval }}
+  timeout: {{ .Values.slurmClusterStorage.timeout }}
+  releaseName: slurm-cluster-storage
+  targetNamespace: soperator
+  valuesFrom:
+  - kind: ConfigMap
+    name: slurm-cluster-storage
+    optional: true
+    valuesKey: values.yaml
+{{- end }}
