@@ -10,12 +10,14 @@ certManager:
   interval: 3m
   timeout: 3m
   version: v1.12.*
+  namespace: "cert-manager-system"
   values: null
 k8up:
   enabled: true
   interval: 3m
   timeout: 3m
   version: 4.8.*
+  namespace: "k8up-system"
   values:
     k8up:
       envVars:
@@ -58,6 +60,7 @@ nodeConfigurator:
         - operator: Exists
 opentelemetry:
   enabled: true
+  namespace: "logs-system"
   logs:
     version: 0.117.*
     interval: 3m
@@ -73,6 +76,7 @@ prometheusOperator:
   interval: 3m
   timeout: 3m
   version: 0.64.*
+  namespace: "monitoring-system"
 securityProfilesOperator:
   enabled: true
   interval: 3m
@@ -135,6 +139,7 @@ soperatorChecks:
   interval: 3m
   timeout: 3m
   version: 1.19.0
+  namespace: "soperator-system"
   values: null
 vmStack:
   enabled: true
@@ -145,6 +150,7 @@ vmStack:
   interval: 3m
   timeout: 3m
   version: 0.39.*
+  namespace: "monitoring-system"
   values:
     alertmanager:
       enabled: false
@@ -244,6 +250,7 @@ vmLogs:
   interval: 3m
   timeout: 3m
   version: 0.9.*
+  namespace: "logs-system"
   values:
     dashboards:
       enabled: true
