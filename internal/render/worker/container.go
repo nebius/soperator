@@ -125,19 +125,6 @@ func renderContainerSlurmd(
 			SuccessThreshold: common.DefaultProbeSuccessThreshold,
 			FailureThreshold: common.DefaultProbeFailureThreshold,
 		},
-		// PreStop lifecycle hook to update the node state to down in case of worker deletion
-		// Node will not be deleted from the slurm cluster if the job is still running
-		Lifecycle: &corev1.Lifecycle{
-			PreStop: &corev1.LifecycleHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{
-						"/bin/bash",
-						"-c",
-						"scontrol update nodename=$(hostname) state=down reason=preStop && scontrol delete nodename=$(hostname);",
-					},
-				},
-			},
-		},
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: ptr.To(true),
 			Capabilities: &corev1.Capabilities{

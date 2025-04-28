@@ -149,7 +149,7 @@ type SlurmConfig struct {
 	// Defines specific subsystems which should provide more detailed event logging.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs"
+	// +kubebuilder:default="Priority,Script,SelectType,Steps"
 	// +kubebuilder:validation:Pattern="^((Accrue|Agent|AuditRPCs|Backfill|BackfillMap|BurstBuffer|Cgroup|ConMgr|CPU_Bind|CpuFrequency|Data|DBD_Agent|Dependency|Elasticsearch|Energy|Federation|FrontEnd|Gres|Hetjob|Gang|GLOB_SILENCE|JobAccountGather|JobComp|JobContainer|License|Network|NetworkRaw|NodeFeatures|NO_CONF_HASH|Power|Priority|Profile|Protocol|Reservation|Route|Script|SelectType|Steps|Switch|TLS|TraceJobs|Triggers)(,)?)+$"
 	DebugFlags *string `json:"debugFlags,omitempty"`
 	// Defines specific file to run the epilog when job ends. Default value is no epilog
