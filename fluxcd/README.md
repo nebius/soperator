@@ -25,11 +25,6 @@ The project structure is based on the [hierarchical repository pattern](https://
   - `nebius-cloud` - Environment for the Nebius Cloud provider.
   - `local` -  Environment for local development (e.g., using kind, orbstack or Minikube).
 
-  **Clusters** (examples):
-  - `soperator` – Deploys `soperator` in a minimal configuration.
-  - `soperator-infra` – Deploys `soperator` plus additional components (exporters, log collectors, metric collectors, etc.).
-  - `soperator-kind` – Deploys `soperator` for local development using Kubernetes in Docker.
-
 Each subfolder typically has its own `kustomization.yaml`. The structure can be extended as needed to adapt to more complex setups or additional environments.
 
 ## File and Directory Layout
@@ -39,26 +34,11 @@ Below is an example of the project layout under the `fluxcd` directory:
 ```
 fluxcd
 ├── enviroment
-│   ├── base
-│   │   └── kustomization.yaml
 │   ├── nebius-cloud
-│   │   ├── soperator-infra
-│   │   │   ├── kustomization.yaml
-│   │   │   └── git-repository.yaml
-│   │   └── soperator
-│   │       ├── kustomization.yaml
-│   │       └── git-repository.yaml
-│   └── local
-│       └── kind
-│           ├── kustomization.yaml
-│           └── git-repository.yaml
-├── README.md
+│   │   ├── kustomization.yaml
+│   │   └── git-repository.yaml
 └── base
-    ├── fluxcd
-    │   ├── kustomization.yaml
-    │   ├── resources.yaml
-    │   └── build.sh
-    └── soperstor
+    └── soperator-fluxcd
         ├── kustomization.yaml
         └── resources.yaml
 ```
@@ -71,19 +51,20 @@ fluxcd
 
 ## Deployment
 
-To deploy a specific cluster configuration, use [Kustomize](https://kustomize.io/) and apply it with `kubectl`. For example, to deploy the `nebius-cloud-soperator-infra` configuration:
+To deploy a specific cluster configuration, use [Kustomize](https://kustomize.io/) and apply it with `kubectl`. For example, to deploy the `nebius-cloud` configuration:
 
 ```bash
-kustomize build --load-restrictor LoadRestrictionsNone fluxcd/enviroment/nebius-cloud/soperator-infra/bootstrap | kubectl apply -f -
+flux create
+kustomize build --load-restrictor LoadRestrictionsNone fluxcd/enviroment/nebius-cloud/bootstrap | kubectl apply -f -
 ```
 
 In this command:
 - `--load-restrictor LoadRestrictionsNone` allows Kustomize load files from outside their root.
-- `fluxcd/enviroment/nebius-cloud/soperator-infra` points to the directory containing the `kustomization.yaml` for that specific environment and cluster type.
+- `fluxcd/enviroment/nebius-cloud` points to the directory containing the `kustomization.yaml` for that specific environment and cluster type.
 
 ### Hierarchical Rendering with Kustomize
 
-Kustomize may require you to “walk up” the directory structure to gather configurations. For instance, a `kustomization.yaml` in `fluxcd/clusters/nebius-cloud/soperator-infra/` might reference:
+Kustomize may require you to “walk up” the directory structure to gather configurations. For instance, a `kustomization.yaml` in `fluxcd/clusters/nebius-cloud/` might reference:
 1. Its parent environment-level `kustomization.yaml` (such as `fluxcd/clusters/nebius-cloud/base/`).
 2. Which in turn could reference specific `base` components in `fluxcd/base/...`.
 

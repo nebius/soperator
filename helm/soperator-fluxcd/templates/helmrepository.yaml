@@ -6,8 +6,8 @@ metadata:
     {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
   interval: {{ .Values.helmRepository.interval }}
-  type: oci
-  url: oci://cr.eu-north1.nebius.cloud/soperator
+  url: {{ .Values.helmRepository.soperator.url }}
+  type: {{ .Values.helmRepository.soperator.type }}
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
@@ -17,7 +17,8 @@ metadata:
     {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
   interval: {{ .Values.helmRepository.interval }}
-  url: https://charts.jetstack.io
+  url: {{ .Values.helmRepository.certManager.url }}
+  type: {{ .Values.helmRepository.certManager.type }}
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
@@ -27,33 +28,9 @@ metadata:
     {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
   interval: {{ .Values.helmRepository.interval }}
-  url: https://bedag.github.io/helm-charts
+  url: {{ .Values.helmRepository.bedag.url }}
+  type: {{ .Values.helmRepository.bedag.type }}
 ---
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
-  name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster
-  labels:
-    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
-spec:
-  interval: {{ .Values.helmRepository.interval }}
-  type: oci
-  url: oci://cr.eu-north1.nebius.cloud/soperator
----
-{{- if .Values.soperatorChecks.enabled }}
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
-  name: {{ include "soperator-fluxcd.fullname" . }}-soperatorchecks
-  labels:
-    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
-spec:
-  interval: {{ .Values.helmRepository.interval }}
-  type: oci
-  url: oci://cr.eu-north1.nebius.cloud/soperator
----
-{{- end }}
-
 {{- if .Values.k8up.enabled }}
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
@@ -63,10 +40,10 @@ metadata:
     {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
   interval: {{ .Values.helmRepository.interval }}
-  url: https://k8up-io.github.io/k8up
----
+  url: {{ .Values.helmRepository.k8up.url }}
+  type: {{ .Values.helmRepository.k8up.type }}
 {{- end }}
-
+---
 {{- if .Values.mariadbOperator.enabled }}
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
@@ -76,24 +53,10 @@ metadata:
     {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
   interval: {{ .Values.helmRepository.interval }}
-  url: https://helm.mariadb.com/mariadb-operator
----
+  url: {{ .Values.helmRepository.mariadbOperator.url }}
+  type: {{ .Values.helmRepository.mariadbOperator.type }}
 {{- end }}
-
-{{- if .Values.nodeConfigurator.enabled }}
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
-  name: {{ include "soperator-fluxcd.fullname" . }}-nodeconfigurator
-  labels:
-    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
-spec:
-  interval: {{ .Values.helmRepository.interval }}
-  type: oci
-  url: oci://cr.eu-north1.nebius.cloud/soperator
 ---
-{{- end }}
-
 {{- if .Values.opentelemetry.enabled }}
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
@@ -103,10 +66,10 @@ metadata:
     {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
   interval: {{ .Values.helmRepository.interval }}
-  url: https://open-telemetry.github.io/opentelemetry-helm-charts
----
+  url: {{ .Values.helmRepository.opentelemetry.url }}
+  type: {{ .Values.helmRepository.opentelemetry.type }}
 {{- end }}
-
+---
 {{- if .Values.prometheusOperator.enabled }}
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
@@ -116,10 +79,10 @@ metadata:
     {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
   interval: {{ .Values.helmRepository.interval }}
-  url: https://prometheus-community.github.io/helm-charts
----
+  url: {{ .Values.helmRepository.prometheusOperator.url }}
+  type: {{ .Values.helmRepository.prometheusOperator.type }}
 {{- end }}
-
+---
 {{- if .Values.securityProfilesOperator.enabled }}
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
@@ -129,46 +92,19 @@ metadata:
     {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
   interval: {{ .Values.helmRepository.interval }}
-  type: oci
-  url: oci://cr.eu-north1.nebius.cloud/e00xdc03sb7gpqfd0a
----
+  url: {{ .Values.helmRepository.securityProfilesOperator.url }}
+  type: {{ .Values.helmRepository.securityProfilesOperator.type }}
 {{- end }}
-
-{{- if .Values.slurmClusterStorage.enabled }}
+---
+{{- if or .Values.vmLogs.enabled .Values.vmStack.enabled }}
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
-  name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster-storage
+  name: {{ include "soperator-fluxcd.fullname" . }}-victoriametrics
   labels:
     {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
   interval: {{ .Values.helmRepository.interval }}
-  type: oci
-  url: oci://cr.eu-north1.nebius.cloud/soperator
----
-{{- end }}
-
-{{- if .Values.vmLogs.enabled }}
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
-  name: {{ include "soperator-fluxcd.fullname" . }}-vm-logs
-  labels:
-    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
-spec:
-  interval: {{ .Values.helmRepository.interval }}
-  url: https://victoriametrics.github.io/helm-charts/
----
-{{- end }}
-
-{{- if .Values.vmStack.enabled }}
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
-  name: {{ include "soperator-fluxcd.fullname" . }}-vm-stack
-  labels:
-    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
-spec:
-  interval: {{ .Values.helmRepository.interval }}
-  url: https://victoriametrics.github.io/helm-charts
+  url: {{ .Values.helmRepository.victoriaMetrics.url }}
+  type: {{ .Values.helmRepository.victoriaMetrics.type }}
 {{- end }}

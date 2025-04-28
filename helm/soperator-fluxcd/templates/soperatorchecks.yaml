@@ -12,7 +12,7 @@ spec:
       interval: {{ .Values.soperatorChecks.interval }}
       sourceRef:
         kind: HelmRepository
-        name: {{ include "soperator-fluxcd.fullname" . }}-soperatorchecks
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.soperatorChecks.version }}
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-soperator

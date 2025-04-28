@@ -12,7 +12,7 @@ spec:
       interval: {{ .Values.slurmClusterStorage.interval }}
       sourceRef:
         kind: HelmRepository
-        name: {{ include "soperator-fluxcd.fullname" . }}slurm-cluster-storage
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.slurmClusterStorage.version }}
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns

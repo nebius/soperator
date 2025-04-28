@@ -12,7 +12,7 @@ spec:
       interval: 3m
       sourceRef:
         kind: HelmRepository
-        name: {{ include "soperator-fluxcd.fullname" . }}-vm-logs
+        name: {{ include "soperator-fluxcd.fullname" . }}-victoriametrics
       version: 0.9.*
   install:
     crds: CreateReplace

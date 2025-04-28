@@ -1,7 +1,7 @@
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
-  name: soperatorchecks
+  name: soperator-fluxcd
   namespace: flux-system
 spec:
   type: "oci"
@@ -11,27 +11,29 @@ spec:
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: soperatorchecks
+  name: soperator-fluxcd
   namespace: flux-system
 spec:
-  dependsOn:
-    - name: soperator
-  releaseName: soperatorchecks
-  interval: 3m
-  timeout: 3m
+  interval: 60m
+  driftDetection:
+    mode: enabled
+  chart:
+    spec:
+      chart: helm-soperator-fluxcd
+      sourceRef:
+        kind: HelmRepository
+        name: soperator-fluxcd
+      interval: 3m
   install:
     remediation:
       retries: 3
-  targetNamespace: soperator-system
-  chart:
-    spec:
-      chart: helm-soperatorchecks
-      sourceRef:
-        kind: HelmRepository
-        name: soperatorchecks
-      interval: 3m
+  targetNamespace: flux-system
   valuesFrom:
     - kind: ConfigMap
-      name: soperatorchecks
+      name: soperator-fluxcd
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: soperator-fluxcd
       valuesKey: values.yaml
       optional: true

@@ -8,8 +8,8 @@ spec:
   interval: 3m
   sourceRef:
     kind: GitRepository
-    name: flux-system
-  path: "./fluxcd/enviroment/local/soperator-kind"
+    name: nebius-cloud
+  path: "./fluxcd/enviroment/nebius-cloud"
   prune: true
   timeout: 1m
 ---
