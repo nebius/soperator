@@ -46,6 +46,8 @@ jobs:
       INFINIBAND_FABRIC: ${{ vars.E2E_TEST_INFINIBAND_FABRIC }}
       SSH_KEYS: ${{ vars.E2E_TEST_SSH_KEYS }}
       O11Y_ACCESS_TOKEN: ${{ secrets.E2E_O11Y_ACCESS_TOKEN }}
+      OUTPUT_LOG_FILE: "${{ github.workspace }}/output/output.log"
+      OUTPUT_ERR_FILE: "${{ github.workspace }}/output/output.err"
 
     steps:
       - name: Harden Runner
@@ -75,3 +77,9 @@ jobs:
           cd -
 
           go test -v -timeout 2h --tags=e2e ./test/e2e/...
+
+      - name: Upload terraform output
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-output
+          path: "${{ github.workspace }}/output"
