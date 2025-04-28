@@ -1,0 +1,94 @@
+suite: test namespace creation logic
+templates:
+  - templates/namespaces.yaml
+tests:
+  - it: should verify namespace creation in HelmRelease values
+    set:
+      vmStack.enabled: false
+      prometheusOperator.enabled: false
+    asserts:
+      - isKind:
+          of: HelmRelease
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-helm-soperator-fluxcd-ns
+      - notContains:
+          path: spec.values.resources
+          content:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: monitoring-system
+
+  - it: should create vmStack namespace when only vmStack is enabled
+    set:
+      vmStack.enabled: true
+      vmStack.namespace: monitoring-system
+      prometheusOperator.enabled: false
+    asserts:
+      - isKind:
+          of: HelmRelease
+      - contains:
+          path: spec.values.resources
+          content:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: monitoring-system
+
+  - it: should create prometheusOperator namespace when only prometheusOperator is enabled
+    set:
+      vmStack.enabled: false
+      prometheusOperator.enabled: true
+      prometheusOperator.namespace: monitoring-system
+    asserts:
+      - isKind:
+          of: HelmRelease
+      - contains:
+          path: spec.values.resources
+          content:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: monitoring-system
+
+  - it: should create single namespace when both components enabled with same namespace
+    set:
+      vmStack.enabled: true
+      vmStack.namespace: monitoring-system
+      prometheusOperator.enabled: true
+      prometheusOperator.namespace: monitoring-system
+    asserts:
+      - isKind:
+          of: HelmRelease
+      - contains:
+          path: spec.values.resources
+          content:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: monitoring-system
+
+  - it: should create two namespaces when both components enabled with different namespaces
+    set:
+      vmStack.enabled: true
+      vmStack.namespace: vm-monitoring
+      prometheusOperator.enabled: true
+      prometheusOperator.namespace: prom-monitoring
+    asserts:
+      - isKind:
+          of: HelmRelease
+      - contains:
+          path: spec.values.resources
+          content:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: vm-monitoring
+      - contains:
+          path: spec.values.resources
+          content:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: prom-monitoring

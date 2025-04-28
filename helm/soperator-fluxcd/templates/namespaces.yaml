@@ -1,0 +1,133 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: raw
+      interval: {{ .Values.ns.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: bedag
+      version: {{ .Values.ns.version }}
+  driftDetection:
+    mode: enabled
+  install:
+    remediation:
+      retries: 3
+  interval: {{ .Values.ns.interval }}
+  values:
+    resources:
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.slurmCluster.namespace | default "soperator" }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.soperator.namespace | default "soperator-system" }}
+    
+    {{- if .Values.mariadbOperator.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.mariadbOperator.namespace | default "mariadb-operator-system" }}
+    {{- end }}
+    
+    {{- if .Values.securityProfilesOperator.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.securityProfilesOperator.namespace | default "security-profiles-operator-system" }}
+    {{- end }}
+    
+    {{- if or .Values.vmLogs.enabled .Values.opentelemetry.enabled }}
+    {{- /* First, check if at least one component is enabled */}}
+    {{- if and .Values.vmLogs.enabled .Values.opentelemetry.enabled }}
+    {{- /* If both components are enabled, we need to handle namespace logic */}}
+    {{- if eq .Values.vmLogs.namespace .Values.opentelemetry.namespace }}
+    {{- /* If namespaces are the same, create only one */}}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.opentelemetry.namespace }}
+    {{- else }}
+    {{- /* If namespaces are different, create both */}}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.opentelemetry.namespace }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.vmLogs.namespace }}
+    {{- end }}
+    {{- else }}
+    {{- /* If only one component is enabled, create its namespace */}}
+    {{- if .Values.vmLogs.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.vmLogs.namespace }}
+    {{- else if .Values.opentelemetry.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.opentelemetry.namespace }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+
+    {{- if or .Values.vmStack.enabled .Values.prometheusOperator.enabled }}
+    {{- /* First, check if at least one component is enabled */}}
+    {{- if and .Values.vmStack.enabled .Values.prometheusOperator.enabled }}
+    {{- /* If both components are enabled, we need to handle namespace logic */}}
+    {{- if eq .Values.vmStack.namespace .Values.prometheusOperator.namespace }}
+    {{- /* If namespaces are the same, create only one */}}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.vmStack.namespace }}
+    {{- else }}
+    {{- /* If namespaces are different, create both */}}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.vmStack.namespace }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.prometheusOperator.namespace }}
+    {{- end }}
+    {{- else }}
+    {{- /* If only one component is enabled, create its namespace */}}
+    {{- if .Values.vmStack.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.vmStack.namespace }}
+    {{- else if .Values.prometheusOperator.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.prometheusOperator.namespace }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+    
+    {{- if .Values.certManager.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.certManager.namespace }}
+    {{- end }}
+    
+    {{- if .Values.k8up.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.k8up.namespace }}
+    {{- end }}

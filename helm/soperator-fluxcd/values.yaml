@@ -1,16 +1,23 @@
 helmRepository:
-  interval: 1m
+  interval: 3m
+ns:
+  enabled: true
+  interval: 3m
+  timeout: 3m
+  version: 2.0.0
 certManager:
   enabled: true
-  interval: 1m
+  interval: 3m
   timeout: 3m
   version: v1.12.*
+  namespace: "cert-manager-system"
   values: null
 k8up:
   enabled: true
-  interval: 1m
+  interval: 3m
   timeout: 3m
   version: 4.8.*
+  namespace: "k8up-system"
   values:
     k8up:
       envVars:
@@ -33,13 +40,13 @@ k8up:
           enabled: true
 mariadbOperator:
   enabled: true
-  interval: 1m
+  interval: 3m
   timeout: 3m
   version: 0.38.*
   values: null
 nodeConfigurator:
   enabled: true
-  interval: 1m
+  interval: 3m
   timeout: 3m
   version: 1.19.0
   values:
@@ -53,24 +60,26 @@ nodeConfigurator:
         - operator: Exists
 opentelemetry:
   enabled: true
+  namespace: "logs-system"
   logs:
     version: 0.117.*
-    interval: 1m
+    interval: 3m
     timeout: 3m
     values: null
   events:
     version: 0.117.*
-    interval: 1m
+    interval: 3m
     timeout: 3m
     values: null
 prometheusOperator:
   enabled: true
-  interval: 1m
+  interval: 3m
   timeout: 3m
   version: 0.64.*
+  namespace: "monitoring-system"
 securityProfilesOperator:
   enabled: true
-  interval: 1m
+  interval: 3m
   timeout: 3m
   version: 0.8.4-soperator
   values:
@@ -99,17 +108,17 @@ securityProfilesOperator:
     verbosity: 0
 slurmClusterStorage:
   enabled: true
-  interval: 1m
+  interval: 3m
   timeout: 3m
   version: 1.19.0
 slurmCluster:
   enabled: true
-  interval: 1m
+  interval: 3m
   timeout: 3m
   version: 1.19.0
 soperator:
   enabled: true
-  interval: 1m
+  interval: 3m
   timeout: 3m
   version: 1.19.0
   values:
@@ -127,19 +136,21 @@ soperator:
           isPrometheusCrdInstalled: true
 soperatorChecks:
   enabled: true
-  interval: 1m
+  interval: 3m
   timeout: 3m
   version: 1.19.0
+  namespace: "soperator-system"
   values: null
 vmStack:
   enabled: true
   crds:
-    interval: 1m
+    interval: 3m
     timeout: 3m
     version: 0.0.3
-  interval: 1m
+  interval: 3m
   timeout: 3m
   version: 0.39.*
+  namespace: "monitoring-system"
   values:
     alertmanager:
       enabled: false
@@ -236,9 +247,10 @@ vmStack:
         retentionPeriod: 30d
 vmLogs:
   enabled: true
-  interval: 1m
+  interval: 3m
   timeout: 3m
   version: 0.9.*
+  namespace: "logs-system"
   values:
     dashboards:
       enabled: true

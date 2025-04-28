@@ -14,6 +14,7 @@ on:
       - 'SECURITY.md'
       - 'images/worker/gpubench/**'
       - 'fluxcd/**'
+      - 'helm/**'
 
   # pull_request are defined separately to allow to run CI from forks.
   pull_request:
@@ -30,6 +31,7 @@ on:
       - 'SECURITY.md'
       - 'images/worker/gpubench/**'
       - 'fluxcd/**'
+      - 'helm/**'
 
 permissions:
   contents: read
