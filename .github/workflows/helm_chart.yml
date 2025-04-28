@@ -1,9 +1,6 @@
 name: Checking Helm Chart
 
 on:
-  push:
-    paths:
-      - 'helm/**'
   pull_request:
     branches:
       - dev
