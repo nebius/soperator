@@ -78,6 +78,9 @@ jobs:
 
           go test -v -timeout 2h --tags=e2e ./test/e2e/...
 
+      - name: Add errors output to job summary
+        run: cat $OUTPUT_ERR_FILE >> $GITHUB_STEP_SUMMARY
+
       - name: Upload terraform output
         uses: actions/upload-artifact@v4
         with:

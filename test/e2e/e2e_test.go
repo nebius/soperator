@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -194,6 +195,8 @@ func ensureOutputFiles(t *testing.T, cfg testConfig) {
 }
 
 func ensureFile(t *testing.T, filename string) {
+	require.NoError(t, os.MkdirAll(filepath.Dir(filename), 0755))
+
 	f, err := os.Create(filename)
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
@@ -201,7 +204,9 @@ func ensureFile(t *testing.T, filename string) {
 
 func writeOutputs(t *testing.T, cfg testConfig, command, output string, err error) {
 	writeOutput(t, cfg.OutputLogFile, command, output)
-	writeOutput(t, cfg.OutputErrFile, command, err.Error())
+	if err != nil {
+		writeOutput(t, cfg.OutputErrFile, command, err.Error())
+	}
 }
 
 func writeOutput(t *testing.T, filename, command, data string) {
