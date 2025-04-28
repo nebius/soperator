@@ -24,6 +24,8 @@ type testConfig struct {
 	O11yAccessToken    string   `split_words:"true" required:"true"`                // O11Y_ACCESS_TOKEN
 	O11ySecretName     string   `split_words:"true" default:"o11y-writer-sa-token"` // O11Y_SECRET_NAME
 	O11yNamespace      string   `split_words:"true" default:"logs-system"`          // O11Y_NAMESPACE
+	OutputLogFile      string   `split_words:"true" default:"output.log"`           // OUTPUT_LOG_FILE
+	OutputErrFile      string   `split_words:"true" default:"output.err"`           // OUTPUT_ERR_FILE
 }
 
 func TestTerraform(t *testing.T) {
@@ -54,13 +56,23 @@ func TestTerraform(t *testing.T) {
 		MaxRetries: 5,
 	}
 
+	ensureOutputFiles(t, cfg)
+
 	terraform.Init(t, &commonOptions)
 	terraform.WorkspaceSelectOrNew(t, &commonOptions, "e2e-test")
-	terraform.Destroy(t, &commonOptions)
+	output, err := terraform.DestroyE(t, &commonOptions)
+	writeOutputs(t, cfg, "destroy", output, err)
+	require.NoError(t, err)
 
-	defer terraform.Destroy(t, &commonOptions)
+	defer func() {
+		output, err := terraform.DestroyE(t, &commonOptions)
+		writeOutputs(t, cfg, "destroy", output, err)
+		require.NoError(t, err)
+	}()
 
-	terraform.Apply(t, &commonOptions)
+	output, err = terraform.ApplyE(t, &commonOptions)
+	writeOutputs(t, cfg, "destroy", output, err)
+	require.NoError(t, err)
 }
 
 func readTFVars(t *testing.T, tfVarsFilename string) map[string]interface{} {
@@ -174,4 +186,32 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 	tfVars["slurm_login_ssh_root_public_keys"] = cfg.SSHKeys
 
 	return tfVars
+}
+
+func ensureOutputFiles(t *testing.T, cfg testConfig) {
+	ensureFile(t, cfg.OutputLogFile)
+	ensureFile(t, cfg.OutputErrFile)
+}
+
+func ensureFile(t *testing.T, filename string) {
+	f, err := os.Create(filename)
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+}
+
+func writeOutputs(t *testing.T, cfg testConfig, command, output string, err error) {
+	writeOutput(t, cfg.OutputLogFile, command, output)
+	writeOutput(t, cfg.OutputErrFile, command, err.Error())
+}
+
+func writeOutput(t *testing.T, filename, command, data string) {
+	f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0644)
+	require.NoError(t, err)
+	defer f.Close()
+
+	_, err = f.WriteString(fmt.Sprintf("Executing %s\n\n", command))
+	require.NoError(t, err)
+
+	_, err = f.WriteString(fmt.Sprintf("%s\n\n", data))
+	require.NoError(t, err)
 }
