@@ -11,12 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
@@ -24,6 +18,10 @@ import (
 	"nebius.ai/slurm-operator/internal/logfield"
 	render "nebius.ai/slurm-operator/internal/render/soperatorchecks"
 	"nebius.ai/slurm-operator/internal/utils"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -60,7 +58,7 @@ func (r *ActiveCheckReconciler) SetupWithManager(
 	cacheSyncTimeout time.Duration,
 ) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&slurmv1alpha1.ActiveCheck{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		For(&slurmv1alpha1.ActiveCheck{}).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
 		Complete(r)
 }
@@ -68,6 +66,7 @@ func (r *ActiveCheckReconciler) SetupWithManager(
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=activechecks,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=activechecks/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=activechecks/finalizers,verbs=update
+// +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;delete
 
 // Reconcile reconciles all resources necessary for active checks controller
 func (r *ActiveCheckReconciler) Reconcile(
@@ -87,6 +86,44 @@ func (r *ActiveCheckReconciler) Reconcile(
 		}
 		logger.Error(err, "Failed to get ActiveCheck")
 		return ctrl.Result{}, err
+	}
+
+	activeCheckFinalizer := "slurm.nebius.ai/activecheck-finalizer"
+	if check.ObjectMeta.DeletionTimestamp.IsZero() == false {
+		if controllerutil.ContainsFinalizer(check, activeCheckFinalizer) {
+			logger.Info("ActiveCheck is being deleted. Cleaning up CronJob")
+			cronJob := &batchv1.CronJob{}
+			err := r.Get(ctx, req.NamespacedName, cronJob)
+			if err != nil {
+				if !apierrors.IsNotFound(err) {
+					logger.Error(err, "Failed to get associated CronJob")
+					return ctrl.Result{}, err
+				}
+				logger.Info("No CronJob found. Nothing to delete")
+			} else {
+				if err := r.Delete(ctx, cronJob); err != nil {
+					logger.Error(err, "Failed to delete associated CronJob")
+					return ctrl.Result{}, err
+				}
+				logger.Info("Deleted associated CronJob")
+			}
+
+			controllerutil.RemoveFinalizer(check, activeCheckFinalizer)
+			if err := r.Update(ctx, check); err != nil {
+				logger.Error(err, "Failed to remove finalizer")
+				return ctrl.Result{}, err
+			}
+		}
+
+		return ctrl.Result{}, nil
+	}
+
+	if !controllerutil.ContainsFinalizer(check, activeCheckFinalizer) {
+		controllerutil.AddFinalizer(check, activeCheckFinalizer)
+		if err := r.Update(ctx, check); err != nil {
+			logger.Error(err, "Failed to add finalizer")
+			return ctrl.Result{}, err
+		}
 	}
 
 	slurmCluster := &slurmv1.SlurmCluster{}
