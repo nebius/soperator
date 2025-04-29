@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/logfield"
@@ -88,9 +89,8 @@ func (r *ActiveCheckReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 
-	activeCheckFinalizer := "slurm.nebius.ai/activecheck-finalizer"
 	if check.ObjectMeta.DeletionTimestamp.IsZero() == false {
-		if controllerutil.ContainsFinalizer(check, activeCheckFinalizer) {
+		if controllerutil.ContainsFinalizer(check, consts.ActiveCheckFinalizer) {
 			logger.Info("ActiveCheck is being deleted. Cleaning up CronJob")
 			cronJob := &batchv1.CronJob{}
 			err := r.Get(ctx, req.NamespacedName, cronJob)
@@ -108,7 +108,7 @@ func (r *ActiveCheckReconciler) Reconcile(
 				logger.Info("Deleted associated CronJob")
 			}
 
-			controllerutil.RemoveFinalizer(check, activeCheckFinalizer)
+			controllerutil.RemoveFinalizer(check, consts.ActiveCheckFinalizer)
 			if err := r.Update(ctx, check); err != nil {
 				logger.Error(err, "Failed to remove finalizer")
 				return ctrl.Result{}, err
@@ -118,8 +118,8 @@ func (r *ActiveCheckReconciler) Reconcile(
 		return ctrl.Result{}, nil
 	}
 
-	if !controllerutil.ContainsFinalizer(check, activeCheckFinalizer) {
-		controllerutil.AddFinalizer(check, activeCheckFinalizer)
+	if !controllerutil.ContainsFinalizer(check, consts.ActiveCheckFinalizer) {
+		controllerutil.AddFinalizer(check, consts.ActiveCheckFinalizer)
 		if err := r.Update(ctx, check); err != nil {
 			logger.Error(err, "Failed to add finalizer")
 			return ctrl.Result{}, err
