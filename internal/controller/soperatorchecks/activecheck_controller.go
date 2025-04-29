@@ -20,9 +20,12 @@ import (
 	render "nebius.ai/slurm-operator/internal/render/soperatorchecks"
 	"nebius.ai/slurm-operator/internal/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 var (
@@ -59,7 +62,26 @@ func (r *ActiveCheckReconciler) SetupWithManager(
 	cacheSyncTimeout time.Duration,
 ) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&slurmv1alpha1.ActiveCheck{}).
+		For(&slurmv1alpha1.ActiveCheck{}, builder.WithPredicates(
+			predicate.Funcs{
+				CreateFunc: func(e event.CreateEvent) bool {
+					return true
+				},
+				DeleteFunc: func(e event.DeleteEvent) bool {
+					return true
+				},
+				UpdateFunc: func(e event.UpdateEvent) bool {
+					if ac, ok := e.ObjectNew.(*slurmv1alpha1.ActiveCheck); ok {
+						return ac.GetDeletionTimestamp() != nil ||
+							e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration()
+					}
+					return false
+				},
+				GenericFunc: func(e event.GenericEvent) bool {
+					return false
+				},
+			},
+		)).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
 		Complete(r)
 }
