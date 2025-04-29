@@ -73,6 +73,7 @@ jobs:
       - name: Run Terratest
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
+          nebius iam session-management revoke --all-my-active
           source .envrc
           cd -
 
