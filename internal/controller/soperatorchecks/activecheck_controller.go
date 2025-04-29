@@ -68,7 +68,7 @@ func (r *ActiveCheckReconciler) SetupWithManager(
 					return true
 				},
 				DeleteFunc: func(e event.DeleteEvent) bool {
-					return true
+					return false
 				},
 				UpdateFunc: func(e event.UpdateEvent) bool {
 					if ac, ok := e.ObjectNew.(*slurmv1alpha1.ActiveCheck); ok {
