@@ -12,7 +12,7 @@ spec:
       interval: {{ .Values.nodeConfigurator.interval }}
       sourceRef:
         kind: HelmRepository
-        name: {{ include "soperator-fluxcd.fullname" . }}-nodeconfigurator
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.nodeConfigurator.version }}
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-soperator

@@ -12,7 +12,7 @@ spec:
       interval: {{ .Values.vmStack.interval }}
       sourceRef:
         kind: HelmRepository
-        name: {{ include "soperator-fluxcd.fullname" . }}-vm-stack
+        name: {{ include "soperator-fluxcd.fullname" . }}-victoriametrics
       version: {{ .Values.vmStack.version }}
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-victoria-metrics-operator-crds

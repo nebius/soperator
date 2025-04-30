@@ -11,7 +11,8 @@ spec:
       interval: {{ .Values.slurmCluster.interval }}
       sourceRef:
         kind: HelmRepository
-        name: slurm-cluster
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+      version: {{ .Values.slurmCluster.version }}
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   - name: {{ include "soperator-fluxcd.fullname" . }}-soperator

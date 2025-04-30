@@ -1,9 +1,0 @@
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - ../base/
-  - ../../../base/victoria-metrics-operator/
-  - ../../../base/victoria-logs/
-  - ../../../base/opentelemetry-collector/
-  - ../../../base/k8up/
-  - ./flux_kustomization.yaml
