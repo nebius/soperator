@@ -1,4 +1,4 @@
-{{- if .Values.vmLogs.enabled }}
+{{- if and .Values.observability.enabled .Values.observability.vmLogs.enabled }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -9,7 +9,7 @@ spec:
   chart:
     spec:
       chart: victoria-logs-single
-      interval: 3m
+      interval: {{ .Values.observability.vmLogs.interval }}
       sourceRef:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-victoriametrics
@@ -18,18 +18,45 @@ spec:
     crds: CreateReplace
     remediation:
       retries: 3
-  interval: 3m
-  releaseName: logs
-  targetNamespace: logs-system
-  timeout: 3m
+  interval: {{ .Values.observability.vmLogs.interval }}
+  timeout: {{ .Values.observability.vmLogs.timeout }}
+  releaseName: {{ .Values.observability.vmLogs.releaseName }}
+  targetNamespace: {{ .Values.observability.vmLogs.namespace }}
   upgrade:
     crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   values:
-  {{- if .Values.vmLogs.values }}
-  values:
-    {{- toYaml .Values.vmLogs.values | nindent 4 }}
+  {{- if .Values.observability.vmStack.overrideValues }}
+    {{- toYaml .Values.observability.vmStack.overrideValues | nindent 4 }}
+  {{- else }}
+      dashboards:
+        enabled: true
+        labels:
+          grafana_dashboard: "1"
+      server:
+        {{- if .Values.observability.vmLogs.values.resources }}
+        resources:
+          {{- toYaml .Values.observability.vmLogs.values.resources | nindent 8 }}
+        {{- end }}
+        {{- if .Values.observability.vmLogs.values.persistentVolume.enabled }}
+        persistence:
+          enabled: true
+          accessModes:
+            - {{ .Values.observability.vmLogs.values.persistentVolume.accessMode }}
+          size: {{ .Values.observability.vmLogs.values.persistentVolume.size }}
+        {{- end }}
+        vmServiceScrape:
+          enabled: true
+      vector:
+        enabled: false
   {{- end }}
   valuesFrom:
+  - kind: ConfigMap
+    name: terraform-vm-logs
+    optional: true
+    valuesKey: values.yaml
   - kind: ConfigMap
     name: vm-logs
     optional: true

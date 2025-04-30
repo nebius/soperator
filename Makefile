@@ -236,13 +236,16 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".controllerManager.manager.image.tag = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator/values.yaml"
 	@# endregion helm/soperator/values.yaml
 
+	@# region fluxcd/environment/nebius-cloud/*/bootstrap/flux-kustomization.yaml
+	@echo 'Syncing helm/soperator-fluxcd/values.yaml'
+	@$(YQ) -i ".spec.postBuild.substitute.soperator_version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/nebius-cloud/dev/bootstrap/flux-kustomization.yaml"
+	@$(YQ) -i ".spec.postBuild.substitute.soperator_version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/nebius-cloud/prod/bootstrap/flux-kustomization.yaml"
+	@# endregion fluxcd/environment/nebius-cloud/*/bootstrap/flux-kustomization.yaml
+
 	@# region helm/soperator-fluxcd/values.yaml
 	@echo 'Syncing helm/soperator-fluxcd/values.yaml'
-	@$(YQ) -i ".nodeConfigurator.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
-	@$(YQ) -i ".slurmClusterStorage.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".slurmCluster.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".soperator.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
-	@$(YQ) -i ".soperatorChecks.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@# endregion helm/soperator-fluxcd/values.yaml
 
 	@# region internal/consts

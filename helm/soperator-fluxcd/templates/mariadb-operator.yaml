@@ -24,13 +24,16 @@ spec:
       retries: 3
   interval: {{ .Values.mariadbOperator.interval }}
   timeout: {{ .Values.mariadbOperator.timeout }}
-  releaseName: mariadb-operator
-  targetNamespace: mariadb-operator-system
+  releaseName: {{ .Values.mariadbOperator.releaseName }}
+  targetNamespace: {{ .Values.mariadbOperator.namespace }}
   upgrade:
     crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   values:
-  {{- if .Values.mariadbOperator.values }}
-    {{- toYaml .Values.mariadbOperator.values | nindent 4 }}
+  {{- if .Values.mariadbOperator.overrideValues }}
+    {{- toYaml .Values.mariadbOperator.overrideValues | nindent 4 }}
   {{- else }}
     webhook:
       cert:
@@ -39,6 +42,10 @@ spec:
       enabled: true
   {{- end }}
   valuesFrom:
+  - kind: ConfigMap
+    name: terraform-mariadb-operator
+    optional: true
+    valuesKey: values.yaml
   - kind: ConfigMap
     name: mariadb-operator
     optional: true

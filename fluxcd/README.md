@@ -23,7 +23,10 @@ The project structure is based on the [hierarchical repository pattern](https://
 
   **Environments**:
   - `nebius-cloud` - Environment for the Nebius Cloud provider.
-  - `local` -  Environment for local development (e.g., using kind, orbstack or Minikube).
+
+  **Clusters** (examples):
+  - `prod` – Deploys `prod` in a stable configuration.
+  - `dev` – Deploys `dev` in a unstable configuration.
 
 Each subfolder typically has its own `kustomization.yaml`. The structure can be extended as needed to adapt to more complex setups or additional environments.
 
@@ -34,9 +37,12 @@ Below is an example of the project layout under the `fluxcd` directory:
 ```
 fluxcd
 ├── enviroment
-│   ├── nebius-cloud
-│   │   ├── kustomization.yaml
-│   │   └── git-repository.yaml
+│   └── nebius-cloud
+│       ├── prod
+│       │   └── kustomization.yaml
+│       └── base
+│           └── kustomization.yaml
+│
 └── base
     └── soperator-fluxcd
         ├── kustomization.yaml
@@ -51,20 +57,20 @@ fluxcd
 
 ## Deployment
 
-To deploy a specific cluster configuration, use [Kustomize](https://kustomize.io/) and apply it with `kubectl`. For example, to deploy the `nebius-cloud` configuration:
+To deploy a specific cluster configuration, use [Kustomize](https://kustomize.io/) and apply it with `kubectl`. For example, to deploy the `nebius-cloud-dev` configuration:
 
 ```bash
 flux create
-kustomize build --load-restrictor LoadRestrictionsNone fluxcd/enviroment/nebius-cloud/bootstrap | kubectl apply -f -
+kustomize build --load-restrictor LoadRestrictionsNone fluxcd/enviroment/nebius-cloud/dev/bootstrap | kubectl apply -f -
 ```
 
 In this command:
 - `--load-restrictor LoadRestrictionsNone` allows Kustomize load files from outside their root.
-- `fluxcd/enviroment/nebius-cloud` points to the directory containing the `kustomization.yaml` for that specific environment and cluster type.
+- `fluxcd/enviroment/nebius-cloud/dev` points to the directory containing the `kustomization.yaml` for that specific environment and cluster type.
 
 ### Hierarchical Rendering with Kustomize
 
-Kustomize may require you to “walk up” the directory structure to gather configurations. For instance, a `kustomization.yaml` in `fluxcd/clusters/nebius-cloud/` might reference:
+Kustomize may require you to “walk up” the directory structure to gather configurations. For instance, a `kustomization.yaml` in `fluxcd/clusters/nebius-cloud/dev/` might reference:
 1. Its parent environment-level `kustomization.yaml` (such as `fluxcd/clusters/nebius-cloud/base/`).
 2. Which in turn could reference specific `base` components in `fluxcd/base/...`.
 

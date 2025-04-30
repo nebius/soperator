@@ -1,0 +1,16 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: flux-system
+  namespace: flux-system
+spec:
+  interval: 3m
+  sourceRef:
+    kind: GitRepository
+    name: nebius-cloud
+  postBuild:
+    substitute:
+      soperator_version: 1.19.0
+  path: "./fluxcd/enviroment/nebius-cloud/prod"
+  prune: false
+  timeout: 1m

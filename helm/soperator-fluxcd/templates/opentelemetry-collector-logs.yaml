@@ -1,4 +1,4 @@
-{{- if .Values.opentelemetry.enabled }}
+{{- if and .Values.observability.enabled .Values.observability.opentelemetry.enabled }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -9,24 +9,28 @@ spec:
   chart:
     spec:
       chart: opentelemetry-collector
-      interval: {{ .Values.opentelemetry.logs.interval }}
+      interval: {{ .Values.observability.opentelemetry.logs.interval }}
       sourceRef:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-opentelemetry-collector
-      version: {{ .Values.opentelemetry.logs.version }}
+      version: {{ .Values.observability.opentelemetry.logs.version }}
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   - name: {{ include "soperator-fluxcd.fullname" . }}-vm-logs
   install:
     remediation:
       retries: 3
-  interval: {{ .Values.opentelemetry.logs.interval }}
-  timeout: {{ .Values.opentelemetry.logs.timeout }}
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  interval: {{ .Values.observability.opentelemetry.logs.interval }}
+  timeout: {{ .Values.observability.opentelemetry.logs.timeout }}
   releaseName: opentelemetry-collector-logs
   targetNamespace: logs-system
   values:
-  {{- if .Values.opentelemetry.logs.values }}
-    {{- toYaml .Values.opentelemetry.logs.values | nindent 4 }}
+  {{- if .Values.observability.opentelemetry.logs.overrideValues }}
+    {{- toYaml .Values.observability.opentelemetry.logs.overrideValues | nindent 4 }}
   {{- else }}
     clusterRole:
       create: true
@@ -49,11 +53,28 @@ spec:
           retry_on_failure:
             initial_interval: 200ms
           timeout: 5s
+        {{- if .Values.observability.opentelemetry.logs.values.publicEndpointEnabled }}
+        otlp:
+          endpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
+          balancer_name: round_robin
+          compression: snappy
+          retry_on_failure:
+            initial_interval: 200ms
+          timeout: 5s
+          headers:
+            iam-container: project-e00h61cxzwnf6zksvdn77
+          auth:
+            authenticator: bearertokenauth
+        {{- end }}
       extensions:
         file_storage:
           directory: /var/lib/otelcol
         health_check:
           endpoint: 0.0.0.0:13133
+        {{- if .Values.observability.opentelemetry.logs.values.publicEndpointEnabled }}
+        bearertokenauth:
+          filename: "/o11ytoken/accessToken"
+        {{- end }}
       processors:
         batch:
           send_batch_max_size: 700
@@ -213,10 +234,16 @@ spec:
         extensions:
         - health_check
         - file_storage
+        {{- if .Values.observability.opentelemetry.logs.values.publicEndpointEnabled }}
+        - bearertokenauth
+        {{- end }}
         pipelines:
           logs:
             exporters:
             - otlphttp/victoriametrics
+            {{- if .Values.observability.opentelemetry.logs.values.publicEndpointEnabled }}
+            - otlp
+            {{- end }}
             processors:
             - k8sattributes
             - transform
@@ -236,6 +263,11 @@ spec:
     - name: GOMAXPROCS
       value: "1"
     extraVolumeMounts:
+    {{- if .Values.observability.opentelemetry.events.values.publicEndpointEnabled }}
+    - mountPath: /o11ytoken
+      name: o11ytoken
+      readOnly: true
+    {{- end }}
     - mountPath: /var/log/pods
       name: varlogpods
       readOnly: true
@@ -245,6 +277,11 @@ spec:
     - mountPath: /var/lib/otelcol
       name: varlibotelcol
     extraVolumes:
+    {{- if .Values.observability.opentelemetry.events.values.publicEndpointEnabled }}
+    - name: o11ytoken
+      secret:
+        secretName: o11y-writer-sa-token
+    {{- end }}
     - hostPath:
         path: /var/log/pods
       name: varlogpods
@@ -308,9 +345,16 @@ spec:
     - effect: NoSchedule
       key: node.cilium.io/agent-not-ready
       operator: Exists
-    useGOMEMLIMIT: true
+    useGOMEMLIMIT: {{ .Values.observability.opentelemetry.logs.values.useGOMEMLIMIT | default true }}
+    {{- if and .Values.observability.opentelemetry.logs.values .Values.observability.opentelemetry.logs.values.resources }}
+    resources: {{- toYaml .Values.observability.opentelemetry.logs.values.resources | nindent 6 }}
+    {{- end }}
   {{- end }}
   valuesFrom:
+  - kind: ConfigMap
+    name: terraform-opentelemetry-collector-logs
+    optional: true
+    valuesKey: values.yaml
   - kind: ConfigMap
     name: opentelemetry-collector-logs
     optional: true

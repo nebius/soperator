@@ -16,28 +16,35 @@ spec:
       version: {{ .Values.certManager.version }}
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-  {{- if .Values.prometheusOperator.enabled }}
+  {{- if and .Values.observability.enabled .Values.observability.prometheusOperator.enabled }}
   - name: {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds
   {{- end }}
   install:
-    crds: Skip
+    crds: CreateReplace
     remediation:
       retries: 3
-  interval: {{ .Values.certManager.interval }}
-  targetNamespace: cert-manager-system
-  timeout: {{ .Values.certManager.timeout }}
   upgrade:
-    crds: Skip
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  interval: {{ .Values.certManager.interval }}
+  targetNamespace: {{ .Values.certManager.namespace }}
+  releaseName: {{ .Values.certManager.releaseName }}
+  timeout: {{ .Values.certManager.timeout }}
   values:
-  {{- if .Values.certManager.values }}
-    {{- toYaml .Values.certManager.values | nindent 4 }}
+  {{- if .Values.certManager.overrideValues }}
+    {{- toYaml .Values.certManager.overrideValues | nindent 4 }}
   {{- else }}
+    enableCertificateOwnerRef: true
+    startupapicheck:
+      enabled: true
     crds:
       enabled: true
     global:
       leaderElection:
         namespace: cert-manager-system
-    {{- if .Values.prometheusOperator.enabled }}
+    {{- if .Values.observability.prometheusOperator.enabled }}
     prometheus:
       enabled: true
       servicemonitor:
@@ -45,6 +52,10 @@ spec:
     {{- end }}
   {{- end }}
   valuesFrom:
+  - kind: ConfigMap
+    name: terraform-cert-manager
+    optional: true
+    valuesKey: values.yaml
   - kind: ConfigMap
     name: cert-manager
     optional: true
