@@ -54,6 +54,7 @@ func TestTerraform(t *testing.T) {
 			"(?m)^.*context deadline exceeded.*$": "retry on context deadline exceeded",
 			"(?m)^.*connection reset by peer.*$":  "retry on conn reset by peer",
 		},
+		NoColor:    true,
 		MaxRetries: 5,
 	}
 
@@ -72,7 +73,7 @@ func TestTerraform(t *testing.T) {
 	}()
 
 	output, err = terraform.ApplyE(t, &commonOptions)
-	writeOutputs(t, cfg, "destroy", output, err)
+	writeOutputs(t, cfg, "apply", output, err)
 	require.NoError(t, err)
 }
 
