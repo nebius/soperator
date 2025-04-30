@@ -76,6 +76,10 @@ type ActiveCheckSpec struct {
 	// +kubebuilder:validation:Optional
 	K8sJobSpec K8sJobSpec `json:"k8sJobSpec,omitempty"`
 
+	// SlurmJobSpec defines options for k8s cronjob which creates slurm job
+	// +kubebuilder:validation:Optional
+	SlurmJobSpec SlurmJobSpec `json:"slurmJobSpec,omitempty"`
+
 	// CheckType defines the type of the check
 	// +kubebuilder:validation:Enum=k8sJob;slurmJob
 	// +kubebuilder:validation:Optional
@@ -97,16 +101,32 @@ type Reactions struct {
 	DrainSlurmNode bool `json:"DrainSlurmNode,omitempty"`
 }
 
+type ContainerSpec struct {
+	Image        string               `json:"image,omitempty"`
+	Command      []string             `json:"command,omitempty"`
+	Args         []string             `json:"args,omitempty"`
+	Env          []corev1.EnvVar      `json:"env,omitempty"`
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+	Volumes      []corev1.Volume      `json:"volumes,omitempty"`
+	// AppArmorProfile defines the AppArmor profile for the containers
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="unconfined"
+	AppArmorProfile string `json:"appArmorProfile,omitempty"`
+}
 type K8sJobSpec struct {
-	Image   string   `json:"image,omitempty"`
-	Command []string `json:"command,omitempty"`
+	JobContainer ContainerSpec `json:"jobContainer,omitempty"`
 	// ScriptRefName name of configMap with custom script. Data expected in the key script.sh inside ConfigMap.
 	// +kubebuilder:validation:Optional
-	ScriptRefName *string              `json:"scriptRefName,omitempty"`
-	Args          []string             `json:"args,omitempty"`
-	Env           []corev1.EnvVar      `json:"env,omitempty"`
-	VolumeMounts  []corev1.VolumeMount `json:"volumeMounts,omitempty"`
-	Volumes       []corev1.Volume      `json:"volumes,omitempty"`
+	ScriptRefName *string `json:"scriptRefName,omitempty"`
+}
+
+type SlurmJobSpec struct {
+	JobContainer   ContainerSpec `json:"jobContainer,omitempty"`
+	MungeContainer ContainerSpec `json:"mungeContainer,omitempty"`
+	// SbatchScriptRefName name of configMap with sbatch script. Data expected in the key sbatch.sh inside ConfigMap.
+	// +kubebuilder:validation:Optional
+	SbatchScriptRefName *string `json:"sbatchScriptRefName,omitempty"`
 }
 
 // ActiveCheckK8sJobsStatus defines the observed state of ActiveCheck k8s jobs.
