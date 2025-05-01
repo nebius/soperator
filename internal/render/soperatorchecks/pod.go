@@ -10,6 +10,7 @@ import (
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/values"
 )
@@ -105,18 +106,29 @@ func renderVolumes(check *slurmv1alpha1.ActiveCheck) []corev1.Volume {
 		volumes = append(volumes, scriptVolume)
 	}
 
-	if check.Spec.CheckType == "slurmJob" && check.Spec.SlurmJobSpec.SbatchScriptRefName != nil {
+	if check.Spec.CheckType == "slurmJob" {
+		var sbatchScriptName string
+		if check.Spec.SlurmJobSpec.SbatchScriptRefName != nil {
+			sbatchScriptName = *check.Spec.SlurmJobSpec.SbatchScriptRefName
+
+		} else {
+			sbatchScriptName = naming.BuildConfigMapSbatchScriptName(check.Spec.Name)
+		}
+		if check.Spec.SlurmJobSpec.SbatchScriptRefName == nil {
+			sbatchScriptName = naming.BuildConfigMapSbatchScriptName(check.Spec.Name)
+		}
+
 		scriptVolume := corev1.Volume{
 			Name: "sbatch-volume",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: *check.Spec.SlurmJobSpec.SbatchScriptRefName,
+						Name: sbatchScriptName,
 					},
 					Items: []corev1.KeyToPath{
 						{
-							Key:  "sbatch.sh",
-							Path: "sbatch.sh",
+							Key:  consts.ConfigMapKeySoperatorcheckSbatch,
+							Path: consts.ConfigMapKeySoperatorcheckSbatch,
 							Mode: ptr.To(int32(0755)),
 						},
 					},
