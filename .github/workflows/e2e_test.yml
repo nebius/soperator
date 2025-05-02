@@ -76,15 +76,15 @@ jobs:
           echo "run_id=$run_id" >> $GITHUB_OUTPUT
 
       - name: Download artifact with version
-        uses: actions/download-artifact@v4
-        with:
-          run-id: ${{ steps.find_build.outputs.run_id }}
-          name: version
+        run: |
+          gh run download ${{ steps.find_build.outputs.run_id }} -n version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Read version
         run: |
-          SOPERATOR_VERSION=$(sed -n '1p' image_version.txt)
-          SOPERATOR_UNSTABLE=$(sed -n '2p' image_version.txt)
+          SOPERATOR_VERSION=$(sed -n '1p' version.txt)
+          SOPERATOR_UNSTABLE=$(sed -n '2p' version.txt)
 
           echo "SOPERATOR_VERSION=$SOPERATOR_VERSION" >> $GITHUB_ENV
           echo "SOPERATOR_UNSTABLE=$SOPERATOR_UNSTABLE" >> $GITHUB_ENV
