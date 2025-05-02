@@ -245,3 +245,7 @@ func BuildRoleBindingSConfigControllerName(clusterName string) string {
 func BuildRoleSConfigControllerName(clusterName string) string {
 	return clusterName + "-sconfigcontroller-configmaps-role"
 }
+
+func BuildConfigMapSbatchScriptName(scriptName string) string {
+	return "sbatch-script-" + scriptName
+}

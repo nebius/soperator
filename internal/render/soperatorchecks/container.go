@@ -11,12 +11,6 @@ import (
 func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Container {
 	var container corev1.Container
 
-	slurmVolumeMounts := []corev1.VolumeMount{
-		common.RenderVolumeMountSlurmConfigs(),
-		common.RenderVolumeMountMungeKey(),
-		common.RenderVolumeMountMungeSocket(),
-	}
-
 	if check.Spec.CheckType == "k8sJob" {
 		container = corev1.Container{
 			Name:            check.Spec.Name,
@@ -46,12 +40,24 @@ func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Containe
 		return container
 	}
 
-	volumeMounts := append(slurmVolumeMounts, check.Spec.SlurmJobSpec.JobContainer.VolumeMounts...)
+	sbatchScriptVolumeMount := corev1.VolumeMount{
+		Name:      "sbatch-volume",
+		MountPath: "/opt/bin/sbatch.sh",
+		SubPath:   "sbatch.sh",
+		ReadOnly:  true,
+	}
+
+	slurmVolumeMounts := []corev1.VolumeMount{
+		common.RenderVolumeMountSlurmConfigs(),
+		common.RenderVolumeMountMungeKey(),
+		common.RenderVolumeMountMungeSocket(),
+		sbatchScriptVolumeMount,
+	}
 
 	container = corev1.Container{
 		Name:            check.Spec.Name,
 		Image:           check.Spec.SlurmJobSpec.JobContainer.Image,
-		Command:         check.Spec.SlurmJobSpec.JobContainer.Command,
+		Command:         []string{"/usr/bin/sbatch", "/opt/bin/sbatch.sh"},
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Env:             check.Spec.SlurmJobSpec.JobContainer.Env,
 		SecurityContext: &corev1.SecurityContext{
@@ -59,22 +65,7 @@ func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Containe
 				Add: []corev1.Capability{consts.ContainerSecurityContextCapabilitySysAdmin},
 			},
 		},
-		VolumeMounts: volumeMounts,
-	}
-
-	if check.Spec.SlurmJobSpec.SbatchScriptRefName != nil {
-		scriptVolumeMount := corev1.VolumeMount{
-			Name:      "sbatch-volume",
-			MountPath: "/opt/bin/sbatch.sh",
-			SubPath:   "sbatch.sh",
-			ReadOnly:  true,
-		}
-
-		container.VolumeMounts = append(volumeMounts, scriptVolumeMount)
-
-		if container.Command == nil {
-			container.Command = []string{"/usr/bin/sbatch", "/opt/bin/sbatch.sh"}
-		}
+		VolumeMounts: slurmVolumeMounts,
 	}
 
 	return container

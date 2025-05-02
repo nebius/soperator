@@ -3001,7 +3001,7 @@ spec:
                 type: object
               podTemplateNameRef:
                 description: PodTemplateNameRef points to a PodTemplate that contains
-                  the pod configuration. Use it to override the default settings.
+                  the pod configuration.
                 type: string
               reactions:
                 description: Reactions defines reaction on specific check
@@ -7033,6 +7033,9 @@ spec:
                           type: object
                         type: array
                     type: object
+                  sbatchScript:
+                    description: Multiline sbatch script
+                    type: string
                   sbatchScriptRefName:
                     description: SbatchScriptRefName name of configMap with sbatch
                       script. Data expected in the key sbatch.sh inside ConfigMap.

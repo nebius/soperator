@@ -11,14 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
-	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/controller/reconciler"
-	"nebius.ai/slurm-operator/internal/controllerconfig"
-	"nebius.ai/slurm-operator/internal/logfield"
-	render "nebius.ai/slurm-operator/internal/render/soperatorchecks"
-	"nebius.ai/slurm-operator/internal/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,6 +18,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/controller/reconciler"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
+	"nebius.ai/slurm-operator/internal/logfield"
+	"nebius.ai/slurm-operator/internal/naming"
+	render "nebius.ai/slurm-operator/internal/render/soperatorchecks"
+	"nebius.ai/slurm-operator/internal/utils"
 )
 
 var (
@@ -36,7 +38,8 @@ type ActiveCheckReconciler struct {
 	*reconciler.Reconciler
 	reconcileTimeout time.Duration
 
-	CronJob *reconciler.CronJobReconciler
+	CronJob   *reconciler.CronJobReconciler
+	ConfigMap *reconciler.ConfigMapReconciler
 }
 
 func NewActiveCheckController(
@@ -47,11 +50,13 @@ func NewActiveCheckController(
 ) *ActiveCheckReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 	cronJobReconciler := reconciler.NewCronJobReconciler(r)
+	configMapReconciler := reconciler.NewConfigMapReconciler(r)
 
 	return &ActiveCheckReconciler{
 		Reconciler:       r,
 		reconcileTimeout: reconcileTimeout,
 		CronJob:          cronJobReconciler,
+		ConfigMap:        configMapReconciler,
 	}
 }
 
@@ -90,6 +95,7 @@ func (r *ActiveCheckReconciler) SetupWithManager(
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=activechecks/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=activechecks/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;delete
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile reconciles all resources necessary for active checks controller
 func (r *ActiveCheckReconciler) Reconcile(
@@ -128,6 +134,27 @@ func (r *ActiveCheckReconciler) Reconcile(
 					return ctrl.Result{}, err
 				}
 				logger.Info("Deleted associated CronJob")
+			}
+			if check.Spec.SlurmJobSpec.SbatchScript != nil {
+				logger.Info("ActiveCheck is being deleted. Cleaning up ConfigMap")
+				configMap := &corev1.ConfigMap{}
+				err = r.Get(ctx, types.NamespacedName{
+					Name:      naming.BuildConfigMapSbatchScriptName(check.Spec.Name),
+					Namespace: check.Namespace,
+				}, configMap)
+				if err != nil {
+					if !apierrors.IsNotFound(err) {
+						logger.Error(err, "Failed to get associated ConfigMap")
+						return ctrl.Result{}, err
+					}
+					logger.Info("No ConfigMap found. Nothing to delete")
+				} else {
+					if err := r.Delete(ctx, configMap); err != nil {
+						logger.Error(err, "Failed to delete associated ConfigMap")
+						return ctrl.Result{}, err
+					}
+					logger.Info("Deleted associated ConfigMap")
+				}
 			}
 
 			controllerutil.RemoveFinalizer(check, consts.ActiveCheckFinalizer)
@@ -173,6 +200,23 @@ func (r *ActiveCheckReconciler) Reconcile(
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
+
+					if check.Spec.SlurmJobSpec.SbatchScript != nil {
+						desired := render.RenderSbatchConfigMap(
+							check.Spec.Name,
+							check.Spec.SlurmClusterRefName,
+							check.Namespace,
+							*check.Spec.SlurmJobSpec.SbatchScript,
+						)
+						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+						stepLogger.V(1).Info("Rendered")
+
+						if err = r.ConfigMap.Reconcile(stepCtx, slurmCluster, &desired); err != nil {
+							stepLogger.Error(err, "Failed to reconcile")
+							return errors.Wrap(err, "reconciling ActiveChecks sbatch script ConfigMap")
+						}
+						stepLogger.V(1).Info("Reconciled")
+					}
 
 					var foundPodTemplate *corev1.PodTemplate = nil
 
