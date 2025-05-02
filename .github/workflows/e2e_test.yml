@@ -63,6 +63,32 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Find latest successful build run on current branch
+        id: find_build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Looking for build run on branch: ${{ github.ref_name }}"
+          run_id=$(gh api -X GET \
+            "/repos/${{ github.repository }}/actions/workflows/one_job.yml/runs" \
+            -F branch=${{ github.ref_name }} -F status=success \
+            --jq '.workflow_runs[0].id')
+          echo "run_id=$run_id" >> $GITHUB_OUTPUT
+
+      - name: Download artifact with version
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ steps.find_build.outputs.run_id }}
+          name: version
+
+      - name: Read version
+        run: |
+          SOPERATOR_VERSION=$(sed -n '1p' image_version.txt)
+          SOPERATOR_UNSTABLE=$(sed -n '2p' image_version.txt)
+
+          echo "SOPERATOR_VERSION=$SOPERATOR_VERSION" >> $GITHUB_ENV
+          echo "SOPERATOR_UNSTABLE=$SOPERATOR_UNSTABLE" >> $GITHUB_ENV
+
       - name: Checkout Terraform repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:

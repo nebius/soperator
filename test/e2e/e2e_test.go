@@ -19,6 +19,8 @@ import (
 )
 
 type testConfig struct {
+	SoperatorVersion   string   `split_words:"true" required:"true"`                // SOPERATOR_VERSION
+	SoperatorUnstable  bool     `split_words:"true" required:"true"`                // SOPERATOR_UNSTABLE
 	PathToInstallation string   `split_words:"true" required:"true"`                // PATH_TO_INSTALLATION
 	InfinibandFabric   string   `split_words:"true" required:"true"`                // INFINIBAND_FABRIC
 	SSHKeys            []string `split_words:"true" required:"true"`                // SSH_KEYS
@@ -110,6 +112,11 @@ func readTFVars(t *testing.T, tfVarsFilename string) map[string]interface{} {
 }
 
 func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[string]interface{} {
+	// slurm_operator_version = "1.19.0"
+	tfVars["slurm_operator_version"] = cfg.SoperatorVersion
+	// slurm_operator_stable = true
+	tfVars["slurm_operator_stable"] = !cfg.SoperatorUnstable
+
 	// company_name = "e2e-test"
 	tfVars["company_name"] = "e2e-test"
 

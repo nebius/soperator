@@ -184,3 +184,14 @@ jobs:
 
           echo "Pushing Helm charts"
           make release-helm UNSTABLE="${UNSTABLE}" OPERATOR_IMAGE_TAG="$OPERATOR_IMAGE_TAG"
+
+      - name: Generate version file
+        run: |
+          make get-version UNSTABLE=${{ needs.pre-build.outputs.unstable }} >> version.txt
+          echo ${{ needs.pre-build.outputs.unstable }} >> version.txt
+
+      - name: Upload version file
+        uses: actions/upload-artifact@v4
+        with:
+          name: version
+          path: version.txt
