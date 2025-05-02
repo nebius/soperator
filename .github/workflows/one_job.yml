@@ -151,6 +151,9 @@ jobs:
 
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd DOCKERFILE=restd/slurmrestd.dockerfile
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd
+          
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_job DOCKERFILE=k8s_job/k8s_job.dockerfile
+          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_job
 
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter DOCKERFILE=rebooter.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
