@@ -111,6 +111,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 
 					if !isMariaDBEnabled || !isProtectedSecret {
 						stepLogger.V(1).Info("Reconciled")
+
 						return nil
 					}
 
