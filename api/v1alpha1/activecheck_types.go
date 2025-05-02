@@ -68,7 +68,7 @@ type ActiveCheckSpec struct {
 	// +kubebuilder:validation:Optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
-	// PodTemplateNameRef points to a PodTemplate that contains the pod configuration. Use it to override the default settings.
+	// PodTemplateNameRef points to a PodTemplate that contains the pod configuration.
 	// +kubebuilder:validation:Optional
 	PodTemplateNameRef *string `json:"podTemplateNameRef,omitempty"`
 
@@ -127,6 +127,9 @@ type SlurmJobSpec struct {
 	// SbatchScriptRefName name of configMap with sbatch script. Data expected in the key sbatch.sh inside ConfigMap.
 	// +kubebuilder:validation:Optional
 	SbatchScriptRefName *string `json:"sbatchScriptRefName,omitempty"`
+	// Multiline sbatch script
+	// +kubebuilder:validation:Optional
+	SbatchScript *string `json:"sbatchScript,omitempty"`
 }
 
 // ActiveCheckK8sJobsStatus defines the observed state of ActiveCheck k8s jobs.

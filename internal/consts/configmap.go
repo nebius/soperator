@@ -30,4 +30,5 @@ const (
 	ConfigMapKeyNCCLTopology            = "virtualTopology.xml"
 	ConfigMapKeySysctl                  = sysctlConfFile
 	ConfigMapKeySupervisord             = supervisordConfFile
+	ConfigMapKeySoperatorcheckSbatch    = "sbatch.sh"
 )
