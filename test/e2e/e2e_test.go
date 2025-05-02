@@ -53,8 +53,9 @@ func TestTerraform(t *testing.T) {
 		Vars:         tfVars,
 		EnvVars:      envVars,
 		RetryableTerraformErrors: map[string]string{
-			"(?m)^.*context deadline exceeded.*$": "retry on context deadline exceeded",
-			"(?m)^.*connection reset by peer.*$":  "retry on conn reset by peer",
+			"(?m)^.*context deadline exceeded.*$":  "retry on context deadline exceeded",
+			"(?m)^.*connection reset by peer.*$":   "retry on conn reset by peer",
+			"(?m)^.*etcdserver: leader changed.*$": "retry on leader changed",
 		},
 		NoColor:    true,
 		MaxRetries: 5,
