@@ -93,7 +93,7 @@ RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
 RUN rm -rf /home
 
 # Make sbatch script executable
-chmod +x /opt/bin/sbatch.sh
+RUN chmod +x /opt/bin/sbatch.sh
 
 # Copy & run the entrypoint script
 COPY k8s_job/k8s_job_entrypoint.sh /opt/bin/slurm/
