@@ -88,6 +88,13 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -s https://dl.k8s.io/release/stab
 # Update linker cache
 RUN ldconfig
 
+# Delete users & home because they will be linked from jail
+RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
+RUN rm -rf /home
+
+# Make sbatch script executable
+chmod +x /opt/bin/sbatch.sh
+
 # Copy & run the entrypoint script
 COPY k8s_job/k8s_job_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/k8s_job_entrypoint.sh

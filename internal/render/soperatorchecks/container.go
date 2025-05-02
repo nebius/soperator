@@ -57,7 +57,6 @@ func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Containe
 	container = corev1.Container{
 		Name:            check.Spec.Name,
 		Image:           check.Spec.SlurmJobSpec.JobContainer.Image,
-		Command:         []string{"/usr/bin/sbatch", "/opt/bin/sbatch.sh"},
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Env:             check.Spec.SlurmJobSpec.JobContainer.Env,
 		SecurityContext: &corev1.SecurityContext{
