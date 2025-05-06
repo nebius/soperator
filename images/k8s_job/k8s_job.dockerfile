@@ -80,6 +80,15 @@ RUN chmod +x /opt/bin/install_pyxis_plugin.sh && \
     /opt/bin/install_pyxis_plugin.sh && \
     rm /opt/bin/install_pyxis_plugin.sh
 
+# Copy script for complementing jail filesystem in runtime
+COPY common/scripts/complement_jail.sh /opt/bin/slurm/
+
+# Copy script for bind-mounting slurm into the jail
+COPY common/scripts/bind_slurm_common.sh /opt/bin/slurm/
+
+RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
+    chmod +x /opt/bin/slurm/bind_slurm_common.sh
+
 # Install kubectl
 RUN KUBECTL_VERSION=$(curl -Ls https://dl.k8s.io/release/stable.txt) && \
     echo "Downloading kubectl from https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && \
