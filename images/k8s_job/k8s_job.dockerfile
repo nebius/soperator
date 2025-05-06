@@ -81,7 +81,9 @@ RUN chmod +x /opt/bin/install_pyxis_plugin.sh && \
     rm /opt/bin/install_pyxis_plugin.sh
 
 # Install kubectl
-RUN curl -LO "https://dl.k8s.io/release/$(curl -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
+RUN KUBECTL_VERSION=$(curl -Ls https://dl.k8s.io/release/stable.txt) && \
+    echo "Downloading kubectl from https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && \
+    curl -LO https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl && \
     install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
     rm kubectl
 
@@ -91,9 +93,6 @@ RUN ldconfig
 # Delete users & home because they will be linked from jail
 RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
 RUN rm -rf /home
-
-# Make sbatch script executable
-RUN chmod +x /opt/bin/sbatch.sh
 
 # Copy & run the entrypoint script
 COPY k8s_job/k8s_job_entrypoint.sh /opt/bin/slurm/

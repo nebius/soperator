@@ -29,20 +29,17 @@ fi
 SLURM_JOB_ID="$SLURM_OUTPUT"
 echo "Slurm Job ID: $SLURM_JOB_ID"
 
-POD_NAME=$(hostname)
-NAMESPACE="${POD_NAMESPACE}"
+echo "Looking up owning Job for pod: $K8S_POD_NAME in namespace: $K8S_POD_NAMESPACE"
+K8S_JOB_NAME=$(kubectl get pod "$K8S_POD_NAME" -n "$K8S_POD_NAMESPACE" -o jsonpath='{.metadata.ownerReferences[?(@.kind=="Job")].name}')
 
-echo "Looking up owning Job for pod: $POD_NAME in namespace: $NAMESPACE"
-JOB_NAME=$(kubectl get pod "$POD_NAME" -n "$NAMESPACE" -o jsonpath='{.metadata.ownerReferences[?(@.kind=="Job")].name}')
-
-if [[ -z "$JOB_NAME" ]]; then
-    echo "Could not find owning Job for pod: $POD_NAME"
+if [[ -z "$K8S_JOB_NAME" ]]; then
+    echo "Could not find owning Job for pod: $K8S_POD_NAME"
     exit 1
 fi
 
-echo "Annotating Job $JOB_NAME with slurm-job-id=$SLURM_JOB_ID"
-kubectl annotate job "$JOB_NAME" slurm-job-id="$SLURM_JOB_ID" \
-    -n "$NAMESPACE" --overwrite || {
+echo "Annotating Job $K8S_JOB_NAME with slurm-job-id=$SLURM_JOB_ID"
+kubectl annotate job "$K8S_JOB_NAME" slurm-job-id="$SLURM_JOB_ID" \
+    -n "$K8S_POD_NAMESPACE" --overwrite || {
     echo "Failed to annotate Job"
     exit 1
 }
