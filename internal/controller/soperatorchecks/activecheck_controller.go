@@ -76,14 +76,10 @@ func (r *ActiveCheckReconciler) SetupWithManager(
 					return false
 				},
 				UpdateFunc: func(e event.UpdateEvent) bool {
-					if oldAC, okOld := e.ObjectOld.(*slurmv1alpha1.ActiveCheck); okOld {
-						if newAC, okNew := e.ObjectNew.(*slurmv1alpha1.ActiveCheck); okNew {
-							return newAC.GetDeletionTimestamp() != nil ||
-								e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration() ||
-								oldAC.Status.ServiceAccountReady != newAC.Status.ServiceAccountReady
-						}
+					if ac, ok := e.ObjectNew.(*slurmv1alpha1.ActiveCheck); ok {
+						return ac.GetDeletionTimestamp() != nil ||
+							e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration()
 					}
-
 					return false
 				},
 				GenericFunc: func(e event.GenericEvent) bool {
@@ -181,7 +177,7 @@ func (r *ActiveCheckReconciler) Reconcile(
 
 	if !check.Status.ServiceAccountReady {
 		logger.Info("Waiting for service account to be ready")
-		return ctrl.Result{}, nil
+		return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 	}
 
 	slurmCluster := &slurmv1.SlurmCluster{}
