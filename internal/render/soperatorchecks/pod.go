@@ -64,6 +64,7 @@ func renderPodTemplateSpec(check *slurmv1alpha1.ActiveCheck, labels map[string]s
 			Volumes:               renderVolumes(check),
 			Containers:            []corev1.Container{renderContainerK8sCronjob(check)},
 			InitContainers:        initContainers,
+			ServiceAccountName:    naming.BuildServiceAccountActiveCheckName(check.Spec.SlurmClusterRefName),
 		},
 	}
 }

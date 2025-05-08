@@ -76,10 +76,14 @@ func (r *ActiveCheckReconciler) SetupWithManager(
 					return false
 				},
 				UpdateFunc: func(e event.UpdateEvent) bool {
-					if ac, ok := e.ObjectNew.(*slurmv1alpha1.ActiveCheck); ok {
-						return ac.GetDeletionTimestamp() != nil ||
-							e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration()
+					if oldAC, okOld := e.ObjectOld.(*slurmv1alpha1.ActiveCheck); okOld {
+						if newAC, okNew := e.ObjectNew.(*slurmv1alpha1.ActiveCheck); okNew {
+							return newAC.GetDeletionTimestamp() != nil ||
+								e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration() ||
+								oldAC.Status.ServiceAccountReady != newAC.Status.ServiceAccountReady
+						}
 					}
+
 					return false
 				},
 				GenericFunc: func(e event.GenericEvent) bool {
@@ -173,6 +177,11 @@ func (r *ActiveCheckReconciler) Reconcile(
 			logger.Error(err, "Failed to add finalizer")
 			return ctrl.Result{}, err
 		}
+	}
+
+	if !check.Status.ServiceAccountReady {
+		logger.Info("Waiting for service account to be ready")
+		return ctrl.Result{}, nil
 	}
 
 	slurmCluster := &slurmv1.SlurmCluster{}

@@ -95,6 +95,7 @@ func (r *ServiceAccountReconciler) SetupWithManager(
 }
 
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=activechecks,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=activechecks/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=activechecks/finalizers,verbs=update
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
@@ -176,7 +177,7 @@ func (r *ServiceAccountReconciler) Reconcile(
 			},
 
 			utils.MultiStepExecutionStep{
-				Name: "Slurm Worker Role",
+				Name: "Slurm active check Role",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
@@ -196,7 +197,7 @@ func (r *ServiceAccountReconciler) Reconcile(
 			},
 
 			utils.MultiStepExecutionStep{
-				Name: "Slurm Worker RoleBinding",
+				Name: "Slurm active check RoleBinding",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
@@ -211,6 +212,22 @@ func (r *ServiceAccountReconciler) Reconcile(
 					}
 
 					stepLogger.V(1).Info("Reconciled")
+
+					return nil
+				},
+			},
+
+			utils.MultiStepExecutionStep{
+				Name: "Slurm active check status update",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling")
+
+					check.Status.ServiceAccountReady = true
+					if err := r.Update(ctx, check); err != nil {
+						logger.Error(err, "Failed to update status")
+						return err
+					}
 
 					return nil
 				},

@@ -150,6 +150,9 @@ type ActiveCheckK8sJobsStatus struct {
 type ActiveCheckStatus struct {
 	StatusMetadata `json:",inline"`
 	K8sJobsStatus  ActiveCheckK8sJobsStatus `json:"k8sJobsStatus,omitempty"`
+
+	// +kubebuilder:default=false
+	ServiceAccountReady bool `json:"serviceAccountReady,omitempty"`
 }
 
 // +kubebuilder:object:root=true
