@@ -2,7 +2,7 @@
 
 set -e
 
-if [[ $# -eq 0 ]] || [[ "$*" == *"-h"* ]] || [[ "$*" == *"--help"* ]]; then
+if [[ $# -eq 0 ]] || [[ "$*" == *"-h "* ]] || [[ "$*" == *"--help"* ]]; then
     echo "Usage: screateuser <username> [--with-password] [--without-sudo] [--without-docker] [<args for adduser...>]"
     exit 0
 fi
@@ -45,7 +45,20 @@ if [[ "$*" != *"--without-docker"* ]]; then
     add_to_group docker
 fi
 
+expect_home_value=0
 home_dir=$(eval echo "~$username")
+for arg in "$@"; do
+    if [[ "$expect_home_value" -eq 1 ]]; then
+        home_dir="$arg"
+        expect_home_value=0
+        continue
+    fi
+
+    if [[ "$arg" == "--home" ]]; then
+        expect_home_value=1
+    fi
+done
+
 ssh_dir="$home_dir/.ssh"
 authorized_keys="$ssh_dir/authorized_keys"
 internal_key="$ssh_dir/id_ecdsa"
