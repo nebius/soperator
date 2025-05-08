@@ -256,6 +256,15 @@ func main() {
 		setupLog.Error(err, "unable to create activecheckjob controller", "controller", "ActiveCheckJob")
 		os.Exit(1)
 	}
+	if err = soperatorchecks.NewServiceAccountController(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		mgr.GetEventRecorderFor(soperatorchecks.SlurmChecksServiceAccountControllerName),
+		reconcileTimeout,
+	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+		setupLog.Error(err, "unable to create soperatorchecks serviceaccount controller", "controller", "ServiceAccount")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

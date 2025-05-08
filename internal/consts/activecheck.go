@@ -1,5 +1,6 @@
 package consts
 
 const (
-	ActiveCheckFinalizer = "slurm.nebius.ai/activecheck-finalizer"
+	ActiveCheckServiceAccountFinalizer = "slurm.nebius.ai/activecheck-serviceaccount-finalizer"
+	ActiveCheckFinalizer               = "slurm.nebius.ai/activecheck-finalizer"
 )
