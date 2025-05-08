@@ -183,7 +183,7 @@ func (r *ActiveCheckReconciler) Reconcile(
 	err = r.Get(ctx, slurmClusterNamespacedName, slurmCluster)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.V(1).Info("SlurmCluster resource not found")
+			return ctrl.Result{}, errors.Wrap(err, "SlurmCluster resource not found")
 		}
 
 		logger.Error(err, "Failed to get SlurmCluster")

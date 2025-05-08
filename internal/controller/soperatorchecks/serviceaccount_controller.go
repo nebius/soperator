@@ -143,7 +143,7 @@ func (r *ServiceAccountReconciler) Reconcile(
 	err = r.Get(ctx, clusterNN, cluster)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.V(1).Info("SlurmCluster resource not found")
+			return ctrl.Result{}, errors.Wrap(err, "SlurmCluster resource not found")
 		}
 
 		logger.Error(err, "Failed to get SlurmCluster")
@@ -160,20 +160,6 @@ func (r *ServiceAccountReconciler) Reconcile(
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
-
-					existing := &corev1.ServiceAccount{}
-					err := r.Get(ctx, types.NamespacedName{
-						Name:      naming.BuildServiceAccountActiveCheckName(clusterNN.Name),
-						Namespace: clusterNN.Namespace,
-					}, existing)
-
-					if err == nil {
-						stepLogger.V(1).Info("ServiceAccount already exists, skipping")
-						return nil
-					}
-					if !apierrors.IsNotFound(err) {
-						return errors.Wrap(err, "checking existing ServiceAccount")
-					}
 
 					desired := render.RenderServiceAccount(clusterNN.Namespace, clusterNN.Name)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
@@ -195,20 +181,6 @@ func (r *ServiceAccountReconciler) Reconcile(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					existing := &rbacv1.Role{}
-					err := r.Get(ctx, types.NamespacedName{
-						Name:      naming.BuildRoleActiveCheckName(clusterNN.Name),
-						Namespace: clusterNN.Namespace,
-					}, existing)
-
-					if err == nil {
-						stepLogger.V(1).Info("Role already exists, skipping")
-						return nil
-					}
-					if !apierrors.IsNotFound(err) {
-						return errors.Wrap(err, "checking existing Role")
-					}
-
 					desired := render.RenderRole(clusterNN.Namespace, clusterNN.Name)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
@@ -228,20 +200,6 @@ func (r *ServiceAccountReconciler) Reconcile(
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
-
-					existing := &rbacv1.RoleBinding{}
-					err := r.Get(ctx, types.NamespacedName{
-						Name:      naming.BuildRoleBindingActiveCheckName(clusterNN.Name),
-						Namespace: clusterNN.Namespace,
-					}, existing)
-
-					if err == nil {
-						stepLogger.V(1).Info("RoleBinding already exists, skipping")
-						return nil
-					}
-					if !apierrors.IsNotFound(err) {
-						return errors.Wrap(err, "checking existing RoleBinding")
-					}
 
 					desired := render.RenderRoleBinding(clusterNN.Namespace, clusterNN.Name)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
