@@ -47,6 +47,7 @@ fi
 
 expect_home_value=0
 home_dir=$(eval echo "~$username")
+# Catch home dir if specified in the form --home <path>
 for arg in "$@"; do
     if [[ "$expect_home_value" -eq 1 ]]; then
         home_dir="$arg"
