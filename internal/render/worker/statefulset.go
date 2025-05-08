@@ -141,6 +141,10 @@ func RenderStatefulSet(
 				},
 				Spec: spec,
 			},
+			PersistentVolumeClaimRetentionPolicy: &kruisev1b1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  kruisev1b1.RetainPersistentVolumeClaimRetentionPolicyType,
+			},
 		},
 	}, nil
 }
