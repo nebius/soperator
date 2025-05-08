@@ -69,11 +69,11 @@ func TestTerraform(t *testing.T) {
 	writeOutputs(t, cfg, "destroy", output, err)
 	require.NoError(t, err)
 
-	defer func() {
-		output, err := terraform.DestroyE(t, &commonOptions)
-		writeOutputs(t, cfg, "destroy", output, err)
-		require.NoError(t, err)
-	}()
+	// defer func() {
+	// 	output, err := terraform.DestroyE(t, &commonOptions)
+	// 	writeOutputs(t, cfg, "destroy", output, err)
+	// 	require.NoError(t, err)
+	// }()
 
 	output, err = terraform.ApplyE(t, &commonOptions)
 	writeOutputs(t, cfg, "apply", output, err)
