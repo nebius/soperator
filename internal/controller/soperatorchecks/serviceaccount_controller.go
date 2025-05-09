@@ -100,6 +100,8 @@ func (r *ServiceAccountReconciler) SetupWithManager(
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=activechecks/finalizers,verbs=update
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=pods,verbs=get
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;patch
 
 // Reconcile reconciles service account resources active checks
 func (r *ServiceAccountReconciler) Reconcile(
