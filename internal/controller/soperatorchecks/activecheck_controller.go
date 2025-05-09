@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"nebius.ai/slurm-operator/internal/naming"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,7 +26,6 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/logfield"
-	"nebius.ai/slurm-operator/internal/naming"
 	render "nebius.ai/slurm-operator/internal/render/soperatorchecks"
 	"nebius.ai/slurm-operator/internal/utils"
 )
@@ -119,49 +119,7 @@ func (r *ActiveCheckReconciler) Reconcile(
 
 	if check.ObjectMeta.DeletionTimestamp.IsZero() == false {
 		if controllerutil.ContainsFinalizer(check, consts.ActiveCheckFinalizer) {
-			logger.Info("ActiveCheck is being deleted. Cleaning up CronJob")
-			cronJob := &batchv1.CronJob{}
-			err := r.Get(ctx, req.NamespacedName, cronJob)
-			if err != nil {
-				if !apierrors.IsNotFound(err) {
-					logger.Error(err, "Failed to get associated CronJob")
-					return ctrl.Result{}, err
-				}
-				logger.Info("No CronJob found. Nothing to delete")
-			} else {
-				if err := r.Delete(ctx, cronJob); err != nil {
-					logger.Error(err, "Failed to delete associated CronJob")
-					return ctrl.Result{}, err
-				}
-				logger.Info("Deleted associated CronJob")
-			}
-			if check.Spec.SlurmJobSpec.SbatchScript != nil {
-				logger.Info("ActiveCheck is being deleted. Cleaning up ConfigMap")
-				configMap := &corev1.ConfigMap{}
-				err = r.Get(ctx, types.NamespacedName{
-					Name:      naming.BuildConfigMapSbatchScriptName(check.Spec.Name),
-					Namespace: check.Namespace,
-				}, configMap)
-				if err != nil {
-					if !apierrors.IsNotFound(err) {
-						logger.Error(err, "Failed to get associated ConfigMap")
-						return ctrl.Result{}, err
-					}
-					logger.Info("No ConfigMap found. Nothing to delete")
-				} else {
-					if err := r.Delete(ctx, configMap); err != nil {
-						logger.Error(err, "Failed to delete associated ConfigMap")
-						return ctrl.Result{}, err
-					}
-					logger.Info("Deleted associated ConfigMap")
-				}
-			}
-
-			controllerutil.RemoveFinalizer(check, consts.ActiveCheckFinalizer)
-			if err := r.Update(ctx, check); err != nil {
-				logger.Error(err, "Failed to remove finalizer")
-				return ctrl.Result{}, err
-			}
+			return r.reconcileDelete(ctx, check)
 		}
 
 		return ctrl.Result{}, nil
@@ -274,6 +232,59 @@ func (r *ActiveCheckReconciler) Reconcile(
 	}
 
 	logger.Info("Reconciled ActiveChecks")
+	return ctrl.Result{}, nil
+}
+
+func (r *ActiveCheckReconciler) reconcileDelete(ctx context.Context, check *slurmv1alpha1.ActiveCheck) (ctrl.Result, error) {
+	logger := log.FromContext(ctx).WithName("ActiveCheckController.reconcileDelete")
+
+	logger.Info("ActiveCheck is being deleted. Cleaning up CronJob")
+	cronJob := &batchv1.CronJob{}
+	err := r.Get(ctx, types.NamespacedName{
+		Namespace: check.Namespace,
+		Name:      check.Name,
+	}, cronJob)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			logger.Error(err, "Failed to get associated CronJob")
+			return ctrl.Result{}, err
+		}
+		logger.Info("No CronJob found. Nothing to delete")
+	} else {
+		if err := r.Delete(ctx, cronJob); err != nil {
+			logger.Error(err, "Failed to delete associated CronJob")
+			return ctrl.Result{}, err
+		}
+		logger.Info("Deleted associated CronJob")
+	}
+	if check.Spec.SlurmJobSpec.SbatchScript != nil {
+		logger.Info("ActiveCheck is being deleted. Cleaning up ConfigMap")
+		configMap := &corev1.ConfigMap{}
+		err = r.Get(ctx, types.NamespacedName{
+			Name:      naming.BuildConfigMapSbatchScriptName(check.Spec.Name),
+			Namespace: check.Namespace,
+		}, configMap)
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				logger.Error(err, "Failed to get associated ConfigMap")
+				return ctrl.Result{}, err
+			}
+			logger.Info("No ConfigMap found. Nothing to delete")
+		} else {
+			if err := r.Delete(ctx, configMap); err != nil {
+				logger.Error(err, "Failed to delete associated ConfigMap")
+				return ctrl.Result{}, err
+			}
+			logger.Info("Deleted associated ConfigMap")
+		}
+	}
+
+	controllerutil.RemoveFinalizer(check, consts.ActiveCheckFinalizer)
+	if err := r.Update(ctx, check); err != nil {
+		logger.Error(err, "Failed to remove finalizer")
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
