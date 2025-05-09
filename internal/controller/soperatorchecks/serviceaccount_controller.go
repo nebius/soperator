@@ -228,9 +228,9 @@ func (r *ServiceAccountReconciler) Reconcile(
 					stepLogger.V(1).Info("Reconciling")
 
 					check.Status.ServiceAccountReady = true
-					if err := r.Update(ctx, check); err != nil {
+					if err = r.Status().Update(ctx, check); err != nil {
 						logger.Error(err, "Failed to update status")
-						return err
+						return errors.Wrap(err, "reconciling active check status")
 					}
 
 					return nil
