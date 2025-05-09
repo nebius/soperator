@@ -71,6 +71,7 @@ func (r *ServiceAccountReconciler) SetupWithManager(
 	cacheSyncTimeout time.Duration,
 ) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		Named(SlurmChecksServiceAccountControllerName).
 		For(&slurmv1alpha1.ActiveCheck{}, builder.WithPredicates(
 			predicate.Funcs{
 				CreateFunc: func(e event.CreateEvent) bool {

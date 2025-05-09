@@ -62,6 +62,7 @@ func (r *SlurmNodesController) SetupWithManager(mgr ctrl.Manager,
 	maxConcurrency int, cacheSyncTimeout time.Duration) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
+		Named(SlurmNodesControllerName).
 		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
 				return true

@@ -47,6 +47,7 @@ func (r *K8SNodesController) SetupWithManager(mgr ctrl.Manager,
 
 	// TODO: common code for predicates
 	return ctrl.NewControllerManagedBy(mgr).
+		Named(K8SNodesControllerName).
 		For(&corev1.Node{}, builder.WithPredicates(predicate.Funcs{
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				oldNode := e.ObjectOld.(*corev1.Node)
