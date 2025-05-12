@@ -1,6 +1,6 @@
 ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
 
-FROM $BASE_IMAGE AS k8s_job
+FROM $BASE_IMAGE AS slurm_check_job
 
 ARG SLURM_VERSION=24.05.5
 
@@ -104,6 +104,6 @@ RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
 RUN rm -rf /home
 
 # Copy & run the entrypoint script
-COPY k8s_job/k8s_job_entrypoint.sh /opt/bin/slurm/
-RUN chmod +x /opt/bin/slurm/k8s_job_entrypoint.sh
-ENTRYPOINT ["/opt/bin/slurm/k8s_job_entrypoint.sh"]
+COPY slurm_check_job/slurm_check_job_entrypoint.sh /opt/bin/slurm/
+RUN chmod +x /opt/bin/slurm/slurm_check_job_entrypoint.sh
+ENTRYPOINT ["/opt/bin/slurm/slurm_check_job_entrypoint.sh"]
