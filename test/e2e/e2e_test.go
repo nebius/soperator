@@ -195,6 +195,9 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 	// ]
 	tfVars["slurm_login_ssh_root_public_keys"] = cfg.SSHKeys
 
+	// github_branch = "main"
+	tfVars["github_branch"] = "dev"
+
 	return tfVars
 }
 
