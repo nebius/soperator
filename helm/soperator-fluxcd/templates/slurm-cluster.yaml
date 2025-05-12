@@ -16,7 +16,7 @@ spec:
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
-{{- if .Values.slurmClusterStorage.enabled }}
+{{- if .Values.slurmCluster.slurmClusterStorage.enabled }}
   - name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster-storage
 {{- end }}
 {{- if .Values.securityProfilesOperator.enabled }}
@@ -28,13 +28,24 @@ spec:
       retries: 3
   interval: {{ .Values.slurmCluster.interval }}
   timeout: {{ .Values.slurmCluster.timeout }}
-  releaseName: slurm
+  releaseName: soperator
   targetNamespace: soperator
   upgrade:
     crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   values:
+  {{- if .Values.slurmCluster.overrideValues }}
+    {{- toYaml .Values.slurmCluster.overrideValues | nindent 4 }}
+  {{- else }}
     clusterName: soperator
+  {{- end }}
   valuesFrom:
+  - kind: ConfigMap
+    name: terrraform-slurm-cluster
+    optional: true
+    valuesKey: values.yaml
   - kind: ConfigMap
     name: slurm-cluster
     optional: true

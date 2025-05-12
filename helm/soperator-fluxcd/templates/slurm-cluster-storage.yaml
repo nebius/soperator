@@ -1,4 +1,4 @@
-{{- if .Values.slurmClusterStorage.enabled }}
+{{- if and .Values.slurmCluster.enabled .Values.slurmCluster.slurmClusterStorage.enabled }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -9,22 +9,36 @@ spec:
   chart:
     spec:
       chart: helm-slurm-cluster-storage
-      interval: {{ .Values.slurmClusterStorage.interval }}
+      interval: {{ .Values.slurmCluster.slurmClusterStorage.interval }}
       sourceRef:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
-      version: {{ .Values.slurmClusterStorage.version }}
+      version: {{ .Values.slurmCluster.version }}
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- if .Values.soperator.enabled }}
   - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+  {{- end }}
   install:
     remediation:
       retries: 3
-  interval: {{ .Values.slurmClusterStorage.interval }}
-  timeout: {{ .Values.slurmClusterStorage.timeout }}
-  releaseName: slurm-cluster-storage
-  targetNamespace: soperator
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  interval: {{ .Values.slurmCluster.slurmClusterStorage.interval }}
+  timeout: {{ .Values.slurmCluster.slurmClusterStorage.timeout }}
+  releaseName: {{ .Values.slurmCluster.slurmClusterStorage.releaseName }}
+  targetNamespace: {{ .Values.slurmCluster.namespace }}
+  {{- if .Values.slurmCluster.slurmClusterStorage.overrideValues }}
+  values:
+    {{- toYaml .Values.slurmCluster.slurmClusterStorage.overrideValues | nindent 4 }}
+  {{- end }}
   valuesFrom:
+  - kind: ConfigMap
+    name: terrraform-slurm-cluster-storage
+    optional: true
+    valuesKey: values.yaml
   - kind: ConfigMap
     name: slurm-cluster-storage
     optional: true

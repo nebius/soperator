@@ -1,0 +1,66 @@
+{{- if .Values.backup.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-k8up
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: k8up
+      interval: {{ .Values.backup.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-k8up
+      version: {{ .Values.backup.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- if .Values.certManager.enabled }}
+  - name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
+  {{- end }}
+  {{- if and .Values.observability.enabled .Values.observability.prometheusOperator.enabled }}
+  - name: {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds
+  {{- end }}
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  interval: {{ .Values.backup.interval }}
+  timeout: {{ .Values.backup.timeout }}
+  releaseName: {{ .Values.backup.releaseName }}
+  targetNamespace: {{ .Values.backup.namespace }}
+  upgrade:
+    crds: Skip
+  {{- if .Values.backup.overrideValues }}
+  values:
+    {{- toYaml .Values.backup.overrideValues | nindent 4 }}
+  {{- else }}
+    k8up:
+      envVars:
+        - name: BACKUP_SKIP_WITHOUT_ANNOTATION
+          value: "true"
+      env:
+        K8UP_BACKUP_SKIP_WITHOUT_ANNOTATION: "true"
+      image:
+        repository: ghcr.io/vshn/k8up
+        tag: v4.8.0
+    {{- if .Values.observability.prometheusOperator.enabled }}
+      metrics:
+        grafanaDashboard:
+          additionalLabels:
+            grafana_dashboard: "1"
+          enabled: true
+          namespace: monitoring-system
+        prometheusRule:
+          enabled: false
+        serviceMonitor:
+          enabled: true
+    {{- end }}
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: backup
+    optional: true
+    valuesKey: values.yaml
+{{- end }}

@@ -1,0 +1,10 @@
+suite: test general enabled flag behavior
+templates:
+  - templates/*.yaml
+excludeTemplates:
+  - templates/helmrepository.yaml
+tests:
+  - it: should not render component when enabled=false
+    asserts:
+      - hasDocuments:
+          count: 1

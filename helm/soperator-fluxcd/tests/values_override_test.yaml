@@ -1,0 +1,131 @@
+suite: test values override default values soperator
+templates:
+  - templates/soperator.yaml
+tests:
+  - it: should use custom values when provided
+    set:
+      soperator.enabled: true
+      soperator.overrideValues:
+        customKey: customValue
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.customKey
+          value: customValue
+      - notExists:
+          path:  spec.values.controllerManager
+
+  - it: should use default values when custom values not provided
+    set:
+      soperator.enabled: true
+      soperator.overrideValues: null
+    asserts:
+      - hasDocuments:
+          count: 1
+      - exists:
+          path: spec.values.controllerManager
+  - it: should be requests soperator
+    set:
+      soperator.enabled: true
+      soperator.values:
+        manager:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.controllerManager.manager.resources.requests
+          value:
+            cpu: 100m
+            memory: 128Mi
+---
+suite: test values override default values nodeconfigurator
+templates:
+  - templates/nodeconfigurator.yaml
+tests:
+  - it: should be requests nodeconfigurator
+    set:
+      soperator.nodeConfigurator.values.rebooter.resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          memory: 256Mi
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.rebooter.resources.requests
+          value:
+            cpu: 100m
+            memory: 128Mi
+---
+suite: test values override default values opentelemetry collector events
+templates:
+  - templates/opentelemetry-collector-events.yaml
+tests:
+  - it: should use custom values when provided
+    set:
+      observability.opentelemetry.events.values.publicEndpointEnabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.extraVolumes[0].name
+          value: o11ytoken
+  - it: should use custom values when provided
+    set:
+      observability.opentelemetry.events.values.resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          memory: 256Mi
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.extraVolumes[0].name
+          value: o11ytoken
+      - equal:
+          path: spec.values.resources.requests
+          value:
+            cpu: 100m
+            memory: 128Mi
+---
+suite: test values override default values opentelemetry collector logs
+templates:
+  - templates/opentelemetry-collector-logs.yaml
+tests:
+  - it: should use custom values when provided
+    set:
+      observability.opentelemetry.logs.values.publicEndpointEnabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.extraVolumes[0].name
+          value: o11ytoken
+  - it: should use custom values when provided
+    set:
+      observability.opentelemetry.logs.values.resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          memory: 256Mi
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.extraVolumes[0].name
+          value: o11ytoken
+      - equal:
+          path: spec.values.resources.requests
+          value:
+            cpu: 100m
+            memory: 128Mi
