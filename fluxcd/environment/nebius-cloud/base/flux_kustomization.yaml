@@ -9,7 +9,7 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
-  path: "./fluxcd/enviroment/nebius-cloud/base/custom-configmaps-soperator"
+  path: "./fluxcd/environment/nebius-cloud/base/custom-configmaps-soperator"
   prune: false
   timeout: 1m
   postBuild:
