@@ -18,8 +18,11 @@ echo "Complement jail rootfs"
 echo "Symlink slurm configs from jail(sconfigcontroller)"
 rm -rf /etc/slurm && ln -s /mnt/jail/slurm /etc/slurm
 
+echo "Bind-mount /opt/bin/sbatch.sh script"
+mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
+
 echo "Submitting Slurm job..."
-SLURM_OUTPUT=$(sbatch --parsable --wrap="/opt/bin/sbatch.sh")
+SLURM_OUTPUT=$(/usr/bin/sbatch --parsable --wrap="/opt/bin/sbatch.sh")
 
 if [[ -z "$SLURM_OUTPUT" ]]; then
     echo "Failed to submit Slurm job"
