@@ -1,6 +1,8 @@
 #include "snccld.h"
 
+#include <fcntl.h>
 #include <sched.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,6 +11,7 @@
 
 #include <sys/mount.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 
 #include <slurm/slurm.h>
 #include <slurm/slurm_errno.h>
@@ -150,7 +153,48 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
 
     snprintf(info->fifo_path, sizeof(info->fifo_path), "/tmp/nccl_debug_%u_%u.fifo", info->key.job_id, info->key.step_id);
     snprintf(info->log_path, sizeof(info->log_path), "/tmp/nccl_debug_%u_%u.out", info->key.job_id, info->key.step_id);
-    info->tee_pid = (rand() * INT32_MAX / 2) % INT32_MAX;
+
+    if (mkfifo(info->fifo_path, SNCCLDEBUG_FIFO_MODE) != EXIT_SUCCESS) {
+        if (errno == EEXIST) {
+            unlink(info->fifo_path);
+            if (mkfifo(info->fifo_path, SNCCLDEBUG_FIFO_MODE) != EXIT_SUCCESS) {
+                slurm_error(SNCCLDEBUG_LOG_PREFIX "Cannot create FIFO %s: %m", info->fifo_path);
+                free(info);
+                return ESPANK_SUCCESS;
+            }
+        } else {
+            slurm_error(SNCCLDEBUG_LOG_PREFIX "Cannot create FIFO %s: %m", info->fifo_path);
+            free(info);
+            return ESPANK_SUCCESS;
+        }
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        slurm_error(SNCCLDEBUG_LOG_PREFIX "fork() failed: %m");
+        unlink(info->fifo_path);
+        return ESPANK_SUCCESS;
+    } else if (pid == 0) {
+        int fd = open(info->fifo_path, O_RDONLY);
+        if (fd < 0) {
+            _exit(EXIT_FAILURE);
+        }
+        dup2(fd, STDIN_FILENO);
+        close(fd);
+
+        if (!user_set_debug) {
+            int devnull = open("/dev/null", O_WRONLY);
+            if (devnull >= 0) {
+                dup2(devnull, STDOUT_FILENO);
+                close(devnull);
+            }
+        }
+
+        execlp("stdbuf", "stdbuf", "-oL", "/usr/bin/tee", "-a", info->log_path, (char*)NULL);
+        _exit(EXIT_FAILURE);
+    }
+
+    info->tee_pid = pid;
     infos[infos_count++] = info;
 
     char *str = snccld_format_infos();
@@ -163,6 +207,11 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         spank_setenv(spank, SNCCLDEBUG_NCCL_DEBUG_ENV_VAR, "INFO", 1);
     } else {
         slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "Skipping env var");
+    }
+
+    {
+        slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "Setting " SNCCLDEBUG_NCCL_DEBUG_ENV_VAR " to INFO");
+        spank_setenv(spank, SNCCLDEBUG_NCCL_DEBUG_FILE_ENV_VAR, info->fifo_path, 1);
     }
 
     return ESPANK_SUCCESS;
@@ -183,7 +232,18 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
     slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "info count: %lu", infos_count);
     free(str);
 
-    free(infos[--infos_count]);
+    snccld_output_info_t *info = infos[infos_count-1];
+    if (info->tee_pid > 0) {
+        int status;
+        if (waitpid(info->tee_pid, &status, WNOHANG) == 0) {
+            kill(info->tee_pid, SIGKILL);
+            waitpid(info->tee_pid, &status, 0);
+        }
+        info->tee_pid = -1;
+    }
+    unlink(info->fifo_path);
+    free(info);
+    infos_count--;
 
     str = snccld_format_infos();
     slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "info after removal: %s", str);
