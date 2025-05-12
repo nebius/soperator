@@ -14,6 +14,28 @@
 #include <slurm/slurm_errno.h>
 #include <slurm/spank.h>
 
+snccld_output_info_key_t *snccld_new_key() {
+    return malloc(sizeof(snccld_output_info_key_t));
+}
+
+spank_err_t snccld_get_key_from(spank_t spank, snccld_output_info_key_t *key) {
+    if (spank_get_item(spank, S_JOB_ID, &key->job_id) != ESPANK_SUCCESS) {
+        slurm_error(SNCCLDEBUG_LOG_PREFIX "Failed to get Job ID");
+        return ESPANK_ERROR;
+    }
+
+    if (spank_get_item(spank, S_JOB_STEPID, &key->step_id) != ESPANK_SUCCESS) {
+        slurm_error(SNCCLDEBUG_LOG_PREFIX "Failed to get Step ID");
+        return ESPANK_ERROR;
+    }
+
+    return ESPANK_SUCCESS;
+}
+
+snccld_output_info_t *snccld_new_info() {
+    return malloc(sizeof(snccld_output_info_t));
+}
+
 char *get_executable_name(pid_t pid) {
     static char buffer[256];
     snprintf(buffer, sizeof(buffer), "/proc/%d/exe", pid);
@@ -80,7 +102,7 @@ char *snccld_format_infos() {
         return strdup("[]");
     }
 
-    size_t buf_size = 64 * infos_count + 3;
+    size_t buf_size = 256 * infos_count + 3;
     char *result = malloc(buf_size);
     if (!result) return NULL;
 
@@ -91,8 +113,8 @@ char *snccld_format_infos() {
     for (size_t i = 0; i < infos_count; ++i) {
         offset += snprintf(
             result + offset, buf_size - offset,
-            "(job=%u, step=%u, tee=%u, pipe=%s)%s",
-            infos[i]->job_id, infos[i]->step_id, infos[i]->tee_pid, infos[i]->pipe_name,
+            "(job=%u, step=%u, pipe=%s, log=%s, tee=%u)%s",
+            infos[i]->key.job_id, infos[i]->key.step_id, infos[i]->fifo_path, infos[i]->log_path, infos[i]->tee_pid,
             (i < infos_count - 1) ? ", " : ""
         );
     }
@@ -101,23 +123,34 @@ char *snccld_format_infos() {
     return result;
 }
 
-int slurm_spank_init(spank_t sp, int ac, char **av) {
-    log_context("init", sp);
+int slurm_spank_init(spank_t spank, int argc, char **argv) {
+    log_context("init", spank);
     srand(1);
     return ESPANK_SUCCESS;
 }
 
-int slurm_spank_user_init(spank_t sp, int ac, char **av) {
-    log_context("user_init", sp);
+int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
+    log_context("user_init", spank);
 
-    snccld_output_info_t *info = snccld_output_info_get_from(sp);
-
-    if (info->step_id == SLURM_BATCH_SCRIPT) {
+    snccld_output_info_key_t *key = snccld_new_key();
+    if (snccld_get_key_from(spank, key) != ESPANK_SUCCESS || key->step_id == SLURM_BATCH_SCRIPT) {
+        free(key);
         return ESPANK_SUCCESS;
     }
 
+    snccld_output_info_t *info = snccld_new_info();
+    info->key = *key;
+    free(key);
+
+    char debug_val[16] = "";
+    int user_set_debug = 0;
+    if (spank_getenv(spank, SNCCLDEBUG_NCCL_DEBUG_ENV_VAR, debug_val, sizeof(debug_val)) == ESPANK_SUCCESS) {
+        user_set_debug = 1;
+    }
+
+    snprintf(info->fifo_path, sizeof(info->fifo_path), "/tmp/nccl_debug_%u_%u.fifo", info->key.job_id, info->key.step_id);
+    snprintf(info->log_path, sizeof(info->log_path), "/tmp/nccl_debug_%u_%u.out", info->key.job_id, info->key.step_id);
     info->tee_pid = (rand() * INT32_MAX / 2) % INT32_MAX;
-    sprintf(info->pipe_name, "pipe_%u_%u", info->job_id, info->step_id);
     infos[infos_count++] = info;
 
     char *str = snccld_format_infos();
@@ -125,18 +158,25 @@ int slurm_spank_user_init(spank_t sp, int ac, char **av) {
     slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "info count: %lu", infos_count);
     free(str);
 
+    if (!user_set_debug) {
+        slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "Setting " SNCCLDEBUG_NCCL_DEBUG_ENV_VAR " to INFO");
+        spank_setenv(spank, SNCCLDEBUG_NCCL_DEBUG_ENV_VAR, "INFO", 1);
+    } else {
+        slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "Skipping env var");
+    }
+
     return ESPANK_SUCCESS;
 }
 
-int slurm_spank_task_exit(spank_t sp, int argc, char **argv) {
-    log_context("task_exit", sp);
+int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
+    log_context("task_exit", spank);
 
-    snccld_output_info_t *info = snccld_output_info_get_from(sp);
-    if (info->step_id == SLURM_BATCH_SCRIPT) {
-        free(info);
+    snccld_output_info_key_t *key = snccld_new_key();
+    if (snccld_get_key_from(spank, key) != ESPANK_SUCCESS || key->step_id == SLURM_BATCH_SCRIPT) {
+        free(key);
         return ESPANK_SUCCESS;
     }
-    free(info);
+    free(key);
 
     char *str = snccld_format_infos();
     slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "info before removal: %s", str);
