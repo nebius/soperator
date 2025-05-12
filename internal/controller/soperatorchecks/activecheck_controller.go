@@ -66,7 +66,7 @@ func (r *ActiveCheckReconciler) SetupWithManager(
 	maxConcurrency int,
 	cacheSyncTimeout time.Duration,
 ) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return ctrl.NewControllerManagedBy(mgr).Named(SlurmActiveCheckControllerName).
 		For(&slurmv1alpha1.ActiveCheck{}, builder.WithPredicates(
 			predicate.Funcs{
 				CreateFunc: func(e event.CreateEvent) bool {

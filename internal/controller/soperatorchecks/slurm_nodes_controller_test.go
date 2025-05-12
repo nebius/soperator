@@ -135,10 +135,10 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 			apiClient := slurmapifake.NewMockClient(t)
 			apiClient.On("ListNodes", ctx).Return(tt.listNodesOut, tt.listNodesErr)
 
+			slurmAPIClients := slurmapi.NewClientSet()
+			slurmAPIClients.AddClient(tt.slurmClusterName, apiClient)
 			c := &SlurmNodesController{
-				slurmAPIClients: map[types.NamespacedName]slurmapi.Client{
-					tt.slurmClusterName: apiClient,
-				},
+				slurmAPIClients: slurmAPIClients,
 			}
 			got, err := c.findDegradedNodes(ctx)
 			require.Equal(t, tt.wantErr, err != nil)
