@@ -195,7 +195,7 @@ func main() {
 		slurmAPIServer = "http://localhost:6820"
 	}
 
-	// TODO: init jwt controller
+	// TODO: init jwt controller (https://github.com/nebius/soperator/issues/453)
 	slurmClusterName := types.NamespacedName{
 		Namespace: "soperator",
 		Name:      "soperator",
