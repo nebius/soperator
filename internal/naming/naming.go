@@ -209,6 +209,18 @@ func BuildRoleBindingWorkerName(clusterName string) string {
 	return clusterName + "-worker-events-role-binding"
 }
 
+func BuildServiceAccountActiveCheckName(clusterName string) string {
+	return clusterName + "-activecheck-sa"
+}
+
+func BuildRoleActiveCheckName(clusterName string) string {
+	return clusterName + "-activecheck-role"
+}
+
+func BuildRoleBindingActiveCheckName(clusterName string) string {
+	return clusterName + "-activecheck-role-binding"
+}
+
 func BuildOtelSvcEndpoint(clusterName string) string {
 	return fmt.Sprintf("%s-collector", clusterName)
 }

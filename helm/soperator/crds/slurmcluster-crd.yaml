@@ -7191,6 +7191,9 @@ spec:
               reason:
                 description: Reason defines human readable error reason
                 type: string
+              serviceAccountReady:
+                default: false
+                type: boolean
               updateStatus:
                 description: UpdateStatus defines a status for update rollout
                 type: string
