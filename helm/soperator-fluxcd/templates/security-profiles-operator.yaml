@@ -20,15 +20,46 @@ spec:
       retries: 3
   upgrade:
     crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   interval: {{ .Values.securityProfilesOperator.interval }}
   timeout: {{ .Values.securityProfilesOperator.timeout }}
-  releaseName: security-profiles-operator
-  targetNamespace: security-profiles-operator-system
-{{- if .Values.securityProfilesOperator.values }}
+  releaseName: {{ .Values.securityProfilesOperator.releaseName }}
+  targetNamespace: {{ .Values.securityProfilesOperator.namespace }}
   values:
-    {{- toYaml .Values.securityProfilesOperator.values | nindent 4 }}
-{{- end }}
+  {{- if .Values.securityProfilesOperator.overrideValues }}
+    {{- toYaml .Values.securityProfilesOperator.overrideValues | nindent 4 }}
+  {{- else }}
+    daemon:
+      tolerations:
+        - operator: Exists
+    enableAppArmor: true
+    enableBpfRecorder: false
+    enableLogEnricher: false
+    enableProfiling: false
+    enableSelinux: false
+    replicaCount: 2
+    spoImage:
+      registry: gcr.io
+      repository: k8s-staging-sp-operator/security-profiles-operator
+      tag: v0.8.4
+    tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists
+      - effect: NoSchedule
+        operator: Exists
+    verbosity: 0
+  {{- end }}
   valuesFrom:
+  - kind: ConfigMap
+    name: terraform-security-profiles-operator
+    optional: true
+    valuesKey: values.yaml
   - kind: ConfigMap
     name: security-profiles-operator
     optional: true

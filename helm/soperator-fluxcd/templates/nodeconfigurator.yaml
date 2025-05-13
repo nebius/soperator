@@ -1,4 +1,4 @@
-{{- if .Values.nodeConfigurator.enabled }}
+{{- if and .Values.soperator.enabled .Values.soperator.nodeConfigurator.enabled }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -9,28 +9,48 @@ spec:
   chart:
     spec:
       chart: helm-nodeconfigurator
-      interval: {{ .Values.nodeConfigurator.interval }}
+      interval: {{ .Values.soperator.nodeConfigurator.interval }}
       sourceRef:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
-      version: {{ .Values.nodeConfigurator.version }}
+      version: {{ .Values.soperator.version }}
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
   install:
     crds: Skip
     remediation:
       retries: 3
-  interval: {{ .Values.nodeConfigurator.interval }}
-  timeout: {{ .Values.nodeConfigurator.timeout }}
-  releaseName: nodeconfigurator
-  targetNamespace: soperator-system
+  interval: {{ .Values.soperator.nodeConfigurator.interval }}
+  timeout: {{ .Values.soperator.nodeConfigurator.timeout }}
+  releaseName: {{ .Values.soperator.nodeConfigurator.releaseName }}
+  targetNamespace: {{ .Values.soperator.namespace }}
   upgrade:
     crds: Skip
-  {{- if .Values.nodeConfigurator.values }}
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   values:
-    {{- toYaml .Values.nodeConfigurator.values | nindent 4 }}
+  {{- if .Values.soperator.nodeConfigurator.overrideValues }}
+    {{- toYaml .Values.soperator.nodeConfigurator.overrideValues | nindent 4 }}
+  {{- else }}
+    nodeConfigurator:
+      enabled: false
+    rebooter:
+      enabled: true
+      {{- if and .Values.soperator.nodeConfigurator.values.rebooter .Values.soperator.nodeConfigurator.values.rebooter.resources }}
+      resources: 
+      {{- toYaml .Values.soperator.nodeConfigurator.values.rebooter.resources | nindent 8 }}
+      {{- end }}
+      generateRBAC: true
+      logFormat: json
+      tolerations:
+        - operator: Exists
   {{- end }}
   valuesFrom:
+  - kind: ConfigMap
+    name: terraform-nodeconfigurator
+    optional: true
+    valuesKey: values.yaml
   - kind: ConfigMap
     name: nodeconfigurator
     optional: true

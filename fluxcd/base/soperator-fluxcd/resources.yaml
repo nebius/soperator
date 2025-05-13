@@ -5,7 +5,7 @@ metadata:
   namespace: flux-system
 spec:
   type: "oci"
-  interval: 120m
+  interval: 24h
   url: oci://cr.eu-north1.nebius.cloud/soperator
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
@@ -23,12 +23,17 @@ spec:
       sourceRef:
         kind: HelmRepository
         name: soperator-fluxcd
+      version: ${soperator_version}
       interval: 3m
   install:
     remediation:
       retries: 3
   targetNamespace: flux-system
   valuesFrom:
+    - kind: ConfigMap
+      name: terraform-fluxcd-values
+      valuesKey: values.yaml
+      optional: false
     - kind: ConfigMap
       name: soperator-fluxcd
       valuesKey: values.yaml

@@ -1,0 +1,11 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: flux-system
+  namespace: flux-system
+spec:
+  interval: 3m
+  url: https://github.com/nebius/soperator
+  ref:
+    # TODO: Change this to the branch main after the first release
+    branch: dev

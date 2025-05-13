@@ -4,14 +4,14 @@ templates:
 tests:
   - it: should verify namespace creation in HelmRelease values
     set:
-      vmStack.enabled: false
-      prometheusOperator.enabled: false
+      observability.vmStack.enabled: false
+      observability.prometheusOperator.enabled: false
     asserts:
       - isKind:
           of: HelmRelease
       - equal:
           path: metadata.name
-          value: RELEASE-NAME-helm-soperator-fluxcd-ns
+          value: RELEASE-NAME-ns
       - notContains:
           path: spec.values.resources
           content:
@@ -22,9 +22,9 @@ tests:
 
   - it: should create vmStack namespace when only vmStack is enabled
     set:
-      vmStack.enabled: true
-      vmStack.namespace: monitoring-system
-      prometheusOperator.enabled: false
+      observability.vmStack.enabled: true
+      observability.vmStack.namespace: monitoring-system
+      observability.prometheusOperator.enabled: false
     asserts:
       - isKind:
           of: HelmRelease
@@ -38,9 +38,9 @@ tests:
 
   - it: should create prometheusOperator namespace when only prometheusOperator is enabled
     set:
-      vmStack.enabled: false
-      prometheusOperator.enabled: true
-      prometheusOperator.namespace: monitoring-system
+      observability.vmStack.enabled: false
+      observability.prometheusOperator.enabled: true
+      observability.prometheusOperator.namespace: monitoring-system
     asserts:
       - isKind:
           of: HelmRelease
@@ -54,10 +54,10 @@ tests:
 
   - it: should create single namespace when both components enabled with same namespace
     set:
-      vmStack.enabled: true
-      vmStack.namespace: monitoring-system
-      prometheusOperator.enabled: true
-      prometheusOperator.namespace: monitoring-system
+      observability.vmStack.enabled: true
+      observability.vmStack.namespace: monitoring-system
+      observability.prometheusOperator.enabled: true
+      observability.prometheusOperator.namespace: monitoring-system
     asserts:
       - isKind:
           of: HelmRelease
@@ -71,10 +71,10 @@ tests:
 
   - it: should create two namespaces when both components enabled with different namespaces
     set:
-      vmStack.enabled: true
-      vmStack.namespace: vm-monitoring
-      prometheusOperator.enabled: true
-      prometheusOperator.namespace: prom-monitoring
+      observability.vmStack.enabled: true
+      observability.vmStack.namespace: vm-monitoring
+      observability.prometheusOperator.enabled: true
+      observability.prometheusOperator.namespace: prom-monitoring
     asserts:
       - isKind:
           of: HelmRelease

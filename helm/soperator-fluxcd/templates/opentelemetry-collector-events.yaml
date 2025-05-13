@@ -1,4 +1,4 @@
-{{- if .Values.opentelemetry.enabled }}
+{{- if and .Values.observability.enabled .Values.observability.opentelemetry.enabled }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -9,24 +9,28 @@ spec:
   chart:
     spec:
       chart: opentelemetry-collector
-      interval: {{ .Values.opentelemetry.events.interval }}
+      interval: {{ .Values.observability.opentelemetry.events.interval }}
       sourceRef:
         kind: HelmRepository
-        name: {{ include "soperator-fluxcd.fullname" . }}- opentelemetry-collector
-      version: {{ .Values.opentelemetry.events.version }}
+        name: {{ include "soperator-fluxcd.fullname" . }}-opentelemetry-collector
+      version: {{ .Values.observability.opentelemetry.events.version }}
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   - name: {{ include "soperator-fluxcd.fullname" . }}-vm-logs
   install:
     remediation:
       retries: 3
-  interval: {{ .Values.opentelemetry.events.interval }}
-  timeout: {{ .Values.opentelemetry.events.timeout }}
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  interval: {{ .Values.observability.opentelemetry.events.interval }}
+  timeout: {{ .Values.observability.opentelemetry.events.timeout }}
   releaseName: opentelemetry-collector-events
   targetNamespace: logs-system
   values:
-  {{- if .Values.opentelemetry.events.values }}
-    {{- toYaml .Values.opentelemetry.events.values | nindent 4 }}
+  {{- if .Values.observability.opentelemetry.events.overrideValues }}
+    {{- toYaml .Values.observability.opentelemetry.events.overrideValues | nindent 4 }}
   {{- else }}
     clusterRole:
       create: true
@@ -56,9 +60,26 @@ spec:
           retry_on_failure:
             initial_interval: 200ms
           timeout: 5s
+        {{- if .Values.observability.opentelemetry.events.values.publicEndpointEnabled }}
+        otlp:
+          endpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
+          balancer_name: round_robin
+          compression: snappy
+          retry_on_failure:
+            initial_interval: 200ms
+          timeout: 5s
+          headers:
+            iam-container: project-e00h61cxzwnf6zksvdn77
+          auth:
+            authenticator: bearertokenauth
+        {{- end }}
       extensions:
         health_check:
           endpoint: 0.0.0.0:13133
+        {{- if .Values.observability.opentelemetry.events.values.publicEndpointEnabled }}
+        bearertokenauth:
+          filename: "/o11ytoken/accessToken"
+        {{- end }}
       processors:
         batch:
           send_batch_max_size: 700
@@ -126,10 +147,16 @@ spec:
       service:
         extensions:
         - health_check
+        {{- if .Values.observability.opentelemetry.events.values.publicEndpointEnabled }}
+        - bearertokenauth
+        {{- end }}
         pipelines:
           logs/events:
             exporters:
             - otlphttp/victoriametrics
+            {{- if .Values.observability.opentelemetry.events.values.publicEndpointEnabled }}
+            - otlp
+            {{- end }}
             processors:
             - transform
             - memory_limiter
@@ -144,7 +171,7 @@ spec:
         fieldRef:
           fieldPath: spec.nodeName
     - name: CLUSTER_NAME
-      value: soperator
+      value: {{ .Values.observability.opentelemetry.clusterName | quote }}
     - name: GOMAXPROCS
       value: "1"
     image:
@@ -162,9 +189,28 @@ spec:
     serviceAccount:
       create: true
     tolerations: []
-    useGOMEMLIMIT: true
+    useGOMEMLIMIT: {{ .Values.observability.opentelemetry.events.values.useGOMEMLIMIT | default true }}
+    {{- if and .Values.observability.opentelemetry.events.values
+    .Values.observability.opentelemetry.events.values.resources }}
+    resources:
+    {{- toYaml .Values.observability.opentelemetry.events.values.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.observability.opentelemetry.events.values.publicEndpointEnabled }}
+    extraVolumes:
+      - name: o11ytoken
+        secret:
+          secretName: o11y-writer-sa-token
+    extraVolumeMounts:
+      - mountPath: /o11ytoken
+        name: o11ytoken
+        readOnly: true
+    {{- end }}
   {{- end }}
   valuesFrom:
+  - kind: ConfigMap
+    name: terraform-opentelemetry-collector-events
+    optional: true
+    valuesKey: values.yaml
   - kind: ConfigMap
     name: opentelemetry-collector-events
     optional: true

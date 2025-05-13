@@ -36,16 +36,15 @@ var (
 
 type SlurmNodesController struct {
 	*reconciler.Reconciler
-	slurmAPIClients  map[types.NamespacedName]slurmapi.Client
+	slurmAPIClients  *slurmapi.ClientSet
 	reconcileTimeout time.Duration
 }
 
-// TODO: change clients init to jwtController.
 func NewSlurmNodesController(
 	client client.Client,
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
-	slurmAPIClients map[types.NamespacedName]slurmapi.Client,
+	slurmAPIClients *slurmapi.ClientSet,
 	reconcileTimeout time.Duration,
 ) *SlurmNodesController {
 	r := reconciler.NewReconciler(client, scheme, recorder)
@@ -61,8 +60,7 @@ func NewSlurmNodesController(
 func (r *SlurmNodesController) SetupWithManager(mgr ctrl.Manager,
 	maxConcurrency int, cacheSyncTimeout time.Duration) error {
 
-	return ctrl.NewControllerManagedBy(mgr).
-		Named(SlurmNodesControllerName).
+	return ctrl.NewControllerManagedBy(mgr).Named(SlurmNodesControllerName).
 		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
 				return true
@@ -121,7 +119,7 @@ func (c *SlurmNodesController) Reconcile(ctx context.Context, req ctrl.Request) 
 func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types.NamespacedName][]slurmapi.Node, error) {
 	degradedNodes := make(map[types.NamespacedName][]slurmapi.Node)
 
-	for slurmClusterName, slurmAPIClient := range c.slurmAPIClients {
+	for slurmClusterName, slurmAPIClient := range c.slurmAPIClients.GetClients() {
 		slurmNodes, err := slurmAPIClient.ListNodes(ctx)
 		if err != nil {
 			return nil, err
@@ -391,9 +389,9 @@ func (c *SlurmNodesController) drainSlurmNode(
 		)
 	logger.Info("draining slurm node")
 
-	slurmAPIClient, ok := c.slurmAPIClients[slurmClusterName]
-	if !ok {
-		return fmt.Errorf("no slurm clusters found with name %s", slurmClusterName)
+	slurmAPIClient, found := c.slurmAPIClients.GetClient(slurmClusterName)
+	if !found {
+		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 	}
 
 	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
@@ -464,9 +462,9 @@ func (c *SlurmNodesController) undrainSlurmNode(
 		)
 	logger.Info("undraining slurm node")
 
-	slurmAPIClient, ok := c.slurmAPIClients[slurmClusterName]
-	if !ok {
-		return fmt.Errorf("no slurm clusters with name %s", slurmClusterName)
+	slurmAPIClient, found := c.slurmAPIClients.GetClient(slurmClusterName)
+	if !found {
+		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 	}
 
 	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
@@ -491,9 +489,9 @@ func (c *SlurmNodesController) getSlurmNode(
 	slurmNodeName string,
 ) (slurmapi.Node, error) {
 
-	slurmAPIClient, ok := c.slurmAPIClients[slurmClusterName]
-	if !ok {
-		return slurmapi.Node{}, fmt.Errorf("no slurm clusters with name %s", slurmClusterName)
+	slurmAPIClient, found := c.slurmAPIClients.GetClient(slurmClusterName)
+	if !found {
+		return slurmapi.Node{}, fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 	}
 
 	node, err := slurmAPIClient.GetNode(ctx, slurmNodeName)

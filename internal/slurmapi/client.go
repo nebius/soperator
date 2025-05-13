@@ -33,7 +33,7 @@ type tokenIssuer interface {
 	Issue(ctx context.Context) (string, error)
 }
 
-func NewClient(server string, tokenIssuer tokenIssuer, httpClient *http.Client) (*client, error) {
+func NewClient(server string, tokenIssuer tokenIssuer, httpClient *http.Client) (Client, error) {
 	if httpClient != nil {
 		httpClient = DefaultHTTPClient()
 	}

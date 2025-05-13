@@ -8,7 +8,7 @@ metadata:
 spec:
   chart:
     spec:
-      chart: {{ include "soperator-fluxcd.fullname" . }}-mariadb-operator-crds
+      chart: mariadb-operator-crds
       interval: {{ .Values.mariadbOperator.interval }}
       sourceRef:
         kind: HelmRepository

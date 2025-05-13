@@ -1,0 +1,11 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: soperator-fluxcd
+  namespace: flux-system
+spec:
+  values:
+    helmRepository:
+      soperator:
+        url: oci://cr.eu-north1.nebius.cloud/soperator-unstable
+        type: oci

@@ -1,4 +1,4 @@
-{{- if .Values.prometheusOperator.enabled }}
+{{- if and .Values.observability.enabled .Values.observability.prometheusOperator.enabled }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -9,10 +9,10 @@ spec:
   chart:
     spec:
       chart: prometheus-operator-crds
-      interval: {{ .Values.prometheusOperator.interval }}
+      interval: {{ .Values.observability.prometheusOperator.interval }}
       sourceRef:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds
-      version: {{ .Values.prometheusOperator.version }}
+      version: {{ .Values.observability.prometheusOperator.version }}
   interval: 60m
 {{- end }}

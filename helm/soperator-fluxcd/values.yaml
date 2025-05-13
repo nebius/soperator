@@ -1,15 +1,18 @@
 helmRepository:
-  interval: 3m
+  interval: 15m
   soperator:
     url: oci://cr.eu-north1.nebius.cloud/soperator
     type: oci
+  kruise:
+    url: https://openkruise.github.io/charts/
+    type: default
   certManager:
     url: https://charts.jetstack.io
     type: default
   bedag:
     url: https://bedag.github.io/helm-charts
     type: default
-  k8up:
+  backup:
     url: https://k8up-io.github.io/k8up
     type: default
   mariadbOperator:
@@ -29,265 +32,177 @@ helmRepository:
     type: default
 ns:
   enabled: true
-  interval: 3m
-  timeout: 3m
+  interval: 5m
+  timeout: 5m
   version: 2.0.0
 certManager:
   enabled: true
-  interval: 3m
-  timeout: 3m
-  version: v1.12.*
-  namespace: "cert-manager-system"
+  interval: 5m
+  timeout: 5m
+  version: v1.17.*
+  namespace: cert-manager-system
+  releaseName: cert-manager
   values: null
-k8up:
+  overrideValues: null
+backup:
   enabled: true
-  interval: 3m
-  timeout: 3m
+  interval: 5m
+  timeout: 5m
   version: 4.8.*
-  namespace: "k8up-system"
-  values:
-    k8up:
-      envVars:
-        - name: BACKUP_SKIP_WITHOUT_ANNOTATION
-          value: "true"
-      env:
-        K8UP_BACKUP_SKIP_WITHOUT_ANNOTATION: "true"
-      image:
-        repository: ghcr.io/vshn/k8up
-        tag: v4.8.0
-      metrics:
-        grafanaDashboard:
-          additionalLabels:
-            grafana_dashboard: "1"
-          enabled: true
-          namespace: monitoring-system
-        prometheusRule:
-          enabled: false
-        serviceMonitor:
-          enabled: true
+  namespace: k8up-system
+  releaseName: k8up
+  values: null
+  overrideValues: null
 mariadbOperator:
   enabled: true
-  interval: 3m
-  timeout: 3m
+  interval: 5m
+  timeout: 5m
   version: 0.38.*
+  namespace: mariadb-operator-system
+  releaseName: mariadb-operator
   values: null
-nodeConfigurator:
+  overrideValues: null
+observability:
   enabled: true
-  interval: 3m
-  timeout: 3m
-  version: 1.19.0
-  values:
-    nodeConfigurator:
-      enabled: false
-    rebooter:
-      enabled: true
-      generateRBAC: true
-      logFormat: json
-      tolerations:
-        - operator: Exists
-opentelemetry:
-  enabled: true
-  namespace: "logs-system"
-  logs:
-    version: 0.117.*
-    interval: 3m
-    timeout: 3m
-    values: null
-  events:
-    version: 0.117.*
-    interval: 3m
-    timeout: 3m
-    values: null
-prometheusOperator:
-  enabled: true
-  interval: 3m
-  timeout: 3m
-  version: 0.64.*
-  namespace: "monitoring-system"
-securityProfilesOperator:
-  enabled: true
-  interval: 3m
-  timeout: 3m
-  version: 0.8.4-soperator
-  values:
-    daemon:
-      tolerations:
-        - operator: Exists
-    enableAppArmor: true
-    enableBpfRecorder: false
-    enableLogEnricher: false
-    enableProfiling: false
-    enableSelinux: false
-    replicaCount: 2
-    spoImage:
-      registry: gcr.io
-      repository: k8s-staging-sp-operator/security-profiles-operator
-      tag: v0.8.4
-    tolerations:
-      - effect: NoSchedule
-        key: node-role.kubernetes.io/master
-      - key: CriticalAddonsOnly
-        operator: Exists
-      - effect: NoExecute
-        operator: Exists
-      - effect: NoSchedule
-        operator: Exists
-    verbosity: 0
-slurmClusterStorage:
-  enabled: true
-  interval: 3m
-  timeout: 3m
-  version: 1.19.0
-slurmCluster:
-  enabled: true
-  interval: 3m
-  timeout: 3m
-  version: 1.19.0
-soperator:
-  enabled: true
-  interval: 3m
-  timeout: 3m
-  version: 1.19.0
-  values:
-    certManager:
-      enabled: true
-    controllerManager:
-      kubeRbacProxy:
-        image:
-          repository: gcr.io/kubebuilder/kube-rbac-proxy
-          tag: v0.15.0
-      manager:
-        env:
-          isApparmorCrdInstalled: true
-          isMariadbCrdInstalled: true
-          isPrometheusCrdInstalled: true
-soperatorChecks:
-  enabled: true
-  interval: 3m
-  timeout: 3m
-  version: 1.19.0
-  namespace: "soperator-system"
-  values: null
-vmStack:
-  enabled: true
-  crds:
-    interval: 3m
-    timeout: 3m
-    version: 0.0.3
-  interval: 3m
-  timeout: 3m
-  version: 0.39.*
-  namespace: "monitoring-system"
-  values:
-    alertmanager:
-      enabled: false
+  opentelemetry:
+    enabled: true
+    clusterName: soperator
+    namespace: logs-system
+    logs:
+      version: 0.117.*
+      interval: 5m
+      timeout: 5m
+      values:
+        publicEndpointEnabled: true
+        resources: {}
+      overrideValues: null
+    events:
+      version: 0.117.*
+      interval: 5m
+      timeout: 5m
+      values:
+        publicEndpointEnabled: true
+        resources: {}
+      overrideValues: null
+  prometheusOperator:
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    version: 19.1.*
+    namespace: monitoring-system
+  vmStack:
+    enabled: true
     crds:
-      enabled: false
-    defaultRules:
-      groups:
-        etcd:
-          create: false
-        vmcluster:
-          create: false
-      rules:
-        KubeHpaMaxedOut:
-          create: false
-        KubeMemoryOvercommit:
-          create: false
-        TooHighChurnRate24h:
-          create: false
-        TooManyScrapeErrors:
-          create: false
-    grafana:
-      assertNoLeakedSecrets: false
-      plugins:
-        - https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip;grafana-lokiexplore-app
-        - victoriametrics-logs-datasource
-      sidecar:
-        dashboards:
-          searchNamespace: ALL
-        datasources:
-          searchNamespace: ALL
-    kube-state-metrics:
-      prometheusScrape: false
-      selfMonitor:
-        enabled: true
-      vmServiceScrape:
+      interval: 5m
+      timeout: 5m
+      version: 0.0.3
+    interval: 5m
+    timeout: 5m
+    version: 0.39.*
+    namespace: monitoring-system
+    releaseName: metrics
+    values:
+      vmagent:
         spec:
-          endpoints:
-            - honorLabels: true
-              metricRelabelConfigs:
-                - action: labeldrop
-                  regex: (uid|container_id|image_id)
-              port: http
-            - honorLabels: true
-              metricRelabelConfigs:
-                - action: labeldrop
-                  regex: (uid|container_id|image_id)
-              port: metrics
-          jobLabel: app.kubernetes.io/name
-    kubeControllerManager:
-      enabled: false
-    kubeEtcd:
-      enabled: false
-    kubeProxy:
-      enabled: true
-      vmScrape:
+          extraArgs:
+            promscrape.maxScrapeSize: "33554432"
+      vmsingle:
         spec:
-          endpoints:
-            - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-              port: http-metrics
-              scheme: http
-          jobLabel: jobLabel
-          namespaceSelector:
-            matchNames:
-              - kube-system
-    kubeScheduler:
-      enabled: false
-    kubelet:
-      enabled: true
-    prometheus-node-exporter:
-      enabled: true
-    victoria-metrics-operator:
-      admissionWebhooks:
-        enable: true
-      crd:
-        cleanup:
-          enabled: false
-        create: false
-      operator:
-        disable_prometheus_converter: false
-        enable_converter_ownership: true
-    vmagent:
-      spec:
-        extraArgs:
-          promscrape.maxScrapeSize: "33554432"
-    vmalert:
-      enabled: false
-    vmsingle:
-      spec:
-        extraArgs:
-          dedup.minScrapeInterval: 30s
-          maxLabelsPerTimeseries: "40"
-          search.maxQueryLen: "18765"
-          search.maxUniqueTimeseries: "500000"
-        retentionPeriod: 30d
-vmLogs:
-  enabled: true
-  interval: 3m
-  timeout: 3m
-  version: 0.9.*
-  namespace: "logs-system"
-  values:
-    dashboards:
-      enabled: true
-      labels:
-        grafana_dashboard: "1"
-    server:
+          extraArgs:
+            dedup.minScrapeInterval: 30s
+            maxLabelsPerTimeseries: "40"
+            search.maxQueryLen: "18765"
+            search.maxUniqueTimeseries: "500000"
+          retentionPeriod: 30d
+          storage:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 30Gi
+          resources: {}
+    overrideValues: null
+  vmLogs:
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    version: 0.9.*
+    namespace: logs-system
+    releaseName: vm-logs
+    values:
       persistentVolume:
         enabled: true
-        size: 10Gi
-      vmServiceScrape:
-        enabled: true
-    vector:
-      enabled: false
+        size: 30Gi
+        accessMode: ReadWriteOnce
+      resources: {}
+    overrideValues: null
+securityProfilesOperator:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: 0.8.4-soperator
+  releaseName: security-profiles-operator
+  namespace: security-profiles-operator-system
+  values: null
+  overrideValues: null
+slurmCluster:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: 1.19.0
+  namespace: soperator
+  releaseName: soperator
+  values: null
+  overrideValues: null
+  slurmClusterStorage:
+    enabled: true
+    releaseName: slurm-cluster-storage
+    interval: 5m
+    timeout: 5m
+    values: null
+    overrideValues: null
+soperator:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: 1.19.0
+  namespace: "soperator-system"
+  releaseName: soperator-controller
+  values:
+    manager:
+      resources: {}
+  overrideValues: null
+  kruise:
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    version: 1.8.*
+    releaseName: soperator-kruise
+    overrideValues:
+      crds:
+        managed: true
+      resources:
+        limits:
+          memory: 256Mi
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      manager:
+        replicas: 1
+      featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true"
+  soperatorChecks:
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    releaseName: soperator-checks
+    values: null
+    overrideValues: null
+  nodeConfigurator:
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    releaseName: soperator-node-configurator
+    values:
+      rebooter:
+        resources: {}
+    overrideValues: null
