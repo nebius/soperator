@@ -60,7 +60,7 @@ func (r *SlurmAPIClientsController) SetupWithManager(mgr ctrl.Manager,
 				return false
 			},
 			UpdateFunc: func(e event.UpdateEvent) bool {
-				return true
+				return false
 			},
 			GenericFunc: func(e event.GenericEvent) bool {
 				return false
@@ -72,12 +72,6 @@ func (r *SlurmAPIClientsController) SetupWithManager(mgr ctrl.Manager,
 
 func (c *SlurmAPIClientsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithName("SlurmAPIClientsController.reconcile")
-
-	// Skip if already populated client
-	_, found := c.slurmAPIClients.GetClient(req.NamespacedName)
-	if found {
-		return ctrl.Result{}, nil
-	}
 
 	logger.Info("Adding new slurm api client")
 
