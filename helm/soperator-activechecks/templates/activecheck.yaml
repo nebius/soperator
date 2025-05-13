@@ -1,0 +1,23 @@
+{{ if .Values.activeCheck.enabled }}
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: ActiveCheck
+metadata:
+  name: 
+  namespace: {{ include "soperator-activechecks.name" . }}
+spec:
+  checkType: k8sJob
+  suspend: true
+  k8sJobSpec:
+  jobContainer:
+    command: {{ .Values.activeCheck.command }}
+    volumes:
+    - name: jail
+    persistentVolumeClaim:
+        claimName: jail-pvc
+    volumeMounts:
+    - name: jail
+    mountPath: /mnt/jail
+  name: create-user-${user_name}-check
+  runAfterCreation: true
+  slurmClusterRefName: ${slurm_cluster_name}
+{{ end }}
