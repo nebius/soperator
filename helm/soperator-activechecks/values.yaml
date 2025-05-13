@@ -1,0 +1,42 @@
+activeCheck:
+  enabled: false
+podTemplate:
+  enabled: false
+  name: example-app
+  metadata:
+    labels:
+      app: example-app
+      tier: frontend
+    annotations:
+      example.io/annotation: "value"
+  
+  # Template spec for the pods
+  template:
+    metadata:
+      labels:
+        app: example-app
+        tier: frontend
+      annotations: {}
+    spec:
+      containers:
+      - name: main
+        image: "busybox:latest"
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            memory: 128Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
