@@ -51,7 +51,7 @@ func NewActiveCheckJobController(
 
 func (r *ActiveCheckJobReconciler) SetupWithManager(mgr ctrl.Manager,
 	maxConcurrency int, cacheSyncTimeout time.Duration) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return ctrl.NewControllerManagedBy(mgr).Named(SlurmActiveCheckJobControllerName).
 		For(&batchv1.Job{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
 				job, ok := e.Object.(*batchv1.Job)
