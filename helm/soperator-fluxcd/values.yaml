@@ -102,6 +102,8 @@ observability:
     namespace: monitoring-system
     releaseName: metrics
     values:
+      grafana:
+        password: "password"
       vmagent:
         spec:
           extraArgs:
