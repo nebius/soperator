@@ -70,20 +70,33 @@ k8sNodeFilters:
                   values:
                     - "node-group-id-here"
 # Sources for the volumes used in Slurm node specifications
+# You can use existing pvc or create via helm if `createPVC: true`
 volumeSources:
   - name: controller-spool
+    createPVC: false
+    storageClassName: ""
+    size: ""
     persistentVolumeClaim:
       claimName: "controller-spool-pvc"
       readOnly: false
   - name: jail
+    createPVC: false
+    storageClassName: ""
+    size: ""
     persistentVolumeClaim:
       claimName: "jail-pvc"
       readOnly: false
 #  - name: jail-snapshot
+#    createPVC: false
+#    storageClassName: ""
+#    size: ""
 #    persistentVolumeClaim:
 #      claimName: "jail-snapshot-pvc"
 #      readOnly: true
 #  - name: mlperf-sd
+#    createPVC: false
+#    storageClassName: ""
+#    size: ""
 #    persistentVolumeClaim:
 #      claimName: "jail-submount-mlperf-sd-pvc"
 #      readOnly: false
