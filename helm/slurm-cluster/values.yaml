@@ -88,11 +88,15 @@ volumeSources:
       readOnly: false
 #  - name: jail-snapshot
 #    createPVC: false
+#    storageClassName: ""
+#    size: ""
 #    persistentVolumeClaim:
 #      claimName: "jail-snapshot-pvc"
 #      readOnly: true
 #  - name: mlperf-sd
 #    createPVC: false
+#    storageClassName: ""
+#    size: ""
 #    persistentVolumeClaim:
 #      claimName: "jail-submount-mlperf-sd-pvc"
 #      readOnly: false
