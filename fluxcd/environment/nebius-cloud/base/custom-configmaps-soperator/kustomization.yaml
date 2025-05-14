@@ -25,3 +25,10 @@ configMapGenerator:
       - 95-nebius-o11y
     options:
       disableNameSuffixHash: true
+  - name: image-storage
+    namespace: soperator
+    files:
+      - daemon.json
+      - enroot.conf
+    options:
+      disableNameSuffixHash: true
