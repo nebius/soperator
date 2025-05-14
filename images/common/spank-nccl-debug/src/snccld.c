@@ -52,7 +52,7 @@ char *get_executable_name(pid_t pid) {
 }
 
 void log_context(const char *func_name, spank_t spank) {
-    char context[16];
+    char            context[16];
     spank_context_t spank_ctx = spank_context();
 
     switch (spank_ctx) {
@@ -78,27 +78,34 @@ void log_context(const char *func_name, spank_t spank) {
             strcpy(context, "unknown");
     }
 
-    pid_t pid = getpid();
-    pid_t ppid = getppid();
-    char *pname = get_executable_name(pid);
+    pid_t pid         = getpid();
+    pid_t ppid        = getppid();
+    char *pname       = get_executable_name(pid);
     char *parent_name = get_executable_name(ppid);
 
     uint32_t job_id = 0, job_stepid = 0;
-    pid_t task_pid = 0;
+    pid_t    task_pid = 0;
 
     spank_get_item(spank, S_JOB_ID, &job_id);
     spank_get_item(spank, S_JOB_STEPID, &job_stepid);
     spank_get_item(spank, S_TASK_PID, &task_pid);
 
     slurm_spank_log(
-        SNCCLDEBUG_LOG_PREFIX
-        "%s\t%s\t%d\t%s\t%d\t%s\t%u\t%u\t%d",
-        func_name, context, pid, pname, ppid, parent_name, job_id, job_stepid, task_pid
+        SNCCLDEBUG_LOG_PREFIX "%s\t%s\t%d\t%s\t%d\t%s\t%u\t%u\t%d",
+        func_name,
+        context,
+        pid,
+        pname,
+        ppid,
+        parent_name,
+        job_id,
+        job_stepid,
+        task_pid
     );
 }
 
-static snccld_output_info_t* infos[64];
-static size_t infos_count = 0;
+static snccld_output_info_t *infos[64];
+static size_t                infos_count = 0;
 
 char *snccld_format_infos() {
     if (infos_count == 0 || infos[0] == NULL) {
@@ -106,18 +113,24 @@ char *snccld_format_infos() {
     }
 
     size_t buf_size = 256 * infos_count + 3;
-    char *result = malloc(buf_size);
-    if (!result) return NULL;
+    char  *result   = malloc(buf_size);
+    if (!result) {
+        return NULL;
+    }
 
-
-    size_t offset = 0;
-    offset += snprintf(result + offset, buf_size - offset, "[");
+    size_t offset  = 0;
+    offset        += snprintf(result + offset, buf_size - offset, "[");
 
     for (size_t i = 0; i < infos_count; ++i) {
         offset += snprintf(
-            result + offset, buf_size - offset,
+            result + offset,
+            buf_size - offset,
             "(job=%u, step=%u, pipe=%s, log=%s, tee=%u)%s",
-            infos[i]->key.job_id, infos[i]->key.step_id, infos[i]->fifo_path, infos[i]->log_path, infos[i]->tee_pid,
+            infos[i]->key.job_id,
+            infos[i]->key.step_id,
+            infos[i]->fifo_path,
+            infos[i]->log_path,
+            infos[i]->tee_pid,
             (i < infos_count - 1) ? ", " : ""
         );
     }
@@ -136,34 +149,55 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     log_context("user_init", spank);
 
     snccld_output_info_key_t *key = snccld_new_key();
-    if (snccld_get_key_from(spank, key) != ESPANK_SUCCESS || key->step_id == SLURM_BATCH_SCRIPT) {
+    if (snccld_get_key_from(spank, key) != ESPANK_SUCCESS ||
+        key->step_id == SLURM_BATCH_SCRIPT) {
         free(key);
         return ESPANK_SUCCESS;
     }
 
     snccld_output_info_t *info = snccld_new_info();
-    info->key = *key;
+    info->key                  = *key;
     free(key);
 
-    char debug_val[16] = "";
-    int user_set_debug = 0;
-    if (spank_getenv(spank, SNCCLDEBUG_NCCL_DEBUG_ENV_VAR, debug_val, sizeof(debug_val)) == ESPANK_SUCCESS) {
+    char debug_val[16]  = "";
+    int  user_set_debug = 0;
+    if (spank_getenv(
+            spank, SNCCLDEBUG_ENV_NCCL_DEBUG, debug_val, sizeof(debug_val)
+        ) == ESPANK_SUCCESS) {
         user_set_debug = 1;
     }
 
-    snprintf(info->fifo_path, sizeof(info->fifo_path), "/tmp/nccl_debug_%u_%u.fifo", info->key.job_id, info->key.step_id);
-    snprintf(info->log_path, sizeof(info->log_path), "/tmp/nccl_debug_%u_%u.out", info->key.job_id, info->key.step_id);
+    snprintf(
+        info->fifo_path,
+        sizeof(info->fifo_path),
+        "/tmp/nccl_debug_%u_%u.fifo",
+        info->key.job_id,
+        info->key.step_id
+    );
+    snprintf(
+        info->log_path,
+        sizeof(info->log_path),
+        "/tmp/nccl_debug_%u_%u.out",
+        info->key.job_id,
+        info->key.step_id
+    );
 
     if (mkfifo(info->fifo_path, SNCCLDEBUG_FIFO_MODE) != EXIT_SUCCESS) {
         if (errno == EEXIST) {
             unlink(info->fifo_path);
             if (mkfifo(info->fifo_path, SNCCLDEBUG_FIFO_MODE) != EXIT_SUCCESS) {
-                slurm_error(SNCCLDEBUG_LOG_PREFIX "Cannot create FIFO %s: %m", info->fifo_path);
+                slurm_error(
+                    SNCCLDEBUG_LOG_PREFIX "Cannot create FIFO %s: %m",
+                    info->fifo_path
+                );
                 free(info);
                 return ESPANK_SUCCESS;
             }
         } else {
-            slurm_error(SNCCLDEBUG_LOG_PREFIX "Cannot create FIFO %s: %m", info->fifo_path);
+            slurm_error(
+                SNCCLDEBUG_LOG_PREFIX "Cannot create FIFO %s: %m",
+                info->fifo_path
+            );
             free(info);
             return ESPANK_SUCCESS;
         }
@@ -190,11 +224,19 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
             }
         }
 
-        execlp("stdbuf", "stdbuf", "-oL", "/usr/bin/tee", "-a", info->log_path, (char*)NULL);
+        execlp(
+            "stdbuf",
+            "stdbuf",
+            "-oL",
+            "/usr/bin/tee",
+            "-a",
+            info->log_path,
+            (char *)NULL
+        );
         _exit(EXIT_FAILURE);
     }
 
-    info->tee_pid = pid;
+    info->tee_pid        = pid;
     infos[infos_count++] = info;
 
     char *str = snccld_format_infos();
@@ -203,15 +245,21 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     free(str);
 
     if (!user_set_debug) {
-        slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "Setting " SNCCLDEBUG_NCCL_DEBUG_ENV_VAR " to INFO");
-        spank_setenv(spank, SNCCLDEBUG_NCCL_DEBUG_ENV_VAR, "INFO", 1);
+        slurm_spank_log(
+            SNCCLDEBUG_LOG_PREFIX "Setting " SNCCLDEBUG_ENV_NCCL_DEBUG
+                                  " to INFO"
+        );
+        spank_setenv(spank, SNCCLDEBUG_ENV_NCCL_DEBUG, "INFO", 1);
     } else {
         slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "Skipping env var");
     }
 
     {
-        slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "Setting " SNCCLDEBUG_NCCL_DEBUG_ENV_VAR " to INFO");
-        spank_setenv(spank, SNCCLDEBUG_NCCL_DEBUG_FILE_ENV_VAR, info->fifo_path, 1);
+        slurm_spank_log(
+            SNCCLDEBUG_LOG_PREFIX "Setting " SNCCLDEBUG_ENV_NCCL_DEBUG
+                                  " to INFO"
+        );
+        spank_setenv(spank, SNCCLDEBUG_ENV_NCCL_DEBUG_FILE, info->fifo_path, 1);
     }
 
     return ESPANK_SUCCESS;
@@ -221,7 +269,8 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
     log_context("task_exit", spank);
 
     snccld_output_info_key_t *key = snccld_new_key();
-    if (snccld_get_key_from(spank, key) != ESPANK_SUCCESS || key->step_id == SLURM_BATCH_SCRIPT) {
+    if (snccld_get_key_from(spank, key) != ESPANK_SUCCESS ||
+        key->step_id == SLURM_BATCH_SCRIPT) {
         free(key);
         return ESPANK_SUCCESS;
     }
@@ -232,7 +281,7 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
     slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "info count: %lu", infos_count);
     free(str);
 
-    snccld_output_info_t *info = infos[infos_count-1];
+    snccld_output_info_t *info = infos[infos_count - 1];
     if (info->tee_pid > 0) {
         int status;
         if (waitpid(info->tee_pid, &status, WNOHANG) == 0) {

@@ -1,0 +1,29 @@
+AllowAllArgumentsOnNextLine: true
+AllowShortBlocksOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+
+AlignAfterOpenBracket: BlockIndent
+AlignOperands: true
+AlignConsecutiveMacros: Consecutive
+AlignConsecutiveBitFields: Consecutive
+AlignConsecutiveDeclarations: Consecutive
+
+AlignConsecutiveAssignments:
+  Enabled: true
+  AlignCompound: true
+  AcrossEmptyLines: false
+  AcrossComments: false
+
+BreakBeforeBraces: Attach
+InsertBraces: true
+
+BreakAdjacentStringLiterals: true
+BinPackArguments: false
+BinPackParameters: BinPack
+
+IndentCaseBlocks: true
+IndentCaseLabels: true
+IndentWidth: 4
+BracedInitializerIndentWidth: 4
+
+ColumnLimit: 80
