@@ -59,6 +59,8 @@ spec:
           TooManyScrapeErrors:
             create: false
       grafana:
+        enabled: true
+        password: {{ .Values.observability.vmStack.values.grafana.password | default "password" | quote }}
         assertNoLeakedSecrets: false
         plugins:
           - https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip;grafana-lokiexplore-app
