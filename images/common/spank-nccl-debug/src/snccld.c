@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <sched.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -259,8 +260,6 @@ static void snccld_parse_plugin_args(spank_t spank, int argc, char **argv) {
 int slurm_spank_init(spank_t spank, int argc, char **argv) {
     log_context("init", spank);
 
-    snccld_parse_plugin_args(spank, argc, argv);
-
     return ESPANK_SUCCESS;
 }
 
@@ -268,6 +267,11 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     log_context("user_init", spank);
 
     if (spank_context() != S_CTX_REMOTE) {
+        return ESPANK_SUCCESS;
+    }
+
+    snccld_parse_plugin_args(spank, argc, argv);
+    if (!snccld_config.enabled) {
         return ESPANK_SUCCESS;
     }
 
@@ -393,6 +397,11 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
     log_context("task_exit", spank);
 
     if (spank_context() != S_CTX_REMOTE) {
+        return ESPANK_SUCCESS;
+    }
+
+    snccld_parse_plugin_args(spank, argc, argv);
+    if (!snccld_config.enabled) {
         return ESPANK_SUCCESS;
     }
 
