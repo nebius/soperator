@@ -70,7 +70,7 @@ void log_context(const char *func_name, spank_t spank) {
     spank_get_item(spank, S_TASK_PID, &task_pid);
 
     slurm_spank_log(
-        SNCCLDEBUG_LOG_PREFIX "%s\t%s\t%d\t%s\t%d\t%s\t%u\t%u\t%d",
+        SNCCLD_LOG_PREFIX "%s\t%s\t%d\t%s\t%d\t%s\t%u\t%u\t%d",
         func_name,
         context,
         pid,
@@ -122,8 +122,8 @@ SPANK_PLUGIN(nccl_debug, 1);
 
 static snccld_config_t snccld_config = {
     .enabled    = false,
-    .log_level  = SNCCLDEBUG_NCCL_LOG_LEVEL_INFO,
-    .out_dir    = SNCCLDEBUG_DEFAULT_LOG_DIR,
+    .log_level  = SNCCLD_NCCL_LOG_LEVEL_INFO,
+    .out_dir    = SNCCLD_DEFAULT_LOG_DIR,
     .out_stdout = true,
 };
 
@@ -139,7 +139,7 @@ static inline void snccld_parse_arg_enabled_value(const char *val) {
     }
 
     slurm_error(
-        SNCCLDEBUG_LOG_PREFIX SNCCLDEBUG_LOG_INVALID_ARG,
+        SNCCLD_LOG_PREFIX SNCCLD_LOG_INVALID_ARG,
         SNCCLD_ARG_ENABLED,
         val,
         snccld_config.enabled ? "true" : "false"
@@ -152,10 +152,10 @@ static inline void snccld_parse_arg_enabled(const char *arg) {
 }
 
 static inline void snccld_parse_arg_log_level_value(const char *val) {
-    if (strcasecmp(val, SNCCLDEBUG_NCCL_LOG_LEVEL_VERSION) == 0 ||
-        strcasecmp(val, SNCCLDEBUG_NCCL_LOG_LEVEL_WARN) == 0 ||
-        strcasecmp(val, SNCCLDEBUG_NCCL_LOG_LEVEL_INFO) == 0 ||
-        strcasecmp(val, SNCCLDEBUG_NCCL_LOG_LEVEL_TRACE) == 0) {
+    if (strcasecmp(val, SNCCLD_NCCL_LOG_LEVEL_VERSION) == 0 ||
+        strcasecmp(val, SNCCLD_NCCL_LOG_LEVEL_WARN) == 0 ||
+        strcasecmp(val, SNCCLD_NCCL_LOG_LEVEL_INFO) == 0 ||
+        strcasecmp(val, SNCCLD_NCCL_LOG_LEVEL_TRACE) == 0) {
         strncpy(
             snccld_config.log_level, val, sizeof(snccld_config.log_level) - 1
         );
@@ -164,7 +164,7 @@ static inline void snccld_parse_arg_log_level_value(const char *val) {
     }
 
     slurm_error(
-        SNCCLDEBUG_LOG_PREFIX SNCCLDEBUG_LOG_INVALID_ARG,
+        SNCCLD_LOG_PREFIX SNCCLD_LOG_INVALID_ARG,
         SNCCLD_ARG_LOG_LEVEL,
         val,
         snccld_config.log_level
@@ -198,7 +198,7 @@ static inline void snccld_parse_arg_out_stdout_value(const char *val) {
     }
 
     slurm_error(
-        SNCCLDEBUG_LOG_PREFIX SNCCLDEBUG_LOG_INVALID_ARG,
+        SNCCLD_LOG_PREFIX SNCCLD_LOG_INVALID_ARG,
         SNCCLD_ARG_OUT_STDOUT,
         val,
         snccld_config.out_stdout ? "true" : "false"
@@ -236,14 +236,14 @@ static void snccld_parse_plugin_args(spank_t spank, int argc, char **argv) {
             arg, SNCCLD_ARG_OUT_STDOUT, snccld_parse_arg_out_stdout
         );
 
-        slurm_error(SNCCLDEBUG_LOG_PREFIX "Unknown plugin arg: %s", arg);
+        slurm_error(SNCCLD_LOG_PREFIX "Unknown plugin arg: %s", arg);
     }
 
     snccld_parse_env_vars(spank);
 
     // clang-format off
     slurm_info(
-        SNCCLDEBUG_LOG_PREFIX
+        SNCCLD_LOG_PREFIX
         "Loaded parameters: "
         SNCCLD_ARG_ENABLED    "='%s', "
         SNCCLD_ARG_LOG_LEVEL  "='%s', "
@@ -289,7 +289,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     char debug_val[16]  = "";
     int  user_set_debug = 0;
     if (spank_getenv(
-            spank, SNCCLDEBUG_ENV_NCCL_DEBUG, debug_val, sizeof(debug_val)
+            spank, SNCCLD_NCCL_ENV_DEBUG, debug_val, sizeof(debug_val)
         ) == ESPANK_SUCCESS) {
         user_set_debug = 1;
     }
@@ -309,13 +309,13 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         info->key.step_id
     );
 
-    if (mkfifo(info->fifo_path, SNCCLDEBUG_DEFAULT_FIFO_MODE) != EXIT_SUCCESS) {
+    if (mkfifo(info->fifo_path, SNCCLD_DEFAULT_FIFO_MODE) != EXIT_SUCCESS) {
         if (errno == EEXIST) {
             unlink(info->fifo_path);
-            if (mkfifo(info->fifo_path, SNCCLDEBUG_DEFAULT_FIFO_MODE) !=
+            if (mkfifo(info->fifo_path, SNCCLD_DEFAULT_FIFO_MODE) !=
                 EXIT_SUCCESS) {
                 slurm_error(
-                    SNCCLDEBUG_LOG_PREFIX "Cannot create FIFO %s: %m",
+                    SNCCLD_LOG_PREFIX "Cannot create FIFO %s: %m",
                     info->fifo_path
                 );
                 free(info);
@@ -323,8 +323,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
             }
         } else {
             slurm_error(
-                SNCCLDEBUG_LOG_PREFIX "Cannot create FIFO %s: %m",
-                info->fifo_path
+                SNCCLD_LOG_PREFIX "Cannot create FIFO %s: %m", info->fifo_path
             );
             free(info);
             return ESPANK_SUCCESS;
@@ -333,7 +332,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
 
     pid_t pid = fork();
     if (pid < 0) {
-        slurm_error(SNCCLDEBUG_LOG_PREFIX "fork() failed: %m");
+        slurm_error(SNCCLD_LOG_PREFIX "fork() failed: %m");
         unlink(info->fifo_path);
         return ESPANK_SUCCESS;
     } else if (pid == 0) {
@@ -368,26 +367,24 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     infos[infos_count++] = info;
 
     char *str = snccld_format_infos();
-    slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "added new info: %s", str);
-    slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "info count: %lu", infos_count);
+    slurm_spank_log(SNCCLD_LOG_PREFIX "added new info: %s", str);
+    slurm_spank_log(SNCCLD_LOG_PREFIX "info count: %lu", infos_count);
     free(str);
 
     if (!user_set_debug) {
         slurm_spank_log(
-            SNCCLDEBUG_LOG_PREFIX "Setting " SNCCLDEBUG_ENV_NCCL_DEBUG
-                                  " to INFO"
+            SNCCLD_LOG_PREFIX "Setting " SNCCLD_NCCL_ENV_DEBUG " to INFO"
         );
-        spank_setenv(spank, SNCCLDEBUG_ENV_NCCL_DEBUG, "INFO", 1);
+        spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG, "INFO", 1);
     } else {
-        slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "Skipping env var");
+        slurm_spank_log(SNCCLD_LOG_PREFIX "Skipping env var");
     }
 
     {
         slurm_spank_log(
-            SNCCLDEBUG_LOG_PREFIX "Setting " SNCCLDEBUG_ENV_NCCL_DEBUG
-                                  " to INFO"
+            SNCCLD_LOG_PREFIX "Setting " SNCCLD_NCCL_ENV_DEBUG " to INFO"
         );
-        spank_setenv(spank, SNCCLDEBUG_ENV_NCCL_DEBUG_FILE, info->fifo_path, 1);
+        spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG_FILE, info->fifo_path, 1);
     }
 
     return ESPANK_SUCCESS;
@@ -414,8 +411,8 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
     free(key);
 
     char *str = snccld_format_infos();
-    slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "info before removal: %s", str);
-    slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "info count: %lu", infos_count);
+    slurm_spank_log(SNCCLD_LOG_PREFIX "info before removal: %s", str);
+    slurm_spank_log(SNCCLD_LOG_PREFIX "info count: %lu", infos_count);
     free(str);
 
     snccld_output_info_t *info = infos[infos_count - 1];
@@ -432,8 +429,8 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
     infos_count--;
 
     str = snccld_format_infos();
-    slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "info after removal: %s", str);
-    slurm_spank_log(SNCCLDEBUG_LOG_PREFIX "info count: %lu", infos_count);
+    slurm_spank_log(SNCCLD_LOG_PREFIX "info after removal: %s", str);
+    slurm_spank_log(SNCCLD_LOG_PREFIX "info count: %lu", infos_count);
     free(str);
 
     return ESPANK_SUCCESS;
@@ -445,12 +442,12 @@ snccld_output_info_key_t *snccld_new_key() {
 
 spank_err_t snccld_get_key_from(spank_t spank, snccld_output_info_key_t *key) {
     if (spank_get_item(spank, S_JOB_ID, &key->job_id) != ESPANK_SUCCESS) {
-        slurm_error(SNCCLDEBUG_LOG_PREFIX "Failed to get Job ID");
+        slurm_error(SNCCLD_LOG_PREFIX "Failed to get Job ID");
         return ESPANK_ERROR;
     }
 
     if (spank_get_item(spank, S_JOB_STEPID, &key->step_id) != ESPANK_SUCCESS) {
-        slurm_error(SNCCLDEBUG_LOG_PREFIX "Failed to get Step ID");
+        slurm_error(SNCCLD_LOG_PREFIX "Failed to get Step ID");
         return ESPANK_ERROR;
     }
 
