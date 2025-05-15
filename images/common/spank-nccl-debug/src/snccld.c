@@ -267,6 +267,10 @@ int slurm_spank_init(spank_t spank, int argc, char **argv) {
 int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     log_context("user_init", spank);
 
+    if (spank_context() != S_CTX_REMOTE) {
+        return ESPANK_SUCCESS;
+    }
+
     snccld_output_info_key_t *key = snccld_new_key();
     if (snccld_get_key_from(spank, key) != ESPANK_SUCCESS ||
         key->step_id == SLURM_BATCH_SCRIPT) {
@@ -387,6 +391,10 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
 
 int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
     log_context("task_exit", spank);
+
+    if (spank_context() != S_CTX_REMOTE) {
+        return ESPANK_SUCCESS;
+    }
 
     snccld_output_info_key_t *key = snccld_new_key();
     if (snccld_get_key_from(spank, key) != ESPANK_SUCCESS ||
