@@ -1,13 +1,22 @@
 #ifndef SNCCLD_H
 #define SNCCLD_H
 
+#include <limits.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include <slurm/spank.h>
 
-SPANK_PLUGIN(nccl_debug, 1);
+#define SNCCLD_ARG_ENABLED        "enabled"
+#define SNCCLD_ARG_ENABLED_ENV    "SNCCLD_ENABLED"
+#define SNCCLD_ARG_LOG_LEVEL      "log_level"
+#define SNCCLD_ARG_LOG_LEVEL_ENV  "SNCCLD_LOG_LEVEL"
+#define SNCCLD_ARG_OUT_DIR        "out_dir"
+#define SNCCLD_ARG_OUT_DIR_ENV    "SNCCLD_OUT_DIR"
+#define SNCCLD_ARG_OUT_STDOUT     "out_stdout"
+#define SNCCLD_ARG_OUT_STDOUT_ENV "SNCCLD_OUT_STDOUT"
 
 #define SNCCLDEBUG_ENV_NCCL_DEBUG      "NCCL_DEBUG"
 #define SNCCLDEBUG_ENV_NCCL_DEBUG_FILE "NCCL_DEBUG_FILE"
@@ -24,6 +33,15 @@ SPANK_PLUGIN(nccl_debug, 1);
 #define SNCCLDEBUG_DEFAULT_LOG_DIR   SNCCLDEBUG_DEFAULT_DIR
 
 #define SNCCLDEBUG_LOG_PREFIX "SPANK | NCCL DEBUG: "
+#define SNCCLDEBUG_LOG_INVALID_ARG                                             \
+    "Invalid value for argument '%s': '%s', using default '%s'"
+
+typedef struct {
+    bool enabled;
+    char log_level[8];
+    char out_dir[PATH_MAX];
+    bool out_stdout;
+} snccld_config_t;
 
 typedef struct {
     uint32_t job_id;
@@ -42,5 +60,20 @@ typedef struct {
 } snccld_output_info_t;
 
 snccld_output_info_t *snccld_new_info(void);
+
+#define SNCCLD_PARSE_ARG(arg, arg_name, parse_fn)                              \
+    if (strncmp(arg, arg_name, strlen(arg_name)) == 0) {                       \
+        parse_fn(arg);                                                         \
+        continue;                                                              \
+    }
+
+#define SNCCLD_PARSE_ENV_ARG(env_key, parse_fn)                                \
+    do {                                                                       \
+        char val[PATH_MAX];                                                    \
+        if (spank_getenv(spank, env_key, val, sizeof(val)) ==                  \
+            ESPANK_SUCCESS) {                                                  \
+            parse_fn(val);                                                     \
+        }                                                                      \
+    } while (false);
 
 #endif // SNCCLD_H
