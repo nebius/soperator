@@ -1,5 +1,6 @@
 #include "snccld.h"
 
+#include <ctype.h>
 #include <fcntl.h>
 #include <sched.h>
 #include <signal.h>
@@ -159,6 +160,9 @@ static inline void snccld_parse_arg_log_level_value(const char *val) {
         strncpy(
             snccld_config.log_level, val, sizeof(snccld_config.log_level) - 1
         );
+        for (size_t i = 0; i < sizeof(val) - 1; i++) {
+            snccld_config.log_level[i] = toupper(snccld_config.log_level[i]);
+        }
         snccld_config.log_level[sizeof(snccld_config.log_level) - 1] = '\0';
         return;
     }
@@ -373,16 +377,20 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
 
     if (!user_set_debug) {
         slurm_spank_log(
-            SNCCLD_LOG_PREFIX "Setting " SNCCLD_NCCL_ENV_DEBUG " to INFO"
+            SNCCLD_LOG_PREFIX "Setting %s=%s",
+            SNCCLD_NCCL_ENV_DEBUG,
+            snccld_config.log_level
         );
-        spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG, "INFO", 1);
+        spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG, snccld_config.log_level, 1);
     } else {
         slurm_spank_log(SNCCLD_LOG_PREFIX "Skipping env var");
     }
 
     {
         slurm_spank_log(
-            SNCCLD_LOG_PREFIX "Setting " SNCCLD_NCCL_ENV_DEBUG " to INFO"
+            SNCCLD_LOG_PREFIX "Setting %s=%s",
+            SNCCLD_NCCL_ENV_DEBUG_FILE,
+            info->fifo_path
         );
         spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG_FILE, info->fifo_path, 1);
     }
