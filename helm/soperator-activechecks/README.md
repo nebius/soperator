@@ -3,14 +3,11 @@
 This helm chart deploys ActiveCheck to soperator cluster
 
 ### To install / update:
-```bash
-helm upgrade --install activecheck ./soperator-activechecks --set activeCheck.enabled=true --set activeCheck.schedule="0 */2 * * *"
-```
-or
+
 ```bash
 helm upgrade --install activecheck ./soperator-activechecks -f activecheck.yaml
 ```
-As an example we can use next activecheck.yaml for k8sJobs:
+As an example we can use next `activecheck.yaml` for `k8sJobs`:
 ```yaml
 activeCheck:
   enabled: true
@@ -22,7 +19,7 @@ activeCheck:
       - "-c"
       - "echo Hello, activecheck!"
 ```
-and for slurmJobs:
+and for `slurmJobs`:
 ```yaml
 activeCheck:
   enabled: true
