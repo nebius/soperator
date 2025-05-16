@@ -3,11 +3,11 @@
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
-  name: {{ .Values.activeCheck.name | quote }}
+  name: {{ .Release.Name }}-activecheck
   namespace: {{ .Values.activeCheck.namespace | quote }}
 spec:
   checkType: {{ .Values.activeCheck.checkType | quote }}
-  name: {{ .Values.activeCheck.name | quote }}
+  name: {{ .Release.Name }}-activecheck
   slurmClusterRefName: {{ .Values.activeCheck.slurmClusterRefName | quote }}
   schedule: {{ .Values.activeCheck.schedule | quote }}
   suspend: {{ .Values.activeCheck.suspend }}

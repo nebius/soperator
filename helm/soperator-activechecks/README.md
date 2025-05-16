@@ -4,17 +4,16 @@ This helm chart deploys ActiveCheck to soperator cluster
 
 ### To install / update:
 ```bash
-helm upgrade --install activecheckhelm ./soperator-activechecks --set activeCheck.enabled=true --set activeCheck.name=newactivecheck
+helm upgrade --install activecheck ./soperator-activechecks --set activeCheck.enabled=true --set activeCheck.schedule="0 */2 * * *"
 ```
 or
 ```bash
-helm upgrade --install activecheckhelm ./soperator-activechecks -f activecheck.yaml
+helm upgrade --install activecheck ./soperator-activechecks -f activecheck.yaml
 ```
 As an example we can use next activecheck.yaml for k8sJobs:
 ```yaml
 activeCheck:
   enabled: true
-  name: "newactivecheck"
   checkType: "k8sJob"
   schedule: "0 */2 * * *"    # every 2 hours
   k8sJobSpec:
@@ -27,7 +26,6 @@ and for slurmJobs:
 ```yaml
 activeCheck:
   enabled: true
-  name: "newactivecheck"
   checkType: "slurmJob"
   schedule: "0 */3 * * *"    # every 3 hours
   slurmJobSpec:
@@ -42,5 +40,5 @@ activeCheck:
 ### To delete:
 
 ```bash
-helm uninstall activecheckhelm
+helm uninstall activecheck
 ```

@@ -1,6 +1,5 @@
 activeCheck:
   enabled: false
-  name: "helm-active-check"
   namespace: "soperator"
   checkType: "k8sJob"
   schedule: "0 * * * *"
