@@ -1,0 +1,41 @@
+activeCheck:
+  enabled: false
+  namespace: "soperator"
+  checkType: "k8sJob"
+  schedule: "0 * * * *"
+  suspend: true
+  slurmClusterRefName: "soperator"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  runAfterCreation: false
+  k8sJobSpec:
+    jobContainer:
+      command: ["/bin/sh", "-c", "echo Hello, world!"]
+  slurmJobSpec:
+    sbatchScript: |
+      #!/bin/bash
+      #SBATCH -J simple_job         # Job name
+      #SBATCH --output=output.txt   # Output file
+
+      srun echo "Hello, world!"
+    jobContainer:
+      env:
+        - name: "K8S_POD_NAME"
+          valueFrom:
+            fieldRef:
+              fieldPath: "metadata.name"
+        - name: "K8S_POD_NAMESPACE"
+          valueFrom:
+            fieldRef:
+              fieldPath: "metadata.namespace"
+      volumeMounts:
+        - mountPath: "/mnt/jail"
+          name: "jail"
+      volumes:
+        - name: "jail"
+          persistentVolumeClaim:
+            claimName: "jail-pvc"
+images:
+  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.19.0-jammy-slurm24.05.5"
+  k8sJob: "ubuntu:jammy"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.19.0-jammy-slurm24.05.5"

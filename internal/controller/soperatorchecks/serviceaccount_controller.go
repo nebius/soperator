@@ -126,6 +126,10 @@ func (r *ServiceAccountReconciler) Reconcile(
 
 	if !check.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(check, consts.ActiveCheckServiceAccountFinalizer) {
+			if controllerutil.ContainsFinalizer(check, consts.ActiveCheckFinalizer) {
+				logger.Info("Waiting until dependant resources are deleted")
+				return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			}
 			return r.reconcileDelete(ctx, check)
 		}
 
@@ -258,7 +262,14 @@ func (r *ServiceAccountReconciler) reconcileDelete(ctx context.Context, check *s
 	}
 
 	if len(checks.Items) > 1 {
-		logger.Info("More than 1 check left, skipping")
+		logger.Info("More than 1 check left, removing finalizer")
+
+		controllerutil.RemoveFinalizer(check, consts.ActiveCheckServiceAccountFinalizer)
+		if err := r.Update(ctx, check); err != nil {
+			logger.Error(err, "Failed to remove finalizer")
+			return ctrl.Result{}, err
+		}
+
 		return ctrl.Result{}, nil
 	}
 
