@@ -74,6 +74,8 @@ spec:
         prometheusScrape: false
         selfMonitor:
           enabled: true
+        collectors:
+          - pods
         vmServiceScrape:
           spec:
             endpoints:
@@ -108,6 +110,8 @@ spec:
         enabled: false
       kubelet:
         enabled: true
+      coreDns:
+        enabled: false
       prometheus-node-exporter:
         enabled: true
       victoria-metrics-operator:
