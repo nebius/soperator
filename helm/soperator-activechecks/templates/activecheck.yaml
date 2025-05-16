@@ -1,4 +1,3 @@
-{{ if .Values.activeCheck.enabled }}
 {{- if .Values.activeCheck.enabled }}
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
@@ -35,4 +34,3 @@ spec:
       image: {{ .Values.images.munge | quote }}
   {{- end }}
 {{- end }}
-{{ end }}
