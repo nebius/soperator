@@ -111,11 +111,7 @@ func renderVolumes(check *slurmv1alpha1.ActiveCheck) []corev1.Volume {
 		var sbatchScriptName string
 		if check.Spec.SlurmJobSpec.SbatchScriptRefName != nil {
 			sbatchScriptName = *check.Spec.SlurmJobSpec.SbatchScriptRefName
-
 		} else {
-			sbatchScriptName = naming.BuildConfigMapSbatchScriptName(check.Spec.Name)
-		}
-		if check.Spec.SlurmJobSpec.SbatchScriptRefName == nil {
 			sbatchScriptName = naming.BuildConfigMapSbatchScriptName(check.Spec.Name)
 		}
 

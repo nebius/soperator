@@ -1,0 +1,36 @@
+{{- if .Values.activeCheck.enabled }}
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: ActiveCheck
+metadata:
+  name: {{ .Release.Name }}-activecheck
+  namespace: {{ .Values.activeCheck.namespace | quote }}
+spec:
+  checkType: {{ .Values.activeCheck.checkType | quote }}
+  name: {{ .Release.Name }}-activecheck
+  slurmClusterRefName: {{ .Values.activeCheck.slurmClusterRefName | quote }}
+  schedule: {{ .Values.activeCheck.schedule | quote }}
+  suspend: {{ .Values.activeCheck.suspend }}
+  successfulJobsHistoryLimit: {{ .Values.activeCheck.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.activeCheck.failedJobsHistoryLimit }}
+  runAfterCreation: {{ .Values.activeCheck.runAfterCreation }}
+  {{- if eq .Values.activeCheck.checkType "k8sJob" }}
+  k8sJobSpec:
+    jobContainer:
+      image: {{ .Values.images.k8sJob | quote }}
+      command: {{ toYaml .Values.activeCheck.k8sJobSpec.jobContainer.command | nindent 8 }}
+  {{- else if eq .Values.activeCheck.checkType "slurmJob" }}
+  slurmJobSpec:
+    sbatchScript: |
+{{ .Values.activeCheck.slurmJobSpec.sbatchScript | indent 6 }}
+    jobContainer:
+      image: {{ .Values.images.slurmJob | quote }}
+      env:
+{{ toYaml .Values.activeCheck.slurmJobSpec.jobContainer.env | indent 8 }}
+      volumeMounts:
+{{ toYaml .Values.activeCheck.slurmJobSpec.jobContainer.volumeMounts | indent 8 }}
+      volumes:
+{{ toYaml .Values.activeCheck.slurmJobSpec.jobContainer.volumes | indent 8 }}
+    mungeContainer:
+      image: {{ .Values.images.munge | quote }}
+  {{- end }}
+{{- end }}

@@ -28,6 +28,7 @@ CHART_OPERATOR_CRDS_PATH   	 = $(CHART_PATH)/soperator-crds
 CHART_CLUSTER_PATH    		 = $(CHART_PATH)/slurm-cluster
 CHART_STORAGE_PATH    		 = $(CHART_PATH)/slurm-cluster-storage
 CHART_FLUXCD_PATH    		 = $(CHART_PATH)/soperator-fluxcd
+CHART_ACTIVECHECK_PATH       = $(CHART_PATH)/soperator-activechecks
 
 SLURM_VERSION		  		= 24.05.5
 UBUNTU_VERSION		  		= jammy
@@ -184,6 +185,7 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATORCHECKS_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODECONFIGURATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_FLUXCD_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_ACTIVECHECK_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_CRDS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
@@ -191,6 +193,7 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATORCHECKS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODECONFIGURATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_FLUXCD_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_ACTIVECHECK_PATH)/Chart.yaml"
 	@# endregion helm chart versions
 #
 	@# region helm/slurm-cluster/values.yaml
@@ -207,6 +210,12 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.sConfigController = \"$(IMAGE_REPO)/sconfigcontroller:$(OPERATOR_IMAGE_TAG)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.mariaDB = \"docker-registry1.mariadb.com/library/mariadb:11.4.3\"" "helm/slurm-cluster/values.yaml"
 	@# endregion helm/slurm-cluster/values.yaml
+
+	@# region helm/soperator-activechecks/values.yaml
+	@echo 'Syncing helm/soperator-activechecks/values.yaml'
+	@$(YQ) -i ".images.munge = \"$(IMAGE_REPO)/munge:$(IMAGE_VERSION)\"" "helm/soperator-activechecks/values.yaml"
+	@$(YQ) -i ".images.slurmJob = \"$(IMAGE_REPO)/slurm_check_job:$(IMAGE_VERSION)\"" "helm/soperator-activechecks/values.yaml"
+	@# endregion helm/soperator-activechecks/values.yaml
 
 	@# region helm/nodeconfigurator/values.yaml
 	@echo 'Syncing helm/nodeconfigurator/values.yaml'
