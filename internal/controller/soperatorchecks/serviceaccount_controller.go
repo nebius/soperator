@@ -258,7 +258,14 @@ func (r *ServiceAccountReconciler) reconcileDelete(ctx context.Context, check *s
 	}
 
 	if len(checks.Items) > 1 {
-		logger.Info("More than 1 check left, skipping")
+		logger.Info("More than 1 check left, removing finalizer")
+
+		controllerutil.RemoveFinalizer(check, consts.ActiveCheckServiceAccountFinalizer)
+		if err := r.Update(ctx, check); err != nil {
+			logger.Error(err, "Failed to remove finalizer")
+			return ctrl.Result{}, err
+		}
+
 		return ctrl.Result{}, nil
 	}
 

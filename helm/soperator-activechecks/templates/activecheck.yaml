@@ -4,10 +4,11 @@ apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
   name: {{ .Values.activeCheck.name | quote }}
+  namespace: {{ .Values.activeCheck.namespace | quote }}
 spec:
   checkType: {{ .Values.activeCheck.checkType | quote }}
   name: {{ .Values.activeCheck.name | quote }}
-  slurmClusterRefName: "$slurm_cluster_name"
+  slurmClusterRefName: {{ .Values.activeCheck.slurmClusterRefName | quote }}
   schedule: {{ .Values.activeCheck.schedule | quote }}
   suspend: {{ .Values.activeCheck.suspend }}
   successfulJobsHistoryLimit: {{ .Values.activeCheck.successfulJobsHistoryLimit }}
@@ -15,8 +16,9 @@ spec:
   runAfterCreation: {{ .Values.activeCheck.runAfterCreation }}
   {{- if eq .Values.activeCheck.checkType "k8sJob" }}
   k8sJobSpec:
-    image: {{ .Values.images.k8sJob | quote }}
-    command: {{ toYaml .Values.activeCheck.k8sJobSpec.command | nindent 6 }}
+    jobContainer:
+      image: {{ .Values.images.k8sJob | quote }}
+      command: {{ toYaml .Values.activeCheck.k8sJobSpec.jobContainer.command | nindent 8 }}
   {{- else if eq .Values.activeCheck.checkType "slurmJob" }}
   slurmJobSpec:
     sbatchScript: |

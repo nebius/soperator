@@ -1,14 +1,17 @@
 activeCheck:
   enabled: false
   name: "helm-active-check"
+  namespace: "soperator"
   checkType: "k8sJob"
   schedule: "0 * * * *"
   suspend: true
+  slurmClusterRefName: "soperator"
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
   runAfterCreation: false
   k8sJobSpec:
-    command: ["/bin/sh", "-c", "echo Hello, world!"]
+    jobContainer:
+      command: ["/bin/sh", "-c", "echo Hello, world!"]
   slurmJobSpec:
     sbatchScript: |
       #!/bin/bash
