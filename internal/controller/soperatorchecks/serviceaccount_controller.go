@@ -126,6 +126,10 @@ func (r *ServiceAccountReconciler) Reconcile(
 
 	if !check.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(check, consts.ActiveCheckServiceAccountFinalizer) {
+			if controllerutil.ContainsFinalizer(check, consts.ActiveCheckFinalizer) {
+				logger.Info("Waiting until dependant resources are deleted")
+				return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			}
 			return r.reconcileDelete(ctx, check)
 		}
 

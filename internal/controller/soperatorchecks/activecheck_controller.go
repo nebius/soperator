@@ -126,6 +126,11 @@ func (r *ActiveCheckReconciler) Reconcile(
 	}
 
 	if !controllerutil.ContainsFinalizer(check, consts.ActiveCheckFinalizer) {
+		if !controllerutil.ContainsFinalizer(check, consts.ActiveCheckServiceAccountFinalizer) {
+			logger.Info("Waiting until service account is reconciled")
+			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+		}
+
 		controllerutil.AddFinalizer(check, consts.ActiveCheckFinalizer)
 		if err := r.Update(ctx, check); err != nil {
 			logger.Error(err, "Failed to add finalizer")
