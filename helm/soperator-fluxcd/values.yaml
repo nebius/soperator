@@ -123,10 +123,11 @@ observability:
               requests:
                 storage: 30Gi
           # remoteWrite:
-          #   url: "https://write.monitoring.eu-north1.nebius.cloud/projects/project-e00h61cxzwnf6zksvdn77/prometheus/api/v1/write"
-          #   bearerTokenSecret:
-          #     name: o11y-writer-sa-token
-          #     key: accessToken
+          #   - bearerTokenSecret:
+          #       key: accessToken
+          #       name: o11y-writer-sa-token
+          #     url: https://write.monitoring.eu-north1.nebius.cloud./projects/project-e00h61cxzwnf6zksvdn77/prometheus/api/v1/write
+          #   - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8429/api/v1/write
           # remoteWriteSettings:
           #   label:
           #     cluster: soperator
