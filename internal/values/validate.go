@@ -126,19 +126,6 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 			volumeSourceNamesRaw = append(volumeSourceNamesRaw, customMount.VolumeSourceName)
 		}
 
-		// custom init container mounts
-		customInitContainers := []corev1.Container{}
-		customInitContainers = append(customInitContainers, c.NodeWorker.CustomInitContainers...)
-		customInitContainers = append(customInitContainers, c.NodeLogin.CustomInitContainers...)
-		customInitContainers = append(customInitContainers, c.NodeController.CustomInitContainers...)
-		customInitContainers = append(customInitContainers, c.NodeAccounting.CustomInitContainers...)
-		customInitContainers = append(customInitContainers, c.NodeRest.CustomInitContainers...)
-		for _, customInitContainer := range customInitContainers {
-			for _, mount := range customInitContainer.VolumeMounts {
-				volumeSourceNamesRaw = append(volumeSourceNamesRaw, &mount.Name)
-			}
-		}
-
 		for _, volumeSourceName := range volumeSourceNamesRaw {
 			if volumeSourceName == nil {
 				continue
