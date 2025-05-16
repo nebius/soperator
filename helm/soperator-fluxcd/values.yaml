@@ -30,6 +30,10 @@ helmRepository:
   victoriaMetrics:
     url: https://victoriametrics.github.io/helm-charts/
     type: default
+  dcgmExporter:
+    url: oci://cr.eu-north1.nebius.cloud/soperator-unstable/helm-soperator-dcgm-exporter
+    type: oci
+
 ns:
   enabled: true
   interval: 5m
@@ -156,6 +160,16 @@ observability:
         accessMode: ReadWriteOnce
       resources: {}
     overrideValues: null
+  dcgmExporter:
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    version: 1.19.0-463aee07
+    namespace: soperator
+    releaseName: soperator-dcgm-exporter
+    values:
+      hpcJobMapDir: /var/run/nebius/slurm
+      resources: {}
 securityProfilesOperator:
   enabled: true
   interval: 5m
