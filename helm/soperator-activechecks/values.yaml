@@ -33,9 +33,7 @@ activeCheck:
         - name: "jail"
           persistentVolumeClaim:
             claimName: "jail-pvc"
-
 images:
-  slurmJob: "cr.eu-north1.nebius.cloud/soperator/k8s_job:1.19.0-jammy-slurm24.05.5"
+  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.19.0-jammy-slurm24.05.5"
   k8sJob: "ubuntu:jammy"
   munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.19.0-jammy-slurm24.05.5"
-
