@@ -18,8 +18,8 @@ on:
 
   # pull_request are defined separately to allow to run CI from forks.
   pull_request:
-    branches:
-      - dev
+    branches-ignore:
+      - main
     types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/**'
