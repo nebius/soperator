@@ -113,6 +113,18 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 		for _, subMount := range c.NodeLogin.JailSubMounts {
 			volumeSourceNamesRaw = append(volumeSourceNamesRaw, subMount.VolumeSourceName)
 		}
+		// worker custom mounts
+		for _, customMount := range c.NodeWorker.CustomVolumeMounts {
+			volumeSourceNamesRaw = append(volumeSourceNamesRaw, customMount.VolumeSourceName)
+		}
+		// login custom mounts
+		for _, customMount := range c.NodeLogin.CustomVolumeMounts {
+			volumeSourceNamesRaw = append(volumeSourceNamesRaw, customMount.VolumeSourceName)
+		}
+		// controller custom mounts
+		for _, customMount := range c.NodeController.CustomVolumeMounts {
+			volumeSourceNamesRaw = append(volumeSourceNamesRaw, customMount.VolumeSourceName)
+		}
 		for _, volumeSourceName := range volumeSourceNamesRaw {
 			if volumeSourceName == nil {
 				continue
