@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ include "soperator-dcgm-exporter.fullname" . }}-ds
+  name: {{ include "soperator-dcgm-exporter.name" . }}-ds
   labels:
     app: nvidia-dcgm-exporter
   {{- include "soperator-dcgm-exporter.labels" . | nindent 4 }}
@@ -104,8 +104,7 @@ spec:
       runtimeClassName: nvidia
       schedulerName: default-scheduler
       securityContext: {}
-      serviceAccount: nvidia-dcgm-exporter
-      serviceAccountName: {{ include "soperator-dcgm-exporter.fullname" . }}-sa
+      serviceAccountName: {{ include "soperator-dcgm-exporter.name" . }}-sa
       terminationGracePeriodSeconds: 30
       tolerations:
       - effect: NoSchedule
@@ -133,5 +132,5 @@ spec:
           items:
           - key: dcgm-metrics.csv
             path: dcgm-metrics.csv
-          name: {{ include "soperator-dcgm-exporter.fullname" . }}-metrics
+          name: {{ include "soperator-dcgm-exporter.name" . }}-metrics
         name: metrics-config

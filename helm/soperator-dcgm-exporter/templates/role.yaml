@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "soperator-dcgm-exporter.fullname" . }}-role
+  name: {{ include "soperator-dcgm-exporter.name" . }}-role
   labels:
     app: nvidia-dcgm-exporter
   {{- include "soperator-dcgm-exporter.labels" . | nindent 4 }}

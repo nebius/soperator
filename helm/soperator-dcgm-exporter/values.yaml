@@ -6,6 +6,8 @@ metricsPort: 9400
 
 serviceType: ClusterIP
 
+scrapeInterval: 15s
+
 daemonSet:
   # init container
   toolkitValidation:
