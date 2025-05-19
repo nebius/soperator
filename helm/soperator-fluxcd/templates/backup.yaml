@@ -26,14 +26,14 @@ spec:
     crds: Skip
     remediation:
       retries: 3
+  upgrade:
+    crds: Skip
   interval: {{ .Values.backup.interval }}
   timeout: {{ .Values.backup.timeout }}
   releaseName: {{ .Values.backup.releaseName }}
   targetNamespace: {{ .Values.backup.namespace }}
-  upgrade:
-    crds: Skip
-  {{- if .Values.backup.overrideValues }}
   values:
+  {{- if .Values.backup.overrideValues }}
     {{- toYaml .Values.backup.overrideValues | nindent 4 }}
   {{- else }}
     k8up:
