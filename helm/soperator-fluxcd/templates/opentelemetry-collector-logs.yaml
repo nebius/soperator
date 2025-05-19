@@ -49,7 +49,7 @@ spec:
         otlphttp/victoriametrics:
           compression: gzip
           encoding: proto
-          logs_endpoint: http://vm-victoria-logs-single-server.logs-system.svc.cluster.local.:9428/insert/opentelemetry/v1/logs
+          logs_endpoint: http://vm-logs-victoria-logs-single-server.logs-system.svc.cluster.local.:9428/insert/opentelemetry/v1/logs
           retry_on_failure:
             initial_interval: 200ms
           timeout: 5s
@@ -123,7 +123,48 @@ spec:
             - set(attributes["cluster"], "${env:CLUSTER_NAME}")
             - set(attributes["k8s.node.name"], "${env:K8S_NODE_NAME}")
       receivers:
-        filelog:
+        filelog/nodelogs:
+          include:
+            - '/var/nodelogs/kern.log*'
+            - '/var/nodelogs/syslog*'
+            - '/var/nodelogs/dmesg*'
+          exclude:
+            - '/var/nodelogs/*.gz'
+            - '/var/nodelogs/*.tmp'
+          include_file_name: true
+          operators:
+            - type: add
+              field: resource["o11y_agent_raw_logs"]
+              value: 'yes'
+            - type: add
+              field: resource["workspace.id"]
+              value: node-system
+            - id: extract_logtype
+              type: regex_parser
+              parse_from: attributes["log.file.name"]
+              regex: '^(?P<logtype>[^.]+).*$'
+            - type: remove
+              field: attributes["log.file.name"]
+            - id: get-format
+              type: router
+              routes:
+                - expr: attributes["logtype"] matches "syslog|kern"
+                  output: parse-syslog
+              default: not-syslog
+            - id: parse-syslog
+              type: syslog_parser
+              protocol: rfc3164
+              allow_skip_pri_header: true
+            - type: move
+              from: attributes["message"]
+              to: body
+              if: '"message" in attributes'
+            - id: not-syslog
+              type: noop
+            - type: move
+              from: attributes["logtype"]
+              to: resource["app.kubernetes.io/name"]
+        filelog/pods:
           exclude:
           - /var/log/pods/*/otc-container/*.log
           - /var/log/pods/*/munge/*.log
@@ -250,7 +291,8 @@ spec:
             - memory_limiter
             - batch
             receivers:
-            - filelog
+            - filelog/pods
+            - filelog/nodelogs
           metrics: null
           traces: null
     extraEnvs:
@@ -276,6 +318,9 @@ spec:
       readOnly: true
     - mountPath: /var/lib/otelcol
       name: varlibotelcol
+    - name: node-logs
+      mountPath: /var/nodelogs
+      readOnly: true
     extraVolumes:
     {{- if .Values.observability.opentelemetry.events.values.publicEndpointEnabled }}
     - name: o11ytoken
@@ -285,6 +330,10 @@ spec:
     - hostPath:
         path: /var/log/pods
       name: varlogpods
+    - hostPath:
+        path: /var/log
+        type: Directory
+      name: node-logs
     - hostPath:
         path: /var/lib/otelcol
         type: DirectoryOrCreate
@@ -300,7 +349,7 @@ spec:
     - command:
       - sh
       - -c
-      - 'chown -R 10001: /var/lib/otelcol'
+      - 'chown -R 10001: /var/lib/otelcol /var/nodelogs'
       image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
       name: init-fs
       securityContext:
@@ -309,6 +358,8 @@ spec:
       volumeMounts:
       - mountPath: /var/lib/otelcol
         name: varlibotelcol
+      - name: node-logs
+        mountPath: /var/nodelogs
     mode: daemonset
     rollout:
       rollingUpdate:
