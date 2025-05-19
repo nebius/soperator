@@ -10,7 +10,6 @@ var (
 )
 
 const (
-	SigningKeyLength = 32
-
+	SigningKeyLength       = 32
 	DefaultMaxCacheEntries = 10
 )
