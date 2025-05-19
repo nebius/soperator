@@ -8,7 +8,8 @@ apt -y install \
     python3.10-dev \
     python3.10-venv \
     python3.10-dbg
-apt clean
+apt-get clean
+rm -rf /var/lib/apt/lists/*
 
 # Install pip
 curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
