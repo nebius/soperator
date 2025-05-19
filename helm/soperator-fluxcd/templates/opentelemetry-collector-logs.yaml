@@ -295,7 +295,7 @@ spec:
     image:
       pullPolicy: IfNotPresent
       repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
-      tag: 0.2.241
+      tag: 0.2.267
     initContainers:
     - command:
       - sh
