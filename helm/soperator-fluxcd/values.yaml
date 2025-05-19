@@ -53,6 +53,35 @@ backup:
   releaseName: k8up
   values: null
   overrideValues: null
+  schedule: 
+    interval: 5m
+    timeout: 5m
+    version: 4.8.*
+    namespace: k8up-system
+    releaseName: k8up-schedule
+    values:
+      name: soperator-jail
+      spec: {}
+        # backend:
+        #   s3:
+        #     endpoint: "${s3_endpoint}"
+        #     bucket: "${s3_bucket}"
+        #     accessKeyIDSecretRef:
+        #       name: "${backups_secret}"
+        #       key: aws-access-key-id
+        #     secretAccessKeySecretRef:
+        #       name: "${backups_secret}"
+        #       key: aws-access-secret-key
+        #   repoPasswordSecretRef:
+        #     name: "${backups_secret}"
+        #     key: backup-password
+
+        # backup:
+        #   schedule: "${backups_schedule}"
+        #   failedJobsHistoryLimit: 2
+        #   successfulJobsHistoryLimit: 2
+        #   concurrentRunsAllowed: false
+        #   tags: ["soperator-jail-schedule"]
 mariadbOperator:
   enabled: true
   interval: 5m
@@ -122,6 +151,15 @@ observability:
             resources:
               requests:
                 storage: 30Gi
+          # remoteWrite:
+          #   - bearerTokenSecret:
+          #       key: accessToken
+          #       name: o11y-writer-sa-token
+          #     url: https://write.monitoring.eu-north1.nebius.cloud./projects/project-e00h61cxzwnf6zksvdn77/prometheus/api/v1/write
+          #   - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8429/api/v1/write
+          # remoteWriteSettings:
+          #   label:
+          #     cluster: soperator
           resources: {}
     overrideValues: null
   vmLogs:
