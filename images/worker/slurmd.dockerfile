@@ -1,5 +1,5 @@
 # BASE_IMAGE defined here for second multistage build
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
+ARG BASE_IMAGE=ubuntu:jammy
 
 # First stage: Build the gpubench application
 FROM golang:1.24 AS gpubench_builder
@@ -23,16 +23,16 @@ RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 #######################################################################################################################
 # Second stage: Build worker image
 
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
+ARG BASE_IMAGE=ubuntu:jammy
 
 FROM $BASE_IMAGE AS worker_slurmd
 
-ARG SLURM_VERSION=24.05.5
+ARG SLURM_VERSION=24.05.7
 ARG OPENMPI_VERSION=4.1.7a1
+ARG PYXIS_VERSION=0.21.0
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-# TODO: Install only those dependencies that are required for running slurmd + useful utilities
 # Install dependencies
 RUN apt-get update && \
     apt -y install \
@@ -89,18 +89,15 @@ ENV PATH=$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
     echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" > /etc/apt/sources.list.d/nebius.list
 
-
-ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
-# Download and install Slurm packages
 RUN apt-get update && \
-    for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd slurm-smd-slurmd; do \
-        wget -q -P /tmp $PACKAGES_REPO_URL/slurm-packages-$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
-        echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
-        { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
-    done && \
-    apt install -y /tmp/*.deb && \
-    rm -rf /tmp/*.deb && \
-    apt clean
+    apt -y install \
+      slurm-smd-client=${SLURM_VERSION}-1 \
+      slurm-smd-dev=${SLURM_VERSION}-1 \
+      slurm-smd-libnss-slurm=${SLURM_VERSION}-1 \
+      slurm-smd=${SLURM_VERSION}-1 \
+      slurm-smd-slurmd=${SLURM_VERSION}-1 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install slurm сhroot plugin
 COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
@@ -110,10 +107,10 @@ RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
 # Install parallel because it's required for enroot operation
-COPY common/scripts/install_parallel.sh /opt/bin/
-RUN chmod +x /opt/bin/install_parallel.sh && \
-    /opt/bin/install_parallel.sh && \
-    rm /opt/bin/install_parallel.sh
+RUN apt-get update && \
+    apt -y install parallel=20210822+ds-2 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install enroot
 COPY common/scripts/install_enroot.sh /opt/bin/
@@ -126,10 +123,10 @@ COPY common/enroot/enroot.conf /etc/enroot/
 RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
 
 # Install slurm pyxis plugin
-COPY common/scripts/install_pyxis_plugin.sh /opt/bin/
-RUN chmod +x /opt/bin/install_pyxis_plugin.sh && \
-    /opt/bin/install_pyxis_plugin.sh && \
-    rm /opt/bin/install_pyxis_plugin.sh
+RUN apt-get update && \
+    apt -y install nvslurm-plugin-pyxis=${PYXIS_VERSION}-1 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install nvidia-container-toolkit
 COPY common/scripts/install_container_toolkit.sh /opt/bin/
