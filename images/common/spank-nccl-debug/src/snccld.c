@@ -1,4 +1,5 @@
 #include "snccld.h"
+#include "snccld_mkdir.h"
 
 #include <ctype.h>
 #include <fcntl.h>
@@ -298,17 +299,38 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         user_set_debug = 1;
     }
 
+    if (snccld_mkdir_p(SNCCLD_DEFAULT_DIR, SNCCLD_DEFAULT_FIFO_MODE) ==
+        ESPANK_ERROR) {
+        slurm_error(
+            SNCCLD_LOG_PREFIX "Cannot create directory '%s': %m",
+            SNCCLD_DEFAULT_DIR
+        );
+        free(info);
+        return ESPANK_ERROR;
+    }
     snprintf(
         info->fifo_path,
         sizeof(info->fifo_path),
-        "/tmp/nccl_debug_%u_%u.fifo",
+        "%s/%u_%u.fifo",
+        SNCCLD_DEFAULT_DIR,
         info->key.job_id,
         info->key.step_id
     );
+
+    if (snccld_mkdir_p(snccld_config.out_dir, SNCCLD_DEFAULT_FIFO_MODE) ==
+        ESPANK_ERROR) {
+        slurm_error(
+            SNCCLD_LOG_PREFIX "Cannot create directory '%s': %m",
+            snccld_config.out_dir
+        );
+        free(info);
+        return ESPANK_ERROR;
+    }
     snprintf(
         info->log_path,
         sizeof(info->log_path),
-        "/tmp/nccl_debug_%u_%u.out",
+        "%s/%u_%u.out",
+        snccld_config.out_dir,
         info->key.job_id,
         info->key.step_id
     );
