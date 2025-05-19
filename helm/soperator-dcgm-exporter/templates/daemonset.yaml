@@ -1,0 +1,136 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "soperator-dcgm-exporter.name" . }}-ds
+  labels:
+    app: nvidia-dcgm-exporter
+  {{- include "soperator-dcgm-exporter.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-dcgm-exporter
+    {{- include "soperator-dcgm-exporter.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: nvidia-dcgm-exporter
+      {{- include "soperator-dcgm-exporter.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - env:
+        - name: DCGM_EXPORTER_LISTEN
+          value: :{{ .Values.metricsPort }}
+        - name: DCGM_EXPORTER_KUBERNETES
+          value: "true"
+        - name: DCGM_EXPORTER_COLLECTORS
+          value: /etc/dcgm-exporter/dcgm-metrics.csv
+        - name: DCGM_HPC_JOB_MAPPING_DIR
+          value: {{ .Values.dcgmHpcJobMappingDir }}
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: KUBERNETES_CLUSTER_DOMAIN
+          value: {{ quote .Values.kubernetesClusterDomain }}
+        image: {{ .Values.daemonSet.nvidiaDcgmExporter.image.repository }}:{{
+          .Values.daemonSet.nvidiaDcgmExporter.image.tag | default .Chart.AppVersion
+          }}
+        imagePullPolicy: IfNotPresent
+        name: nvidia-dcgm-exporter
+        ports:
+        - containerPort: {{ .Values.metricsPort }}
+          name: metrics
+          protocol: TCP
+        resources: {{- toYaml .Values.daemonSet.nvidiaDcgmExporter.resources | nindent 10 }}
+        securityContext:
+          privileged: true
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /var/lib/kubelet/pod-resources
+          name: pod-gpu-resources
+          readOnly: true
+        - mountPath: /etc/dcgm-exporter/dcgm-metrics.csv
+          name: metrics-config
+          readOnly: true
+          subPath: dcgm-metrics.csv
+        - mountPath: {{ .Values.dcgmHpcJobMappingDir }}
+          mountPropagation: HostToContainer
+          name: hpc-jobs-dir
+      dnsPolicy: ClusterFirst
+      initContainers:
+      - command:
+        - sh
+        - -c
+        - |
+          mkdir -p {{ .Values.dcgmHpcJobMappingDir }}
+        env:
+        - name: KUBERNETES_CLUSTER_DOMAIN
+          value: {{ quote .Values.kubernetesClusterDomain }}
+        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
+        imagePullPolicy: IfNotPresent
+        name: create-hpc-jobs-dir
+        resources: {}
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /var
+          mountPropagation: HostToContainer
+          name: host-var
+      - args:
+        - until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done 
+        command:
+        - sh
+        - -c
+        env:
+        - name: KUBERNETES_CLUSTER_DOMAIN
+          value: {{ quote .Values.kubernetesClusterDomain }}
+        image: {{ .Values.daemonSet.toolkitValidation.image.repository }}:{{ .Values.daemonSet.toolkitValidation.image.tag | default .Chart.AppVersion }}
+        imagePullPolicy: IfNotPresent
+        name: toolkit-validation
+        resources: {}
+        securityContext:
+          privileged: true
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /run/nvidia
+          mountPropagation: HostToContainer
+          name: run-nvidia
+      nodeSelector: {{- toYaml .Values.daemonSet.nodeSelector | nindent 8 }}
+      priorityClassName: system-node-critical
+      restartPolicy: Always
+      runtimeClassName: nvidia
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccountName: {{ include "soperator-dcgm-exporter.name" . }}-sa
+      terminationGracePeriodSeconds: 30
+      tolerations:
+      - effect: NoSchedule
+        key: nvidia.com/gpu
+        operator: Exists
+      volumes:
+      - hostPath:
+          path: /var/lib/kubelet/pod-resources
+          type: ""
+        name: pod-gpu-resources
+      - hostPath:
+          path: /run/nvidia
+          type: ""
+        name: run-nvidia
+      - hostPath:
+          path: {{ .Values.dcgmHpcJobMappingDir }}
+          type: ""
+        name: hpc-jobs-dir
+      - hostPath:
+          path: /var
+          type: ""
+        name: host-var
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: dcgm-metrics.csv
+            path: dcgm-metrics.csv
+          name: {{ include "soperator-dcgm-exporter.name" . }}-metrics
+        name: metrics-config
