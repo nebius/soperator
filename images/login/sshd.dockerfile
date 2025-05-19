@@ -95,7 +95,7 @@ RUN chmod +x /opt/bin/install_enroot.sh && \
 COPY common/enroot/enroot.conf /etc/enroot/
 RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
 
-# Install slurm pyxis plugin \
+# Install slurm pyxis plugin
 RUN apt-get update && \
     apt -y install nvslurm-plugin-pyxis=${PYXIS_VERSION}-1 && \
     apt-get clean && \
