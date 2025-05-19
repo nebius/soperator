@@ -166,7 +166,6 @@ RUN chmod +x /opt/bin/install_python.sh && \
     rm /opt/bin/install_python.sh
 
 # Install parallel because it's required for enroot operation
-COPY common/scripts/install_parallel.sh /opt/bin/
 RUN apt-get update && \
     apt -y install parallel=20210822+ds-2 && \
     apt-get clean && \
