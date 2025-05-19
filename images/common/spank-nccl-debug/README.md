@@ -1,5 +1,20 @@
 # NCCL debug SPANK plugin
 
+## Arguments
+
+Argument priority (in order of application):
+1. Plugin defaults
+2. Arguments from `plugstack.conf`
+3. Arguments from ENV
+4. Arguments from options
+
+To see a list of arguments, run:
+```shell
+srun --help
+```
+And search for `Options provided by plugins`.
+In this section you can find options prefixed with `nccld-`.
+
 ## Deployment
 
 ### Disable Soperator
@@ -59,4 +74,3 @@ or (not reliable)
 ```shell
 kubectl-kruise -n soperator rollout restart statefulset.apps.kruise.io/{worker,login}
 ```
-

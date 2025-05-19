@@ -120,16 +120,16 @@ char *snccld_format_infos() {
     return result;
 }
 
-SPANK_PLUGIN(nccl_debug, 1);
+XSPANK_PLUGIN(SNCCLD_PLUGIN_NAME, 1);
 
 static snccld_config_t snccld_config = {
-    .enabled    = false,
+    .enabled    = SNCCLD_ARG_ENABLED_DEFAULT,
     .log_level  = SNCCLD_NCCL_LOG_LEVEL_INFO,
-    .out_dir    = SNCCLD_DEFAULT_LOG_DIR,
-    .out_stdout = true,
+    .out_dir    = SNCCLD_ARG_OUT_DIR_DEFAULT,
+    .out_stdout = SNCCLD_ARG_OUT_STDOUT_DEFAULT,
 };
 
-static inline void snccld_parse_arg_enabled_value(const char *val) {
+static void snccld_parse_arg_enabled_value(const char *val) {
     if (strcasecmp(val, "1") == 0 || strcasecmp(val, "true") == 0) {
         snccld_config.enabled = true;
         return;
@@ -153,7 +153,17 @@ static inline void snccld_parse_arg_enabled(const char *arg) {
     snccld_parse_arg_enabled_value(val);
 }
 
-static inline void snccld_parse_arg_log_level_value(const char *val) {
+/**
+ * Implementation of @spank_opt_cb_f callback for `enabled` arg.
+ */
+static int spank_option_enabled(int val, const char *optarg, int remote) {
+    SNCCLD_ARG_OPTION(
+        SNCCLD_ARG_ENABLED, snccld_parse_arg_enabled_value, optarg
+    )
+}
+
+static void snccld_parse_arg_log_level_value(const char *val) {
+    slurm_error(SNCCLD_LOG_PREFIX "Val: %s", val);
     if (strcasecmp(val, SNCCLD_NCCL_LOG_LEVEL_VERSION) == 0 ||
         strcasecmp(val, SNCCLD_NCCL_LOG_LEVEL_WARN) == 0 ||
         strcasecmp(val, SNCCLD_NCCL_LOG_LEVEL_INFO) == 0 ||
@@ -181,7 +191,16 @@ static inline void snccld_parse_arg_log_level(const char *arg) {
     snccld_parse_arg_log_level_value(val);
 }
 
-static inline void snccld_parse_arg_out_dir_value(const char *val) {
+/**
+ * Implementation of @spank_opt_cb_f callback for `log_level` arg.
+ */
+static int spank_option_log_level(int val, const char *optarg, int remote) {
+    SNCCLD_ARG_OPTION(
+        SNCCLD_ARG_LOG_LEVEL, snccld_parse_arg_log_level_value, optarg
+    )
+}
+
+static void snccld_parse_arg_out_dir_value(const char *val) {
     strncpy(snccld_config.out_dir, val, sizeof(snccld_config.out_dir) - 1);
     snccld_config.out_dir[sizeof(snccld_config.out_dir) - 1] = '\0';
 }
@@ -191,7 +210,16 @@ static inline void snccld_parse_arg_out_dir(const char *arg) {
     snccld_parse_arg_out_dir_value(val);
 }
 
-static inline void snccld_parse_arg_out_stdout_value(const char *val) {
+/**
+ * Implementation of @spank_opt_cb_f callback for `out_dir` arg.
+ */
+static int spank_option_out_dir(int val, const char *optarg, int remote) {
+    SNCCLD_ARG_OPTION(
+        SNCCLD_ARG_OUT_DIR, snccld_parse_arg_out_dir_value, optarg
+    )
+}
+
+static void snccld_parse_arg_out_stdout_value(const char *val) {
     if (strcasecmp(val, "1") == 0 || strcasecmp(val, "true") == 0) {
         snccld_config.out_stdout = true;
         return;
@@ -215,7 +243,16 @@ static inline void snccld_parse_arg_out_stdout(const char *arg) {
     snccld_parse_arg_out_stdout_value(val);
 }
 
-static inline void snccld_parse_env_vars(spank_t spank) {
+/**
+ * Implementation of @spank_opt_cb_f callback for `out_stdout` arg.
+ */
+static int spank_option_out_stdout(int val, const char *optarg, int remote) {
+    SNCCLD_ARG_OPTION(
+        SNCCLD_ARG_OUT_STDOUT, snccld_parse_arg_out_stdout_value, optarg
+    )
+}
+
+static void snccld_parse_env_vars(spank_t spank) {
     SNCCLD_PARSE_ENV_ARG(
         SNCCLD_ARG_ENABLED_ENV, snccld_parse_arg_enabled_value
     );
@@ -234,38 +271,88 @@ static void snccld_parse_plugin_args(spank_t spank, int argc, char **argv) {
     for (int i = 0; i < argc; ++i) {
         const char *arg = argv[i];
 
+        // clang-format off
         SNCCLD_PARSE_ARG(arg, SNCCLD_ARG_ENABLED, snccld_parse_arg_enabled);
         SNCCLD_PARSE_ARG(arg, SNCCLD_ARG_LOG_LEVEL, snccld_parse_arg_log_level);
         SNCCLD_PARSE_ARG(arg, SNCCLD_ARG_OUT_DIR, snccld_parse_arg_out_dir);
-        SNCCLD_PARSE_ARG(
-            arg, SNCCLD_ARG_OUT_STDOUT, snccld_parse_arg_out_stdout
-        );
+        SNCCLD_PARSE_ARG(arg, SNCCLD_ARG_OUT_STDOUT, snccld_parse_arg_out_stdout);
+        // clang-format on
 
         slurm_error(SNCCLD_LOG_PREFIX "Unknown plugin arg: %s", arg);
     }
 
     snccld_parse_env_vars(spank);
+}
 
-    // clang-format off
-    slurm_info(
-        SNCCLD_LOG_PREFIX
-        "Loaded parameters: "
-        SNCCLD_ARG_ENABLED    "='%s', "
-        SNCCLD_ARG_LOG_LEVEL  "='%s', "
-        SNCCLD_ARG_OUT_DIR    "='%s', "
-        SNCCLD_ARG_OUT_STDOUT "='%s'",
-        snccld_config.enabled ? "true" : "false",
-        snccld_config.log_level,
-        snccld_config.out_dir,
-        snccld_config.out_stdout ? "true" : "false"
-    );
-    // clang-format on
+struct spank_option spank_opts[] = {
+    {
+        .name    = SNCCLD_ARG_PREFIX "-" SNCCLD_ARG_ENABLED,
+        .arginfo = SNCCLD_ARG_ENABLED_ARGINFO,
+        .usage   = "[" XSTR(SNCCLD_PLUGIN_NAME) "] " SNCCLD_ARG_ENABLED_USAGE,
+        .has_arg = true,
+        .val     = 0,
+        .cb      = spank_option_enabled,
+    },
+    {
+        .name    = SNCCLD_ARG_PREFIX "-" SNCCLD_ARG_LOG_LEVEL,
+        .arginfo = SNCCLD_ARG_LOG_LEVEL_ARGINFO,
+        .usage   = "[" XSTR(SNCCLD_PLUGIN_NAME) "] " SNCCLD_ARG_LOG_LEVEL_USAGE,
+        .has_arg = true,
+        .val     = 0,
+        .cb      = spank_option_log_level,
+    },
+    {
+        .name    = SNCCLD_ARG_PREFIX "-" SNCCLD_ARG_OUT_DIR,
+        .arginfo = SNCCLD_ARG_OUT_DIR_ARGINFO,
+        .usage   = "[" XSTR(SNCCLD_PLUGIN_NAME) "] " SNCCLD_ARG_OUT_DIR_USAGE,
+        .has_arg = true,
+        .val     = 0,
+        .cb      = spank_option_out_dir,
+    },
+    {
+        .name    = SNCCLD_ARG_PREFIX "-" SNCCLD_ARG_OUT_STDOUT,
+        .arginfo = SNCCLD_ARG_OUT_STDOUT_ARGINFO,
+        .usage = "[" XSTR(SNCCLD_PLUGIN_NAME) "] " SNCCLD_ARG_OUT_STDOUT_USAGE,
+        .has_arg = true,
+        .val     = 0,
+        .cb      = spank_option_out_stdout,
+    },
+    SPANK_OPTIONS_TABLE_END
+};
+
+static spank_err_t snccld_args_register(spank_t spank) {
+    spank_err_t res = ESPANK_SUCCESS;
+
+    for (int i = 0; spank_opts[i].name != NULL; ++i) {
+        res = spank_option_register(spank, &spank_opts[i]);
+        if (res != ESPANK_SUCCESS) {
+            slurm_error(
+                SNCCLD_LOG_PREFIX "Couldn't register option %s: %s",
+                spank_opts[i].name,
+                spank_strerror(res)
+            );
+            return ESPANK_ERROR;
+        }
+    }
+
+    return res;
 }
 
 int slurm_spank_init(spank_t spank, int argc, char **argv) {
     log_context("init", spank);
 
-    return ESPANK_SUCCESS;
+    switch (spank_context()) {
+        case S_CTX_LOCAL:
+        case S_CTX_REMOTE:
+            {
+                // To read from plugstack.conf, then from env
+                snccld_parse_plugin_args(spank, argc, argv);
+                // To read from flags
+                return snccld_args_register(spank);
+            }
+        default:
+            return ESPANK_SUCCESS;
+    }
 }
 
 int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
@@ -275,7 +362,18 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         return ESPANK_SUCCESS;
     }
 
-    snccld_parse_plugin_args(spank, argc, argv);
+    slurm_error(
+        SNCCLD_LOG_PREFIX "Config:\n"
+                          "\t" SNCCLD_ARG_ENABLED ": %s\n"
+                          "\t" SNCCLD_ARG_LOG_LEVEL ": %s\n"
+                          "\t" SNCCLD_ARG_OUT_DIR ": %s\n"
+                          "\t" SNCCLD_ARG_OUT_STDOUT ": %s",
+        snccld_config.enabled ? "true" : "false",
+        snccld_config.log_level,
+        snccld_config.out_dir,
+        snccld_config.out_stdout ? "true" : "false"
+    );
+
     if (!snccld_config.enabled) {
         return ESPANK_SUCCESS;
     }
@@ -427,7 +525,18 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
         return ESPANK_SUCCESS;
     }
 
-    snccld_parse_plugin_args(spank, argc, argv);
+    slurm_error(
+        SNCCLD_LOG_PREFIX "Config:\n"
+                          "\t" SNCCLD_ARG_ENABLED ": %s\n"
+                          "\t" SNCCLD_ARG_LOG_LEVEL ": %s\n"
+                          "\t" SNCCLD_ARG_OUT_DIR ": %s\n"
+                          "\t" SNCCLD_ARG_OUT_STDOUT ": %s",
+        snccld_config.enabled ? "true" : "false",
+        snccld_config.log_level,
+        snccld_config.out_dir,
+        snccld_config.out_stdout ? "true" : "false"
+    );
+
     if (!snccld_config.enabled) {
         return ESPANK_SUCCESS;
     }
