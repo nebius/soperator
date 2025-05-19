@@ -11,6 +11,7 @@ wget -qO - https://www.mellanox.com/downloads/ofed/RPM-GPG-KEY-Mellanox | apt-ke
 apt update
 apt install openmpi="$OPENMPI_VERSION" ucx="$UCX_VERSION"
 apt clean
+rm -rf /var/lib/apt/lists/*
 
 echo "export PATH=\$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION_SHORT}/bin" > /etc/profile.d/path_openmpi.sh
 source /etc/profile.d/path_openmpi.sh

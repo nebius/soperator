@@ -73,7 +73,8 @@ RUN apt-get update && \
         ibverbs-utils \
         libpmix2 \
         libpmix-dev && \
-    apt clean
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install OpenMPI
 COPY common/scripts/install_openmpi.sh /opt/bin/
@@ -86,7 +87,8 @@ ENV PATH=$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
 ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
 # Download and install Slurm packages
-RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd slurm-smd-slurmd; do \
+RUN apt-get update && \
+    for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd slurm-smd-slurmd; do \
         wget -q -P /tmp $PACKAGES_REPO_URL/slurm-packages-$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
         echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
         { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
