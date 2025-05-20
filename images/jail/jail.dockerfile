@@ -1,4 +1,4 @@
-FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy AS cuda
+FROM ubuntu:jammy AS cuda
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
@@ -10,14 +10,16 @@ RUN apt-get update &&  \
       ca-certificates \
       locales \
       tzdata \
-      wget && \
+      wget \
+      curl && \
     wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb && \
     dpkg -i cuda-keyring_1.1-1_all.deb && \
     rm -rf cuda-keyring_1.1-1_all.deb && \
     ln -snf /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
     locale-gen en_US.UTF-8 && \
     dpkg-reconfigure locales tzdata && \
-    apt clean
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 ENV LANG="en_US.UTF-8" \
 	LC_CTYPE="en_US.UTF-8" \
@@ -40,14 +42,17 @@ ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
-# download and install mock packages for nvidia drivers https://github.com/nebius/soperator/issues/384
-ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
-RUN for pkg in cuda-drivers_9999.9999.9999_amd64.deb nvidia-open_9999.9999.9999_amd64.deb; do \
-        wget -q -P /tmp "$PACKAGES_REPO_URL/cuda_mocks/${pkg}" && \
-        echo "${pkg} successfully downloaded" || { echo "Failed to download ${pkg}"; exit 1; }; \
-        dpkg -i "/tmp/${pkg}" && \
-        rm -rf "/tmp/${pkg}"; \
-    done
+# Add Nebius public registry
+RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" > /etc/apt/sources.list.d/nebius.list
+
+# Install mock packages for nvidia drivers https://github.com/nebius/soperator/issues/384
+RUN apt-get update && \
+    apt -y install \
+      cuda-drivers=9999.9999.9999 \
+      nvidia-open=9999.9999.9999 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # About CUDA packages https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#meta-packages
 RUN apt update && \
@@ -58,7 +63,9 @@ RUN apt update && \
         libcudnn9-dev-cuda-12=9.1.0.70-1 \
         libnccl-dev=2.21.5-1+cuda12.4 \
         libnccl2=2.21.5-1+cuda12.4 && \
-    apt clean
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY jail/pin_packages/cuda-pins /etc/apt/preferences.d/
 RUN apt update
 
@@ -76,20 +83,27 @@ ENV LIBRARY_PATH=/usr/local/cuda/lib64/stubs
 
 # Download NCCL tests executables
 ARG CUDA_VERSION=12.4.1
-RUN wget -P /tmp $PACKAGES_REPO_URL/nccl_tests_$CUDA_VERSION/nccl-tests-perf.tar.gz && \
-    tar -xvzf /tmp/nccl-tests-perf.tar.gz -C /usr/bin && \
-    rm -rf /tmp/nccl-tests-perf.tar.gz
+ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
+RUN ARCH=$(uname -m) && \
+    case "$ARCH" in \
+      x86_64) ARCH_DEB=x64 ;; \
+      aarch64) ARCH_DEB=arm64 ;; \
+      *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
+    esac && \
+    echo "Using architecture: $ARCH_DEB" && \
+    wget -P /tmp $PACKAGES_REPO_URL/nccl_tests_$CUDA_VERSION/nccl-tests-perf-${ARCH_DEB}.tar.gz && \
+    tar -xvzf /tmp/nccl-tests-perf-${ARCH_DEB}.tar.gz -C /usr/bin && \
+    rm -rf /tmp/nccl-tests-perf-${ARCH_DEB}.tar.gz
 
 #######################################################################################################################
 
 FROM cuda AS jail
 
-ARG SLURM_VERSION=24.05.5
-ARG GDRCOPY_VERSION=2.4.4
+ARG SLURM_VERSION=24.05.7
+ARG GDRCOPY_VERSION=2.5
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-# TODO: Install only those dependencies that are required for Slurm client + useful utilities
 # Install dependencies
 RUN apt update && \
     apt install -y \
@@ -142,7 +156,8 @@ RUN apt update && \
         libpmix2 \
         libpmix-dev \
         bsdmainutils && \
-    apt clean
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install python
 COPY common/scripts/install_python.sh /opt/bin/
@@ -151,10 +166,10 @@ RUN chmod +x /opt/bin/install_python.sh && \
     rm /opt/bin/install_python.sh
 
 # Install parallel because it's required for enroot operation
-COPY common/scripts/install_parallel.sh /opt/bin/
-RUN chmod +x /opt/bin/install_parallel.sh && \
-    /opt/bin/install_parallel.sh && \
-    rm /opt/bin/install_parallel.sh
+RUN apt-get update && \
+    apt -y install parallel=20210822+ds-2 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install OpenMPI
 COPY common/scripts/install_openmpi.sh /opt/bin/
@@ -162,16 +177,15 @@ RUN chmod +x /opt/bin/install_openmpi.sh && \
     /opt/bin/install_openmpi.sh && \
     rm /opt/bin/install_openmpi.sh
 
-ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
-# Download and install Slurm packages
-RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd; do \
-        wget -q -P /tmp $PACKAGES_REPO_URL/slurm-packages-$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
-        echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
-        { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
-    done && \
-    apt install -y /tmp/*.deb && \
-    rm -rf /tmp/*.deb && \
-    apt clean
+# Install Slurm packages
+RUN apt-get update && \
+    apt -y install \
+      slurm-smd-client=${SLURM_VERSION}-1 \
+      slurm-smd-dev=${SLURM_VERSION}-1 \
+      slurm-smd-libnss-slurm=${SLURM_VERSION}-1 \
+      slurm-smd=${SLURM_VERSION}-1 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create directory for bind-mounting it from the host. It's needed for sbatch to work
 RUN mkdir -m 755 -p /var/spool/slurmd
@@ -187,21 +201,26 @@ COPY common/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/c
 
 # Install nvtop GPU monitoring utility
 RUN add-apt-repository ppa:flexiondotorg/nvtop && \
+    apt-get update && \
     apt install -y nvtop && \
-    apt clean
+    apt clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install dcgmi tools
 # https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/dcgm-diagnostics.html
-RUN apt install -y datacenter-gpu-manager-4-cuda12 && \
-    apt clean
+RUN apt-get update && \
+    apt install -y datacenter-gpu-manager-4-cuda12 && \
+    apt clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install GDRCopy libraries & executables
-RUN wget -q -P /tmp ${PACKAGES_REPO_URL}/gdrcopy-${GDRCOPY_VERSION}/gdrcopy_${GDRCOPY_VERSION}_amd64.Ubuntu22_04.deb || { echo "Failed to download gdrcopy"; exit 1; } && \
-    wget -q -P /tmp ${PACKAGES_REPO_URL}/gdrcopy-${GDRCOPY_VERSION}/gdrcopy-tests_${GDRCOPY_VERSION}_amd64.Ubuntu22_04+cuda12.4.deb || { echo "Failed to download gdrcopy-tests"; exit 1; } && \
-    wget -q -P /tmp ${PACKAGES_REPO_URL}/gdrcopy-${GDRCOPY_VERSION}/libgdrapi_${GDRCOPY_VERSION}_amd64.Ubuntu22_04.deb || { echo "Failed to download libgdrapi"; exit 1; } && \
-    apt install -y /tmp/*.deb && \
-    rm -rf /tmp/*.deb && \
-    apt clean
+RUN apt-get update && \
+    apt -y install \
+      gdrcopy=${GDRCOPY_VERSION}-1 \
+      gdrcopy-tests=${GDRCOPY_VERSION}-1 \
+      libgdrapi=${GDRCOPY_VERSION}-1 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install AWS CLI
 COPY common/scripts/install_awscli.sh /opt/bin/

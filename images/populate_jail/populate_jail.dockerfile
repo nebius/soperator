@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
+ARG BASE_IMAGE=ubuntu:jammy
 
 # First stage: untap jail_rootfs.tar
 FROM $BASE_IMAGE AS untaped

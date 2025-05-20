@@ -1,12 +1,11 @@
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
+ARG BASE_IMAGE=ubuntu:jammy
 
 FROM $BASE_IMAGE AS controller_slurmctld
 
-ARG SLURM_VERSION=24.05.5
+ARG SLURM_VERSION=24.05.7
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-# TODO: Install only those dependencies that are required for running slurmctld + useful utilities
 # Install dependencies
 RUN apt-get update && \
     apt -y install \
@@ -33,18 +32,22 @@ RUN apt-get update && \
         tree \
         lsof \
         daemontools && \
-    apt clean
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
-# Download and install Slurm packages
-RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd slurm-smd-slurmctld; do \
-        wget -q -P /tmp $PACKAGES_REPO_URL/slurm-packages-$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
-        echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
-        { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
-    done && \
-    apt install -y /tmp/*.deb && \
-    rm -rf /tmp/*.deb && \
-    apt clean
+# Add Nebius public registry
+RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" > /etc/apt/sources.list.d/nebius.list
+
+RUN apt-get update && \
+    apt -y install \
+      slurm-smd-client=${SLURM_VERSION}-1 \
+      slurm-smd-dev=${SLURM_VERSION}-1 \
+      slurm-smd-libnss-slurm=${SLURM_VERSION}-1 \
+      slurm-smd=${SLURM_VERSION}-1 \
+      slurm-smd-slurmctld=${SLURM_VERSION}-1 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Update linker cache
 RUN ldconfig

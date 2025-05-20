@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e # Exit immediately if any command returns a non-zero error code
+
 OPENMPI_VERSION=4.1.7a1-1.2310055
 OPENMPI_VERSION_SHORT=4.1.7a1
 UCX_VERSION=1.16.0-1.2310213
@@ -11,6 +13,7 @@ wget -qO - https://www.mellanox.com/downloads/ofed/RPM-GPG-KEY-Mellanox | apt-ke
 apt update
 apt install openmpi="$OPENMPI_VERSION" ucx="$UCX_VERSION"
 apt clean
+rm -rf /var/lib/apt/lists/*
 
 echo "export PATH=\$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION_SHORT}/bin" > /etc/profile.d/path_openmpi.sh
 source /etc/profile.d/path_openmpi.sh
