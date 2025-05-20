@@ -7,7 +7,6 @@ FROM golang:1.24 AS gpubench_builder
 ARG GO_LDFLAGS=""
 ARG CGO_ENABLED=0
 ARG GOOS=linux
-ARG GOARCH=amd64
 
 WORKDIR /app
 
@@ -17,7 +16,7 @@ RUN go mod download
 
 COPY worker/gpubench/main.go .
 
-RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
+RUN GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
     go build -o gpubench .
 
 #######################################################################################################################
