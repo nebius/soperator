@@ -25,9 +25,6 @@ func BasePodTemplateSpec(
 		common.RenderVolumeJailFromSource(volumeSources, *sConfigController.VolumeJail.VolumeSourceName),
 	}
 
-	var affinity *corev1.Affinity = nil
-	var nodeSelector map[string]string
-
 	nodeFilter, err := utils.GetBy(
 		nodeFilters,
 		sConfigController.K8sNodeFilterName,
@@ -37,9 +34,6 @@ func BasePodTemplateSpec(
 		return nil, err
 	}
 
-	affinity = nodeFilter.Affinity
-	nodeSelector = nodeFilter.NodeSelector
-
 	return &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: matchLabels,
@@ -48,8 +42,9 @@ func BasePodTemplateSpec(
 			},
 		},
 		Spec: corev1.PodSpec{
-			Affinity:     affinity,
-			NodeSelector: nodeSelector,
+			Affinity:     nodeFilter.Affinity,
+			Tolerations:  nodeFilter.Tolerations,
+			NodeSelector: nodeFilter.NodeSelector,
 			Containers: []corev1.Container{
 				renderContainerSConfigController(
 					clusterNamespace,

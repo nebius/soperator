@@ -30,6 +30,7 @@ func BasePodTemplateSpec(
 	}
 
 	var affinity *corev1.Affinity = nil
+	var tolerations []corev1.Toleration
 	var nodeSelector map[string]string
 
 	nodeFilter, err := utils.GetBy(
@@ -40,6 +41,7 @@ func BasePodTemplateSpec(
 	if err == nil {
 		affinity = nodeFilter.Affinity
 		nodeSelector = nodeFilter.NodeSelector
+		tolerations = nodeFilter.Tolerations
 	}
 
 	return corev1.PodTemplateSpec{
@@ -56,6 +58,7 @@ func BasePodTemplateSpec(
 		},
 		Spec: corev1.PodSpec{
 			Affinity:       affinity,
+			Tolerations:    tolerations,
 			NodeSelector:   nodeSelector,
 			InitContainers: initContainers,
 			Containers: []corev1.Container{
