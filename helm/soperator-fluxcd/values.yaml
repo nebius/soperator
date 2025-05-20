@@ -30,7 +30,6 @@ helmRepository:
   victoriaMetrics:
     url: https://victoriametrics.github.io/helm-charts/
     type: default
-
 ns:
   enabled: true
   interval: 5m
