@@ -30,9 +30,6 @@ helmRepository:
   victoriaMetrics:
     url: https://victoriametrics.github.io/helm-charts/
     type: default
-  dcgmExporter:
-    url: oci://cr.eu-north1.nebius.cloud/soperator-unstable/helm-soperator-dcgm-exporter
-    type: oci
 
 ns:
   enabled: true

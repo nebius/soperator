@@ -8,11 +8,11 @@ metadata:
 spec:
   chart:
     spec:
-      chart: soperator-dcgm-exporter
+      chart: helm-soperator-dcgm-exporter
       interval: {{ .Values.observability.dcgmExporter.interval }}
       sourceRef:
         kind: HelmRepository
-        name: {{ include "soperator-fluxcd.fullname" . }}-dcgm-exporter
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.observability.dcgmExporter.version }}
   install:
     crds: CreateReplace

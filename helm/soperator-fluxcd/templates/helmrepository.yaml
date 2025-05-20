@@ -130,15 +130,4 @@ spec:
   interval: {{ .Values.helmRepository.interval }}
   url: {{ .Values.helmRepository.victoriaMetrics.url }}
   type: {{ .Values.helmRepository.victoriaMetrics.type }}
----
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
-  name: {{ include "soperator-fluxcd.fullname" . }}-dcgm-exporter
-  labels:
-    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
-spec:
-  interval: {{ .Values.helmRepository.interval }}
-  url: {{ .Values.helmRepository.dcgmExporter.url }}
-  type: {{ .Values.helmRepository.dcgmExporter.type }}
 {{- end }}
