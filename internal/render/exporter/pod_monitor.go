@@ -1,27 +1,24 @@
-package prometheus
+package exporter
 
 import (
 	"errors"
 
-	consts "nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/values"
-
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+
+	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/values"
 )
 
 func RenderPodMonitor(
 	clusterName, namespace string,
-	exporterValues *values.SlurmExporter,
+	exporterValues values.SlurmExporter,
 ) (*prometheusv1.PodMonitor, error) {
-	if exporterValues == nil || !exporterValues.Enabled {
-		return nil, errors.New("prometheus PodMonitor is not enabled")
+	if !exporterValues.Enabled {
+		return nil, errors.New("exporter is not enabled")
 	}
-
-	metricsSpec := exporterValues.PodMonitorConfig
-
+	pmConfig := exporterValues.PodMonitorConfig
 	return &prometheusv1.PodMonitor{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterName,
@@ -36,16 +33,16 @@ func RenderPodMonitor(
 					consts.LabelComponentKey: consts.Exporter,
 				},
 			},
-			JobLabel: metricsSpec.JobLabel,
+			JobLabel: pmConfig.JobLabel,
 			PodMetricsEndpoints: []prometheusv1.PodMetricsEndpoint{
 				{
-					Interval:             metricsSpec.Interval,
-					ScrapeTimeout:        metricsSpec.ScrapeTimeout,
+					Interval:             pmConfig.Interval,
+					ScrapeTimeout:        pmConfig.ScrapeTimeout,
 					Path:                 consts.ContainerPathExporter,
 					Port:                 ptr.To(consts.ContainerPortNameExporter),
 					Scheme:               consts.ContainerSchemeExporter,
-					MetricRelabelConfigs: metricsSpec.MetricRelabelConfigs,
-					RelabelConfigs:       metricsSpec.RelabelConfig,
+					MetricRelabelConfigs: pmConfig.MetricRelabelConfigs,
+					RelabelConfigs:       pmConfig.RelabelConfig,
 				},
 			},
 		},
