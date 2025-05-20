@@ -11,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"nebius.ai/slurm-operator/internal/naming"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,6 +25,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/logfield"
+	"nebius.ai/slurm-operator/internal/naming"
 	render "nebius.ai/slurm-operator/internal/render/soperatorchecks"
 	"nebius.ai/slurm-operator/internal/utils"
 )
@@ -186,11 +186,12 @@ func (r *ActiveCheckReconciler) Reconcile(
 						stepLogger.V(1).Info("Reconciled")
 					}
 
-					var foundPodTemplate *corev1.PodTemplate = nil
+					var foundPodTemplate *corev1.PodTemplate
 
 					if check.Spec.PodTemplateNameRef != nil {
 						podTemplateName := *check.Spec.PodTemplateNameRef
 
+						foundPodTemplate = &corev1.PodTemplate{}
 						err := r.Get(
 							stepCtx,
 							types.NamespacedName{
