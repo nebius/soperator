@@ -6,7 +6,6 @@ FROM golang:1.22 AS exporter_builder
 ARG GO_LDFLAGS=""
 ARG CGO_ENABLED=0
 ARG GOOS=linux
-ARG GOARCH=amd64
 ARG VERSION_EXPORTER=0.20
 
 RUN apt-get update && \
@@ -22,7 +21,7 @@ RUN wget https://github.com/vpenso/prometheus-slurm-exporter/archive/refs/tags/$
 
 WORKDIR /app/prometheus-slurm-exporter-${VERSION_EXPORTER}
 
-RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
+RUN GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
     go build -o prometheus-slurm-exporter . && \
     mv prometheus-slurm-exporter /app/
 

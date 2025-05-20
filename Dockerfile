@@ -4,7 +4,6 @@ ARG GO_LDFLAGS=""
 ARG BUILD_TIME
 ARG CGO_ENABLED=0
 ARG GOOS=linux
-ARG GOARCH=amd64
 
 WORKDIR /operator
 
@@ -12,7 +11,7 @@ COPY . ./
 
 RUN go mod download
 
-RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
+RUN GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
     go build -o slurm_operator ./cmd/
 
 #######################################################################################################################
