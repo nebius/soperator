@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e # Exit immediately if any command returns a non-zero error code
+
 OPENMPI_VERSION=4.1.7a1-1.2310055
 OPENMPI_VERSION_SHORT=4.1.7a1
 UCX_VERSION=1.16.0-1.2310213

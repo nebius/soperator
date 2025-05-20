@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e # Exit immediately if any command returns a non-zero error code
+
 # Install nvidia-container-toolkit for propagating NVIDIA drivers to containers
 export DISTRIBUTION=$(. /etc/os-release;echo $ID$VERSION_ID)
 curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | apt-key add -

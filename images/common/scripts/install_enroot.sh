@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e # Exit immediately if any command returns a non-zero error code
+
 ENROOT_VERSION=3.5.0
 
 apt-get update
