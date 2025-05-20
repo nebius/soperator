@@ -20,3 +20,19 @@ if [ -n "$SLURM_JOB_GPUS" ]; then
     exit 0
     fi
 fi
+
+echo "Unmap the Slurm job with DCGM metrics"
+metrics_dir="/var/run/nebius/slurm"
+
+if [[ -z "${CUDA_VISIBLE_DEVICES:-}" ]]; then
+    echo "No GPU devices are requested by user" >&2
+    exit 0
+fi
+
+IFS=',' read -ra cuda_devs <<< "$CUDA_VISIBLE_DEVICES"
+
+for gpu_id in "${cuda_devs[@]}"; do
+    [[ -z "$gpu_id" ]] && continue
+    echo "Removing $metrics_dir/${gpu_id:-99}"
+    rm -f "${METRICS_DIR:-}/${gpu_id:-99}" || echo "Unable to remove file ${METRICS_DIR:-}/${gpu_id:-99}"
+done
