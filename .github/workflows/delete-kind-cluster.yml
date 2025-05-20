@@ -1,0 +1,18 @@
+name: Delete Kind Cluster
+
+on:
+  workflow_dispatch:
+
+jobs:
+  delete-cluster:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        with:
+          egress-policy: audit
+
+      - name: Delete existing kind cluster if exists
+        run: |
+          /home/soperator/actions-runner/_work/_tool/kind/0.27.0/x64/kind delete cluster --name kind || true
