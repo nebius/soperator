@@ -25921,7 +25921,8 @@ spec:
                           Must correspond to the name of one of [K8sNodeFilter]
                         type: string
                       munge:
-                        description: Munge represents the Slurm munge configuration
+                        description: |
+                          Munge represents the Slurm munge configuration
                         properties:
                           appArmorProfile:
                             default: unconfined
@@ -26177,6 +26178,12 @@ spec:
                         description: Size defines the number of node instances
                         format: int32
                         type: integer
+                      useSoperatorExporter:
+                        default: false
+                        description: |-
+                          UseSoperatorExporter defines whether build-in cluster exporter is used
+                          instead of third-party prometheus-slurm-exporter.
+                        type: boolean
                       volumes:
                         description: Volumes represents the volume configurations
                           for the controller node

@@ -943,7 +943,15 @@ type SlurmExporter struct {
 	// Munge represents the Slurm munge configuration
 	//
 	// +kubebuilder:validation:Required
+	// TODO: Optional?
 	Munge NodeContainer `json:"munge"`
+
+	// UseSoperatorExporter defines whether build-in cluster exporter is used
+	// instead of third-party prometheus-slurm-exporter.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	UseSoperatorExporter bool `json:"useSoperatorExporter,omitempty"`
 
 	// Volumes represents the volume configurations for the controller node
 	//

@@ -3,8 +3,9 @@ package prometheus_test
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	consts "nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/consts"
 )
 
 var (
@@ -12,6 +13,7 @@ var (
 	defaultNameCluster     = "test-cluster"
 	defaultPodTemplateName = "test-pod-template"
 	imageExporter          = "image-exporter:latest"
+	defaultSlurmAPIServer  = "http://slurm-api-server"
 
 	defaultPodTemplate = &corev1.PodTemplate{
 		ObjectMeta: metav1.ObjectMeta{

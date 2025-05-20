@@ -12,6 +12,7 @@ import (
 	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/logfield"
 	slurmprometheus "nebius.ai/slurm-operator/internal/render/prometheus"
+	"nebius.ai/slurm-operator/internal/render/rest"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
@@ -96,6 +97,7 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 								clusterValues.NodeFilters,
 								clusterValues.VolumeSources,
 								foundPodTemplate,
+								rest.GetServiceURL(clusterValues.Namespace, &clusterValues.NodeRest),
 							)
 							if err != nil {
 								stepLogger.Error(err, "Failed to render")
@@ -103,6 +105,7 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 							if desired != nil {
 								logger = logger.WithValues(logfield.ResourceKV(desired)...)
 							}
+
 							var exporterNamePtr *string = nil
 							err = r.Deployment.Reconcile(stepCtx, cluster, desired, exporterNamePtr)
 							if err != nil {
@@ -112,6 +115,71 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 							stepLogger.V(1).Info("Reconciled")
 						}
 					}
+					return nil
+				},
+			},
+
+			utils.MultiStepExecutionStep{
+				Name: "Exporter ServiceAccount",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling Exporter ServiceAccount")
+
+					desired := slurmprometheus.RenderServiceAccount(clusterValues.Namespace, clusterValues.Name)
+
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("Rendered")
+
+					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling Exporter ServiceAccount")
+					}
+
+					stepLogger.V(1).Info("Reconciled")
+					return nil
+				},
+			},
+
+			utils.MultiStepExecutionStep{
+				Name: "Exporter Role",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling Exporter Role")
+
+					desired := slurmprometheus.RenderExporterRole(clusterValues.Namespace, clusterValues.Name)
+
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("Rendered")
+
+					if err := r.Role.Reconcile(stepCtx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling Exporter Role")
+					}
+
+					stepLogger.V(1).Info("Reconciled")
+
+					return nil
+				},
+			},
+
+			utils.MultiStepExecutionStep{
+				Name: "Exporter RoleBinding",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling Exporter RoleBinding")
+
+					desired := slurmprometheus.RenderExporterRoleBinding(clusterValues.Namespace, clusterValues.Name)
+
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("Rendered")
+
+					if err := r.RoleBinding.Reconcile(stepCtx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling Exporter RoleBinding")
+					}
+
+					stepLogger.V(1).Info("Reconciled")
+
 					return nil
 				},
 			},

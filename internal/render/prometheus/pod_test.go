@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+
 	"nebius.ai/slurm-operator/internal/render/common"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -118,7 +119,8 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 		},
 	}
 
-	result := slurmprometheus.BasePodTemplateSpec(clusterName, initContainers, podParams, defaultNodeFilter, volumeSources, matchLabels)
+	result := slurmprometheus.BasePodTemplateSpec(clusterName, defaultNamespace, initContainers, podParams,
+		defaultNodeFilter, volumeSources, matchLabels, defaultSlurmAPIServer)
 
 	assert.Equal(t, expected.Labels, result.Labels)
 
@@ -222,7 +224,8 @@ func Test_RenderPodTemplateSpec(t *testing.T) {
 		},
 	}
 
-	result := slurmprometheus.RenderPodTemplateSpec(clusterName, initContainers, podParams, defaultNodeFilter, volumeSources, matchLabels, podTemplateSpec)
+	result := slurmprometheus.RenderPodTemplateSpec(clusterName, defaultNamespace, initContainers, podParams,
+		defaultNodeFilter, volumeSources, matchLabels, podTemplateSpec, defaultNameCluster)
 
 	assert.Equal(t, expected.Labels, result.Labels)
 

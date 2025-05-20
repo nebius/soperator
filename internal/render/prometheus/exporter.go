@@ -23,6 +23,7 @@ func RenderDeploymentExporter(
 	nodeFilter []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
 	podTemplate *corev1.PodTemplate,
+	slurmAPIServer string,
 ) (deployment *appsv1.Deployment, err error) {
 	if valuesExporter == nil || !valuesExporter.Enabled {
 		return nil, errors.New("prometheus is not enabled")
@@ -48,7 +49,10 @@ func RenderDeploymentExporter(
 		replicas = ptr.To(consts.ZeroReplicas)
 	}
 
-	initContainers := append(valuesExporter.CustomInitContainers, common.RenderContainerMunge(&valuesExporter.ContainerMunge))
+	initContainers := valuesExporter.CustomInitContainers
+	if !valuesExporter.UseSoperatorExporter {
+		initContainers = append(initContainers, common.RenderContainerMunge(&valuesExporter.ContainerMunge))
+	}
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -66,12 +70,14 @@ func RenderDeploymentExporter(
 			},
 			Template: RenderPodTemplateSpec(
 				clusterName,
+				namespace,
 				initContainers,
 				valuesExporter,
 				nodeFilter,
 				volumeSources,
 				matchLabels,
 				podTemplateSpec,
+				slurmAPIServer,
 			),
 		},
 	}, nil
