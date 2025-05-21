@@ -306,6 +306,18 @@ ifeq ($(UNSTABLE), false)
 	docker push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 endif
 
+.PHONY: docker-manifest
+docker-manifest: ## Create and push docker manifest for multiple image architecture
+ifndef IMAGE_NAME
+	$(error IMAGE_NAME is not set, docker image can not be pushed)
+endif
+	docker manifest create "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-aarch64" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-x86_64"
+	docker manifest push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+ifeq ($(UNSTABLE), false)
+	docker manifest create "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-aarch64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-x86_64"
+	docker manifest push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+endif
+
 .PHONY: release-helm
 release-helm: ## Build & push helm docker image
 	mkdir -p "helm-releases"

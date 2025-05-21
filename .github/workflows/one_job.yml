@@ -298,3 +298,36 @@ jobs:
           make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
 
           
+
+
+  create-manifest:
+    runs-on: self-hosted
+    needs: [build_x64, build_arm64]
+    steps:
+      - name: Log in to the Docker registry
+        uses: docker/login-action@v3
+        with:
+          registry: cr.eu-north1.nebius.cloud
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Create and Push Multi-Arch Manifest
+        run: |
+          UNSTABLE=${{ needs.pre-build.outputs.unstable }}
+          IMAGE_VERSION=$(make get-image-version UNSTABLE=${UNSTABLE})
+          VERSION=$(make get-version UNSTABLE=${UNSTABLE})
+          OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
+          
+          make docker-manifest
+          
+          echo "Building and push manifest of the soperatorchecks"
+          make docker manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          
+          echo "Building and push manifest of the sconfigcontroller"
+          make docker manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          
+          echo "Building and push manifest of the rebooter"
+          make docker manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+         
+          echo "Building and push manifest the operator"
+          make docker manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
