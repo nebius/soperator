@@ -60,10 +60,9 @@ spec:
             create: false
       grafana:
         enabled: true
-        {{- if .Values.observability.vmStack.values.grafana-ini }}
-        grafana.ini:
-          {{- toYaml .Values.observability.vmStack.values.grafana-ini | nindent 8 }}
-        {{- else }}
+        {{- if .Values.observability.vmStack.values.grafanaIni }}
+        grafana.ini: {{- toYaml .Values.observability.vmStack.values.grafanaIni | nindent 10 }}
+        {{- end }}
         assertNoLeakedSecrets: false
         plugins:
           - https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip;grafana-lokiexplore-app
