@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - ../../../base/soperator-fluxcd/
   - ./flux_kustomization.yaml
+  - https://github.com/k8up-io/k8up/releases/download/k8up-4.8.4/k8up-crd.yaml
