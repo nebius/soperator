@@ -60,24 +60,6 @@ spec:
           name: hpc-jobs-dir
       dnsPolicy: ClusterFirst
       initContainers:
-      - command:
-        - sh
-        - -c
-        - |
-          mkdir -p {{ .Values.dcgmHpcJobMappingDir }}
-        env:
-        - name: KUBERNETES_CLUSTER_DOMAIN
-          value: {{ quote .Values.kubernetesClusterDomain }}
-        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
-        imagePullPolicy: IfNotPresent
-        name: create-hpc-jobs-dir
-        resources: {}
-        securityContext:
-          privileged: true
-        volumeMounts:
-        - mountPath: /var
-          mountPropagation: HostToContainer
-          name: host-var
       - args:
         - until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done 
         command:
@@ -121,12 +103,8 @@ spec:
         name: run-nvidia
       - hostPath:
           path: {{ .Values.dcgmHpcJobMappingDir }}
-          type: ""
+          type: DirectoryOrCreate
         name: hpc-jobs-dir
-      - hostPath:
-          path: /var
-          type: ""
-        name: host-var
       - configMap:
           defaultMode: 420
           items:
