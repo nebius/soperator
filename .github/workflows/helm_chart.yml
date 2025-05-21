@@ -17,7 +17,7 @@ env:
   HELM_PATH: ./helm
 
 jobs:
-  pre-build:
+  helm_chart:
     runs-on: self-hosted
 
     outputs:
@@ -71,7 +71,6 @@ jobs:
             
             echo "----------------------------------------"
           done
-
 
       - uses: engineerd/setup-kind@v0.6.2
         name: Setup kind
