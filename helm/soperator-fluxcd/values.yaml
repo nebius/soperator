@@ -163,6 +163,16 @@ observability:
         accessMode: ReadWriteOnce
       resources: {}
     overrideValues: null
+  dcgmExporter:
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    version: 1.19.0
+    namespace: soperator
+    releaseName: soperator-dcgm-exporter
+    values:
+      hpcJobMapDir: /var/run/nebius/slurm
+      resources: {}
 securityProfilesOperator:
   enabled: true
   interval: 5m
