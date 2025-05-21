@@ -22,6 +22,9 @@ if [ -n "$SLURM_JOB_GPUS" ]; then
 fi
 
 echo "Unmap the Slurm job with DCGM metrics"
+# set in hpcJobMapDir in soperator/helm/soperator-fluxcd/values.yaml
+#   and dcgm_job_map_dir in nebius-solution-library/soperator/modules/slurm/variables.tf
+#   check those before changing it here
 metrics_dir="/var/run/nebius/slurm"
 
 if [[ -z "${CUDA_VISIBLE_DEVICES:-}" ]]; then
