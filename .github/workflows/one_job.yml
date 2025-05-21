@@ -65,7 +65,7 @@ jobs:
           echo "UNSTABLE - ${{ steps.set-env.outputs.unstable }}"
 
   one_job:
-    runs-on: self-hosted
+    runs-on: X64
     needs: pre-build
 
     steps:
