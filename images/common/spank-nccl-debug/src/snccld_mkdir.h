@@ -1,5 +1,5 @@
-/**
- * Header-only library implementing missing recursive `mkdir`.
+/*
+ * Header-only implementation of missing recursive `mkdir`.
  */
 
 #ifndef SNCCLD_MKDIR_H
