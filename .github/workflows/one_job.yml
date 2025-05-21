@@ -143,72 +143,75 @@ jobs:
           OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
 
           make sync-version UNSTABLE=${UNSTABLE}
-
+          
           echo "Updating CRDs & auto-generated code (included in test step) & run tests"
           make test UNSTABLE="${UNSTABLE}"
-
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd DOCKERFILE=worker/slurmd.dockerfile
-          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd
-
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld DOCKERFILE=controller/slurmctld.dockerfile
-          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld
-
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd DOCKERFILE=accounting/slurmdbd.dockerfile
-          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd
-
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd DOCKERFILE=login/sshd.dockerfile
-          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd
-
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=munge DOCKERFILE=munge/munge.dockerfile
-          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=munge
-
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=nccl_benchmark DOCKERFILE=nccl_benchmark/nccl_benchmark.dockerfile
-          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=nccl_benchmark
-
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=exporter DOCKERFILE=exporter/exporter.dockerfile
-          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=exporter
-
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd DOCKERFILE=restd/slurmrestd.dockerfile
-          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd
           
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm_check_job DOCKERFILE=slurm_check_job/slurm_check_job.dockerfile
-          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm_check_job
-
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_check_job DOCKERFILE=k8s_check_job/k8s_check_job.dockerfile
-          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_check_job
-
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter DOCKERFILE=rebooter.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
-          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
-
-          echo "Common images were built"
-
-          echo "Removing previous jail rootfs tar archive"
-          rm -rf images/jail_rootfs.tar
-
-          echo "Building tarball for jail"
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=jail DOCKERFILE=jail/jail.dockerfile DOCKER_OUTPUT="--output type=tar,dest=jail_rootfs.tar"
-          echo "Built tarball jail_rootfs.tar"
-
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail DOCKERFILE=populate_jail/populate_jail.dockerfile
-          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail
-
           echo "Building image of the soperatorchecks"
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks DOCKERFILE=soperatorchecks.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks DOCKERFILE=soperatorchecks.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
           echo "Pushing image of the soperatorchecks"
-          make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
 
           echo "Building image of the sconfigcontroller"
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller DOCKERFILE=sconfigcontroller.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller DOCKERFILE=sconfigcontroller.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
           echo "Pushing image of the sconfigcontroller"
-          make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
 
+          echo "Building image of the rebooter"
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter DOCKERFILE=rebooter.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
+          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
+          
           echo "Building image of the operator"
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator DOCKERFILE=Dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator DOCKERFILE=Dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
           echo "Pushing image of the operator"
-          make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
 
-          echo "Pushing Helm charts"
-          make release-helm UNSTABLE="${UNSTABLE}" OPERATOR_IMAGE_TAG="$OPERATOR_IMAGE_TAG"
+          
+
+#          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd DOCKERFILE=worker/slurmd.dockerfile
+#          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd
+#
+#          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld DOCKERFILE=controller/slurmctld.dockerfile
+#          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld
+#
+#          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd DOCKERFILE=accounting/slurmdbd.dockerfile
+#          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd
+#
+#          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd DOCKERFILE=login/sshd.dockerfile
+#          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd
+#
+#          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=munge DOCKERFILE=munge/munge.dockerfile
+#          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=munge
+#
+#          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=nccl_benchmark DOCKERFILE=nccl_benchmark/nccl_benchmark.dockerfile
+#          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=nccl_benchmark
+#
+#          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=exporter DOCKERFILE=exporter/exporter.dockerfile
+#          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=exporter
+#
+#          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd DOCKERFILE=restd/slurmrestd.dockerfile
+#          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd
+#
+#          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm_check_job DOCKERFILE=slurm_check_job/slurm_check_job.dockerfile
+#          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm_check_job
+#
+#          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_check_job DOCKERFILE=k8s_check_job/k8s_check_job.dockerfile
+#          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_check_job
+#
+#          echo "Common images were built"
+#
+#          echo "Removing previous jail rootfs tar archive"
+#          rm -rf images/jail_rootfs.tar
+#
+#          echo "Building tarball for jail"
+#          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=jail DOCKERFILE=jail/jail.dockerfile DOCKER_OUTPUT="--output type=tar,dest=jail_rootfs.tar"
+#          echo "Built tarball jail_rootfs.tar"
+#
+#          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail DOCKERFILE=populate_jail/populate_jail.dockerfile
+#          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail
+#
+#          echo "Pushing Helm charts"
+#          make release-helm UNSTABLE="${UNSTABLE}" OPERATOR_IMAGE_TAG="$OPERATOR_IMAGE_TAG"
 
 
   build_arm64:
@@ -271,6 +274,27 @@ jobs:
           OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
 
           make sync-version UNSTABLE=${UNSTABLE}
-
+          
           echo "Updating CRDs & auto-generated code (included in test step) & run tests"
           make test UNSTABLE="${UNSTABLE}"
+          
+          echo "Building image of the soperatorchecks"
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks DOCKERFILE=soperatorchecks.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
+          echo "Pushing image of the soperatorchecks"
+          make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
+
+          echo "Building image of the sconfigcontroller"
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller DOCKERFILE=sconfigcontroller.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
+          echo "Pushing image of the sconfigcontroller"
+          make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
+
+          echo "Building image of the rebooter"
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter DOCKERFILE=rebooter.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
+          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
+          
+          echo "Building image of the operator"
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator DOCKERFILE=Dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
+          echo "Pushing image of the operator"
+          make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator IMAGE_VERSION="$OPERATOR_IMAGE_TAG-$(uname -m)"
+
+          
