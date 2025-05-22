@@ -11,6 +11,7 @@
 #include <limits.h>
 #include <stdbool.h>
 #include <string.h>
+#include <strings.h>
 
 #include <slurm/spank.h>
 
@@ -113,8 +114,8 @@ typedef struct {
 
 static snccld_config_t snccld_config = {
     .enabled    = SNCCLD_ARG_ENABLED_DEFAULT,
-    .log_level  = SNCCLD_NCCL_LOG_LEVEL_INFO,
-    .out_dir    = SNCCLD_ARG_LOG_LEVEL_DEFAULT,
+    .log_level  = SNCCLD_ARG_LOG_LEVEL_DEFAULT,
+    .out_dir    = SNCCLD_ARG_OUT_DIR_DEFAULT,
     .out_stdout = SNCCLD_ARG_OUT_STDOUT_DEFAULT,
 };
 

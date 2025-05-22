@@ -86,41 +86,6 @@ void log_context(const char *func_name, spank_t spank) {
     );
 }
 
-static snccld_state_t *infos[64];
-static size_t          infos_count = 0;
-
-char *snccld_format_infos() {
-    if (infos_count == 0 || infos[0] == NULL) {
-        return strdup("[]");
-    }
-
-    size_t buf_size = 256 * infos_count + 3;
-    char  *result   = malloc(buf_size);
-    if (!result) {
-        return NULL;
-    }
-
-    size_t offset  = 0;
-    offset        += snprintf(result + offset, buf_size - offset, "[");
-
-    for (size_t i = 0; i < infos_count; ++i) {
-        offset += snprintf(
-            result + offset,
-            buf_size - offset,
-            "(job=%u, step=%u, pipe=%s, log=%s, tee=%u)%s",
-            infos[i]->key.job_id,
-            infos[i]->key.step_id,
-            infos[i]->fifo_path,
-            infos[i]->log_path,
-            infos[i]->tee_pid,
-            (i < infos_count - 1) ? ", " : ""
-        );
-    }
-
-    snprintf(result + offset, buf_size - offset, "]");
-    return result;
-}
-
 XSPANK_PLUGIN(SNCCLD_PLUGIN_NAME, 1);
 
 int slurm_spank_init(spank_t spank, int argc, char **argv) {
@@ -170,9 +135,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         return ESPANK_SUCCESS;
     }
 
-    snccld_state_t *info = snccld_state_new();
-    info->key            = *key;
-    free(key);
+    snccld_state_t *state = snccld_state_new();
 
     char debug_val[16]  = "";
     int  user_set_debug = 0;
@@ -188,16 +151,17 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
             SNCCLD_LOG_PREFIX "Cannot create directory '%s': %m",
             SNCCLD_DEFAULT_DIR
         );
-        free(info);
+        free(key);
+        free(state);
         return ESPANK_ERROR;
     }
     snprintf(
-        info->fifo_path,
-        sizeof(info->fifo_path),
+        state->fifo_path,
+        sizeof(state->fifo_path),
         "%s/%u_%u.fifo",
         SNCCLD_DEFAULT_DIR,
-        info->key.job_id,
-        info->key.step_id
+        key->job_id,
+        key->step_id
     );
 
     if (snccld_mkdir_p(snccld_config.out_dir, SNCCLD_DEFAULT_FIFO_MODE) ==
@@ -206,35 +170,38 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
             SNCCLD_LOG_PREFIX "Cannot create directory '%s': %m",
             snccld_config.out_dir
         );
-        free(info);
+        free(key);
+        free(state);
         return ESPANK_ERROR;
     }
     snprintf(
-        info->log_path,
-        sizeof(info->log_path),
+        state->log_path,
+        sizeof(state->log_path),
         "%s/%u_%u.out",
         snccld_config.out_dir,
-        info->key.job_id,
-        info->key.step_id
+        key->job_id,
+        key->step_id
     );
 
-    if (mkfifo(info->fifo_path, SNCCLD_DEFAULT_FIFO_MODE) != EXIT_SUCCESS) {
+    if (mkfifo(state->fifo_path, SNCCLD_DEFAULT_FIFO_MODE) != EXIT_SUCCESS) {
         if (errno == EEXIST) {
-            unlink(info->fifo_path);
-            if (mkfifo(info->fifo_path, SNCCLD_DEFAULT_FIFO_MODE) !=
+            unlink(state->fifo_path);
+            if (mkfifo(state->fifo_path, SNCCLD_DEFAULT_FIFO_MODE) !=
                 EXIT_SUCCESS) {
                 slurm_error(
                     SNCCLD_LOG_PREFIX "Cannot create FIFO %s: %m",
-                    info->fifo_path
+                    state->fifo_path
                 );
-                free(info);
+                free(key);
+                free(state);
                 return ESPANK_SUCCESS;
             }
         } else {
             slurm_error(
-                SNCCLD_LOG_PREFIX "Cannot create FIFO %s: %m", info->fifo_path
+                SNCCLD_LOG_PREFIX "Cannot create FIFO %s: %m", state->fifo_path
             );
-            free(info);
+            free(key);
+            free(state);
             return ESPANK_SUCCESS;
         }
     }
@@ -242,10 +209,10 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     pid_t pid = fork();
     if (pid < 0) {
         slurm_error(SNCCLD_LOG_PREFIX "fork() failed: %m");
-        unlink(info->fifo_path);
+        unlink(state->fifo_path);
         return ESPANK_SUCCESS;
     } else if (pid == 0) {
-        int fd = open(info->fifo_path, O_RDONLY);
+        int fd = open(state->fifo_path, O_RDONLY);
         if (fd < 0) {
             _exit(EXIT_FAILURE);
         }
@@ -266,18 +233,21 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
             "-oL",
             "/usr/bin/tee",
             "-a",
-            info->log_path,
+            state->log_path,
             (char *)NULL
         );
         _exit(EXIT_FAILURE);
     }
 
-    info->tee_pid        = pid;
-    infos[infos_count++] = info;
+    state->tee_pid = pid;
+    if (snccld_state_write(key, state) != ESPANK_SUCCESS) {
+        free(key);
+        free(state);
+        return ESPANK_ERROR;
+    }
 
-    char *str = snccld_format_infos();
-    slurm_spank_log(SNCCLD_LOG_PREFIX "added new info: %s", str);
-    slurm_spank_log(SNCCLD_LOG_PREFIX "info count: %lu", infos_count);
+    char *str = snccld_state_to_string(state);
+    slurm_spank_log(SNCCLD_LOG_PREFIX "state: %s", str);
     free(str);
 
     if (!user_set_debug) {
@@ -295,10 +265,13 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         slurm_spank_log(
             SNCCLD_LOG_PREFIX "Setting %s=%s",
             SNCCLD_NCCL_ENV_DEBUG_FILE,
-            info->fifo_path
+            state->fifo_path
         );
-        spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG_FILE, info->fifo_path, 1);
+        spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG_FILE, state->fifo_path, 1);
     }
+
+    free(key);
+    free(state);
 
     return ESPANK_SUCCESS;
 }
@@ -332,30 +305,36 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
         free(key);
         return ESPANK_SUCCESS;
     }
-    free(key);
 
-    char *str = snccld_format_infos();
-    slurm_spank_log(SNCCLD_LOG_PREFIX "info before removal: %s", str);
-    slurm_spank_log(SNCCLD_LOG_PREFIX "info count: %lu", infos_count);
-    free(str);
-
-    snccld_state_t *info = infos[infos_count - 1];
-    if (info->tee_pid > 0) {
-        int status;
-        if (waitpid(info->tee_pid, &status, WNOHANG) == 0) {
-            kill(info->tee_pid, SIGKILL);
-            waitpid(info->tee_pid, &status, 0);
-        }
-        info->tee_pid = -1;
+    snccld_state_t *state = snccld_state_read(key);
+    if (state == NULL) {
+        free(key);
+        free(state);
+        return ESPANK_ERROR;
     }
-    unlink(info->fifo_path);
-    free(info);
-    infos_count--;
 
-    str = snccld_format_infos();
-    slurm_spank_log(SNCCLD_LOG_PREFIX "info after removal: %s", str);
-    slurm_spank_log(SNCCLD_LOG_PREFIX "info count: %lu", infos_count);
+    char *str = snccld_state_to_string(state);
+    slurm_spank_log(SNCCLD_LOG_PREFIX "state: %s", str);
     free(str);
+
+    if (state->tee_pid > 0) {
+        int status;
+        if (waitpid(state->tee_pid, &status, WNOHANG) == 0) {
+            kill(state->tee_pid, SIGKILL);
+            waitpid(state->tee_pid, &status, 0);
+        }
+        state->tee_pid = -1;
+    }
+    unlink(state->fifo_path);
+
+    str = snccld_state_to_string(state);
+    slurm_spank_log(SNCCLD_LOG_PREFIX "state: %s", str);
+    free(str);
+
+    snccld_state_cleanup(key);
+
+    free(key);
+    free(state);
 
     return ESPANK_SUCCESS;
 }
