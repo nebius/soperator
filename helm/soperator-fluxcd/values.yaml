@@ -173,7 +173,7 @@ observability:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 1.19.0
+    version: 1.20.0
     namespace: soperator
     releaseName: soperator-dcgm-exporter
     values:
