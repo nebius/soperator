@@ -7,6 +7,23 @@ on:
     types: [opened, synchronize, reopened, edited]
     paths:
       - 'helm/**'
+  workflow_dispatch:
+    inputs:
+      helm_path:
+        description: 'Path to Helm charts (default: ./helm)'
+        required: false
+        default: './helm'
+        type: string
+      kind_version:
+        description: 'Kind version to use'
+        required: false
+        default: 'v0.27.0'
+        type: string
+      k8s_version:
+        description: 'Kubernetes version for kind cluster'
+        required: false
+        default: 'v1.30.10'
+        type: string
 permissions:
   contents: read
   packages: write
@@ -14,7 +31,10 @@ permissions:
   id-token: write
 
 env:
-  HELM_PATH: ./helm
+  HELM_PATH: ${{ github.event.inputs.helm_path || './helm' }}
+  KIND_VERSION: ${{ github.event.inputs.kind_version || '0.27.0' }}
+  K8S_VERSION: ${{ github.event.inputs.k8s_version || 'v1.30.10' }}
+  KIND_CLUSTER_NAME: "kind"
 
 jobs:
   helm_chart:
@@ -56,7 +76,7 @@ jobs:
             helm lint "${HELM_PATH}/${HELM_CHART_NAME}"
             
             echo "Templating ${HELM_CHART_NAME}"
-            helm template soperator "${HELM_PATH}/${HELM_CHART_NAME}" --namespace soperator
+            helm template soperator "${HELM_PATH}/${HELM_CHART_NAME}" --namespace soperator > /dev/null
             
             echo "Running unit tests for ${HELM_CHART_NAME}"
             if [ -d "${HELM_PATH}/${HELM_CHART_NAME}/tests" ]; then
@@ -72,14 +92,42 @@ jobs:
             echo "----------------------------------------"
           done
 
+      - name: Delete existing kind cluster if exists
+        run: |
+          /home/soperator/actions-runner/_work/_tool/kind/${{ env.KIND_VERSION }}/x64/kind delete cluster --name kind || true
+
       - uses: engineerd/setup-kind@v0.6.2
         name: Setup kind
         with:
-          version: "v0.27.0"
-          image: "kindest/node:v1.30.10"
+          version: v${{ env.KIND_VERSION }}
+          image: "kindest/node:${{ env.K8S_VERSION }}"
 
       - name: Testing umbrella chart soperator-fluxcd
         run: |
+          echo "Installing Flux2"
           helm install -n flux-system --create-namespace flux oci://ghcr.io/fluxcd-community/charts/flux2
+          
+          echo "Waiting for helm-controller to be ready"
+          kubectl wait --for=condition=ready pod -l app=helm-controller -n flux-system --timeout=300s
+          echo "Waiting for kustomize-controller to be ready"
+          kubectl wait --for=condition=ready pod -l app=kustomize-controller -n flux-system --timeout=300s
+          
+          echo "Installing soperator-fluxcd chart"
           helm upgrade --install soperator-fluxcd ./helm/soperator-fluxcd --namespace soperator --create-namespace
+          
+          echo "Waiting for HelmReleases to be ready"
+          # Wait for all HelmReleases with name containing 'soperator-flux' to be ready
+          for release in $(kubectl get helmreleases.helm.toolkit.fluxcd.io -n flux-system --no-headers -o custom-columns=":metadata.name" | grep soperator-flux); do
+            echo "Waiting for HelmRelease '$release' to be ready..."
+            kubectl wait --for=condition=ready helmreleases.helm.toolkit.fluxcd.io/$release -n flux-system --timeout=600s
+            if [ $? -eq 0 ]; then
+              echo "HelmRelease '$release' is ready"
+            else
+              echo "HelmRelease '$release' failed to become ready"
+              kubectl describe helmreleases.helm.toolkit.fluxcd.io/$release -n flux-system
+              exit 1
+            fi
+          done
+          
+          echo "All HelmReleases are ready, running Helm tests"
           helm test soperator-fluxcd --namespace soperator
