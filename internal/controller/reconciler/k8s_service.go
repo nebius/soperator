@@ -3,6 +3,7 @@ package reconciler
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -99,8 +100,11 @@ func (r *ServiceReconciler) patch(existing, desired client.Object) (client.Patch
 	patchImpl := func(dst, src *corev1.Service) client.Patch {
 		res := client.MergeFrom(dst.DeepCopy())
 
-		for k, v := range src.Annotations {
-			dst.Annotations[k] = v
+		if len(src.Annotations) > 0 {
+			if dst.Annotations == nil {
+				dst.Annotations = make(map[string]string, len(src.Annotations))
+			}
+			maps.Copy(dst.Annotations, src.Annotations) // dst ← src
 		}
 
 		dst.Spec.Type = src.Spec.Type
