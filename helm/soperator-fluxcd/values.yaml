@@ -111,6 +111,12 @@ observability:
     namespace: monitoring-system
     releaseName: metrics
     values:
+      dashboardNamespaces:
+      - soperator
+      - soperator-system
+      - gpu-operator
+      - monitoring-system
+      - logs-system
       grafanaIni:
         auth:
           disable_login_form: true

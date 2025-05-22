@@ -69,9 +69,9 @@ spec:
           - victoriametrics-logs-datasource
         sidecar:
           dashboards:
-            searchNamespace: ALL
+            searchNamespace: {{- toYaml .Values.observability.vmStack.values.dashboardNamespaces | nindent 12 }}
           datasources:
-            searchNamespace: ALL
+            searchNamespace: {{- toYaml .Values.observability.vmStack.values.dashboardNamespaces | nindent 12 }}
       kube-state-metrics:
         prometheusScrape: false
         selfMonitor:
