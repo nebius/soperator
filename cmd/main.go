@@ -50,6 +50,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
 	"nebius.ai/slurm-operator/internal/controller/nodeconfigurator"
 	"nebius.ai/slurm-operator/internal/controller/nodesetcontroller"
+	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
 	webhookcorev1 "nebius.ai/slurm-operator/internal/webhook/v1"
 	//+kubebuilder:scaffold:imports
 )
@@ -124,6 +125,7 @@ func main() {
 		enableHTTP2          bool
 		logFormat            string
 		logLevel             string
+		soperatorNamespace   string
 
 		cacheSyncTimeout time.Duration
 		maxConcurrency   int
@@ -139,6 +141,7 @@ func main() {
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.StringVar(&soperatorNamespace, "operator-namespace", "", "The namespace where the operator is running. If not set, it will be detected automatically.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", true,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -175,6 +178,15 @@ func main() {
 	webhookServer := webhook.NewServer(webhook.Options{
 		TLSOpts: tlsOpts,
 	})
+
+	var err error
+
+	if soperatorNamespace == "" {
+		if soperatorNamespace, err = getCurrentNamespace(); err != nil {
+			setupLog.Error(err, "unable to get operator namespace")
+			os.Exit(1)
+		}
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
@@ -237,6 +249,20 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeSet")
 		os.Exit(1)
 	}
+
+	if err = topologyconfcontroller.NewNodeTopologyConfReconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		soperatorNamespace,
+	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+		setupLog.Error(
+			err,
+			"unable to create controller",
+			"controller",
+			topologyconfcontroller.NodeTopologyReconcilerName,
+		)
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -253,4 +279,13 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func getCurrentNamespace() (string, error) {
+	namespaceFile := "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+	ns, err := os.ReadFile(namespaceFile)
+	if err != nil {
+		return "", err
+	}
+	return string(ns), nil
 }
