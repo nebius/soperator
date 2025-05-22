@@ -329,8 +329,6 @@ jobs:
           VERSION=$(make get-version UNSTABLE=${UNSTABLE})
           OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
           
-          make docker-manifest
-          
           echo "Building and push manifest of the soperatorchecks"
           make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
           
