@@ -275,9 +275,9 @@ RUN chmod 755 /etc/skel/.slurm && \
 RUN rm -rf -- /root/..?* /root/.[!.]* /root/* && \
     cp -a /etc/skel/. /root/
 
-# Copy screateuser utility script
-COPY images/jail/scripts/screateuser.sh /usr/bin/screateuser
-RUN chmod +x /usr/bin/screateuser
+# Copy createuser utility script
+COPY images/jail/scripts/createuser.sh /usr/bin/createuser
+RUN chmod +x /usr/bin/createuser
 
 # Replace SSH "message of the day" scripts
 RUN rm -rf /etc/update-motd.d/*
