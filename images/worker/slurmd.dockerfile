@@ -29,6 +29,7 @@ FROM $BASE_IMAGE AS worker_slurmd
 ARG SLURM_VERSION=24.05.7
 ARG OPENMPI_VERSION=4.1.7a1
 ARG PYXIS_VERSION=0.21.0
+ARG CUDA_KEYRING_VERSION=1.0-1
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -76,12 +77,13 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Intsall dcgm (mainly for nv-hostengine)
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb && \
-    dpkg -i cuda-keyring_1.0-1_all.deb && \
+ARG CUDA_KEYRING_PKG=cuda-keyring_${CUDA_KEYRING_VERSION}_all.deb
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/${CUDA_KEYRING_PKG} && \
+    dpkg -i ${CUDA_KEYRING_PKG} && \
     add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /" && \
     apt -y install datacenter-gpu-manager && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* ./cuda-keyring_1.0-1_all.deb
+    rm -rf /var/lib/apt/lists/* ./${CUDA_KEYRING_PKG}
 
 # Install OpenMPI
 COPY images/common/scripts/install_openmpi.sh /opt/bin/
