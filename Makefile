@@ -309,7 +309,7 @@ endif
 .PHONY: docker-manifest
 docker-manifest: ## Create and push docker manifest for multiple image architecture
 ifndef IMAGE_NAME
-	$(error IMAGE_NAME is not set, docker image can not be pushed)
+	$(error IMAGE_NAME is not set, docker manifest can not be pushed)
 endif
 	docker manifest create "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-aarch64" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-x86_64"
 	docker manifest push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"

@@ -332,13 +332,13 @@ jobs:
           make docker-manifest
           
           echo "Building and push manifest of the soperatorchecks"
-          make docker manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
           
           echo "Building and push manifest of the sconfigcontroller"
-          make docker manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
           
           echo "Building and push manifest of the rebooter"
-          make docker manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
          
           echo "Building and push manifest the operator"
-          make docker manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
