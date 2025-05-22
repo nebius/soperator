@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "soperator.fullname" . }}-proxy-role
+  name: {{ include "soperator.name" . }}-proxy-role
   labels:
     app.kubernetes.io/component: kube-rbac-proxy
     app.kubernetes.io/created-by: slurm-operator
@@ -24,7 +24,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "soperator.fullname" . }}-proxy-rolebinding
+  name: {{ include "soperator.name" . }}-proxy-rolebinding
   labels:
     app.kubernetes.io/component: kube-rbac-proxy
     app.kubernetes.io/created-by: slurm-operator
@@ -33,8 +33,8 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: '{{ include "soperator.fullname" . }}-proxy-role'
+  name: '{{ include "soperator.name" . }}-proxy-role'
 subjects:
 - kind: ServiceAccount
-  name: '{{ include "soperator.fullname" . }}-controller-manager'
+  name: '{{ include "soperator.name" . }}-controller-manager'
   namespace: '{{ .Release.Namespace }}'
