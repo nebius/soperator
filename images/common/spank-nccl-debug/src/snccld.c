@@ -1,6 +1,7 @@
 #include "snccld.h"
 #include "snccld_args.h"
 #include "snccld_mkdir.h"
+#include "snccld_state.h"
 
 #include <ctype.h>
 #include <fcntl.h>
@@ -85,8 +86,8 @@ void log_context(const char *func_name, spank_t spank) {
     );
 }
 
-static snccld_output_info_t *infos[64];
-static size_t                infos_count = 0;
+static snccld_state_t *infos[64];
+static size_t          infos_count = 0;
 
 char *snccld_format_infos() {
     if (infos_count == 0 || infos[0] == NULL) {
@@ -162,15 +163,15 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         return ESPANK_SUCCESS;
     }
 
-    snccld_output_info_key_t *key = snccld_new_key();
-    if (snccld_get_key_from(spank, key) != ESPANK_SUCCESS ||
+    snccld_state_key_t *key = snccld_key_new();
+    if (snccld_key_get_from(spank, key) != ESPANK_SUCCESS ||
         key->step_id == SLURM_BATCH_SCRIPT) {
         free(key);
         return ESPANK_SUCCESS;
     }
 
-    snccld_output_info_t *info = snccld_new_info();
-    info->key                  = *key;
+    snccld_state_t *info = snccld_state_new();
+    info->key            = *key;
     free(key);
 
     char debug_val[16]  = "";
@@ -325,8 +326,8 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
         return ESPANK_SUCCESS;
     }
 
-    snccld_output_info_key_t *key = snccld_new_key();
-    if (snccld_get_key_from(spank, key) != ESPANK_SUCCESS ||
+    snccld_state_key_t *key = snccld_key_new();
+    if (snccld_key_get_from(spank, key) != ESPANK_SUCCESS ||
         key->step_id == SLURM_BATCH_SCRIPT) {
         free(key);
         return ESPANK_SUCCESS;
@@ -338,7 +339,7 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
     slurm_spank_log(SNCCLD_LOG_PREFIX "info count: %lu", infos_count);
     free(str);
 
-    snccld_output_info_t *info = infos[infos_count - 1];
+    snccld_state_t *info = infos[infos_count - 1];
     if (info->tee_pid > 0) {
         int status;
         if (waitpid(info->tee_pid, &status, WNOHANG) == 0) {
@@ -357,26 +358,4 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
     free(str);
 
     return ESPANK_SUCCESS;
-}
-
-snccld_output_info_key_t *snccld_new_key() {
-    return malloc(sizeof(snccld_output_info_key_t));
-}
-
-spank_err_t snccld_get_key_from(spank_t spank, snccld_output_info_key_t *key) {
-    if (spank_get_item(spank, S_JOB_ID, &key->job_id) != ESPANK_SUCCESS) {
-        slurm_error(SNCCLD_LOG_PREFIX "Failed to get Job ID");
-        return ESPANK_ERROR;
-    }
-
-    if (spank_get_item(spank, S_JOB_STEPID, &key->step_id) != ESPANK_SUCCESS) {
-        slurm_error(SNCCLD_LOG_PREFIX "Failed to get Step ID");
-        return ESPANK_ERROR;
-    }
-
-    return ESPANK_SUCCESS;
-}
-
-snccld_output_info_t *snccld_new_info() {
-    return malloc(sizeof(snccld_output_info_t));
 }
