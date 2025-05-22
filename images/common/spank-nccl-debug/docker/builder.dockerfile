@@ -7,6 +7,7 @@ WORKDIR /usr/src/spanknccldebug/
 SHELL ["/bin/bash", "-c"]
 CMD gcc \
         -fPIC \
+        -std=gnu99 \
         -shared \
         -I/usr/local/include/slurm \
         -I. \
