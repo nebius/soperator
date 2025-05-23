@@ -31,7 +31,7 @@ CHART_FLUXCD_PATH    		 = $(CHART_PATH)/soperator-fluxcd
 CHART_ACTIVECHECK_PATH       = $(CHART_PATH)/soperator-activechecks
 CHART_DCGM_EXPORTER_PATH     = $(CHART_PATH)/soperator-dcgm-exporter
 
-SLURM_VERSION		  		= 24.05.5
+SLURM_VERSION		  		= 24.05.7
 UBUNTU_VERSION		  		= jammy
 VERSION               		= $(shell cat VERSION)
 
