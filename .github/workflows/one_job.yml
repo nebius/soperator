@@ -6,7 +6,7 @@ on:
       - main
       - dev
     paths-ignore:
-      - '.github/**'
+#      - '.github/**'
       - 'docs/**'
       - 'CODEOWNERS'
       - 'LICENSE'
@@ -21,7 +21,7 @@ on:
       - main
     types: [opened, synchronize, reopened]
     paths-ignore:
-      - '.github/**'
+#      - '.github/**'
       - 'docs/**'
       - 'CODEOWNERS'
       - 'LICENSE'
@@ -41,28 +41,66 @@ jobs:
   pre-build:
     runs-on: self-hosted
 
-    outputs:
-      UNSTABLE: ${{ steps.set-env.outputs.unstable }}
-
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
         with:
           egress-policy: audit
 
-      - name: Set environment to global output variables based on branch
-        id: set-env
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Cache go modules
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod') }}
+          restore-keys: |
+            go-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install GO
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: 'go.mod'
+          cache: false
+
+      - name: Generate version file
         run: |
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "unstable=false" >> $GITHUB_OUTPUT
+            make get-version UNSTABLE=false >> version.txt
+            echo "false" >> version.txt
           else
-            echo "unstable=true" >> $GITHUB_OUTPUT
+            make get-version UNSTABLE=true >> version.txt
+            echo "true" >> version.txt
           fi
 
-      - name: Print UNSTABLE from output
+      - name: Upload version file
+        uses: actions/upload-artifact@v4
+        with:
+          name: version
+          path: version.txt
+
+      - name: Download version artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: version
+          path: ./version
+
+      - name: Read version and unstable
+        id: read-version
         run: |
-          echo "Branch is - ${{ github.ref }}"
-          echo "UNSTABLE - ${{ steps.set-env.outputs.unstable }}"
+          VERSION=$(sed -n '1p' ./version/version.txt)
+          UNSTABLE=$(sed -n '2p' ./version/version.txt)
+          
+          echo "Version: $VERSION"
+          echo "Unstable: $UNSTABLE"
+
+      - name: Save Cache (only if needed)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: echo "cache miss – saved automatically by actions/cache"
 
   one_job:
     runs-on: X64
@@ -77,34 +115,64 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
+      - name: Cache go modules
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod') }}
+          restore-keys: |
+            go-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Install GO
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
             go-version-file: 'go.mod'
+            cache: false
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
         with:
           version: v2.0.2 # version of golangci-lint, should be in sync with Makefile.
 
-      - name: Debug vars
-        run: |
-          echo "UNSTABLE - is ${{ needs.pre-build.outputs.unstable }}"
-          make get-version UNSTABLE=${{ needs.pre-build.outputs.unstable }}
+      - name: Download version artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: version
+          path: ./version
 
-      - name: Run make sync-version-from-scratch
+      - name: Read version and unstable
+        id: read-version
+        run: |
+          VERSION=$(sed -n '1p' ./version/version.txt)
+          UNSTABLE=$(sed -n '2p' ./version/version.txt)
+          
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
+          
+          echo "Version: $VERSION"
+          echo "Unstable: $UNSTABLE"
+
+      - name: Debug VERSION and UNSTABLE vars
+        run: |
+          echo "Building version ${{ steps.read-version.outputs.version }}" 
+          echo "Unstable: ${{ steps.read-version.outputs.unstable }}"
+
+      - name: Run make sync-version-from-scratch # Every time we should have only stable version in our code. So UNSTABLE=false here
         run: |
           make kustomize helmify yq
-          make sync-version-from-scratch
+          make sync-version-from-scratch UNSTABLE=false
 
       - name: Check for uncommitted changes
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
             echo "❌ Uncommitted changes detected after make sync-version-from-scratch"
+            git status --porcelain
             git diff
             exit 1
           fi
-        shell: bash
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
@@ -118,7 +186,7 @@ jobs:
 
       - name: Run all
         run: |
-          UNSTABLE=${{ needs.pre-build.outputs.unstable }}
+          UNSTABLE=${{ steps.read-version.outputs.unstable }}
           IMAGE_VERSION=$(make get-image-version UNSTABLE=${UNSTABLE})
           VERSION=$(make get-version UNSTABLE=${UNSTABLE})
           OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
@@ -151,7 +219,7 @@ jobs:
 
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd DOCKERFILE=restd/slurmrestd.dockerfile
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd
-          
+
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm_check_job DOCKERFILE=slurm_check_job/slurm_check_job.dockerfile
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm_check_job
 
@@ -191,13 +259,6 @@ jobs:
           echo "Pushing Helm charts"
           make release-helm UNSTABLE="${UNSTABLE}" OPERATOR_IMAGE_TAG="$OPERATOR_IMAGE_TAG"
 
-      - name: Generate version file
-        run: |
-          make get-version UNSTABLE=${{ needs.pre-build.outputs.unstable }} >> version.txt
-          echo ${{ needs.pre-build.outputs.unstable }} >> version.txt
-
-      - name: Upload version file
-        uses: actions/upload-artifact@v4
-        with:
-          name: version
-          path: version.txt
+      - name: Save Cache (only if needed)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: echo "cache miss – saved automatically by actions/cache"
