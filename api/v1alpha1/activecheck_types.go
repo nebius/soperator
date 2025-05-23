@@ -138,18 +138,40 @@ type ActiveCheckK8sJobsStatus struct {
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
 
 	// +kubebuilder:validation:Optional
-	LastK8sJobScheduleTime *metav1.Time `json:"lastK8sJobScheduleTime"`
+	LastJobScheduleTime *metav1.Time `json:"lastJobScheduleTime"`
 	// +kubebuilder:validation:Optional
-	LastK8sJobSuccessfulTime *metav1.Time `json:"lastK8sJobSuccessfulTime"`
+	LastJobSuccessfulTime *metav1.Time `json:"lastJobSuccessfulTime"`
 
-	LastK8sJobName   string                         `json:"lastK8sJobName"`
-	LastK8sJobStatus consts.ActiveCheckK8sJobStatus `json:"lastK8sJobStatus"`
+	LastJobName   string                         `json:"lastJobName"`
+	LastJobStatus consts.ActiveCheckK8sJobStatus `json:"lastJobStatus"`
+}
+
+// ActiveCheckSlurmJobsStatus defines the observed state of ActiveCheck slurm jobs.
+type ActiveCheckSlurmJobsStatus struct {
+	// +kubebuilder:validation:Optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
+
+	// +kubebuilder:validation:Optional
+	LastJobId *int32 `json:"lastJobId"`
+	// +kubebuilder:validation:Optional
+	LastJobName *string `json:"lastJobName"`
+	// +kubebuilder:validation:Optional
+	LastJobState string `json:"lastJobState"`
+	// +kubebuilder:validation:Optional
+	LastJobStateReason *string `json:"lastJobStateReason"`
+	// +kubebuilder:validation:Optional
+	LastJobSubmitTime *metav1.Time `json:"lastJobSubmitTime"`
+	// +kubebuilder:validation:Optional
+	LastJobStartTime *metav1.Time `json:"lastJobStartTime"`
+	// +kubebuilder:validation:Optional
+	LastJobEndTime *metav1.Time `json:"lastJobEndTime"`
 }
 
 // ActiveCheckStatus defines the observed state of ActiveCheck.
 type ActiveCheckStatus struct {
-	StatusMetadata `json:",inline"`
-	K8sJobsStatus  ActiveCheckK8sJobsStatus `json:"k8sJobsStatus,omitempty"`
+	StatusMetadata  `json:",inline"`
+	K8sJobsStatus   ActiveCheckK8sJobsStatus   `json:"k8sJobsStatus,omitempty"`
+	SlurmJobsStatus ActiveCheckSlurmJobsStatus `json:"slurmJobsStatus,omitempty"`
 
 	// +kubebuilder:default=false
 	ServiceAccountReady bool `json:"serviceAccountReady,omitempty"`
