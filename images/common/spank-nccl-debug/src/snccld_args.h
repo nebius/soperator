@@ -65,6 +65,18 @@
     SNCCLD_ARG_OUT_DIR_ENV " env var is also supported."
 // clang-format on
 
+#define SNCCLD_ARG_OUT_FILE         "out-file"
+#define SNCCLD_ARG_OUT_FILE_ENV     "SNCCLD_OUT_FILE"
+#define SNCCLD_ARG_OUT_FILE_ARGINFO SNCCLD_ARG_BOOLEAN_STRING_ARGINFO
+#define SNCCLD_ARG_OUT_FILE_DEFAULT true
+// clang-format off
+
+#define SNCCLD_ARG_OUT_FILE_USAGE                                                  \
+"whether to additionally redirect " SNCCLD_NCCL_ENV_DEBUG " outputs to the file. " \
+"Possible values are case-insensitive. "                                         \
+SNCCLD_ARG_OUT_STDOUT_ENV " env var is also supported."
+// clang-format on
+
 #define SNCCLD_ARG_OUT_STDOUT         "out-stdout"
 #define SNCCLD_ARG_OUT_STDOUT_ENV     "SNCCLD_OUT_STDOUT"
 #define SNCCLD_ARG_OUT_STDOUT_ARGINFO SNCCLD_ARG_BOOLEAN_STRING_ARGINFO
@@ -109,6 +121,7 @@ typedef struct {
     bool enabled;
     char log_level[8];
     char out_dir[PATH_MAX];
+    bool out_file;
     bool out_stdout;
 } snccld_config_t;
 
@@ -116,6 +129,7 @@ static snccld_config_t snccld_config = {
     .enabled    = SNCCLD_ARG_ENABLED_DEFAULT,
     .log_level  = SNCCLD_ARG_LOG_LEVEL_DEFAULT,
     .out_dir    = SNCCLD_ARG_OUT_DIR_DEFAULT,
+    .out_file   = SNCCLD_ARG_OUT_FILE_DEFAULT,
     .out_stdout = SNCCLD_ARG_OUT_STDOUT_DEFAULT,
 };
 
@@ -182,7 +196,7 @@ static inline void snccld_parse_arg_log_level(const char *arg) {
 }
 
 /**
- * Implementation of @spank_opt_cb_f callback for `log_level` arg.
+ * Implementation of @spank_opt_cb_f callback for `log-level` arg.
  */
 static int spank_option_log_level(int val, const char *optarg, int remote) {
     SNCCLD_ARG_OPTION(
@@ -201,11 +215,45 @@ static inline void snccld_parse_arg_out_dir(const char *arg) {
 }
 
 /**
- * Implementation of @spank_opt_cb_f callback for `out_dir` arg.
+ * Implementation of @spank_opt_cb_f callback for `out-dir` arg.
  */
 static int spank_option_out_dir(int val, const char *optarg, int remote) {
     SNCCLD_ARG_OPTION(
         SNCCLD_ARG_OUT_DIR, snccld_parse_arg_out_dir_value, optarg
+    )
+}
+
+static void snccld_parse_arg_out_file_value(const char *val) {
+    if (strcasecmp(val, "1") == 0 || strcasecmp(val, "true") == 0) {
+        snccld_config.out_file = true;
+        return;
+    }
+
+    if (strcasecmp(val, "0") == 0 || strcasecmp(val, "false") == 0) {
+        snccld_config.out_file = false;
+        return;
+    }
+
+    slurm_error(
+        SNCCLD_LOG_INVALID_ARG,
+        SNCCLD_LOG_PREFIX,
+        SNCCLD_ARG_OUT_FILE,
+        val,
+        snccld_config.out_file ? "true" : "false"
+    );
+}
+
+static inline void snccld_parse_arg_out_file(const char *arg) {
+    const char *val = arg + strlen(SNCCLD_ARG_OUT_FILE "=");
+    snccld_parse_arg_out_file_value(val);
+}
+
+/**
+ * Implementation of @spank_opt_cb_f callback for `out-file` arg.
+ */
+static int spank_option_out_file(int val, const char *optarg, int remote) {
+    SNCCLD_ARG_OPTION(
+        SNCCLD_ARG_OUT_FILE, snccld_parse_arg_out_file_value, optarg
     )
 }
 
@@ -234,7 +282,7 @@ static inline void snccld_parse_arg_out_stdout(const char *arg) {
 }
 
 /**
- * Implementation of @spank_opt_cb_f callback for `out_stdout` arg.
+ * Implementation of @spank_opt_cb_f callback for `out-stdout` arg.
  */
 static int spank_option_out_stdout(int val, const char *optarg, int remote) {
     SNCCLD_ARG_OPTION(
@@ -253,6 +301,9 @@ static void snccld_parse_env_vars(spank_t spank) {
         SNCCLD_ARG_OUT_DIR_ENV, snccld_parse_arg_out_dir_value
     );
     SNCCLD_PARSE_ENV_ARG(
+        SNCCLD_ARG_OUT_FILE_ENV, snccld_parse_arg_out_file_value
+    );
+    SNCCLD_PARSE_ENV_ARG(
         SNCCLD_ARG_OUT_STDOUT_ENV, snccld_parse_arg_out_stdout_value
     );
 }
@@ -265,6 +316,7 @@ static void snccld_parse_plugin_args(spank_t spank, int argc, char **argv) {
         SNCCLD_PARSE_ARG(arg, SNCCLD_ARG_ENABLED, snccld_parse_arg_enabled);
         SNCCLD_PARSE_ARG(arg, SNCCLD_ARG_LOG_LEVEL, snccld_parse_arg_log_level);
         SNCCLD_PARSE_ARG(arg, SNCCLD_ARG_OUT_DIR, snccld_parse_arg_out_dir);
+        SNCCLD_PARSE_ARG(arg, SNCCLD_ARG_OUT_FILE, snccld_parse_arg_out_file);
         SNCCLD_PARSE_ARG(arg, SNCCLD_ARG_OUT_STDOUT, snccld_parse_arg_out_stdout);
         // clang-format on
 
@@ -298,6 +350,14 @@ struct spank_option spank_opts[] = {
         .has_arg = true,
         .val     = 0,
         .cb      = spank_option_out_dir,
+    },
+    {
+        .name    = SNCCLD_ARG_PREFIX "-" SNCCLD_ARG_OUT_FILE,
+        .arginfo = SNCCLD_ARG_OUT_FILE_ARGINFO,
+        .usage   = "[" XSTR(SNCCLD_PLUGIN_NAME) "] " SNCCLD_ARG_OUT_FILE_USAGE,
+        .has_arg = true,
+        .val     = 0,
+        .cb      = spank_option_out_file,
     },
     {
         .name    = SNCCLD_ARG_PREFIX "-" SNCCLD_ARG_OUT_STDOUT,

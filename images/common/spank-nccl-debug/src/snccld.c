@@ -112,15 +112,18 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         return ESPANK_SUCCESS;
     }
 
-    slurm_error(
-        SNCCLD_LOG_PREFIX "Config:\n"
-                          "\t" SNCCLD_ARG_ENABLED ": %s\n"
-                          "\t" SNCCLD_ARG_LOG_LEVEL ": %s\n"
-                          "\t" SNCCLD_ARG_OUT_DIR ": %s\n"
-                          "\t" SNCCLD_ARG_OUT_STDOUT ": %s",
+    slurm_spank_log(
+        "%s: Config:\n"
+        "\t" SNCCLD_ARG_ENABLED ": %s\n"
+        "\t" SNCCLD_ARG_LOG_LEVEL ": %s\n"
+        "\t" SNCCLD_ARG_OUT_DIR ": %s\n"
+        "\t" SNCCLD_ARG_OUT_FILE ": %s\n"
+        "\t" SNCCLD_ARG_OUT_STDOUT ": %s",
+        SNCCLD_LOG_PREFIX,
         snccld_config.enabled ? "true" : "false",
         snccld_config.log_level,
         snccld_config.out_dir,
+        snccld_config.out_file ? "true" : "false",
         snccld_config.out_stdout ? "true" : "false"
     );
 
@@ -283,15 +286,18 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
         return ESPANK_SUCCESS;
     }
 
-    slurm_error(
-        SNCCLD_LOG_PREFIX "Config:\n"
-                          "\t" SNCCLD_ARG_ENABLED ": %s\n"
-                          "\t" SNCCLD_ARG_LOG_LEVEL ": %s\n"
-                          "\t" SNCCLD_ARG_OUT_DIR ": %s\n"
-                          "\t" SNCCLD_ARG_OUT_STDOUT ": %s",
+    slurm_spank_log(
+        "%s: Config:\n"
+        "\t" SNCCLD_ARG_ENABLED ": %s\n"
+        "\t" SNCCLD_ARG_LOG_LEVEL ": %s\n"
+        "\t" SNCCLD_ARG_OUT_DIR ": %s\n"
+        "\t" SNCCLD_ARG_OUT_FILE ": %s\n"
+        "\t" SNCCLD_ARG_OUT_STDOUT ": %s",
+        SNCCLD_LOG_PREFIX,
         snccld_config.enabled ? "true" : "false",
         snccld_config.log_level,
         snccld_config.out_dir,
+        snccld_config.out_file ? "true" : "false",
         snccld_config.out_stdout ? "true" : "false"
     );
 
