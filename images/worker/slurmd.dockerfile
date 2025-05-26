@@ -23,6 +23,7 @@ RUN GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 # Second stage: Build worker image
 
 ARG BASE_IMAGE=ubuntu:jammy
+ARG ARCH=x86_64
 
 FROM $BASE_IMAGE AS worker_slurmd
 
@@ -78,9 +79,9 @@ RUN apt-get update && \
 
 # Intsall dcgm (mainly for nv-hostengine)
 ARG CUDA_KEYRING_PKG=cuda-keyring_${CUDA_KEYRING_VERSION}_all.deb
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/${CUDA_KEYRING_PKG} && \
+RUN  wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/${ARCH}/${CUDA_KEYRING_PKG} && \
     dpkg -i ${CUDA_KEYRING_PKG} && \
-    add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /" && \
+    add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/${ARCH}/ /" && \
     apt -y install datacenter-gpu-manager && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* ./${CUDA_KEYRING_PKG}
@@ -91,7 +92,7 @@ RUN chmod +x /opt/bin/install_openmpi.sh && \
     /opt/bin/install_openmpi.sh && \
     rm /opt/bin/install_openmpi.sh
 
-ENV LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib
+ENV LD_LIBRARY_PATH=/lib/${ARCH}-linux-gnu:/usr/lib/${ARCH}-linux-gnu:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/targets/${ARCH}-linux/lib:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib
 ENV PATH=$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
 # Add Nebius public registry
