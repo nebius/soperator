@@ -354,14 +354,26 @@ func (r *ActiveCheckReconciler) reconcileDelete(ctx context.Context, check *slur
 		}
 	}
 
-	var checks slurmv1alpha1.ActiveCheckList
-	if err := r.List(ctx, &checks, client.InNamespace(check.Namespace)); err != nil {
-		logger.Error(err, "Failed to list ActiveChecks")
+	clusterName := check.Spec.SlurmClusterRefName
+
+	otherCheckExists := false
+	checkList := &slurmv1alpha1.ActiveCheckList{}
+
+	if err := r.List(ctx, checkList, client.InNamespace(check.Namespace)); err != nil {
+		logger.Error(err, "Failed to list ActiveChecks from cache")
 		return ctrl.Result{}, err
 	}
 
-	if len(checks.Items) <= 1 {
-		clusterName := check.Spec.SlurmClusterRefName
+	for _, item := range checkList.Items {
+		if item.Name != check.Name &&
+			item.Spec.SlurmClusterRefName == clusterName &&
+			item.DeletionTimestamp.IsZero() {
+			otherCheckExists = true
+			break
+		}
+	}
+
+	if !otherCheckExists {
 		logger.Info("Last ActiveCheck in namespace. Deleting shared ServiceAccount resources")
 
 		resources := []client.Object{
