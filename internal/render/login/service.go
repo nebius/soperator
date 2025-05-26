@@ -53,7 +53,7 @@ func RenderHeadlessService(namespace, clusterName string, login *values.SlurmLog
 		Spec: corev1.ServiceSpec{
 			Type:      corev1.ServiceTypeClusterIP,
 			Selector:  common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName),
-			ClusterIP: "None",
+			ClusterIP: "0.0.0.0",
 			Ports: []corev1.ServicePort{{
 				Protocol:   login.HeadlessService.Protocol,
 				Port:       login.ContainerSshd.Port,
