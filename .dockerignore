@@ -4,10 +4,8 @@
 /docker
 /slurm-service/internal/docs
 /helm*
-/images
 /terraform*
 /test
 .*
 *.sh
 Makefile
-Dockerfile

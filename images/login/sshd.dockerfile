@@ -73,8 +73,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install slurm сhroot plugin
-COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
-COPY common/scripts/install_chroot_plugin.sh /opt/bin/
+COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
+COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
     /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
@@ -86,13 +86,13 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install enroot
-COPY common/scripts/install_enroot.sh /opt/bin/
+COPY images/common/scripts/install_enroot.sh /opt/bin/
 RUN chmod +x /opt/bin/install_enroot.sh && \
     /opt/bin/install_enroot.sh && \
     rm /opt/bin/install_enroot.sh
 
 # Copy enroot configuration
-COPY common/enroot/enroot.conf /etc/enroot/
+COPY images/common/enroot/enroot.conf /etc/enroot/
 RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
 
 # Install slurm pyxis plugin
@@ -102,10 +102,10 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy script for complementing jail filesystem in runtime
-COPY common/scripts/complement_jail.sh /opt/bin/slurm/
+COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
 
 # Copy script for bind-mounting slurm into the jail
-COPY common/scripts/bind_slurm_common.sh /opt/bin/slurm/
+COPY images/common/scripts/bind_slurm_common.sh /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
     chmod +x /opt/bin/slurm/bind_slurm_common.sh
@@ -124,6 +124,6 @@ RUN rm -rf /etc/update-motd.d
 EXPOSE 22
 
 # Copy & run the entrypoint script
-COPY login/sshd_entrypoint.sh /opt/bin/slurm/
+COPY images/login/sshd_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/sshd_entrypoint.sh
 ENTRYPOINT ["/opt/bin/slurm/sshd_entrypoint.sh"]
