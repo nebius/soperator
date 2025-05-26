@@ -27,7 +27,7 @@ ARG BASE_IMAGE=ubuntu:jammy
 # ARCH has the short form like: amd64, arm64
 ARG ARCH=$TARGETARCH
 # ALT_ARCH has the extended form like: x86_64, aarch64
-ARG ALT_ARCH
+ARG ALT_ARCH=x86_64
 
 FROM $BASE_IMAGE AS worker_slurmd
 
