@@ -1,7 +1,8 @@
-package prometheus
+package exporter
 
 import (
 	"errors"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -19,36 +20,44 @@ import (
 func RenderDeploymentExporter(
 	clusterName,
 	namespace string,
-	valuesExporter *values.SlurmExporter,
+	exporterValues values.SlurmExporter,
 	nodeFilter []slurmv1.K8sNodeFilter,
-	volumeSources []slurmv1.VolumeSource,
-	podTemplate *corev1.PodTemplate,
+	podTemplatePatch *corev1.PodTemplate,
+	slurmAPIServer string,
 ) (deployment *appsv1.Deployment, err error) {
-	if valuesExporter == nil || !valuesExporter.Enabled {
-		return nil, errors.New("prometheus is not enabled")
+	if !exporterValues.Enabled {
+		return nil, errors.New("exporter is not enabled")
 	}
-	if valuesExporter.ExporterContainer.Image == "" {
-		return nil, errors.New("image for ContainerExporter is empty")
-	}
-
-	var podTemplateSpec *corev1.PodTemplateSpec = nil
-	if podTemplate != nil {
-		podTemplateSpec = &podTemplate.Template
+	if exporterValues.NodeContainer.Image == "" {
+		return nil, errors.New("image for NodeContainer is empty")
 	}
 
-	// in Deployment mode replicas should be 1.
-	// in StatefulSet mode replicas should be more than 1.
-	// Because of munge container use pvcs, we can't use template pvc for munge in Deployment mode.
+	var podTemplatePatchSpec *corev1.PodTemplateSpec
+	if podTemplatePatch != nil {
+		podTemplatePatchSpec = &podTemplatePatch.Template
+	}
 
 	labels := common.RenderLabels(consts.ComponentTypeExporter, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeExporter, clusterName)
 
-	replicas := ptr.To(consts.SingleReplicas)
-	if check.IsMaintenanceActive(valuesExporter.Maintenance) {
-		replicas = ptr.To(consts.ZeroReplicas)
+	replicas := 1
+	if check.IsMaintenanceActive(exporterValues.Maintenance) {
+		replicas = 0
 	}
 
-	initContainers := append(valuesExporter.CustomInitContainers, common.RenderContainerMunge(&valuesExporter.ContainerMunge))
+	renderedPodTemplateSpec, err := renderPodTemplateSpec(
+		clusterName,
+		namespace,
+		exporterValues.CustomInitContainers,
+		exporterValues,
+		nodeFilter,
+		matchLabels,
+		podTemplatePatchSpec,
+		slurmAPIServer,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("render pod template spec: %w", err)
+	}
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -57,22 +66,14 @@ func RenderDeploymentExporter(
 			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: replicas,
+			Replicas: ptr.To(int32(replicas)),
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RecreateDeploymentStrategyType,
 			},
 			Selector: &metav1.LabelSelector{
 				MatchLabels: matchLabels,
 			},
-			Template: RenderPodTemplateSpec(
-				clusterName,
-				initContainers,
-				valuesExporter,
-				nodeFilter,
-				volumeSources,
-				matchLabels,
-				podTemplateSpec,
-			),
+			Template: renderedPodTemplateSpec,
 		},
 	}, nil
 }

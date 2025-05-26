@@ -7575,6 +7575,25 @@ spec:
                     description: |
                       Exporter represents the Slurm exporter node configuration
                     properties:
+                      appArmorProfile:
+                        default: unconfined
+                        description: AppArmorProfile defines the AppArmor profile
+                          for the Slurm containers
+                        type: string
+                      args:
+                        description: |-
+                          Args defines the arguments to the entrypoint (command).
+                          The container image's CMD is used if this is not provided.
+                        items:
+                          type: string
+                        type: array
+                      command:
+                        description: |-
+                          Command defines the entrypoint array for the container. Not executed within a shell.
+                          The container image's ENTRYPOINT is used if this is not provided.
+                        items:
+                          type: string
+                        type: array
                       customInitContainers:
                         description: CustomInitContainers represent additional init
                           containers that should be added to created Pods
@@ -9080,14 +9099,24 @@ spec:
                         required:
                         - image
                         type: object
+                      image:
+                        description: Image defines the container image
+                        type: string
+                      imagePullPolicy:
+                        default: IfNotPresent
+                        description: ImagePullPolicy defines the image pull policy
+                        enum:
+                        - Always
+                        - Never
+                        - IfNotPresent
+                        type: string
                       k8sNodeFilterName:
                         description: |-
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
                           Must correspond to the name of one of [K8sNodeFilter]
                         type: string
                       munge:
-                        description: |
-                          Munge represents the Slurm munge configuration
+                        description: Munge represents the Slurm munge configuration
                         properties:
                           appArmorProfile:
                             default: unconfined
@@ -9142,6 +9171,10 @@ spec:
                         required:
                         - image
                         type: object
+                      patchPodTemplateNameRef:
+                        description: PodTemplatePatchNameRef references the PodTemplate
+                          with the Soperator Exporter configuration
+                        type: string
                       podMonitorConfig:
                         default:
                           interval: 30s
@@ -9339,16 +9372,30 @@ spec:
                             pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
                             type: string
                         type: object
+                      port:
+                        description: Port defines the port the container exposes
+                        format: int32
+                        type: integer
+                      resources:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Resources defines the [corev1.ResourceRequirements]
+                          for the container
+                        type: object
+                      securityLimitsConfig:
+                        description: |-
+                          SecurityLimitsConfig represents multiline limits.conf
+                          format of a string should be: '* <soft|hard> <item> <value>'
+                          example: '* soft nofile 1024'
+                        type: string
                       size:
                         description: Size defines the number of node instances
                         format: int32
                         type: integer
-                      useSoperatorExporter:
-                        default: false
-                        description: |-
-                          UseSoperatorExporter defines whether build-in cluster exporter is used
-                          instead of third-party prometheus-slurm-exporter.
-                        type: boolean
                       volumes:
                         description: Volumes represents the volume configurations
                           for the controller node
@@ -9569,7 +9616,8 @@ spec:
                         - jail
                         type: object
                     required:
-                    - exporter
+                    - ""
+                    - image
                     - k8sNodeFilterName
                     - munge
                     - volumes

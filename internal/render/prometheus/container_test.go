@@ -43,7 +43,7 @@ func Test_RenderContainerExporter(t *testing.T) {
 		},
 	}
 
-	result := RenderContainerExporter(containerParams, defaultNamespace, defaultNameCluster, defaultSlurmAPIServer)
+	result := RenderContainerExporter(containerParams)
 
 	if _, ok := result.Resources.Limits[corev1.ResourceCPU]; ok {
 		t.Errorf("ResourceCPU should not be set")

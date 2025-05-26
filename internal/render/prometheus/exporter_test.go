@@ -36,8 +36,7 @@ func Test_RenderDeploymentExporter_Error(t *testing.T) {
 		t.Run("exporter", func(t *testing.T) {
 
 			_, err := RenderDeploymentExporter(
-				defaultNamespace, defaultNameCluster, tc.valuesExporter, defaultNodeFilter, defaultVolumeSources,
-				defaultPodTemplate, defaultSlurmAPIServer,
+				defaultNamespace, defaultNameCluster, tc.valuesExporter, defaultNodeFilter, defaultVolumeSources, defaultPodTemplate,
 			)
 			if err == nil {
 				t.Errorf("expected error, got nil")

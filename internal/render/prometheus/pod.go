@@ -16,31 +16,17 @@ import (
 
 func BasePodTemplateSpec(
 	clusterName string,
-	clusterNamespace string,
 	initContainers []corev1.Container,
 	valuesExporter *values.SlurmExporter,
 	nodeFilters []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
 	matchLabels map[string]string,
-	slurmAPIServer string,
 ) corev1.PodTemplateSpec {
-	var volumes []corev1.Volume
-	var annotations map[string]string
-	if !valuesExporter.UseSoperatorExporter {
-		volumes = []corev1.Volume{
-			common.RenderVolumeJailFromSource(volumeSources, *valuesExporter.VolumeJail.VolumeSourceName),
-			common.RenderVolumeSlurmConfigs(clusterName),
-			common.RenderVolumeMungeKey(clusterName),
-			common.RenderVolumeMungeSocket(),
-		}
-		annotations = map[string]string{
-			fmt.Sprintf(
-				"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameExporter,
-			): valuesExporter.AppArmorProfile,
-			fmt.Sprintf(
-				"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-			): valuesExporter.ContainerMunge.AppArmorProfile,
-		}
+	volumes := []corev1.Volume{
+		common.RenderVolumeJailFromSource(volumeSources, *valuesExporter.VolumeJail.VolumeSourceName),
+		common.RenderVolumeSlurmConfigs(clusterName),
+		common.RenderVolumeMungeKey(clusterName),
+		common.RenderVolumeMungeSocket(),
 	}
 
 	var affinity *corev1.Affinity = nil
@@ -60,8 +46,15 @@ func BasePodTemplateSpec(
 
 	return corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:      matchLabels,
-			Annotations: annotations,
+			Labels: matchLabels,
+			Annotations: map[string]string{
+				fmt.Sprintf(
+					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameExporter,
+				): valuesExporter.AppArmorProfile,
+				fmt.Sprintf(
+					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
+				): valuesExporter.ContainerMunge.AppArmorProfile,
+			},
 		},
 		Spec: corev1.PodSpec{
 			Affinity:       affinity,
@@ -69,27 +62,23 @@ func BasePodTemplateSpec(
 			NodeSelector:   nodeSelector,
 			InitContainers: initContainers,
 			Containers: []corev1.Container{
-				RenderContainerExporter(valuesExporter, clusterName, clusterNamespace, slurmAPIServer),
+				RenderContainerExporter(valuesExporter),
 			},
-			Volumes:            volumes,
-			ServiceAccountName: buildExporterServiceAccountName(clusterName),
+			Volumes: volumes,
 		},
 	}
 }
 
 func RenderPodTemplateSpec(
 	clusterName string,
-	clusterNamespace string,
 	initContainers []corev1.Container,
 	valuesExporter *values.SlurmExporter,
 	nodeFilters []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
 	matchLabels map[string]string,
 	podTemplateSpec *corev1.PodTemplateSpec,
-	slurmAPIServer string,
 ) corev1.PodTemplateSpec {
-	result := BasePodTemplateSpec(
-		clusterName, clusterNamespace, initContainers, valuesExporter, nodeFilters, volumeSources, matchLabels, slurmAPIServer)
+	result := BasePodTemplateSpec(clusterName, initContainers, valuesExporter, nodeFilters, volumeSources, matchLabels)
 	if podTemplateSpec != nil {
 		var err error
 		result, err = common.MergePodTemplateSpecs(result, podTemplateSpec)

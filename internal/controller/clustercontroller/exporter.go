@@ -11,8 +11,8 @@ import (
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/logfield"
+	"nebius.ai/slurm-operator/internal/render/exporter"
 	slurmprometheus "nebius.ai/slurm-operator/internal/render/prometheus"
-	"nebius.ai/slurm-operator/internal/render/rest"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
@@ -24,6 +24,10 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 	clusterValues *values.SlurmCluster,
 ) error {
 	logger := log.FromContext(ctx)
+	if clusterValues.SlurmExporter.ExporterContainer.Image == "" {
+		logger.V(1).Info("Slurm exporter image is not set, skipping Slurm exporter reconciliation")
+		return nil
+	}
 
 	reconcileExporterImpl := func() error {
 		return utils.ExecuteMultiStep(ctx,
@@ -39,10 +43,10 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 						stepLogger.V(1).Info("Prometheus Operator CRD is installed")
 						if check.IsPrometheusEnabled(&clusterValues.SlurmExporter) {
 							stepLogger.V(1).Info("Prometheus is enabled")
-							desired, err := slurmprometheus.RenderPodMonitor(
+							desired, err := exporter.RenderPodMonitor(
 								clusterValues.Name,
 								clusterValues.Namespace,
-								&clusterValues.SlurmExporter,
+								clusterValues.SlurmExporter,
 							)
 							if err != nil {
 								stepLogger.Error(err, "Failed to render")
@@ -97,7 +101,6 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 								clusterValues.NodeFilters,
 								clusterValues.VolumeSources,
 								foundPodTemplate,
-								rest.GetServiceURL(clusterValues.Namespace, &clusterValues.NodeRest),
 							)
 							if err != nil {
 								stepLogger.Error(err, "Failed to render")

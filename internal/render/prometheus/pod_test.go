@@ -119,8 +119,7 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 		},
 	}
 
-	result := slurmprometheus.BasePodTemplateSpec(clusterName, defaultNamespace, initContainers, podParams,
-		defaultNodeFilter, volumeSources, matchLabels, defaultSlurmAPIServer)
+	result := slurmprometheus.BasePodTemplateSpec(clusterName, initContainers, podParams, defaultNodeFilter, volumeSources, matchLabels)
 
 	assert.Equal(t, expected.Labels, result.Labels)
 
@@ -224,8 +223,7 @@ func Test_RenderPodTemplateSpec(t *testing.T) {
 		},
 	}
 
-	result := slurmprometheus.RenderPodTemplateSpec(clusterName, defaultNamespace, initContainers, podParams,
-		defaultNodeFilter, volumeSources, matchLabels, podTemplateSpec, defaultNameCluster)
+	result := slurmprometheus.RenderPodTemplateSpec(clusterName, initContainers, podParams, defaultNodeFilter, volumeSources, matchLabels, podTemplateSpec)
 
 	assert.Equal(t, expected.Labels, result.Labels)
 
