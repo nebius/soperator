@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "soperator.name" . }}-controller-manager
+  name: {{ include "soperator.fullname" . }}-controller-manager
   labels:
     app.kubernetes.io/component: manager
     app.kubernetes.io/created-by: slurm-operator
