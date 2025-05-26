@@ -20,9 +20,20 @@ type JobStatus struct {
 
 func isTerminalState(state slurmapispec.V0041JobInfoJobState) bool {
 	switch state {
-	case slurmapispec.V0041JobInfoJobStateCOMPLETED, slurmapispec.V0041JobInfoJobStateFAILED,
-		slurmapispec.V0041JobInfoJobStateCANCELLED, slurmapispec.V0041JobInfoJobStateTIMEOUT,
-		slurmapispec.V0041JobInfoJobStateOUTOFMEMORY:
+	case slurmapispec.V0041JobInfoJobStateCOMPLETED,
+		slurmapispec.V0041JobInfoJobStateFAILED,
+		slurmapispec.V0041JobInfoJobStateCANCELLED,
+		slurmapispec.V0041JobInfoJobStateTIMEOUT,
+		slurmapispec.V0041JobInfoJobStateOUTOFMEMORY,
+		slurmapispec.V0041JobInfoJobStateBOOTFAIL,
+		slurmapispec.V0041JobInfoJobStateDEADLINE,
+		slurmapispec.V0041JobInfoJobStateLAUNCHFAILED,
+		slurmapispec.V0041JobInfoJobStateNODEFAIL,
+		slurmapispec.V0041JobInfoJobStatePREEMPTED,
+		slurmapispec.V0041JobInfoJobStateRECONFIGFAIL,
+		slurmapispec.V0041JobInfoJobStateREVOKED,
+		slurmapispec.V0041JobInfoJobStateSPECIALEXIT,
+		slurmapispec.V0041JobInfoJobStateSTOPPED:
 		return true
 	default:
 		return false
