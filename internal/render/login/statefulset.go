@@ -101,6 +101,7 @@ func RenderStatefulSet(
 					DNSConfig: &corev1.PodDNSConfig{
 						Searches: []string{
 							naming.BuildServiceFQDN(consts.ComponentTypeWorker, namespace, clusterName),
+							naming.BuildLoginHeadlessServiceFQDN(namespace, clusterName),
 						},
 					},
 					RestartPolicy:                 corev1.RestartPolicyAlways,

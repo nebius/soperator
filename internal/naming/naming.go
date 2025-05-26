@@ -146,6 +146,11 @@ func BuildLoginHeadlessServiceName(clusterName string) string {
 	}.String()
 }
 
+func BuildLoginHeadlessServiceFQDN(namespace, clusterName string) string {
+	svcName := BuildLoginHeadlessServiceName(clusterName)
+	return fmt.Sprintf("%s.%s.svc.cluster.local", svcName, namespace)
+}
+
 // endregion Login
 
 // region Worker
