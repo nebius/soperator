@@ -24,12 +24,12 @@ RUN GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 
 ARG BASE_IMAGE=ubuntu:jammy
 
+FROM $BASE_IMAGE AS worker_slurmd
+
 # ARCH has the short form like: amd64, arm64
 ARG ARCH=$TARGETARCH
 # ALT_ARCH has the extended form like: x86_64, aarch64
 ARG ALT_ARCH=x86_64
-
-FROM $BASE_IMAGE AS worker_slurmd
 
 ARG SLURM_VERSION=24.05.7
 ARG OPENMPI_VERSION=4.1.7a1
@@ -83,7 +83,7 @@ RUN apt-get update && \
 
 # Intsall dcgm (mainly for nv-hostengine)
 ARG CUDA_KEYRING_PKG=cuda-keyring_${CUDA_KEYRING_VERSION}_all.deb
-RUN  wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/${ALT_ARCH}/${CUDA_KEYRING_PKG} && \
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/${ALT_ARCH}/${CUDA_KEYRING_PKG} && \
     dpkg -i ${CUDA_KEYRING_PKG} && \
     add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/${ALT_ARCH}/ /" && \
     apt -y install datacenter-gpu-manager && \
