@@ -1,8 +1,6 @@
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.28.0
 
-DOCKER_BUILD_PLATFORM = "--platform=linux/amd64"
-
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -292,7 +290,7 @@ endif
 ifndef DOCKERFILE
 	$(error DOCKERFILE is not set, docker image cannot be built)
 endif
-	docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} ${DOCKER_BUILD_PLATFORM} -f images/${DOCKERFILE} ${DOCKER_OUTPUT} .
+	docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} -f images/${DOCKERFILE} ${DOCKER_OUTPUT} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image
@@ -303,6 +301,18 @@ endif
 ifeq ($(UNSTABLE), false)
 	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 	docker push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+endif
+
+.PHONY: docker-manifest
+docker-manifest: ## Create and push docker manifest for multiple image architecture
+ifndef IMAGE_NAME
+	$(error IMAGE_NAME is not set, docker manifest can not be pushed)
+endif
+	docker manifest create "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
+	docker manifest push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+ifeq ($(UNSTABLE), false)
+	docker manifest create "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
+	docker manifest push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 endif
 
 .PHONY: release-helm
