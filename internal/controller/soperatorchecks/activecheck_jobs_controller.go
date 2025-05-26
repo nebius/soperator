@@ -13,8 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"nebius.ai/slurm-operator/internal/jwt"
-	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -36,6 +34,7 @@ var (
 
 type ActiveCheckJobReconciler struct {
 	*reconciler.Reconciler
+	slurmAPIClients  *slurmapi.ClientSet
 	reconcileTimeout time.Duration
 }
 
@@ -43,12 +42,14 @@ func NewActiveCheckJobController(
 	client client.Client,
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
+	slurmAPIClients *slurmapi.ClientSet,
 	reconcileTimeout time.Duration,
 ) *ActiveCheckJobReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
 	return &ActiveCheckJobReconciler{
 		Reconciler:       r,
+		slurmAPIClients:  slurmAPIClients,
 		reconcileTimeout: reconcileTimeout,
 	}
 }
@@ -150,12 +151,14 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 	}
 
 	if activeCheck.Spec.CheckType == "slurmJob" {
-		jwtToken := jwt.NewToken(r.Client).For(req.NamespacedName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
-		slurmAPIServer := fmt.Sprintf("http://%s.%s:6820", naming.BuildServiceName(consts.ComponentTypeREST, req.Name), req.Namespace)
-		slurmAPIClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
-		if err != nil {
-			logger.Error(err, "failed to create slurm api client")
-			return ctrl.Result{}, err
+		slurmClusterName := types.NamespacedName{
+			Namespace: req.Namespace,
+			Name:      activeCheck.Spec.SlurmClusterRefName,
+		}
+		slurmAPIClient, found := r.slurmAPIClients.GetClient(slurmClusterName)
+		if !found {
+			logger.Error(err, "failed to get slurm api client")
+			return ctrl.Result{}, fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 		}
 
 		slurmJobID, ok := k8sJob.Annotations["slurm-job-id"]
