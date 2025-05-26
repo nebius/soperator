@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "soperator.fullname" . }}-soperator-checks-role
+  name: {{ include "soperator.name" . }}-soperator-checks-role
   labels:
   {{- include "soperator.labels" . | nindent 4 }}
 rules:

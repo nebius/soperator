@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "soperator.fullname" . }}-metrics-reader
+  name: {{ include "soperator.name" . }}-metrics-reader
   labels:
     app.kubernetes.io/component: kube-rbac-proxy
     app.kubernetes.io/created-by: slurm-operator

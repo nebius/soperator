@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "soperator.fullname" . }}-binding
+  name: {{ include "soperator.name" . }}-binding
   labels:
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: slurm-operator
@@ -10,8 +10,8 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: '{{ include "soperator.fullname" . }}-manager-role'
+  name: '{{ include "soperator.name" . }}-manager-role'
 subjects:
 - kind: ServiceAccount
-  name: '{{ include "soperator.fullname" . }}-controller-manager'
+  name: '{{ include "soperator.name" . }}-controller-manager'
   namespace: '{{ .Release.Namespace }}'
