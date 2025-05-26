@@ -2,17 +2,17 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "soperator.name" . }}-serving-cert
+  name: {{ include "soperator.fullname" . }}-serving-cert
   labels:
   {{- include "soperator.labels" . | nindent 4 }}
 spec:
   dnsNames:
-  - '{{ include "soperator.name" . }}-webhook-service.{{ .Release.Namespace }}.svc.{{ .Values.kubernetesClusterDomain }}'
-  - '{{ include "soperator.name" . }}-webhook-service.{{ .Release.Namespace }}.svc'
-  - '{{ include "soperator.name" . }}-webhook-service.{{ .Release.Namespace }}'
-  - '{{ include "soperator.name" . }}-webhook-service'
+  - '{{ include "soperator.fullname" . }}-webhook-service.{{ .Release.Namespace }}.svc.{{ .Values.kubernetesClusterDomain }}'
+  - '{{ include "soperator.fullname" . }}-webhook-service.{{ .Release.Namespace }}.svc'
+  - '{{ include "soperator.fullname" . }}-webhook-service.{{ .Release.Namespace }}'
+  - '{{ include "soperator.fullname" . }}-webhook-service'
   issuerRef:
     kind: Issuer
-    name: '{{ include "soperator.name" . }}-selfsigned-issuer'
+    name: '{{ include "soperator.fullname" . }}-selfsigned-issuer'
   secretName: webhook-server-cert
 {{- end }}
