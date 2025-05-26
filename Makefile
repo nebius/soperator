@@ -291,11 +291,7 @@ endif
 ifndef DOCKERFILE
 	$(error DOCKERFILE is not set, docker image cannot be built)
 endif
-ifeq ($(filter ${IMAGE_NAME},slurm-operator rebooter soperatorchecks sconfigcontroller),${IMAGE_NAME})
-	docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} ${DOCKER_BUILD_PLATFORM} -f ${DOCKERFILE} ${DOCKER_OUTPUT} .
-else
-	cd images && docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} ${DOCKER_BUILD_PLATFORM} -f ${DOCKERFILE} ${DOCKER_OUTPUT} .
-endif
+	docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} ${DOCKER_BUILD_PLATFORM} -f images/${DOCKERFILE} ${DOCKER_OUTPUT} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image

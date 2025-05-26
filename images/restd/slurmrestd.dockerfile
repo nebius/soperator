@@ -49,6 +49,6 @@ RUN apt-get update && \
 EXPOSE 6820
 
 # Copy & run the entrypoint script
-COPY restd/slurmrestd_entrypoint.sh /opt/bin/slurm/
+COPY images/restd/slurmrestd_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/slurmrestd_entrypoint.sh
 ENTRYPOINT ["/opt/bin/slurm/slurmrestd_entrypoint.sh"]

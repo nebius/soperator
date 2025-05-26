@@ -10,11 +10,11 @@ ARG GOOS=linux
 
 WORKDIR /app
 
-COPY worker/gpubench/go.mod worker/gpubench/go.sum ./
+COPY images/worker/gpubench/go.mod images/worker/gpubench/go.sum ./
 
 RUN go mod download
 
-COPY worker/gpubench/main.go .
+COPY images/worker/gpubench/main.go .
 
 RUN GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
     go build -o gpubench .
@@ -76,7 +76,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install OpenMPI
-COPY common/scripts/install_openmpi.sh /opt/bin/
+COPY images/common/scripts/install_openmpi.sh /opt/bin/
 RUN chmod +x /opt/bin/install_openmpi.sh && \
     /opt/bin/install_openmpi.sh && \
     rm /opt/bin/install_openmpi.sh
@@ -99,8 +99,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install slurm сhroot plugin
-COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
-COPY common/scripts/install_chroot_plugin.sh /opt/bin/
+COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
+COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
     /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
@@ -112,13 +112,13 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install enroot
-COPY common/scripts/install_enroot.sh /opt/bin/
+COPY images/common/scripts/install_enroot.sh /opt/bin/
 RUN chmod +x /opt/bin/install_enroot.sh && \
     /opt/bin/install_enroot.sh && \
     rm /opt/bin/install_enroot.sh
 
 # Copy enroot configuration
-COPY common/enroot/enroot.conf /etc/enroot/
+COPY images/common/enroot/enroot.conf /etc/enroot/
 RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
 
 # Install slurm pyxis plugin
@@ -128,31 +128,31 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install nvidia-container-toolkit
-COPY common/scripts/install_container_toolkit.sh /opt/bin/
+COPY images/common/scripts/install_container_toolkit.sh /opt/bin/
 RUN chmod +x /opt/bin/install_container_toolkit.sh && \
     /opt/bin/install_container_toolkit.sh && \
     rm /opt/bin/install_container_toolkit.sh
 
 # Copy NVIDIA Container Toolkit config
-COPY common/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
+COPY images/common/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
 
 # Install Docker
-COPY common/scripts/install_docker.sh /opt/bin/
+COPY images/common/scripts/install_docker.sh /opt/bin/
 RUN chmod +x /opt/bin/install_docker.sh && \
     /opt/bin/install_docker.sh && \
     rm /opt/bin/install_docker.sh
 
 # Copy Docker daemon config
-COPY worker/docker/daemon.json /etc/docker/daemon.json
+COPY images/worker/docker/daemon.json /etc/docker/daemon.json
 
 # Copy GPU healthcheck script
-COPY worker/scripts/gpu_healthcheck.sh /usr/bin/gpu_healthcheck.sh
+COPY images/worker/scripts/gpu_healthcheck.sh /usr/bin/gpu_healthcheck.sh
 
 # Copy script for complementing jail filesystem in runtime
-COPY common/scripts/complement_jail.sh /opt/bin/slurm/
+COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
 
 # Copy script for bind-mounting slurm into the jail
-COPY common/scripts/bind_slurm_common.sh /opt/bin/slurm/
+COPY images/common/scripts/bind_slurm_common.sh /opt/bin/slurm/
 
 RUN chmod +x /usr/bin/gpu_healthcheck.sh && \
     chmod +x /opt/bin/slurm/complement_jail.sh && \
@@ -180,10 +180,10 @@ RUN mkdir -p /var/log/slurm/multilog && \
     ln -s /var/log/slurm/multilog/current /var/log/slurm/slurmd.log
 
 # Copy slurmd entrypoint script
-COPY worker/slurmd_entrypoint.sh /opt/bin/slurm/
+COPY images/worker/slurmd_entrypoint.sh /opt/bin/slurm/
 
 # Copy supervisord entrypoint script
-COPY worker/supervisord_entrypoint.sh /opt/bin/slurm/
+COPY images/worker/supervisord_entrypoint.sh /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh && \
     chmod +x /opt/bin/slurm/supervisord_entrypoint.sh

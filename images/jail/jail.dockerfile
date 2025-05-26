@@ -66,7 +66,7 @@ RUN apt update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY jail/pin_packages/cuda-pins /etc/apt/preferences.d/
+COPY images/jail/pin_packages/cuda-pins /etc/apt/preferences.d/
 RUN apt update
 
 RUN apt-mark hold \
@@ -160,7 +160,7 @@ RUN apt update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install python
-COPY common/scripts/install_python.sh /opt/bin/
+COPY images/common/scripts/install_python.sh /opt/bin/
 RUN chmod +x /opt/bin/install_python.sh && \
     /opt/bin/install_python.sh && \
     rm /opt/bin/install_python.sh
@@ -172,7 +172,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install OpenMPI
-COPY common/scripts/install_openmpi.sh /opt/bin/
+COPY images/common/scripts/install_openmpi.sh /opt/bin/
 RUN chmod +x /opt/bin/install_openmpi.sh && \
     /opt/bin/install_openmpi.sh && \
     rm /opt/bin/install_openmpi.sh
@@ -191,13 +191,13 @@ RUN apt-get update && \
 RUN mkdir -m 755 -p /var/spool/slurmd
 
 # Install nvidia-container-toolkit
-COPY common/scripts/install_container_toolkit.sh /opt/bin/
+COPY images/common/scripts/install_container_toolkit.sh /opt/bin/
 RUN chmod +x /opt/bin/install_container_toolkit.sh && \
     /opt/bin/install_container_toolkit.sh && \
     rm /opt/bin/install_container_toolkit.sh
 
 # Copy NVIDIA Container Toolkit config
-COPY common/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
+COPY images/common/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
 
 # Install nvtop GPU monitoring utility
 RUN add-apt-repository ppa:flexiondotorg/nvtop && \
@@ -223,30 +223,30 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install AWS CLI
-COPY common/scripts/install_awscli.sh /opt/bin/
+COPY images/common/scripts/install_awscli.sh /opt/bin/
 RUN chmod +x /opt/bin/install_awscli.sh && \
     /opt/bin/install_awscli.sh && \
     rm /opt/bin/install_awscli.sh
 
 # Install Rclone
-COPY common/scripts/install_rclone.sh /opt/bin/
+COPY images/common/scripts/install_rclone.sh /opt/bin/
 RUN chmod +x /opt/bin/install_rclone.sh && \
     /opt/bin/install_rclone.sh && \
     rm /opt/bin/install_rclone.sh
 
 # Install Docker CLI
-COPY common/scripts/install_docker_cli.sh /opt/bin/
+COPY images/common/scripts/install_docker_cli.sh /opt/bin/
 RUN chmod +x /opt/bin/install_docker_cli.sh && \
     /opt/bin/install_docker_cli.sh && \
     rm /opt/bin/install_docker_cli.sh
 
 # Replace the real Docker CLI with a wrapper script
 RUN mv /usr/bin/docker /usr/bin/docker.real
-COPY jail/scripts/docker.sh /usr/bin/docker
+COPY images/jail/scripts/docker.sh /usr/bin/docker
 RUN chmod +x /usr/bin/docker
 
 # Create a wrapper script for nvidia-smi that shows running processes (in the host's PID namespace)
-COPY jail/scripts/nvidia_smi_hostpid.sh /usr/bin/nvidia-smi-hostpid
+COPY images/jail/scripts/nvidia_smi_hostpid.sh /usr/bin/nvidia-smi-hostpid
 RUN chmod +x /usr/bin/nvidia-smi-hostpid
 
 # Create directory for pivoting host's root
@@ -254,14 +254,14 @@ RUN mkdir -m 555 /mnt/host
 
 # Copy initial users
 RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
-COPY jail/init-users/* /etc/
+COPY images/jail/init-users/* /etc/
 RUN chmod 644 /etc/passwd /etc/group && chown 0:0 /etc/passwd /etc/group && \
     chmod 640 /etc/shadow /etc/gshadow && chown 0:42 /etc/shadow /etc/gshadow && \
     chmod 440 /etc/sudoers && chown 0:0 /etc/sudoers
 
 # Setup the default $HOME directory content
 RUN rm -rf -- /etc/skel/..?* /etc/skel/.[!.]* /etc/skel/*
-COPY jail/skel/ /etc/skel/
+COPY images/jail/skel/ /etc/skel/
 RUN chmod 755 /etc/skel/.slurm && \
     chmod 644 /etc/skel/.slurm/defaults && \
     chmod 644 /etc/skel/.bash_logout && \
@@ -276,12 +276,12 @@ RUN rm -rf -- /root/..?* /root/.[!.]* /root/* && \
     cp -a /etc/skel/. /root/
 
 # Copy screateuser utility script
-COPY jail/scripts/screateuser.sh /usr/bin/screateuser
+COPY images/jail/scripts/screateuser.sh /usr/bin/screateuser
 RUN chmod +x /usr/bin/screateuser
 
 # Replace SSH "message of the day" scripts
 RUN rm -rf /etc/update-motd.d/*
-COPY jail/motd/ /etc/update-motd.d/
+COPY images/jail/motd/ /etc/update-motd.d/
 RUN chmod +x /etc/update-motd.d/*
 
 # Update linker cache
