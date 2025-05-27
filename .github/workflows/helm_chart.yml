@@ -52,6 +52,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
+      - name: Cache go modules
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod') }}
+          restore-keys: |
+            go-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install GO
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: 'go.mod'
+          cache: false
+
       - name: Run make sync-version-from-scratch # Every time we should have only stable version in our code. So UNSTABLE=false here
         run: |
           make sync-version-from-scratch UNSTABLE=false
