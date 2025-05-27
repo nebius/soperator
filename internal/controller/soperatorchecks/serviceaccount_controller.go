@@ -75,8 +75,7 @@ func (r *ServiceAccountReconciler) SetupWithManager(
 					return false
 				},
 				UpdateFunc: func(e event.UpdateEvent) bool {
-					// only reconceile ifthe generation changed - spec updates
-					return e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration()
+					return false
 				},
 				GenericFunc: func(e event.GenericEvent) bool {
 					return false
@@ -112,10 +111,6 @@ func (r *ServiceAccountReconciler) Reconcile(
 		}
 		logger.Error(err, "Failed to get ActiveCheck")
 		return ctrl.Result{}, err
-	}
-
-	if !check.DeletionTimestamp.IsZero() {
-		return ctrl.Result{}, nil
 	}
 
 	cluster := &slurmv1.SlurmCluster{}
