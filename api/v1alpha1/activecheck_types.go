@@ -169,12 +169,9 @@ type ActiveCheckSlurmJobsStatus struct {
 
 // ActiveCheckStatus defines the observed state of ActiveCheck.
 type ActiveCheckStatus struct {
-	StatusMetadata `json:",inline"`
-	K8sJobsStatus  ActiveCheckK8sJobsStatus `json:"k8sJobsStatus,omitempty"`
+	StatusMetadata  `json:",inline"`
+	K8sJobsStatus   ActiveCheckK8sJobsStatus   `json:"k8sJobsStatus,omitempty"`
 	SlurmJobsStatus ActiveCheckSlurmJobsStatus `json:"slurmJobsStatus,omitempty"`
-
-	// +kubebuilder:default=false
-	ServiceAccountReady bool `json:"serviceAccountReady,omitempty"`
 }
 
 // +kubebuilder:object:root=true

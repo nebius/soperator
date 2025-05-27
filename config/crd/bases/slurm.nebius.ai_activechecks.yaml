@@ -7192,9 +7192,6 @@ spec:
               reason:
                 description: Reason defines human readable error reason
                 type: string
-              serviceAccountReady:
-                default: false
-                type: boolean
               slurmJobsStatus:
                 description: ActiveCheckSlurmJobsStatus defines the observed state
                   of ActiveCheck slurm jobs.
