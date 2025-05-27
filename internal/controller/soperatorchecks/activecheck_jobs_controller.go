@@ -2,6 +2,7 @@ package soperatorchecks
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -12,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"nebius.ai/slurm-operator/internal/slurmapi"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,6 +34,7 @@ var (
 
 type ActiveCheckJobReconciler struct {
 	*reconciler.Reconciler
+	slurmAPIClients  *slurmapi.ClientSet
 	reconcileTimeout time.Duration
 }
 
@@ -39,12 +42,14 @@ func NewActiveCheckJobController(
 	client client.Client,
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
+	slurmAPIClients *slurmapi.ClientSet,
 	reconcileTimeout time.Duration,
 ) *ActiveCheckJobReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
 	return &ActiveCheckJobReconciler{
 		Reconciler:       r,
+		slurmAPIClients:  slurmAPIClients,
 		reconcileTimeout: reconcileTimeout,
 	}
 }
@@ -145,34 +150,94 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 
-	newStatus := slurmv1alpha1.ActiveCheckK8sJobsStatus{
-		LastK8sJobScheduleTime:   cronJob.Status.LastScheduleTime,
-		LastK8sJobSuccessfulTime: cronJob.Status.LastSuccessfulTime,
+	if activeCheck.Spec.CheckType == "slurmJob" {
+		slurmClusterName := types.NamespacedName{
+			Namespace: req.Namespace,
+			Name:      activeCheck.Spec.SlurmClusterRefName,
+		}
+		slurmAPIClient, found := r.slurmAPIClients.GetClient(slurmClusterName)
+		if !found {
+			logger.Error(err, "failed to get slurm api client")
+			return ctrl.Result{}, fmt.Errorf("slurm cluster %v not found", slurmClusterName)
+		}
 
-		LastK8sJobName:   k8sJob.Name,
-		LastK8sJobStatus: getK8sJobStatus(k8sJob),
-	}
+		slurmJobID, ok := k8sJob.Annotations["slurm-job-id"]
+		if !ok {
+			logger.Error(err, "failed to get slurm job id")
+			return ctrl.Result{}, err
+		}
 
-	newStatusCopy := newStatus.DeepCopy()
-	currentStatusCopy := activeCheck.Status.K8sJobsStatus.DeepCopy()
-	newStatusCopy.LastTransitionTime = metav1.Time{}
-	currentStatusCopy.LastTransitionTime = metav1.Time{}
+		slurmJobState, err := slurmAPIClient.GetJobStatus(ctx, slurmJobID)
+		if err != nil {
+			logger.Error(err, "failed to get slurm job status")
+			return ctrl.Result{}, err
+		}
 
-	if *newStatusCopy == *currentStatusCopy {
-		logger.Info("Reconciled ActiveCheckJob, no update were made")
-		return ctrl.Result{}, nil
-	}
+		if !slurmJobState.IsTerminateState {
+			return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
+		}
 
-	newStatus.LastTransitionTime = metav1.Now()
-	activeCheck.Status.K8sJobsStatus = newStatus
+		newStatus := slurmv1alpha1.ActiveCheckSlurmJobsStatus{
+			LastJobId:          slurmJobState.Id,
+			LastJobName:        slurmJobState.Name,
+			LastJobState:       slurmJobState.State,
+			LastJobStateReason: slurmJobState.StateReason,
+			LastJobSubmitTime:  slurmJobState.SubmitTime,
+			LastJobStartTime:   slurmJobState.StartTime,
+			LastJobEndTime:     slurmJobState.EndTime,
+		}
 
-	logger = logger.WithValues(logfield.ResourceKV(activeCheck)...)
-	logger.V(1).Info("Rendered")
+		newStatusCopy := newStatus.DeepCopy()
+		currentStatusCopy := activeCheck.Status.SlurmJobsStatus.DeepCopy()
+		newStatusCopy.LastTransitionTime = metav1.Time{}
+		currentStatusCopy.LastTransitionTime = metav1.Time{}
 
-	err = r.Status().Update(ctx, activeCheck)
-	if err != nil {
-		logger.Error(err, "Failed to reconcile ActiveCheckJob")
-		return ctrl.Result{}, errors.Wrap(err, "reconciling ActiveCheckJob")
+		if *newStatusCopy == *currentStatusCopy {
+			logger.Info("Reconciled ActiveCheckJob, no update were made")
+			return ctrl.Result{}, nil
+		}
+
+		newStatus.LastTransitionTime = metav1.Now()
+		activeCheck.Status.SlurmJobsStatus = newStatus
+
+		logger = logger.WithValues(logfield.ResourceKV(activeCheck)...)
+		logger.V(1).Info("Rendered")
+
+		err = r.Status().Update(ctx, activeCheck)
+		if err != nil {
+			logger.Error(err, "Failed to reconcile ActiveCheckJob")
+			return ctrl.Result{}, errors.Wrap(err, "reconciling ActiveCheckJob")
+		}
+	} else if activeCheck.Spec.CheckType == "k8sJob" {
+		newStatus := slurmv1alpha1.ActiveCheckK8sJobsStatus{
+			LastJobScheduleTime:   cronJob.Status.LastScheduleTime,
+			LastJobSuccessfulTime: cronJob.Status.LastSuccessfulTime,
+
+			LastJobName:   k8sJob.Name,
+			LastJobStatus: getK8sJobStatus(k8sJob),
+		}
+
+		newStatusCopy := newStatus.DeepCopy()
+		currentStatusCopy := activeCheck.Status.K8sJobsStatus.DeepCopy()
+		newStatusCopy.LastTransitionTime = metav1.Time{}
+		currentStatusCopy.LastTransitionTime = metav1.Time{}
+
+		if *newStatusCopy == *currentStatusCopy {
+			logger.Info("Reconciled ActiveCheckJob, no update were made")
+			return ctrl.Result{}, nil
+		}
+
+		newStatus.LastTransitionTime = metav1.Now()
+		activeCheck.Status.K8sJobsStatus = newStatus
+
+		logger = logger.WithValues(logfield.ResourceKV(activeCheck)...)
+		logger.V(1).Info("Rendered")
+
+		err = r.Status().Update(ctx, activeCheck)
+		if err != nil {
+			logger.Error(err, "Failed to reconcile ActiveCheckJob")
+			return ctrl.Result{}, errors.Wrap(err, "reconciling ActiveCheckJob")
+		}
 	}
 
 	logger.Info("Reconciled ActiveCheckJob")

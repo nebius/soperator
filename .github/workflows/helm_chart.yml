@@ -51,7 +51,20 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-     
+
+      - name: Run make sync-version-from-scratch # Every time we should have only stable version in our code. So UNSTABLE=false here
+        run: |
+          make sync-version-from-scratch UNSTABLE=false
+
+      - name: Check for uncommitted changes
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "❌ Uncommitted changes detected after make sync-version-from-scratch"
+            git status --porcelain
+            git diff
+            exit 1
+          fi
+  
       - name: Install Helm unittest plugin (if not exists)
         run: |
           if ! helm plugin list | grep -q unittest; then

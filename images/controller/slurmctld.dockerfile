@@ -65,6 +65,6 @@ RUN mkdir -p /var/log/slurm/multilog && \
     ln -s /var/log/slurm/multilog/current /var/log/slurm/slurmctld.log
 
 # Copy & run the entrypoint script
-COPY controller/slurmctld_entrypoint.sh /opt/bin/slurm/
+COPY images/controller/slurmctld_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/slurmctld_entrypoint.sh
 ENTRYPOINT ["/opt/bin/slurm/slurmctld_entrypoint.sh"]
