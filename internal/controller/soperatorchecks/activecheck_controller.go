@@ -7,9 +7,7 @@ import (
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -42,11 +40,6 @@ type ActiveCheckReconciler struct {
 
 	CronJob   *reconciler.CronJobReconciler
 	ConfigMap *reconciler.ConfigMapReconciler
-
-	// Added reconcilers from ServiceAccountReconciler
-	ServiceAccount *reconciler.ServiceAccountReconciler
-	Role           *reconciler.RoleReconciler
-	RoleBinding    *reconciler.RoleBindingReconciler
 }
 
 func NewActiveCheckController(
@@ -59,18 +52,11 @@ func NewActiveCheckController(
 	cronJobReconciler := reconciler.NewCronJobReconciler(r)
 	configMapReconciler := reconciler.NewConfigMapReconciler(r)
 
-	serviceAccountReconciler := reconciler.NewServiceAccountReconciler(r)
-	roleReconciler := reconciler.NewRoleReconciler(r)
-	roleBindingReconciler := reconciler.NewRoleBindingReconciler(r)
-
 	return &ActiveCheckReconciler{
 		Reconciler:       r,
 		reconcileTimeout: reconcileTimeout,
 		CronJob:          cronJobReconciler,
 		ConfigMap:        configMapReconciler,
-		ServiceAccount:   serviceAccountReconciler,
-		Role:             roleReconciler,
-		RoleBinding:      roleBindingReconciler,
 	}
 }
 
@@ -110,11 +96,6 @@ func (r *ActiveCheckReconciler) SetupWithManager(
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=activechecks/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=pods,verbs=get
-// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;patch
-// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile reconciles all resources necessary for active checks controller
 func (r *ActiveCheckReconciler) Reconcile(
@@ -136,10 +117,11 @@ func (r *ActiveCheckReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 
-	if !check.ObjectMeta.DeletionTimestamp.IsZero() {
+	if check.ObjectMeta.DeletionTimestamp.IsZero() == false {
 		if controllerutil.ContainsFinalizer(check, consts.ActiveCheckFinalizer) {
 			return r.reconcileDelete(ctx, check)
 		}
+
 		return ctrl.Result{}, nil
 	}
 
@@ -161,121 +143,60 @@ func (r *ActiveCheckReconciler) Reconcile(
 		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, errors.Wrap(err, "SlurmCluster resource not found")
 		}
+
 		logger.Error(err, "Failed to get SlurmCluster")
 		return ctrl.Result{}, errors.Wrap(err, "getting SlurmCluster")
 	}
 
-	reconcileImpl := func() error {
+	reconcileActiveChecksImpl := func() error {
 		return utils.ExecuteMultiStep(ctx,
 			"Reconciliation of active check",
 			utils.MultiStepExecutionStrategyFailAtFirstError,
 
 			utils.MultiStepExecutionStep{
-				Name: "Active check ServiceAccount",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling ServiceAccount")
-
-					desired := render.RenderServiceAccount(req.Namespace, check.Spec.SlurmClusterRefName)
-					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.V(1).Info("Rendered")
-
-					if err := r.ServiceAccount.Reconcile(stepCtx, slurmCluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling active check ServiceAccount")
-					}
-					stepLogger.V(1).Info("Reconciled")
-					return nil
-				},
-			},
-
-			utils.MultiStepExecutionStep{
-				Name: "Active check Role",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling Role")
-
-					desired := render.RenderRole(req.Namespace, check.Spec.SlurmClusterRefName)
-					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.V(1).Info("Rendered")
-
-					if err := r.Role.Reconcile(stepCtx, slurmCluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling active check Role")
-					}
-					stepLogger.V(1).Info("Reconciled")
-					return nil
-				},
-			},
-
-			utils.MultiStepExecutionStep{
-				Name: "Active check RoleBinding",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling RoleBinding")
-
-					desired := render.RenderRoleBinding(req.Namespace, check.Spec.SlurmClusterRefName)
-					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.V(1).Info("Rendered")
-
-					if err := r.RoleBinding.Reconcile(stepCtx, slurmCluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling active check RoleBinding")
-					}
-					stepLogger.V(1).Info("Reconciled")
-					return nil
-				},
-			},
-
-			utils.MultiStepExecutionStep{
-				Name: "Active check ConfigMap",
-				Func: func(stepCtx context.Context) error {
-					if check.Spec.SlurmJobSpec.SbatchScript == nil {
-						return nil
-					}
-
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling ConfigMap")
-
-					desired := render.RenderSbatchConfigMap(
-						check.Spec.Name,
-						check.Spec.SlurmClusterRefName,
-						check.Namespace,
-						*check.Spec.SlurmJobSpec.SbatchScript,
-					)
-					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.V(1).Info("Rendered")
-
-					if err := r.ConfigMap.Reconcile(stepCtx, slurmCluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling ActiveChecks sbatch script ConfigMap")
-					}
-					stepLogger.V(1).Info("Reconciled")
-					return nil
-				},
-			},
-
-			utils.MultiStepExecutionStep{
 				Name: "Active check CronJob",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling CronJob")
+					stepLogger.V(1).Info("Reconciling")
+
+					if check.Spec.SlurmJobSpec.SbatchScript != nil {
+						desired := render.RenderSbatchConfigMap(
+							check.Spec.Name,
+							check.Spec.SlurmClusterRefName,
+							check.Namespace,
+							*check.Spec.SlurmJobSpec.SbatchScript,
+						)
+						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+						stepLogger.V(1).Info("Rendered")
+
+						if err = r.ConfigMap.Reconcile(stepCtx, slurmCluster, &desired); err != nil {
+							stepLogger.Error(err, "Failed to reconcile")
+							return errors.Wrap(err, "reconciling ActiveChecks sbatch script ConfigMap")
+						}
+						stepLogger.V(1).Info("Reconciled")
+					}
 
 					var foundPodTemplate *corev1.PodTemplate
+
 					if check.Spec.PodTemplateNameRef != nil {
 						podTemplateName := *check.Spec.PodTemplateNameRef
+
 						foundPodTemplate = &corev1.PodTemplate{}
-						err := r.Get(stepCtx, types.NamespacedName{
-							Namespace: check.Namespace,
-							Name:      podTemplateName,
-						}, foundPodTemplate)
+						err := r.Get(
+							stepCtx,
+							types.NamespacedName{
+								Namespace: check.Namespace,
+								Name:      podTemplateName,
+							},
+							foundPodTemplate,
+						)
 						if err != nil {
 							stepLogger.Error(err, "Failed to get PodTemplate")
 							return errors.Wrap(err, "getting PodTemplate")
 						}
 					}
-
 					desired, err := render.RenderK8sCronJob(check, foundPodTemplate)
+
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
 						return errors.Wrap(err, "rendering Active check CronJob")
@@ -283,7 +204,7 @@ func (r *ActiveCheckReconciler) Reconcile(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err := r.CronJob.Reconcile(stepCtx, slurmCluster, &desired); err != nil {
+					if err = r.CronJob.Reconcile(stepCtx, slurmCluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling ActiveChecks CronJob")
 					}
@@ -301,19 +222,19 @@ func (r *ActiveCheckReconciler) Reconcile(
 		)
 	}
 
-	if err := reconcileImpl(); err != nil {
-		logger.Error(err, "Failed to reconcile ActiveCheck")
-		return ctrl.Result{}, errors.Wrap(err, "reconciling ActiveCheck")
+	if err := reconcileActiveChecksImpl(); err != nil {
+		logger.Error(err, "Failed to reconcile ActiveChecks")
+		return ctrl.Result{}, errors.Wrap(err, "reconciling ActiveChecks")
 	}
 
-	logger.Info("Reconciled ActiveCheck")
+	logger.Info("Reconciled ActiveChecks")
 	return ctrl.Result{}, nil
 }
 
 func (r *ActiveCheckReconciler) reconcileDelete(ctx context.Context, check *slurmv1alpha1.ActiveCheck) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithName("ActiveCheckController.reconcileDelete")
 
-	logger.Info("ActiveCheck is being deleted. Cleaning up resources")
+	logger.Info("ActiveCheck is being deleted. Cleaning up CronJob")
 	cronJob := &batchv1.CronJob{}
 	err := r.Get(ctx, types.NamespacedName{
 		Namespace: check.Namespace,
@@ -354,67 +275,12 @@ func (r *ActiveCheckReconciler) reconcileDelete(ctx context.Context, check *slur
 		}
 	}
 
-	clusterName := check.Spec.SlurmClusterRefName
-
-	otherCheckExists := false
-	checkList := &slurmv1alpha1.ActiveCheckList{}
-
-	if err := r.List(ctx, checkList, client.InNamespace(check.Namespace)); err != nil {
-		logger.Error(err, "Failed to list ActiveChecks from cache")
-		return ctrl.Result{}, err
-	}
-
-	for _, item := range checkList.Items {
-		if item.Name != check.Name &&
-			item.Spec.SlurmClusterRefName == clusterName &&
-			item.DeletionTimestamp.IsZero() {
-			otherCheckExists = true
-			break
-		}
-	}
-
-	if !otherCheckExists {
-		logger.Info("Last ActiveCheck in namespace. Deleting shared ServiceAccount resources")
-
-		resources := []client.Object{
-			&corev1.ServiceAccount{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      naming.BuildServiceAccountActiveCheckName(clusterName),
-					Namespace: check.Namespace,
-				},
-			},
-			&rbacv1.Role{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      naming.BuildRoleActiveCheckName(clusterName),
-					Namespace: check.Namespace,
-				},
-			},
-			&rbacv1.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      naming.BuildRoleBindingActiveCheckName(clusterName),
-					Namespace: check.Namespace,
-				},
-			},
-		}
-
-		for _, obj := range resources {
-			if err := r.Delete(ctx, obj); client.IgnoreNotFound(err) != nil {
-				logger.Error(err, "Failed to delete", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName())
-				return ctrl.Result{}, err
-			}
-			logger.Info("Deleted", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName())
-		}
-	} else {
-		logger.Info("Other ActiveChecks exist in namespace. Keeping shared ServiceAccount resources")
-	}
-
 	controllerutil.RemoveFinalizer(check, consts.ActiveCheckFinalizer)
 	if err := r.Update(ctx, check); err != nil {
 		logger.Error(err, "Failed to remove finalizer")
 		return ctrl.Result{}, err
 	}
 
-	logger.Info("Successfully cleaned up ActiveCheck resources")
 	return ctrl.Result{}, nil
 }
 
