@@ -18,8 +18,8 @@ func (_m *MockStore) EXPECT() *MockStore_Expecter {
 }
 
 // Add provides a mock function with given fields: name, content
-func (_m *MockStore) Add(name string, content string) error {
-	ret := _m.Called(name, content)
+func (_m *MockStore) Add(name, content, subPath string) error {
+	ret := _m.Called(name, content, subPath)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Add")
