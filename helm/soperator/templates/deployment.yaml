@@ -93,7 +93,7 @@ spec:
           | nindent 10 }}
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: {{ include "soperator.name" . }}-controller-manager
+      serviceAccountName: {{ include "soperator.fullname" . }}-controller-manager
       terminationGracePeriodSeconds: 10
       {{- if .Values.certManager.enabled }}
       volumes:
