@@ -17,14 +17,18 @@ func NewFileStore(path string) *FileStore {
 }
 
 func ensureDir(dirPath string) error {
-	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+	_, err := os.Stat(dirPath)
+	switch {
+	case err == nil:
+		return nil
+	case os.IsNotExist(err):
 		if err := os.MkdirAll(dirPath, 0755); err != nil {
 			return fmt.Errorf("create directory %q: %w", dirPath, err)
 		}
-	} else if err != nil {
+		return nil
+	default:
 		return fmt.Errorf("check directory %q: %w", dirPath, err)
 	}
-	return nil
 }
 
 func (s *FileStore) Add(name, content, subPath string) error {
