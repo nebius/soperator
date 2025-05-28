@@ -25,7 +25,6 @@ func TestFileStore_Add(t *testing.T) {
 			path:        tempDir,
 			fileName:    "testfile.txt",
 			content:     "content",
-			subPath:     "",
 			expectError: false,
 		},
 		{
@@ -33,14 +32,13 @@ func TestFileStore_Add(t *testing.T) {
 			path:        "/invalid/path",
 			fileName:    "testfile.txt",
 			content:     "content",
-			subPath:     "/kek",
 			expectError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fs := NewFileStore(tt.path + tt.subPath)
+			fs := NewFileStore(tt.path)
 			err := fs.Add(tt.fileName, tt.content, tt.subPath)
 
 			if tt.expectError {

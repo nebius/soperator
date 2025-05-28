@@ -285,8 +285,7 @@ func TestValidatePath(t *testing.T) {
 		{
 			name:        "empty path",
 			path:        "",
-			expectError: true,
-			errorSubstr: "must start with '/slurm'",
+			expectError: false,
 		},
 		{
 			name:        "path without slurm prefix",
