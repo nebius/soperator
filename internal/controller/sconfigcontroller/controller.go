@@ -130,6 +130,8 @@ func NewController(
 
 func validatePath(path string) error {
 	switch {
+	case path == "":
+		return nil
 	case !strings.HasPrefix(path, "/slurm"):
 		return fmt.Errorf("invalid path %q: must start with '/slurm'", path)
 	case strings.Contains(path, "/..") || strings.HasPrefix(path, "../"):
