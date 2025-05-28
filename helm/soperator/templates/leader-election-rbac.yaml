@@ -55,5 +55,5 @@ roleRef:
   name: '{{ include "soperator.fullname" . }}-leader-election-role'
 subjects:
 - kind: ServiceAccount
-  name: '{{ include "soperator.fullname" . }}-controller-manager'
+  name: '{{ include "soperator.fullname" . }}-manager'
   namespace: '{{ .Release.Namespace }}'
