@@ -83,7 +83,8 @@ func (r *ControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	subPath, ok := configMap.Annotations[consts.AnnotationSConfigControllerSourceKey]
 	if !ok {
 		subPath = ""
-	} else if err := validatePath(subPath); err != nil {
+	}
+	if err := validatePath(subPath); err != nil {
 		logger.V(1).Error(err, "Invalid path in ConfigMap annotations", "path", subPath)
 		return ctrl.Result{}, fmt.Errorf("invalid path %q in ConfigMap annotations: %w", subPath, err)
 	}
