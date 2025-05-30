@@ -66,7 +66,11 @@ typedef struct {
 } snccld_state_t;
 
 static inline snccld_state_t *snccld_state_new(void) {
-    return malloc(sizeof(snccld_state_t));
+    snccld_state_t *res = malloc(sizeof(snccld_state_t));
+    res->fifo_path[0]   = '\0';
+    res->log_path[0]    = '\0';
+    res->tee_pid        = -1;
+    return res;
 }
 
 static inline size_t snccld_state_file_size(void) {
@@ -122,13 +126,8 @@ static spank_err_t
 snccld_state_write(const snccld_state_key_t *key, const snccld_state_t *state) {
     char *path = snccld_key_to_state_file_path(key);
 
-    const int fd = open(path, O_CREAT | O_EXCL | O_WRONLY, SNCCLD_DEFAULT_MODE);
+    const int fd = open(path, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE);
     if (fd < 0) {
-        if (errno == EEXIST) {
-            // Another process already wrote the state - do nothing.
-            return ESPANK_SUCCESS;
-        }
-
         slurm_error("%s: Cannot open %s: %m", SNCCLD_LOG_PREFIX, path);
         free(path);
         return ESPANK_ERROR;
