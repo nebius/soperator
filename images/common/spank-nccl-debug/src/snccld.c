@@ -142,7 +142,7 @@ static void snccld_run_named_pipe_reading_process(
     snccld_state_t *state, const bool user_set_debug_file, char *user_debug_file
 ) {
     // Build shell command: <SHELL> -c '<COMMAND>'
-    char *sh_argv[3];
+    char *sh_argv[4];
     int   sh_idx = 0;
 
     // Choose shell.
@@ -260,8 +260,8 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG, snccld_config.log_level, 1);
 
     // Check if user set debug file.
-    static char user_debug_file[PATH_MAX] = "";
-    bool        user_set_debug_file =
+    char user_debug_file[PATH_MAX] = "";
+    bool user_set_debug_file =
         (spank_getenv(
              spank,
              SNCCLD_NCCL_ENV_DEBUG_FILE,
@@ -351,23 +351,101 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         return ESPANK_ERROR;
     }
 
-    slurm_spank_log(
-        "%s: Setting %s=%s",
-        SNCCLD_LOG_PREFIX,
-        SNCCLD_NCCL_ENV_DEBUG_FILE,
-        state->fifo_path
-    );
-    spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG_FILE, state->fifo_path, 1);
+    if (snccld_state_write(key, state) != ESPANK_SUCCESS) {
+        free(key);
+        free(state);
+        return ESPANK_ERROR;
+    }
 
-    // Create separate process to distribute logs from the named pipe.
-    pid_t tee_pid = fork();
+    char *str = snccld_state_to_string(state);
+    slurm_spank_log("%s: State: \n%s", SNCCLD_LOG_PREFIX, str);
+    free(str);
+
+    free(key);
+    free(state);
+
+    return ESPANK_SUCCESS;
+}
+
+int slurm_spank_task_init(spank_t spank, int argc, char **argv) {
+    log_context("task_init", spank);
+
+    if (spank_context() != S_CTX_REMOTE) {
+        return ESPANK_SUCCESS;
+    }
+
+    slurm_spank_log(
+        "%s: Config:\n"
+        "\t" SNCCLD_ARG_ENABLED ": %s\n"
+        "\t" SNCCLD_ARG_LOG_LEVEL ": %s\n"
+        "\t" SNCCLD_ARG_OUT_DIR ": %s\n"
+        "\t" SNCCLD_ARG_OUT_FILE ": %s\n"
+        "\t" SNCCLD_ARG_OUT_STDOUT ": %s",
+        SNCCLD_LOG_PREFIX,
+        snccld_config.enabled ? "true" : "false",
+        snccld_config.log_level,
+        snccld_config.out_dir,
+        snccld_config.out_file ? "true" : "false",
+        snccld_config.out_stdout ? "true" : "false"
+    );
+
+    if (!snccld_config.enabled) {
+        return ESPANK_SUCCESS;
+    }
+
+    snccld_state_key_t *key = snccld_key_new();
+    if (snccld_key_get_from(spank, key) != ESPANK_SUCCESS ||
+        key->step_id == SLURM_BATCH_SCRIPT) {
+        free(key);
+        return ESPANK_SUCCESS;
+    }
+
+    snccld_state_t *state = snccld_state_read(key);
+    if (state == NULL) {
+        free(key);
+        return ESPANK_ERROR;
+    }
+
+    char *str = snccld_state_to_string(state);
+    slurm_spank_log("%s: State: \n%s", SNCCLD_LOG_PREFIX, str);
+    free(str);
+
+    // Forking fan-out process is not needed
+    // if named pipe is not created,
+    // or it's already forked.
+    slurm_spank_log(
+        "%s: FIFO path len: %lu", SNCCLD_LOG_PREFIX, strlen(state->fifo_path)
+    );
+    slurm_spank_log("%s: Tee PID: %d", SNCCLD_LOG_PREFIX, state->tee_pid);
+    if (strlen(state->fifo_path) <= 0 || state->tee_pid > 0) {
+        slurm_spank_log(
+            "%s: Forking fan-out process is not needed.", SNCCLD_LOG_PREFIX
+        );
+        free(key);
+        free(state);
+        return ESPANK_SUCCESS;
+    }
+
+    char user_debug_file[PATH_MAX] = "";
+    bool user_set_debug_file =
+        (spank_getenv(
+             spank,
+             SNCCLD_NCCL_ENV_DEBUG_FILE,
+             user_debug_file,
+             sizeof(user_debug_file)
+         ) == ESPANK_SUCCESS);
+    slurm_spank_log(
+        "%s: user_set_debug_file =%u", SNCCLD_LOG_PREFIX, user_set_debug_file
+    );
+
+    // Create separate process to fan out logs from the named pipe.
+    const pid_t tee_pid = fork();
     if (tee_pid < 0) {
         // Forking failed.
         slurm_error(
             "%s: Cannot create named pipe reading process: %m",
             SNCCLD_LOG_PREFIX
         );
-        unlink(state->fifo_path);
         free(key);
         free(state);
         return ESPANK_ERROR;
@@ -380,6 +458,15 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         // We're in main process -> tee_pid is a pid of the forked process.
         state->tee_pid = tee_pid;
     }
+    slurm_spank_log("%s: Tee PID: %d", SNCCLD_LOG_PREFIX, state->tee_pid);
+
+    slurm_spank_log(
+        "%s: Setting %s=%s",
+        SNCCLD_LOG_PREFIX,
+        SNCCLD_NCCL_ENV_DEBUG_FILE,
+        state->fifo_path
+    );
+    spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG_FILE, state->fifo_path, 1);
 
     if (snccld_state_write(key, state) != ESPANK_SUCCESS) {
         free(key);
@@ -387,7 +474,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         return ESPANK_ERROR;
     }
 
-    char *str = snccld_state_to_string(state);
+    str = snccld_state_to_string(state);
     slurm_spank_log("%s: State: \n%s", SNCCLD_LOG_PREFIX, str);
     free(str);
 
@@ -440,7 +527,7 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
     slurm_spank_log("%s: State: \n%s", SNCCLD_LOG_PREFIX, str);
     free(str);
 
-    // Kill process reading from named pipe if exists.
+    // Kill fan-out process if exists.
     if (state->tee_pid > 0) {
         slurm_spank_log(
             "%s: Killing named pipe reading process with pid %d.",
@@ -456,7 +543,7 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
     }
 
     // Remove named pipe if exists.
-    if (state->fifo_path) {
+    if (strlen(state->fifo_path) > 0) {
         slurm_spank_log(
             "%s: Removing named pipe '%s'.", SNCCLD_LOG_PREFIX, state->fifo_path
         );
