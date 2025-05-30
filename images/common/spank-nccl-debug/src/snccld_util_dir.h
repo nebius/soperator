@@ -20,7 +20,7 @@
  * @param mode Directory mode.
  * @return ESPANK_SUCCESS if directory was created. Otherwise, ESPANK_ERROR.
  */
-spank_err_t snccld_mkdir_p(const char *path, mode_t mode) {
+static spank_err_t snccld_mkdir_p(const char *path, mode_t mode) {
     char  tmp[PATH_MAX];
     char *p = NULL;
 

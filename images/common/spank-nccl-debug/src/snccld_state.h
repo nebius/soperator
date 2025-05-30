@@ -11,6 +11,7 @@
 #include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -121,8 +122,7 @@ static spank_err_t
 snccld_state_write(const snccld_state_key_t *key, const snccld_state_t *state) {
     char *path = snccld_key_to_state_file_path(key);
 
-    const int fd =
-        open(path, O_CREAT | O_EXCL | O_WRONLY, SNCCLD_DEFAULT_FIFO_MODE);
+    const int fd = open(path, O_CREAT | O_EXCL | O_WRONLY, SNCCLD_DEFAULT_MODE);
     if (fd < 0) {
         if (errno == EEXIST) {
             // Another process already wrote the state - do nothing.
