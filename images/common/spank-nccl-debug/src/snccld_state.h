@@ -30,12 +30,12 @@ static inline snccld_state_key_t *snccld_key_new(void) {
 
 static spank_err_t snccld_key_get_from(spank_t spank, snccld_state_key_t *key) {
     if (spank_get_item(spank, S_JOB_ID, &key->job_id) != ESPANK_SUCCESS) {
-        slurm_error(SNCCLD_LOG_PREFIX "Failed to get Job ID");
+        slurm_error("%s: Failed to get Job ID", SNCCLD_LOG_PREFIX);
         return ESPANK_ERROR;
     }
 
     if (spank_get_item(spank, S_JOB_STEPID, &key->step_id) != ESPANK_SUCCESS) {
-        slurm_error(SNCCLD_LOG_PREFIX "Failed to get Step ID");
+        slurm_error("%s: Failed to get Step ID", SNCCLD_LOG_PREFIX);
         return ESPANK_ERROR;
     }
 
@@ -49,7 +49,7 @@ static char *snccld_key_to_state_file_path(const snccld_state_key_t *key) {
     snprintf(
         res,
         buf_size,
-        "%s/%u-%u.%s",
+        SNCCLD_TEMPLATE_FILE_NAME,
         SNCCLD_DEFAULT_DIR,
         key->job_id,
         key->step_id,
@@ -129,13 +129,13 @@ snccld_state_write(const snccld_state_key_t *key, const snccld_state_t *state) {
             return ESPANK_SUCCESS;
         }
 
-        slurm_error(SNCCLD_LOG_PREFIX "Cannot open %s: %m", path);
+        slurm_error("%s: Cannot open %s: %m", SNCCLD_LOG_PREFIX, path);
         free(path);
         return ESPANK_ERROR;
     }
 
     if (flock(fd, LOCK_EX) != 0) {
-        slurm_error(SNCCLD_LOG_PREFIX "Cannot flock %s: %m", path);
+        slurm_error("%s: Cannot flock %s: %m", SNCCLD_LOG_PREFIX, path);
         close(fd);
         free(path);
         return ESPANK_ERROR;
@@ -147,7 +147,7 @@ snccld_state_write(const snccld_state_key_t *key, const snccld_state_t *state) {
     free(state_string);
 
     if (flock(fd, LOCK_UN) != 0) {
-        slurm_error(SNCCLD_LOG_PREFIX "Cannot unflock %s: %m", path);
+        slurm_error("%s: Cannot unflock %s: %m", SNCCLD_LOG_PREFIX, path);
         close(fd);
         free(path);
         return ESPANK_ERROR;
@@ -165,13 +165,13 @@ static snccld_state_t *snccld_state_read(const snccld_state_key_t *key) {
 
     const int fd = open(path, O_RDONLY);
     if (fd < 0) {
-        slurm_error(SNCCLD_LOG_PREFIX "Cannot open %s: %m", path);
+        slurm_error("%s: Cannot open %s: %m", SNCCLD_LOG_PREFIX, path);
         free(path);
         return NULL;
     }
 
     if (flock(fd, LOCK_SH) != 0) {
-        slurm_error(SNCCLD_LOG_PREFIX "Cannot flock %s: %m", path);
+        slurm_error("%s: Cannot flock %s: %m", SNCCLD_LOG_PREFIX, path);
         close(fd);
         free(path);
         return NULL;
@@ -184,11 +184,13 @@ static snccld_state_t *snccld_state_read(const snccld_state_key_t *key) {
     res = snccld_state_from_string(state_string);
     free(state_string);
     if (res == NULL) {
-        slurm_error(SNCCLD_LOG_PREFIX "Cannot read state from %s: %m", path);
+        slurm_error(
+            "%s: Cannot read state from %s: %m", SNCCLD_LOG_PREFIX, path
+        );
     }
 
     if (flock(fd, LOCK_UN) != 0) {
-        slurm_error(SNCCLD_LOG_PREFIX "Cannot unflock %s: %m", path);
+        slurm_error("%s: Cannot unflock %s: %m", SNCCLD_LOG_PREFIX, path);
         close(fd);
         free(path);
         return res;
@@ -214,7 +216,7 @@ static spank_err_t snccld_state_cleanup(snccld_state_key_t *key) {
         return ESPANK_SUCCESS;
     }
 
-    slurm_error(SNCCLD_LOG_PREFIX "Cannot remove %s: %m", path);
+    slurm_error("%s: Cannot remove '%s': %m", SNCCLD_LOG_PREFIX, path);
     free(path);
 
     return ESPANK_ERROR;

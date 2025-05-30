@@ -74,7 +74,8 @@ void log_context(const char *func_name, spank_t spank) {
     spank_get_item(spank, S_TASK_PID, &task_pid);
 
     slurm_spank_log(
-        SNCCLD_LOG_PREFIX "%s\t%s\t%d\t%s\t%d\t%s\t%u\t%u\t%d",
+        "%s: %s\t%s\t%d\t%s\t%d\t%s\t%u\t%u\t%d",
+        SNCCLD_LOG_PREFIX,
         func_name,
         context,
         pid,
@@ -436,7 +437,7 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
     }
 
     char *str = snccld_state_to_string(state);
-    slurm_spank_log(SNCCLD_LOG_PREFIX "state: %s", str);
+    slurm_spank_log("%s: State: \n%s", SNCCLD_LOG_PREFIX, str);
     free(str);
 
     // Kill process reading from named pipe if exists.
@@ -465,7 +466,7 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
     }
 
     str = snccld_state_to_string(state);
-    slurm_spank_log(SNCCLD_LOG_PREFIX "state: %s", str);
+    slurm_spank_log("%s: state: \n%s", SNCCLD_LOG_PREFIX, str);
     free(str);
 
     snccld_state_cleanup(key);
