@@ -258,6 +258,7 @@ sync-version: yq ## Sync versions from file
 	@echo 'Syncing helm/soperator-fluxcd/values.yaml'
 	@$(YQ) -i ".slurmCluster.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".soperator.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
+	@$(YQ) -i ".observability.dcgmExporter.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@# endregion helm/soperator-fluxcd/values.yaml
 
 	@# region internal/consts
