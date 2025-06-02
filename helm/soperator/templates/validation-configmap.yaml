@@ -1,0 +1,36 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ include "soperator.fullname" . }}-sconficontroller-path-validation
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - operations: ["CREATE", "UPDATE"]
+      apiGroups: [""]
+      apiVersions: ["v1"]
+      resources: ["configmaps"]
+  validations:
+  - expression: |
+      !has(object.metadata.annotations) || 
+      !('sconficontroller.slurm.nebius.ai/path' in object.metadata.annotations) ||
+      (
+        object.metadata.annotations['sconficontroller.slurm.nebius.ai/path'].startsWith('/slurm') &&
+        !object.metadata.annotations['sconficontroller.slurm.nebius.ai/path'].contains('/..') &&
+        !object.metadata.annotations['sconficontroller.slurm.nebius.ai/path'].contains('../')
+      )
+    message: "ConfigMap annotation 'sconficontroller.slurm.nebius.ai/path' must start with '/slurm' and cannot contain path traversal sequences ('/..' or '../')"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: {{ include "soperator.fullname" . }}-sconficontroller-path-validation-binding
+spec:
+  policyName: configmap-path-validation
+  validationActions: [Deny]
+  matchResources:
+    resourceRules:
+    - operations: ["CREATE", "UPDATE"]
+      apiGroups: [""]
+      apiVersions: ["v1"]
+      resources: ["configmaps"]
