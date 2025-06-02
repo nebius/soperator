@@ -218,6 +218,9 @@ jobs:
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=exporter DOCKERFILE=exporter/exporter.dockerfile
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=exporter
 
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperator-exporter DOCKERFILE=soperator-exporter/soperator-exporter.dockerfile
+          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperator-exporter
+
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd DOCKERFILE=restd/slurmrestd.dockerfile
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd
 
