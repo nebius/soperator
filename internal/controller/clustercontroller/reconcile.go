@@ -176,6 +176,7 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1.SlurmCluster) (ctrl.Result, error) {
+	// TODO: debug where logger comes from.
 	logger := log.FromContext(ctx)
 
 	{
@@ -252,6 +253,9 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 				return ctrl.Result{}, err
 			}
 			if err = r.ReconcileExporter(ctx, cluster, clusterValues); err != nil {
+				return ctrl.Result{}, err
+			}
+			if err = r.ReconcileSoperatorExporter(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
 

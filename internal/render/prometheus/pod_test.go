@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+
 	"nebius.ai/slurm-operator/internal/render/common"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
