@@ -21,8 +21,28 @@ partitionConfiguration:
   # configuration as list string started with PartitionName
   # Example for custom ConfigType:
   rawConfig: []
-#    - PartitionName=low_priority Nodes=worker-[0-15] Default=YES MaxTime=INFINITE State=UP PriorityTier=1
-#    - PartitionName=high_priority  Nodes=worker-[10-20] Default=NO MaxTime=INFINITE State=UP PriorityTier=2
+#    - PartitionName=low_priority Nodes=low_priority Default=YES MaxTime=INFINITE State=UP PriorityTier=1
+#    - PartitionName=high_priority  Nodes=high_priority Default=NO MaxTime=INFINITE State=UP PriorityTier=2
+# If Nodes present, they must not contain node names: use only nodeset values, "ALL" or "".
+# Specifying specific nodes is not supported since Dynamic Nodes are used.
+# For more details, see https://slurm.schedmd.com/dynamic_nodes.html#partitions.
+
+# List of features to be enabled on worker nodes. Each feature object has:
+# - name: (Required) The name of the feature.
+# - hostlist_expr: (Required) A Slurm hostlist expression, e.g. "workers-[0-2,10],workers-[3-5]".
+#   Soperator will run these workers with the feature name.
+# - nodeset_name: (Optional) The Slurm nodeset name to be provisioned using this feature.
+#   This nodeset may be used in conjunction with partitions.
+workerFeatures: []
+#  - name: "low_priority"
+#    hostlistExpr: "worker-[0-9]"
+#    nodesetName: "low_priority"
+#  - name: "high_priority"
+#    hostlistExpr: "worker-[10-12]"
+#    nodesetName: "high_priority"
+
+# HealthCheckConfig defines Slurm health check configuration.
+healthCheckConfig: null
 # K8s node filters used in Slurm node specifications. Define which nodes should be used to schedule pods to
 k8sNodeFilters:
   - name: gpu
@@ -50,20 +70,33 @@ k8sNodeFilters:
                   values:
                     - "node-group-id-here"
 # Sources for the volumes used in Slurm node specifications
+# You can use existing pvc or create via helm if `createPVC: true`
 volumeSources:
   - name: controller-spool
+    createPVC: false
+    storageClassName: ""
+    size: ""
     persistentVolumeClaim:
       claimName: "controller-spool-pvc"
       readOnly: false
   - name: jail
+    createPVC: false
+    storageClassName: ""
+    size: ""
     persistentVolumeClaim:
       claimName: "jail-pvc"
       readOnly: false
 #  - name: jail-snapshot
+#    createPVC: false
+#    storageClassName: ""
+#    size: ""
 #    persistentVolumeClaim:
 #      claimName: "jail-snapshot-pvc"
 #      readOnly: true
 #  - name: mlperf-sd
+#    createPVC: false
+#    storageClassName: ""
+#    size: ""
 #    persistentVolumeClaim:
 #      claimName: "jail-submount-mlperf-sd-pvc"
 #      readOnly: false
@@ -169,6 +202,8 @@ slurmNodes:
     slurmdbd:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      command: []
+      args: []
       port: 6819
       resources:
         cpu: "1000m"
@@ -181,6 +216,7 @@ slurmNodes:
         cpu: "1000m"
         memory: "1Gi"
         ephemeralStorage: "5Gi"
+    customInitContainers: []
     externalDB:
       enabled: false
       # host: ""
@@ -264,6 +300,8 @@ slurmNodes:
     slurmctld:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      command: []
+      args: []
       port: 6817
       resources:
         cpu: "1000m"
@@ -272,10 +310,13 @@ slurmNodes:
     munge:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      command: []
+      args: []
       resources:
         cpu: "1000m"
         memory: "1Gi"
         ephemeralStorage: "5Gi"
+    customInitContainers: []
     volumes:
       spool:
         volumeSourceName: "controller-spool"
@@ -291,10 +332,13 @@ slurmNodes:
     slurmNodeExtra: ""
     supervisordConfigMapRefName: ""
     sshdConfigMapRefName: ""
+    # workerAnnotations: []
     slurmd:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
       port: 6818
+      command: []
+      args: []
       resources:
         cpu: "156000m"
         memory: "1220Gi"
@@ -304,10 +348,13 @@ slurmNodes:
     munge:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      command: []
+      args: []
       resources:
         cpu: "2000m"
         memory: "4Gi"
         ephemeralStorage: "5Gi"
+    customInitContainers: []
     volumes:
       spool:
         volumeClaimTemplateSpec:
@@ -341,6 +388,8 @@ slurmNodes:
         cpu: "3000m"
         memory: "9Gi"
         ephemeralStorage: "30Gi"
+      command: []
+      args: []
     # Authorized keys required for SSH connection to Slurm login nodes
     sshRootPublicKeys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzxkjzPQ4EyZSjan4MLGFSA18idpZicoKW7Hfff username1"
@@ -357,10 +406,13 @@ slurmNodes:
     munge:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      command: []
+      args: []
       resources:
         cpu: "500m"
         memory: "500Mi"
         ephemeralStorage: "5Gi"
+    customInitContainers: []
     volumes:
       jail:
         volumeSourceName: "jail"
@@ -377,6 +429,8 @@ slurmNodes:
     exporter:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      command: []
+      args: []
       resources:
         cpu: "250m"
         memory: "256Mi"
@@ -384,10 +438,13 @@ slurmNodes:
     munge:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      command: []
+      args: []
       resources:
         cpu: "1000m"
         memory: "1Gi"
         ephemeralStorage: "5Gi"
+    customInitContainers: []
     volumes:
       jail:
         volumeSourceName: "jail"
@@ -398,10 +455,23 @@ slurmNodes:
     rest:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      command: []
+      args: []
       resources:
         cpu: "1000m"
         memory: "1Gi"
         ephemeralStorage: "500Mi"
+    customInitContainers: []
+sConfigController:
+  node:
+    k8sNodeFilterName: "system"
+    size: 1
+  container:
+    imagePullPolicy: "IfNotPresent"
+    resources:
+      cpu: "250m"
+      memory: "256Mi"
+      ephemeralStorage: "500Mi"
 telemetry: {}
 # jobsTelemetry:
 #   otelCollectorHttpHost: vmsingle-slurm.monitoring-system.svc.cluster.local
@@ -415,14 +485,14 @@ telemetry: {}
 #   otelCollectorPort: 8429
 
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.19.0-jammy-slurm24.05.5"
-  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.19.0-jammy-slurm24.05.5"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.19.0-jammy-slurm24.05.5"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.19.0-jammy-slurm24.05.5"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.19.0-jammy-slurm24.05.5"
-  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.19.0-jammy-slurm24.05.5"
-  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.19.0-jammy-slurm24.05.5"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.19.0-jammy-slurm24.05.5"
-  exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.19.0-jammy-slurm24.05.5"
-  mariaDB: "docker-registry1.mariadb.com/library/mariadb:11.4.3"
-  rebooter: "cr.eu-north1.nebius.cloud/soperator/rebooter:1.17.0"
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.20.0-jammy-slurm24.05.7"
+  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.20.0-jammy-slurm24.05.7"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.20.0-jammy-slurm24.05.7"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.20.0-jammy-slurm24.05.7"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.20.0-jammy-slurm24.05.7"
+  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.20.0-jammy-slurm24.05.7"
+  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.20.0-jammy-slurm24.05.7"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.20.0-jammy-slurm24.05.7"
+  exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.20.0-jammy-slurm24.05.7"
+  sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.20.0
+  mariaDB: docker-registry1.mariadb.com/library/mariadb:11.4.3

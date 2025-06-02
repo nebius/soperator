@@ -1,6 +1,7 @@
 package values
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -14,8 +15,9 @@ type SlurmAccounting struct {
 
 	Enabled bool
 
-	ContainerAccounting Container
-	ContainerMunge      Container
+	ContainerAccounting  Container
+	ContainerMunge       Container
+	CustomInitContainers []corev1.Container
 
 	Service        Service
 	Deployment     Deployment
@@ -43,7 +45,8 @@ func buildAccountingFrom(clusterName string, maintenance *consts.MaintenanceMode
 			accounting.Munge,
 			consts.ContainerNameMunge,
 		),
-		Service: buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeAccounting, clusterName)),
+		CustomInitContainers: accounting.CustomInitContainers,
+		Service:              buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeAccounting, clusterName)),
 		Deployment: buildDeploymentFrom(
 			naming.BuildDeploymentName(consts.ComponentTypeAccounting),
 		),

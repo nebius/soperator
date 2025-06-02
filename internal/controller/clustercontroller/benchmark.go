@@ -58,20 +58,15 @@ func (r SlurmClusterReconciler) ReconcileNCCLBenchmark(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					desired, err := benchmark.RenderNCCLBenchmarkCronJob(
+					desired := benchmark.RenderNCCLBenchmarkCronJob(
 						clusterValues.Namespace,
 						clusterValues.Name,
 						clusterValues.NodeFilters,
-						&clusterValues.Secrets,
 						clusterValues.VolumeSources,
 						&clusterValues.NCCLBenchmark,
 						clusterValues.Telemetry,
 						clusterValues.SlurmTopologyConfigMapRefName,
 					)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering NCCL benchmark CronJob")
-					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
@@ -107,19 +102,6 @@ func (r SlurmClusterReconciler) getNCCLBenchmarkDependencies(
 	clusterValues *values.SlurmCluster,
 ) ([]metav1.Object, error) {
 	var res []metav1.Object
-
-	slurmConfigsConfigMap := &corev1.ConfigMap{}
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{
-			Namespace: clusterValues.Namespace,
-			Name:      naming.BuildConfigMapSlurmConfigsName(clusterValues.Name),
-		},
-		slurmConfigsConfigMap,
-	); err != nil {
-		return []metav1.Object{}, err
-	}
-	res = append(res, slurmConfigsConfigMap)
 
 	mungeKeySecret := &corev1.Secret{}
 	if err := r.Get(

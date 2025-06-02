@@ -33,7 +33,7 @@ type tokenIssuer interface {
 	Issue(ctx context.Context) (string, error)
 }
 
-func NewClient(server string, tokenIssuer tokenIssuer, httpClient *http.Client) (*client, error) {
+func NewClient(server string, tokenIssuer tokenIssuer, httpClient *http.Client) (Client, error) {
 	if httpClient != nil {
 		httpClient = DefaultHTTPClient()
 	}
@@ -114,4 +114,41 @@ func (c *client) GetNode(ctx context.Context, nodeName string) (Node, error) {
 	}
 
 	return node, nil
+}
+
+func (c *client) GetJobStatus(ctx context.Context, jobID string) (JobStatus, error) {
+	getJobResp, err := c.SlurmV0041GetJobWithResponse(ctx, jobID, &slurmapispec.SlurmV0041GetJobParams{})
+	if err != nil {
+		return JobStatus{}, fmt.Errorf("get job %s: %w", jobID, err)
+	}
+	if getJobResp.JSON200 == nil {
+		return JobStatus{}, fmt.Errorf("json200 field is nil for job ID %s", jobID)
+	}
+	if getJobResp.JSON200.Errors != nil && len(*getJobResp.JSON200.Errors) != 0 {
+		return JobStatus{}, fmt.Errorf("get job %s responded with errors: %v", jobID, *getJobResp.JSON200.Errors)
+	}
+	if len(getJobResp.JSON200.Jobs) != 1 {
+		return JobStatus{}, fmt.Errorf("expected one job in response for job ID %s, got %d", jobID, len(getJobResp.JSON200.Jobs))
+	}
+
+	job := getJobResp.JSON200.Jobs[0]
+
+	status := JobStatus{
+		Id:          job.JobId,
+		Name:        job.Name,
+		StateReason: job.StateReason,
+		SubmitTime:  convertToMetav1Time(job.SubmitTime),
+		StartTime:   convertToMetav1Time(job.StartTime),
+		EndTime:     convertToMetav1Time(job.EndTime),
+	}
+
+	if job.JobState != nil && len(*job.JobState) > 0 {
+		status.State = string((*job.JobState)[0])
+		status.IsTerminateState = isTerminalState((*job.JobState)[0])
+	} else {
+		status.State = "UNKNOWN"
+		status.IsTerminateState = true
+	}
+
+	return status, nil
 }

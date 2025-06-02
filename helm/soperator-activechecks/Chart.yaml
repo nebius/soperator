@@ -1,0 +1,6 @@
+apiVersion: v2
+name: helm-soperator-activechecks
+description: A Helm chart for Kubernetes
+type: application
+version: "1.20.0"
+appVersion: "1.20.0"

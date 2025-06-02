@@ -86,7 +86,10 @@ func (r *RebooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	nodeActions := r.GetActions(ctx, node)
+	nodeActions, err := r.GetActions(ctx, node)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	logger.V(1).Info("Node actions", "actions", nodeActions)
 
 	logger.V(1).Info("Starting handling node drain")
@@ -119,7 +122,7 @@ func (r *RebooterReconciler) getNode(ctx context.Context) (*corev1.Node, error) 
 }
 
 // GetActions returns the actions that need to be taken on the node with the given name.
-func (r *RebooterReconciler) GetActions(ctx context.Context, node *corev1.Node) NodeActions {
+func (r *RebooterReconciler) GetActions(ctx context.Context, node *corev1.Node) (NodeActions, error) {
 	logger := log.FromContext(ctx).WithName("GetActions").WithValues("nodeName", node.Name).V(1)
 	actions := NodeActions{}
 
@@ -135,8 +138,10 @@ func (r *RebooterReconciler) GetActions(ctx context.Context, node *corev1.Node) 
 	if nodeRebootCondition != nil {
 		if !r.IsUptimeGreaterThanLastTransition(ctx, nodeRebootCondition.LastTransitionTime) {
 			logger.Info("Node does not need to be rebooted")
-			r.setNodeCondition(ctx, node, consts.SlurmNodeReboot, corev1.ConditionTrue, consts.ReasonNodeRebooted, consts.MessageRebooted)
-			return actions
+			err := r.setNodeCondition(ctx, node, consts.SlurmNodeReboot, corev1.ConditionTrue, consts.ReasonNodeRebooted, consts.MessageRebooted)
+			if err != nil {
+				return NodeActions{}, fmt.Errorf("set node condition: %w", err)
+			}
 		}
 		if r.checkIfNodeNeedsReboot(ctx, nodeRebootCondition) {
 			logger.V(1).Info("Node needs reboot")
@@ -150,7 +155,7 @@ func (r *RebooterReconciler) GetActions(ctx context.Context, node *corev1.Node) 
 	if !actions.Drain && !actions.Reboot {
 		actions.Undrain = true
 	}
-	return actions
+	return actions, nil
 }
 
 // handleNodeDrain drains the node with the given name if needed.
@@ -363,7 +368,7 @@ func (r *RebooterReconciler) TaintNodeWithNoExecute(ctx context.Context, node *c
 	}
 
 	if addTaint {
-		if r.IsNodeTaintedWithNoExecute(ctx, node) {
+		if r.IsNodeTaintedWithNoExecute(node) {
 			logger.Info("Node already has NoExecute taint", "node name", node.Name)
 			return nil
 		}
@@ -394,7 +399,7 @@ func (r *RebooterReconciler) TaintNodeWithNoExecute(ctx context.Context, node *c
 }
 
 // IsNodeTaintedWithNoExecute check if the taint already exists
-func (r *RebooterReconciler) IsNodeTaintedWithNoExecute(ctx context.Context, node *corev1.Node) bool {
+func (r *RebooterReconciler) IsNodeTaintedWithNoExecute(node *corev1.Node) bool {
 	for _, taint := range node.Spec.Taints {
 		if taint.Key == "node.kubernetes.io/NoExecute" {
 			return true

@@ -1,0 +1,43 @@
+{{- if and .Values.soperator.enabled  .Values.soperator.soperatorChecks.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-soperatorchecks
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: helm-soperatorchecks
+      interval: {{ .Values.soperator.soperatorChecks.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+      version: {{ .Values.soperator.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  interval: {{ .Values.soperator.soperatorChecks.interval }}
+  timeout: {{ .Values.soperator.soperatorChecks.timeout }}
+  releaseName: {{ .Values.soperator.soperatorChecks.releaseName }}
+  targetNamespace: {{ .Values.soperator.namespace }}
+  {{- if .Values.soperator.soperatorChecks.values }}
+  values:
+    {{- toYaml .Values.soperator.soperatorChecks.values | nindent 4 }}
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: terrraform-soperatorchecks
+    optional: true
+    valuesKey: values.yaml
+  - kind: ConfigMap
+    name: soperatorchecks
+    optional: true
+    valuesKey: values.yaml
+{{- end }}

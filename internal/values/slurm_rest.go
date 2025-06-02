@@ -1,6 +1,7 @@
 package values
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -10,10 +11,11 @@ import (
 type SlurmREST struct {
 	slurmv1.SlurmNode
 
-	Enabled       bool
-	ContainerREST Container
-	Service       Service
-	Maintenance   *consts.MaintenanceMode
+	Enabled              bool
+	ContainerREST        Container
+	CustomInitContainers []corev1.Container
+	Service              Service
+	Maintenance          *consts.MaintenanceMode
 }
 
 func buildRestFrom(clusterName string, maintenance *consts.MaintenanceMode, rest *slurmv1.SlurmRest) SlurmREST {
@@ -26,10 +28,11 @@ func buildRestFrom(clusterName string, maintenance *consts.MaintenanceMode, rest
 	}
 
 	return SlurmREST{
-		SlurmNode:     *rest.SlurmNode.DeepCopy(),
-		Enabled:       rest.Enabled,
-		ContainerREST: containerREST,
-		Service:       buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeREST, clusterName)),
-		Maintenance:   maintenance,
+		SlurmNode:            *rest.SlurmNode.DeepCopy(),
+		Enabled:              rest.Enabled,
+		ContainerREST:        containerREST,
+		CustomInitContainers: rest.CustomInitContainers,
+		Service:              buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeREST, clusterName)),
+		Maintenance:          maintenance,
 	}
 }

@@ -2,7 +2,9 @@ package worker
 
 import (
 	"fmt"
+	"maps"
 
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,7 +19,7 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-// RenderStatefulSet renders new [appsv1.StatefulSet] containing Slurm worker pods
+// RenderStatefulSet renders new [kruisev1b1.StatefulSet] containing Slurm worker pods
 func RenderStatefulSet(
 	namespace,
 	clusterName string,
@@ -27,7 +29,8 @@ func RenderStatefulSet(
 	volumeSources []slurmv1.VolumeSource,
 	worker *values.SlurmWorker,
 	slurmTopologyConfigMapRefName string,
-) (appsv1.StatefulSet, error) {
+	workerFeatures []slurmv1.WorkerFeature,
+) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeWorker, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeWorker, clusterName)
 
@@ -41,7 +44,7 @@ func RenderStatefulSet(
 		clusterName, secrets, volumeSources, worker, slurmTopologyConfigMapRefName,
 	)
 	if err != nil {
-		return appsv1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
+		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
 	// Since 1.29 is native sidecar support, we can use the native restart policy
@@ -51,6 +54,7 @@ func RenderStatefulSet(
 	if clusterType == consts.ClusterTypeGPU {
 		initContainers = append(initContainers, renderContainerToolkitValidation(&worker.ContainerToolkitValidation))
 	}
+	initContainers = append(initContainers, worker.CustomInitContainers...)
 
 	slurmdContainer, err := renderContainerSlurmd(
 		&worker.ContainerSlurmd,
@@ -61,9 +65,10 @@ func RenderStatefulSet(
 		worker.CgroupVersion,
 		worker.EnableGDRCopy,
 		worker.SlurmNodeExtra,
+		workerFeatures,
 	)
 	if err != nil {
-		return appsv1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
+		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
 	}
 
 	replicas := &worker.StatefulSet.Replicas
@@ -81,32 +86,40 @@ func RenderStatefulSet(
 		Containers: []corev1.Container{
 			slurmdContainer,
 		},
-		Volumes: volumes,
+		Volumes:   volumes,
+		DNSPolicy: corev1.DNSClusterFirst,
 		DNSConfig: &corev1.PodDNSConfig{
 			Searches: []string{
 				naming.BuildServiceFQDN(consts.ComponentTypeWorker, namespace, clusterName),
 			},
 		},
+		RestartPolicy:                 corev1.RestartPolicyAlways,
+		TerminationGracePeriodSeconds: ptr.To(common.DefaultPodTerminationGracePeriodSeconds),
+		SecurityContext:               &corev1.PodSecurityContext{},
+		SchedulerName:                 corev1.DefaultSchedulerName,
 	}
 
 	if worker.PriorityClass != "" {
 		spec.PriorityClassName = worker.PriorityClass
 	}
 
-	return appsv1.StatefulSet{
+	return kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      worker.StatefulSet.Name,
 			Namespace: namespace,
 			Labels:    labels,
 		},
-		Spec: appsv1.StatefulSetSpec{
+		Spec: kruisev1b1.StatefulSetSpec{
 			PodManagementPolicy: consts.PodManagementPolicy,
 			ServiceName:         worker.Service.Name,
 			Replicas:            replicas,
-			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
-				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-					MaxUnavailable: &worker.StatefulSet.MaxUnavailable,
+				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
+					MaxUnavailable:  &worker.StatefulSet.MaxUnavailable,
+					PodUpdatePolicy: kruisev1b1.RecreatePodUpdateStrategyType,
+					Partition:       ptr.To(int32(0)),
+					MinReadySeconds: ptr.To(int32(0)),
 				},
 			},
 			Selector: &metav1.LabelSelector{
@@ -118,12 +131,19 @@ func RenderStatefulSet(
 				clusterName,
 				pvcTemplateSpecs,
 			),
+			VolumeClaimUpdateStrategy: kruisev1b1.VolumeClaimUpdateStrategy{
+				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
+			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
 					Annotations: renderAnnotations(worker, clusterName, namespace),
 				},
 				Spec: spec,
+			},
+			PersistentVolumeClaimRetentionPolicy: &kruisev1b1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  kruisev1b1.RetainPersistentVolumeClaimRetentionPolicyType,
 			},
 		},
 	}, nil
@@ -146,6 +166,8 @@ func renderAnnotations(worker *values.SlurmWorker, clusterName, namespace string
 		): mungeAppArmorProfile,
 		consts.DefaultContainerAnnotationName: consts.ContainerNameSlurmd,
 	}
+
+	maps.Copy(annotations, worker.WorkerAnnotations)
 
 	return annotations
 }

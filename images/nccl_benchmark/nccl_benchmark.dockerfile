@@ -1,12 +1,12 @@
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
+ARG BASE_IMAGE=ubuntu:jammy
 
 FROM $BASE_IMAGE AS nccl_benchmark
 
-ARG SLURM_VERSION=24.05.5
+ARG SLURM_VERSION=24.05.7
+ARG PYXIS_VERSION=0.21.0
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-# TODO: Install only those dependencies that are required for running NCCL bacnhmark
 # Install dependencies
 RUN apt-get update && \
     apt -y install \
@@ -28,50 +28,53 @@ RUN apt-get update && \
         vim \
         libpmix2 \
         libpmix-dev && \
-    apt clean
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
-# Download and install Slurm packages
-RUN for pkg in slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd; do \
-        wget -q -P /tmp $PACKAGES_REPO_URL/slurm-packages-$SLURM_VERSION/${pkg}_$SLURM_VERSION-1_amd64.deb && \
-        echo "${pkg}_$SLURM_VERSION-1_amd64.deb successfully downloaded" || \
-        { echo "Failed to download ${pkg}_$SLURM_VERSION-1_amd64.deb"; exit 1; }; \
-    done && \
-    apt install -y /tmp/*.deb && \
-    rm -rf /tmp/*.deb && \
-    apt clean
+# Add Nebius public registry
+RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" > /etc/apt/sources.list.d/nebius.list
+
+RUN apt-get update && \
+    apt -y install \
+      slurm-smd-client=${SLURM_VERSION}-1 \
+      slurm-smd-dev=${SLURM_VERSION}-1 \
+      slurm-smd-libnss-slurm=${SLURM_VERSION}-1 \
+      slurm-smd=${SLURM_VERSION}-1 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install slurm сhroot plugin
-COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
-COPY common/scripts/install_chroot_plugin.sh /opt/bin/
+COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
+COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
     /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
-# Install parallel because it's required for enroot operation and used in the benchmark script
-COPY common/scripts/install_parallel.sh /opt/bin/
-RUN chmod +x /opt/bin/install_parallel.sh && \
-    /opt/bin/install_parallel.sh && \
-    rm /opt/bin/install_parallel.sh
+# Install parallel because it's required for enroot operation
+RUN apt-get update && \
+    apt -y install parallel=20210822+ds-2 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install enroot
-COPY common/scripts/install_enroot.sh /opt/bin/
+COPY images/common/scripts/install_enroot.sh /opt/bin/
 RUN chmod +x /opt/bin/install_enroot.sh && \
     /opt/bin/install_enroot.sh && \
     rm /opt/bin/install_enroot.sh
 
 # Copy enroot configuration
-COPY common/enroot/enroot.conf /etc/enroot/
+COPY images/common/enroot/enroot.conf /etc/enroot/
 RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
 
-# Install slurm pyxis plugin
-COPY common/scripts/install_pyxis_plugin.sh /opt/bin/
-RUN chmod +x /opt/bin/install_pyxis_plugin.sh && \
-    /opt/bin/install_pyxis_plugin.sh && \
-    rm /opt/bin/install_pyxis_plugin.sh
+# Install slurm pyxis plugin \
+RUN apt-get update && \
+    apt -y install nvslurm-plugin-pyxis=${PYXIS_VERSION}-1 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install munge
-COPY common/scripts/install_munge.sh /opt/bin/
+COPY images/common/scripts/install_munge.sh /opt/bin/
 RUN chmod +x /opt/bin/install_munge.sh && \
     /opt/bin/install_munge.sh && \
     rm /opt/bin/install_munge.sh
@@ -80,7 +83,7 @@ RUN chmod +x /opt/bin/install_munge.sh && \
 RUN mkdir -m 755 /run/munge
 
 # Copy srun_perf script that schedules jobs with GPU benchmark
-COPY nccl_benchmark/scripts/srun_perf.sh /usr/bin/srun_perf.sh
+COPY images/nccl_benchmark/scripts/srun_perf.sh /usr/bin/srun_perf.sh
 RUN chmod +x /usr/bin/srun_perf.sh
 
 # Update linker cache
@@ -96,6 +99,6 @@ ENV MUNGE_PID_FILE=/run/munge/munged.pid
 ENV MUNGE_SOCKET_FILE=/run/munge/munge.socket.2
 
 # Copy & run the entrypoint script
-COPY nccl_benchmark/nccl_benchmark_entrypoint.sh /opt/bin/nccl_benchmark_entrypoint.sh
+COPY images/nccl_benchmark/nccl_benchmark_entrypoint.sh /opt/bin/nccl_benchmark_entrypoint.sh
 RUN chmod +x /opt/bin/nccl_benchmark_entrypoint.sh
 ENTRYPOINT ["/opt/bin/nccl_benchmark_entrypoint.sh"]

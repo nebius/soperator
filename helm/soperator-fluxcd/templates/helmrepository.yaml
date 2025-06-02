@@ -1,0 +1,133 @@
+{{- if .Values.soperator.enabled }}
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  interval: {{ .Values.helmRepository.interval }}
+  url: {{ .Values.helmRepository.soperator.url }}
+  type: {{ .Values.helmRepository.soperator.type }}
+{{- end }}
+{{- if and .Values.soperator.enabled .Values.soperator.kruise.enabled }}
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-kruise
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  interval: {{ .Values.helmRepository.interval }}
+  url: {{ .Values.helmRepository.kruise.url }}
+  type: {{ .Values.helmRepository.kruise.type }}
+{{- end }}
+{{- if and .Values.certManager.enabled }}
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  interval: {{ .Values.helmRepository.interval }}
+  url: {{ .Values.helmRepository.certManager.url }}
+  type: {{ .Values.helmRepository.certManager.type }}
+{{- end }}
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-bedag
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  interval: {{ .Values.helmRepository.interval }}
+  url: {{ .Values.helmRepository.bedag.url }}
+  type: {{ .Values.helmRepository.bedag.type }}
+{{- if .Values.backup.enabled }}
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-k8up
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  interval: {{ .Values.helmRepository.interval }}
+  url: {{ .Values.helmRepository.backup.url }}
+  type: {{ .Values.helmRepository.backup.type }}
+{{- end }}
+{{- if .Values.mariadbOperator.enabled }}
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-mariadb-operator
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  interval: {{ .Values.helmRepository.interval }}
+  url: {{ .Values.helmRepository.mariadbOperator.url }}
+  type: {{ .Values.helmRepository.mariadbOperator.type }}
+{{- end }}
+{{- if and .Values.observability.enabled .Values.observability.opentelemetry.enabled }}
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-opentelemetry-collector
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  interval: {{ .Values.helmRepository.interval }}
+  url: {{ .Values.helmRepository.opentelemetry.url }}
+  type: {{ .Values.helmRepository.opentelemetry.type }}
+{{- end }}
+{{- if and .Values.observability.enabled .Values.observability.prometheusOperator.enabled }}
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  interval: {{ .Values.helmRepository.interval }}
+  url: {{ .Values.helmRepository.prometheusOperator.url }}
+  type: {{ .Values.helmRepository.prometheusOperator.type }}
+{{- end }}
+{{- if .Values.securityProfilesOperator.enabled }}
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-security-profiles-operator
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  interval: {{ .Values.helmRepository.interval }}
+  url: {{ .Values.helmRepository.securityProfilesOperator.url }}
+  type: {{ .Values.helmRepository.securityProfilesOperator.type }}
+{{- end }}
+{{- if and 
+    .Values.observability.enabled 
+    (or 
+      .Values.observability.vmLogs.enabled 
+      .Values.observability.vmStack.enabled 
+    ) 
+}}
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-victoriametrics
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  interval: {{ .Values.helmRepository.interval }}
+  url: {{ .Values.helmRepository.victoriaMetrics.url }}
+  type: {{ .Values.helmRepository.victoriaMetrics.type }}
+{{- end }}

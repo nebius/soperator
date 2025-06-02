@@ -18,23 +18,24 @@ func renderContainerSshd(
 	jailSubMounts, customMounts []slurmv1.NodeVolumeMount,
 ) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
-		common.RenderVolumeMountSlurmConfigs(),
 		common.RenderVolumeMountJail(),
 		common.RenderVolumeMountMungeSocket(),
 		common.RenderVolumeMountSecurityLimits(),
 		common.RenderVolumeMountSshdKeys(),
-		common.RenderVolumeMountSshdConfigs(),
 		common.RenderVolumeMountSshdRootKeys(),
 		common.RenderVolumeMountInMemory(),
 		common.RenderVolumeMountTmpDisk(),
+		renderVolumeMountSshdConfigs(),
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(jailSubMounts, consts.VolumeMountPathJailUpper)...)
 	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(customMounts, "")...)
 	// Create a copy of the container's limits and add non-CPU resources from Requests
 	limits := common.CopyNonCPUResources(container.Resources)
 	return corev1.Container{
-		Name:  consts.ContainerNameSshd,
-		Image: container.Image,
+		Name:    consts.ContainerNameSshd,
+		Image:   container.Image,
+		Command: container.Command,
+		Args:    container.Args,
 		Env: []corev1.EnvVar{
 			{
 				Name:  "SLURM_CLUSTER_TYPE",
@@ -54,6 +55,10 @@ func renderContainerSshd(
 					Port: intstr.FromInt32(container.Port),
 				},
 			},
+			TimeoutSeconds:   common.DefaultProbeTimeoutSeconds,
+			PeriodSeconds:    common.DefaultProbePeriodSeconds,
+			SuccessThreshold: common.DefaultProbeSuccessThreshold,
+			FailureThreshold: common.DefaultProbeFailureThreshold,
 		},
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: ptr.To(true),
@@ -67,5 +72,7 @@ func renderContainerSshd(
 			Limits:   limits,
 			Requests: container.Resources,
 		},
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}
 }

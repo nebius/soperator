@@ -1,0 +1,64 @@
+{{- if and .Values.observability.enabled .Values.observability.vmLogs.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-vm-logs
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: victoria-logs-single
+      interval: {{ .Values.observability.vmLogs.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-victoriametrics
+      version: 0.9.*
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  interval: {{ .Values.observability.vmLogs.interval }}
+  timeout: {{ .Values.observability.vmLogs.timeout }}
+  releaseName: {{ .Values.observability.vmLogs.releaseName }}
+  targetNamespace: {{ .Values.observability.vmLogs.namespace }}
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  values:
+  {{- if .Values.observability.vmStack.overrideValues }}
+    {{- toYaml .Values.observability.vmStack.overrideValues | nindent 4 }}
+  {{- else }}
+      dashboards:
+        enabled: true
+        labels:
+          grafana_dashboard: "1"
+      server:
+        {{- if .Values.observability.vmLogs.values.resources }}
+        resources:
+          {{- toYaml .Values.observability.vmLogs.values.resources | nindent 8 }}
+        {{- end }}
+        {{- if .Values.observability.vmLogs.values.persistentVolume.enabled }}
+        persistence:
+          enabled: true
+          accessModes:
+            - {{ .Values.observability.vmLogs.values.persistentVolume.accessMode }}
+          size: {{ .Values.observability.vmLogs.values.persistentVolume.size }}
+        {{- end }}
+        vmServiceScrape:
+          enabled: true
+      vector:
+        enabled: false
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: terraform-vm-logs
+    optional: true
+    valuesKey: values.yaml
+  - kind: ConfigMap
+    name: vm-logs
+    optional: true
+    valuesKey: values.yaml
+{{- end }}

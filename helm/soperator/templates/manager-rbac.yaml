@@ -52,6 +52,18 @@ rules:
   - update
   - watch
 - apiGroups:
+  - apps.kruise.io
+  resources:
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - batch
   resources:
   - cronjobs
@@ -137,6 +149,7 @@ rules:
   - slurm.nebius.ai
   resources:
   - nodeconfigurators
+  - nodesets
   - slurmclusters
   verbs:
   - create
@@ -150,6 +163,7 @@ rules:
   - slurm.nebius.ai
   resources:
   - nodeconfigurators/finalizers
+  - nodesets/finalizers
   - slurmclusters/finalizers
   verbs:
   - update
@@ -157,6 +171,7 @@ rules:
   - slurm.nebius.ai
   resources:
   - nodeconfigurators/status
+  - nodesets/status
   - slurmclusters/status
   verbs:
   - get

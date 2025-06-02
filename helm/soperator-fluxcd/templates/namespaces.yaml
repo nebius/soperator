@@ -1,0 +1,133 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: raw
+      interval: {{ .Values.ns.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-bedag
+      version: {{ .Values.ns.version }}
+  install:
+    remediation:
+      retries: 3
+  interval: {{ .Values.ns.interval }}
+  values:
+    resources:
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.slurmCluster.namespace | default "soperator" }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.soperator.namespace | default "soperator-system" }}
+    
+    {{- if .Values.mariadbOperator.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.mariadbOperator.namespace | default "mariadb-operator-system" }}
+    {{- end }}
+    
+    {{- if .Values.securityProfilesOperator.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.securityProfilesOperator.namespace | default "security-profiles-operator-system" }}
+    {{- end }}
+    {{- if .Values.observability.enabled }}
+    {{- if or .Values.observability.vmLogs.enabled .Values.observability.opentelemetry.enabled }}
+    {{- /* First, check if at least one component is enabled */}}
+    {{- if and .Values.observability.vmLogs.enabled .Values.observability.opentelemetry.enabled }}
+    {{- /* If both components are enabled, we need to handle namespace logic */}}
+    {{- if eq .Values.observability.vmLogs.namespace .Values.observability.opentelemetry.namespace }}
+    {{- /* If namespaces are the same, create only one */}}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.observability.opentelemetry.namespace }}
+    {{- else }}
+    {{- /* If namespaces are different, create both */}}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.observability.opentelemetry.namespace }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.observability.vmLogs.namespace }}
+    {{- end }}
+    {{- else }}
+    {{- /* If only one component is enabled, create its namespace */}}
+    {{- if .Values.observability.vmLogs.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.observability.vmLogs.namespace }}
+    {{- else if .Values.observability.opentelemetry.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.observability.opentelemetry.namespace }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+
+    {{- if or .Values.observability.vmStack.enabled .Values.observability.prometheusOperator.enabled }}
+    {{- /* First, check if at least one component is enabled */}}
+    {{- if and .Values.observability.vmStack.enabled .Values.observability.prometheusOperator.enabled }}
+    {{- /* If both components are enabled, we need to handle namespace logic */}}
+    {{- if eq .Values.observability.vmStack.namespace .Values.observability.prometheusOperator.namespace }}
+    {{- /* If namespaces are the same, create only one */}}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.observability.vmStack.namespace }}
+    {{- else }}
+    {{- /* If namespaces are different, create both */}}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.observability.vmStack.namespace }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.observability.prometheusOperator.namespace }}
+    {{- end }}
+    {{- else }}
+    {{- /* If only one component is enabled, create its namespace */}}
+    {{- if .Values.observability.vmStack.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.observability.vmStack.namespace }}
+    {{- else if .Values.observability.prometheusOperator.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.observability.prometheusOperator.namespace }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+
+    
+    {{- if .Values.certManager.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.certManager.namespace }}
+    {{- end }}
+    
+    {{- if .Values.backup.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.backup.namespace }}
+    {{- end }}

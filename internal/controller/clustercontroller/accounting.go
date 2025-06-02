@@ -39,6 +39,9 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 	isProtectedSecret := clusterValues.NodeAccounting.MariaDb.ProtectedSecret
 	isDBEnabled := isExternalDBEnabled || isMariaDBEnabled
 
+	// Important: this service will restart every time slurm-configs ConfigMap changes
+	// We've left this behavior for this service, because it doesn't use Jail, and current realisation require Jail
+	//
 	reconcileAccountingImpl := func() error {
 		return utils.ExecuteMultiStep(ctx,
 			"Reconciliation of Accounting",
@@ -203,15 +206,11 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						return nil
 					}
 
-					desired, err = accounting.RenderService(
+					desired = accounting.RenderService(
 						clusterValues.Namespace,
 						clusterValues.Name,
 						&clusterValues.NodeAccounting,
 					)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering accounting Service")
-					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.V(1).Info("Rendered")
 
@@ -445,7 +444,7 @@ func (r SlurmClusterReconciler) ValidateAccounting(
 	existingDeployment, err := getTypedResource(ctx, r.Client, clusterValues.Namespace, clusterValues.NodeAccounting.Deployment.Name, existingDeployment)
 	if err != nil {
 		message := "Failed to get Deployment"
-		return r.updateStatus(ctx, cluster, slurmv1.ConditionClusterAccountingAvailable, metav1.ConditionUnknown, "Unknown", message, 10*time.Second)
+		return r.updateAccountingAvailabilityStatus(ctx, cluster, metav1.ConditionUnknown, "Unknown", message, 10*time.Second)
 	}
 
 	targetReplicas := clusterValues.NodeAccounting.Deployment.Replicas
@@ -457,31 +456,31 @@ func (r SlurmClusterReconciler) ValidateAccounting(
 		existingMariaDb, mariadbErr := getTypedResource(ctx, r.Client, clusterValues.Namespace, naming.BuildMariaDbName(clusterValues.Name), existingMariaDb)
 		if mariadbErr != nil || existingMariaDb == nil {
 			message := "Failed to get MariaDB"
-			return r.updateStatus(ctx, cluster, slurmv1.ConditionClusterAccountingAvailable, metav1.ConditionUnknown, "Unknown", message, 10*time.Second)
+			return r.updateAccountingAvailabilityStatus(ctx, cluster, metav1.ConditionUnknown, "Unknown", message, 10*time.Second)
 		}
 		existingMariaDbGrant, mariadbGrantErr := getTypedResource(ctx, r.Client, clusterValues.Namespace, naming.BuildMariaDbName(clusterValues.Name), existingMariaDbGrant)
 		if mariadbGrantErr != nil || existingMariaDbGrant == nil {
 			message := "Failed to get MariaDB Grant"
-			return r.updateStatus(ctx, cluster, slurmv1.ConditionClusterAccountingAvailable, metav1.ConditionUnknown, "Unknown", message, 10*time.Second)
+			return r.updateAccountingAvailabilityStatus(ctx, cluster, metav1.ConditionUnknown, "Unknown", message, 10*time.Second)
 		}
 	}
 
 	switch {
 	case !isConditionReady(existingMariaDb.Status.Conditions, mariadbv1alpha1.ConditionTypeReady):
 		message := "MariaDB is not ready"
-		return r.updateStatus(ctx, cluster, slurmv1.ConditionClusterAccountingAvailable, metav1.ConditionFalse, "NotAvailable", message, 10*time.Second)
+		return r.updateAccountingAvailabilityStatus(ctx, cluster, metav1.ConditionFalse, "NotAvailable", message, 10*time.Second)
 	case !isConditionReady(existingMariaDbGrant.Status.Conditions, mariadbv1alpha1.ConditionTypeReady):
 		message := "MariaDB Grant is not ready"
-		return r.updateStatus(ctx, cluster, slurmv1.ConditionClusterAccountingAvailable, metav1.ConditionFalse, "NotAvailable", message, 10*time.Second)
+		return r.updateAccountingAvailabilityStatus(ctx, cluster, metav1.ConditionFalse, "NotAvailable", message, 10*time.Second)
 	case existingDeployment.Status.AvailableReplicas == 0:
 		message := "Slurm accounting is not available yet"
-		return r.updateStatus(ctx, cluster, slurmv1.ConditionClusterAccountingAvailable, metav1.ConditionFalse, "NotAvailable", message, 10*time.Second)
+		return r.updateAccountingAvailabilityStatus(ctx, cluster, metav1.ConditionFalse, "NotAvailable", message, 10*time.Second)
 	case existingDeployment.Status.AvailableReplicas != targetReplicas:
 		message := fmt.Sprintf("Slurm accounting available replicas: %d, but target replicas: %d", existingDeployment.Status.AvailableReplicas, targetReplicas)
-		return r.updateStatus(ctx, cluster, slurmv1.ConditionClusterAccountingAvailable, metav1.ConditionFalse, "NotAvailable", message, 10*time.Second)
+		return r.updateAccountingAvailabilityStatus(ctx, cluster, metav1.ConditionFalse, "NotAvailable", message, 10*time.Second)
 	}
 
-	return r.updateStatus(ctx, cluster, slurmv1.ConditionClusterAccountingAvailable, metav1.ConditionTrue, "Available", "Slurm accounting is available", 0)
+	return r.updateAccountingAvailabilityStatus(ctx, cluster, metav1.ConditionTrue, "Available", "Slurm accounting is available", 0)
 }
 
 func getTypedResource[T client.Object](
@@ -501,17 +500,16 @@ func getTypedResource[T client.Object](
 	return obj, nil
 }
 
-func (r SlurmClusterReconciler) updateStatus(
+func (r SlurmClusterReconciler) updateAccountingAvailabilityStatus(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
-	conditionType string,
 	conditionStatus metav1.ConditionStatus,
 	reason, message string,
 	requeueAfter time.Duration,
 ) (ctrl.Result, error) {
 	if err := r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
 		status.SetCondition(metav1.Condition{
-			Type:    conditionType,
+			Type:    slurmv1.ConditionClusterAccountingAvailable,
 			Status:  conditionStatus,
 			Reason:  reason,
 			Message: message,

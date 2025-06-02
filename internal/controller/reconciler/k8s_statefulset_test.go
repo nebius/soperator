@@ -9,13 +9,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
 )
 
 func TestAnnotationsMatch(t *testing.T) {
 	scheme := runtime.NewScheme()
-	appsv1.AddToScheme(scheme)
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add appsv1 scheme: %v", err)
+	}
 
 	cluster := &slurmv1.SlurmCluster{
 		ObjectMeta: metav1.ObjectMeta{

@@ -16,6 +16,10 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
+const (
+	DefaultFileMode = int32(0420)
+)
+
 // region PVC template
 
 func RenderVolumeClaimTemplates(
@@ -34,6 +38,7 @@ func RenderVolumeClaimTemplates(
 			renderVolumeClaimTemplate(componentType, namespace, clusterName, template.Name, *template.Spec),
 		)
 	}
+
 	return res
 }
 
@@ -221,6 +226,7 @@ func RenderVolumeMungeKey(clusterName string) corev1.Volume {
 						Mode: ptr.To(consts.SecretMungeKeyFileMode),
 					},
 				},
+				DefaultMode: ptr.To(DefaultFileMode),
 			},
 		},
 	}
@@ -269,6 +275,7 @@ func RenderVolumeSecurityLimits(clusterName string, componentType consts.Compone
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: naming.BuildConfigMapSecurityLimitsName(componentType, clusterName),
 				},
+				DefaultMode: ptr.To(DefaultFileMode),
 			},
 		},
 	}
@@ -301,6 +308,7 @@ func RenderVolumeRESTJWTKey(clusterName string) corev1.Volume {
 						Mode: ptr.To(consts.SecretRESTJWTKeyFileMode),
 					},
 				},
+				DefaultMode: ptr.To(DefaultFileMode),
 			},
 		},
 	}
@@ -318,33 +326,6 @@ func RenderVolumeMountRESTJWTKey() corev1.VolumeMount {
 // endregion REST JWT key
 
 // region SSHD
-
-// region configs
-
-// RenderVolumeSshdConfigs renders [corev1.Volume] containing SSHD configs contents
-func RenderVolumeSshdConfigs(sshdConfigMapName string) corev1.Volume {
-	return corev1.Volume{
-		Name: consts.VolumeNameSSHDConfigs,
-		VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: sshdConfigMapName,
-				},
-			},
-		},
-	}
-}
-
-// RenderVolumeMountSshdConfigs renders [corev1.VolumeMount] defining the mounting path for SSHD configs
-func RenderVolumeMountSshdConfigs() corev1.VolumeMount {
-	return corev1.VolumeMount{
-		Name:      consts.VolumeNameSSHDConfigs,
-		MountPath: consts.VolumeMountPathSSHConfigs,
-		ReadOnly:  true,
-	}
-}
-
-// endregion configs
 
 // region root keys
 
@@ -416,6 +397,7 @@ func RenderVolumeSshdKeys(sshdKeysSecretName string) corev1.Volume {
 						Mode: ptr.To(consts.SecretSshdKeysPublicFileMode),
 					},
 				},
+				DefaultMode: ptr.To(DefaultFileMode),
 			},
 		},
 	}

@@ -21,9 +21,6 @@ func BasePodTemplateSpec(
 ) (*corev1.PodTemplateSpec, error) {
 	volumes := []corev1.Volume{common.RenderVolumeSlurmConfigs(clusterName)}
 
-	var affinity *corev1.Affinity = nil
-	var nodeSelector map[string]string
-
 	nodeFilter, err := utils.GetBy(
 		nodeFilters,
 		valuesREST.K8sNodeFilterName,
@@ -32,9 +29,6 @@ func BasePodTemplateSpec(
 	if err != nil {
 		return nil, err
 	}
-
-	affinity = nodeFilter.Affinity
-	nodeSelector = nodeFilter.NodeSelector
 
 	return &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
@@ -46,11 +40,13 @@ func BasePodTemplateSpec(
 			},
 		},
 		Spec: corev1.PodSpec{
-			Affinity:     affinity,
-			NodeSelector: nodeSelector,
-			Hostname:     consts.HostnameREST,
-			Containers:   []corev1.Container{renderContainerREST(valuesREST.ContainerREST)},
-			Volumes:      volumes,
+			Affinity:       nodeFilter.Affinity,
+			Tolerations:    nodeFilter.Tolerations,
+			NodeSelector:   nodeFilter.NodeSelector,
+			Hostname:       consts.HostnameREST,
+			InitContainers: valuesREST.CustomInitContainers,
+			Containers:     []corev1.Container{renderContainerREST(valuesREST.ContainerREST)},
+			Volumes:        volumes,
 		},
 	}, nil
 }

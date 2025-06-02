@@ -1,47 +1,97 @@
+version: "2"
 linters:
-  presets:
-    - bugs
-    - complexity
-    - error
-    - format
-    - import
-    - metalinter
-    - module
-    - performance
-    - style
-    - test
-    - unused
+  enable:
+    - asasalint # Detect pass of []any as any in variadic func(...any).
+    - asciicheck # Ensure identifiers only contain ASCII characters.
+    - bidichk # Detect dangerous unicode character sequences.
+    - copyloopvar # Check for pointers to enclosing loop variables.
+    - decorder # Verify consistency in declaration order (constants, variables, types).
+    - dogsled # Detect excessive use of blank identifiers in assignments.
+    - durationcheck # Check for two durations multiplied together.
+    - errcheck # Check for unchecked errors in function calls.
+    - errname # Enforce consistent error variable naming conventions.
+    - govet # Official Go static analysis tool to find bugs and potential issues.
+    - gocheckcompilerdirectives # Verify compiler directives like //go:generate.
+    - goheader # Check presence and format of copyright headers.
+    - gomoddirectives # Enforce rules for go.mod files (replace/retract directives).
+    - gomodguard # Control package imports.
+    - goprintffuncname # Enforce consistent printf-like function naming conventions.
+    - grouper # Group related constant/variable/import/type declarations.
+    - inamedparam # Reports interfaces with unnamed method parameters.
+    - interfacebloat # Detect interface declarations with too many methods.
+    - nakedret # Find naked returns in functions larger than specified size.
+    - nilerr # Find code returning nil when err is not nil.
+    - nilnil # Detect redundant nil checks and nil returns.
+    - noctx # Find HTTP requests sent without context.Context.
+    - nosprintfhostport # Prevent using net.Sprint(f|ln) functions with IP or host:port.
+    - predeclared # Find shadowing of Go's predeclared identifiers.
+    - promlinter # Validate Prometheus metric names against best practices.
+    - tagalign # Enforce consistent struct tag alignment for readability.
+    - testableexamples # Verify testable examples contain expected output comments.
+    - unparam # Detect unused function parameters.
+    - usestdlibvars # Suggest using stdlib variables like http.MethodGet instead of string literals.
+
+  settings:
+    unparam:
+      # Inspect exported functions. Default: false.
+      check-exported: true
+
   disable:
-    - depguard
-    - ineffassign
-    - funlen
-    - forcetypeassert
-    - testpackage
-    - tagliatelle
-    - godot
-    - misspell
-    - goconst
-    - dupl
-    - gci
-    - whitespace
-    - gochecknoinits
-    - gocognit
-    - nestif
-    - gocyclo
-    - maintidx
-    - godox
-    - gofumpt
-    - gomnd
-    - lll
-    - nlreturn
-    - nolintlint
-    - wsl
-    - prealloc
-  fast: true
+    - depguard # Check for dependencies in go.mod.
+    - dupl # Detect duplicate code.
+    - cyclop # Detect function with too many branches.
+    - forcetypeassert # Check for unnecessary type assertions.
+    - funlen # Check function length.
+    - gochecknoinits # Check for init functions.
+    - gocognit # Check function cognitive complexity.
+    - goconst # Check for duplicate constant values.
+    - gocyclo # Check function cyclomatic complexity.
+    - godot # Check if comments end in a period.
+    - godox # Detects usage of FIXME, TODO and other keywords inside comments.
+    - ineffassign # Detects when assignments to existing variables are not used.
+    - lll # Reports long lines.
+    - maintidx # Measures the maintainability index of each function.
+    - misspell # Detects commonly misspelled words.
+    - mnd # Detect magic numbers.
+    - nestif # Reports deeply nested if statements.
+    - nlreturn # Checks for a new line before return and branch statements.
+    - nolintlint # Reports ill-formed or insufficient nolint directives.
+    - prealloc # Finds slice declarations that could potentially be pre-allocated.
+    - staticcheck # Standard linter, finds bugs and performance issues, offers simplifications, and enforces style rules.
+    - tagliatelle # Ensure consistent struct field tag naming style.
+    - testpackage # Makes you use a separate _test package.
+    - unused # Detect unused variables, constants, functions, and types.
+    - whitespace # Checks for unnecessary newlines at the start and end of functions, if, for, etc.
+    - wsl # Forces you to put empty lines in random places.
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
 output:
   formats:
-    - format: colored-line-number
+    text:
+      path: stdout
+
+issues:
+  # Maximum issues count per one linter.
+  # Set to 0 to disable.
+  # Default: 50
+  max-issues-per-linter: 0
+  # Maximum count of issues with the same text.
+  # Set to 0 to disable.
+  # Default: 3
+  max-same-issues: 0
+  # Make issues output unique by line.
+  # Default: true
+  uniq-by-line: true
 
 run:
   relative-path-mode: gomod

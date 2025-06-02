@@ -1,0 +1,48 @@
+{{ if and .Values.soperator.enabled .Values.soperator.kruise.enabled}}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-kruise
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: kruise
+      interval: {{ .Values.soperator.kruise.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-kruise
+      version: {{ .Values.soperator.kruise.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- if .Values.certManager.enabled }}
+  - name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
+  {{- end }}
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  interval: {{ .Values.soperator.kruise.interval }}
+  timeout: {{ .Values.soperator.kruise.timeout }}
+  releaseName: {{ .Values.soperator.kruise.releaseName }}
+  targetNamespace: {{ .Values.soperator.namespace }}
+  {{- if .Values.soperator.kruise.overrideValues }}
+  values:
+    {{- toYaml .Values.soperator.kruise.overrideValues | nindent 4 }}
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: terraform-kruise
+    optional: true
+    valuesKey: values.yaml
+  - kind: ConfigMap
+    name: kruise
+    optional: true
+    valuesKey: values.yaml
+{{- end }}

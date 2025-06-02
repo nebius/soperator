@@ -6,7 +6,8 @@ const (
 
 const (
 	ConfigMapNameSlurmConfigs      = slurmConfigs
-	ConfigMapNameSSHDConfigs       = sshConfigs
+	ConfigMapNameSSHDConfigsLogin  = sshConfigs
+	ConfigMapNameSSHDConfigsWorker = sshConfigsWorker
 	ConfigMapNameSshRootPublicKeys = sshRootKeys
 	ConfigMapNameSecurityLimits    = securityLimits
 	ConfigMapNameNCCLTopology      = ncclTopology
@@ -29,4 +30,5 @@ const (
 	ConfigMapKeyNCCLTopology            = "virtualTopology.xml"
 	ConfigMapKeySysctl                  = sysctlConfFile
 	ConfigMapKeySupervisord             = supervisordConfFile
+	ConfigMapKeySoperatorcheckSbatch    = "sbatch.sh"
 )

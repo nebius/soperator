@@ -72,6 +72,11 @@ var (
 )
 
 func init() {
+	log = logrus.WithField("slurmNode", currentNode)
+}
+
+func main() {
+	fs.Parse(os.Args[1:])
 	if *logFormat != logFormatText && *logFormat != logFormatJSON {
 		logrus.WithField("logFormat", *logFormat).Fatal("Invalid log format")
 	}
@@ -92,11 +97,7 @@ func init() {
 	} else {
 		logrus.SetLevel(logrus.InfoLevel)
 	}
-	log = logrus.WithField("slurmNode", currentNode)
-}
 
-func main() {
-	fs.Parse(os.Args[1:])
 	log.Info(fmt.Sprintf("Starting %s", nameNCCL))
 	if *debugLog {
 		debugFlags()

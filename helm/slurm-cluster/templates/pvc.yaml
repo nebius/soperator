@@ -1,0 +1,18 @@
+{{- range $name, $volume := .Values.volumeSources }}
+{{- if $volume.createPVC }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: {{ required "Claim name must be provided." $volume.persistentVolumeClaim.claimName | quote }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: {{ required "Volume size must be provided." $volume.size | quote }}
+  storageClassName: {{ required "Storage class name must be provided." $volume.storageClassName | quote }}
+{{- end }}
+---
+{{- end }}

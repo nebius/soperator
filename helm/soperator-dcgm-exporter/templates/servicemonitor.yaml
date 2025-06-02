@@ -1,0 +1,26 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "soperator-dcgm-exporter.name" . }}-service-monitor
+  labels:
+    app: nvidia-dcgm-exporter
+  {{- include "soperator-dcgm-exporter.labels" . | nindent 4 }}
+spec:
+  endpoints:
+  - interval: {{ .Values.scrapeInterval }}
+    path: /metrics
+    port: gpu-metrics
+    relabelings:
+    - action: replace
+      regex: nvidia-dcgm-exporter
+      replacement: dcgm-exporter
+      sourceLabels:
+      - __meta_kubernetes_pod_label_app
+      targetLabel: app_kubernetes_io_name
+  jobLabel: app
+  namespaceSelector:
+    matchNames:
+    - soperator
+  selector:
+    matchLabels:
+      app: nvidia-dcgm-exporter

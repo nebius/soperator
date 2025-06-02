@@ -1,0 +1,44 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: soperator-fluxcd
+  namespace: flux-system
+spec:
+  type: "oci"
+  interval: 24h
+  url: oci://cr.eu-north1.nebius.cloud/soperator
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: soperator-fluxcd
+  namespace: flux-system
+spec:
+  interval: 60m
+  driftDetection:
+    mode: enabled
+  chart:
+    spec:
+      chart: helm-soperator-fluxcd
+      sourceRef:
+        kind: HelmRepository
+        name: soperator-fluxcd
+      version: ${soperator_version}
+      interval: 3m
+  install:
+    remediation:
+      retries: 3
+  targetNamespace: flux-system
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-fluxcd-values
+      valuesKey: values.yaml
+      optional: false
+    - kind: ConfigMap
+      name: soperator-fluxcd
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: soperator-fluxcd
+      valuesKey: values.yaml
+      optional: true

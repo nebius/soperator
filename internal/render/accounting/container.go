@@ -21,6 +21,8 @@ func renderContainerAccounting(container values.Container) corev1.Container {
 	return corev1.Container{
 		Name:            consts.ContainerNameAccounting,
 		Image:           container.Image,
+		Command:         container.Command,
+		Args:            container.Args,
 		ImagePullPolicy: container.ImagePullPolicy,
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,

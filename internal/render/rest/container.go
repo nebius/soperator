@@ -19,6 +19,8 @@ func renderContainerREST(containerParams values.Container) corev1.Container {
 		Name:            consts.ContainerNameREST,
 		Image:           containerParams.Image,
 		ImagePullPolicy: containerParams.ImagePullPolicy,
+		Command:         containerParams.Command,
+		Args:            containerParams.Args,
 		Ports: []corev1.ContainerPort{{
 			Name:          containerParams.Name,
 			ContainerPort: containerParams.Port,

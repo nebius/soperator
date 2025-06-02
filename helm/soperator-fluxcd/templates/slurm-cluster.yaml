@@ -1,0 +1,52 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: helm-slurm-cluster
+      interval: {{ .Values.slurmCluster.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+      version: {{ .Values.slurmCluster.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+{{- if .Values.slurmCluster.slurmClusterStorage.enabled }}
+  - name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster-storage
+{{- end }}
+{{- if .Values.securityProfilesOperator.enabled }}
+  - name: {{ include "soperator-fluxcd.fullname" . }}-security-profiles-operator
+{{- end }}
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  interval: {{ .Values.slurmCluster.interval }}
+  timeout: {{ .Values.slurmCluster.timeout }}
+  releaseName: soperator
+  targetNamespace: soperator
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  values:
+  {{- if .Values.slurmCluster.overrideValues }}
+    {{- toYaml .Values.slurmCluster.overrideValues | nindent 4 }}
+  {{- else }}
+    clusterName: soperator
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: terrraform-slurm-cluster
+    optional: true
+    valuesKey: values.yaml
+  - kind: ConfigMap
+    name: slurm-cluster
+    optional: true
+    valuesKey: values.yaml

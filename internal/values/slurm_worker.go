@@ -1,6 +1,7 @@
 package values
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -17,12 +18,15 @@ type SlurmWorker struct {
 	ContainerToolkitValidation Container
 	ContainerSlurmd            Container
 	ContainerMunge             Container
+	CustomInitContainers       []corev1.Container
 
 	SupervisordConfigMapDefault bool
 	SupervisordConfigMapName    string
 
 	IsSSHDConfigMapDefault bool
 	SSHDConfigMapName      string
+
+	WorkerAnnotations map[string]string
 
 	CgroupVersion  string
 	EnableGDRCopy  bool
@@ -57,7 +61,7 @@ func buildSlurmWorkerFrom(
 	sshdConfigMapName := worker.SSHDConfigMapRefName
 	isSSHDConfigDefault := sshdConfigMapName == ""
 	if isSSHDConfigDefault {
-		sshdConfigMapName = naming.BuildConfigMapSSHDConfigsName(clusterName)
+		sshdConfigMapName = naming.BuildConfigMapSSHDConfigsNameWorker(clusterName)
 	}
 
 	res := SlurmWorker{
@@ -78,11 +82,13 @@ func buildSlurmWorkerFrom(
 			worker.Munge,
 			consts.ContainerNameMunge,
 		),
+		CustomInitContainers:        worker.CustomInitContainers,
 		SupervisordConfigMapDefault: supervisordConfigDefault,
 		SupervisordConfigMapName:    supervisordConfigName,
+		WorkerAnnotations:           worker.WorkerAnnotations,
 		Service:                     buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeWorker, clusterName)),
 		StatefulSet: buildStatefulSetFrom(
-			naming.BuildStatefulSetName(consts.ComponentTypeWorker, clusterName),
+			naming.BuildStatefulSetName(consts.ComponentTypeWorker),
 			worker.SlurmNode.Size,
 		),
 		VolumeSpool:               *worker.Volumes.Spool.DeepCopy(),

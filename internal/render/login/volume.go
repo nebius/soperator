@@ -2,6 +2,7 @@ package login
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -16,19 +17,20 @@ func renderVolumesAndClaimTemplateSpecs(
 	login *values.SlurmLogin,
 	slurmTopologyConfigMapRefName string,
 ) (volumes []corev1.Volume, pvcTemplateSpecs []values.PVCTemplateSpec, err error) {
+	// TODO: should we remove slurmTopologyConfigMapRefName?
+	// It was added here: https://github.com/nebius/soperator/pull/512/files#diff-7b22c3a71b5e99d01467ef50b9d060d03cf76d9cede340519df7d4ed99e75fd2
+	// and then it was removed here: https://github.com/nebius/soperator/pull/543/files#diff-7b22c3a71b5e99d01467ef50b9d060d03cf76d9cede340519df7d4ed99e75fd2
+	_ = slurmTopologyConfigMapRefName
+
 	volumes = []corev1.Volume{
-		common.RenderVolumeProjectedSlurmConfigs(
-			clusterName,
-			common.RenderVolumeProjectionSlurmTopologyConfig(slurmTopologyConfigMapRefName),
-		),
 		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeMungeSocket(),
 		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeLogin),
 		common.RenderVolumeSshdKeys(secrets.SshdKeysName),
-		common.RenderVolumeSshdConfigs(login.SSHDConfigMapName),
 		common.RenderVolumeSshdRootKeys(clusterName),
 		common.RenderVolumeInMemory(),
 		common.RenderVolumeTmpDisk(),
+		renderVolumeSshdConfigs(login.SSHDConfigMapName),
 	}
 
 	// Jail could be specified by template spec or by volume source name
@@ -82,3 +84,31 @@ func renderVolumesAndClaimTemplateSpecs(
 
 	return volumes, pvcTemplateSpecs, nil
 }
+
+// region configs
+
+// RenderVolumeSshdConfigs renders [corev1.Volume] containing SSHD configs contents
+func renderVolumeSshdConfigs(sshdConfigMapName string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSSHDConfigsLogin,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: sshdConfigMapName,
+				},
+				DefaultMode: ptr.To(common.DefaultFileMode),
+			},
+		},
+	}
+}
+
+// RenderVolumeMountSshdConfigs renders [corev1.VolumeMount] defining the mounting path for SSHD configs
+func renderVolumeMountSshdConfigs() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSSHDConfigsLogin,
+		MountPath: consts.VolumeMountPathSSHConfigs,
+		ReadOnly:  true,
+	}
+}
+
+// endregion configs

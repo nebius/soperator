@@ -48,6 +48,8 @@ func RenderDeploymentExporter(
 		replicas = ptr.To(consts.ZeroReplicas)
 	}
 
+	initContainers := append(valuesExporter.CustomInitContainers, common.RenderContainerMunge(&valuesExporter.ContainerMunge))
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildDeploymentName(consts.ComponentTypeExporter),
@@ -64,7 +66,7 @@ func RenderDeploymentExporter(
 			},
 			Template: RenderPodTemplateSpec(
 				clusterName,
-				&valuesExporter.ContainerMunge,
+				initContainers,
 				valuesExporter,
 				nodeFilter,
 				volumeSources,

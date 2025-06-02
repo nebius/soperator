@@ -41,8 +41,8 @@ func renderContainerToolkitValidation(container *values.Container) corev1.Contai
 		VolumeMounts: []corev1.VolumeMount{
 			renderVolumeMountNvidia(),
 		},
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-		TerminationMessagePath:   "/dev/termination-log",
 	}
 }
 
@@ -55,18 +55,18 @@ func renderContainerSlurmd(
 	cgroupVersion string,
 	enableGDRCopy bool,
 	slurmNodeExtra string,
+	workerFeatures []slurmv1.WorkerFeature,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
-		common.RenderVolumeMountSlurmConfigs(),
 		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
 		common.RenderVolumeMountJail(),
 		common.RenderVolumeMountMungeSocket(),
 		common.RenderVolumeMountSecurityLimits(),
 		common.RenderVolumeMountSshdKeys(),
-		common.RenderVolumeMountSshdConfigs(),
 		common.RenderVolumeMountSshdRootKeys(),
 		common.RenderVolumeMountInMemory(),
 		common.RenderVolumeMountTmpDisk(),
+		renderVolumeMountSshdConfigs(),
 		renderVolumeMountNvidia(),
 		renderVolumeMountBoot(),
 		renderVolumeMountNCCLTopology(),
@@ -93,6 +93,8 @@ func renderContainerSlurmd(
 		Name:            consts.ContainerNameSlurmd,
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
+		Command:         container.Command,
+		Args:            container.Args,
 		Env: renderSlurmdEnv(
 			clusterName,
 			cgroupVersion,
@@ -100,6 +102,7 @@ func renderContainerSlurmd(
 			realMemory,
 			enableGDRCopy,
 			slurmNodeExtra,
+			workerFeatures,
 		),
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,
@@ -117,20 +120,10 @@ func renderContainerSlurmd(
 					},
 				},
 			},
-			PeriodSeconds: 1,
-		},
-		// PreStop lifecycle hook to update the node state to down in case of worker deletion
-		// Node will not be deleted from the slurm cluster if the job is still running
-		Lifecycle: &corev1.Lifecycle{
-			PreStop: &corev1.LifecycleHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{
-						"/bin/bash",
-						"-c",
-						"scontrol update nodename=$(hostname) state=down reason=preStop && scontrol delete nodename=$(hostname);",
-					},
-				},
-			},
+			PeriodSeconds:    1,
+			TimeoutSeconds:   common.DefaultProbeTimeoutSeconds,
+			SuccessThreshold: common.DefaultProbeSuccessThreshold,
+			FailureThreshold: common.DefaultProbeFailureThreshold,
 		},
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: ptr.To(true),
@@ -144,7 +137,9 @@ func renderContainerSlurmd(
 			},
 			ProcMount: ptr.To(corev1.UnmaskedProcMount),
 		},
-		Resources: resources,
+		Resources:                resources,
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}, nil
 }
 
@@ -162,13 +157,15 @@ func renderSlurmdEnv(
 	realMemory int64,
 	enableGDRCopy bool,
 	slurmNodeExtra string,
+	workerFeatures []slurmv1.WorkerFeature,
 ) []corev1.EnvVar {
 	envVar := []corev1.EnvVar{
 		{
 			Name: "K8S_POD_NAME",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.name",
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "metadata.name",
 				},
 			},
 		},
@@ -176,7 +173,8 @@ func renderSlurmdEnv(
 			Name: "K8S_POD_NAMESPACE",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.namespace",
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "metadata.namespace",
 				},
 			},
 		},
@@ -184,7 +182,8 @@ func renderSlurmdEnv(
 			Name: "INSTANCE_ID",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "spec.nodeName",
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "spec.nodeName",
 				},
 			},
 		},
@@ -215,6 +214,12 @@ func renderSlurmdEnv(
 		envVar = append(envVar, corev1.EnvVar{
 			Name:  consts.NVIDIAGDRCopy,
 			Value: "enabled",
+		})
+	}
+	for _, feature := range workerFeatures {
+		envVar = append(envVar, corev1.EnvVar{
+			Name:  "SLURM_FEATURE_" + feature.Name,
+			Value: feature.HostlistExpr,
 		})
 	}
 	return envVar

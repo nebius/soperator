@@ -93,15 +93,11 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 						}
 					}
 
-					desired, err := common.RenderConfigMapSlurmConfigs(clusterValues, topologyConfig)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering ConfigMap with Slurm configs")
-					}
+					desired := common.RenderConfigMapSlurmConfigs(clusterValues, topologyConfig)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling ConfigMap with Slurm configs")
 					}
@@ -119,7 +115,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					if check.IsOtelCRDInstalled() {
 						if check.IsOtelEnabled(clusterValues.Telemetry) {
 
-							var foundPodTemplate *corev1.PodTemplate = nil
+							var foundPodTemplate *corev1.PodTemplate
 
 							if clusterValues.Telemetry.OpenTelemetryCollector != nil &&
 								clusterValues.Telemetry.OpenTelemetryCollector.Enabled &&
@@ -127,6 +123,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 
 								podTemplateName := *clusterValues.Telemetry.OpenTelemetryCollector.PodTemplateNameRef
 
+								foundPodTemplate = &corev1.PodTemplate{}
 								if err := r.Get(
 									stepCtx,
 									types.NamespacedName{

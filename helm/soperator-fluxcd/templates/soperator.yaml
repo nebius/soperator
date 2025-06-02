@@ -1,0 +1,81 @@
+{{ if .Values.soperator.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: helm-soperator
+      interval: {{ .Values.soperator.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+      version: {{ .Values.soperator.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- if .Values.certManager.enabled }}
+  - name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
+  {{- end }}
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  interval: {{ .Values.soperator.interval }}
+  timeout: {{ .Values.soperator.timeout }}
+  releaseName: {{ .Values.soperator.releaseName }}
+  targetNamespace: {{ .Values.soperator.namespace }}
+  values:
+  {{- if .Values.soperator.overrideValues }}
+    {{- toYaml .Values.soperator.overrideValues | nindent 4 }}
+  {{- else }}
+    {{- if .Values.certManager.enabled }}
+    certManager:
+      enabled: true
+    {{- end }}
+    controllerManager:
+      kubeRbacProxy:
+        image:
+          repository: gcr.io/kubebuilder/kube-rbac-proxy
+          tag: v0.15.0
+      manager:
+        {{- if and .Values.soperator.values .Values.soperator.values.manager .Values.soperator.values.manager.resources }}
+        resources: {{- toYaml .Values.soperator.values.manager.resources | nindent 10 }}
+        {{- end }}
+        {{- if or 
+          .Values.observability.enabled 
+          .Values.observability.prometheusOperator.enabled 
+          .Values.mariadbOperator.enabled 
+        }}
+        env:
+          {{- if .Values.securityProfilesOperator.enabled }}
+          isApparmorCrdInstalled: true
+          {{- end }}
+          {{- if .Values.mariadbOperator.enabled }}
+          isMariadbCrdInstalled: true
+          {{- end }}
+          {{- if and  
+            .Values.observability.enabled 
+            .Values.observability.prometheusOperator.enabled 
+          }} 
+          isPrometheusCrdInstalled: true
+          {{- end }}
+    {{- end }}
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: terraform-soperator
+    optional: true
+    valuesKey: values.yaml
+  - kind: ConfigMap
+    name: soperator
+    optional: true
+    valuesKey: values.yaml
+{{- end }}

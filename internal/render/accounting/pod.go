@@ -34,9 +34,6 @@ func BasePodTemplateSpec(
 		RenderVolumeSlurmdbdSpool(accounting),
 	}
 
-	var affinity *corev1.Affinity = nil
-	var nodeSelector map[string]string
-
 	nodeFilter, err := utils.GetBy(
 		nodeFilters,
 		accounting.K8sNodeFilterName,
@@ -45,9 +42,6 @@ func BasePodTemplateSpec(
 	if err != nil {
 		return nil, err
 	}
-
-	affinity = nodeFilter.Affinity
-	nodeSelector = nodeFilter.NodeSelector
 
 	return &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
@@ -63,13 +57,14 @@ func BasePodTemplateSpec(
 			},
 		},
 		Spec: corev1.PodSpec{
-			Affinity:     affinity,
-			NodeSelector: nodeSelector,
+			Affinity:     nodeFilter.Affinity,
 			Tolerations:  nodeFilter.Tolerations,
+			NodeSelector: nodeFilter.NodeSelector,
 			Hostname:     consts.HostnameAccounting,
-			InitContainers: []corev1.Container{
+			InitContainers: append(
+				accounting.CustomInitContainers,
 				common.RenderContainerMunge(&accounting.ContainerMunge),
-			},
+			),
 			Containers: []corev1.Container{
 				renderContainerAccounting(accounting.ContainerAccounting),
 			},

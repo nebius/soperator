@@ -1,0 +1,251 @@
+helmRepository:
+  interval: 15m
+  soperator:
+    url: oci://cr.eu-north1.nebius.cloud/soperator
+    type: oci
+  kruise:
+    url: https://openkruise.github.io/charts/
+    type: default
+  certManager:
+    url: https://charts.jetstack.io
+    type: default
+  bedag:
+    url: https://bedag.github.io/helm-charts
+    type: default
+  backup:
+    url: https://k8up-io.github.io/k8up
+    type: default
+  mariadbOperator:
+    url: https://helm.mariadb.com/mariadb-operator
+    type: default
+  opentelemetry:
+    url: https://open-telemetry.github.io/opentelemetry-helm-charts
+    type: default
+  prometheusOperator:
+    url: https://prometheus-community.github.io/helm-charts
+    type: default
+  securityProfilesOperator:
+    url: oci://cr.eu-north1.nebius.cloud/e00xdc03sb7gpqfd0a
+    type: oci
+  victoriaMetrics:
+    url: https://victoriametrics.github.io/helm-charts/
+    type: default
+ns:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: 2.0.0
+certManager:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: v1.17.*
+  namespace: cert-manager-system
+  releaseName: cert-manager
+  values: null
+  overrideValues: null
+backup:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: 4.8.*
+  namespace: k8up-system
+  releaseName: k8up
+  values: null
+  overrideValues: null
+  schedule:
+    interval: 5m
+    timeout: 5m
+    version: 4.8.*
+    namespace: k8up-system
+    releaseName: k8up-schedule
+    values:
+      name: soperator-jail
+      spec: {}
+mariadbOperator:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: 0.38.*
+  namespace: mariadb-operator-system
+  releaseName: mariadb-operator
+  values: null
+  overrideValues: null
+observability:
+  enabled: true
+  opentelemetry:
+    enabled: true
+    clusterName: soperator
+    namespace: logs-system
+    logs:
+      version: 0.117.*
+      interval: 5m
+      timeout: 5m
+      values:
+        publicEndpointEnabled: true
+        resources: {}
+      overrideValues: null
+    events:
+      version: 0.117.*
+      interval: 5m
+      timeout: 5m
+      values:
+        publicEndpointEnabled: true
+        resources: {}
+      overrideValues: null
+  prometheusOperator:
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    version: 19.1.*
+    namespace: monitoring-system
+  vmStack:
+    enabled: true
+    crds:
+      interval: 5m
+      timeout: 5m
+      version: 0.0.3
+    interval: 5m
+    timeout: 5m
+    version: 0.39.*
+    namespace: monitoring-system
+    releaseName: metrics
+    values:
+      dashboardNamespaces:
+        - soperator
+        - soperator-system
+        - gpu-operator
+        - monitoring-system
+        - logs-system
+      grafanaIni:
+        auth:
+          disable_login_form: true
+        auth.basic:
+          enabled: false
+        auth.anonymous:
+          enabled: true
+          org_name: Main Org.
+          org_role: Editor
+      vmagent:
+        spec:
+          extraArgs:
+            promscrape.maxScrapeSize: "33554432"
+      vmsingle:
+        spec:
+          extraArgs:
+            dedup.minScrapeInterval: 30s
+            maxLabelsPerTimeseries: "40"
+            search.maxQueryLen: "18765"
+            search.maxUniqueTimeseries: "500000"
+          retentionPeriod: 30d
+          storage:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 30Gi
+          # remoteWrite:
+          #   - bearerTokenSecret:
+          #       key: accessToken
+          #       name: o11y-writer-sa-token
+          #     url: https://write.monitoring.eu-north1.nebius.cloud./projects/project-e00h61cxzwnf6zksvdn77/prometheus/api/v1/write
+          #   - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8429/api/v1/write
+          # remoteWriteSettings:
+          #   label:
+          #     cluster: soperator
+          resources: {}
+    overrideValues: null
+  vmLogs:
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    version: 0.9.*
+    namespace: logs-system
+    releaseName: vm-logs
+    values:
+      persistentVolume:
+        enabled: true
+        size: 30Gi
+        accessMode: ReadWriteOnce
+      resources: {}
+    overrideValues: null
+  dcgmExporter:
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    version: 1.20.0
+    namespace: soperator
+    releaseName: soperator-dcgm-exporter
+    values:
+      hpcJobMapDir: /var/run/nebius/slurm
+      resources: {}
+securityProfilesOperator:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: 0.8.4-soperator
+  releaseName: security-profiles-operator
+  namespace: security-profiles-operator-system
+  values: null
+  overrideValues: null
+slurmCluster:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: 1.20.0
+  namespace: soperator
+  releaseName: soperator
+  values: null
+  overrideValues: null
+  slurmClusterStorage:
+    enabled: true
+    releaseName: slurm-cluster-storage
+    interval: 5m
+    timeout: 5m
+    values: null
+    overrideValues: null
+soperator:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: 1.20.0
+  namespace: "soperator-system"
+  releaseName: soperator-controller
+  values:
+    manager:
+      resources: {}
+  overrideValues: null
+  kruise:
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    version: 1.8.*
+    releaseName: soperator-kruise
+    overrideValues:
+      crds:
+        managed: true
+      resources:
+        limits:
+          memory: 256Mi
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      manager:
+        replicas: 1
+      featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true"
+  soperatorChecks:
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    releaseName: soperator-checks
+    values: null
+    overrideValues: null
+  nodeConfigurator:
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    releaseName: soperator-node-configurator
+    values:
+      rebooter:
+        resources: {}
+    overrideValues: null

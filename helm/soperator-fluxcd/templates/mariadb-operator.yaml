@@ -1,0 +1,53 @@
+{{- if .Values.mariadbOperator.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-mariadb-operator
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: mariadb-operator
+      interval: {{ .Values.mariadbOperator.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-mariadb-operator
+      version: {{ .Values.mariadbOperator.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  - name: {{ include "soperator-fluxcd.fullname" . }}-mariadb-operator-crds
+  - name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  interval: {{ .Values.mariadbOperator.interval }}
+  timeout: {{ .Values.mariadbOperator.timeout }}
+  releaseName: {{ .Values.mariadbOperator.releaseName }}
+  targetNamespace: {{ .Values.mariadbOperator.namespace }}
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  values:
+  {{- if .Values.mariadbOperator.overrideValues }}
+    {{- toYaml .Values.mariadbOperator.overrideValues | nindent 4 }}
+  {{- else }}
+    webhook:
+      cert:
+        certManager:
+          enabled: true
+      enabled: true
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: terraform-mariadb-operator
+    optional: true
+    valuesKey: values.yaml
+  - kind: ConfigMap
+    name: mariadb-operator
+    optional: true
+    valuesKey: values.yaml
+{{- end }}

@@ -13,3 +13,21 @@ func buildPartitionConfiguration(partitionConfiguration *slurmv1.PartitionConfig
 		RawConfig:  partitionConfiguration.RawConfig,
 	}
 }
+
+type HealthCheckConfig struct {
+	HealthCheckInterval  int32
+	HealthCheckProgram   string
+	HealthCheckNodeState []slurmv1.HealthCheckNodeState
+}
+
+func buildHealthCheckConfig(healthCheckConfig *slurmv1.HealthCheckConfig) *HealthCheckConfig {
+	if healthCheckConfig == nil {
+		return nil
+	}
+
+	return &HealthCheckConfig{
+		HealthCheckInterval:  healthCheckConfig.HealthCheckInterval,
+		HealthCheckProgram:   healthCheckConfig.HealthCheckProgram,
+		HealthCheckNodeState: healthCheckConfig.HealthCheckNodeState,
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"nebius.ai/slurm-operator/internal/consts"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
@@ -107,10 +108,25 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	SlurmTopologyConfigMapRefName string `json:"slurmTopologyConfigMapRefName,omitempty"`
 
+	// SConfigController defines the desired state of controller that watches after configs
+	//
+	// +kubebuilder:validation:Optional
+	SConfigController SConfigController `json:"sConfigController,omitempty"`
+
 	// Generate and set default AppArmor profile for the Slurm worker and login nodes. The Security Profiles Operator must be installed.
 	//
 	// +kubebuilder:default=false
 	UseDefaultAppArmorProfile bool `json:"useDefaultAppArmorProfile,omitempty"`
+
+	// WorkerFeatures defines Slurm node features to be used in the workers and Slurm nodesets to create using these features.
+	//
+	// +kubebuilder:validation:Optional
+	WorkerFeatures []WorkerFeature `json:"workerFeatures,omitempty"`
+
+	// HealthCheckConfig defines Slurm health check configuration.
+	//
+	// +kubebuilder:validation:Optional
+	HealthCheckConfig *HealthCheckConfig `json:"healthCheckConfig,omitempty"`
 }
 
 // SlurmConfig represents the Slurm configuration in slurm.conf
@@ -133,7 +149,7 @@ type SlurmConfig struct {
 	// Defines specific subsystems which should provide more detailed event logging.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs"
+	// +kubebuilder:default="Priority,Script,SelectType,Steps"
 	// +kubebuilder:validation:Pattern="^((Accrue|Agent|AuditRPCs|Backfill|BackfillMap|BurstBuffer|Cgroup|ConMgr|CPU_Bind|CpuFrequency|Data|DBD_Agent|Dependency|Elasticsearch|Energy|Federation|FrontEnd|Gres|Hetjob|Gang|GLOB_SILENCE|JobAccountGather|JobComp|JobContainer|License|Network|NetworkRaw|NodeFeatures|NO_CONF_HASH|Power|Priority|Profile|Protocol|Reservation|Route|Script|SelectType|Steps|Switch|TLS|TraceJobs|Triggers)(,)?)+$"
 	DebugFlags *string `json:"debugFlags,omitempty"`
 	// Defines specific file to run the epilog when job ends. Default value is no epilog
@@ -189,6 +205,11 @@ type MPIConfig struct {
 	PMIxEnv string `json:"pmixEnv,omitempty"`
 }
 
+type SConfigController struct {
+	Node      SlurmNode     `json:"node,omitempty"`
+	Container NodeContainer `json:"container,omitempty"`
+}
+
 type PartitionConfiguration struct {
 	// ConfigType
 	// +kubebuilder:validation:Enum=default;custom
@@ -201,6 +222,48 @@ type PartitionConfiguration struct {
 	// - PartitionName=high_priority  Nodes=worker-[10-20] Default=NO MaxTime=INFINITE State=UP PriorityTier=2
 	// +kubebuilder:validation:Optional
 	RawConfig []string `json:"rawConfig,omitempty"`
+}
+
+type WorkerFeature struct {
+	// Name defines the name of the feature.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+	// HostlistExpr defines a Slurm hostlist expression, e.g. "workers-[0-2,10],workers-[3-5]".
+	// Soperator will run these workers with the feature name.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	HostlistExpr string `json:"hostlistExpr,omitempty"`
+	// NodesetName optionally defines the Slurm nodeset name to be provisioned using this feature.
+	// This nodeset maybe be used in conjunction with partitions.
+	// +kubebuilder:validation:Optional
+	NodesetName string `json:"nodesetName,omitempty"`
+}
+
+type HealthCheckConfig struct {
+	// HealthCheckInterval defines interval for health check run in seconds.
+	//
+	// +kubebuilder:validation:Required
+	HealthCheckInterval int32 `json:"healthCheckInterval"`
+
+	// HealthCheckProgram defines program for health check run.
+	//
+	// +kubebuilder:validation:Required
+	HealthCheckProgram string `json:"healthCheckProgram"`
+
+	// HealthCheckNodeState identifies what node states should execute the HealthCheckProgram.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	HealthCheckNodeState []HealthCheckNodeState `json:"healthCheckNodeState"`
+}
+
+type HealthCheckNodeState struct {
+	// State identifies node state on which HealthCheckProgram should be executed.
+	//
+	// +kubebuilder:validation:Enum=ALLOC;ANY;CYCLE;IDLE;NONDRAINED_IDLE;MIXED
+	// +kubebuilder:validation:Required
+	State string `json:"state"`
 }
 
 type NCCLSettings struct {
@@ -430,7 +493,7 @@ type Secrets struct {
 
 // SlurmNodes define the desired state of the Slurm nodes
 type SlurmNodes struct {
-	// Accounting represents the Slurm accounting configuration
+	// Accounting represents the Slurm accounting node and database configuration
 	//
 	// TODO: Making accounting optional requires SlurmNode.K8sNodeFilterName to be optional.
 	// +kubebuilder:validation:Required
@@ -451,12 +514,15 @@ type SlurmNodes struct {
 	// +kubebuilder:validation:Required
 	Login SlurmNodeLogin `json:"login"`
 
-	// Exporter represents the Slurm exporter configuration
+	// Exporter represents the Slurm exporter node configuration
 	//
 	// TODO: Making exporter optional requires SlurmNode.K8sNodeFilterName to be optional.
 	// +kubebuilder:validation:Required
 	Exporter SlurmExporter `json:"exporter"`
 
+	// Rest represents the Slurm REST API node configuration
+	//
+	// +kubebuilder:validation:Required
 	Rest SlurmRest `json:"rest"`
 }
 
@@ -724,6 +790,11 @@ type SlurmNodeWorker struct {
 	// +kubebuilder:validation:Optional
 	SSHDConfigMapRefName string `json:"sshdConfigMapRefName,omitempty"`
 
+	// WorkerAnnotations represent K8S annotations that should be added to the workers
+	//
+	// +kubebuilder:validation:Optional
+	WorkerAnnotations map[string]string `json:"workerAnnotations,omitempty"`
+
 	// Volumes represents the volume configurations for the worker node
 	//
 	// +kubebuilder:validation:Required
@@ -903,6 +974,9 @@ type SlurmNode struct {
 	// Size defines the number of node instances
 	Size int32 `json:"size,omitempty"`
 
+	// CustomInitContainers represent additional init containers that should be added to created Pods
+	CustomInitContainers []corev1.Container `json:"customInitContainers,omitempty"`
+
 	// K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
 	// Must correspond to the name of one of [K8sNodeFilter]
 	//
@@ -916,6 +990,18 @@ type NodeContainer struct {
 	//
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
+
+	// Command defines the entrypoint array for the container. Not executed within a shell.
+	// The container image's ENTRYPOINT is used if this is not provided.
+	//
+	// +kubebuilder:validation:Optional
+	Command []string `json:"command,omitempty"`
+
+	// Args defines the arguments to the entrypoint (command).
+	// The container image's CMD is used if this is not provided.
+	//
+	// +kubebuilder:validation:Optional
+	Args []string `json:"args,omitempty"`
 
 	// ImagePullPolicy defines the image pull policy
 	//
@@ -1093,7 +1179,7 @@ type PodMonitorConfig struct {
 }
 
 const (
-	SlurmClusterKind = "SlurmCluster"
+	KindSlurmCluster = "SlurmCluster"
 
 	ConditionClusterCommonAvailable      = "CommonAvailable"
 	ConditionClusterControllersAvailable = "ControllersAvailable"

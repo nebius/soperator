@@ -1,0 +1,63 @@
+{{- if .Values.certManager.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: cert-manager
+      interval: {{ .Values.certManager.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
+      version: {{ .Values.certManager.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- if and .Values.observability.enabled .Values.observability.prometheusOperator.enabled }}
+  - name: {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds
+  {{- end }}
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  interval: {{ .Values.certManager.interval }}
+  targetNamespace: {{ .Values.certManager.namespace }}
+  releaseName: {{ .Values.certManager.releaseName }}
+  timeout: {{ .Values.certManager.timeout }}
+  values:
+  {{- if .Values.certManager.overrideValues }}
+    {{- toYaml .Values.certManager.overrideValues | nindent 4 }}
+  {{- else }}
+    enableCertificateOwnerRef: true
+    startupapicheck:
+      enabled: true
+    crds:
+      enabled: true
+    global:
+      leaderElection:
+        namespace: cert-manager-system
+    {{- if .Values.observability.prometheusOperator.enabled }}
+    prometheus:
+      enabled: true
+      servicemonitor:
+        enabled: false
+    {{- end }}
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: terraform-cert-manager
+    optional: true
+    valuesKey: values.yaml
+  - kind: ConfigMap
+    name: cert-manager
+    optional: true
+    valuesKey: values.yaml
+{{- end }}

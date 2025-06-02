@@ -18,6 +18,8 @@ type SlurmCluster struct {
 	CRVersion              string
 	ClusterType            consts.ClusterType
 	PartitionConfiguration PartitionConfiguration
+	WorkerFeatures         []slurmv1.WorkerFeature
+	HealthCheckConfig      *HealthCheckConfig
 
 	PopulateJail PopulateJail
 
@@ -37,12 +39,14 @@ type SlurmCluster struct {
 	SlurmConfig                   slurmv1.SlurmConfig
 	CustomSlurmConfig             *string
 	MPIConfig                     slurmv1.MPIConfig
-  SlurmTopologyConfigMapRefName string
+	SlurmTopologyConfigMapRefName string
+	SConfigController             SConfigController
 }
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD
 func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (*SlurmCluster, error) {
 	logger := log.FromContext(ctx)
+	logger.V(1).Info(fmt.Sprintf("%+v", cluster.Spec.SConfigController))
 
 	clusterType, err := consts.StringToClusterType(cluster.Spec.ClusterType)
 	if err != nil {
@@ -58,6 +62,8 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		CRVersion:              buildCRVersionFrom(ctx, cluster.Spec.CRVersion),
 		ClusterType:            clusterType,
 		PartitionConfiguration: buildPartitionConfiguration(&cluster.Spec.PartitionConfiguration),
+		WorkerFeatures:         cluster.Spec.WorkerFeatures,
+		HealthCheckConfig:      buildHealthCheckConfig(cluster.Spec.HealthCheckConfig),
 		NCCLBenchmark:          buildSlurmNCCLBenchmarkFrom(cluster.Name, &cluster.Spec.PeriodicChecks.NCCLBenchmark),
 		PopulateJail:           buildSlurmPopulateJailFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.PopulateJail),
 		NodeFilters:            buildNodeFiltersFrom(cluster.Spec.K8sNodeFilters),
@@ -73,13 +79,18 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 			&cluster.Spec.NCCLSettings,
 			cluster.Spec.UseDefaultAppArmorProfile,
 		),
-    NodeLogin:                     buildSlurmLoginFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
+		NodeLogin:                     buildSlurmLoginFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
 		Telemetry:                     cluster.Spec.Telemetry,
 		SlurmExporter:                 buildSlurmExporterFrom(cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Exporter),
 		SlurmConfig:                   cluster.Spec.SlurmConfig,
 		CustomSlurmConfig:             cluster.Spec.CustomSlurmConfig,
 		MPIConfig:                     cluster.Spec.MPIConfig,
-    SlurmTopologyConfigMapRefName: cluster.Spec.SlurmTopologyConfigMapRefName,
+		SlurmTopologyConfigMapRefName: cluster.Spec.SlurmTopologyConfigMapRefName,
+		SConfigController: buildSConfigControllerFrom(
+			cluster.Spec.SConfigController.Node,
+			cluster.Spec.SConfigController.Container,
+			*cluster.Spec.Maintenance,
+		),
 	}
 
 	if err := res.Validate(ctx); err != nil {

@@ -33,7 +33,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -43,9 +42,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/jwt"
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/controller/soperatorchecks"
 	"nebius.ai/slurm-operator/internal/slurmapi"
-	"nebius.ai/slurm-operator/internal/soperatorchecks"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -58,6 +57,7 @@ func init() {
 
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(slurmv1.AddToScheme(scheme))
+	utilruntime.Must(slurmv1alpha1.AddToScheme(scheme))
 }
 
 func getZapOpts(logFormat, logLevel string) []zap.Opts {
@@ -131,6 +131,7 @@ func main() {
 	flag.DurationVar(&reconcileTimeout, "reconcile-timeout", 5*time.Minute, "The maximum duration allowed for a single reconcile")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 5*time.Minute, "The maximum duration allowed for caching sync")
+	flag.Parse()
 
 	opts := getZapOpts(logFormat, logLevel)
 	ctrl.SetLogger(zap.New(opts...))
@@ -187,25 +188,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	slurmAPIServer := os.Getenv("SLURM_API_SERVER")
-	if len(slurmAPIServer) == 0 {
-		slurmAPIServer = "http://localhost:6820"
-	}
-
-	// TODO: init jwt controller
-	slurmClusterName := types.NamespacedName{
-		Namespace: "soperator",
-		Name:      "soperator",
-	}
-	jwtToken := jwt.NewToken(mgr.GetClient()).For(slurmClusterName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
-	slurmapiClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
-	if err != nil {
-		os.Exit(1)
-	}
-	slurmapiClients := map[types.NamespacedName]slurmapi.Client{
-		slurmClusterName: slurmapiClient,
-	}
-
 	ctx := context.Background()
 
 	// Index pods by node name. This is used to list and evict pods from a specific node.
@@ -217,14 +199,25 @@ func main() {
 		os.Exit(1)
 	}
 
+	slurmAPIClients := slurmapi.NewClientSet()
+
+	if err = soperatorchecks.NewSlurmAPIClientsController(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		mgr.GetEventRecorderFor(soperatorchecks.SlurmAPIClientsControllerName),
+		slurmAPIClients,
+	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+		setupLog.Error(err, "unable to create slurm api clients controller", "controller", soperatorchecks.SlurmAPIClientsControllerName)
+		os.Exit(1)
+	}
 	if err = soperatorchecks.NewSlurmNodesController(
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		mgr.GetEventRecorderFor(soperatorchecks.SlurmNodesControllerName),
-		slurmapiClients,
+		slurmAPIClients,
 		reconcileTimeout,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", soperatorchecks.SlurmNodesControllerName)
+		setupLog.Error(err, "unable to create slurm nodes controller", "controller", soperatorchecks.SlurmNodesControllerName)
 		os.Exit(1)
 	}
 	if err = soperatorchecks.NewK8SNodesController(
@@ -232,7 +225,35 @@ func main() {
 		mgr.GetScheme(),
 		mgr.GetEventRecorderFor(soperatorchecks.K8SNodesControllerName),
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", soperatorchecks.K8SNodesControllerName)
+		setupLog.Error(err, "unable to create k8s nodes controller", "controller", soperatorchecks.K8SNodesControllerName)
+		os.Exit(1)
+	}
+	if err = soperatorchecks.NewActiveCheckController(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckControllerName),
+		reconcileTimeout,
+	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+		setupLog.Error(err, "unable to create activecheck controller", "controller", "ActiveCheck")
+		os.Exit(1)
+	}
+	if err = soperatorchecks.NewActiveCheckJobController(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckJobControllerName),
+		slurmAPIClients,
+		reconcileTimeout,
+	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+		setupLog.Error(err, "unable to create activecheckjob controller", "controller", "ActiveCheckJob")
+		os.Exit(1)
+	}
+	if err = soperatorchecks.NewServiceAccountController(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		mgr.GetEventRecorderFor(soperatorchecks.SlurmChecksServiceAccountControllerName),
+		reconcileTimeout,
+	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+		setupLog.Error(err, "unable to create soperatorchecks serviceaccount controller", "controller", "ServiceAccount")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

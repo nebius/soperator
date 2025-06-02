@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	"github.com/pkg/errors"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,15 +66,11 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					desired, err := worker.RenderConfigMapSysctl(clusterValues)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering worker Sysctl ConfigMap")
-					}
+					desired := worker.RenderConfigMapSysctl(clusterValues)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling worker Sysctl ConfigMap")
 					}
@@ -96,15 +92,11 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						return nil
 					}
 
-					desired, err := common.RenderDefaultConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeWorker)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering worker default SSHD ConfigMap")
-					}
+					desired := worker.RenderConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeWorker)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling worker default SSHD ConfigMap")
 					}
@@ -241,6 +233,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						clusterValues.VolumeSources,
 						&clusterValues.NodeWorker,
 						clusterValues.SlurmTopologyConfigMapRefName,
+						clusterValues.WorkerFeatures,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
@@ -256,7 +249,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					}
 					stepLogger.V(1).Info("Retrieved dependencies")
 
-					if err = r.StatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
+					if err = r.AdvancedStatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling worker StatefulSet")
 					}
@@ -370,7 +363,7 @@ func (r SlurmClusterReconciler) ValidateWorkers(
 ) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	existing := &appsv1.StatefulSet{}
+	existing := &kruisev1b1.StatefulSet{}
 	err := r.Get(
 		ctx,
 		types.NamespacedName{
@@ -422,19 +415,6 @@ func (r SlurmClusterReconciler) getWorkersStatefulSetDependencies(
 	clusterValues *values.SlurmCluster,
 ) ([]metav1.Object, error) {
 	var res []metav1.Object
-
-	slurmConfigsConfigMap := &corev1.ConfigMap{}
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{
-			Namespace: clusterValues.Namespace,
-			Name:      naming.BuildConfigMapSlurmConfigsName(clusterValues.Name),
-		},
-		slurmConfigsConfigMap,
-	); err != nil {
-		return []metav1.Object{}, err
-	}
-	res = append(res, slurmConfigsConfigMap)
 
 	mungeKeySecret := &corev1.Secret{}
 	if err := r.Get(

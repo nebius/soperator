@@ -1,4 +1,24 @@
 checks:
+  kubeRbacProxy:
+    args:
+      - --secure-listen-address=0.0.0.0:8443
+      - --upstream=http://127.0.0.1:8080/
+      - --logtostderr=true
+      - --v=0
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+    image:
+      repository: gcr.io/kubebuilder/kube-rbac-proxy
+      tag: v0.15.0
+    resources:
+      limits:
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
   manager:
     args:
       - --leader-elect
@@ -8,11 +28,10 @@ checks:
         drop:
           - ALL
     env:
-      slurmApiServer: http://soperator-rest-svc.soperator:6820
       slurmOperatorWatchNamespaces: '*'
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/soperatorchecks
-      tag: 1.19.0
+      tag: 1.20.0
     imagePullPolicy: Always
     resources:
       limits:
@@ -24,3 +43,22 @@ checks:
   serviceAccount:
     annotations: {}
 kubernetesClusterDomain: cluster.local
+metricsService:
+  enabled: false
+  serviceMonitor:
+    # -- Labels to be added to the controller ServiceMonitor
+    additionalLabels: {}
+    # release: kube-prometheus-stack
+    # --  Interval to scrape metrics
+    interval: 30s
+    # -- Timeout if metrics can't be retrieved in given time interval
+    scrapeTimeout: 25s
+    # MetricRelabelConfigs to apply to samples before ingestion.
+    metricRelabelings: []
+    # RelabelConfigs to apply to samples before scraping.
+  ports:
+    - name: https
+      port: 8443
+      protocol: TCP
+      targetPort: https
+  type: ClusterIP

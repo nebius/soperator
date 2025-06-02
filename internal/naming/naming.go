@@ -66,7 +66,7 @@ func BuildServiceHostFQDN(
 	hostIndex int32,
 ) (hostName, hostFQDN string) {
 	// <stsName>-<index>.<svcName>.<namespace>.svc.cluster.local
-	hostName = fmt.Sprintf("%s-%d", BuildStatefulSetName(componentType, clusterName), hostIndex)
+	hostName = fmt.Sprintf("%s-%d", BuildStatefulSetName(componentType), hostIndex)
 	hostFQDN = fmt.Sprintf("%s.%s", hostName, BuildServiceFQDN(componentType, namespace, clusterName))
 	return hostName, hostFQDN
 }
@@ -78,7 +78,7 @@ func BuildAppArmorProfileName(clusterName, namespace string) string {
 	}.String()
 }
 
-func BuildStatefulSetName(componentType consts.ComponentType, clusterName string) string {
+func BuildStatefulSetName(componentType consts.ComponentType) string {
 	return namedEntity{
 		componentType: &componentType,
 		clusterName:   "",
@@ -109,10 +109,10 @@ func BuildSecretMungeKeyName(clusterName string) string {
 
 // region Login
 
-func BuildConfigMapSSHDConfigsName(clusterName string) string {
+func BuildConfigMapSSHDConfigsNameLogin(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,
-		entity:      consts.ConfigMapNameSSHDConfigs,
+		entity:      consts.ConfigMapNameSSHDConfigsLogin,
 	}.String()
 }
 
@@ -141,6 +141,12 @@ func BuildConfigMapSecurityLimitsName(componentType consts.ComponentType, cluste
 // endregion Login
 
 // region Worker
+func BuildConfigMapSSHDConfigsNameWorker(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.ConfigMapNameSSHDConfigsWorker,
+	}.String()
+}
 
 func BuildConfigMapNCCLTopologyName(clusterName string) string {
 	return namedEntity{
@@ -203,6 +209,18 @@ func BuildRoleBindingWorkerName(clusterName string) string {
 	return clusterName + "-worker-events-role-binding"
 }
 
+func BuildServiceAccountActiveCheckName(clusterName string) string {
+	return clusterName + "-activecheck-sa"
+}
+
+func BuildRoleActiveCheckName(clusterName string) string {
+	return clusterName + "-activecheck-role"
+}
+
+func BuildRoleBindingActiveCheckName(clusterName string) string {
+	return clusterName + "-activecheck-role-binding"
+}
+
 func BuildOtelSvcEndpoint(clusterName string) string {
 	return fmt.Sprintf("%s-collector", clusterName)
 }
@@ -226,4 +244,20 @@ func BuildMariaDbName(clusterName string) string {
 		clusterName: clusterName,
 		entity:      consts.MariaDbClusterSuffix,
 	}.String()
+}
+
+func BuildServiceAccountSconfigControllerName(clusterName string) string {
+	return clusterName + "-sconfigcontroller-sa"
+}
+
+func BuildRoleBindingSConfigControllerName(clusterName string) string {
+	return clusterName + "-sconfigcontroller-configmaps-role-binding"
+}
+
+func BuildRoleSConfigControllerName(clusterName string) string {
+	return clusterName + "-sconfigcontroller-configmaps-role"
+}
+
+func BuildConfigMapSbatchScriptName(scriptName string) string {
+	return "sbatch-script-" + scriptName
 }

@@ -1,0 +1,94 @@
+suite: test soperator dependencies
+templates:
+  - templates/soperator.yaml
+tests:
+  - it: should not render soperatorChecks and nodeConfigurator when soperator.enabled=false
+    set:
+      soperator.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render soperator but not its subcomponents when soperator.enabled=true but subcomponents disabled
+    set:
+      soperator.enabled: true
+      soperator.soperatorChecks.enabled: false
+      soperator.nodeConfigurator.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: HelmRelease
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-soperator
+---
+suite: test soperatorchecks dependencies
+templates:
+  - templates/soperatorchecks.yaml
+tests:
+  - it: should not render soperatorChecks and nodeConfigurator when soperator.enabled=false
+    set:
+      soperator.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render soperator but not its subcomponents when soperator.enabled=true but subcomponents disabled
+    set:
+      soperator.enabled: true
+      soperator.soperatorChecks.enabled: false
+      soperator.nodeConfigurator.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+---
+suite: test nodeconfigurator dependencies
+templates:
+  - templates/nodeconfigurator.yaml
+tests:
+  - it: should not render soperatorChecks and nodeConfigurator when soperator.enabled=false
+    set:
+      soperator.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render soperator but not its subcomponents when soperator.enabled=true but subcomponents disabled
+    set:
+      soperator.enabled: true
+      soperator.soperatorChecks.enabled: false
+      soperator.nodeConfigurator.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: should render soperator but not its subcomponents when soperator.enabled=true but subcomponents disabled
+    set:
+      soperator.enabled: true
+      soperator.soperatorChecks.enabled: false
+      soperator.nodeConfigurator.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: HelmRelease
+          index: 0
+      - equal:
+          path: metadata.name
+          index: 0
+          value: RELEASE-NAME-nodeconfigurator
+---
+suite: test nodeconfigurator dependencies
+templates:
+  - templates/soperator.yaml
+  - templates/soperatorchecks.yaml
+  - templates/nodeconfigurator.yaml
+tests:
+  - it: should render all soperator components when all are enabled
+    set:
+      soperator.enabled: true
+      soperator.soperatorChecks.enabled: true
+      soperator.nodeConfigurator.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1

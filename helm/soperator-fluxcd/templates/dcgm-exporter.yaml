@@ -1,0 +1,38 @@
+{{- if and .Values.observability.enabled .Values.observability.dcgmExporter.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-dcgm-exporter
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: helm-soperator-dcgm-exporter
+      interval: {{ .Values.observability.dcgmExporter.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+      version: {{ .Values.observability.dcgmExporter.version }}
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  interval: {{ .Values.observability.dcgmExporter.interval }}
+  timeout: {{ .Values.observability.dcgmExporter.timeout }}
+  releaseName: {{ .Values.observability.dcgmExporter.releaseName }}
+  targetNamespace: {{ .Values.observability.dcgmExporter.namespace }}
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  values:
+    dcgmHpcJobMappingDir: {{ .Values.observability.dcgmExporter.values.hpcJobMapDir }}
+    {{- if .Values.observability.dcgmExporter.values.resources }}
+    daemonSet:
+      nvidiaDcgmExporter:
+        resources:
+          {{- toYaml .Values.observability.dcgmExporter.values.resources | nindent 8 }}
+    {{- end }}
+{{- end }}

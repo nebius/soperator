@@ -1,0 +1,67 @@
+{{- if .Values.securityProfilesOperator.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-security-profiles-operator
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: security-profiles-operator
+      interval: {{ .Values.securityProfilesOperator.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-security-profiles-operator
+      version: {{ .Values.securityProfilesOperator.version }}
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  interval: {{ .Values.securityProfilesOperator.interval }}
+  timeout: {{ .Values.securityProfilesOperator.timeout }}
+  releaseName: {{ .Values.securityProfilesOperator.releaseName }}
+  targetNamespace: {{ .Values.securityProfilesOperator.namespace }}
+  values:
+  {{- if .Values.securityProfilesOperator.overrideValues }}
+    {{- toYaml .Values.securityProfilesOperator.overrideValues | nindent 4 }}
+  {{- else }}
+    daemon:
+      tolerations:
+        - operator: Exists
+    enableAppArmor: true
+    enableBpfRecorder: false
+    enableLogEnricher: false
+    enableProfiling: false
+    enableSelinux: false
+    replicaCount: 2
+    spoImage:
+      registry: gcr.io
+      repository: k8s-staging-sp-operator/security-profiles-operator
+      tag: v0.8.4
+    tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists
+      - effect: NoSchedule
+        operator: Exists
+    verbosity: 0
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: terraform-security-profiles-operator
+    optional: true
+    valuesKey: values.yaml
+  - kind: ConfigMap
+    name: security-profiles-operator
+    optional: true
+    valuesKey: values.yaml
+{{- end }}

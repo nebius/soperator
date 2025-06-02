@@ -21,19 +21,20 @@ func renderVolumesAndClaimTemplateSpecs(
 	worker *values.SlurmWorker,
 	slurmTopologyConfigMapRefName string,
 ) (volumes []corev1.Volume, pvcTemplateSpecs []values.PVCTemplateSpec, err error) {
+	// TODO: should we remove slurmTopologyConfigMapRefName?
+	// It was added here: https://github.com/nebius/soperator/pull/512/files#diff-61e019adaefbac7d794afa71993ec23d49c70bcbd6c19523d755e74b0e80aa0e
+	// and then it was removed here: https://github.com/nebius/soperator/pull/543/files#diff-61e019adaefbac7d794afa71993ec23d49c70bcbd6c19523d755e74b0e80aa0e
+	_ = slurmTopologyConfigMapRefName
+
 	volumes = []corev1.Volume{
-		common.RenderVolumeProjectedSlurmConfigs(
-			clusterName,
-			common.RenderVolumeProjectionSlurmTopologyConfig(slurmTopologyConfigMapRefName),
-		),
 		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeMungeSocket(),
 		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeWorker),
 		common.RenderVolumeSshdKeys(secrets.SshdKeysName),
-		common.RenderVolumeSshdConfigs(worker.SSHDConfigMapName),
 		common.RenderVolumeSshdRootKeys(clusterName),
 		common.RenderVolumeInMemory(),
 		common.RenderVolumeTmpDisk(),
+		renderVolumeSshdConfigs(worker.SSHDConfigMapName),
 		renderVolumeNvidia(),
 		renderVolumeBoot(),
 		renderVolumeNCCLTopology(clusterName),
@@ -122,6 +123,7 @@ func renderSupervisordConfigMap(name string) corev1.Volume {
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: name,
 				},
+				DefaultMode: ptr.To(common.DefaultFileMode),
 			},
 		},
 	}
@@ -138,6 +140,7 @@ func renderVolumeNvidia() corev1.Volume {
 		VolumeSource: corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: consts.VolumeMountPathNvidia,
+				Type: ptr.To(corev1.HostPathType("")),
 			},
 		},
 	}
@@ -163,6 +166,7 @@ func renderVolumeBoot() corev1.Volume {
 		VolumeSource: corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: consts.VolumeMountPathBoot,
+				Type: ptr.To(corev1.HostPathType("")),
 			},
 		},
 	}
@@ -190,6 +194,7 @@ func renderVolumeNCCLTopology(clusterName string) corev1.Volume {
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: naming.BuildConfigMapNCCLTopologyName(clusterName),
 				},
+				DefaultMode: ptr.To(common.DefaultFileMode),
 			},
 		},
 	}
@@ -242,6 +247,7 @@ func renderVolumeSysctl(clusterName string) corev1.Volume {
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: naming.BuildConfigMapSysctlName(clusterName),
 				},
+				DefaultMode: ptr.To(common.DefaultFileMode),
 			},
 		},
 	}
@@ -257,3 +263,31 @@ func renderVolumeMountSysctl() corev1.VolumeMount {
 }
 
 // endregion Sysctl
+
+// region configs
+
+// RenderVolumeSshdConfigs renders [corev1.Volume] containing SSHD configs contents
+func renderVolumeSshdConfigs(sshdConfigMapName string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSSHDConfigsWorker,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: sshdConfigMapName,
+				},
+				DefaultMode: ptr.To(common.DefaultFileMode),
+			},
+		},
+	}
+}
+
+// RenderVolumeMountSshdConfigs renders [corev1.VolumeMount] defining the mounting path for SSHD configs
+func renderVolumeMountSshdConfigs() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSSHDConfigsWorker,
+		MountPath: consts.VolumeMountPathSSHConfigs,
+		ReadOnly:  true,
+	}
+}
+
+// endregion configs

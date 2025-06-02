@@ -127,7 +127,6 @@ func renderContainerNCCLBenchmark(
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
-			common.RenderVolumeMountSlurmConfigs(),
 			common.RenderVolumeMountJail(),
 			common.RenderVolumeMountMungeKey(),
 		},

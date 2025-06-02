@@ -70,11 +70,12 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 						stepLogger.V(1).Info("Prometheus Operator CRD is installed")
 						if check.IsPrometheusEnabled(&clusterValues.SlurmExporter) {
 							stepLogger.V(1).Info("Prometheus is enabled")
-							var foundPodTemplate *corev1.PodTemplate = nil
+							var foundPodTemplate *corev1.PodTemplate
 
 							if clusterValues.SlurmExporter.PodTemplateNameRef != nil {
 								podTemplateName := *clusterValues.SlurmExporter.PodTemplateNameRef
 
+								foundPodTemplate = &corev1.PodTemplate{}
 								err := r.Get(
 									stepCtx,
 									types.NamespacedName{
@@ -121,6 +122,6 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 		logger.Error(err, "Failed to reconcile exporter resources")
 		return errors.Wrap(err, "reconciling exporter resources")
 	}
-	logger.V(1).Info("Reconciled exporter resources")
+	logger.Info("Reconciled exporter resources")
 	return nil
 }

@@ -1,0 +1,58 @@
+{{- if and .Values.soperator.enabled .Values.soperator.nodeConfigurator.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-nodeconfigurator
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: helm-nodeconfigurator
+      interval: {{ .Values.soperator.nodeConfigurator.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+      version: {{ .Values.soperator.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  interval: {{ .Values.soperator.nodeConfigurator.interval }}
+  timeout: {{ .Values.soperator.nodeConfigurator.timeout }}
+  releaseName: {{ .Values.soperator.nodeConfigurator.releaseName }}
+  targetNamespace: {{ .Values.soperator.namespace }}
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  values:
+  {{- if .Values.soperator.nodeConfigurator.overrideValues }}
+    {{- toYaml .Values.soperator.nodeConfigurator.overrideValues | nindent 4 }}
+  {{- else }}
+    nodeConfigurator:
+      enabled: false
+    rebooter:
+      enabled: true
+      {{- if and .Values.soperator.nodeConfigurator.values.rebooter .Values.soperator.nodeConfigurator.values.rebooter.resources }}
+      resources: 
+      {{- toYaml .Values.soperator.nodeConfigurator.values.rebooter.resources | nindent 8 }}
+      {{- end }}
+      generateRBAC: true
+      logFormat: json
+      tolerations:
+        - operator: Exists
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: terraform-nodeconfigurator
+    optional: true
+    valuesKey: values.yaml
+  - kind: ConfigMap
+    name: nodeconfigurator
+    optional: true
+    valuesKey: values.yaml
+{{- end }}

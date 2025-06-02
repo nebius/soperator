@@ -1,13 +1,11 @@
 package prometheus
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -18,7 +16,7 @@ import (
 
 func BasePodTemplateSpec(
 	clusterName string,
-	munge *values.Container,
+	initContainers []corev1.Container,
 	valuesExporter *values.SlurmExporter,
 	nodeFilters []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
@@ -32,6 +30,7 @@ func BasePodTemplateSpec(
 	}
 
 	var affinity *corev1.Affinity = nil
+	var tolerations []corev1.Toleration
 	var nodeSelector map[string]string
 
 	nodeFilter, err := utils.GetBy(
@@ -42,6 +41,7 @@ func BasePodTemplateSpec(
 	if err == nil {
 		affinity = nodeFilter.Affinity
 		nodeSelector = nodeFilter.NodeSelector
+		tolerations = nodeFilter.Tolerations
 	}
 
 	return corev1.PodTemplateSpec{
@@ -57,11 +57,10 @@ func BasePodTemplateSpec(
 			},
 		},
 		Spec: corev1.PodSpec{
-			Affinity:     affinity,
-			NodeSelector: nodeSelector,
-			InitContainers: []corev1.Container{
-				common.RenderContainerMunge(munge),
-			},
+			Affinity:       affinity,
+			Tolerations:    tolerations,
+			NodeSelector:   nodeSelector,
+			InitContainers: initContainers,
 			Containers: []corev1.Container{
 				RenderContainerExporter(valuesExporter),
 			},
@@ -72,37 +71,20 @@ func BasePodTemplateSpec(
 
 func RenderPodTemplateSpec(
 	clusterName string,
-	munge *values.Container,
+	initContainers []corev1.Container,
 	valuesExporter *values.SlurmExporter,
 	nodeFilters []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
 	matchLabels map[string]string,
 	podTemplateSpec *corev1.PodTemplateSpec,
 ) corev1.PodTemplateSpec {
-	result := BasePodTemplateSpec(clusterName, munge, valuesExporter, nodeFilters, volumeSources, matchLabels)
+	result := BasePodTemplateSpec(clusterName, initContainers, valuesExporter, nodeFilters, volumeSources, matchLabels)
 	if podTemplateSpec != nil {
-		// Convert the structs to JSON
-		originalJSON, err := json.Marshal(result)
-		if err != nil {
-			log.Fatalf("Error marshalling original PodTemplateSpec: %v", err)
-		}
-
-		patchJSON, err := json.Marshal(podTemplateSpec)
-		if err != nil {
-			log.Fatalf("Error marshalling patch PodTemplateSpec: %v", err)
-		}
-
-		mergedJSON, err := strategicpatch.StrategicMergePatch(originalJSON, patchJSON, &corev1.PodTemplateSpec{})
+		var err error
+		result, err = common.MergePodTemplateSpecs(result, podTemplateSpec)
 		if err != nil {
 			log.Fatalf("Error performing strategic merge: %v", err)
 		}
-
-		// Ummarshal the merged JSON back into a struct
-		err = json.Unmarshal(mergedJSON, &result)
-		if err != nil {
-			log.Fatalf("Error unmarshalling merged PodTemplateSpec: %v", err)
-		}
 	}
-
 	return result
 }

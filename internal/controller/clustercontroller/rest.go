@@ -41,6 +41,9 @@ func (r SlurmClusterReconciler) ReconcileREST(
 		return nil
 	}
 
+	// Important: this service will restart every time slurm-configs ConfigMap changes
+	// We've left this behavior for this service, because it doesn't use Jail, and current realisation require Jail
+	//
 	reconcileRESTImpl := func() error {
 		return utils.ExecuteMultiStep(ctx,
 			"Reconciliation of REST API resources",
@@ -50,19 +53,15 @@ func (r SlurmClusterReconciler) ReconcileREST(
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
-					desired, err := rest.RenderService(
+					desired := rest.RenderService(
 						clusterValues.Namespace,
 						clusterValues.Name,
 						&clusterValues.NodeRest,
 					)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering REST API service")
-					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.V(1).Info("Rendered")
 					var restNamePtr *string = nil
-					if err = r.Service.Reconcile(stepCtx, cluster, desired, restNamePtr); err != nil {
+					if err := r.Service.Reconcile(stepCtx, cluster, desired, restNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return errors.Wrap(err, "reconciling REST API service")
 					}
@@ -113,7 +112,7 @@ func (r SlurmClusterReconciler) ReconcileREST(
 		logger.Error(err, "Failed to reconcile REST resources")
 		return errors.Wrap(err, "reconciling REST resources")
 	}
-	logger.V(1).Info("Reconciled REST resources")
+	logger.Info("Reconciled REST resources")
 	return nil
 }
 

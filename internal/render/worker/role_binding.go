@@ -27,7 +27,7 @@ func RenderRoleBinding(namespace, clusterName string) rbacv1.RoleBinding {
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "Role",
 			Name:     naming.BuildRoleWorkerName(clusterName),
-			APIGroup: "rbac.authorization.k8s.io",
+			APIGroup: rbacv1.GroupName,
 		},
 	}
 }

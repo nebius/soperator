@@ -2,8 +2,11 @@ name: Build All in one job
 
 on:
   push:
+    branches:
+      - main
+      - dev
     paths-ignore:
-      - '.github/**'
+#      - '.github/**'
       - 'docs/**'
       - 'CODEOWNERS'
       - 'LICENSE'
@@ -11,7 +14,23 @@ on:
       - 'README.md'
       - 'SECURITY.md'
       - 'images/worker/gpubench/**'
+      - 'helm/**'
 
+  # pull_request are defined separately to allow to run CI from forks.
+  pull_request:
+    branches-ignore:
+      - main
+    types: [opened, synchronize, reopened]
+    paths-ignore:
+#      - '.github/**'
+      - 'docs/**'
+      - 'CODEOWNERS'
+      - 'LICENSE'
+      - 'PROJECT'
+      - 'README.md'
+      - 'SECURITY.md'
+      - 'images/worker/gpubench/**'
+      - 'helm/**'
 
 permissions:
   contents: read
@@ -23,71 +42,144 @@ jobs:
   pre-build:
     runs-on: self-hosted
 
-    outputs:
-      UNSTABLE: ${{ steps.set-env.outputs.unstable }}
-
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
-        with:
-          egress-policy: audit
-
-      - name: Set environment to global output variables based on branch
-        id: set-env
-        run: |
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "unstable=false" >> $GITHUB_OUTPUT
-          else
-            echo "unstable=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Print UNSTABLE from output
-        run: |
-          echo "Branch is - ${{ github.ref }}"
-          echo "UNSTABLE - ${{ steps.set-env.outputs.unstable }}"
-
-  one_job:
-    runs-on: self-hosted
-    needs: pre-build
-
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
         with:
           egress-policy: audit
 
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
+      - name: Cache go modules
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod') }}
+          restore-keys: |
+            go-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Install GO
-        uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: 'go.mod'
+          cache: false
+
+      - name: Generate version file
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            make get-version UNSTABLE=false >> version.txt
+            echo "false" >> version.txt
+          else
+            make get-version UNSTABLE=true >> version.txt
+            echo "true" >> version.txt
+          fi
+
+      - name: Upload version file
+        uses: actions/upload-artifact@v4
+        with:
+          name: version
+          path: version.txt
+
+      - name: Download version artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: version
+          path: ./version
+
+      - name: Read version and unstable
+        id: read-version
+        run: |
+          VERSION=$(sed -n '1p' ./version/version.txt)
+          UNSTABLE=$(sed -n '2p' ./version/version.txt)
+          
+          echo "Version: $VERSION"
+          echo "Unstable: $UNSTABLE"
+
+      - name: Save Cache (only if needed)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: echo "cache miss – saved automatically by actions/cache"
+
+  one_job:
+    runs-on: X64
+    needs: pre-build
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Cache go modules
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod') }}
+          restore-keys: |
+            go-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install GO
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
             go-version-file: 'go.mod'
+            cache: false
 
-      - name: Debug vars
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
+        with:
+          version: v2.0.2 # version of golangci-lint, should be in sync with Makefile.
+
+      - name: Download version artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: version
+          path: ./version
+
+      - name: Read version and unstable
+        id: read-version
         run: |
-          echo "UNSTABLE - is ${{ needs.pre-build.outputs.unstable }}"
-          make get-version UNSTABLE=${{ needs.pre-build.outputs.unstable }}
+          VERSION=$(sed -n '1p' ./version/version.txt)
+          UNSTABLE=$(sed -n '2p' ./version/version.txt)
+          
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
+          
+          echo "Version: $VERSION"
+          echo "Unstable: $UNSTABLE"
 
-      - name: Run make sync-version-from-scratch
+      - name: Debug VERSION and UNSTABLE vars
+        run: |
+          echo "Building version ${{ steps.read-version.outputs.version }}" 
+          echo "Unstable: ${{ steps.read-version.outputs.unstable }}"
+
+      - name: Run make sync-version-from-scratch # Every time we should have only stable version in our code. So UNSTABLE=false here
         run: |
           make kustomize helmify yq
-          make sync-version-from-scratch
+          make sync-version-from-scratch UNSTABLE=false
 
       - name: Check for uncommitted changes
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
             echo "❌ Uncommitted changes detected after make sync-version-from-scratch"
+            git status --porcelain
             git diff
             exit 1
           fi
-        shell: bash
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
       - name: Log in to the Github Container registry
-        uses: docker/login-action@327cd5a69de6c009b9ce71bce8395f28e651bf99
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -95,7 +187,7 @@ jobs:
 
       - name: Run all
         run: |
-          UNSTABLE=${{ needs.pre-build.outputs.unstable }}
+          UNSTABLE=${{ steps.read-version.outputs.unstable }}
           IMAGE_VERSION=$(make get-image-version UNSTABLE=${UNSTABLE})
           VERSION=$(make get-version UNSTABLE=${UNSTABLE})
           OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
@@ -125,34 +217,52 @@ jobs:
 
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=exporter DOCKERFILE=exporter/exporter.dockerfile
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=exporter
-          
+
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd DOCKERFILE=restd/slurmrestd.dockerfile
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd
 
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter DOCKERFILE=rebooter.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm_check_job DOCKERFILE=slurm_check_job/slurm_check_job.dockerfile
+          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm_check_job
+
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_check_job DOCKERFILE=k8s_check_job/k8s_check_job.dockerfile
+          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_check_job
+
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter DOCKERFILE=rebooter/rebooter.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
 
           echo "Common images were built"
 
           echo "Removing previous jail rootfs tar archive"
-          rm -rf images/jail_rootfs.tar
+          rm -f images/jail_rootfs.tar
 
           echo "Building tarball for jail"
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=jail DOCKERFILE=jail/jail.dockerfile DOCKER_OUTPUT="--output type=tar,dest=jail_rootfs.tar"
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=jail DOCKERFILE=jail/jail.dockerfile DOCKER_OUTPUT="--output type=tar,dest=images/jail_rootfs.tar"
           echo "Built tarball jail_rootfs.tar"
 
           make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail DOCKERFILE=populate_jail/populate_jail.dockerfile
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail
 
+          echo "Removing jail rootfs tar archive to speedup further docker builds."
+          rm -f images/jail_rootfs.tar
+
           echo "Building image of the soperatorchecks"
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks DOCKERFILE=soperatorchecks.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks DOCKERFILE=soperatorchecks/soperatorchecks.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
           echo "Pushing image of the soperatorchecks"
           make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
 
+          echo "Building image of the sconfigcontroller"
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller DOCKERFILE=sconfigcontroller/sconfigcontroller.dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          echo "Pushing image of the sconfigcontroller"
+          make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+
           echo "Building image of the operator"
-          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator DOCKERFILE=Dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
+          make docker-build UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator DOCKERFILE=soperator/Dockerfile IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
           echo "Pushing image of the operator"
           make docker-push UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator IMAGE_VERSION="$OPERATOR_IMAGE_TAG"
 
           echo "Pushing Helm charts"
           make release-helm UNSTABLE="${UNSTABLE}" OPERATOR_IMAGE_TAG="$OPERATOR_IMAGE_TAG"
+
+      - name: Save Cache (only if needed)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: echo "cache miss – saved automatically by actions/cache"

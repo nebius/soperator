@@ -1,0 +1,29 @@
+{{- if and .Values.observability.enabled .Values.observability.vmStack.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-victoria-metrics-operator-crds
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: victoria-metrics-operator-crds
+      interval: {{ .Values.observability.vmStack.crds.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-victoriametrics
+      version: {{ .Values.observability.vmStack.crds.version }}
+  driftDetection:
+    mode: enabled
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  interval: {{ .Values.observability.vmStack.crds.interval }}
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+{{- end }}

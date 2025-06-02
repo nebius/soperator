@@ -14,6 +14,7 @@ const (
 	ContainerNameNodeSysctl        = "node-sysctl"
 	ContainerNameRebooter          = "rebooter"
 	ContainerNameNodeSysctlSleep   = "node-sysctl-sleep"
+	ContainerNameSConfigController = SConfigControllerName
 
 	ContainerSecurityContextCapabilitySysAdmin = "SYS_ADMIN"
 

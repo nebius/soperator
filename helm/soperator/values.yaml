@@ -37,7 +37,7 @@ controllerManager:
       slurmOperatorWatchNamespaces: '*'
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/slurm-operator
-      tag: 1.19.0
+      tag: 1.20.0
     imagePullPolicy: Always
     resources:
       limits:
@@ -56,6 +56,19 @@ metricsService:
       protocol: TCP
       targetPort: https
   type: ClusterIP
+  serviceMonitor:
+    # -- Labels to be added to the controller ServiceMonitor
+    enabled: false
+    additionalLabels: {}
+    # release: kube-prometheus-stack
+    # --  Interval to scrape metrics
+    interval: 30s
+    # -- Timeout if metrics can't be retrieved in given time interval
+    scrapeTimeout: 25s
+    # MetricRelabelConfigs to apply to samples before ingestion.
+    metricRelabelings: []
+    # RelabelConfigs to apply to samples before scraping.
+    relabelings: []
 webhookService:
   ports:
     - port: 443
@@ -64,3 +77,8 @@ webhookService:
   type: ClusterIP
 certManager:
   enabled: false
+kruise:
+  installOperator: true
+  manager:
+    replicas: 1
+  featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true"

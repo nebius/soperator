@@ -15,11 +15,11 @@ func renderVolumesAndClaimTemplateSpecs(
 	controller *values.SlurmController,
 	slurmTopologyConfigMapRefName string,
 ) (volumes []corev1.Volume, pvcTemplateSpecs []values.PVCTemplateSpec, err error) {
+	// TODO: should we remove slurmTopologyConfigMapRefName?
+	// It was added here:https://github.com/nebius/soperator/pull/512/files#diff-2791182e727336ce7ed0d512bacffce1971ad4eed34bdc27d6fb8be612e1b147
+	// and then it was removed here: https://github.com/nebius/soperator/pull/543/files#diff-2791182e727336ce7ed0d512bacffce1971ad4eed34bdc27d6fb8be612e1b147
+	_ = slurmTopologyConfigMapRefName
 	volumes = []corev1.Volume{
-		common.RenderVolumeProjectedSlurmConfigs(
-			clusterName,
-			common.RenderVolumeProjectionSlurmTopologyConfig(slurmTopologyConfigMapRefName),
-		),
 		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeMungeSocket(),
 		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeController),

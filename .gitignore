@@ -6,3 +6,6 @@ cover.out
 release_all.sh
 upload_to_build_agent.sh
 .vscode
+
+# ignoring generated version folder
+/version/

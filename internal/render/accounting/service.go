@@ -11,7 +11,7 @@ import (
 )
 
 // RenderService renders new [corev1.Service] serving Slurm accountings
-func RenderService(namespace, clusterName string, accounting *values.SlurmAccounting) (*corev1.Service, error) {
+func RenderService(namespace, clusterName string, accounting *values.SlurmAccounting) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      accounting.Service.Name,
@@ -28,5 +28,5 @@ func RenderService(namespace, clusterName string, accounting *values.SlurmAccoun
 				TargetPort: intstr.FromString(accounting.ContainerAccounting.Name),
 			}},
 		},
-	}, nil
+	}
 }
