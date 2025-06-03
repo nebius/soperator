@@ -31,4 +31,6 @@ const (
 	ConfigMapKeySysctl                  = sysctlConfFile
 	ConfigMapKeySupervisord             = supervisordConfFile
 	ConfigMapKeySoperatorcheckSbatch    = "sbatch.sh"
+
+	CongigMapNameNodesTopology = "nodes-topology"
 )
