@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -79,14 +80,22 @@ func getZapOpts(logFormat, logLevel string) []zap.Opts {
 
 func parseFlags() Flags {
 	var flags Flags
+
 	flag.StringVar(&flags.logFormat, "log-format", "json", "Log format: plain or json")
 	flag.StringVar(&flags.logLevel, "log-level", "debug", "Log level: debug, info, warn, error, dpanic, panic, fatal")
 	flag.StringVar(&flags.metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&flags.slurmAPIServer, "slurm-api-server", "http://localhost:6820", "The address of the Slurm REST API server.")
 	flag.StringVar(&flags.clusterNamespace, "cluster-namespace", "soperator", "The namespace of the Slurm cluster")
-	flag.StringVar(&flags.clusterName, "cluster-name", "soperator", "The name of the Slurm cluster")
+	flag.StringVar(&flags.clusterName, "cluster-name", "", "The name of the Slurm cluster (required)")
 	flag.StringVar(&flags.soperatorVersion, "soperator-version", "", "Version of the soperator")
 	flag.Parse()
+
+	if flags.clusterName == "" {
+		_, _ = fmt.Fprintf(os.Stderr, "Error: cluster-name is required\n")
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	return flags
 }
 
