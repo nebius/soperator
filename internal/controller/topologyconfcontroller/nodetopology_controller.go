@@ -26,7 +26,7 @@ var (
 )
 
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;
-// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;update;create
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;update;create
 
 type NodeTopologyConfReconciler struct {
 	BaseReconciler
