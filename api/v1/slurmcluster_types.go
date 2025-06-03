@@ -926,29 +926,40 @@ type SlurmNodeLoginVolumes struct {
 // SlurmExporter defines the configuration for the Slurm exporter
 type SlurmExporter struct {
 	SlurmNode `json:",inline"`
+
 	// It has to be set to true if Prometheus Operator is used
 	//
 	// +kubebuilder:default=false
 	Enabled bool `json:"enabled,omitempty"`
+
 	// It references the PodMonitor configuration
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={jobLabel: "slurm-exporter", interval: "30s", scrapeTimeout: "20s"}
 	PodMonitorConfig PodMonitorConfig `json:"podMonitorConfig,omitempty"`
+
 	// Exporter represents the Slurm exporter daemon configuration
 	//
-	// +kubebuilder:validation:Required
+	// +kubebuilder:deprecation:warning="The Exporter field is deprecated and will be removed in a future release"
+	// +kubebuilder:validation:Optional
 	Exporter ExporterContainer `json:"exporter,omitempty"`
 
 	// Munge represents the Slurm munge configuration
 	//
-	// +kubebuilder:validation:Required
+	// +kubebuilder:deprecation:warning="The Munge field is deprecated and will be removed in a future release"
+	// +kubebuilder:validation:Optional
 	Munge NodeContainer `json:"munge"`
 
 	// Volumes represents the volume configurations for the controller node
 	//
-	// +kubebuilder:validation:Required
+	// +kubebuilder:deprecation:warning="The Munge field is deprecated and will be removed in a future release"
+	// +kubebuilder:validation:Optional
 	Volumes SlurmExporterVolumes `json:"volumes"`
+
+	// ExporterContainer represents the Soperator exporter container configuration
+	//
+	// +kubebuilder:validation:Optional
+	ExporterContainer NodeContainer `json:"exporterContainer"`
 }
 
 // ExporterContainer defines the configuration for one of node containers
