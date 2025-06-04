@@ -27,7 +27,7 @@ func RenderDeploymentExporter(
 	if valuesExporter == nil || !valuesExporter.Enabled {
 		return nil, errors.New("prometheus is not enabled")
 	}
-	if valuesExporter.ExporterContainer.Image == "" {
+	if valuesExporter.ExporterContainer.NodeContainer.Image == "" {
 		return nil, errors.New("image for ContainerExporter is empty")
 	}
 

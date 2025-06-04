@@ -30,6 +30,10 @@ RUN GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 FROM $BASE_IMAGE AS exporter
 
 ARG SLURM_VERSION=24.05.7
+# ARCH has the short form like: amd64, arm64
+ARG ARCH
+# ALT_ARCH has the extended form like: x86_64, aarch64
+ARG ALT_ARCH
 
 # Install dependencies
 RUN apt-get update && \
@@ -80,10 +84,10 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install slurm сhroot plugin
-COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
-COPY common/scripts/install_chroot_plugin.sh /opt/bin/
+COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
+COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
-    /opt/bin/install_chroot_plugin.sh && \
+    ALT_ARCH=${ALT_ARCH} /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
 # Update linker cache

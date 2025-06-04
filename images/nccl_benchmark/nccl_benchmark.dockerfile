@@ -4,6 +4,10 @@ FROM $BASE_IMAGE AS nccl_benchmark
 
 ARG SLURM_VERSION=24.05.7
 ARG PYXIS_VERSION=0.21.0
+# ARCH has the short form like: amd64, arm64
+ARG ARCH
+# ALT_ARCH has the extended form like: x86_64, aarch64
+ARG ALT_ARCH
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -45,10 +49,10 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install slurm сhroot plugin
-COPY common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
-COPY common/scripts/install_chroot_plugin.sh /opt/bin/
+COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
+COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
-    /opt/bin/install_chroot_plugin.sh && \
+    ALT_ARCH=${ALT_ARCH} /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
 # Install parallel because it's required for enroot operation
@@ -58,13 +62,13 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install enroot
-COPY common/scripts/install_enroot.sh /opt/bin/
+COPY images/common/scripts/install_enroot.sh /opt/bin/
 RUN chmod +x /opt/bin/install_enroot.sh && \
     /opt/bin/install_enroot.sh && \
     rm /opt/bin/install_enroot.sh
 
 # Copy enroot configuration
-COPY common/enroot/enroot.conf /etc/enroot/
+COPY images/common/enroot/enroot.conf /etc/enroot/
 RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
 
 # Install slurm pyxis plugin \
@@ -74,7 +78,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install munge
-COPY common/scripts/install_munge.sh /opt/bin/
+COPY images/common/scripts/install_munge.sh /opt/bin/
 RUN chmod +x /opt/bin/install_munge.sh && \
     /opt/bin/install_munge.sh && \
     rm /opt/bin/install_munge.sh
@@ -83,7 +87,7 @@ RUN chmod +x /opt/bin/install_munge.sh && \
 RUN mkdir -m 755 /run/munge
 
 # Copy srun_perf script that schedules jobs with GPU benchmark
-COPY nccl_benchmark/scripts/srun_perf.sh /usr/bin/srun_perf.sh
+COPY images/nccl_benchmark/scripts/srun_perf.sh /usr/bin/srun_perf.sh
 RUN chmod +x /usr/bin/srun_perf.sh
 
 # Update linker cache
@@ -99,6 +103,6 @@ ENV MUNGE_PID_FILE=/run/munge/munged.pid
 ENV MUNGE_SOCKET_FILE=/run/munge/munge.socket.2
 
 # Copy & run the entrypoint script
-COPY nccl_benchmark/nccl_benchmark_entrypoint.sh /opt/bin/nccl_benchmark_entrypoint.sh
+COPY images/nccl_benchmark/nccl_benchmark_entrypoint.sh /opt/bin/nccl_benchmark_entrypoint.sh
 RUN chmod +x /opt/bin/nccl_benchmark_entrypoint.sh
 ENTRYPOINT ["/opt/bin/nccl_benchmark_entrypoint.sh"]

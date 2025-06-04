@@ -7,5 +7,4 @@ spec:
   interval: 3m
   url: oci://cr.eu-north1.nebius.cloud/soperator-unstable
   ref:
-    # TODO: Change this to the branch main after the first release
     branch: dev

@@ -15,13 +15,18 @@ rm -rf /etc/slurm && ln -s /mnt/jail/slurm /etc/slurm
 echo "Bind-mount munge key from K8S secret"
 mount --bind /mnt/munge-key/munge.key /etc/munge/munge.key
 
+ALT_ARCH="$(uname -m)"
+SLURM_LIB_PATH="usr/lib/${ALT_ARCH}-linux-gnu/slurm"
+
+echo "🔧 Using ALT_ARCH = ${ALT_ARCH}"
+
 echo "Bind-mount slurm chroot plugin from container at jail"
-touch /mnt/jail/usr/lib/x86_64-linux-gnu/slurm/chroot.so
-mount --bind /usr/lib/x86_64-linux-gnu/slurm/chroot.so /mnt/jail/usr/lib/x86_64-linux-gnu/slurm/chroot.so
+touch "/mnt/jail/${SLURM_LIB_PATH}/chroot.so"
+mount --bind "/${SLURM_LIB_PATH}/chroot.so" "/mnt/jail/${SLURM_LIB_PATH}/chroot.so"
 
 echo "Bind-mount pyxis plugin from container at jail"
-touch usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
-mount --bind /usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
+touch "${SLURM_LIB_PATH}/spank_pyxis.so"
+mount --bind "/${SLURM_LIB_PATH}/spank_pyxis.so" "${SLURM_LIB_PATH}/spank_pyxis.so"
 mkdir -p usr/share/pyxis
 mount --bind /usr/share/pyxis usr/share/pyxis
 

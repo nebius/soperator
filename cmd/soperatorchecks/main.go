@@ -241,6 +241,7 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckJobControllerName),
+		slurmAPIClients,
 		reconcileTimeout,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create activecheckjob controller", "controller", "ActiveCheckJob")

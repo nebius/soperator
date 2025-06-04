@@ -7165,24 +7165,24 @@ spec:
                 description: ActiveCheckK8sJobsStatus defines the observed state of
                   ActiveCheck k8s jobs.
                 properties:
-                  lastK8sJobName:
+                  lastJobName:
                     type: string
-                  lastK8sJobScheduleTime:
+                  lastJobScheduleTime:
                     format: date-time
                     type: string
-                  lastK8sJobStatus:
+                  lastJobStatus:
                     description: ActiveCheckK8sJobStatus defines status for ActiveCheck
                       k8s job.
                     type: string
-                  lastK8sJobSuccessfulTime:
+                  lastJobSuccessfulTime:
                     format: date-time
                     type: string
                   lastTransitionTime:
                     format: date-time
                     type: string
                 required:
-                - lastK8sJobName
-                - lastK8sJobStatus
+                - lastJobName
+                - lastJobStatus
                 type: object
               observedGeneration:
                 description: ObservedGeneration defines current generation picked
@@ -7192,9 +7192,32 @@ spec:
               reason:
                 description: Reason defines human readable error reason
                 type: string
-              serviceAccountReady:
-                default: false
-                type: boolean
+              slurmJobsStatus:
+                description: ActiveCheckSlurmJobsStatus defines the observed state
+                  of ActiveCheck slurm jobs.
+                properties:
+                  lastJobEndTime:
+                    format: date-time
+                    type: string
+                  lastJobId:
+                    format: int32
+                    type: integer
+                  lastJobName:
+                    type: string
+                  lastJobStartTime:
+                    format: date-time
+                    type: string
+                  lastJobState:
+                    type: string
+                  lastJobStateReason:
+                    type: string
+                  lastJobSubmitTime:
+                    format: date-time
+                    type: string
+                  lastTransitionTime:
+                    format: date-time
+                    type: string
+                type: object
               updateStatus:
                 description: UpdateStatus defines a status for update rollout
                 type: string

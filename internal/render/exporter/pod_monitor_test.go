@@ -1,18 +1,17 @@
-package prometheus_test
+package exporter_test
 
 import (
 	"testing"
 
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	consts "nebius.ai/slurm-operator/internal/consts"
-	slurmprometheus "nebius.ai/slurm-operator/internal/render/prometheus"
+	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/render/exporter"
 	"nebius.ai/slurm-operator/internal/values"
-
-	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
 
 func Test_RenderPodMonitor(t *testing.T) {
@@ -20,7 +19,7 @@ func Test_RenderPodMonitor(t *testing.T) {
 	interval := "1m"
 	scrapeTimeout := "30m"
 
-	exporter := values.SlurmExporter{
+	slurmExporter := values.SlurmExporter{
 		Enabled: true,
 		PodMonitorConfig: slurmv1.PodMonitorConfig{
 			JobLabel:             jobLabel,
@@ -55,7 +54,7 @@ func Test_RenderPodMonitor(t *testing.T) {
 		},
 	}
 
-	result, err := slurmprometheus.RenderPodMonitor(defaultNameCluster, defaultNamespace, &exporter)
+	result, err := exporter.RenderPodMonitor(defaultNameCluster, defaultNamespace, slurmExporter)
 	assert.NoError(t, err)
 	assert.Equal(t, expected.Name, result.Name)
 	assert.Equal(t, expected.Namespace, result.Namespace)

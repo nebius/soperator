@@ -26,7 +26,10 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig co
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapSlurmConfigsName(cluster.Name),
 			Namespace: cluster.Namespace,
-			Labels:    renderConfigMapSlurmConfigsLabels(consts.ComponentTypeController, cluster.Name),
+			Annotations: map[string]string{
+				consts.AnnotationSConfigControllerSourceKey: consts.DefaultSConfigControllerSourcePath,
+			},
+			Labels: renderConfigMapSlurmConfigsLabels(consts.ComponentTypeController, cluster.Name),
 		},
 		Data: map[string]string{
 			consts.ConfigMapKeySlurmConfig:       generateSlurmConfig(cluster, topologyConfig).Render(),

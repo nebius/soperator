@@ -7164,24 +7164,24 @@ spec:
                 description: ActiveCheckK8sJobsStatus defines the observed state of
                   ActiveCheck k8s jobs.
                 properties:
-                  lastK8sJobName:
+                  lastJobName:
                     type: string
-                  lastK8sJobScheduleTime:
+                  lastJobScheduleTime:
                     format: date-time
                     type: string
-                  lastK8sJobStatus:
+                  lastJobStatus:
                     description: ActiveCheckK8sJobStatus defines status for ActiveCheck
                       k8s job.
                     type: string
-                  lastK8sJobSuccessfulTime:
+                  lastJobSuccessfulTime:
                     format: date-time
                     type: string
                   lastTransitionTime:
                     format: date-time
                     type: string
                 required:
-                - lastK8sJobName
-                - lastK8sJobStatus
+                - lastJobName
+                - lastJobStatus
                 type: object
               observedGeneration:
                 description: ObservedGeneration defines current generation picked
@@ -7191,9 +7191,32 @@ spec:
               reason:
                 description: Reason defines human readable error reason
                 type: string
-              serviceAccountReady:
-                default: false
-                type: boolean
+              slurmJobsStatus:
+                description: ActiveCheckSlurmJobsStatus defines the observed state
+                  of ActiveCheck slurm jobs.
+                properties:
+                  lastJobEndTime:
+                    format: date-time
+                    type: string
+                  lastJobId:
+                    format: int32
+                    type: integer
+                  lastJobName:
+                    type: string
+                  lastJobStartTime:
+                    format: date-time
+                    type: string
+                  lastJobState:
+                    type: string
+                  lastJobStateReason:
+                    type: string
+                  lastJobSubmitTime:
+                    format: date-time
+                    type: string
+                  lastTransitionTime:
+                    format: date-time
+                    type: string
+                type: object
               updateStatus:
                 description: UpdateStatus defines a status for update rollout
                 type: string
@@ -25915,6 +25938,63 @@ spec:
                         required:
                         - image
                         type: object
+                      exporterContainer:
+                        description: ExporterContainer represents the Soperator exporter
+                          container configuration
+                        properties:
+                          appArmorProfile:
+                            default: unconfined
+                            description: AppArmorProfile defines the AppArmor profile
+                              for the Slurm containers
+                            type: string
+                          args:
+                            description: |-
+                              Args defines the arguments to the entrypoint (command).
+                              The container image's CMD is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
+                          command:
+                            description: |-
+                              Command defines the entrypoint array for the container. Not executed within a shell.
+                              The container image's ENTRYPOINT is used if this is not provided.
+                            items:
+                              type: string
+                            type: array
+                          image:
+                            description: Image defines the container image
+                            type: string
+                          imagePullPolicy:
+                            default: IfNotPresent
+                            description: ImagePullPolicy defines the image pull policy
+                            enum:
+                            - Always
+                            - Never
+                            - IfNotPresent
+                            type: string
+                          port:
+                            description: Port defines the port the container exposes
+                            format: int32
+                            type: integer
+                          resources:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: Resources defines the [corev1.ResourceRequirements]
+                              for the container
+                            type: object
+                          securityLimitsConfig:
+                            description: |-
+                              SecurityLimitsConfig represents multiline limits.conf
+                              format of a string should be: '* <soft|hard> <item> <value>'
+                              example: '* soft nofile 1024'
+                            type: string
+                        required:
+                        - image
+                        type: object
                       k8sNodeFilterName:
                         description: |-
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
@@ -26397,10 +26477,7 @@ spec:
                         - jail
                         type: object
                     required:
-                    - exporter
                     - k8sNodeFilterName
-                    - munge
-                    - volumes
                     type: object
                   login:
                     description: Login represents the Slurm login node configuration
