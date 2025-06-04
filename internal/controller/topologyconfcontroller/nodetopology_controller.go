@@ -28,14 +28,14 @@ var (
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;update;create
 
-type NodeTopologyConfReconciler struct {
+type NodeTopologyReconciler struct {
 	BaseReconciler
 	namespace string
 }
 
-func NewNodeTopologyConfReconciler(
-	client client.Client, scheme *runtime.Scheme, namespace string) *NodeTopologyConfReconciler {
-	return &NodeTopologyConfReconciler{
+func NewNodeTopologyReconciler(
+	client client.Client, scheme *runtime.Scheme, namespace string) *NodeTopologyReconciler {
+	return &NodeTopologyReconciler{
 		BaseReconciler: BaseReconciler{
 			Client: client,
 			Scheme: scheme,
@@ -44,7 +44,7 @@ func NewNodeTopologyConfReconciler(
 	}
 }
 
-// NodeTopologyConfReconciler watches Kubernetes nodes via the API server.
+// NodeTopologyReconciler watches Kubernetes nodes via the API server.
 //
 // Upon detecting a node with a `topologyconf.slurm.nebius.ai/tier-1` label,
 // it records the node’s tier information in the `node-topoly-labels` ConfigMap in a
@@ -99,7 +99,7 @@ func NewNodeTopologyConfReconciler(
 // nodeB: [tier-1: leaf00, tier-2: spine00]
 // nodeC: [tier-1: leaf01, tier-2: spine01]
 // nodeD: [tier-1: leaf02, tier-2: spine01]
-func (r *NodeTopologyConfReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *NodeTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithName(NodeTopologyReconcilerName)
 	logger.Info("Starting reconciliation", "node", req.Name)
 
@@ -126,7 +126,7 @@ func (r *NodeTopologyConfReconciler) Reconcile(ctx context.Context, req ctrl.Req
 }
 
 // getNode retrieves the node object from the Kubernetes API server.
-func (r *NodeTopologyConfReconciler) getNode(ctx context.Context, nodeName string, logger logr.Logger) (*corev1.Node, error) {
+func (r *NodeTopologyReconciler) getNode(ctx context.Context, nodeName string, logger logr.Logger) (*corev1.Node, error) {
 	node := &corev1.Node{}
 	nodeKey := client.ObjectKey{Name: nodeName}
 
@@ -139,7 +139,7 @@ func (r *NodeTopologyConfReconciler) getNode(ctx context.Context, nodeName strin
 }
 
 // shouldProcessNode checks if the node has the required tier-1 label
-func (r *NodeTopologyConfReconciler) shouldProcessNode(node *corev1.Node, nodeName string, logger logr.Logger) bool {
+func (r *NodeTopologyReconciler) shouldProcessNode(node *corev1.Node, nodeName string, logger logr.Logger) bool {
 	if _, hasTierLabel := node.Labels[consts.TierOnePrefix]; !hasTierLabel {
 		logger.V(1).Info("Node missing tier-1 label, skipping", "node", nodeName)
 		return false
@@ -148,7 +148,7 @@ func (r *NodeTopologyConfReconciler) shouldProcessNode(node *corev1.Node, nodeNa
 }
 
 // extractTierData extracts tier labels from the node's labels
-func (r *NodeTopologyConfReconciler) extractTierData(node *corev1.Node, nodeName string, logger logr.Logger) (map[string]string, error) {
+func (r *NodeTopologyReconciler) extractTierData(node *corev1.Node, nodeName string, logger logr.Logger) (map[string]string, error) {
 	tierData := ExtractTierLabels(node.Labels, consts.TopologyLabelPrefix)
 
 	if len(tierData) == 0 {
@@ -172,7 +172,7 @@ func ExtractTierLabels(k8sNodeLabels map[string]string, topologyLabelPrefix stri
 }
 
 // updateTopologyConfigMap updates the ConfigMap with the node's tier data
-func (r *NodeTopologyConfReconciler) updateTopologyConfigMap(ctx context.Context, nodeName string, tierData map[string]string, logger logr.Logger) error {
+func (r *NodeTopologyReconciler) updateTopologyConfigMap(ctx context.Context, nodeName string, tierData map[string]string, logger logr.Logger) error {
 	configMap, err := r.getOrCreateTopologyConfigMap(ctx, logger)
 	if err != nil {
 		return err
@@ -198,7 +198,7 @@ func (r *NodeTopologyConfReconciler) updateTopologyConfigMap(ctx context.Context
 }
 
 // getOrCreateTopologyConfigMap retrieves or creates the ConfigMap used to store node topology information.
-func (r *NodeTopologyConfReconciler) getOrCreateTopologyConfigMap(ctx context.Context, logger logr.Logger) (*corev1.ConfigMap, error) {
+func (r *NodeTopologyReconciler) getOrCreateTopologyConfigMap(ctx context.Context, logger logr.Logger) (*corev1.ConfigMap, error) {
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: ctrl.ObjectMeta{
 			Name:      consts.CongigMapNameNodesTopology,
@@ -214,7 +214,7 @@ func (r *NodeTopologyConfReconciler) getOrCreateTopologyConfigMap(ctx context.Co
 	return configMap, nil
 }
 
-func (r *NodeTopologyConfReconciler) SetupWithManager(mgr ctrl.Manager,
+func (r *NodeTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 	maxConcurrency int, cacheSyncTimeout time.Duration) error {
 	return ctrl.NewControllerManagedBy(mgr).Named(NodeTopologyReconcilerName).
 		For(&corev1.Node{}, builder.WithPredicates(predicate.Funcs{

@@ -261,3 +261,7 @@ func BuildRoleSConfigControllerName(clusterName string) string {
 func BuildConfigMapSbatchScriptName(scriptName string) string {
 	return "sbatch-script-" + scriptName
 }
+
+func BuildConfigMapTopologyName(clusterName string) string {
+	return clusterName + "-" + consts.CongigMapNameNodesTopology
+}
