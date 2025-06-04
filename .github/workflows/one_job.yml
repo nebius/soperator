@@ -422,4 +422,4 @@ jobs:
           make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd
           
           echo "Building and push manifest of the populate_jail"
-           make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail
+          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail

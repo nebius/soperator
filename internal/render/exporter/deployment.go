@@ -79,7 +79,7 @@ func renderMinimalNoopContainer() (corev1.Container, error) {
 		return corev1.Container{}, err
 	}
 
-	const minimalMultiArchImage = "busybox:latest"
+	const minimalMultiArchImage = "cr.eu-north1.nebius.cloud/soperator/busybox:latest"
 
 	return corev1.Container{
 		Name:            consts.ContainerNameMunge,
