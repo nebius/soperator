@@ -37,5 +37,5 @@ IFS=',' read -ra cuda_devs <<< "$CUDA_VISIBLE_DEVICES"
 for gpu_id in "${cuda_devs[@]}"; do
     [[ -z "$gpu_id" ]] && continue
     echo "Removing $metrics_dir/${gpu_id:-99}"
-    rm -f "${METRICS_DIR:-}/${gpu_id:-99}" || echo "Unable to remove file ${METRICS_DIR:-}/${gpu_id:-99}"
+    rm -f "${metrics_dir:-}/${gpu_id:-99}" || echo "Unable to remove file ${metrics_dir:-}/${gpu_id:-99}"
 done
