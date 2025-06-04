@@ -22,6 +22,11 @@ if [ -z "$jaildir" ] || [ -z "$upperdir" ]; then
     usage
 fi
 
+ALT_ARCH="$(uname -m)"
+SLURM_LIB_PATH="usr/lib/${ALT_ARCH}-linux-gnu/slurm"
+
+echo "🔧 Using ALT_ARCH = ${ALT_ARCH}"
+
 pushd "${jaildir}"
     echo "Bind-mount virtual filesystems"
     mount -t proc /proc proc/
@@ -89,9 +94,9 @@ pushd "${jaildir}"
     /opt/bin/slurm/bind_slurm_common.sh -j ${jaildir}
 
     echo "Bind-mount slurm chroot plugin from container to the jail"
-    mkdir -p usr/lib/x86_64-linux-gnu/slurm
-    touch usr/lib/x86_64-linux-gnu/slurm/chroot.so
-    mount --bind /usr/lib/x86_64-linux-gnu/slurm/chroot.so usr/lib/x86_64-linux-gnu/slurm/chroot.so
+    mkdir -p "${SLURM_LIB_PATH}"
+    touch "${SLURM_LIB_PATH}/chroot.so"
+    mount --bind "/usr/lib/${ALT_ARCH}-linux-gnu/slurm/chroot.so" "${SLURM_LIB_PATH}/chroot.so"
 
     echo "Bind-mount /etc/enroot, /usr/share/enroot and /usr/lib/enroot"
     mkdir -p etc/enroot usr/share/enroot usr/lib/enroot
@@ -118,8 +123,8 @@ pushd "${jaildir}"
     mkdir -m 1777 -p var/cache/enroot-container-images
 
     echo "Bind-mount pyxis plugin from container to the jail"
-    touch usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
-    mount --bind /usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so usr/lib/x86_64-linux-gnu/slurm/spank_pyxis.so
+    touch "${SLURM_LIB_PATH}/spank_pyxis.so"
+    mount --bind "/usr/lib/${ALT_ARCH}-linux-gnu/slurm/spank_pyxis.so" "${SLURM_LIB_PATH}/spank_pyxis.so"
 
     echo "Bind-mount slurm configs"
     mkdir -p etc/slurm
@@ -145,8 +150,8 @@ pushd "${jaildir}"
             sleep 10
         done
         echo "Bind-mount all GPU-specific empty lib files into the host's libdummy"
-        find "${jaildir}/lib/x86_64-linux-gnu" -maxdepth 1 -type f ! -type l -empty -print0 | while IFS= read -r -d '' file; do
-            mount --bind "/lib/x86_64-linux-gnu/libdummy.so" "$file"
+        find "${jaildir}/lib/${ALT_ARCH}-linux-gnu" -maxdepth 1 -type f ! -type l -empty -print0 | while IFS= read -r -d '' file; do
+            mount --bind "/lib/${ALT_ARCH}-linux-gnu/libdummy.so" "$file"
         done
     fi
 

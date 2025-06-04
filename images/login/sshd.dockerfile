@@ -4,6 +4,10 @@ FROM $BASE_IMAGE AS login_sshd
 
 ARG SLURM_VERSION=24.05.7
 ARG PYXIS_VERSION=0.21.0
+# ARCH has the short form like: amd64, arm64
+ARG ARCH
+# ALT_ARCH has the extended form like: x86_64, aarch64
+ARG ALT_ARCH
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -57,7 +61,7 @@ RUN mkdir -p /usr/src/dummy && \
     cd /usr/src/dummy && \
     echo "int main() { return 0; }" > dummy.c && \
     gcc -shared -o libdummy.so dummy.c && \
-    cp libdummy.so /lib/x86_64-linux-gnu/
+    cp libdummy.so "/lib/${ALT_ARCH}-linux-gnu/"
 
 # Add Nebius public registry
 RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
@@ -76,7 +80,7 @@ RUN apt-get update && \
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
 COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
-    /opt/bin/install_chroot_plugin.sh && \
+    ALT_ARCH=${ALT_ARCH} /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
 # Install parallel because it's required for enroot operation

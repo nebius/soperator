@@ -21,17 +21,22 @@ if [ -z "$jaildir" ]; then
     usage
 fi
 
+ALT_ARCH="$(uname -m)"
+SLURM_LIB_PATH="usr/lib/${ALT_ARCH}-linux-gnu/slurm"
+
+echo "🔧 Using ALT_ARCH = ${ALT_ARCH}"
+
 pushd "${jaildir}"
 
     # slurm-smd
     # https://gist.github.com/asteny/58df92e594b0b27190fcedf4b5815762
     echo "Bind-mount slurm-smd package content from container to the jail"
-    mkdir -p usr/lib/x86_64-linux-gnu/slurm
-    mount --bind /usr/lib/x86_64-linux-gnu/slurm usr/lib/x86_64-linux-gnu/slurm
+    mkdir -p "${SLURM_LIB_PATH}"
+    mount --bind "/${SLURM_LIB_PATH}" "${SLURM_LIB_PATH}"
 
-    touch usr/lib/x86_64-linux-gnu/libslurm.so.41.0.0
-    mount --bind /usr/lib/x86_64-linux-gnu/libslurm.so.41.0.0 usr/lib/x86_64-linux-gnu/libslurm.so.41.0.0
-    pushd usr/lib/x86_64-linux-gnu
+    touch "usr/lib/${ALT_ARCH}-linux-gnu/libslurm.so.41.0.0"
+    mount --bind "/usr/lib/${ALT_ARCH}-linux-gnu/libslurm.so.41.0.0" "usr/lib/${ALT_ARCH}-linux-gnu/libslurm.so.41.0.0"
+    pushd "usr/lib/${ALT_ARCH}-linux-gnu"
          ln -sf libslurm.so.41.0.0 libslurm.so.41
          ln -sf libslurm.so.41.0.0 libslurm.so
     popd
@@ -42,8 +47,8 @@ pushd "${jaildir}"
     # slurm-smd-libnss-slurm
     # https://gist.github.com/asteny/b5c6b7df0320657fd1b21212c8f7ef45
     echo "Bind-mount slurm-smd-libnss-slurm package content from container to the jail"
-    touch usr/lib/x86_64-linux-gnu/libnss_slurm.so.2
-    mount --bind /usr/lib/x86_64-linux-gnu/libnss_slurm.so.2 usr/lib/x86_64-linux-gnu/libnss_slurm.so.2
+    touch "usr/lib/${ALT_ARCH}-linux-gnu/libnss_slurm.so.2"
+    mount --bind "/usr/lib/${ALT_ARCH}-linux-gnu/libnss_slurm.so.2" "usr/lib/${ALT_ARCH}-linux-gnu/libnss_slurm.so.2"
 
     # slurm-smd-client
     # https://gist.github.com/asteny/988e08fbe978e1c6ba20e4aa2d87f114

@@ -4,6 +4,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
 ENV LANG=en_US.UTF-8
 
+# ARCH has the short form like: amd64, arm64
+ARG ARCH
+# ALT_ARCH has the extended form like: x86_64, aarch64
+ARG ALT_ARCH
+
 RUN apt-get update &&  \
     apt-get install -y --no-install-recommends \
       gnupg2  \
@@ -12,7 +17,14 @@ RUN apt-get update &&  \
       tzdata \
       wget \
       curl && \
-    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb && \
+    ARCH=$(uname -m) && \
+        case "$ARCH" in \
+          x86_64) ARCH_DEB=x86_64 ;; \
+          aarch64) ARCH_DEB=sbsa ;; \
+          *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
+        esac && \
+        echo "Using architecture: ${ARCH_DEB}" && \
+    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${ARCH_DEB}/cuda-keyring_1.1-1_all.deb && \
     dpkg -i cuda-keyring_1.1-1_all.deb && \
     rm -rf cuda-keyring_1.1-1_all.deb && \
     ln -snf /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
@@ -35,8 +47,7 @@ ENV LANG="en_US.UTF-8" \
 	LC_MEASUREMENT="en_US.UTF-8" \
 	LC_IDENTIFICATION="en_US.UTF-8"
 
-ENV PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
-ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64
+ENV PATH=/usr/local/cuda/bin:${PATH}
 
 # nvidia-container-runtime
 ENV NVIDIA_VISIBLE_DEVICES=all
