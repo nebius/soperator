@@ -145,6 +145,8 @@ jobs:
         uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
         with:
           version: v2.0.2 # version of golangci-lint, should be in sync with Makefile.
+        env:
+          GOEXPERIMENT: synctest
 
       - name: Download version artifact
         uses: actions/download-artifact@v4
@@ -208,7 +210,7 @@ jobs:
           make sync-version UNSTABLE=${UNSTABLE}
 
           echo "Updating CRDs & auto-generated code (included in test step) & run tests"
-          make test UNSTABLE="${UNSTABLE}"
+          make test-coverage UNSTABLE="${UNSTABLE}"
           
           echo "Building image of the rebooter ${OPERATOR_IMAGE_TAG}-${ARCH}"
           make docker-build DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter DOCKERFILE=rebooter/rebooter.dockerfile IMAGE_VERSION="${OPERATOR_IMAGE_TAG}-${ARCH}"
