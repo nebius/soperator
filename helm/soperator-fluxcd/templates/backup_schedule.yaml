@@ -37,6 +37,5 @@ spec:
   valuesFrom:
   - kind: ConfigMap
     name: backup-schedule
-    optional: true
     valuesKey: values.yaml
 {{- end }}

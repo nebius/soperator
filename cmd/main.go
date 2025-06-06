@@ -58,6 +58,7 @@ import (
 var scheme = runtime.NewScheme()
 
 func init() {
+
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	// Check if OpenTelemetryCollector and PodMonitor CRD is installed before adding it to the scheme
