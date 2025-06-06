@@ -24,7 +24,7 @@ spec:
   interval: {{ .Values.backup.schedule.interval }}
   timeout: {{ .Values.backup.schedule.timeout }}
   releaseName: {{ .Values.backup.schedule.releaseName }}
-  targetNamespace: {{ .Values.backup.schedule.namespace }}
+  targetNamespace: {{ .Values.slurmCluster.namespace }}
   upgrade:
     crds: Skip
   values:
