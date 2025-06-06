@@ -4,9 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"slices"
-	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -20,11 +17,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
-	"nebius.ai/slurm-operator/internal/naming"
-
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
 )
 
 var (
@@ -67,19 +62,19 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		"Starting reconciliation", "SlurmCluster", req.Name, "Namespace", req.Namespace,
 	)
 
-	nodeTopologyConf, err := r.getTopologyConfigMap(ctx)
+	topologyLabelsConfigMap, err := r.getNodeTopologyLabelsConfigMap(ctx)
 	if err != nil {
-		logger.Error(err, "Failed to get", "configMap", consts.CongigMapNameNodesTopology)
+		logger.Error(err, "Failed to get node topology labels config map")
 		return DefaultRequeueResult, nil
 	}
 
 	logger.Info(
-		"Using ConfigMap for node topology",
-		"ConfigMapName", nodeTopologyConf.Name,
-		"ConfigMapNamespace", nodeTopologyConf.Namespace,
+		"Using ConfigMap for topology node labels",
+		"ConfigMapName", topologyLabelsConfigMap.Name,
+		"ConfigMapNamespace", topologyLabelsConfigMap.Namespace,
 	)
 
-	labelSelector := client.MatchingLabels{consts.LabelComponentKey: "worker"}
+	labelSelector := client.MatchingLabels{consts.LabelComponentKey: consts.ComponentTypeWorker.String()}
 	podList, err := r.getPodList(ctx, labelSelector, req.Namespace, logger)
 	if err != nil {
 		logger.Error(err, "Failed to list pods with label", "labelSelector", labelSelector)
@@ -91,22 +86,18 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return DefaultRequeueResult, nil
 	}
 
-	podsByNode := r.GetPodByNode(podList.Items)
-	if len(podsByNode) == 0 {
-		logger.Info("No pods found organized by node", "podsByNode", podsByNode)
-		return DefaultRequeueResult, nil
-	}
+	podsByNode := r.GetPodsByNode(podList.Items)
 	logger.Info("Pods organized by node", "podsByNode", podsByNode)
 
-	topologyLinks := make([]string, 0)
-	if topologyLinks, err = r.BuildTopologyLinks(nodeTopologyConf, podsByNode); err != nil {
-		logger.Error(err, "Failed to build topology links")
+	topologyConfig, err := r.BuildTopologyConfig(ctx, topologyLabelsConfigMap, podsByNode)
+	if err != nil {
+		logger.Error(err, "Failed to build topology config")
 		return DefaultRequeueResult, nil
 	}
-	logger.Info("Built topology links", "topologyLinks", topologyLinks)
+	logger.Info("Built topology config", "topologyConfig", topologyConfig)
 
-	if err := r.updateTopologyConfigMap(ctx, req.Name, req.Namespace, topologyLinks); err != nil {
-		logger.Error(err, "Failed to update ConfigMap with topology links")
+	if err := r.updateTopologyConfigMap(ctx, req.Namespace, topologyConfig); err != nil {
+		logger.Error(err, "Failed to update ConfigMap with topology config")
 		return DefaultRequeueResult, nil
 	}
 
@@ -132,177 +123,44 @@ func (r *WorkerTopologyReconciler) getPodList(
 	return podList, nil
 }
 
-// getPodByNode organizes pods by their node name.
-func (r *WorkerTopologyReconciler) GetPodByNode(pods []corev1.Pod) map[string][]string {
-	podsByNode := make(map[string][]string)
+// GetPodsByNode organizes pods by their node name.
+func (r *WorkerTopologyReconciler) GetPodsByNode(pods []corev1.Pod) map[string][]string {
+	podsByNode := make(map[string][]string, len(pods))
 	for _, pod := range pods {
-		if pod.Spec.NodeName != "" {
-			podsByNode[pod.Spec.NodeName] = append(podsByNode[pod.Spec.NodeName], pod.Name)
-		} else {
-			podsByNode["root"] = append(podsByNode["root"], pod.Name)
-		}
+		podsByNode[pod.Spec.NodeName] = append(podsByNode[pod.Spec.NodeName], pod.Name)
 	}
 	return podsByNode
 }
 
-type NodeTopology map[string]string
+// NodeTopologyLabels represents the labels for a node's topology, e.g.:
+//
+//	{
+//	  "tier-1": "switch1",
+//	  "tier-2": "switch2",
+//	  "tier-3": "switch3"
+//	}
+type NodeTopologyLabels map[string]string
 
-// BuildTopologyLinks builds topology links from nodes
-func (r *WorkerTopologyReconciler) BuildTopologyLinks(nodeTopologyConf *corev1.ConfigMap, podsByNode map[string][]string) ([]string, error) {
-	tierNodes, err := r.DeserializeNodeTopology(nodeTopologyConf.Data)
+// BuildTopologyConfig builds topology config.
+func (r *WorkerTopologyReconciler) BuildTopologyConfig(
+	ctx context.Context, nodeTopologyLabelsConf *corev1.ConfigMap, podsByNode map[string][]string,
+) (string, error) {
+	labelsByNode, err := r.ParseNodeTopologyLabels(nodeTopologyLabelsConf.Data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize node topology: %w", err)
+		return "", fmt.Errorf("failed to deserialize node topology: %w", err)
 	}
-
-	tier1Links := r.BuildTier1Links(tierNodes, podsByNode)
-	higherTierLinks := r.BuildHigherTierLinks(tierNodes)
-
-	return append(tier1Links, higherTierLinks...), nil
+	graph := BuildTopologyGraph(ctx, labelsByNode, podsByNode)
+	config := strings.Join(graph.RenderConfigLines(), "\n") + "\n"
+	return config, nil
 }
 
-// BuildTier1Links builds links for tier-1 switches
-// It connects tier-1 switches to the nodes/pods (workers)
-// It returns a slice of strings representing the links for tier-1 switches
-// ** Example of the result: **
-// [
-// "SwitchName=tier-1 Nodes=pod1,pod2,pod3",
-// "SwitchName=root Nodes=pod4,pod5"
-// ]
-func (r *WorkerTopologyReconciler) BuildTier1Links(tierNodes map[string]NodeTopology, podsByNode map[string][]string) []string {
-	links := make(map[string][]string)
-
-	for node, topology := range tierNodes {
-		tier1Switch := topology["tier-1"]
-		links[tier1Switch] = append(links[tier1Switch], podsByNode[node]...)
-	}
-
-	if podsByNode, ok := podsByNode["root"]; ok {
-		links["root"] = append(links["root"], podsByNode...)
-	}
-
-	var result []string
-	for switchName, nodes := range links {
-		sort.Strings(nodes)
-		result = append(result, fmt.Sprintf("SwitchName=%s Nodes=%s", switchName, strings.Join(nodes, ",")))
-	}
-
-	return result
-}
-
-// BuildHigherTierLinks builds links for higher tiers (tier-2 and above)
-// Based on the provided node topology
-// It's necessary to have at least 2 tiers for connections
-// The tier-1 it's always connected to the nodes/pods (workers)
-// Also we could have more than 2 tiers
-// So we start from tier-2 and go up to maxTier
-// If there are no higher tiers, it returns an empty slice
-// Returns a slice of strings representing the links for higher tiers
-// ** Example of the result: **
-// [
-// "SwitchName=leaf0 Switches=switch0,switch0",
-// "SwitchName=spine0 Switches=leaf0"
-// ]
-func (r *WorkerTopologyReconciler) BuildHigherTierLinks(tierNodes map[string]NodeTopology) []string {
-	if len(tierNodes) == 0 {
-		return []string{}
-	}
-
-	maxTier := r.FindMaxTier(tierNodes)
-	if maxTier < 2 {
-		return []string{}
-	}
-
-	var result []string
-
-	for currentTier := 2; currentTier <= maxTier; currentTier++ {
-		links := r.BuildLinksForTierWithSlices(tierNodes, currentTier)
-		result = append(result, links...)
-	}
-
-	return result
-}
-
-// FindMaxTier finds the maximum tier number in the given node topology
-func (r *WorkerTopologyReconciler) FindMaxTier(tierNodes map[string]NodeTopology) int {
-	maxTier := 0
-
-	for _, topology := range tierNodes {
-		for tierKey := range topology {
-			if strings.HasPrefix(tierKey, "tier-") {
-				tierNum := r.ExtractTierNumber(tierKey)
-				if tierNum > maxTier {
-					maxTier = tierNum
-				}
-			}
-		}
-	}
-
-	return maxTier
-}
-
-// BuildLinksForTierWithSlices builds links for a specific tier using slices
-// It connects the current tier devices with the lower tier devices
-// It returns a slice of strings representing the links for the current tier
-// It expects the tierNodes to have at least 2 tiers (tier-1 and tier-2)
-// For example, if the current tier=2, it will connect tier-2 devices with tier-1 devices
-// If tier-3 exists, it will connect tier-2 devices with tier-3 devices, and so on
-// if tier-4 and tier-3 does not exist, it will not connect them
-func (r *WorkerTopologyReconciler) BuildLinksForTierWithSlices(tierNodes map[string]NodeTopology, currentTier int) []string {
-	currentTierKey := fmt.Sprintf("tier-%d", currentTier)
-	lowerTierKey := fmt.Sprintf("tier-%d", currentTier-1)
-
-	tierConnections := make(map[string][]string)
-
-	for _, topology := range tierNodes {
-		currentTierDevice, hasCurrentTier := topology[currentTierKey]
-		lowerTierDevice, hasLowerTier := topology[lowerTierKey]
-
-		if hasCurrentTier && hasLowerTier {
-			if _, exists := tierConnections[currentTierDevice]; !exists {
-				tierConnections[currentTierDevice] = []string{}
-			}
-			if !slices.Contains(tierConnections[currentTierDevice], lowerTierDevice) {
-				tierConnections[currentTierDevice] = append(tierConnections[currentTierDevice], lowerTierDevice)
-			}
-		}
-	}
-
-	var result []string
-	for currentTierDevice, lowerTierDevices := range tierConnections {
-		if len(lowerTierDevices) > 0 && currentTierDevice != "" {
-			sort.Strings(lowerTierDevices)
-			switchesStr := strings.Join(lowerTierDevices, ",")
-			if switchesStr == "" {
-				continue
-			}
-			linkStr := fmt.Sprintf("SwitchName=%s Switches=%s", currentTierDevice, switchesStr)
-			result = append(result, linkStr)
-		}
-	}
-
-	sort.Strings(result)
-	return result
-}
-
-func (r *WorkerTopologyReconciler) ExtractTierNumber(tier string) int {
-	parts := strings.Split(tier, "-")
-	if len(parts) != 2 {
-		return 0
-	}
-	num, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return 0
-	}
-	return num
-}
-
-func (r *WorkerTopologyReconciler) DeserializeNodeTopology(data map[string]string) (map[string]NodeTopology, error) {
-	result := make(map[string]NodeTopology)
+func (r *WorkerTopologyReconciler) ParseNodeTopologyLabels(data map[string]string) (map[string]NodeTopologyLabels, error) {
+	result := make(map[string]NodeTopologyLabels)
 
 	for nodeName, jsonData := range data {
-		var topology NodeTopology
+		var topology NodeTopologyLabels
 		if err := json.Unmarshal([]byte(jsonData), &topology); err != nil {
-			return nil, fmt.Errorf("failed to deserialize topology for node %s: %w", nodeName, err)
+			return nil, fmt.Errorf("parse topology labels for node %s: %w", nodeName, err)
 		}
 		result[nodeName] = topology
 	}
@@ -310,21 +168,14 @@ func (r *WorkerTopologyReconciler) DeserializeNodeTopology(data map[string]strin
 	return result, nil
 }
 
-func (r *WorkerTopologyReconciler) updateTopologyConfigMap(
-	ctx context.Context, clusterName, namespace string, topologyLinks []string) error {
-
-	topologyData := ""
-	if len(topologyLinks) > 0 {
-		topologyData = strings.Join(topologyLinks, "\n")
-	}
-
+func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, namespace string, config string) error {
 	configMap := &corev1.ConfigMap{
 		TypeMeta: ctrl.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.Version,
 			Kind:       "ConfigMap",
 		},
 		ObjectMeta: ctrl.ObjectMeta{
-			Name:      naming.BuildConfigMapTopologyName(clusterName),
+			Name:      consts.ConfigMapNameTopologyConfig,
 			Namespace: namespace,
 			Labels: map[string]string{
 				consts.LabelSConfigControllerSourceKey: consts.LabelSConfigControllerSourceValue,
@@ -334,7 +185,7 @@ func (r *WorkerTopologyReconciler) updateTopologyConfigMap(
 			},
 		},
 		Data: map[string]string{
-			"topology.conf": topologyData,
+			"topology.conf": config,
 		},
 	}
 
@@ -342,11 +193,11 @@ func (r *WorkerTopologyReconciler) updateTopologyConfigMap(
 		client.ForceOwnership, client.FieldOwner(WorkerTopologyReconcilerName))
 }
 
-// getOrCreateTopologyConfigMap retrieves or creates the ConfigMap used to store node topology information.
-func (r *WorkerTopologyReconciler) getTopologyConfigMap(ctx context.Context) (*corev1.ConfigMap, error) {
+// getNodeTopologyLabelsConfigMap retrieves the ConfigMap used to store node topology information.
+func (r *WorkerTopologyReconciler) getNodeTopologyLabelsConfigMap(ctx context.Context) (*corev1.ConfigMap, error) {
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.CongigMapNameNodesTopology,
+			Name:      consts.ConfigMapNameTopologyNodeLabels,
 			Namespace: r.namespace,
 		},
 	}

@@ -173,7 +173,7 @@ func ExtractTierLabels(k8sNodeLabels map[string]string, topologyLabelPrefix stri
 
 // updateTopologyConfigMap updates the ConfigMap with the node's tier data
 func (r *NodeTopologyReconciler) updateTopologyConfigMap(ctx context.Context, nodeName string, tierData map[string]string, logger logr.Logger) error {
-	configMap, err := r.getOrCreateTopologyConfigMap(ctx, logger)
+	configMap, err := r.getOrCreateTopologyLabelsConfigMap(ctx, logger)
 	if err != nil {
 		return err
 	}
@@ -190,18 +190,18 @@ func (r *NodeTopologyReconciler) updateTopologyConfigMap(ctx context.Context, no
 	configMap.Data[nodeName] = string(tierDataJSON)
 
 	if err := r.Client.Update(ctx, configMap); err != nil {
-		logger.Error(err, "Failed to update ConfigMap", "configMap", consts.CongigMapNameNodesTopology)
-		return fmt.Errorf("failed to update ConfigMap %s/%s: %w", r.namespace, consts.CongigMapNameNodesTopology, err)
+		logger.Error(err, "Failed to update ConfigMap", "configMap", configMap.ObjectMeta.Name)
+		return fmt.Errorf("failed to update ConfigMap %s/%s: %w", r.namespace, configMap.ObjectMeta.Name, err)
 	}
 
 	return nil
 }
 
-// getOrCreateTopologyConfigMap retrieves or creates the ConfigMap used to store node topology information.
-func (r *NodeTopologyReconciler) getOrCreateTopologyConfigMap(ctx context.Context, logger logr.Logger) (*corev1.ConfigMap, error) {
+// getOrCreateTopologyLabelsConfigMap retrieves or creates the ConfigMap used to store node topology information.
+func (r *NodeTopologyReconciler) getOrCreateTopologyLabelsConfigMap(ctx context.Context, logger logr.Logger) (*corev1.ConfigMap, error) {
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.CongigMapNameNodesTopology,
+			Name:      consts.ConfigMapNameTopologyNodeLabels,
 			Namespace: r.namespace,
 		},
 	}

@@ -263,6 +263,7 @@ func main() {
 		)
 		os.Exit(1)
 	}
+
 	if err = topologyconfcontroller.NewWorkerTopologyReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
