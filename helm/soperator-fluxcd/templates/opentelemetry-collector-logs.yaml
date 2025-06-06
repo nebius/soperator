@@ -49,7 +49,7 @@ spec:
         otlphttp/victoriametrics:
           compression: gzip
           encoding: proto
-          logs_endpoint: http://vm-logs-victoria-logs-single-server.logs-system.svc.cluster.local.:9428/insert/opentelemetry/v1/logs
+          logs_endpoint: http://vm-logs-victoria-logs-single-server:9428/insert/opentelemetry/v1/logs
           retry_on_failure:
             initial_interval: 200ms
           timeout: 5s
@@ -67,6 +67,10 @@ spec:
             authenticator: bearertokenauth
         {{- end }}
       extensions:
+        {{- if .Values.observability.opentelemetry.logs.values.hcOutputEnabled }}
+        k8s_observer:
+          node: ${env:K8S_NODE_NAME}
+        {{- end }}
         file_storage:
           directory: /var/lib/otelcol
         health_check:
@@ -123,6 +127,16 @@ spec:
             - set(attributes["cluster"], "${env:CLUSTER_NAME}")
             - set(attributes["k8s.node.name"], "${env:K8S_NODE_NAME}")
       receivers:
+        {{- if .Values.observability.opentelemetry.logs.values.hcOutputEnabled }}
+        receiver_creator:
+          watch_observers: [k8s_observer]
+          receivers:
+            filelog:
+              rule: type == "pod" && name matches "worker-"
+              config:
+                include: 
+                  - "/mnt/jail/opt/hc_out/`name`/**/*.out"
+        {{- end }}
         filelog/nodelogs:
           include:
             - '/var/nodelogs/kern.log*'
@@ -279,6 +293,9 @@ spec:
         {{- if .Values.observability.opentelemetry.logs.values.publicEndpointEnabled }}
         - bearertokenauth
         {{- end }}
+        {{- if .Values.observability.opentelemetry.logs.values.hcOutputEnabled }}
+        - k8s_observer
+        {{- end }}
         pipelines:
           logs:
             exporters:
@@ -294,6 +311,9 @@ spec:
             receivers:
             - filelog/pods
             - filelog/nodelogs
+            {{- if .Values.observability.opentelemetry.logs.values.hcOutputEnabled }}
+            - receiver_creator
+            {{- end }}
           metrics: null
           traces: null
     extraEnvs:
@@ -322,6 +342,11 @@ spec:
     - name: node-logs
       mountPath: /var/nodelogs
       readOnly: true
+    {{- if .Values.observability.opentelemetry.logs.values.hcOutputEnabled }}
+    - mountPath: /mnt/jail/opt/hc_out
+      name: hc-logs
+      readOnly: true
+    {{- end }}
     extraVolumes:
     {{- if .Values.observability.opentelemetry.events.values.publicEndpointEnabled }}
     - name: o11ytoken
@@ -335,6 +360,12 @@ spec:
         path: /var/log
         type: Directory
       name: node-logs
+    {{- if .Values.observability.opentelemetry.logs.values.hcOutputEnabled }}
+    - hostPath:
+        path: /mnt/jail/opt/hc_out
+        type: Directory
+      name: hc-logs
+    {{- end }}
     - hostPath:
         path: /var/lib/otelcol
         type: DirectoryOrCreate
