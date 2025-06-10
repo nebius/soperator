@@ -44,6 +44,8 @@ func TestMetricsCollector_Describe(t *testing.T) {
 
 	assert.Contains(t, found, `Desc{fqName: "soperator_cluster_info", help: "Soperator cluster information", constLabels: {soperator_version="test-version"}, variableLabels: {}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,compute_instance_id,base_state,is_drain,address}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_job_info", help: "Slurm job detail information", constLabels: {}, variableLabels: {job_id,job_state,job_state_reason,slurm_partition,job_name,user_name,standard_error,standard_output}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_job", help: "Slurm job node information", constLabels: {}, variableLabels: {job_id,node_name}}`)
 }
 
 func TestMetricsCollector_Collect_Success(t *testing.T) {
@@ -77,6 +79,22 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 
 		mockClient.EXPECT().ListNodes(mock.Anything).Return(testNodes, nil)
 
+		// Mock successful ListJobs response
+		testJobs := []slurmapi.Job{
+			{
+				ID:             12345,
+				Name:           "test_job",
+				State:          "RUNNING",
+				StateReason:    "None",
+				Partition:      "gpu",
+				UserName:       "testuser",
+				StandardError:  "/path/to/stderr",
+				StandardOutput: "/path/to/stdout",
+				Nodes:          "node-1",
+			},
+		}
+		mockClient.EXPECT().ListJobs(mock.Anything).Return(testJobs, nil)
+
 		ch := make(chan prometheus.Metric, 20)
 		go func() {
 			collector.Collect(ch)
@@ -88,21 +106,24 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 			metrics = append(metrics, metric)
 		}
 
-		// Should have at least: 1 cluster info + 2 node info + GPU seconds metrics
-		assert.GreaterOrEqual(t, len(metrics), 3)
+		// Should have at least: 1 cluster info + 2 node info + 1 job info + 1 job node + GPU seconds metrics
+		assert.GreaterOrEqual(t, len(metrics), 5)
 
 		var metricsText []string
 		for _, metric := range metrics {
 			metricsText = append(metricsText, toPrometheusLikeString(t, metric))
 		}
 
-		wantMetricsText := []string{
+		expectedMetrics := []string{
 			`GAUGE; soperator_cluster_info{soperator_version="test-version"} 1`,
 			`GAUGE; slurm_node_info{address="10.0.0.1",base_state="allocated",compute_instance_id="instance-1",is_drain="false",node_name="node-1"} 1`,
 			`GAUGE; slurm_node_info{address="10.0.0.2",base_state="idle",compute_instance_id="instance-2",is_drain="true",node_name="node-2"} 1`,
 			`COUNTER; slurm_active_node_gpu_seconds_total{node_name="node-1"} 20`, // 20 gpu seconds passed.
+			`GAUGE; slurm_job_info{job_id="12345",job_name="test_job",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr",standard_output="/path/to/stdout",user_name="testuser"} 1`,
+			`GAUGE; slurm_node_job{job_id="12345",node_name="node-1"} 1`,
 		}
-		assert.Equal(t, wantMetricsText, metricsText)
+
+		assert.Equal(t, expectedMetrics, metricsText)
 
 		// Now drain node-0 and check that slurm_node_fails_total appear in the metrics.
 		testNodes[0].States = map[slurmapispec.V0041NodeState]struct{}{
@@ -113,6 +134,7 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 			ChangedAt: time.Now(),
 		}
 		mockClient.EXPECT().ListNodes(mock.Anything).Return(testNodes, nil)
+		mockClient.EXPECT().ListJobs(mock.Anything).Return(testJobs, nil)
 		ch = make(chan prometheus.Metric, 10)
 		go func() {
 			collector.Collect(ch)
