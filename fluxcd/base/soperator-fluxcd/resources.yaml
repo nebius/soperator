@@ -42,3 +42,7 @@ spec:
       name: soperator-fluxcd
       valuesKey: values.yaml
       optional: true
+    - kind: ConfigMap
+      name: backup-schedule
+      valuesKey: values.yaml
+      optional: true
