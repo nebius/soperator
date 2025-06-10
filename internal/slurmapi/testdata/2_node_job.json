@@ -1,0 +1,509 @@
+{
+  "account": "root",
+  "accrue_time": {
+    "infinite": false,
+    "number": 1749564035,
+    "set": true
+  },
+  "admin_comment": "",
+  "allocating_node": "login-0",
+  "array_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "array_max_tasks": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "array_task_id": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+  },
+  "array_task_string": "",
+  "association_id": 2,
+  "batch_features": "",
+  "batch_flag": true,
+  "batch_host": "worker-1",
+  "billable_tres": {
+    "infinite": false,
+    "number": 4,
+    "set": true
+  },
+  "burst_buffer": "",
+  "burst_buffer_state": "",
+  "cluster": "soperator",
+  "cluster_features": "",
+  "command": "",
+  "comment": "",
+  "container": "",
+  "container_id": "",
+  "contiguous": false,
+  "core_spec": 0,
+  "cores_per_socket": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+  },
+  "cpu_frequency_governor": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+  },
+  "cpu_frequency_maximum": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+  },
+  "cpu_frequency_minimum": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+  },
+  "cpus": {
+    "infinite": false,
+    "number": 4,
+    "set": true
+  },
+  "cpus_per_task": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+  },
+  "cpus_per_tres": "",
+  "cron": "",
+  "current_working_directory": "/root",
+  "deadline": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "delay_boot": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "dependency": "",
+  "derived_exit_code": {
+    "return_code": {
+      "infinite": false,
+      "number": 0,
+      "set": true
+    },
+    "signal": {
+      "id": {
+        "infinite": false,
+        "number": 0,
+        "set": false
+      },
+      "name": ""
+    },
+    "status": [
+      "SUCCESS"
+    ]
+  },
+  "eligible_time": {
+    "infinite": false,
+    "number": 1749564035,
+    "set": true
+  },
+  "end_time": {
+    "infinite": false,
+    "number": 1749564041,
+    "set": true
+  },
+  "excluded_nodes": "",
+  "exclusive": [],
+  "exit_code": {
+    "return_code": {
+      "infinite": false,
+      "number": 0,
+      "set": true
+    },
+    "signal": {
+      "id": {
+        "infinite": false,
+        "number": 0,
+        "set": false
+      },
+      "name": ""
+    },
+    "status": [
+      "SUCCESS"
+    ]
+  },
+  "extra": "",
+  "failed_node": "",
+  "features": "",
+  "federation_origin": "",
+  "federation_siblings_active": "",
+  "federation_siblings_viable": "",
+  "flags": [
+    "EXACT_TASK_COUNT_REQUESTED",
+    "USING_DEFAULT_ACCOUNT",
+    "USING_DEFAULT_PARTITION",
+    "USING_DEFAULT_QOS",
+    "USING_DEFAULT_WCKEY",
+    "PARTITION_ASSIGNED"
+  ],
+  "gres_detail": [],
+  "group_id": 0,
+  "group_name": "root",
+  "het_job_id": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "het_job_id_set": "",
+  "het_job_offset": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "hold": false,
+  "job_id": 349,
+  "job_resources": {
+    "cpus": 2,
+    "nodes": {
+      "allocation": [
+        {
+          "cpus": {
+            "count": 2,
+            "used": 0
+          },
+          "index": 0,
+          "memory": {
+            "allocated": 191356,
+            "used": 0
+          },
+          "name": "worker-1",
+          "sockets": [
+            {
+              "cores": [
+                {
+                  "index": 0,
+                  "status": [
+                    "ALLOCATED"
+                  ]
+                },
+                {
+                  "index": 1,
+                  "status": [
+                    "UNALLOCATED"
+                  ]
+                },
+                {
+                  "index": 2,
+                  "status": [
+                    "UNALLOCATED"
+                  ]
+                },
+                {
+                  "index": 3,
+                  "status": [
+                    "UNALLOCATED"
+                  ]
+                },
+                {
+                  "index": 4,
+                  "status": [
+                    "UNALLOCATED"
+                  ]
+                },
+                {
+                  "index": 5,
+                  "status": [
+                    "UNALLOCATED"
+                  ]
+                },
+                {
+                  "index": 6,
+                  "status": [
+                    "UNALLOCATED"
+                  ]
+                },
+                {
+                  "index": 7,
+                  "status": [
+                    "UNALLOCATED"
+                  ]
+                }
+              ],
+              "index": 0
+            }
+          ]
+        },
+        {
+          "cpus": {
+            "count": 2,
+            "used": 0
+          },
+          "index": 1,
+          "memory": {
+            "allocated": 191356,
+            "used": 0
+          },
+          "name": "worker-0",
+          "sockets": [
+            {
+              "cores": [
+                {
+                  "index": 0,
+                  "status": [
+                    "ALLOCATED"
+                  ]
+                },
+                {
+                  "index": 1,
+                  "status": [
+                    "UNALLOCATED"
+                  ]
+                },
+                {
+                  "index": 2,
+                  "status": [
+                    "UNALLOCATED"
+                  ]
+                },
+                {
+                  "index": 3,
+                  "status": [
+                    "UNALLOCATED"
+                  ]
+                },
+                {
+                  "index": 4,
+                  "status": [
+                    "UNALLOCATED"
+                  ]
+                },
+                {
+                  "index": 5,
+                  "status": [
+                    "UNALLOCATED"
+                  ]
+                },
+                {
+                  "index": 6,
+                  "status": [
+                    "UNALLOCATED"
+                  ]
+                },
+                {
+                  "index": 7,
+                  "status": [
+                    "UNALLOCATED"
+                  ]
+                }
+              ],
+              "index": 0
+            }
+          ]
+        }
+      ],
+      "count": 2,
+      "list": "worker-[1,0]",
+      "select_type": [
+        "ONE_ROW"
+      ],
+      "whole": false
+    },
+    "select_type": [
+      "CORE"
+    ],
+    "threads_per_core": {
+      "infinite": false,
+      "number": 0,
+      "set": false
+    }
+  },
+  "job_size_str": [],
+  "job_state": [
+    "COMPLETED"
+  ],
+  "last_sched_evaluation": {
+    "infinite": false,
+    "number": 1749564035,
+    "set": true
+  },
+  "licenses": "",
+  "mail_type": [],
+  "mail_user": "root",
+  "max_cpus": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "max_nodes": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "maximum_switch_wait_time": 0,
+  "mcs_label": "",
+  "memory_per_cpu": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+  },
+  "memory_per_node": {
+    "infinite": false,
+    "number": 191356,
+    "set": true
+  },
+  "memory_per_tres": "",
+  "minimum_cpus_per_node": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+  },
+  "minimum_switches": 0,
+  "minimum_tmp_disk_per_node": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "name": "wrap",
+  "network": "",
+  "nice": 0,
+  "node_count": {
+    "infinite": false,
+    "number": 2,
+    "set": true
+  },
+  "nodes": "worker-[1,0]",
+  "oversubscribe": true,
+  "partition": "main",
+  "power": {
+    "flags": []
+  },
+  "pre_sus_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "preempt_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "preemptable_time": {
+    "infinite": false,
+    "number": 1749564035,
+    "set": true
+  },
+  "prefer": "",
+  "priority": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+  },
+  "profile": [
+    "NOT_SET"
+  ],
+  "qos": "normal",
+  "reboot": false,
+  "requeue": true,
+  "required_nodes": "",
+  "resize_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "restart_cnt": 0,
+  "resv_name": "",
+  "scheduled_nodes": "",
+  "selinux_context": "",
+  "shared": [],
+  "show_flags": [
+    "ALL",
+    "DETAIL",
+    "LOCAL"
+  ],
+  "sockets_per_board": 0,
+  "sockets_per_node": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+  },
+  "standard_error": "/root/slurm-349.out",
+  "standard_input": "/dev/null",
+  "standard_output": "/root/slurm-349.out",
+  "start_time": {
+    "infinite": false,
+    "number": 1749564035,
+    "set": true
+  },
+  "state_description": "",
+  "state_reason": "None",
+  "submit_time": {
+    "infinite": false,
+    "number": 1749564035,
+    "set": true
+  },
+  "suspend_time": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "system_comment": "",
+  "tasks": {
+    "infinite": false,
+    "number": 2,
+    "set": true
+  },
+  "tasks_per_board": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "tasks_per_core": {
+    "infinite": true,
+    "number": 0,
+    "set": false
+  },
+  "tasks_per_node": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "tasks_per_socket": {
+    "infinite": true,
+    "number": 0,
+    "set": false
+  },
+  "tasks_per_tres": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "thread_spec": 32766,
+  "threads_per_core": {
+    "infinite": false,
+    "number": 0,
+    "set": false
+  },
+  "time_limit": {
+    "infinite": false,
+    "number": 1,
+    "set": true
+  },
+  "time_minimum": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "tres_alloc_str": "cpu=4,mem=382712M,node=2,billing=4",
+  "tres_bind": "",
+  "tres_freq": "",
+  "tres_per_job": "",
+  "tres_per_node": "",
+  "tres_per_socket": "",
+  "tres_per_task": "",
+  "tres_req_str": "cpu=2,mem=382712M,node=2,billing=2",
+  "user_id": 0,
+  "user_name": "root",
+  "wckey": ""
+}

@@ -38,7 +38,7 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client, soperatorVersion string
 
 		sopClusterInfo: prometheus.NewDesc("soperator_cluster_info", "Soperator cluster information", []string{}, sopClusterInfoConstLabels),
 		nodeInfo:       prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "compute_instance_id", "base_state", "is_drain", "address"}, nil),
-		jobInfo:        prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{}, nil),
+		jobInfo:        prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "standard_error", "standard_output"}, nil),
 		jobNode:        prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
 		nodeGPUSeconds: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "slurm_active_node_gpu_seconds_total",
@@ -99,6 +99,16 @@ func (c *MetricsCollector) Collect(ch chan<- prometheus.Metric) {
 
 	c.nodeGPUSeconds.Collect(ch)
 	c.nodeFails.Collect(ch)
+
+	jobs, err := c.slurmAPIClient.ListJobs(ctx)
+	if err != nil {
+		logger.Error(err, "Failed to get jobs from SLURM API")
+		return
+	}
+	for slurmJobMetric := range c.slurmJobMetrics(ctx, jobs) {
+		ch <- slurmJobMetric
+	}
+
 	c.lastUpdateTime = now
 
 	logger.Info("Collected metrics", "elapsed_seconds", time.Now().Sub(now).Seconds())
@@ -127,6 +137,37 @@ func (c *MetricsCollector) slurmNodeMetrics(
 			if !node.IsDownState() && !node.IsIdleDrained() {
 				gpuSecondsInc := now.Sub(c.lastUpdateTime).Seconds() * float64(tres.GPUCount)
 				c.nodeGPUSeconds.WithLabelValues(node.Name).Add(gpuSecondsInc)
+			}
+		}
+	}
+}
+
+func (c *MetricsCollector) slurmJobMetrics(
+	ctx context.Context, slurmJobs []slurmapi.Job,
+) iter.Seq[prometheus.Metric] {
+	return func(yield func(prometheus.Metric) bool) {
+		logger := log.FromContext(ctx).WithName(ControllerName)
+		for _, job := range slurmJobs {
+			jobLabels := []string{
+				job.GetIDString(),
+				job.State,
+				job.StateReason,
+				job.Partition,
+				job.Name,
+				job.UserName,
+				job.StandardError,
+				job.StandardOutput,
+			}
+			yield(prometheus.MustNewConstMetric(c.jobInfo, prometheus.GaugeValue, 1, jobLabels...))
+
+			nodeList, err := job.GetNodeList()
+			if err != nil {
+				logger.Error(err, "Failed to parse node list for job", "job_id", job.GetIDString(), "nodes", job.Nodes)
+				continue
+			}
+			for _, nodeName := range nodeList {
+				jobNodeLabels := []string{job.GetIDString(), nodeName}
+				yield(prometheus.MustNewConstMetric(c.jobNode, prometheus.GaugeValue, 1, jobNodeLabels...))
 			}
 		}
 	}
