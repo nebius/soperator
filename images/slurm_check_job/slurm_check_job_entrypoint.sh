@@ -21,6 +21,20 @@ rm -rf /etc/slurm && ln -s /mnt/jail/slurm /etc/slurm
 echo "Bind-mount /opt/bin/sbatch.sh script"
 mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
 
+echo "Setting Extra field to all nodes..."
+for i in $(seq 0 $((NODE_NUM - 1))); do
+    node="worker-${i}"
+    echo "Updating node: $node"
+
+    extra_json=$(scontrol show node "$node" | awk -F= '/Extra=/{print $2}')
+    if [[ -z "$extra_json" || "$extra_json" == "none" ]]; then
+        extra_json="{}"
+    fi
+    updated_json=$(echo "$extra_json" | jq -c --arg key "$ACTIVE_CHECK_NAME" --argjson val true '.[$key] = $val')
+
+    scontrol update NodeName="$node" Extra="$updated_json"
+done
+
 echo "Submitting Slurm job..."
 SLURM_OUTPUT=$(/usr/bin/sbatch --parsable /opt/bin/sbatch.sh)
 
