@@ -37,5 +37,5 @@ activeCheck:
             claimName: "jail-pvc"
 images:
   slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.20.0-jammy-slurm24.05.7"
-  k8sJob: "cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy"
+  k8sJob: "ubuntu:jammy"
   munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.20.0-jammy-slurm24.05.7"
