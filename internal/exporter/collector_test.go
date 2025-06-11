@@ -90,7 +90,7 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 				UserName:       "testuser",
 				StandardError:  "/path/to/stderr",
 				StandardOutput: "/path/to/stdout",
-				Nodes:          "node-1",
+				Nodes:          "node-[1,2]",
 			},
 		}
 		mockClient.EXPECT().ListJobs(mock.Anything).Return(testJobs, nil)
@@ -118,9 +118,11 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 			`GAUGE; soperator_cluster_info{soperator_version="test-version"} 1`,
 			`GAUGE; slurm_node_info{address="10.0.0.1",base_state="allocated",compute_instance_id="instance-1",is_drain="false",node_name="node-1"} 1`,
 			`GAUGE; slurm_node_info{address="10.0.0.2",base_state="idle",compute_instance_id="instance-2",is_drain="true",node_name="node-2"} 1`,
-			`COUNTER; slurm_active_node_gpu_seconds_total{node_name="node-1"} 20`, // 20 gpu seconds passed.
+			`COUNTER; slurm_active_node_gpu_seconds_total{node_name="node-1"} 20`, // (10 seconds * 2 gpu on node-1) = 20 passed.
+			`COUNTER; slurm_job_alloc_gpu_seconds_total 30`,                       // 10 seconds * 3 GPUs for a job on both nodes.
 			`GAUGE; slurm_job_info{job_id="12345",job_name="test_job",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr",standard_output="/path/to/stdout",user_name="testuser"} 1`,
 			`GAUGE; slurm_node_job{job_id="12345",node_name="node-1"} 1`,
+			`GAUGE; slurm_node_job{job_id="12345",node_name="node-2"} 1`,
 		}
 
 		assert.Equal(t, expectedMetrics, metricsText)

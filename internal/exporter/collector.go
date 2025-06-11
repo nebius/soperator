@@ -23,11 +23,13 @@ type MetricsCollector struct {
 	jobInfo        *prometheus.Desc
 	jobNode        *prometheus.Desc
 	nodeGPUSeconds *prometheus.CounterVec
+	jobGPUSeconds  *prometheus.CounterVec
 	nodeFails      *prometheus.CounterVec
 
-	lastUpdateTime time.Time
-	nodes          map[string]slurmapi.Node
-	stateMutex     sync.RWMutex
+	lastNodeGPUTimeUpdated time.Time
+	lastJobGPUTimeUpdated  time.Time
+	nodes                  map[string]slurmapi.Node
+	stateMutex             sync.RWMutex
 }
 
 // NewMetricsCollector creates a new MetricsCollector
@@ -44,13 +46,18 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client, soperatorVersion string
 			Name: "slurm_active_node_gpu_seconds_total",
 			Help: "Total GPU seconds on active Slurm nodes (not down, not idle+drain)",
 		}, []string{"node_name"}),
+		jobGPUSeconds: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "slurm_job_alloc_gpu_seconds_total",
+			Help: "Total GPU seconds allocated to jobs in RUNNING state",
+		}, []string{}),
 		nodeFails: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "slurm_node_fails_total",
 			Help: "Total number of times a node has failed (went from not down/drain to down/drain state)",
 		}, []string{"node_name", "reason"}),
 
-		lastUpdateTime: time.Now(),
-		nodes:          make(map[string]slurmapi.Node),
+		lastNodeGPUTimeUpdated: time.Now(),
+		lastJobGPUTimeUpdated:  time.Now(),
+		nodes:                  make(map[string]slurmapi.Node),
 	}
 }
 
@@ -61,6 +68,7 @@ func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.jobInfo
 	ch <- c.jobNode
 	c.nodeGPUSeconds.Describe(ch)
+	c.jobGPUSeconds.Describe(ch)
 	c.nodeFails.Describe(ch)
 }
 
@@ -105,11 +113,14 @@ func (c *MetricsCollector) Collect(ch chan<- prometheus.Metric) {
 		logger.Error(err, "Failed to get jobs from SLURM API")
 		return
 	}
+
+	// Calculate job GPU seconds for running jobs (before updating lastNodeGPUTimeUpdated)
+	c.calculateJobGPUSeconds(ctx, now, jobs, nodes)
+	c.jobGPUSeconds.Collect(ch)
+
 	for slurmJobMetric := range c.slurmJobMetrics(ctx, jobs) {
 		ch <- slurmJobMetric
 	}
-
-	c.lastUpdateTime = now
 
 	logger.Info("Collected metrics", "elapsed_seconds", time.Now().Sub(now).Seconds())
 }
@@ -135,11 +146,60 @@ func (c *MetricsCollector) slurmNodeMetrics(
 				continue
 			}
 			if !node.IsDownState() && !node.IsIdleDrained() {
-				gpuSecondsInc := now.Sub(c.lastUpdateTime).Seconds() * float64(tres.GPUCount)
+				gpuSecondsInc := now.Sub(c.lastNodeGPUTimeUpdated).Seconds() * float64(tres.GPUCount)
 				c.nodeGPUSeconds.WithLabelValues(node.Name).Add(gpuSecondsInc)
 			}
 		}
+		c.lastNodeGPUTimeUpdated = now
 	}
+}
+
+func (c *MetricsCollector) calculateJobGPUSeconds(
+	ctx context.Context, now time.Time, jobs []slurmapi.Job, nodes []slurmapi.Node,
+) {
+	logger := log.FromContext(ctx).WithName(ControllerName)
+
+	nodeMap := make(map[string]slurmapi.Node, len(nodes))
+	for _, node := range nodes {
+		nodeMap[node.Name] = node
+	}
+
+	var totalRunningJobGPUs int
+	for _, job := range jobs {
+		if job.State != "RUNNING" {
+			continue
+		}
+
+		nodeList, err := job.GetNodeList()
+		if err != nil {
+			logger.Error(err, "Failed to parse node list for job", "job_id", job.GetIDString(), "nodes", job.Nodes)
+			continue
+		}
+
+		for _, nodeName := range nodeList {
+			node, exists := nodeMap[nodeName]
+			if !exists {
+				logger.Error(nil, "Job references unknown node", "job_id", job.GetIDString(), "node_name", nodeName)
+				continue
+			}
+
+			tres, err := slurmapi.ParseTrackableResources(node.Tres)
+			if err != nil {
+				logger.Error(err, "Failed to parse trackable resources for job node", "job_id", job.GetIDString(), "node_name", nodeName, "tres", node.Tres)
+				continue
+			}
+
+			totalRunningJobGPUs += tres.GPUCount
+		}
+	}
+
+	if totalRunningJobGPUs > 0 {
+		timeDelta := now.Sub(c.lastJobGPUTimeUpdated).Seconds()
+		gpuSecondsInc := timeDelta * float64(totalRunningJobGPUs)
+		c.jobGPUSeconds.WithLabelValues().Add(gpuSecondsInc)
+	}
+
+	c.lastJobGPUTimeUpdated = now
 }
 
 func (c *MetricsCollector) slurmJobMetrics(
