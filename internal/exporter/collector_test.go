@@ -44,7 +44,7 @@ func TestMetricsCollector_Describe(t *testing.T) {
 
 	assert.Contains(t, found, `Desc{fqName: "soperator_cluster_info", help: "Soperator cluster information", constLabels: {soperator_version="test-version"}, variableLabels: {}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,compute_instance_id,base_state,is_drain,address}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_job_info", help: "Slurm job detail information", constLabels: {}, variableLabels: {job_id,job_state,job_state_reason,slurm_partition,job_name,user_name,standard_error,standard_output}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_job_info", help: "Slurm job detail information", constLabels: {}, variableLabels: {job_id,job_state,job_state_reason,slurm_partition,job_name,user_name,standard_error,standard_output,array_job_id,array_task_id}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_job", help: "Slurm job node information", constLabels: {}, variableLabels: {job_id,node_name}}`)
 }
 
@@ -79,6 +79,7 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 
 		mockClient.EXPECT().ListNodes(mock.Anything).Return(testNodes, nil)
 
+		arrayTaskID := int32(42)
 		// Mock successful ListJobs response
 		testJobs := []slurmapi.Job{
 			{
@@ -91,6 +92,8 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 				StandardError:  "/path/to/stderr",
 				StandardOutput: "/path/to/stdout",
 				Nodes:          "node-[1,2]",
+				ArrayJobID:     nil,
+				ArrayTaskID:    &arrayTaskID,
 			},
 		}
 		mockClient.EXPECT().ListJobs(mock.Anything).Return(testJobs, nil)
@@ -120,7 +123,7 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 			`GAUGE; slurm_node_info{address="10.0.0.2",base_state="idle",compute_instance_id="instance-2",is_drain="true",node_name="node-2"} 1`,
 			`COUNTER; slurm_active_node_gpu_seconds_total{node_name="node-1"} 20`, // (10 seconds * 2 gpu on node-1) = 20 passed.
 			`COUNTER; slurm_job_alloc_gpu_seconds_total 30`,                       // 10 seconds * 3 GPUs for a job on both nodes.
-			`GAUGE; slurm_job_info{job_id="12345",job_name="test_job",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr",standard_output="/path/to/stdout",user_name="testuser"} 1`,
+			`GAUGE; slurm_job_info{array_job_id="",array_task_id="42",job_id="12345",job_name="test_job",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr",standard_output="/path/to/stdout",user_name="testuser"} 1`,
 			`GAUGE; slurm_node_job{job_id="12345",node_name="node-1"} 1`,
 			`GAUGE; slurm_node_job{job_id="12345",node_name="node-2"} 1`,
 		}

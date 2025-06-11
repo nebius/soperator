@@ -40,7 +40,7 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client, soperatorVersion string
 
 		sopClusterInfo: prometheus.NewDesc("soperator_cluster_info", "Soperator cluster information", []string{}, sopClusterInfoConstLabels),
 		nodeInfo:       prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "compute_instance_id", "base_state", "is_drain", "address"}, nil),
-		jobInfo:        prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "standard_error", "standard_output"}, nil),
+		jobInfo:        prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "standard_error", "standard_output", "array_job_id", "array_task_id"}, nil),
 		jobNode:        prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
 		nodeGPUSeconds: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "slurm_active_node_gpu_seconds_total",
@@ -114,7 +114,6 @@ func (c *MetricsCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	// Calculate job GPU seconds for running jobs (before updating lastNodeGPUTimeUpdated)
 	c.calculateJobGPUSeconds(ctx, now, jobs, nodes)
 	c.jobGPUSeconds.Collect(ch)
 
@@ -217,6 +216,8 @@ func (c *MetricsCollector) slurmJobMetrics(
 				job.UserName,
 				job.StandardError,
 				job.StandardOutput,
+				job.GetArrayJobIDString(),
+				job.GetArrayTaskIDString(),
 			}
 			yield(prometheus.MustNewConstMetric(c.jobInfo, prometheus.GaugeValue, 1, jobLabels...))
 
