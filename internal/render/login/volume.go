@@ -28,7 +28,7 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeLogin),
 		common.RenderVolumeSshdKeys(secrets.SshdKeysName),
 		common.RenderVolumeSshdRootKeys(clusterName),
-		common.RenderVolumeInMemory(),
+		common.RenderVolumeInMemory(login.ContainerSshd.Resources.Memory()),
 		common.RenderVolumeTmpDisk(),
 		renderVolumeSshdConfigs(login.SSHDConfigMapName),
 	}

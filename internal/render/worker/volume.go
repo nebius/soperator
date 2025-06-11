@@ -32,7 +32,7 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeWorker),
 		common.RenderVolumeSshdKeys(secrets.SshdKeysName),
 		common.RenderVolumeSshdRootKeys(clusterName),
-		common.RenderVolumeInMemory(),
+		common.RenderVolumeInMemory(worker.ContainerSlurmd.Resources.Memory()),
 		common.RenderVolumeTmpDisk(),
 		renderVolumeSshdConfigs(worker.SSHDConfigMapName),
 		renderVolumeNvidia(),
