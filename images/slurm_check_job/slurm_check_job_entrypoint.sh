@@ -34,7 +34,7 @@ for node in $(sinfo -N --noheader -o "%N" | tr '\n' ' '); do
 done
 
 echo "Creating epilog script..."
-EPILOG_SCRIPT=$(mktemp /tmp/activecheck-epilog.sh)
+EPILOG_SCRIPT=$(mktemp /tmp/activecheck-epilog.XXXXXX.sh)
 chmod +x "$EPILOG_SCRIPT"
 
 cat <<EOF > "$EPILOG_SCRIPT"
