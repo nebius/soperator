@@ -35,7 +35,8 @@ for node in $(sinfo -N --noheader -o "%N" | tr '\n' ' '); do
 done
 
 echo "Submitting Slurm job..."
-SLURM_OUTPUT=$(/usr/bin/sbatch --parsable /opt/bin/sbatch.sh)
+HOSTS_NUM=$(sinfo -N --noheader -o "%N" | wc -l)
+SLURM_OUTPUT=$(/usr/bin/sbatch --parsable --export=ALL,HOSTS_NUM /opt/bin/sbatch.sh)
 
 if [[ -z "$SLURM_OUTPUT" ]]; then
     echo "Failed to submit Slurm job"
