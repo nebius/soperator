@@ -22,8 +22,7 @@ echo "Bind-mount /opt/bin/sbatch.sh script"
 mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
 
 echo "Setting Extra field to all nodes..."
-for i in $(seq 0 $((NODE_NUM - 1))); do
-    node="worker-${i}"
+for node in $(sinfo -N --noheader -o "%N" | tr '\n' ' '); do
     echo "Updating node: $node"
 
     extra_json=$(scontrol show node "$node" | awk -F= '/Extra=/{print $2}')

@@ -25,6 +25,8 @@ spec:
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:
+        - name: ACTIVE_CHECK_NAME
+          value: {{ printf "%s-activecheck" .Release.Name | quote }}
 {{ toYaml .Values.activeCheck.slurmJobSpec.jobContainer.env | indent 8 }}
       volumeMounts:
 {{ toYaml .Values.activeCheck.slurmJobSpec.jobContainer.volumeMounts | indent 8 }}
