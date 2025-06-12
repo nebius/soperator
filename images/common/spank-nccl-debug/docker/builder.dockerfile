@@ -14,4 +14,4 @@ CMD gcc \
         -L/usr/local/lib \
         -lslurm \
         -o build/spanknccldebug.so \
-        snccld.c
+        ./*.c
