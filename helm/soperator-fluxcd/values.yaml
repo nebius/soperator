@@ -83,6 +83,7 @@ observability:
       timeout: 5m
       values:
         publicEndpointEnabled: true
+        hcOutputEnabled: true
         resources: {}
       overrideValues: null
     events:
