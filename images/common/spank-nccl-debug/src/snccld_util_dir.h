@@ -130,4 +130,12 @@ static void snccld_ensure_file_exists(const char *path) {
     }
 }
 
+/**
+ * Ensure if directory exists. Creates the directory if it doesn't exist.
+ * @param path Path to the directory to ensure its existence.
+ */
+static inline void snccld_ensure_dir_exists(const char *path) {
+    snccld_mkdir_p(path, SNCCLD_DEFAULT_MODE);
+}
+
 #endif // SNCCLD_MKDIR_H

@@ -3,6 +3,8 @@
 #include "snccld_state.h"
 #include "snccld_util_antidupl.h"
 #include "snccld_util_dir.h"
+#include "snccld_util_host.h"
+#include "snccld_util_oplock.h"
 
 #include <ctype.h>
 #include <fcntl.h>
@@ -105,37 +107,6 @@ int slurm_spank_init(spank_t spank, int argc, char **argv) {
         default:
             return ESPANK_SUCCESS;
     }
-}
-
-static spank_err_t snccld_prepare_directories() {
-    slurm_spank_log(
-        "%s: Prepare directories: '%s', '%s'.",
-        SNCCLD_LOG_PREFIX,
-        snccld_config.out_dir,
-        SNCCLD_SYSTEM_DIR
-    );
-
-    if (snccld_mkdir_p(snccld_config.out_dir, SNCCLD_DEFAULT_MODE) ==
-        ESPANK_ERROR) {
-        slurm_error(
-            "%s: Cannot create directory %s: %m",
-            SNCCLD_LOG_PREFIX,
-            snccld_config.out_dir
-        );
-        return ESPANK_ERROR;
-    }
-
-    if (snccld_mkdir_p(SNCCLD_SYSTEM_DIR, SNCCLD_DEFAULT_MODE) ==
-        ESPANK_ERROR) {
-        slurm_error(
-            "%s: Cannot create directory '%s': %m",
-            SNCCLD_LOG_PREFIX,
-            SNCCLD_SYSTEM_DIR
-        );
-        return ESPANK_ERROR;
-    }
-
-    return ESPANK_SUCCESS;
 }
 
 static void snccld_run_named_pipe_reading_process(
@@ -242,13 +213,22 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         return ESPANK_SUCCESS;
     }
 
+    char *hostname = snccld_get_hostname();
+    slurm_spank_log("%s: hostname=%s", SNCCLD_LOG_PREFIX, hostname);
+
     snccld_state_key_t *key = snccld_key_new();
     if (snccld_key_get_from(spank, key) != ESPANK_SUCCESS ||
         key->step_id == SLURM_BATCH_SCRIPT) {
-        free(key);
-        return ESPANK_SUCCESS;
+        goto user_init_exit;
     }
-    snccld_state_t *state = snccld_state_new();
+
+    // Ensure `user_init` ran once per worker.
+    snccld_ensure_dir_exists(SNCCLD_SYSTEM_DIR);
+    if (!snccld_acquire_lock(
+            key->job_id, key->step_id, SNCCLD_OPLOCK_OP_USER_INIT, hostname
+        )) {
+        goto user_init_exit;
+    }
 
     // Set forced debug level.
     slurm_spank_log(
@@ -292,50 +272,10 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
             "Skipping.",
             SNCCLD_LOG_PREFIX
         );
-        free(key);
-        free(state);
-        return ESPANK_SUCCESS;
+        goto user_init_exit;
     }
 
-    // Ensure necessary directories exist.
-    if (snccld_config.out_file || snccld_config.out_stdout ||
-        user_set_debug_file) {
-        if (snccld_prepare_directories() != ESPANK_SUCCESS) {
-            free(key);
-            free(state);
-            return ESPANK_ERROR;
-        }
-    }
-
-    if (snccld_config.out_file) {
-        snprintf(
-            state->log_path,
-            sizeof(state->log_path),
-            SNCCLD_TEMPLATE_FILE_NAME,
-            snccld_config.out_dir,
-            key->job_id,
-            key->step_id,
-            "out"
-        );
-    }
-
-    // Only out file needed -> set NCCL_DEBUG_FILE.
-    if (snccld_config.out_file && !snccld_config.out_stdout &&
-        !user_set_debug_file) {
-        slurm_spank_log("%s: Only out file needed.", SNCCLD_LOG_PREFIX);
-        slurm_spank_log(
-            "%s: Setting %s=%s",
-            SNCCLD_LOG_PREFIX,
-            SNCCLD_NCCL_ENV_DEBUG_FILE,
-            state->log_path
-        );
-        spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG_FILE, state->log_path, 1);
-
-        free(key);
-        free(state);
-
-        return ESPANK_SUCCESS;
-    }
+    snccld_state_t *state = snccld_state_new();
 
     // Create Enroot bind mounts for the state and log files.
     {
@@ -363,7 +303,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         );
 
         // Write config once.
-        int lock_fd = -1;
+        int lock_fd;
         {
             lock_fd =
                 open(lock_filename, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE);
@@ -407,10 +347,12 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         }
 
         {
-            const size_t dir_mount_count = 2;
-            char        *mounts[dir_mount_count];
-            mounts[0] = strdup(SNCCLD_SYSTEM_DIR);
-            mounts[1] = strdup(snccld_config.out_dir);
+            char  *mounts[2];
+            size_t dir_mount_count    = 0;
+            mounts[dir_mount_count++] = strdup(SNCCLD_SYSTEM_DIR);
+            if (snccld_config.out_file) {
+                mounts[dir_mount_count++] = strdup(snccld_config.out_dir);
+            }
 
             // Write dir mounts to the mount config.
             const size_t unique_dir_mounts =
@@ -461,44 +403,95 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     mount_config_end:
     }
 
-    // If we're here, named pipe has to be constructed.
+    if (snccld_config.out_file) {
+        snccld_ensure_dir_exists(snccld_config.out_dir);
+        snprintf(
+            state->log_path,
+            sizeof(state->log_path),
+            SNCCLD_TEMPLATE_FILE_NAME,
+            snccld_config.out_dir,
+            key->job_id,
+            key->step_id,
+            "out"
+        );
+    }
 
+    // Check if only 'NCCL_ENV_DEBUG_FILE' has to be set.
+    {
+        const bool only_out_file =
+            snccld_config.out_file &&
+            !(snccld_config.out_stdout || user_set_debug_file);
+        const bool only_user_file =
+            user_set_debug_file &&
+            !(snccld_config.out_file || snccld_config.out_stdout);
+        const bool only_stdout =
+            snccld_config.out_stdout &&
+            !(user_set_debug_file || snccld_config.out_file);
+
+        if (!(only_out_file || only_user_file || only_stdout)) {
+            goto user_init_create_fifo;
+        }
+
+        slurm_spank_log(
+            "%s: Only %s has to be set.",
+            SNCCLD_LOG_PREFIX,
+            SNCCLD_NCCL_ENV_DEBUG_FILE
+        );
+
+        char *out_file = NULL;
+        if (only_out_file) {
+            out_file = strdup(state->log_path);
+        } else if (only_user_file) {
+            out_file = strdup(user_debug_file);
+        } else if (only_stdout) {
+            out_file = strdup("/dev/stdout");
+        }
+
+        slurm_spank_log(
+            "%s: Setting %s=%s",
+            SNCCLD_LOG_PREFIX,
+            SNCCLD_NCCL_ENV_DEBUG_FILE,
+            out_file
+        );
+        spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG_FILE, out_file, 1);
+        free(out_file);
+        goto user_init_write_state;
+    }
+
+    // If we're here, FIFO has to be constructed.
+user_init_create_fifo:
     slurm_spank_log("%s: Named pipe has to be constructed.", SNCCLD_LOG_PREFIX);
+    char fifo_path[PATH_MAX] = "";
     snprintf(
-        state->fifo_path,
-        sizeof(state->fifo_path),
+        fifo_path,
+        sizeof(fifo_path),
         SNCCLD_TEMPLATE_FILE_NAME,
         SNCCLD_SYSTEM_DIR,
         key->job_id,
         key->step_id,
         "fifo"
     );
-    if (mkfifo(state->fifo_path, SNCCLD_DEFAULT_MODE) != 0 && errno != EEXIST) {
+    if (mkfifo(fifo_path, SNCCLD_DEFAULT_MODE) != 0 && errno != EEXIST) {
         slurm_error(
             "%s: Cannot create named pipe '%s': %m",
             SNCCLD_LOG_PREFIX,
-            state->fifo_path
+            fifo_path
         );
-
-        free(key);
-        free(state);
-
-        return ESPANK_ERROR;
+        goto user_init_write_state;
     }
+    snprintf(state->fifo_path, sizeof(state->fifo_path), "%s", fifo_path);
 
-    if (snccld_state_write(key, state) != ESPANK_SUCCESS) {
-        free(key);
-        free(state);
-        return ESPANK_ERROR;
-    }
-
+user_init_write_state:
     char *str = snccld_state_to_string(state);
     slurm_spank_log("%s: State: \n%s", SNCCLD_LOG_PREFIX, str);
     free(str);
 
-    free(key);
+    snccld_state_write(key, state);
     free(state);
 
+user_init_exit:
+    free(key);
+    free(hostname);
     return ESPANK_SUCCESS;
 }
 
@@ -528,11 +521,19 @@ int slurm_spank_task_init(spank_t spank, int argc, char **argv) {
         return ESPANK_SUCCESS;
     }
 
+    char *hostname = snccld_get_hostname();
+
     snccld_state_key_t *key = snccld_key_new();
     if (snccld_key_get_from(spank, key) != ESPANK_SUCCESS ||
         key->step_id == SLURM_BATCH_SCRIPT) {
-        free(key);
-        return ESPANK_SUCCESS;
+        goto task_init_exit;
+    }
+
+    // Ensure `task_init` ran once per worker.
+    if (!snccld_acquire_lock(
+            key->job_id, key->step_id, SNCCLD_OPLOCK_OP_TASK_INIT, hostname
+        )) {
+        goto task_init_exit;
     }
 
     snccld_state_t *state = snccld_state_read(key);
@@ -545,20 +546,14 @@ int slurm_spank_task_init(spank_t spank, int argc, char **argv) {
     slurm_spank_log("%s: State: \n%s", SNCCLD_LOG_PREFIX, str);
     free(str);
 
-    // Forking fan-out process is not needed
-    // if named pipe is not created,
+    // Forking fan-out process is not needed if named pipe is not created,
     // or it's already forked.
-    slurm_spank_log(
-        "%s: FIFO path len: %lu", SNCCLD_LOG_PREFIX, strlen(state->fifo_path)
-    );
-    slurm_spank_log("%s: Tee PID: %d", SNCCLD_LOG_PREFIX, state->tee_pid);
     if (strlen(state->fifo_path) <= 0 || state->tee_pid > 0) {
         slurm_spank_log(
             "%s: Forking fan-out process is not needed.", SNCCLD_LOG_PREFIX
         );
-        free(key);
         free(state);
-        return ESPANK_SUCCESS;
+        goto task_init_exit;
     }
 
     char       user_debug_file[PATH_MAX] = "";
@@ -574,7 +569,7 @@ int slurm_spank_task_init(spank_t spank, int argc, char **argv) {
         "%s: user_set_debug_file =%u", SNCCLD_LOG_PREFIX, user_set_debug_file
     );
 
-    // Create separate process to fan out logs from the named pipe.
+    // Create separate process to fan out logs from the fifo.
     const pid_t tee_pid = fork();
     if (tee_pid < 0) {
         // Forking failed.
@@ -582,9 +577,8 @@ int slurm_spank_task_init(spank_t spank, int argc, char **argv) {
             "%s: Cannot create named pipe reading process: %m",
             SNCCLD_LOG_PREFIX
         );
-        free(key);
         free(state);
-        return ESPANK_ERROR;
+        goto task_init_exit;
     } else if (tee_pid == 0) {
         // We're in forked process.
         snccld_run_named_pipe_reading_process(
@@ -594,29 +588,17 @@ int slurm_spank_task_init(spank_t spank, int argc, char **argv) {
         // We're in main process -> tee_pid is a pid of the forked process.
         state->tee_pid = tee_pid;
     }
-    slurm_spank_log("%s: Tee PID: %d", SNCCLD_LOG_PREFIX, state->tee_pid);
-
-    slurm_spank_log(
-        "%s: Setting %s=%s",
-        SNCCLD_LOG_PREFIX,
-        SNCCLD_NCCL_ENV_DEBUG_FILE,
-        state->fifo_path
-    );
-    spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG_FILE, state->fifo_path, 1);
-
-    if (snccld_state_write(key, state) != ESPANK_SUCCESS) {
-        free(key);
-        free(state);
-        return ESPANK_ERROR;
-    }
 
     str = snccld_state_to_string(state);
     slurm_spank_log("%s: State: \n%s", SNCCLD_LOG_PREFIX, str);
     free(str);
 
-    free(key);
+    snccld_state_write(key, state);
     free(state);
 
+task_init_exit:
+    free(key);
+    free(hostname);
     return ESPANK_SUCCESS;
 }
 
@@ -646,11 +628,19 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
         return ESPANK_SUCCESS;
     }
 
+    char *hostname = snccld_get_hostname();
+
     snccld_state_key_t *key = snccld_key_new();
     if (snccld_key_get_from(spank, key) != ESPANK_SUCCESS ||
         key->step_id == SLURM_BATCH_SCRIPT) {
-        free(key);
-        return ESPANK_SUCCESS;
+        goto task_exit_exit;
+    }
+
+    // Ensure `user_init` ran once per worker.
+    if (!snccld_acquire_lock(
+            key->job_id, key->step_id, SNCCLD_OPLOCK_OP_TASK_EXIT, hostname
+        )) {
+        goto task_exit_exit;
     }
 
     snccld_state_t *state = snccld_state_read(key);
@@ -700,14 +690,21 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
         slurm_spank_log("%s: No mount config to remove.", SNCCLD_LOG_PREFIX);
     }
 
-    str = snccld_state_to_string(state);
-    slurm_spank_log("%s: state: \n%s", SNCCLD_LOG_PREFIX, str);
-    free(str);
-
+    free(state);
     snccld_state_cleanup(key);
 
-    free(key);
-    free(state);
+    snccld_release_lock(
+        key->job_id, key->step_id, SNCCLD_OPLOCK_OP_USER_INIT, hostname
+    );
+    snccld_release_lock(
+        key->job_id, key->step_id, SNCCLD_OPLOCK_OP_TASK_INIT, hostname
+    );
+    snccld_release_lock(
+        key->job_id, key->step_id, SNCCLD_OPLOCK_OP_TASK_EXIT, hostname
+    );
 
+task_exit_exit:
+    free(key);
+    free(hostname);
     return ESPANK_SUCCESS;
 }
