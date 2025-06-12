@@ -157,3 +157,28 @@ func (c *client) GetJob(ctx context.Context, jobID string) ([]SlurmJob, error) {
 
 	return result, nil
 }
+
+func (c *client) ListJobs(ctx context.Context) ([]Job, error) {
+	getJobsResp, err := c.SlurmV0041GetJobsWithResponse(ctx, &slurmapispec.SlurmV0041GetJobsParams{})
+	if err != nil {
+		return nil, fmt.Errorf("list jobs: %w", err)
+	}
+	if getJobsResp.JSON200 == nil {
+		return nil, fmt.Errorf("json200 field is nil")
+	}
+	if getJobsResp.JSON200.Errors != nil && len(*getJobsResp.JSON200.Errors) != 0 {
+		return nil, fmt.Errorf("list jobs responded with errors: %v", *getJobsResp.JSON200.Errors)
+	}
+
+	jobs := make([]Job, 0, len(getJobsResp.JSON200.Jobs))
+	for _, j := range getJobsResp.JSON200.Jobs {
+		job, err := JobFromAPI(j)
+		if err != nil {
+			return nil, fmt.Errorf("convert job from api response: %w", err)
+		}
+
+		jobs = append(jobs, job)
+	}
+
+	return jobs, nil
+}

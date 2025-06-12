@@ -140,6 +140,64 @@ func (_c *MockClient_GetNode_Call) RunAndReturn(run func(context.Context, string
 	return _c
 }
 
+// ListJobs provides a mock function with given fields: ctx
+func (_m *MockClient) ListJobs(ctx context.Context) ([]slurmapi.Job, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListJobs")
+	}
+
+	var r0 []slurmapi.Job
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]slurmapi.Job, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []slurmapi.Job); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]slurmapi.Job)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_ListJobs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListJobs'
+type MockClient_ListJobs_Call struct {
+	*mock.Call
+}
+
+// ListJobs is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockClient_Expecter) ListJobs(ctx interface{}) *MockClient_ListJobs_Call {
+	return &MockClient_ListJobs_Call{Call: _e.mock.On("ListJobs", ctx)}
+}
+
+func (_c *MockClient_ListJobs_Call) Run(run func(ctx context.Context)) *MockClient_ListJobs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockClient_ListJobs_Call) Return(_a0 []slurmapi.Job, _a1 error) *MockClient_ListJobs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_ListJobs_Call) RunAndReturn(run func(context.Context) ([]slurmapi.Job, error)) *MockClient_ListJobs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListNodes provides a mock function with given fields: ctx
 func (_m *MockClient) ListNodes(ctx context.Context) ([]slurmapi.Node, error) {
 	ret := _m.Called(ctx)

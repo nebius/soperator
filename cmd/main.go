@@ -58,6 +58,7 @@ import (
 var scheme = runtime.NewScheme()
 
 func init() {
+
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	// Check if OpenTelemetryCollector and PodMonitor CRD is installed before adding it to the scheme
@@ -250,7 +251,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = topologyconfcontroller.NewNodeTopologyConfReconciler(
+	if err = topologyconfcontroller.NewNodeTopologyReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		soperatorNamespace,
@@ -260,6 +261,20 @@ func main() {
 			"unable to create controller",
 			"controller",
 			topologyconfcontroller.NodeTopologyReconcilerName,
+		)
+		os.Exit(1)
+	}
+
+	if err = topologyconfcontroller.NewWorkerTopologyReconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		soperatorNamespace,
+	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+		setupLog.Error(
+			err,
+			"unable to create controller",
+			"controller",
+			topologyconfcontroller.WorkerTopologyReconcilerName,
 		)
 		os.Exit(1)
 	}

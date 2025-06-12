@@ -166,6 +166,26 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 				},
 			},
 			utils.MultiStepExecutionStep{
+				Name: "Slurm Login Headless Service",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling")
+
+					desired := login.RenderHeadlessService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeLogin)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("Rendered")
+
+					var loginHeadlessNamePtr *string = nil
+					if err := r.Service.Reconcile(stepCtx, cluster, &desired, loginHeadlessNamePtr); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return errors.Wrap(err, "reconciling login Headless Service")
+					}
+					stepLogger.V(1).Info("Reconciled")
+
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
 				Name: "Slurm Login StatefulSet",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)

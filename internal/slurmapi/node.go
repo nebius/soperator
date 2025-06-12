@@ -13,6 +13,10 @@ type Node struct {
 	InstanceID  string
 	States      map[slurmapispec.V0041NodeState]struct{}
 	Reason      *NodeReason
+	Partitions  []string
+	Tres        string    // Trackable Resources (e.g., CPUs, GPUs) assigned to the node.
+	Address     string    // IP Address of the node in the Kubernetes cluster.
+	BootTime    time.Time // The boot time of the node.
 }
 
 type NodeReason struct {
@@ -63,6 +67,13 @@ func NodeFromAPI(node slurmapispec.V0041Node) (Node, error) {
 		ClusterName: *node.ClusterName,
 		InstanceID:  *node.InstanceId,
 		States:      nodeStates,
+		Partitions:  *node.Partitions,
+		Tres:        *node.Tres,
+		Address:     *node.Address,
+	}
+
+	if node.BootTime != nil && node.BootTime.Number != nil {
+		res.BootTime = time.Unix(*node.BootTime.Number, 0)
 	}
 
 	if node.Reason != nil && len(*node.Reason) != 0 {
@@ -80,4 +91,35 @@ func (n *Node) IsIdleDrained() bool {
 	_, idle := n.States[slurmapispec.V0041NodeStateIDLE]
 
 	return drained && idle
+}
+
+func (n *Node) IsDrainState() bool {
+	_, drained := n.States[slurmapispec.V0041NodeStateDRAIN]
+	return drained
+}
+
+func (n *Node) IsDownState() bool {
+	_, down := n.States[slurmapispec.V0041NodeStateDOWN]
+	return down
+}
+
+var baseStates = []slurmapispec.V0041NodeState{
+	slurmapispec.V0041NodeStateUNKNOWN,
+	slurmapispec.V0041NodeStateDOWN,
+	slurmapispec.V0041NodeStateIDLE,
+	slurmapispec.V0041NodeStateALLOCATED,
+	slurmapispec.V0041NodeStateERROR,
+	slurmapispec.V0041NodeStateMIXED,
+}
+
+// BaseState returns the base state of the node.
+// Slurm node has one base state and multiple additional states.
+// More details: https://github.com/SchedMD/slurm/blob/1cb50f245f05d851f2383e326db2f20a01820a88/slurm/slurm.h#L961
+func (n *Node) BaseState() slurmapispec.V0041NodeState {
+	for _, baseState := range baseStates {
+		if _, ok := n.States[baseState]; ok {
+			return baseState
+		}
+	}
+	return ""
 }

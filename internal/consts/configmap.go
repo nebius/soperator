@@ -32,5 +32,6 @@ const (
 	ConfigMapKeySupervisord             = supervisordConfFile
 	ConfigMapKeySoperatorcheckSbatch    = "sbatch.sh"
 
-	CongigMapNameNodesTopology = "nodes-topology"
+	ConfigMapNameTopologyNodeLabels = "topology-node-labels"
+	ConfigMapNameTopologyConfig     = "topology-config"
 )

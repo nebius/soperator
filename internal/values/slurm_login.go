@@ -16,8 +16,9 @@ type SlurmLogin struct {
 	ContainerMunge       Container
 	CustomInitContainers []corev1.Container
 
-	Service     Service
-	StatefulSet StatefulSet
+	Service         Service
+	HeadlessService Service
+	StatefulSet     StatefulSet
 
 	IsSSHDConfigMapDefault bool
 	SSHDConfigMapName      string
@@ -38,6 +39,9 @@ func buildSlurmLoginFrom(clusterName string, maintenance *consts.MaintenanceMode
 	svc.LoadBalancerIP = login.SshdServiceLoadBalancerIP
 	svc.NodePort = login.SshdServiceNodePort
 
+	headlessSvc := buildServiceFrom(naming.BuildLoginHeadlessServiceName(clusterName))
+	headlessSvc.Type = corev1.ServiceTypeClusterIP
+
 	sshdConfigMapName := login.SSHDConfigMapRefName
 	isSSHDConfigDefault := sshdConfigMapName == ""
 	if isSSHDConfigDefault {
@@ -56,6 +60,7 @@ func buildSlurmLoginFrom(clusterName string, maintenance *consts.MaintenanceMode
 		),
 		CustomInitContainers: login.CustomInitContainers,
 		Service:              svc,
+		HeadlessService:      headlessSvc,
 		StatefulSet: buildStatefulSetFrom(
 			naming.BuildStatefulSetName(consts.ComponentTypeLogin),
 			login.SlurmNode.Size,

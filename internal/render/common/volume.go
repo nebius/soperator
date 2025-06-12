@@ -6,6 +6,7 @@ import (
 	"path"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
@@ -419,12 +420,13 @@ func RenderVolumeMountSshdKeys() corev1.VolumeMount {
 // region InMemory
 
 // RenderVolumeInMemory renders [corev1.Volume] which content is stored in shared memory (tmpfs).
-func RenderVolumeInMemory() corev1.Volume {
+func RenderVolumeInMemory(sizeLimit *resource.Quantity) corev1.Volume {
 	return corev1.Volume{
 		Name: consts.VolumeNameInMemorySubmount,
 		VolumeSource: corev1.VolumeSource{
 			EmptyDir: &corev1.EmptyDirVolumeSource{
-				Medium: corev1.StorageMediumMemory,
+				Medium:    corev1.StorageMediumMemory,
+				SizeLimit: sizeLimit,
 			},
 		},
 	}

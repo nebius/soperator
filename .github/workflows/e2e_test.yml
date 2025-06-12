@@ -115,7 +115,7 @@ jobs:
           source .envrc
           cd -
 
-          go test -v -timeout 2h --tags=e2e ./test/e2e/...
+          GOEXPERIMENT=synctest go test -v -timeout 2h --tags=e2e ./test/e2e/...
 
       - name: Add errors output to job summary
         if: ${{ always() }}

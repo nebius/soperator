@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=ubuntu:jammy
+ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
 
 # First stage: Build the prometheus-slurm-exporter from source
 FROM golang:1.22 AS exporter_builder
