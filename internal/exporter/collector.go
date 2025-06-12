@@ -4,7 +4,6 @@ import (
 	"context"
 	"iter"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -133,7 +132,7 @@ func (c *MetricsCollector) slurmNodeMetrics(
 			labels := []string{
 				node.Name,
 				node.InstanceID,
-				strings.ToLower(string(node.BaseState())),
+				string(node.BaseState()),
 				strconv.FormatBool(node.IsDrainState()),
 				node.Address,
 			}
