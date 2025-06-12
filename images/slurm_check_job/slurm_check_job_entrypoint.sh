@@ -30,13 +30,34 @@ for node in $(sinfo -N --noheader -o "%N" | tr '\n' ' '); do
         extra_json="{}"
     fi
     updated_json=$(echo "$extra_json" | jq -c --arg key "$ACTIVE_CHECK_NAME" --argjson val true '.[$key] = $val')
-
     scontrol update NodeName="$node" Extra="$updated_json"
 done
 
-echo "Submitting Slurm job..."
+echo "Creating epilog script..."
+EPILOG_SCRIPT=$(mktemp /tmp/activecheck-epilog.sh)
+chmod +x "$EPILOG_SCRIPT"
+
+cat <<EOF > "$EPILOG_SCRIPT"
+#!/bin/bash
+ACTIVE_CHECK_NAME="$ACTIVE_CHECK_NAME"
+NODE_NAME=\$(hostname)
+
+echo "Running embedded epilog on node: \$NODE_NAME"
+
+extra_json=\$(scontrol show node "\$NODE_NAME" | awk -F= '/Extra=/{print \$2}')
+if [[ -z "\$extra_json" || "\$extra_json" == "none" ]]; then
+    extra_json="{}"
+fi
+updated_json=\$(echo "\$extra_json" | jq -c --arg key "\$ACTIVE_CHECK_NAME" --argjson val false '.[\$key] = \$val')
+scontrol update NodeName="\$NODE_NAME" Extra="\$updated_json"
+
+echo "Epilog completed for \$NODE_NAME"
+EOF
+
 HOSTS_NUM=$(sinfo -N --noheader -o "%N" | wc -l)
-SLURM_OUTPUT=$(/usr/bin/sbatch --parsable --export=ALL,HOSTS_NUM /opt/bin/sbatch.sh)
+
+echo "Submitting Slurm job..."
+SLURM_OUTPUT=$(/usr/bin/sbatch --parsable --export=ALL,HOSTS_NUM,EPILOG_SCRIPT /opt/bin/sbatch.sh)
 
 if [[ -z "$SLURM_OUTPUT" ]]; then
     echo "Failed to submit Slurm job"
