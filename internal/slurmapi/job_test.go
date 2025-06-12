@@ -31,7 +31,6 @@ func TestJobFromAPI(t *testing.T) {
 				Nodes:          ptr("gpu[001-003]"),
 				ScheduledNodes: ptr("gpu001,gpu002"),
 				RequiredNodes:  ptr("gpu[001-005]"),
-				NodeCount:      &slurmapispec.V0041Uint32NoValStruct{Set: ptr(true), Number: ptr(int32(3))},
 			},
 			want: Job{
 				ID:             12345,
@@ -45,7 +44,6 @@ func TestJobFromAPI(t *testing.T) {
 				Nodes:          "gpu[001-003]",
 				ScheduledNodes: "gpu001,gpu002",
 				RequiredNodes:  "gpu[001-005]",
-				NodeCount:      ptr(int32(3)),
 			},
 			wantErr: false,
 		},
