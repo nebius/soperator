@@ -14,7 +14,12 @@
 #define SNCCLD_NCCL_LOG_LEVEL_INFO    "INFO"
 #define SNCCLD_NCCL_LOG_LEVEL_TRACE   "TRACE"
 
-#define SNCCLD_DEFAULT_DIR  "/tmp/nccl_debug"
+#define SNCCLD_ENROOT_MOUNT_DIR           "/etc/enroot/mounts.d"
+#define SNCCLD_ENROOT_MOUNT_TEMPLATE      "%s %s none %sbind,rw,nosuid\n"
+#define SNCCLD_ENROOT_MOUNT_TEMPLATE_DIR  "x-create=dir,"
+#define SNCCLD_ENROOT_MOUNT_TEMPLATE_FILE "x-create=file,"
+
+#define SNCCLD_SYSTEM_DIR   "/tmp/nccl_debug"
 #define SNCCLD_DEFAULT_MODE 0666
 
 #define SNCCLD_LOG_PREFIX "SPANK | NCCL DEBUG"

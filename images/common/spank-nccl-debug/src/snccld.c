@@ -91,7 +91,7 @@ void log_context(const char *func_name, spank_t spank) {
 XSPANK_PLUGIN(SNCCLD_PLUGIN_NAME, 1);
 
 int slurm_spank_init(spank_t spank, int argc, char **argv) {
-    log_context("init", spank);
+    log_context("slurm_spank_init", spank);
 
     switch (spank_context()) {
         case S_CTX_LOCAL:
@@ -112,7 +112,7 @@ static spank_err_t snccld_prepare_directories() {
         "%s: Prepare directories: '%s', '%s'.",
         SNCCLD_LOG_PREFIX,
         snccld_config.out_dir,
-        SNCCLD_DEFAULT_DIR
+        SNCCLD_SYSTEM_DIR
     );
 
     if (snccld_mkdir_p(snccld_config.out_dir, SNCCLD_DEFAULT_MODE) ==
@@ -125,12 +125,12 @@ static spank_err_t snccld_prepare_directories() {
         return ESPANK_ERROR;
     }
 
-    if (snccld_mkdir_p(SNCCLD_DEFAULT_DIR, SNCCLD_DEFAULT_MODE) ==
+    if (snccld_mkdir_p(SNCCLD_SYSTEM_DIR, SNCCLD_DEFAULT_MODE) ==
         ESPANK_ERROR) {
         slurm_error(
             "%s: Cannot create directory '%s': %m",
             SNCCLD_LOG_PREFIX,
-            SNCCLD_DEFAULT_DIR
+            SNCCLD_SYSTEM_DIR
         );
         return ESPANK_ERROR;
     }
@@ -217,7 +217,7 @@ static void snccld_run_named_pipe_reading_process(
 }
 
 int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
-    log_context("user_init", spank);
+    log_context("slurm_spank_user_init", spank);
 
     if (spank_context() != S_CTX_REMOTE) {
         return ESPANK_SUCCESS;
@@ -260,17 +260,28 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG, snccld_config.log_level, 1);
 
     // Check if user set debug file.
-    char user_debug_file[PATH_MAX] = "";
-    bool user_set_debug_file =
+    char       user_debug_file[PATH_MAX] = "";
+    const bool user_set_debug_file =
         (spank_getenv(
              spank,
              SNCCLD_NCCL_ENV_DEBUG_FILE,
              user_debug_file,
              sizeof(user_debug_file)
-         ) == ESPANK_SUCCESS);
+         ) == ESPANK_SUCCESS &&
+         strlen(user_debug_file) > 0);
     slurm_spank_log(
         "%s: user_set_debug_file =%u", SNCCLD_LOG_PREFIX, user_set_debug_file
     );
+
+    // Ensure the user's debug file exists before mounting.
+    if (user_set_debug_file) {
+        slurm_spank_log(
+            "%s: Ensuring user's debug file '%s' exists.",
+            SNCCLD_LOG_PREFIX,
+            user_debug_file
+        );
+        snccld_ensure_file_exists(user_debug_file);
+    }
 
     // Neither outfile nor stdout requested nor user set debug file -> noop
     if (!snccld_config.out_file && !snccld_config.out_stdout &&
@@ -326,6 +337,130 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         return ESPANK_SUCCESS;
     }
 
+    // Create Enroot bind mounts for the state and log files.
+    {
+        if (!snccld_dir_exists(SNCCLD_ENROOT_MOUNT_DIR)) {
+            goto mount_config_end;
+        }
+
+        char mount_config_filename[PATH_MAX] = "";
+        snprintf(
+            mount_config_filename,
+            sizeof(mount_config_filename),
+            "%s/%s-%u-%u.fstab",
+            SNCCLD_ENROOT_MOUNT_DIR,
+            "30-nccl-debug",
+            key->job_id,
+            key->step_id
+        );
+
+        char lock_filename[PATH_MAX] = "";
+        snprintf(
+            lock_filename,
+            sizeof(lock_filename),
+            "%s.lock",
+            mount_config_filename
+        );
+
+        // Write config once.
+        int lock_fd = -1;
+        {
+            lock_fd =
+                open(lock_filename, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE);
+            if (lock_fd < 0) {
+                slurm_error(
+                    "%s: Cannot open %s: %m", SNCCLD_LOG_PREFIX, lock_filename
+                );
+                goto mount_config_end;
+            }
+
+            if (flock(lock_fd, LOCK_EX | LOCK_NB) == -1) {
+                slurm_error(
+                    "%s: Cannot flock %s: %m", SNCCLD_LOG_PREFIX, lock_filename
+                );
+                close(lock_fd);
+                goto mount_config_end;
+            }
+        }
+
+        const int mount_config_fd = open(
+            mount_config_filename, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE
+        );
+        if (mount_config_fd < 0) {
+            slurm_error(
+                "%s: Cannot open %s: %m",
+                SNCCLD_LOG_PREFIX,
+                mount_config_filename
+            );
+            goto mount_config_unflock;
+        }
+
+        FILE *mount_config_f = fdopen(mount_config_fd, "w");
+        if (mount_config_f == NULL) {
+            slurm_error(
+                "%s: Cannot fdopen %s: %m",
+                SNCCLD_LOG_PREFIX,
+                mount_config_filename
+            );
+            close(mount_config_fd);
+            goto mount_config_unflock;
+        }
+
+        {
+            const size_t dir_mount_count = 2;
+            char        *mounts[dir_mount_count];
+            mounts[0] = strdup(SNCCLD_SYSTEM_DIR);
+            mounts[1] = strdup(snccld_config.out_dir);
+
+            // Write dir mounts to the mount config.
+            const size_t unique_dir_mounts =
+                snccld_remove_string_duplicates(mounts, dir_mount_count);
+            for (size_t i = 0; i < unique_dir_mounts; ++i) {
+                fprintf(
+                    mount_config_f,
+                    SNCCLD_ENROOT_MOUNT_TEMPLATE,
+                    mounts[i],
+                    mounts[i],
+                    SNCCLD_ENROOT_MOUNT_TEMPLATE_DIR
+                );
+                slurm_spank_log(
+                    "%s: Created mount for %s", SNCCLD_LOG_PREFIX, mounts[i]
+                );
+                free(mounts[i]);
+            }
+
+            // Write file mount to the mount config.
+            if (user_set_debug_file) {
+                fprintf(
+                    mount_config_f,
+                    SNCCLD_ENROOT_MOUNT_TEMPLATE,
+                    user_debug_file,
+                    user_debug_file,
+                    SNCCLD_ENROOT_MOUNT_TEMPLATE_FILE
+                );
+                slurm_spank_log(
+                    "%s: Created mount for %s",
+                    SNCCLD_LOG_PREFIX,
+                    user_debug_file
+                );
+            }
+        }
+
+        fclose(mount_config_f);
+        snprintf(
+            state->mounts_path,
+            sizeof(state->mounts_path),
+            mount_config_filename
+        );
+
+    mount_config_unflock:
+        flock(lock_fd, LOCK_UN);
+        close(lock_fd);
+        unlink(lock_filename);
+
+    mount_config_end:
+    }
+
     // If we're here, named pipe has to be constructed.
 
     slurm_spank_log("%s: Named pipe has to be constructed.", SNCCLD_LOG_PREFIX);
@@ -333,7 +468,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         state->fifo_path,
         sizeof(state->fifo_path),
         SNCCLD_TEMPLATE_FILE_NAME,
-        SNCCLD_DEFAULT_DIR,
+        SNCCLD_SYSTEM_DIR,
         key->job_id,
         key->step_id,
         "fifo"
@@ -368,7 +503,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
 }
 
 int slurm_spank_task_init(spank_t spank, int argc, char **argv) {
-    log_context("task_init", spank);
+    log_context("slurm_spank_task_init", spank);
 
     if (spank_context() != S_CTX_REMOTE) {
         return ESPANK_SUCCESS;
@@ -426,14 +561,15 @@ int slurm_spank_task_init(spank_t spank, int argc, char **argv) {
         return ESPANK_SUCCESS;
     }
 
-    char user_debug_file[PATH_MAX] = "";
-    bool user_set_debug_file =
+    char       user_debug_file[PATH_MAX] = "";
+    const bool user_set_debug_file =
         (spank_getenv(
              spank,
              SNCCLD_NCCL_ENV_DEBUG_FILE,
              user_debug_file,
              sizeof(user_debug_file)
-         ) == ESPANK_SUCCESS);
+         ) == ESPANK_SUCCESS &&
+         strlen(user_debug_file) > 0);
     slurm_spank_log(
         "%s: user_set_debug_file =%u", SNCCLD_LOG_PREFIX, user_set_debug_file
     );
@@ -485,7 +621,7 @@ int slurm_spank_task_init(spank_t spank, int argc, char **argv) {
 }
 
 int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
-    log_context("task_exit", spank);
+    log_context("slurm_spank_task_exit", spank);
 
     if (spank_context() != S_CTX_REMOTE) {
         return ESPANK_SUCCESS;
@@ -550,6 +686,18 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
         unlink(state->fifo_path);
     } else {
         slurm_spank_log("%s: No named pipe to remove.", SNCCLD_LOG_PREFIX);
+    }
+
+    // Remove mount config if created.
+    if (strlen(state->mounts_path) > 0) {
+        slurm_spank_log(
+            "%s: Removing mount config '%s'.",
+            SNCCLD_LOG_PREFIX,
+            state->mounts_path
+        );
+        unlink(state->mounts_path);
+    } else {
+        slurm_spank_log("%s: No mount config to remove.", SNCCLD_LOG_PREFIX);
     }
 
     str = snccld_state_to_string(state);

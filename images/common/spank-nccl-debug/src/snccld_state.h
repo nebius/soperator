@@ -50,7 +50,7 @@ static char *snccld_key_to_state_file_path(const snccld_state_key_t *key) {
         res,
         buf_size,
         SNCCLD_TEMPLATE_FILE_NAME,
-        SNCCLD_DEFAULT_DIR,
+        SNCCLD_SYSTEM_DIR,
         key->job_id,
         key->step_id,
         "state"
@@ -62,6 +62,7 @@ static char *snccld_key_to_state_file_path(const snccld_state_key_t *key) {
 typedef struct {
     char  fifo_path[PATH_MAX];
     char  log_path[PATH_MAX];
+    char  mounts_path[PATH_MAX];
     pid_t tee_pid;
 } snccld_state_t;
 
@@ -69,13 +70,14 @@ static inline snccld_state_t *snccld_state_new(void) {
     snccld_state_t *res = malloc(sizeof(snccld_state_t));
     res->fifo_path[0]   = '\0';
     res->log_path[0]    = '\0';
+    res->mounts_path[0] = '\0';
     res->tee_pid        = -1;
     return res;
 }
 
 static inline size_t snccld_state_file_size(void) {
     const size_t max_len_pid_t = 10;
-    return (PATH_MAX * 2 + max_len_pid_t + 3) * sizeof(char);
+    return (PATH_MAX * 3 + max_len_pid_t + 4) * sizeof(char);
 }
 
 static char *snccld_state_to_string(const snccld_state_t *state) {
@@ -85,9 +87,10 @@ static char *snccld_state_to_string(const snccld_state_t *state) {
     snprintf(
         res,
         buf_size,
-        "%s\n%s\n%d\n",
+        "%s\n%s\n%s\n%d\n",
         state->fifo_path,
         state->log_path,
+        state->mounts_path,
         state->tee_pid
     );
 
@@ -106,8 +109,9 @@ static snccld_state_t *snccld_state_from_string(const char *str) {
     char *line1   = strtok_r(copy, "\n", &saveptr);
     char *line2   = strtok_r(NULL, "\n", &saveptr);
     char *line3   = strtok_r(NULL, "\n", &saveptr);
+    char *line4   = strtok_r(NULL, "\n", &saveptr);
 
-    if (!line1 || !line2 || !line3) {
+    if (!line1 || !line2 || !line3 || !line4) {
         free(copy);
         free(res);
         return NULL;
@@ -115,7 +119,8 @@ static snccld_state_t *snccld_state_from_string(const char *str) {
 
     snprintf(res->fifo_path, PATH_MAX, "%s", line1);
     snprintf(res->log_path, PATH_MAX, "%s", line2);
-    res->tee_pid = (pid_t)atoi(line3);
+    snprintf(res->mounts_path, PATH_MAX, "%s", line3);
+    res->tee_pid = (pid_t)atoi(line4);
 
     free(copy);
 
@@ -133,7 +138,7 @@ snccld_state_write(const snccld_state_key_t *key, const snccld_state_t *state) {
         return ESPANK_ERROR;
     }
 
-    if (flock(fd, LOCK_EX) != 0) {
+    if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
         slurm_error("%s: Cannot flock %s: %m", SNCCLD_LOG_PREFIX, path);
         close(fd);
         free(path);

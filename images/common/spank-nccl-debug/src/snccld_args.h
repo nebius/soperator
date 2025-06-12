@@ -57,7 +57,7 @@
 #define SNCCLD_ARG_OUT_DIR         "out-dir"
 #define SNCCLD_ARG_OUT_DIR_ENV     "SNCCLD_OUT_DIR"
 #define SNCCLD_ARG_OUT_DIR_ARGINFO "PATH"
-#define SNCCLD_ARG_OUT_DIR_DEFAULT SNCCLD_DEFAULT_DIR
+#define SNCCLD_ARG_OUT_DIR_DEFAULT SNCCLD_SYSTEM_DIR
 // clang-format off
 
 #define SNCCLD_ARG_OUT_DIR_USAGE                                               \
