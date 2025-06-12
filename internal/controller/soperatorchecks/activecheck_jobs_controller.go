@@ -176,51 +176,50 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		}
 
 		for _, slurmJob := range slurmJobs {
-			if !slurmJob.IsTerminateState {
+			if !slurmJob.IsTerminalState() {
 				return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
 			}
 		}
 
 		var failReasons []string
-		var jobName *string
+		var jobName string
 		var submitTime *metav1.Time
 		for _, slurmJob := range slurmJobs {
-			if slurmJob.IsFailedState {
-				if slurmJob.StateReason != nil {
-					failReasons = append(failReasons, *slurmJob.StateReason)
+			if slurmJob.IsFailedState() {
+				if slurmJob.StateReason != "" {
+					failReasons = append(failReasons, slurmJob.StateReason)
 				}
 
 				if activeCheck.Spec.Reactions.DrainSlurmNode {
-					if slurmJob.NodeCount == nil || *slurmJob.NodeCount != 1 {
-						logger.Error(err, "jobs with only 1 node is yet supported")
+					nodes, err := slurmJob.GetNodeList()
+					if err != nil {
 						return ctrl.Result{}, err
 					}
-					if slurmJob.NodeName == nil {
-						logger.Error(err, "job node name is not specified")
-						return ctrl.Result{}, err
-					}
+
 					reason := consts.SlurmNodeReasonActiveCheckFailedUnknown
 					if activeCheck.Spec.Reactions.SetCondition {
 						reason = consts.SlurmNodeReasonActiveCheckFailed
 					}
-					resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, *slurmJob.NodeName,
-						slurmapispec.V0041UpdateNodeMsg{
-							Reason: ptr.To(reason),
-							State:  ptr.To([]slurmapispec.V0041UpdateNodeMsgState{slurmapispec.V0041UpdateNodeMsgStateDRAIN}),
-						},
-					)
-					if err != nil {
-						return ctrl.Result{}, fmt.Errorf("post drain slurm node: %w", err)
-					}
-					if resp.JSON200.Errors != nil && len(*resp.JSON200.Errors) != 0 {
-						return ctrl.Result{}, fmt.Errorf("post drain returned errors: %v", *resp.JSON200.Errors)
-					}
+					for _, node := range nodes {
+						resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, node,
+							slurmapispec.V0041UpdateNodeMsg{
+								Reason: ptr.To(reason),
+								State:  ptr.To([]slurmapispec.V0041UpdateNodeMsgState{slurmapispec.V0041UpdateNodeMsgStateDRAIN}),
+							},
+						)
+						if err != nil {
+							return ctrl.Result{}, fmt.Errorf("post drain slurm node: %w", err)
+						}
+						if resp.JSON200.Errors != nil && len(*resp.JSON200.Errors) != 0 {
+							return ctrl.Result{}, fmt.Errorf("post drain returned errors: %v", *resp.JSON200.Errors)
+						}
 
-					logger.V(1).Info("slurm node state is updated to DRAIN")
+						logger.V(1).Info("slurm node state is updated to DRAIN")
+					}
 				}
 			}
 
-			if slurmJob.ArrayId == nil || fmt.Sprint(*slurmJob.ArrayId) == slurmJobID {
+			if slurmJob.ArrayJobID == nil || fmt.Sprint(*slurmJob.ArrayJobID) == slurmJobID {
 				jobName = slurmJob.Name
 				submitTime = slurmJob.SubmitTime
 			}

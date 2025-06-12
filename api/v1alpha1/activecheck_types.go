@@ -154,7 +154,7 @@ type ActiveCheckSlurmJobsStatus struct {
 	// +kubebuilder:validation:Optional
 	LastJobId string `json:"lastJobId"`
 	// +kubebuilder:validation:Optional
-	LastJobName *string `json:"lastJobName"`
+	LastJobName string `json:"lastJobName"`
 	// +kubebuilder:validation:Optional
 	LastJobState consts.ActiveCheckSlurmJobStatus `json:"lastJobState"`
 	// +kubebuilder:validation:Optional

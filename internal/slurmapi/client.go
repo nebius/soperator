@@ -116,46 +116,29 @@ func (c *client) GetNode(ctx context.Context, nodeName string) (Node, error) {
 	return node, nil
 }
 
-func (c *client) GetJob(ctx context.Context, jobID string) ([]SlurmJob, error) {
+func (c *client) GetJob(ctx context.Context, jobID string) ([]Job, error) {
 	getJobResp, err := c.SlurmV0041GetJobWithResponse(ctx, jobID, &slurmapispec.SlurmV0041GetJobParams{})
 	if err != nil {
-		return []SlurmJob{}, fmt.Errorf("get job %s: %w", jobID, err)
+		return []Job{}, fmt.Errorf("get job %s: %w", jobID, err)
 	}
 	if getJobResp.JSON200 == nil {
-		return []SlurmJob{}, fmt.Errorf("json200 field is nil for job ID %s", jobID)
+		return []Job{}, fmt.Errorf("json200 field is nil for job ID %s", jobID)
 	}
 	if getJobResp.JSON200.Errors != nil && len(*getJobResp.JSON200.Errors) != 0 {
-		return []SlurmJob{}, fmt.Errorf("get job %s responded with errors: %v", jobID, *getJobResp.JSON200.Errors)
+		return []Job{}, fmt.Errorf("get job %s responded with errors: %v", jobID, *getJobResp.JSON200.Errors)
 	}
 
-	result := make([]SlurmJob, 0, len(getJobResp.JSON200.Jobs))
-	for _, job := range getJobResp.JSON200.Jobs {
-		status := SlurmJob{
-			Id:          job.JobId,
-			ArrayId:     convertToInt(job.ArrayJobId),
-			Name:        job.Name,
-			StateReason: job.StateReason,
-			SubmitTime:  convertToMetav1Time(job.SubmitTime),
-			StartTime:   convertToMetav1Time(job.StartTime),
-			EndTime:     convertToMetav1Time(job.EndTime),
-			NodeCount:   convertToInt(job.NodeCount),
-			NodeName:    job.Nodes,
+	jobs := make([]Job, 0, len(getJobResp.JSON200.Jobs))
+	for _, j := range getJobResp.JSON200.Jobs {
+		job, err := JobFromAPI(j)
+		if err != nil {
+			return nil, fmt.Errorf("convert job from api response: %w", err)
 		}
 
-		if job.JobState != nil && len(*job.JobState) > 0 {
-			status.State = string((*job.JobState)[0])
-			status.IsTerminateState = isTerminalState((*job.JobState)[0])
-			status.IsFailedState = isFailedState((*job.JobState)[0])
-		} else {
-			status.State = "UNKNOWN"
-			status.IsTerminateState = true
-			status.IsFailedState = true
-		}
-
-		result = append(result, status)
+		jobs = append(jobs, job)
 	}
 
-	return result, nil
+	return jobs, nil
 }
 
 func (c *client) ListJobs(ctx context.Context) ([]Job, error) {

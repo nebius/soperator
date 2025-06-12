@@ -96,11 +96,6 @@ func (in *ActiveCheckList) DeepCopyObject() runtime.Object {
 func (in *ActiveCheckSlurmJobsStatus) DeepCopyInto(out *ActiveCheckSlurmJobsStatus) {
 	*out = *in
 	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
-	if in.LastJobName != nil {
-		in, out := &in.LastJobName, &out.LastJobName
-		*out = new(string)
-		**out = **in
-	}
 	if in.LastJobFailReasons != nil {
 		in, out := &in.LastJobFailReasons, &out.LastJobFailReasons
 		*out = make([]string, len(*in))
