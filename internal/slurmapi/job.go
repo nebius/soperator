@@ -22,6 +22,8 @@ type Job struct {
 	ScheduledNodes string
 	RequiredNodes  string
 	NodeCount      int32
+	ArrayJobID     *int32
+	ArrayTaskID    *int32
 }
 
 func JobFromAPI(apiJob slurmapispec.V0041JobInfo) (Job, error) {
@@ -78,6 +80,14 @@ func JobFromAPI(apiJob slurmapispec.V0041JobInfo) (Job, error) {
 		job.NodeCount = *apiJob.NodeCount.Number
 	}
 
+	if apiJob.ArrayJobId != nil && apiJob.ArrayJobId.Set != nil && *apiJob.ArrayJobId.Set && apiJob.ArrayJobId.Number != nil {
+		job.ArrayJobID = apiJob.ArrayJobId.Number
+	}
+
+	if apiJob.ArrayTaskId != nil && apiJob.ArrayTaskId.Set != nil && *apiJob.ArrayTaskId.Set && apiJob.ArrayTaskId.Number != nil {
+		job.ArrayTaskID = apiJob.ArrayTaskId.Number
+	}
+
 	return job, nil
 }
 
@@ -88,6 +98,20 @@ func (j Job) String() string {
 
 func (j Job) GetIDString() string {
 	return strconv.Itoa(int(j.ID))
+}
+
+func (j Job) GetArrayJobIDString() string {
+	if j.ArrayJobID == nil {
+		return ""
+	}
+	return strconv.Itoa(int(*j.ArrayJobID))
+}
+
+func (j Job) GetArrayTaskIDString() string {
+	if j.ArrayTaskID == nil {
+		return ""
+	}
+	return strconv.Itoa(int(*j.ArrayTaskID))
 }
 
 func (j Job) GetNodeList() ([]string, error) {
