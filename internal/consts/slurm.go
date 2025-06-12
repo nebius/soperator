@@ -14,9 +14,10 @@ const (
 )
 
 const (
-	SlurmNodeReasonKillTaskFailed  string = "Kill task failed"
-	SlurmNodeReasonNodeReplacement string = "Soperator auto-healing: node replacement process"
-	SlurmNodeReasonNodeReboot      string = "Soperator auto-healing: node reboot process"
+	SlurmNodeReasonKillTaskFailed    string = "Kill task failed"
+	SlurmNodeReasonNodeReplacement   string = "Soperator auto-healing: node replacement process"
+	SlurmNodeReasonNodeReboot        string = "Soperator auto-healing: node reboot process"
+	SlurmNodeReasonActiveCheckFailed string = "Soperator activecheck: node drain process"
 )
 
 var SlurmNodeReasonsMap = map[string]struct{}{

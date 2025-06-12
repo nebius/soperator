@@ -169,6 +169,7 @@ func (c *SlurmNodesController) processDegradedNode(
 		return c.processKillTaskFailed(ctx, k8sNode, slurmClusterName, node)
 	case consts.SlurmNodeReasonNodeReplacement:
 		return c.processSlurmNodeMaintenance(ctx, k8sNode, slurmClusterName, node.Name)
+	// TODO: support SlurmNodeReasonActiveCheckFailed here
 	default:
 		return fmt.Errorf("unknown node reason: node name %s, reason %s, instance id %s",
 			node.Name, node.Reason, node.InstanceID)

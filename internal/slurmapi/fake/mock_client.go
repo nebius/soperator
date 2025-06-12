@@ -27,22 +27,22 @@ func (_m *MockClient) EXPECT() *MockClient_Expecter {
 }
 
 // GetJobStatus provides a mock function with given fields: ctx, jobID
-func (_m *MockClient) GetJobStatus(ctx context.Context, jobID string) (slurmapi.JobStatus, error) {
+func (_m *MockClient) GetJobStatus(ctx context.Context, jobID string) (slurmapi.SlurmJob, error) {
 	ret := _m.Called(ctx, jobID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetJobStatus")
+		panic("no return value specified for GetJob")
 	}
 
-	var r0 slurmapi.JobStatus
+	var r0 slurmapi.SlurmJob
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (slurmapi.JobStatus, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) (slurmapi.SlurmJob, error)); ok {
 		return rf(ctx, jobID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) slurmapi.JobStatus); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) slurmapi.SlurmJob); ok {
 		r0 = rf(ctx, jobID)
 	} else {
-		r0 = ret.Get(0).(slurmapi.JobStatus)
+		r0 = ret.Get(0).(slurmapi.SlurmJob)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
@@ -54,7 +54,7 @@ func (_m *MockClient) GetJobStatus(ctx context.Context, jobID string) (slurmapi.
 	return r0, r1
 }
 
-// MockClient_GetJobStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetJobStatus'
+// MockClient_GetJobStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetJob'
 type MockClient_GetJobStatus_Call struct {
 	*mock.Call
 }
@@ -63,7 +63,7 @@ type MockClient_GetJobStatus_Call struct {
 //   - ctx context.Context
 //   - jobID string
 func (_e *MockClient_Expecter) GetJobStatus(ctx interface{}, jobID interface{}) *MockClient_GetJobStatus_Call {
-	return &MockClient_GetJobStatus_Call{Call: _e.mock.On("GetJobStatus", ctx, jobID)}
+	return &MockClient_GetJobStatus_Call{Call: _e.mock.On("GetJob", ctx, jobID)}
 }
 
 func (_c *MockClient_GetJobStatus_Call) Run(run func(ctx context.Context, jobID string)) *MockClient_GetJobStatus_Call {
@@ -73,12 +73,12 @@ func (_c *MockClient_GetJobStatus_Call) Run(run func(ctx context.Context, jobID 
 	return _c
 }
 
-func (_c *MockClient_GetJobStatus_Call) Return(_a0 slurmapi.JobStatus, _a1 error) *MockClient_GetJobStatus_Call {
+func (_c *MockClient_GetJobStatus_Call) Return(_a0 slurmapi.SlurmJob, _a1 error) *MockClient_GetJobStatus_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_GetJobStatus_Call) RunAndReturn(run func(context.Context, string) (slurmapi.JobStatus, error)) *MockClient_GetJobStatus_Call {
+func (_c *MockClient_GetJobStatus_Call) RunAndReturn(run func(context.Context, string) (slurmapi.SlurmJob, error)) *MockClient_GetJobStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }
