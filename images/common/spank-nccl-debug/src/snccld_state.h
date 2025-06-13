@@ -42,7 +42,9 @@ static spank_err_t snccld_key_get_from(spank_t spank, snccld_state_key_t *key) {
     return ESPANK_SUCCESS;
 }
 
-static char *snccld_key_to_state_file_path(const snccld_state_key_t *key) {
+static char *snccld_key_to_state_file_path(
+    const snccld_state_key_t *key, const char *hostname
+) {
     const size_t buf_size = PATH_MAX * sizeof(char);
     char        *res      = malloc(buf_size);
 
@@ -53,6 +55,7 @@ static char *snccld_key_to_state_file_path(const snccld_state_key_t *key) {
         SNCCLD_SYSTEM_DIR,
         key->job_id,
         key->step_id,
+        hostname,
         "state"
     );
 
@@ -127,9 +130,11 @@ static snccld_state_t *snccld_state_from_string(const char *str) {
     return res;
 }
 
-static spank_err_t
-snccld_state_write(const snccld_state_key_t *key, const snccld_state_t *state) {
-    char *path = snccld_key_to_state_file_path(key);
+static spank_err_t snccld_state_write(
+    const snccld_state_key_t *key, const snccld_state_t *state,
+    const char *hostname
+) {
+    char *path = snccld_key_to_state_file_path(key, hostname);
 
     const int fd = open(path, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE);
     if (fd < 0) {
@@ -163,9 +168,10 @@ snccld_state_write(const snccld_state_key_t *key, const snccld_state_t *state) {
     return ESPANK_SUCCESS;
 }
 
-static snccld_state_t *snccld_state_read(const snccld_state_key_t *key) {
+static snccld_state_t *
+snccld_state_read(const snccld_state_key_t *key, const char *hostname) {
     snccld_state_t *res  = NULL;
-    char           *path = snccld_key_to_state_file_path(key);
+    char           *path = snccld_key_to_state_file_path(key, hostname);
 
     const int fd = open(path, O_RDONLY);
     if (fd < 0) {
@@ -206,8 +212,9 @@ static snccld_state_t *snccld_state_read(const snccld_state_key_t *key) {
     return res;
 }
 
-static spank_err_t snccld_state_cleanup(snccld_state_key_t *key) {
-    char *path = snccld_key_to_state_file_path(key);
+static spank_err_t
+snccld_state_cleanup(snccld_state_key_t *key, const char *hostname) {
+    char *path = snccld_key_to_state_file_path(key, hostname);
 
     int res = unlink(path);
     if (res == 0) {

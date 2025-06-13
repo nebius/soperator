@@ -24,6 +24,6 @@
 
 #define SNCCLD_LOG_PREFIX "SPANK | NCCL DEBUG"
 
-#define SNCCLD_TEMPLATE_FILE_NAME "%s/%u-%u.%s"
+#define SNCCLD_TEMPLATE_FILE_NAME "%s/%u-%u.%s.%s"
 
 #endif // SNCCLD_H

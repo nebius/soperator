@@ -412,6 +412,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
             snccld_config.out_dir,
             key->job_id,
             key->step_id,
+            hostname,
             "out"
         );
     }
@@ -469,6 +470,7 @@ user_init_create_fifo:
         SNCCLD_SYSTEM_DIR,
         key->job_id,
         key->step_id,
+        hostname,
         "fifo"
     );
     if (mkfifo(fifo_path, SNCCLD_DEFAULT_MODE) != 0 && errno != EEXIST) {
@@ -486,7 +488,7 @@ user_init_write_state:
     slurm_spank_log("%s: State: \n%s", SNCCLD_LOG_PREFIX, str);
     free(str);
 
-    snccld_state_write(key, state);
+    snccld_state_write(key, state, hostname);
     free(state);
 
 user_init_exit:
@@ -536,7 +538,7 @@ int slurm_spank_task_init(spank_t spank, int argc, char **argv) {
         goto task_init_exit;
     }
 
-    snccld_state_t *state = snccld_state_read(key);
+    snccld_state_t *state = snccld_state_read(key, hostname);
     if (state == NULL) {
         free(key);
         return ESPANK_ERROR;
@@ -593,7 +595,7 @@ int slurm_spank_task_init(spank_t spank, int argc, char **argv) {
     slurm_spank_log("%s: State: \n%s", SNCCLD_LOG_PREFIX, str);
     free(str);
 
-    snccld_state_write(key, state);
+    snccld_state_write(key, state, hostname);
     free(state);
 
 task_init_exit:
@@ -643,7 +645,7 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
         goto task_exit_exit;
     }
 
-    snccld_state_t *state = snccld_state_read(key);
+    snccld_state_t *state = snccld_state_read(key, hostname);
     if (state == NULL) {
         free(key);
         return ESPANK_ERROR;
@@ -691,7 +693,7 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
     }
 
     free(state);
-    snccld_state_cleanup(key);
+    snccld_state_cleanup(key, hostname);
 
     snccld_release_lock(
         key->job_id, key->step_id, SNCCLD_OPLOCK_OP_USER_INIT, hostname

@@ -31,12 +31,12 @@ static inline char *_snccld_render_lock_file_path(
     snprintf(
         res,
         PATH_MAX,
-        SNCCLD_TEMPLATE_FILE_NAME ".%s.lock",
+        SNCCLD_TEMPLATE_FILE_NAME ".lock",
         SNCCLD_SYSTEM_DIR,
         job_id,
         step_id,
-        op,
-        hostname
+        hostname,
+        op
     );
     return res;
 }
