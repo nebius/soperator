@@ -7196,20 +7196,17 @@ spec:
                 description: ActiveCheckSlurmJobsStatus defines the observed state
                   of ActiveCheck slurm jobs.
                 properties:
-                  lastJobEndTime:
-                    format: date-time
-                    type: string
+                  lastJobFailReasons:
+                    items:
+                      type: string
+                    type: array
                   lastJobId:
-                    format: int32
-                    type: integer
+                    type: string
                   lastJobName:
                     type: string
-                  lastJobStartTime:
-                    format: date-time
-                    type: string
                   lastJobState:
-                    type: string
-                  lastJobStateReason:
+                    description: ActiveCheckSlurmJobStatus defines status for ActiveCheck
+                      slurm job.
                     type: string
                   lastJobSubmitTime:
                     format: date-time

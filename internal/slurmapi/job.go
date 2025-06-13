@@ -5,8 +5,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	slurmapispec "github.com/SlinkyProject/slurm-client/api/v0041"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Job struct {
@@ -21,9 +23,10 @@ type Job struct {
 	Nodes          string
 	ScheduledNodes string
 	RequiredNodes  string
-	NodeCount      int32
+	NodeCount      *int32
 	ArrayJobID     *int32
 	ArrayTaskID    *int32
+	SubmitTime     *metav1.Time
 }
 
 func JobFromAPI(apiJob slurmapispec.V0041JobInfo) (Job, error) {
@@ -76,17 +79,10 @@ func JobFromAPI(apiJob slurmapispec.V0041JobInfo) (Job, error) {
 		job.RequiredNodes = *apiJob.RequiredNodes
 	}
 
-	if apiJob.NodeCount != nil && apiJob.NodeCount.Set != nil && *apiJob.NodeCount.Set && apiJob.NodeCount.Number != nil {
-		job.NodeCount = *apiJob.NodeCount.Number
-	}
-
-	if apiJob.ArrayJobId != nil && apiJob.ArrayJobId.Set != nil && *apiJob.ArrayJobId.Set && apiJob.ArrayJobId.Number != nil {
-		job.ArrayJobID = apiJob.ArrayJobId.Number
-	}
-
-	if apiJob.ArrayTaskId != nil && apiJob.ArrayTaskId.Set != nil && *apiJob.ArrayTaskId.Set && apiJob.ArrayTaskId.Number != nil {
-		job.ArrayTaskID = apiJob.ArrayTaskId.Number
-	}
+	job.NodeCount = convertToInt(apiJob.NodeCount)
+	job.ArrayJobID = convertToInt(apiJob.ArrayJobId)
+	job.ArrayTaskID = convertToInt(apiJob.ArrayJobId)
+	job.SubmitTime = convertToMetav1Time(apiJob.SubmitTime)
 
 	return job, nil
 }
@@ -124,6 +120,31 @@ func (j Job) GetScheduledNodeList() ([]string, error) {
 
 func (j Job) GetRequiredNodeList() ([]string, error) {
 	return parseNodeList(j.RequiredNodes)
+}
+
+func (j Job) IsTerminalState() bool {
+	return j.IsFailedState() || j.State == string(slurmapispec.V0041JobInfoJobStateCOMPLETED) || j.State == string(slurmapispec.V0041JobInfoJobStateSTOPPED)
+}
+
+func (j Job) IsFailedState() bool {
+	switch j.State {
+	case string(slurmapispec.V0041JobInfoJobStateFAILED),
+		string(slurmapispec.V0041JobInfoJobStateCANCELLED),
+		string(slurmapispec.V0041JobInfoJobStateTIMEOUT),
+		string(slurmapispec.V0041JobInfoJobStateOUTOFMEMORY),
+		string(slurmapispec.V0041JobInfoJobStateBOOTFAIL),
+		string(slurmapispec.V0041JobInfoJobStateDEADLINE),
+		string(slurmapispec.V0041JobInfoJobStateLAUNCHFAILED),
+		string(slurmapispec.V0041JobInfoJobStateNODEFAIL),
+		string(slurmapispec.V0041JobInfoJobStatePREEMPTED),
+		string(slurmapispec.V0041JobInfoJobStateRECONFIGFAIL),
+		string(slurmapispec.V0041JobInfoJobStateREVOKED),
+		string(slurmapispec.V0041JobInfoJobStateSPECIALEXIT),
+		"":
+		return true
+	default:
+		return false
+	}
 }
 
 func parseNodeList(nodeString string) ([]string, error) {
@@ -231,4 +252,29 @@ func expandNodeRange(nodePattern string) ([]string, error) {
 	}
 
 	return nodes, nil
+}
+
+func convertToMetav1Time(input *slurmapispec.V0041Uint64NoValStruct) *metav1.Time {
+	if input == nil || input.Set == nil || !*input.Set || input.Number == nil {
+		return nil
+	}
+
+	if input.Infinite != nil && *input.Infinite {
+		return nil
+	}
+
+	t := time.Unix(*input.Number, 0)
+	return &metav1.Time{Time: t}
+}
+
+func convertToInt(input *slurmapispec.V0041Uint32NoValStruct) *int32 {
+	if input == nil || input.Set == nil || !*input.Set || input.Number == nil {
+		return nil
+	}
+
+	if input.Infinite != nil && *input.Infinite {
+		return nil
+	}
+
+	return input.Number
 }
