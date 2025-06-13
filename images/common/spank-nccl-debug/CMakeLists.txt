@@ -7,6 +7,7 @@ set(LIBRARY_NAME nccldebug)
 
 set(SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/snccld.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/snccld_state.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/snccld_util_host.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/snccld_util_oplock.c
 )

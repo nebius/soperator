@@ -109,9 +109,7 @@ int slurm_spank_init(spank_t spank, int argc, char **argv) {
     }
 }
 
-static void snccld_run_named_pipe_reading_process(
-    snccld_state_t *state, const bool user_set_debug_file, char *user_debug_file
-) {
+static void snccld_run_named_pipe_reading_process(snccld_state_t *state) {
     // Build shell command: <SHELL> -c '<COMMAND>'
     char *sh_argv[4];
     int   sh_idx = 0;
@@ -141,8 +139,8 @@ static void snccld_run_named_pipe_reading_process(
         size_t target_count = 0;
 
         // Include user-specified debug file.
-        if (user_set_debug_file) {
-            output_targets[target_count++] = user_debug_file;
+        if (strlen(state->user_log_path) > 0) {
+            output_targets[target_count++] = state->user_log_path;
         }
 
         // Include out file.
@@ -150,7 +148,7 @@ static void snccld_run_named_pipe_reading_process(
             output_targets[target_count++] = state->log_path;
         }
 
-        size_t unique_output_targets =
+        const size_t unique_output_targets =
             snccld_remove_string_duplicates(output_targets, target_count);
         for (size_t i = 0; i < unique_output_targets; ++i) {
             tee_argv[tee_idx++] = output_targets[i];
@@ -252,16 +250,6 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     slurm_spank_log(
         "%s: user_set_debug_file =%u", SNCCLD_LOG_PREFIX, user_set_debug_file
     );
-
-    // Ensure the user's debug file exists before mounting.
-    if (user_set_debug_file) {
-        slurm_spank_log(
-            "%s: Ensuring user's debug file '%s' exists.",
-            SNCCLD_LOG_PREFIX,
-            user_debug_file
-        );
-        snccld_ensure_file_exists(user_debug_file);
-    }
 
     // Neither outfile nor stdout requested nor user set debug file -> noop
     if (!snccld_config.out_file && !snccld_config.out_stdout &&
@@ -404,6 +392,11 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     }
 
     if (snccld_config.out_file) {
+        slurm_spank_log(
+            "%s: Ensuring '%s' exists.",
+            SNCCLD_LOG_PREFIX,
+            snccld_config.out_dir
+        );
         snccld_ensure_dir_exists(snccld_config.out_dir);
         snprintf(
             state->log_path,
@@ -414,6 +407,18 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
             key->step_id,
             hostname,
             "out"
+        );
+    }
+    if (user_set_debug_file) {
+        slurm_spank_log(
+            "%s: Ensuring '%s' exists.", SNCCLD_LOG_PREFIX, user_debug_file
+        );
+        snccld_ensure_file_exists(user_debug_file);
+        snprintf(
+            state->user_log_path,
+            sizeof(state->user_log_path),
+            "%s",
+            user_debug_file
         );
     }
 
@@ -443,7 +448,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         if (only_out_file) {
             out_file = strdup(state->log_path);
         } else if (only_user_file) {
-            out_file = strdup(user_debug_file);
+            out_file = strdup(state->user_log_path);
         } else if (only_stdout) {
             out_file = strdup("/dev/stdout");
         }
@@ -482,6 +487,13 @@ user_init_create_fifo:
         goto user_init_write_state;
     }
     snprintf(state->fifo_path, sizeof(state->fifo_path), "%s", fifo_path);
+    slurm_spank_log(
+        "%s: Setting %s=%s",
+        SNCCLD_LOG_PREFIX,
+        SNCCLD_NCCL_ENV_DEBUG_FILE,
+        state->fifo_path
+    );
+    spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG_FILE, state->fifo_path, 1);
 
 user_init_write_state:
     char *str = snccld_state_to_string(state);
@@ -558,19 +570,6 @@ int slurm_spank_task_init(spank_t spank, int argc, char **argv) {
         goto task_init_exit;
     }
 
-    char       user_debug_file[PATH_MAX] = "";
-    const bool user_set_debug_file =
-        (spank_getenv(
-             spank,
-             SNCCLD_NCCL_ENV_DEBUG_FILE,
-             user_debug_file,
-             sizeof(user_debug_file)
-         ) == ESPANK_SUCCESS &&
-         strlen(user_debug_file) > 0);
-    slurm_spank_log(
-        "%s: user_set_debug_file =%u", SNCCLD_LOG_PREFIX, user_set_debug_file
-    );
-
     // Create separate process to fan out logs from the fifo.
     const pid_t tee_pid = fork();
     if (tee_pid < 0) {
@@ -583,9 +582,7 @@ int slurm_spank_task_init(spank_t spank, int argc, char **argv) {
         goto task_init_exit;
     } else if (tee_pid == 0) {
         // We're in forked process.
-        snccld_run_named_pipe_reading_process(
-            state, user_set_debug_file, user_debug_file
-        );
+        snccld_run_named_pipe_reading_process(state);
     } else {
         // We're in main process -> tee_pid is a pid of the forked process.
         state->tee_pid = tee_pid;
