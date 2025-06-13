@@ -61,6 +61,9 @@ func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Containe
 		slurmEnvVars = append(slurmEnvVars, corev1.EnvVar{
 			Name:  consts.ActiveCheckEachWorkerJobArrayEnv,
 			Value: "true",
+		}, corev1.EnvVar{
+			Name:  consts.ActiveCheckNameEnv,
+			Value: check.Name,
 		})
 	}
 
