@@ -5,7 +5,7 @@
 #ifndef SNCCLD_ARGS_H
 #define SNCCLD_ARGS_H
 
-#include "snccld.h"
+#include "snccld_util_dir_file.h"
 
 #include <ctype.h>
 #include <limits.h>

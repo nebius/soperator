@@ -1,8 +1,9 @@
 #include "snccld.h"
+
 #include "snccld_args.h"
 #include "snccld_state.h"
 #include "snccld_util_antidupl.h"
-#include "snccld_util_dir.h"
+#include "snccld_util_dir_file.h"
 #include "snccld_util_host.h"
 #include "snccld_util_oplock.h"
 

@@ -19,11 +19,6 @@
 #define SNCCLD_ENROOT_MOUNT_TEMPLATE_DIR  "x-create=dir,"
 #define SNCCLD_ENROOT_MOUNT_TEMPLATE_FILE "x-create=file,"
 
-#define SNCCLD_SYSTEM_DIR   "/tmp/nccl_debug"
-#define SNCCLD_DEFAULT_MODE 0666
-
 #define SNCCLD_LOG_PREFIX "SPANK | NCCL DEBUG"
-
-#define SNCCLD_TEMPLATE_FILE_NAME "%s/%u-%u.%s.%s"
 
 #endif // SNCCLD_H

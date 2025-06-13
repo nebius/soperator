@@ -1,6 +1,7 @@
 #include "snccld_util_oplock.h"
 
 #include "snccld.h"
+#include "snccld_util_dir_file.h"
 
 #include <fcntl.h>
 #include <limits.h>
