@@ -14,7 +14,7 @@ for node in $(sinfo -N --noheader -o "%N" | tr '\n' ' '); do
 done
 
 echo "Creating prolog script..."
-SLURM_PROLOG=$(mktemp /tmp/activecheck-prolog.XXXXXX.sh)
+SLURM_PROLOG=$(mktemp /opt/bin/activecheck-prolog.XXXXXX.sh)
 export SLURM_PROLOG
 chmod +x "$SLURM_PROLOG"
 
