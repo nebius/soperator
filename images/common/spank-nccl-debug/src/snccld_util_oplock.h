@@ -1,3 +1,11 @@
+/**
+ * @brief Advisory lock utilities.
+ *
+ * This module provides per-job and per-step advisory locking functionality.
+ * It allows a single process to perform setup or teardown actions once per
+ * job/step, coordinating multiple ranks via file locks.
+ */
+
 #ifndef SNCCLD_UTIL_OPLOCK_H
 #define SNCCLD_UTIL_OPLOCK_H
 
@@ -16,7 +24,8 @@
  * @param op: Short string identifying the action for the lock.
  * @param hostname: Name of the host where lock is being acquired.
  *
- * @return true if the lock has been acquired, o/w false.
+ * @retval true Successfully acquired the lock.
+ * @retval false Something went wrong.
  */
 bool snccld_acquire_lock(
     uint32_t job_id, uint32_t step_id, const char *op, const char *hostname
