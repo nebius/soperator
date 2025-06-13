@@ -28,7 +28,7 @@ extra_json=\$(scontrol show node "\$NODE_NAME" | awk -F= '/Extra=/{print \$2}')
 if [[ -z "\$extra_json" || "\$extra_json" == "none" ]]; then
     extra_json="{}"
 fi
-updated_json=\$(echo "\$extra_json" | jq -c --arg key "\$ACTIVE_CHECK_NAME" --argjson val false '.[\$key] = \$val')
+updated_json=\$(echo "\$extra_json" | jq -c --arg key "\$ACTIVE_CHECK_NAME" 'del(.["\$\key"])')
 scontrol update NodeName="\$NODE_NAME" Extra="\$updated_json"
 
 echo "Epilog completed for \$NODE_NAME"
