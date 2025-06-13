@@ -13,16 +13,17 @@ for node in $(sinfo -N --noheader -o "%N" | tr '\n' ' '); do
     scontrol update NodeName="$node" Extra="$updated_json"
 done
 
-echo "Creating epilog script..."
-EPILOG_SCRIPT=$(mktemp /tmp/activecheck-epilog.XXXXXX.sh)
-chmod +x "$EPILOG_SCRIPT"
+echo "Creating prolog script..."
+SLURM_PROLOG=$(mktemp /tmp/activecheck-prolog.XXXXXX.sh)
+export SLURM_PROLOG
+chmod +x "$SLURM_PROLOG"
 
-cat <<EOF > "$EPILOG_SCRIPT"
+cat <<EOF > "$SLURM_PROLOG"
 #!/bin/bash
 ACTIVE_CHECK_NAME="$ACTIVE_CHECK_NAME"
 NODE_NAME=\$(hostname)
 
-echo "Running embedded epilog on node: \$NODE_NAME"
+echo "Running embedded prolog on node: \$NODE_NAME"
 
 extra_json=\$(scontrol show node "\$NODE_NAME" | awk -F= '/Extra=/{print \$2}')
 if [[ -z "\$extra_json" || "\$extra_json" == "none" ]]; then
@@ -31,12 +32,12 @@ fi
 updated_json=\$(echo "\$extra_json" | jq -c --arg key "\$ACTIVE_CHECK_NAME" 'del(.["\$\key"])')
 scontrol update NodeName="\$NODE_NAME" Extra="\$updated_json"
 
-echo "Epilog completed for \$NODE_NAME"
+echo "prolog completed for \$NODE_NAME"
 EOF
 
 echo "Submitting Slurm array job..."
 HOSTS_NUM=$(sinfo -N --noheader -o "%N" | wc -l)
-SLURM_OUTPUT=$(/usr/bin/sbatch --parsable --export=ALL,EPILOG_SCRIPT --extra="${ACTIVE_CHECK_NAME}=true" --array=0-$((HOSTS_NUM - 1)) --nodes=1 /opt/bin/sbatch.sh)
+SLURM_OUTPUT=$(/usr/bin/sbatch --parsable --export=ALL,SLURM_PROLOG --extra="${ACTIVE_CHECK_NAME}=true" --array=0-$((HOSTS_NUM - 1)) --nodes=1 /opt/bin/sbatch.sh)
 
 if [[ -z "$SLURM_OUTPUT" ]]; then
     echo "Failed to submit Slurm job"
