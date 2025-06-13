@@ -22,6 +22,7 @@ spec:
   slurmJobSpec:
     sbatchScript: |
 {{ .Values.activeCheck.slurmJobSpec.sbatchScript | indent 6 }}
+    eachWorkerJobArray: {{ .Values.activeCheck.slurmJobSpec.eachWorkerJobArray }}
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:
