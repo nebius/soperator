@@ -56,11 +56,19 @@ func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Containe
 
 	slurmVolumeMounts = append(slurmVolumeMounts, check.Spec.SlurmJobSpec.JobContainer.VolumeMounts...)
 
+	slurmEnvVars := check.Spec.SlurmJobSpec.JobContainer.Env
+	if check.Spec.SlurmJobSpec.EachWorkerJobArray {
+		slurmEnvVars = append(slurmEnvVars, corev1.EnvVar{
+			Name:  consts.ActiveCheckEachWorkerJobArrayEnv,
+			Value: "true",
+		})
+	}
+
 	container = corev1.Container{
 		Name:            check.Spec.Name,
 		Image:           check.Spec.SlurmJobSpec.JobContainer.Image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
-		Env:             check.Spec.SlurmJobSpec.JobContainer.Env,
+		Env:             slurmEnvVars,
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{consts.ContainerSecurityContextCapabilitySysAdmin},

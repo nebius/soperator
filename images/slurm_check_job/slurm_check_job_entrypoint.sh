@@ -21,50 +21,19 @@ rm -rf /etc/slurm && ln -s /mnt/jail/slurm /etc/slurm
 echo "Bind-mount /opt/bin/sbatch.sh script"
 mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
 
-echo "Setting Extra field to all nodes..."
-for node in $(sinfo -N --noheader -o "%N" | tr '\n' ' '); do
-    echo "Updating node: $node"
-
-    extra_json=$(scontrol show node "$node" | awk -F= '/Extra=/{print $2}')
-    if [[ -z "$extra_json" || "$extra_json" == "none" ]]; then
-        extra_json="{}"
+if [[ "$EACH_WORKER_JOB_ARRAY" == "true" ]]; then
+    echo "Submitting job using slurm_submit_array_job.sh..."
+    SLURM_JOB_ID=$(/opt/bin/slurm/slurm_submit_array_job.sh)
+else
+    echo "Submitting regular Slurm job..."
+    SLURM_OUTPUT=$(/usr/bin/sbatch --parsable /opt/bin/sbatch.sh)
+    if [[ -z "$SLURM_OUTPUT" ]]; then
+        echo "Failed to submit Slurm job"
+        exit 1
     fi
-    updated_json=$(echo "$extra_json" | jq -c --arg key "$ACTIVE_CHECK_NAME" --argjson val true '.[$key] = $val')
-    scontrol update NodeName="$node" Extra="$updated_json"
-done
-
-echo "Creating epilog script..."
-EPILOG_SCRIPT=$(mktemp /tmp/activecheck-epilog.XXXXXX.sh)
-chmod +x "$EPILOG_SCRIPT"
-
-cat <<EOF > "$EPILOG_SCRIPT"
-#!/bin/bash
-ACTIVE_CHECK_NAME="$ACTIVE_CHECK_NAME"
-NODE_NAME=\$(hostname)
-
-echo "Running embedded epilog on node: \$NODE_NAME"
-
-extra_json=\$(scontrol show node "\$NODE_NAME" | awk -F= '/Extra=/{print \$2}')
-if [[ -z "\$extra_json" || "\$extra_json" == "none" ]]; then
-    extra_json="{}"
-fi
-updated_json=\$(echo "\$extra_json" | jq -c --arg key "\$ACTIVE_CHECK_NAME" --argjson val false '.[\$key] = \$val')
-scontrol update NodeName="\$NODE_NAME" Extra="\$updated_json"
-
-echo "Epilog completed for \$NODE_NAME"
-EOF
-
-HOSTS_NUM=$(sinfo -N --noheader -o "%N" | wc -l)
-
-echo "Submitting Slurm job..."
-SLURM_OUTPUT=$(/usr/bin/sbatch --parsable --export=ALL,HOSTS_NUM,EPILOG_SCRIPT /opt/bin/sbatch.sh)
-
-if [[ -z "$SLURM_OUTPUT" ]]; then
-    echo "Failed to submit Slurm job"
-    exit 1
+    SLURM_JOB_ID="$SLURM_OUTPUT"
 fi
 
-SLURM_JOB_ID="$SLURM_OUTPUT"
 echo "Slurm Job ID: $SLURM_JOB_ID"
 
 echo "Looking up owning Job for pod: $K8S_POD_NAME in namespace: $K8S_POD_NAMESPACE"
