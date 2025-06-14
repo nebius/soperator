@@ -2,10 +2,10 @@
 
 #include "snccld_args.h"
 #include "snccld_state.h"
-#include "snccld_util_antidupl.h"
 #include "snccld_util_dir_file.h"
 #include "snccld_util_host.h"
 #include "snccld_util_oplock.h"
+#include "snccld_util_string.h"
 
 #include <ctype.h>
 #include <fcntl.h>

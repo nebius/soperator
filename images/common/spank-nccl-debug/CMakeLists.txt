@@ -11,6 +11,7 @@ set(SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/snccld_util_dir_file.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/snccld_util_host.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/snccld_util_oplock.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/snccld_util_string.c
 )
 
 if (USE_SYSTEM_SLURM)
