@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"maps"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,7 +50,7 @@ func (r *ServiceReconciler) Reconcile(
 		logger.V(1).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile Service")
-		return errors.Wrap(err, "reconciling Service")
+		return fmt.Errorf("reconciling Service: %w", err)
 	}
 	return nil
 }
@@ -69,7 +68,7 @@ func (r *ServiceReconciler) deleteIfOwnedByController(
 		return nil
 	}
 	if err != nil {
-		return errors.Wrap(err, "getting Service")
+		return fmt.Errorf("getting Service: %w", err)
 	}
 
 	if !metav1.IsControlledBy(service, cluster) {
@@ -78,7 +77,7 @@ func (r *ServiceReconciler) deleteIfOwnedByController(
 	}
 
 	if err := r.Delete(ctx, service); err != nil {
-		return errors.Wrap(err, "deleting Service")
+		return fmt.Errorf("deleting Service: %w", err)
 	}
 	return nil
 }

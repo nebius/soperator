@@ -6,6 +6,7 @@ linters:
     - bidichk # Detect dangerous unicode character sequences.
     - copyloopvar # Check for pointers to enclosing loop variables.
     - decorder # Verify consistency in declaration order (constants, variables, types).
+    - depguard # Check for dependencies in go.mod and enforce import restrictions.
     - dogsled # Detect excessive use of blank identifiers in assignments.
     - durationcheck # Check for two durations multiplied together.
     - errcheck # Check for unchecked errors in function calls.
@@ -35,9 +36,14 @@ linters:
     unparam:
       # Inspect exported functions. Default: false.
       check-exported: true
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: "github.com/pkg/errors"
+              desc: "Use fmt.Errorf() with %w verb instead of pkg/errors for error wrapping"
 
   disable:
-    - depguard # Check for dependencies in go.mod.
     - dupl # Detect duplicate code.
     - cyclop # Detect function with too many branches.
     - forcetypeassert # Check for unnecessary type assertions.

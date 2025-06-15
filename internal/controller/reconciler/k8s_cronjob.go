@@ -2,8 +2,8 @@ package reconciler
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,7 +37,7 @@ func (r *CronJobReconciler) Reconcile(
 		log.FromContext(ctx).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile CronJob")
-		return errors.Wrap(err, "reconciling CronJob")
+		return fmt.Errorf("reconciling CronJob: %w", err)
 	}
 	return nil
 }

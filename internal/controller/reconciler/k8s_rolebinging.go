@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +45,7 @@ func (r *RoleBindingReconciler) Reconcile(
 		logger.V(1).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile RoleBinding")
-		return errors.Wrap(err, "reconciling RoleBinding")
+		return fmt.Errorf("reconciling RoleBinding: %w", err)
 	}
 	return nil
 }
@@ -62,7 +61,7 @@ func (r *RoleBindingReconciler) deleteIfOwnedByController(
 		return nil
 	}
 	if err != nil {
-		return errors.Wrap(err, "getting Worker RoleBinding")
+		return fmt.Errorf("getting Worker RoleBinding: %w", err)
 	}
 
 	if !metav1.IsControlledBy(roleBinding, cluster) {
@@ -75,7 +74,7 @@ func (r *RoleBindingReconciler) deleteIfOwnedByController(
 			logger.V(1).Info("RoleBinding is already deleted")
 			return nil
 		}
-		return errors.Wrap(err, "deleting RoleBinding")
+		return fmt.Errorf("deleting RoleBinding: %w", err)
 	}
 
 	logger.V(1).Info("RoleBinding deleted")
