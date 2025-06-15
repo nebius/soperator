@@ -2,12 +2,12 @@ package reconciler
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -38,7 +38,7 @@ func (r *SecretReconciler) Reconcile(
 		log.FromContext(ctx).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile Secret")
-		return errors.Wrap(err, "reconciling Secret")
+		return fmt.Errorf("reconciling Secret: %w", err)
 	}
 	return nil
 }

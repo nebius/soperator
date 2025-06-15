@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -53,7 +51,7 @@ func (r *PodMonitorReconciler) Reconcile(
 		logger.V(1).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile PodMonitor")
-		return errors.Wrap(err, "reconciling PodMonitor")
+		return fmt.Errorf("reconciling PodMonitor: %w", err)
 	}
 	return nil
 }
@@ -69,7 +67,7 @@ func (r *PodMonitorReconciler) deleteIfOwnedByController(
 		return nil
 	}
 	if err != nil {
-		return errors.Wrap(err, "getting PodMonitor")
+		return fmt.Errorf("getting PodMonitor: %w", err)
 	}
 
 	if !metav1.IsControlledBy(podMonitor, cluster) {
@@ -78,7 +76,7 @@ func (r *PodMonitorReconciler) deleteIfOwnedByController(
 	}
 
 	if err := r.Delete(ctx, podMonitor); err != nil {
-		return errors.Wrap(err, "deleting PodMonitor")
+		return fmt.Errorf("deleting PodMonitor: %w", err)
 	}
 	return nil
 }
@@ -99,7 +97,7 @@ func (r *PodMonitorReconciler) getPodMonitor(ctx context.Context, cluster *slurm
 			return podMonitor, nil
 		}
 		// Other error occurred
-		return nil, errors.Wrap(err, "getting PodMonitor")
+		return nil, fmt.Errorf("getting PodMonitor: %w", err)
 	}
 	return podMonitor, nil
 }

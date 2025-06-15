@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -206,7 +205,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		err = r.Status().Update(ctx, activeCheck)
 		if err != nil {
 			logger.Error(err, "Failed to reconcile ActiveCheckJob")
-			return ctrl.Result{}, errors.Wrap(err, "reconciling ActiveCheckJob")
+			return ctrl.Result{}, fmt.Errorf("reconciling ActiveCheckJob: %w", err)
 		}
 	} else if activeCheck.Spec.CheckType == "k8sJob" {
 		newStatus := slurmv1alpha1.ActiveCheckK8sJobsStatus{
@@ -236,7 +235,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		err = r.Status().Update(ctx, activeCheck)
 		if err != nil {
 			logger.Error(err, "Failed to reconcile ActiveCheckJob")
-			return ctrl.Result{}, errors.Wrap(err, "reconciling ActiveCheckJob")
+			return ctrl.Result{}, fmt.Errorf("reconciling ActiveCheckJob: %w", err)
 		}
 	}
 

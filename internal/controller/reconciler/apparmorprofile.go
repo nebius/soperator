@@ -2,8 +2,8 @@ package reconciler
 
 import (
 	"context"
-
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
 
 	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
 
@@ -42,7 +42,7 @@ func (r *AppArmorProfileReconciler) Reconcile(
 		log.FromContext(ctx).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile AppArmorProfile ")
-		return errors.Wrap(err, "reconciling AppArmorProfile ")
+		return fmt.Errorf("reconciling AppArmorProfile: %w", err)
 	}
 	return nil
 }

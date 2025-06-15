@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +52,7 @@ func (r *DeploymentReconciler) Reconcile(
 		logger.V(1).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile Deployment ")
-		return errors.Wrap(err, "reconciling Deployment ")
+		return fmt.Errorf("reconciling Deployment: %w", err)
 	}
 	return nil
 }
@@ -73,7 +71,7 @@ func (r *DeploymentReconciler) deleteIfOwnedByController(
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "getting Deployment")
+		return fmt.Errorf("getting Deployment: %w", err)
 	}
 
 	if !metav1.IsControlledBy(deployment, cluster) {
@@ -86,7 +84,7 @@ func (r *DeploymentReconciler) deleteIfOwnedByController(
 			logger.V(1).Info("Deployment already deleted")
 			return nil
 		}
-		return errors.Wrap(err, "deleting Deployment")
+		return fmt.Errorf("deleting Deployment: %w", err)
 	}
 	logger.V(1).Info("Deployment deleted")
 	return nil

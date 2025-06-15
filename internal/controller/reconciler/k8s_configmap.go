@@ -2,9 +2,9 @@ package reconciler
 
 import (
 	"context"
+	"fmt"
 	"maps"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,7 +38,7 @@ func (r *ConfigMapReconciler) Reconcile(
 		log.FromContext(ctx).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile ConfigMap")
-		return errors.Wrap(err, "reconciling ConfigMap")
+		return fmt.Errorf("reconciling ConfigMap: %w", err)
 	}
 	return nil
 }

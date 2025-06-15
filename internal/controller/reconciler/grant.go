@@ -2,8 +2,7 @@ package reconciler
 
 import (
 	"context"
-
-	"github.com/pkg/errors"
+	"fmt"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 
@@ -50,7 +49,7 @@ func (r *MariaDbGrantReconciler) Reconcile(
 		logger.V(1).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile MariaDbGrant ")
-		return errors.Wrap(err, "reconciling MariaDbGrant ")
+		return fmt.Errorf("reconciling MariaDbGrant: %w", err)
 	}
 	return nil
 }
@@ -69,7 +68,7 @@ func (r *MariaDbGrantReconciler) deleteIfOwnedByController(
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "getting MariaDbGrant")
+		return fmt.Errorf("getting MariaDbGrant: %w", err)
 	}
 
 	if !metav1.IsControlledBy(grant, cluster) {
@@ -78,7 +77,7 @@ func (r *MariaDbGrantReconciler) deleteIfOwnedByController(
 	}
 
 	if err := r.Client.Delete(ctx, grant); err != nil {
-		return errors.Wrap(err, "deleting MariaDbGrant")
+		return fmt.Errorf("deleting MariaDbGrant: %w", err)
 	}
 	return nil
 }

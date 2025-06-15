@@ -2,8 +2,8 @@ package reconciler
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,7 +39,7 @@ func (r *AdvancedStatefulSetReconciler) Reconcile(
 		log.FromContext(ctx).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile StatefulSet")
-		return errors.Wrap(err, "reconciling StatefulSet")
+		return fmt.Errorf("reconciling StatefulSet: %w", err)
 	}
 	return nil
 }

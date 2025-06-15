@@ -6,7 +6,6 @@ import (
 	"maps"
 	"strings"
 
-	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,7 +23,7 @@ func (r Reconciler) updateDependencyVersions(ctx context.Context, resource clien
 		err := setVersionsRecursive(resource, deps...)
 		if err != nil {
 			log.FromContext(ctx).Error(err, "Failed to update dependency versions", logfield.ResourceKV(resource)...)
-			return errors.Wrap(err, "updating dependency versions")
+			return fmt.Errorf("updating dependency versions: %w", err)
 		}
 	}
 	return nil
@@ -52,14 +51,14 @@ func getVersionsAnnotation(resource metav1.Object) (map[string]string, error) {
 
 		res := map[string]string{}
 		if err := yaml.UnmarshalStrict([]byte(resource.GetAnnotations()[consts.AnnotationVersions]), &res); err != nil {
-			return nil, errors.Wrap(err, "unmarshalling versions annotation")
+			return nil, fmt.Errorf("unmarshalling versions annotation: %w", err)
 		}
 		return res, nil
 	}
 
 	res, err := getVersionsAnnotationImpl()
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("getting versions annotation from resource %q", resource.GetName()))
+		return nil, fmt.Errorf("getting versions annotation from resource %q: %w", resource.GetName(), err)
 	}
 	return res, err
 }
@@ -72,12 +71,12 @@ func setVersionsAnnotation(resource metav1.Object, deps ...metav1.Object) error 
 	setDependencyVersionsImpl := func() error {
 		versions, err := getVersionsAnnotation(resource)
 		if err != nil {
-			return errors.Wrap(err, "getting existing versions annotation")
+			return fmt.Errorf("getting existing versions annotation: %w", err)
 		}
 		maps.Copy(versions, generateDependencyVersionMap(deps...))
 		versionsYaml, err := yaml.Marshal(versions)
 		if err != nil {
-			return errors.Wrap(err, "marshaling versions annotation")
+			return fmt.Errorf("marshaling versions annotation: %w", err)
 		}
 
 		annotations := map[string]string{}
@@ -90,7 +89,7 @@ func setVersionsAnnotation(resource metav1.Object, deps ...metav1.Object) error 
 
 	err := setDependencyVersionsImpl()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("setting versions annotation to resource %q", resource.GetName()))
+		return fmt.Errorf("setting versions annotation to resource %q: %w", resource.GetName(), err)
 	}
 	return nil
 }
@@ -103,29 +102,29 @@ func setVersionsRecursive(resource metav1.Object, deps ...metav1.Object) error {
 	setDependencyVersionsRecursiveImpl := func() error {
 		err := setVersionsAnnotation(resource, deps...)
 		if err != nil {
-			return errors.Wrap(err, "setting versions annotation to base resource")
+			return fmt.Errorf("setting versions annotation to base resource: %w", err)
 		}
 
 		switch o := resource.(type) {
 		case *appsv1.StatefulSet:
 			err = setVersionsAnnotation(&o.Spec.Template, deps...)
 			if err != nil {
-				return errors.Wrap(err, "setting StatefulSet pod template versions annotation")
+				return fmt.Errorf("setting StatefulSet pod template versions annotation: %w", err)
 			}
 		case *batchv1.CronJob:
 			err = setVersionsAnnotation(&o.Spec.JobTemplate.Spec.Template, deps...)
 			if err != nil {
-				return errors.Wrap(err, "setting CronJob pod template versions annotation")
+				return fmt.Errorf("setting CronJob pod template versions annotation: %w", err)
 			}
 		case *batchv1.Job:
 			err = setVersionsAnnotation(&o.Spec.Template, deps...)
 			if err != nil {
-				return errors.Wrap(err, "setting Job pod template versions annotation")
+				return fmt.Errorf("setting Job pod template versions annotation: %w", err)
 			}
 		case *appsv1.Deployment:
 			err = setVersionsAnnotation(&o.Spec.Template, deps...)
 			if err != nil {
-				return errors.Wrap(err, "setting Deployment pod template versions annotation")
+				return fmt.Errorf("setting Deployment pod template versions annotation: %w", err)
 			}
 		}
 
@@ -133,7 +132,7 @@ func setVersionsRecursive(resource metav1.Object, deps ...metav1.Object) error {
 	}
 
 	if err := setDependencyVersionsRecursiveImpl(); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("setting versions annotation to resource %q", resource.GetName()))
+		return fmt.Errorf("setting versions annotation to resource %q: %w", resource.GetName(), err)
 	}
 	return nil
 }

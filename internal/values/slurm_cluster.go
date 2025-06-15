@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -51,7 +50,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 	clusterType, err := consts.StringToClusterType(cluster.Spec.ClusterType)
 	if err != nil {
 		logger.Error(err, "Failed to get cluster type")
-		return nil, errors.Wrap(err, "getting cluster type")
+		return nil, fmt.Errorf("getting cluster type: %w", err)
 	}
 
 	res := &SlurmCluster{

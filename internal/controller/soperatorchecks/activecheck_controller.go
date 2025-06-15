@@ -2,9 +2,9 @@ package soperatorchecks
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -141,11 +141,11 @@ func (r *ActiveCheckReconciler) Reconcile(
 	err = r.Get(ctx, slurmClusterNamespacedName, slurmCluster)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, errors.Wrap(err, "SlurmCluster resource not found")
+			return ctrl.Result{}, fmt.Errorf("SlurmCluster resource not found: %w", err)
 		}
 
 		logger.Error(err, "Failed to get SlurmCluster")
-		return ctrl.Result{}, errors.Wrap(err, "getting SlurmCluster")
+		return ctrl.Result{}, fmt.Errorf("getting SlurmCluster: %w", err)
 	}
 
 	reconcileActiveChecksImpl := func() error {
@@ -171,7 +171,7 @@ func (r *ActiveCheckReconciler) Reconcile(
 
 						if err = r.ConfigMap.Reconcile(stepCtx, slurmCluster, &desired); err != nil {
 							stepLogger.Error(err, "Failed to reconcile")
-							return errors.Wrap(err, "reconciling ActiveChecks sbatch script ConfigMap")
+							return fmt.Errorf("reconciling ActiveChecks sbatch script ConfigMap: %w", err)
 						}
 						stepLogger.V(1).Info("Reconciled")
 					}
@@ -192,28 +192,28 @@ func (r *ActiveCheckReconciler) Reconcile(
 						)
 						if err != nil {
 							stepLogger.Error(err, "Failed to get PodTemplate")
-							return errors.Wrap(err, "getting PodTemplate")
+							return fmt.Errorf("getting PodTemplate: %w", err)
 						}
 					}
 					desired, err := render.RenderK8sCronJob(check, foundPodTemplate)
 
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering Active check CronJob")
+						return fmt.Errorf("rendering Active check CronJob: %w", err)
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
 					if err = r.CronJob.Reconcile(stepCtx, slurmCluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling ActiveChecks CronJob")
+						return fmt.Errorf("reconciling ActiveChecks CronJob: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
 					if check.Spec.RunAfterCreation && check.Status.K8sJobsStatus.LastTransitionTime.IsZero() {
 						if err := r.runAfterCreation(ctx, check, &desired); err != nil {
 							stepLogger.Error(err, "Failed to run after creation")
-							return errors.Wrap(err, "run job after creation")
+							return fmt.Errorf("run job after creation: %w", err)
 						}
 					}
 					return nil
@@ -224,7 +224,7 @@ func (r *ActiveCheckReconciler) Reconcile(
 
 	if err := reconcileActiveChecksImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile ActiveChecks")
-		return ctrl.Result{}, errors.Wrap(err, "reconciling ActiveChecks")
+		return ctrl.Result{}, fmt.Errorf("reconciling ActiveChecks: %w", err)
 	}
 
 	logger.Info("Reconciled ActiveChecks")
@@ -295,7 +295,7 @@ func (r *ActiveCheckReconciler) runAfterCreation(
 	}
 	err := r.Client.Get(ctx, jobName, &batchv1.Job{})
 	if err != nil && !apierrors.IsNotFound(err) {
-		return errors.Wrap(err, "failed to get job")
+		return fmt.Errorf("failed to get job: %w", err)
 	}
 
 	if err == nil {
@@ -308,7 +308,7 @@ func (r *ActiveCheckReconciler) runAfterCreation(
 		Namespace: cronJob.Namespace,
 	}
 	if err := r.Client.Get(ctx, cronJobName, cronJob); err != nil {
-		return errors.Wrap(err, "failed to get cronJob")
+		return fmt.Errorf("failed to get cronJob: %w", err)
 	}
 
 	return r.Client.Create(ctx, render.RenderK8sJob(check, cronJob))

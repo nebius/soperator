@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -55,7 +54,7 @@ func ExecuteMultiStep(ctx context.Context, name string, strategy MultiStepExecut
 
 	if err != nil {
 		logger.Error(err, "Failed to execute steps")
-		return errors.Wrap(err, "failed to execute steps")
+		return fmt.Errorf("failed to execute steps: %w", err)
 	} else {
 		logger.V(1).Info("Executed steps")
 	}
@@ -77,7 +76,7 @@ func executeFailAtFirstError(ctx context.Context, steps ...MultiStepExecutionSte
 		err := step.Func(stepCtx)
 		if err != nil {
 			stepLogger.Error(err, "Failed step. Stopping execution of the following steps")
-			return errors.Wrap(err, "multi-step execution failed at the first met error")
+			return fmt.Errorf("multi-step execution failed at the first met error: %w", err)
 		}
 	}
 	return nil
