@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +45,7 @@ func (r *RoleReconciler) Reconcile(
 		logger.V(1).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile Worker Role")
-		return errors.Wrap(err, "reconciling Worker Role")
+		return fmt.Errorf("reconciling Worker Role: %w", err)
 	}
 	return nil
 }
@@ -63,7 +62,7 @@ func (r *RoleReconciler) deleteIfOwnedByController(
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "getting Worker Role")
+		return fmt.Errorf("getting Worker Role: %w", err)
 	}
 
 	if !metav1.IsControlledBy(role, cluster) {
@@ -76,7 +75,7 @@ func (r *RoleReconciler) deleteIfOwnedByController(
 			logger.V(1).Info("Role not found, skipping deletion")
 			return nil
 		}
-		return errors.Wrap(err, "deleting Worker Role")
+		return fmt.Errorf("deleting Worker Role: %w", err)
 	}
 	logger.V(1).Info("Role deleted")
 	return nil

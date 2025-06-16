@@ -2,12 +2,12 @@ package jwt
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -141,7 +141,7 @@ func (t *Token) validate() error {
 // Issue issues a signed JWT token with specified parameters.
 func (t *Token) Issue(ctx context.Context) (string, error) {
 	if err := t.validate(); err != nil {
-		return "", errors.Wrap(err, "failed to issue token")
+		return "", fmt.Errorf("failed to issue token: %w", err)
 	}
 
 	if t.registry != nil {
@@ -173,12 +173,12 @@ func (t *Token) Issue(ctx context.Context) (string, error) {
 
 	signingKey, err := t.getSigningKey(ctx)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get signing key")
+		return "", fmt.Errorf("failed to get signing key: %w", err)
 	}
 
 	signedToken, err := token.SignedString(signingKey)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to sign token")
+		return "", fmt.Errorf("failed to sign token: %w", err)
 	}
 
 	if t.registry != nil {
@@ -199,7 +199,7 @@ func (t *Token) getSigningKey(ctx context.Context) ([]byte, error) {
 		},
 		&signingKeySecret,
 	); err != nil {
-		return nil, errors.Wrap(err, "failed to get signing secret")
+		return nil, fmt.Errorf("failed to get signing secret: %w", err)
 	}
 
 	return signingKeySecret.Data[consts.SecretRESTJWTKeyFileName], nil

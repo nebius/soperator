@@ -2,10 +2,10 @@ package reconciler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 
-	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -70,19 +70,19 @@ func (r Reconciler) EnsureDeployed(
 	// resource is present, but failed to be gotten
 	if !apierrors.IsNotFound(err) {
 		logger.Error(err, "Failed to get existing resource")
-		return errors.Wrap(err, "getting existing resource")
+		return fmt.Errorf("getting existing resource: %w", err)
 	}
 
 	logger.V(1).Info("Creating new resource")
 	{
 		if err = ctrl.SetControllerReference(owner, desired, r.Scheme); err != nil {
 			logger.Error(err, "Failed to set controller reference")
-			return errors.Wrap(err, "setting controller reference")
+			return fmt.Errorf("setting controller reference: %w", err)
 		}
 
 		err = r.updateDependencyVersions(ctx, desired, deps...)
 		if err != nil {
-			return errors.Wrap(err, "updating dependency versions")
+			return fmt.Errorf("updating dependency versions: %w", err)
 		}
 
 		if err = r.Create(ctx, desired); err != nil {
@@ -94,7 +94,7 @@ func (r Reconciler) EnsureDeployed(
 		err = r.Get(ctx, client.ObjectKeyFromObject(desired), existing)
 		if err != nil {
 			logger.Error(err, "Failed to get newly created resource")
-			return errors.Wrap(err, "getting newly created resource")
+			return fmt.Errorf("getting newly created resource: %w", err)
 		}
 	}
 
@@ -119,7 +119,7 @@ func (r Reconciler) EnsureUpdated(
 	err := r.updateDependencyVersions(ctx, desired, deps...)
 	if err != nil {
 		logger.Error(err, "Failed to update dependency versions")
-		return errors.Wrap(err, "updating dependency versions")
+		return fmt.Errorf("updating dependency versions: %w", err)
 	}
 
 	existingDepVersions, err := getVersionsAnnotation(existing)
@@ -138,12 +138,12 @@ func (r Reconciler) EnsureUpdated(
 
 		if err = ctrl.SetControllerReference(owner, desired, r.Scheme); err != nil {
 			logger.Error(err, "Failed to set controller reference")
-			return errors.Wrap(err, "setting controller reference")
+			return fmt.Errorf("setting controller reference: %w", err)
 		}
 
 		if err = r.Update(ctx, desired); err != nil {
 			logger.Error(err, "Failed to update resource")
-			return errors.Wrap(err, "updating resource")
+			return fmt.Errorf("updating resource: %w", err)
 		}
 
 		return nil
@@ -153,7 +153,7 @@ func (r Reconciler) EnsureUpdated(
 	logger.V(1).Info("Patching resource")
 	if err = r.Patch(ctx, existing, patch); err != nil {
 		logger.Error(err, "Failed to patch resource")
-		return errors.Wrap(err, "patching resource")
+		return fmt.Errorf("patching resource: %w", err)
 	}
 
 	return nil
@@ -216,19 +216,19 @@ func (r Reconciler) reconcile(
 		err := r.EnsureDeployed(ctx, cluster, existing, desired, deps...)
 		if err != nil {
 			logger.Error(err, "Failed to deploy")
-			return errors.Wrap(err, "deploying")
+			return fmt.Errorf("deploying: %w", err)
 		}
 
 		patch, err := patcher(existing, desired)
 		if err != nil {
 			logger.Error(err, "Failed to patch")
-			return errors.Wrap(err, "patching")
+			return fmt.Errorf("patching: %w", err)
 		}
 
 		err = r.EnsureUpdated(ctx, cluster, existing, desired, patch, deps...)
 		if err != nil {
 			logger.Error(err, "Failed to update")
-			return errors.Wrap(err, "updating")
+			return fmt.Errorf("updating: %w", err)
 		}
 
 		return nil
@@ -236,7 +236,7 @@ func (r Reconciler) reconcile(
 
 	if err := reconcileImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile")
-		return errors.Wrap(err, "reconciling")
+		return fmt.Errorf("reconciling: %w", err)
 	}
 	return nil
 }

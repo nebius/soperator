@@ -2,8 +2,8 @@ package clustercontroller
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,7 +44,7 @@ func (r SlurmClusterReconciler) ReconcileNCCLBenchmark(
 
 					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling nccl benchmark security limits configmap")
+						return fmt.Errorf("reconciling nccl benchmark security limits configmap: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -73,13 +73,13 @@ func (r SlurmClusterReconciler) ReconcileNCCLBenchmark(
 					deps, err := r.getNCCLBenchmarkDependencies(stepCtx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
-						return errors.Wrap(err, "retrieving dependencies for NCCLBenchmark CronJob")
+						return fmt.Errorf("retrieving dependencies for NCCLBenchmark CronJob: %w", err)
 					}
 					stepLogger.V(1).Info("Retrieved dependencies")
 
 					if err = r.CronJob.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling NCCL benchmark CronJob")
+						return fmt.Errorf("reconciling NCCL benchmark CronJob: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -91,7 +91,7 @@ func (r SlurmClusterReconciler) ReconcileNCCLBenchmark(
 
 	if err := reconcileNCCLBenchmarkImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile NCCL benchmark")
-		return errors.Wrap(err, "reconciling NCCL benchmark")
+		return fmt.Errorf("reconciling NCCL benchmark: %w", err)
 	}
 	logger.Info("Reconciled NCCL benchmark")
 	return nil
