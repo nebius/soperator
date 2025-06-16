@@ -23,7 +23,7 @@ mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
 
 if [[ "$EACH_WORKER_JOB_ARRAY" == "true" ]]; then
     echo "Submitting job using slurm_submit_array_job.sh..."
-    SLURM_JOB_ID=$(/opt/bin/slurm/slurm_submit_array_job.sh)
+    SLURM_JOB_ID=$(/opt/bin/slurm/slurm_submit_array_job.sh | tail -n 1)
 else
     echo "Submitting regular Slurm job..."
     SLURM_OUTPUT=$(/usr/bin/sbatch --parsable /opt/bin/sbatch.sh)
