@@ -493,6 +493,6 @@ images:
   populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.20.1-jammy-slurm24.05.7"
   ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.20.1-jammy-slurm24.05.7"
   slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.20.1-jammy-slurm24.05.7"
-  exporter: "cr.eu-north1.nebius.cloud/soperator/exporter:1.20.1-jammy-slurm24.05.7"
+  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.20.1-jammy-slurm24.05.7"
   sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.20.1
   mariaDB: docker-registry1.mariadb.com/library/mariadb:11.4.3
