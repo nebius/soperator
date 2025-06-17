@@ -103,7 +103,8 @@ func (r *ActiveCheckPrologReconciler) updatePrologConfigMap(ctx context.Context,
 				consts.LabelSConfigControllerSourceKey: consts.LabelSConfigControllerSourceValue,
 			},
 			Annotations: map[string]string{
-				consts.AnnotationSConfigControllerSourceKey: consts.DefaultSConfigControllerSourcePath,
+				consts.AnnotationSConfigControllerSourceKey:     consts.DefaultSConfigControllerSourcePath,
+				consts.AnnotationSConfigControllerExecutableKey: consts.DefaultSConfigControllerExecutableValue,
 			},
 		},
 		Data: map[string]string{
