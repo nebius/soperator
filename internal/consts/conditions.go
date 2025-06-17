@@ -52,3 +52,12 @@ const (
 	ActiveCheckK8sJobStatusSuspended ActiveCheckK8sJobStatus = "Suspended"
 	ActiveCheckK8sJobStatusUnknown   ActiveCheckK8sJobStatus = "Unknown"
 )
+
+// ActiveCheckSlurmJobStatus defines status for ActiveCheck slurm job.
+type ActiveCheckSlurmJobStatus string
+
+const (
+	ActiveCheckSlurmJobStatusComplete ActiveCheckSlurmJobStatus = "Complete"
+	ActiveCheckSlurmJobStatusFailed   ActiveCheckSlurmJobStatus = "Failed"
+	ActiveCheckSlurmJobStatusDegraded ActiveCheckSlurmJobStatus = "Degraded"
+)

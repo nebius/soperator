@@ -10,6 +10,6 @@ type Client interface {
 	api.ClientWithResponsesInterface
 	ListNodes(ctx context.Context) ([]Node, error)
 	GetNode(ctx context.Context, nodeName string) (Node, error)
-	GetJobStatus(ctx context.Context, jobID string) (JobStatus, error)
+	GetJobsByID(ctx context.Context, jobID string) ([]Job, error)
 	ListJobs(ctx context.Context) ([]Job, error)
 }

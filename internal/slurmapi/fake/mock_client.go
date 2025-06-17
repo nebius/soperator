@@ -26,23 +26,25 @@ func (_m *MockClient) EXPECT() *MockClient_Expecter {
 	return &MockClient_Expecter{mock: &_m.Mock}
 }
 
-// GetJobStatus provides a mock function with given fields: ctx, jobID
-func (_m *MockClient) GetJobStatus(ctx context.Context, jobID string) (slurmapi.JobStatus, error) {
+// GetJobsByID provides a mock function with given fields: ctx, jobID
+func (_m *MockClient) GetJobsByID(ctx context.Context, jobID string) ([]slurmapi.Job, error) {
 	ret := _m.Called(ctx, jobID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetJobStatus")
+		panic("no return value specified for GetJobsByID")
 	}
 
-	var r0 slurmapi.JobStatus
+	var r0 []slurmapi.Job
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (slurmapi.JobStatus, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]slurmapi.Job, error)); ok {
 		return rf(ctx, jobID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) slurmapi.JobStatus); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) []slurmapi.Job); ok {
 		r0 = rf(ctx, jobID)
 	} else {
-		r0 = ret.Get(0).(slurmapi.JobStatus)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]slurmapi.Job)
+		}
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
@@ -54,31 +56,31 @@ func (_m *MockClient) GetJobStatus(ctx context.Context, jobID string) (slurmapi.
 	return r0, r1
 }
 
-// MockClient_GetJobStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetJobStatus'
-type MockClient_GetJobStatus_Call struct {
+// MockClient_GetJobsByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetJobsByID'
+type MockClient_GetJobsByID_Call struct {
 	*mock.Call
 }
 
-// GetJobStatus is a helper method to define mock.On call
+// GetJobsByID is a helper method to define mock.On call
 //   - ctx context.Context
 //   - jobID string
-func (_e *MockClient_Expecter) GetJobStatus(ctx interface{}, jobID interface{}) *MockClient_GetJobStatus_Call {
-	return &MockClient_GetJobStatus_Call{Call: _e.mock.On("GetJobStatus", ctx, jobID)}
+func (_e *MockClient_Expecter) GetJobsByID(ctx interface{}, jobID interface{}) *MockClient_GetJobsByID_Call {
+	return &MockClient_GetJobsByID_Call{Call: _e.mock.On("GetJobsByID", ctx, jobID)}
 }
 
-func (_c *MockClient_GetJobStatus_Call) Run(run func(ctx context.Context, jobID string)) *MockClient_GetJobStatus_Call {
+func (_c *MockClient_GetJobsByID_Call) Run(run func(ctx context.Context, jobID string)) *MockClient_GetJobsByID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
 
-func (_c *MockClient_GetJobStatus_Call) Return(_a0 slurmapi.JobStatus, _a1 error) *MockClient_GetJobStatus_Call {
+func (_c *MockClient_GetJobsByID_Call) Return(_a0 []slurmapi.Job, _a1 error) *MockClient_GetJobsByID_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_GetJobStatus_Call) RunAndReturn(run func(context.Context, string) (slurmapi.JobStatus, error)) *MockClient_GetJobStatus_Call {
+func (_c *MockClient_GetJobsByID_Call) RunAndReturn(run func(context.Context, string) ([]slurmapi.Job, error)) *MockClient_GetJobsByID_Call {
 	_c.Call.Return(run)
 	return _c
 }

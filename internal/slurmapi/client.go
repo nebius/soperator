@@ -116,41 +116,29 @@ func (c *client) GetNode(ctx context.Context, nodeName string) (Node, error) {
 	return node, nil
 }
 
-func (c *client) GetJobStatus(ctx context.Context, jobID string) (JobStatus, error) {
+func (c *client) GetJobsByID(ctx context.Context, jobID string) ([]Job, error) {
 	getJobResp, err := c.SlurmV0041GetJobWithResponse(ctx, jobID, &slurmapispec.SlurmV0041GetJobParams{})
 	if err != nil {
-		return JobStatus{}, fmt.Errorf("get job %s: %w", jobID, err)
+		return nil, fmt.Errorf("get job %s: %w", jobID, err)
 	}
 	if getJobResp.JSON200 == nil {
-		return JobStatus{}, fmt.Errorf("json200 field is nil for job ID %s", jobID)
+		return nil, fmt.Errorf("json200 field is nil for job ID %s", jobID)
 	}
 	if getJobResp.JSON200.Errors != nil && len(*getJobResp.JSON200.Errors) != 0 {
-		return JobStatus{}, fmt.Errorf("get job %s responded with errors: %v", jobID, *getJobResp.JSON200.Errors)
-	}
-	if len(getJobResp.JSON200.Jobs) != 1 {
-		return JobStatus{}, fmt.Errorf("expected one job in response for job ID %s, got %d", jobID, len(getJobResp.JSON200.Jobs))
+		return nil, fmt.Errorf("get job %s responded with errors: %v", jobID, *getJobResp.JSON200.Errors)
 	}
 
-	job := getJobResp.JSON200.Jobs[0]
+	jobs := make([]Job, 0, len(getJobResp.JSON200.Jobs))
+	for _, j := range getJobResp.JSON200.Jobs {
+		job, err := JobFromAPI(j)
+		if err != nil {
+			return nil, fmt.Errorf("convert job from api response: %w", err)
+		}
 
-	status := JobStatus{
-		Id:          job.JobId,
-		Name:        job.Name,
-		StateReason: job.StateReason,
-		SubmitTime:  convertToMetav1Time(job.SubmitTime),
-		StartTime:   convertToMetav1Time(job.StartTime),
-		EndTime:     convertToMetav1Time(job.EndTime),
+		jobs = append(jobs, job)
 	}
 
-	if job.JobState != nil && len(*job.JobState) > 0 {
-		status.State = string((*job.JobState)[0])
-		status.IsTerminateState = isTerminalState((*job.JobState)[0])
-	} else {
-		status.State = "UNKNOWN"
-		status.IsTerminateState = true
-	}
-
-	return status, nil
+	return jobs, nil
 }
 
 func (c *client) ListJobs(ctx context.Context) ([]Job, error) {

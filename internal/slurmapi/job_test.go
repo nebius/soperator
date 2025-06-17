@@ -31,7 +31,6 @@ func TestJobFromAPI(t *testing.T) {
 				Nodes:          ptr("gpu[001-003]"),
 				ScheduledNodes: ptr("gpu001,gpu002"),
 				RequiredNodes:  ptr("gpu[001-005]"),
-				NodeCount:      &slurmapispec.V0041Uint32NoValStruct{Set: ptr(true), Number: ptr(int32(3))},
 			},
 			want: Job{
 				ID:             12345,
@@ -45,17 +44,18 @@ func TestJobFromAPI(t *testing.T) {
 				Nodes:          "gpu[001-003]",
 				ScheduledNodes: "gpu001,gpu002",
 				RequiredNodes:  "gpu[001-005]",
-				NodeCount:      3,
 			},
 			wantErr: false,
 		},
 		{
 			name: "minimal job",
 			apiJob: slurmapispec.V0041JobInfo{
-				JobId: ptr(int32(123)),
+				JobId:    ptr(int32(123)),
+				JobState: &[]slurmapispec.V0041JobInfoJobState{slurmapispec.V0041JobInfoJobStateCOMPLETED},
 			},
 			want: Job{
-				ID: 123,
+				ID:    123,
+				State: "COMPLETED",
 			},
 			wantErr: false,
 		},
@@ -63,6 +63,14 @@ func TestJobFromAPI(t *testing.T) {
 			name: "job without ID",
 			apiJob: slurmapispec.V0041JobInfo{
 				Name: ptr("test"),
+			},
+			want:    Job{},
+			wantErr: true,
+		},
+		{
+			name: "job without State",
+			apiJob: slurmapispec.V0041JobInfo{
+				JobId: ptr(int32(123)),
 			},
 			want:    Job{},
 			wantErr: true,
@@ -103,7 +111,7 @@ func TestJobFromAPI_SmokeTest(t *testing.T) {
 				Nodes:          "worker-[1,0]",
 				ScheduledNodes: "",
 				RequiredNodes:  "",
-				NodeCount:      2,
+				NodeCount:      ptr(int32(2)),
 			},
 			wantErr: false,
 		},
