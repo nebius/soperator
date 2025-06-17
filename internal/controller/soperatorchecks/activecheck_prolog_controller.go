@@ -82,7 +82,7 @@ func (r *ActiveCheckPrologReconciler) Reconcile(
 	)
 
 	if err := r.updatePrologConfigMap(ctx, req.Namespace, r.getPrologScript()); err != nil {
-		logger.Error(err, "Failed to update ConfigMap with topology config")
+		logger.Error(err, "Failed to update ConfigMap with active check prolog script")
 		return DefaultRequeueResult, nil
 	}
 
