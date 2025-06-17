@@ -192,7 +192,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 				if activeCheck.Spec.Reactions.DrainSlurmNode {
 					nodes, err := slurmJob.GetNodeList()
 					if err != nil {
-						return ctrl.Result{}, err
+						return ctrl.Result{}, fmt.Errorf("get node list: %w", err)
 					}
 
 					reason := consts.SlurmNodeReasonActiveCheckFailedUnknown
@@ -218,7 +218,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 				}
 			}
 
-			if slurmJob.ArrayJobID == nil || fmt.Sprint(*slurmJob.ArrayJobID) == slurmJobID {
+			if fmt.Sprint(slurmJob.ID) == slurmJobID {
 				jobName = slurmJob.Name
 				submitTime = slurmJob.SubmitTime
 			}
