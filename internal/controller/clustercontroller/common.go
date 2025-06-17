@@ -2,8 +2,8 @@ package clustercontroller
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -49,13 +49,13 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					); getErr != nil {
 						if !apierrors.IsNotFound(getErr) {
 							stepLogger.Error(getErr, "Failed to get")
-							return errors.Wrap(getErr, "getting REST JWT Key Secret")
+							return fmt.Errorf("getting REST JWT Key Secret: %w", getErr)
 						}
 
 						renderedDesired, err := rest.RenderSecret(clusterValues.Name, clusterValues.Namespace)
 						if err != nil {
 							stepLogger.Error(err, "Failed to render")
-							return errors.Wrap(err, "rendering REST JWT secret key")
+							return fmt.Errorf("rendering REST JWT secret key: %w", err)
 						}
 						desired = *renderedDesired.DeepCopy()
 						stepLogger.V(1).Info("Rendered")
@@ -64,7 +64,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 
 					if err := r.Secret.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling REST JWT secret key")
+						return fmt.Errorf("reconciling REST JWT secret key: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -89,7 +89,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 							&topologyConfig,
 						); getErr != nil {
 							stepLogger.Error(getErr, "Failed to get topology config")
-							return errors.Wrap(getErr, "failed to get topology config")
+							return fmt.Errorf("failed to get topology config: %w", getErr)
 						}
 					}
 
@@ -99,7 +99,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 
 					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling ConfigMap with Slurm configs")
+						return fmt.Errorf("reconciling ConfigMap with Slurm configs: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -133,7 +133,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 									foundPodTemplate,
 								); err != nil {
 									stepLogger.Error(err, "Failed to get PodTemplate")
-									return errors.Wrap(err, "getting PodTemplate")
+									return fmt.Errorf("getting PodTemplate: %w", err)
 								}
 							}
 
@@ -156,7 +156,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 							err = r.Otel.Reconcile(stepCtx, cluster, desired)
 							if err != nil {
 								stepLogger.Error(err, "Failed to reconcile")
-								return errors.Wrap(err, "reconciling OpenTelemetry Collector")
+								return fmt.Errorf("reconciling OpenTelemetry Collector: %w", err)
 							}
 
 							stepLogger.V(1).Info("Reconciled")
@@ -182,13 +182,13 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					); getErr != nil {
 						if !apierrors.IsNotFound(getErr) {
 							stepLogger.Error(getErr, "Failed to get")
-							return errors.Wrap(getErr, "getting Munge Key Secret")
+							return fmt.Errorf("getting Munge Key Secret: %w", getErr)
 						}
 
 						renderedDesired, err := common.RenderMungeKeySecret(clusterValues.Name, clusterValues.Namespace)
 						if err != nil {
 							stepLogger.Error(err, "Failed to render")
-							return errors.Wrap(err, "rendering Munge Key Secret")
+							return fmt.Errorf("rendering Munge Key Secret: %w", err)
 						}
 						desired = *renderedDesired.DeepCopy()
 						stepLogger.V(1).Info("Rendered")
@@ -197,7 +197,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 
 					if err := r.Secret.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling Munge Key Secret")
+						return fmt.Errorf("reconciling Munge Key Secret: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -226,7 +226,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 
 					if err := r.AppArmorProfile.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling AppArmor profiles")
+						return fmt.Errorf("reconciling AppArmor profiles: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 					return nil
@@ -237,7 +237,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 
 	if err := reconcileCommonImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile common resources")
-		return errors.Wrap(err, "reconciling common resources")
+		return fmt.Errorf("reconciling common resources: %w", err)
 	}
 	logger.Info("Reconciled common resources")
 	return nil

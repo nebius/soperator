@@ -2,9 +2,9 @@ package soperatorchecks
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -121,11 +121,11 @@ func (r *ServiceAccountReconciler) Reconcile(
 	err = r.Get(ctx, clusterNN, cluster)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, errors.Wrap(err, "SlurmCluster resource not found")
+			return ctrl.Result{}, fmt.Errorf("SlurmCluster resource not found: %w", err)
 		}
 
 		logger.Error(err, "Failed to get SlurmCluster")
-		return ctrl.Result{}, errors.Wrap(err, "getting SlurmCluster")
+		return ctrl.Result{}, fmt.Errorf("getting SlurmCluster: %w", err)
 	}
 
 	reconcileServiceAccountImpl := func() error {
@@ -145,7 +145,7 @@ func (r *ServiceAccountReconciler) Reconcile(
 
 					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling active check ServiceAccount")
+						return fmt.Errorf("reconciling active check ServiceAccount: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -165,7 +165,7 @@ func (r *ServiceAccountReconciler) Reconcile(
 
 					if err := r.Role.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling active check Role")
+						return fmt.Errorf("reconciling active check Role: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -185,7 +185,7 @@ func (r *ServiceAccountReconciler) Reconcile(
 
 					if err := r.RoleBinding.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling active check RoleBinding")
+						return fmt.Errorf("reconciling active check RoleBinding: %w", err)
 					}
 
 					stepLogger.V(1).Info("Reconciled")
@@ -198,7 +198,7 @@ func (r *ServiceAccountReconciler) Reconcile(
 
 	if err := reconcileServiceAccountImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile ServiceAccount")
-		return ctrl.Result{}, errors.Wrap(err, "reconciling ServiceAccount")
+		return ctrl.Result{}, fmt.Errorf("reconciling ServiceAccount: %w", err)
 	}
 
 	logger.Info("Reconciled ServiceAccount")

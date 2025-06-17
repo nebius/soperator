@@ -103,6 +103,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 	res.AddComment("")
 	res.AddProperty("PropagateResourceLimits", "NONE") // Don't propagate ulimits from the login node by default
 	res.AddComment("")
+	res.AddProperty("SchedulerParameters", "extra_constraints")
+	res.AddComment("")
 	res.AddComment("HEALTH CHECKS")
 	res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
 	if cluster.HealthCheckConfig == nil {

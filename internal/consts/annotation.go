@@ -10,4 +10,7 @@ const (
 
 	AnnotationSConfigControllerSourceKey = LabelSConfigControllerSourceKey + "/path"
 	DefaultSConfigControllerSourcePath   = "/slurm"
+
+	AnnotationSConfigControllerExecutableKey = LabelSConfigControllerSourceKey + "/executable"
+	DefaultSConfigControllerExecutableValue  = "true"
 )

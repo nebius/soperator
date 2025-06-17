@@ -2,10 +2,10 @@ package clustercontroller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,7 +48,7 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 
 					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling controller security limits configmap")
+						return fmt.Errorf("reconciling controller security limits configmap: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -69,7 +69,7 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					var controllerNamePtr *string = nil
 					if err := r.Service.Reconcile(stepCtx, cluster, &desired, controllerNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling controller Service")
+						return fmt.Errorf("reconciling controller Service: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -92,7 +92,7 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering controller StatefulSet")
+						return fmt.Errorf("rendering controller StatefulSet: %w", err)
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
@@ -100,13 +100,13 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					deps, err := r.getControllersStatefulSetDependencies(stepCtx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
-						return errors.Wrap(err, "retrieving dependencies for controller StatefulSet")
+						return fmt.Errorf("retrieving dependencies for controller StatefulSet: %w", err)
 					}
 					stepLogger.V(1).Info("Retrieved dependencies")
 
 					if err = r.AdvancedStatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling controller StatefulSet")
+						return fmt.Errorf("reconciling controller StatefulSet: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -118,7 +118,7 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 
 	if err := reconcileControllersImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile Slurm Controllers")
-		return errors.Wrap(err, "reconciling Slurm Controllers")
+		return fmt.Errorf("reconciling Slurm Controllers: %w", err)
 	}
 	logger.Info("Reconciled Slurm Controllers")
 	return nil
@@ -146,7 +146,7 @@ func (r SlurmClusterReconciler) ValidateControllers(
 			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 		}
 		logger.Error(err, "Failed to get controller StatefulSet")
-		return ctrl.Result{}, errors.Wrap(err, "getting controller StatefulSet")
+		return ctrl.Result{}, fmt.Errorf("getting controller StatefulSet: %w", err)
 	}
 
 	targetReplicas := clusterValues.NodeController.StatefulSet.Replicas

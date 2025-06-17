@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -48,7 +46,7 @@ func (r *OtelReconciler) Reconcile(
 		log.FromContext(ctx).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile OpenTelemetryCollector")
-		return errors.Wrap(err, "reconciling OpenTelemetryCollector")
+		return fmt.Errorf("reconciling OpenTelemetryCollector: %w", err)
 	}
 	return nil
 }
@@ -65,7 +63,7 @@ func (r *OtelReconciler) deleteIfOwnedByController(
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "getting OpenTelemetryCollector")
+		return fmt.Errorf("getting OpenTelemetryCollector: %w", err)
 	}
 
 	if !metav1.IsControlledBy(otel, cluster) {
@@ -74,7 +72,7 @@ func (r *OtelReconciler) deleteIfOwnedByController(
 	}
 
 	if err := r.Delete(ctx, otel); err != nil {
-		return errors.Wrap(err, "deleting Service")
+		return fmt.Errorf("deleting Service: %w", err)
 	}
 
 	return nil

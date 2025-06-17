@@ -256,6 +256,15 @@ func main() {
 		setupLog.Error(err, "unable to create soperatorchecks serviceaccount controller", "controller", "ServiceAccount")
 		os.Exit(1)
 	}
+	if err = soperatorchecks.NewActiveCheckPrologController(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckPrologControllerName),
+		reconcileTimeout,
+	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+		setupLog.Error(err, "unable to create soperatorchecks prolog controller", "controller", "Prolog")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

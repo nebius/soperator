@@ -51,3 +51,19 @@ func (s *FileStore) Add(name, content, subPath string) error {
 
 	return nil
 }
+
+func (s *FileStore) SetExecutable(name, subPath string) error {
+	filePath := filepath.Join(s.path, subPath, name)
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return fmt.Errorf("stat file %q: %w", filePath, err)
+	}
+
+	// Preserve current perms, add execute bits for u/g/o (0000111 in octal)
+	newPerm := info.Mode().Perm() | 0o111
+
+	if err := os.Chmod(filePath, newPerm); err != nil {
+		return fmt.Errorf("chmod +x %q: %w", filePath, err)
+	}
+	return nil
+}

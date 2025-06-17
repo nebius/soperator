@@ -42,6 +42,7 @@ const SConfigControllerName = "sconfigcontroller"
 
 type Store interface {
 	Add(name, content, subPath string) error
+	SetExecutable(name, subPath string) error
 }
 
 // SConfigControllerReconciler reconciles a SConfigController object
@@ -88,6 +89,7 @@ func (r *ControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	subPath = trimSlurmPrefix(subPath)
 
+	executable := configMap.Annotations[consts.AnnotationSConfigControllerExecutableKey] == consts.DefaultSConfigControllerExecutableValue
 	for configName, configContent := range configMap.Data {
 		logger.V(1).Info("About to save slurm config", "configName", configName)
 
@@ -95,6 +97,14 @@ func (r *ControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		if err != nil {
 			logger.V(1).Error(err, "Adding file to fileStore produced an error", "configName", configName)
 			return ctrl.Result{}, err
+		}
+
+		if executable {
+			err = r.fileStore.SetExecutable(configName, subPath)
+			if err != nil {
+				logger.V(1).Error(err, "Setting executable to a file produced an error", "configName", configName)
+				return ctrl.Result{}, err
+			}
 		}
 	}
 
