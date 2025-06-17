@@ -21,15 +21,19 @@ rm -rf /etc/slurm && ln -s /mnt/jail/slurm /etc/slurm
 echo "Bind-mount /opt/bin/sbatch.sh script"
 mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
 
-echo "Submitting Slurm job..."
-SLURM_OUTPUT=$(/usr/bin/sbatch --parsable /opt/bin/sbatch.sh)
-
-if [[ -z "$SLURM_OUTPUT" ]]; then
-    echo "Failed to submit Slurm job"
-    exit 1
+if [[ "$EACH_WORKER_JOB_ARRAY" == "true" ]]; then
+    echo "Submitting job using slurm_submit_array_job.sh..."
+    SLURM_JOB_ID=$(/opt/bin/slurm/slurm_submit_array_job.sh | tail -n 1)
+else
+    echo "Submitting regular Slurm job..."
+    SLURM_OUTPUT=$(/usr/bin/sbatch --parsable /opt/bin/sbatch.sh)
+    if [[ -z "$SLURM_OUTPUT" ]]; then
+        echo "Failed to submit Slurm job"
+        exit 1
+    fi
+    SLURM_JOB_ID="$SLURM_OUTPUT"
 fi
 
-SLURM_JOB_ID="$SLURM_OUTPUT"
 echo "Slurm Job ID: $SLURM_JOB_ID"
 
 echo "Looking up owning Job for pod: $K8S_POD_NAME in namespace: $K8S_POD_NAMESPACE"

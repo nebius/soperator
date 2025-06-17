@@ -158,3 +158,63 @@ func TestEnsureDir(t *testing.T) {
 		})
 	}
 }
+
+func TestFileStore_SetExecutable(t *testing.T) {
+	tempDir := t.TempDir()
+
+	tests := []struct {
+		name        string
+		setup       func(fs *FileStore) (fileName, subPath string, err error)
+		expectError bool
+		check       func(path string) error
+	}{
+		{
+			name: "make file executable",
+			setup: func(fs *FileStore) (string, string, error) {
+				fileName := "script.sh"
+				subPath := "bin"
+				err := fs.Add(fileName, "#!/bin/bash\necho test", subPath)
+				return fileName, subPath, err
+			},
+			expectError: false,
+			check: func(path string) error {
+				info, err := os.Stat(path)
+				if err != nil {
+					return err
+				}
+				mode := info.Mode().Perm()
+				if mode&0o111 == 0 {
+					return fmt.Errorf("file is not executable: mode %o", mode)
+				}
+				return nil
+			},
+		},
+		{
+			name: "file does not exist",
+			setup: func(fs *FileStore) (string, string, error) {
+				return "nonexistent.sh", "", nil
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := NewFileStore(tempDir)
+			fileName, subPath, err := tt.setup(fs)
+			require.NoError(t, err)
+
+			err = fs.SetExecutable(fileName, subPath)
+
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				fullPath := filepath.Join(tempDir, subPath, fileName)
+				if tt.check != nil {
+					require.NoError(t, tt.check(fullPath))
+				}
+			}
+		})
+	}
+}
