@@ -7,6 +7,9 @@ else
 ARCH_DOCKER = amd64
 endif
 
+# Or `debug`
+TARGET_COMPILATION_MODE ?= release
+
 SLURM_VERSION ?= 24.05.5.1
 # Replace underscores and dashes with dots
 SLURM_VERSION_BRANCH = $(subst _,-,$(subst .,-,$(SLURM_VERSION)))
@@ -46,6 +49,7 @@ build: docker-slurm-base
 		--platform linux/$(ARCH) \
 		--build-arg ARCH=$(ARCH_DOCKER) \
 		--build-arg SLURM_VERSION=$(SLURM_VERSION_BRANCH) \
+		--build-arg MODE=$(TARGET_COMPILATION_MODE) \
 		.
 
 	@docker run \
@@ -76,10 +80,15 @@ _recreate_configmap:
 	kubectl -n soperator create configmap spanknccldebug --from-file build/spanknccldebug.so
 
 _restart_pods:
-	@kubectl -n soperator delete pod {worker,login}-0
+	@kubectl -n soperator delete pod login-0
+	@kubectl -n soperator delete pod worker-{0,1}
 
 	@echo -n 'Waiting for worker-0 to be Running'
 	@until kubectl -n soperator get pod worker-0 -o jsonpath='{.status.phase}' 2>/dev/null | grep -q Running; do \
+		echo -n '.'; sleep 2; \
+	done;
+	@echo -n 'Waiting for worker-1 to be Running'
+	@until kubectl -n soperator get pod worker-1 -o jsonpath='{.status.phase}' 2>/dev/null | grep -q Running; do \
 		echo -n '.'; sleep 2; \
 	done;
 	@echo '' && echo -n 'Waiting for login-0 to be Running'
