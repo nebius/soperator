@@ -7,6 +7,12 @@
 
 #include <stdio.h>
 
+/// Make string out of plain text `__x`.
+#define STR(__x) #__x
+
+/// Make string out of plain text `__x`. Supports macros as values.
+#define XSTR(__x) STR(__x)
+
 /**
  * @brief Remove duplicate strings from a string array in-place.
  *
