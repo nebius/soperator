@@ -7,6 +7,4 @@
 
 #define XSPANK_PLUGIN(__name, __ver) SPANK_PLUGIN(__name, __ver)
 
-#define SNCCLD_LOG_PREFIX "SPANK | NCCL DEBUG"
-
 #endif // SNCCLD_H

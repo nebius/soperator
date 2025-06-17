@@ -1,6 +1,6 @@
 #include "snccld_util_oplock.h"
 
-#include "snccld.h"
+#include "snccld_log.h"
 #include "snccld_util_dir_file.h"
 
 #include <fcntl.h>
@@ -48,21 +48,17 @@ bool snccld_acquire_lock(
 ) {
     char *lock_file_path =
         _snccld_render_lock_file_path(job_id, step_id, op, hostname);
-    slurm_spank_log("%s: lock_path=%s", SNCCLD_LOG_PREFIX, lock_file_path);
+    snccld_log_debug("lock_path=%s", lock_file_path);
 
     const int lock_fd =
         open(lock_file_path, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE);
     if (lock_fd < 0) {
-        slurm_error(
-            "%s: Cannot open '%s': %m", SNCCLD_LOG_PREFIX, lock_file_path
-        );
+        snccld_log_error("Cannot open '%s': %m", lock_file_path);
         goto acquire_lock_fail;
     }
 
     if (flock(lock_fd, LOCK_EX | LOCK_NB) == -1) {
-        slurm_error(
-            "%s: Cannot flock '%s': %m", SNCCLD_LOG_PREFIX, lock_file_path
-        );
+        snccld_log_error("Cannot flock '%s': %m", lock_file_path);
         goto acquire_lock_fail;
     }
     close(lock_fd);
@@ -81,21 +77,17 @@ void snccld_release_lock(
 ) {
     char *lock_file_path =
         _snccld_render_lock_file_path(job_id, step_id, op, hostname);
-    slurm_spank_log("%s: lock_path=%s", SNCCLD_LOG_PREFIX, lock_file_path);
+    snccld_log_debug("lock_path=%s", lock_file_path);
 
     const int lock_fd =
         open(lock_file_path, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE);
     if (lock_fd < 0) {
-        slurm_error(
-            "%s: Cannot open '%s': %m", SNCCLD_LOG_PREFIX, lock_file_path
-        );
+        snccld_log_error("Cannot open '%s': %m", lock_file_path);
         goto release_lock_fail;
     }
 
     if (flock(lock_fd, LOCK_UN) != 0) {
-        slurm_error(
-            "%s: Cannot unflock '%s': %m", SNCCLD_LOG_PREFIX, lock_file_path
-        );
+        snccld_log_error("Cannot unflock '%s': %m", lock_file_path);
         goto release_lock_fail;
     }
     close(lock_fd);

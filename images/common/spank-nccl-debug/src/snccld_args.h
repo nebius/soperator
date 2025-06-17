@@ -5,6 +5,7 @@
 #ifndef SNCCLD_ARGS_H
 #define SNCCLD_ARGS_H
 
+#include "snccld_log.h"
 #include "snccld_nccl.h"
 #include "snccld_util_dir_file.h"
 
@@ -20,7 +21,7 @@
 #define XSTR(__x) STR(__x)
 
 #define SNCCLD_LOG_TEMPLATE_INVALID_ARG                                        \
-    "%s: Invalid value for argument '%s': '%s', using default '%s'"
+    "Invalid value for argument '%s': '%s', using default '%s'"
 
 #define SNCCLD_ARG_PREFIX "nccld"
 
@@ -107,9 +108,8 @@ SNCCLD_ARG_OUT_FILE_ENV " env var is also supported."
 
 #define SNCCLD_ARG_OPTION(__arg, __handler, __optarg)                          \
     if (__optarg == NULL || *__optarg == '\0') {                               \
-        slurm_error(                                                           \
-            "%s: --" SNCCLD_ARG_PREFIX "-" __arg ": argument required",        \
-            SNCCLD_LOG_PREFIX                                                  \
+        snccld_log_error(                                                      \
+            "--" SNCCLD_ARG_PREFIX "-" __arg ": argument required"             \
         );                                                                     \
         return ESPANK_BAD_ARG;                                                 \
     }                                                                          \
@@ -145,9 +145,8 @@ static void snccld_parse_arg_enabled_value(const char *val) {
         return;
     }
 
-    slurm_error(
+    snccld_log_error(
         SNCCLD_LOG_TEMPLATE_INVALID_ARG,
-        SNCCLD_LOG_PREFIX,
         SNCCLD_ARG_ENABLED,
         val,
         snccld_config.enabled ? "true" : "false"
@@ -183,9 +182,8 @@ static void snccld_parse_arg_log_level_value(const char *val) {
         return;
     }
 
-    slurm_error(
+    snccld_log_error(
         SNCCLD_LOG_TEMPLATE_INVALID_ARG,
-        SNCCLD_LOG_PREFIX,
         SNCCLD_ARG_LOG_LEVEL,
         val,
         snccld_config.log_level
@@ -236,9 +234,8 @@ static void snccld_parse_arg_out_file_value(const char *val) {
         return;
     }
 
-    slurm_error(
+    snccld_log_error(
         SNCCLD_LOG_TEMPLATE_INVALID_ARG,
-        SNCCLD_LOG_PREFIX,
         SNCCLD_ARG_OUT_FILE,
         val,
         snccld_config.out_file ? "true" : "false"
@@ -270,9 +267,8 @@ static void snccld_parse_arg_out_stdout_value(const char *val) {
         return;
     }
 
-    slurm_error(
+    snccld_log_error(
         SNCCLD_LOG_TEMPLATE_INVALID_ARG,
-        SNCCLD_LOG_PREFIX,
         SNCCLD_ARG_OUT_STDOUT,
         val,
         snccld_config.out_stdout ? "true" : "false"
@@ -323,7 +319,7 @@ static void snccld_parse_plugin_args(spank_t spank, int argc, char **argv) {
         SNCCLD_PARSE_ARG(arg, SNCCLD_ARG_OUT_STDOUT, snccld_parse_arg_out_stdout);
         // clang-format on
 
-        slurm_error("%s: Unknown plugin arg: %s", SNCCLD_LOG_PREFIX, arg);
+        snccld_log_error("Unknown plugin arg: %s", arg);
     }
 
     snccld_parse_env_vars(spank);
@@ -379,9 +375,8 @@ static spank_err_t snccld_args_register(spank_t spank) {
     for (int i = 0; spank_opts[i].name != NULL; ++i) {
         res = spank_option_register(spank, &spank_opts[i]);
         if (res != ESPANK_SUCCESS) {
-            slurm_error(
-                "%s: Couldn't register option %s: %s",
-                SNCCLD_LOG_PREFIX,
+            snccld_log_error(
+                "Cannot register option %s: %s",
                 spank_opts[i].name,
                 spank_strerror(res)
             );

@@ -2,6 +2,7 @@
 
 #include "snccld_args.h"
 #include "snccld_enroot.h"
+#include "snccld_log.h"
 #include "snccld_nccl.h"
 #include "snccld_state.h"
 #include "snccld_util_dir_file.h"
@@ -27,7 +28,10 @@
 #include <slurm/slurm_errno.h>
 #include <slurm/spank.h>
 
-char *get_executable_name(pid_t pid) {
+XSPANK_PLUGIN(SNCCLD_PLUGIN_NAME, 1);
+
+#ifndef NDEBUG
+char *_snccld_get_executable_name(pid_t pid) {
     static char buffer[256];
     snprintf(buffer, sizeof(buffer), "/proc/%d/exe", pid);
     ssize_t len = readlink(buffer, buffer, sizeof(buffer) - 1);
@@ -38,8 +42,12 @@ char *get_executable_name(pid_t pid) {
         return "unknown";
     }
 }
+#endif
 
-void log_context(const char *func_name, spank_t spank) {
+void _snccld_log_context(const char *func_name, spank_t spank) {
+#ifdef NDEBUG
+    return;
+#else
     char            context[16];
     spank_context_t spank_ctx = spank_context();
 
@@ -68,8 +76,8 @@ void log_context(const char *func_name, spank_t spank) {
 
     pid_t pid         = getpid();
     pid_t ppid        = getppid();
-    char *pname       = get_executable_name(pid);
-    char *parent_name = get_executable_name(ppid);
+    char *pname       = _snccld_get_executable_name(pid);
+    char *parent_name = _snccld_get_executable_name(ppid);
 
     uint32_t job_id = 0, job_stepid = 0;
     pid_t    task_pid = 0;
@@ -78,9 +86,8 @@ void log_context(const char *func_name, spank_t spank) {
     spank_get_item(spank, S_JOB_STEPID, &job_stepid);
     spank_get_item(spank, S_TASK_PID, &task_pid);
 
-    slurm_spank_log(
-        "%s: %s\t%s\t%d\t%s\t%d\t%s\t%u\t%u\t%d",
-        SNCCLD_LOG_PREFIX,
+    snccld_log_debug(
+        "%s\t%s\t%d\t%s\t%d\t%s\t%u\t%u\t%d",
         func_name,
         context,
         pid,
@@ -90,13 +97,12 @@ void log_context(const char *func_name, spank_t spank) {
         job_id,
         job_stepid,
         task_pid
-    );
+    )
+#endif
 }
 
-XSPANK_PLUGIN(SNCCLD_PLUGIN_NAME, 1);
-
 int slurm_spank_init(spank_t spank, int argc, char **argv) {
-    log_context("slurm_spank_init", spank);
+    _snccld_log_context("slurm_spank_init", spank);
 
     switch (spank_context()) {
         case S_CTX_LOCAL:
@@ -181,7 +187,7 @@ static void snccld_run_named_pipe_reading_process(snccld_state_t *state) {
     }
     sh_argv[sh_idx] = NULL;
 
-    slurm_spank_log("Running: %s -c '%s'", sh_argv[0], sh_argv[2]);
+    snccld_log_debug("Running: %s -c '%s'", sh_argv[0], sh_argv[2]);
 
     execvp(sh_argv[0], sh_argv);
 
@@ -189,20 +195,19 @@ static void snccld_run_named_pipe_reading_process(snccld_state_t *state) {
 }
 
 int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
-    log_context("slurm_spank_user_init", spank);
+    _snccld_log_context("slurm_spank_user_init", spank);
 
     if (spank_context() != S_CTX_REMOTE) {
         return ESPANK_SUCCESS;
     }
 
-    slurm_spank_log(
-        "%s: Config:\n"
+    snccld_log_debug(
+        "Config:\n"
         "\t" SNCCLD_ARG_ENABLED ": %s\n"
         "\t" SNCCLD_ARG_LOG_LEVEL ": %s\n"
         "\t" SNCCLD_ARG_OUT_DIR ": %s\n"
         "\t" SNCCLD_ARG_OUT_FILE ": %s\n"
         "\t" SNCCLD_ARG_OUT_STDOUT ": %s",
-        SNCCLD_LOG_PREFIX,
         snccld_config.enabled ? "true" : "false",
         snccld_config.log_level,
         snccld_config.out_dir,
@@ -215,7 +220,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     }
 
     char *hostname = snccld_get_hostname();
-    slurm_spank_log("%s: hostname=%s", SNCCLD_LOG_PREFIX, hostname);
+    snccld_log_debug("hostname=%s", hostname);
 
     snccld_state_key_t *key = snccld_key_new();
     if (snccld_key_get_from(spank, key) != ESPANK_SUCCESS ||
@@ -232,11 +237,8 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     }
 
     // Set forced debug level.
-    slurm_spank_log(
-        "%s: Setting %s=%s",
-        SNCCLD_LOG_PREFIX,
-        SNCCLD_NCCL_ENV_DEBUG,
-        snccld_config.log_level
+    snccld_log_info(
+        "Setting %s=%s", SNCCLD_NCCL_ENV_DEBUG, snccld_config.log_level
     );
     spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG, snccld_config.log_level, 1);
 
@@ -250,18 +252,14 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
              sizeof(user_debug_file)
          ) == ESPANK_SUCCESS &&
          strlen(user_debug_file) > 0);
-    slurm_spank_log(
-        "%s: user_set_debug_file =%u", SNCCLD_LOG_PREFIX, user_set_debug_file
-    );
+    snccld_log_debug("user_set_debug_file=%u", user_set_debug_file);
 
     // Neither outfile nor stdout requested nor user set debug file -> noop
     if (!snccld_config.out_file && !snccld_config.out_stdout &&
         !user_set_debug_file) {
-        slurm_spank_log(
-            "%s: Neither out file nor stdout requested nor user set debug "
-            "file. "
-            "Skipping.",
-            SNCCLD_LOG_PREFIX
+        snccld_log_info(
+            "Neither out file nor stdout requested nor user set debug file. "
+            "Skipping."
         );
         goto user_init_exit;
     }
@@ -284,8 +282,11 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
             key->job_id,
             key->step_id
         );
+        snccld_log_info(
+            "Creating Enroot mount config '%s'.", mount_config_filename
+        )
 
-        char lock_filename[PATH_MAX] = "";
+            char lock_filename[PATH_MAX] = "";
         snprintf(
             lock_filename,
             sizeof(lock_filename),
@@ -299,16 +300,12 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
             lock_fd =
                 open(lock_filename, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE);
             if (lock_fd < 0) {
-                slurm_error(
-                    "%s: Cannot open %s: %m", SNCCLD_LOG_PREFIX, lock_filename
-                );
+                snccld_log_error("Cannot open %s: %m", lock_filename);
                 goto mount_config_end;
             }
 
             if (flock(lock_fd, LOCK_EX | LOCK_NB) == -1) {
-                slurm_error(
-                    "%s: Cannot flock %s: %m", SNCCLD_LOG_PREFIX, lock_filename
-                );
+                snccld_log_error("Cannot flock %s: %m", lock_filename);
                 close(lock_fd);
                 goto mount_config_end;
             }
@@ -318,21 +315,13 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
             mount_config_filename, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE
         );
         if (mount_config_fd < 0) {
-            slurm_error(
-                "%s: Cannot open %s: %m",
-                SNCCLD_LOG_PREFIX,
-                mount_config_filename
-            );
+            snccld_log_error("Cannot open %s: %m", mount_config_filename);
             goto mount_config_unflock;
         }
 
         FILE *mount_config_f = fdopen(mount_config_fd, "w");
         if (mount_config_f == NULL) {
-            slurm_error(
-                "%s: Cannot fdopen %s: %m",
-                SNCCLD_LOG_PREFIX,
-                mount_config_filename
-            );
+            snccld_log_error("Cannot fdopen %s: %m", mount_config_filename);
             close(mount_config_fd);
             goto mount_config_unflock;
         }
@@ -356,9 +345,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
                     mounts[i],
                     SNCCLD_ENROOT_MOUNT_TEMPLATE_DIR
                 );
-                slurm_spank_log(
-                    "%s: Created mount for %s", SNCCLD_LOG_PREFIX, mounts[i]
-                );
+                snccld_log_debug("Created mount for %s", mounts[i]);
                 free(mounts[i]);
             }
 
@@ -371,11 +358,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
                     user_debug_file,
                     SNCCLD_ENROOT_MOUNT_TEMPLATE_FILE
                 );
-                slurm_spank_log(
-                    "%s: Created mount for %s",
-                    SNCCLD_LOG_PREFIX,
-                    user_debug_file
-                );
+                snccld_log_debug("Created mount for %s", user_debug_file);
             }
         }
 
@@ -395,11 +378,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     }
 
     if (snccld_config.out_file) {
-        slurm_spank_log(
-            "%s: Ensuring '%s' exists.",
-            SNCCLD_LOG_PREFIX,
-            snccld_config.out_dir
-        );
+        snccld_log_debug("Ensuring '%s' exists.", snccld_config.out_dir);
         snccld_ensure_dir_exists(snccld_config.out_dir);
         snprintf(
             state->log_path,
@@ -413,9 +392,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         );
     }
     if (user_set_debug_file) {
-        slurm_spank_log(
-            "%s: Ensuring '%s' exists.", SNCCLD_LOG_PREFIX, user_debug_file
-        );
+        snccld_log_debug("Ensuring '%s' exists.", user_debug_file);
         snccld_ensure_file_exists(user_debug_file);
         snprintf(
             state->user_log_path,
@@ -441,11 +418,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
             goto user_init_create_fifo;
         }
 
-        slurm_spank_log(
-            "%s: Only %s has to be set.",
-            SNCCLD_LOG_PREFIX,
-            SNCCLD_NCCL_ENV_DEBUG_FILE
-        );
+        snccld_log_info("Only %s has to be set.", SNCCLD_NCCL_ENV_DEBUG_FILE);
 
         char *out_file = NULL;
         if (only_out_file) {
@@ -456,12 +429,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
             out_file = strdup("/dev/stdout");
         }
 
-        slurm_spank_log(
-            "%s: Setting %s=%s",
-            SNCCLD_LOG_PREFIX,
-            SNCCLD_NCCL_ENV_DEBUG_FILE,
-            out_file
-        );
+        snccld_log_info("Setting %s=%s", SNCCLD_NCCL_ENV_DEBUG_FILE, out_file);
         spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG_FILE, out_file, 1);
         free(out_file);
         goto user_init_write_state;
@@ -469,7 +437,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
 
     // If we're here, FIFO has to be constructed.
 user_init_create_fifo:
-    slurm_spank_log("%s: Named pipe has to be constructed.", SNCCLD_LOG_PREFIX);
+    snccld_log_info("Named pipe has to be constructed.");
     char fifo_path[PATH_MAX] = "";
     snprintf(
         fifo_path,
@@ -482,25 +450,18 @@ user_init_create_fifo:
         "fifo"
     );
     if (mkfifo(fifo_path, SNCCLD_DEFAULT_MODE) != 0 && errno != EEXIST) {
-        slurm_error(
-            "%s: Cannot create named pipe '%s': %m",
-            SNCCLD_LOG_PREFIX,
-            fifo_path
-        );
+        snccld_log_error("Cannot create named pipe '%s': %m", fifo_path);
         goto user_init_write_state;
     }
     snprintf(state->fifo_path, sizeof(state->fifo_path), "%s", fifo_path);
-    slurm_spank_log(
-        "%s: Setting %s=%s",
-        SNCCLD_LOG_PREFIX,
-        SNCCLD_NCCL_ENV_DEBUG_FILE,
-        state->fifo_path
+    snccld_log_info(
+        "Setting %s=%s", SNCCLD_NCCL_ENV_DEBUG_FILE, state->fifo_path
     );
     spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG_FILE, state->fifo_path, 1);
 
 user_init_write_state:
     char *str = snccld_state_to_string(state);
-    slurm_spank_log("%s: State: \n%s", SNCCLD_LOG_PREFIX, str);
+    snccld_log_debug("State: \n%s", str);
     free(str);
 
     snccld_state_write(key, state, hostname);
@@ -513,20 +474,19 @@ user_init_exit:
 }
 
 int slurm_spank_task_init(spank_t spank, int argc, char **argv) {
-    log_context("slurm_spank_task_init", spank);
+    _snccld_log_context("slurm_spank_task_init", spank);
 
     if (spank_context() != S_CTX_REMOTE) {
         return ESPANK_SUCCESS;
     }
 
-    slurm_spank_log(
-        "%s: Config:\n"
+    snccld_log_debug(
+        "Config:\n"
         "\t" SNCCLD_ARG_ENABLED ": %s\n"
         "\t" SNCCLD_ARG_LOG_LEVEL ": %s\n"
         "\t" SNCCLD_ARG_OUT_DIR ": %s\n"
         "\t" SNCCLD_ARG_OUT_FILE ": %s\n"
         "\t" SNCCLD_ARG_OUT_STDOUT ": %s",
-        SNCCLD_LOG_PREFIX,
         snccld_config.enabled ? "true" : "false",
         snccld_config.log_level,
         snccld_config.out_dir,
@@ -555,20 +515,19 @@ int slurm_spank_task_init(spank_t spank, int argc, char **argv) {
 
     snccld_state_t *state = snccld_state_read(key, hostname);
     if (state == NULL) {
-        free(key);
-        return ESPANK_ERROR;
+        goto task_init_fail;
     }
 
+#ifndef NDEBUG
     char *str = snccld_state_to_string(state);
-    slurm_spank_log("%s: State: \n%s", SNCCLD_LOG_PREFIX, str);
+    snccld_log_debug("State: \n%s", str);
     free(str);
+#endif
 
     // Forking fan-out process is not needed if named pipe is not created,
     // or it's already forked.
     if (strlen(state->fifo_path) <= 0 || state->tee_pid > 0) {
-        slurm_spank_log(
-            "%s: Forking fan-out process is not needed.", SNCCLD_LOG_PREFIX
-        );
+        snccld_log_info("Forking fan-out process is not needed.");
         free(state);
         goto task_init_exit;
     }
@@ -577,23 +536,23 @@ int slurm_spank_task_init(spank_t spank, int argc, char **argv) {
     const pid_t tee_pid = fork();
     if (tee_pid < 0) {
         // Forking failed.
-        slurm_error(
-            "%s: Cannot create named pipe reading process: %m",
-            SNCCLD_LOG_PREFIX
-        );
+        snccld_log_error("Cannot create named pipe reading process: %m");
         free(state);
         goto task_init_exit;
     } else if (tee_pid == 0) {
         // We're in forked process.
+        snccld_log_info("Forking fan-out process.");
         snccld_run_named_pipe_reading_process(state);
     } else {
         // We're in main process -> tee_pid is a pid of the forked process.
         state->tee_pid = tee_pid;
     }
 
+#ifndef NDEBUG
     str = snccld_state_to_string(state);
-    slurm_spank_log("%s: State: \n%s", SNCCLD_LOG_PREFIX, str);
+    snccld_log_debug("State: \n%s", str);
     free(str);
+#endif
 
     snccld_state_write(key, state, hostname);
     free(state);
@@ -602,23 +561,27 @@ task_init_exit:
     free(key);
     free(hostname);
     return ESPANK_SUCCESS;
+
+task_init_fail:
+    free(key);
+    free(hostname);
+    return ESPANK_SUCCESS;
 }
 
 int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
-    log_context("slurm_spank_task_exit", spank);
+    _snccld_log_context("slurm_spank_task_exit", spank);
 
     if (spank_context() != S_CTX_REMOTE) {
         return ESPANK_SUCCESS;
     }
 
-    slurm_spank_log(
-        "%s: Config:\n"
+    snccld_log_debug(
+        "Config:\n"
         "\t" SNCCLD_ARG_ENABLED ": %s\n"
         "\t" SNCCLD_ARG_LOG_LEVEL ": %s\n"
         "\t" SNCCLD_ARG_OUT_DIR ": %s\n"
         "\t" SNCCLD_ARG_OUT_FILE ": %s\n"
         "\t" SNCCLD_ARG_OUT_STDOUT ": %s",
-        SNCCLD_LOG_PREFIX,
         snccld_config.enabled ? "true" : "false",
         snccld_config.log_level,
         snccld_config.out_dir,
@@ -647,21 +610,18 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
 
     snccld_state_t *state = snccld_state_read(key, hostname);
     if (state == NULL) {
-        free(key);
-        return ESPANK_ERROR;
+        goto task_exit_fail;
     }
 
+#ifndef NDEBUG
     char *str = snccld_state_to_string(state);
-    slurm_spank_log("%s: State: \n%s", SNCCLD_LOG_PREFIX, str);
+    snccld_log_debug("State: \n%s", str);
     free(str);
+#endif
 
     // Kill fan-out process if exists.
     if (state->tee_pid > 0) {
-        slurm_spank_log(
-            "%s: Killing named pipe reading process with pid %d.",
-            SNCCLD_LOG_PREFIX,
-            state->tee_pid
-        );
+        snccld_log_info("Killing fan-out process with pid %d.", state->tee_pid);
         int status;
         if (waitpid(state->tee_pid, &status, WNOHANG) == 0) {
             kill(state->tee_pid, SIGKILL);
@@ -672,24 +632,18 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
 
     // Remove named pipe if exists.
     if (strlen(state->fifo_path) > 0) {
-        slurm_spank_log(
-            "%s: Removing named pipe '%s'.", SNCCLD_LOG_PREFIX, state->fifo_path
-        );
+        snccld_log_info("Removing named pipe '%s'.", state->fifo_path);
         unlink(state->fifo_path);
     } else {
-        slurm_spank_log("%s: No named pipe to remove.", SNCCLD_LOG_PREFIX);
+        snccld_log_info("No named pipe to remove.");
     }
 
     // Remove mount config if created.
     if (strlen(state->mounts_path) > 0) {
-        slurm_spank_log(
-            "%s: Removing mount config '%s'.",
-            SNCCLD_LOG_PREFIX,
-            state->mounts_path
-        );
+        snccld_log_info("Removing mount config '%s'.", state->mounts_path);
         unlink(state->mounts_path);
     } else {
-        slurm_spank_log("%s: No mount config to remove.", SNCCLD_LOG_PREFIX);
+        snccld_log_info("No mount config to remove.");
     }
 
     free(state);
@@ -709,4 +663,9 @@ task_exit_exit:
     free(key);
     free(hostname);
     return ESPANK_SUCCESS;
+
+task_exit_fail:
+    free(key);
+    free(hostname);
+    return ESPANK_ERROR;
 }
