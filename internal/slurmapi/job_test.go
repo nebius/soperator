@@ -50,10 +50,12 @@ func TestJobFromAPI(t *testing.T) {
 		{
 			name: "minimal job",
 			apiJob: slurmapispec.V0041JobInfo{
-				JobId: ptr(int32(123)),
+				JobId:    ptr(int32(123)),
+				JobState: &[]slurmapispec.V0041JobInfoJobState{slurmapispec.V0041JobInfoJobStateCOMPLETED},
 			},
 			want: Job{
-				ID: 123,
+				ID:    123,
+				State: "COMPLETED",
 			},
 			wantErr: false,
 		},
@@ -61,6 +63,14 @@ func TestJobFromAPI(t *testing.T) {
 			name: "job without ID",
 			apiJob: slurmapispec.V0041JobInfo{
 				Name: ptr("test"),
+			},
+			want:    Job{},
+			wantErr: true,
+		},
+		{
+			name: "job without State",
+			apiJob: slurmapispec.V0041JobInfo{
+				JobId: ptr(int32(123)),
 			},
 			want:    Job{},
 			wantErr: true,

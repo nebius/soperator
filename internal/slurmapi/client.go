@@ -116,16 +116,16 @@ func (c *client) GetNode(ctx context.Context, nodeName string) (Node, error) {
 	return node, nil
 }
 
-func (c *client) GetJob(ctx context.Context, jobID string) ([]Job, error) {
+func (c *client) GetJobsByID(ctx context.Context, jobID string) ([]Job, error) {
 	getJobResp, err := c.SlurmV0041GetJobWithResponse(ctx, jobID, &slurmapispec.SlurmV0041GetJobParams{})
 	if err != nil {
-		return []Job{}, fmt.Errorf("get job %s: %w", jobID, err)
+		return nil, fmt.Errorf("get job %s: %w", jobID, err)
 	}
 	if getJobResp.JSON200 == nil {
-		return []Job{}, fmt.Errorf("json200 field is nil for job ID %s", jobID)
+		return nil, fmt.Errorf("json200 field is nil for job ID %s", jobID)
 	}
 	if getJobResp.JSON200.Errors != nil && len(*getJobResp.JSON200.Errors) != 0 {
-		return []Job{}, fmt.Errorf("get job %s responded with errors: %v", jobID, *getJobResp.JSON200.Errors)
+		return nil, fmt.Errorf("get job %s responded with errors: %v", jobID, *getJobResp.JSON200.Errors)
 	}
 
 	jobs := make([]Job, 0, len(getJobResp.JSON200.Jobs))

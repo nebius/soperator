@@ -169,7 +169,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			return ctrl.Result{}, err
 		}
 
-		slurmJobs, err := slurmAPIClient.GetJob(ctx, slurmJobID)
+		slurmJobs, err := slurmAPIClient.GetJobsByID(ctx, slurmJobID)
 		if err != nil {
 			logger.Error(err, "failed to get slurm job status")
 			return ctrl.Result{}, err

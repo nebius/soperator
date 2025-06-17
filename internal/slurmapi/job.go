@@ -41,9 +41,11 @@ func JobFromAPI(apiJob slurmapispec.V0041JobInfo) (Job, error) {
 		job.Name = *apiJob.Name
 	}
 
-	if apiJob.JobState != nil && len(*apiJob.JobState) > 0 {
-		job.State = string((*apiJob.JobState)[0])
+	if apiJob.JobState == nil || len(*apiJob.JobState) == 0 {
+		return Job{}, fmt.Errorf("job state is missing")
 	}
+
+	job.State = string((*apiJob.JobState)[0])
 
 	if apiJob.StateReason != nil {
 		job.StateReason = *apiJob.StateReason
@@ -81,7 +83,7 @@ func JobFromAPI(apiJob slurmapispec.V0041JobInfo) (Job, error) {
 
 	job.NodeCount = convertToInt(apiJob.NodeCount)
 	job.ArrayJobID = convertToInt(apiJob.ArrayJobId)
-	job.ArrayTaskID = convertToInt(apiJob.ArrayJobId)
+	job.ArrayTaskID = convertToInt(apiJob.ArrayTaskId)
 	job.SubmitTime = convertToMetav1Time(apiJob.SubmitTime)
 
 	return job, nil
@@ -139,8 +141,7 @@ func (j Job) IsFailedState() bool {
 		string(slurmapispec.V0041JobInfoJobStatePREEMPTED),
 		string(slurmapispec.V0041JobInfoJobStateRECONFIGFAIL),
 		string(slurmapispec.V0041JobInfoJobStateREVOKED),
-		string(slurmapispec.V0041JobInfoJobStateSPECIALEXIT),
-		"":
+		string(slurmapispec.V0041JobInfoJobStateSPECIALEXIT):
 		return true
 	default:
 		return false
