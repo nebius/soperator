@@ -34,4 +34,7 @@ spec:
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
   {{- end }}
+  reactions:
+    setCondition: {{ .Values.activeCheck.reactions.setCondition }}
+    drainSlurmNode: {{ .Values.activeCheck.reactions.drainSlurmNode }}
 {{- end }}

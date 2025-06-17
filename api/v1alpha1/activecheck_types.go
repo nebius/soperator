@@ -98,7 +98,7 @@ type Reactions struct {
 
 	// DrainSlurmNode enabling slurm node draining if check failed
 	// +kubebuilder:validation:Optional
-	DrainSlurmNode bool `json:"DrainSlurmNode,omitempty"`
+	DrainSlurmNode bool `json:"drainSlurmNode,omitempty"`
 }
 
 type ContainerSpec struct {
