@@ -5,6 +5,7 @@
 #ifndef SNCCLD_ARGS_H
 #define SNCCLD_ARGS_H
 
+#include "snccld_nccl.h"
 #include "snccld_util_dir_file.h"
 
 #include <ctype.h>
@@ -61,7 +62,7 @@
 // clang-format off
 
 #define SNCCLD_ARG_OUT_DIR_USAGE                                               \
-    "directory path where to store " SNCCLD_NCCL_ENV_DEBUG " outputs. "        \
+    "path to the directory to store `" SNCCLD_NCCL_ENV_DEBUG "` outputs. "        \
     SNCCLD_ARG_OUT_DIR_ENV " env var is also supported."
 // clang-format on
 
@@ -72,9 +73,9 @@
 // clang-format off
 
 #define SNCCLD_ARG_OUT_FILE_USAGE                                                  \
-"whether to additionally redirect " SNCCLD_NCCL_ENV_DEBUG " outputs to the file. " \
+"whether to additionally redirect `" SNCCLD_NCCL_ENV_DEBUG "` outputs to the file. " \
 "Possible values are case-insensitive. "                                         \
-SNCCLD_ARG_OUT_STDOUT_ENV " env var is also supported."
+SNCCLD_ARG_OUT_FILE_ENV " env var is also supported."
 // clang-format on
 
 #define SNCCLD_ARG_OUT_STDOUT         "out-stdout"
@@ -84,7 +85,7 @@ SNCCLD_ARG_OUT_STDOUT_ENV " env var is also supported."
 // clang-format off
 
 #define SNCCLD_ARG_OUT_STDOUT_USAGE                                                  \
-    "whether to additionally redirect " SNCCLD_NCCL_ENV_DEBUG " outputs to stdout. " \
+    "whether to additionally redirect `" SNCCLD_NCCL_ENV_DEBUG "` outputs to stdout. " \
     "Possible values are case-insensitive. "                                         \
     SNCCLD_ARG_OUT_STDOUT_ENV " env var is also supported."
 // clang-format on

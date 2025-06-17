@@ -1,6 +1,8 @@
 #include "snccld.h"
 
 #include "snccld_args.h"
+#include "snccld_enroot.h"
+#include "snccld_nccl.h"
 #include "snccld_state.h"
 #include "snccld_util_dir_file.h"
 #include "snccld_util_host.h"
