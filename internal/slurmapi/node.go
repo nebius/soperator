@@ -94,13 +94,23 @@ func (n *Node) IsIdleDrained() bool {
 }
 
 func (n *Node) IsDrainState() bool {
-	_, drained := n.States[slurmapispec.V0041NodeStateDRAIN]
-	return drained
+	_, exists := n.States[slurmapispec.V0041NodeStateDRAIN]
+	return exists
+}
+
+func (n *Node) IsMaintenanceState() bool {
+	_, exists := n.States[slurmapispec.V0041NodeStateMAINTENANCE]
+	return exists
+}
+
+func (n *Node) IsReservedState() bool {
+	_, exists := n.States[slurmapispec.V0041NodeStateRESERVED]
+	return exists
 }
 
 func (n *Node) IsDownState() bool {
-	_, down := n.States[slurmapispec.V0041NodeStateDOWN]
-	return down
+	_, exists := n.States[slurmapispec.V0041NodeStateDOWN]
+	return exists
 }
 
 var baseStates = []slurmapispec.V0041NodeState{
