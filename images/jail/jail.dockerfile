@@ -54,8 +54,10 @@ ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 # Add Nebius public registry
+# TODO: change nc-health-checker to stable version
 RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
-    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" > /etc/apt/sources.list.d/nebius.list
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" > /etc/apt/sources.list.d/nebius.list && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ testing main" >> /etc/apt/sources.list.d/nebius.list
 
 # Install mock packages for nvidia drivers https://github.com/nebius/soperator/issues/384
 RUN apt-get update && \
@@ -78,6 +80,7 @@ RUN apt update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY images/jail/pin_packages/cuda-pins /etc/apt/preferences.d/
+COPY images/jail/pin_packages/nebius-pins /etc/apt/preferences.d/
 RUN apt update
 
 RUN apt-mark hold \
@@ -169,6 +172,17 @@ RUN apt update && \
         bsdmainutils && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Install health-check library
+# TODO: install for arm when it's available
+RUN if [ "$ARCH" = "amd64" ]; then \
+      apt-get update && \
+      apt-get install -y nc-health-checker && \
+      apt-get clean && \
+      rm -rf /var/lib/apt/lists/* ; \
+    else \
+      echo "Skipping nc-health-checker installation for architecture: $ARCH" ; \
+    fi
 
 # Install python
 COPY images/common/scripts/install_python.sh /opt/bin/
