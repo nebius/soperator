@@ -485,14 +485,14 @@ telemetry: {}
 #   otelCollectorPort: 8429
 
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.20.1-jammy-slurm24.05.7"
-  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.20.1-jammy-slurm24.05.7"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.20.1-jammy-slurm24.05.7"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.20.1-jammy-slurm24.05.7"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.20.1-jammy-slurm24.05.7"
-  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.20.1-jammy-slurm24.05.7"
-  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.20.1-jammy-slurm24.05.7"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.20.1-jammy-slurm24.05.7"
-  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.20.1-jammy-slurm24.05.7"
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.20.1-jammy-slurm24.11.5"
+  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.20.1-jammy-slurm24.11.5"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.20.1-jammy-slurm24.11.5"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.20.1-jammy-slurm24.11.5"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.20.1-jammy-slurm24.11.5"
+  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.20.1-jammy-slurm24.11.5"
+  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.20.1-jammy-slurm24.11.5"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.20.1-jammy-slurm24.11.5"
+  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.20.1-jammy-slurm24.11.5"
   sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.20.1
   mariaDB: docker-registry1.mariadb.com/library/mariadb:11.4.3
