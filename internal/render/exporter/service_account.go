@@ -13,7 +13,7 @@ func RenderServiceAccount(clusterNamespace, clusterName string) corev1.ServiceAc
 
 	return corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      buildExporterServiceAccountName(clusterName),
+			Name:      BuildExporterServiceAccountName(clusterName),
 			Namespace: clusterNamespace,
 			Labels:    labels,
 		},

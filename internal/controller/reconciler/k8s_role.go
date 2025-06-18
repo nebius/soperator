@@ -7,12 +7,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/logfield"
-	"nebius.ai/slurm-operator/internal/naming"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/logfield"
 )
 
 type RoleReconciler struct {
@@ -37,9 +36,7 @@ func (r *RoleReconciler) Reconcile(
 ) error {
 	logger := log.FromContext(ctx)
 	if desired == nil {
-		// If desired is nil, delete the Role
-		logger.V(1).Info(fmt.Sprintf("Deleting Role %s, because of Role is not needed", naming.BuildRoleWorkerName(cluster.Name)))
-		return r.deleteIfOwnedByController(ctx, cluster)
+		return fmt.Errorf("desired Role cannot be nil")
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
 		logger.V(1).
@@ -50,48 +47,43 @@ func (r *RoleReconciler) Reconcile(
 	return nil
 }
 
-func (r *RoleReconciler) deleteIfOwnedByController(
+func (r *RoleReconciler) Cleanup(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
+	roleName string,
 ) error {
 	logger := log.FromContext(ctx)
-	role, err := r.getRole(ctx, cluster)
+
+	role := &rbacv1.Role{}
+	err := r.Get(ctx, client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      roleName,
+	}, role)
+
 	if apierrors.IsNotFound(err) {
-		logger.V(1).Info("Service not found, skipping deletion")
+		logger.V(1).Info("Role not found, skipping deletion", "name", roleName)
 		return nil
 	}
 
 	if err != nil {
-		return fmt.Errorf("getting Worker Role: %w", err)
+		return fmt.Errorf("getting Role %s: %w", roleName, err)
 	}
 
 	if !metav1.IsControlledBy(role, cluster) {
-		logger.V(1).Info("Role is not owned by controller, skipping deletion")
+		logger.V(1).Info("Role is not owned by controller, skipping deletion", "name", roleName)
 		return nil
 	}
 
 	if err := r.Delete(ctx, role); err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.V(1).Info("Role not found, skipping deletion")
+			logger.V(1).Info("Role not found, skipping deletion", "name", roleName)
 			return nil
 		}
-		return fmt.Errorf("deleting Worker Role: %w", err)
+		return fmt.Errorf("deleting Role %s: %w", roleName, err)
 	}
-	logger.V(1).Info("Role deleted")
-	return nil
-}
 
-func (r *RoleReconciler) getRole(ctx context.Context, cluster *slurmv1.SlurmCluster) (*rbacv1.Role, error) {
-	role := &rbacv1.Role{}
-	err := r.Get(
-		ctx,
-		types.NamespacedName{
-			Namespace: cluster.Namespace,
-			Name:      naming.BuildRoleWorkerName(cluster.Name),
-		},
-		role,
-	)
-	return role, err
+	logger.V(1).Info("Role deleted", "name", roleName)
+	return nil
 }
 
 func (r *RoleReconciler) patch(existing, desired client.Object) (client.Patch, error) {

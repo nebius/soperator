@@ -33,7 +33,7 @@ func renderPodTemplateSpec(
 			NodeSelector:       nodeFilter.NodeSelector,
 			InitContainers:     initContainers,
 			Containers:         []corev1.Container{renderContainerExporter(clusterValues)},
-			ServiceAccountName: buildExporterServiceAccountName(clusterValues.Name),
+			ServiceAccountName: BuildExporterServiceAccountName(clusterValues.Name),
 		},
 	}
 	return result

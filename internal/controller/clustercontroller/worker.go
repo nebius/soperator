@@ -300,7 +300,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						// Without explicit deletion through reconciliation,
 						// The Role will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
 						stepLogger.V(1).Info("Removing")
-						if err := r.Role.Reconcile(stepCtx, cluster, nil); err != nil {
+						if err := r.Role.Cleanup(stepCtx, cluster, naming.BuildRoleWorkerName(cluster.Name)); err != nil {
 							stepLogger.Error(err, "Failed to remove")
 							return fmt.Errorf("removing worker Role: %w", err)
 						}
@@ -333,7 +333,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						// Without explicit deletion through reconciliation,
 						// Еhe RoleBinding will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
 						stepLogger.V(1).Info("Removing")
-						if err := r.RoleBinding.Reconcile(stepCtx, cluster, nil); err != nil {
+						if err := r.RoleBinding.Cleanup(stepCtx, cluster, naming.BuildRoleBindingWorkerName(cluster.Name)); err != nil {
 							stepLogger.Error(err, "Failed to remove")
 							return fmt.Errorf("removing worker Role: %w", err)
 						}

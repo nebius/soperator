@@ -43,18 +43,15 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 						stepLogger.V(1).Info("Prometheus Operator CRD is installed")
 						if check.IsPrometheusEnabled(&clusterValues.SlurmExporter) {
 							stepLogger.V(1).Info("Prometheus is enabled")
-							desired, err := exporter.RenderPodMonitor(
+							desired := exporter.RenderPodMonitor(
 								clusterValues.Name,
 								clusterValues.Namespace,
 								clusterValues.SlurmExporter,
 							)
-							if err != nil {
-								stepLogger.Error(err, "Failed to render")
-							}
 							if desired != nil {
 								stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 							}
-							err = r.PodMonitor.Reconcile(stepCtx, cluster, desired)
+							err := r.PodMonitor.Reconcile(stepCtx, cluster, desired)
 							if err != nil {
 								stepLogger.Error(err, "Failed to reconcile")
 								return fmt.Errorf("reconciling PodMonitor: %w", err)

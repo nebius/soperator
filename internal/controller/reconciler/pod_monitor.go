@@ -8,10 +8,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/logfield"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/logfield"
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
@@ -38,14 +39,7 @@ func (r *PodMonitorReconciler) Reconcile(
 ) error {
 	logger := log.FromContext(ctx)
 	if desired == nil {
-		// If desired is nil, delete the PodMonitor
-		// TODO: Using error or desired is nil presence as an indicator for resource deletion doesn't seem good
-		// We should use conditions instead. if condition is met and resource exists, delete it
-		// MSP-2715 - task to improve resource deletion
-		logger.V(1).Info(fmt.Sprintf(
-			"Deleting PodMonitor %s-collector, because of PodMonitor is not needed", cluster.Name,
-		))
-		return r.deleteIfOwnedByController(ctx, cluster)
+		return fmt.Errorf("desired PodMonitor cannot be nil")
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
 		logger.V(1).
@@ -56,28 +50,42 @@ func (r *PodMonitorReconciler) Reconcile(
 	return nil
 }
 
-func (r *PodMonitorReconciler) deleteIfOwnedByController(
+func (r *PodMonitorReconciler) Cleanup(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
+	resourceName string,
 ) error {
 	logger := log.FromContext(ctx)
-	podMonitor, err := r.getPodMonitor(ctx, cluster)
+
+	podMonitor := &prometheusv1.PodMonitor{}
+	err := r.Get(ctx, client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      resourceName,
+	}, podMonitor)
+
 	if apierrors.IsNotFound(err) {
-		logger.V(1).Info("PodMonitor is not needed, skipping deletion")
+		logger.V(1).Info("PodMonitor not found, skipping deletion", "name", resourceName)
 		return nil
 	}
+
 	if err != nil {
-		return fmt.Errorf("getting PodMonitor: %w", err)
+		return fmt.Errorf("getting PodMonitor %s: %w", resourceName, err)
 	}
 
 	if !metav1.IsControlledBy(podMonitor, cluster) {
-		logger.V(1).Info("PodMonitor is not owned by controller, skipping deletion")
+		logger.V(1).Info("PodMonitor is not owned by controller, skipping deletion", "name", resourceName)
 		return nil
 	}
 
 	if err := r.Delete(ctx, podMonitor); err != nil {
-		return fmt.Errorf("deleting PodMonitor: %w", err)
+		if apierrors.IsNotFound(err) {
+			logger.V(1).Info("PodMonitor not found, skipping deletion", "name", resourceName)
+			return nil
+		}
+		return fmt.Errorf("deleting PodMonitor %s: %w", resourceName, err)
 	}
+
+	logger.V(1).Info("PodMonitor deleted", "name", resourceName)
 	return nil
 }
 

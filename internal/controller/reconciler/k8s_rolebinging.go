@@ -37,9 +37,7 @@ func (r *RoleBindingReconciler) Reconcile(
 ) error {
 	logger := log.FromContext(ctx)
 	if desired == nil {
-		// If desired is nil, delete the Role Binding
-		logger.V(1).Info(fmt.Sprintf("Deleting RoleBinding %s, because of RoleBinding is not needed", naming.BuildRoleBindingWorkerName(cluster.Name)))
-		return r.deleteIfOwnedByController(ctx, cluster)
+		return fmt.Errorf("desired RoleBinding cannot be nil")
 	}
 	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
 		logger.V(1).
@@ -50,34 +48,42 @@ func (r *RoleBindingReconciler) Reconcile(
 	return nil
 }
 
-func (r *RoleBindingReconciler) deleteIfOwnedByController(
+func (r *RoleBindingReconciler) Cleanup(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
+	resourceName string,
 ) error {
 	logger := log.FromContext(ctx)
-	roleBinding, err := r.getRoleBinding(ctx, cluster)
+
+	roleBinding := &rbacv1.RoleBinding{}
+	err := r.Get(ctx, client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      resourceName,
+	}, roleBinding)
+
 	if apierrors.IsNotFound(err) {
-		logger.V(1).Info("RoleBinding is not found, skipping deletion")
+		logger.V(1).Info("RoleBinding not found, skipping deletion", "name", resourceName)
 		return nil
 	}
+
 	if err != nil {
-		return fmt.Errorf("getting Worker RoleBinding: %w", err)
+		return fmt.Errorf("getting RoleBinding %s: %w", resourceName, err)
 	}
 
 	if !metav1.IsControlledBy(roleBinding, cluster) {
-		logger.V(1).Info("RoleBinding is not owned by controller, skipping deletion")
+		logger.V(1).Info("RoleBinding is not owned by controller, skipping deletion", "name", resourceName)
 		return nil
 	}
 
 	if err := r.Delete(ctx, roleBinding); err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.V(1).Info("RoleBinding is already deleted")
+			logger.V(1).Info("RoleBinding not found, skipping deletion", "name", resourceName)
 			return nil
 		}
-		return fmt.Errorf("deleting RoleBinding: %w", err)
+		return fmt.Errorf("deleting RoleBinding %s: %w", resourceName, err)
 	}
 
-	logger.V(1).Info("RoleBinding deleted")
+	logger.V(1).Info("RoleBinding deleted", "name", resourceName)
 	return nil
 }
 
