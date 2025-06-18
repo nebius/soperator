@@ -45,7 +45,7 @@ func TestMetricsCollector_Describe(t *testing.T) {
 	}
 
 	assert.Contains(t, found, `Desc{fqName: "soperator_cluster_info", help: "Soperator cluster information", constLabels: {soperator_version="test-version"}, variableLabels: {}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,compute_instance_id,base_state,is_drain,is_maintenance,is_reserved,address}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,instance_id,state_base,state_is_drain,state_is_maintenance,state_is_reserved,address}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_job_info", help: "Slurm job detail information", constLabels: {}, variableLabels: {job_id,job_state,job_state_reason,slurm_partition,job_name,user_name,standard_error,standard_output,array_job_id,array_task_id}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_job", help: "Slurm job node information", constLabels: {}, variableLabels: {job_id,node_name}}`)
 }
@@ -123,10 +123,10 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 
 		expectedMetrics := []string{
 			`GAUGE; soperator_cluster_info{soperator_version="test-version"} 1`,
-			`GAUGE; slurm_node_info{address="10.0.0.1",base_state="ALLOCATED",compute_instance_id="instance-1",is_drain="false",is_maintenance="false",is_reserved="false",node_name="node-1"} 1`,
-			`GAUGE; slurm_node_info{address="10.0.0.2",base_state="IDLE",compute_instance_id="instance-2",is_drain="true",is_maintenance="false",is_reserved="false",node_name="node-2"} 1`,
-			`COUNTER; slurm_node_gpu_seconds_total{base_state="ALLOCATED",is_drain="false",is_maintenance="false",is_reserved="false",node_name="node-1"} 20`,
-			`COUNTER; slurm_node_gpu_seconds_total{base_state="IDLE",is_drain="true",is_maintenance="false",is_reserved="false",node_name="node-2"} 10`,
+			`GAUGE; slurm_node_info{address="10.0.0.1",instance_id="instance-1",node_name="node-1",state_base="ALLOCATED",state_is_drain="false",state_is_maintenance="false",state_is_reserved="false"} 1`,
+			`GAUGE; slurm_node_info{address="10.0.0.2",instance_id="instance-2",node_name="node-2",state_base="IDLE",state_is_drain="true",state_is_maintenance="false",state_is_reserved="false"} 1`,
+			`COUNTER; slurm_node_gpu_seconds_total{node_name="node-1",state_base="ALLOCATED",state_is_drain="false",state_is_maintenance="false",state_is_reserved="false"} 20`,
+			`COUNTER; slurm_node_gpu_seconds_total{node_name="node-2",state_base="IDLE",state_is_drain="true",state_is_maintenance="false",state_is_reserved="false"} 10`,
 			`GAUGE; slurm_job_info{array_job_id="",array_task_id="42",job_id="12345",job_name="test_job",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr",standard_output="/path/to/stdout",user_name="testuser"} 1`,
 			`GAUGE; slurm_node_job{job_id="12345",node_name="node-1"} 1`,
 			`GAUGE; slurm_node_job{job_id="12345",node_name="node-2"} 1`,
@@ -216,8 +216,8 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 
 	// Check specific state combinations for node info metrics
 	expectedNodeMetrics := []string{
-		`GAUGE; slurm_node_info{address="10.0.0.3",base_state="IDLE",compute_instance_id="instance-maintenance",is_drain="false",is_maintenance="true",is_reserved="false",node_name="node-maintenance"} 1`,
-		`GAUGE; slurm_node_info{address="10.0.0.4",base_state="IDLE",compute_instance_id="instance-reserved",is_drain="false",is_maintenance="false",is_reserved="true",node_name="node-reserved"} 1`,
+		`GAUGE; slurm_node_info{address="10.0.0.3",instance_id="instance-maintenance",node_name="node-maintenance",state_base="IDLE",state_is_drain="false",state_is_maintenance="true",state_is_reserved="false"} 1`,
+		`GAUGE; slurm_node_info{address="10.0.0.4",instance_id="instance-reserved",node_name="node-reserved",state_base="IDLE",state_is_drain="false",state_is_maintenance="false",state_is_reserved="true"} 1`,
 	}
 
 	for _, expected := range expectedNodeMetrics {
@@ -228,10 +228,10 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 	foundMaintenanceGPU := false
 	foundReservedGPU := false
 	for _, metric := range metricsText {
-		if strings.Contains(metric, `slurm_node_gpu_seconds_total{base_state="IDLE",is_drain="false",is_maintenance="true",is_reserved="false",node_name="node-maintenance"}`) {
+		if strings.Contains(metric, `slurm_node_gpu_seconds_total{node_name="node-maintenance",state_base="IDLE",state_is_drain="false",state_is_maintenance="true",state_is_reserved="false"}`) {
 			foundMaintenanceGPU = true
 		}
-		if strings.Contains(metric, `slurm_node_gpu_seconds_total{base_state="IDLE",is_drain="false",is_maintenance="false",is_reserved="true",node_name="node-reserved"}`) {
+		if strings.Contains(metric, `slurm_node_gpu_seconds_total{node_name="node-reserved",state_base="IDLE",state_is_drain="false",state_is_maintenance="false",state_is_reserved="true"}`) {
 			foundReservedGPU = true
 		}
 	}
@@ -270,7 +270,7 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 	}
 
 	// Check that node fails metric includes all the new labels
-	expectedNodeFailsMetric := `COUNTER; slurm_node_fails_total{base_state="IDLE",is_drain="true",is_maintenance="true",is_reserved="false",node_name="node-maintenance",reason="maintenance drain triggered"} 1`
+	expectedNodeFailsMetric := `COUNTER; slurm_node_fails_total{node_name="node-maintenance",reason="maintenance drain triggered",state_base="IDLE",state_is_drain="true",state_is_maintenance="true",state_is_reserved="false"} 1`
 	assert.Contains(t, metricsText, expectedNodeFailsMetric)
 
 	mockClient.AssertExpectations(t)
@@ -278,7 +278,7 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 
 // toPrometheusLikeString returns metric text representation like Prometheus does, with some extra additions.
 // E.g.:
-// GAUGE; slurm_node_info{base_state="idle",compute_instance_id="computeinstance-xyz",is_drain="false",node_name="worker-0",reason=""} 1
+// GAUGE; slurm_node_info{address="10.0.0.1",instance_id="computeinstance-xyz",node_name="worker-0",state_base="idle",state_is_drain="false",state_is_maintenance="false",state_is_reserved="false"} 1
 func toPrometheusLikeString(t *testing.T, metric prometheus.Metric) string {
 	var pb dto.Metric
 	if err := metric.Write(&pb); err != nil {

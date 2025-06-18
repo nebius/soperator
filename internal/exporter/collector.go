@@ -36,17 +36,17 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client, soperatorVersion string
 		slurmAPIClient: slurmAPIClient,
 
 		sopClusterInfo: prometheus.NewDesc("soperator_cluster_info", "Soperator cluster information", []string{}, sopClusterInfoConstLabels),
-		nodeInfo:       prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "compute_instance_id", "base_state", "is_drain", "is_maintenance", "is_reserved", "address"}, nil),
+		nodeInfo:       prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "address"}, nil),
 		jobInfo:        prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "standard_error", "standard_output", "array_job_id", "array_task_id"}, nil),
 		jobNode:        prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
 		nodeGPUSeconds: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "slurm_node_gpu_seconds_total",
 			Help: "Total GPU seconds on Slurm nodes",
-		}, []string{"node_name", "base_state", "is_drain", "is_maintenance", "is_reserved"}),
+		}, []string{"node_name", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved"}),
 		nodeFails: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "slurm_node_fails_total",
 			Help: "Total number of times a node has failed (went from not down/drain to down/drain state)",
-		}, []string{"node_name", "base_state", "is_drain", "is_maintenance", "is_reserved", "reason"}),
+		}, []string{"node_name", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "reason"}),
 
 		lastNodeGPUTimeUpdated: time.Now(),
 		nodes:                  make(map[string]slurmapi.Node),
