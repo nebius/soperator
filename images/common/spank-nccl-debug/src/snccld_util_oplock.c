@@ -46,28 +46,27 @@ bool snccld_acquire_lock(
     const uint32_t job_id, const uint32_t step_id, const char *op,
     const char *hostname
 ) {
-    char *lock_file_path =
-        _snccld_render_lock_file_path(job_id, step_id, op, hostname);
-    snccld_log_debug("lock_path=%s", lock_file_path);
+    char *path = _snccld_render_lock_file_path(job_id, step_id, op, hostname);
+    snccld_log_debug("Acquiring lock: '%s'", path);
 
-    const int lock_fd =
-        open(lock_file_path, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE);
-    if (lock_fd < 0) {
-        snccld_log_error("Cannot open '%s': %m", lock_file_path);
+    const int fd = open(path, O_CREAT | O_EXCL | O_RDWR, SNCCLD_DEFAULT_MODE);
+    if (fd < 0) {
+        if (errno == EEXIST) {
+            snccld_log_debug("Lock busy/existing: '%s'", path);
+        } else {
+            snccld_log_error("Cannot create lock '%s': %m", path);
+        }
         goto acquire_lock_fail;
     }
+    close(fd);
 
-    if (flock(lock_fd, LOCK_EX | LOCK_NB) == -1) {
-        snccld_log_error("Cannot flock '%s': %m", lock_file_path);
-        goto acquire_lock_fail;
-    }
-    close(lock_fd);
-
-    free(lock_file_path);
+    snccld_log_debug("Lock acquired: '%s'", path);
+    free(path);
     return true;
 
 acquire_lock_fail:
-    free(lock_file_path);
+    snccld_log_debug("Lock not acquired: '%s'", path);
+    free(path);
     return false;
 }
 
@@ -75,28 +74,13 @@ void snccld_release_lock(
     const uint32_t job_id, const uint32_t step_id, const char *op,
     const char *hostname
 ) {
-    char *lock_file_path =
-        _snccld_render_lock_file_path(job_id, step_id, op, hostname);
-    snccld_log_debug("lock_path=%s", lock_file_path);
+    char *path = _snccld_render_lock_file_path(job_id, step_id, op, hostname);
+    snccld_log_debug("Releasing lock: '%s'", path);
 
-    const int lock_fd =
-        open(lock_file_path, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE);
-    if (lock_fd < 0) {
-        snccld_log_error("Cannot open '%s': %m", lock_file_path);
-        goto release_lock_fail;
+    if (unlink(path) != 0 && errno != ENOENT) {
+        snccld_log_error("Cannot remove lock '%s': %m", path);
+    } else {
+        snccld_log_debug("Lock released: '%s'", path);
     }
-
-    if (flock(lock_fd, LOCK_UN) != 0) {
-        snccld_log_error("Cannot unflock '%s': %m", lock_file_path);
-        goto release_lock_fail;
-    }
-    close(lock_fd);
-
-    unlink(lock_file_path);
-    free(lock_file_path);
-
-    return;
-
-release_lock_fail:
-    free(lock_file_path);
+    free(path);
 }
