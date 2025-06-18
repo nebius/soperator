@@ -62,11 +62,13 @@ static char *_snccld_key_to_state_file_path(
 }
 
 inline snccld_state_t *snccld_state_new() {
-    snccld_state_t *res = malloc(sizeof(snccld_state_t));
-    res->fifo_path[0]   = '\0';
-    res->log_path[0]    = '\0';
-    res->mounts_path[0] = '\0';
-    res->tee_pid        = -1;
+    snccld_state_t *res   = malloc(sizeof(snccld_state_t));
+    res->fifo_path[0]     = '\0';
+    res->log_path[0]      = '\0';
+    res->mounts_path[0]   = '\0';
+    res->user_log_path[0] = '\0';
+    res->tee_pid          = -1;
+
     return res;
 }
 
@@ -99,32 +101,33 @@ char *snccld_state_to_string(const snccld_state_t *state) {
 }
 
 snccld_state_t *snccld_state_from_string(const char *str) {
-    if (!str) {
-        return NULL;
-    }
-
     snccld_state_t *res = snccld_state_new();
 
-    char *copy    = strdup(str);
-    char *saveptr = NULL;
-    char *line1   = strtok_r(copy, "\n", &saveptr);
-    char *line2   = strtok_r(NULL, "\n", &saveptr);
-    char *line3   = strtok_r(NULL, "\n", &saveptr);
-    char *line4   = strtok_r(NULL, "\n", &saveptr);
-    char *line5   = strtok_r(NULL, "\n", &saveptr);
-
-    if (!line1 || !line2 || !line3 || !line4 || !line5) {
-        free(copy);
-        free(res);
-        return NULL;
+    char *copy = strdup(str);
+    char *p    = copy;
+    for (int line = 0; line < 5; ++line) {
+        char *field = strsep(&p, "\n");
+        if (!field) {
+            continue;
+        }
+        switch (line) {
+            case 0:
+                snprintf(res->fifo_path, PATH_MAX, "%s", field);
+                break;
+            case 1:
+                snprintf(res->log_path, PATH_MAX, "%s", field);
+                break;
+            case 2:
+                snprintf(res->mounts_path, PATH_MAX, "%s", field);
+                break;
+            case 3:
+                snprintf(res->user_log_path, PATH_MAX, "%s", field);
+                break;
+            case 4:
+                res->tee_pid = (pid_t)atoi(field);
+                break;
+        }
     }
-
-    snprintf(res->fifo_path, PATH_MAX, "%s", line1);
-    snprintf(res->log_path, PATH_MAX, "%s", line2);
-    snprintf(res->mounts_path, PATH_MAX, "%s", line3);
-    snprintf(res->user_log_path, PATH_MAX, "%s", line4);
-    res->tee_pid = (pid_t)atoi(line5);
-
     free(copy);
 
     return res;
@@ -135,19 +138,12 @@ spank_err_t snccld_state_write(
     const char *hostname
 ) {
     char *path = _snccld_key_to_state_file_path(key, hostname);
+    snccld_log_debug("Writing state file: '%s'", path);
 
-    const int fd = open(path, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE);
+    const int fd = open(path, O_CREAT | O_TRUNC | O_RDWR, SNCCLD_DEFAULT_MODE);
     if (fd < 0) {
-        snccld_log_error("Cannot open %s: %m", path);
-        free(path);
-        return ESPANK_ERROR;
-    }
-
-    if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
-        snccld_log_error("Cannot flock %s: %m", path);
-        close(fd);
-        free(path);
-        return ESPANK_ERROR;
+        snccld_log_error("Cannot open or truncate state file '%s': %m", path);
+        goto state_write_fail;
     }
 
     char *state_string = snccld_state_to_string(state);
@@ -155,80 +151,66 @@ spank_err_t snccld_state_write(
     write(fd, state_string, strlen(state_string));
     free(state_string);
 
-    if (flock(fd, LOCK_UN) != 0) {
-        snccld_log_error("Cannot unflock %s: %m", path);
-        close(fd);
-        free(path);
-        return ESPANK_ERROR;
-    }
-
+    snccld_log_debug("State file written: '%s'", path);
     close(fd);
     free(path);
-
     return ESPANK_SUCCESS;
+
+state_write_fail:
+    snccld_log_debug("State file not written: '%s'", path);
+    free(path);
+    return ESPANK_ERROR;
 }
 
 snccld_state_t *
 snccld_state_read(const snccld_state_key_t *key, const char *hostname) {
     snccld_state_t *res  = NULL;
     char           *path = _snccld_key_to_state_file_path(key, hostname);
+    snccld_log_debug("Reading state file: '%s'", path);
 
     const int fd = open(path, O_RDONLY);
     if (fd < 0) {
-        snccld_log_error("Cannot open %s: %m", path);
-        free(path);
-        return NULL;
-    }
-
-    if (flock(fd, LOCK_SH) != 0) {
-        snccld_log_error("Cannot flock %s: %m", path);
-        close(fd);
-        free(path);
-        return NULL;
+        if (errno == ENOENT) {
+            // This could be an error,
+            // but we don't want excess logs because of races.
+            snccld_log_debug("State file does not exist: '%s'", path);
+        } else {
+            snccld_log_error("Cannot read state file '%s': %m", path);
+        }
+        goto state_read_exit;
     }
 
     char        *state_string = malloc(_snccld_state_file_size());
     const size_t n = read(fd, state_string, _snccld_state_file_size() - 1);
     state_string[(n > 0) ? n : 0] = '\0';
+    close(fd);
 
     res = snccld_state_from_string(state_string);
     free(state_string);
-    if (res == NULL) {
-        snccld_log_error("Cannot read state from %s: %m", path);
-    }
 
-    if (flock(fd, LOCK_UN) != 0) {
-        snccld_log_error("Cannot unflock %s: %m", path);
-        close(fd);
-        free(path);
-        return res;
-    }
+    snccld_log_debug("State file read: '%s'", path);
 
-    close(fd);
+state_read_exit:
     free(path);
-
     return res;
 }
 
 spank_err_t
 snccld_state_cleanup(const snccld_state_key_t *key, const char *hostname) {
     char *path = _snccld_key_to_state_file_path(key, hostname);
+    snccld_log_debug("Cleaning up state file '%s': %m", path);
 
     const int res = unlink(path);
-    if (res == 0) {
-        goto state_cleanup_exit;
-    }
-    if (errno == ENOENT) {
-        // File is already deleted.
-        goto state_cleanup_exit;
+    if (res != 0 && errno != ENOENT) {
+        snccld_log_error("Cannot clean up state file '%s': %m", path);
+        goto state_cleanup_fail;
     }
 
-    snccld_log_error("Cannot remove '%s': %m", path);
-
-    free(path);
-    return ESPANK_ERROR;
-
-state_cleanup_exit:
+    snccld_log_debug("State file cleaned up: '%s'", path);
     free(path);
     return ESPANK_SUCCESS;
+
+state_cleanup_fail:
+    free(path);
+    return ESPANK_ERROR;
 }

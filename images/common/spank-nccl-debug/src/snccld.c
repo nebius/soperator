@@ -610,6 +610,9 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
 
     snccld_state_t *state = snccld_state_read(key, hostname);
     if (state == NULL) {
+        snccld_release_lock(
+            key->job_id, key->step_id, SNCCLD_OPLOCK_OP_TASK_EXIT, hostname
+        );
         goto task_exit_fail;
     }
 
