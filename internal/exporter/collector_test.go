@@ -12,6 +12,8 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"nebius.ai/slurm-operator/internal/slurmapi"
 	"nebius.ai/slurm-operator/internal/slurmapi/fake"
@@ -43,12 +45,14 @@ func TestMetricsCollector_Describe(t *testing.T) {
 	}
 
 	assert.Contains(t, found, `Desc{fqName: "soperator_cluster_info", help: "Soperator cluster information", constLabels: {soperator_version="test-version"}, variableLabels: {}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,compute_instance_id,base_state,is_drain,address}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,compute_instance_id,base_state,is_drain,is_maintenance,is_reserved,address}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_job_info", help: "Slurm job detail information", constLabels: {}, variableLabels: {job_id,job_state,job_state_reason,slurm_partition,job_name,user_name,standard_error,standard_output,array_job_id,array_task_id}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_job", help: "Slurm job node information", constLabels: {}, variableLabels: {job_id,node_name}}`)
 }
 
 func TestMetricsCollector_Collect_Success(t *testing.T) {
+	log.SetLogger(zap.New(zap.UseDevMode(true)))
+
 	synctest.Run(func() {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient, "test-version")
@@ -119,49 +123,24 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 
 		expectedMetrics := []string{
 			`GAUGE; soperator_cluster_info{soperator_version="test-version"} 1`,
-			`GAUGE; slurm_node_info{address="10.0.0.1",base_state="ALLOCATED",compute_instance_id="instance-1",is_drain="false",node_name="node-1"} 1`,
-			`GAUGE; slurm_node_info{address="10.0.0.2",base_state="IDLE",compute_instance_id="instance-2",is_drain="true",node_name="node-2"} 1`,
-			`COUNTER; slurm_active_node_gpu_seconds_total{node_name="node-1"} 20`, // (10 seconds * 2 gpu on node-1) = 20 passed.
-			`COUNTER; slurm_job_alloc_gpu_seconds_total 30`,                       // 10 seconds * 3 GPUs for a job on both nodes.
+			`GAUGE; slurm_node_info{address="10.0.0.1",base_state="ALLOCATED",compute_instance_id="instance-1",is_drain="false",is_maintenance="false",is_reserved="false",node_name="node-1"} 1`,
+			`GAUGE; slurm_node_info{address="10.0.0.2",base_state="IDLE",compute_instance_id="instance-2",is_drain="true",is_maintenance="false",is_reserved="false",node_name="node-2"} 1`,
+			`COUNTER; slurm_node_gpu_seconds_total{base_state="ALLOCATED",is_drain="false",is_maintenance="false",is_reserved="false",node_name="node-1"} 20`,
+			`COUNTER; slurm_node_gpu_seconds_total{base_state="IDLE",is_drain="true",is_maintenance="false",is_reserved="false",node_name="node-2"} 10`,
 			`GAUGE; slurm_job_info{array_job_id="",array_task_id="42",job_id="12345",job_name="test_job",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr",standard_output="/path/to/stdout",user_name="testuser"} 1`,
 			`GAUGE; slurm_node_job{job_id="12345",node_name="node-1"} 1`,
 			`GAUGE; slurm_node_job{job_id="12345",node_name="node-2"} 1`,
 		}
 
-		assert.Equal(t, expectedMetrics, metricsText)
-
-		// Now drain node-0 and check that slurm_node_fails_total appear in the metrics.
-		testNodes[0].States = map[slurmapispec.V0041NodeState]struct{}{
-			slurmapispec.V0041NodeStateDRAIN: {},
-		}
-		testNodes[0].Reason = &slurmapi.NodeReason{
-			Reason:    "state changed to drain",
-			ChangedAt: time.Now(),
-		}
-		mockClient.EXPECT().ListNodes(mock.Anything).Return(testNodes, nil)
-		mockClient.EXPECT().ListJobs(mock.Anything).Return(testJobs, nil)
-		ch = make(chan prometheus.Metric, 10)
-		go func() {
-			collector.Collect(ch)
-			close(ch)
-		}()
-		metrics = nil
-		for metric := range ch {
-			metrics = append(metrics, metric)
-		}
-		assert.Greater(t, len(metrics), 4)
-		metricsText = nil
-		for _, metric := range metrics {
-			metricsText = append(metricsText, toPrometheusLikeString(t, metric))
-		}
-		wantSlurmNodeFailsTotal := `COUNTER; slurm_node_fails_total{node_name="node-1",reason="state changed to drain"} 1`
-		assert.Contains(t, metricsText, wantSlurmNodeFailsTotal)
+		assert.ElementsMatch(t, expectedMetrics, metricsText)
 
 		mockClient.AssertExpectations(t)
 	})
 }
 
 func TestMetricsCollector_Collect_APIError(t *testing.T) {
+	log.SetLogger(zap.New(zap.UseDevMode(true)))
+
 	mockClient := &fake.MockClient{}
 	collector := NewMetricsCollector(mockClient, "test-version")
 
@@ -181,6 +160,118 @@ func TestMetricsCollector_Collect_APIError(t *testing.T) {
 
 	// Should still have cluster info metric even if API fails
 	assert.Equal(t, 1, len(metrics))
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestMetricsCollector_NodeFails(t *testing.T) {
+	log.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	mockClient := &fake.MockClient{}
+	collector := NewMetricsCollector(mockClient, "test-version")
+
+	// Mock nodes with different states to test the node fails metric with new labels
+	testNodes := []slurmapi.Node{
+		{
+			Name:       "node-maintenance",
+			InstanceID: "instance-maintenance",
+			States: map[slurmapispec.V0041NodeState]struct{}{
+				slurmapispec.V0041NodeStateIDLE:        {},
+				slurmapispec.V0041NodeStateMAINTENANCE: {},
+			},
+			Tres:    "cpu=8,mem=64000M,gres/gpu=1",
+			Address: "10.0.0.3",
+		},
+		{
+			Name:       "node-reserved",
+			InstanceID: "instance-reserved",
+			States: map[slurmapispec.V0041NodeState]struct{}{
+				slurmapispec.V0041NodeStateIDLE:     {},
+				slurmapispec.V0041NodeStateRESERVED: {},
+			},
+			Tres:    "cpu=8,mem=64000M,gres/gpu=1",
+			Address: "10.0.0.4",
+		},
+	}
+
+	mockClient.EXPECT().ListNodes(mock.Anything).Return(testNodes, nil)
+	mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil)
+
+	// First collect - establish baseline
+	ch := make(chan prometheus.Metric, 20)
+	go func() {
+		collector.Collect(ch)
+		close(ch)
+	}()
+
+	var metrics []prometheus.Metric
+	for metric := range ch {
+		metrics = append(metrics, metric)
+	}
+
+	var metricsText []string
+	for _, metric := range metrics {
+		metricsText = append(metricsText, toPrometheusLikeString(t, metric))
+	}
+
+	// Check specific state combinations for node info metrics
+	expectedNodeMetrics := []string{
+		`GAUGE; slurm_node_info{address="10.0.0.3",base_state="IDLE",compute_instance_id="instance-maintenance",is_drain="false",is_maintenance="true",is_reserved="false",node_name="node-maintenance"} 1`,
+		`GAUGE; slurm_node_info{address="10.0.0.4",base_state="IDLE",compute_instance_id="instance-reserved",is_drain="false",is_maintenance="false",is_reserved="true",node_name="node-reserved"} 1`,
+	}
+
+	for _, expected := range expectedNodeMetrics {
+		assert.Contains(t, metricsText, expected)
+	}
+
+	// Check that GPU seconds metrics include all the new labels
+	foundMaintenanceGPU := false
+	foundReservedGPU := false
+	for _, metric := range metricsText {
+		if strings.Contains(metric, `slurm_node_gpu_seconds_total{base_state="IDLE",is_drain="false",is_maintenance="true",is_reserved="false",node_name="node-maintenance"}`) {
+			foundMaintenanceGPU = true
+		}
+		if strings.Contains(metric, `slurm_node_gpu_seconds_total{base_state="IDLE",is_drain="false",is_maintenance="false",is_reserved="true",node_name="node-reserved"}`) {
+			foundReservedGPU = true
+		}
+	}
+	assert.True(t, foundMaintenanceGPU, "Expected to find maintenance node GPU seconds metric with new labels")
+	assert.True(t, foundReservedGPU, "Expected to find reserved node GPU seconds metric with new labels")
+
+	// Now change one node to drain state to trigger a node fail with the new labels
+	testNodes[0].States = map[slurmapispec.V0041NodeState]struct{}{
+		slurmapispec.V0041NodeStateIDLE:        {},
+		slurmapispec.V0041NodeStateMAINTENANCE: {},
+		slurmapispec.V0041NodeStateDRAIN:       {},
+	}
+	testNodes[0].Reason = &slurmapi.NodeReason{
+		Reason:    "maintenance drain triggered",
+		ChangedAt: time.Now(),
+	}
+
+	mockClient.EXPECT().ListNodes(mock.Anything).Return(testNodes, nil)
+	mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil)
+
+	// Second collect - trigger node fails
+	ch = make(chan prometheus.Metric, 20)
+	go func() {
+		collector.Collect(ch)
+		close(ch)
+	}()
+
+	metrics = nil
+	for metric := range ch {
+		metrics = append(metrics, metric)
+	}
+
+	metricsText = nil
+	for _, metric := range metrics {
+		metricsText = append(metricsText, toPrometheusLikeString(t, metric))
+	}
+
+	// Check that node fails metric includes all the new labels
+	expectedNodeFailsMetric := `COUNTER; slurm_node_fails_total{base_state="IDLE",is_drain="true",is_maintenance="true",is_reserved="false",node_name="node-maintenance",reason="maintenance drain triggered"} 1`
+	assert.Contains(t, metricsText, expectedNodeFailsMetric)
 
 	mockClient.AssertExpectations(t)
 }
