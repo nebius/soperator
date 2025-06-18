@@ -1,0 +1,12 @@
+activeCheck:
+  enabled: true
+  checkType: "slurmJob"
+  schedule: "0 */3 * * *"    # every 3 hours
+  slurmJobSpec:
+    eachWorkerJobArray: true
+    sbatchScript: |
+      #!/bin/bash
+
+      echo "Cleaning up Enroot containers on node: $(hostname)"
+      enroot list --quiet | xargs -r -n1 enroot remove --force
+      echo "Cleanup done."
