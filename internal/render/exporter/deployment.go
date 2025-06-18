@@ -17,20 +17,19 @@ import (
 )
 
 func RenderDeploymentExporter(clusterValues *values.SlurmCluster) (deployment *appsv1.Deployment, err error) {
-	if !clusterValues.SlurmExporter.Enabled {
-		return nil, errors.New("exporter is not enabled")
+	replicas := 1
+	if check.IsMaintenanceActive(clusterValues.SlurmExporter.Maintenance) {
+		replicas = 0
+	} else if !clusterValues.SlurmExporter.Enabled {
+		replicas = 0
 	}
-	if clusterValues.SlurmExporter.Container.Image == "" {
+
+	if clusterValues.SlurmExporter.Container.Image == "" && replicas > 0 {
 		return nil, errors.New("image for ExporterContainer is empty")
 	}
 
 	labels := common.RenderLabels(consts.ComponentTypeExporter, clusterValues.Name)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeExporter, clusterValues.Name)
-
-	replicas := 1
-	if check.IsMaintenanceActive(clusterValues.SlurmExporter.Maintenance) {
-		replicas = 0
-	}
 
 	// Hack to overcome apparmor labels validation during cluster upgrade reconciliation.
 	// Otherwise Kubernetes API will not validate new deployment:

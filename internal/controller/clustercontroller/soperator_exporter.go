@@ -25,10 +25,6 @@ func (r SlurmClusterReconciler) ReconcileSoperatorExporter(
 		logger.V(1).Info("Prometheus Operator CRD is not installed, skipping reconciliation")
 		return nil
 	}
-	if !clusterValues.SlurmExporter.Enabled {
-		logger.V(1).Info("Soperator exporter is not enabled, skipping reconciliation")
-		return nil
-	}
 	if clusterValues.SlurmExporter.ExporterContainer.Image != "" {
 		logger.V(1).Info("Slurm exporter image is set, skipping Soperator exporter reconciliation")
 		return nil
