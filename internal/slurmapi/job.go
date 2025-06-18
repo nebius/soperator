@@ -125,10 +125,6 @@ func (j Job) GetRequiredNodeList() ([]string, error) {
 }
 
 func (j Job) IsTerminalState() bool {
-	return j.IsFailedState() || j.State == string(slurmapispec.V0041JobInfoJobStateCOMPLETED) || j.State == string(slurmapispec.V0041JobInfoJobStateSTOPPED)
-}
-
-func (j Job) IsFailedState() bool {
 	switch j.State {
 	case string(slurmapispec.V0041JobInfoJobStateFAILED),
 		string(slurmapispec.V0041JobInfoJobStateCANCELLED),
@@ -141,11 +137,17 @@ func (j Job) IsFailedState() bool {
 		string(slurmapispec.V0041JobInfoJobStatePREEMPTED),
 		string(slurmapispec.V0041JobInfoJobStateRECONFIGFAIL),
 		string(slurmapispec.V0041JobInfoJobStateREVOKED),
-		string(slurmapispec.V0041JobInfoJobStateSPECIALEXIT):
+		string(slurmapispec.V0041JobInfoJobStateSPECIALEXIT),
+		string(slurmapispec.V0041JobInfoJobStateCOMPLETED),
+		string(slurmapispec.V0041JobInfoJobStateSTOPPED):
 		return true
 	default:
 		return false
 	}
+}
+
+func (j Job) IsFailedState() bool {
+	return j.State == string(slurmapispec.V0041JobInfoJobStateFAILED)
 }
 
 func parseNodeList(nodeString string) ([]string, error) {
