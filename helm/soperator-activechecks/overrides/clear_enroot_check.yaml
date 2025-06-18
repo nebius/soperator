@@ -1,12 +1,14 @@
 activeCheck:
   enabled: true
+  suspend: false
   checkType: "slurmJob"
-  schedule: "0 */3 * * *"    # every 3 hours
+  schedule: "0 0 * * *"    # every 24 hours
   slurmJobSpec:
     eachWorkerJobArray: true
     sbatchScript: |
       #!/bin/bash
+      #SBATCH --exclusive
 
       echo "Cleaning up Enroot containers on node: $(hostname)"
-      enroot list --quiet | xargs -r -n1 enroot remove --force
+      enroot list --quiet | grep '^pyxis_' | xargs -r -n1 enroot remove --force
       echo "Cleanup done."
