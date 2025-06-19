@@ -34,11 +34,11 @@ pushd "${jaildir}"
     mkdir -p "${SLURM_LIB_PATH}"
     mount --bind "/${SLURM_LIB_PATH}" "${SLURM_LIB_PATH}"
 
-    touch "usr/lib/${ALT_ARCH}-linux-gnu/libslurm.so.41.0.0"
-    mount --bind "/usr/lib/${ALT_ARCH}-linux-gnu/libslurm.so.41.0.0" "usr/lib/${ALT_ARCH}-linux-gnu/libslurm.so.41.0.0"
+    touch "usr/lib/${ALT_ARCH}-linux-gnu/libslurm.so.42.0.0"
+    mount --bind "/usr/lib/${ALT_ARCH}-linux-gnu/libslurm.so.42.0.0" "usr/lib/${ALT_ARCH}-linux-gnu/libslurm.so.42.0.0"
     pushd "usr/lib/${ALT_ARCH}-linux-gnu"
-         ln -sf libslurm.so.41.0.0 libslurm.so.41
-         ln -sf libslurm.so.41.0.0 libslurm.so
+         ln -sf libslurm.so.42.0.0 libslurm.so.42
+         ln -sf libslurm.so.42.0.0 libslurm.so
     popd
 
     # slurm-smd-dev
