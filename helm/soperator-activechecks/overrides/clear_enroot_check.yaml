@@ -10,5 +10,5 @@ activeCheck:
       #SBATCH --exclusive
 
       echo "Cleaning up Enroot containers on node: $(hostname)"
-      enroot list --quiet | grep '^pyxis_' | xargs -r -n1 enroot remove --force
+      srun bash -c "enroot list | grep '^pyxis_' | xargs -r -n1 enroot remove --force"
       echo "Cleanup done."
