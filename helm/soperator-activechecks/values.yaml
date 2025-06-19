@@ -1,6 +1,7 @@
 activeCheck:
   enabled: false
   namespace: "soperator"
+  name: "activecheck"
   checkType: "k8sJob"
   schedule: "0 * * * *"
   suspend: true

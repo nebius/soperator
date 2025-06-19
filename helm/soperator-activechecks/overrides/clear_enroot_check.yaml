@@ -1,6 +1,7 @@
 activeCheck:
   enabled: true
   suspend: false
+  name: "clear-enroot-check"
   checkType: "slurmJob"
   schedule: "0 0 * * *"    # every 24 hours
   slurmJobSpec:
