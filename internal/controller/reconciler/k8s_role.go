@@ -31,16 +31,13 @@ func NewRoleReconciler(r *Reconciler) *RoleReconciler {
 func (r *RoleReconciler) Reconcile(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
-	desired *rbacv1.Role,
+	desired rbacv1.Role,
 	deps ...metav1.Object,
 ) error {
 	logger := log.FromContext(ctx)
-	if desired == nil {
-		return fmt.Errorf("desired Role cannot be nil")
-	}
-	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
+	if err := r.reconcile(ctx, cluster, &desired, r.patch, deps...); err != nil {
 		logger.V(1).
-			WithValues(logfield.ResourceKV(desired)...).
+			WithValues(logfield.ResourceKV(&desired)...).
 			Error(err, "Failed to reconcile Worker Role")
 		return fmt.Errorf("reconciling Worker Role: %w", err)
 	}

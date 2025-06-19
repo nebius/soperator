@@ -31,16 +31,13 @@ func NewServiceAccountReconciler(r *Reconciler) *ServiceAccountReconciler {
 func (r *ServiceAccountReconciler) Reconcile(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
-	desired *corev1.ServiceAccount,
+	desired corev1.ServiceAccount,
 	deps ...metav1.Object,
 ) error {
 	logger := log.FromContext(ctx)
-	if desired == nil {
-		return fmt.Errorf("desired ServiceAccount cannot be nil")
-	}
-	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
+	if err := r.reconcile(ctx, cluster, &desired, r.patch, deps...); err != nil {
 		logger.V(1).
-			WithValues(logfield.ResourceKV(desired)...).
+			WithValues(logfield.ResourceKV(&desired)...).
 			Error(err, "Failed to reconcile ServiceAccount")
 		return fmt.Errorf("reconciling ServiceAccount: %w", err)
 	}

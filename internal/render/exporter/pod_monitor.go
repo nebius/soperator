@@ -12,9 +12,9 @@ import (
 func RenderPodMonitor(
 	clusterName, namespace string,
 	exporterValues values.SlurmExporter,
-) *prometheusv1.PodMonitor {
+) prometheusv1.PodMonitor {
 	pmConfig := exporterValues.PodMonitorConfig
-	return &prometheusv1.PodMonitor{
+	return prometheusv1.PodMonitor{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterName,
 			Namespace: namespace,

@@ -269,7 +269,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling worker ServiceAccount: %w", err)
 					}
@@ -290,7 +290,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 						stepLogger.V(1).Info("Rendered")
 
-						if err := r.Role.Reconcile(stepCtx, cluster, &desired); err != nil {
+						if err := r.Role.Reconcile(stepCtx, cluster, desired); err != nil {
 							stepLogger.Error(err, "Failed to reconcile")
 							return fmt.Errorf("reconciling worker Role: %w", err)
 						}
@@ -323,7 +323,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 						stepLogger.V(1).Info("Rendered")
 
-						if err := r.RoleBinding.Reconcile(stepCtx, cluster, &desired); err != nil {
+						if err := r.RoleBinding.Reconcile(stepCtx, cluster, desired); err != nil {
 							stepLogger.Error(err, "Failed to reconcile")
 							return fmt.Errorf("reconciling worker RoleBinding: %w", err)
 						}

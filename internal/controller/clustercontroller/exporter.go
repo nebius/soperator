@@ -48,9 +48,7 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 								clusterValues.Namespace,
 								clusterValues.SlurmExporter,
 							)
-							if desired != nil {
-								stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-							}
+							stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 							err := r.PodMonitor.Reconcile(stepCtx, cluster, desired)
 							if err != nil {
 								stepLogger.Error(err, "Failed to reconcile")
@@ -102,12 +100,9 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 							if err != nil {
 								stepLogger.Error(err, "Failed to render")
 							}
-							if desired != nil {
-								logger = logger.WithValues(logfield.ResourceKV(desired)...)
-							}
+							logger = logger.WithValues(logfield.ResourceKV(desired)...)
 
-							var exporterNamePtr *string = nil
-							err = r.Deployment.Reconcile(stepCtx, cluster, desired, exporterNamePtr)
+							err = r.Deployment.Reconcile(stepCtx, cluster, *desired)
 							if err != nil {
 								stepLogger.Error(err, "Failed to reconcile")
 								return fmt.Errorf("reconciling Slurm Exporter Deployment: %w", err)
@@ -130,7 +125,7 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling Exporter ServiceAccount: %w", err)
 					}
@@ -151,7 +146,7 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err := r.Role.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.Role.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling Exporter Role: %w", err)
 					}
@@ -173,7 +168,7 @@ func (r SlurmClusterReconciler) ReconcileExporter(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err := r.RoleBinding.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.RoleBinding.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling Exporter RoleBinding: %w", err)
 					}

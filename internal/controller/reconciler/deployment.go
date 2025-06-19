@@ -31,25 +31,13 @@ func NewDeploymentReconciler(r *Reconciler) *DeploymentReconciler {
 func (r *DeploymentReconciler) Reconcile(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
-	desired *appsv1.Deployment,
-	name *string,
+	desired appsv1.Deployment,
 	deps ...metav1.Object,
 ) error {
 	logger := log.FromContext(ctx)
-	if desired == nil {
-		// If desired is nil, delete the Deployment
-		if name == nil {
-			logger.V(1).Info("Deployment is not needed, skipping deletion")
-			return nil
-		}
-		logger.V(1).Info(fmt.Sprintf(
-			"Deleting Deployment %s-collector, because of Deployment  is not needed", cluster.Name,
-		))
-		return r.Cleanup(ctx, cluster, *name)
-	}
-	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
+	if err := r.reconcile(ctx, cluster, &desired, r.patch, deps...); err != nil {
 		logger.V(1).
-			WithValues(logfield.ResourceKV(desired)...).
+			WithValues(logfield.ResourceKV(&desired)...).
 			Error(err, "Failed to reconcile Deployment ")
 		return fmt.Errorf("reconciling Deployment: %w", err)
 	}

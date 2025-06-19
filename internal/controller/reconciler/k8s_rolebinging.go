@@ -8,11 +8,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type RoleBindingReconciler struct {
@@ -32,16 +33,13 @@ func NewRoleBindingReconciler(r *Reconciler) *RoleBindingReconciler {
 func (r *RoleBindingReconciler) Reconcile(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
-	desired *rbacv1.RoleBinding,
+	desired rbacv1.RoleBinding,
 	deps ...metav1.Object,
 ) error {
 	logger := log.FromContext(ctx)
-	if desired == nil {
-		return fmt.Errorf("desired RoleBinding cannot be nil")
-	}
-	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
+	if err := r.reconcile(ctx, cluster, &desired, r.patch, deps...); err != nil {
 		logger.V(1).
-			WithValues(logfield.ResourceKV(desired)...).
+			WithValues(logfield.ResourceKV(&desired)...).
 			Error(err, "Failed to reconcile RoleBinding")
 		return fmt.Errorf("reconciling RoleBinding: %w", err)
 	}

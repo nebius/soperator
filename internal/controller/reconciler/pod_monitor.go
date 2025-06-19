@@ -34,16 +34,13 @@ func NewPodMonitorReconciler(r *Reconciler) *PodMonitorReconciler {
 func (r *PodMonitorReconciler) Reconcile(
 	ctx context.Context,
 	cluster *slurmv1.SlurmCluster,
-	desired *prometheusv1.PodMonitor,
+	desired prometheusv1.PodMonitor,
 	deps ...metav1.Object,
 ) error {
 	logger := log.FromContext(ctx)
-	if desired == nil {
-		return fmt.Errorf("desired PodMonitor cannot be nil")
-	}
-	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
+	if err := r.reconcile(ctx, cluster, &desired, r.patch, deps...); err != nil {
 		logger.V(1).
-			WithValues(logfield.ResourceKV(desired)...).
+			WithValues(logfield.ResourceKV(&desired)...).
 			Error(err, "Failed to reconcile PodMonitor")
 		return fmt.Errorf("reconciling PodMonitor: %w", err)
 	}

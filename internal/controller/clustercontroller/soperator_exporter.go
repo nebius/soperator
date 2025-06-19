@@ -42,7 +42,7 @@ func (r SlurmClusterReconciler) ReconcileSoperatorExporter(
 				if clusterValues.SlurmExporter.Enabled {
 					sa := exporter.RenderServiceAccount(clusterValues.Namespace, clusterValues.Name)
 					debugLogger.Info("Rendered", logfield.ResourceKV(&sa)...)
-					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, &sa); err != nil {
+					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, sa); err != nil {
 						return fmt.Errorf("reconcile Exporter SA: %w", err)
 					}
 				} else {
@@ -66,7 +66,7 @@ func (r SlurmClusterReconciler) ReconcileSoperatorExporter(
 				if clusterValues.SlurmExporter.Enabled {
 					desired := exporter.RenderRole(clusterValues.Namespace, clusterValues.Name)
 					debugLogger.Info("Rendered", logfield.ResourceKV(&desired)...)
-					if err := r.Role.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.Role.Reconcile(stepCtx, cluster, desired); err != nil {
 						return fmt.Errorf("reconcile Exporter Role: %w", err)
 					}
 				} else {
@@ -90,7 +90,7 @@ func (r SlurmClusterReconciler) ReconcileSoperatorExporter(
 				if clusterValues.SlurmExporter.Enabled {
 					rb := exporter.RenderExporterRoleBinding(clusterValues.Namespace, clusterValues.Name)
 					debugLogger.Info("Rendered", logfield.ResourceKV(&rb)...)
-					if err := r.RoleBinding.Reconcile(stepCtx, cluster, &rb); err != nil {
+					if err := r.RoleBinding.Reconcile(stepCtx, cluster, rb); err != nil {
 						return fmt.Errorf("reconcile Exporter RoleBinding: %w", err)
 					}
 				} else {
@@ -117,7 +117,7 @@ func (r SlurmClusterReconciler) ReconcileSoperatorExporter(
 						clusterValues.Namespace,
 						clusterValues.SlurmExporter,
 					)
-					debugLogger.Info("Rendered", logfield.ResourceKV(desired)...)
+					debugLogger.Info("Rendered", logfield.ResourceKV(&desired)...)
 					if err := r.PodMonitor.Reconcile(stepCtx, cluster, desired); err != nil {
 						return fmt.Errorf("reconcile PodMonitor: %w", err)
 					}
@@ -144,7 +144,7 @@ func (r SlurmClusterReconciler) ReconcileSoperatorExporter(
 						return fmt.Errorf("render deployment exporter: %w", err)
 					}
 					debugLogger.Info("Rendered", logfield.ResourceKV(desired)...)
-					if err := r.Deployment.Reconcile(stepCtx, cluster, desired, nil); err != nil {
+					if err := r.Deployment.Reconcile(stepCtx, cluster, *desired); err != nil {
 						return fmt.Errorf("reconcile soperator exporter deployment: %w", err)
 					}
 				} else {
