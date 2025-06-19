@@ -60,6 +60,21 @@ func renderContainerSshd(
 			SuccessThreshold: common.DefaultProbeSuccessThreshold,
 			FailureThreshold: common.DefaultProbeFailureThreshold,
 		},
+		StartupProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"sh",
+						"-c",
+						common.SSHStartupProbeScript,
+					},
+				},
+			},
+			TimeoutSeconds:   5,
+			PeriodSeconds:    common.DefaultProbePeriodSeconds,
+			SuccessThreshold: common.DefaultProbeSuccessThreshold,
+			FailureThreshold: 120, // ~10min
+		},
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: ptr.To(true),
 			Capabilities: &corev1.Capabilities{
