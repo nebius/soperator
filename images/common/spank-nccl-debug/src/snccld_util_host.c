@@ -13,6 +13,7 @@ char *snccld_get_hostname() {
 
     char *res = malloc(len);
     if (gethostname(res, len) != 0) {
+        free(res);
         res = strdup("unknown");
     }
     return res;
