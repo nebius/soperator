@@ -29,7 +29,7 @@ RUN GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 # Second stage: Build image for the prometheus-slurm-exporter
 FROM $BASE_IMAGE AS exporter
 
-ARG SLURM_VERSION=24.05.7
+ARG SLURM_VERSION=24.11.5
 # ARCH has the short form like: amd64, arm64
 ARG ARCH
 # ALT_ARCH has the extended form like: x86_64, aarch64

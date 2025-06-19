@@ -26,7 +26,7 @@ ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
 
 FROM $BASE_IMAGE AS worker_slurmd
 
-ARG SLURM_VERSION=24.05.7
+ARG SLURM_VERSION=24.11.5
 ARG OPENMPI_VERSION=4.1.7a1
 ARG PYXIS_VERSION=0.21.0
 # ARCH has the short form like: amd64, arm64
@@ -127,7 +127,7 @@ RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
 
 # Install slurm pyxis plugin
 RUN apt-get update && \
-    apt -y install nvslurm-plugin-pyxis=${PYXIS_VERSION}-1 && \
+    apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
