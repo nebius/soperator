@@ -7,13 +7,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/logfield"
-	"nebius.ai/slurm-operator/internal/naming"
 )
 
 type RoleBindingReconciler struct {
@@ -83,19 +81,6 @@ func (r *RoleBindingReconciler) Cleanup(
 
 	logger.V(1).Info("RoleBinding deleted", "name", resourceName)
 	return nil
-}
-
-func (r *RoleBindingReconciler) getRoleBinding(ctx context.Context, cluster *slurmv1.SlurmCluster) (*rbacv1.RoleBinding, error) {
-	roleBinding := &rbacv1.RoleBinding{}
-	err := r.Get(
-		ctx,
-		types.NamespacedName{
-			Namespace: cluster.Namespace,
-			Name:      naming.BuildRoleBindingWorkerName(cluster.Name),
-		},
-		roleBinding,
-	)
-	return roleBinding, err
 }
 
 func (r *RoleBindingReconciler) patch(existing, desired client.Object) (client.Patch, error) {
