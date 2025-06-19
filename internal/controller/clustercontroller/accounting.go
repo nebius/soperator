@@ -325,15 +325,12 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 
 					var err error
 					var desired *appsv1.Deployment
-					var deploymentNamePtr *string = nil
 
 					if !isAccountingEnabled {
 						stepLogger.V(1).Info("Removing")
 						deploymentName := naming.BuildDeploymentName(consts.ComponentTypeAccounting)
-						deploymentNamePtr = &deploymentName
-						if err = r.Deployment.Reconcile(stepCtx, cluster, desired, deploymentNamePtr); err != nil {
-							stepLogger.Error(err, "Failed to reconcile")
-							return fmt.Errorf("reconciling accounting Deployment: %w", err)
+						if err = r.Deployment.Cleanup(stepCtx, cluster, deploymentName); err != nil {
+							return fmt.Errorf("cleanup accounting Deployment: %w", err)
 						}
 						stepLogger.V(1).Info("Reconciled")
 						return nil
@@ -360,7 +357,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					}
 					stepLogger.V(1).Info("Retrieved dependencies")
 
-					if err = r.Deployment.Reconcile(stepCtx, cluster, desired, deploymentNamePtr, deps...); err != nil {
+					if err = r.Deployment.Reconcile(stepCtx, cluster, *desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling accounting Deployment: %w", err)
 					}

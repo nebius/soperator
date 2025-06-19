@@ -1,13 +1,13 @@
 package exporter
 
-func buildExporterServiceAccountName(clusterName string) string {
+func BuildExporterServiceAccountName(clusterName string) string {
 	return clusterName + "-exporter-sa"
 }
 
-func buildExporterRoleName(clusterName string) string {
+func BuildExporterRoleName(clusterName string) string {
 	return clusterName + "-exporter-role"
 }
 
-func buildExporterRoleBindingName(clusterName string) string {
+func BuildExporterRoleBindingName(clusterName string) string {
 	return clusterName + "-exporter-role-binding"
 }

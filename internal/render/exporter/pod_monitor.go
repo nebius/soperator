@@ -1,8 +1,6 @@
 package exporter
 
 import (
-	"errors"
-
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -14,12 +12,9 @@ import (
 func RenderPodMonitor(
 	clusterName, namespace string,
 	exporterValues values.SlurmExporter,
-) (*prometheusv1.PodMonitor, error) {
-	if !exporterValues.Enabled {
-		return nil, errors.New("exporter is not enabled")
-	}
+) prometheusv1.PodMonitor {
 	pmConfig := exporterValues.PodMonitorConfig
-	return &prometheusv1.PodMonitor{
+	return prometheusv1.PodMonitor{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterName,
 			Namespace: namespace,
@@ -46,5 +41,5 @@ func RenderPodMonitor(
 				},
 			},
 		},
-	}, nil
+	}
 }

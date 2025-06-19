@@ -95,8 +95,7 @@ func (r SlurmClusterReconciler) ReconcileREST(
 					}
 					stepLogger.V(1).Info("Retrieved dependencies")
 
-					var restNamePtr *string = nil
-					if err = r.Deployment.Reconcile(stepCtx, cluster, desired, restNamePtr, deps...); err != nil {
+					if err = r.Deployment.Reconcile(stepCtx, cluster, *desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling REST API Deployment: %w", err)
 					}

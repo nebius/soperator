@@ -13,7 +13,7 @@ func RenderRole(clusterNamespace, clusterName string) rbacv1.Role {
 
 	return rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      buildExporterRoleName(clusterName),
+			Name:      BuildExporterRoleName(clusterName),
 			Namespace: clusterNamespace,
 			Labels:    labels,
 		},

@@ -16,21 +16,18 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-func RenderDeploymentExporter(clusterValues *values.SlurmCluster) (deployment *appsv1.Deployment, err error) {
-	if !clusterValues.SlurmExporter.Enabled {
-		return nil, errors.New("exporter is not enabled")
+func RenderDeploymentExporter(clusterValues *values.SlurmCluster) (*appsv1.Deployment, error) {
+	replicas := 1
+	if check.IsMaintenanceActive(clusterValues.SlurmExporter.Maintenance) {
+		replicas = 0
 	}
+
 	if clusterValues.SlurmExporter.Container.Image == "" {
 		return nil, errors.New("image for ExporterContainer is empty")
 	}
 
 	labels := common.RenderLabels(consts.ComponentTypeExporter, clusterValues.Name)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeExporter, clusterValues.Name)
-
-	replicas := 1
-	if check.IsMaintenanceActive(clusterValues.SlurmExporter.Maintenance) {
-		replicas = 0
-	}
 
 	// Hack to overcome apparmor labels validation during cluster upgrade reconciliation.
 	// Otherwise Kubernetes API will not validate new deployment:

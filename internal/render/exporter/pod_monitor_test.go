@@ -54,8 +54,7 @@ func Test_RenderPodMonitor(t *testing.T) {
 		},
 	}
 
-	result, err := exporter.RenderPodMonitor(defaultNameCluster, defaultNamespace, slurmExporter)
-	assert.NoError(t, err)
+	result := exporter.RenderPodMonitor(defaultNameCluster, defaultNamespace, slurmExporter)
 	assert.Equal(t, expected.Name, result.Name)
 	assert.Equal(t, expected.Namespace, result.Namespace)
 	assert.Equal(t, expected.Spec.Selector, result.Spec.Selector)

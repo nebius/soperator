@@ -47,8 +47,7 @@ func (r SlurmClusterReconciler) ReconcileSConfigController(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					var sConfigControllerNamePtr *string = nil
-					if err = r.Deployment.Reconcile(stepCtx, cluster, desired, sConfigControllerNamePtr); err != nil {
+					if err = r.Deployment.Reconcile(stepCtx, cluster, *desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling SConfigController Deployment: %w", err)
 					}
@@ -69,7 +68,7 @@ func (r SlurmClusterReconciler) ReconcileSConfigController(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling SConfigController ServiceAccount: %w", err)
 					}
@@ -91,7 +90,7 @@ func (r SlurmClusterReconciler) ReconcileSConfigController(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err := r.Role.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.Role.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling SConfigController Role: %w", err)
 					}
@@ -113,7 +112,7 @@ func (r SlurmClusterReconciler) ReconcileSConfigController(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err := r.RoleBinding.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.RoleBinding.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling SConfigController RoleBinding: %w", err)
 					}
