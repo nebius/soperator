@@ -57,7 +57,7 @@ func RenderStatefulSet(
 		},
 		Spec: kruisev1b1.StatefulSetSpec{
 			PodManagementPolicy: consts.PodManagementPolicy,
-			ServiceName:         login.HeadlessService.Name,
+			ServiceName:         login.Service.Name,
 			Replicas:            replicas,
 			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,

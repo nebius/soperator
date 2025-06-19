@@ -28,8 +28,8 @@ echo "Complement jail rootfs"
 echo "Waiting until munge started"
 while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done
 
-echo "Waiting until sshd user is synced"
-while ! grep -q "^sshd:" /etc/passwd; do sleep 1; done
+# echo "Waiting until sshd user is synced"
+# while ! grep -q "^sshd:" /etc/passwd; do sleep 1; done
 
 echo "Start sshd daemon"
 /usr/sbin/sshd -D -e -f /mnt/ssh-configs/sshd_config
