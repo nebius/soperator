@@ -1,4 +1,5 @@
 #include "snccld_util_dir_file.h"
+#include "snccld_log.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -61,19 +62,22 @@ bool snccld_dir_exists(const char *path) {
 }
 
 void snccld_split_file_path(const char *path, char **dir_out, char **file_out) {
-    char *path_copy_dir = strdup(path);
-    char *real_dir_copy = realpath(dirname(path_copy_dir), NULL);
-    *dir_out            = strdup(real_dir_copy);
-    free(real_dir_copy);
-    free(path_copy_dir);
+    const char *sep = strrchr(path, '/');
+    if (sep) {
+        size_t dir_len = sep - path;
+        *dir_out       = malloc(dir_len + 1);
+        memcpy(*dir_out, path, dir_len);
+        (*dir_out)[dir_len] = '\0';
 
-    char *path_copy_file = strdup(path);
-    *file_out            = strdup(basename(path_copy_file));
-    free(path_copy_file);
+        *file_out = strdup(sep + 1);
+    } else {
+        *dir_out  = strdup(".");
+        *file_out = strdup(path);
+    }
 }
 
 void snccld_ensure_file_exists(const char *path) {
-    char *dir, *file;
+    char *dir = NULL, *file = NULL;
     snccld_split_file_path(path, &dir, &file);
 
     snccld_mkdir_p(dir, SNCCLD_DEFAULT_MODE);
@@ -87,9 +91,15 @@ void snccld_ensure_file_exists(const char *path) {
         file
     );
 
-    const int user_debug_file_fd =
-        open(user_debug_file_absolute, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE);
-    if (user_debug_file_fd > 0) {
+    const int user_debug_file_fd = open(
+        user_debug_file_absolute,
+        O_CREAT | O_WRONLY | O_TRUNC,
+        SNCCLD_DEFAULT_MODE
+    );
+    if (user_debug_file_fd < 0) {
+        snccld_log_error("Cannot create file: '%s'", user_debug_file_absolute);
+    } else {
+        snccld_log_debug("File created: '%s'", user_debug_file_absolute);
         close(user_debug_file_fd);
     }
 }
