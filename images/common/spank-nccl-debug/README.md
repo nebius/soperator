@@ -100,6 +100,10 @@ before it launches.
   [#1021](https://github.com/nebius/soperator/issues/1021)
 - Log rotation & cleanup
   [#1022](https://github.com/nebius/soperator/issues/1022)
+- String deduplication
+  [#1032](https://github.com/nebius/soperator/issues/1032)
+- Separation of argument handling & config management
+  [#1033](https://github.com/nebius/soperator/issues/1033)
 
 ---
 
