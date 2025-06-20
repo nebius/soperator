@@ -282,10 +282,38 @@ func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 
 func generateSpankConfig() renderutils.ConfigFile {
 	res := &renderutils.MultilineStringConfig{}
+
 	res.AddLine(fmt.Sprintf("required chroot.so %s", consts.VolumeMountPathJail))
-	// TODO: make `container_image_save` and `expose_enroot_logs` configurable
+
+	// TODO(@dstaroff): #1034: make `container_image_save` and `expose_enroot_logs` configurable
 	// TODO: enable `expose_enroot_logs` once #413 is resolved.
-	res.AddLine("required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 container_image_save=/var/cache/enroot-container-images/")
+	res.AddLine(strings.Join(
+		[]string{
+			"required",
+			"spank_pyxis.so",
+			"runtime_path=/run/pyxis",
+			"execute_entrypoint=0",
+			"container_scope=global",
+			"sbatch_support=1",
+			"container_image_save=/var/cache/enroot-container-images/",
+		},
+		" ",
+	))
+
+	// TODO(@dstaroff): #1034: Make plugin configurable
+	res.AddLine(strings.Join(
+		[]string{
+			"optional",
+			"spanknccldebug.so",
+			"enabled=True",
+			"log-level=INFO",
+			"out-file=True",
+			"out-dir=/var/log/soperator/nccl-debug",
+			"out-stdout=False",
+		},
+		" ",
+	))
+
 	return res
 }
 

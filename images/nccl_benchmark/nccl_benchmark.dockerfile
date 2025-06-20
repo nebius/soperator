@@ -60,7 +60,8 @@ COPY images/common/spank-nccl-debug/src /usr/src/soperator/spank/nccld-debug
 COPY images/common/scripts/install_nccld_debug_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
     ALT_ARCH=${ALT_ARCH} /opt/bin/install_nccld_debug_plugin.sh && \
-    rm /opt/bin/install_nccld_debug_plugin.sh
+    rm /opt/bin/install_nccld_debug_plugin.sh && \
+    mkdir -p /opt/soperator-outputs/nccl_logs
 
 # Install parallel because it's required for enroot operation
 RUN apt-get update && \
