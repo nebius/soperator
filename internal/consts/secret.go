@@ -18,4 +18,10 @@ const (
 	SecretSshdECDSA25519PubKeyName = SecretSshdECDSA25519KeyName + SecretSshdPublicKeysPostfix
 	SecretSshdRSAKeyName           = "ssh_host_rsa_key"
 	SecretSshdRSAPubKeyName        = SecretSshdRSAKeyName + SecretSshdPublicKeysPostfix
+
+	SecretSlurmdbdSSLServerCACertificateFile  = "ca.crt"
+	SecretSlurmdbdSSLClientKeyPrivateKeyFile  = "tls.key"
+	SecretSlurmdbdSSLClientKeyCertificateFile = "tls.crt"
+	SecretSlurmdbdSSLClientKeyFileMode        = int32(0400)
+	SecretSlurmdbdSSLServerCAFileMode         = int32(0400)
 )

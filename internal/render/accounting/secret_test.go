@@ -27,9 +27,9 @@ func Test_RenderSecret(t *testing.T) {
 
 func Test_RenderSecret_Errors(t *testing.T) {
 	testAcc := *acc
-	// Test with nil secret
+	// Test with nil accounting
 	_, err := accounting.RenderSecret(defaultNamespace, defaultNameCluster, nil, nil, false)
-	assert.Equal(t, accounting.ErrSecretNil, err.Error())
+	assert.Equal(t, accounting.ErrAccountingNil, err.Error())
 
 	// // Test with empty secret data
 	testSecret := &corev1.Secret{}

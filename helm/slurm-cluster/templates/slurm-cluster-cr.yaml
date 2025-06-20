@@ -127,6 +127,18 @@ spec:
         passwordSecretKeyRef:
           name: {{ required ".Values.slurmNodes.accounting.externalDB.passwordSecretKeyRef.name must be provided." .Values.slurmNodes.accounting.externalDB.passwordSecretKeyRef.name | quote }}
           key: {{ required ".Values.slurmNodes.accounting.externalDB.passwordSecretKeyRef.key must be provided." .Values.slurmNodes.accounting.externalDB.passwordSecretKeyRef.key | quote }}
+        {{- if .Values.slurmNodes.accounting.externalDB.tls  }}
+        tls:
+          {{- if .Values.slurmNodes.accounting.externalDB.tls.serverCASecretRef }}
+          serverCASecretRef: {{ .Values.slurmNodes.accounting.externalDB.tls.serverCASecretRef | quote }}
+          {{- end }}
+          {{- if .Values.slurmNodes.accounting.externalDB.tls.clientCertSecretRef }}
+          clientCertSecretRef: {{ .Values.slurmNodes.accounting.externalDB.tls.clientCertSecretRef | quote }}
+          {{- end }}
+        {{- end }}
+        {{- if .Values.slurmNodes.accounting.externalDB.storageParameters }}
+        storageParameters: {{ .Values.slurmNodes.accounting.externalDB.storageParameters | toYaml | nindent 10 }}
+        {{- end }}
       {{- end }}
       {{- if .Values.slurmNodes.accounting.mariadbOperator.enabled }}
       mariadbOperator:
