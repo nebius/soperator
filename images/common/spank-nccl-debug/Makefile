@@ -54,7 +54,7 @@ build: docker-slurm-base
 		.
 
 	@docker run \
-		-v '$(shell pwd)/build:/usr/src/spanknccldebug//build' \
+		-v '$(shell pwd)/build:/usr/src/spanknccldebug/build' \
 		--rm \
 		--platform linux/$(ARCH) \
 		spanknccldebug-builder
@@ -82,14 +82,10 @@ _recreate_configmap:
 
 _restart_pods:
 	@kubectl -n soperator delete pod login-0
-	@kubectl -n soperator delete pod worker-{0,1}
+	@kubectl -n soperator delete pod worker-0
 
 	@echo -n 'Waiting for worker-0 to be Running'
 	@until kubectl -n soperator get pod worker-0 -o jsonpath='{.status.phase}' 2>/dev/null | grep -q Running; do \
-		echo -n '.'; sleep 2; \
-	done;
-	@echo -n 'Waiting for worker-1 to be Running'
-	@until kubectl -n soperator get pod worker-1 -o jsonpath='{.status.phase}' 2>/dev/null | grep -q Running; do \
 		echo -n '.'; sleep 2; \
 	done;
 	@echo '' && echo -n 'Waiting for login-0 to be Running'
