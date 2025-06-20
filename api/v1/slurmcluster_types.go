@@ -182,7 +182,7 @@ type SlurmConfig struct {
 	// See https://slurm.schedmd.com/slurm.conf.html#OPT_MessageTimeout.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=30
+	// +kubebuilder:default=60
 	MessageTimeout *int32 `json:"messageTimeout,omitempty"`
 	// TopologyPlugin identifies the plugin to determine network topology for optimizations.
 	// It is set automatically to `topology/tree` if SlurmTopologyConfigMapRefName is specified.
