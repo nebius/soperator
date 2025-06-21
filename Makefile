@@ -286,6 +286,10 @@ build: manifests generate fmt vet ## Build manager binary with native toolchain.
 run: manifests generate fmt vet ## Run a controller from your host with native toolchain.
 	go run ./cmd/main.go
 
+.PHONY: docker-build-go-base
+docker-build-go-base: ## Build shared Go base image
+	docker build $(DOCKER_BUILD_ARGS) --tag go-base:latest --target go-base ${DOCKER_IGNORE_CACHE} -f images/common/go-base.dockerfile .
+
 .PHONY: docker-build
 docker-build: ## Build docker image
 ifndef IMAGE_NAME
