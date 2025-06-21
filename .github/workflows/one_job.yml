@@ -157,9 +157,6 @@ jobs:
             exit 1
           fi
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
-
       - name: Log in to the Github Container registry
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
         with:
@@ -295,9 +292,6 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: false
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
 
       - name: Log in to the Github Container registry
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
