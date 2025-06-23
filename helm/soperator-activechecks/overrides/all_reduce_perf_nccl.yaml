@@ -20,7 +20,7 @@ activeCheck:
       HC_OUTPUT=$(srun bash -c "health-checker run -e soperator -p 8xH100 -n all_reduce_without_ib --json-log")
       HC_EXIT_CODE=$?
       HC_STATUS=$(echo "$HC_OUTPUT" | jq -r '.status')
-      if [[ "$HC_STATUS" == "ERROR" && $HC_EXIT_CODE -ne 0 ]]; then
+      if [[ "$HC_STATUS" == "ERROR" && $HC_EXIT_CODE -e 1 ]]; then
       echo "Health-checker reported status=ERROR and exited with non-zero status."
       exit 1
       else
