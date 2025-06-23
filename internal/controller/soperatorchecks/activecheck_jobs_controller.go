@@ -197,7 +197,12 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 					reason := consts.SlurmNodeReasonActiveCheckFailedUnknown
 					if activeCheck.Spec.Reactions.SetCondition {
-						reason = consts.SlurmNodeReasonActiveCheckFailed
+						switch activeCheck.Name {
+						case consts.AllReducePerfNcclActiveCheckName:
+							reason = consts.SlurmNodeReasonAllReducePerfNcclFailed
+						default:
+							return ctrl.Result{}, fmt.Errorf("unknown active check name: %s", activeCheck.Name)
+						}
 					}
 					for _, node := range nodes {
 						resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, node,
