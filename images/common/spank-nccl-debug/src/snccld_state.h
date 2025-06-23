@@ -46,19 +46,19 @@ spank_err_t snccld_key_get_from(spank_t spank, snccld_state_key_t *key);
 /// State of the plugin for the particular job.
 typedef struct {
     /// Absolute path of the named pipe (FIFO).
-    char fifo_path[PATH_MAX];
+    char fifo_path[PATH_MAX + 1];
 
     /// Absolute path of the file to store the NCCL debug output.
-    char log_path[PATH_MAX];
+    char log_path[PATH_MAX + 1];
 
     /// Absolute path of the Enroot mount configuration.
-    char mounts_path[PATH_MAX];
+    char mounts_path[PATH_MAX + 1];
 
     /**
      * Absolute path of the file to store the NCCL debug output set by user
      * via NCCL_DEBUG_FILE.
      */
-    char user_log_path[PATH_MAX];
+    char user_log_path[PATH_MAX + 1];
 
     /// PID of the FIFO reading process.
     pid_t tee_pid;

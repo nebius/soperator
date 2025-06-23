@@ -28,10 +28,10 @@ static inline char *_snccld_render_lock_file_path(
     const uint32_t job_id, const uint32_t step_id, const char *op,
     const char *hostname
 ) {
-    char *res = malloc(sizeof(char) * PATH_MAX + 1);
+    char *res = malloc(PATH_MAX + 1);
     snprintf(
         res,
-        PATH_MAX,
+        PATH_MAX + 1,
         SNCCLD_TEMPLATE_FILE_NAME ".lock",
         SNCCLD_SYSTEM_DIR,
         job_id,

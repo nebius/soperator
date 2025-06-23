@@ -130,7 +130,7 @@ SNCCLD_ARG_OUT_FILE_ENV " env var is also supported."
 /// Parse argument with `__parse_fn` if `__env_key` is defined.
 #define SNCCLD_PARSE_ENV_ARG(__env_key, __parse_fn)                            \
     do {                                                                       \
-        char val[PATH_MAX];                                                    \
+        char val[PATH_MAX + 1];                                                \
         if (spank_getenv(spank, __env_key, val, sizeof(val)) ==                \
             ESPANK_SUCCESS) {                                                  \
             __parse_fn(val);                                                   \
@@ -154,7 +154,7 @@ SNCCLD_ARG_OUT_FILE_ENV " env var is also supported."
 typedef struct {
     bool enabled;
     char log_level[8];
-    char out_dir[PATH_MAX];
+    char out_dir[PATH_MAX + 1];
     bool out_file;
     bool out_stdout;
 } snccld_config_t;

@@ -44,7 +44,7 @@ spank_err_t snccld_key_get_from(spank_t spank, snccld_state_key_t *key) {
 static char *_snccld_key_to_state_file_path(
     const snccld_state_key_t *key, const char *hostname
 ) {
-    const size_t buf_size = PATH_MAX * sizeof(char);
+    const size_t buf_size = PATH_MAX + 1;
     char        *res      = malloc(buf_size);
 
     snprintf(
@@ -79,7 +79,7 @@ inline snccld_state_t *snccld_state_new() {
  */
 static inline size_t _snccld_state_file_size(void) {
     const size_t max_len_pid_t = 10;
-    return (PATH_MAX * 4 + max_len_pid_t + 5) * sizeof(char);
+    return PATH_MAX * 4 + max_len_pid_t + 5 + 1;
 }
 
 char *snccld_state_to_string(const snccld_state_t *state) {
@@ -112,16 +112,16 @@ snccld_state_t *snccld_state_from_string(const char *str) {
         }
         switch (line) {
             case 0:
-                snprintf(res->fifo_path, PATH_MAX, "%s", field);
+                snprintf(res->fifo_path, PATH_MAX + 1, "%s", field);
                 break;
             case 1:
-                snprintf(res->log_path, PATH_MAX, "%s", field);
+                snprintf(res->log_path, PATH_MAX + 1, "%s", field);
                 break;
             case 2:
-                snprintf(res->mounts_path, PATH_MAX, "%s", field);
+                snprintf(res->mounts_path, PATH_MAX + 1, "%s", field);
                 break;
             case 3:
-                snprintf(res->user_log_path, PATH_MAX, "%s", field);
+                snprintf(res->user_log_path, PATH_MAX + 1, "%s", field);
                 break;
             case 4:
                 res->tee_pid = (pid_t)atoi(field);

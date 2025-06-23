@@ -175,7 +175,7 @@ static void snccld_run_named_pipe_reading_process(snccld_state_t *state) {
     }
 
     {
-        size_t buf_size    = PATH_MAX * 3;
+        size_t buf_size    = PATH_MAX * 3 + 1;
         char  *tee_command = malloc(buf_size);
         size_t offset      = 0;
         for (size_t i = 0; i < tee_idx; ++i) {
@@ -243,7 +243,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     spank_setenv(spank, SNCCLD_NCCL_ENV_DEBUG, snccld_config.log_level, 1);
 
     // Check if user set debug file.
-    char       user_debug_file[PATH_MAX] = "";
+    char       user_debug_file[PATH_MAX + 1] = "";
     const bool user_set_debug_file =
         (spank_getenv(
              spank,
@@ -272,7 +272,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
             goto mount_config_end;
         }
 
-        char mount_config_filename[PATH_MAX] = "";
+        char mount_config_filename[PATH_MAX + 1] = "";
         snprintf(
             mount_config_filename,
             sizeof(mount_config_filename),
@@ -286,7 +286,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
             "Creating Enroot mount config '%s'.", mount_config_filename
         )
 
-            char lock_filename[PATH_MAX] = "";
+            char lock_filename[PATH_MAX + 1] = "";
         snprintf(
             lock_filename,
             sizeof(lock_filename),
@@ -438,7 +438,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     // If we're here, FIFO has to be constructed.
 user_init_create_fifo:
     snccld_log_info("Named pipe has to be constructed.");
-    char fifo_path[PATH_MAX] = "";
+    char fifo_path[PATH_MAX + 1] = "";
     snprintf(
         fifo_path,
         sizeof(fifo_path),

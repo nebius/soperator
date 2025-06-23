@@ -17,8 +17,8 @@
 #include <slurm/spank.h>
 
 spank_err_t snccld_mkdir_p(const char *path, mode_t mode) {
-    char  tmp[PATH_MAX];
-    char *p = NULL;
+    char  tmp[PATH_MAX + 1] = "";
+    char *p                 = NULL;
 
     if (!path || *path == '\0') {
         return ESPANK_ERROR;
@@ -82,7 +82,7 @@ void snccld_ensure_file_exists(const char *path) {
 
     snccld_mkdir_p(dir, SNCCLD_DEFAULT_MODE);
 
-    char user_debug_file_absolute[PATH_MAX] = "";
+    char user_debug_file_absolute[PATH_MAX + 1] = "";
     snprintf(
         user_debug_file_absolute,
         sizeof(user_debug_file_absolute),
