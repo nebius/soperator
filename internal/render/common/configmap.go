@@ -103,7 +103,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 	res.AddComment("")
 	res.AddProperty("PropagateResourceLimits", "NONE") // Don't propagate ulimits from the login node by default
 	res.AddComment("")
-	res.AddProperty("SchedulerParameters", "extra_constraints")
+	res.AddProperty("SchedulerParameters", "extra_constraints,conmgr_max_connections=512,conmgr_threads=16")
 	res.AddComment("")
 	res.AddComment("HEALTH CHECKS")
 	res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
@@ -112,7 +112,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 		if cluster.ClusterType == consts.ClusterTypeGPU {
 			res.AddProperty("HealthCheckProgram", "/usr/bin/gpu_healthcheck.sh")
 		}
-		res.AddProperty("HealthCheckNodeState", "ANY")
+		res.AddProperty("HealthCheckNodeState", "NONDRAINED_IDLE,CYCLE")
 	} else {
 		res.AddProperty("HealthCheckInterval", cluster.HealthCheckConfig.HealthCheckInterval)
 		res.AddProperty("HealthCheckProgram", cluster.HealthCheckConfig.HealthCheckProgram)
@@ -130,6 +130,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 	res.AddProperty("UnkillableStepTimeout", 600)
 	res.AddProperty("SlurmctldTimeout", 30)
 	res.AddProperty("SlurmdTimeout", 180)
+	res.AddProperty("TCPTimeout", 15)
 	res.AddProperty("WaitTime", 0)
 	res.AddComment("")
 	res.AddComment("SCHEDULING")

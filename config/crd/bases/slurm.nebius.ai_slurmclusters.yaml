@@ -3104,7 +3104,7 @@ spec:
                     format: int32
                     type: integer
                   messageTimeout:
-                    default: 30
+                    default: 60
                     description: |-
                       MessageTimeout specifies the permitted time for a round-trip communication to complete in seconds.
                       See https://slurm.schedmd.com/slurm.conf.html#OPT_MessageTimeout.
