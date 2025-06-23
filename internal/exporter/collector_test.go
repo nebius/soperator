@@ -21,7 +21,7 @@ import (
 
 func TestMetricsCollector_Describe(t *testing.T) {
 	mockClient := &fake.MockClient{}
-	collector := NewMetricsCollector(mockClient, "test-version")
+	collector := NewMetricsCollector(mockClient)
 
 	ch := make(chan *prometheus.Desc, 10)
 	go func() {
@@ -34,9 +34,9 @@ func TestMetricsCollector_Describe(t *testing.T) {
 		descriptors = append(descriptors, desc)
 	}
 
-	// Should have 4 descriptors: sopClusterInfo, nodeInfo, jobInfo, jobNode
+	// Should have 3 descriptors: nodeInfo, jobInfo, jobNode
 	// Plus the nodeGPUSeconds descriptor
-	assert.GreaterOrEqual(t, len(descriptors), 4)
+	assert.GreaterOrEqual(t, len(descriptors), 3)
 
 	// Verify descriptor names
 	found := make(map[string]bool)
@@ -44,7 +44,6 @@ func TestMetricsCollector_Describe(t *testing.T) {
 		found[desc.String()] = true
 	}
 
-	assert.Contains(t, found, `Desc{fqName: "soperator_cluster_info", help: "Soperator cluster information", constLabels: {soperator_version="test-version"}, variableLabels: {}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,instance_id,state_base,state_is_drain,state_is_maintenance,state_is_reserved,address}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_job_info", help: "Slurm job detail information", constLabels: {}, variableLabels: {job_id,job_state,job_state_reason,slurm_partition,job_name,user_name,standard_error,standard_output,array_job_id,array_task_id}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_job", help: "Slurm job node information", constLabels: {}, variableLabels: {job_id,node_name}}`)
@@ -55,7 +54,7 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 
 	synctest.Run(func() {
 		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient, "test-version")
+		collector := NewMetricsCollector(mockClient)
 		time.Sleep(time.Second * 10)
 
 		// Mock successful ListNodes response
@@ -113,8 +112,8 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 			metrics = append(metrics, metric)
 		}
 
-		// Should have at least: 1 cluster info + 2 node info + 1 job info + 1 job node + GPU seconds metrics
-		assert.GreaterOrEqual(t, len(metrics), 5)
+		// Should have at least: 2 node info + 1 job info + 1 job node + GPU seconds metrics
+		assert.GreaterOrEqual(t, len(metrics), 4)
 
 		var metricsText []string
 		for _, metric := range metrics {
@@ -122,7 +121,6 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 		}
 
 		expectedMetrics := []string{
-			`GAUGE; soperator_cluster_info{soperator_version="test-version"} 1`,
 			`GAUGE; slurm_node_info{address="10.0.0.1",instance_id="instance-1",node_name="node-1",state_base="ALLOCATED",state_is_drain="false",state_is_maintenance="false",state_is_reserved="false"} 1`,
 			`GAUGE; slurm_node_info{address="10.0.0.2",instance_id="instance-2",node_name="node-2",state_base="IDLE",state_is_drain="true",state_is_maintenance="false",state_is_reserved="false"} 1`,
 			`COUNTER; slurm_node_gpu_seconds_total{node_name="node-1",state_base="ALLOCATED",state_is_drain="false",state_is_maintenance="false",state_is_reserved="false"} 20`,
@@ -142,7 +140,7 @@ func TestMetricsCollector_Collect_APIError(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	mockClient := &fake.MockClient{}
-	collector := NewMetricsCollector(mockClient, "test-version")
+	collector := NewMetricsCollector(mockClient)
 
 	// Mock failed ListNodes response
 	mockClient.EXPECT().ListNodes(mock.Anything).Return(nil, assert.AnError)
@@ -158,8 +156,8 @@ func TestMetricsCollector_Collect_APIError(t *testing.T) {
 		metrics = append(metrics, metric)
 	}
 
-	// Should still have cluster info metric even if API fails
-	assert.Equal(t, 1, len(metrics))
+	// Should have no metrics if API fails
+	assert.Equal(t, 0, len(metrics))
 
 	mockClient.AssertExpectations(t)
 }
@@ -168,7 +166,7 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	mockClient := &fake.MockClient{}
-	collector := NewMetricsCollector(mockClient, "test-version")
+	collector := NewMetricsCollector(mockClient)
 
 	// Mock nodes with different states to test the node fails metric with new labels
 	testNodes := []slurmapi.Node{

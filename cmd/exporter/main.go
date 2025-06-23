@@ -43,7 +43,6 @@ type Flags struct {
 	slurmAPIServer   string
 	clusterNamespace string
 	clusterName      string
-	soperatorVersion string
 }
 
 func getZapOpts(logFormat, logLevel string) []zap.Opts {
@@ -87,7 +86,6 @@ func parseFlags() Flags {
 	flag.StringVar(&flags.slurmAPIServer, "slurm-api-server", "http://localhost:6820", "The address of the Slurm REST API server.")
 	flag.StringVar(&flags.clusterNamespace, "cluster-namespace", "soperator", "The namespace of the Slurm cluster")
 	flag.StringVar(&flags.clusterName, "cluster-name", "", "The name of the Slurm cluster (required)")
-	flag.StringVar(&flags.soperatorVersion, "soperator-version", "", "Version of the soperator")
 	flag.Parse()
 
 	if flags.clusterName == "" {
@@ -131,9 +129,8 @@ func main() {
 	clusterExporter := exporter.NewClusterExporter(
 		slurmAPIClient,
 		exporter.Params{
-			SlurmAPIServer:   flags.slurmAPIServer,
-			SlurmClusterID:   slurmClusterID,
-			SoperatorVersion: flags.soperatorVersion,
+			SlurmAPIServer: flags.slurmAPIServer,
+			SlurmClusterID: slurmClusterID,
 		},
 	)
 

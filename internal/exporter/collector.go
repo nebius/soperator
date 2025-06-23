@@ -17,7 +17,6 @@ import (
 type MetricsCollector struct {
 	slurmAPIClient slurmapi.Client
 
-	sopClusterInfo *prometheus.Desc
 	nodeInfo       *prometheus.Desc
 	jobInfo        *prometheus.Desc
 	jobNode        *prometheus.Desc
@@ -30,15 +29,13 @@ type MetricsCollector struct {
 }
 
 // NewMetricsCollector creates a new MetricsCollector
-func NewMetricsCollector(slurmAPIClient slurmapi.Client, soperatorVersion string) *MetricsCollector {
-	sopClusterInfoConstLabels := prometheus.Labels{"soperator_version": soperatorVersion}
+func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 	return &MetricsCollector{
 		slurmAPIClient: slurmAPIClient,
 
-		sopClusterInfo: prometheus.NewDesc("soperator_cluster_info", "Soperator cluster information", []string{}, sopClusterInfoConstLabels),
-		nodeInfo:       prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "address"}, nil),
-		jobInfo:        prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "standard_error", "standard_output", "array_job_id", "array_task_id"}, nil),
-		jobNode:        prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
+		nodeInfo: prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "address"}, nil),
+		jobInfo:  prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "standard_error", "standard_output", "array_job_id", "array_task_id"}, nil),
+		jobNode:  prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
 		nodeGPUSeconds: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "slurm_node_gpu_seconds_total",
 			Help: "Total GPU seconds on Slurm nodes",
@@ -55,7 +52,6 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client, soperatorVersion string
 
 // Describe implements the prometheus.Collector interface
 func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- c.sopClusterInfo
 	ch <- c.nodeInfo
 	ch <- c.jobInfo
 	ch <- c.jobNode
@@ -70,7 +66,6 @@ func (c *MetricsCollector) Collect(ch chan<- prometheus.Metric) {
 
 	ctx := context.Background()
 	now := time.Now()
-	ch <- prometheus.MustNewConstMetric(c.sopClusterInfo, prometheus.GaugeValue, 1)
 	logger := log.FromContext(ctx).WithName(ControllerName)
 	nodes, err := c.slurmAPIClient.ListNodes(ctx)
 	if err != nil {

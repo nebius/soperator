@@ -24,8 +24,6 @@ type Params struct {
 	SlurmAPIServer string
 	// SlurmClusterID is the namespaced name of the SlurmCluster resource
 	SlurmClusterID types.NamespacedName
-	// SoperatorVersion is the version the soperator's custom resource.
-	SoperatorVersion string
 }
 
 // Exporter collects metrics from a SLURM cluster and exports them in Prometheus format
@@ -47,7 +45,7 @@ type Exporter struct {
 // NewClusterExporter creates a new SLURM cluster exporter
 func NewClusterExporter(slurmAPIClient slurmapi.Client, params Params) *Exporter {
 	registry := prometheus.NewRegistry()
-	collector := NewMetricsCollector(slurmAPIClient, params.SoperatorVersion)
+	collector := NewMetricsCollector(slurmAPIClient)
 
 	return &Exporter{
 		params:         params,

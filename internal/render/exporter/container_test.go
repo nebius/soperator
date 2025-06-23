@@ -57,7 +57,6 @@ func TestRenderContainerExporter(t *testing.T) {
 			"--cluster-namespace=soperator-ns",
 			"--cluster-name=test-cluster",
 			"--slurm-api-server=http://rest-service.soperator-ns.svc:6817",
-			"--soperator-version=1.0.0",
 		},
 	}
 
