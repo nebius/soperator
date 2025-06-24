@@ -1287,6 +1287,130 @@ spec:
                 required:
                 - ncclBenchmark
                 type: object
+              plugStackConfig:
+                default:
+                  ncclDebug:
+                    enabled: false
+                    logLevel: INFO
+                    outputDirectory: /opt/soperator-outputs/nccl_logs
+                    outputToFile: true
+                    outputToStdOut: false
+                    required: false
+                  pyxis:
+                    containerImageSave: /var/cache/enroot-container-images/
+                    required: true
+                description: PlugStackConfig represents the Plugin stack configurations
+                  in `plugstack.conf`.
+                properties:
+                  customPlugins:
+                    default: []
+                    description: PluginConfigCustom represents a configuration of
+                      custom SPANK plugins.
+                    items:
+                      description: PluginConfigCustom represents a custom SPANK plugin
+                        configuration.
+                      properties:
+                        arguments:
+                          additionalProperties:
+                            type: string
+                          default: {}
+                          description: Arguments define a map of key-value arguments
+                            provided to the plugin.
+                          type: object
+                        path:
+                          description: |-
+                            Path defines an absolute path to the plugin's shared library file.
+                            It could be just a filename of the library if it's located inside `/usr/lib/<ARCH>-linux-gnu/slurm/`.
+                          type: string
+                        required:
+                          default: false
+                          description: |-
+                            Required defines if the plugin is 'required' for SLURM.
+                            Otherwise, 'optional'.
+                          type: boolean
+                      required:
+                      - path
+                      type: object
+                    type: array
+                  ncclDebug:
+                    default:
+                      enabled: false
+                      logLevel: INFO
+                      outputDirectory: /opt/soperator-outputs/nccl_logs
+                      outputToFile: true
+                      outputToStdOut: false
+                      required: false
+                    description: NcclDebug represents the 'NCCL Debug' SPANK plugin
+                      configuration.
+                    properties:
+                      enabled:
+                        default: false
+                        description: Enabled defines whether to enable the plugin.
+                        type: boolean
+                      logLevel:
+                        default: INFO
+                        description: LogLevel defines NCCL's log level to be forced.
+                        enum:
+                        - VERSION
+                        - WARN
+                        - INFO
+                        - TRACE
+                        type: string
+                      outputDirectory:
+                        default: /opt/soperator-outputs/nccl_logs
+                        description: |-
+                          OutputDirectory defines a directory path where OutputToFile has to be created.
+
+                          The path could be both absolute or relative (to where `srun` or `sbatch` are being called from).
+                          The trailing slash is possible.
+
+                          If the path does not exist, it will be created by the plugin.
+                        type: string
+                      outputToFile:
+                        default: true
+                        description: |-
+                          OutputToFile defines whether to additionally redirect `NCCL_DEBUG` outputs to the output file.
+                          Output filename will have the following format:
+                           <WORKER_NAME>.<JOB_ID>.<STEP_ID>.out
+                        type: boolean
+                      outputToStdOut:
+                        default: false
+                        description: |-
+                          OutputToStdOut defines whether to additionally redirect `NCCL_DEBUG` outputs to the standard output stream.
+                          This will make `NCCL_DEBUG` logs being present in job output.
+                        type: boolean
+                      required:
+                        default: false
+                        description: |-
+                          Required defines if NCCL Debug is 'required' for SLURM.
+                          Otherwise, 'optional'.
+                        type: boolean
+                    type: object
+                  pyxis:
+                    default:
+                      containerImageSave: /var/cache/enroot-container-images/
+                      required: true
+                    description: Pyxis represents the 'Pyxis' SPANK plugin configuration.
+                    properties:
+                      containerImageSave:
+                        default: /var/cache/enroot-container-images/
+                        description: |-
+                          ContainerImageSave represents an absolute path to the file or directory where SquashFS files will be stored.
+                          If the specified file or directory already exists, it will be reused.
+                          If the path does not exist, it will be created.
+
+                          A directory path must end with '/' (e.g., /path/to/directory/ vs. /path/to/file).
+                          If the image name contains '/', a nested directory will be created under the specified path (if it is a directory).
+                          If the option argument is empty (""), SquashFS files will not be stored.
+                        type: string
+                      required:
+                        default: true
+                        description: |-
+                          Required defines if Pyxis is 'required' for SLURM.
+                          Otherwise, 'optional'.
+                        type: boolean
+                    type: object
+                type: object
               populateJail:
                 description: PopulateJail defines the k8s Job that performs initial
                   jail file system population
