@@ -11,8 +11,8 @@ activeCheck:
 
       echo "Checking for running GPU processes..."
       if [[ -n "$(nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -v '^ *$')" ]]; then
-      echo "Another GPU process is currently running. Exiting."
-      exit 0
+        echo "Another GPU process is currently running. Exiting."
+        exit 0
       fi
 
       echo "Running all_reduce_without_ib check on $(hostname)..."
@@ -20,11 +20,11 @@ activeCheck:
       HC_EXIT_CODE=$?
       HC_STATUS=$(echo "$HC_OUTPUT" | jq -r '.status')
       if [[ "$HC_STATUS" == "ERROR" && $HC_EXIT_CODE -eq 1 ]]; then
-      echo "Health-checker reported status=ERROR and exited with non-zero status."
-      exit 1
+        echo "Health-checker reported status=ERROR and exited with non-zero status."
+        exit 1
       else
-      echo "Health-checker passed or returned non-ERROR status."
-      exit 0
+        echo "Health-checker passed or returned non-ERROR status."
+        exit 0
       fi
   reactions:
     setCondition: true
