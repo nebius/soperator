@@ -101,6 +101,8 @@ observability:
     namespace: monitoring-system
   vmStack:
     enabled: true
+    projectId: default-project-id
+    publicEndpointEnabled: false
     crds:
       interval: 5m
       timeout: 5m
@@ -130,6 +132,15 @@ observability:
         spec:
           extraArgs:
             promscrape.maxScrapeSize: "33554432"
+            promscrape.dropOriginalLabels: "true"
+            promscrape.streamParse: "true"
+          remoteWriteSettings: {}
+          remoteWrite:
+            - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8429/api/v1/write
+          resources: {}
+          extraEnv: []
+          volumeMounts: []
+          volumes: []
       vmsingle:
         spec:
           extraArgs:
@@ -144,15 +155,6 @@ observability:
             resources:
               requests:
                 storage: 30Gi
-          # remoteWrite:
-          #   - bearerTokenSecret:
-          #       key: accessToken
-          #       name: o11y-writer-sa-token
-          #     url: https://write.monitoring.eu-north1.nebius.cloud./projects/project-e00h61cxzwnf6zksvdn77/prometheus/api/v1/write
-          #   - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8429/api/v1/write
-          # remoteWriteSettings:
-          #   label:
-          #     cluster: soperator
           resources: {}
     overrideValues: null
   vmLogs:
