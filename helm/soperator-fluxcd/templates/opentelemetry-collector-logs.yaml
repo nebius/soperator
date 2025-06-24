@@ -322,7 +322,7 @@ spec:
         fieldRef:
           fieldPath: spec.nodeName
     - name: CLUSTER_NAME
-      value: soperator
+      value: {{ .Values.observability.opentelemetry.clusterName | quote }}
     - name: GOMAXPROCS
       value: "1"
     extraVolumeMounts:
