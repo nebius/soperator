@@ -107,5 +107,4 @@ At the moment, the following information is gathered and can be viewed by users:
 - K8s node metrics: CPU, memory, network, disk usage, etc.
 - K8s pod resource metrics: resource usage by pods & containers.
 - NVIDIA GPU metrics: GPU utilization, power, temperature, etc.
-- Slurm metrics: job queue size, job statuses, node states, resource allocation & consumption, scheduler info, GPU 
-benchmark results, etc. 
+- Slurm metrics: comprehensive monitoring of nodes, jobs, and controller performance. See [SLURM Exporter](slurm-exporter.md) for detailed metrics documentation.
