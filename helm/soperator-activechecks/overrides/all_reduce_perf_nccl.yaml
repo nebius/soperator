@@ -8,17 +8,40 @@ activeCheck:
     eachWorkerJobArray: true
     sbatchScript: |
       #!/bin/bash
+      #SBATCH --deadline="now+6hours"
+      #SBATCH --time=10:00
       #SBATCH --gpus=8
       #SBATCH --mem-per-gpu=16G
-      
+      #SBATCH --gpus-per-node=8
+      #SBATCH --cpus-per-task=16
+      #SBATCH --cpu-bind="verbose,cores"
+      #SBATCH --mem=128G
+      #SBATCH --no-requeue
+      #SBATCH --uid=soperatorchecks
+      #SBATCH --chdir=/home/soperatorchecks
+      #SBATCH --output=/home/soperatorchecks/%x_%A_%j_%n.out
+      #SBATCH --error=/home/soperatorchecks/%x_%A_%j_%n.out
+      #SBATCH -vvv
+
       echo "Checking for running GPU processes..."
       if [[ -n "$(nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -v '^ *$')" ]]; then
         echo "Another GPU process is currently running. Exiting."
         exit 0
       fi
 
+      platform=""
+      gpus_on_node=$(nvidia-smi --query-gpu=name --format=csv,noheader | sort | uniq -c)
+      if [[ "${gpus_on_node}" == *"8 NVIDIA H100"* ]]; then
+        platform="8xH100"
+      elif [[ "${gpus_on_node}" == *"8 NVIDIA H200"* ]]; then
+        platform="8xH200"
+      else
+        echo "Unsupported platform"
+        exit 0
+      fi
+
       echo "Running all_reduce_without_ib check on $(hostname)..."
-      HC_OUTPUT=$(srun bash -c "health-checker run -e soperator -p 8xH100 -n all_reduce_without_ib --json-log")
+      HC_OUTPUT=$(srun bash -c "health-checker run -e soperator -p $platform -n all_reduce_without_ib --json-log")
       echo "Health checker output: $HC_OUTPUT"
       HC_EXIT_CODE=$?
       HC_STATUS=$(echo "$HC_OUTPUT" | jq -r '.status')
