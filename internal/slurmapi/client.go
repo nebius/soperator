@@ -165,3 +165,18 @@ func (c *client) ListJobs(ctx context.Context) ([]Job, error) {
 
 	return jobs, nil
 }
+
+func (c *client) GetDiag(ctx context.Context) (*slurmapispec.V0041OpenapiDiagResp, error) {
+	getDiagResp, err := c.SlurmV0041GetDiagWithResponse(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get diag: %w", err)
+	}
+	if getDiagResp.JSON200 == nil {
+		return nil, fmt.Errorf("json200 field is nil")
+	}
+	if getDiagResp.JSON200.Errors != nil && len(*getDiagResp.JSON200.Errors) != 0 {
+		return nil, fmt.Errorf("get diag responded with errors: %v", *getDiagResp.JSON200.Errors)
+	}
+
+	return getDiagResp.JSON200, nil
+}

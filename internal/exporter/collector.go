@@ -23,6 +23,12 @@ type MetricsCollector struct {
 	nodeGPUSeconds *prometheus.CounterVec
 	nodeFails      *prometheus.CounterVec
 
+	rpcCallsTotal               *prometheus.Desc
+	rpcDurationSecondsTotal     *prometheus.Desc
+	rpcUserCallsTotal           *prometheus.Desc
+	rpcUserDurationSecondsTotal *prometheus.Desc
+	controllerServerThreadCount *prometheus.Desc
+
 	lastNodeGPUTimeUpdated time.Time
 	nodes                  map[string]slurmapi.Node
 	stateMutex             sync.RWMutex
@@ -45,6 +51,12 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 			Help: "Total number of times a node has failed (went from not down/drain to down/drain state)",
 		}, []string{"node_name", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "reason"}),
 
+		rpcCallsTotal:               prometheus.NewDesc("slurm_controller_rpc_calls_total", "Total count of RPC calls by message type", []string{"message_type"}, nil),
+		rpcDurationSecondsTotal:     prometheus.NewDesc("slurm_controller_rpc_duration_seconds_total", "Total time spent processing RPCs by message type", []string{"message_type"}, nil),
+		rpcUserCallsTotal:           prometheus.NewDesc("slurm_controller_rpc_user_calls_total", "Total count of RPC calls by user", []string{"user", "user_id"}, nil),
+		rpcUserDurationSecondsTotal: prometheus.NewDesc("slurm_controller_rpc_user_duration_seconds_total", "Total time spent on user RPCs", []string{"user", "user_id"}, nil),
+		controllerServerThreadCount: prometheus.NewDesc("slurm_controller_server_thread_count", "Number of server threads", nil, nil),
+
 		lastNodeGPUTimeUpdated: time.Now(),
 		nodes:                  make(map[string]slurmapi.Node),
 	}
@@ -57,6 +69,12 @@ func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.jobNode
 	c.nodeGPUSeconds.Describe(ch)
 	c.nodeFails.Describe(ch)
+
+	ch <- c.rpcCallsTotal
+	ch <- c.rpcDurationSecondsTotal
+	ch <- c.rpcUserCallsTotal
+	ch <- c.rpcUserDurationSecondsTotal
+	ch <- c.controllerServerThreadCount
 }
 
 // Collect implements the prometheus.Collector interface
@@ -109,6 +127,10 @@ func (c *MetricsCollector) Collect(ch chan<- prometheus.Metric) {
 
 	for slurmJobMetric := range c.slurmJobMetrics(ctx, jobs) {
 		ch <- slurmJobMetric
+	}
+
+	for rpcMetric := range c.slurmRPCMetrics(ctx) {
+		ch <- rpcMetric
 	}
 
 	logger.Info("Collected metrics", "elapsed_seconds", time.Now().Sub(now).Seconds())
@@ -177,6 +199,56 @@ func (c *MetricsCollector) slurmJobMetrics(
 			for _, nodeName := range nodeList {
 				jobNodeLabels := []string{job.GetIDString(), nodeName}
 				yield(prometheus.MustNewConstMetric(c.jobNode, prometheus.GaugeValue, 1, jobNodeLabels...))
+			}
+		}
+	}
+}
+
+func (c *MetricsCollector) slurmRPCMetrics(
+	ctx context.Context,
+) iter.Seq[prometheus.Metric] {
+	return func(yield func(prometheus.Metric) bool) {
+		logger := log.FromContext(ctx).WithName(ControllerName)
+
+		diag, err := c.slurmAPIClient.GetDiag(ctx)
+		if err != nil {
+			logger.Error(err, "Failed to get diagnostics from SLURM API")
+			return
+		}
+
+		stats := diag.Statistics
+
+		if stats.ServerThreadCount != nil {
+			yield(prometheus.MustNewConstMetric(c.controllerServerThreadCount, prometheus.GaugeValue, float64(*stats.ServerThreadCount)))
+		}
+		if stats.RpcsByMessageType != nil {
+			for _, rpc := range *stats.RpcsByMessageType {
+				messageType := rpc.MessageType
+
+				if rpc.Count > 0 {
+					yield(prometheus.MustNewConstMetric(c.rpcCallsTotal, prometheus.CounterValue, float64(rpc.Count), messageType))
+				}
+
+				if rpc.TotalTime > 0 {
+					durationSeconds := float64(rpc.TotalTime) / 1_000_000
+					yield(prometheus.MustNewConstMetric(c.rpcDurationSecondsTotal, prometheus.CounterValue, durationSeconds, messageType))
+				}
+			}
+		}
+
+		if stats.RpcsByUser != nil {
+			for _, userRpc := range *stats.RpcsByUser {
+				user := userRpc.User
+				userID := strconv.Itoa(int(userRpc.UserId))
+
+				if userRpc.Count > 0 {
+					yield(prometheus.MustNewConstMetric(c.rpcUserCallsTotal, prometheus.CounterValue, float64(userRpc.Count), user, userID))
+				}
+
+				if userRpc.TotalTime > 0 {
+					durationSeconds := float64(userRpc.TotalTime) / 1_000_000
+					yield(prometheus.MustNewConstMetric(c.rpcUserDurationSecondsTotal, prometheus.CounterValue, durationSeconds, user, userID))
+				}
 			}
 		}
 	}

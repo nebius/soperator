@@ -258,6 +258,64 @@ func (_c *MockClient_ListNodes_Call) RunAndReturn(run func(context.Context) ([]s
 	return _c
 }
 
+// GetDiag provides a mock function with given fields: ctx
+func (_m *MockClient) GetDiag(ctx context.Context) (*v0041.V0041OpenapiDiagResp, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetDiag")
+	}
+
+	var r0 *v0041.V0041OpenapiDiagResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (*v0041.V0041OpenapiDiagResp, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) *v0041.V0041OpenapiDiagResp); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0041.V0041OpenapiDiagResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_GetDiag_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetDiag'
+type MockClient_GetDiag_Call struct {
+	*mock.Call
+}
+
+// GetDiag is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockClient_Expecter) GetDiag(ctx interface{}) *MockClient_GetDiag_Call {
+	return &MockClient_GetDiag_Call{Call: _e.mock.On("GetDiag", ctx)}
+}
+
+func (_c *MockClient_GetDiag_Call) Run(run func(ctx context.Context)) *MockClient_GetDiag_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockClient_GetDiag_Call) Return(_a0 *v0041.V0041OpenapiDiagResp, _a1 error) *MockClient_GetDiag_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_GetDiag_Call) RunAndReturn(run func(context.Context) (*v0041.V0041OpenapiDiagResp, error)) *MockClient_GetDiag_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SlurmV0041DeleteJobWithResponse provides a mock function with given fields: ctx, jobId, params, reqEditors
 func (_m *MockClient) SlurmV0041DeleteJobWithResponse(ctx context.Context, jobId string, params *v0041.SlurmV0041DeleteJobParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041DeleteJobResponse, error) {
 	_va := make([]interface{}, len(reqEditors))

@@ -12,4 +12,5 @@ type Client interface {
 	GetNode(ctx context.Context, nodeName string) (Node, error)
 	GetJobsByID(ctx context.Context, jobID string) ([]Job, error)
 	ListJobs(ctx context.Context) ([]Job, error)
+	GetDiag(ctx context.Context) (*api.V0041OpenapiDiagResp, error)
 }
