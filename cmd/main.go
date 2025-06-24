@@ -156,6 +156,7 @@ func main() {
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 5*time.Minute, "The maximum duration allowed for caching sync")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.BoolVar(&topologyControllerEnabled, "enable-topology-controller", false, "if set, the topology controller will be enabled.")
+	flag.Parse()
 	opts := getZapOpts(logFormat, logLevel)
 	ctrl.SetLogger(zap.New(opts...))
 	setupLog := ctrl.Log.WithName("setup")
