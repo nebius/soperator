@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	slurmapispec "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,16 +13,16 @@ import (
 func TestJobFromAPI(t *testing.T) {
 	tests := []struct {
 		name    string
-		apiJob  slurmapispec.V0041JobInfo
+		apiJob  api.V0041JobInfo
 		want    Job
 		wantErr bool
 	}{
 		{
 			name: "complete job",
-			apiJob: slurmapispec.V0041JobInfo{
+			apiJob: api.V0041JobInfo{
 				JobId:          ptr(int32(12345)),
 				Name:           ptr("test_job"),
-				JobState:       &[]slurmapispec.V0041JobInfoJobState{slurmapispec.V0041JobInfoJobStateCOMPLETED},
+				JobState:       &[]api.V0041JobInfoJobState{api.V0041JobInfoJobStateCOMPLETED},
 				StateReason:    ptr("None"),
 				Partition:      ptr("gpu"),
 				UserName:       ptr("testuser"),
@@ -49,9 +49,9 @@ func TestJobFromAPI(t *testing.T) {
 		},
 		{
 			name: "minimal job",
-			apiJob: slurmapispec.V0041JobInfo{
+			apiJob: api.V0041JobInfo{
 				JobId:    ptr(int32(123)),
-				JobState: &[]slurmapispec.V0041JobInfoJobState{slurmapispec.V0041JobInfoJobStateCOMPLETED},
+				JobState: &[]api.V0041JobInfoJobState{api.V0041JobInfoJobStateCOMPLETED},
 			},
 			want: Job{
 				ID:    123,
@@ -61,7 +61,7 @@ func TestJobFromAPI(t *testing.T) {
 		},
 		{
 			name: "job without ID",
-			apiJob: slurmapispec.V0041JobInfo{
+			apiJob: api.V0041JobInfo{
 				Name: ptr("test"),
 			},
 			want:    Job{},
@@ -69,7 +69,7 @@ func TestJobFromAPI(t *testing.T) {
 		},
 		{
 			name: "job without State",
-			apiJob: slurmapispec.V0041JobInfo{
+			apiJob: api.V0041JobInfo{
 				JobId: ptr(int32(123)),
 			},
 			want:    Job{},
@@ -122,7 +122,7 @@ func TestJobFromAPI_SmokeTest(t *testing.T) {
 			data, err := os.ReadFile(tt.filename)
 			require.NoError(t, err)
 
-			var apiJob slurmapispec.V0041JobInfo
+			var apiJob api.V0041JobInfo
 			err = json.Unmarshal(data, &apiJob)
 			require.NoError(t, err)
 

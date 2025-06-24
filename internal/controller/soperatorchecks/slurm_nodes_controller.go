@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	slurmapispec "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -126,7 +126,7 @@ func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types
 		}
 
 		for _, node := range slurmNodes {
-			if _, ok := node.States[slurmapispec.V0041NodeStateDRAIN]; !ok {
+			if _, ok := node.States[api.V0041NodeStateDRAIN]; !ok {
 				// Node is not drained, skipping
 				continue
 			}
@@ -396,9 +396,9 @@ func (c *SlurmNodesController) drainSlurmNode(
 	}
 
 	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
-		slurmapispec.V0041UpdateNodeMsg{
+		api.V0041UpdateNodeMsg{
 			Reason: ptr.To(string(reason)),
-			State:  ptr.To([]slurmapispec.V0041UpdateNodeMsgState{slurmapispec.V0041UpdateNodeMsgStateDRAIN}),
+			State:  ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateDRAIN}),
 		},
 	)
 	if err != nil {
@@ -469,8 +469,8 @@ func (c *SlurmNodesController) undrainSlurmNode(
 	}
 
 	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
-		slurmapispec.V0041UpdateNodeMsg{
-			State: ptr.To([]slurmapispec.V0041UpdateNodeMsgState{slurmapispec.V0041UpdateNodeMsgStateRESUME}),
+		api.V0041UpdateNodeMsg{
+			State: ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateRESUME}),
 		},
 	)
 	if err != nil {

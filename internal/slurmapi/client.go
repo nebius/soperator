@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	api "github.com/SlinkyProject/slurm-client/api/v0041"
-	slurmapispec "github.com/SlinkyProject/slurm-client/api/v0041"
 	"github.com/hashicorp/go-retryablehttp"
 )
 
@@ -68,7 +67,7 @@ func (c *client) setHeaders(ctx context.Context, req *http.Request) error {
 }
 
 func (c *client) ListNodes(ctx context.Context) ([]Node, error) {
-	getNodesResp, err := c.SlurmV0041GetNodesWithResponse(ctx, &slurmapispec.SlurmV0041GetNodesParams{})
+	getNodesResp, err := c.SlurmV0041GetNodesWithResponse(ctx, &api.SlurmV0041GetNodesParams{})
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
@@ -93,7 +92,7 @@ func (c *client) ListNodes(ctx context.Context) ([]Node, error) {
 }
 
 func (c *client) GetNode(ctx context.Context, nodeName string) (Node, error) {
-	getNodesResp, err := c.SlurmV0041GetNodeWithResponse(ctx, nodeName, &slurmapispec.SlurmV0041GetNodeParams{})
+	getNodesResp, err := c.SlurmV0041GetNodeWithResponse(ctx, nodeName, &api.SlurmV0041GetNodeParams{})
 	if err != nil {
 		return Node{}, fmt.Errorf("get node %s: %w", nodeName, err)
 	}
@@ -117,7 +116,7 @@ func (c *client) GetNode(ctx context.Context, nodeName string) (Node, error) {
 }
 
 func (c *client) GetJobsByID(ctx context.Context, jobID string) ([]Job, error) {
-	getJobResp, err := c.SlurmV0041GetJobWithResponse(ctx, jobID, &slurmapispec.SlurmV0041GetJobParams{})
+	getJobResp, err := c.SlurmV0041GetJobWithResponse(ctx, jobID, &api.SlurmV0041GetJobParams{})
 	if err != nil {
 		return nil, fmt.Errorf("get job %s: %w", jobID, err)
 	}
@@ -142,7 +141,7 @@ func (c *client) GetJobsByID(ctx context.Context, jobID string) ([]Job, error) {
 }
 
 func (c *client) ListJobs(ctx context.Context) ([]Job, error) {
-	getJobsResp, err := c.SlurmV0041GetJobsWithResponse(ctx, &slurmapispec.SlurmV0041GetJobsParams{})
+	getJobsResp, err := c.SlurmV0041GetJobsWithResponse(ctx, &api.SlurmV0041GetJobsParams{})
 	if err != nil {
 		return nil, fmt.Errorf("list jobs: %w", err)
 	}
@@ -166,7 +165,7 @@ func (c *client) ListJobs(ctx context.Context) ([]Job, error) {
 	return jobs, nil
 }
 
-func (c *client) GetDiag(ctx context.Context) (*slurmapispec.V0041OpenapiDiagResp, error) {
+func (c *client) GetDiag(ctx context.Context) (*api.V0041OpenapiDiagResp, error) {
 	getDiagResp, err := c.SlurmV0041GetDiagWithResponse(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get diag: %w", err)
