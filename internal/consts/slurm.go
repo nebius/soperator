@@ -29,4 +29,5 @@ var SlurmNodeReasonsMap = map[string]struct{}{
 const (
 	SlurmConfigRawStrategyPatch    = "patch"
 	SlurmConfigRawStrategyOverride = "override"
+	SlurmTopologyTree              = "topology/tree"
 )

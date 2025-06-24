@@ -119,14 +119,15 @@ func getZapOpts(logFormat, logLevel string) []zap.Opts {
 
 func main() {
 	var (
-		metricsAddr          string
-		enableLeaderElection bool
-		probeAddr            string
-		secureMetrics        bool
-		enableHTTP2          bool
-		logFormat            string
-		logLevel             string
-		soperatorNamespace   string
+		metricsAddr               string
+		enableLeaderElection      bool
+		probeAddr                 string
+		secureMetrics             bool
+		enableHTTP2               bool
+		logFormat                 string
+		logLevel                  string
+		soperatorNamespace        string
+		topologyControllerEnabled bool
 
 		cacheSyncTimeout time.Duration
 		maxConcurrency   int
@@ -154,8 +155,7 @@ func main() {
 	flag.StringVar(&logLevel, "log-level", "info", "Log level: debug, info, warn, error, dpanic, panic, fatal")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 5*time.Minute, "The maximum duration allowed for caching sync")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
-	flag.Parse()
-
+	flag.BoolVar(&topologyControllerEnabled, "enable-topology-controller", false, "if set, the topology controller will be enabled.")
 	opts := getZapOpts(logFormat, logLevel)
 	ctrl.SetLogger(zap.New(opts...))
 	setupLog := ctrl.Log.WithName("setup")
@@ -251,32 +251,34 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = topologyconfcontroller.NewNodeTopologyReconciler(
-		mgr.GetClient(),
-		mgr.GetScheme(),
-		soperatorNamespace,
-	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(
-			err,
-			"unable to create controller",
-			"controller",
-			topologyconfcontroller.NodeTopologyReconcilerName,
-		)
-		os.Exit(1)
-	}
+	if topologyControllerEnabled {
+		if err = topologyconfcontroller.NewNodeTopologyReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			soperatorNamespace,
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			setupLog.Error(
+				err,
+				"unable to create controller",
+				"controller",
+				topologyconfcontroller.NodeTopologyReconcilerName,
+			)
+			os.Exit(1)
+		}
 
-	if err = topologyconfcontroller.NewWorkerTopologyReconciler(
-		mgr.GetClient(),
-		mgr.GetScheme(),
-		soperatorNamespace,
-	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(
-			err,
-			"unable to create controller",
-			"controller",
-			topologyconfcontroller.WorkerTopologyReconcilerName,
-		)
-		os.Exit(1)
+		if err = topologyconfcontroller.NewWorkerTopologyReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			soperatorNamespace,
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			setupLog.Error(
+				err,
+				"unable to create controller",
+				"controller",
+				topologyconfcontroller.WorkerTopologyReconcilerName,
+			)
+			os.Exit(1)
+		}
 	}
 	//+kubebuilder:scaffold:builder
 
