@@ -96,6 +96,10 @@ spec:
       failureActions:
         setSlurmNodeDrainState: {{ default true .Values.periodicChecks.ncclBenchmark.failureActions.setSlurmNodeDrainState }}
       k8sNodeFilterName: {{ (required ".Values.periodicChecks.ncclBenchmark.k8sNodeFilterName must be provided." .Values.periodicChecks.ncclBenchmark.k8sNodeFilterName ) | quote }}
+  {{- if .Values.plugStackConfig }}
+  plugStackConfig:
+    {{- toYaml .Values.plugStackConfig | nindent 4 }}
+  {{- end }}
   slurmNodes:
     accounting:
       k8sNodeFilterName: {{ required ".Values.slurmNodes.accounting.k8sNodeFilterName must be provided." .Values.slurmNodes.accounting.k8sNodeFilterName | quote }}

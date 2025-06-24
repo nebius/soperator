@@ -167,6 +167,24 @@ slurmConfig: {}
 # taskPluginParam: "Verbose"
 # maxJobCount: 10000
 # minJobAge: 86400
+
+plugStackConfig: {}
+#  pyxis:
+#    required: true
+#    containerImageSave: "/var/cache/enroot-container-images/"
+#  ncclDebug:
+#    required: false
+#    enabled: true
+#    logLevel: "INFO"
+#    outputToFile: true
+#    outputToStdOut: false
+#    outputDirectory: "/opt/soperator-outputs/nccl_logs"
+#  customPlugins:
+#    - required: true
+#      path: custom.so
+#      arguments:
+#        foo: bar
+
 slurmNodes:
   accounting:
     enabled: false
