@@ -3,12 +3,14 @@ activeCheck:
   suspend: false
   name: "all-reduce-perf-nccl"
   checkType: "slurmJob"
-  schedule: "0 0 * * *"    # every 24 hours
+  schedule: "0 */8 * * *"   # every 8 hours
   slurmJobSpec:
     eachWorkerJobArray: true
     sbatchScript: |
       #!/bin/bash
-
+      #SBATCH --gpus=8
+      #SBATCH --mem-per-gpu=16G
+      
       echo "Checking for running GPU processes..."
       if [[ -n "$(nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -v '^ *$')" ]]; then
         echo "Another GPU process is currently running. Exiting."
@@ -17,6 +19,7 @@ activeCheck:
 
       echo "Running all_reduce_without_ib check on $(hostname)..."
       HC_OUTPUT=$(srun bash -c "health-checker run -e soperator -p 8xH100 -n all_reduce_without_ib --json-log")
+      echo "Health checker output: $HC_OUTPUT"
       HC_EXIT_CODE=$?
       HC_STATUS=$(echo "$HC_OUTPUT" | jq -r '.status')
       if [[ "$HC_STATUS" == "ERROR" && $HC_EXIT_CODE -eq 1 ]]; then
