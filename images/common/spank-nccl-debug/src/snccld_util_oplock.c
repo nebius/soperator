@@ -34,9 +34,9 @@ static inline char *_snccld_render_lock_file_path(
         PATH_MAX + 1,
         SNCCLD_TEMPLATE_FILE_NAME ".lock",
         SNCCLD_SYSTEM_DIR,
+        hostname,
         job_id,
         step_id,
-        hostname,
         op
     );
     return res;

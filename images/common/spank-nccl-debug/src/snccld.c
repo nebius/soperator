@@ -97,7 +97,7 @@ void _snccld_log_context(const char *func_name, spank_t spank) {
         job_id,
         job_stepid,
         task_pid
-    )
+    );
 #endif
 }
 
@@ -287,9 +287,9 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         );
         snccld_log_info(
             "Creating Enroot mount config '%s'.", mount_config_filename
-        )
+        );
 
-            char lock_filename[PATH_MAX + 1] = "";
+        char lock_filename[PATH_MAX + 1] = "";
         snprintf(
             lock_filename,
             sizeof(lock_filename),
@@ -388,9 +388,9 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
             sizeof(state->log_path),
             SNCCLD_TEMPLATE_FILE_NAME,
             snccld_config.out_dir,
+            hostname,
             key->job_id,
             key->step_id,
-            hostname,
             "out"
         );
     }
@@ -447,9 +447,9 @@ user_init_create_fifo:
         sizeof(fifo_path),
         SNCCLD_TEMPLATE_FILE_NAME,
         SNCCLD_SYSTEM_DIR,
+        hostname,
         key->job_id,
         key->step_id,
-        hostname,
         "fifo"
     );
     if (mkfifo(fifo_path, SNCCLD_DEFAULT_MODE) != 0 && errno != EEXIST) {

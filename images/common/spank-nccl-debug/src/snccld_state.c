@@ -52,9 +52,9 @@ static char *_snccld_key_to_state_file_path(
         buf_size,
         SNCCLD_TEMPLATE_FILE_NAME,
         SNCCLD_SYSTEM_DIR,
+        hostname,
         key->job_id,
         key->step_id,
-        hostname,
         "state"
     );
 

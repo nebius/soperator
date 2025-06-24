@@ -13,7 +13,7 @@
 
 #define SNCCLD_SYSTEM_DIR         "/tmp/nccl_debug"
 #define SNCCLD_DEFAULT_MODE       0666
-#define SNCCLD_TEMPLATE_FILE_NAME "%s/%u-%u.%s.%s"
+#define SNCCLD_TEMPLATE_FILE_NAME "%s/%s.%u.%u.%s"
 
 /**
  * Make directory with all its parent directories.
