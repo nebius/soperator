@@ -17,11 +17,8 @@ activeCheck:
       #SBATCH --cpu-bind="verbose,cores"
       #SBATCH --mem=128G
       #SBATCH --no-requeue
-      #SBATCH --uid=soperatorchecks
-      #SBATCH --chdir=/home/soperatorchecks
       #SBATCH --output=/home/soperatorchecks/%x_%A_%j_%n.out
       #SBATCH --error=/home/soperatorchecks/%x_%A_%j_%n.out
-      #SBATCH -vvv
 
       echo "Checking for running GPU processes..."
       if [[ -n "$(nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -v '^ *$')" ]]; then
