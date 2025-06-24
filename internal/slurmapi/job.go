@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	slurmapispec "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,7 +29,7 @@ type Job struct {
 	SubmitTime     *metav1.Time
 }
 
-func JobFromAPI(apiJob slurmapispec.V0041JobInfo) (Job, error) {
+func JobFromAPI(apiJob api.V0041JobInfo) (Job, error) {
 	job := Job{}
 
 	if apiJob.JobId == nil {
@@ -126,20 +126,20 @@ func (j Job) GetRequiredNodeList() ([]string, error) {
 
 func (j Job) IsTerminalState() bool {
 	switch j.State {
-	case string(slurmapispec.V0041JobInfoJobStateFAILED),
-		string(slurmapispec.V0041JobInfoJobStateCANCELLED),
-		string(slurmapispec.V0041JobInfoJobStateTIMEOUT),
-		string(slurmapispec.V0041JobInfoJobStateOUTOFMEMORY),
-		string(slurmapispec.V0041JobInfoJobStateBOOTFAIL),
-		string(slurmapispec.V0041JobInfoJobStateDEADLINE),
-		string(slurmapispec.V0041JobInfoJobStateLAUNCHFAILED),
-		string(slurmapispec.V0041JobInfoJobStateNODEFAIL),
-		string(slurmapispec.V0041JobInfoJobStatePREEMPTED),
-		string(slurmapispec.V0041JobInfoJobStateRECONFIGFAIL),
-		string(slurmapispec.V0041JobInfoJobStateREVOKED),
-		string(slurmapispec.V0041JobInfoJobStateSPECIALEXIT),
-		string(slurmapispec.V0041JobInfoJobStateCOMPLETED),
-		string(slurmapispec.V0041JobInfoJobStateSTOPPED):
+	case string(api.V0041JobInfoJobStateFAILED),
+		string(api.V0041JobInfoJobStateCANCELLED),
+		string(api.V0041JobInfoJobStateTIMEOUT),
+		string(api.V0041JobInfoJobStateOUTOFMEMORY),
+		string(api.V0041JobInfoJobStateBOOTFAIL),
+		string(api.V0041JobInfoJobStateDEADLINE),
+		string(api.V0041JobInfoJobStateLAUNCHFAILED),
+		string(api.V0041JobInfoJobStateNODEFAIL),
+		string(api.V0041JobInfoJobStatePREEMPTED),
+		string(api.V0041JobInfoJobStateRECONFIGFAIL),
+		string(api.V0041JobInfoJobStateREVOKED),
+		string(api.V0041JobInfoJobStateSPECIALEXIT),
+		string(api.V0041JobInfoJobStateCOMPLETED),
+		string(api.V0041JobInfoJobStateSTOPPED):
 		return true
 	default:
 		return false
@@ -147,7 +147,7 @@ func (j Job) IsTerminalState() bool {
 }
 
 func (j Job) IsFailedState() bool {
-	return j.State == string(slurmapispec.V0041JobInfoJobStateFAILED)
+	return j.State == string(api.V0041JobInfoJobStateFAILED)
 }
 
 func parseNodeList(nodeString string) ([]string, error) {
@@ -257,7 +257,7 @@ func expandNodeRange(nodePattern string) ([]string, error) {
 	return nodes, nil
 }
 
-func convertToMetav1Time(input *slurmapispec.V0041Uint64NoValStruct) *metav1.Time {
+func convertToMetav1Time(input *api.V0041Uint64NoValStruct) *metav1.Time {
 	if input == nil || input.Set == nil || !*input.Set || input.Number == nil {
 		return nil
 	}
@@ -270,7 +270,7 @@ func convertToMetav1Time(input *slurmapispec.V0041Uint64NoValStruct) *metav1.Tim
 	return &metav1.Time{Time: t}
 }
 
-func convertToInt(input *slurmapispec.V0041Uint32NoValStruct) *int32 {
+func convertToInt(input *api.V0041Uint32NoValStruct) *int32 {
 	if input == nil || input.Set == nil || !*input.Set || input.Number == nil {
 		return nil
 	}
