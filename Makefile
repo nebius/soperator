@@ -379,6 +379,8 @@ CONTROLLER_TOOLS_VERSION ?= v0.16.4
 ENVTEST_VERSION          ?= release-0.17
 GOLANGCI_LINT_VERSION    ?= v2.0.2  # Should be in sync with the github CI step.
 HELMIFY_VERSION          ?= 0.4.13
+HELM_VERSION						 ?= v3.18.3
+HELM_UNITTEST_VERSION    ?= 0.8.2
 YQ_VERSION               ?= 4.44.3
 
 .PHONY: kustomize
@@ -418,3 +420,34 @@ $(HELMIFY): $(LOCALBIN)
 yq: $(YQ) ## Download yq locally if necessary.
 $(YQ): $(LOCALBIN)
 	test -s $(LOCALBIN)/yq || GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@v$(YQ_VERSION)
+
+.PHONY: helmtest check-helm install-helm install-unittest
+
+## helm unittest: Run helm unittest with dependency check
+helmtest: check-helm
+	@echo "Running helm unittest"
+	@helm unittest $(CHART_PATH)/soperator-fluxcd
+
+check-helm:
+	@echo "Checking Helm installation..."
+	@if ! command -v helm >/dev/null 2>&1; then \
+		echo "Helm not found, installing..."; \
+		$(MAKE) install-helm; \
+	else \
+		echo "Helm found: $$(helm version --short)"; \
+	fi
+	@echo "Checking helm-unittest plugin..."
+	@if ! helm plugin list 2>/dev/null | grep -q unittest; then \
+		echo "helm-unittest plugin not found, installing..."; \
+		$(MAKE) install-unittest; \
+	else \
+		echo "helm-unittest plugin found"; \
+	fi
+
+install-helm:
+	@echo "Installing Helm $(HELM_VERSION)..."
+	@curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+install-unittest:
+	@echo "Installing helm-unittest plugin $(HELM_UNITTEST_VERSION)..."
+	@helm plugin install https://github.com/helm-unittest/helm-unittest --version $(HELM_UNITTEST_VERSION)

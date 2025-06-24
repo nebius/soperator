@@ -126,7 +126,96 @@ spec:
         operator:
           disable_prometheus_converter: false
           enable_converter_ownership: true
-      vmagent: {{ toYaml .Values.observability.vmStack.values.vmagent | nindent 8 }}
+      vmagent:
+        spec:
+          {{- if .Values.observability.vmStack.publicEndpointEnabled }}
+          remoteWriteSettings:
+            label:
+              container_id: {{ .Values.observability.vmStack.projectId  }}
+            {{- if and .Values.observability.vmStack.values .Values.observability.vmStack.values.vmagent .Values.observability.vmStack.values.vmagent.spec .Values.observability.vmStack.values.vmagent.spec.remoteWriteSettings }}
+            {{- toYaml .Values.observability.vmStack.values.vmagent.spec.remoteWriteSettings | nindent 12 }}
+            {{- end }}
+          {{- else }}
+          {{- if and .Values.observability.vmStack.values .Values.observability.vmStack.values.vmagent .Values.observability.vmStack.values.vmagent.spec .Values.observability.vmStack.values.vmagent.spec.remoteWriteSettings }}
+          remoteWriteSettings:
+            {{- toYaml .Values.observability.vmStack.values.vmagent.spec.remoteWriteSettings | nindent 12 }}
+          {{- end }}
+          {{- end }}
+
+          {{- if .Values.observability.vmStack.publicEndpointEnabled }}
+          remoteWrite:
+            - url: https://write.monitoring.eu-north1.nebius.cloud/projects/{{ .Values.observability.vmStack.projectId }}/buckets/soperator/prometheus
+              inlineUrlRelabelConfig:
+                - action: labeldrop
+                  regex: feature_node_kubernetes_io_.*|kubernetes_io_.*|nvidia_com_gpu.*
+                - action: labeldrop
+                  regex: UUID|DCGM_FI_PROCESS_NAME|pci_bus_id|prometheus|DCGM_FI_DEV_SERIAL|DCGM_FI_DEV_NAME|job
+            {{- if and .Values.observability.vmStack.values .Values.observability.vmStack.values.vmagent .Values.observability.vmStack.values.vmagent.spec .Values.observability.vmStack.values.vmagent.spec.remoteWrite }}
+            {{- toYaml .Values.observability.vmStack.values.vmagent.spec.remoteWrite | nindent 12 }}
+            {{- end }}
+          {{- else }}
+          {{- if and .Values.observability.vmStack.values .Values.observability.vmStack.values.vmagent .Values.observability.vmStack.values.vmagent.spec .Values.observability.vmStack.values.vmagent.spec.remoteWrite }}
+          remoteWrite:
+            {{- toYaml .Values.observability.vmStack.values.vmagent.spec.remoteWrite | nindent 12 }}
+          {{- end }}
+          {{- end }}
+
+          {{- if .Values.observability.vmStack.publicEndpointEnabled }}
+          volumeMounts:
+            - name: tsa-token
+              mountPath: /mnt/cloud-metadata/tsa-token
+              readOnly: true
+            {{- if and .Values.observability.vmStack.values .Values.observability.vmStack.values.vmagent .Values.observability.vmStack.values.vmagent.spec .Values.observability.vmStack.values.vmagent.spec.volumeMounts }}
+            {{- toYaml .Values.observability.vmStack.values.vmagent.spec.volumeMounts | nindent 12 }}
+            {{- end }}
+          {{- else }}
+          {{- if and .Values.observability.vmStack.values .Values.observability.vmStack.values.vmagent .Values.observability.vmStack.values.vmagent.spec .Values.observability.vmStack.values.vmagent.spec.volumeMounts }}
+          volumeMounts:
+            {{- toYaml .Values.observability.vmStack.values.vmagent.spec.volumeMounts | nindent 12 }}
+          {{- end }}
+          {{- end }}
+
+          {{- if .Values.observability.vmStack.publicEndpointEnabled }}
+          volumes:
+            - name: tsa-token
+              hostPath:
+                path: /mnt/cloud-metadata/tsa-token
+                type: File
+            {{- if and .Values.observability.vmStack.values .Values.observability.vmStack.values.vmagent .Values.observability.vmStack.values.vmagent.spec .Values.observability.vmStack.values.vmagent.spec.volumes }}
+            {{- toYaml .Values.observability.vmStack.values.vmagent.spec.volumes | nindent 12 }}
+            {{- end }}
+          {{- else }}
+          {{- if and .Values.observability.vmStack.values .Values.observability.vmStack.values.vmagent .Values.observability.vmStack.values.vmagent.spec .Values.observability.vmStack.values.vmagent.spec.volumes }}
+          volumes:
+            {{- toYaml .Values.observability.vmStack.values.vmagent.spec.volumes | nindent 12 }}
+          {{- end }}
+          {{- end }}
+
+          {{- if .Values.observability.vmStack.publicEndpointEnabled }}
+          extraArgs:
+            remoteWrite.flushInterval: 2s
+            remoteWrite.bearerTokenFile: /mnt/cloud-metadata/tsa-token
+            remoteWrite.maxRowsPerBlock: "12000"
+            {{- if and .Values.observability.vmStack.values .Values.observability.vmStack.values.vmagent .Values.observability.vmStack.values.vmagent.spec .Values.observability.vmStack.values.vmagent.spec.extraArgs }}
+            {{- toYaml .Values.observability.vmStack.values.vmagent.spec.extraArgs | nindent 12 }}
+            {{- end }}
+          {{- else }}
+          {{- if and .Values.observability.vmStack.values .Values.observability.vmStack.values.vmagent .Values.observability.vmStack.values.vmagent.spec .Values.observability.vmStack.values.vmagent.spec.extraArgs }}
+          extraArgs:
+            {{- toYaml .Values.observability.vmStack.values.vmagent.spec.extraArgs | nindent 12 }}
+          {{- end }}
+          {{- end }}
+
+          {{- if and .Values.observability.vmStack.values .Values.observability.vmStack.values.vmagent .Values.observability.vmStack.values.vmagent.spec .Values.observability.vmStack.values.vmagent.spec.resources }}
+          resources:
+            {{- toYaml .Values.observability.vmStack.values.vmagent.spec.resources | nindent 12 }}
+          {{- end }}
+
+          {{- if and .Values.observability.vmStack.values .Values.observability.vmStack.values.vmagent .Values.observability.vmStack.values.vmagent.spec .Values.observability.vmStack.values.vmagent.spec.extraEnv }}
+          extraEnv:
+            {{- toYaml .Values.observability.vmStack.values.vmagent.spec.extraEnv | nindent 12 }}
+          {{- end }}
+          
       vmalert:
         enabled: false
       vmsingle: {{ toYaml .Values.observability.vmStack.values.vmsingle | nindent 8 }}
