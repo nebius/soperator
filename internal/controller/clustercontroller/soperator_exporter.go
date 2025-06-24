@@ -8,9 +8,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/check"
-	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
-	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/exporter"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
@@ -47,7 +45,7 @@ func (r SlurmClusterReconciler) ReconcileSoperatorExporter(
 					}
 				} else {
 					debugLogger.Info("Exporter disabled, will delete ServiceAccount if exists")
-					exporterSAName := exporter.BuildExporterServiceAccountName(clusterValues.Name)
+					exporterSAName := exporter.ServiceAccountName
 					if err := r.ServiceAccount.Cleanup(stepCtx, cluster, exporterSAName); err != nil {
 						return fmt.Errorf("cleanup Exporter SA: %w", err)
 					}
@@ -71,7 +69,7 @@ func (r SlurmClusterReconciler) ReconcileSoperatorExporter(
 					}
 				} else {
 					debugLogger.Info("Exporter disabled, will delete Role if exists")
-					exporterRoleName := exporter.BuildExporterRoleName(clusterValues.Name)
+					exporterRoleName := exporter.RoleName
 					if err := r.Role.Cleanup(stepCtx, cluster, exporterRoleName); err != nil {
 						return fmt.Errorf("cleanup Exporter Role: %w", err)
 					}
@@ -95,7 +93,7 @@ func (r SlurmClusterReconciler) ReconcileSoperatorExporter(
 					}
 				} else {
 					debugLogger.Info("Exporter disabled, will delete RoleBinding if exists")
-					exporterRoleBindingName := exporter.BuildExporterRoleBindingName(clusterValues.Name)
+					exporterRoleBindingName := exporter.RoleBindingName
 					if err := r.RoleBinding.Cleanup(stepCtx, cluster, exporterRoleBindingName); err != nil {
 						return fmt.Errorf("cleanup Exporter RoleBinding: %w", err)
 					}
@@ -149,7 +147,7 @@ func (r SlurmClusterReconciler) ReconcileSoperatorExporter(
 					}
 				} else {
 					debugLogger.Info("Exporter disabled, will delete Deployment if exists")
-					exporterDeploymentName := naming.BuildDeploymentName(consts.ComponentTypeExporter)
+					exporterDeploymentName := exporter.DeploymentName
 					if err := r.Deployment.Cleanup(stepCtx, cluster, exporterDeploymentName); err != nil {
 						return fmt.Errorf("cleanup soperator exporter deployment: %w", err)
 					}

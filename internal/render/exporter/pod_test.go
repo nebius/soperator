@@ -45,7 +45,7 @@ func TestRenderPodTemplateSpec(t *testing.T) {
 			Labels: map[string]string{"app": "slurm-exporter"},
 		},
 		Spec: corev1.PodSpec{
-			ServiceAccountName: "test-cluster-exporter-sa",
+			ServiceAccountName: ServiceAccountName,
 			NodeSelector:       map[string]string{"node": "exporter"},
 			Tolerations:        []corev1.Toleration{{Key: "test", Value: "true"}},
 			InitContainers:     []corev1.Container{},

@@ -13,20 +13,20 @@ func RenderExporterRoleBinding(clusterNamespace, clusterName string) rbacv1.Role
 
 	return rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      BuildExporterRoleBindingName(clusterName),
+			Name:      RoleBindingName,
 			Namespace: clusterNamespace,
 			Labels:    labels,
 		},
 		Subjects: []rbacv1.Subject{
 			{
 				Kind:      rbacv1.ServiceAccountKind,
-				Name:      BuildExporterServiceAccountName(clusterName),
+				Name:      ServiceAccountName,
 				Namespace: clusterNamespace,
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "Role",
-			Name:     BuildExporterRoleName(clusterName),
+			Name:     RoleName,
 			APIGroup: rbacv1.GroupName,
 		},
 	}
