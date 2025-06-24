@@ -175,13 +175,16 @@ static void snccld_run_named_pipe_reading_process(snccld_state_t *state) {
     }
 
     {
-        size_t buf_size    = PATH_MAX * 3 + 1;
+        size_t buf_size    = PATH_MAX * tee_idx + (tee_idx - 1) + 1;
         char  *tee_command = malloc(buf_size);
         size_t offset      = 0;
         for (size_t i = 0; i < tee_idx; ++i) {
-            offset += snprintf(
+            size_t w = snprintf(
                 tee_command + offset, buf_size - offset, "%s ", tee_argv[i]
             );
+            if (offset + w < buf_size) {
+                offset += w;
+            }
         }
         sh_argv[sh_idx++] = tee_command;
     }
