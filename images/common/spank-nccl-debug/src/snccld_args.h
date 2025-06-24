@@ -226,7 +226,7 @@ static void snccld_parse_arg_log_level_value(const char *val) {
         strncpy(
             snccld_config.log_level, val, sizeof(snccld_config.log_level) - 1
         );
-        for (size_t i = 0; i < sizeof(val) - 1; i++) {
+        for (size_t i = 0; i < strlen(val); i++) {
             snccld_config.log_level[i] = toupper(snccld_config.log_level[i]);
         }
         snccld_config.log_level[sizeof(snccld_config.log_level) - 1] = '\0';
