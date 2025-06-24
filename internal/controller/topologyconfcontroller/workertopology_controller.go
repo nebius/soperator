@@ -64,7 +64,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	slurmCluster := &slurmv1.SlurmCluster{}
 	if err := r.Client.Get(ctx, req.NamespacedName, slurmCluster); err != nil {
-		logger.Error(err, "Failed to get SlurmCluster", "SlurmCluster", req.Name)
+		logger.Error(err, "Failed to get SlurmCluster", "SlurmCluster", req.Name, "Namespace", req.Namespace)
 		return DefaultRequeueResult, nil
 	}
 
