@@ -6,7 +6,6 @@ on:
       - main
       - dev
     paths-ignore:
-      #      - '.github/**'
       - 'docs/**'
       - 'CODEOWNERS'
       - 'LICENSE'
@@ -21,7 +20,6 @@ on:
       - main
     types: [opened, synchronize, reopened]
     paths-ignore:
-      #      - '.github/**'
       - 'docs/**'
       - 'CODEOWNERS'
       - 'LICENSE'
