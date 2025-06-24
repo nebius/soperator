@@ -62,6 +62,18 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		"Starting reconciliation", "SlurmCluster", req.Name, "Namespace", req.Namespace,
 	)
 
+	slurmCluster := &slurmv1.SlurmCluster{}
+	if err := r.Client.Get(ctx, req.NamespacedName, slurmCluster); err != nil {
+		logger.Error(err, "Failed to get SlurmCluster", "SlurmCluster", req.Name)
+		return DefaultRequeueResult, nil
+	}
+
+	shouldReconcileCluster := isClusterReconciliationNeeded(slurmCluster)
+
+	if !shouldReconcileCluster {
+		return DefaultRequeueResult, nil
+	}
+
 	topologyLabelsConfigMap, err := r.getNodeTopologyLabelsConfigMap(ctx)
 	if err != nil {
 		logger.Error(err, "Failed to get node topology labels config map")
@@ -103,6 +115,10 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	logger.Info("Reconciliation completed successfully")
 	return DefaultRequeueResult, nil
+}
+
+func isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
+	return slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyTree && slurmCluster.Spec.SlurmConfig.TopologyParam == ""
 }
 
 // getPodList retrieves the list of pods in the specified namespace with the given label selector.
