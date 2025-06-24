@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	slurmapispec "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -39,8 +39,8 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 					Name:        "node",
 					ClusterName: "slurm-cluster",
 					InstanceID:  "k8s-node",
-					States: map[slurmapispec.V0041NodeState]struct{}{
-						slurmapispec.V0041NodeStateDRAIN: {},
+					States: map[api.V0041NodeState]struct{}{
+						api.V0041NodeStateDRAIN: {},
 					},
 					Reason: ptr.To(slurmapi.NodeReason{
 						Reason:    consts.SlurmNodeReasonKillTaskFailed,
@@ -58,8 +58,8 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 						Name:        "node",
 						ClusterName: "slurm-cluster",
 						InstanceID:  "k8s-node",
-						States: map[slurmapispec.V0041NodeState]struct{}{
-							slurmapispec.V0041NodeStateDRAIN: {},
+						States: map[api.V0041NodeState]struct{}{
+							api.V0041NodeStateDRAIN: {},
 						},
 						Reason: ptr.To(slurmapi.NodeReason{
 							Reason:    consts.SlurmNodeReasonKillTaskFailed,
@@ -92,8 +92,8 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 					Name:        "node",
 					ClusterName: "slurm-cluster",
 					InstanceID:  "k8s-node",
-					States: map[slurmapispec.V0041NodeState]struct{}{
-						slurmapispec.V0041NodeStateIDLE: {},
+					States: map[api.V0041NodeState]struct{}{
+						api.V0041NodeStateIDLE: {},
 					},
 					Reason: ptr.To(slurmapi.NodeReason{
 						Reason:    consts.SlurmNodeReasonKillTaskFailed,
@@ -117,8 +117,8 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 					Name:        "node",
 					ClusterName: "slurm-cluster",
 					InstanceID:  "k8s-node",
-					States: map[slurmapispec.V0041NodeState]struct{}{
-						slurmapispec.V0041NodeStateDRAIN: {},
+					States: map[api.V0041NodeState]struct{}{
+						api.V0041NodeStateDRAIN: {},
 					},
 					Reason: nil,
 				},

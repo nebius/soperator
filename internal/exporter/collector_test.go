@@ -7,7 +7,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	slurmapispec "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
@@ -71,8 +71,8 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 			{
 				Name:       "node-1",
 				InstanceID: "instance-1",
-				States: map[slurmapispec.V0041NodeState]struct{}{
-					slurmapispec.V0041NodeStateALLOCATED: {},
+				States: map[api.V0041NodeState]struct{}{
+					api.V0041NodeStateALLOCATED: {},
 				},
 				Tres:    "cpu=16,mem=191356M,gres/gpu=2",
 				Address: "10.0.0.1",
@@ -80,9 +80,9 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 			{
 				Name:       "node-2",
 				InstanceID: "instance-2",
-				States: map[slurmapispec.V0041NodeState]struct{}{
-					slurmapispec.V0041NodeStateIDLE:  {},
-					slurmapispec.V0041NodeStateDRAIN: {},
+				States: map[api.V0041NodeState]struct{}{
+					api.V0041NodeStateIDLE:  {},
+					api.V0041NodeStateDRAIN: {},
 				},
 				Tres:    "cpu=8,mem=64000M,gres/gpu=1",
 				Address: "10.0.0.2",
@@ -93,8 +93,8 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 
 		// Mock GetDiag response with realistic data
 		serverThreadCount := int32(1)
-		mockClient.EXPECT().GetDiag(mock.Anything).Return(&slurmapispec.V0041OpenapiDiagResp{
-			Statistics: slurmapispec.V0041StatsMsg{
+		mockClient.EXPECT().GetDiag(mock.Anything).Return(&api.V0041OpenapiDiagResp{
+			Statistics: api.V0041StatsMsg{
 				ServerThreadCount: &serverThreadCount,
 			},
 		}, nil)
@@ -191,9 +191,9 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 		{
 			Name:       "node-maintenance",
 			InstanceID: "instance-maintenance",
-			States: map[slurmapispec.V0041NodeState]struct{}{
-				slurmapispec.V0041NodeStateIDLE:        {},
-				slurmapispec.V0041NodeStateMAINTENANCE: {},
+			States: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE:        {},
+				api.V0041NodeStateMAINTENANCE: {},
 			},
 			Tres:    "cpu=8,mem=64000M,gres/gpu=1",
 			Address: "10.0.0.3",
@@ -201,9 +201,9 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 		{
 			Name:       "node-reserved",
 			InstanceID: "instance-reserved",
-			States: map[slurmapispec.V0041NodeState]struct{}{
-				slurmapispec.V0041NodeStateIDLE:     {},
-				slurmapispec.V0041NodeStateRESERVED: {},
+			States: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE:     {},
+				api.V0041NodeStateRESERVED: {},
 			},
 			Tres:    "cpu=8,mem=64000M,gres/gpu=1",
 			Address: "10.0.0.4",
@@ -213,8 +213,8 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 	serverThreadCount := int32(1)
 	mockClient.EXPECT().ListNodes(mock.Anything).Return(testNodes, nil)
 	mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil)
-	mockClient.EXPECT().GetDiag(mock.Anything).Return(&slurmapispec.V0041OpenapiDiagResp{
-		Statistics: slurmapispec.V0041StatsMsg{
+	mockClient.EXPECT().GetDiag(mock.Anything).Return(&api.V0041OpenapiDiagResp{
+		Statistics: api.V0041StatsMsg{
 			ServerThreadCount: &serverThreadCount,
 		},
 	}, nil)
@@ -261,10 +261,10 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 	assert.True(t, foundReservedGPU, "Expected to find reserved node GPU seconds metric with new labels")
 
 	// Now change one node to drain state to trigger a node fail with the new labels
-	testNodes[0].States = map[slurmapispec.V0041NodeState]struct{}{
-		slurmapispec.V0041NodeStateIDLE:        {},
-		slurmapispec.V0041NodeStateMAINTENANCE: {},
-		slurmapispec.V0041NodeStateDRAIN:       {},
+	testNodes[0].States = map[api.V0041NodeState]struct{}{
+		api.V0041NodeStateIDLE:        {},
+		api.V0041NodeStateMAINTENANCE: {},
+		api.V0041NodeStateDRAIN:       {},
 	}
 	testNodes[0].Reason = &slurmapi.NodeReason{
 		Reason:    "maintenance drain triggered",
@@ -273,8 +273,8 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 
 	mockClient.EXPECT().ListNodes(mock.Anything).Return(testNodes, nil)
 	mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil)
-	mockClient.EXPECT().GetDiag(mock.Anything).Return(&slurmapispec.V0041OpenapiDiagResp{
-		Statistics: slurmapispec.V0041StatsMsg{
+	mockClient.EXPECT().GetDiag(mock.Anything).Return(&api.V0041OpenapiDiagResp{
+		Statistics: api.V0041StatsMsg{
 			ServerThreadCount: &serverThreadCount,
 		},
 	}, nil)
@@ -315,7 +315,7 @@ func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 
 	// Mock realistic RPC diagnostics data based on production output
 	serverThreadCount := int32(1)
-	rpcsByMessageType := slurmapispec.V0041StatsMsgRpcsByType{
+	rpcsByMessageType := api.V0041StatsMsgRpcsByType{
 		{
 			MessageType: "REQUEST_NODE_INFO",
 			Count:       576,
@@ -332,7 +332,7 @@ func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 			TotalTime:   14239,
 		},
 	}
-	rpcsByUser := slurmapispec.V0041StatsMsgRpcsByUser{
+	rpcsByUser := api.V0041StatsMsgRpcsByUser{
 		{
 			User:      "root",
 			UserId:    0,
@@ -347,8 +347,8 @@ func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 		},
 	}
 
-	mockClient.EXPECT().GetDiag(mock.Anything).Return(&slurmapispec.V0041OpenapiDiagResp{
-		Statistics: slurmapispec.V0041StatsMsg{
+	mockClient.EXPECT().GetDiag(mock.Anything).Return(&api.V0041OpenapiDiagResp{
+		Statistics: api.V0041StatsMsg{
 			ServerThreadCount: &serverThreadCount,
 			RpcsByMessageType: &rpcsByMessageType,
 			RpcsByUser:        &rpcsByUser,
@@ -406,7 +406,7 @@ func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 	mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil)
 
 	serverThreadCount := int32(0)
-	rpcsByMessageType := slurmapispec.V0041StatsMsgRpcsByType{
+	rpcsByMessageType := api.V0041StatsMsgRpcsByType{
 		{
 			MessageType: "ZERO_COUNT",
 			Count:       0,
@@ -423,7 +423,7 @@ func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 			TotalTime:   1,
 		},
 	}
-	rpcsByUser := slurmapispec.V0041StatsMsgRpcsByUser{
+	rpcsByUser := api.V0041StatsMsgRpcsByUser{
 		{
 			User:      "zero_user",
 			UserId:    999,
@@ -438,8 +438,8 @@ func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 		},
 	}
 
-	mockClient.EXPECT().GetDiag(mock.Anything).Return(&slurmapispec.V0041OpenapiDiagResp{
-		Statistics: slurmapispec.V0041StatsMsg{
+	mockClient.EXPECT().GetDiag(mock.Anything).Return(&api.V0041OpenapiDiagResp{
+		Statistics: api.V0041StatsMsg{
 			ServerThreadCount: &serverThreadCount,
 			RpcsByMessageType: &rpcsByMessageType,
 			RpcsByUser:        &rpcsByUser,
@@ -500,8 +500,8 @@ func TestMetricsCollector_GetDiag_APIError(t *testing.T) {
 		{
 			Name:       "test-node",
 			InstanceID: "test-instance",
-			States: map[slurmapispec.V0041NodeState]struct{}{
-				slurmapispec.V0041NodeStateIDLE: {},
+			States: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE: {},
 			},
 			Tres:    "cpu=4,mem=8000M,gres/gpu=0",
 			Address: "10.0.0.1",
@@ -552,8 +552,8 @@ func TestMetricsCollector_GetDiag_NilFields(t *testing.T) {
 	mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil)
 
 	// Mock GetDiag response with nil fields
-	mockClient.EXPECT().GetDiag(mock.Anything).Return(&slurmapispec.V0041OpenapiDiagResp{
-		Statistics: slurmapispec.V0041StatsMsg{
+	mockClient.EXPECT().GetDiag(mock.Anything).Return(&api.V0041OpenapiDiagResp{
+		Statistics: api.V0041StatsMsg{
 			ServerThreadCount: nil, // Should not emit metric
 			RpcsByMessageType: nil, // Should not emit metrics
 			RpcsByUser:        nil, // Should not emit metrics
