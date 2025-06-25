@@ -1195,7 +1195,7 @@ spec:
                           for the Slurm node
                         type: string
                       enabled:
-                        default: true
+                        default: false
                         description: Enabled defines whether the CronJob should be
                           scheduled
                         type: boolean
