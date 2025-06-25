@@ -162,6 +162,10 @@ static void snccld_run_named_pipe_reading_process(snccld_state_t *state) {
         for (size_t i = 0; i < unique_output_targets; ++i) {
             tee_argv[tee_idx++] = output_targets[i];
         }
+        // Remove duplicate elements.
+        for (size_t i = unique_output_targets; i < target_count; ++i) {
+            free(output_targets[i]);
+        }
     }
 
     // Take input from named pipe.
@@ -349,6 +353,10 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
                     SNCCLD_ENROOT_MOUNT_TEMPLATE_DIR
                 );
                 snccld_log_debug("Created mount for %s", mounts[i]);
+                free(mounts[i]);
+            }
+            // Remove duplicate elements.
+            for (size_t i = unique_dir_mounts; i < dir_mount_count; ++i) {
                 free(mounts[i]);
             }
 

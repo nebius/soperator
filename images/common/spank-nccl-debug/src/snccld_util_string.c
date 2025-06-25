@@ -28,10 +28,5 @@ size_t snccld_remove_string_duplicates(char **arr, const size_t n) {
         }
     }
 
-    // Remove duplicate elements.
-    for (int i = write_idx; i < n; ++i) {
-        free(arr[i]);
-    }
-
     return write_idx;
 }
