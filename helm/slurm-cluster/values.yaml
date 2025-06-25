@@ -126,7 +126,7 @@ periodicChecks:
   # NCCL test benchmark
   ncclBenchmark:
     # Whether to enable the benchmark
-    enabled: true
+    enabled: false
     # CronJob schedule. By default, runs every 3 hours
     schedule: "0 */3 * * *"
     # CronJob timeout in seconds. By default, equals to 30 min

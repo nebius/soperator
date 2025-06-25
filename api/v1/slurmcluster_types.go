@@ -332,7 +332,7 @@ type NCCLBenchmark struct {
 	// Enabled defines whether the CronJob should be scheduled
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=true
+	// +kubebuilder:default=false
 	Enabled bool `json:"enabled,omitempty"`
 
 	// Schedule defines the CronJob schedule.
