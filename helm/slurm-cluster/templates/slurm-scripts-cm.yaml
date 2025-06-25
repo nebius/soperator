@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: slurm-scripts
+  labels:
+    app: {{ .Chart.Name }}
+    release: {{ .Release.Name }}
+data:
+  prolog.sh: |
+{{- if .Values.healthCheckScripts.prolog.script }}
+{{ .Values.healthCheckScripts.prolog.script | tpl . | indent 4 }}
+{{- else }}
+{{ tpl (.Files.Get "hc_scripts/prolog.sh") . | indent 4 }}
+{{- end }}
+
+  epilog.sh: |
+{{- if .Values.healthCheckScripts.epilog.script }}
+{{ .Values.healthCheckScripts.epilog.script | tpl . | indent 4 }}
+{{- else }}
+{{ tpl (.Files.Get "hc_scripts/epilog.sh") . | indent 4 }}
+{{- end }}
+
+  hc_program.sh: |
+{{- if .Values.healthCheckScripts.hcProgram.script }}
+{{ .Values.healthCheckScripts.hcProgram.script | tpl . | indent 4 }}
+{{- else }}
+{{ tpl (.Files.Get "hc_scripts/hc_program.sh") . | indent 4 }}
+{{- end }}

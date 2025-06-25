@@ -109,9 +109,9 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 	res.AddComment("HEALTH CHECKS")
 	res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
 	if cluster.HealthCheckConfig == nil {
-		res.AddProperty("HealthCheckInterval", 30)
+		res.AddProperty("HealthCheckInterval", 600)
 		if cluster.ClusterType == consts.ClusterTypeGPU {
-			res.AddProperty("HealthCheckProgram", "/usr/bin/gpu_healthcheck.sh")
+			res.AddProperty("HealthCheckProgram", "/etc/slurm-scripts/hc_program.sh")
 		}
 		res.AddProperty("HealthCheckNodeState", "NONDRAINED_IDLE,CYCLE")
 	} else {

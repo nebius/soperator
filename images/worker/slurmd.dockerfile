@@ -156,17 +156,13 @@ RUN chmod +x /opt/bin/install_docker.sh && \
 # Copy Docker daemon config
 COPY images/worker/docker/daemon.json /etc/docker/daemon.json
 
-# Copy GPU healthcheck script
-COPY images/worker/scripts/gpu_healthcheck.sh /usr/bin/gpu_healthcheck.sh
-
 # Copy script for complementing jail filesystem in runtime
 COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
 
 # Copy script for bind-mounting slurm into the jail
 COPY images/common/scripts/bind_slurm_common.sh /opt/bin/slurm/
 
-RUN chmod +x /usr/bin/gpu_healthcheck.sh && \
-    chmod +x /opt/bin/slurm/complement_jail.sh && \
+RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
     chmod +x /opt/bin/slurm/bind_slurm_common.sh
 
 # Update linker cache

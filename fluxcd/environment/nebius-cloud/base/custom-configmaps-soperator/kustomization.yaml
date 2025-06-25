@@ -7,18 +7,6 @@ configMapGenerator:
       - supervisord.conf
     options:
       disableNameSuffixHash: true
-  - name: slurm-epilog
-    namespace: soperator
-    files:
-      - epilog.sh
-    options:
-      disableNameSuffixHash: true
-  - name: slurm-prolog
-    namespace: soperator
-    files:
-      - prolog.sh
-    options:
-      disableNameSuffixHash: true
   - name: motd-nebius-o11y
     namespace: soperator
     files:
