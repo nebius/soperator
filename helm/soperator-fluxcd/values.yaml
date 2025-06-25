@@ -73,16 +73,17 @@ mariadbOperator:
   overrideValues: null
 observability:
   enabled: true
+  clusterName: soperator
+  publicEndpointEnabled: true
+  projectId: default-project-id
   opentelemetry:
     enabled: true
-    clusterName: soperator
     namespace: logs-system
     logs:
       version: 0.117.*
       interval: 5m
       timeout: 5m
       values:
-        publicEndpointEnabled: true
         hcOutputEnabled: true
         resources: {}
       overrideValues: null
@@ -91,7 +92,6 @@ observability:
       interval: 5m
       timeout: 5m
       values:
-        publicEndpointEnabled: true
         resources: {}
       overrideValues: null
   prometheusOperator:
@@ -102,8 +102,6 @@ observability:
     namespace: monitoring-system
   vmStack:
     enabled: true
-    projectId: default-project-id
-    publicEndpointEnabled: false
     crds:
       interval: 5m
       timeout: 5m
@@ -139,7 +137,7 @@ observability:
           remoteWrite:
             - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8429/api/v1/write
           resources: {}
-          extraEnv: []
+          extraEnvs: []
           volumeMounts: []
           volumes: []
       vmsingle:
