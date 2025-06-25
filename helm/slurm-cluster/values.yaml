@@ -514,23 +514,14 @@ images:
   soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.20.1-jammy-slurm24.11.5"
   sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.20.1
   mariaDB: docker-registry1.mariadb.com/library/mariadb:11.4.3
-# Configuration for health check scripts.
-healthCheckScripts:
-  platform: 8xH100
-  prolog:
-    script: null
-    checks: "module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dcgmi_diag_r1,dmesg"
-  epilog:
-    script: null
-    checks: "module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dcgmi_diag_r1,dmesg"
-  hcProgram:
-    script: null
-    checks: "module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dcgmi_diag_r1,dmesg"
-# CustomScripts to mount inside jail.
-# Format:
-# customScripts:
-#   example.sh: |
-#     #!/bin/bash
-#
-#     echo "Example"
-customScripts: null
+# Configuration for slurm scripts.
+slurmScripts:
+  prolog: null
+  epilog: null
+  hcProgram: null
+  # custom:
+  #   example.sh: |
+  #     #!/bin/bash
+  #
+  #     echo "Example"
+  custom: null

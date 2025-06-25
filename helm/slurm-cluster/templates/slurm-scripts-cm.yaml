@@ -8,22 +8,41 @@ metadata:
     release: {{ .Release.Name }}
 data:
   prolog.sh: |
-{{- if .Values.healthCheckScripts.prolog.script }}
-{{ .Values.healthCheckScripts.prolog.script | tpl . | indent 4 }}
+{{- if .Values.slurmScripts.prolog }}
+{{ .Values.slurmScripts.prolog | tpl . | indent 4 }}
 {{- else }}
-{{ tpl (.Files.Get "hc_scripts/prolog.sh") . | indent 4 }}
+{{ tpl (.Files.Get "slurm_scripts/prolog.sh") . | indent 4 }}
 {{- end }}
 
   epilog.sh: |
-{{- if .Values.healthCheckScripts.epilog.script }}
-{{ .Values.healthCheckScripts.epilog.script | tpl . | indent 4 }}
+{{- if .Values.slurmScripts.epilog }}
+{{ .Values.slurmScripts.epilog | tpl . | indent 4 }}
 {{- else }}
-{{ tpl (.Files.Get "hc_scripts/epilog.sh") . | indent 4 }}
+{{ tpl (.Files.Get "slurm_scripts/epilog.sh") . | indent 4 }}
 {{- end }}
 
   hc_program.sh: |
-{{- if .Values.healthCheckScripts.hcProgram.script }}
-{{ .Values.healthCheckScripts.hcProgram.script | tpl . | indent 4 }}
+{{- if .Values.slurmScripts.hcProgram }}
+{{ .Values.slurmScripts.hcProgram | tpl . | indent 4 }}
 {{- else }}
-{{ tpl (.Files.Get "hc_scripts/hc_program.sh") . | indent 4 }}
+{{ tpl (.Files.Get "slurm_scripts/hc_program.sh") . | indent 4 }}
+{{- end }}
+
+  cleanup_enroot.sh: |
+{{ tpl (.Files.Get "slurm_scripts/cleanup_enroot.sh") . | indent 4 }}
+
+  map_job_dcgm.sh: |
+{{ tpl (.Files.Get "slurm_scripts/map_job_dcgm.sh") . | indent 4 }}
+
+  unmap_job_dcgm.sh: |
+{{ tpl (.Files.Get "slurm_scripts/unmap_job_dcgm.sh") . | indent 4 }}
+
+  health_checker.sh: |
+{{ tpl (.Files.Get "slurm_scripts/health_checker.sh") . | indent 4 }}
+
+{{- if .Values.slurmScripts.custom }}
+{{- range $name, $content := .Values.slurmScripts.custom }}
+  {{ $name }}: |
+{{ tpl $content $ | indent 4 }}
+{{- end }}
 {{- end }}

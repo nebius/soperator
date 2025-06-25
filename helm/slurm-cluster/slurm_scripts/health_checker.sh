@@ -1,0 +1,58 @@
+#!/bin/bash
+
+set -eox
+
+# PATH is required to be propagated inside health-checker
+if [[ -z "${PATH:-}" ]]; then
+    echo "PATH is not provided, skipping health-checker" >&2
+    exit 0
+fi
+
+# Define platform for health-checker
+platform=""
+gpus_on_node=$(nvidia-smi --query-gpu=name --format=csv,noheader | sort | uniq -c)
+if [[ "${gpus_on_node}" == *"8 NVIDIA H100"* ]]; then
+  platform="8xH100"
+elif [[ "${gpus_on_node}" == *"8 NVIDIA H200"* ]]; then
+  platform="8xH200"
+else
+  echo "Unsupported platform" >&2
+  exit 0
+fi
+echo "Platform found: $platform"
+
+# Define health-checker checks to run
+case "$SCRIPT_CONTEXT" in
+  "prolog")
+    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dcgmi_diag_r1,dmesg"
+    ;;
+  "epilog")
+    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dcgmi_diag_r1,dmesg"
+    ;;
+  "hc_program")
+    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dcgmi_diag_r1,dmesg"
+    ;;
+  *)
+    echo "Unknown context: $SCRIPT_CONTEXT" >&2
+    exit 0
+    ;;
+esac
+
+exit_code=0
+details=$(health-checker run -e soperator -p $platform -f mk8s-txt -n $checks &2>1) || exit_code=$?
+if [[ $exit_code -eq 1 ]]; then
+    echo "Health-checker failed with exit code 1."
+    echo "$details"
+
+    error_checks=$(echo "$details" | sed -n 's/.*S: ERROR \[\(.*\)\].*/\1/p')
+    echo "$error_checks" >&3
+    exit 0
+elif [[ $exit_code -eq 2 ]]; then
+    echo "Health-checker reported with " >&2
+    echo "$details"
+    exit 0
+else
+    echo "Health-checker passed or returned non-ERROR status."
+    echo "$details"
+    exit 0
+fi
