@@ -22,7 +22,9 @@ echo "Bind-mount /opt/bin/sbatch.sh script"
 mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
 
 echo "Create directory for slurm job outputs"
-mkdir -p /mnt/jail/opt/soperator-outputs/slurm_jobs/
+mkdir -p /mnt/jail/opt/soperator-outputs/slurm_jobs
+chown soperatorchecks:soperatorchecks /mnt/jail/opt/soperator-outputs/slurm_jobs
+chmod 755 /mnt/jail/opt/soperator-outputs/slurm_jobs
 
 if [[ "$EACH_WORKER_JOB_ARRAY" == "true" ]]; then
     echo "Submitting job using slurm_submit_array_job.sh..."
