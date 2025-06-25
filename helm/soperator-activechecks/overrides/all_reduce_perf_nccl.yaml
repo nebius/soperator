@@ -10,8 +10,7 @@ activeCheck:
       #!/bin/bash
       #SBATCH --deadline="now+6hours"
       #SBATCH --time=10:00
-      #SBATCH --gpus=8
-      #SBATCH --mem-per-gpu=16G
+      #SBATCH --mem=32G
       #SBATCH --gpus-per-node=8
       #SBATCH --cpus-per-task=16
       #SBATCH --no-requeue
