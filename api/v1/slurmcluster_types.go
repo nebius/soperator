@@ -95,11 +95,18 @@ type SlurmClusterSpec struct {
 	//
 	// +kubebuilder:validation:Optional
 	CustomSlurmConfig *string `json:"customSlurmConfig,omitempty"`
+
 	// MPIConfig represents the PMIx configuration in mpi.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={pmixEnv: "OMPI_MCA_btl_tcp_if_include=eth0"}
 	MPIConfig MPIConfig `json:"mpiConfig,omitempty"`
+
+	// PlugStackConfig represents the Plugin stack configurations in `plugstack.conf`.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={ pyxis: { required: true, containerImageSave: "/var/cache/enroot-container-images/" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" } }
+	PlugStackConfig PlugStackConfig `json:"plugStackConfig,omitempty"`
 
 	// SlurmTopologyConfigMapRefName is the name of the slurm topology config.
 	// When exists, TopologyPlugin is automatically set to `topology/tree` in slurm.conf
@@ -201,8 +208,121 @@ type MPIConfig struct {
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="OMPI_MCA_btl_tcp_if_include=eth0"
-	// +kubebuilder:validation:Optional
 	PMIxEnv string `json:"pmixEnv,omitempty"`
+}
+
+// PlugStackConfig represents the Plugin stack configurations in `plugstack.conf`.
+type PlugStackConfig struct {
+	// Pyxis represents the 'Pyxis' SPANK plugin configuration.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={ required: true, containerImageSave: "/var/cache/enroot-container-images/" }
+	Pyxis PluginConfigPyxis `json:"pyxis,omitempty"`
+
+	// NcclDebug represents the 'NCCL Debug' SPANK plugin configuration.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={ required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" }
+	NcclDebug PluginConfigNcclDebug `json:"ncclDebug,omitempty"`
+
+	// PluginConfigCustom represents a configuration of custom SPANK plugins.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={}
+	CustomPlugins []PluginConfigCustom `json:"customPlugins,omitempty"`
+}
+
+// PluginConfigPyxis represents the Pyxis SPANK plugin configuration.
+type PluginConfigPyxis struct {
+	// Required defines if Pyxis is 'required' for SLURM.
+	// Otherwise, 'optional'.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
+	Required bool `json:"required,omitempty"`
+
+	// ContainerImageSave represents an absolute path to the file or directory where SquashFS files will be stored.
+	// If the specified file or directory already exists, it will be reused.
+	// If the path does not exist, it will be created.
+	//
+	// A directory path must end with '/' (e.g., /path/to/directory/ vs. /path/to/file).
+	// If the image name contains '/', a nested directory will be created under the specified path (if it is a directory).
+	// If the option argument is empty (""), SquashFS files will not be stored.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="/var/cache/enroot-container-images/"
+	ContainerImageSave string `json:"containerImageSave,omitempty"`
+}
+
+// PluginConfigNcclDebug represents the NCCL Debug SPANK plugin configuration.
+type PluginConfigNcclDebug struct {
+	// Required defines if NCCL Debug is 'required' for SLURM.
+	// Otherwise, 'optional'.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Required bool `json:"required,omitempty"`
+
+	// Enabled defines whether to enable the plugin.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled,omitempty"`
+
+	// LogLevel defines NCCL's log level to be forced.
+	//
+	// +kubebuilder:validation:Enum=VERSION;WARN;INFO;TRACE
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="INFO"
+	LogLevel string `json:"logLevel,omitempty"`
+
+	// OutputToFile defines whether to additionally redirect `NCCL_DEBUG` outputs to the output file.
+	// Output filename will have the following format:
+	//  <WORKER_NAME>.<JOB_ID>.<STEP_ID>.out
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
+	OutputToFile bool `json:"outputToFile,omitempty"`
+
+	// OutputToStdOut defines whether to additionally redirect `NCCL_DEBUG` outputs to the standard output stream.
+	// This will make `NCCL_DEBUG` logs being present in job output.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	OutputToStdOut bool `json:"outputToStdOut,omitempty"`
+
+	// OutputDirectory defines a directory path where OutputToFile has to be created.
+	//
+	// The path could be both absolute or relative (to where `srun` or `sbatch` are being called from).
+	// The trailing slash is possible.
+	//
+	// If the path does not exist, it will be created by the plugin.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="/opt/soperator-outputs/nccl_logs"
+	OutputDirectory string `json:"outputDirectory,omitempty"`
+}
+
+// PluginConfigCustom represents a custom SPANK plugin configuration.
+type PluginConfigCustom struct {
+	// Required defines if the plugin is 'required' for SLURM.
+	// Otherwise, 'optional'.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Required bool `json:"required,omitempty"`
+
+	// Path defines an absolute path to the plugin's shared library file.
+	// It could be just a filename of the library if it's located inside `/usr/lib/<ARCH>-linux-gnu/slurm/`.
+	//
+	// +kubebuilder:validation:Required
+	Path string `json:"path"`
+
+	// Arguments define a map of key-value arguments provided to the plugin.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={}
+	Arguments map[string]string `json:"arguments,omitempty"`
 }
 
 type SConfigController struct {

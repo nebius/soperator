@@ -1,6 +1,7 @@
 package common
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -245,4 +246,103 @@ func TestRenderSlurmConfigMapAndTopology(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRenderPlugstack(t *testing.T) {
+	t.Run("Pyxis no options", func(t *testing.T) {
+		result := generateSpankConfig(&values.SlurmCluster{
+			PlugStackConfig: slurmv1.PlugStackConfig{
+				Pyxis: slurmv1.PluginConfigPyxis{},
+			},
+		}).Render()
+		assert.NotEmpty(t, result)
+		assert.Contains(t, result, "optional spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 container_image_save=")
+	})
+
+	t.Run("Pyxis options", func(t *testing.T) {
+		result := generateSpankConfig(&values.SlurmCluster{
+			PlugStackConfig: slurmv1.PlugStackConfig{
+				Pyxis: slurmv1.PluginConfigPyxis{
+					Required:           true,
+					ContainerImageSave: "/tmp/",
+				},
+			},
+		}).Render()
+		assert.NotEmpty(t, result)
+		assert.Contains(t, result, "required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 container_image_save=/tmp/")
+	})
+
+	t.Run("NCCL no options", func(t *testing.T) {
+		result := generateSpankConfig(&values.SlurmCluster{
+			PlugStackConfig: slurmv1.PlugStackConfig{
+				NcclDebug: slurmv1.PluginConfigNcclDebug{},
+			},
+		}).Render()
+		assert.NotEmpty(t, result)
+		assert.Contains(t, result, "optional spanknccldebug.so enabled=0 log-level=INFO out-file=0 out-dir=/opt/soperator-outputs/nccl_logs out-stdout=0")
+	})
+
+	t.Run("NCCL options", func(t *testing.T) {
+		result := generateSpankConfig(&values.SlurmCluster{
+			PlugStackConfig: slurmv1.PlugStackConfig{
+				NcclDebug: slurmv1.PluginConfigNcclDebug{
+					Required:        true,
+					Enabled:         true,
+					LogLevel:        "TRACE",
+					OutputToFile:    true,
+					OutputDirectory: "/tmp",
+					OutputToStdOut:  true,
+				},
+			},
+		}).Render()
+		assert.NotEmpty(t, result)
+		assert.Contains(t, result, "required spanknccldebug.so enabled=1 log-level=TRACE out-file=1 out-dir=/tmp out-stdout=1")
+	})
+
+	t.Run("Custom not provided", func(t *testing.T) {
+		result := generateSpankConfig(&values.SlurmCluster{
+			PlugStackConfig: slurmv1.PlugStackConfig{
+				CustomPlugins: []slurmv1.PluginConfigCustom{},
+			},
+		}).Render()
+		assert.NotEmpty(t, result)
+		assert.Equal(t, 3, len(strings.Split(result, "\n")))
+	})
+
+	t.Run("Custom no options", func(t *testing.T) {
+		result := generateSpankConfig(&values.SlurmCluster{
+			PlugStackConfig: slurmv1.PlugStackConfig{
+				CustomPlugins: []slurmv1.PluginConfigCustom{{
+					Path: "/lol/kek.so",
+				}},
+			},
+		}).Render()
+		assert.NotEmpty(t, result)
+		assert.Equal(t, 4, len(strings.Split(result, "\n")))
+		assert.Contains(t, result, "optional /lol/kek.so")
+	})
+
+	t.Run("Custom options", func(t *testing.T) {
+		result := generateSpankConfig(&values.SlurmCluster{
+			PlugStackConfig: slurmv1.PlugStackConfig{
+				CustomPlugins: []slurmv1.PluginConfigCustom{{
+					Required: true,
+					Path:     "/lol/kek.so",
+					Arguments: map[string]string{
+						"lol": "kek",
+					},
+				}, {
+					Required: true,
+					Path:     "/kek/lol.so",
+					Arguments: map[string]string{
+						"kek": "lol",
+					},
+				}},
+			},
+		}).Render()
+		assert.NotEmpty(t, result)
+		assert.Equal(t, 5, len(strings.Split(result, "\n")))
+		assert.Contains(t, result, "required /lol/kek.so lol=kek")
+		assert.Contains(t, result, "required /kek/lol.so kek=lol")
+	})
 }

@@ -23,9 +23,9 @@ if [ -z "$jaildir" ] || [ -z "$upperdir" ]; then
 fi
 
 ALT_ARCH="$(uname -m)"
-SLURM_LIB_PATH="usr/lib/${ALT_ARCH}-linux-gnu/slurm"
-
 echo "🔧 Using ALT_ARCH = ${ALT_ARCH}"
+
+SLURM_LIB_PATH="usr/lib/${ALT_ARCH}-linux-gnu/slurm"
 
 pushd "${jaildir}"
     echo "Bind-mount virtual filesystems"
@@ -96,7 +96,7 @@ pushd "${jaildir}"
     echo "Bind-mount slurm chroot plugin from container to the jail"
     mkdir -p "${SLURM_LIB_PATH}"
     touch "${SLURM_LIB_PATH}/chroot.so"
-    mount --bind "/usr/lib/${ALT_ARCH}-linux-gnu/slurm/chroot.so" "${SLURM_LIB_PATH}/chroot.so"
+    mount --bind "/${SLURM_LIB_PATH}/chroot.so" "${SLURM_LIB_PATH}/chroot.so"
 
     echo "Bind-mount /etc/enroot, /usr/share/enroot and /usr/lib/enroot"
     mkdir -p etc/enroot usr/share/enroot usr/lib/enroot
@@ -124,11 +124,18 @@ pushd "${jaildir}"
 
     echo "Bind-mount pyxis plugin from container to the jail"
     touch "${SLURM_LIB_PATH}/spank_pyxis.so"
-    mount --bind "/usr/lib/${ALT_ARCH}-linux-gnu/slurm/spank_pyxis.so" "${SLURM_LIB_PATH}/spank_pyxis.so"
+    mount --bind "/${SLURM_LIB_PATH}/spank_pyxis.so" "${SLURM_LIB_PATH}/spank_pyxis.so"
 
     echo "Bind-mount slurm configs"
     mkdir -p etc/slurm
     mount --bind /mnt/jail/slurm etc/slurm
+
+    echo 'Creating Soperator output directory'
+    ( \
+      umask 000 ; \
+      mkdir -p opt/soperator-outputs ; \
+      chmod 777 opt/soperator-outputs ; \
+    )
 
     if [ -n "$worker" ]; then
         echo "Bind-mount slurmd spool directory from the host because it should be propagated to the jail"

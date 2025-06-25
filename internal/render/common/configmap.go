@@ -11,6 +11,7 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	renderutils "nebius.ai/slurm-operator/internal/render/utils"
+	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -36,7 +37,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig co
 			consts.ConfigMapKeyRESTConfig:        generateRESTConfig().Render(),
 			consts.ConfigMapKeyCustomSlurmConfig: generateCustomSlurmConfig(cluster).Render(),
 			consts.ConfigMapKeyCGroupConfig:      generateCGroupConfig(cluster).Render(),
-			consts.ConfigMapKeySpankConfig:       generateSpankConfig().Render(),
+			consts.ConfigMapKeySpankConfig:       generateSpankConfig(cluster).Render(),
 			consts.ConfigMapKeyGresConfig:        generateGresConfig(cluster.ClusterType).Render(),
 			consts.ConfigMapKeyMPIConfig:         generateMPIConfig(cluster).Render(),
 		},
@@ -280,12 +281,56 @@ func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	return res
 }
 
-func generateSpankConfig() renderutils.ConfigFile {
+func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res := &renderutils.MultilineStringConfig{}
+
 	res.AddLine(fmt.Sprintf("required chroot.so %s", consts.VolumeMountPathJail))
-	// TODO: make `container_image_save` and `expose_enroot_logs` configurable
-	// TODO: enable `expose_enroot_logs` once #413 is resolved.
-	res.AddLine("required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 container_image_save=/var/cache/enroot-container-images/")
+
+	// TODO(@itechdima): make `expose_enroot_logs` configurable and enable it once #413 is resolved.
+	res.AddLine(strings.Join(
+		[]string{
+			utils.Ternary(cluster.PlugStackConfig.Pyxis.Required, "required", "optional"),
+			"spank_pyxis.so",
+			"runtime_path=/run/pyxis",
+			"execute_entrypoint=0",
+			"container_scope=global",
+			"sbatch_support=1",
+			fmt.Sprintf("container_image_save=%s", cluster.PlugStackConfig.Pyxis.ContainerImageSave),
+		},
+		" ",
+	))
+
+	{
+		opts := cluster.PlugStackConfig.NcclDebug.DeepCopy()
+		res.AddLine(strings.Join(
+			[]string{
+				utils.Ternary(opts.Required, "required", "optional"),
+				"spanknccldebug.so",
+				fmt.Sprintf("enabled=%d", utils.Ternary(opts.Enabled, 1, 0)),
+				fmt.Sprintf("log-level=%s", utils.Ternary(opts.LogLevel != "", opts.LogLevel, "INFO")),
+				fmt.Sprintf("out-file=%d", utils.Ternary(opts.OutputToFile, 1, 0)),
+				fmt.Sprintf("out-dir=%s", utils.Ternary(opts.OutputDirectory != "", opts.OutputDirectory, "/opt/soperator-outputs/nccl_logs")),
+				fmt.Sprintf("out-stdout=%d", utils.Ternary(opts.OutputToStdOut, 1, 0)),
+			},
+			" ",
+		))
+	}
+
+	for _, plugin := range cluster.PlugStackConfig.CustomPlugins {
+		conf := []string{
+			utils.Ternary(plugin.Required, "required", "optional"),
+			plugin.Path,
+		}
+
+		if len(plugin.Arguments) > 0 {
+			for k, v := range plugin.Arguments {
+				conf = append(conf, fmt.Sprintf("%s=%s", k, v))
+			}
+		}
+
+		res.AddLine(strings.Join(conf, " "))
+	}
+
 	return res
 }
 
