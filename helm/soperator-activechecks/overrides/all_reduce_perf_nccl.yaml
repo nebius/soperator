@@ -14,8 +14,6 @@ activeCheck:
       #SBATCH --mem-per-gpu=16G
       #SBATCH --gpus-per-node=8
       #SBATCH --cpus-per-task=16
-      #SBATCH --cpu-bind="verbose,cores"
-      #SBATCH --mem=128G
       #SBATCH --no-requeue
       #SBATCH --output=/opt/soperatorchecks/%N.%x.%j.%A.out
       #SBATCH --error=/opt/soperatorchecks/%N.%x.%j.%A.out
@@ -36,12 +34,15 @@ activeCheck:
         echo "Unsupported platform"
         exit 0
       fi
+      echo "Platform found: $platform"
 
       echo "Running all_reduce_without_ib check on $(hostname)..."
       HC_OUTPUT=$(srun bash -c "health-checker run -e soperator -p $platform -n all_reduce_without_ib --json-log")
       echo "Health checker output: $HC_OUTPUT"
       HC_EXIT_CODE=$?
-      HC_STATUS=$(echo "$HC_OUTPUT" | jq -r '.status')
+      echo "Health checker exit code: $HC_EXIT_CODE"
+      HC_STATUS=$(echo "$HC_OUTPUT" | awk '/^\s*{/,/^\s*}/' | jq -r '.status')
+      echo "Health checker status: $HC_STATUS"
       if [[ "$HC_STATUS" == "ERROR" && $HC_EXIT_CODE -eq 1 ]]; then
         echo "Health-checker reported status=ERROR and exited with non-zero status."
         exit 1
