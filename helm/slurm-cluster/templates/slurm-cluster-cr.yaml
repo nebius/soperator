@@ -14,8 +14,16 @@ metadata:
   {{- end }}
 spec:
   slurmConfig:
-    prolog: /opt/slurm-scripts/prolog.sh
-    epilog: /opt/slurm-scripts/epilog.sh
+    prolog: /opt/slurm_scripts/prolog.sh
+    epilog: /opt/slurm_scripts/epilog.sh
+  {{- if eq .Values.clusterType "gpu" }}
+  healthCheckConfig:
+    healthCheckInterval: 600
+    healthCheckProgram: /opt/slurm_scripts/hc_program.sh
+    healthCheckNodeState:
+    - state: NONDRAINED_IDLE
+    - state: CYCLE
+  {{- end }}
   {{- if .Values.slurmConfig }}
     {{- toYaml .Values.slurmConfig | nindent 4 }}
   {{- end }}
@@ -270,12 +278,12 @@ spec:
         jailSubMounts:
           {{- default list .Values.slurmNodes.worker.volumes.jailSubMounts | toYaml | nindent 10 }}
         customMounts:
-        - name: slurm-scripts
-          mountPath: /opt/slurm-scripts/
-          volumeSourceName: slurm-scripts
-        - name: slurm-scripts-jail
-          mountPath: /mnt/jail.upper/opt/slurm-scripts/
-          volumeSourceName: slurm-scripts
+          - name: slurm-scripts
+            mountPath: /opt/slurm_scripts/
+            volumeSourceName: slurm-scripts
+          - name: slurm-scripts-jail
+            mountPath: /mnt/jail.upper/opt/slurm_scripts/
+            volumeSourceName: slurm-scripts
           {{- default list .Values.slurmNodes.worker.volumes.customMounts | toYaml | nindent 10 }}
         {{- if .Values.slurmNodes.worker.volumes.sharedMemorySize }}
         sharedMemorySize: {{ .Values.slurmNodes.worker.volumes.sharedMemorySize | quote }}
@@ -331,12 +339,12 @@ spec:
         jailSubMounts:
           {{- default list .Values.slurmNodes.login.volumes.jailSubMounts | toYaml | nindent 10 }}
         customMounts:
-        - name: slurm-scripts
-          mountPath: /opt/slurm-scripts/
-          volumeSourceName: slurm-scripts
-        - name: slurm-scripts-jail
-          mountPath: /mnt/jail.upper/opt/slurm-scripts/
-          volumeSourceName: slurm-scripts
+          - name: slurm-scripts
+            mountPath: /opt/slurm_scripts/
+            volumeSourceName: slurm-scripts
+          - name: slurm-scripts-jail
+            mountPath: /mnt/jail.upper/opt/slurm_scripts/
+            volumeSourceName: slurm-scripts
           {{- default list .Values.slurmNodes.login.volumes.customMounts | toYaml | nindent 10 }}
     exporter:
       enabled: {{ .Values.slurmNodes.exporter.enabled }}

@@ -17,7 +17,7 @@ chroot /mnt/jail /bin/bash -s <<-'EOF'
         health_checker
     )
 
-    pushd /opt/slurm-scripts || exit 0
+    pushd /opt/slurm_scripts || exit 0
     for check in "${checks[@]}"; do
         script="${check}.sh"
         log="${LOGS_OUTPUT_DIR}/${SLURMD_NODENAME}.${check}.${SCRIPT_CONTEXT}.out"

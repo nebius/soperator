@@ -41,7 +41,7 @@ case "$SCRIPT_CONTEXT" in
 esac
 
 exit_code=0
-details=$(health-checker run -e soperator -p $platform -f mk8s-txt -n $checks &2>1) || exit_code=$?
+details=$(health-checker run -e soperator -p $platform -f mk8s-txt -n $checks 2>&1) || exit_code=$?
 if [[ $exit_code -eq 1 ]]; then
     echo "Health-checker failed with exit code 1."
     echo "$details"

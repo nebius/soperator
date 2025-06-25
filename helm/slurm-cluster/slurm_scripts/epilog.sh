@@ -18,7 +18,7 @@ if [ -n "$SLURM_JOB_GPUS" ]; then
             health_checker
         )
 
-        pushd /opt/slurm-scripts || exit 0
+        pushd /opt/slurm_scripts || exit 0
         for check in "${checks[@]}"; do
             script="${check}.sh"
             log="${LOGS_OUTPUT_DIR}/${SLURMD_NODENAME}.${check}.${SCRIPT_CONTEXT}.out"
@@ -54,6 +54,6 @@ fi
 
 echo "Unmap the Slurm job with DCGM metrics"
 log="${JAIL_DIR}${LOGS_OUTPUT_DIR}/${SLURMD_NODENAME}.unmap_job_dcgm.${SCRIPT_CONTEXT}.out"
-bash /mnt/jail/opt/soperator/slurm_scripts/unmap_job_dcgm.sh > "$log" 2>&1 || true
+bash /mnt/jail/opt/slurm_scripts/unmap_job_dcgm.sh > "$log" 2>&1 || true
 
 exit 0
