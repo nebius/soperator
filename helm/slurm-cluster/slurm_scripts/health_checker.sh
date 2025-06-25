@@ -7,6 +7,8 @@ if [[ -z "${PATH:-}" ]]; then
     echo "PATH is not provided, skipping health-checker" >&2
     exit 0
 fi
+# health-checker library uses os.Environ and we need to explicitly export PATH
+export PATH=$PATH
 
 # Define platform for health-checker
 platform=""
@@ -46,9 +48,9 @@ if [[ $exit_code -eq 1 ]]; then
 
     error_checks=$(echo "$details" | sed -n 's/.*S: ERROR \[\(.*\)\].*/\1/p')
     echo "$error_checks" >&3
-    exit 0
+    exit 1
 elif [[ $exit_code -eq 2 ]]; then
-    echo "Health-checker reported with " >&2
+    echo "Health-checker reported with exit code 2." >&2
     echo "$details"
     exit 0
 else

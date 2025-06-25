@@ -13,8 +13,10 @@ metadata:
     {{- .  | toYaml | nindent 4 }}
   {{- end }}
 spec:
-  {{- if .Values.slurmConfig }}
   slurmConfig:
+    prolog: /opt/slurm-scripts/prolog.sh
+    epilog: /opt/slurm-scripts/epilog.sh
+  {{- if .Values.slurmConfig }}
     {{- toYaml .Values.slurmConfig | nindent 4 }}
   {{- end }}
   maintenance: {{ default "none" .Values.maintenance | quote  }}
@@ -58,6 +60,10 @@ spec:
     {{- end }}
     {{- end }}
   volumeSources:
+    - name: slurm-scripts
+      configMap:
+        name: slurm-scripts
+        defaultMode: 500
     {{- range .Values.volumeSources }}
     - name: {{ .name | quote }}
       {{- omit . "name" | toYaml | nindent 6 }}
@@ -264,6 +270,12 @@ spec:
         jailSubMounts:
           {{- default list .Values.slurmNodes.worker.volumes.jailSubMounts | toYaml | nindent 10 }}
         customMounts:
+        - name: slurm-scripts
+          mountPath: /opt/slurm-scripts/
+          volumeSourceName: slurm-scripts
+        - name: slurm-scripts-jail
+          mountPath: /mnt/jail.upper/opt/slurm-scripts/
+          volumeSourceName: slurm-scripts
           {{- default list .Values.slurmNodes.worker.volumes.customMounts | toYaml | nindent 10 }}
         {{- if .Values.slurmNodes.worker.volumes.sharedMemorySize }}
         sharedMemorySize: {{ .Values.slurmNodes.worker.volumes.sharedMemorySize | quote }}
@@ -319,6 +331,12 @@ spec:
         jailSubMounts:
           {{- default list .Values.slurmNodes.login.volumes.jailSubMounts | toYaml | nindent 10 }}
         customMounts:
+        - name: slurm-scripts
+          mountPath: /opt/slurm-scripts/
+          volumeSourceName: slurm-scripts
+        - name: slurm-scripts-jail
+          mountPath: /mnt/jail.upper/opt/slurm-scripts/
+          volumeSourceName: slurm-scripts
           {{- default list .Values.slurmNodes.login.volumes.customMounts | toYaml | nindent 10 }}
     exporter:
       enabled: {{ .Values.slurmNodes.exporter.enabled }}

@@ -39,7 +39,7 @@ if [ -n "$SLURM_JOB_GPUS" ]; then
                 if [[ -n "${cur_state}" && "${cur_state}" != "draining" && "${cur_state}" != "drained" ]]; then
                     reason="[HC] Failed ${check} [${SCRIPT_CONTEXT}]"
                     if [[ -n "${details}" ]]; then
-                        reason="[HC] Failed ${check}, ${details} [${SCRIPT_CONTEXT}]"
+                        reason="[HC] Failed ${check}: ${details} [${SCRIPT_CONTEXT}]"
                     fi
                     echo "Drain Slurm node ${SLURMD_NODENAME}"
                     scontrol update NodeName="${SLURMD_NODENAME}" State=drain Reason="${reason}" || true
