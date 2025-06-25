@@ -136,7 +136,73 @@ spec:
               rule: type == "pod" && name matches "worker-"
               config:
                 include: 
-                  - "/mnt/jail/opt/hc_out/`name`/**/*.out"
+                  - "/mnt/jail/opt/soperator-outputs/**/`name`*.out"
+                include_file_name: true
+                include_file_path: true
+                operators:
+                  - type: add
+                    field: resource["worker_name"]
+                    value: "`name`"
+                  - id: extract_content_from_filename
+                    type: regex_parser
+                    parse_from: attributes["log.file.name"]
+                    regex: ^`name`\.(?P<content>.+)\.out$
+                  - id: extract_directory
+                    type: regex_parser
+                    parse_from: attributes["log.file.path"]
+                    regex: ^.*/(?P<log_directory>nccl_logs|slurm_jobs|slurm_scripts)/.*$
+                  - type: move
+                    from: attributes.log_directory
+                    to: resource["log_type"]
+                  - id: parse_nccl_content
+                    type: regex_parser
+                    parse_from: attributes.content
+                    regex: ^(?P<job_id>\d+)\.(?P<job_step_id>\d+)$
+                    if: resource["log_type"] == "nccl_logs"
+                  - type: move
+                    from: attributes.job_id
+                    to: resource["job_id"]
+                    if: resource["log_type"] == "nccl_logs" and attributes["job_id"] != nil
+                  - type: move
+                    from: attributes.job_step_id
+                    to: resource["job_step_id"]
+                    if: resource["log_type"] == "nccl_logs" and attributes["job_step_id"] != nil
+                  - id: parse_slurm_job_content
+                    type: regex_parser
+                    parse_from: attributes.content
+                    regex: ^(?P<job_name>[^.]+)\.(?P<job_id>\d+)(?:\.(?P<job_array_id>\d+))?$
+                    if: resource["log_type"] == "slurm_jobs"
+                  - type: move
+                    from: attributes.job_name
+                    to: resource["job_name"]
+                    if: resource["log_type"] == "slurm_jobs" and attributes["job_name"] != nil
+                  - type: move
+                    from: attributes.job_id
+                    to: resource["job_id"]
+                    if: resource["log_type"] == "slurm_jobs" and attributes["job_id"] != nil
+                  - type: move
+                    from: attributes.job_array_id
+                    to: resource["job_array_id"]
+                    if: resource["log_type"] == "slurm_jobs" and attributes["job_array_id"] != nil
+                  - id: parse_script_content
+                    type: regex_parser
+                    parse_from: attributes.content
+                    regex: ^(?P<script_name>[^.]+)(?:\.(?P<script_context>[^.]+))?$
+                    if: resource["log_type"] == "slurm_scripts"
+                  - type: move
+                    from: attributes.script_name
+                    to: resource["slurm_script_name"]
+                    if: resource["log_type"] == "slurm_scripts" and attributes["script_name"] != nil
+                  - type: move
+                    from: attributes.script_context
+                    to: resource["slurm_script_context"]
+                    if: resource["log_type"] == "slurm_scripts" and attributes["script_context"] != nil
+                  - type: remove
+                    field: attributes.content
+                retry_on_failure:
+                  enabled: true
+                start_at: end
+                storage: file_storage
         {{- end }}
         filelog/nodelogs:
           include:
@@ -344,8 +410,8 @@ spec:
       mountPath: /var/nodelogs
       readOnly: true
     {{- if .Values.observability.opentelemetry.logs.values.hcOutputEnabled }}
-    - mountPath: /mnt/jail/opt/hc_out
-      name: hc-logs
+    - mountPath: /mnt/jail/opt/soperator-outputs
+      name: soperator-outputs
       readOnly: true
     {{- end }}
     extraVolumes:
@@ -363,9 +429,9 @@ spec:
       name: node-logs
     {{- if .Values.observability.opentelemetry.logs.values.hcOutputEnabled }}
     - hostPath:
-        path: /mnt/jail/opt/hc_out
-        type: Directory
-      name: hc-logs
+        path: /mnt/jail/opt/soperator-outputs
+        type: DirectoryOrCreate
+      name: soperator-outputs
     {{- end }}
     - hostPath:
         path: /var/lib/otelcol

@@ -103,8 +103,59 @@ this information on the dashboards we provide as well.
 
 At the moment, the following information is gathered and can be viewed by users:
 - Logs for all K8s pods + K8s events.
+- **Centralized Slurm workload logs**: Structured collection of job outputs with automatic categorization.
 - K8s cluster metrics: node states, stateful set & deployment sizes, etc.
 - K8s node metrics: CPU, memory, network, disk usage, etc.
 - K8s pod resource metrics: resource usage by pods & containers.
 - NVIDIA GPU metrics: GPU utilization, power, temperature, etc.
 - Slurm metrics: comprehensive monitoring of nodes, jobs, and controller performance. See [SLURM Exporter](slurm-exporter.md) for detailed metrics documentation.
+
+
+### Centralized Logging Scheme
+
+Soperator implements a centralized logging system that automatically collects and categorizes Slurm workload outputs. Logs are stored in a structured directory layout and processed by OpenTelemetry collectors for centralized analysis.
+
+#### Directory Structure
+```
+/opt/soperator-outputs/
+├── nccl_logs/      # NCCL benchmark outputs
+├── slurm_jobs/     # Slurm job outputs
+└── slurm_scripts/  # Slurm script outputs
+```
+
+#### Logging Schema
+
+Log files follow specific naming patterns for automatic parsing and labeling:
+
+**NCCL Logs:**
+```
+worker_name.job_id.job_step_id.out
+Example: worker-0.12345.67890.out
+```
+
+**Slurm Jobs:**
+```
+worker_name.job_name.job_id[.array_id].out
+Examples:
+- worker-0.benchmark.12345.out
+- worker-0.training.12345.1.out (array job)
+```
+
+**Slurm Scripts:**
+```
+worker_name.script_name[.context].out
+Examples:
+- worker-0.setup.out
+- worker-0.cleanup.batch.out
+```
+
+#### Generated Labels
+
+The logging system automatically extracts metadata and creates the following labels:
+
+- `worker_name`: Worker pod identifier (e.g., worker-0)
+- `log_type`: Category (nccl_logs, slurm_jobs, slurm_scripts)
+- `job_id`, `job_step_id`: For NCCL logs
+- `job_name`, `job_array_id`: For Slurm job logs
+- `slurm_script_name`, `slurm_script_context`: For script logs
+
