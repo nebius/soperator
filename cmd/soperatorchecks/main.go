@@ -96,13 +96,14 @@ func getZapOpts(logFormat, logLevel string) []zap.Opts {
 
 func main() {
 	var (
-		metricsAddr          string
-		enableLeaderElection bool
-		probeAddr            string
-		secureMetrics        bool
-		enableHTTP2          bool
-		logFormat            string
-		logLevel             string
+		metricsAddr            string
+		enableLeaderElection   bool
+		probeAddr              string
+		secureMetrics          bool
+		enableHTTP2            bool
+		logFormat              string
+		logLevel               string
+		enabledNodeReplacement bool
 
 		reconcileTimeout time.Duration
 		maxConcurrency   int
@@ -131,6 +132,7 @@ func main() {
 	flag.DurationVar(&reconcileTimeout, "reconcile-timeout", 5*time.Minute, "The maximum duration allowed for a single reconcile")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 5*time.Minute, "The maximum duration allowed for caching sync")
+	flag.BoolVar(&enabledNodeReplacement, "enable-node-replacement", true, "Enable node replacement controller")
 	flag.Parse()
 
 	opts := getZapOpts(logFormat, logLevel)
@@ -216,6 +218,7 @@ func main() {
 		mgr.GetEventRecorderFor(soperatorchecks.SlurmNodesControllerName),
 		slurmAPIClients,
 		reconcileTimeout,
+		enabledNodeReplacement,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create slurm nodes controller", "controller", soperatorchecks.SlurmNodesControllerName)
 		os.Exit(1)

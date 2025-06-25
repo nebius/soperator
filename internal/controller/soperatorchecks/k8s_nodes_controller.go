@@ -10,6 +10,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	check "nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
@@ -60,7 +61,7 @@ func (r *K8SNodesController) SetupWithManager(mgr ctrl.Manager,
 
 					for _, condition := range conditions {
 						switch condition.Type {
-						case consts.SlurmNodeDrain, consts.SlurmNodeReboot, consts.K8SNodeMaintenanceScheduled,
+						case consts.SlurmNodeDrain, consts.SlurmNodeReboot, consts.K8SNodeMaintenanceScheduled, consts.HardwareIssuesSuspected,
 							consts.SoperatorChecksK8SNodeDegraded, consts.SoperatorChecksK8SNodeMaintenance:
 							condition := condition
 
@@ -120,8 +121,9 @@ func (c *K8SNodesController) processDrainCondition(ctx context.Context, k8sNode 
 	logger.Info("processing drain condition")
 
 	var (
-		drainCondition       corev1.NodeCondition
-		maintenanceCondition corev1.NodeCondition
+		drainCondition          corev1.NodeCondition
+		maintenanceCondition    corev1.NodeCondition
+		hardwareIssuesCondition corev1.NodeCondition
 	)
 	for _, cond := range k8sNode.Status.Conditions {
 		if cond.Type == consts.SlurmNodeDrain {
@@ -130,14 +132,28 @@ func (c *K8SNodesController) processDrainCondition(ctx context.Context, k8sNode 
 		if cond.Type == consts.SoperatorChecksK8SNodeMaintenance {
 			maintenanceCondition = cond
 		}
+		if cond.Type == consts.HardwareIssuesSuspected {
+			hardwareIssuesCondition = cond
+		}
 	}
 
 	logger = logger.WithValues("maintenanceCondition", maintenanceCondition, "drainCondition", drainCondition)
-	if drainCondition == (corev1.NodeCondition{}) || drainCondition.Status == corev1.ConditionFalse {
-		if maintenanceCondition == (corev1.NodeCondition{}) || maintenanceCondition.Status == corev1.ConditionFalse {
+	if check.IsConditionFalseOrEmpty(drainCondition) {
+		if check.IsConditionTrue(hardwareIssuesCondition) {
+			logger.Info("hardware issues suspected, setting SlurmNodeDrain: true")
+			return setK8SNodeCondition(ctx, c.Client, k8sNode.Name, newNodeCondition(
+				consts.SlurmNodeDrain,
+				corev1.ConditionTrue,
+				consts.ReasonNodeNeedDrain,
+				consts.MessageHardwareIssuesSuspected,
+			))
+		}
+
+		if check.IsConditionFalseOrEmpty(maintenanceCondition) {
 			logger.Info("no action needed: no maintenance condition")
 			return nil
 		}
+
 		logger.Info("setting SlurmNodeDrain: true")
 		return setK8SNodeCondition(ctx, c.Client, k8sNode.Name, newNodeCondition(
 			consts.SlurmNodeDrain,
@@ -180,8 +196,8 @@ func (c *K8SNodesController) processRebootCondition(ctx context.Context, k8sNode
 			degradedCondition = cond
 		}
 	}
-	if rebootCondition == (corev1.NodeCondition{}) || rebootCondition.Status == corev1.ConditionFalse {
-		if degradedCondition == (corev1.NodeCondition{}) || degradedCondition.Status == corev1.ConditionFalse {
+	if check.IsConditionFalseOrEmpty(rebootCondition) {
+		if check.IsConditionFalseOrEmpty(degradedCondition) {
 			logger.Info("no action needed: no reboot reason")
 			return nil
 		}
