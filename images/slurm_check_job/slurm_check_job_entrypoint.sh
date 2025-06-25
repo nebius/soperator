@@ -28,9 +28,8 @@ else
     echo "Submitting regular Slurm job..."
     SLURM_OUTPUT=$(/usr/bin/sbatch --parsable \
       --job-name="$ACTIVE_CHECK_NAME" \
-      --chdir=/home/soperatorchecks \
+      --chdir=/opt/soperatorchecks \
       --uid=soperatorchecks \
-      -vvv \
       /opt/bin/sbatch.sh)
     if [[ -z "$SLURM_OUTPUT" ]]; then
         echo "Failed to submit Slurm job"
