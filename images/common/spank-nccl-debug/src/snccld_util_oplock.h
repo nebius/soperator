@@ -12,9 +12,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define SNCCLD_OPLOCK_OP_USER_INIT "user-init"
-#define SNCCLD_OPLOCK_OP_TASK_INIT "task-init"
-#define SNCCLD_OPLOCK_OP_TASK_EXIT "task-exit"
+#define SNCCLD_OPLOCK_OP_USER_INIT   "user-init"
+#define SNCCLD_OPLOCK_OP_TASK_INIT_P "task-init-privileged"
+#define SNCCLD_OPLOCK_OP_TASK_INIT   "task-init"
+#define SNCCLD_OPLOCK_OP_TASK_EXIT   "task-exit"
 
 /**
  * Try to acquire a per‐job/step lock for the given operation on a host.
