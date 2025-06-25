@@ -274,7 +274,7 @@ sync-version: yq ## Sync versions from file
 	@# endregion internal/consts
 
 .PHONY: sync-version-from-scratch
-sync-version-from-scratch: generate manifests helm sync-version ## Regenerates all resources and syncs versions to them
+sync-version-from-scratch: generate manifests helm mock sync-version ## Regenerates all resources and syncs versions to them
 
 ##@ Build
 
@@ -372,6 +372,7 @@ ENVTEST        ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT   = $(LOCALBIN)/golangci-lint
 HELMIFY        ?= $(LOCALBIN)/helmify
 YQ             ?= $(LOCALBIN)/yq
+MOCKERY        ?= $(LOCALBIN)/mockery
 
 ## Tool Versions
 KUSTOMIZE_VERSION        ?= v5.5.0
@@ -382,6 +383,7 @@ HELMIFY_VERSION          ?= 0.4.13
 HELM_VERSION						 ?= v3.18.3
 HELM_UNITTEST_VERSION    ?= 0.8.2
 YQ_VERSION               ?= 4.44.3
+MOCKERY_VERSION 		 ?= 2.53.4
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -391,6 +393,22 @@ $(KUSTOMIZE): $(LOCALBIN)
 		rm -rf $(LOCALBIN)/kustomize; \
 	fi
 	test -s $(LOCALBIN)/kustomize || GOBIN=$(LOCALBIN) GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION)
+
+.PHONY: mockery
+mockery:
+	@mkdir -p $(LOCALBIN)
+	@current_version="$$( $(MOCKERY) --version 2>&1 | grep -o 'version=v[0-9.]*' | cut -d= -f2 || true)"; \
+	if [ "$$current_version" != "v$(MOCKERY_VERSION)" ]; then \
+		echo "🛠  Installing mockery v$(MOCKERY_VERSION) (found: $$current_version)"; \
+		rm -f $(MOCKERY); \
+		GOBIN=$(LOCALBIN) GO111MODULE=on go install github.com/vektra/mockery/v2@v$(MOCKERY_VERSION); \
+	else \
+		echo "✅ mockery v$(MOCKERY_VERSION) already installed"; \
+	fi
+
+.PHONY: mock
+mock: mockery ## Generate mocks using mockery
+	$(MOCKERY)
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
