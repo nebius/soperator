@@ -11,8 +11,8 @@ activeCheck:
       #SBATCH --deadline="now+12hours"
       #SBATCH --time=1:00:00
       #SBATCH --exclusive
-      #SBATCH --output=/opt/soperatorchecks/%N.%x.%j.%A.out
-      #SBATCH --error=/opt/soperatorchecks/%N.%x.%j.%A.out
+      #SBATCH --output=/opt/soperator-outputs/slurm_jobs/%N.%x.%j.%A.out
+      #SBATCH --error=/opt/soperator-outputs/slurm_jobs/%N.%x.%j.%A.out
 
       echo "Cleaning up Enroot containers on node: $(hostname)"
       srun bash -c "enroot list | grep '^pyxis_' | xargs -r -n1 enroot remove --force"

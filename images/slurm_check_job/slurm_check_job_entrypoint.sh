@@ -21,6 +21,9 @@ rm -rf /etc/slurm && ln -s /mnt/jail/slurm /etc/slurm
 echo "Bind-mount /opt/bin/sbatch.sh script"
 mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
 
+echo "Create directory for slurm job outputs"
+mkdir -p /opt/soperator-outputs/slurm_jobs/
+
 if [[ "$EACH_WORKER_JOB_ARRAY" == "true" ]]; then
     echo "Submitting job using slurm_submit_array_job.sh..."
     SLURM_JOB_ID=$(/opt/bin/slurm/slurm_submit_array_job.sh | tail -n 1)

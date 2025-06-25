@@ -15,8 +15,8 @@ activeCheck:
       #SBATCH --gpus-per-node=8
       #SBATCH --cpus-per-task=16
       #SBATCH --no-requeue
-      #SBATCH --output=/opt/soperatorchecks/%N.%x.%j.%A.out
-      #SBATCH --error=/opt/soperatorchecks/%N.%x.%j.%A.out
+      #SBATCH --output=/opt/soperator-outputs/slurm_jobs/%N.%x.%j.%A.out
+      #SBATCH --error=/opt/soperator-outputs/slurm_jobs/%N.%x.%j.%A.out
 
       echo "Checking for running GPU processes..."
       if [[ -n "$(nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -v '^ *$')" ]]; then
