@@ -12,7 +12,7 @@
 #include <slurm/spank.h>
 
 #define SNCCLD_SYSTEM_DIR         "/tmp/nccl_debug"
-#define SNCCLD_DEFAULT_MODE       0666
+#define SNCCLD_DEFAULT_MODE       0777
 #define SNCCLD_TEMPLATE_FILE_NAME "%s/%s.%u.%u.%s"
 
 /**
