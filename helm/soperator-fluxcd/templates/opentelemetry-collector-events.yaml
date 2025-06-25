@@ -29,6 +29,7 @@ spec:
   releaseName: opentelemetry-collector-events
   targetNamespace: logs-system
   values:
+  {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
   {{- if .Values.observability.opentelemetry.events.overrideValues }}
     {{- toYaml .Values.observability.opentelemetry.events.overrideValues | nindent 4 }}
   {{- else }}
@@ -60,7 +61,7 @@ spec:
           retry_on_failure:
             initial_interval: 200ms
           timeout: 5s
-        {{- if .Values.observability.opentelemetry.events.values.publicEndpointEnabled }}
+        {{- if $hasPublicEndpoint }}
         otlp:
           endpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
           balancer_name: round_robin
@@ -76,7 +77,7 @@ spec:
       extensions:
         health_check:
           endpoint: 0.0.0.0:13133
-        {{- if .Values.observability.opentelemetry.events.values.publicEndpointEnabled }}
+        {{- if $hasPublicEndpoint }}
         bearertokenauth:
           filename: "/o11ytoken/accessToken"
         {{- end }}
@@ -147,14 +148,14 @@ spec:
       service:
         extensions:
         - health_check
-        {{- if .Values.observability.opentelemetry.events.values.publicEndpointEnabled }}
+        {{- if $hasPublicEndpoint }}
         - bearertokenauth
         {{- end }}
         pipelines:
           logs/events:
             exporters:
             - otlphttp/victoriametrics
-            {{- if .Values.observability.opentelemetry.events.values.publicEndpointEnabled }}
+            {{- if $hasPublicEndpoint }}
             - otlp
             {{- end }}
             processors:
@@ -171,7 +172,7 @@ spec:
         fieldRef:
           fieldPath: spec.nodeName
     - name: CLUSTER_NAME
-      value: {{ .Values.observability.opentelemetry.clusterName | quote }}
+      value: {{ .Values.observability.clusterName | quote }}
     - name: GOMAXPROCS
       value: "1"
     image:
@@ -195,7 +196,7 @@ spec:
     resources:
     {{- toYaml .Values.observability.opentelemetry.events.values.resources | nindent 6 }}
     {{- end }}
-    {{- if .Values.observability.opentelemetry.events.values.publicEndpointEnabled }}
+    {{- if $hasPublicEndpoint }}
     extraVolumes:
       - name: o11ytoken
         secret:

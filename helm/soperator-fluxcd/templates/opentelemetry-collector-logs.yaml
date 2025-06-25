@@ -29,6 +29,7 @@ spec:
   releaseName: opentelemetry-collector-logs
   targetNamespace: logs-system
   values:
+  {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
   {{- if .Values.observability.opentelemetry.logs.overrideValues }}
     {{- toYaml .Values.observability.opentelemetry.logs.overrideValues | nindent 4 }}
   {{- else }}
@@ -53,7 +54,7 @@ spec:
           retry_on_failure:
             initial_interval: 200ms
           timeout: 5s
-        {{- if .Values.observability.opentelemetry.logs.values.publicEndpointEnabled }}
+        {{- if $hasPublicEndpoint }}
         otlp:
           endpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
           balancer_name: round_robin
@@ -75,7 +76,7 @@ spec:
           directory: /var/lib/otelcol
         health_check:
           endpoint: 0.0.0.0:13133
-        {{- if .Values.observability.opentelemetry.logs.values.publicEndpointEnabled }}
+        {{- if $hasPublicEndpoint }}
         bearertokenauth:
           filename: "/o11ytoken/accessToken"
         {{- end }}
@@ -290,7 +291,7 @@ spec:
         extensions:
         - health_check
         - file_storage
-        {{- if .Values.observability.opentelemetry.logs.values.publicEndpointEnabled }}
+        {{- if $hasPublicEndpoint }}
         - bearertokenauth
         {{- end }}
         {{- if .Values.observability.opentelemetry.logs.values.hcOutputEnabled }}
@@ -300,7 +301,7 @@ spec:
           logs:
             exporters:
             - otlphttp/victoriametrics
-            {{- if .Values.observability.opentelemetry.logs.values.publicEndpointEnabled }}
+            {{- if $hasPublicEndpoint }}
             - otlp
             {{- end }}
             processors:
@@ -322,11 +323,11 @@ spec:
         fieldRef:
           fieldPath: spec.nodeName
     - name: CLUSTER_NAME
-      value: {{ .Values.observability.opentelemetry.clusterName | quote }}
+      value: {{ .Values.observability.clusterName | quote }}
     - name: GOMAXPROCS
       value: "1"
     extraVolumeMounts:
-    {{- if .Values.observability.opentelemetry.events.values.publicEndpointEnabled }}
+    {{- if $hasPublicEndpoint }}
     - mountPath: /o11ytoken
       name: o11ytoken
       readOnly: true
@@ -348,7 +349,7 @@ spec:
       readOnly: true
     {{- end }}
     extraVolumes:
-    {{- if .Values.observability.opentelemetry.events.values.publicEndpointEnabled }}
+    {{- if $hasPublicEndpoint }}
     - name: o11ytoken
       secret:
         secretName: o11y-writer-sa-token
