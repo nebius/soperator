@@ -132,7 +132,7 @@ fi
 
 updated_json=$(echo "$extra_json" | jq -c --arg key "$ACTIVE_CHECK_NAME" 'del(.[$key])')
 
-scontrol update NodeName="$NODE_NAME" Extra="$updated_json"
+sudo scontrol update NodeName="$NODE_NAME" Extra="$updated_json"
 
 echo "prolog completed for $NODE_NAME"`
 }

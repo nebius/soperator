@@ -16,8 +16,15 @@ done
 echo "Submitting Slurm array job..."
 HOSTS_NUM=$(sinfo -N --noheader -o "%N" | wc -l)
 export SLURM_PROLOG="/slurm/activecheck-prolog.sh"
-SLURM_OUTPUT=$(/usr/bin/sbatch --parsable --job-name="$ACTIVE_CHECK_NAME" --export=ALL,SLURM_PROLOG --extra="${ACTIVE_CHECK_NAME}=true" --array=0-$((HOSTS_NUM - 1)) --nodes=1 /opt/bin/sbatch.sh)
-
+SLURM_OUTPUT=$(/usr/bin/sbatch --parsable \
+  --job-name="$ACTIVE_CHECK_NAME" \
+  --export=ALL,SLURM_PROLOG \
+  --extra="${ACTIVE_CHECK_NAME}=true" \
+  --array=0-$((HOSTS_NUM - 1)) \
+  --nodes=1 \
+  --chdir=/opt/soperatorchecks \
+  --uid=soperatorchecks \
+  /opt/bin/sbatch.sh)
 if [[ -z "$SLURM_OUTPUT" ]]; then
     echo "Failed to submit Slurm job"
     exit 1
