@@ -33,16 +33,24 @@ spank_err_t snccld_mkdir_p(const char *path, mode_t mode) {
     for (p = tmp + 1; *p; p++) {
         if (*p == '/') {
             *p = '\0';
+
+            const mode_t old_mask = umask(0);
             if (mkdir(tmp, mode) != 0 && errno != EEXIST) {
+                umask(old_mask);
                 return ESPANK_ERROR;
             }
+            umask(old_mask);
+
             *p = '/';
         }
     }
 
+    const mode_t old_mask = umask(0);
     if (mkdir(tmp, mode) != 0 && errno != EEXIST) {
+        umask(old_mask);
         return ESPANK_ERROR;
     }
+    umask(old_mask);
 
     return ESPANK_SUCCESS;
 }
@@ -91,7 +99,8 @@ void snccld_ensure_file_exists(const char *path) {
         file
     );
 
-    const int user_debug_file_fd = open(
+    const mode_t old_mask           = umask(0);
+    const int    user_debug_file_fd = open(
         user_debug_file_absolute,
         O_CREAT | O_WRONLY | O_TRUNC,
         SNCCLD_DEFAULT_MODE
@@ -102,6 +111,7 @@ void snccld_ensure_file_exists(const char *path) {
         snccld_log_debug("File created: '%s'", user_debug_file_absolute);
         close(user_debug_file_fd);
     }
+    umask(old_mask);
 }
 
 inline void snccld_ensure_dir_exists(const char *path) {

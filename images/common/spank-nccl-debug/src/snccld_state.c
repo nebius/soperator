@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include <sys/file.h>
+#include <sys/stat.h>
 
 #include <slurm/spank.h>
 
@@ -140,11 +141,14 @@ spank_err_t snccld_state_write(
     char *path = _snccld_key_to_state_file_path(key, hostname);
     snccld_log_debug("Writing state file: '%s'", path);
 
+    const mode_t old_mask = umask(0);
     const int fd = open(path, O_CREAT | O_TRUNC | O_RDWR, SNCCLD_DEFAULT_MODE);
     if (fd < 0) {
         snccld_log_error("Cannot open or truncate state file '%s': %m", path);
+        umask(old_mask);
         goto state_write_fail;
     }
+    umask(old_mask);
 
     char *state_string = snccld_state_to_string(state);
     ftruncate(fd, 0);
