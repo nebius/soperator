@@ -294,6 +294,12 @@ func toCamelCase(input string) string {
 		return ""
 	}
 
+	if regexp.MustCompile(`^[A-Za-z0-9]+$`).MatchString(input) {
+		if len(input) > 0 && unicode.IsLetter(rune(input[0])) {
+			return strings.ToLower(string(input[0])) + input[1:]
+		}
+	}
+
 	words := regexp.MustCompile(`[^A-Za-z0-9]+`).Split(input, -1)
 
 	var result strings.Builder
