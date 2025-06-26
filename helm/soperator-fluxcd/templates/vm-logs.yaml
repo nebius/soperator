@@ -31,26 +31,26 @@ spec:
   {{- if .Values.observability.vmStack.overrideValues }}
     {{- toYaml .Values.observability.vmStack.overrideValues | nindent 4 }}
   {{- else }}
-      dashboards:
+    dashboards:
+      enabled: true
+      labels:
+        grafana_dashboard: "1"
+    server:
+      {{- if .Values.observability.vmLogs.values.resources }}
+      resources:
+        {{- toYaml .Values.observability.vmLogs.values.resources | nindent 8 }}
+      {{- end }}
+      {{- if .Values.observability.vmLogs.values.persistentVolume.enabled }}
+      persistentVolume:
         enabled: true
-        labels:
-          grafana_dashboard: "1"
-      server:
-        {{- if .Values.observability.vmLogs.values.resources }}
-        resources:
-          {{- toYaml .Values.observability.vmLogs.values.resources | nindent 8 }}
-        {{- end }}
-        {{- if .Values.observability.vmLogs.values.persistentVolume.enabled }}
-        persistence:
-          enabled: true
-          accessModes:
-            - {{ .Values.observability.vmLogs.values.persistentVolume.accessMode }}
-          size: {{ .Values.observability.vmLogs.values.persistentVolume.size }}
-        {{- end }}
-        vmServiceScrape:
-          enabled: true
-      vector:
-        enabled: false
+        accessModes:
+          - {{ .Values.observability.vmLogs.values.persistentVolume.accessMode }}
+        size: {{ .Values.observability.vmLogs.values.persistentVolume.size }}
+      {{- end }}
+      vmServiceScrape:
+        enabled: true
+    vector:
+      enabled: false
   {{- end }}
   valuesFrom:
   - kind: ConfigMap
