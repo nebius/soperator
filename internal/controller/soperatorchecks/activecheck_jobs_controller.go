@@ -164,8 +164,8 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 		slurmJobID, ok := k8sJob.Annotations["slurm-job-id"]
 		if !ok {
-			logger.Error(err, "failed to get slurm job id")
-			return ctrl.Result{}, err
+			logger.Error(err, "slurm-job-id annotation is missing, retrying")
+			return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, err
 		}
 
 		slurmJobs, err := slurmAPIClient.GetJobsByID(ctx, slurmJobID)
