@@ -14,12 +14,14 @@ const (
 )
 
 const (
+	SlurmNodeReasonHC              string = "[HC]"
 	SlurmNodeReasonKillTaskFailed  string = "Kill task failed"
 	SlurmNodeReasonNodeReplacement string = "Soperator auto-healing: node replacement process"
 	SlurmNodeReasonNodeReboot      string = "Soperator auto-healing: node reboot process"
 )
 
 var SlurmNodeReasonsMap = map[string]struct{}{
+	SlurmNodeReasonHC:              {},
 	SlurmNodeReasonKillTaskFailed:  {},
 	SlurmNodeReasonNodeReplacement: {},
 	SlurmNodeReasonNodeReboot:      {},

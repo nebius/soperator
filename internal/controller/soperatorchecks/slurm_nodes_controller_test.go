@@ -3,6 +3,7 @@ package soperatorchecks
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -43,7 +44,7 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 						api.V0041NodeStateDRAIN: {},
 					},
 					Reason: ptr.To(slurmapi.NodeReason{
-						Reason:    consts.SlurmNodeReasonKillTaskFailed,
+						Reason:    fmt.Sprintf("%s: extra", consts.SlurmNodeReasonKillTaskFailed),
 						ChangedAt: time.Date(2024, time.March, 1, 1, 1, 1, 1, time.UTC),
 					}),
 				},
@@ -62,8 +63,9 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 							api.V0041NodeStateDRAIN: {},
 						},
 						Reason: ptr.To(slurmapi.NodeReason{
-							Reason:    consts.SlurmNodeReasonKillTaskFailed,
-							ChangedAt: time.Date(2024, time.March, 1, 1, 1, 1, 1, time.UTC),
+							Reason:         consts.SlurmNodeReasonKillTaskFailed,
+							OriginalReason: fmt.Sprintf("%s: extra", consts.SlurmNodeReasonKillTaskFailed),
+							ChangedAt:      time.Date(2024, time.March, 1, 1, 1, 1, 1, time.UTC),
 						}),
 					},
 				},
@@ -149,4 +151,24 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 	}
 }
 
-// TODO: more tests
+func TestToCamelCase(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"hello world", "helloWorld"},
+		{"FOO BAR", "fooBar"},
+		{"multiple   spaces", "multipleSpaces"},
+		{"unicode test", "unicodeTest"},
+		{"123 numbers", "numbers"},
+		{"special_characters!", "specialCharacters"},
+		{"", ""},
+	}
+
+	for _, test := range tests {
+		result := toCamelCase(test.input)
+		if result != test.expected {
+			t.Errorf("toCamelCase(%q) = %q; want %q", test.input, result, test.expected)
+		}
+	}
+}

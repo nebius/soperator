@@ -20,8 +20,9 @@ type Node struct {
 }
 
 type NodeReason struct {
-	Reason    string
-	ChangedAt time.Time
+	Reason         string
+	OriginalReason string
+	ChangedAt      time.Time
 }
 
 func validateAPINode(node api.V0041Node) error {
