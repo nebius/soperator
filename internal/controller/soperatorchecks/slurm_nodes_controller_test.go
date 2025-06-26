@@ -162,6 +162,7 @@ func TestToCamelCase(t *testing.T) {
 		{"unicode test", "unicodeTest"},
 		{"123 numbers", "numbers"},
 		{"special_characters!", "specialCharacters"},
+		{"camelCaseAlready", "camelCaseAlready"},
 		{"", ""},
 	}
 
