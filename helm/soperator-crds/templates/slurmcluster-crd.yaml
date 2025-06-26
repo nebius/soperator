@@ -20107,7 +20107,6 @@ spec:
                   taskPluginParam:
                     default: Autobind=Cores
                     description: Additional parameters for the task plugin
-                    pattern: ^(|((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+)$
                     type: string
                   topologyParam:
                     description: TopologyParam is list of comma-separated options
