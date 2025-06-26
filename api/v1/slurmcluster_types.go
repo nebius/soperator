@@ -173,7 +173,6 @@ type SlurmConfig struct {
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="Autobind=Cores"
-	// +kubebuilder:validation:Pattern="^(|((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+)$"
 	TaskPluginParam *string `json:"taskPluginParam,omitempty"`
 	// Keep N last jobs in controller memory
 	//
