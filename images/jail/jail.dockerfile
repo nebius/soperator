@@ -274,6 +274,11 @@ RUN chmod +x /usr/bin/docker
 COPY images/jail/scripts/nvidia_smi_hostpid.sh /usr/bin/nvidia-smi-hostpid
 RUN chmod +x /usr/bin/nvidia-smi-hostpid
 
+# Copy Soperator utility scripts
+COPY images/jail/scripts/soperator_instance_login.sh /opt/soperator_utils/soperator_instance_login.sh
+COPY images/jail/scripts/slurm_task_info.sh /opt/soperator_utils/slurm_task_info.sh
+RUN chmod -R 755 /opt/soperator_utils
+
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host
 

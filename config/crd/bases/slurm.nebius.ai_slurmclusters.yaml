@@ -3190,7 +3190,7 @@ spec:
                   maxJobCount: 10000
                   minJobAge: 86400
                   prolog: ""
-                  taskPluginParam: ""
+                  taskPluginParam: Autobind=Cores
                 description: SlurmConfig represents the Slurm configuration in slurm.conf.
                   Not all options are supported.
                 properties:
@@ -3246,7 +3246,7 @@ spec:
                       starts. Default value is no prolog
                     type: string
                   taskPluginParam:
-                    default: ""
+                    default: Autobind=Cores
                     description: Additional parameters for the task plugin
                     pattern: ^(|((None|Cores|Sockets|Threads|SlurmdOffSpec|OOMKillStep|Verbose|Autobind)(,)?)+)$
                     type: string
