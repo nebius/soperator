@@ -33,7 +33,7 @@ chroot /mnt/jail /bin/bash -s <<-'EOF'
         else
             echo "Check ${check}: FAIL (${details})"
 
-            # Drain the Slurm node if it's not yet drained by the hc_*.sh script
+            # Drain the Slurm node if it's not yet drained by the check script
             cur_state=$(sinfo -n "${SLURMD_NODENAME}" --Format=StateLong --noheader || true)
             if [[ -n "${cur_state}" && "${cur_state}" != "draining" && "${cur_state}" != "drained" ]]; then
                 reason="[HC] Failed ${check} [${SCRIPT_CONTEXT}]"

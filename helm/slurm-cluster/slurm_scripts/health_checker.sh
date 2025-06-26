@@ -26,13 +26,13 @@ echo "Platform found: $platform"
 # Define health-checker checks to run
 case "$SCRIPT_CONTEXT" in
   "prolog")
-    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dcgmi_diag_r1,dmesg"
+    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg"
     ;;
   "epilog")
     checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dcgmi_diag_r1,dmesg"
     ;;
   "hc_program")
-    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dcgmi_diag_r1,dmesg"
+    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg"
     ;;
   *)
     echo "Unknown context: $SCRIPT_CONTEXT" >&2
