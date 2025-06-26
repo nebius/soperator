@@ -166,8 +166,8 @@ spec:
           {{- $hasVolumeMounts := and $hasVmagentSpec $hasVmagentSpec.volumeMounts }}
           {{- $volumeMountsNotEmpty := and $hasVolumeMounts (gt (len $hasVmagentSpec.volumeMounts) 0) }}
           {{- if $hasPublicEndpoint }}
-            - name: tsa-token
-              mountPath: /mnt/cloud-metadata/tsa-token
+            - name: cloud-metadata
+              mountPath: /mnt/cloud-metadata
               readOnly: true
           {{- if $volumeMountsNotEmpty }}
           {{- toYaml $hasVmagentSpec.volumeMounts | nindent 12 }}
@@ -180,10 +180,10 @@ spec:
           {{- $hasVolumes := and $hasVmagentSpec $hasVmagentSpec.volumes }}
           {{- $volumesNotEmpty := and $hasVolumes (gt (len $hasVmagentSpec.volumes) 0) }}
           {{- if $hasPublicEndpoint }}
-            - name: tsa-token
+            - name: cloud-metadata
               hostPath:
-                path: /mnt/cloud-metadata/tsa-token
-                type: File
+                path: /mnt/cloud-metadata
+                type: Directory
           {{- if $volumesNotEmpty }}
           {{- toYaml $hasVmagentSpec.volumes | nindent 12 }}
           {{- end }}
