@@ -2,10 +2,10 @@ package clustercontroller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,7 +53,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 
 					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling login default SSHD ConfigMap")
+						return fmt.Errorf("reconciling login default SSHD ConfigMap: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -73,7 +73,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 
 					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling login SSHRootPublicKeys ConfigMap")
+						return fmt.Errorf("reconciling login SSHRootPublicKeys ConfigMap: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -98,7 +98,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					); getErr != nil {
 						if !apierrors.IsNotFound(getErr) {
 							stepLogger.Error(getErr, "Failed to get")
-							return errors.Wrap(getErr, "getting login SSHDKeys Secrets")
+							return fmt.Errorf("getting login SSHDKeys Secrets: %w", getErr)
 						}
 
 						renderedDesired, err := common.RenderSSHDKeysSecret(
@@ -109,7 +109,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 						)
 						if err != nil {
 							stepLogger.Error(err, "Failed to render")
-							return errors.Wrap(err, "rendering login SSHDKeys Secrets")
+							return fmt.Errorf("rendering login SSHDKeys Secrets: %w", err)
 						}
 						desired = *renderedDesired.DeepCopy()
 						stepLogger.V(1).Info("Rendered")
@@ -118,7 +118,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 
 					if err := r.Secret.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling login SSHDKeys Secrets")
+						return fmt.Errorf("reconciling login SSHDKeys Secrets: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -138,7 +138,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 
 					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling login security limits configmap")
+						return fmt.Errorf("reconciling login security limits configmap: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -158,7 +158,27 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					var loginNamePtr *string = nil
 					if err := r.Service.Reconcile(stepCtx, cluster, &desired, loginNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling login Service")
+						return fmt.Errorf("reconciling login Service: %w", err)
+					}
+					stepLogger.V(1).Info("Reconciled")
+
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Login Headless Service",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling")
+
+					desired := login.RenderHeadlessService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeLogin)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("Rendered")
+
+					var loginHeadlessNamePtr *string = nil
+					if err := r.Service.Reconcile(stepCtx, cluster, &desired, loginHeadlessNamePtr); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return fmt.Errorf("reconciling login Headless Service: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -183,7 +203,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering login StatefulSet")
+						return fmt.Errorf("rendering login StatefulSet: %w", err)
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
@@ -191,13 +211,13 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					deps, err := r.getLoginStatefulSetDependencies(stepCtx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
-						return errors.Wrap(err, "retrieving dependencies for login StatefulSet")
+						return fmt.Errorf("retrieving dependencies for login StatefulSet: %w", err)
 					}
 					stepLogger.V(1).Info("Retrieved dependencies")
 
 					if err = r.AdvancedStatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling login StatefulSet")
+						return fmt.Errorf("reconciling login StatefulSet: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -209,7 +229,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 
 	if err := reconcileLoginImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile Slurm Login")
-		return errors.Wrap(err, "reconciling Slurm Login")
+		return fmt.Errorf("reconciling Slurm Login: %w", err)
 	}
 	logger.Info("Reconciled Slurm Login")
 	return nil
@@ -237,7 +257,7 @@ func (r SlurmClusterReconciler) ValidateLogin(
 			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 		}
 		logger.Error(err, "Failed to get login StatefulSet")
-		return ctrl.Result{}, errors.Wrap(err, "getting login StatefulSet")
+		return ctrl.Result{}, fmt.Errorf("getting login StatefulSet: %w", err)
 	}
 
 	targetReplicas := clusterValues.NodeLogin.StatefulSet.Replicas

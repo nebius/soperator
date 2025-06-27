@@ -17,17 +17,17 @@ func (_m *MockStore) EXPECT() *MockStore_Expecter {
 	return &MockStore_Expecter{mock: &_m.Mock}
 }
 
-// Add provides a mock function with given fields: name, content
-func (_m *MockStore) Add(name string, content string) error {
-	ret := _m.Called(name, content)
+// Add provides a mock function with given fields: name, content, subPath
+func (_m *MockStore) Add(name string, content string, subPath string) error {
+	ret := _m.Called(name, content, subPath)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Add")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = rf(name, content)
+	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
+		r0 = rf(name, content, subPath)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -43,13 +43,14 @@ type MockStore_Add_Call struct {
 // Add is a helper method to define mock.On call
 //   - name string
 //   - content string
-func (_e *MockStore_Expecter) Add(name interface{}, content interface{}) *MockStore_Add_Call {
-	return &MockStore_Add_Call{Call: _e.mock.On("Add", name, content)}
+//   - subPath string
+func (_e *MockStore_Expecter) Add(name interface{}, content interface{}, subPath interface{}) *MockStore_Add_Call {
+	return &MockStore_Add_Call{Call: _e.mock.On("Add", name, content, subPath)}
 }
 
-func (_c *MockStore_Add_Call) Run(run func(name string, content string)) *MockStore_Add_Call {
+func (_c *MockStore_Add_Call) Run(run func(name string, content string, subPath string)) *MockStore_Add_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string))
+		run(args[0].(string), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -59,7 +60,54 @@ func (_c *MockStore_Add_Call) Return(_a0 error) *MockStore_Add_Call {
 	return _c
 }
 
-func (_c *MockStore_Add_Call) RunAndReturn(run func(string, string) error) *MockStore_Add_Call {
+func (_c *MockStore_Add_Call) RunAndReturn(run func(string, string, string) error) *MockStore_Add_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetExecutable provides a mock function with given fields: name, subPath
+func (_m *MockStore) SetExecutable(name string, subPath string) error {
+	ret := _m.Called(name, subPath)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetExecutable")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(name, subPath)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockStore_SetExecutable_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetExecutable'
+type MockStore_SetExecutable_Call struct {
+	*mock.Call
+}
+
+// SetExecutable is a helper method to define mock.On call
+//   - name string
+//   - subPath string
+func (_e *MockStore_Expecter) SetExecutable(name interface{}, subPath interface{}) *MockStore_SetExecutable_Call {
+	return &MockStore_SetExecutable_Call{Call: _e.mock.On("SetExecutable", name, subPath)}
+}
+
+func (_c *MockStore_SetExecutable_Call) Run(run func(name string, subPath string)) *MockStore_SetExecutable_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockStore_SetExecutable_Call) Return(_a0 error) *MockStore_SetExecutable_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockStore_SetExecutable_Call) RunAndReturn(run func(string, string) error) *MockStore_SetExecutable_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -1,8 +1,8 @@
-ARG BASE_IMAGE=ubuntu:jammy
+ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
 
 FROM $BASE_IMAGE AS slurmrestd
 
-ARG SLURM_VERSION=24.05.7
+ARG SLURM_VERSION=24.11.5
 
 ARG DEBIAN_FRONTEND=noninteractive
 

@@ -73,16 +73,18 @@ mariadbOperator:
   overrideValues: null
 observability:
   enabled: true
+  clusterName: soperator
+  publicEndpointEnabled: true
+  projectId: default-project-id
   opentelemetry:
     enabled: true
-    clusterName: soperator
     namespace: logs-system
     logs:
       version: 0.117.*
       interval: 5m
       timeout: 5m
       values:
-        publicEndpointEnabled: true
+        hcOutputEnabled: true
         resources: {}
       overrideValues: null
     events:
@@ -90,7 +92,6 @@ observability:
       interval: 5m
       timeout: 5m
       values:
-        publicEndpointEnabled: true
         resources: {}
       overrideValues: null
   prometheusOperator:
@@ -130,6 +131,15 @@ observability:
         spec:
           extraArgs:
             promscrape.maxScrapeSize: "33554432"
+            promscrape.dropOriginalLabels: "true"
+            promscrape.streamParse: "true"
+          remoteWriteSettings: {}
+          remoteWrite:
+            - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8429/api/v1/write
+          resources: {}
+          extraEnvs: []
+          volumeMounts: []
+          volumes: []
       vmsingle:
         spec:
           extraArgs:
@@ -144,15 +154,6 @@ observability:
             resources:
               requests:
                 storage: 30Gi
-          # remoteWrite:
-          #   - bearerTokenSecret:
-          #       key: accessToken
-          #       name: o11y-writer-sa-token
-          #     url: https://write.monitoring.eu-north1.nebius.cloud./projects/project-e00h61cxzwnf6zksvdn77/prometheus/api/v1/write
-          #   - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8429/api/v1/write
-          # remoteWriteSettings:
-          #   label:
-          #     cluster: soperator
           resources: {}
     overrideValues: null
   vmLogs:
@@ -173,7 +174,7 @@ observability:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 1.20.1
+    version: 1.21.0
     namespace: soperator
     releaseName: soperator-dcgm-exporter
     values:
@@ -192,7 +193,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.20.1
+  version: 1.21.0
   namespace: soperator
   releaseName: soperator
   values: null
@@ -208,7 +209,7 @@ soperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.20.1
+  version: 1.21.0
   namespace: "soperator-system"
   releaseName: soperator-controller
   values:

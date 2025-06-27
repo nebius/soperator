@@ -1,8 +1,6 @@
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.28.0
 
-DOCKER_BUILD_PLATFORM = "--platform=linux/amd64"
-
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -31,7 +29,7 @@ CHART_FLUXCD_PATH    		 = $(CHART_PATH)/soperator-fluxcd
 CHART_ACTIVECHECK_PATH       = $(CHART_PATH)/soperator-activechecks
 CHART_DCGM_EXPORTER_PATH     = $(CHART_PATH)/soperator-dcgm-exporter
 
-SLURM_VERSION		  		= 24.05.7
+SLURM_VERSION		  		= 24.11.5
 UBUNTU_VERSION		  		= jammy
 VERSION               		= $(shell cat VERSION)
 
@@ -85,7 +83,7 @@ help: ## Display this help.
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) crd webhook paths=$(GENPATH) output:crd:artifacts:config=config/crd/bases
 	$(CONTROLLER_GEN) rbac:roleName=nodeconfigurator-role paths="./internal/rebooter/..." output:artifacts:config=config/rbac/nodeconfigurator/
-	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./internal/controller/clustercontroller/...; ./internal/controller/nodeconfigurator/...; ./internal/controller/nodesetcontroller/..." output:artifacts:config=config/rbac/clustercontroller/
+	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./internal/controller/clustercontroller/...;  ./internal/controller/topologyconfcontroller/...; ./internal/controller/nodeconfigurator/...; ./internal/controller/nodesetcontroller/..." output:artifacts:config=config/rbac/clustercontroller/
 	$(CONTROLLER_GEN) rbac:roleName=soperator-checks-role paths="./internal/controller/soperatorchecks/..." output:artifacts:config=config/rbac/soperatorchecks/
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -93,23 +91,27 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
-	go fmt ./...
+	GOEXPERIMENT=synctest go fmt ./...
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	go vet ./...
+	GOEXPERIMENT=synctest go vet ./...
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	go test ./... -coverprofile cover.out
+	GOEXPERIMENT=synctest go test ./... # TODO: remove "GOEXPERIMENT=synctest" from everywhere after upgrading to Go 1.25.
+
+.PHONY: test-coverage
+test-coverage: manifests generate fmt vet envtest ## Run tests with coverage.
+	GOEXPERIMENT=synctest go test ./... -coverprofile cover.out
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter & yamllint
-	$(GOLANGCI_LINT) run
+	GOEXPERIMENT=synctest $(GOLANGCI_LINT) run
 
 .PHONY: lint-fix
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
-	$(GOLANGCI_LINT) run --fix
+	GOEXPERIMENT=synctest $(GOLANGCI_LINT) run --fix
 
 .PHONY: helm
 helm: generate manifests kustomize helmify ## Update soperator Helm chart
@@ -209,7 +211,7 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.sshd = \"$(IMAGE_REPO)/login_sshd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.munge = \"$(IMAGE_REPO)/munge:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.populateJail = \"$(IMAGE_REPO)/populate_jail:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
-	@$(YQ) -i ".images.exporter = \"$(IMAGE_REPO)/exporter:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.soperatorExporter = \"$(IMAGE_REPO)/soperator-exporter:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.sConfigController = \"$(IMAGE_REPO)/sconfigcontroller:$(OPERATOR_IMAGE_TAG)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.mariaDB = \"docker-registry1.mariadb.com/library/mariadb:11.4.3\"" "helm/slurm-cluster/values.yaml"
 	@# endregion helm/slurm-cluster/values.yaml
@@ -272,7 +274,7 @@ sync-version: yq ## Sync versions from file
 	@# endregion internal/consts
 
 .PHONY: sync-version-from-scratch
-sync-version-from-scratch: generate manifests helm sync-version ## Regenerates all resources and syncs versions to them
+sync-version-from-scratch: generate manifests helm mock sync-version ## Regenerates all resources and syncs versions to them
 
 ##@ Build
 
@@ -284,6 +286,10 @@ build: manifests generate fmt vet ## Build manager binary with native toolchain.
 run: manifests generate fmt vet ## Run a controller from your host with native toolchain.
 	go run ./cmd/main.go
 
+.PHONY: docker-build-go-base
+docker-build-go-base: ## Build shared Go base image
+	docker build $(DOCKER_BUILD_ARGS) --tag go-base:latest --target go-base ${DOCKER_IGNORE_CACHE} -f images/common/go-base.dockerfile .
+
 .PHONY: docker-build
 docker-build: ## Build docker image
 ifndef IMAGE_NAME
@@ -292,7 +298,7 @@ endif
 ifndef DOCKERFILE
 	$(error DOCKERFILE is not set, docker image cannot be built)
 endif
-	docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} ${DOCKER_BUILD_PLATFORM} -f images/${DOCKERFILE} ${DOCKER_OUTPUT} .
+	docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} -f images/${DOCKERFILE} ${DOCKER_OUTPUT} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image
@@ -303,6 +309,18 @@ endif
 ifeq ($(UNSTABLE), false)
 	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 	docker push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+endif
+
+.PHONY: docker-manifest
+docker-manifest: ## Create and push docker manifest for multiple image architecture
+ifndef IMAGE_NAME
+	$(error IMAGE_NAME is not set, docker manifest can not be pushed)
+endif
+	docker manifest create "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
+	docker manifest push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+ifeq ($(UNSTABLE), false)
+	docker manifest create "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
+	docker manifest push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 endif
 
 .PHONY: release-helm
@@ -354,6 +372,7 @@ ENVTEST        ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT   = $(LOCALBIN)/golangci-lint
 HELMIFY        ?= $(LOCALBIN)/helmify
 YQ             ?= $(LOCALBIN)/yq
+MOCKERY        ?= $(LOCALBIN)/mockery
 
 ## Tool Versions
 KUSTOMIZE_VERSION        ?= v5.5.0
@@ -361,7 +380,10 @@ CONTROLLER_TOOLS_VERSION ?= v0.16.4
 ENVTEST_VERSION          ?= release-0.17
 GOLANGCI_LINT_VERSION    ?= v2.0.2  # Should be in sync with the github CI step.
 HELMIFY_VERSION          ?= 0.4.13
+HELM_VERSION						 ?= v3.18.3
+HELM_UNITTEST_VERSION    ?= 0.8.2
 YQ_VERSION               ?= 4.44.3
+MOCKERY_VERSION 		 ?= 2.53.4
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -371,6 +393,22 @@ $(KUSTOMIZE): $(LOCALBIN)
 		rm -rf $(LOCALBIN)/kustomize; \
 	fi
 	test -s $(LOCALBIN)/kustomize || GOBIN=$(LOCALBIN) GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION)
+
+.PHONY: mockery
+mockery:
+	@mkdir -p $(LOCALBIN)
+	@current_version="$$( $(MOCKERY) --version 2>&1 | grep -o 'version=v[0-9.]*' | cut -d= -f2 || true)"; \
+	if [ "$$current_version" != "v$(MOCKERY_VERSION)" ]; then \
+		echo "🛠  Installing mockery v$(MOCKERY_VERSION) (found: $$current_version)"; \
+		rm -f $(MOCKERY); \
+		GOBIN=$(LOCALBIN) GO111MODULE=on go install github.com/vektra/mockery/v2@v$(MOCKERY_VERSION); \
+	else \
+		echo "✅ mockery v$(MOCKERY_VERSION) already installed"; \
+	fi
+
+.PHONY: mock
+mock: mockery ## Generate mocks using mockery
+	$(MOCKERY)
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
@@ -400,3 +438,34 @@ $(HELMIFY): $(LOCALBIN)
 yq: $(YQ) ## Download yq locally if necessary.
 $(YQ): $(LOCALBIN)
 	test -s $(LOCALBIN)/yq || GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@v$(YQ_VERSION)
+
+.PHONY: helmtest check-helm install-helm install-unittest
+
+## helm unittest: Run helm unittest with dependency check
+helmtest: check-helm
+	@echo "Running helm unittest"
+	@helm unittest $(CHART_PATH)/soperator-fluxcd
+
+check-helm:
+	@echo "Checking Helm installation..."
+	@if ! command -v helm >/dev/null 2>&1; then \
+		echo "Helm not found, installing..."; \
+		$(MAKE) install-helm; \
+	else \
+		echo "Helm found: $$(helm version --short)"; \
+	fi
+	@echo "Checking helm-unittest plugin..."
+	@if ! helm plugin list 2>/dev/null | grep -q unittest; then \
+		echo "helm-unittest plugin not found, installing..."; \
+		$(MAKE) install-unittest; \
+	else \
+		echo "helm-unittest plugin found"; \
+	fi
+
+install-helm:
+	@echo "Installing Helm $(HELM_VERSION)..."
+	@curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+install-unittest:
+	@echo "Installing helm-unittest plugin $(HELM_UNITTEST_VERSION)..."
+	@helm plugin install https://github.com/helm-unittest/helm-unittest --version $(HELM_UNITTEST_VERSION)

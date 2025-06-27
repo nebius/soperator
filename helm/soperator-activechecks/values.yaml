@@ -1,6 +1,7 @@
 activeCheck:
   enabled: false
   namespace: "soperator"
+  name: "activecheck"
   checkType: "k8sJob"
   schedule: "0 * * * *"
   suspend: true
@@ -12,6 +13,7 @@ activeCheck:
     jobContainer:
       command: ["/bin/sh", "-c", "echo Hello, world!"]
   slurmJobSpec:
+    eachWorkerJobArray: false
     sbatchScript: |
       #!/bin/bash
       #SBATCH -J simple_job         # Job name
@@ -35,7 +37,10 @@ activeCheck:
         - name: "jail"
           persistentVolumeClaim:
             claimName: "jail-pvc"
+  reactions:
+    setCondition: false
+    drainSlurmNode: false
 images:
-  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.20.1-jammy-slurm24.05.7"
-  k8sJob: "ubuntu:jammy"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.20.1-jammy-slurm24.05.7"
+  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.21.0-jammy-slurm24.11.5"
+  k8sJob: "cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.21.0-jammy-slurm24.11.5"

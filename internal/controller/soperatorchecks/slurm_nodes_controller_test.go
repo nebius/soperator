@@ -3,10 +3,11 @@ package soperatorchecks
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
-	slurmapispec "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -39,11 +40,11 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 					Name:        "node",
 					ClusterName: "slurm-cluster",
 					InstanceID:  "k8s-node",
-					States: map[slurmapispec.V0041NodeState]struct{}{
-						slurmapispec.V0041NodeStateDRAIN: {},
+					States: map[api.V0041NodeState]struct{}{
+						api.V0041NodeStateDRAIN: {},
 					},
 					Reason: ptr.To(slurmapi.NodeReason{
-						Reason:    consts.SlurmNodeReasonKillTaskFailed,
+						Reason:    fmt.Sprintf("%s: extra", consts.SlurmNodeReasonKillTaskFailed),
 						ChangedAt: time.Date(2024, time.March, 1, 1, 1, 1, 1, time.UTC),
 					}),
 				},
@@ -58,12 +59,13 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 						Name:        "node",
 						ClusterName: "slurm-cluster",
 						InstanceID:  "k8s-node",
-						States: map[slurmapispec.V0041NodeState]struct{}{
-							slurmapispec.V0041NodeStateDRAIN: {},
+						States: map[api.V0041NodeState]struct{}{
+							api.V0041NodeStateDRAIN: {},
 						},
 						Reason: ptr.To(slurmapi.NodeReason{
-							Reason:    consts.SlurmNodeReasonKillTaskFailed,
-							ChangedAt: time.Date(2024, time.March, 1, 1, 1, 1, 1, time.UTC),
+							Reason:         consts.SlurmNodeReasonKillTaskFailed,
+							OriginalReason: fmt.Sprintf("%s: extra", consts.SlurmNodeReasonKillTaskFailed),
+							ChangedAt:      time.Date(2024, time.March, 1, 1, 1, 1, 1, time.UTC),
 						}),
 					},
 				},
@@ -92,8 +94,8 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 					Name:        "node",
 					ClusterName: "slurm-cluster",
 					InstanceID:  "k8s-node",
-					States: map[slurmapispec.V0041NodeState]struct{}{
-						slurmapispec.V0041NodeStateIDLE: {},
+					States: map[api.V0041NodeState]struct{}{
+						api.V0041NodeStateIDLE: {},
 					},
 					Reason: ptr.To(slurmapi.NodeReason{
 						Reason:    consts.SlurmNodeReasonKillTaskFailed,
@@ -117,8 +119,8 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 					Name:        "node",
 					ClusterName: "slurm-cluster",
 					InstanceID:  "k8s-node",
-					States: map[slurmapispec.V0041NodeState]struct{}{
-						slurmapispec.V0041NodeStateDRAIN: {},
+					States: map[api.V0041NodeState]struct{}{
+						api.V0041NodeStateDRAIN: {},
 					},
 					Reason: nil,
 				},
@@ -149,4 +151,25 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 	}
 }
 
-// TODO: more tests
+func TestToCamelCase(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"hello world", "helloWorld"},
+		{"FOO BAR", "fooBar"},
+		{"multiple   spaces", "multipleSpaces"},
+		{"unicode test", "unicodeTest"},
+		{"123 numbers", "numbers"},
+		{"special_characters!", "specialCharacters"},
+		{"camelCaseAlready", "camelCaseAlready"},
+		{"", ""},
+	}
+
+	for _, test := range tests {
+		result := toCamelCase(test.input)
+		if result != test.expected {
+			t.Errorf("toCamelCase(%q) = %q; want %q", test.input, result, test.expected)
+		}
+	}
+}

@@ -59,19 +59,25 @@ Soperator consists of the following components:
   reconciliation cycle in the
   [internal/controller/clustercontroller/reconcile.go](../internal/controller/clustercontroller/reconcile.go) file.
   You can start exploring the code from this place.
-- **slurm-operator Helm chart**. It allows you to deploy the operator binary to a K8s cluster. There should be only 1
-  operator in one Kubernetes cluster.
-- **slurm-cluster**. It allows you to create the custom resource representing a Slurm cluster. You can apply it many
-  times if you need more than one Slurm cluster. The Slurm cluster is actually configured by values in this chart.
-- **slurm-operator-crds**. It deploys the schema of the `SlurmCluster` custom resource, it should always be applied when
-  you upgrade the version of Soperator in your cluster.
-- **slurm-cluster-storage**. This chart is optional. It can be used to create a PVC with a shared storage if your K8s
-  cluster does not have a CSI driver for it.
 - **Container images**. The [images/](../images) directory contains Dockerfiles for all containers Soperator creates.
   These images are quite complicated. A significant part of this solution and features it provides is actually
   implemented there and not in the operator's code. If you want to customize these images for your needs it's strongly
   recommended not to try to write them from scratch. Instead, *derive* your container images from these adding or changing
   things you want.
+
+## Helm charts
+- **slurm-cluster**. It allows you to create the custom resource representing a Slurm cluster. You can apply it many
+  times if you need more than one Slurm cluster. The Slurm cluster is actually configured by values in this chart.
+- **slurm-cluster-storage**. This chart is optional. It can be used to create a PVC with a shared storage if your K8s
+  cluster does not have a CSI driver for it.
+- **soperator**. It allows you to deploy the operator binary to a K8s cluster. There should be only 1
+  operator in one Kubernetes cluster.
+- **soperator-activechecks**. This chart is optional. It is used to deploy Kubernetes resources of `kind: ActiveCheck`, which perform active jobs to monitor and validate the state of a Slurm cluster.
+- **soperator-crds**. It deploys the schema of the `SlurmCluster` custom resource, it should always be applied when
+  you upgrade the version of Soperator in your cluster.
+- **soperator-dcgm-exporter**. This chart is optional. It is a custom Helm chart with `hpc-jobs-dir` where Slurm stores information about jobs.
+- **soperator-fluxcd**. This chart is optional. It is an umbrella chart with various components designed for convenient use in a cluster with soperator. It includes `kind: HelmRelease` and `kind: HelmRepository`. This approach was chosen because customizing components through Kustomize is difficult, and Helm dependencies lack flexibility in configuration. Therefore, this umbrella chart was created to deploy HelmReleases with properly configured dependencies.
+- **soperatorchecks**. This chart is optional. It is used to deploy additional controller that runs Slurm and Kubernetes jobs to actively check the state of the Slurm cluster.
 
 All these components are built using [Makefile](../Makefile).
 

@@ -138,6 +138,19 @@ func BuildConfigMapSecurityLimitsName(componentType consts.ComponentType, cluste
 	}.String()
 }
 
+func BuildLoginHeadlessServiceName(clusterName string) string {
+	return namedEntity{
+		componentType: &consts.ComponentTypeLogin,
+		clusterName:   clusterName,
+		entity:        "headless-svc",
+	}.String()
+}
+
+func BuildLoginHeadlessServiceFQDN(namespace, clusterName string) string {
+	svcName := BuildLoginHeadlessServiceName(clusterName)
+	return fmt.Sprintf("%s.%s.svc.cluster.local", svcName, namespace)
+}
+
 // endregion Login
 
 // region Worker

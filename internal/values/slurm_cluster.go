@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -39,6 +38,7 @@ type SlurmCluster struct {
 	SlurmConfig                   slurmv1.SlurmConfig
 	CustomSlurmConfig             *string
 	MPIConfig                     slurmv1.MPIConfig
+	PlugStackConfig               slurmv1.PlugStackConfig
 	SlurmTopologyConfigMapRefName string
 	SConfigController             SConfigController
 }
@@ -51,7 +51,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 	clusterType, err := consts.StringToClusterType(cluster.Spec.ClusterType)
 	if err != nil {
 		logger.Error(err, "Failed to get cluster type")
-		return nil, errors.Wrap(err, "getting cluster type")
+		return nil, fmt.Errorf("getting cluster type: %w", err)
 	}
 
 	res := &SlurmCluster{
@@ -85,6 +85,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		SlurmConfig:                   cluster.Spec.SlurmConfig,
 		CustomSlurmConfig:             cluster.Spec.CustomSlurmConfig,
 		MPIConfig:                     cluster.Spec.MPIConfig,
+		PlugStackConfig:               cluster.Spec.PlugStackConfig,
 		SlurmTopologyConfigMapRefName: cluster.Spec.SlurmTopologyConfigMapRefName,
 		SConfigController: buildSConfigControllerFrom(
 			cluster.Spec.SConfigController.Node,

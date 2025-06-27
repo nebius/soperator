@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
+	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -167,38 +168,80 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			return ctrl.Result{}, err
 		}
 
-		slurmJobState, err := slurmAPIClient.GetJobStatus(ctx, slurmJobID)
+		slurmJobs, err := slurmAPIClient.GetJobsByID(ctx, slurmJobID)
 		if err != nil {
 			logger.Error(err, "failed to get slurm job status")
 			return ctrl.Result{}, err
 		}
 
-		if !slurmJobState.IsTerminateState {
-			return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
+		for _, slurmJob := range slurmJobs {
+			if !slurmJob.IsTerminalState() {
+				return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
+			}
 		}
 
-		newStatus := slurmv1alpha1.ActiveCheckSlurmJobsStatus{
-			LastJobId:          slurmJobState.Id,
-			LastJobName:        slurmJobState.Name,
-			LastJobState:       slurmJobState.State,
-			LastJobStateReason: slurmJobState.StateReason,
-			LastJobSubmitTime:  slurmJobState.SubmitTime,
-			LastJobStartTime:   slurmJobState.StartTime,
-			LastJobEndTime:     slurmJobState.EndTime,
+		var failReasons []string
+		var jobName string
+		var submitTime *metav1.Time
+		for _, slurmJob := range slurmJobs {
+			if slurmJob.IsFailedState() {
+				if slurmJob.StateReason != "" {
+					failReasons = append(failReasons, slurmJob.StateReason)
+				}
+
+				if activeCheck.Spec.Reactions.DrainSlurmNode {
+					nodes, err := slurmJob.GetNodeList()
+					if err != nil {
+						return ctrl.Result{}, fmt.Errorf("get node list: %w", err)
+					}
+
+					reason := consts.SlurmNodeReasonActiveCheckFailedUnknown
+					if activeCheck.Spec.Reactions.SetCondition {
+						reason = fmt.Sprintf("[HC] Failed %s: job %d [slurm_job]", activeCheckName, slurmJob.ID)
+					}
+					for _, node := range nodes {
+						resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, node,
+							api.V0041UpdateNodeMsg{
+								Reason: ptr.To(reason),
+								State:  ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateDRAIN}),
+							},
+						)
+						if err != nil {
+							return ctrl.Result{}, fmt.Errorf("post drain slurm node: %w", err)
+						}
+						if resp.JSON200.Errors != nil && len(*resp.JSON200.Errors) != 0 {
+							return ctrl.Result{}, fmt.Errorf("post drain returned errors: %v", *resp.JSON200.Errors)
+						}
+
+						logger.V(1).Info("slurm node state is updated to DRAIN")
+					}
+				}
+			}
+
+			if fmt.Sprint(slurmJob.ID) == slurmJobID {
+				jobName = slurmJob.Name
+				submitTime = slurmJob.SubmitTime
+			}
 		}
 
-		newStatusCopy := newStatus.DeepCopy()
-		currentStatusCopy := activeCheck.Status.SlurmJobsStatus.DeepCopy()
-		newStatusCopy.LastTransitionTime = metav1.Time{}
-		currentStatusCopy.LastTransitionTime = metav1.Time{}
-
-		if *newStatusCopy == *currentStatusCopy {
-			logger.Info("Reconciled ActiveCheckJob, no update were made")
-			return ctrl.Result{}, nil
+		var state consts.ActiveCheckSlurmJobStatus
+		switch {
+		case len(failReasons) == 0:
+			state = consts.ActiveCheckSlurmJobStatusComplete
+		case len(failReasons) == len(slurmJobs):
+			state = consts.ActiveCheckSlurmJobStatusFailed
+		default:
+			state = consts.ActiveCheckSlurmJobStatusDegraded
 		}
 
-		newStatus.LastTransitionTime = metav1.Now()
-		activeCheck.Status.SlurmJobsStatus = newStatus
+		activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{
+			LastJobId:          slurmJobID,
+			LastJobName:        jobName,
+			LastJobState:       state,
+			LastJobFailReasons: failReasons,
+			LastJobSubmitTime:  submitTime,
+			LastTransitionTime: metav1.Now(),
+		}
 
 		logger = logger.WithValues(logfield.ResourceKV(activeCheck)...)
 		logger.V(1).Info("Rendered")
@@ -206,7 +249,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		err = r.Status().Update(ctx, activeCheck)
 		if err != nil {
 			logger.Error(err, "Failed to reconcile ActiveCheckJob")
-			return ctrl.Result{}, errors.Wrap(err, "reconciling ActiveCheckJob")
+			return ctrl.Result{}, fmt.Errorf("reconciling ActiveCheckJob: %w", err)
 		}
 	} else if activeCheck.Spec.CheckType == "k8sJob" {
 		newStatus := slurmv1alpha1.ActiveCheckK8sJobsStatus{
@@ -236,7 +279,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		err = r.Status().Update(ctx, activeCheck)
 		if err != nil {
 			logger.Error(err, "Failed to reconcile ActiveCheckJob")
-			return ctrl.Result{}, errors.Wrap(err, "reconciling ActiveCheckJob")
+			return ctrl.Result{}, fmt.Errorf("reconciling ActiveCheckJob: %w", err)
 		}
 	}
 

@@ -2,11 +2,11 @@ package clustercontroller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
-	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -83,7 +83,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering accounting Secret")
+						return fmt.Errorf("rendering accounting Secret: %w", err)
 					}
 
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
@@ -91,7 +91,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 
 					if err = r.Secret.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling accounting Secret")
+						return fmt.Errorf("reconciling accounting Secret: %w", err)
 					}
 
 					stepLogger.V(1).Info("Reconciled")
@@ -126,7 +126,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						)
 						if err != nil {
 							stepLogger.Error(err, "Failed to render")
-							return errors.Wrap(err, "rendering mariadb password Secret")
+							return fmt.Errorf("rendering mariadb password Secret: %w", err)
 						}
 						stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 						stepLogger.V(1).Info("Rendered")
@@ -134,7 +134,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						err = r.Create(ctx, desired)
 						if err != nil {
 							stepLogger.Error(err, "Failed to create")
-							return errors.Wrap(err, "creating mariadb password Secret")
+							return fmt.Errorf("creating mariadb password Secret: %w", err)
 						}
 					}
 					return err
@@ -169,7 +169,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						)
 						if err != nil {
 							stepLogger.Error(err, "Failed to render")
-							return errors.Wrap(err, "rendering mariadb root password Secret")
+							return fmt.Errorf("rendering mariadb root password Secret: %w", err)
 						}
 						stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 						stepLogger.V(1).Info("Rendered")
@@ -177,7 +177,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						err = r.Create(ctx, desired)
 						if err != nil {
 							stepLogger.Error(err, "Failed to create")
-							return errors.Wrap(err, "creating mariadb root password Secret")
+							return fmt.Errorf("creating mariadb root password Secret: %w", err)
 						}
 					}
 					return err
@@ -200,7 +200,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 
 						if err = r.Service.Reconcile(stepCtx, cluster, desired, accountingServiceNamePtr); err != nil {
 							stepLogger.Error(err, "Failed to reconcile")
-							return errors.Wrap(err, "reconciling accounting service")
+							return fmt.Errorf("reconciling accounting service: %w", err)
 						}
 						stepLogger.V(1).Info("Reconciled")
 						return nil
@@ -216,7 +216,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 
 					if err = r.Service.Reconcile(stepCtx, cluster, desired, accountingServiceNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling accounting service")
+						return fmt.Errorf("reconciling accounting service: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 					return nil
@@ -243,7 +243,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						mariaDbGrantNamePtr = &mariaDbGrantName
 						if err = r.MariaDbGrant.Reconcile(stepCtx, cluster, desired, mariaDbGrantNamePtr); err != nil {
 							stepLogger.Error(err, "Failed to reconcile")
-							return errors.Wrap(err, "reconciling accounting mariadb grant")
+							return fmt.Errorf("reconciling accounting mariadb grant: %w", err)
 						}
 						stepLogger.V(1).Info("Reconciled")
 						return nil
@@ -256,14 +256,14 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering accounting mariadb grant")
+						return fmt.Errorf("rendering accounting mariadb grant: %w", err)
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.V(1).Info("Rendered")
 
 					if err = r.MariaDbGrant.Reconcile(ctx, cluster, desired, mariaDbGrantNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling accounting mariadb grant")
+						return fmt.Errorf("reconciling accounting mariadb grant: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 					return nil
@@ -290,7 +290,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						mariaDbNamePtr = &mariaDbName
 						if err = r.MariaDb.Reconcile(stepCtx, cluster, desired, mariaDbNamePtr); err != nil {
 							stepLogger.Error(err, "Failed to reconcile")
-							return errors.Wrap(err, "reconciling accounting mariadb")
+							return fmt.Errorf("reconciling accounting mariadb: %w", err)
 						}
 						stepLogger.V(1).Info("Reconciled")
 						return nil
@@ -304,14 +304,14 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering accounting mariadb")
+						return fmt.Errorf("rendering accounting mariadb: %w", err)
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.V(1).Info("Rendered")
 
 					if err = r.MariaDb.Reconcile(ctx, cluster, desired, mariaDbNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling accounting mariadb")
+						return fmt.Errorf("reconciling accounting mariadb: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 					return nil
@@ -325,15 +325,12 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 
 					var err error
 					var desired *appsv1.Deployment
-					var deploymentNamePtr *string = nil
 
 					if !isAccountingEnabled {
 						stepLogger.V(1).Info("Removing")
 						deploymentName := naming.BuildDeploymentName(consts.ComponentTypeAccounting)
-						deploymentNamePtr = &deploymentName
-						if err = r.Deployment.Reconcile(stepCtx, cluster, desired, deploymentNamePtr); err != nil {
-							stepLogger.Error(err, "Failed to reconcile")
-							return errors.Wrap(err, "reconciling accounting Deployment")
+						if err = r.Deployment.Cleanup(stepCtx, cluster, deploymentName); err != nil {
+							return fmt.Errorf("cleanup accounting Deployment: %w", err)
 						}
 						stepLogger.V(1).Info("Reconciled")
 						return nil
@@ -348,7 +345,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering accounting Deployment")
+						return fmt.Errorf("rendering accounting Deployment: %w", err)
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.V(1).Info("Rendered")
@@ -356,13 +353,13 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 					deps, err := r.getAccountingDeploymentDependencies(ctx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
-						return errors.Wrap(err, "retrieving dependencies for accounting Deployment")
+						return fmt.Errorf("retrieving dependencies for accounting Deployment: %w", err)
 					}
 					stepLogger.V(1).Info("Retrieved dependencies")
 
-					if err = r.Deployment.Reconcile(stepCtx, cluster, desired, deploymentNamePtr, deps...); err != nil {
+					if err = r.Deployment.Reconcile(stepCtx, cluster, *desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling accounting Deployment")
+						return fmt.Errorf("reconciling accounting Deployment: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 					return nil
@@ -373,7 +370,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 
 	if err := reconcileAccountingImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile Slurm Accounting")
-		return errors.Wrap(err, "reconciling Slurm Accounting")
+		return fmt.Errorf("reconciling Slurm Accounting: %w", err)
 	}
 	logger.Info("Reconciled Slurm Accounting")
 	return nil
@@ -402,7 +399,7 @@ func (r SlurmClusterReconciler) handleExternalDB(
 	)
 	if err != nil {
 		logger.Error(err, fmt.Sprintf("Failed to get Secret %s", secretNameAcc))
-		return errors.Wrap(err, fmt.Sprintf("getting Secret %s", secretNameAcc))
+		return fmt.Errorf("getting Secret %s: %w", secretNameAcc, err)
 	}
 
 	return nil
@@ -425,7 +422,7 @@ func (r SlurmClusterReconciler) handleMariaDB(
 	)
 	if err != nil {
 		logger.Error(err, "Failed to get Secret")
-		return errors.Wrap(err, "getting Secret")
+		return fmt.Errorf("getting Secret: %w", err)
 	}
 
 	return nil
@@ -495,7 +492,7 @@ func getTypedResource[T client.Object](
 			var zeroValue T // This creates the zero value for type T
 			return zeroValue, nil
 		}
-		return obj, errors.Wrap(err, "failed to get resource")
+		return obj, fmt.Errorf("failed to get resource: %w", err)
 	}
 	return obj, nil
 }

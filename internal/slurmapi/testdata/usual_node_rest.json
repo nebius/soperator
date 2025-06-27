@@ -1,0 +1,105 @@
+{
+  "active_features": [
+    "h100"
+  ],
+  "address": "10.0.0.1",
+  "alloc_cpus": 0,
+  "alloc_idle_cpus": 16,
+  "alloc_memory": 0,
+  "architecture": "x86_64",
+  "boards": 1,
+  "boot_time": {
+    "infinite": false,
+    "number": 1747752894,
+    "set": true
+  },
+  "burstbuffer_network_address": "",
+  "cluster_name": "",
+  "comment": "",
+  "cores": 8,
+  "cpu_binding": 0,
+  "cpu_load": 15,
+  "cpus": 16,
+  "effective_cpus": 16,
+  "energy": {
+    "average_watts": 0,
+    "base_consumed_energy": 0,
+    "consumed_energy": 0,
+    "current_watts": {
+      "infinite": false,
+      "number": 0,
+      "set": true
+    },
+    "last_collected": 0,
+    "previous_consumed_energy": 0
+  },
+  "external_sensors": {},
+  "extra": "{ \"monitoring\": \"https://console.eu.nebius.com/project-pppppppp/compute/instances/computeinstance-xxxxxxxxxxxxx/monitoring\" }",
+  "features": [
+    "h100"
+  ],
+  "free_mem": {
+    "infinite": false,
+    "number": 168840,
+    "set": true
+  },
+  "gpu_spec": "",
+  "gres": "gpu:nvidia_h100_80gb_hbm3:1(S:0)",
+  "gres_drained": "N/A",
+  "gres_used": "gpu:nvidia_h100_80gb_hbm3:0(IDX:N/A)",
+  "hostname": "worker-1",
+  "instance_id": "computeinstance-xxxxxxxxxxxxx",
+  "instance_type": "",
+  "last_busy": {
+    "infinite": false,
+    "number": 1748342680,
+    "set": true
+  },
+  "mcs_label": "",
+  "name": "worker-1",
+  "next_state_after_reboot": [
+    "INVALID"
+  ],
+  "operating_system": "Linux 5.15.0-138-generic #148-Ubuntu SMP Fri Mar 14 19:05:48 UTC 2025",
+  "owner": "",
+  "partitions": [
+    "main"
+  ],
+  "port": 6818,
+  "power": {},
+  "real_memory": 191356,
+  "reason": "",
+  "reason_changed_at": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "reason_set_by_user": "",
+  "res_cores_per_gpu": 0,
+  "reservation": "",
+  "resume_after": {
+    "infinite": false,
+    "number": 0,
+    "set": true
+  },
+  "slurmd_start_time": {
+    "infinite": false,
+    "number": 1749109916,
+    "set": true
+  },
+  "sockets": 1,
+  "specialized_cores": 0,
+  "specialized_cpus": "",
+  "specialized_memory": 0,
+  "state": [
+    "IDLE",
+    "DYNAMIC_NORM"
+  ],
+  "temporary_disk": 0,
+  "threads": 2,
+  "tres": "cpu=16,mem=191356M,billing=16,gres/gpu=1",
+  "tres_used": "",
+  "tres_weighted": 0,
+  "version": "24.05.7",
+  "weight": 1
+}

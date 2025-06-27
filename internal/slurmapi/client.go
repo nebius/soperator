@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	api "github.com/SlinkyProject/slurm-client/api/v0041"
-	slurmapispec "github.com/SlinkyProject/slurm-client/api/v0041"
 	"github.com/hashicorp/go-retryablehttp"
 )
 
@@ -68,7 +67,7 @@ func (c *client) setHeaders(ctx context.Context, req *http.Request) error {
 }
 
 func (c *client) ListNodes(ctx context.Context) ([]Node, error) {
-	getNodesResp, err := c.SlurmV0041GetNodesWithResponse(ctx, &slurmapispec.SlurmV0041GetNodesParams{})
+	getNodesResp, err := c.SlurmV0041GetNodesWithResponse(ctx, &api.SlurmV0041GetNodesParams{})
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
@@ -93,7 +92,7 @@ func (c *client) ListNodes(ctx context.Context) ([]Node, error) {
 }
 
 func (c *client) GetNode(ctx context.Context, nodeName string) (Node, error) {
-	getNodesResp, err := c.SlurmV0041GetNodeWithResponse(ctx, nodeName, &slurmapispec.SlurmV0041GetNodeParams{})
+	getNodesResp, err := c.SlurmV0041GetNodeWithResponse(ctx, nodeName, &api.SlurmV0041GetNodeParams{})
 	if err != nil {
 		return Node{}, fmt.Errorf("get node %s: %w", nodeName, err)
 	}
@@ -116,39 +115,67 @@ func (c *client) GetNode(ctx context.Context, nodeName string) (Node, error) {
 	return node, nil
 }
 
-func (c *client) GetJobStatus(ctx context.Context, jobID string) (JobStatus, error) {
-	getJobResp, err := c.SlurmV0041GetJobWithResponse(ctx, jobID, &slurmapispec.SlurmV0041GetJobParams{})
+func (c *client) GetJobsByID(ctx context.Context, jobID string) ([]Job, error) {
+	getJobResp, err := c.SlurmV0041GetJobWithResponse(ctx, jobID, &api.SlurmV0041GetJobParams{})
 	if err != nil {
-		return JobStatus{}, fmt.Errorf("get job %s: %w", jobID, err)
+		return nil, fmt.Errorf("get job %s: %w", jobID, err)
 	}
 	if getJobResp.JSON200 == nil {
-		return JobStatus{}, fmt.Errorf("json200 field is nil for job ID %s", jobID)
+		return nil, fmt.Errorf("json200 field is nil for job ID %s", jobID)
 	}
 	if getJobResp.JSON200.Errors != nil && len(*getJobResp.JSON200.Errors) != 0 {
-		return JobStatus{}, fmt.Errorf("get job %s responded with errors: %v", jobID, *getJobResp.JSON200.Errors)
-	}
-	if len(getJobResp.JSON200.Jobs) != 1 {
-		return JobStatus{}, fmt.Errorf("expected one job in response for job ID %s, got %d", jobID, len(getJobResp.JSON200.Jobs))
+		return nil, fmt.Errorf("get job %s responded with errors: %v", jobID, *getJobResp.JSON200.Errors)
 	}
 
-	job := getJobResp.JSON200.Jobs[0]
+	jobs := make([]Job, 0, len(getJobResp.JSON200.Jobs))
+	for _, j := range getJobResp.JSON200.Jobs {
+		job, err := JobFromAPI(j)
+		if err != nil {
+			return nil, fmt.Errorf("convert job from api response: %w", err)
+		}
 
-	status := JobStatus{
-		Id:          job.JobId,
-		Name:        job.Name,
-		StateReason: job.StateReason,
-		SubmitTime:  convertToMetav1Time(job.SubmitTime),
-		StartTime:   convertToMetav1Time(job.StartTime),
-		EndTime:     convertToMetav1Time(job.EndTime),
+		jobs = append(jobs, job)
 	}
 
-	if job.JobState != nil && len(*job.JobState) > 0 {
-		status.State = string((*job.JobState)[0])
-		status.IsTerminateState = isTerminalState((*job.JobState)[0])
-	} else {
-		status.State = "UNKNOWN"
-		status.IsTerminateState = true
+	return jobs, nil
+}
+
+func (c *client) ListJobs(ctx context.Context) ([]Job, error) {
+	getJobsResp, err := c.SlurmV0041GetJobsWithResponse(ctx, &api.SlurmV0041GetJobsParams{})
+	if err != nil {
+		return nil, fmt.Errorf("list jobs: %w", err)
+	}
+	if getJobsResp.JSON200 == nil {
+		return nil, fmt.Errorf("json200 field is nil")
+	}
+	if getJobsResp.JSON200.Errors != nil && len(*getJobsResp.JSON200.Errors) != 0 {
+		return nil, fmt.Errorf("list jobs responded with errors: %v", *getJobsResp.JSON200.Errors)
 	}
 
-	return status, nil
+	jobs := make([]Job, 0, len(getJobsResp.JSON200.Jobs))
+	for _, j := range getJobsResp.JSON200.Jobs {
+		job, err := JobFromAPI(j)
+		if err != nil {
+			return nil, fmt.Errorf("convert job from api response: %w", err)
+		}
+
+		jobs = append(jobs, job)
+	}
+
+	return jobs, nil
+}
+
+func (c *client) GetDiag(ctx context.Context) (*api.V0041OpenapiDiagResp, error) {
+	getDiagResp, err := c.SlurmV0041GetDiagWithResponse(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get diag: %w", err)
+	}
+	if getDiagResp.JSON200 == nil {
+		return nil, fmt.Errorf("json200 field is nil")
+	}
+	if getDiagResp.JSON200.Errors != nil && len(*getDiagResp.JSON200.Errors) != 0 {
+		return nil, fmt.Errorf("get diag responded with errors: %v", *getDiagResp.JSON200.Errors)
+	}
+
+	return getDiagResp.JSON200, nil
 }

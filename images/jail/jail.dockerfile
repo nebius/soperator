@@ -1,8 +1,13 @@
-FROM ubuntu:jammy AS cuda
+FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy AS cuda
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
 ENV LANG=en_US.UTF-8
+
+# ARCH has the short form like: amd64, arm64
+ARG ARCH
+# ALT_ARCH has the extended form like: x86_64, aarch64
+ARG ALT_ARCH
 
 RUN apt-get update &&  \
     apt-get install -y --no-install-recommends \
@@ -12,7 +17,14 @@ RUN apt-get update &&  \
       tzdata \
       wget \
       curl && \
-    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb && \
+    ARCH=$(uname -m) && \
+        case "$ARCH" in \
+          x86_64) ARCH_DEB=x86_64 ;; \
+          aarch64) ARCH_DEB=sbsa ;; \
+          *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
+        esac && \
+        echo "Using architecture: ${ARCH_DEB}" && \
+    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${ARCH_DEB}/cuda-keyring_1.1-1_all.deb && \
     dpkg -i cuda-keyring_1.1-1_all.deb && \
     rm -rf cuda-keyring_1.1-1_all.deb && \
     ln -snf /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
@@ -35,16 +47,17 @@ ENV LANG="en_US.UTF-8" \
 	LC_MEASUREMENT="en_US.UTF-8" \
 	LC_IDENTIFICATION="en_US.UTF-8"
 
-ENV PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
-ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64
+ENV PATH=/usr/local/cuda/bin:${PATH}
 
 # nvidia-container-runtime
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 # Add Nebius public registry
+# TODO: change nc-health-checker to stable version
 RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
-    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" > /etc/apt/sources.list.d/nebius.list
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" > /etc/apt/sources.list.d/nebius.list && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ testing main" >> /etc/apt/sources.list.d/nebius.list
 
 # Install mock packages for nvidia drivers https://github.com/nebius/soperator/issues/384
 RUN apt-get update && \
@@ -67,6 +80,7 @@ RUN apt update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY images/jail/pin_packages/cuda-pins /etc/apt/preferences.d/
+COPY images/jail/pin_packages/nebius-pins /etc/apt/preferences.d/
 RUN apt update
 
 RUN apt-mark hold \
@@ -99,7 +113,7 @@ RUN ARCH=$(uname -m) && \
 
 FROM cuda AS jail
 
-ARG SLURM_VERSION=24.05.7
+ARG SLURM_VERSION=24.11.5
 ARG GDRCOPY_VERSION=2.5
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -158,6 +172,17 @@ RUN apt update && \
         bsdmainutils && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Install health-check library
+# TODO: install for arm when it's available
+RUN if [ "$ARCH" = "amd64" ]; then \
+      apt-get update && \
+      apt-get install -y nc-health-checker && \
+      apt-get clean && \
+      rm -rf /var/lib/apt/lists/* ; \
+    else \
+      echo "Skipping nc-health-checker installation for architecture: $ARCH" ; \
+    fi
 
 # Install python
 COPY images/common/scripts/install_python.sh /opt/bin/
@@ -248,6 +273,11 @@ RUN chmod +x /usr/bin/docker
 # Create a wrapper script for nvidia-smi that shows running processes (in the host's PID namespace)
 COPY images/jail/scripts/nvidia_smi_hostpid.sh /usr/bin/nvidia-smi-hostpid
 RUN chmod +x /usr/bin/nvidia-smi-hostpid
+
+# Copy Soperator utility scripts
+COPY images/jail/scripts/soperator_instance_login.sh /opt/soperator_utils/soperator_instance_login.sh
+COPY images/jail/scripts/slurm_task_info.sh /opt/soperator_utils/slurm_task_info.sh
+RUN chmod -R 755 /opt/soperator_utils
 
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host

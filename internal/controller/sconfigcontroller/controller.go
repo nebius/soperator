@@ -18,6 +18,8 @@ package sconfigcontroller
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"nebius.ai/slurm-operator/internal/consts"
@@ -39,7 +41,8 @@ import (
 const SConfigControllerName = "sconfigcontroller"
 
 type Store interface {
-	Add(name string, content string) error
+	Add(name, content, subPath string) error
+	SetExecutable(name, subPath string) error
 }
 
 // SConfigControllerReconciler reconciles a SConfigController object
@@ -78,13 +81,30 @@ func (r *ControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
+	subPath := configMap.Annotations[consts.AnnotationSConfigControllerSourceKey]
+	if err := validatePath(subPath); err != nil {
+		logger.V(1).Error(err, "Invalid path in ConfigMap annotations", "path", subPath)
+		return ctrl.Result{}, fmt.Errorf("invalid path %q in ConfigMap annotations: %w", subPath, err)
+	}
+
+	subPath = trimSlurmPrefix(subPath)
+
+	executable := configMap.Annotations[consts.AnnotationSConfigControllerExecutableKey] == consts.DefaultSConfigControllerExecutableValue
 	for configName, configContent := range configMap.Data {
 		logger.V(1).Info("About to save slurm config", "configName", configName)
 
-		err := r.fileStore.Add(configName, configContent)
+		err := r.fileStore.Add(configName, configContent, subPath)
 		if err != nil {
 			logger.V(1).Error(err, "Adding file to fileStore produced an error", "configName", configName)
 			return ctrl.Result{}, err
+		}
+
+		if executable {
+			err = r.fileStore.SetExecutable(configName, subPath)
+			if err != nil {
+				logger.V(1).Error(err, "Setting executable to a file produced an error", "configName", configName)
+				return ctrl.Result{}, err
+			}
 		}
 	}
 
@@ -114,6 +134,23 @@ func NewController(
 		slurmAPIClient: slurmAPIClient,
 		fileStore:      fileStore,
 	}
+}
+
+func validatePath(path string) error {
+	switch {
+	case path == "":
+		return nil
+	case !strings.HasPrefix(path, "/slurm"):
+		return fmt.Errorf("invalid path %q: must start with '/slurm'", path)
+	case strings.Contains(path, "/..") || strings.HasPrefix(path, "../"):
+		return fmt.Errorf("invalid path %q: path traversal detected", path)
+	default:
+		return nil
+	}
+}
+
+func trimSlurmPrefix(subPath string) string {
+	return strings.TrimPrefix(subPath, "/slurm")
 }
 
 func (r *ControllerReconciler) SetupWithManager(mgr ctrl.Manager,

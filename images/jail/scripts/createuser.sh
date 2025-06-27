@@ -17,7 +17,8 @@ ADDUSER_ARGS=()
 for arg in "${ARGS[@]}"; do
     if [[ "$arg" != "--with-password" ]] && \
        [[ "$arg" != "--without-sudo" ]] && \
-       [[ "$arg" != "--without-docker" ]]; then
+       [[ "$arg" != "--without-docker" ]] && \
+       [[ "$arg" != "--without-internal-ssh" ]]; then
         ADDUSER_ARGS+=("$arg")
     fi
 done
@@ -81,7 +82,9 @@ if [ -n "$ssh_public_key" ]; then
     echo "$ssh_public_key" >> "$authorized_keys"
 fi
 
-echo "Generating an internal SSH key pair ..."
-ssh-keygen -t ecdsa -f "$internal_key" -N ''
-chown "$username:$username" "$internal_key" "$internal_key.pub"
-cat "$internal_key.pub" >> "$authorized_keys"
+if [[ "$*" != *"--without-internal-ssh"* ]]; then
+    echo "Generating an internal SSH key pair ..."
+    ssh-keygen -t ecdsa -f "$internal_key" -N ''
+    chown "$username:$username" "$internal_key" "$internal_key.pub"
+    cat "$internal_key.pub" >> "$authorized_keys"
+fi

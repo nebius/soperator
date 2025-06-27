@@ -1,9 +1,13 @@
-ARG BASE_IMAGE=ubuntu:jammy
+ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
 
 FROM $BASE_IMAGE AS slurm_check_job
 
-ARG SLURM_VERSION=24.05.7
+ARG SLURM_VERSION=24.11.5
 ARG PYXIS_VERSION=0.21.0
+# ARCH has the short form like: amd64, arm64
+ARG ARCH
+# ALT_ARCH has the extended form like: x86_64, aarch64
+ARG ALT_ARCH
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -58,7 +62,7 @@ RUN apt-get update && \
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
 COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
-    /opt/bin/install_chroot_plugin.sh && \
+    ALT_ARCH=${ALT_ARCH} /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
 # Install parallel because it's required for enroot operation
@@ -79,7 +83,7 @@ RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
 
 # Install slurm pyxis plugin \
 RUN apt-get update && \
-    apt -y install nvslurm-plugin-pyxis=${PYXIS_VERSION}-1 && \
+    apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -94,8 +98,8 @@ RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
 
 # Install kubectl
 RUN KUBECTL_VERSION=$(curl -Ls https://dl.k8s.io/release/stable.txt) && \
-    echo "Downloading kubectl from https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && \
-    curl -LO https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl && \
+    echo "Downloading kubectl from https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" && \
+    curl -LO https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl && \
     install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
     rm kubectl
 
@@ -108,5 +112,8 @@ RUN rm -rf /home
 
 # Copy & run the entrypoint script
 COPY images/slurm_check_job/slurm_check_job_entrypoint.sh /opt/bin/slurm/
-RUN chmod +x /opt/bin/slurm/slurm_check_job_entrypoint.sh
+COPY images/slurm_check_job/slurm_submit_array_job.sh /opt/bin/slurm/
+RUN chmod +x /opt/bin/slurm/slurm_check_job_entrypoint.sh \
+    && chmod +x /opt/bin/slurm/slurm_submit_array_job.sh
+
 ENTRYPOINT ["/opt/bin/slurm/slurm_check_job_entrypoint.sh"]

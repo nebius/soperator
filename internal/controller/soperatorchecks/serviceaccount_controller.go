@@ -2,22 +2,23 @@ package soperatorchecks
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"nebius.ai/slurm-operator/internal/logfield"
-	render "nebius.ai/slurm-operator/internal/render/soperatorchecks"
-	"nebius.ai/slurm-operator/internal/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	"nebius.ai/slurm-operator/internal/logfield"
+	render "nebius.ai/slurm-operator/internal/render/soperatorchecks"
+	"nebius.ai/slurm-operator/internal/utils"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
@@ -121,11 +122,11 @@ func (r *ServiceAccountReconciler) Reconcile(
 	err = r.Get(ctx, clusterNN, cluster)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, errors.Wrap(err, "SlurmCluster resource not found")
+			return ctrl.Result{}, fmt.Errorf("SlurmCluster resource not found: %w", err)
 		}
 
 		logger.Error(err, "Failed to get SlurmCluster")
-		return ctrl.Result{}, errors.Wrap(err, "getting SlurmCluster")
+		return ctrl.Result{}, fmt.Errorf("getting SlurmCluster: %w", err)
 	}
 
 	reconcileServiceAccountImpl := func() error {
@@ -143,9 +144,9 @@ func (r *ServiceAccountReconciler) Reconcile(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling active check ServiceAccount")
+						return fmt.Errorf("reconciling active check ServiceAccount: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -163,9 +164,9 @@ func (r *ServiceAccountReconciler) Reconcile(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err := r.Role.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.Role.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling active check Role")
+						return fmt.Errorf("reconciling active check Role: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -183,9 +184,9 @@ func (r *ServiceAccountReconciler) Reconcile(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err := r.RoleBinding.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.RoleBinding.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling active check RoleBinding")
+						return fmt.Errorf("reconciling active check RoleBinding: %w", err)
 					}
 
 					stepLogger.V(1).Info("Reconciled")
@@ -198,7 +199,7 @@ func (r *ServiceAccountReconciler) Reconcile(
 
 	if err := reconcileServiceAccountImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile ServiceAccount")
-		return ctrl.Result{}, errors.Wrap(err, "reconciling ServiceAccount")
+		return ctrl.Result{}, fmt.Errorf("reconciling ServiceAccount: %w", err)
 	}
 
 	logger.Info("Reconciled ServiceAccount")

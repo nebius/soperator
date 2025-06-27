@@ -23,6 +23,7 @@ controllerManager:
     args:
       - --health-probe-bind-address=:8081
       - --metrics-bind-address=127.0.0.1:8080
+      - --enable-topology-controller=true
       - --leader-elect
     containerSecurityContext:
       allowPrivilegeEscalation: false
@@ -37,7 +38,7 @@ controllerManager:
       slurmOperatorWatchNamespaces: '*'
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/slurm-operator
-      tag: 1.20.1
+      tag: 1.21.0
     imagePullPolicy: Always
     resources:
       limits:

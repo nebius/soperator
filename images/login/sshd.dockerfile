@@ -2,8 +2,12 @@ ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
 
 FROM $BASE_IMAGE AS login_sshd
 
-ARG SLURM_VERSION=24.05.7
+ARG SLURM_VERSION=24.11.5
 ARG PYXIS_VERSION=0.21.0
+# ARCH has the short form like: amd64, arm64
+ARG ARCH
+# ALT_ARCH has the extended form like: x86_64, aarch64
+ARG ALT_ARCH
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -57,7 +61,7 @@ RUN mkdir -p /usr/src/dummy && \
     cd /usr/src/dummy && \
     echo "int main() { return 0; }" > dummy.c && \
     gcc -shared -o libdummy.so dummy.c && \
-    cp libdummy.so /lib/x86_64-linux-gnu/
+    cp libdummy.so "/lib/${ALT_ARCH}-linux-gnu/"
 
 # Add Nebius public registry
 RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
@@ -76,8 +80,15 @@ RUN apt-get update && \
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
 COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
-    /opt/bin/install_chroot_plugin.sh && \
+    ALT_ARCH=${ALT_ARCH} /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
+
+# Install NCCL debug plugin
+COPY images/common/spank-nccl-debug/src /usr/src/soperator/spank/nccld-debug
+COPY images/common/scripts/install_nccld_debug_plugin.sh /opt/bin/
+RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
+    ALT_ARCH=${ALT_ARCH} /opt/bin/install_nccld_debug_plugin.sh && \
+    rm /opt/bin/install_nccld_debug_plugin.sh
 
 # Install parallel because it's required for enroot operation
 RUN apt-get update && \
@@ -97,7 +108,7 @@ RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
 
 # Install slurm pyxis plugin
 RUN apt-get update && \
-    apt -y install nvslurm-plugin-pyxis=${PYXIS_VERSION}-1 && \
+    apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

@@ -57,7 +57,7 @@ func RenderStatefulSet(
 		},
 		Spec: kruisev1b1.StatefulSetSpec{
 			PodManagementPolicy: consts.PodManagementPolicy,
-			ServiceName:         login.Service.Name,
+			ServiceName:         login.HeadlessService.Name,
 			Replicas:            replicas,
 			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -101,6 +101,7 @@ func RenderStatefulSet(
 					DNSConfig: &corev1.PodDNSConfig{
 						Searches: []string{
 							naming.BuildServiceFQDN(consts.ComponentTypeWorker, namespace, clusterName),
+							naming.BuildLoginHeadlessServiceFQDN(namespace, clusterName),
 						},
 					},
 					RestartPolicy:                 corev1.RestartPolicyAlways,

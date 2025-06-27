@@ -2,10 +2,10 @@ package clustercontroller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,14 +45,14 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					desired, err := worker.RenderConfigMapNCCLTopology(clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering worker NCCL topology ConfigMap")
+						return fmt.Errorf("rendering worker NCCL topology ConfigMap: %w", err)
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
 					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling worker NCCL topology ConfigMap")
+						return fmt.Errorf("reconciling worker NCCL topology ConfigMap: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -72,7 +72,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 
 					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling worker Sysctl ConfigMap")
+						return fmt.Errorf("reconciling worker Sysctl ConfigMap: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -98,7 +98,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 
 					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling worker default SSHD ConfigMap")
+						return fmt.Errorf("reconciling worker default SSHD ConfigMap: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -123,7 +123,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					); getErr != nil {
 						if !apierrors.IsNotFound(getErr) {
 							stepLogger.Error(getErr, "Failed to get")
-							return errors.Wrap(getErr, "getting worker SSHDKeys Secrets")
+							return fmt.Errorf("getting worker SSHDKeys Secrets: %w", getErr)
 						}
 
 						renderedDesired, err := common.RenderSSHDKeysSecret(
@@ -134,7 +134,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						)
 						if err != nil {
 							stepLogger.Error(err, "Failed to render")
-							return errors.Wrap(err, "rendering worker SSHDKeys Secrets")
+							return fmt.Errorf("rendering worker SSHDKeys Secrets: %w", err)
 						}
 						desired = *renderedDesired.DeepCopy()
 						stepLogger.V(1).Info("Rendered")
@@ -143,7 +143,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 
 					if err := r.Secret.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling worker SSHDKeys Secrets")
+						return fmt.Errorf("reconciling worker SSHDKeys Secrets: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -163,7 +163,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 
 					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling worker security limits configmap")
+						return fmt.Errorf("reconciling worker security limits configmap: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -186,7 +186,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 
 						if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 							stepLogger.Error(err, "Failed to reconcile")
-							return errors.Wrap(err, "reconciling worker supervisord configmap")
+							return fmt.Errorf("reconciling worker supervisord configmap: %w", err)
 						}
 					} else {
 						stepLogger.V(1).Info("Use custom ConfigMap")
@@ -210,7 +210,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 
 					if err := r.Service.Reconcile(stepCtx, cluster, &desired, nil); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling worker Service")
+						return fmt.Errorf("reconciling worker Service: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -237,7 +237,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering worker StatefulSet")
+						return fmt.Errorf("rendering worker StatefulSet: %w", err)
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
@@ -245,13 +245,13 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					deps, err := r.getWorkersStatefulSetDependencies(stepCtx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
-						return errors.Wrap(err, "retrieving dependencies for worker StatefulSet")
+						return fmt.Errorf("retrieving dependencies for worker StatefulSet: %w", err)
 					}
 					stepLogger.V(1).Info("Retrieved dependencies")
 
 					if err = r.AdvancedStatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling worker StatefulSet")
+						return fmt.Errorf("reconciling worker StatefulSet: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -269,9 +269,9 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling worker ServiceAccount")
+						return fmt.Errorf("reconciling worker ServiceAccount: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -290,9 +290,9 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 						stepLogger.V(1).Info("Rendered")
 
-						if err := r.Role.Reconcile(stepCtx, cluster, &desired); err != nil {
+						if err := r.Role.Reconcile(stepCtx, cluster, desired); err != nil {
 							stepLogger.Error(err, "Failed to reconcile")
-							return errors.Wrap(err, "reconciling worker Role")
+							return fmt.Errorf("reconciling worker Role: %w", err)
 						}
 					} else {
 						// If SendJobsEvents is set to false or nil, the Role is not necessary because we don't need the permissions.
@@ -300,9 +300,9 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						// Without explicit deletion through reconciliation,
 						// The Role will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
 						stepLogger.V(1).Info("Removing")
-						if err := r.Role.Reconcile(stepCtx, cluster, nil); err != nil {
+						if err := r.Role.Cleanup(stepCtx, cluster, naming.BuildRoleWorkerName(cluster.Name)); err != nil {
 							stepLogger.Error(err, "Failed to remove")
-							return errors.Wrap(err, "removing worker Role")
+							return fmt.Errorf("removing worker Role: %w", err)
 						}
 						stepLogger.V(1).Info("Removed")
 					}
@@ -323,9 +323,9 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 						stepLogger.V(1).Info("Rendered")
 
-						if err := r.RoleBinding.Reconcile(stepCtx, cluster, &desired); err != nil {
+						if err := r.RoleBinding.Reconcile(stepCtx, cluster, desired); err != nil {
 							stepLogger.Error(err, "Failed to reconcile")
-							return errors.Wrap(err, "reconciling worker RoleBinding")
+							return fmt.Errorf("reconciling worker RoleBinding: %w", err)
 						}
 					} else {
 						// If SendJobsEvents is set to false or nil, the RoleBinding is not necessary because we don't need the permissions.
@@ -333,9 +333,9 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						// Without explicit deletion through reconciliation,
 						// Еhe RoleBinding will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
 						stepLogger.V(1).Info("Removing")
-						if err := r.RoleBinding.Reconcile(stepCtx, cluster, nil); err != nil {
+						if err := r.RoleBinding.Cleanup(stepCtx, cluster, naming.BuildRoleBindingWorkerName(cluster.Name)); err != nil {
 							stepLogger.Error(err, "Failed to remove")
-							return errors.Wrap(err, "removing worker Role")
+							return fmt.Errorf("removing worker Role: %w", err)
 						}
 						stepLogger.V(1).Info("Removed")
 					}
@@ -349,7 +349,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 
 	if err := reconcileWorkersImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile Slurm Workers")
-		return errors.Wrap(err, "reconciling Slurm Workers")
+		return fmt.Errorf("reconciling Slurm Workers: %w", err)
 	}
 	logger.Info("Reconciled Slurm Workers")
 	return nil
@@ -377,7 +377,7 @@ func (r SlurmClusterReconciler) ValidateWorkers(
 			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 		}
 		logger.Error(err, "Failed to get worker StatefulSet")
-		return ctrl.Result{}, errors.Wrap(err, "getting worker StatefulSet")
+		return ctrl.Result{}, fmt.Errorf("getting worker StatefulSet: %w", err)
 	}
 
 	targetReplicas := clusterValues.NodeWorker.StatefulSet.Replicas

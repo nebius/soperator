@@ -2,8 +2,8 @@ package clustercontroller
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -41,16 +41,15 @@ func (r SlurmClusterReconciler) ReconcileSConfigController(
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering SConfigController Deployment")
+						return fmt.Errorf("rendering SConfigController Deployment: %w", err)
 					}
 
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					var sConfigControllerNamePtr *string = nil
-					if err = r.Deployment.Reconcile(stepCtx, cluster, desired, sConfigControllerNamePtr); err != nil {
+					if err = r.Deployment.Reconcile(stepCtx, cluster, *desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling SConfigController Deployment")
+						return fmt.Errorf("reconciling SConfigController Deployment: %w", err)
 					}
 
 					stepLogger.V(1).Info("Reconciled")
@@ -69,9 +68,9 @@ func (r SlurmClusterReconciler) ReconcileSConfigController(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling SConfigController ServiceAccount")
+						return fmt.Errorf("reconciling SConfigController ServiceAccount: %w", err)
 					}
 
 					stepLogger.V(1).Info("Reconciled")
@@ -91,9 +90,9 @@ func (r SlurmClusterReconciler) ReconcileSConfigController(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err := r.Role.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.Role.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling SConfigController Role")
+						return fmt.Errorf("reconciling SConfigController Role: %w", err)
 					}
 
 					stepLogger.V(1).Info("Reconciled")
@@ -113,9 +112,9 @@ func (r SlurmClusterReconciler) ReconcileSConfigController(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
-					if err := r.RoleBinding.Reconcile(stepCtx, cluster, &desired); err != nil {
+					if err := r.RoleBinding.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling SConfigController RoleBinding")
+						return fmt.Errorf("reconciling SConfigController RoleBinding: %w", err)
 					}
 
 					stepLogger.V(1).Info("Reconciled")
@@ -128,7 +127,7 @@ func (r SlurmClusterReconciler) ReconcileSConfigController(
 
 	if err := reconcileSConfigControllerImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile SConfigController")
-		return errors.Wrap(err, "reconciling SConfigController")
+		return fmt.Errorf("reconciling SConfigController: %w", err)
 	}
 	logger.V(1).Info("Reconciled SConfigController")
 	return nil

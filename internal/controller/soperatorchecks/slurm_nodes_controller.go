@@ -7,8 +7,9 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
-	slurmapispec "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,8 +37,9 @@ var (
 
 type SlurmNodesController struct {
 	*reconciler.Reconciler
-	slurmAPIClients  *slurmapi.ClientSet
-	reconcileTimeout time.Duration
+	slurmAPIClients        *slurmapi.ClientSet
+	reconcileTimeout       time.Duration
+	enabledNodeReplacement bool
 }
 
 func NewSlurmNodesController(
@@ -46,13 +48,15 @@ func NewSlurmNodesController(
 	recorder record.EventRecorder,
 	slurmAPIClients *slurmapi.ClientSet,
 	reconcileTimeout time.Duration,
+	enabledNodeReplacement bool,
 ) *SlurmNodesController {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
 	return &SlurmNodesController{
-		Reconciler:       r,
-		slurmAPIClients:  slurmAPIClients,
-		reconcileTimeout: reconcileTimeout,
+		Reconciler:             r,
+		slurmAPIClients:        slurmAPIClients,
+		reconcileTimeout:       reconcileTimeout,
+		enabledNodeReplacement: enabledNodeReplacement,
 	}
 }
 
@@ -126,7 +130,7 @@ func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types
 		}
 
 		for _, node := range slurmNodes {
-			if _, ok := node.States[slurmapispec.V0041NodeStateDRAIN]; !ok {
+			if _, ok := node.States[api.V0041NodeStateDRAIN]; !ok {
 				// Node is not drained, skipping
 				continue
 			}
@@ -139,6 +143,7 @@ func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types
 			for wellKnownReason := range consts.SlurmNodeReasonsMap {
 				if strings.Contains(node.Reason.Reason, wellKnownReason) {
 					// For simplicity, we keep only well known part
+					node.Reason.OriginalReason = node.Reason.Reason
 					node.Reason.Reason = wellKnownReason
 
 					nodes := degradedNodes[slurmClusterName]
@@ -165,6 +170,8 @@ func (c *SlurmNodesController) processDegradedNode(
 	}
 
 	switch node.Reason.Reason {
+	case consts.SlurmNodeReasonHC:
+		return c.processHealthCheckFailed(ctx, k8sNode, slurmClusterName, node, node.Reason)
 	case consts.SlurmNodeReasonKillTaskFailed, consts.SlurmNodeReasonNodeReboot:
 		return c.processKillTaskFailed(ctx, k8sNode, slurmClusterName, node)
 	case consts.SlurmNodeReasonNodeReplacement:
@@ -173,6 +180,190 @@ func (c *SlurmNodesController) processDegradedNode(
 		return fmt.Errorf("unknown node reason: node name %s, reason %s, instance id %s",
 			node.Name, node.Reason, node.InstanceID)
 	}
+}
+
+func (c *SlurmNodesController) processHealthCheckFailed(
+	ctx context.Context,
+	k8sNode *corev1.Node,
+	slurmClusterName types.NamespacedName,
+	slurmNode slurmapi.Node,
+	nodeReason *slurmapi.NodeReason,
+) error {
+	logger := log.FromContext(ctx).WithName("SlurmNodesController.processHealthCheckFailed")
+
+	if !c.enabledNodeReplacement {
+		logger.V(1).Info("skipping health check failed processing, node replacement is disabled")
+		return nil
+	}
+
+	if slurmNode.Reason.ChangedAt.Before(k8sNode.CreationTimestamp.Time) {
+		logger.V(1).Info("undraining, slurm node drained before degraded condition changed")
+		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
+	}
+
+	reason, message, err := parseHealthCheckReason(nodeReason.OriginalReason)
+	if err != nil {
+		return fmt.Errorf("parse health check reason: %w", err)
+	}
+
+	drainWithCondition := func() error {
+		if err := c.drainSlurmNodesWithConditionUpdate(
+			ctx,
+			slurmNode.InstanceID,
+			nodeReason.OriginalReason,
+			// https://github.com/kubernetes/apimachinery/blob/release-1.33/pkg/apis/meta/v1/types.go#L1633-L1643
+			newNodeCondition(
+				consts.HardwareIssuesSuspected,
+				corev1.ConditionTrue,
+				reason,
+				message,
+			),
+		); err != nil {
+			return fmt.Errorf("drain slurm nodes: %w", err)
+		}
+		return nil
+	}
+
+	var hardwareIssuesCondition corev1.NodeCondition
+	for _, cond := range k8sNode.Status.Conditions {
+		if cond.Type == consts.HardwareIssuesSuspected {
+			hardwareIssuesCondition = cond
+			break
+		}
+	}
+	if hardwareIssuesCondition == (corev1.NodeCondition{}) {
+		// No hardware issues condition found
+		logger.V(1).Info("draining because no hardware issues condition found")
+		return drainWithCondition()
+	}
+	if hardwareIssuesCondition.Status == corev1.ConditionTrue {
+		// Node is still hardware degraded, skip
+		logger.V(1).Info("skip, still hardware degraded")
+		return nil
+	}
+
+	logger.V(1).Info("draining, slurm node drained after degraded condition changed")
+	return drainWithCondition()
+}
+
+// https://github.com/kubernetes/apimachinery/blob/release-1.33/pkg/apis/meta/v1/types.go#L1640
+const MaxReasonLength = 1024
+
+// https://github.com/kubernetes/apimachinery/blob/release-1.33/pkg/apis/meta/v1/types.go#L1648C29-L1648C44
+const MaxMessageLength = 32768
+
+var reasonRegex = regexp.MustCompile(`^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$`)
+
+func parseHealthCheckReason(healthCheckReason string) (consts.ReasonConditionType, consts.MessageConditionType, error) {
+	// Split the string into reason and message
+	parts := strings.SplitN(healthCheckReason, ": ", 2)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid healthCheckReason format")
+	}
+
+	// Extract reason and message
+	rawReason := strings.TrimPrefix(parts[0], "[HC] ")
+	message := parts[1]
+
+	// https://github.com/kubernetes/apimachinery/blob/release-1.33/pkg/apis/meta/v1/types.go#L1642
+	reason := toCamelCase(rawReason)
+
+	if len(reason) > MaxReasonLength {
+		reason = reason[:MaxReasonLength]
+	}
+	if !reasonRegex.MatchString(reason) {
+		return "", "", fmt.Errorf("reason does not match required format")
+	}
+	if len(message) > MaxMessageLength {
+		message = message[:MaxMessageLength]
+	}
+
+	return consts.ReasonConditionType(reason), consts.MessageConditionType(message), nil
+}
+
+// toCamelCase converts a string to camelCase format
+// Removes invalid characters according to ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+// and converts to camelCase
+func toCamelCase(input string) string {
+	if input == "" {
+		return ""
+	}
+
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return ""
+	}
+
+	if regexp.MustCompile(`^[A-Za-z0-9]+$`).MatchString(input) {
+		if len(input) > 0 && unicode.IsLetter(rune(input[0])) {
+			return strings.ToLower(string(input[0])) + input[1:]
+		}
+	}
+
+	words := regexp.MustCompile(`[^A-Za-z0-9]+`).Split(input, -1)
+
+	var result strings.Builder
+	firstWord := true
+
+	for _, word := range words {
+		if word == "" {
+			continue
+		}
+
+		cleanWord := cleanWord(word)
+		if cleanWord == "" {
+			continue
+		}
+
+		cleanWord = removeLeadingNumbers(cleanWord)
+		if cleanWord == "" {
+			continue
+		}
+
+		if firstWord {
+			result.WriteString(strings.ToLower(cleanWord))
+			firstWord = false
+		} else {
+			if len(cleanWord) > 0 {
+				result.WriteString(strings.ToUpper(string(cleanWord[0])) + strings.ToLower(cleanWord[1:]))
+			}
+		}
+	}
+
+	finalResult := result.String()
+
+	if finalResult == "" {
+		return ""
+	}
+
+	if !unicode.IsLetter(rune(finalResult[0])) {
+		return ""
+	}
+
+	return finalResult
+}
+
+// cleanWord removes characters not allowed (keeps only alphanumeric)
+func cleanWord(word string) string {
+	var result strings.Builder
+
+	for _, r := range word {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			result.WriteRune(r)
+		}
+	}
+
+	return result.String()
+}
+
+// removeLeadingNumbers removes leading digits from the word
+func removeLeadingNumbers(word string) string {
+	for i, r := range word {
+		if !unicode.IsDigit(r) {
+			return word[i:]
+		}
+	}
+	return ""
 }
 
 func (c *SlurmNodesController) processKillTaskFailed(
@@ -305,6 +496,10 @@ func (c *SlurmNodesController) processMaintenance(
 			maintenanceCondition = cond
 			continue
 		}
+		if cond.Type == consts.HardwareIssuesSuspected {
+			maintenanceCondition = cond
+			continue
+		}
 	}
 
 	if maintenanceCondition == (corev1.NodeCondition{}) || maintenanceCondition.Status == corev1.ConditionFalse {
@@ -395,9 +590,9 @@ func (c *SlurmNodesController) drainSlurmNode(
 	}
 
 	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
-		slurmapispec.V0041UpdateNodeMsg{
+		api.V0041UpdateNodeMsg{
 			Reason: ptr.To(string(reason)),
-			State:  ptr.To([]slurmapispec.V0041UpdateNodeMsgState{slurmapispec.V0041UpdateNodeMsgStateDRAIN}),
+			State:  ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateDRAIN}),
 		},
 	)
 	if err != nil {
@@ -468,8 +663,8 @@ func (c *SlurmNodesController) undrainSlurmNode(
 	}
 
 	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
-		slurmapispec.V0041UpdateNodeMsg{
-			State: ptr.To([]slurmapispec.V0041UpdateNodeMsgState{slurmapispec.V0041UpdateNodeMsgStateRESUME}),
+		api.V0041UpdateNodeMsg{
+			State: ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateRESUME}),
 		},
 	)
 	if err != nil {

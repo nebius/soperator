@@ -1,0 +1,247 @@
+package topologyconfcontroller
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
+)
+
+var (
+	WorkerTopologyReconcilerName = "workerTopologyReconciler"
+	DefaultRequeueResult         = ctrl.Result{
+		RequeueAfter: 3 * time.Minute,
+		Requeue:      true,
+	}
+)
+
+// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;update;create;patch
+
+type WorkerTopologyReconciler struct {
+	BaseReconciler
+	namespace string
+}
+
+// Link represents a connection in the topology
+type Link struct {
+	FromSwitch string   // switch name
+	ToSwitches []string // connected switches (for higher tier switches)
+	ToNodes    []string // connected nodes/pods (for lowest tier switches)
+}
+
+func NewWorkerTopologyReconciler(
+	client client.Client, scheme *runtime.Scheme, namespace string) *WorkerTopologyReconciler {
+	return &WorkerTopologyReconciler{
+		BaseReconciler: BaseReconciler{
+			Client: client,
+			Scheme: scheme,
+		},
+		namespace: namespace,
+	}
+}
+
+func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := log.FromContext(ctx).WithName(WorkerTopologyReconcilerName)
+	logger.Info(
+		"Starting reconciliation", "SlurmCluster", req.Name, "Namespace", req.Namespace,
+	)
+
+	slurmCluster := &slurmv1.SlurmCluster{}
+	if err := r.Client.Get(ctx, req.NamespacedName, slurmCluster); err != nil {
+		logger.Error(err, "Failed to get SlurmCluster", "SlurmCluster", req.Name, "Namespace", req.Namespace)
+		return DefaultRequeueResult, nil
+	}
+
+	shouldReconcileCluster := isClusterReconciliationNeeded(slurmCluster)
+
+	if !shouldReconcileCluster {
+		return DefaultRequeueResult, nil
+	}
+
+	topologyLabelsConfigMap, err := r.getNodeTopologyLabelsConfigMap(ctx)
+	if err != nil {
+		logger.Error(err, "Failed to get node topology labels config map")
+		return DefaultRequeueResult, nil
+	}
+
+	logger.Info(
+		"Using ConfigMap for topology node labels",
+		"ConfigMapName", topologyLabelsConfigMap.Name,
+		"ConfigMapNamespace", topologyLabelsConfigMap.Namespace,
+	)
+
+	labelSelector := client.MatchingLabels{consts.LabelComponentKey: consts.ComponentTypeWorker.String()}
+	podList, err := r.getPodList(ctx, labelSelector, req.Namespace, logger)
+	if err != nil {
+		logger.Error(err, "Failed to list pods with label", "labelSelector", labelSelector)
+		return DefaultRequeueResult, nil
+	}
+
+	if len(podList.Items) == 0 {
+		logger.Info("No pods found with label", "labelSelector", labelSelector)
+		return DefaultRequeueResult, nil
+	}
+
+	podsByNode := r.GetPodsByNode(podList.Items)
+	logger.Info("Pods organized by node", "podsByNode", podsByNode)
+
+	topologyConfig, err := r.BuildTopologyConfig(ctx, topologyLabelsConfigMap, podsByNode)
+	if err != nil {
+		logger.Error(err, "Failed to build topology config")
+		return DefaultRequeueResult, nil
+	}
+	logger.Info("Built topology config", "topologyConfig", topologyConfig)
+
+	if err := r.updateTopologyConfigMap(ctx, req.Namespace, topologyConfig); err != nil {
+		logger.Error(err, "Failed to update ConfigMap with topology config")
+		return DefaultRequeueResult, nil
+	}
+
+	logger.Info("Reconciliation completed successfully")
+	return DefaultRequeueResult, nil
+}
+
+func isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
+	return slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyTree && slurmCluster.Spec.SlurmConfig.TopologyParam == ""
+}
+
+// getPodList retrieves the list of pods in the specified namespace with the given label selector.
+func (r *WorkerTopologyReconciler) getPodList(
+	ctx context.Context, labelSelector client.MatchingLabels, namespace string, logger logr.Logger,
+) (*corev1.PodList, error) {
+	podList := &corev1.PodList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(namespace),
+		labelSelector,
+	}
+
+	if err := r.Client.List(ctx, podList, listOpts...); err != nil {
+		logger.Error(err, "Failed to list pods")
+		return podList, err
+	}
+
+	return podList, nil
+}
+
+// GetPodsByNode organizes pods by their node name.
+func (r *WorkerTopologyReconciler) GetPodsByNode(pods []corev1.Pod) map[string][]string {
+	podsByNode := make(map[string][]string, len(pods))
+	for _, pod := range pods {
+		podsByNode[pod.Spec.NodeName] = append(podsByNode[pod.Spec.NodeName], pod.Name)
+	}
+	return podsByNode
+}
+
+// NodeTopologyLabels represents the labels for a node's topology, e.g.:
+//
+//	{
+//	  "tier-1": "switch1",
+//	  "tier-2": "switch2",
+//	  "tier-3": "switch3"
+//	}
+type NodeTopologyLabels map[string]string
+
+// BuildTopologyConfig builds topology config.
+func (r *WorkerTopologyReconciler) BuildTopologyConfig(
+	ctx context.Context, nodeTopologyLabelsConf *corev1.ConfigMap, podsByNode map[string][]string,
+) (string, error) {
+	labelsByNode, err := r.ParseNodeTopologyLabels(nodeTopologyLabelsConf.Data)
+	if err != nil {
+		return "", fmt.Errorf("failed to deserialize node topology: %w", err)
+	}
+	graph := BuildTopologyGraph(ctx, labelsByNode, podsByNode)
+	config := strings.Join(graph.RenderConfigLines(), "\n") + "\n"
+	return config, nil
+}
+
+func (r *WorkerTopologyReconciler) ParseNodeTopologyLabels(data map[string]string) (map[string]NodeTopologyLabels, error) {
+	result := make(map[string]NodeTopologyLabels)
+
+	for nodeName, jsonData := range data {
+		var topology NodeTopologyLabels
+		if err := json.Unmarshal([]byte(jsonData), &topology); err != nil {
+			return nil, fmt.Errorf("parse topology labels for node %s: %w", nodeName, err)
+		}
+		result[nodeName] = topology
+	}
+
+	return result, nil
+}
+
+func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, namespace string, config string) error {
+	configMap := &corev1.ConfigMap{
+		TypeMeta: ctrl.TypeMeta{
+			APIVersion: corev1.SchemeGroupVersion.Version,
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      consts.ConfigMapNameTopologyConfig,
+			Namespace: namespace,
+			Labels: map[string]string{
+				consts.LabelSConfigControllerSourceKey: consts.LabelSConfigControllerSourceValue,
+			},
+			Annotations: map[string]string{
+				consts.AnnotationSConfigControllerSourceKey: consts.DefaultSConfigControllerSourcePath,
+			},
+		},
+		Data: map[string]string{
+			"topology.conf": config,
+		},
+	}
+
+	return r.Client.Patch(ctx, configMap, client.Apply,
+		client.ForceOwnership, client.FieldOwner(WorkerTopologyReconcilerName))
+}
+
+// getNodeTopologyLabelsConfigMap retrieves the ConfigMap used to store node topology information.
+func (r *WorkerTopologyReconciler) getNodeTopologyLabelsConfigMap(ctx context.Context) (*corev1.ConfigMap, error) {
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      consts.ConfigMapNameTopologyNodeLabels,
+			Namespace: r.namespace,
+		},
+	}
+
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap); err != nil {
+		return configMap, err
+	}
+
+	return configMap, nil
+}
+
+func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
+	maxConcurrency int, cacheSyncTimeout time.Duration) error {
+	return ctrl.NewControllerManagedBy(mgr).Named(WorkerTopologyReconcilerName).
+		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.Funcs{
+			CreateFunc: func(e event.CreateEvent) bool {
+				return true
+			},
+			DeleteFunc: func(e event.DeleteEvent) bool {
+				return false
+			},
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				return false
+			},
+			GenericFunc: func(e event.GenericEvent) bool {
+				return false
+			},
+		})).
+		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
+		Complete(r)
+}

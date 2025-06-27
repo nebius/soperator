@@ -2,11 +2,11 @@
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
-  name: {{ .Release.Name }}-activecheck
+  name: {{ .Values.activeCheck.name | quote }}
   namespace: {{ .Values.activeCheck.namespace | quote }}
 spec:
   checkType: {{ .Values.activeCheck.checkType | quote }}
-  name: {{ .Release.Name }}-activecheck
+  name: {{ .Values.activeCheck.name | quote }}
   slurmClusterRefName: {{ .Values.activeCheck.slurmClusterRefName | quote }}
   schedule: {{ .Values.activeCheck.schedule | quote }}
   suspend: {{ .Values.activeCheck.suspend }}
@@ -22,6 +22,7 @@ spec:
   slurmJobSpec:
     sbatchScript: |
 {{ .Values.activeCheck.slurmJobSpec.sbatchScript | indent 6 }}
+    eachWorkerJobArray: {{ .Values.activeCheck.slurmJobSpec.eachWorkerJobArray }}
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:
@@ -33,4 +34,7 @@ spec:
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
   {{- end }}
+  reactions:
+    setCondition: {{ .Values.activeCheck.reactions.setCondition }}
+    drainSlurmNode: {{ .Values.activeCheck.reactions.drainSlurmNode }}
 {{- end }}

@@ -9,7 +9,6 @@ import (
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
-	"github.com/pkg/errors"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -136,7 +135,7 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 		// Error reading the object - requeue the request.
 		logger.Error(err, "Failed to get SlurmCluster")
-		return ctrl.Result{Requeue: true}, errors.Wrap(err, "getting SlurmCluster")
+		return ctrl.Result{Requeue: true}, fmt.Errorf("getting SlurmCluster: %w", err)
 	}
 
 	// If cluster marked for deletion, we have nothing to do
@@ -148,7 +147,7 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err != nil {
 		logger.Error(err, "Failed to reconcile SlurmCluster")
 		result = ctrl.Result{}
-		err = errors.Wrap(err, "reconciling SlurmCluster")
+		err = fmt.Errorf("reconciling SlurmCluster: %w", err)
 	}
 
 	statusErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -161,7 +160,7 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 			// Error reading the object - requeue the request.
 			logger.Error(innerErr, "Failed to get SlurmCluster")
-			return errors.Wrap(innerErr, "getting SlurmCluster")
+			return fmt.Errorf("getting SlurmCluster: %w", innerErr)
 		}
 
 		return r.Status().Update(ctx, cluster)
@@ -169,13 +168,14 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if statusErr != nil {
 		logger.Error(statusErr, "Failed to update SlurmCluster status")
 		result = ctrl.Result{}
-		err = errors.Wrap(statusErr, "updating SlurmCluster status")
+		err = fmt.Errorf("updating SlurmCluster status: %w", statusErr)
 	}
 
 	return result, errorsStd.Join(err, statusErr)
 }
 
 func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1.SlurmCluster) (ctrl.Result, error) {
+	// TODO: debug where logger comes from.
 	logger := log.FromContext(ctx)
 
 	{
@@ -252,6 +252,9 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 				return ctrl.Result{}, err
 			}
 			if err = r.ReconcileExporter(ctx, cluster, clusterValues); err != nil {
+				return ctrl.Result{}, err
+			}
+			if err = r.ReconcileSoperatorExporter(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
 
@@ -367,7 +370,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 			default:
 				if res, err := r.ValidateControllers(ctx, cluster, clusterValues); err != nil {
 					logger.Error(err, "Failed to validate Slurm controllers")
-					return ctrl.Result{}, errors.Wrap(err, "validating Slurm controllers")
+					return ctrl.Result{}, fmt.Errorf("validating Slurm controllers: %w", err)
 				} else if res.Requeue {
 					return res, nil
 				}
@@ -391,7 +394,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 			case clusterValues.NodeWorker.Size > 0:
 				if res, err := r.ValidateWorkers(ctx, cluster, clusterValues); err != nil {
 					logger.Error(err, "Failed to validate Slurm workers")
-					return ctrl.Result{}, errors.Wrap(err, "validating Slurm workers")
+					return ctrl.Result{}, fmt.Errorf("validating Slurm workers: %w", err)
 				} else if res.Requeue {
 					return res, nil
 				}
@@ -425,7 +428,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 			case clusterValues.NodeLogin.Size > 0:
 				if res, err := r.ValidateLogin(ctx, cluster, clusterValues); err != nil {
 					logger.Error(err, "Failed to validate Slurm login")
-					return ctrl.Result{}, errors.Wrap(err, "validating Slurm login")
+					return ctrl.Result{}, fmt.Errorf("validating Slurm login: %w", err)
 				} else if res.Requeue {
 					return res, nil
 				}
@@ -473,7 +476,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 				res, err := r.ValidateAccounting(ctx, cluster, clusterValues)
 				if err != nil {
 					logger.Error(err, "Failed to validate Slurm accounting")
-					return ctrl.Result{}, errors.Wrap(err, "validating Slurm accounting")
+					return ctrl.Result{}, fmt.Errorf("validating Slurm accounting: %w", err)
 				}
 				if res.Requeue {
 					return res, nil
@@ -589,7 +592,7 @@ func (r *SlurmClusterReconciler) patchStatus(ctx context.Context, cluster *slurm
 
 	if err := r.Status().Patch(ctx, cluster, patch); err != nil {
 		log.FromContext(ctx).Error(err, "Failed to patch Slurm cluster status")
-		return errors.Wrap(err, "patching cluster status")
+		return fmt.Errorf("patching cluster status: %w", err)
 	}
 
 	return nil

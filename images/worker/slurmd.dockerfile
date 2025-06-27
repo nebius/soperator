@@ -1,5 +1,5 @@
 # BASE_IMAGE defined here for second multistage build
-ARG BASE_IMAGE=ubuntu:jammy
+ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
 
 # First stage: Build the gpubench application
 FROM golang:1.24 AS gpubench_builder
@@ -22,13 +22,17 @@ RUN GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 #######################################################################################################################
 # Second stage: Build worker image
 
-ARG BASE_IMAGE=ubuntu:jammy
+ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
 
 FROM $BASE_IMAGE AS worker_slurmd
 
-ARG SLURM_VERSION=24.05.7
+ARG SLURM_VERSION=24.11.5
 ARG OPENMPI_VERSION=4.1.7a1
 ARG PYXIS_VERSION=0.21.0
+# ARCH has the short form like: amd64, arm64
+ARG ARCH
+# ALT_ARCH has the extended form like: x86_64, aarch64
+ARG ALT_ARCH
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -81,7 +85,7 @@ RUN chmod +x /opt/bin/install_openmpi.sh && \
     /opt/bin/install_openmpi.sh && \
     rm /opt/bin/install_openmpi.sh
 
-ENV LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib
+ENV LD_LIBRARY_PATH=/lib/${ALT_ARCH}-linux-gnu:/usr/lib/${ALT_ARCH}-linux-gnu:/usr/local/cuda/targets/${ALT_ARCH}-linux/lib:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib
 ENV PATH=$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
 # Add Nebius public registry
@@ -102,8 +106,15 @@ RUN apt-get update && \
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
 COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
-    /opt/bin/install_chroot_plugin.sh && \
+    ALT_ARCH=${ALT_ARCH} /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
+
+# Install NCCL debug plugin
+COPY images/common/spank-nccl-debug/src /usr/src/soperator/spank/nccld-debug
+COPY images/common/scripts/install_nccld_debug_plugin.sh /opt/bin/
+RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
+    ALT_ARCH=${ALT_ARCH} /opt/bin/install_nccld_debug_plugin.sh && \
+    rm /opt/bin/install_nccld_debug_plugin.sh
 
 # Install parallel because it's required for enroot operation
 RUN apt-get update && \
@@ -123,7 +134,7 @@ RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
 
 # Install slurm pyxis plugin
 RUN apt-get update && \
-    apt -y install nvslurm-plugin-pyxis=${PYXIS_VERSION}-1 && \
+    apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -145,17 +156,13 @@ RUN chmod +x /opt/bin/install_docker.sh && \
 # Copy Docker daemon config
 COPY images/worker/docker/daemon.json /etc/docker/daemon.json
 
-# Copy GPU healthcheck script
-COPY images/worker/scripts/gpu_healthcheck.sh /usr/bin/gpu_healthcheck.sh
-
 # Copy script for complementing jail filesystem in runtime
 COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
 
 # Copy script for bind-mounting slurm into the jail
 COPY images/common/scripts/bind_slurm_common.sh /opt/bin/slurm/
 
-RUN chmod +x /usr/bin/gpu_healthcheck.sh && \
-    chmod +x /opt/bin/slurm/complement_jail.sh && \
+RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
     chmod +x /opt/bin/slurm/bind_slurm_common.sh
 
 # Update linker cache

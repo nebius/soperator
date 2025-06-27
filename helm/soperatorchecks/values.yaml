@@ -21,6 +21,7 @@ checks:
         memory: 64Mi
   manager:
     args:
+      - --enable-node-replacement=false
       - --leader-elect
     containerSecurityContext:
       allowPrivilegeEscalation: false
@@ -31,7 +32,7 @@ checks:
       slurmOperatorWatchNamespaces: '*'
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/soperatorchecks
-      tag: 1.20.1
+      tag: 1.21.0
     imagePullPolicy: Always
     resources:
       limits:

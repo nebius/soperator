@@ -63,7 +63,7 @@ jobs:
 
       - name: Generate changelog
         id: changelog
-        uses: mikepenz/release-changelog-builder-action@e92187bd633e680ebfdd15961a7c30b2d097e7ad # v5
+        uses: mikepenz/release-changelog-builder-action@5fb6e51e44d4aea73f66549f425aa3ed5008109e # v5
         with:
           mode: "PR"
           fromTag: ${{ needs.tag.outputs.previous-tag }}
@@ -117,7 +117,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release with changelog
-        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2.2.2
+        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2.3.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

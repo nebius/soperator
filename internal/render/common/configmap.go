@@ -11,6 +11,7 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	renderutils "nebius.ai/slurm-operator/internal/render/utils"
+	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -26,14 +27,17 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig co
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapSlurmConfigsName(cluster.Name),
 			Namespace: cluster.Namespace,
-			Labels:    renderConfigMapSlurmConfigsLabels(consts.ComponentTypeController, cluster.Name),
+			Annotations: map[string]string{
+				consts.AnnotationSConfigControllerSourceKey: consts.DefaultSConfigControllerSourcePath,
+			},
+			Labels: renderConfigMapSlurmConfigsLabels(consts.ComponentTypeController, cluster.Name),
 		},
 		Data: map[string]string{
 			consts.ConfigMapKeySlurmConfig:       generateSlurmConfig(cluster, topologyConfig).Render(),
 			consts.ConfigMapKeyRESTConfig:        generateRESTConfig().Render(),
 			consts.ConfigMapKeyCustomSlurmConfig: generateCustomSlurmConfig(cluster).Render(),
 			consts.ConfigMapKeyCGroupConfig:      generateCGroupConfig(cluster).Render(),
-			consts.ConfigMapKeySpankConfig:       generateSpankConfig().Render(),
+			consts.ConfigMapKeySpankConfig:       generateSpankConfig(cluster).Render(),
 			consts.ConfigMapKeyGresConfig:        generateGresConfig(cluster.ClusterType).Render(),
 			consts.ConfigMapKeyMPIConfig:         generateMPIConfig(cluster).Render(),
 		},
@@ -100,15 +104,11 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 	res.AddComment("")
 	res.AddProperty("PropagateResourceLimits", "NONE") // Don't propagate ulimits from the login node by default
 	res.AddComment("")
+	res.AddProperty("SchedulerParameters", "extra_constraints,conmgr_max_connections=512,conmgr_threads=16")
+	res.AddComment("")
 	res.AddComment("HEALTH CHECKS")
 	res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
-	if cluster.HealthCheckConfig == nil {
-		res.AddProperty("HealthCheckInterval", 30)
-		if cluster.ClusterType == consts.ClusterTypeGPU {
-			res.AddProperty("HealthCheckProgram", "/usr/bin/gpu_healthcheck.sh")
-		}
-		res.AddProperty("HealthCheckNodeState", "ANY")
-	} else {
+	if cluster.HealthCheckConfig != nil {
 		res.AddProperty("HealthCheckInterval", cluster.HealthCheckConfig.HealthCheckInterval)
 		res.AddProperty("HealthCheckProgram", cluster.HealthCheckConfig.HealthCheckProgram)
 
@@ -125,12 +125,13 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 	res.AddProperty("UnkillableStepTimeout", 600)
 	res.AddProperty("SlurmctldTimeout", 30)
 	res.AddProperty("SlurmdTimeout", 180)
+	res.AddProperty("TCPTimeout", 15)
 	res.AddProperty("WaitTime", 0)
 	res.AddComment("")
 	res.AddComment("SCHEDULING")
 	res.AddProperty("SchedulerType", "sched/backfill")
 	res.AddProperty("SelectType", "select/cons_tres")
-	res.AddProperty("SelectTypeParameters", "CR_Core_Memory,CR_CORE_DEFAULT_DIST_BLOCK") // TODO: Make it configurable
+	res.AddProperty("SelectTypeParameters", "CR_Core_Memory,CR_ONE_TASK_PER_CORE,CR_CORE_DEFAULT_DIST_BLOCK")
 	res.AddComment("")
 	res.AddComment("LOGGING")
 	res.AddProperty("SlurmctldDebug", consts.SlurmDefaultDebugLevel)
@@ -274,12 +275,56 @@ func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	return res
 }
 
-func generateSpankConfig() renderutils.ConfigFile {
+func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res := &renderutils.MultilineStringConfig{}
+
 	res.AddLine(fmt.Sprintf("required chroot.so %s", consts.VolumeMountPathJail))
-	// TODO: make `container_image_save` and `expose_enroot_logs` configurable
-	// TODO: enable `expose_enroot_logs` once #413 is resolved.
-	res.AddLine("required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 container_image_save=/var/cache/enroot-container-images/")
+
+	// TODO(@itechdima): make `expose_enroot_logs` configurable and enable it once #413 is resolved.
+	res.AddLine(strings.Join(
+		[]string{
+			utils.Ternary(cluster.PlugStackConfig.Pyxis.Required, "required", "optional"),
+			"spank_pyxis.so",
+			"runtime_path=/run/pyxis",
+			"execute_entrypoint=0",
+			"container_scope=global",
+			"sbatch_support=1",
+			fmt.Sprintf("container_image_save=%s", cluster.PlugStackConfig.Pyxis.ContainerImageSave),
+		},
+		" ",
+	))
+
+	{
+		opts := cluster.PlugStackConfig.NcclDebug.DeepCopy()
+		res.AddLine(strings.Join(
+			[]string{
+				utils.Ternary(opts.Required, "required", "optional"),
+				"spanknccldebug.so",
+				fmt.Sprintf("enabled=%d", utils.Ternary(opts.Enabled, 1, 0)),
+				fmt.Sprintf("log-level=%s", utils.Ternary(opts.LogLevel != "", opts.LogLevel, "INFO")),
+				fmt.Sprintf("out-file=%d", utils.Ternary(opts.OutputToFile, 1, 0)),
+				fmt.Sprintf("out-dir=%s", utils.Ternary(opts.OutputDirectory != "", opts.OutputDirectory, "/opt/soperator-outputs/nccl_logs")),
+				fmt.Sprintf("out-stdout=%d", utils.Ternary(opts.OutputToStdOut, 1, 0)),
+			},
+			" ",
+		))
+	}
+
+	for _, plugin := range cluster.PlugStackConfig.CustomPlugins {
+		conf := []string{
+			utils.Ternary(plugin.Required, "required", "optional"),
+			plugin.Path,
+		}
+
+		if len(plugin.Arguments) > 0 {
+			for k, v := range plugin.Arguments {
+				conf = append(conf, fmt.Sprintf("%s=%s", k, v))
+			}
+		}
+
+		res.AddLine(strings.Join(conf, " "))
+	}
+
 	return res
 }
 

@@ -98,7 +98,7 @@ type Reactions struct {
 
 	// DrainSlurmNode enabling slurm node draining if check failed
 	// +kubebuilder:validation:Optional
-	DrainSlurmNode bool `json:"DrainSlurmNode,omitempty"`
+	DrainSlurmNode bool `json:"drainSlurmNode,omitempty"`
 }
 
 type ContainerSpec struct {
@@ -130,6 +130,10 @@ type SlurmJobSpec struct {
 	// Multiline sbatch script
 	// +kubebuilder:validation:Optional
 	SbatchScript *string `json:"sbatchScript,omitempty"`
+	// Run sbatch script on each worker exactly once
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	EachWorkerJobArray bool `json:"eachWorkerJobArray,omitempty"`
 }
 
 // ActiveCheckK8sJobsStatus defines the observed state of ActiveCheck k8s jobs.
@@ -152,19 +156,15 @@ type ActiveCheckSlurmJobsStatus struct {
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
 
 	// +kubebuilder:validation:Optional
-	LastJobId *int32 `json:"lastJobId"`
+	LastJobId string `json:"lastJobId"`
 	// +kubebuilder:validation:Optional
-	LastJobName *string `json:"lastJobName"`
+	LastJobName string `json:"lastJobName"`
 	// +kubebuilder:validation:Optional
-	LastJobState string `json:"lastJobState"`
+	LastJobState consts.ActiveCheckSlurmJobStatus `json:"lastJobState"`
 	// +kubebuilder:validation:Optional
-	LastJobStateReason *string `json:"lastJobStateReason"`
+	LastJobFailReasons []string `json:"lastJobFailReasons"`
 	// +kubebuilder:validation:Optional
 	LastJobSubmitTime *metav1.Time `json:"lastJobSubmitTime"`
-	// +kubebuilder:validation:Optional
-	LastJobStartTime *metav1.Time `json:"lastJobStartTime"`
-	// +kubebuilder:validation:Optional
-	LastJobEndTime *metav1.Time `json:"lastJobEndTime"`
 }
 
 // ActiveCheckStatus defines the observed state of ActiveCheck.

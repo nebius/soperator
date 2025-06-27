@@ -2,8 +2,8 @@ package clustercontroller
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -63,7 +63,7 @@ func (r SlurmClusterReconciler) ReconcileREST(
 					var restNamePtr *string = nil
 					if err := r.Service.Reconcile(stepCtx, cluster, desired, restNamePtr); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling REST API service")
+						return fmt.Errorf("reconciling REST API service: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 					return nil
@@ -83,7 +83,7 @@ func (r SlurmClusterReconciler) ReconcileREST(
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
-						return errors.Wrap(err, "rendering ConfigMap with Slurm configs")
+						return fmt.Errorf("rendering ConfigMap with Slurm configs: %w", err)
 					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
 					stepLogger.V(1).Info("Rendered")
@@ -91,14 +91,13 @@ func (r SlurmClusterReconciler) ReconcileREST(
 					deps, err := r.getRESTDeploymentDependencies(ctx, clusterValues)
 					if err != nil {
 						stepLogger.Error(err, "Failed to retrieve dependencies")
-						return errors.Wrap(err, "retrieving dependencies for REST API Deployment")
+						return fmt.Errorf("retrieving dependencies for REST API Deployment: %w", err)
 					}
 					stepLogger.V(1).Info("Retrieved dependencies")
 
-					var restNamePtr *string = nil
-					if err = r.Deployment.Reconcile(stepCtx, cluster, desired, restNamePtr, deps...); err != nil {
+					if err = r.Deployment.Reconcile(stepCtx, cluster, *desired, deps...); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
-						return errors.Wrap(err, "reconciling REST API Deployment")
+						return fmt.Errorf("reconciling REST API Deployment: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -110,7 +109,7 @@ func (r SlurmClusterReconciler) ReconcileREST(
 
 	if err := reconcileRESTImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile REST resources")
-		return errors.Wrap(err, "reconciling REST resources")
+		return fmt.Errorf("reconciling REST resources: %w", err)
 	}
 	logger.Info("Reconciled REST resources")
 	return nil

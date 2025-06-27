@@ -11,15 +11,28 @@ import (
 type SlurmExporter struct {
 	slurmv1.SlurmNode
 
-	Enabled          bool
+	Enabled bool
+
 	PodMonitorConfig slurmv1.PodMonitorConfig
 
+	// ExporterContainer is a pair of NodeContainer + PodTemplateNameRef.
+	// Deprecated: will be removed when Slurm Exporter will be replaced with Soperator Exporter.
 	slurmv1.ExporterContainer
-	ContainerMunge       Container
+
+	// ContainerMunge is a container that runs Munge daemon.
+	// Deprecated: will be removed when Slurm Exporter will be replaced with Soperator Exporter.
+	ContainerMunge Container
+
 	CustomInitContainers []corev1.Container
 
-	VolumeJail  slurmv1.NodeVolume
+	// VolumeJail is a volume that is used to mount the jail directory for the Slurm Exporter.
+	// Deprecated: will be removed when Slurm Exporter will be replaced with Soperator Exporter.
+	VolumeJail slurmv1.NodeVolume
+
 	Maintenance *consts.MaintenanceMode
+
+	// Container represents the main container for the Soperator Exporter.
+	Container slurmv1.NodeContainer
 }
 
 func buildSlurmExporterFrom(maintenance *consts.MaintenanceMode, exporter *slurmv1.SlurmExporter) SlurmExporter {
@@ -37,5 +50,6 @@ func buildSlurmExporterFrom(maintenance *consts.MaintenanceMode, exporter *slurm
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),
 		},
 		Maintenance: maintenance,
+		Container:   *exporter.ExporterContainer.DeepCopy(),
 	}
 }

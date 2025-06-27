@@ -111,6 +111,7 @@ rules:
   - slurm.nebius.ai
   resources:
   - activechecks
+  - slurmclusters
   verbs:
   - create
   - delete
@@ -133,11 +134,3 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - slurm.nebius.ai
-  resources:
-  - slurmclusters
-  verbs:
-  - get
-  - list
-  - watch

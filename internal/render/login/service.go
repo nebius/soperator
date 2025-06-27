@@ -41,3 +41,24 @@ func RenderService(namespace, clusterName string, login *values.SlurmLogin) core
 
 	return res
 }
+
+// RenderHeadlessService renders new headless [corev1.Service] for login pod-to-pod communication
+func RenderHeadlessService(namespace, clusterName string, login *values.SlurmLogin) corev1.Service {
+	return corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      login.HeadlessService.Name,
+			Namespace: namespace,
+			Labels:    common.RenderLabels(consts.ComponentTypeLogin, clusterName),
+		},
+		Spec: corev1.ServiceSpec{
+			Type:      corev1.ServiceTypeClusterIP,
+			Selector:  common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName),
+			ClusterIP: "None",
+			Ports: []corev1.ServicePort{{
+				Protocol:   login.HeadlessService.Protocol,
+				Port:       login.ContainerSshd.Port,
+				TargetPort: intstr.FromString(login.ContainerSshd.Name),
+			}},
+		},
+	}
+}

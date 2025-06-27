@@ -11,6 +11,7 @@ const (
 	SoperatorChecksK8SNodeMaintenance corev1.NodeConditionType = "SoperatorChecksNodeMaintenance"
 	// External condition to react in soperator checks.
 	K8SNodeMaintenanceScheduled corev1.NodeConditionType = "MaintenanceScheduled"
+	HardwareIssuesSuspected     corev1.NodeConditionType = "HardwareIssuesSuspected"
 )
 
 type ReasonConditionType string
@@ -36,9 +37,10 @@ const (
 	MessageRebooted  MessageConditionType = "Node has been rebooted"
 	MessageUndrained MessageConditionType = "Node has been undrained"
 
-	MessageSlurmNodeDegraded    MessageConditionType = "Some slurm nodes on the k8s nod are degraded"
-	MessageMaintenanceScheduled MessageConditionType = "Maintenance is scheduled on k8s node"
-	MessageNodeIsRebooted       MessageConditionType = "Node is rebooted"
+	MessageSlurmNodeDegraded       MessageConditionType = "Some slurm nodes on the k8s nod are degraded"
+	MessageMaintenanceScheduled    MessageConditionType = "Maintenance is scheduled on k8s node"
+	MessageHardwareIssuesSuspected MessageConditionType = "Hardware issues suspected on k8s node"
+	MessageNodeIsRebooted          MessageConditionType = "Node is rebooted"
 )
 
 // ActiveCheckK8sJobStatus defines status for ActiveCheck k8s job.
@@ -51,4 +53,13 @@ const (
 	ActiveCheckK8sJobStatusFailed    ActiveCheckK8sJobStatus = "Failed"
 	ActiveCheckK8sJobStatusSuspended ActiveCheckK8sJobStatus = "Suspended"
 	ActiveCheckK8sJobStatusUnknown   ActiveCheckK8sJobStatus = "Unknown"
+)
+
+// ActiveCheckSlurmJobStatus defines status for ActiveCheck slurm job.
+type ActiveCheckSlurmJobStatus string
+
+const (
+	ActiveCheckSlurmJobStatusComplete ActiveCheckSlurmJobStatus = "Complete"
+	ActiveCheckSlurmJobStatusFailed   ActiveCheckSlurmJobStatus = "Failed"
+	ActiveCheckSlurmJobStatusDegraded ActiveCheckSlurmJobStatus = "Degraded"
 )
