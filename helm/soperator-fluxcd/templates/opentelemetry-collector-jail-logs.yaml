@@ -299,6 +299,14 @@ spec:
       runAsUser: 10001
     serviceAccount:
       create: true
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: slurm.nebius.ai/nodeset
+              operator: NotIn
+              values: ["login", "accounting", "controller", "system"]
     tolerations:
     - operator: Exists
     - effect: NoExecute
