@@ -136,6 +136,7 @@ spec:
                   - "/mnt/jail/opt/soperator-outputs/**/`name`*.out"
                 include_file_name: true
                 include_file_path: true
+                preserve_leading_whitespaces: true
                 operators:
                   - type: add
                     field: resource["worker_name"]
