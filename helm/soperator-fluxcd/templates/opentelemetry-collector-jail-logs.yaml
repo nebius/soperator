@@ -136,6 +136,7 @@ spec:
                   - "/mnt/jail/opt/soperator-outputs/**/`name`*.out"
                 include_file_name: true
                 include_file_path: true
+                preserve_leading_whitespaces: true
                 operators:
                   - type: add
                     field: resource["worker_name"]
@@ -299,6 +300,14 @@ spec:
       runAsUser: 10001
     serviceAccount:
       create: true
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: slurm.nebius.ai/nodeset
+              operator: NotIn
+              values: ["login", "accounting", "controller", "system"]
     tolerations:
     - operator: Exists
     - effect: NoExecute
