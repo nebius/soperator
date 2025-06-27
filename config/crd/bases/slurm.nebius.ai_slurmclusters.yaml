@@ -4723,8 +4723,9 @@ spec:
                               database
                             type: string
                           passwordSecretKeyRef:
-                            description: SecretRef defines the reference to the secret
-                              with the password key for the external database
+                            description: |-
+                              PasswordSecretKeyRef defines the reference to the secret with the password key for the external database.
+                              Either this or tls.clientCertSecretName must be provided as client credentials.
                             properties:
                               key:
                                 description: Key defines the key of password in the
@@ -4741,6 +4742,30 @@ spec:
                               database
                             format: int32
                             type: integer
+                          storageParameters:
+                            additionalProperties:
+                              type: string
+                            description: |-
+                              StorageParameters defines the list of additional parameters to set in slurmdbd.conf's StorageParameters.
+                              Some values here may be overridden by TLS configuration
+                            type: object
+                          tls:
+                            description: TLS provides the configuration required to
+                              establish TLS connection with the external MariaDB.
+                            properties:
+                              clientCertSecretRef:
+                                description: |-
+                                  ClientCertSecretName defines the reference to a Kubernetes TLS Secret (with tls.crt and tls.key files).
+                                  Either this or passwordSecretKeyRef must be provided as client credentials.
+                                  If set, it overrides SSL_CERT and SSL_KEY values in storageParameters
+                                type: string
+                              serverCASecretRef:
+                                description: |-
+                                  ServerCASecretRef defines the reference to a Secret containing the MariaDB server CA certificates.
+                                  The secret should contain a 'ca.crt' key.
+                                  If set, it overrides SSL_CA value in storageParameters
+                                type: string
+                            type: object
                           user:
                             description: Key defines the key of username and password
                               in the secret

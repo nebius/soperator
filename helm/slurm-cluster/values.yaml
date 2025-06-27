@@ -243,6 +243,11 @@ slurmNodes:
       # passwordSecretKeyRef:
       #   name: ""
       #   key: ""
+      # tls:
+      #   serverCASecretRef: ""
+      #   clientCertSecretRef: ""
+      # storageParameters:
+      #   SSL_CIPHER: ""
     mariadbOperator:
       enabled: false
       protectedSecret: false

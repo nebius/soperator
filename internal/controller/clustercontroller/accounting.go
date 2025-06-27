@@ -35,6 +35,8 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 	logger := log.FromContext(ctx)
 	isAccountingEnabled := clusterValues.NodeAccounting.Enabled
 	isExternalDBEnabled := clusterValues.NodeAccounting.ExternalDB.Enabled
+	isExternalDBWithPassword := clusterValues.NodeAccounting.ExternalDB.PasswordSecretKeyRef.Name != ""
+	isExternalDBWithClientCert := clusterValues.NodeAccounting.ExternalDB.TLS.ClientCertSecretRef != ""
 	isMariaDBEnabled := clusterValues.NodeAccounting.MariaDb.Enabled
 	isProtectedSecret := clusterValues.NodeAccounting.MariaDb.ProtectedSecret
 	isDBEnabled := isExternalDBEnabled || isMariaDBEnabled
@@ -57,17 +59,27 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						return nil
 					}
 
-					var secret = &corev1.Secret{}
+					var secret *corev1.Secret = nil
 					var err error
 
 					if isExternalDBEnabled {
-						err = r.handleExternalDB(stepCtx, clusterValues, secret)
-						if err != nil {
-							return err
+						if isExternalDBWithClientCert {
+							err = r.handleExternalDBClientCert(stepCtx, clusterValues)
+							if err != nil {
+								return err
+							}
+						}
+						if isExternalDBWithPassword {
+							secret = &corev1.Secret{}
+							err = r.handleExternalDBPassword(stepCtx, clusterValues, secret)
+							if err != nil {
+								return err
+							}
 						}
 					}
 
 					if isMariaDBEnabled {
+						secret = &corev1.Secret{}
 						err = r.handleMariaDB(stepCtx, clusterValues, consts.MariaDbSecretName, secret)
 						if err != nil {
 							return err
@@ -376,7 +388,46 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 	return nil
 }
 
-func (r SlurmClusterReconciler) handleExternalDB(
+func (r SlurmClusterReconciler) handleExternalDBClientCert(
+	ctx context.Context,
+	clusterValues *values.SlurmCluster) error {
+
+	isSecretNameEmpty := clusterValues.NodeAccounting.ExternalDB.TLS.ClientCertSecretRef == ""
+	if isSecretNameEmpty {
+		return errors.New("client cert secret name is empty")
+	}
+
+	secretName := clusterValues.NodeAccounting.ExternalDB.TLS.ClientCertSecretRef
+	secret := &corev1.Secret{}
+	err := r.Get(
+		ctx,
+		types.NamespacedName{
+			Namespace: clusterValues.Namespace,
+			Name:      secretName,
+		},
+		secret,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	if secret.Data == nil {
+		return errors.New("client cert secret: data is empty")
+	}
+
+	if len(secret.Data[consts.SecretSlurmdbdSSLClientKeyCertificateFile]) == 0 {
+		return errors.New("client cert secret: certificate is empty")
+	}
+
+	if len(secret.Data[consts.SecretSlurmdbdSSLClientKeyPrivateKeyFile]) == 0 {
+		return errors.New("client cert secret: private key is empty")
+	}
+
+	return nil
+}
+
+func (r SlurmClusterReconciler) handleExternalDBPassword(
 	ctx context.Context,
 	clusterValues *values.SlurmCluster,
 	secret *corev1.Secret) error {
@@ -384,8 +435,8 @@ func (r SlurmClusterReconciler) handleExternalDB(
 
 	isSecretNameEmpty := clusterValues.NodeAccounting.ExternalDB.PasswordSecretKeyRef.Name == ""
 	if isSecretNameEmpty {
-		logger.Error(nil, "Secret name is empty")
-		return errors.New("secret name is empty")
+		logger.Error(nil, "Password secret name is empty")
+		return errors.New("password secret name is empty")
 	}
 
 	secretNameAcc := clusterValues.NodeAccounting.ExternalDB.PasswordSecretKeyRef.Name
@@ -537,10 +588,11 @@ func (r SlurmClusterReconciler) getAccountingDeploymentDependencies(
 	var res []metav1.Object
 
 	// Define the names and the corresponding objects
-	objects := [3]struct {
+	type accountingDep struct {
 		name string
 		obj  client.Object
-	}{
+	}
+	objects := []accountingDep{
 		{
 			name: naming.BuildConfigMapSlurmConfigsName(clusterValues.Name),
 			obj:  &corev1.ConfigMap{},
@@ -553,6 +605,23 @@ func (r SlurmClusterReconciler) getAccountingDeploymentDependencies(
 			name: naming.BuildSecretMungeKeyName(clusterValues.Name),
 			obj:  &corev1.Secret{},
 		},
+	}
+
+	if clusterValues.NodeAccounting.ExternalDB.Enabled {
+		externalDBSecretRefs := []string{
+			clusterValues.NodeAccounting.ExternalDB.PasswordSecretKeyRef.Name,
+			clusterValues.NodeAccounting.ExternalDB.TLS.ServerCASecretRef,
+			clusterValues.NodeAccounting.ExternalDB.TLS.ClientCertSecretRef,
+		}
+
+		for _, secretRef := range externalDBSecretRefs {
+			if secretRef != "" {
+				objects = append(objects, accountingDep{
+					name: secretRef,
+					obj:  &corev1.Secret{},
+				})
+			}
+		}
 	}
 
 	for _, object := range objects {

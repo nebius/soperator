@@ -601,11 +601,14 @@ func (r *SlurmClusterReconciler) patchStatus(ctx context.Context, cluster *slurm
 type statusPatcher func(status *slurmv1.SlurmClusterStatus)
 
 const (
-	podTemplateField            = ".spec.slurmNodes.exporter.exporter.podTemplateNameRef"
-	supervisordConfigMapField   = ".spec.slurmNodes.worker.supervisordConfigMapRefName"
-	sshdLoginConfigMapField     = ".spec.slurmNodes.login.sshdConfigMapRefName"
-	sshdWorkerConfigMapField    = ".spec.slurmNodes.worker.sshdConfigMapRefName"
-	slurmTopologyConfigMapField = ".spec.slurmTopologyConfigMapRefName"
+	podTemplateField                             = ".spec.slurmNodes.exporter.exporter.podTemplateNameRef"
+	supervisordConfigMapField                    = ".spec.slurmNodes.worker.supervisordConfigMapRefName"
+	sshdLoginConfigMapField                      = ".spec.slurmNodes.login.sshdConfigMapRefName"
+	sshdWorkerConfigMapField                     = ".spec.slurmNodes.worker.sshdConfigMapRefName"
+	slurmTopologyConfigMapField                  = ".spec.slurmTopologyConfigMapRefName"
+	accountingExternalDBPasswordSecretKeyField   = ".spec.slurmNodes.accounting.externalDB.passwordSecretKeyRef.Name"
+	accountingExternalDBTLSServerCASecretField   = ".spec.slurmNodes.accounting.externalDB.tls.serverCASecretRef"
+	accountingExternalDBTLSClientCertSecretField = ".spec.slurmNodes.accounting.externalDB.tls.clientCertSecretRef"
 )
 
 func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency int, cacheSyncTimeout time.Duration) error {
@@ -613,6 +616,9 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 		return err
 	}
 	if err := r.setupConfigMapIndexer(mgr); err != nil {
+		return err
+	}
+	if err := r.setupSecretIndexer(mgr); err != nil {
 		return err
 	}
 
@@ -631,6 +637,12 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 	controllerBuilder.Watches(
 		&corev1.ConfigMap{},
 		handler.EnqueueRequestsFromMapFunc(r.findObjectsForConfigMap),
+		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+	)
+
+	controllerBuilder.Watches(
+		&corev1.Secret{},
+		handler.EnqueueRequestsFromMapFunc(r.findObjectsForSecret),
 		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 	)
 
@@ -672,6 +684,35 @@ func (r *SlurmClusterReconciler) setupConfigMapIndexer(mgr ctrl.Manager) error {
 		},
 		slurmTopologyConfigMapField: func(sc *slurmv1.SlurmCluster) string {
 			return sc.Spec.SlurmTopologyConfigMapRefName
+		},
+	}
+
+	for field, extractFunc := range indexers {
+		err := mgr.GetFieldIndexer().IndexField(context.Background(), &slurmv1.SlurmCluster{}, field, func(rawObj client.Object) []string {
+			slurmCluster := rawObj.(*slurmv1.SlurmCluster)
+			value := extractFunc(slurmCluster)
+			if value == "" {
+				return nil
+			}
+			return []string{value}
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *SlurmClusterReconciler) setupSecretIndexer(mgr ctrl.Manager) error {
+	indexers := map[string]func(*slurmv1.SlurmCluster) string{
+		accountingExternalDBPasswordSecretKeyField: func(sc *slurmv1.SlurmCluster) string {
+			return sc.Spec.SlurmNodes.Accounting.ExternalDB.PasswordSecretKeyRef.Name
+		},
+		accountingExternalDBTLSServerCASecretField: func(sc *slurmv1.SlurmCluster) string {
+			return sc.Spec.SlurmNodes.Accounting.ExternalDB.TLS.ServerCASecretRef
+		},
+		accountingExternalDBTLSClientCertSecretField: func(sc *slurmv1.SlurmCluster) string {
+			return sc.Spec.SlurmNodes.Accounting.ExternalDB.TLS.ClientCertSecretRef
 		},
 	}
 
@@ -758,6 +799,44 @@ func (r *SlurmClusterReconciler) findObjectsForConfigMap(
 		listOpts := []client.ListOption{
 			client.MatchingFields{field: configMap.Name},
 			client.InNamespace(configMap.Namespace),
+		}
+		if err := r.Client.List(ctx, attachedSlurmClusters, listOpts...); err != nil {
+			continue
+		}
+		for _, slurmCluster := range attachedSlurmClusters.Items {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: slurmCluster.Namespace,
+					Name:      slurmCluster.Name,
+				},
+			})
+		}
+	}
+
+	return requests
+}
+
+func (r *SlurmClusterReconciler) findObjectsForSecret(
+	ctx context.Context,
+	rawSecret client.Object,
+) []reconcile.Request {
+	secret, ok := rawSecret.(*corev1.Secret)
+	if !ok {
+		return nil
+	}
+	attachedSlurmClusters := &slurmv1.SlurmClusterList{}
+	matchingFields := []string{
+		accountingExternalDBPasswordSecretKeyField,
+		accountingExternalDBTLSServerCASecretField,
+		accountingExternalDBTLSClientCertSecretField,
+	}
+
+	var requests []reconcile.Request
+
+	for _, field := range matchingFields {
+		listOpts := []client.ListOption{
+			client.MatchingFields{field: secret.Name},
+			client.InNamespace(secret.Namespace),
 		}
 		if err := r.Client.List(ctx, attachedSlurmClusters, listOpts...); err != nil {
 			continue

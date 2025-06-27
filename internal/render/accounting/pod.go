@@ -34,6 +34,24 @@ func BasePodTemplateSpec(
 		RenderVolumeSlurmdbdSpool(accounting),
 	}
 
+	additionalVolumeMounts := make([]corev1.VolumeMount, 0)
+
+	if accounting.ExternalDB.Enabled {
+		if accounting.ExternalDB.TLS.ServerCASecretRef != "" {
+			volumes = append(volumes,
+				RenderVolumeSlurmdbdSSLCACertificate(accounting.ExternalDB.TLS.ServerCASecretRef))
+			additionalVolumeMounts = append(additionalVolumeMounts,
+				RenderVolumeMountSlurmdbdSSLCACertificate())
+		}
+
+		if accounting.ExternalDB.TLS.ClientCertSecretRef != "" {
+			volumes = append(volumes,
+				RenderVolumeSlurmdbdSSLClientKey(accounting.ExternalDB.TLS.ClientCertSecretRef))
+			additionalVolumeMounts = append(additionalVolumeMounts,
+				RenderVolumeMountSlurmdbdSSLClientKey())
+		}
+	}
+
 	nodeFilter, err := utils.GetBy(
 		nodeFilters,
 		accounting.K8sNodeFilterName,
@@ -66,7 +84,7 @@ func BasePodTemplateSpec(
 				common.RenderContainerMunge(&accounting.ContainerMunge),
 			),
 			Containers: []corev1.Container{
-				renderContainerAccounting(accounting.ContainerAccounting),
+				renderContainerAccounting(accounting.ContainerAccounting, additionalVolumeMounts),
 			},
 			Volumes: volumes,
 		},

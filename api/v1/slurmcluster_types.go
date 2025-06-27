@@ -720,10 +720,35 @@ type ExternalDB struct {
 	//
 	// +kubebuilder:validation:Optional
 	User string `json:"user"`
-	// SecretRef defines the reference to the secret with the password key for the external database
+	// PasswordSecretKeyRef defines the reference to the secret with the password key for the external database.
+	// Either this or tls.clientCertSecretName must be provided as client credentials.
 	//
 	// +kubebuilder:validation:Optional
 	PasswordSecretKeyRef PasswordSecretKeyRef `json:"passwordSecretKeyRef"`
+	// TLS provides the configuration required to establish TLS connection with the external MariaDB.
+	//
+	// +kubebuilder:validation:Optional
+	TLS ExternalDBTLSConfig `json:"tls,omitempty"`
+	// StorageParameters defines the list of additional parameters to set in slurmdbd.conf's StorageParameters.
+	// Some values here may be overridden by TLS configuration
+	//
+	// +kubebuilder:validation:Optional
+	StorageParameters map[string]string `json:"storageParameters,omitempty"`
+}
+
+type ExternalDBTLSConfig struct {
+	// ServerCASecretRef defines the reference to a Secret containing the MariaDB server CA certificates.
+	// The secret should contain a 'ca.crt' key.
+	// If set, it overrides SSL_CA value in storageParameters
+	//
+	// +kubebuilder:validation:Optional
+	ServerCASecretRef string `json:"serverCASecretRef,omitempty"`
+	// ClientCertSecretName defines the reference to a Kubernetes TLS Secret (with tls.crt and tls.key files).
+	// Either this or passwordSecretKeyRef must be provided as client credentials.
+	// If set, it overrides SSL_CERT and SSL_KEY values in storageParameters
+	//
+	// +kubebuilder:validation:Optional
+	ClientCertSecretRef string `json:"clientCertSecretRef,omitempty"`
 }
 
 type PasswordSecretKeyRef struct {
