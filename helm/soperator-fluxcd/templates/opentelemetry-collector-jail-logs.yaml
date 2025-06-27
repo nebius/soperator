@@ -1,8 +1,8 @@
-{{- if and .Values.observability.enabled .Values.observability.opentelemetry.enabled }}
+{{- if and .Values.observability.enabled .Values.observability.opentelemetry.enabled .Values.observability.opentelemetry.logs.values.hcOutputEnabled }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: {{ include "soperator-fluxcd.fullname" . }}-opentelemetry-collector-logs
+  name: {{ include "soperator-fluxcd.fullname" . }}-opentelemetry-collector-jail-logs
   labels:
   {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
@@ -26,7 +26,7 @@ spec:
       remediateLastFailure: true
   interval: {{ .Values.observability.opentelemetry.logs.interval }}
   timeout: {{ .Values.observability.opentelemetry.logs.timeout }}
-  releaseName: opentelemetry-collector-logs
+  releaseName: opentelemetry-collector-jail-logs
   targetNamespace: logs-system
   values:
   {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
@@ -68,8 +68,10 @@ spec:
             authenticator: bearertokenauth
         {{- end }}
       extensions:
+        k8s_observer:
+          node: ${env:K8S_NODE_NAME}
         file_storage:
-          directory: /var/lib/otelcol
+          directory: /var/lib/otelcol-jail
         health_check:
           endpoint: 0.0.0.0:13133
         {{- if $hasPublicEndpoint }}
@@ -124,154 +126,80 @@ spec:
             - set(attributes["cluster"], "${env:CLUSTER_NAME}")
             - set(attributes["k8s.node.name"], "${env:K8S_NODE_NAME}")
       receivers:
-        filelog/nodelogs:
-          include:
-            - '/var/nodelogs/kern.log*'
-            - '/var/nodelogs/syslog*'
-            - '/var/nodelogs/dmesg*'
-            - '/var/nodelogs/fabricmanager.log*'
-          exclude:
-            - '/var/nodelogs/*.gz'
-            - '/var/nodelogs/*.tmp'
-          include_file_name: true
-          operators:
-            - type: add
-              field: resource["o11y_agent_raw_logs"]
-              value: 'yes'
-            - type: add
-              field: resource["workspace.id"]
-              value: node-system
-            - id: extract_logtype
-              type: regex_parser
-              parse_from: attributes["log.file.name"]
-              regex: '^(?P<logtype>[^.]+).*$'
-            - type: remove
-              field: attributes["log.file.name"]
-            - id: get-format
-              type: router
-              routes:
-                - expr: attributes["logtype"] matches "syslog|kern"
-                  output: parse-syslog
-              default: not-syslog
-            - id: parse-syslog
-              type: syslog_parser
-              protocol: rfc3164
-              allow_skip_pri_header: true
-            - type: move
-              from: attributes["message"]
-              to: body
-              if: '"message" in attributes'
-            - id: not-syslog
-              type: noop
-            - type: move
-              from: attributes["logtype"]
-              to: resource["app.kubernetes.io/name"]
-        filelog/pods:
-          exclude:
-          - /var/log/pods/*/otc-container/*.log
-          - /var/log/pods/*/munge/*.log
-          - /var/log/pods/kube-system_hubble-*/**/*.log
-          - /var/log/pods/monitoring-system_*/**/*.log
-          - /var/log/pods/logs-system_*/**/*.log
-          include:
-          - /var/log/pods/*-system_*/**/*.log
-          - /var/log/pods/soperator_*/**/*.log
-          include_file_name: false
-          include_file_path: true
-          operators:
-          - id: get-format
-            routes:
-            - expr: body matches "^[^ Z]+Z"
-              output: parser-containerd
-            - expr: body matches "^\\{"
-              output: parser-docker
-            type: router
-          - id: parser-docker
-            output: extract_metadata_from_filepath
-            timestamp:
-              layout: '%Y-%m-%dT%H:%M:%S.%LZ'
-              parse_from: attributes.timestamp
-            type: json_parser
-          - combine_field: attributes.log
-            combine_with: ""
-            id: crio-recombine
-            is_last_entry: attributes.logtag == 'F'
-            max_log_size: 102400
-            output: extract_metadata_from_filepath
-            source_identifier: attributes["log.file.path"]
-            type: recombine
-          - id: parser-containerd
-            regex: ^(?P<time>[^ ^Z]+Z) (?P<stream>stdout|stderr) (?P<logtag>[^ ]*)
-              ?(?P<log>.*)$
-            timestamp:
-              layout: '%Y-%m-%dT%H:%M:%S.%LZ'
-              parse_from: attributes.time
-            type: regex_parser
-          - combine_field: attributes.log
-            combine_with: ""
-            id: containerd-recombine
-            is_last_entry: attributes.logtag == 'F'
-            max_log_size: 102400
-            output: extract_metadata_from_filepath
-            source_identifier: attributes["log.file.path"]
-            type: recombine
-          - id: extract_metadata_from_filepath
-            parse_from: attributes["log.file.path"]
-            regex: ^.*\/(?P<namespace>[^_]+)_(?P<pod_name>[^_]+)_(?P<uid>[a-f0-9\-]+)\/(?P<container_name>[^\._]+)\/(?P<restart_count>\d+)\.log$
-            type: regex_parser
-          - from: attributes.stream
-            to: attributes["log.iostream"]
-            type: move
-          - from: attributes.container_name
-            to: resource["k8s.container.name"]
-            type: move
-          - from: attributes.namespace
-            to: resource["k8s.namespace.name"]
-            type: move
-          - from: attributes.pod_name
-            to: resource["k8s.pod.name"]
-            type: move
-          - from: attributes.restart_count
-            to: resource["k8s.container.restart_count"]
-            type: move
-          - from: attributes.uid
-            to: resource["k8s.pod.uid"]
-            type: move
-          - from: attributes.log
-            to: body
-            type: move
-          - field: attributes.level
-            type: add
-            value: unknown
-          - id: parse-json-logs
-            if: body matches "^\\{.+\\}$"
-            parse_from: body
-            parse_to: attributes
-            severity:
-              mapping:
-                debug:
-                - debug
-                - DEBUG
-                error:
-                - error
-                - ERROR
-                fatal:
-                - fatal
-                - FATAL
-                info:
-                - info
-                - INFO
-                warn:
-                - warn
-                - WARN
-                - warning
-                - WARNING
-              parse_from: attributes.level
-            type: json_parser
-          retry_on_failure:
-            enabled: true
-          start_at: end
-          storage: file_storage
+        receiver_creator:
+          watch_observers: [k8s_observer]
+          receivers:
+            filelog:
+              rule: type == "pod" && name matches "worker-"
+              config:
+                include: 
+                  - "/mnt/jail/opt/soperator-outputs/**/`name`*.out"
+                include_file_name: true
+                include_file_path: true
+                operators:
+                  - type: add
+                    field: resource["worker_name"]
+                    value: "`name`"
+                  - id: extract_content_from_filename
+                    type: regex_parser
+                    parse_from: attributes["log.file.name"]
+                    regex: ^`name`\.(?P<content>.+)\.out$
+                  - id: extract_directory
+                    type: regex_parser
+                    parse_from: attributes["log.file.path"]
+                    regex: ^.*/(?P<log_directory>nccl_logs|slurm_jobs|slurm_scripts)/.*$
+                  - type: move
+                    from: attributes.log_directory
+                    to: resource["log_type"]
+                  - id: parse_nccl_content
+                    type: regex_parser
+                    parse_from: attributes.content
+                    regex: ^(?P<job_id>\d+)\.(?P<job_step_id>\d+)$
+                    if: resource["log_type"] == "nccl_logs"
+                  - type: move
+                    from: attributes.job_id
+                    to: resource["job_id"]
+                    if: resource["log_type"] == "nccl_logs" and attributes["job_id"] != nil
+                  - type: move
+                    from: attributes.job_step_id
+                    to: resource["job_step_id"]
+                    if: resource["log_type"] == "nccl_logs" and attributes["job_step_id"] != nil
+                  - id: parse_slurm_job_content
+                    type: regex_parser
+                    parse_from: attributes.content
+                    regex: ^(?P<job_name>[^.]+)\.(?P<job_id>\d+)(?:\.(?P<job_array_id>\d+))?$
+                    if: resource["log_type"] == "slurm_jobs"
+                  - type: move
+                    from: attributes.job_name
+                    to: resource["job_name"]
+                    if: resource["log_type"] == "slurm_jobs" and attributes["job_name"] != nil
+                  - type: move
+                    from: attributes.job_id
+                    to: resource["job_id"]
+                    if: resource["log_type"] == "slurm_jobs" and attributes["job_id"] != nil
+                  - type: move
+                    from: attributes.job_array_id
+                    to: resource["job_array_id"]
+                    if: resource["log_type"] == "slurm_jobs" and attributes["job_array_id"] != nil
+                  - id: parse_script_content
+                    type: regex_parser
+                    parse_from: attributes.content
+                    regex: ^(?P<script_name>[^.]+)(?:\.(?P<script_context>[^.]+))?$
+                    if: resource["log_type"] == "slurm_scripts"
+                  - type: move
+                    from: attributes.script_name
+                    to: resource["slurm_script_name"]
+                    if: resource["log_type"] == "slurm_scripts" and attributes["script_name"] != nil
+                  - type: move
+                    from: attributes.script_context
+                    to: resource["slurm_script_context"]
+                    if: resource["log_type"] == "slurm_scripts" and attributes["script_context"] != nil
+                  - type: remove
+                    field: attributes.content
+                retry_on_failure:
+                  enabled: true
+                start_at: end
+                storage: file_storage
         zipkin: null
       service:
         extensions:
@@ -280,6 +208,7 @@ spec:
         {{- if $hasPublicEndpoint }}
         - bearertokenauth
         {{- end }}
+        - k8s_observer
         pipelines:
           logs:
             exporters:
@@ -293,8 +222,7 @@ spec:
             - memory_limiter
             - batch
             receivers:
-            - filelog/pods
-            - filelog/nodelogs
+            - receiver_creator
           metrics: null
           traces: null
     extraEnvs:
@@ -312,16 +240,10 @@ spec:
       name: o11ytoken
       readOnly: true
     {{- end }}
-    - mountPath: /var/log/pods
-      name: varlogpods
-      readOnly: true
-    - mountPath: /var/lib/docker/containers
-      name: varlibdockercontainers
-      readOnly: true
-    - mountPath: /var/lib/otelcol
+    - mountPath: /var/lib/otelcol-jail
       name: varlibotelcol
-    - name: node-logs
-      mountPath: /var/nodelogs
+    - mountPath: /mnt/jail/opt/soperator-outputs
+      name: soperator-outputs
       readOnly: true
     extraVolumes:
     {{- if $hasPublicEndpoint }}
@@ -330,19 +252,13 @@ spec:
         secretName: o11y-writer-sa-token
     {{- end }}
     - hostPath:
-        path: /var/log/pods
-      name: varlogpods
-    - hostPath:
-        path: /var/log
+        path: /mnt/jail/opt/soperator-outputs
         type: Directory
-      name: node-logs
+      name: soperator-outputs
     - hostPath:
-        path: /var/lib/otelcol
+        path: /var/lib/otelcol-jail
         type: DirectoryOrCreate
       name: varlibotelcol
-    - hostPath:
-        path: /var/lib/docker/containers
-      name: varlibdockercontainers
     image:
       pullPolicy: IfNotPresent
       repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
@@ -351,18 +267,29 @@ spec:
     - command:
       - sh
       - -c
-      - 'chown -R 10001: /var/lib/otelcol /var/nodelogs'
+      - 'chown -R 10001: /var/lib/otelcol-jail'
       image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
       name: init-fs
       securityContext:
         runAsGroup: 0
         runAsUser: 0
       volumeMounts:
-      - mountPath: /var/lib/otelcol
+      - mountPath: /var/lib/otelcol-jail
         name: varlibotelcol
-      - name: node-logs
-        mountPath: /var/nodelogs
     mode: daemonset
+    ports:
+      jaeger-compact:
+        enabled: false
+      jaeger-grpc:
+        enabled: false
+      jaeger-thrift:
+        enabled: false
+      otlp:
+        enabled: false
+      otlp-http:
+        enabled: false
+      zipkin:
+        enabled: false
     rollout:
       rollingUpdate:
         maxUnavailable: 50%
@@ -405,11 +332,11 @@ spec:
   {{- end }}
   valuesFrom:
   - kind: ConfigMap
-    name: terraform-opentelemetry-collector-logs
+    name: terraform-opentelemetry-collector-jail-logs
     optional: true
     valuesKey: values.yaml
   - kind: ConfigMap
-    name: opentelemetry-collector-logs
+    name: opentelemetry-collector-jail-logs
     optional: true
     valuesKey: values.yaml
 {{- end }}

@@ -155,6 +155,9 @@ jobs:
             exit 1
           fi
 
+      - name: Run Helm Tests
+        run: make helmtest
+
       - name: Log in to the Github Container registry
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
         with:
