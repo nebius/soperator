@@ -26,6 +26,6 @@ const (
 	LabelSConfigControllerSourceKey   = "sconficontroller.slurm.nebius.ai"
 	LabelSConfigControllerSourceValue = "true"
 
-	TopologyLabelPrefix = "topologyconf.slurm.nebius.ai"
+	TopologyLabelPrefix = "topology.nebius.com"
 	TierOnePrefix       = TopologyLabelPrefix + "/tier-1"
 )
