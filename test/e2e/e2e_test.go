@@ -196,6 +196,9 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 	// ]
 	tfVars["slurm_login_ssh_root_public_keys"] = cfg.SSHKeys
 
+	// Not HA, so it'll k8s cluster will be created faster
+	tfVars["etcd_cluster_size"] = 1
+
 	return tfVars
 }
 
