@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - dev
+    tags:
+      - 'build**'  # Trigger on tags starting with "build"
     paths-ignore:
       - 'docs/**'
       - 'CODEOWNERS'

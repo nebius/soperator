@@ -137,6 +137,7 @@ spec:
                 include_file_name: true
                 include_file_path: true
                 preserve_leading_whitespaces: true
+                poll_interval: 10s
                 operators:
                   - type: add
                     field: resource["worker_name"]
