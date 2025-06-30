@@ -171,7 +171,8 @@ RUN apt update && \
         ibverbs-utils \
         libpmix2 \
         libpmix-dev \
-        bsdmainutils && \
+        bsdmainutils \
+        kmod && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
