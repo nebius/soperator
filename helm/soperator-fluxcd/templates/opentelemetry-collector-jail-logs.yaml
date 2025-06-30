@@ -137,7 +137,7 @@ spec:
                 include_file_name: true
                 include_file_path: true
                 preserve_leading_whitespaces: true
-                poll_interval: 10s
+                poll_interval: {{ .Values.observability.opentelemetry.logs.values.jailLogs.pollInterval | default "5m" }}
                 operators:
                   - type: add
                     field: resource["worker_name"]
