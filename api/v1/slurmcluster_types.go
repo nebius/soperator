@@ -85,7 +85,7 @@ type SlurmClusterSpec struct {
 	// SlurmConfig represents the Slurm configuration in slurm.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", epilog: "", prolog: "", taskPluginParam: "Autobind=Cores", maxJobCount: 10000, minJobAge: 86400}
+	// +kubebuilder:default={defMemPerNode: 1048576, defCpuPerGPU: 4, completeWait: 5, epilog: "", prolog: "", taskPluginParam: "Autobind=Cores", maxJobCount: 10000, minJobAge: 86400, messageTimeout: 60}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 
 	// CustomSlurmConfig represents the raw Slurm configuration from slurm.conf.
@@ -141,24 +141,18 @@ type SlurmConfig struct {
 	// Default real memory size available per allocated node in mebibytes.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=1228800
+	// +kubebuilder:default=1048576
 	DefMemPerNode *int32 `json:"defMemPerNode,omitempty"`
 	// Default count of CPUs allocated per allocated GPU
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=16
+	// +kubebuilder:default=4
 	DefCpuPerGPU *int32 `json:"defCpuPerGPU,omitempty"`
 	// The time to wait, in seconds, when any job is in the COMPLETING state before any additional jobs are scheduled.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=5
 	CompleteWait *int32 `json:"completeWait,omitempty"`
-	// Defines specific subsystems which should provide more detailed event logging.
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="Priority,Script,SelectType,Steps"
-	// +kubebuilder:validation:Pattern="^((Accrue|Agent|AuditRPCs|Backfill|BackfillMap|BurstBuffer|Cgroup|ConMgr|CPU_Bind|CpuFrequency|Data|DBD_Agent|Dependency|Elasticsearch|Energy|Federation|FrontEnd|Gres|Hetjob|Gang|GLOB_SILENCE|JobAccountGather|JobComp|JobContainer|License|Network|NetworkRaw|NodeFeatures|NO_CONF_HASH|Power|Priority|Profile|Protocol|Reservation|Route|Script|SelectType|Steps|Switch|TLS|TraceJobs|Triggers)(,)?)+$"
-	DebugFlags *string `json:"debugFlags,omitempty"`
 	// Defines specific file to run the epilog when job ends. Default value is no epilog
 	//
 	// +kubebuilder:validation:Optional

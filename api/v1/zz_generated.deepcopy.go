@@ -845,11 +845,6 @@ func (in *SlurmConfig) DeepCopyInto(out *SlurmConfig) {
 		*out = new(int32)
 		**out = **in
 	}
-	if in.DebugFlags != nil {
-		in, out := &in.DebugFlags, &out.DebugFlags
-		*out = new(string)
-		**out = **in
-	}
 	if in.Epilog != nil {
 		in, out := &in.Epilog, &out.Epilog
 		*out = new(string)

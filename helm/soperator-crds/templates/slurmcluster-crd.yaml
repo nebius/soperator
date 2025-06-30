@@ -20042,11 +20042,11 @@ spec:
               slurmConfig:
                 default:
                   completeWait: 5
-                  debugFlags: Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs
-                  defCpuPerGPU: 16
-                  defMemPerNode: 1228800
+                  defCpuPerGPU: 4
+                  defMemPerNode: 1048576
                   epilog: ""
                   maxJobCount: 10000
+                  messageTimeout: 60
                   minJobAge: 86400
                   prolog: ""
                   taskPluginParam: Autobind=Cores
@@ -20059,19 +20059,13 @@ spec:
                       the COMPLETING state before any additional jobs are scheduled.
                     format: int32
                     type: integer
-                  debugFlags:
-                    default: Priority,Script,SelectType,Steps
-                    description: Defines specific subsystems which should provide
-                      more detailed event logging.
-                    pattern: ^((Accrue|Agent|AuditRPCs|Backfill|BackfillMap|BurstBuffer|Cgroup|ConMgr|CPU_Bind|CpuFrequency|Data|DBD_Agent|Dependency|Elasticsearch|Energy|Federation|FrontEnd|Gres|Hetjob|Gang|GLOB_SILENCE|JobAccountGather|JobComp|JobContainer|License|Network|NetworkRaw|NodeFeatures|NO_CONF_HASH|Power|Priority|Profile|Protocol|Reservation|Route|Script|SelectType|Steps|Switch|TLS|TraceJobs|Triggers)(,)?)+$
-                    type: string
                   defCpuPerGPU:
-                    default: 16
+                    default: 4
                     description: Default count of CPUs allocated per allocated GPU
                     format: int32
                     type: integer
                   defMemPerNode:
-                    default: 1228800
+                    default: 1048576
                     description: Default real memory size available per allocated
                       node in mebibytes.
                     format: int32
