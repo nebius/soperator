@@ -27,6 +27,10 @@ chown -h 0:42 /etc/{shadow,gshadow}
 echo "Link home from jail because slurmd uses it"
 ln -s /mnt/jail/home /home
 
+echo "Link soperator home directories from jail to use SSH keys from there"
+mkdir -p /mnt/jail/opt/soperator-home
+ln -s /mnt/jail/opt/soperator-home /opt/soperator-home
+
 echo "Symlink slurm configs from jail(sconfigcontroller)"
 rm -rf /etc/slurm && ln -s /mnt/jail/slurm /etc/slurm
 
