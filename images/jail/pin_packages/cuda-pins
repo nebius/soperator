@@ -5,7 +5,3 @@ Pin-Priority: 1001
 Package: nvidia-open
 Pin: version 9999.9999.9999
 Pin-Priority: 1001
-
-Package: cuda
-Pin: version 12.4.1-1
-Pin-Priority: 1001

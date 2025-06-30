@@ -59,36 +59,38 @@ RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.
     echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" > /etc/apt/sources.list.d/nebius.list && \
     echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ testing main" >> /etc/apt/sources.list.d/nebius.list
 
-# Install mock packages for nvidia drivers https://github.com/nebius/soperator/issues/384
-RUN apt-get update && \
-    apt -y install \
-      cuda-drivers=9999.9999.9999 \
-      nvidia-open=9999.9999.9999 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Install mock packages for NVIDIA drivers
+COPY images/common/scripts/install_driver_mocks.sh /opt/bin/
+RUN chmod +x /opt/bin/install_driver_mocks.sh && \
+    /opt/bin/install_driver_mocks.sh && \
+    rm /opt/bin/install_driver_mocks.sh
 
 # About CUDA packages https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#meta-packages
 RUN apt update && \
     apt install -y \
-        cuda=12.4.1-1 \
-        libcublas-dev-12-4 \
-        libcudnn9-cuda-12=9.1.0.70-1 \
-        libcudnn9-dev-cuda-12=9.1.0.70-1 \
-        libnccl-dev=2.21.5-1+cuda12.4 \
-        libnccl2=2.21.5-1+cuda12.4 && \
+        cuda=12.9.0-1 \
+        libcublas-dev-12-9 \
+        libcudnn9-cuda-12=9.10.1.4-1 \
+        libcudnn9-dev-cuda-12=9.10.1.4-1 \
+        libcudnn9-headers-cuda-12=9.10.1.4-1 \
+        libnccl-dev=2.26.5-1+cuda12.9 \
+        libnccl2=2.26.5-1+cuda12.9 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Disable automatic upgrades for CUDA packages
+RUN apt-mark hold \
+    cuda=12.9.0-1 \
+    libcublas-dev-12-9 \
+    libcudnn9-cuda-12=9.10.1.4-1 \
+    libcudnn9-dev-cuda-12=9.10.1.4-1 \
+    libcudnn9-headers-cuda-12=9.10.1.4-1 \
+    libnccl-dev=2.26.5-1+cuda12.9 \
+    libnccl2=2.26.5-1+cuda12.9
 
 COPY images/jail/pin_packages/cuda-pins /etc/apt/preferences.d/
 COPY images/jail/pin_packages/nebius-pins /etc/apt/preferences.d/
 RUN apt update
-
-RUN apt-mark hold \
-      libcublas-12-4 \
-      libcublas-dev-12-4 \
-      libcudnn9-cuda-12 \
-      libnccl-dev=2.21.5-1+cuda12.4 \
-      libnccl2
 
 RUN echo "export PATH=\$PATH:/usr/local/cuda/bin" > /etc/profile.d/path_cuda.sh && \
     . /etc/profile.d/path_cuda.sh
@@ -169,7 +171,8 @@ RUN apt update && \
         ibverbs-utils \
         libpmix2 \
         libpmix-dev \
-        bsdmainutils && \
+        bsdmainutils \
+        kmod && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
