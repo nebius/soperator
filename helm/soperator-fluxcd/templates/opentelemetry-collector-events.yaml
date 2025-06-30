@@ -128,13 +128,6 @@ spec:
             statements:
             - set(attributes["cache"], ParseJSON(body.string)) where IsMatch(body.string,
               "^\\{")
-            - set(attributes["name"], attributes["cache"]["metadata"]["name"])
-            - set(attributes["source"], attributes["cache"]["source"])
-            - set(attributes["timestamp"], attributes["cache"]["lastTimestamp"])
-            - set(attributes["count"], attributes["cache"]["count"])
-            - set(attributes["type"], attributes["cache"]["type"])
-            - set(body, attributes["cache"]["message"])
-            - delete_key(attributes, "cache")
             - set(severity_text, "INFO")
             - set(attributes["cluster"], "${env:CLUSTER_NAME}")
       receivers:
