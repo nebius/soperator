@@ -17,6 +17,8 @@ if [[ "${gpus_on_node}" == *"8 NVIDIA H100"* ]]; then
   platform="8xH100"
 elif [[ "${gpus_on_node}" == *"8 NVIDIA H200"* ]]; then
   platform="8xH200"
+elif [[ "${gpus_on_node}" == *"8 NVIDIA B200"* ]]; then
+  platform="8xB200"
 else
   echo "Unsupported platform" >&2
   exit 0
