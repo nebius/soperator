@@ -445,6 +445,7 @@ $(YQ): $(LOCALBIN)
 helmtest: check-helm
 	@echo "Running helm unittest"
 	@helm unittest $(CHART_PATH)/soperator-fluxcd
+	@helm unittest $(CHART_PATH)/slurm-cluster-storage
 
 check-helm:
 	@echo "Checking Helm installation..."
