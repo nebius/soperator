@@ -3,7 +3,7 @@
 set -eox pipefail
 
 export JAIL_DIR="/mnt/jail"
-export LOGS_OUTPUT_DIR="/opt/soperator-outputs/slurm_scripts"
+export LOGS_OUTPUT_DIR="/opt/soperator-outputs/${SLURMD_NODENAME}/slurm_scripts"
 export SCRIPT_CONTEXT="epilog"
 
 (umask 000; mkdir -p ${JAIL_DIR}${LOGS_OUTPUT_DIR})
@@ -21,7 +21,7 @@ if [ -n "$SLURM_JOB_GPUS" ]; then
         pushd /opt/slurm_scripts || exit 0
         for check in "${checks[@]}"; do
             script="${check}.sh"
-            log="${LOGS_OUTPUT_DIR}/${SLURMD_NODENAME}.${check}.${SCRIPT_CONTEXT}.out"
+            log="${LOGS_OUTPUT_DIR}/${check}.${SCRIPT_CONTEXT}.out"
 
             # Run the current script and:
             # - write its fd 1 and 2 (stderr+stdout) to the $log file
@@ -53,7 +53,7 @@ EOF
 fi
 
 echo "Unmap the Slurm job with DCGM metrics"
-log="${JAIL_DIR}${LOGS_OUTPUT_DIR}/${SLURMD_NODENAME}.unmap_job_dcgm.${SCRIPT_CONTEXT}.out"
+log="${JAIL_DIR}${LOGS_OUTPUT_DIR}/unmap_job_dcgm.${SCRIPT_CONTEXT}.out"
 bash /mnt/jail/opt/slurm_scripts/unmap_job_dcgm.sh > "$log" 2>&1 || true
 
 exit 0
