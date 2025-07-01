@@ -4,9 +4,23 @@ templates:
 excludeTemplates:
   - templates/helmrepository.yaml
 tests:
-  - it: should not render component when enabled=false
+  - it: should render jail logs component when jailLogs.enabled=true
     set:
       observability.opentelemetry.logs.values.jailLogs.enabled: true
     asserts:
       - hasDocuments:
           count: 1
+  - it: should render node logs when nodeLogs.enabled=true
+    set:
+      observability.opentelemetry.logs.values.nodeLogs.enabled: true
+    templates:
+      - templates/opentelemetry-collector-logs.yaml
+    asserts:
+      - exists:
+          path: spec.values.config.receivers["filelog/nodelogs"]
+  - it: should not render node logs when nodeLogs.enabled=false (default)
+    templates:
+      - templates/opentelemetry-collector-logs.yaml
+    asserts:
+      - notExists:
+          path: spec.values.config.receivers["filelog/nodelogs"]
