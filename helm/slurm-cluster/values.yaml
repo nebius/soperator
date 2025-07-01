@@ -178,7 +178,7 @@ plugStackConfig: {}
 #    logLevel: "INFO"
 #    outputToFile: true
 #    outputToStdOut: false
-#    outputDirectory: "/opt/soperator-outputs/nccl_logs"
+#    outputDirectory: "/opt/soperator-outputs/%h/nccl_logs"
 #  customPlugins:
 #    - required: true
 #      path: custom.so
