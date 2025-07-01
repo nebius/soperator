@@ -21,19 +21,30 @@ rm -rf /etc/slurm && ln -s /mnt/jail/slurm /etc/slurm
 echo "Bind-mount /opt/bin/sbatch.sh script"
 mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
 
-echo "Create directory for slurm job outputs"
-(umask 000; mkdir -p /mnt/jail/opt/soperator-outputs/slurm_jobs)
+echo "Create directory for slurm job outputs for every node"
+NODES=$(sinfo -N --noheader -o "%N" | sort -u)
+BASE_DIR="/mnt/jail/opt/soperator-outputs"
+for NODE in $NODES; do
+    DIR="${BASE_DIR}/${NODE}/slurm_jobs"
+    (umask 000; mkdir -p "$DIR")
+done
 
 if [[ "$EACH_WORKER_JOB_ARRAY" == "true" ]]; then
     echo "Submitting job using slurm_submit_array_job.sh..."
     SLURM_JOB_ID=$(/opt/bin/slurm/slurm_submit_array_job.sh | tail -n 1)
 else
     echo "Submitting regular Slurm job..."
-    SLURM_OUTPUT=$(/usr/bin/sbatch --parsable \
-      --job-name="$ACTIVE_CHECK_NAME" \
-      --chdir=/opt/soperatorchecks \
-      --uid=soperatorchecks \
-      /opt/bin/sbatch.sh)
+    OUT_PATTERN='/opt/soperator-outputs/%N/slurm_jobs/%x.%j.out'
+    # Here we use env variables instead of --output and --error because they do not support %N (node name) parameter.
+    SLURM_OUTPUT=$(
+      SBATCH_OUTPUT="$OUT_PATTERN" \
+      SBATCH_ERROR="$OUT_PATTERN" \
+      /usr/bin/sbatch --parsable \
+        --job-name="$ACTIVE_CHECK_NAME" \
+        --chdir=/opt/soperatorchecks \
+        --uid=soperatorchecks \
+        /opt/bin/sbatch.sh
+    )
     if [[ -z "$SLURM_OUTPUT" ]]; then
         echo "Failed to submit Slurm job"
         exit 1
