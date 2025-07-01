@@ -44,6 +44,29 @@ char *_snccld_get_executable_name(pid_t pid) {
 }
 #endif
 
+/**
+ * Substitute %h placeholder with hostname in directory path.
+ *
+ * @param path The path potentially containing %h placeholder.
+ * @param hostname The hostname to substitute for %h.
+ * @param output Buffer to store the result (must be PATH_MAX + 1 bytes).
+ */
+static void snccld_substitute_hostname(const char *path, const char *hostname, char *output) {
+    const char *p = path;
+    char *out = output;
+    
+    while (*p && (out - output) < PATH_MAX) {
+        if (*p == '%' && *(p + 1) == 'h') {
+            // Replace %h with hostname
+            out += snprintf(out, PATH_MAX - (out - output), "%s", hostname);
+            p += 2; // Skip %h
+        } else {
+            *out++ = *p++;
+        }
+    }
+    *out = '\0';
+}
+
 void _snccld_log_context(const char *func_name, spank_t spank) {
 #ifdef NDEBUG
     return;
@@ -274,15 +297,16 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     snccld_state_t *state = snccld_state_new();
 
     if (snccld_config.out_file) {
+        char resolved_out_dir[PATH_MAX + 1];
+        snccld_substitute_hostname(snccld_config.out_dir, hostname, resolved_out_dir);
+        
         snprintf(
             state->log_path,
             sizeof(state->log_path),
-            SNCCLD_TEMPLATE_FILE_NAME,
-            snccld_config.out_dir,
-            hostname,
+            "%s/%u.%u.out",
+            resolved_out_dir,
             key->job_id,
-            key->step_id,
-            "out"
+            key->step_id
         );
     }
     if (user_set_debug_file) {
@@ -412,8 +436,10 @@ int slurm_spank_task_init_privileged(spank_t spank, int argc, char **argv) {
     }
 
     if (snccld_config.out_file) {
-        snccld_log_debug("Ensuring '%s' exists.", snccld_config.out_dir);
-        snccld_ensure_dir_exists(snccld_config.out_dir);
+        char resolved_out_dir[PATH_MAX + 1];
+        snccld_substitute_hostname(snccld_config.out_dir, hostname, resolved_out_dir);
+        snccld_log_debug("Ensuring '%s' exists.", resolved_out_dir);
+        snccld_ensure_dir_exists(resolved_out_dir);
     }
     if (strlen(state->user_log_path) > 0) {
         snccld_log_debug("Ensuring '%s' exists.", state->user_log_path);
@@ -491,7 +517,9 @@ int slurm_spank_task_init_privileged(spank_t spank, int argc, char **argv) {
             size_t dir_mount_count    = 0;
             mounts[dir_mount_count++] = strdup(SNCCLD_SYSTEM_DIR);
             if (snccld_config.out_file) {
-                mounts[dir_mount_count++] = strdup(snccld_config.out_dir);
+                char resolved_out_dir[PATH_MAX + 1];
+                snccld_substitute_hostname(snccld_config.out_dir, hostname, resolved_out_dir);
+                mounts[dir_mount_count++] = strdup(resolved_out_dir);
             }
 
             // Write dir mounts to the mount config.

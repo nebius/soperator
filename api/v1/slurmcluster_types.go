@@ -271,7 +271,7 @@ type PluginConfigNcclDebug struct {
 
 	// OutputToFile defines whether to additionally redirect `NCCL_DEBUG` outputs to the output file.
 	// Output filename will have the following format:
-	//  <WORKER_NAME>.<JOB_ID>.<STEP_ID>.out
+	//  <JOB_ID>.<STEP_ID>.out
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=true
@@ -292,7 +292,7 @@ type PluginConfigNcclDebug struct {
 	// If the path does not exist, it will be created by the plugin.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="/opt/soperator-outputs/nccl_logs"
+	// +kubebuilder:default="/opt/soperator-outputs/%h/nccl_logs"
 	OutputDirectory string `json:"outputDirectory,omitempty"`
 }
 

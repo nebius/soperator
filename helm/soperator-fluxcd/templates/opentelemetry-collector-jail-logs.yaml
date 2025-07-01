@@ -133,7 +133,7 @@ spec:
               rule: type == "pod" && name matches "worker-"
               config:
                 include: 
-                  - "/mnt/jail/opt/soperator-outputs/**/`name`*.out"
+                  - "/mnt/jail/opt/soperator-outputs/`name`/**/*.out"
                 include_file_name: true
                 include_file_path: true
                 preserve_leading_whitespaces: true
@@ -145,7 +145,7 @@ spec:
                   - id: extract_content_from_filename
                     type: regex_parser
                     parse_from: attributes["log.file.name"]
-                    regex: ^`name`\.(?P<content>.+)\.out$
+                    regex: ^(?P<content>.+)\.out$
                   - id: extract_directory
                     type: regex_parser
                     parse_from: attributes["log.file.path"]

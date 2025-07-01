@@ -18216,7 +18216,7 @@ spec:
                         - TRACE
                         type: string
                       outputDirectory:
-                        default: /opt/soperator-outputs/nccl_logs
+                        default: /opt/soperator-outputs/%h/nccl_logs
                         description: |-
                           OutputDirectory defines a directory path where OutputToFile has to be created.
 
@@ -18230,7 +18230,7 @@ spec:
                         description: |-
                           OutputToFile defines whether to additionally redirect `NCCL_DEBUG` outputs to the output file.
                           Output filename will have the following format:
-                           <WORKER_NAME>.<JOB_ID>.<STEP_ID>.out
+                           <JOB_ID>.<STEP_ID>.out
                         type: boolean
                       outputToStdOut:
                         default: false
