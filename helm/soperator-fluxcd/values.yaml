@@ -86,7 +86,10 @@ observability:
       timeout: 5m
       values:
         jailLogs:
+          enabled: false
           pollInterval: 5m
+        nodeLogs:
+          enabled: false
         hcOutputEnabled: true
         resources: {}
       overrideValues: null

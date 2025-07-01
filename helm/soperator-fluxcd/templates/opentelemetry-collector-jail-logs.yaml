@@ -1,4 +1,7 @@
-{{- if and .Values.observability.enabled .Values.observability.opentelemetry.enabled .Values.observability.opentelemetry.logs.values.hcOutputEnabled }}
+{{- if and .Values.observability.enabled
+            .Values.observability.opentelemetry.enabled
+            .Values.observability.opentelemetry.logs.values.hcOutputEnabled
+            .Values.observability.opentelemetry.logs.values.jailLogs.enabled }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:

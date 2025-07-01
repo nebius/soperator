@@ -5,6 +5,8 @@ excludeTemplates:
   - templates/helmrepository.yaml
 tests:
   - it: should not render component when enabled=false
+    set:
+      observability.opentelemetry.logs.values.jailLogs.enabled: true
     asserts:
       - hasDocuments:
           count: 1
