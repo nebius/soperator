@@ -1,0 +1,163 @@
+suite: test mashedkebab helper function
+templates:
+  - templates/local-storageclass.yaml
+tests:
+  - it: should convert CamelCase to kebab-case
+    set:
+      storageClass:
+        local:
+          name: "CamelCase"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "camel-case"
+
+  - it: should convert PascalCase to kebab-case
+    set:
+      storageClass:
+        local:
+          name: "PascalCaseString"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "pascal-case-string"
+
+  - it: should handle consecutive uppercase letters
+    set:
+      storageClass:
+        local:
+          name: "HTMLParser"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "html-parser"
+
+  - it: should handle mixed case with numbers
+    set:
+      storageClass:
+        local:
+          name: "Item123Test"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "item123test"
+
+  - it: should handle numbers at the start
+    set:
+      storageClass:
+        local:
+          name: "123TestCase"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "123test-case"
+
+  - it: should handle single word
+    set:
+      storageClass:
+        local:
+          name: "word"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "word"
+
+  - it: should handle single word uppercase
+    set:
+      storageClass:
+        local:
+          name: "WORD"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "word"
+
+  - it: should handle already kebab-case
+    set:
+      storageClass:
+        local:
+          name: "already-kebab-case"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "already-kebab-case"
+
+  - it: should replace special characters with dashes
+    set:
+      storageClass:
+        local:
+          name: "test_with@special#chars!"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "test-with-special-chars-"
+
+  - it: should compress multiple dashes into one
+    set:
+      storageClass:
+        local:
+          name: "multiple___dashes"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "multiple-dashes"
+
+  - it: should handle spaces
+    set:
+      storageClass:
+        local:
+          name: "words with spaces"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "words-with-spaces"
+
+  - it: should handle mixed special characters and case
+    set:
+      storageClass:
+        local:
+          name: "ComplexTestCase123@End!"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "complex-test-case123-end-"
+
+  - it: should handle acronyms correctly
+    set:
+      storageClass:
+        local:
+          name: "HTTPAPIServer"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "httpapi-server"
+
+  - it: should handle long consecutive uppercase
+    set:
+      storageClass:
+        local:
+          name: "XMLHTTPRequest"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "xmlhttp-request"
+
+  - it: should handle numbers between letters
+    set:
+      storageClass:
+        local:
+          name: "Version2API"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "version2api"
+
+  - it: should handle dots and underscores
+    set:
+      storageClass:
+        local:
+          name: "domain.name_service"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "domain-name-service"
