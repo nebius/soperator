@@ -18151,7 +18151,7 @@ spec:
                   ncclDebug:
                     enabled: false
                     logLevel: INFO
-                    outputDirectory: /opt/soperator-outputs/nccl_logs
+                    outputDirectory: /opt/soperator-outputs/%h/nccl_logs
                     outputToFile: true
                     outputToStdOut: false
                     required: false
@@ -18195,7 +18195,7 @@ spec:
                     default:
                       enabled: false
                       logLevel: INFO
-                      outputDirectory: /opt/soperator-outputs/nccl_logs
+                      outputDirectory: /opt/soperator-outputs/%h/nccl_logs
                       outputToFile: true
                       outputToStdOut: false
                       required: false
@@ -20103,6 +20103,7 @@ spec:
                     description: Additional parameters for the task plugin
                     type: string
                   topologyParam:
+                    default: topology/tree
                     description: TopologyParam is list of comma-separated options
                       identifying network topology options.
                     type: string
