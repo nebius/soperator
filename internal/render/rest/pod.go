@@ -45,7 +45,7 @@ func BasePodTemplateSpec(
 			NodeSelector:   nodeFilter.NodeSelector,
 			Hostname:       consts.HostnameREST,
 			InitContainers: valuesREST.CustomInitContainers,
-			Containers:     []corev1.Container{renderContainerREST(valuesREST.ContainerREST)},
+			Containers:     []corev1.Container{renderContainerREST(valuesREST.ContainerREST, valuesREST.MaxConnections)},
 			Volumes:        volumes,
 		},
 	}, nil

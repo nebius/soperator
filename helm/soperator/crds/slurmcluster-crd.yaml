@@ -30373,6 +30373,15 @@ spec:
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
                           Must correspond to the name of one of [K8sNodeFilter]
                         type: string
+                      maxConnections:
+                        default: 10
+                        description: |-
+                          MaxConnections defines the maximum number of connections to process at any one time
+                          This helps reduce memory usage and prevents slurmctld from being overwhelmed
+                        format: int32
+                        maximum: 1000
+                        minimum: 1
+                        type: integer
                       rest:
                         description: SlurmRestNode represents the Slurm REST API daemon
                           configuration

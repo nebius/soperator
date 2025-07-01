@@ -1,6 +1,8 @@
 package rest
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -10,7 +12,7 @@ import (
 )
 
 // renderContainerREST renders [corev1.Container] for slurmrestd
-func renderContainerREST(containerParams values.Container) corev1.Container {
+func renderContainerREST(containerParams values.Container, maxConnections *int32) corev1.Container {
 	if containerParams.Port == 0 {
 		containerParams.Port = consts.DefaultRESTPort
 	}
@@ -29,6 +31,19 @@ func renderContainerREST(containerParams values.Container) corev1.Container {
 		VolumeMounts: []corev1.VolumeMount{
 			common.RenderVolumeMountSlurmConfigs(),
 		},
+		Env: func() []corev1.EnvVar {
+			defaultMaxConnections := int32(10)
+			connections := defaultMaxConnections
+			if maxConnections != nil {
+				connections = *maxConnections
+			}
+			return []corev1.EnvVar{
+				{
+					Name:  "SLURMRESTD_MAX_CONNECTIONS",
+					Value: fmt.Sprintf("%d", connections),
+				},
+			}
+		}(),
 		// TODO: Http check?
 		LivenessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{

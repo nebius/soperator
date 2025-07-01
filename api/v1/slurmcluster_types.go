@@ -653,6 +653,15 @@ type SlurmRest struct {
 	//
 	// +kubebuilder:validation:Optional
 	SlurmRestNode NodeContainer `json:"rest,omitempty"`
+
+	// MaxConnections defines the maximum number of connections to process at any one time
+	// This helps reduce memory usage and prevents slurmctld from being overwhelmed
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=1000
+	// +kubebuilder:default=10
+	MaxConnections *int32 `json:"maxConnections,omitempty"`
 }
 
 // SlurmNodeAccounting represents the Slurm accounting configuration

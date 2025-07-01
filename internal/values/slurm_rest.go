@@ -16,6 +16,7 @@ type SlurmREST struct {
 	CustomInitContainers []corev1.Container
 	Service              Service
 	Maintenance          *consts.MaintenanceMode
+	MaxConnections       *int32
 }
 
 func buildRestFrom(clusterName string, maintenance *consts.MaintenanceMode, rest *slurmv1.SlurmRest) SlurmREST {
@@ -34,5 +35,6 @@ func buildRestFrom(clusterName string, maintenance *consts.MaintenanceMode, rest
 		CustomInitContainers: rest.CustomInitContainers,
 		Service:              buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeREST, clusterName)),
 		Maintenance:          maintenance,
+		MaxConnections:       rest.MaxConnections,
 	}
 }
