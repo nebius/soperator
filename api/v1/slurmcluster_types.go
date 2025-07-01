@@ -191,7 +191,7 @@ type SlurmConfig struct {
 	TopologyPlugin string `json:"topologyPlugin,omitempty"`
 	// TopologyParam is list of comma-separated options identifying network topology options.
 	//
-	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=topology/tree
 	TopologyParam string `json:"topologyParam,omitempty"`
 }
 
