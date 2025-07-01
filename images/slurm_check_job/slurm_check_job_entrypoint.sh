@@ -29,11 +29,16 @@ if [[ "$EACH_WORKER_JOB_ARRAY" == "true" ]]; then
     SLURM_JOB_ID=$(/opt/bin/slurm/slurm_submit_array_job.sh | tail -n 1)
 else
     echo "Submitting regular Slurm job..."
-    SLURM_OUTPUT=$(/usr/bin/sbatch --parsable \
-      --job-name="$ACTIVE_CHECK_NAME" \
-      --chdir=/opt/soperatorchecks \
-      --uid=soperatorchecks \
-      /opt/bin/sbatch.sh)
+    OUT_PATTERN='/opt/soperator-outputs/%N/slurm_jobs/%x.%j.out'
+    SLURM_OUTPUT=$(
+      SBATCH_OUTPUT="$OUT_PATTERN" \
+      SBATCH_ERROR="$OUT_PATTERN" \
+      /usr/bin/sbatch --parsable \
+        --job-name="$ACTIVE_CHECK_NAME" \
+        --chdir=/opt/soperatorchecks \
+        --uid=soperatorchecks \
+        /opt/bin/sbatch.sh
+    )
     if [[ -z "$SLURM_OUTPUT" ]]; then
         echo "Failed to submit Slurm job"
         exit 1
