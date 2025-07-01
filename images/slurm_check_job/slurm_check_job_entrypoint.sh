@@ -21,8 +21,13 @@ rm -rf /etc/slurm && ln -s /mnt/jail/slurm /etc/slurm
 echo "Bind-mount /opt/bin/sbatch.sh script"
 mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
 
-echo "Create directory for slurm job outputs"
-(umask 000; mkdir -p /mnt/jail/opt/soperator-outputs/slurm_jobs)
+echo "Create directory for slurm job outputs for every node"
+NODES=$(sinfo -N --noheader -o "%N" | sort -u)
+BASE_DIR="/mnt/jail/opt/soperator-outputs"
+for NODE in $NODES; do
+    DIR="${BASE_DIR}/${NODE}/slurm_jobs"
+    (umask 000; mkdir -p "$DIR")
+done
 
 if [[ "$EACH_WORKER_JOB_ARRAY" == "true" ]]; then
     echo "Submitting job using slurm_submit_array_job.sh..."
