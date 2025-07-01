@@ -35,8 +35,8 @@ if [[ "$EACH_WORKER_JOB_ARRAY" == "true" ]]; then
 else
     echo "Submitting regular Slurm job..."
     OUT_PATTERN='/opt/soperator-outputs/%N/slurm_jobs/%x.%j.out'
+    # Here we use env variables instead of --output and --error because they do not support %N (node name) parameter.
     SLURM_OUTPUT=$(
-      # Here we use env variables instead of --output and --error because they do not support %N (node name) parameter.
       SBATCH_OUTPUT="$OUT_PATTERN" \
       SBATCH_ERROR="$OUT_PATTERN" \
       /usr/bin/sbatch --parsable \
