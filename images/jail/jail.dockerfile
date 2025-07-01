@@ -98,7 +98,7 @@ RUN echo "export PATH=\$PATH:/usr/local/cuda/bin" > /etc/profile.d/path_cuda.sh 
 ENV LIBRARY_PATH=/usr/local/cuda/lib64/stubs
 
 # Download NCCL tests executables
-ARG CUDA_VERSION=12.4.1
+ARG CUDA_VERSION=12.9.0
 ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
 RUN ARCH=$(uname -m) && \
     case "$ARCH" in \
