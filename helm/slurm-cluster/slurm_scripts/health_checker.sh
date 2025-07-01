@@ -17,6 +17,8 @@ if [[ "${gpus_on_node}" == *"8 NVIDIA H100"* ]]; then
   platform="8xH100"
 elif [[ "${gpus_on_node}" == *"8 NVIDIA H200"* ]]; then
   platform="8xH200"
+elif [[ "${gpus_on_node}" == *"8 NVIDIA B200"* ]]; then
+  platform="8xB200"
 else
   echo "Unsupported platform" >&2
   exit 0
@@ -46,7 +48,8 @@ if [[ $exit_code -eq 1 ]]; then
     echo "Health-checker failed with exit code 1."
     echo "$details"
 
-    error_checks=$(echo "$details" | sed -n 's/.*S: ERROR \[\(.*\)\].*/\1/p')
+    # Extract the name of the first failed check
+    error_checks=$(echo "$details" | sed -n 's/.*S: FAIL \[\([^ ,'\''"]*\).*/\1/p' | head -n 1)
     echo "$error_checks" >&3
     exit 1
 elif [[ $exit_code -eq 2 ]]; then

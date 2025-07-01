@@ -85,7 +85,7 @@ type SlurmClusterSpec struct {
 	// SlurmConfig represents the Slurm configuration in slurm.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={defMemPerNode: 1228800, defCpuPerGPU: 16, completeWait: 5, debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs", epilog: "", prolog: "", taskPluginParam: "Autobind=Cores", maxJobCount: 10000, minJobAge: 86400}
+	// +kubebuilder:default={defMemPerNode: 1048576, defCpuPerGPU: 4, completeWait: 5, epilog: "", prolog: "", taskPluginParam: "Autobind=Cores", maxJobCount: 10000, minJobAge: 86400, messageTimeout: 60}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 
 	// CustomSlurmConfig represents the raw Slurm configuration from slurm.conf.
@@ -105,7 +105,7 @@ type SlurmClusterSpec struct {
 	// PlugStackConfig represents the Plugin stack configurations in `plugstack.conf`.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ pyxis: { required: true, containerImageSave: "/var/cache/enroot-container-images/" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" } }
+	// +kubebuilder:default={ pyxis: { required: true, containerImageSave: "/var/cache/enroot-container-images/" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/%h/nccl_logs" } }
 	PlugStackConfig PlugStackConfig `json:"plugStackConfig,omitempty"`
 
 	// SlurmTopologyConfigMapRefName is the name of the slurm topology config.
@@ -141,24 +141,18 @@ type SlurmConfig struct {
 	// Default real memory size available per allocated node in mebibytes.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=1228800
+	// +kubebuilder:default=1048576
 	DefMemPerNode *int32 `json:"defMemPerNode,omitempty"`
 	// Default count of CPUs allocated per allocated GPU
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=16
+	// +kubebuilder:default=4
 	DefCpuPerGPU *int32 `json:"defCpuPerGPU,omitempty"`
 	// The time to wait, in seconds, when any job is in the COMPLETING state before any additional jobs are scheduled.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=5
 	CompleteWait *int32 `json:"completeWait,omitempty"`
-	// Defines specific subsystems which should provide more detailed event logging.
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="Priority,Script,SelectType,Steps"
-	// +kubebuilder:validation:Pattern="^((Accrue|Agent|AuditRPCs|Backfill|BackfillMap|BurstBuffer|Cgroup|ConMgr|CPU_Bind|CpuFrequency|Data|DBD_Agent|Dependency|Elasticsearch|Energy|Federation|FrontEnd|Gres|Hetjob|Gang|GLOB_SILENCE|JobAccountGather|JobComp|JobContainer|License|Network|NetworkRaw|NodeFeatures|NO_CONF_HASH|Power|Priority|Profile|Protocol|Reservation|Route|Script|SelectType|Steps|Switch|TLS|TraceJobs|Triggers)(,)?)+$"
-	DebugFlags *string `json:"debugFlags,omitempty"`
 	// Defines specific file to run the epilog when job ends. Default value is no epilog
 	//
 	// +kubebuilder:validation:Optional
@@ -197,7 +191,7 @@ type SlurmConfig struct {
 	TopologyPlugin string `json:"topologyPlugin,omitempty"`
 	// TopologyParam is list of comma-separated options identifying network topology options.
 	//
-	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=topology/tree
 	TopologyParam string `json:"topologyParam,omitempty"`
 }
 
@@ -221,7 +215,7 @@ type PlugStackConfig struct {
 	// NcclDebug represents the 'NCCL Debug' SPANK plugin configuration.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" }
+	// +kubebuilder:default={ required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/%h/nccl_logs" }
 	NcclDebug PluginConfigNcclDebug `json:"ncclDebug,omitempty"`
 
 	// PluginConfigCustom represents a configuration of custom SPANK plugins.
@@ -277,7 +271,7 @@ type PluginConfigNcclDebug struct {
 
 	// OutputToFile defines whether to additionally redirect `NCCL_DEBUG` outputs to the output file.
 	// Output filename will have the following format:
-	//  <WORKER_NAME>.<JOB_ID>.<STEP_ID>.out
+	//  <JOB_ID>.<STEP_ID>.out
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=true
@@ -298,7 +292,7 @@ type PluginConfigNcclDebug struct {
 	// If the path does not exist, it will be created by the plugin.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="/opt/soperator-outputs/nccl_logs"
+	// +kubebuilder:default="/opt/soperator-outputs/%h/nccl_logs"
 	OutputDirectory string `json:"outputDirectory,omitempty"`
 }
 
@@ -720,10 +714,35 @@ type ExternalDB struct {
 	//
 	// +kubebuilder:validation:Optional
 	User string `json:"user"`
-	// SecretRef defines the reference to the secret with the password key for the external database
+	// PasswordSecretKeyRef defines the reference to the secret with the password key for the external database.
+	// Either this or tls.clientCertSecretName must be provided as client credentials.
 	//
 	// +kubebuilder:validation:Optional
 	PasswordSecretKeyRef PasswordSecretKeyRef `json:"passwordSecretKeyRef"`
+	// TLS provides the configuration required to establish TLS connection with the external MariaDB.
+	//
+	// +kubebuilder:validation:Optional
+	TLS ExternalDBTLSConfig `json:"tls,omitempty"`
+	// StorageParameters defines the list of additional parameters to set in slurmdbd.conf's StorageParameters.
+	// Some values here may be overridden by TLS configuration
+	//
+	// +kubebuilder:validation:Optional
+	StorageParameters map[string]string `json:"storageParameters,omitempty"`
+}
+
+type ExternalDBTLSConfig struct {
+	// ServerCASecretRef defines the reference to a Secret containing the MariaDB server CA certificates.
+	// The secret should contain a 'ca.crt' key.
+	// If set, it overrides SSL_CA value in storageParameters
+	//
+	// +kubebuilder:validation:Optional
+	ServerCASecretRef string `json:"serverCASecretRef,omitempty"`
+	// ClientCertSecretName defines the reference to a Kubernetes TLS Secret (with tls.crt and tls.key files).
+	// Either this or passwordSecretKeyRef must be provided as client credentials.
+	// If set, it overrides SSL_CERT and SSL_KEY values in storageParameters
+	//
+	// +kubebuilder:validation:Optional
+	ClientCertSecretRef string `json:"clientCertSecretRef,omitempty"`
 }
 
 type PasswordSecretKeyRef struct {

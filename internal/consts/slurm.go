@@ -10,7 +10,7 @@ const (
 	// TODO: we should rename it. It's not only recommended using root user
 	SlurmUser              = "root"
 	SlurmLogFile           = "/dev/null"
-	SlurmDefaultDebugLevel = "info"
+	SlurmDefaultDebugLevel = "verbose"
 )
 
 const (

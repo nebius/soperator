@@ -2,6 +2,8 @@ package accounting
 
 import (
 	"errors"
+	"sort"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,24 +16,37 @@ import (
 )
 
 const (
+	ErrAccountingNil      = "accounting is nil"
 	ErrSecretNil          = "secret is nil"
 	ErrSecretDataEmpty    = "secret data is empty"
 	ErrDBUserEmpty        = "external DB user is empty"
 	ErrDBHostEmpty        = "external DB host is empty"
 	ErrPasswordKeyMissing = "secret data does not contain password key"
 	ErrPasswordEmpty      = "password is empty"
+
+	StorageParameterSSLClientCert = "SSL_CERT"
+	StorageParameterSSLClientKey  = "SSL_KEY"
+	StorageParameterSSLCACert     = "SSL_CA"
 )
 
 func RenderSecret(
 	namespace,
 	clusterName string,
 	accounting *values.SlurmAccounting,
-	secret *corev1.Secret,
+	passwordSecret *corev1.Secret,
 	isRESTenabled bool,
 ) (*corev1.Secret, error) {
-	passwordName, err := checkSecret(accounting, secret)
-	if err != nil {
-		return nil, err
+	var err error
+	passwordName := make([]byte, 0)
+	if accounting == nil {
+		return nil, errors.New("accounting is nil")
+	}
+
+	if passwordSecret != nil {
+		passwordName, err = checkPasswordSecret(accounting, passwordSecret)
+		if err != nil {
+			return nil, err
+		}
 	}
 	secretName := naming.BuildSecretSlurmdbdConfigsName(clusterName)
 	labels := common.RenderLabels(consts.ComponentTypeAccounting, clusterName)
@@ -51,7 +66,7 @@ func RenderSecret(
 	}, nil
 }
 
-func checkSecret(accounting *values.SlurmAccounting, secret *corev1.Secret) ([]byte, error) {
+func checkPasswordSecret(accounting *values.SlurmAccounting, secret *corev1.Secret) ([]byte, error) {
 	if secret == nil {
 		return nil, errors.New(ErrSecretNil)
 	}
@@ -107,7 +122,9 @@ func generateSlurdbdConfig(
 	res.AddProperty("DbdPort", consts.DefaultAccountingPort)
 	res.AddProperty("StorageLoc", "slurm_acct_db")
 	res.AddProperty("StorageType", "accounting_storage/mysql")
-	res.AddProperty("StoragePass", string(passwordName))
+	if len(passwordName) > 0 {
+		res.AddProperty("StoragePass", string(passwordName))
+	}
 	if accounting.MariaDb.Enabled {
 		res.AddProperty("StorageUser", consts.MariaDbUsername)
 		res.AddProperty("StorageHost", naming.BuildMariaDbName(clusterName))
@@ -116,6 +133,10 @@ func generateSlurdbdConfig(
 		res.AddProperty("StorageUser", accounting.ExternalDB.User)
 		res.AddProperty("StorageHost", accounting.ExternalDB.Host)
 		res.AddProperty("StoragePort", accounting.ExternalDB.Port)
+		storageParameters := generateSlurmdbdConfigStorageParameters(accounting)
+		if storageParameters != "" {
+			res.AddProperty("StorageParameters", storageParameters)
+		}
 	}
 	if isRESTenabled {
 		res.AddComment("")
@@ -149,4 +170,30 @@ func generateSlurdbdConfig(
 	}
 
 	return res
+}
+
+func generateSlurmdbdConfigStorageParameters(accounting *values.SlurmAccounting) string {
+	spValues := map[string]string{}
+	for k, v := range accounting.ExternalDB.StorageParameters {
+		spValues[k] = v
+	}
+
+	if accounting.ExternalDB.TLS.ServerCASecretRef != "" {
+		spValues[StorageParameterSSLCACert] = consts.VolumeMountPathSlurmdbdSSLCACertificate + "/" +
+			consts.SecretSlurmdbdSSLServerCACertificateFile
+	}
+
+	if accounting.ExternalDB.TLS.ClientCertSecretRef != "" {
+		spValues[StorageParameterSSLClientCert] = consts.VolumeMountPathSlurmdbdSSLClientKey + "/" +
+			consts.SecretSlurmdbdSSLClientKeyCertificateFile
+		spValues[StorageParameterSSLClientKey] = consts.VolumeMountPathSlurmdbdSSLClientKey + "/" +
+			consts.SecretSlurmdbdSSLClientKeyPrivateKeyFile
+	}
+
+	valuesList := make([]string, 0, len(spValues))
+	for k, v := range spValues {
+		valuesList = append(valuesList, k+"="+v)
+	}
+	sort.Strings(valuesList)
+	return strings.Join(valuesList, ",")
 }

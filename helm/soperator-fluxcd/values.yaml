@@ -76,6 +76,7 @@ observability:
   clusterName: soperator
   publicEndpointEnabled: true
   projectId: default-project-id
+  region: eu-north1
   opentelemetry:
     enabled: true
     namespace: logs-system
@@ -84,6 +85,11 @@ observability:
       interval: 5m
       timeout: 5m
       values:
+        jailLogs:
+          enabled: false
+          pollInterval: 5m
+        nodeLogs:
+          enabled: false
         hcOutputEnabled: true
         resources: {}
       overrideValues: null
@@ -174,7 +180,7 @@ observability:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 1.21.0
+    version: 1.21.1
     namespace: soperator
     releaseName: soperator-dcgm-exporter
     values:
@@ -193,7 +199,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.21.0
+  version: 1.21.1
   namespace: soperator
   releaseName: soperator
   values: null
@@ -209,7 +215,7 @@ soperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.21.0
+  version: 1.21.1
   namespace: "soperator-system"
   releaseName: soperator-controller
   values:

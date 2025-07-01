@@ -124,6 +124,7 @@ spec:
             - set(attributes["cluster"], "${env:CLUSTER_NAME}")
             - set(attributes["k8s.node.name"], "${env:K8S_NODE_NAME}")
       receivers:
+        {{- if .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
         filelog/nodelogs:
           include:
             - '/var/nodelogs/kern.log*'
@@ -166,6 +167,7 @@ spec:
             - type: move
               from: attributes["logtype"]
               to: resource["app.kubernetes.io/name"]
+        {{- end }}
         filelog/pods:
           exclude:
           - /var/log/pods/*/otc-container/*.log
@@ -294,7 +296,9 @@ spec:
             - batch
             receivers:
             - filelog/pods
+            {{- if .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
             - filelog/nodelogs
+            {{- end }}
           metrics: null
           traces: null
     extraEnvs:
@@ -320,9 +324,11 @@ spec:
       readOnly: true
     - mountPath: /var/lib/otelcol
       name: varlibotelcol
+    {{- if .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
     - name: node-logs
       mountPath: /var/nodelogs
       readOnly: true
+    {{- end }}
     extraVolumes:
     {{- if $hasPublicEndpoint }}
     - name: o11ytoken
@@ -332,10 +338,12 @@ spec:
     - hostPath:
         path: /var/log/pods
       name: varlogpods
+    {{- if .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
     - hostPath:
         path: /var/log
         type: Directory
       name: node-logs
+    {{- end }}
     - hostPath:
         path: /var/lib/otelcol
         type: DirectoryOrCreate
@@ -351,7 +359,11 @@ spec:
     - command:
       - sh
       - -c
+      {{- if .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
       - 'chown -R 10001: /var/lib/otelcol /var/nodelogs'
+      {{- else }}
+      - 'chown -R 10001: /var/lib/otelcol'
+      {{- end }}
       image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
       name: init-fs
       securityContext:
@@ -360,8 +372,10 @@ spec:
       volumeMounts:
       - mountPath: /var/lib/otelcol
         name: varlibotelcol
+      {{- if .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
       - name: node-logs
         mountPath: /var/nodelogs
+      {{- end }}
     mode: daemonset
     rollout:
       rollingUpdate:

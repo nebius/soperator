@@ -279,7 +279,7 @@ func TestRenderPlugstack(t *testing.T) {
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Contains(t, result, "optional spanknccldebug.so enabled=0 log-level=INFO out-file=0 out-dir=/opt/soperator-outputs/nccl_logs out-stdout=0")
+		assert.Contains(t, result, "optional spanknccldebug.so enabled=0 log-level=INFO out-file=0 out-dir=/opt/soperator-outputs/%h/nccl_logs out-stdout=0")
 	})
 
 	t.Run("NCCL options", func(t *testing.T) {

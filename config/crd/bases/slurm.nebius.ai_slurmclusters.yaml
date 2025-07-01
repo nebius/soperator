@@ -1292,7 +1292,7 @@ spec:
                   ncclDebug:
                     enabled: false
                     logLevel: INFO
-                    outputDirectory: /opt/soperator-outputs/nccl_logs
+                    outputDirectory: /opt/soperator-outputs/%h/nccl_logs
                     outputToFile: true
                     outputToStdOut: false
                     required: false
@@ -1336,7 +1336,7 @@ spec:
                     default:
                       enabled: false
                       logLevel: INFO
-                      outputDirectory: /opt/soperator-outputs/nccl_logs
+                      outputDirectory: /opt/soperator-outputs/%h/nccl_logs
                       outputToFile: true
                       outputToStdOut: false
                       required: false
@@ -1357,7 +1357,7 @@ spec:
                         - TRACE
                         type: string
                       outputDirectory:
-                        default: /opt/soperator-outputs/nccl_logs
+                        default: /opt/soperator-outputs/%h/nccl_logs
                         description: |-
                           OutputDirectory defines a directory path where OutputToFile has to be created.
 
@@ -1371,7 +1371,7 @@ spec:
                         description: |-
                           OutputToFile defines whether to additionally redirect `NCCL_DEBUG` outputs to the output file.
                           Output filename will have the following format:
-                           <WORKER_NAME>.<JOB_ID>.<STEP_ID>.out
+                           <JOB_ID>.<STEP_ID>.out
                         type: boolean
                       outputToStdOut:
                         default: false
@@ -3183,11 +3183,11 @@ spec:
               slurmConfig:
                 default:
                   completeWait: 5
-                  debugFlags: Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs
-                  defCpuPerGPU: 16
-                  defMemPerNode: 1228800
+                  defCpuPerGPU: 4
+                  defMemPerNode: 1048576
                   epilog: ""
                   maxJobCount: 10000
+                  messageTimeout: 60
                   minJobAge: 86400
                   prolog: ""
                   taskPluginParam: Autobind=Cores
@@ -3200,19 +3200,13 @@ spec:
                       the COMPLETING state before any additional jobs are scheduled.
                     format: int32
                     type: integer
-                  debugFlags:
-                    default: Priority,Script,SelectType,Steps
-                    description: Defines specific subsystems which should provide
-                      more detailed event logging.
-                    pattern: ^((Accrue|Agent|AuditRPCs|Backfill|BackfillMap|BurstBuffer|Cgroup|ConMgr|CPU_Bind|CpuFrequency|Data|DBD_Agent|Dependency|Elasticsearch|Energy|Federation|FrontEnd|Gres|Hetjob|Gang|GLOB_SILENCE|JobAccountGather|JobComp|JobContainer|License|Network|NetworkRaw|NodeFeatures|NO_CONF_HASH|Power|Priority|Profile|Protocol|Reservation|Route|Script|SelectType|Steps|Switch|TLS|TraceJobs|Triggers)(,)?)+$
-                    type: string
                   defCpuPerGPU:
-                    default: 16
+                    default: 4
                     description: Default count of CPUs allocated per allocated GPU
                     format: int32
                     type: integer
                   defMemPerNode:
-                    default: 1228800
+                    default: 1048576
                     description: Default real memory size available per allocated
                       node in mebibytes.
                     format: int32
@@ -3250,6 +3244,7 @@ spec:
                     description: Additional parameters for the task plugin
                     type: string
                   topologyParam:
+                    default: topology/tree
                     description: TopologyParam is list of comma-separated options
                       identifying network topology options.
                     type: string
@@ -4723,8 +4718,9 @@ spec:
                               database
                             type: string
                           passwordSecretKeyRef:
-                            description: SecretRef defines the reference to the secret
-                              with the password key for the external database
+                            description: |-
+                              PasswordSecretKeyRef defines the reference to the secret with the password key for the external database.
+                              Either this or tls.clientCertSecretName must be provided as client credentials.
                             properties:
                               key:
                                 description: Key defines the key of password in the
@@ -4741,6 +4737,30 @@ spec:
                               database
                             format: int32
                             type: integer
+                          storageParameters:
+                            additionalProperties:
+                              type: string
+                            description: |-
+                              StorageParameters defines the list of additional parameters to set in slurmdbd.conf's StorageParameters.
+                              Some values here may be overridden by TLS configuration
+                            type: object
+                          tls:
+                            description: TLS provides the configuration required to
+                              establish TLS connection with the external MariaDB.
+                            properties:
+                              clientCertSecretRef:
+                                description: |-
+                                  ClientCertSecretName defines the reference to a Kubernetes TLS Secret (with tls.crt and tls.key files).
+                                  Either this or passwordSecretKeyRef must be provided as client credentials.
+                                  If set, it overrides SSL_CERT and SSL_KEY values in storageParameters
+                                type: string
+                              serverCASecretRef:
+                                description: |-
+                                  ServerCASecretRef defines the reference to a Secret containing the MariaDB server CA certificates.
+                                  The secret should contain a 'ca.crt' key.
+                                  If set, it overrides SSL_CA value in storageParameters
+                                type: string
+                            type: object
                           user:
                             description: Key defines the key of username and password
                               in the secret

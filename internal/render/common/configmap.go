@@ -104,7 +104,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 	res.AddComment("")
 	res.AddProperty("PropagateResourceLimits", "NONE") // Don't propagate ulimits from the login node by default
 	res.AddComment("")
-	res.AddProperty("SchedulerParameters", "extra_constraints,conmgr_max_connections=512,conmgr_threads=16")
+	res.AddProperty("SchedulerParameters", "extra_constraints")
 	res.AddComment("")
 	res.AddComment("HEALTH CHECKS")
 	res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
@@ -127,6 +127,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 	res.AddProperty("SlurmdTimeout", 180)
 	res.AddProperty("TCPTimeout", 15)
 	res.AddProperty("WaitTime", 0)
+	res.AddProperty("SlurmctldParameters", "conmgr_max_connections=512,conmgr_threads=16")
 	res.AddComment("")
 	res.AddComment("SCHEDULING")
 	res.AddProperty("SchedulerType", "sched/backfill")
@@ -138,6 +139,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 	res.AddProperty("SlurmctldLogFile", consts.SlurmLogFile)
 	res.AddProperty("SlurmdDebug", consts.SlurmDefaultDebugLevel)
 	res.AddProperty("SlurmdLogFile", consts.SlurmLogFile)
+	res.AddProperty("DebugFlags", "Script")
 	res.AddComment("")
 	res.AddComment("COMPUTE NODES")
 	res.AddComment("We're using the \"dynamic nodes\" feature: https://slurm.schedmd.com/dynamic_nodes.html")
@@ -303,7 +305,7 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 				fmt.Sprintf("enabled=%d", utils.Ternary(opts.Enabled, 1, 0)),
 				fmt.Sprintf("log-level=%s", utils.Ternary(opts.LogLevel != "", opts.LogLevel, "INFO")),
 				fmt.Sprintf("out-file=%d", utils.Ternary(opts.OutputToFile, 1, 0)),
-				fmt.Sprintf("out-dir=%s", utils.Ternary(opts.OutputDirectory != "", opts.OutputDirectory, "/opt/soperator-outputs/nccl_logs")),
+				fmt.Sprintf("out-dir=%s", utils.Ternary(opts.OutputDirectory != "", opts.OutputDirectory, "/opt/soperator-outputs/%h/nccl_logs")),
 				fmt.Sprintf("out-stdout=%d", utils.Ternary(opts.OutputToStdOut, 1, 0)),
 			},
 			" ",

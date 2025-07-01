@@ -15,8 +15,9 @@ ln -s /mnt/jail/etc/update-motd.d /etc/update-motd.d
 echo "Link home from jail to use SSH keys from there"
 ln -s /mnt/jail/home /home
 
-echo "Link soperatorchecks home from jail to use SSH keys from there"
-ln -s /mnt/jail/opt/soperatorchecks /opt/soperatorchecks
+echo "Link soperator home directories from jail to use SSH keys from there"
+mkdir -p /mnt/jail/opt/soperator-home
+ln -s /mnt/jail/opt/soperator-home /opt/soperator-home
 
 echo "Create privilege separation directory /var/run/sshd"
 mkdir -p /var/run/sshd
