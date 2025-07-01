@@ -95,7 +95,7 @@ jobs:
                 {
                     "key": "docs",
                     "title": "## 📔Docs",
-                    "labels": ["doc", "docs"]
+                    "labels": ["doc", "docs", "documentation"]
                 },
                 {
                     "key": "other",
