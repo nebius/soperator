@@ -2,11 +2,11 @@ suite: test mashedkebab helper function
 templates:
   - templates/local-storageclass.yaml
 tests:
-  - it: should convert CamelCase to kebab-case
+  - it: should convert camelCase to kebab-case
     set:
       storageClass:
         local:
-          name: "CamelCase"
+          name: "camelCase"
     asserts:
       - equal:
           path: metadata.name
@@ -16,11 +16,11 @@ tests:
     set:
       storageClass:
         local:
-          name: "PascalCaseString"
+          name: "PascalCase"
     asserts:
       - equal:
           path: metadata.name
-          value: "pascal-case-string"
+          value: "pascal-case"
 
   - it: should handle consecutive uppercase letters
     set:
@@ -111,6 +111,28 @@ tests:
       - equal:
           path: metadata.name
           value: "words-with-spaces"
+
+  - it: should handle spaces around text
+    set:
+      storageClass:
+        local:
+          name: "   words with spaces surrounded with spaces  "
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "words-with-spaces-surrounded-with-spaces"
+
+  - it: should handle whitespace characters
+    set:
+      storageClass:
+        local:
+          name: " words with	whitespaces
+and
+more"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "words-with-whitespaces-and-more"
 
   - it: should handle mixed special characters and case
     set:
