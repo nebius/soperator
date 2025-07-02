@@ -227,8 +227,10 @@ spec:
           {{- required ".Values.slurmNodes.controller.volumes.spool must be provided." .Values.slurmNodes.controller.volumes.spool | toYaml | nindent 10 }}
         jail:
           {{- required ".Values.slurmNodes.controller.volumes.jail must be provided." .Values.slurmNodes.controller.volumes.jail | toYaml | nindent 10 }}
+        {{- if .Values.slurmNodes.controller.volumes.customMounts }}
         customMounts:
-          {{- default list .Values.slurmNodes.controller.volumes.customMounts | toYaml | nindent 10 }}
+          {{- .Values.slurmNodes.controller.volumes.customMounts | toYaml | nindent 10 }}
+        {{- end }}
     worker:
       cgroupVersion: {{ .Values.slurmNodes.worker.cgroupVersion | quote }}
       enableGDRCopy: {{ default false .Values.slurmNodes.worker.enableGDRCopy }}
@@ -287,8 +289,10 @@ spec:
           {{- required ".Values.slurmNodes.worker.volumes.spool must be provided." .Values.slurmNodes.worker.volumes.spool | toYaml | nindent 10 }}
         jail:
           {{- required ".Values.slurmNodes.worker.volumes.jail must be provided." .Values.slurmNodes.worker.volumes.jail | toYaml | nindent 10 }}
+        {{- if .Values.slurmNodes.worker.volumes.jailSubMounts }}
         jailSubMounts:
-          {{- default list .Values.slurmNodes.worker.volumes.jailSubMounts | toYaml | nindent 10 }}
+          {{- .Values.slurmNodes.worker.volumes.jailSubMounts | toYaml | nindent 10 }}
+        {{- end }}
         customMounts:
           - name: slurm-scripts
             mountPath: /opt/slurm_scripts/
@@ -296,7 +300,9 @@ spec:
           - name: slurm-scripts-jail
             mountPath: /mnt/jail.upper/opt/slurm_scripts/
             volumeSourceName: slurm-scripts
-          {{- default list .Values.slurmNodes.worker.volumes.customMounts | toYaml | nindent 10 }}
+          {{- if .Values.slurmNodes.worker.volumes.customMounts }}
+          {{- .Values.slurmNodes.worker.volumes.customMounts | toYaml | nindent 10 }}
+          {{- end }}
         {{- if .Values.slurmNodes.worker.volumes.sharedMemorySize }}
         sharedMemorySize: {{ .Values.slurmNodes.worker.volumes.sharedMemorySize | quote }}
         {{- end }}
@@ -357,7 +363,9 @@ spec:
           - name: slurm-scripts-jail
             mountPath: /mnt/jail.upper/opt/slurm_scripts/
             volumeSourceName: slurm-scripts
-          {{- default list .Values.slurmNodes.login.volumes.customMounts | toYaml | nindent 10 }}
+          {{- if .Values.slurmNodes.login.volumes.customMounts }}
+          {{- .Values.slurmNodes.login.volumes.customMounts | toYaml | nindent 10 }}
+          {{- end }}
     exporter:
       enabled: {{ .Values.slurmNodes.exporter.enabled }}
       size: {{ required ".Values.slurmNodes.exporter.size must be provided." .Values.slurmNodes.exporter.size }}
