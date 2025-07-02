@@ -1159,6 +1159,16 @@ func (in *SlurmNodes) DeepCopy() *SlurmNodes {
 func (in *SlurmRest) DeepCopyInto(out *SlurmRest) {
 	*out = *in
 	in.SlurmNode.DeepCopyInto(&out.SlurmNode)
+	if in.ThreadCount != nil {
+		in, out := &in.ThreadCount, &out.ThreadCount
+		*out = new(int32)
+		**out = **in
+	}
+	if in.MaxConnections != nil {
+		in, out := &in.MaxConnections, &out.MaxConnections
+		*out = new(int32)
+		**out = **in
+	}
 	in.SlurmRestNode.DeepCopyInto(&out.SlurmRestNode)
 }
 

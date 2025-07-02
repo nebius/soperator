@@ -473,16 +473,18 @@ slurmNodes:
         volumeSourceName: "jail"
   rest:
     enabled: false
-    size: 1
+    size: 2
     k8sNodeFilterName: "no-gpu"
+    threadCount: 3
+    maxConnections: 10
     rest:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
       command: []
       args: []
       resources:
-        cpu: "1000m"
-        memory: "1Gi"
+        cpu: "2000m"
+        memory: "8Gi"
         ephemeralStorage: "500Mi"
     customInitContainers: []
 sConfigController:
