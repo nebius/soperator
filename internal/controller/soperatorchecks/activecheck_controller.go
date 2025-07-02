@@ -148,6 +148,14 @@ func (r *ActiveCheckReconciler) Reconcile(
 		return ctrl.Result{}, fmt.Errorf("getting SlurmCluster: %w", err)
 	}
 
+	if *slurmCluster.Spec.Maintenance != "none" {
+		logger.Info(fmt.Sprintf(
+			"Slurm cluster maintenance status is %s, skip ActiveCheck reconcile",
+			*slurmCluster.Spec.Maintenance,
+		))
+		return ctrl.Result{}, nil
+	}
+
 	reconcileActiveChecksImpl := func() error {
 		return utils.ExecuteMultiStep(ctx,
 			"Reconciliation of active check",
