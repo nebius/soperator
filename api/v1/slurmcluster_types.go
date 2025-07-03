@@ -188,10 +188,10 @@ type SlurmConfig struct {
 	// It is set automatically to `topology/tree` if SlurmTopologyConfigMapRefName is specified.
 	//
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="topology/tree"
 	TopologyPlugin string `json:"topologyPlugin,omitempty"`
 	// TopologyParam is list of comma-separated options identifying network topology options.
 	//
-	// +kubebuilder:default=topology/tree
 	TopologyParam string `json:"topologyParam,omitempty"`
 }
 
