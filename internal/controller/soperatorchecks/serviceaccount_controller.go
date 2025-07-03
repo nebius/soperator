@@ -129,6 +129,14 @@ func (r *ServiceAccountReconciler) Reconcile(
 		return ctrl.Result{}, fmt.Errorf("getting SlurmCluster: %w", err)
 	}
 
+	if *cluster.Spec.Maintenance != "none" {
+		logger.Info(fmt.Sprintf(
+			"Slurm cluster maintenance status is %s, skip ActiveCheck ServiceAccount reconcile",
+			*cluster.Spec.Maintenance,
+		))
+		return ctrl.Result{}, nil
+	}
+
 	reconcileServiceAccountImpl := func() error {
 		return utils.ExecuteMultiStep(ctx,
 			"Reconciliation of slurm active check service account",
