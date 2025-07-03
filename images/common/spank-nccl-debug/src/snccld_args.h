@@ -161,11 +161,11 @@ typedef struct {
 
 /// Per-job plugin config initialized with default values.
 static snccld_config_t snccld_config = {
-    .enabled          = SNCCLD_ARG_ENABLED_DEFAULT,
-    .log_level        = SNCCLD_ARG_LOG_LEVEL_DEFAULT,
-    .out_dir          = SNCCLD_ARG_OUT_DIR_DEFAULT,
-    .out_file         = SNCCLD_ARG_OUT_FILE_DEFAULT,
-    .out_stdout       = SNCCLD_ARG_OUT_STDOUT_DEFAULT,
+    .enabled    = SNCCLD_ARG_ENABLED_DEFAULT,
+    .log_level  = SNCCLD_ARG_LOG_LEVEL_DEFAULT,
+    .out_dir    = SNCCLD_ARG_OUT_DIR_DEFAULT,
+    .out_file   = SNCCLD_ARG_OUT_FILE_DEFAULT,
+    .out_stdout = SNCCLD_ARG_OUT_STDOUT_DEFAULT,
 };
 
 /**

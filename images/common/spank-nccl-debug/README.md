@@ -63,6 +63,10 @@ Ensures every rank runs with the same level you requested.
 
 `--nccld-out-stdout=0` (or `SNCCLD_OUT_STDOUT=0`) stops NCCL logs from going to your job’s standard output.
 
+> [!IMPORTANT]
+> If the user submitting a job already has env variable `NCCL_DEBUG` set to some value,
+> outputting the NCCL logs to the stdout will be forced no matter the arguments.
+
 ### Toggle file output
 
 `--nccld-out-file=0` (or `SNCCLD_OUT_FILE=0`) disables writing NCCL output to the dedicated files,
