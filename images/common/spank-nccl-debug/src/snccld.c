@@ -268,6 +268,23 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         goto user_init_exit;
     }
 
+    {
+        char       user_debug[8] = "";
+        const bool user_set_debug =
+            (spank_getenv(
+                 spank, SNCCLD_NCCL_ENV_DEBUG, user_debug, sizeof(user_debug)
+             ) == ESPANK_SUCCESS &&
+             strlen(user_debug) > 0);
+        snccld_log_debug("user_set_debug=%u", user_set_debug);
+        if (user_set_debug) {
+            snccld_log_info(
+                "Enabling output to stdout as user set %s on their own.",
+                SNCCLD_NCCL_ENV_DEBUG
+            );
+            snccld_config.out_stdout = true;
+        }
+    }
+
     // Set forced debug level.
     snccld_log_info(
         "Setting %s=%s", SNCCLD_NCCL_ENV_DEBUG, snccld_config.log_level
