@@ -3244,11 +3244,11 @@ spec:
                     description: Additional parameters for the task plugin
                     type: string
                   topologyParam:
-                    default: topology/tree
                     description: TopologyParam is list of comma-separated options
                       identifying network topology options.
                     type: string
                   topologyPlugin:
+                    default: topology/tree
                     description: |-
                       TopologyPlugin identifies the plugin to determine network topology for optimizations.
                       It is set automatically to `topology/tree` if SlurmTopologyConfigMapRefName is specified.
