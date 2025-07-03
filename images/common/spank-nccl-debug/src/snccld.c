@@ -51,15 +51,17 @@ char *_snccld_get_executable_name(pid_t pid) {
  * @param hostname The hostname to substitute for %h.
  * @param output Buffer to store the result (must be PATH_MAX + 1 bytes).
  */
-static void snccld_substitute_hostname(const char *path, const char *hostname, char *output) {
-    const char *p = path;
-    char *out = output;
-    
+static void snccld_substitute_hostname(
+    const char *path, const char *hostname, char *output
+) {
+    const char *p   = path;
+    char       *out = output;
+
     while (*p && (out - output) < PATH_MAX) {
         if (*p == '%' && *(p + 1) == 'h') {
             // Replace %h with hostname
             out += snprintf(out, PATH_MAX - (out - output), "%s", hostname);
-            p += 2; // Skip %h
+            p   += 2; // Skip %h
         } else {
             *out++ = *p++;
         }
@@ -298,8 +300,10 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
 
     if (snccld_config.out_file) {
         char resolved_out_dir[PATH_MAX + 1];
-        snccld_substitute_hostname(snccld_config.out_dir, hostname, resolved_out_dir);
-        
+        snccld_substitute_hostname(
+            snccld_config.out_dir, hostname, resolved_out_dir
+        );
+
         snprintf(
             state->log_path,
             sizeof(state->log_path),
@@ -437,7 +441,9 @@ int slurm_spank_task_init_privileged(spank_t spank, int argc, char **argv) {
 
     if (snccld_config.out_file) {
         char resolved_out_dir[PATH_MAX + 1];
-        snccld_substitute_hostname(snccld_config.out_dir, hostname, resolved_out_dir);
+        snccld_substitute_hostname(
+            snccld_config.out_dir, hostname, resolved_out_dir
+        );
         snccld_log_debug("Ensuring '%s' exists.", resolved_out_dir);
         snccld_ensure_dir_exists(resolved_out_dir);
     }
@@ -518,7 +524,9 @@ int slurm_spank_task_init_privileged(spank_t spank, int argc, char **argv) {
             mounts[dir_mount_count++] = strdup(SNCCLD_SYSTEM_DIR);
             if (snccld_config.out_file) {
                 char resolved_out_dir[PATH_MAX + 1];
-                snccld_substitute_hostname(snccld_config.out_dir, hostname, resolved_out_dir);
+                snccld_substitute_hostname(
+                    snccld_config.out_dir, hostname, resolved_out_dir
+                );
                 mounts[dir_mount_count++] = strdup(resolved_out_dir);
             }
 
