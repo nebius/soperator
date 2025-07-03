@@ -16,6 +16,9 @@ spec:
   slurmConfig:
     prolog: /opt/slurm_scripts/prolog.sh
     epilog: /opt/slurm_scripts/epilog.sh
+  {{- if .Values.slurmConfig }}
+    {{- toYaml .Values.slurmConfig | nindent 4 }}
+  {{- end }}
   {{- if eq .Values.clusterType "gpu" }}
   healthCheckConfig:
     healthCheckInterval: 600
@@ -23,9 +26,6 @@ spec:
     healthCheckNodeState:
     - state: NONDRAINED_IDLE
     - state: CYCLE
-  {{- end }}
-  {{- if .Values.slurmConfig }}
-    {{- toYaml .Values.slurmConfig | nindent 4 }}
   {{- end }}
   maintenance: {{ default "none" .Values.maintenance | quote  }}
   crVersion: {{ .Chart.Version }}
