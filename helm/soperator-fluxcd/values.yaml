@@ -30,6 +30,9 @@ helmRepository:
   victoriaMetrics:
     url: https://victoriametrics.github.io/helm-charts/
     type: default
+  helmReleaseTriggerOperator:
+    url: oci://ghcr.io/uburro
+    type: oci
 ns:
   enabled: true
   interval: 5m
@@ -256,3 +259,20 @@ soperator:
       rebooter:
         resources: {}
     overrideValues: null
+helmReleaseTriggerOperator:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: 0.2.0
+  namespace: flux-system
+  releaseName: helmrelease-trigger
+  values:
+    enableHrAutodiscovery: true
+    repository: "ghcr.io/uburro/helmrelease-trigger-operator"
+    resources:
+      limits:
+        memory: 128Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+  overrideValues: null
