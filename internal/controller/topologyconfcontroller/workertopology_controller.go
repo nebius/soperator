@@ -222,28 +222,23 @@ func InitializeTopologyConf(asts *kruisev1b1.StatefulSetList) string {
 	}
 
 	switchName := "SwitchName=unknown"
-	var builder strings.Builder
-	builder.WriteString(switchName)
-	builder.WriteString(" Nodes=")
+	var nodes []string
 
-	firstNode := true
 	for _, sts := range asts.Items {
 		if sts.Spec.Replicas == nil || *sts.Spec.Replicas <= 0 {
 			continue
 		}
 
-		workerSize := *sts.Spec.Replicas
-		for i := range workerSize {
-			if !firstNode {
-				builder.WriteString(",")
-			}
-			builder.WriteString(sts.Name)
-			builder.WriteString(strconv.Itoa(int(i)))
-			firstNode = false
+		for i := 0; i < int(*sts.Spec.Replicas); i++ {
+			nodes = append(nodes, sts.Name+strconv.Itoa(i))
 		}
 	}
 
-	return builder.String()
+	if len(nodes) == 0 {
+		return switchName
+	}
+
+	return switchName + " Nodes=" + strings.Join(nodes, ",")
 }
 
 // getPodList retrieves the list of pods in the specified namespace with the given label selector.
