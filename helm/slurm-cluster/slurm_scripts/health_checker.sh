@@ -2,6 +2,8 @@
 
 set -eox
 
+echo "[$(date)] Run Nebius GPU health-checker"
+
 # PATH is required to be propagated inside health-checker
 if [[ -z "${PATH:-}" ]]; then
     echo "PATH is not provided, skipping health-checker" >&2

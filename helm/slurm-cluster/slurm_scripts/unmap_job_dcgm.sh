@@ -2,7 +2,8 @@
 
 set -eox
 
-echo "Unmap the Slurm job with DCGM metrics"
+echo "[$(date)] Unmap the Slurm job with DCGM metrics"
+
 # set in hpcJobMapDir in soperator/helm/soperator-fluxcd/values.yaml
 #   and dcgm_job_map_dir in nebius-solution-library/soperator/modules/slurm/variables.tf
 #   check those before changing it here
