@@ -210,7 +210,7 @@ func (r *ActiveCheckReconciler) Reconcile(
 					}
 					stepLogger.V(1).Info("Reconciled")
 
-					if check.Spec.RunAfterCreation && check.Status.K8sJobsStatus.LastTransitionTime.IsZero() {
+					if check.Spec.RunAfterCreation != nil && *check.Spec.RunAfterCreation && check.Status.K8sJobsStatus.LastTransitionTime.IsZero() {
 						if err := r.runAfterCreation(ctx, check, &desired); err != nil {
 							stepLogger.Error(err, "Failed to run after creation")
 							return fmt.Errorf("run job after creation: %w", err)
