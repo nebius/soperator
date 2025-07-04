@@ -50,19 +50,6 @@ type Link struct {
 	ToNodes    []string // connected nodes/pods (for lowest tier switches)
 }
 
-type TpologyError struct {
-	Msg string
-	Err error
-}
-
-func (e *TpologyError) Error() string {
-	return e.Msg
-}
-
-func (e *TpologyError) Unwrap() error {
-	return e.Err
-}
-
 func NewWorkerTopologyReconciler(
 	client client.Client, scheme *runtime.Scheme, namespace string) *WorkerTopologyReconciler {
 	return &WorkerTopologyReconciler{
@@ -82,7 +69,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	slurmCluster := &slurmv1.SlurmCluster{}
 	if err := r.Client.Get(ctx, req.NamespacedName, slurmCluster); err != nil {
-		logger.Error(err, "Failed to get SlurmCluster", "SlurmCluster", req.Name, "Namespace", req.Namespace)
+		logger.Error(err, "Get SlurmCluster", "SlurmCluster", req.Name, "Namespace", req.Namespace)
 		return DefaultRequeueResult, nil
 	}
 
@@ -93,17 +80,13 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if err := r.EnsureTopologyConfigMap(ctx, req.Namespace, slurmCluster.Name, logger); err != nil {
-		logger.Error(err, "Failed to ensure topology ConfigMap")
+		logger.Error(err, "Ensure topology ConfigMap")
 		return DefaultRequeueResult, nil
 	}
 
 	topologyLabelsConfigMap, err := r.handleTopologyConfigMapFunctional(ctx, req, slurmCluster, logger)
 	if err != nil {
-		if tpologyErr, ok := err.(*TpologyError); ok {
-			logger.Info(tpologyErr.Msg)
-			return DefaultRequeueResult, nil
-		}
-		logger.Error(err, "Failed to handle topology ConfigMap")
+		logger.Error(err, "Warnming: cannot handle topology ConfigMap")
 		return DefaultRequeueResult, nil
 	}
 
@@ -116,7 +99,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	labelSelector := client.MatchingLabels{consts.LabelComponentKey: consts.ComponentTypeWorker.String()}
 	podList, err := r.getPodList(ctx, labelSelector, req.Namespace, logger)
 	if err != nil {
-		logger.Error(err, "Failed to list pods with label", "labelSelector", labelSelector)
+		logger.Error(err, "list pods with label", "labelSelector", labelSelector)
 		return DefaultRequeueResult, nil
 	}
 
@@ -130,13 +113,13 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	topologyConfig, err := r.BuildTopologyConfig(ctx, topologyLabelsConfigMap, podsByNode)
 	if err != nil {
-		logger.Error(err, "Failed to build topology config")
+		logger.Error(err, "build topology config")
 		return DefaultRequeueResult, nil
 	}
 	logger.Info("Built topology config", "topologyConfig", topologyConfig)
 
 	if err := r.updateTopologyConfigMap(ctx, req.Namespace, topologyConfig); err != nil {
-		logger.Error(err, "Failed to update ConfigMap with topology config")
+		logger.Error(err, "Update ConfigMap with topology config")
 		return DefaultRequeueResult, nil
 	}
 
@@ -156,16 +139,11 @@ func (r *WorkerTopologyReconciler) handleTopologyConfigMapFunctional(
 	case client.IgnoreNotFound(err) == nil:
 		logger.Info("Node topology labels ConfigMap not found, creating with default topology")
 		if err = r.createDefaultTopologyConfigMap(ctx, req, slurmCluster, logger); err != nil {
-			logger.Error(err, "Failed to create default topology ConfigMap")
-			return nil, err
+			return nil, fmt.Errorf("create default topology config map: %w", err)
 		}
-		return nil, &TpologyError{
-			Msg: "Node topology labels ConfigMap not found, created with default topology",
-			Err: nil,
-		}
+		return nil, fmt.Errorf("config map %s not found, created with default topology", err)
 	case err != nil:
-		logger.Error(err, "Failed to get node topology labels config map")
-		return nil, err
+		return nil, fmt.Errorf("get node topology labels config map: %w", err)
 	}
 
 	logger.Info("Node topology labels ConfigMap found", "configMap", topologyLabelsConfigMap.Name)
@@ -178,9 +156,7 @@ func (r *WorkerTopologyReconciler) createDefaultTopologyConfigMap(
 	listASTS := &kruisev1b1.StatefulSetList{}
 
 	if err := r.getAdvancedSTS(ctx, slurmCluster.Name, listASTS); err != nil {
-		logger.Error(err, "Failed to initialize topology configuration")
-		return err
-
+		return fmt.Errorf("get advanced stateful sets: %w", err)
 	}
 	config := InitializeTopologyConf(listASTS)
 	if err := r.updateTopologyConfigMap(ctx, req.Namespace, config); err != nil {
@@ -198,8 +174,7 @@ func (r *WorkerTopologyReconciler) EnsureTopologyConfigMap(
 	listASTS := &kruisev1b1.StatefulSetList{}
 
 	if err := r.getAdvancedSTS(ctx, clusterName, listASTS); err != nil {
-		logger.Error(err, "Failed to initialize topology configuration")
-		return err
+		return fmt.Errorf("get advanced stateful sets: %w", err)
 	}
 	config := InitializeTopologyConf(listASTS)
 	configMap := &corev1.ConfigMap{
@@ -271,8 +246,7 @@ func (r *WorkerTopologyReconciler) getPodList(
 	}
 
 	if err := r.Client.List(ctx, podList, listOpts...); err != nil {
-		logger.Error(err, "Failed to list pods")
-		return podList, err
+		return podList, fmt.Errorf("list pods in namespace %s with label selector %v: %w", namespace, labelSelector, err)
 	}
 
 	return podList, nil
@@ -302,7 +276,7 @@ func (r *WorkerTopologyReconciler) BuildTopologyConfig(
 ) (string, error) {
 	labelsByNode, err := r.ParseNodeTopologyLabels(nodeTopologyLabelsConf.Data)
 	if err != nil {
-		return "", fmt.Errorf("failed to deserialize node topology: %w", err)
+		return "", fmt.Errorf("deserialize node topology: %w", err)
 	}
 	graph := BuildTopologyGraph(ctx, labelsByNode, podsByNode)
 	config := strings.Join(graph.RenderConfigLines(), "\n") + "\n"
