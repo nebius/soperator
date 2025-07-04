@@ -40,6 +40,9 @@ data:
   health_checker.sh: |
 {{ tpl (.Files.Get "slurm_scripts/health_checker.sh") . | indent 4 }}
 
+  boot_disk_full.sh: |
+{{ tpl (.Files.Get "slurm_scripts/boot_disk_full.sh") . | indent 4 }}
+
 {{- if .Values.slurmScripts.custom }}
 {{- range $name, $content := .Values.slurmScripts.custom }}
   {{ $name }}: |
