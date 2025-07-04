@@ -31,7 +31,7 @@ helmRepository:
     url: https://victoriametrics.github.io/helm-charts/
     type: default
   helmReleaseTriggerOperator:
-    url: oci://ghcr.io/uburro
+    url: oci://cr.eu-north1.nebius.cloud/soperator
     type: oci
 ns:
   enabled: true
