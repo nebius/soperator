@@ -25,7 +25,7 @@ helmRepository:
     url: https://prometheus-community.github.io/helm-charts
     type: default
   securityProfilesOperator:
-    url: oci://cr.eu-north1.nebius.cloud/e00xdc03sb7gpqfd0a
+    url: oci://cr.eu-north1.nebius.cloud/soperator
     type: oci
   victoriaMetrics:
     url: https://victoriametrics.github.io/helm-charts/
@@ -193,7 +193,7 @@ securityProfilesOperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 0.8.4-soperator
+  version: 0.9.1
   releaseName: security-profiles-operator
   namespace: security-profiles-operator-system
   values: null
