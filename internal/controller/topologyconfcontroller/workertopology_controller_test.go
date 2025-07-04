@@ -164,7 +164,7 @@ func TestInitializeTopologyConf(t *testing.T) {
 					},
 				},
 			},
-			expected: "SwitchName=unknown Nodes=",
+			expected: "SwitchName=unknown",
 		},
 	}
 

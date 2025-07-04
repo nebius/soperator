@@ -50,6 +50,19 @@ type Link struct {
 	ToNodes    []string // connected nodes/pods (for lowest tier switches)
 }
 
+type TpologyError struct {
+	Msg string
+	Err error
+}
+
+func (e *TpologyError) Error() string {
+	return e.Msg
+}
+
+func (e *TpologyError) Unwrap() error {
+	return e.Err
+}
+
 func NewWorkerTopologyReconciler(
 	client client.Client, scheme *runtime.Scheme, namespace string) *WorkerTopologyReconciler {
 	return &WorkerTopologyReconciler{
@@ -86,6 +99,10 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	topologyLabelsConfigMap, err := r.handleTopologyConfigMapFunctional(ctx, req, slurmCluster, logger)
 	if err != nil {
+		if tpologyErr, ok := err.(*TpologyError); ok {
+			logger.Info(tpologyErr.Msg)
+			return DefaultRequeueResult, nil
+		}
 		logger.Error(err, "Failed to handle topology ConfigMap")
 		return DefaultRequeueResult, nil
 	}
@@ -142,7 +159,10 @@ func (r *WorkerTopologyReconciler) handleTopologyConfigMapFunctional(
 			logger.Error(err, "Failed to create default topology ConfigMap")
 			return nil, err
 		}
-		return nil, fmt.Errorf("node topology labels ConfigMap not found, created with default topology")
+		return nil, &TpologyError{
+			Msg: "Node topology labels ConfigMap not found, created with default topology",
+			Err: nil,
+		}
 	case err != nil:
 		logger.Error(err, "Failed to get node topology labels config map")
 		return nil, err
@@ -155,20 +175,19 @@ func (r *WorkerTopologyReconciler) handleTopologyConfigMapFunctional(
 func (r *WorkerTopologyReconciler) createDefaultTopologyConfigMap(
 	ctx context.Context, req ctrl.Request, slurmCluster *slurmv1.SlurmCluster, logger logr.Logger) error {
 	logger.Info("Node topology labels ConfigMap not found, creating with default topology")
-	var err error
 	listASTS := &kruisev1b1.StatefulSetList{}
 
-	if err = r.getAdvancedSTS(ctx, slurmCluster.Name, listASTS); err != nil {
+	if err := r.getAdvancedSTS(ctx, slurmCluster.Name, listASTS); err != nil {
 		logger.Error(err, "Failed to initialize topology configuration")
 		return err
 
 	}
 	config := InitializeTopologyConf(listASTS)
-	if err = r.updateTopologyConfigMap(ctx, req.Namespace, config); err != nil {
+	if err := r.updateTopologyConfigMap(ctx, req.Namespace, config); err != nil {
 		return err
 	}
 	logger.Info("Successfully created default topology ConfigMap")
-	return err
+	return nil
 }
 
 // EnsureTopologyConfigMap ensures that the ConfigMap for topology configuration exists.
