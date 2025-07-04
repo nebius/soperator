@@ -12,6 +12,8 @@ type SlurmREST struct {
 	slurmv1.SlurmNode
 
 	Enabled              bool
+	ThreadCount          *int32
+	MaxConnections       *int32
 	ContainerREST        Container
 	CustomInitContainers []corev1.Container
 	Service              Service
@@ -30,6 +32,8 @@ func buildRestFrom(clusterName string, maintenance *consts.MaintenanceMode, rest
 	return SlurmREST{
 		SlurmNode:            *rest.SlurmNode.DeepCopy(),
 		Enabled:              rest.Enabled,
+		ThreadCount:          rest.ThreadCount,
+		MaxConnections:       rest.MaxConnections,
 		ContainerREST:        containerREST,
 		CustomInitContainers: rest.CustomInitContainers,
 		Service:              buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeREST, clusterName)),

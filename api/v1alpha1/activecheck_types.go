@@ -26,7 +26,7 @@ type ActiveCheckSpec struct {
 	// Suspend indicates whether the action is suspended.
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=true
-	Suspend bool `json:"suspend,omitempty"`
+	Suspend *bool `json:"suspend,omitempty"`
 
 	// ActiveDeadlineSeconds defines the CronJob timeout in seconds
 	//
@@ -48,7 +48,7 @@ type ActiveCheckSpec struct {
 
 	// RunAfterCreation specifies whether the job should run immediately after the CronJob is created.
 	// +kubebuilder:default=true
-	RunAfterCreation bool `json:"runAfterCreation,omitempty"`
+	RunAfterCreation *bool `json:"runAfterCreation,omitempty"`
 
 	// NodeSelector defines the desired selector for the K8s nodes to place Slurm workers on
 	//

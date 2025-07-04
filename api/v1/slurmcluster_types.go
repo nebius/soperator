@@ -188,10 +188,10 @@ type SlurmConfig struct {
 	// It is set automatically to `topology/tree` if SlurmTopologyConfigMapRefName is specified.
 	//
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="topology/tree"
 	TopologyPlugin string `json:"topologyPlugin,omitempty"`
 	// TopologyParam is list of comma-separated options identifying network topology options.
 	//
-	// +kubebuilder:default=topology/tree
 	TopologyParam string `json:"topologyParam,omitempty"`
 }
 
@@ -648,6 +648,21 @@ type SlurmRest struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	Enabled bool `json:"enabled,omitempty"`
+
+	// ThreadCount defines the number of threads for slurmrestd
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=2
+	// +kubebuilder:validation:Maximum=1024
+	// +kubebuilder:default=3
+	ThreadCount *int32 `json:"threadCount,omitempty"`
+
+	// MaxConnections defines the maximum number of connections for slurmrestd
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=2
+	// +kubebuilder:default=10
+	MaxConnections *int32 `json:"maxConnections,omitempty"`
 
 	// SlurmRestNode represents the Slurm REST API daemon configuration
 	//

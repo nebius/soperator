@@ -8,12 +8,13 @@ export SCRIPT_CONTEXT="hc_program"
 
 (umask 000; mkdir -p ${JAIL_DIR}${LOGS_OUTPUT_DIR})
 
-echo "Execute GPU healthchecks"
+echo "Execute healthchecks in jail"
 chroot /mnt/jail /bin/bash -s <<-'EOF'
     set -eox pipefail
 
     # The list of healthchecks in the execution order
     checks=(
+        boot_disk_full
         health_checker
     )
 

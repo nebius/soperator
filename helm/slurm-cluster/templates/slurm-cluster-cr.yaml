@@ -16,6 +16,9 @@ spec:
   slurmConfig:
     prolog: /opt/slurm_scripts/prolog.sh
     epilog: /opt/slurm_scripts/epilog.sh
+  {{- if .Values.slurmConfig }}
+    {{- toYaml .Values.slurmConfig | nindent 4 }}
+  {{- end }}
   {{- if eq .Values.clusterType "gpu" }}
   healthCheckConfig:
     healthCheckInterval: 600
@@ -23,9 +26,6 @@ spec:
     healthCheckNodeState:
     - state: NONDRAINED_IDLE
     - state: CYCLE
-  {{- end }}
-  {{- if .Values.slurmConfig }}
-    {{- toYaml .Values.slurmConfig | nindent 4 }}
   {{- end }}
   maintenance: {{ default "none" .Values.maintenance | quote  }}
   crVersion: {{ .Chart.Version }}
@@ -378,6 +378,12 @@ spec:
       enabled: {{ .Values.slurmNodes.rest.enabled }}
       size: {{ required ".Values.slurmNodes.rest.size must be provided." .Values.slurmNodes.rest.size }}
       k8sNodeFilterName: {{ required ".Values.slurmNodes.rest.k8sNodeFilterName must be provided." .Values.slurmNodes.rest.k8sNodeFilterName | quote }}
+      {{- if .Values.slurmNodes.rest.threadCount }}
+      threadCount: {{ .Values.slurmNodes.rest.threadCount }}
+      {{- end }}
+      {{- if .Values.slurmNodes.rest.maxConnections }}
+      maxConnections: {{ .Values.slurmNodes.rest.maxConnections }}
+      {{- end }}
       customInitContainers: {{- default list .Values.slurmNodes.rest.customInitContainers | toYaml | nindent 10 }}
       rest:
         image: {{ required "rest image" .Values.images.slurmrestd | quote }}

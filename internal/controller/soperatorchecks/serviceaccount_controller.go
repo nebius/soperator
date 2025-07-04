@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	maintenance "nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/logfield"
 	render "nebius.ai/slurm-operator/internal/render/soperatorchecks"
 	"nebius.ai/slurm-operator/internal/utils"
@@ -127,6 +128,14 @@ func (r *ServiceAccountReconciler) Reconcile(
 
 		logger.Error(err, "Failed to get SlurmCluster")
 		return ctrl.Result{}, fmt.Errorf("getting SlurmCluster: %w", err)
+	}
+
+	if maintenance.IsMaintenanceActive(cluster.Spec.Maintenance) {
+		logger.Info(fmt.Sprintf(
+			"Slurm cluster maintenance status is %s, skip ActiveCheck ServiceAccount reconcile",
+			*cluster.Spec.Maintenance,
+		))
+		return ctrl.Result{}, nil
 	}
 
 	reconcileServiceAccountImpl := func() error {

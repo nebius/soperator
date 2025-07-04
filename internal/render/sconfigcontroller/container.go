@@ -32,6 +32,7 @@ func renderContainerSConfigController(clusterNamespace, clusterName, slurmAPISer
 			fmt.Sprintf("--cluster-namespace=%s", clusterNamespace),
 			fmt.Sprintf("--cluster-name=%s", clusterName),
 			fmt.Sprintf("--slurmapiserver=%s", slurmAPIServer),
+			"--leader-elect",
 		},
 	}
 }

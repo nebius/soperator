@@ -3,7 +3,7 @@
 set -e # Exit immediately if any command returns a non-zero error code
 
 usage() {
-    echo "Run an interactive login shell on the instance associated with a specific worker node." >&2
+    echo "Get NVIDIA bug report from a worker node." >&2
     echo "" >&2
     echo "usage: ${0} [-w worker_name] [-i instance_id] [-h]" >&2
     echo "       (either -w or -i must be set)"
@@ -32,4 +32,9 @@ if [ -z "$worker_name" ] && [ -n "$instance_id" ]; then
     fi
 fi
 
-ssh -t "${worker_name}" sudo chroot /run/nvidia/driver nsenter -t 1 -m -u -i -n systemd-run --pty /bin/bash -l
+ssh -t "${worker_name}" bash -s <<'EOF'
+  sudo chroot /run/nvidia/driver /usr/bin/nvidia-bug-report.sh
+  sudo mv /run/nvidia/driver/nvidia-bug-report.log.gz /tmp/
+EOF
+
+scp "${worker_name}":/tmp/nvidia-bug-report.log.gz "$(pwd)/${worker_name}-nvidia-bug-report.log.gz"

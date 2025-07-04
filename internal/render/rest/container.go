@@ -1,6 +1,8 @@
 package rest
 
 import (
+	"strconv"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -10,17 +12,33 @@ import (
 )
 
 // renderContainerREST renders [corev1.Container] for slurmrestd
-func renderContainerREST(containerParams values.Container) corev1.Container {
+func renderContainerREST(containerParams values.Container, threadCount *int32, maxConnections *int32) corev1.Container {
 	if containerParams.Port == 0 {
 		containerParams.Port = consts.DefaultRESTPort
 	}
 	containerParams.NodeContainer.Resources.Storage()
+
+	var env []corev1.EnvVar
+	if threadCount != nil {
+		env = append(env, corev1.EnvVar{
+			Name:  "SLURMRESTD_THREAD_COUNT",
+			Value: strconv.Itoa(int(*threadCount)),
+		})
+	}
+	if maxConnections != nil {
+		env = append(env, corev1.EnvVar{
+			Name:  "SLURMRESTD_MAX_CONNECTIONS",
+			Value: strconv.Itoa(int(*maxConnections)),
+		})
+	}
+
 	return corev1.Container{
 		Name:            consts.ContainerNameREST,
 		Image:           containerParams.Image,
 		ImagePullPolicy: containerParams.ImagePullPolicy,
 		Command:         containerParams.Command,
 		Args:            containerParams.Args,
+		Env:             env,
 		Ports: []corev1.ContainerPort{{
 			Name:          containerParams.Name,
 			ContainerPort: containerParams.Port,

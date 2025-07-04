@@ -3244,11 +3244,11 @@ spec:
                     description: Additional parameters for the task plugin
                     type: string
                   topologyParam:
-                    default: topology/tree
                     description: TopologyParam is list of comma-separated options
                       identifying network topology options.
                     type: string
                   topologyPlugin:
+                    default: topology/tree
                     description: |-
                       TopologyPlugin identifies the plugin to determine network topology for optimizations.
                       It is set automatically to `topology/tree` if SlurmTopologyConfigMapRefName is specified.
@@ -13515,6 +13515,13 @@ spec:
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
                           Must correspond to the name of one of [K8sNodeFilter]
                         type: string
+                      maxConnections:
+                        default: 10
+                        description: MaxConnections defines the maximum number of
+                          connections for slurmrestd
+                        format: int32
+                        minimum: 2
+                        type: integer
                       rest:
                         description: SlurmRestNode represents the Slurm REST API daemon
                           configuration
@@ -13575,6 +13582,14 @@ spec:
                       size:
                         description: Size defines the number of node instances
                         format: int32
+                        type: integer
+                      threadCount:
+                        default: 3
+                        description: ThreadCount defines the number of threads for
+                          slurmrestd
+                        format: int32
+                        maximum: 1024
+                        minimum: 2
                         type: integer
                     required:
                     - k8sNodeFilterName

@@ -5,8 +5,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 
 	tc "nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
 )
@@ -97,6 +101,81 @@ func TestParseNodeTopologyLabels(t *testing.T) {
 				require.NoError(t, err, "Unexpected error occurred")
 				require.Equal(t, tt.expected, result, "Deserialized topology does not match expected result")
 			}
+		})
+	}
+}
+
+func TestInitializeTopologyConf(t *testing.T) {
+	tests := []struct {
+		name         string
+		statefulSets []kruisev1b1.StatefulSet
+		expected     string
+	}{
+		{
+			name:         "No StatefulSets",
+			statefulSets: []kruisev1b1.StatefulSet{},
+			expected:     "",
+		},
+		{
+			name: "Single StatefulSet with replicas",
+			statefulSets: []kruisev1b1.StatefulSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "worker-sts",
+					},
+					Spec: kruisev1b1.StatefulSetSpec{
+						Replicas: ptr.To(int32(3)),
+					},
+				},
+			},
+			expected: "SwitchName=unknown Nodes=worker-sts0,worker-sts1,worker-sts2",
+		},
+		{
+			name: "Multiple StatefulSets with replicas",
+			statefulSets: []kruisev1b1.StatefulSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "worker-sts1",
+					},
+					Spec: kruisev1b1.StatefulSetSpec{
+						Replicas: ptr.To(int32(2)),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "worker-sts2",
+					},
+					Spec: kruisev1b1.StatefulSetSpec{
+						Replicas: ptr.To(int32(1)),
+					},
+				},
+			},
+			expected: "SwitchName=unknown Nodes=worker-sts10,worker-sts11,worker-sts20",
+		},
+		{
+			name: "StatefulSet with zero replicas",
+			statefulSets: []kruisev1b1.StatefulSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "worker-sts",
+					},
+					Spec: kruisev1b1.StatefulSetSpec{
+						Replicas: ptr.To(int32(0)),
+					},
+				},
+			},
+			expected: "SwitchName=unknown",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			aSTS := &kruisev1b1.StatefulSetList{
+				Items: tt.statefulSets,
+			}
+
+			result := tc.InitializeTopologyConf(aSTS)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

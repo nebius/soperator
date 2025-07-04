@@ -36,7 +36,7 @@ func RenderK8sCronJob(check *slurmv1alpha1.ActiveCheck, foundPodTemplate *corev1
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule: check.Spec.Schedule,
-			Suspend:  ptr.To(check.Spec.Suspend),
+			Suspend:  check.Spec.Suspend,
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
 					Parallelism:  ptr.To(int32(1)),
