@@ -46,6 +46,47 @@ func renderContainerToolkitValidation(container *values.Container) corev1.Contai
 	}
 }
 
+// renderContainerDirectoryInit renders init [corev1.Container] for creating soperator output directories
+func renderContainerDirectoryInit(container *values.Container) corev1.Container {
+	return corev1.Container{
+		Name:            "init-soperator-dirs",
+		Image:           container.Image,
+		ImagePullPolicy: container.ImagePullPolicy,
+		Command: []string{
+			"sh",
+		},
+		Args: []string{
+			"-c",
+			strings.Join(
+				[]string{
+					"POD_NAME=${K8S_POD_NAME:-$(hostname)};",
+					"BASE_DIR='/var/spool/slurmd/soperator-outputs';",
+					"for subdir in nccl_logs slurm_jobs slurm_scripts; do",
+					"  (umask 000; mkdir -p \"${BASE_DIR}/${POD_NAME}/${subdir}\");",
+					"  echo \"Created directory: ${BASE_DIR}/${POD_NAME}/${subdir}\";",
+					"done",
+				},
+				" ",
+			),
+		},
+		Env: []corev1.EnvVar{
+			{
+				Name: "K8S_POD_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						FieldPath: "metadata.name",
+					},
+				},
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
+		},
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+	}
+}
+
 // renderContainerSlurmd renders [corev1.Container] for slurmd
 func renderContainerSlurmd(
 	container *values.Container,

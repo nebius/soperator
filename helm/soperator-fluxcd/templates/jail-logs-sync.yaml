@@ -1,0 +1,201 @@
+{{- if and .Values.observability.enabled
+            .Values.observability.opentelemetry.enabled
+            .Values.observability.opentelemetry.logs.values.hcOutputEnabled
+            .Values.observability.opentelemetry.logs.values.jailLogs.enabled
+            .Values.observability.opentelemetry.logs.values.jailLogs.syncEnabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-jail-logs-sync
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: raw
+      interval: {{ .Values.observability.opentelemetry.logs.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-bedag
+      version: 2.0.0
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  interval: {{ .Values.observability.opentelemetry.logs.interval }}
+  timeout: {{ .Values.observability.opentelemetry.logs.timeout }}
+  releaseName: jail-logs-sync
+  targetNamespace: soperator
+  values:
+    resources:
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: jail-logs-sync-script
+        namespace: soperator
+      data:
+        sync.sh: |
+          #!/bin/bash
+          set -euo pipefail
+          
+          LOCAL_BASE="/var/spool/slurmd"
+          JAIL_BASE="/mnt/jail/opt/soperator-outputs"
+          SYNC_INTERVAL="${SYNC_INTERVAL:-5}"
+          HASH_FILE="/tmp/jail-sync-hash"
+          
+          log() {
+            echo "$(date '+%Y-%m-%d %H:%M:%S') [jail-logs-sync] $*"
+          }
+          
+          compute_hash() {
+            find "$LOCAL_BASE/soperator-outputs" -name "*.out" -type f -exec stat -c "%n %s %Y" {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1
+          }
+          
+          sync_logs() {
+            local current_hash
+            current_hash=$(compute_hash)
+            
+            if [[ -f "$HASH_FILE" ]] && [[ "$(cat "$HASH_FILE")" == "$current_hash" ]]; then
+              log "No changes detected, skipping sync"
+              return 0
+            fi
+            
+            log "Changes detected, starting rsync..."
+            
+            # Ensure jail base directory exists
+            mkdir -p "$JAIL_BASE"
+            
+            # Sync with rsync  
+            if rsync -av --delete --include="*/" --include="*.out" --exclude="*" "$LOCAL_BASE/soperator-outputs/" "$JAIL_BASE/"; then
+              echo "$current_hash" > "$HASH_FILE"
+              log "Sync completed successfully"
+            else
+              log "Sync failed with exit code $?"
+              return 1
+            fi
+          }
+          
+          log "Starting jail logs sync daemon (interval: ${SYNC_INTERVAL}s)"
+          
+          while true; do
+            if ! sync_logs; then
+              log "Sync failed, will retry in ${SYNC_INTERVAL}s"
+            fi
+            sleep "$SYNC_INTERVAL"
+          done
+
+    - apiVersion: apps/v1
+      kind: DaemonSet
+      metadata:
+        name: jail-logs-sync
+        namespace: soperator
+        labels:
+          app.kubernetes.io/name: jail-logs-sync
+          app.kubernetes.io/component: sync
+      spec:
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: jail-logs-sync
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: jail-logs-sync
+          spec:
+            serviceAccountName: default
+            containers:
+            - name: sync
+              image: cr.eu-north1.nebius.cloud/soperator/jail-logs-sync:{{ .Values.observability.opentelemetry.logs.values.jailLogs.imageTag | default "latest" }}
+              command: ["/bin/sh"]
+              args: ["/scripts/sync.sh"]
+              env:
+              - name: SYNC_INTERVAL
+                value: {{ .Values.observability.opentelemetry.logs.values.jailLogs.syncInterval | default "5" | quote }}
+              volumeMounts:
+              - name: spool-outputs  
+                mountPath: /var/spool/slurmd
+                readOnly: true
+              - name: jail-outputs
+                mountPath: /mnt/jail/opt/soperator-outputs
+              - name: sync-script
+                mountPath: /scripts
+                readOnly: true
+              resources:
+                requests:
+                  memory: 64Mi
+                  cpu: 50m
+                limits:
+                  memory: 128Mi
+                  cpu: 100m
+              securityContext:
+                runAsUser: 0
+                runAsGroup: 0
+            volumes:
+            - name: spool-outputs
+              hostPath:
+                path: /var/spool/slurmd  
+                type: DirectoryOrCreate
+            - name: jail-outputs
+              hostPath:
+                path: /mnt/jail/opt/soperator-outputs
+                type: DirectoryOrCreate
+            - name: sync-script
+              configMap:
+                name: jail-logs-sync-script
+                defaultMode: 0755
+            tolerations:
+            - operator: Exists
+            - effect: NoExecute
+              key: node.kubernetes.io/not-ready
+              operator: Exists
+            - effect: NoExecute
+              key: node.kubernetes.io/unreachable
+              operator: Exists
+            - effect: NoSchedule
+              key: node.kubernetes.io/disk-pressure
+              operator: Exists
+            - effect: NoSchedule
+              key: node.kubernetes.io/memory-pressure
+              operator: Exists
+            - effect: NoSchedule
+              key: node.kubernetes.io/pid-pressure
+              operator: Exists
+            - effect: NoSchedule
+              key: node.kubernetes.io/unschedulable
+              operator: Exists
+            - effect: NoSchedule
+              key: node.kubernetes.io/network-unavailable
+              operator: Exists
+            - effect: NoSchedule
+              key: node.cilium.io/agent-not-ready
+              operator: Exists
+            affinity:
+              nodeAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  nodeSelectorTerms:
+                  - matchExpressions:
+                    - key: slurm.nebius.ai/jail
+                      operator: In
+                      values:
+                      - "true"
+                    - key: slurm.nebius.ai/nodeset
+                      operator: NotIn
+                      values: 
+                      - "system"
+                      - "login"
+                      - "controller"
+                      - "accounting"
+  valuesFrom:
+  - kind: ConfigMap
+    name: terraform-jail-logs-sync
+    optional: true
+    valuesKey: values.yaml
+  - kind: ConfigMap
+    name: jail-logs-sync
+    optional: true
+    valuesKey: values.yaml
+{{- end }}

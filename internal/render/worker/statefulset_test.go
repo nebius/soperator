@@ -98,7 +98,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 			secrets:        secret,
 			clusterType:    consts.ClusterTypeCPU,
 			expectedEnvVar: "",
-			expectedInitCt: 1,
+			expectedInitCt: 2,
 		},
 		{
 			name:           "CGROUP V1 GPU",
@@ -106,7 +106,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 			secrets:        secret,
 			clusterType:    consts.ClusterTypeGPU,
 			expectedEnvVar: "",
-			expectedInitCt: 2,
+			expectedInitCt: 3,
 		},
 		{
 			name:           "CGROUP V2",
@@ -114,7 +114,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 			secrets:        secret,
 			clusterType:    consts.ClusterTypeCPU,
 			expectedEnvVar: consts.CGroupV2Env,
-			expectedInitCt: 1,
+			expectedInitCt: 2,
 		},
 		{
 			name:           "CGROUP V2 GPU",
@@ -122,7 +122,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 			secrets:        secret,
 			clusterType:    consts.ClusterTypeGPU,
 			expectedEnvVar: consts.CGroupV2Env,
-			expectedInitCt: 2,
+			expectedInitCt: 3,
 		},
 	}
 
@@ -132,11 +132,12 @@ func Test_RenderStatefulSet(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, consts.ContainerNameSlurmd, result.Spec.Template.Spec.Containers[0].Name)
-			if tt.clusterType == consts.ClusterTypeGPU {
-				assert.Equal(t, consts.ContainerNameToolkitValidation, result.Spec.Template.Spec.InitContainers[1].Name)
-			}
 			assert.Equal(t, tt.expectedInitCt, len(result.Spec.Template.Spec.InitContainers))
 			assert.Equal(t, consts.ContainerNameMunge, result.Spec.Template.Spec.InitContainers[0].Name)
+			assert.Equal(t, "init-soperator-dirs", result.Spec.Template.Spec.InitContainers[1].Name)
+			if tt.clusterType == consts.ClusterTypeGPU {
+				assert.Equal(t, consts.ContainerNameToolkitValidation, result.Spec.Template.Spec.InitContainers[2].Name)
+			}
 		})
 	}
 }
