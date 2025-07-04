@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
+ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:noble
 
 FROM $BASE_IMAGE AS controller_slurmdbd
 
