@@ -79,7 +79,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return DefaultRequeueResult, nil
 	}
 
-	if err := r.EnsureTopologyConfigMap(ctx, req.Namespace, slurmCluster.Name, logger); err != nil {
+	if err := r.EnsureTopologyConfigMap(ctx, req.Namespace, slurmCluster.Name); err != nil {
 		logger.Error(err, "Ensure topology ConfigMap")
 		return DefaultRequeueResult, nil
 	}
@@ -97,7 +97,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	)
 
 	labelSelector := client.MatchingLabels{consts.LabelComponentKey: consts.ComponentTypeWorker.String()}
-	podList, err := r.getPodList(ctx, labelSelector, req.Namespace, logger)
+	podList, err := r.getPodList(ctx, labelSelector, req.Namespace)
 	if err != nil {
 		logger.Error(err, "list pods with label", "labelSelector", labelSelector)
 		return DefaultRequeueResult, nil
@@ -168,7 +168,7 @@ func (r *WorkerTopologyReconciler) createDefaultTopologyConfigMap(
 
 // EnsureTopologyConfigMap ensures that the ConfigMap for topology configuration exists.
 func (r *WorkerTopologyReconciler) EnsureTopologyConfigMap(
-	ctx context.Context, namespace, clusterName string, logger logr.Logger,
+	ctx context.Context, namespace, clusterName string,
 ) error {
 
 	listASTS := &kruisev1b1.StatefulSetList{}
@@ -237,7 +237,7 @@ func InitializeTopologyConf(asts *kruisev1b1.StatefulSetList) string {
 
 // getPodList retrieves the list of pods in the specified namespace with the given label selector.
 func (r *WorkerTopologyReconciler) getPodList(
-	ctx context.Context, labelSelector client.MatchingLabels, namespace string, logger logr.Logger,
+	ctx context.Context, labelSelector client.MatchingLabels, namespace string,
 ) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	listOpts := []client.ListOption{
