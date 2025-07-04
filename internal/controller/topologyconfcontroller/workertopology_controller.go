@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -74,6 +75,11 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return DefaultRequeueResult, nil
 	}
 
+	if err := r.EnsureTopologyConfigMap(ctx, req.Namespace, slurmCluster.Spec.SlurmNodes.Worker.Size); err != nil {
+		logger.Error(err, "Failed to ensure topology ConfigMap")
+		return DefaultRequeueResult, nil
+	}
+
 	topologyLabelsConfigMap, err := r.getNodeTopologyLabelsConfigMap(ctx)
 	if err != nil {
 		logger.Error(err, "Failed to get node topology labels config map")
@@ -118,7 +124,61 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 }
 
 func isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
-	return slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyTree && slurmCluster.Spec.SlurmConfig.TopologyParam == ""
+	return slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyTree
+}
+
+// EnsureTopologyConfigMap ensures that the ConfigMap for topology configuration exists.
+func (r *WorkerTopologyReconciler) EnsureTopologyConfigMap(
+	ctx context.Context, namespace string, workersSize int32,
+) error {
+	config := InitializeTopologyConf(workersSize)
+	configMap := &corev1.ConfigMap{
+		TypeMeta: ctrl.TypeMeta{
+			APIVersion: corev1.SchemeGroupVersion.Version,
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      consts.ConfigMapNameTopologyConfig,
+			Namespace: namespace,
+			Labels: map[string]string{
+				consts.LabelSConfigControllerSourceKey: consts.LabelSConfigControllerSourceValue,
+			},
+			Annotations: map[string]string{
+				consts.AnnotationSConfigControllerSourceKey: consts.DefaultSConfigControllerSourcePath,
+			},
+		},
+		Data: map[string]string{
+			"topology.conf": config,
+		},
+	}
+
+	if err := r.Client.Create(ctx, configMap); err != nil {
+		return client.IgnoreAlreadyExists(err)
+	}
+
+	return nil
+}
+
+func InitializeTopologyConf(workerSize int32) string {
+	if workerSize < 0 {
+		workerSize = 0
+	}
+
+	switchName := "SwitchName=unknown"
+
+	var builder strings.Builder
+	builder.WriteString(switchName)
+	builder.WriteString(" Nodes=")
+
+	for i := int32(0); i < workerSize; i++ {
+		if i > 0 {
+			builder.WriteString(",")
+		}
+		builder.WriteString("worker-")
+		builder.WriteString(strconv.Itoa(int(i)))
+	}
+
+	return builder.String()
 }
 
 // getPodList retrieves the list of pods in the specified namespace with the given label selector.

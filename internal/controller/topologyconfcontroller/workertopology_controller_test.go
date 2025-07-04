@@ -100,3 +100,47 @@ func TestParseNodeTopologyLabels(t *testing.T) {
 		})
 	}
 }
+
+func TestInitializeTopologyConf(t *testing.T) {
+	tests := []struct {
+		name       string
+		workerSize int32
+		expected   string
+	}{
+		{
+			name:       "Zero workers",
+			workerSize: 0,
+			expected:   "SwitchName=unknown Nodes=",
+		},
+		{
+			name:       "Single worker",
+			workerSize: 1,
+			expected:   "SwitchName=unknown Nodes=worker-0",
+		},
+		{
+			name:       "Multiple workers",
+			workerSize: 3,
+			expected:   "SwitchName=unknown Nodes=worker-0,worker-1,worker-2",
+		},
+		{
+			name:       "Large number of workers",
+			workerSize: 10,
+			expected:   "SwitchName=unknown Nodes=worker-0,worker-1,worker-2,worker-3,worker-4,worker-5,worker-6,worker-7,worker-8,worker-9",
+		},
+		{
+			name:       "Negative worker count should become zero",
+			workerSize: -5,
+			expected:   "SwitchName=unknown Nodes=",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tc.InitializeTopologyConf(tt.workerSize)
+
+			if result != tt.expected {
+				t.Errorf("InitializeTopologyConf(%d) = %q, expected %q", tt.workerSize, result, tt.expected)
+			}
+		})
+	}
+}
