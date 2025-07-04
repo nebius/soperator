@@ -21,6 +21,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	maintenance "nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
@@ -148,7 +149,7 @@ func (r *ActiveCheckReconciler) Reconcile(
 		return ctrl.Result{}, fmt.Errorf("getting SlurmCluster: %w", err)
 	}
 
-	if *slurmCluster.Spec.Maintenance != "none" {
+	if maintenance.IsMaintenanceActive(slurmCluster.Spec.Maintenance) {
 		logger.Info(fmt.Sprintf(
 			"Slurm cluster maintenance status is %s, skip ActiveCheck reconcile",
 			*slurmCluster.Spec.Maintenance,
