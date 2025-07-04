@@ -21,6 +21,9 @@ import (
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
+	"nebius.ai/slurm-operator/internal/render/common"
+
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 )
 
 var (
@@ -33,6 +36,7 @@ var (
 
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;update;create;patch
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;create;update;patch
 
 type WorkerTopologyReconciler struct {
 	BaseReconciler
@@ -75,7 +79,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return DefaultRequeueResult, nil
 	}
 
-	if err := r.EnsureTopologyConfigMap(ctx, req.Namespace, slurmCluster.Spec.SlurmNodes.Worker.Size); err != nil {
+	if err := r.EnsureTopologyConfigMap(ctx, req.Namespace, slurmCluster.Name, logger); err != nil {
 		logger.Error(err, "Failed to ensure topology ConfigMap")
 		return DefaultRequeueResult, nil
 	}
@@ -152,7 +156,14 @@ func (r *WorkerTopologyReconciler) createDefaultTopologyConfigMap(
 	ctx context.Context, req ctrl.Request, slurmCluster *slurmv1.SlurmCluster, logger logr.Logger) error {
 	logger.Info("Node topology labels ConfigMap not found, creating with default topology")
 	var err error
-	config := InitializeTopologyConf(slurmCluster.Spec.SlurmNodes.Worker.Size)
+	listASTS := &kruisev1b1.StatefulSetList{}
+
+	if err = r.getAdvancedSTS(ctx, slurmCluster.Name, listASTS); err != nil {
+		logger.Error(err, "Failed to initialize topology configuration")
+		return err
+
+	}
+	config := InitializeTopologyConf(listASTS)
 	if err = r.updateTopologyConfigMap(ctx, req.Namespace, config); err != nil {
 		return err
 	}
@@ -162,9 +173,16 @@ func (r *WorkerTopologyReconciler) createDefaultTopologyConfigMap(
 
 // EnsureTopologyConfigMap ensures that the ConfigMap for topology configuration exists.
 func (r *WorkerTopologyReconciler) EnsureTopologyConfigMap(
-	ctx context.Context, namespace string, workersSize int32,
+	ctx context.Context, namespace, clusterName string, logger logr.Logger,
 ) error {
-	config := InitializeTopologyConf(workersSize)
+
+	listASTS := &kruisev1b1.StatefulSetList{}
+
+	if err := r.getAdvancedSTS(ctx, clusterName, listASTS); err != nil {
+		logger.Error(err, "Failed to initialize topology configuration")
+		return err
+	}
+	config := InitializeTopologyConf(listASTS)
 	configMap := &corev1.ConfigMap{
 		TypeMeta: ctrl.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.Version,
@@ -192,23 +210,37 @@ func (r *WorkerTopologyReconciler) EnsureTopologyConfigMap(
 	return nil
 }
 
-func InitializeTopologyConf(workerSize int32) string {
-	if workerSize < 0 {
-		workerSize = 0
+func (r *WorkerTopologyReconciler) getAdvancedSTS(
+	ctx context.Context, clusterName string, asts *kruisev1b1.StatefulSetList) error {
+	labels := common.RenderLabels(consts.ComponentTypeWorker, clusterName)
+	return r.Client.List(ctx, asts, client.MatchingLabels(labels))
+}
+
+func InitializeTopologyConf(asts *kruisev1b1.StatefulSetList) string {
+	if asts == nil || len(asts.Items) == 0 {
+		return ""
 	}
 
 	switchName := "SwitchName=unknown"
-
 	var builder strings.Builder
 	builder.WriteString(switchName)
 	builder.WriteString(" Nodes=")
 
-	for i := int32(0); i < workerSize; i++ {
-		if i > 0 {
-			builder.WriteString(",")
+	firstNode := true
+	for _, sts := range asts.Items {
+		if sts.Spec.Replicas == nil || *sts.Spec.Replicas <= 0 {
+			continue
 		}
-		builder.WriteString("worker-")
-		builder.WriteString(strconv.Itoa(int(i)))
+
+		workerSize := *sts.Spec.Replicas
+		for i := range workerSize {
+			if !firstNode {
+				builder.WriteString(",")
+			}
+			builder.WriteString(sts.Name)
+			builder.WriteString(strconv.Itoa(int(i)))
+			firstNode = false
+		}
 	}
 
 	return builder.String()
