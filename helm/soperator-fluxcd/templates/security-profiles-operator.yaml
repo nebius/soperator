@@ -43,7 +43,7 @@ spec:
     spoImage:
       registry: gcr.io
       repository: k8s-staging-sp-operator/security-profiles-operator
-      tag: v0.8.4
+      tag: v{{ .Values.securityProfilesOperator.version }}
     tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
