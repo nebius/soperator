@@ -31,7 +31,7 @@ var (
 	}
 )
 
-// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;update;create;patch
 
 type WorkerTopologyReconciler struct {
@@ -80,9 +80,9 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return DefaultRequeueResult, nil
 	}
 
-	topologyLabelsConfigMap, err := r.getNodeTopologyLabelsConfigMap(ctx)
+	topologyLabelsConfigMap, err := r.handleTopologyConfigMapFunctional(ctx, req, slurmCluster, logger)
 	if err != nil {
-		logger.Error(err, "Failed to get node topology labels config map")
+		logger.Error(err, "Failed to handle topology ConfigMap")
 		return DefaultRequeueResult, nil
 	}
 
@@ -125,6 +125,39 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 func isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
 	return slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyTree
+}
+
+func (r *WorkerTopologyReconciler) handleTopologyConfigMapFunctional(
+	ctx context.Context, req ctrl.Request, slurmCluster *slurmv1.SlurmCluster, logger logr.Logger) (*corev1.ConfigMap, error) {
+	topologyLabelsConfigMap, err := r.getNodeTopologyLabelsConfigMap(ctx)
+
+	switch {
+	case client.IgnoreNotFound(err) == nil:
+		logger.Info("Node topology labels ConfigMap not found, creating with default topology")
+		if err = r.createDefaultTopologyConfigMap(ctx, req, slurmCluster, logger); err != nil {
+			logger.Error(err, "Failed to create default topology ConfigMap")
+			return nil, err
+		}
+		return nil, fmt.Errorf("node topology labels ConfigMap not found, created with default topology")
+	case err != nil:
+		logger.Error(err, "Failed to get node topology labels config map")
+		return nil, err
+	}
+
+	logger.Info("Node topology labels ConfigMap found", "configMap", topologyLabelsConfigMap.Name)
+	return topologyLabelsConfigMap, nil
+}
+
+func (r *WorkerTopologyReconciler) createDefaultTopologyConfigMap(
+	ctx context.Context, req ctrl.Request, slurmCluster *slurmv1.SlurmCluster, logger logr.Logger) error {
+	logger.Info("Node topology labels ConfigMap not found, creating with default topology")
+	var err error
+	config := InitializeTopologyConf(slurmCluster.Spec.SlurmNodes.Worker.Size)
+	if err = r.updateTopologyConfigMap(ctx, req.Namespace, config); err != nil {
+		return err
+	}
+	logger.Info("Successfully created default topology ConfigMap")
+	return err
 }
 
 // EnsureTopologyConfigMap ensures that the ConfigMap for topology configuration exists.
