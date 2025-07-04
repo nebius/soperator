@@ -18151,7 +18151,7 @@ spec:
                   ncclDebug:
                     enabled: false
                     logLevel: INFO
-                    outputDirectory: /opt/soperator-outputs/%h/nccl_logs
+                    outputDirectory: /var/spool/slurmd/soperator-outputs/%h/nccl_logs
                     outputToFile: true
                     outputToStdOut: false
                     required: false
@@ -18195,7 +18195,7 @@ spec:
                     default:
                       enabled: false
                       logLevel: INFO
-                      outputDirectory: /opt/soperator-outputs/%h/nccl_logs
+                      outputDirectory: /var/spool/slurmd/soperator-outputs/%h/nccl_logs
                       outputToFile: true
                       outputToStdOut: false
                       required: false
@@ -18216,7 +18216,7 @@ spec:
                         - TRACE
                         type: string
                       outputDirectory:
-                        default: /opt/soperator-outputs/%h/nccl_logs
+                        default: /var/spool/slurmd/soperator-outputs/%h/nccl_logs
                         description: |-
                           OutputDirectory defines a directory path where OutputToFile has to be created.
 

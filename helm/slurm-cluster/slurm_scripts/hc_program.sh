@@ -2,11 +2,10 @@
 
 set -eox pipefail
 
-export JAIL_DIR="/mnt/jail"
-export LOGS_OUTPUT_DIR="/opt/soperator-outputs/${SLURMD_NODENAME}/slurm_scripts"
+export LOGS_OUTPUT_DIR="/var/spool/slurmd/soperator-outputs/${SLURMD_NODENAME}/slurm_scripts"
 export SCRIPT_CONTEXT="hc_program"
 
-(umask 000; mkdir -p ${JAIL_DIR}${LOGS_OUTPUT_DIR})
+(umask 000; mkdir -p ${LOGS_OUTPUT_DIR})
 
 echo "Execute GPU healthchecks"
 chroot /mnt/jail /bin/bash -s <<-'EOF'

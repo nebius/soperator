@@ -2,11 +2,10 @@
 
 set -eox pipefail
 
-export JAIL_DIR="/mnt/jail"
-export LOGS_OUTPUT_DIR="/opt/soperator-outputs/${SLURMD_NODENAME}/slurm_scripts"
+export LOGS_OUTPUT_DIR="/var/spool/slurmd/soperator-outputs/${SLURMD_NODENAME}/slurm_scripts"
 export SCRIPT_CONTEXT="epilog"
 
-(umask 000; mkdir -p ${JAIL_DIR}${LOGS_OUTPUT_DIR})
+(umask 000; mkdir -p ${LOGS_OUTPUT_DIR})
 
 if [ -n "$SLURM_JOB_GPUS" ]; then
     echo "Execute GPU healthchecks"
@@ -53,7 +52,7 @@ EOF
 fi
 
 echo "Unmap the Slurm job with DCGM metrics"
-log="${JAIL_DIR}${LOGS_OUTPUT_DIR}/unmap_job_dcgm.${SCRIPT_CONTEXT}.out"
+log="${LOGS_OUTPUT_DIR}/unmap_job_dcgm.${SCRIPT_CONTEXT}.out"
 bash /mnt/jail/opt/slurm_scripts/unmap_job_dcgm.sh > "$log" 2>&1 || true
 
 exit 0

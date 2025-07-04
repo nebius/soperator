@@ -2,11 +2,10 @@
 
 set -eox pipefail
 
-export JAIL_DIR="/mnt/jail"
-export LOGS_OUTPUT_DIR="/opt/soperator-outputs/${SLURMD_NODENAME}/slurm_scripts"
+export LOGS_OUTPUT_DIR="/var/spool/slurmd/soperator-outputs/${SLURMD_NODENAME}/slurm_scripts"
 export SCRIPT_CONTEXT="prolog"
 
-(umask 000; mkdir -p ${JAIL_DIR}${LOGS_OUTPUT_DIR})
+(umask 000; mkdir -p ${LOGS_OUTPUT_DIR})
 
 if [ -n "$SLURM_JOB_GPUS" ]; then
     echo "Execute GPU healthchecks"
@@ -57,11 +56,11 @@ EOF
 fi
 
 echo "Cleanup leftover enroot containers"
-log="${JAIL_DIR}${LOGS_OUTPUT_DIR}/cleanup_enroot.${SCRIPT_CONTEXT}.out"
+log="${LOGS_OUTPUT_DIR}/cleanup_enroot.${SCRIPT_CONTEXT}.out"
 bash /mnt/jail/opt/slurm_scripts/cleanup_enroot.sh  > "$log" 2>&1 || true
 
 echo "Map the Slurm job with DCGM metrics"
-log="${JAIL_DIR}${LOGS_OUTPUT_DIR}/map_job_dcgm.${SCRIPT_CONTEXT}.out"
+log="${LOGS_OUTPUT_DIR}/map_job_dcgm.${SCRIPT_CONTEXT}.out"
 bash /mnt/jail/opt/slurm_scripts/map_job_dcgm.sh > "$log" 2>&1 || true
 
 exit 0

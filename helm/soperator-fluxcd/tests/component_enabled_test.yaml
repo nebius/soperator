@@ -6,7 +6,13 @@ excludeTemplates:
 tests:
   - it: should render jail logs component when jailLogs.enabled=true
     set:
+      observability.enabled: true
+      observability.opentelemetry.enabled: true
+      observability.opentelemetry.logs.values.hcOutputEnabled: true
       observability.opentelemetry.logs.values.jailLogs.enabled: true
+      observability.opentelemetry.logs.values.jailLogs.syncEnabled: true
+    templates:
+      - templates/jail-logs-sync.yaml
     asserts:
       - hasDocuments:
           count: 1

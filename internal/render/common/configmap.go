@@ -305,7 +305,7 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 				fmt.Sprintf("enabled=%d", utils.Ternary(opts.Enabled, 1, 0)),
 				fmt.Sprintf("log-level=%s", utils.Ternary(opts.LogLevel != "", opts.LogLevel, "INFO")),
 				fmt.Sprintf("out-file=%d", utils.Ternary(opts.OutputToFile, 1, 0)),
-				fmt.Sprintf("out-dir=%s", utils.Ternary(opts.OutputDirectory != "", opts.OutputDirectory, "/opt/soperator-outputs/%h/nccl_logs")),
+				fmt.Sprintf("out-dir=%s", utils.Ternary(opts.OutputDirectory != "", opts.OutputDirectory, "/var/spool/slurmd/soperator-outputs/%h/nccl_logs")),
 				fmt.Sprintf("out-stdout=%d", utils.Ternary(opts.OutputToStdOut, 1, 0)),
 			},
 			" ",
