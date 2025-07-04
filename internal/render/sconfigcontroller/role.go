@@ -28,6 +28,11 @@ func RenderRole(clusterNamespace, clusterName string) rbacv1.Role {
 				Resources: []string{"secrets"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
+			{
+				APIGroups: []string{"coordination.k8s.io"},
+				Resources: []string{"leases"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+			},
 		},
 	}
 }
