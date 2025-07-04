@@ -9,7 +9,7 @@ export SCRIPT_CONTEXT="epilog"
 (umask 000; mkdir -p ${JAIL_DIR}${LOGS_OUTPUT_DIR})
 
 if [ -n "$SLURM_JOB_GPUS" ]; then
-    echo "Execute GPU healthchecks"
+    echo "Execute healthchecks in jail after GPU jobs"
     chroot /mnt/jail /bin/bash -s <<-'EOF'
         set -eox pipefail
 

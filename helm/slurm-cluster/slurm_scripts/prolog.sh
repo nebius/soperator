@@ -9,12 +9,14 @@ export SCRIPT_CONTEXT="prolog"
 (umask 000; mkdir -p ${JAIL_DIR}${LOGS_OUTPUT_DIR})
 
 if [ -n "$SLURM_JOB_GPUS" ]; then
-    echo "Execute GPU healthchecks"
+    echo "Execute healthchecks in jail before GPU jobs"
     chroot /mnt/jail /bin/bash -s <<-'EOF'
         set -eox pipefail
 
         # The list of healthchecks in the execution order
         checks=(
+            boot_disk_full
+            alloc_gpus_busy
             health_checker
         )
 
