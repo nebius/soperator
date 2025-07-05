@@ -105,7 +105,7 @@ type SlurmClusterSpec struct {
 	// PlugStackConfig represents the Plugin stack configurations in `plugstack.conf`.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ pyxis: { required: true, containerImageSave: "/var/cache/enroot-container-images/" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/%h/nccl_logs" } }
+	// +kubebuilder:default={ pyxis: { required: true, containerImageSave: "/var/cache/enroot-container-images/" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" } }
 	PlugStackConfig PlugStackConfig `json:"plugStackConfig,omitempty"`
 
 	// SlurmTopologyConfigMapRefName is the name of the slurm topology config.
@@ -215,7 +215,7 @@ type PlugStackConfig struct {
 	// NcclDebug represents the 'NCCL Debug' SPANK plugin configuration.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/%h/nccl_logs" }
+	// +kubebuilder:default={ required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" }
 	NcclDebug PluginConfigNcclDebug `json:"ncclDebug,omitempty"`
 
 	// PluginConfigCustom represents a configuration of custom SPANK plugins.
@@ -271,7 +271,7 @@ type PluginConfigNcclDebug struct {
 
 	// OutputToFile defines whether to additionally redirect `NCCL_DEBUG` outputs to the output file.
 	// Output filename will have the following format:
-	//  <JOB_ID>.<STEP_ID>.out
+	//  <WORKER_NAME>.<JOB_ID>.<STEP_ID>.out
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=true
@@ -292,7 +292,7 @@ type PluginConfigNcclDebug struct {
 	// If the path does not exist, it will be created by the plugin.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="/opt/soperator-outputs/%h/nccl_logs"
+	// +kubebuilder:default="/opt/soperator-outputs/nccl_logs"
 	OutputDirectory string `json:"outputDirectory,omitempty"`
 }
 

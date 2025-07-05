@@ -324,8 +324,9 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         snprintf(
             state->log_path,
             sizeof(state->log_path),
-            "%s/%u.%u.out",
+            "%s/%s.%u.%u.out",
             resolved_out_dir,
+            hostname,
             key->job_id,
             key->step_id
         );

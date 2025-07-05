@@ -90,10 +90,10 @@ observability:
       values:
         jailLogs:
           enabled: false
-          pollInterval: 5m
+          pollInterval: 30s
+          resources: {}
         nodeLogs:
           enabled: false
-        hcOutputEnabled: true
         resources: {}
       overrideValues: null
     events:
