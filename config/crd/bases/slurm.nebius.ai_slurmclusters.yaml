@@ -3244,6 +3244,7 @@ spec:
                     description: Additional parameters for the task plugin
                     type: string
                   topologyParam:
+                    default: SwitchAsNodeRank
                     description: TopologyParam is list of comma-separated options
                       identifying network topology options.
                     type: string

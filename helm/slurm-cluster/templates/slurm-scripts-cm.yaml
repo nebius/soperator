@@ -43,6 +43,9 @@ data:
   boot_disk_full.sh: |
 {{ tpl (.Files.Get "slurm_scripts/boot_disk_full.sh") . | indent 4 }}
 
+  alloc_gpus_busy.sh: |
+{{ tpl (.Files.Get "slurm_scripts/alloc_gpus_busy.sh") . | indent 4 }}
+
 {{- if .Values.slurmScripts.custom }}
 {{- range $name, $content := .Values.slurmScripts.custom }}
   {{ $name }}: |
