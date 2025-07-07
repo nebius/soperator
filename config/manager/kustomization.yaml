@@ -3,4 +3,4 @@ resources:
 images:
   - name: controller
     newName: cr.eu-north1.nebius.cloud/soperator/slurm-operator
-    newTag: 1.21.6
+    newTag: 1.21.7
