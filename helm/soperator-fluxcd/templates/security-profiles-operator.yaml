@@ -31,7 +31,15 @@ spec:
   {{- if .Values.securityProfilesOperator.overrideValues }}
     {{- toYaml .Values.securityProfilesOperator.overrideValues | nindent 4 }}
   {{- else }}
+    {{- if .Values.securityProfilesOperator.values.resources }}
+    resources: 
+    {{- toYaml .Values.securityProfilesOperator.values.resources | nindent 6 }}
+    {{- end }}
     daemon:
+    {{- if .Values.securityProfilesOperator.values.daemon.resources }}
+      resources: 
+      {{- toYaml .Values.securityProfilesOperator.values.daemon.resources | nindent 8 }}
+    {{- end }}
       tolerations:
         - operator: Exists
     enableAppArmor: true

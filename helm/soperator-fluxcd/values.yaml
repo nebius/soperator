@@ -196,7 +196,25 @@ securityProfilesOperator:
   version: 0.9.1
   releaseName: security-profiles-operator
   namespace: security-profiles-operator-system
-  values: null
+  values:
+    resources:
+      limits:
+        cpu: null
+        memory: 2Gi
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+    daemon:
+      resources:
+        limits:
+          memory: 128Mi
+          ephemeral-storage: 200Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi
+          ephemeral-storage: 200Mi
+      tolerations:
+        - operator: Exists
   overrideValues: null
 slurmCluster:
   enabled: true

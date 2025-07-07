@@ -50,7 +50,7 @@ func (r *AppArmorProfileReconciler) Reconcile(
 func (r *AppArmorProfileReconciler) patch(existing, desired client.Object) (client.Patch, error) {
 	patchImpl := func(dst, src *apparmor.AppArmorProfile) client.Patch {
 		res := client.MergeFrom(dst.DeepCopy())
-		dst.Spec.Policy = src.Spec.Policy
+		dst.Spec.Abstract = src.Spec.Abstract
 		return res
 	}
 	return patchImpl(existing.(*apparmor.AppArmorProfile), desired.(*apparmor.AppArmorProfile)), nil
