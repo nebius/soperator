@@ -31,6 +31,34 @@ func (g TopologyGraph) AddEdge(parent, child string) {
 	g.children[parent][child] = struct{}{}
 }
 
+// ensureSingleRoot adds all parentless switches as children of a single "root" switch
+func (g TopologyGraph) ensureSingleRoot() {
+	// Find all nodes that have parents
+	hasParent := make(map[string]bool)
+	for _, children := range g.children {
+		for child := range children {
+			hasParent[child] = true
+		}
+	}
+
+	// Collect all parentless switches (except "root" itself)
+	var rootChildren []string
+	for switch_ := range g.children {
+		if !hasParent[switch_] && switch_ != "root" {
+			rootChildren = append(rootChildren, switch_)
+		}
+	}
+
+	// If there are multiple parentless switches, add them under "root"
+	if len(rootChildren) > 1 {
+		// Sort children for consistent output
+		slices.Sort(rootChildren)
+		for _, child := range rootChildren {
+			g.AddEdge("root", child)
+		}
+	}
+}
+
 // RenderConfigLines renders the topology graph as a list of configuration lines.
 // Each line represents a vertex in the graph, with list of its children.
 // The format is:
@@ -95,6 +123,9 @@ func BuildTopologyGraph(
 			graph.AddEdge(unknownSwitchName, worker)
 		}
 	}
+
+	// Ensure all top-level switches are under a single root
+	graph.ensureSingleRoot()
 
 	return graph
 }
