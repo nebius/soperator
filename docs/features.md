@@ -113,56 +113,50 @@ At the moment, the following information is gathered and can be viewed by users:
 
 ### Centralized Logging Scheme
 
-Soperator implements a centralized logging system that automatically collects and categorizes Slurm workload outputs. Logs are organized by worker node to optimize filesystem performance and processed by OpenTelemetry collectors for centralized analysis.
+Soperator implements a centralized logging system that automatically collects and categorizes Slurm workload outputs. Logs are organized by type and processed by OpenTelemetry collectors for centralized analysis.
 
 #### Directory Structure
 
-Logs are separated by worker node to prevent filesystem contention on the shared jail storage:
+Logs are organized in a flat structure by log type:
 
 ```
 /opt/soperator-outputs/
-├── worker-0/
-│   ├── nccl_logs/      # NCCL debug outputs from worker-0
-│   ├── slurm_jobs/     # Slurm job outputs from worker-0
-│   └── slurm_scripts/  # Script outputs (prolog, epilog, health checks) from worker-0
-├── worker-1/
-│   ├── nccl_logs/
-│   ├── slurm_jobs/
-│   └── slurm_scripts/
-└── ...
+├── nccl_logs/      # NCCL debug outputs from all workers
+├── slurm_jobs/     # Slurm job outputs from all workers
+└── slurm_scripts/  # Script outputs (prolog, epilog, health checks) from all workers
 ```
 
 #### Logging Schema
 
-Log files follow simplified naming patterns without worker prefixes (since worker identity is determined by directory structure):
+Log files include the worker name at the beginning of the filename for easy identification:
 
 **NCCL Logs:**
 ```
-job_id.job_step_id.out
-Example: 12345.67890.out (in /opt/soperator-outputs/worker-0/nccl_logs/)
+worker_name.job_id.job_step_id.out
+Example: worker-0.12345.67890.out
 ```
 
 **Slurm Jobs:**
 ```
-job_name.job_id[.array_id].out
+worker_name.job_name.job_id[.array_id].out
 Examples:
-- benchmark.12345.out
-- training.12345.1.out (array job)
+- worker-1.benchmark.12345.out
+- worker-2.training.12345.1.out (array job)
 ```
 
 **Slurm Scripts:**
 ```
-script_name[.context].out
+worker_name.script_name.context.out
 Examples:
-- health_checker.prolog.out
-- cleanup_enroot.epilog.out
+- worker-0.health_checker.prolog.out
+- worker-3.cleanup_enroot.epilog.out
 ```
 
 #### Generated Labels
 
-The logging system automatically extracts metadata and creates the following labels:
+The logging system automatically extracts metadata from filenames and creates the following labels:
 
-- `worker_name`: Worker pod identifier extracted from directory path
+- `slurm_node_name`: Slurm worker node identifier extracted from filename (e.g., "worker-0", "worker-1")
 - `log_type`: Category (nccl_logs, slurm_jobs, slurm_scripts)
 - `job_id`, `job_step_id`: For NCCL logs
 - `job_name`, `job_array_id`: For Slurm job logs
