@@ -30,6 +30,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"":      {"pod5", "pod6"},
 			},
 			expected: []string{
+				"SwitchName=root Switches=spine1,spine2,spine3,unknown",
 				"SwitchName=spine1 Switches=switch1",
 				"SwitchName=spine2 Switches=switch2",
 				"SwitchName=spine3 Switches=switch1",
@@ -51,6 +52,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node3": {"pod4"},
 			},
 			expected: []string{
+				"SwitchName=root Switches=spine1,spine2,spine3",
 				"SwitchName=spine1 Switches=switch1",
 				"SwitchName=spine2 Switches=switch2",
 				"SwitchName=spine3 Switches=switch1",
@@ -73,6 +75,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node4": {"node4"},
 			},
 			expected: []string{
+				"SwitchName=root Switches=spine1,spine3",
 				"SwitchName=leaf1 Switches=switch0,switch1",
 				"SwitchName=leaf2 Switches=switch2",
 				"SwitchName=leaf3 Switches=switch3",
@@ -95,6 +98,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node2": {"node2"},
 			},
 			expected: []string{
+				"SwitchName=root Switches=switch1,switch2",
 				"SwitchName=switch1 Nodes=node1",
 				"SwitchName=switch2 Nodes=node2",
 			},
@@ -118,6 +122,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node3": {"node3"},
 			},
 			expected: []string{
+				"SwitchName=root Switches=spine1,spine2",
 				"SwitchName=spine1 Switches=switch1,switch2",
 				"SwitchName=spine2 Switches=switch3",
 				"SwitchName=switch1 Nodes=node1",
@@ -138,6 +143,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node3": {"node3"},
 			},
 			expected: []string{
+				"SwitchName=root Switches=core1,core2",
 				"SwitchName=core1 Switches=spine1",
 				"SwitchName=core2 Switches=spine2",
 				"SwitchName=leaf1 Switches=switch1,switch2",
@@ -164,6 +170,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node4": {"node4"},
 			},
 			expected: []string{
+				"SwitchName=root Switches=spine1,switch3,unknown",
 				"SwitchName=leaf1 Switches=switch1,switch2",
 				"SwitchName=spine1 Switches=leaf1",
 				"SwitchName=switch1 Nodes=node1",
@@ -207,6 +214,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node5": {"node5"},
 			},
 			expected: []string{
+				"SwitchName=root Switches=leaf1,leaf2,leaf3",
 				"SwitchName=leaf1 Switches=switch1,switch4",
 				"SwitchName=leaf2 Switches=switch2,switch5",
 				"SwitchName=leaf3 Switches=switch3",
@@ -258,6 +266,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node3": {"node3"},
 			},
 			expected: []string{
+				"SwitchName=root Switches=a-leaf,m-leaf,z-leaf",
 				"SwitchName=a-leaf Switches=a-switch",
 				"SwitchName=a-switch Nodes=node2",
 				"SwitchName=m-leaf Switches=m-switch",
@@ -278,6 +287,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"":      {"pod6"},
 			},
 			expected: []string{
+				"SwitchName=root Switches=spine1,unknown",
 				"SwitchName=spine1 Switches=switch1,switch2",
 				"SwitchName=switch1 Nodes=pod1,pod2,pod3",
 				"SwitchName=switch2 Nodes=pod4,pod5",
