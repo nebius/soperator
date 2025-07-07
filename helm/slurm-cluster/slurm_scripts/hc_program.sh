@@ -3,7 +3,7 @@
 set -eox pipefail
 
 export JAIL_DIR="/mnt/jail"
-export LOGS_OUTPUT_DIR="/opt/soperator-outputs/${SLURMD_NODENAME}/slurm_scripts"
+export LOGS_OUTPUT_DIR="/opt/soperator-outputs/slurm_scripts"
 export SCRIPT_CONTEXT="hc_program"
 
 (umask 000; mkdir -p ${JAIL_DIR}${LOGS_OUTPUT_DIR})
@@ -21,7 +21,7 @@ chroot /mnt/jail /bin/bash -s <<-'EOF'
     pushd /opt/slurm_scripts || exit 0
     for check in "${checks[@]}"; do
         script="${check}.sh"
-        log="${LOGS_OUTPUT_DIR}/${check}.${SCRIPT_CONTEXT}.out"
+        log="${LOGS_OUTPUT_DIR}/${SLURMD_NODENAME}.${check}.${SCRIPT_CONTEXT}.out"
 
         # Run the current script and:
         # - write its fd 1 and 2 (stderr+stdout) to the $log file
