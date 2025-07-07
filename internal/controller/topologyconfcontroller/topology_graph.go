@@ -51,6 +51,8 @@ func (g TopologyGraph) ensureSingleRoot() {
 
 	// If there are multiple parentless switches, add them under "root"
 	if len(rootChildren) > 1 {
+		// Sort children for consistent output
+		slices.Sort(rootChildren)
 		for _, child := range rootChildren {
 			g.AddEdge("root", child)
 		}
