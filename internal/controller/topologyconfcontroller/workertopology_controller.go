@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -134,15 +135,15 @@ func isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
 func (r *WorkerTopologyReconciler) handleTopologyConfigMapFunctional(
 	ctx context.Context, req ctrl.Request, slurmCluster *slurmv1.SlurmCluster, logger logr.Logger) (*corev1.ConfigMap, error) {
 	topologyLabelsConfigMap, err := r.getNodeTopologyLabelsConfigMap(ctx)
-
-	switch {
-	case client.IgnoreNotFound(err) == nil:
-		logger.Info("Node topology labels ConfigMap not found, creating with default topology")
-		if err = r.createDefaultTopologyConfigMap(ctx, req, slurmCluster, logger); err != nil {
-			return nil, fmt.Errorf("create default topology config map: %w", err)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("Node topology labels ConfigMap not found, creating with default topology")
+			if err = r.createDefaultTopologyConfigMap(ctx, req, slurmCluster, logger); err != nil {
+				return nil, fmt.Errorf("create default topology config map: %w", err)
+			}
+			return nil, fmt.Errorf("config map %s not found, created with default topology", err)
 		}
-		return nil, fmt.Errorf("config map %s not found, created with default topology", err)
-	case err != nil:
+
 		return nil, fmt.Errorf("get node topology labels config map: %w", err)
 	}
 
@@ -224,7 +225,7 @@ func InitializeTopologyConf(asts *kruisev1b1.StatefulSetList) string {
 		}
 
 		for i := 0; i < int(*sts.Spec.Replicas); i++ {
-			nodes = append(nodes, sts.Name+strconv.Itoa(i))
+			nodes = append(nodes, sts.Name+"-"+strconv.Itoa(i))
 		}
 	}
 

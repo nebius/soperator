@@ -128,7 +128,7 @@ func TestInitializeTopologyConf(t *testing.T) {
 					},
 				},
 			},
-			expected: "SwitchName=unknown Nodes=worker-sts0,worker-sts1,worker-sts2",
+			expected: "SwitchName=unknown Nodes=worker-sts-0,worker-sts-1,worker-sts-2",
 		},
 		{
 			name: "Multiple StatefulSets with replicas",
@@ -150,7 +150,7 @@ func TestInitializeTopologyConf(t *testing.T) {
 					},
 				},
 			},
-			expected: "SwitchName=unknown Nodes=worker-sts10,worker-sts11,worker-sts20",
+			expected: "SwitchName=unknown Nodes=worker-sts1-0,worker-sts1-1,worker-sts2-0",
 		},
 		{
 			name: "StatefulSet with zero replicas",
