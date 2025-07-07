@@ -11,7 +11,7 @@ spec:
     name: nebius-cloud
   postBuild:
     substitute:
-      soperator_version: 1.21.5
+      soperator_version: 1.21.4
   path: "./fluxcd/enviroment/nebius-cloud/dev"
   prune: true
   timeout: 1m
