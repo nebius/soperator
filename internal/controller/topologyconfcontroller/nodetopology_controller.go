@@ -107,7 +107,7 @@ func (r *NodeTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	node, err := r.getNode(ctx, req.Name)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			if err := r.RemoveNodeFromTopologyConfigMap(ctx, req.Name); err != nil {
+			if err := r.RemoveNodeFromTopologyConfigMap(ctx, req.Name, logger); err != nil {
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{}, nil
@@ -138,7 +138,7 @@ func (r *NodeTopologyReconciler) getNode(ctx context.Context, nodeName string) (
 	nodeKey := client.ObjectKey{Name: nodeName}
 
 	if err := r.Client.Get(ctx, nodeKey, node); err != nil {
-		return nil, client.IgnoreNotFound(err)
+		return nil, err
 	}
 
 	return node, nil
@@ -178,7 +178,7 @@ func ExtractTierLabels(k8sNodeLabels map[string]string, topologyLabelPrefix stri
 }
 
 // RemoveNodeFromTopologyConfigMap removes the node's tier data from the ConfigMap
-func (r *NodeTopologyReconciler) RemoveNodeFromTopologyConfigMap(ctx context.Context, nodeName string) error {
+func (r *NodeTopologyReconciler) RemoveNodeFromTopologyConfigMap(ctx context.Context, nodeName string, logger logr.Logger) error {
 	configMap, err := r.getOrCreateTopologyLabelsConfigMap(ctx)
 	if err != nil {
 		return fmt.Errorf("get or create ConfigMap: %w", err)
@@ -193,7 +193,8 @@ func (r *NodeTopologyReconciler) RemoveNodeFromTopologyConfigMap(ctx context.Con
 		}
 		return nil
 	}
-	return fmt.Errorf("node %s not found in ConfigMap %s/%s", nodeName, r.Namespace, configMap.ObjectMeta.Name)
+	logger.V(1).Info("Node not found in ConfigMap, nothing to remove", "node", nodeName)
+	return nil
 }
 
 // updateTopologyConfigMap updates the ConfigMap with the node's tier data
