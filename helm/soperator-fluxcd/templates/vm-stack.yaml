@@ -73,6 +73,8 @@ spec:
           datasources:
             searchNamespace: {{- toYaml .Values.observability.vmStack.values.dashboardNamespaces | nindent 12 }}
       kube-state-metrics:
+        extraArgs:
+          - --metric-allowlist=kube_pod_info,kube_pod_status_phase,kube_pod_container_status_running,kube_pod_container_status_waiting,kube_pod_container_status_terminated,kube_pod_ips,kube_pod_status_reason,kube_pod_spec_volumes_persistentvolumeclaims_info,kube_pod_container_status_last_terminated_exitcode,kube_pod_container_resource_requests,kube_pod_container_resource_limits,kube_pod_container_status_restarts_total
         prometheusScrape: false
         selfMonitor:
           enabled: true
@@ -91,6 +93,30 @@ spec:
                   - action: labeldrop
                     regex: (uid|container_id|image_id)
                 port: metrics
+              - action: drop
+                sourceLabels: [__name__]
+                regex: kube_pod_completion_time
+              - action: drop
+                sourceLabels: [__name__]
+                regex: kube_pod_init_.*
+              - action: drop
+                sourceLabels: [__name__]
+                regex: kube_pod_owner
+              - action: drop
+                sourceLabels: [__name__]
+                regex: kube_pod_status_qos_class
+              - action: drop
+                sourceLabels: [__name__]
+                regex: kube_pod_tolerations
+              - action: drop
+                sourceLabels: [__name__]
+                regex: kube_pod_service_account
+              - action: drop
+                sourceLabels: [__name__]
+                regex: kube_pod_scheduler
+              - action: keep
+                sourceLabels: [namespace]
+                regex: ({{ .Values.slurmCluster.namespace}}|.*-system)
             jobLabel: app.kubernetes.io/name
       kubeControllerManager:
         enabled: false
