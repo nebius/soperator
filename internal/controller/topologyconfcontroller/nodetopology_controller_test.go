@@ -12,6 +12,7 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	tc "nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func TestExtractTierLabels(t *testing.T) {
@@ -121,9 +122,10 @@ func TestRemoveTopologyConfigMap(t *testing.T) {
 
 		tierData := map[string]string{"tier-1": "foo", "tier-2": "bar"}
 		err := reconciler.UpdateTopologyConfigMap(ctx, tt.nodeName, tierData)
+		logger := log.FromContext(ctx).WithName(tc.NodeTopologyReconcilerName)
 		assert.NoError(t, err)
 		t.Run(tt.name, func(t *testing.T) {
-			err := reconciler.RemoveNodeFromTopologyConfigMap(ctx, tt.nodeName)
+			err := reconciler.RemoveNodeFromTopologyConfigMap(ctx, tt.nodeName, logger)
 			assert.NoError(t, err)
 
 			updatedConfigMap := &corev1.ConfigMap{}
