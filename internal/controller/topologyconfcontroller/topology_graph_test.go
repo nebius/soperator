@@ -294,6 +294,25 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"SwitchName=unknown Nodes=pod6",
 			},
 		},
+		{
+			name: "Nodes with missing pod assignments should not create invalid switches",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-1": "leaf-A", "tier-2": "spine-X"},
+				"node2": {"tier-1": "leaf-B", "tier-2": "spine-X"},
+				"node3": {"tier-1": "leaf-C", "tier-2": "spine-X"}, // This node has no pods!
+			},
+			podsByNode: map[string][]string{
+				"node1": {"worker-1"},
+				"node2": {"worker-2"},
+				// "node3" is missing - this should not create invalid topology
+			},
+			expected: []string{
+				// This is what SHOULD be generated (without leaf-C):
+				"SwitchName=leaf-A Nodes=worker-1",
+				"SwitchName=leaf-B Nodes=worker-2",
+				"SwitchName=spine-X Switches=leaf-A,leaf-B", // Should NOT include leaf-C
+			},
+		},
 	}
 
 	for _, tt := range tests {
