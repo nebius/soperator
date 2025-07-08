@@ -93,30 +93,6 @@ spec:
                   - action: labeldrop
                     regex: (uid|container_id|image_id)
                 port: metrics
-              - action: drop
-                sourceLabels: [__name__]
-                regex: kube_pod_completion_time
-              - action: drop
-                sourceLabels: [__name__]
-                regex: kube_pod_init_.*
-              - action: drop
-                sourceLabels: [__name__]
-                regex: kube_pod_owner
-              - action: drop
-                sourceLabels: [__name__]
-                regex: kube_pod_status_qos_class
-              - action: drop
-                sourceLabels: [__name__]
-                regex: kube_pod_tolerations
-              - action: drop
-                sourceLabels: [__name__]
-                regex: kube_pod_service_account
-              - action: drop
-                sourceLabels: [__name__]
-                regex: kube_pod_scheduler
-              - action: keep
-                sourceLabels: [namespace]
-                regex: ({{ .Values.slurmCluster.namespace}}|.*-system)
             jobLabel: app.kubernetes.io/name
       kubeControllerManager:
         enabled: false
