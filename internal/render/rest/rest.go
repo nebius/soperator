@@ -41,10 +41,7 @@ func RenderDeploymentREST(
 		return nil, err
 	}
 
-	// in Deployment mode replicas should be 1.
-	// in StatefulSet mode replicas should be more than 1.
-	// Because of munge container use pvcs, we can't use template pvc for munge in Deployment mode.
-	replicas := ptr.To(int32(1))
+	replicas := ptr.To(valuesREST.Size)
 	if check.IsMaintenanceActive(valuesREST.Maintenance) {
 		replicas = ptr.To(consts.ZeroReplicas)
 	}

@@ -60,17 +60,9 @@ func renderContainerREST(containerParams values.Container, threadCount *int32, m
 			SuccessThreshold:    1,
 			TimeoutSeconds:      1,
 		},
-		SecurityContext: &corev1.SecurityContext{
-			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{
-					consts.ContainerSecurityContextCapabilitySysAdmin,
-				},
-			},
-		},
+		SecurityContext: &corev1.SecurityContext{},
 		Resources: corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceMemory: *containerParams.Resources.Memory(),
-			},
+			Limits:   common.CopyNonCPUResources(containerParams.Resources),
 			Requests: containerParams.Resources,
 		},
 	}
