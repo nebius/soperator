@@ -108,11 +108,14 @@ func BuildTopologyGraph(
 		workers := podsByNode[node]
 		delete(podsByNode, node)
 
-		for _, worker := range workers {
-			graph.AddEdge(pathToRoot[0], worker)
-		}
-		for i := range len(pathToRoot) - 1 {
-			graph.AddEdge(pathToRoot[i+1], pathToRoot[i])
+		// Only create topology edges if this node has workers
+		if len(workers) > 0 {
+			for _, worker := range workers {
+				graph.AddEdge(pathToRoot[0], worker)
+			}
+			for i := range len(pathToRoot) - 1 {
+				graph.AddEdge(pathToRoot[i+1], pathToRoot[i])
+			}
 		}
 	}
 
