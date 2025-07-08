@@ -74,7 +74,18 @@ spec:
             searchNamespace: {{- toYaml .Values.observability.vmStack.values.dashboardNamespaces | nindent 12 }}
       kube-state-metrics:
         extraArgs:
-          - --metric-allowlist=kube_pod_info,kube_pod_status_phase,kube_pod_container_status_running,kube_pod_container_status_waiting,kube_pod_container_status_terminated,kube_pod_ips,kube_pod_status_reason,kube_pod_spec_volumes_persistentvolumeclaims_info,kube_pod_container_status_last_terminated_exitcode,kube_pod_container_resource_requests,kube_pod_container_resource_limits,kube_pod_container_status_restarts_total
+          - '--metric-allowlist=kube_pod_info'
+          - '--metric-allowlist=kube_pod_status_phase'
+          - '--metric-allowlist=kube_pod_container_status_running'
+          - '--metric-allowlist=kube_pod_container_status_waiting'
+          - '--metric-allowlist=kube_pod_container_status_terminated'
+          - '--metric-allowlist=kube_pod_ips'
+          - '--metric-allowlist=kube_pod_status_reason'
+          - '--metric-allowlist=kube_pod_spec_volumes_persistentvolumeclaims_info'
+          - '--metric-allowlist=kube_pod_container_status_last_terminated_exitcode'
+          - '--metric-allowlist=kube_pod_container_resource_requests'
+          - '--metric-allowlist=kube_pod_container_resource_limits'
+          - '--metric-allowlist=kube_pod_container_status_restarts_total'
         prometheusScrape: false
         selfMonitor:
           enabled: true
