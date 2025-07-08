@@ -11,8 +11,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// TopologyGraph is a topology forest, i.e. a disjoint set of trees.
-// Leaves of the trees represent SLURM nodes.
+// TopologyGraph represents a network topology as a single tree with two types of vertices:
+//
+// 1. SWITCHES: Infrastructure nodes (spine, leaf, core switches) that represent network hierarchy.
+//   - Always have children (either other switches or worker nodes)
+//   - Are rendered as "SwitchName=X Switches=..." or "SwitchName=X Nodes=..." lines
+//   - Form the hierarchical backbone of the network topology
+//
+// 2. WORKERS: Compute nodes that execute Slurm jobs.
+//   - Have no children (leaf nodes in the tree)
+//   - Are NOT rendered as separate configuration lines
+//   - Only appear in "Nodes=" lists of their parent switches
+//
+// The graph maintains a single tree structure (using artificial "root" if needed) to ensure
+// strong connectivity - this is required for Slurm to schedule jobs across all nodes.
 type TopologyGraph struct {
 	// children[vertex] is set of children of a vertex.
 	children map[string]map[string]struct{}
@@ -31,7 +43,9 @@ func (g TopologyGraph) AddEdge(parent, child string) {
 	g.children[parent][child] = struct{}{}
 }
 
-// ensureSingleRoot adds all parentless switches as children of a single "root" switch
+// ensureSingleRoot ensures the topology forms a single tree by adding all parentless switches
+// as children of a single "root" switch. This is required for Slurm's strong connectivity
+// requirement - all nodes must be reachable from each other for job scheduling to work.
 func (g TopologyGraph) ensureSingleRoot() {
 	// Find all nodes that have parents
 	hasParent := make(map[string]bool)
@@ -59,14 +73,17 @@ func (g TopologyGraph) ensureSingleRoot() {
 	}
 }
 
-// RenderConfigLines renders the topology graph as a list of configuration lines.
-// Each line represents a vertex in the graph, with list of its children.
+// RenderConfigLines renders only SWITCH vertices as Slurm topology configuration lines.
+// WORKER vertices (leaves) are not rendered as separate lines - they only appear in
+// "Nodes=" lists of their parent switches.
+//
 // The format is:
-// SwitchName=<switch_name> Switches=<child1,child2,...>
-// or
-// SwitchName=<switch_name> Nodes=<child1,child2,...>
-// where <switch_name> is the name of the vertex, and <child1,child2,...> is a comma-separated list of its children.
-// If a vertex has no children, it is skipped (i.e. leaves of the tree are not rendered).
+//
+//	SwitchName=<switch_name> Switches=<child1,child2,...>  (if children are switches)
+//	SwitchName=<switch_name> Nodes=<child1,child2,...>     (if children are workers)
+//
+// This distinction is critical: switches with grandchildren use "Switches=",
+// while switches with only worker children use "Nodes=".
 func (g TopologyGraph) RenderConfigLines() []string {
 	var lines []string
 	for parent, childrenSet := range g.children {
@@ -92,6 +109,11 @@ func (g TopologyGraph) RenderConfigLines() []string {
 	return lines
 }
 
+// BuildTopologyGraph constructs a single tree topology from node labels and pod assignments.
+// Only nodes with actual pod assignments create topology edges - nodes with labels but no
+// pods are ignored to prevent "invalid child" errors in Slurm.
+//
+// The tree construction ensures strong connectivity required for Slurm job scheduling.
 func BuildTopologyGraph(
 	ctx context.Context, labelsByNode map[string]NodeTopologyLabels, podsByNode map[string][]string,
 ) TopologyGraph {
