@@ -135,7 +135,7 @@ observability:
         auth.anonymous:
           enabled: true
           org_name: Main Org.
-          org_role: Editor
+          org_role: Admin
       vmagent:
         spec:
           extraArgs:
