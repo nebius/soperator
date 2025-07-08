@@ -26,38 +26,6 @@ func (r SlurmClusterReconciler) ReconcileSConfigController(
 			"Reconciliation of SConfigController",
 			utils.MultiStepExecutionStrategyCollectErrors,
 			utils.MultiStepExecutionStep{
-				Name: "SConfigController Deployment",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling SConfigController Deployment")
-
-					desired, err := sconfigcontroller.RenderDeployment(
-						clusterValues.Namespace,
-						clusterValues.Name,
-						rest.GetServiceURL(clusterValues.Namespace, &clusterValues.NodeRest),
-						&clusterValues.SConfigController,
-						clusterValues.NodeFilters,
-						clusterValues.VolumeSources,
-					)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render")
-						return fmt.Errorf("rendering SConfigController Deployment: %w", err)
-					}
-
-					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-					stepLogger.V(1).Info("Rendered")
-
-					if err = r.Deployment.Reconcile(stepCtx, cluster, *desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
-						return fmt.Errorf("reconciling SConfigController Deployment: %w", err)
-					}
-
-					stepLogger.V(1).Info("Reconciled")
-
-					return nil
-				},
-			},
-			utils.MultiStepExecutionStep{
 				Name: "SCoonfigController ServiceAccount",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
@@ -115,6 +83,38 @@ func (r SlurmClusterReconciler) ReconcileSConfigController(
 					if err := r.RoleBinding.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling SConfigController RoleBinding: %w", err)
+					}
+
+					stepLogger.V(1).Info("Reconciled")
+
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "SConfigController Deployment",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling SConfigController Deployment")
+
+					desired, err := sconfigcontroller.RenderDeployment(
+						clusterValues.Namespace,
+						clusterValues.Name,
+						rest.GetServiceURL(clusterValues.Namespace, &clusterValues.NodeRest),
+						&clusterValues.SConfigController,
+						clusterValues.NodeFilters,
+						clusterValues.VolumeSources,
+					)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return fmt.Errorf("rendering SConfigController Deployment: %w", err)
+					}
+
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
+					stepLogger.V(1).Info("Rendered")
+
+					if err = r.Deployment.Reconcile(stepCtx, cluster, *desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return fmt.Errorf("reconciling SConfigController Deployment: %w", err)
 					}
 
 					stepLogger.V(1).Info("Reconciled")
