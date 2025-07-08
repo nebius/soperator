@@ -62,9 +62,7 @@ func renderContainerREST(containerParams values.Container, threadCount *int32, m
 		},
 		SecurityContext: &corev1.SecurityContext{},
 		Resources: corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceMemory: *containerParams.Resources.Memory(),
-			},
+			Limits:   common.CopyNonCPUResources(containerParams.Resources),
 			Requests: containerParams.Resources,
 		},
 	}
