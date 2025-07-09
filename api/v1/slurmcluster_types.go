@@ -85,7 +85,7 @@ type SlurmClusterSpec struct {
 	// SlurmConfig represents the Slurm configuration in slurm.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={defMemPerNode: 1048576, defCpuPerGPU: 4, completeWait: 5, epilog: "", prolog: "", taskPluginParam: "Autobind=Cores", maxJobCount: 10000, minJobAge: 86400, messageTimeout: 60}
+	// +kubebuilder:default={defMemPerNode: 1048576, defCpuPerGPU: 4, completeWait: 5, epilog: "", prolog: "", maxJobCount: 10000, minJobAge: 86400, messageTimeout: 60}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 
 	// CustomSlurmConfig represents the raw Slurm configuration from slurm.conf.
@@ -166,7 +166,7 @@ type SlurmConfig struct {
 	// Additional parameters for the task plugin
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="Autobind=Cores"
+	// +kubebuilder:default=""
 	TaskPluginParam *string `json:"taskPluginParam,omitempty"`
 	// Keep N last jobs in controller memory
 	//
