@@ -994,7 +994,7 @@ type SlurmNodeWorkerVolumes struct {
 
 	// JailSubMounts represents the sub-mount configurations within the jail volume
 	//
-	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Optional
 	JailSubMounts []NodeVolumeMount `json:"jailSubMounts"`
 
 	// CustomMounts represents the custom mount configurations
@@ -1069,7 +1069,7 @@ type SlurmNodeLoginVolumes struct {
 
 	// JailSubMounts represents the sub-mount configurations within the jail volume
 	//
-	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Optional
 	JailSubMounts []NodeVolumeMount `json:"jailSubMounts"`
 
 	// CustomMounts represents the custom mount configurations

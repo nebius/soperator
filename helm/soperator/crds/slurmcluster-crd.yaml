@@ -28913,7 +28913,6 @@ spec:
                             type: array
                         required:
                         - jail
-                        - jailSubMounts
                         type: object
                     required:
                     - k8sNodeFilterName
@@ -32962,7 +32961,6 @@ spec:
                             type: object
                         required:
                         - jail
-                        - jailSubMounts
                         - spool
                         type: object
                       workerAnnotations:
