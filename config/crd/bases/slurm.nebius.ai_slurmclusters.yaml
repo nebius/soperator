@@ -3190,7 +3190,6 @@ spec:
                   messageTimeout: 60
                   minJobAge: 86400
                   prolog: ""
-                  taskPluginParam: Autobind=Cores
                 description: SlurmConfig represents the Slurm configuration in slurm.conf.
                   Not all options are supported.
                 properties:
@@ -3240,7 +3239,7 @@ spec:
                       starts. Default value is no prolog
                     type: string
                   taskPluginParam:
-                    default: Autobind=Cores
+                    default: ""
                     description: Additional parameters for the task plugin
                     type: string
                   topologyParam:
@@ -12055,7 +12054,6 @@ spec:
                             type: array
                         required:
                         - jail
-                        - jailSubMounts
                         type: object
                     required:
                     - k8sNodeFilterName
@@ -16104,7 +16102,6 @@ spec:
                             type: object
                         required:
                         - jail
-                        - jailSubMounts
                         - spool
                         type: object
                       workerAnnotations:

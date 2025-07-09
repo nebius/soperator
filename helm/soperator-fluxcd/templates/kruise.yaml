@@ -45,4 +45,91 @@ spec:
     name: kruise
     optional: true
     valuesKey: values.yaml
+  postRenderers:
+  - kustomize:
+      patches:
+      - patch: |
+          - op: add
+            path: /spec/template/spec/containers/0/resources/limits/cpu
+            value: null
+        target:
+          kind: Deployment
+      - target:
+          kind: MutatingWebhookConfiguration
+          name: kruise-mutating-webhook-configuration
+        patch: |
+          - op: replace
+            path: /webhooks/0/namespaceSelector/matchExpressions
+            value:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - {{ .Values.soperator.namespace }}
+      - target:
+          kind: ValidatingWebhookConfiguration
+          name: kruise-validating-webhook-configuration
+        patch: |
+          - op: replace
+            path: /webhooks/0/namespaceSelector/matchExpressions
+            value:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - {{ .Values.soperator.namespace }}
+          - op: replace
+            path: /webhooks/1/namespaceSelector/matchExpressions
+            value:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - {{ .Values.soperator.namespace }}
+          - op: replace
+            path: /webhooks/2/namespaceSelector/matchExpressions
+            value:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - {{ .Values.soperator.namespace }}
+          - op: replace
+            path: /webhooks/3/namespaceSelector/matchExpressions
+            value:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - {{ .Values.soperator.namespace }}
+          - op: replace
+            path: /webhooks/4/namespaceSelector/matchExpressions
+            value:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - {{ .Values.soperator.namespace }}
+          - op: replace
+            path: /webhooks/5/namespaceSelector/matchExpressions
+            value:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - {{ .Values.soperator.namespace }}
+          - op: replace
+            path: /webhooks/6/namespaceSelector/matchExpressions
+            value:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - {{ .Values.soperator.namespace }}
+          - op: replace
+            path: /webhooks/7/namespaceSelector/matchExpressions
+            value:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - {{ .Values.soperator.namespace }}
+          - op: replace
+            path: /webhooks/8/namespaceSelector/matchExpressions
+            value:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - {{ .Values.soperator.namespace }}
 {{- end }}

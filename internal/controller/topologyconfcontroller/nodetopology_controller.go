@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -30,7 +31,7 @@ var (
 
 type NodeTopologyReconciler struct {
 	BaseReconciler
-	namespace string
+	Namespace string
 }
 
 func NewNodeTopologyReconciler(
@@ -40,7 +41,7 @@ func NewNodeTopologyReconciler(
 			Client: client,
 			Scheme: scheme,
 		},
-		namespace: namespace,
+		Namespace: namespace,
 	}
 }
 
@@ -103,8 +104,14 @@ func (r *NodeTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	logger := log.FromContext(ctx).WithName(NodeTopologyReconcilerName)
 	logger.Info("Starting reconciliation", "node", req.Name)
 
-	node, err := r.getNode(ctx, req.Name, logger)
+	node, err := r.getNode(ctx, req.Name)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			if err := r.RemoveNodeFromTopologyConfigMap(ctx, req.Name, logger); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{}, nil
+		}
 		return ctrl.Result{}, err
 	}
 
@@ -117,7 +124,7 @@ func (r *NodeTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	if err := r.updateTopologyConfigMap(ctx, req.Name, tierData, logger); err != nil {
+	if err := r.UpdateTopologyConfigMap(ctx, req.Name, tierData); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -126,13 +133,12 @@ func (r *NodeTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 // getNode retrieves the node object from the Kubernetes API server.
-func (r *NodeTopologyReconciler) getNode(ctx context.Context, nodeName string, logger logr.Logger) (*corev1.Node, error) {
+func (r *NodeTopologyReconciler) getNode(ctx context.Context, nodeName string) (*corev1.Node, error) {
 	node := &corev1.Node{}
 	nodeKey := client.ObjectKey{Name: nodeName}
 
 	if err := r.Client.Get(ctx, nodeKey, node); err != nil {
-		logger.Error(err, "Failed to get node", "node", nodeName)
-		return nil, client.IgnoreNotFound(err)
+		return nil, err
 	}
 
 	return node, nil
@@ -171,17 +177,37 @@ func ExtractTierLabels(k8sNodeLabels map[string]string, topologyLabelPrefix stri
 	return tierLabels
 }
 
+// RemoveNodeFromTopologyConfigMap removes the node's tier data from the ConfigMap
+func (r *NodeTopologyReconciler) RemoveNodeFromTopologyConfigMap(ctx context.Context, nodeName string, logger logr.Logger) error {
+	configMap, err := r.getOrCreateTopologyLabelsConfigMap(ctx)
+	if err != nil {
+		return fmt.Errorf("get or create ConfigMap: %w", err)
+	}
+	if configMap.Data == nil {
+		return nil // Nothing to remove if Data is nil
+	}
+	if _, exists := configMap.Data[nodeName]; exists {
+		delete(configMap.Data, nodeName)
+		if err := r.Client.Update(ctx, configMap); err != nil {
+			return fmt.Errorf("update ConfigMap %s/%s: %w", r.Namespace, configMap.ObjectMeta.Name, err)
+		}
+		return nil
+	}
+	logger.V(1).Info("Node not found in ConfigMap, nothing to remove", "node", nodeName)
+	return nil
+}
+
 // updateTopologyConfigMap updates the ConfigMap with the node's tier data
-func (r *NodeTopologyReconciler) updateTopologyConfigMap(ctx context.Context, nodeName string, tierData map[string]string, logger logr.Logger) error {
-	configMap, err := r.getOrCreateTopologyLabelsConfigMap(ctx, logger)
+func (r *NodeTopologyReconciler) UpdateTopologyConfigMap(
+	ctx context.Context, nodeName string, tierData map[string]string) error {
+	configMap, err := r.getOrCreateTopologyLabelsConfigMap(ctx)
 	if err != nil {
 		return err
 	}
 
 	tierDataJSON, err := json.Marshal(tierData)
 	if err != nil {
-		logger.Error(err, "Failed to marshal tier data", "node", nodeName)
-		return fmt.Errorf("failed to serialize tier data for node %s: %w", nodeName, err)
+		return fmt.Errorf("serialize tier data for node %s: %w", nodeName, err)
 	}
 
 	if configMap.Data == nil {
@@ -190,25 +216,23 @@ func (r *NodeTopologyReconciler) updateTopologyConfigMap(ctx context.Context, no
 	configMap.Data[nodeName] = string(tierDataJSON)
 
 	if err := r.Client.Update(ctx, configMap); err != nil {
-		logger.Error(err, "Failed to update ConfigMap", "configMap", configMap.ObjectMeta.Name)
-		return fmt.Errorf("failed to update ConfigMap %s/%s: %w", r.namespace, configMap.ObjectMeta.Name, err)
+		return fmt.Errorf("update ConfigMap %s/%s: %w", r.Namespace, configMap.ObjectMeta.Name, err)
 	}
 
 	return nil
 }
 
 // getOrCreateTopologyLabelsConfigMap retrieves or creates the ConfigMap used to store node topology information.
-func (r *NodeTopologyReconciler) getOrCreateTopologyLabelsConfigMap(ctx context.Context, logger logr.Logger) (*corev1.ConfigMap, error) {
+func (r *NodeTopologyReconciler) getOrCreateTopologyLabelsConfigMap(ctx context.Context) (*corev1.ConfigMap, error) {
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: ctrl.ObjectMeta{
 			Name:      consts.ConfigMapNameTopologyNodeLabels,
-			Namespace: r.namespace,
+			Namespace: r.Namespace,
 		},
 	}
 
 	if err := r.GetOrCreateConfigMap(ctx, configMap, nil); err != nil {
-		logger.Error(err, "Failed to get or create topology ConfigMap")
-		return nil, fmt.Errorf("failed to get or create ConfigMap: %w", err)
+		return nil, fmt.Errorf("get or create ConfigMap: %w", err)
 	}
 
 	return configMap, nil

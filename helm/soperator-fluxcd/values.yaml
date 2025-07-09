@@ -135,7 +135,7 @@ observability:
         auth.anonymous:
           enabled: true
           org_name: Main Org.
-          org_role: Editor
+          org_role: Admin
       vmagent:
         spec:
           extraArgs:
@@ -183,7 +183,7 @@ observability:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 1.21.7
+    version: 1.21.8
     namespace: soperator
     releaseName: soperator-dcgm-exporter
     values:
@@ -202,7 +202,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.21.7
+  version: 1.21.8
   namespace: soperator
   releaseName: soperator
   values: null
@@ -218,7 +218,7 @@ soperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.21.7
+  version: 1.21.8
   namespace: "soperator-system"
   releaseName: soperator-controller
   values:
@@ -236,12 +236,13 @@ soperator:
         managed: true
       resources:
         limits:
-          memory: 256Mi
+          cpu: 1000m
+          memory: 2Gi
         requests:
-          cpu: 100m
-          memory: 256Mi
+          cpu: 1000m
+          memory: 2Gi
       manager:
-        replicas: 1
+        replicas: 2
       featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true"
   soperatorChecks:
     enabled: true
