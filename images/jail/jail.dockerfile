@@ -55,7 +55,10 @@ ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 # Add Nebius public registry
 RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
-    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" > /etc/apt/sources.list.d/nebius.list
+    codename="$(. /etc/os-release && echo $VERSION_CODENAME)" && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ $codename main" > /etc/apt/sources.list.d/nebius.list && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" >> /etc/apt/sources.list.d/nebius.list
+
 
 # Install mock packages for NVIDIA drivers
 COPY images/common/scripts/install_driver_mocks.sh /opt/bin/
