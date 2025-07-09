@@ -151,7 +151,7 @@ RUN apt update && \
         iputils-ping \
         dnsutils \
         telnet \
-        netcat \
+        netcat-openbsd \
         strace \
         sudo \
         tree \
