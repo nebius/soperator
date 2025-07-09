@@ -236,12 +236,13 @@ soperator:
         managed: true
       resources:
         limits:
-          memory: 256Mi
+          cpu: 1000m
+          memory: 2Gi
         requests:
-          cpu: 100m
-          memory: 256Mi
+          cpu: 1000m
+          memory: 2Gi
       manager:
-        replicas: 1
+        replicas: 2
       featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true"
   soperatorChecks:
     enabled: true
