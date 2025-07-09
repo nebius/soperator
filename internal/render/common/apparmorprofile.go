@@ -1,87 +1,123 @@
 package common
 
 import (
-	"fmt"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/values"
 
-	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
+	apparmorprofilev1alpha1 "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
+	profilebasev1alpha1 "sigs.k8s.io/security-profiles-operator/api/profilebase/v1alpha1"
 )
 
-func RenderAppArmorProfile(cluster *values.SlurmCluster) *apparmor.AppArmorProfile {
-	if !cluster.NodeLogin.UseDefaultAppArmorProfile || !cluster.NodeWorker.UseDefaultAppArmorProfile {
-		return nil
-	}
-	return &apparmor.AppArmorProfile{
+func RenderAppArmorProfile(cluster *values.SlurmCluster) *apparmorprofilev1alpha1.AppArmorProfile {
+	isDisabled := cluster.NodeLogin.UseDefaultAppArmorProfile || cluster.NodeWorker.UseDefaultAppArmorProfile
+	return &apparmorprofilev1alpha1.AppArmorProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildAppArmorProfileName(cluster.Name, cluster.Namespace),
 			Namespace: cluster.Namespace,
 		},
-		Spec: apparmor.AppArmorProfileSpec{
-			Policy: generateAppArmorPolicy(cluster.Name, cluster.Namespace),
+		Spec: apparmorprofilev1alpha1.AppArmorProfileSpec{
+			Abstract: renderAppArmorAbstract(),
+			SpecBase: profilebasev1alpha1.SpecBase{
+				Disabled: isDisabled,
+			},
 		},
 	}
 }
 
-func generateAppArmorPolicy(clusterName, namespace string) string {
-	return fmt.Sprintf(`#include <tunables/global>
+func renderAppArmorAbstract() apparmorprofilev1alpha1.AppArmorAbstract {
+	// Start with minimal implementation to see what fields are actually available
+	return apparmorprofilev1alpha1.AppArmorAbstract{
+		Executable: renderExecutableRules(),
+		Filesystem: renderFileSystemRules(),
+		Network:    renderNetworkRules(),
+		Capability: renderCapabilityRules(),
+	}
+}
 
-profile %s flags=(attach_disconnected,mediate_deleted) {
-  include <abstractions/base>
+func renderExecutableRules() *apparmorprofilev1alpha1.AppArmorExecutablesRules {
+	return &apparmorprofilev1alpha1.AppArmorExecutablesRules{
+		AllowedExecutables: &allPaths,
+		AllowedLibraries:   &allPaths,
+	}
+}
 
-  file,
-  mount,
-  capability,
-  network,
-  dbus,
-  pivot_root,
-  remount,
-  ptrace,
-  signal,
-  umount,
-  unix,
+func renderFileSystemRules() *apparmorprofilev1alpha1.AppArmorFsRules {
+	return &apparmorprofilev1alpha1.AppArmorFsRules{
+		ReadOnlyPaths:  &noWritePaths,
+		ReadWritePaths: &allPaths,
+	}
+}
 
-  /** lrixw,
+func renderNetworkRules() *apparmorprofilev1alpha1.AppArmorNetworkRules {
+	return &apparmorprofilev1alpha1.AppArmorNetworkRules{
+		AllowRaw: &[]bool{true}[0],
+		Protocols: &apparmorprofilev1alpha1.AppArmorAllowedProtocols{
+			AllowTCP: &[]bool{true}[0],
+			AllowUDP: &[]bool{true}[0],
+		},
+	}
+}
 
-  deny /usr/lib/x86_64-linux-gnu/libEGL_* w,
-  deny /usr/lib/x86_64-linux-gnu/libGLES* w,
-  deny /usr/lib/x86_64-linux-gnu/libGLX_nvidia* w,
-  deny /usr/lib/x86_64-linux-gnu/libnvcuvid* w,
-  deny /usr/lib/x86_64-linux-gnu/gbm/nvidia-* w,
-  deny /usr/lib/x86_64-linux-gnu/nvidia/wine/_nvngx.dll w,
-  deny /usr/lib/x86_64-linux-gnu/nvidia/wine/nvngx.dll w,
-  deny /usr/lib/x86_64-linux-gnu/nvidia/xorg/libglxserver_nvidia* w,
-  deny /usr/lib/x86_64-linux-gnu/nvidia/xorg/nvidia_drv.so w,
-  deny /usr/lib/x86_64-linux-gnu/vdpau/libvdpau_nvidia w,
-  deny /usr/lib/x86_64-linux-gnu/libnvidia-*.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
-  deny /usr/lib/x86_64-linux-gnu/libcuda.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
-  deny /usr/lib/x86_64-linux-gnu/libcudadebugger.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
+func renderCapabilityRules() *apparmorprofilev1alpha1.AppArmorCapabilityRules {
+	return &apparmorprofilev1alpha1.AppArmorCapabilityRules{
+		AllowedCapabilities: []string{
+			"CAP_CHOWN",
+			"CAP_DAC_OVERRIDE",
+			"CAP_FOWNER",
+			"CAP_FSETID",
+			"CAP_SETGID",
+			"CAP_SETUID",
+			"CAP_NET_BIND_SERVICE",
+			"CAP_SYS_CHROOT",
+			"CAP_SYS_ADMIN",
+			"CAP_SYS_PTRACE",
+			"CAP_KILL",
+			"CAP_AUDIT_WRITE",
+			"CAP_SETFCAP",
+		},
+	}
+}
 
-  deny /lib/x86_64-linux-gnu/libnvidia-*.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
-  deny /usr/local/lib/x86_64-linux-gnu/libcuda.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
-  deny /lib/x86_64-linux-gnu/libcudadebugger.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
+var allPaths = []string{
+	"/**",
+}
 
-  deny /usr/local/lib/x86_64-linux-gnu/libnvidia-*.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
-  deny /usr/local/lib/x86_64-linux-gnu/libcuda.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
-  deny /usr/local/lib/x86_64-linux-gnu/libcudadebugger.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
-
-  deny /usr/local/nvidia/lib/x86_64-linux-gnu/libnvidia-*.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
-  deny /usr/local/nvidia/lib/x86_64-linux-gnu/libcuda.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
-  deny /usr/local/nvidia/lib/x86_64-linux-gnu/libcudadebugger.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
-
-  deny /usr/local/nvidia/lib64/libnvidia-*.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
-  deny /usr/local/nvidia/lib64/libcuda.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
-  deny /usr/local/nvidia/lib64/libcudadebugger.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]* w,
-
-  deny /usr/bin/nvidia-smi w,
-  deny /usr/bin/nvidia-debugdump w,
-  deny /usr/bin/nvidia-persistenced w,
-  deny /usr/bin/nv-fabricmanager w,
-  deny /usr/bin/nvidia-cuda-mps-control w,
-  deny /usr/bin/nvidia-cuda-mps-server w,
-  deny /lib/firmware/nvidia/**/gsp_*.bin w,
-}`, naming.BuildAppArmorProfileName(clusterName, namespace))
+var noWritePaths = []string{
+	"/etc",
+	"/usr",
+	"/var",
+	"/usr/lib/x86_64-linux-gnu/libEGL_*",
+	"/usr/lib/x86_64-linux-gnu/libGLES*",
+	"/usr/lib/x86_64-linux-gnu/libGLX_nvidia*",
+	"/usr/lib/x86_64-linux-gnu/libnvcuvid*",
+	"/usr/lib/x86_64-linux-gnu/gbm/nvidia-*",
+	"/usr/lib/x86_64-linux-gnu/nvidia/wine/_nvngx.dll",
+	"/usr/lib/x86_64-linux-gnu/nvidia/wine/nvngx.dll",
+	"/usr/lib/x86_64-linux-gnu/nvidia/xorg/libglxserver_nvidia*",
+	"/usr/lib/x86_64-linux-gnu/nvidia/xorg/nvidia_drv.so",
+	"/usr/lib/x86_64-linux-gnu/vdpau/libvdpau_nvidia",
+	"/usr/lib/x86_64-linux-gnu/libnvidia-*.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]*",
+	"/usr/lib/x86_64-linux-gnu/libcuda.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]*",
+	"/usr/lib/x86_64-linux-gnu/libcudadebugger.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]*",
+	"/lib/x86_64-linux-gnu/libnvidia-*.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]*",
+	"/usr/local/lib/x86_64-linux-gnu/libcuda.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]*",
+	"/lib/x86_64-linux-gnu/libcudadebugger.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]*",
+	"/usr/local/lib/x86_64-linux-gnu/libnvidia-*.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]*",
+	"/usr/local/lib/x86_64-linux-gnu/libcuda.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]*",
+	"/usr/local/lib/x86_64-linux-gnu/libcudadebugger.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]*",
+	"/usr/local/nvidia/lib/x86_64-linux-gnu/libnvidia-*.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]*",
+	"/usr/local/nvidia/lib/x86_64-linux-gnu/libcuda.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]*",
+	"/usr/local/nvidia/lib/x86_64-linux-gnu/libcudadebugger.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]*",
+	"/usr/local/nvidia/lib64/libnvidia-*.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]*",
+	"/usr/local/nvidia/lib64/libcuda.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]*",
+	"/usr/local/nvidia/lib64/libcudadebugger.so.[0-9][0-9][0-9].[0-9][0-9].[0-9]*",
+	"/usr/bin/nvidia-smi",
+	"/usr/bin/nvidia-debugdump",
+	"/usr/bin/nvidia-persistenced",
+	"/usr/bin/nv-fabricmanager",
+	"/usr/bin/nvidia-cuda-mps-control",
+	"/usr/bin/nvidia-cuda-mps-server",
+	"/lib/firmware/nvidia/**/gsp_*.bin",
 }
