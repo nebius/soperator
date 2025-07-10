@@ -10,7 +10,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -119,14 +118,12 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			logger.Info("ActiveCheckJob resource not found. Ignoring since object must be deleted.")
 			return ctrl.Result{}, nil
 		}
-		logger.Error(err, "Failed to get ActiveCheckJob")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("get active check job: %w", err)
 	}
 
 	activeCheckName, err := r.getActiveCheckNameFromJob(ctx, k8sJob)
 	if err != nil {
-		logger.Error(err, "Failed to get ActiveCheckName")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("get active check name: %w", err)
 	}
 	activeCheck := &slurmv1alpha1.ActiveCheck{}
 	err = r.Get(ctx, types.NamespacedName{
@@ -294,10 +291,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 func (r *ActiveCheckJobReconciler) getActiveCheckNameFromJob(ctx context.Context, k8sJob *batchv1.Job) (string, error) {
 	podList := &corev1.PodList{}
-	err := r.List(ctx, podList, &client.ListOptions{
-		Namespace:     k8sJob.Namespace,
-		LabelSelector: labels.SelectorFromSet(map[string]string{"job-name": k8sJob.Name}),
-	})
+	err := r.List(ctx, podList, client.InNamespace(k8sJob.Namespace), client.MatchingLabels{"job-name": k8sJob.Name})
 	if err != nil || len(podList.Items) == 0 {
 		return "", fmt.Errorf("failed to find pod for job %s: %w", k8sJob.Name, err)
 	}
