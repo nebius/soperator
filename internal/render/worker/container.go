@@ -46,6 +46,30 @@ func renderContainerToolkitValidation(container *values.Container) corev1.Contai
 	}
 }
 
+// RenderContainerWaitForController renders init [corev1.Container] that waits for controller readiness
+func RenderContainerWaitForController(container *values.Container, clusterName string) corev1.Container {
+	return corev1.Container{
+		Name:            consts.ContainerNameWaitForController,
+		Image:           container.Image,
+		ImagePullPolicy: container.ImagePullPolicy,
+		Command: []string{
+			"/opt/bin/slurm/wait-for-controller.sh",
+		},
+		Env: []corev1.EnvVar{
+			{
+				Name:  "CONTROLLER_SERVICE",
+				Value: naming.BuildServiceName(consts.ComponentTypeController, clusterName),
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			common.RenderVolumeMountJail(),
+			common.RenderVolumeMountMungeSocket(),
+		},
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+	}
+}
+
 // renderContainerSlurmd renders [corev1.Container] for slurmd
 func renderContainerSlurmd(
 	container *values.Container,
