@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -122,7 +123,11 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 
-	activeCheckName := k8sJob.Annotations[consts.AnnotationActiveCheckKey]
+	activeCheckName, err := r.getActiveCheckNameFromJob(ctx, k8sJob)
+	if err != nil {
+		logger.Error(err, "Failed to get ActiveCheckName")
+		return ctrl.Result{}, err
+	}
 	activeCheck := &slurmv1alpha1.ActiveCheck{}
 	err = r.Get(ctx, types.NamespacedName{
 		Namespace: req.Namespace,
@@ -285,6 +290,25 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 	logger.Info("Reconciled ActiveCheckJob")
 	return ctrl.Result{}, nil
+}
+
+func (r *ActiveCheckJobReconciler) getActiveCheckNameFromJob(ctx context.Context, k8sJob *batchv1.Job) (string, error) {
+	podList := &corev1.PodList{}
+	err := r.List(ctx, podList, &client.ListOptions{
+		Namespace:     k8sJob.Namespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{"job-name": k8sJob.Name}),
+	})
+	if err != nil || len(podList.Items) == 0 {
+		return "", fmt.Errorf("failed to find pod for job %s: %w", k8sJob.Name, err)
+	}
+
+	pod := &podList.Items[0]
+	activeCheckName, ok := pod.Annotations[consts.AnnotationActiveCheckKey]
+	if !ok {
+		return "", fmt.Errorf("annotation %s not found on pod %s", consts.AnnotationActiveCheckKey, pod.Name)
+	}
+
+	return activeCheckName, nil
 }
 
 func getK8sJobStatus(k8sJob *batchv1.Job) consts.ActiveCheckK8sJobStatus {
