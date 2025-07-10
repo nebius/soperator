@@ -7,7 +7,7 @@ attempt=0
 
 # Create symlink to slurm configs (same as worker entrypoint)
 echo "Creating symlink to slurm configs..."
-rm -rf /etc/slurm && ln -s /mnt/jail/slurm /etc/slurm
+rm -rf /etc/slurm && ln -s /mnt/jail/etc/slurm /etc/slurm
 
 # Wait for controller service to be resolvable via DNS
 echo "Checking controller service DNS resolution..."

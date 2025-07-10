@@ -214,6 +214,7 @@ RUN apt-get update && \
       slurm-smd-dev=${SLURM_VERSION}-1 \
       slurm-smd-libnss-slurm=${SLURM_VERSION}-1 \
       slurm-smd=${SLURM_VERSION}-1 && \
+    rm -rf /etc/slurm && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

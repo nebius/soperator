@@ -228,19 +228,19 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 			if err = r.ReconcileCommon(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
-			if err = r.ReconcileSConfigController(ctx, cluster, clusterValues); err != nil {
-				return ctrl.Result{}, err
-			}
 			if err = r.ReconcileAccounting(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
 			if err = r.ReconcileNCCLBenchmark(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
-			if err = r.ReconcileControllers(ctx, cluster, clusterValues); err != nil {
+			if err = r.ReconcileWorkers(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
-			if err = r.ReconcileWorkers(ctx, cluster, clusterValues); err != nil {
+			if err = r.ReconcileSConfigController(ctx, cluster, clusterValues); err != nil {
+				return ctrl.Result{}, err
+			}
+			if err = r.ReconcileControllers(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
 			// TODO: Drop this check because Slurm clusters can't exist without Login nodes
