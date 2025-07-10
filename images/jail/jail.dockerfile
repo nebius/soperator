@@ -147,6 +147,7 @@ RUN apt update && \
         lsof \
         pkg-config \
         software-properties-common \
+        python3-apt \
         squashfs-tools \
         iputils-ping \
         dnsutils \
