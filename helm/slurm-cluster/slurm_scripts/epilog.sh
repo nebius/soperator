@@ -16,6 +16,10 @@ if [ -n "$SLURM_JOB_GPUS" ]; then
         # The list of healthchecks in the execution order
         checks=(
             health_checker
+            hc_xid
+            hc_ib_link_state
+            hc_ib_counters
+            hc_ib_pkey
         )
 
         pushd /opt/slurm_scripts || exit 0
