@@ -229,7 +229,7 @@ soperator:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 1.8.*
+    version: 1.8.0
     releaseName: soperator-kruise
     overrideValues:
       crds:
