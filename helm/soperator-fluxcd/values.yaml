@@ -234,15 +234,15 @@ soperator:
     overrideValues:
       crds:
         managed: true
-      resources:
-        limits:
-          cpu: 1000m
-          memory: 2Gi
-        requests:
-          cpu: 1000m
-          memory: 2Gi
       manager:
         replicas: 2
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 1000m
+            memory: 2Gi
       featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true"
   soperatorChecks:
     enabled: true
