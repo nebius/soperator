@@ -33,6 +33,11 @@ func RenderRole(clusterNamespace, clusterName string) rbacv1.Role {
 				Resources: []string{"leases"},
 				Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
 			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"events"},
+				Verbs:     []string{"create", "patch"},
+			},
 		},
 	}
 }
