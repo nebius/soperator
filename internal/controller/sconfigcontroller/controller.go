@@ -83,7 +83,10 @@ func (r *ControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	for _, configMap := range configMapList.Items {
-
+		if len(configMap.Data) == 0 {
+			logger.V(1).Info("Skipping ConfigMap with no data", "name", configMap.Name)
+			continue
+		}
 		subPath := configMap.Annotations[consts.AnnotationSConfigControllerSourceKey]
 		if err := validatePath(subPath); err != nil {
 			logger.V(1).Error(err, "Invalid path in ConfigMap annotations", "path", subPath)
