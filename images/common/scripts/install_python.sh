@@ -1,20 +1,34 @@
 #!/bin/bash
+set -e
 
-set -e # Exit immediately if any command returns a non-zero error code
+codename="$(. /etc/os-release && echo "$VERSION_CODENAME")"
 
-# Install python
-add-apt-repository ppa:deadsnakes/ppa -y
-apt-get update
-apt -y install \
-    python3.10 \
-    python3.10-dev \
-    python3.10-venv \
-    python3.10-dbg
+if [[ "$codename" == "jammy" ]]; then
+    echo "[*] Detected Ubuntu Jammy — installing Python 3.10 from deadsnakes PPA"
+    add-apt-repository ppa:deadsnakes/ppa -y
+    apt-get update
+    PYVER=3.10
+
+elif [[ "$codename" == "noble" ]]; then
+    echo "[*] Detected Ubuntu Noble — using system Python 3.12"
+    apt-get update
+    PYVER=3.12
+
+else
+    echo "[!] Unsupported Ubuntu codename: $codename"
+    exit 1
+fi
+
+apt-get install -y \
+    python${PYVER} \
+    python${PYVER}-dev \
+    python${PYVER}-venv \
+    python${PYVER}-dbg
+
+curl -sS https://bootstrap.pypa.io/get-pip.py | python${PYVER}
+
+ln -sf /usr/bin/python${PYVER} /usr/bin/python
+ln -sf /usr/bin/python${PYVER} /usr/bin/python3
+
 apt-get clean
 rm -rf /var/lib/apt/lists/*
-
-# Install pip
-curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
-
-# Make python3.10 the default python
-ln -s -f /usr/bin/python3.10 /usr/bin/python && ln -s -f /usr/bin/python3.10 /usr/bin/python3
