@@ -18,6 +18,11 @@ if [ -n "$SLURM_JOB_GPUS" ]; then
             boot_disk_full
             alloc_gpus_busy
             health_checker
+            hc_host_service
+            hc_xid
+            hc_ib_link_state
+            hc_ib_counters
+            hc_ib_pkey
         )
 
         pushd /opt/slurm_scripts || exit 0

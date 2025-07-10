@@ -16,6 +16,11 @@ chroot /mnt/jail /bin/bash -s <<-'EOF'
     checks=(
         boot_disk_full
         health_checker
+        hc_host_service
+        hc_xid
+        hc_ib_link_state
+        hc_ib_counters
+        hc_ib_pkey
     )
 
     pushd /opt/slurm_scripts || exit 0
