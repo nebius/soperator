@@ -128,7 +128,7 @@ pushd "${jaildir}"
 
     echo "Bind-mount slurm configs"
     mkdir -p etc/slurm
-    mount --bind /mnt/jail/slurm etc/slurm
+    mount --bind /mnt/jail/etc/slurm etc/slurm
 
     echo 'Creating Soperator output directory'
     ( \
