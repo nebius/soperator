@@ -1,4 +1,4 @@
-FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy AS cuda
+FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS cuda
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
@@ -108,7 +108,7 @@ RUN ARCH=$(uname -m) && \
       *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
     esac && \
     echo "Using architecture: $ARCH_DEB" && \
-    wget -P /tmp $PACKAGES_REPO_URL/nccl_tests_$CUDA_VERSION/nccl-tests-perf-${ARCH_DEB}.tar.gz && \
+    wget -P /tmp "${PACKAGES_REPO_URL}/nccl_tests_${CUDA_VERSION}_ubuntu24.04/nccl-tests-perf-${ARCH_DEB}.tar.gz" && \
     tar -xvzf /tmp/nccl-tests-perf-${ARCH_DEB}.tar.gz -C /usr/bin && \
     rm -rf /tmp/nccl-tests-perf-${ARCH_DEB}.tar.gz
 
@@ -147,11 +147,12 @@ RUN apt update && \
         lsof \
         pkg-config \
         software-properties-common \
+        python3-apt \
         squashfs-tools \
         iputils-ping \
         dnsutils \
         telnet \
-        netcat \
+        netcat-openbsd \
         strace \
         sudo \
         tree \
@@ -197,7 +198,7 @@ RUN chmod +x /opt/bin/install_python.sh && \
 
 # Install parallel because it's required for enroot operation
 RUN apt-get update && \
-    apt -y install parallel=20210822+ds-2 && \
+    apt -y install parallel=20240222+ds-2 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -230,8 +231,7 @@ RUN chmod +x /opt/bin/install_container_toolkit.sh && \
 COPY images/common/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
 
 # Install nvtop GPU monitoring utility
-RUN add-apt-repository ppa:flexiondotorg/nvtop && \
-    apt-get update && \
+RUN add-apt-repository -y ppa:quentiumyt/nvtop && \
     apt install -y nvtop && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*

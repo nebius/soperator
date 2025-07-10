@@ -1,5 +1,5 @@
 # BASE_IMAGE defined here for second multistage build
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
+ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:noble
 
 # First stage: Build the gpubench application
 FROM golang:1.24 AS gpubench_builder
@@ -22,7 +22,7 @@ RUN GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 #######################################################################################################################
 # Second stage: Build worker image
 
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
+ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:noble
 
 FROM $BASE_IMAGE AS worker_slurmd
 
@@ -90,7 +90,9 @@ ENV PATH=$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
 # Add Nebius public registry
 RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
-    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" > /etc/apt/sources.list.d/nebius.list
+    codename="$(. /etc/os-release && echo $VERSION_CODENAME)" && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ $codename main" > /etc/apt/sources.list.d/nebius.list && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" >> /etc/apt/sources.list.d/nebius.list
 
 RUN apt-get update && \
     apt -y install \
@@ -118,7 +120,7 @@ RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
 
 # Install parallel because it's required for enroot operation
 RUN apt-get update && \
-    apt -y install parallel=20210822+ds-2 && \
+    apt -y install parallel=20240222+ds-2 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

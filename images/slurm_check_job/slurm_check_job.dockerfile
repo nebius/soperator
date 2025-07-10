@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
+ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:noble
 
 FROM $BASE_IMAGE AS slurm_check_job
 
@@ -47,7 +47,9 @@ RUN apt-get update && \
 
 # Add Nebius public registry
 RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
-    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" > /etc/apt/sources.list.d/nebius.list
+    codename="$(. /etc/os-release && echo $VERSION_CODENAME)" && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ $codename main" > /etc/apt/sources.list.d/nebius.list && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" >> /etc/apt/sources.list.d/nebius.list
 
 RUN apt-get update && \
     apt -y install \
@@ -67,7 +69,7 @@ RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
 
 # Install parallel because it's required for enroot operation
 RUN apt-get update && \
-    apt -y install parallel=20210822+ds-2 && \
+    apt -y install parallel=20240222+ds-2 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
