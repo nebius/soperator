@@ -27,7 +27,7 @@ SLURM_OUTPUT=$(
         --extra="${ACTIVE_CHECK_NAME}=true" \
         --array=0-$((HOSTS_NUM-1)) \
         --nodes=1 \
-        --chdir=/opt/soperatorchecks \
+        --chdir=/opt/soperator-home/soperatorchecks \
         --uid=soperatorchecks \
         /opt/bin/sbatch.sh
 )
