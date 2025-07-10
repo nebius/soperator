@@ -231,8 +231,7 @@ RUN chmod +x /opt/bin/install_container_toolkit.sh && \
 COPY images/common/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
 
 # Install nvtop GPU monitoring utility
-RUN add-apt-repository ppa:flexiondotorg/nvtop && \
-    apt-get update && \
+RUN add-apt-repository -y ppa:quentiumyt/nvtop && \
     apt install -y nvtop && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
