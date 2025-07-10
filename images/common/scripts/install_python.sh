@@ -25,7 +25,13 @@ apt-get install -y \
     python${PYVER}-venv \
     python${PYVER}-dbg
 
-curl -sS https://bootstrap.pypa.io/get-pip.py | python${PYVER}
+
+
+if [[ "$codename" == "jammy" ]]; then
+  curl -sS https://bootstrap.pypa.io/get-pip.py | python${PYVER}
+else
+  apt-get install python3-pip -y
+fi
 
 ln -sf /usr/bin/python${PYVER} /usr/bin/python
 ln -sf /usr/bin/python${PYVER} /usr/bin/python3
