@@ -85,8 +85,8 @@ observability:
     namespace: logs-system
     logs:
       version: 0.117.*
-      interval: 5m
-      timeout: 5m
+      interval: 15m
+      timeout: 15m
       values:
         jailLogs:
           enabled: true
