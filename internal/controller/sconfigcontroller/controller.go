@@ -73,7 +73,7 @@ func (r *ControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	configMapList := &corev1.ConfigMapList{}
 
 	if err := r.List(
-		ctx, configMapList, client.InNamespace(req.Namespace), client.MatchingFields{consts.LabelSConfigControllerSourceKey: "true"},
+		ctx, configMapList, client.InNamespace(req.Namespace), client.MatchingLabels{consts.LabelSConfigControllerSourceKey: "true"},
 	); err != nil {
 		if apierrors.IsNotFound(err) {
 			logger.V(1).Info("ConfigMap not found, skipping reconciliation")
