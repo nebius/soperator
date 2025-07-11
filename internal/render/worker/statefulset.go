@@ -50,6 +50,7 @@ func RenderStatefulSet(
 	// Since 1.29 is native sidecar support, we can use the native restart policy
 	initContainers := []corev1.Container{
 		common.RenderContainerMunge(&worker.ContainerMunge),
+		RenderContainerWaitForController(&worker.ContainerSlurmd, clusterName),
 	}
 	if clusterType == consts.ClusterTypeGPU {
 		initContainers = append(initContainers, renderContainerToolkitValidation(&worker.ContainerToolkitValidation))
