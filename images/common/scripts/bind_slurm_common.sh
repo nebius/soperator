@@ -53,8 +53,6 @@ pushd "${jaildir}"
     # slurm-smd-client
     # https://gist.github.com/asteny/988e08fbe978e1c6ba20e4aa2d87f114
     echo "Bind-mount slurm-smd-client package content from container to the jail"
-    mkdir -p etc/slurm
-
     SLURM_BINARIES=(
         sacct salloc sbatch scancel scrontab sdiag sinfo squeue srun sstat
         sacctmgr sattach sbcast scontrol scrun sh5util sprio sreport sshare strigger

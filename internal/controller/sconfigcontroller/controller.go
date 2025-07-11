@@ -81,12 +81,13 @@ func (r *ControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 		return ctrl.Result{}, fmt.Errorf("listing ConfigMaps: %w", err)
 	}
-
+	reconfigure := false
 	for _, configMap := range configMapList.Items {
 		if len(configMap.Data) == 0 {
 			logger.V(1).Info("Skipping ConfigMap with no data", "name", configMap.Name)
 			continue
 		}
+		reconfigure = true
 		subPath := configMap.Annotations[consts.AnnotationSConfigControllerSourceKey]
 		if err := validatePath(subPath); err != nil {
 			logger.V(1).Error(err, "Invalid path in ConfigMap annotations", "path", subPath)
@@ -115,9 +116,11 @@ func (r *ControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 	logger.V(1).Info("Requesting Slurm API to reconfigure workers")
 
-	_, err := r.slurmAPIClient.SlurmV0041GetReconfigureWithResponse(ctx)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("requesting Slurm API to reconfigure workers: %w", err)
+	if reconfigure {
+		_, err := r.slurmAPIClient.SlurmV0041GetReconfigureWithResponse(ctx)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("requesting Slurm API to reconfigure workers: %w", err)
+		}
 	}
 
 	return ctrl.Result{}, nil
