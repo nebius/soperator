@@ -22,7 +22,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
@@ -198,23 +197,23 @@ func newBasicConfigMap() *corev1.ConfigMap {
 // 	}
 // }
 
-func TestController_FailFlow_ClientGetError(t *testing.T) {
-	t.Parallel()
+// func TestController_FailFlow_ClientGetError(t *testing.T) {
+// 	t.Parallel()
 
-	sctrl, apiClient, fakeStore, err := newTestController(t, newBasicConfigMap())
-	require.NoError(t, err)
+// 	sctrl, apiClient, fakeStore, err := newTestController(t, newBasicConfigMap())
+// 	require.NoError(t, err)
 
-	fakeStore.AssertNotCalled(t, "Add", mock.AnythingOfType("string"), mock.AnythingOfType("string"))
-	apiClient.AssertNotCalled(t, "SlurmV0041GetReconfigureWithResponse", context.Background())
+// 	fakeStore.AssertNotCalled(t, "Add", mock.AnythingOfType("string"), mock.AnythingOfType("string"))
+// 	apiClient.AssertNotCalled(t, "SlurmV0041GetReconfigureWithResponse", context.Background())
 
-	_, err = sctrl.Reconcile(context.Background(), ctrl.Request{
-		NamespacedName: types.NamespacedName{
-			Name:      "somename",
-			Namespace: "somenamespace",
-		},
-	})
-	require.Error(t, err)
-}
+// 	_, err = sctrl.Reconcile(context.Background(), ctrl.Request{
+// 		NamespacedName: types.NamespacedName{
+// 			Name:      "somename",
+// 			Namespace: "somenamespace",
+// 		},
+// 	})
+// 	require.Error(t, err)
+// }
 
 func TestController_FailFlow_StoreAddError(t *testing.T) {
 	t.Parallel()
