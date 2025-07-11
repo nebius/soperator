@@ -127,8 +127,6 @@ pushd "${jaildir}"
     mount --bind "/${SLURM_LIB_PATH}/spank_pyxis.so" "${SLURM_LIB_PATH}/spank_pyxis.so"
 
     echo "Bind-mount slurm configs"
-    mkdir -p etc/slurm
-    mount --bind /mnt/jail/slurm etc/slurm
 
     echo 'Creating Soperator output directory'
     ( \

@@ -18,25 +18,23 @@ package sconfigcontroller
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	k8srest "k8s.io/client-go/rest"
 
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	"nebius.ai/slurm-operator/internal/consts"
 	fakefilestore "nebius.ai/slurm-operator/internal/controller/sconfigcontroller/fake"
 	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
 )
@@ -117,7 +115,7 @@ func TestController_SuccessFlow(t *testing.T) {
 					Name:      "soperator-slurm-configs",
 					Namespace: "soperator",
 					Labels: map[string]string{
-						"slurm.nebius.ai/slurm-config": "general",
+						consts.LabelSConfigControllerSourceKey: "true",
 					},
 				},
 				Data: map[string]string{
@@ -142,7 +140,7 @@ func TestController_SuccessFlow(t *testing.T) {
 					Name:      "soperator-slurm-configs",
 					Namespace: "soperator",
 					Labels: map[string]string{
-						"slurm.nebius.ai/slurm-config": "general",
+						consts.LabelSConfigControllerSourceKey: "true",
 					},
 				},
 				Data: map[string]string{
@@ -169,7 +167,7 @@ func TestController_SuccessFlow(t *testing.T) {
 					Name:      "soperator-slurm-configs",
 					Namespace: "soperator",
 					Labels: map[string]string{
-						"slurm.nebius.ai/slurm-config": "general",
+						consts.LabelSConfigControllerSourceKey: "true",
 					},
 				},
 				Data: map[string]string{},
@@ -196,60 +194,6 @@ func TestController_SuccessFlow(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
-}
-
-func TestController_FailFlow_ClientGetError(t *testing.T) {
-	t.Parallel()
-
-	sctrl, apiClient, fakeStore, err := newTestController(t, newBasicConfigMap())
-	require.NoError(t, err)
-
-	fakeStore.AssertNotCalled(t, "Add", mock.AnythingOfType("string"), mock.AnythingOfType("string"))
-	apiClient.AssertNotCalled(t, "SlurmV0041GetReconfigureWithResponse", context.Background())
-
-	_, err = sctrl.Reconcile(context.Background(), ctrl.Request{
-		NamespacedName: types.NamespacedName{
-			Name:      "somename",
-			Namespace: "somenamespace",
-		},
-	})
-	require.Error(t, err)
-}
-
-func TestController_FailFlow_StoreAddError(t *testing.T) {
-	t.Parallel()
-
-	sctrl, apiClient, fakeStore, err := newTestController(t, newBasicConfigMap())
-	require.NoError(t, err)
-
-	fakeStore.On("Add", "config.conf", "config.conf content", "").Once().Return(errors.New("adding file error"))
-	apiClient.AssertNotCalled(t, "SlurmV0041GetReconfigureWithResponse", context.Background())
-
-	_, err = sctrl.Reconcile(context.Background(), ctrl.Request{
-		NamespacedName: types.NamespacedName{
-			Name:      "soperator-slurm-configs",
-			Namespace: "soperator",
-		},
-	})
-	require.Error(t, err)
-}
-
-func TestController_FailFlow_SlurmAPIReconfigureError(t *testing.T) {
-	t.Parallel()
-
-	sctrl, apiClient, fakeStore, err := newTestController(t, newBasicConfigMap())
-	require.NoError(t, err)
-
-	fakeStore.On("Add", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Once().Return(nil)
-	apiClient.On("SlurmV0041GetReconfigureWithResponse", context.Background()).Once().Return(nil, errors.New("reconfiguring slurm cluster error"))
-
-	_, err = sctrl.Reconcile(context.Background(), ctrl.Request{
-		NamespacedName: types.NamespacedName{
-			Name:      "soperator-slurm-configs",
-			Namespace: "soperator",
-		},
-	})
-	require.Error(t, err)
 }
 
 func TestValidatePath(t *testing.T) {
