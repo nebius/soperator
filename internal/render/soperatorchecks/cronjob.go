@@ -44,11 +44,6 @@ func RenderK8sCronJob(check *slurmv1alpha1.ActiveCheck, foundPodTemplate *corev1
 					BackoffLimit: ptr.To(consts.ZeroReplicas),
 					Template:     podTemplateSpec,
 				},
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						consts.AnnotationActiveCheckKey: check.Name,
-					},
-				},
 			},
 			SuccessfulJobsHistoryLimit: ptr.To(check.Spec.SuccessfulJobsHistoryLimit),
 			FailedJobsHistoryLimit:     ptr.To(check.Spec.FailedJobsHistoryLimit),

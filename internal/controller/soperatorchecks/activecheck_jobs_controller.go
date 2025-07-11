@@ -118,11 +118,13 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			logger.Info("ActiveCheckJob resource not found. Ignoring since object must be deleted.")
 			return ctrl.Result{}, nil
 		}
-		logger.Error(err, "Failed to get ActiveCheckJob")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("get active check job: %w", err)
 	}
 
-	activeCheckName := k8sJob.Annotations[consts.AnnotationActiveCheckKey]
+	activeCheckName, err := r.getActiveCheckNameFromJob(ctx, k8sJob)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("get active check name: %w", err)
+	}
 	activeCheck := &slurmv1alpha1.ActiveCheck{}
 	err = r.Get(ctx, types.NamespacedName{
 		Namespace: req.Namespace,
@@ -285,6 +287,22 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 	logger.Info("Reconciled ActiveCheckJob")
 	return ctrl.Result{}, nil
+}
+
+func (r *ActiveCheckJobReconciler) getActiveCheckNameFromJob(ctx context.Context, k8sJob *batchv1.Job) (string, error) {
+	podList := &corev1.PodList{}
+	err := r.List(ctx, podList, client.InNamespace(k8sJob.Namespace), client.MatchingLabels{"job-name": k8sJob.Name})
+	if err != nil || len(podList.Items) == 0 {
+		return "", fmt.Errorf("failed to find pod for job %s: %w", k8sJob.Name, err)
+	}
+
+	pod := &podList.Items[0]
+	activeCheckName, ok := pod.Annotations[consts.AnnotationActiveCheckKey]
+	if !ok {
+		return "", fmt.Errorf("annotation %s not found on pod %s", consts.AnnotationActiveCheckKey, pod.Name)
+	}
+
+	return activeCheckName, nil
 }
 
 func getK8sJobStatus(k8sJob *batchv1.Job) consts.ActiveCheckK8sJobStatus {
