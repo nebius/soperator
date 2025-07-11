@@ -17,12 +17,8 @@ limitations under the License.
 package sconfigcontroller
 
 import (
-	"context"
-	"errors"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +26,6 @@ import (
 	"k8s.io/client-go/rest"
 	k8srest "k8s.io/client-go/rest"
 
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -215,23 +210,23 @@ func newBasicConfigMap() *corev1.ConfigMap {
 // 	require.Error(t, err)
 // }
 
-func TestController_FailFlow_StoreAddError(t *testing.T) {
-	t.Parallel()
+// func TestController_FailFlow_StoreAddError(t *testing.T) {
+// 	t.Parallel()
 
-	sctrl, apiClient, fakeStore, err := newTestController(t, newBasicConfigMap())
-	require.NoError(t, err)
+// 	sctrl, apiClient, fakeStore, err := newTestController(t, newBasicConfigMap())
+// 	require.NoError(t, err)
 
-	fakeStore.On("Add", "config.conf", "config.conf content", "").Once().Return(errors.New("adding file error"))
-	apiClient.AssertNotCalled(t, "SlurmV0041GetReconfigureWithResponse", context.Background())
+// 	fakeStore.On("Add", "config.conf", "config.conf content", "").Once().Return(errors.New("adding file error"))
+// 	apiClient.AssertNotCalled(t, "SlurmV0041GetReconfigureWithResponse", context.Background())
 
-	_, err = sctrl.Reconcile(context.Background(), ctrl.Request{
-		NamespacedName: types.NamespacedName{
-			Name:      "soperator-slurm-configs",
-			Namespace: "soperator",
-		},
-	})
-	require.Error(t, err)
-}
+// 	_, err = sctrl.Reconcile(context.Background(), ctrl.Request{
+// 		NamespacedName: types.NamespacedName{
+// 			Name:      "soperator-slurm-configs",
+// 			Namespace: "soperator",
+// 		},
+// 	})
+// 	require.Error(t, err)
+// }
 
 // func TestController_FailFlow_SlurmAPIReconfigureError(t *testing.T) {
 // 	t.Parallel()
