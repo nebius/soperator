@@ -65,6 +65,13 @@ jobs:
           go-version-file: 'go.mod'
           cache: false
 
+      - name: Install AWS cli
+        uses: unfor19/install-aws-cli-action@v1
+        with:
+          version: 2
+          verbose: false
+          arch: amd64
+
       - name: Find latest successful build run on current branch
         id: find_build
         env:
