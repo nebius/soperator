@@ -22,8 +22,6 @@ type SlurmCluster struct {
 
 	PopulateJail PopulateJail
 
-	NCCLBenchmark SlurmNCCLBenchmark
-
 	NodeFilters   []slurmv1.K8sNodeFilter
 	VolumeSources []slurmv1.VolumeSource
 	Secrets       slurmv1.Secrets
@@ -62,7 +60,6 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		PartitionConfiguration: buildPartitionConfiguration(&cluster.Spec.PartitionConfiguration),
 		WorkerFeatures:         cluster.Spec.WorkerFeatures,
 		HealthCheckConfig:      buildHealthCheckConfig(cluster.Spec.HealthCheckConfig),
-		NCCLBenchmark:          buildSlurmNCCLBenchmarkFrom(cluster.Name, &cluster.Spec.PeriodicChecks.NCCLBenchmark),
 		PopulateJail:           buildSlurmPopulateJailFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.PopulateJail),
 		NodeFilters:            buildNodeFiltersFrom(cluster.Spec.K8sNodeFilters),
 		VolumeSources:          buildVolumeSourcesFrom(cluster.Spec.VolumeSources),

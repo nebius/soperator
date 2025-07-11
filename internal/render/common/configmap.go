@@ -365,8 +365,6 @@ func RenderConfigMapSecurityLimits(componentType consts.ComponentType, cluster *
 		}
 	case consts.ComponentTypeController:
 		data = cluster.NodeController.ContainerSlurmctld.NodeContainer.SecurityLimitsConfig
-	case consts.ComponentTypeBenchmark:
-		data = cluster.NCCLBenchmark.ContainerNCCLBenchmark.NodeContainer.SecurityLimitsConfig
 	}
 
 	if data == "" {

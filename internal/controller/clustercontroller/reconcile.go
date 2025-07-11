@@ -227,9 +227,6 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 			if err = r.ReconcileAccounting(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
-			if err = r.ReconcileNCCLBenchmark(ctx, cluster, clusterValues); err != nil {
-				return ctrl.Result{}, err
-			}
 			if err = r.ReconcileWorkers(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
