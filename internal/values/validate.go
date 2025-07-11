@@ -160,26 +160,6 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 			)
 		}
 
-		// NCCLBenchmark volume refer to existing volume sources
-		if c.NCCLBenchmark.Enabled {
-			_, err := utils.GetBy(
-				c.VolumeSources,
-				consts.VolumeNameJail,
-				func(f slurmv1.VolumeSource) string { return f.Name },
-			)
-			if err != nil {
-				logger.Error(
-					err,
-					"NCCLBenchmark requires jail specified in VolumeSources",
-					"Slurm.VolumeSource.Name", consts.VolumeNameJail,
-				)
-				return fmt.Errorf(
-					"NCCLBenchmark requires volume source with name %q specified in VolumeSources: %w",
-					consts.VolumeNameJail,
-					err,
-				)
-			}
-		}
 	}
 
 	// Secrets

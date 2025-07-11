@@ -26,7 +26,6 @@ var (
 	ComponentTypeWorker            ComponentType = baseComponentType{"worker"}
 	ComponentTypeNodeConfigurator  ComponentType = baseComponentType{"node-configurator"}
 	ComponentTypeLogin             ComponentType = baseComponentType{"login"}
-	ComponentTypeBenchmark         ComponentType = baseComponentType{"nccl-benchmark"}
 	ComponentTypePopulateJail      ComponentType = baseComponentType{"populate-jail"}
 	ComponentTypeExporter          ComponentType = baseComponentType{"exporter"}
 	ComponentTypeMariaDbOperator   ComponentType = baseComponentType{"mariadb-operator"}
