@@ -14,7 +14,6 @@ on:
       - 'PROJECT'
       - 'README.md'
       - 'SECURITY.md'
-      - 'images/worker/gpubench/**'
 
   # pull_request are defined separately to allow to run CI from forks.
   pull_request:
@@ -28,7 +27,6 @@ on:
       - 'PROJECT'
       - 'README.md'
       - 'SECURITY.md'
-      - 'images/worker/gpubench/**'
 
 permissions:
   contents: read

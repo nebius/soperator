@@ -184,17 +184,6 @@ func BuildConfigMapSupervisordName(clusterName string) string {
 
 // endregion Worker
 
-// region NCCLBenchmark
-
-func BuildCronJobNCCLBenchmarkName(clusterName string) string {
-	return namedEntity{
-		clusterName: clusterName,
-		entity:      consts.CronJobNameNCCLBenchmark,
-	}.String()
-}
-
-// endregion NCCLBenchmark
-
 // region PopulateJailJob
 
 func BuildPopulateJailJobName(clusterName string) string {
