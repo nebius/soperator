@@ -28,7 +28,6 @@ import (
 	"nebius.ai/slurm-operator/internal/slurmapi"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -75,12 +74,13 @@ func (r *ControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := r.List(
 		ctx, configMapList, client.InNamespace(req.Namespace), client.MatchingLabels{consts.LabelSConfigControllerSourceKey: "true"},
 	); err != nil {
-		if apierrors.IsNotFound(err) {
-			logger.V(1).Info("ConfigMap not found, skipping reconciliation")
-			return ctrl.Result{}, nil
-		}
 		return ctrl.Result{}, fmt.Errorf("listing ConfigMaps: %w", err)
 	}
+
+	if len(configMapList.Items) == 0 {
+		return ctrl.Result{}, nil
+	}
+
 	reconfigure := false
 	for _, configMap := range configMapList.Items {
 		if len(configMap.Data) == 0 {
