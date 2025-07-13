@@ -24,7 +24,7 @@ func renderInitContainerSConfigController() corev1.Container {
 		},
 		Command: []string{"/bin/sh", "-c"}, // Use bash to execute the script
 		Args: []string{
-			"cd /mnt/jail && mkdir -p slurm && chown 1001:1001 slurm && chmod 755 slurm",
+			"cd /mnt/jail/etc && mkdir -p slurm && chown 1001:1001 slurm && chmod 755 slurm",
 		},
 	}
 }

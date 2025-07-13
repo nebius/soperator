@@ -16,7 +16,7 @@ echo "Complement jail rootfs"
 /opt/bin/slurm/complement_jail.sh -j /mnt/jail -u /mnt/jail.upper
 
 echo "Symlink slurm configs from jail(sconfigcontroller)"
-rm -rf /etc/slurm && ln -s /mnt/jail/slurm /etc/slurm
+rm -rf /etc/slurm && ln -s /mnt/jail/etc/slurm /etc/slurm
 
 echo "Bind-mount /opt/bin/sbatch.sh script"
 mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh

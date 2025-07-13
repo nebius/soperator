@@ -69,51 +69,58 @@ func (r *ControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	logger.V(1).Info("Reconciling SConfigController")
 
-	configMap := &corev1.ConfigMap{}
-	if err := r.Get(ctx, req.NamespacedName, configMap); err != nil {
-		logger.V(1).Error(err, "Getting ConfigMap produced an error", "configMap", req.Name)
-		// Return an error if the ConfigMap cannot be found or other errors occur
-		return ctrl.Result{}, err
+	configMapList := &corev1.ConfigMapList{}
+
+	if err := r.List(
+		ctx, configMapList, client.InNamespace(req.Namespace), client.MatchingLabels{consts.LabelSConfigControllerSourceKey: "true"},
+	); err != nil {
+		return ctrl.Result{}, fmt.Errorf("listing ConfigMaps: %w", err)
 	}
 
-	if len(configMap.Data) == 0 {
-		logger.V(1).Info("Got ConfigMap with empty Data", "configMapName", req.NamespacedName.Name)
+	if len(configMapList.Items) == 0 {
 		return ctrl.Result{}, nil
 	}
 
-	subPath := configMap.Annotations[consts.AnnotationSConfigControllerSourceKey]
-	if err := validatePath(subPath); err != nil {
-		logger.V(1).Error(err, "Invalid path in ConfigMap annotations", "path", subPath)
-		return ctrl.Result{}, fmt.Errorf("invalid path %q in ConfigMap annotations: %w", subPath, err)
-	}
-
-	subPath = trimSlurmPrefix(subPath)
-
-	executable := configMap.Annotations[consts.AnnotationSConfigControllerExecutableKey] == consts.DefaultSConfigControllerExecutableValue
-	for configName, configContent := range configMap.Data {
-		logger.V(1).Info("About to save slurm config", "configName", configName)
-
-		err := r.fileStore.Add(configName, configContent, subPath)
-		if err != nil {
-			logger.V(1).Error(err, "Adding file to fileStore produced an error", "configName", configName)
-			return ctrl.Result{}, err
+	reconfigure := false
+	for _, configMap := range configMapList.Items {
+		if len(configMap.Data) == 0 {
+			logger.V(1).Info("Skipping ConfigMap with no data", "name", configMap.Name)
+			continue
+		}
+		reconfigure = true
+		subPath := configMap.Annotations[consts.AnnotationSConfigControllerSourceKey]
+		if err := validatePath(subPath); err != nil {
+			logger.V(1).Error(err, "Invalid path in ConfigMap annotations", "path", subPath)
+			return ctrl.Result{}, fmt.Errorf("invalid path %q in ConfigMap annotations: %w", subPath, err)
 		}
 
-		if executable {
-			err = r.fileStore.SetExecutable(configName, subPath)
+		subPath = trimSlurmPrefix(subPath)
+
+		executable := configMap.Annotations[consts.AnnotationSConfigControllerExecutableKey] == consts.DefaultSConfigControllerExecutableValue
+		for configName, configContent := range configMap.Data {
+			logger.V(1).Info("About to save slurm config", "configName", configName)
+
+			err := r.fileStore.Add(configName, configContent, subPath)
 			if err != nil {
-				logger.V(1).Error(err, "Setting executable to a file produced an error", "configName", configName)
-				return ctrl.Result{}, err
+				return ctrl.Result{}, fmt.Errorf("adding file %q to fileStore: %w", configName, err)
+			}
+
+			if executable {
+				err = r.fileStore.SetExecutable(configName, subPath)
+				if err != nil {
+					return ctrl.Result{}, fmt.Errorf("setting executable for file %q in fileStore: %w", configName, err)
+				}
 			}
 		}
-	}
 
+	}
 	logger.V(1).Info("Requesting Slurm API to reconfigure workers")
 
-	_, err := r.slurmAPIClient.SlurmV0041GetReconfigureWithResponse(ctx)
-	if err != nil {
-		logger.V(1).Error(err, "Requesting Slurm API produced an error", "method", "reconfigure")
-		return ctrl.Result{}, err
+	if reconfigure {
+		_, err := r.slurmAPIClient.SlurmV0041GetReconfigureWithResponse(ctx)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("requesting Slurm API to reconfigure workers: %w", err)
+		}
 	}
 
 	return ctrl.Result{}, nil

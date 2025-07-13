@@ -14,7 +14,7 @@ touch /var/spool/slurmctld/jwt_hs256.key
 mount --bind /mnt/rest-jwt-key/rest_jwt.key /var/spool/slurmctld/jwt_hs256.key
 
 echo "Symlink slurm configs from K8S config map"
-rm -rf /etc/slurm && ln -s /mnt/jail/slurm /etc/slurm
+rm -rf /etc/slurm && ln -s /mnt/jail/etc/slurm /etc/slurm
 
 echo "Set permissions for shared /var/spool/slurmctld"
 chmod 755 /var/spool/slurmctld # It changes permissions of this shared directory in other containers as well
