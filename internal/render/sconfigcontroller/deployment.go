@@ -52,7 +52,7 @@ func RenderDeployment(
 		Spec: appsv1.DeploymentSpec{
 			Replicas: replicas,
 			Strategy: appsv1.DeploymentStrategy{
-				Type: appsv1.RecreateDeploymentStrategyType,
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
 			},
 			Selector: &metav1.LabelSelector{
 				MatchLabels: matchLabels,

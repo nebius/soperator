@@ -1,6 +1,8 @@
 package sconfigcontroller
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
@@ -24,7 +26,10 @@ func renderInitContainerSConfigController() corev1.Container {
 		},
 		Command: []string{"/bin/sh", "-c"}, // Use bash to execute the script
 		Args: []string{
-			"cd /mnt/jail/etc && mkdir -p slurm && chown 1001:1001 slurm && chmod 755 slurm",
+			fmt.Sprintf(
+				"mkdir -p %[1]s && chown 1001:1001 %[1]s && chmod 755 %[1]s",
+				consts.DefaultPathEtcSlurm,
+			),
 		},
 	}
 }
