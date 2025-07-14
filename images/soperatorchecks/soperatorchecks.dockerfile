@@ -15,11 +15,11 @@ FROM alpine:latest@sha256:a8560b36e8b8210634f77d9f7f9efd7ffa463e380b75e2e74aff45
 
 COPY --from=soperatorchecks_builder /build/soperatorchecks /usr/bin/
 
-RUN addgroup -S -g 1001 soperatorchecks && \
-    adduser -S -u 1001 soperatorchecks -G soperatorchecks soperatorchecks && \
-    chown 1001:1001 /usr/bin/soperatorchecks && \
+RUN addgroup -S -g 63000 soperatorchecks && \
+    adduser -S -u 63000 soperatorchecks -G soperatorchecks soperatorchecks && \
+    chown 63000:63000 /usr/bin/soperatorchecks && \
     chmod 755 /usr/bin/soperatorchecks
 
-USER 1001
+USER 63000
 
 CMD ["/usr/bin/soperatorchecks"]
