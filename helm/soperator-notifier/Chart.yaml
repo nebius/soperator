@@ -1,0 +1,6 @@
+apiVersion: v2
+name: soperator-notifier
+description: A set of VictoriaMetrics entities to ease up a setup of Slurm operation notifications to Slack
+type: application
+version: 0.1.0
+appVersion: "1.16.0"

@@ -1,0 +1,80 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAlertmanagerConfig
+metadata:
+  name: slack-config
+  namespace: monitoring-system
+  labels:
+    slack-route: "enabled"
+spec:
+  route:
+    receiver: "slack-channel"
+    group_by:
+      - alertname
+      - severity
+    group_wait:  30s
+    group_interval: 5m
+    repeat_interval: 25h
+  receivers:
+    - name: "slack-channel"
+      slack_configs:
+        - api_url:
+            name: slack-webhook
+            key: url
+          title: "{{ .CommonAnnotations.title }}"
+          # language=gotemplate
+          text: |-
+            {{ range .Alerts }}
+            {{- $id := .Labels.job_id }}
+            {{- $job := .Labels.job_name }}
+            {{- $state := .Labels.job_state }}
+            {{- $reason := .Labels.job_state_reason }}
+            {{- $user := .Labels.job_user }}
+
+            {{- if eq $state "FAILED" }}
+            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} has *FAILED* (reason: `{{ $reason }}`)
+
+            {{- else if eq $state "NODE_FAIL" }}
+            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was terminated due to a *NODE FAILURE* (reason: `{{ $reason }}`). It should be automatically restarted under the same job ID.
+
+            {{- else if eq $state "OUT_OF_MEMORY" }}
+            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was killed for *EXCEEDING ITS MEMORY LIMIT* (reason: `{{ $reason }}`)
+
+            {{- else if eq $state "CANCELLED" }}
+            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was *CANCELLED* (reason: `{{ $reason }}`). If this was not done manually, it may indicate an error
+
+            {{- else if eq $state "BOOT_FAIL" }}
+            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was removed from the queue due to an *EPHEMERAL NODE LAUNCH FAILURE* (reason: `{{ $reason }}`)
+
+            {{- else if eq $state "DEADLINE" }}
+            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was removed from the queue because it *DIDN’T START WITHIN ITS DEADLINE* (reason: `{{ $reason }}`)
+
+            {{- else if eq $state "PREEMPTED" }}
+            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was *PREEMPTED* by a higher-priority job (reason: `{{ $reason }}`)
+
+            {{- else if eq $state "SUSPENDED" }}
+            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was *SUSPENDED* (reason: `{{ $reason }}`)
+
+            {{- else if eq $state "TIMEOUT" }}
+            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was killed for *EXCEEDING ITS TIME LIMIT* (reason: `{{ $reason }}`)
+
+            {{- else if eq $state "COMPLETED" }}
+            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} *COMPLETED* successfully
+
+            {{- else }}
+            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} ended in state `{{ $state }}` (reason: `{{ $reason }}`)
+            {{- end }}
+
+            {{- end }}
+
+          # language=gotemplate
+          color: |-
+            {{- if eq .CommonLabels.severity "error" -}}
+            danger
+            {{- else if eq .CommonLabels.severity "warning" -}}
+            #F28B30
+            {{- else if eq .CommonLabels.severity "good" -}}
+            good
+            {{- else -}}
+            #807F83
+            {{- end -}}
+          send_resolved: false

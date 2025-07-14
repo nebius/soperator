@@ -1,0 +1,83 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: slurm-job-records
+  namespace: monitoring-system
+  labels:
+    vmrule-group: slack-records
+spec:
+  groups:
+    - name: slurm-job-records
+      rules:
+        - record: slurm_job_error_alerted
+          expr: max_over_time(slurm_job_info{job_state=~"FAILED|NODE_FAIL|OUT_OF_MEMORY"}[1h])
+
+        - record: slurm_job_warning_alerted
+          expr: max_over_time(slurm_job_info{job_state=~"BOOT_FAIL|CANCELLED|DEADLINE|PREEMPTED|SUSPENDED|TIMEOUT"}[1h])
+
+        - record: slurm_job_good_alerted
+          expr: max_over_time(slurm_job_info{job_state=~"COMPLETED"}[1h])
+
+---
+
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: slurm-job
+  namespace: monitoring-system
+  labels:
+    vmrule-group: slack
+spec:
+  groups:
+    - name: slurm-job-rules
+      rules:
+        - alert: SlurmJobError
+          expr: |
+            changes(slurm_job_info{job_state=~"FAILED|NODE_FAIL|OUT_OF_MEMORY", user_name!~"^(nebius|soperatorchecks)$"}) > 0
+            unless ignoring(job_id, job_state, job_name, job_state_reason, user_name) slurm_job_error_alerted
+          for: 0s
+          labels:
+            severity: error
+            namespace: monitoring-system
+            job_id: "{{ $labels.job_id }}"
+            job_name: "{{ $labels.job_name }}"
+            job_state: "{{ $labels.job_state }}"
+            job_state_reason: "{{ $labels.job_state_reason }}"
+            job_user: "{{ $labels.user_name }}"
+            alert_key: "job_{{ $labels.job_id }}_{{ $labels.job_state }}"
+          annotations:
+            title: "SLURM jobs failed"
+
+        - alert: SlurmJobWarning
+          expr: |
+            changes(slurm_job_info{job_state=~"BOOT_FAIL|CANCELLED|DEADLINE|PREEMPTED|SUSPENDED|TIMEOUT", user_name!~"^(nebius|soperatorchecks)$"}) > 0
+            unless ignoring(job_id, job_state, job_name, job_state_reason, user_name) slurm_job_warning_alerted
+          for: 0s
+          labels:
+            severity: warning
+            namespace: monitoring-system
+            job_id: "{{ $labels.job_id }}"
+            job_name: "{{ $labels.job_name }}"
+            job_state: "{{ $labels.job_state }}"
+            job_state_reason: "{{ $labels.job_state_reason }}"
+            job_user: "{{ $labels.user_name }}"
+            alert_key: "job_{{ $labels.job_id }}_{{ $labels.job_state }}"
+          annotations:
+            title: "SLURM jobs exited"
+
+        - alert: SlurmJobGood
+          expr: |
+            changes(slurm_job_info{job_state=~"COMPLETED", user_name!~"^(nebius|soperatorchecks)$"}) > 0
+            unless ignoring(job_id, job_state, job_name, job_state_reason, user_name) slurm_job_good_alerted
+          for: 0s
+          labels:
+            severity: good
+            namespace: monitoring-system
+            job_id: "{{ $labels.job_id }}"
+            job_name: "{{ $labels.job_name }}"
+            job_state: "{{ $labels.job_state }}"
+            job_state_reason: "{{ $labels.job_state_reason }}"
+            job_user: "{{ $labels.user_name }}"
+            alert_key: "job_{{ $labels.job_id }}_{{ $labels.job_state }}"
+          annotations:
+            title: "SLURM jobs completed"

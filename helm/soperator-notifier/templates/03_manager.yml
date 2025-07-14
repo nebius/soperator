@@ -1,0 +1,10 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAlertmanager
+metadata:
+  name: slack
+  namespace: monitoring-system
+spec:
+  replicaCount: 1
+  configSelector:
+    matchLabels:
+      slack-route: "enabled"

@@ -1,0 +1,31 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAlert
+metadata:
+  name: slurm-job-records
+  namespace: monitoring-system
+spec:
+  evaluationInterval: 30s
+  datasource:
+    url: http://vmsingle-metrics-victoria-metrics-k8s-stack:8429
+  notifiers:
+    - url: blackhole://
+  ruleSelector:
+    matchLabels:
+      vmrule-group: slack-records
+
+---
+
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAlert
+metadata:
+  name: slurm-job
+  namespace: monitoring-system
+spec:
+  evaluationInterval: 30s
+  datasource:
+    url: http://vmsingle-metrics-victoria-metrics-k8s-stack:8429
+  notifiers:
+    - url: http://vmalertmanager-slack:9093
+  ruleSelector:
+    matchLabels:
+      vmrule-group: slack
