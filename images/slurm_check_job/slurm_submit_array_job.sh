@@ -15,7 +15,7 @@ done
 
 echo "Submitting Slurm array job..."
 HOSTS_NUM=$(sinfo -N --noheader -o "%N" | wc -l)
-export SLURM_PROLOG="/slurm/activecheck-prolog.sh"
+export SLURM_PROLOG="/etc/slurm/activecheck-prolog.sh"
 OUT_PATTERN='/opt/soperator-outputs/slurm_jobs/%N.%x.%j.%A.out'
 # Here we use env variables instead of --output and --error because they do not support %N (node name) parameter.
 SLURM_OUTPUT=$(
