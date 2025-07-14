@@ -323,6 +323,12 @@ type PluginConfigCustom struct {
 type SConfigController struct {
 	Node      SlurmNode     `json:"node,omitempty"`
 	Container NodeContainer `json:"container,omitempty"`
+
+	// ConfigsPath defines the path where the Slurm configs are stored in the jail.
+	// Defaults to /mnt/jail/etc/slurm
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="/mnt/jail/etc/slurm"
+	JailSlurmConfigPath string `json:"jailSlurmConfigPath,omitempty"`
 }
 
 type PartitionConfiguration struct {

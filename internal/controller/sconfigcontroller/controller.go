@@ -121,6 +121,10 @@ func (r *ControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("requesting Slurm API to reconfigure workers: %w", err)
 		}
+		logger.V(1).Info("Slurm API reconfigure request sent successfully")
+		logger.V(1).Info("Sleeping for 1 second to allow Slurm to reconfigure")
+		// Default MessageTimeout for Soperator is 1 second
+		time.Sleep(1 * time.Second)
 	}
 
 	return ctrl.Result{}, nil

@@ -10,7 +10,7 @@ import (
 	"nebius.ai/slurm-operator/internal/render/common"
 )
 
-func renderInitContainerSConfigController() corev1.Container {
+func renderInitContainerSConfigController(jailConfigPath string) corev1.Container {
 	// Create a copy of the container's limits and add non-CPU resources from Requests
 
 	// restartPolicy := corev1.ContainerRestartPolicyAlways
@@ -28,7 +28,7 @@ func renderInitContainerSConfigController() corev1.Container {
 		Args: []string{
 			fmt.Sprintf(
 				"mkdir -p %[1]s && chown 1001:1001 %[1]s && chmod 755 %[1]s",
-				consts.DefaultPathEtcSlurm,
+				jailConfigPath,
 			),
 		},
 	}

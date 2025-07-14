@@ -91,6 +91,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 			cluster.Spec.SConfigController.Node,
 			cluster.Spec.SConfigController.Container,
 			*cluster.Spec.Maintenance,
+			cluster.Spec.SConfigController.JailSlurmConfigPath,
 		),
 	}
 
