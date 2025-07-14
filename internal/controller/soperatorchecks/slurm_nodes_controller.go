@@ -37,9 +37,9 @@ var (
 
 type SlurmNodesController struct {
 	*reconciler.Reconciler
-	slurmAPIClients        *slurmapi.ClientSet
-	reconcileTimeout       time.Duration
-	enabledNodeReplacement bool
+	slurmAPIClients  *slurmapi.ClientSet
+	reconcileTimeout time.Duration
+	cfg              Config
 }
 
 func NewSlurmNodesController(
@@ -48,15 +48,15 @@ func NewSlurmNodesController(
 	recorder record.EventRecorder,
 	slurmAPIClients *slurmapi.ClientSet,
 	reconcileTimeout time.Duration,
-	enabledNodeReplacement bool,
+	cfg Config,
 ) *SlurmNodesController {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
 	return &SlurmNodesController{
-		Reconciler:             r,
-		slurmAPIClients:        slurmAPIClients,
-		reconcileTimeout:       reconcileTimeout,
-		enabledNodeReplacement: enabledNodeReplacement,
+		Reconciler:       r,
+		slurmAPIClients:  slurmAPIClients,
+		reconcileTimeout: reconcileTimeout,
+		cfg:              cfg,
 	}
 }
 
@@ -119,7 +119,6 @@ func (c *SlurmNodesController) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{RequeueAfter: c.reconcileTimeout}, nil
 }
 
-// TODO: filter slurmNodes by supported slurm clusters
 func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types.NamespacedName][]slurmapi.Node, error) {
 	degradedNodes := make(map[types.NamespacedName][]slurmapi.Node)
 
@@ -177,7 +176,7 @@ func (c *SlurmNodesController) processDegradedNode(
 	case consts.SlurmNodeReasonNodeReplacement:
 		return c.processSlurmNodeMaintenance(ctx, k8sNode, slurmClusterName, node.Name)
 	case consts.SlurmNodeReasonGresGPUCount:
-		return c.processSlurmNodeFalsePositiveDrain(ctx, slurmClusterName, node)
+		return c.processGresGPUCount(ctx, slurmClusterName, node)
 	default:
 		return fmt.Errorf("unknown node reason: node name %s, reason %s, instance id %s",
 			node.Name, node.Reason, node.InstanceID)
@@ -193,7 +192,7 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 ) error {
 	logger := log.FromContext(ctx).WithName("SlurmNodesController.processHealthCheckFailed")
 
-	if !c.enabledNodeReplacement {
+	if !c.cfg.EnableNodeReplacement {
 		logger.V(1).Info("skipping health check failed processing, node replacement is disabled")
 		return nil
 	}
@@ -376,6 +375,11 @@ func (c *SlurmNodesController) processKillTaskFailed(
 ) error {
 	logger := log.FromContext(ctx).WithName("SlurmNodesController.processKillTaskFailed")
 
+	if !c.cfg.EnableKillTaskFailed {
+		logger.V(1).Info("skipping kill task failed processing, disabled")
+		return nil
+	}
+
 	drainWithCondition := func() error {
 		if err := c.drainSlurmNodesWithConditionUpdate(
 			ctx,
@@ -471,6 +475,12 @@ func (c *SlurmNodesController) processSlurmNodeMaintenance(
 	slurmClusterName types.NamespacedName,
 	slurmNodeName string) error {
 
+	if !c.cfg.EnableKillTaskFailed {
+		log.FromContext(ctx).WithName("SlurmNodesController.processSlurmNodeMaintenance").V(1).
+			Info("skipping maintenance processing, disabled")
+		return nil
+	}
+
 	undrainFn := func() error {
 		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNodeName)
 	}
@@ -511,16 +521,41 @@ func (c *SlurmNodesController) processMaintenance(
 	return drainFn()
 }
 
-func (c *SlurmNodesController) processSlurmNodeFalsePositiveDrain(
+func (c *SlurmNodesController) processGresGPUCount(
 	ctx context.Context,
 	slurmClusterName types.NamespacedName,
 	slurmNode slurmapi.Node) error {
 
-	log.FromContext(ctx).WithName("SlurmNodesController.processSlurmNodeFalsePositiveDrain").V(1).
-		WithValues("drainReason", slurmNode.Reason.OriginalReason).
-		Info("undraining false positive drain")
+	logger := log.FromContext(ctx).WithName("SlurmNodesController.processGresGPUCount").V(1).
+		WithValues("drainReason", slurmNode.Reason.OriginalReason)
 
-	return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
+	if !c.cfg.EnableGresGPUCount {
+		logger.Info("skipping gres gpu count drain processing, disabled")
+		return nil
+	}
+
+	logger.Info("undraining false positive drain")
+
+	// It might be that reconfigure changed state of already fetched nodes
+	slurmNode, err := c.getSlurmNode(ctx, slurmClusterName, slurmNode.Name)
+	if err != nil {
+		return fmt.Errorf("get node: %w", err)
+	}
+
+	if _, ok := slurmNode.States[api.V0041NodeStateINVALIDREG]; ok {
+		if err := c.reconfigure(ctx, slurmClusterName); err != nil {
+			return err
+		}
+
+		// sleep because reconfigure is async (by default MessageTimeout=60)
+		time.Sleep(time.Minute)
+	}
+
+	if _, ok := slurmNode.States[api.V0041NodeStateDRAIN]; ok {
+		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
+	}
+
+	return nil
 }
 
 func (c *SlurmNodesController) drainSlurmNodesWithConditionUpdate(
@@ -709,4 +744,21 @@ func (c *SlurmNodesController) getSlurmNode(
 	}
 
 	return node, nil
+}
+
+func (c *SlurmNodesController) reconfigure(
+	ctx context.Context,
+	slurmClusterName types.NamespacedName,
+) error {
+
+	slurmAPIClient, found := c.slurmAPIClients.GetClient(slurmClusterName)
+	if !found {
+		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
+	}
+
+	if err := slurmAPIClient.Reconfigure(ctx); err != nil {
+		return fmt.Errorf("reconfiguring cluster: %w", err)
+	}
+
+	return nil
 }

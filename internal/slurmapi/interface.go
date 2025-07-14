@@ -13,4 +13,5 @@ type Client interface {
 	GetJobsByID(ctx context.Context, jobID string) ([]Job, error)
 	ListJobs(ctx context.Context) ([]Job, error)
 	GetDiag(ctx context.Context) (*api.V0041OpenapiDiagResp, error)
+	Reconfigure(ctx context.Context) error
 }

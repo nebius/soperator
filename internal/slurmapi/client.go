@@ -179,3 +179,16 @@ func (c *client) GetDiag(ctx context.Context) (*api.V0041OpenapiDiagResp, error)
 
 	return getDiagResp.JSON200, nil
 }
+
+func (c client) Reconfigure(ctx context.Context) error {
+	getReconfigreResp, err := c.SlurmV0041GetReconfigureWithResponse(ctx)
+	if err != nil {
+		return fmt.Errorf("reconfigure: %w", err)
+	}
+
+	if getReconfigreResp.JSON200.Errors != nil && len(*getReconfigreResp.JSON200.Errors) != 0 {
+		return fmt.Errorf("reconfigure responded with errors: %v", *getReconfigreResp.JSON200.Errors)
+	}
+
+	return nil
+}

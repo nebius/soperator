@@ -21,6 +21,9 @@ checks:
         memory: 64Mi
   manager:
     args:
+      - --enable-maintenance=true
+      - --enable-kill-task-failed=true
+      - --enable-gres-gpu-count=false
       - --enable-node-replacement=false
       - --leader-elect
     containerSecurityContext:

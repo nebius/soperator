@@ -104,6 +104,9 @@ func main() {
 		logFormat              string
 		logLevel               string
 		enabledNodeReplacement bool
+		enabledMaintenance     bool
+		enabledKillTaskFailed  bool
+		enabledGresGPUCount    bool
 
 		reconcileTimeout time.Duration
 		maxConcurrency   int
@@ -133,6 +136,9 @@ func main() {
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 5*time.Minute, "The maximum duration allowed for caching sync")
 	flag.BoolVar(&enabledNodeReplacement, "enable-node-replacement", true, "Enable node replacement controller")
+	flag.BoolVar(&enabledMaintenance, "enable-maintenance", true, "Enable maintenance controller")
+	flag.BoolVar(&enabledKillTaskFailed, "enable-kill-task-failed", true, "Enable kill task failed controller")
+	flag.BoolVar(&enabledGresGPUCount, "enable-gres-gpu-count", true, "Enable gres gpu count controller")
 	flag.Parse()
 
 	opts := getZapOpts(logFormat, logLevel)
@@ -218,7 +224,12 @@ func main() {
 		mgr.GetEventRecorderFor(soperatorchecks.SlurmNodesControllerName),
 		slurmAPIClients,
 		reconcileTimeout,
-		enabledNodeReplacement,
+		soperatorchecks.Config{
+			EnableMaintenance:     enabledMaintenance,
+			EnableKillTaskFailed:  enabledKillTaskFailed,
+			EnableNodeReplacement: enabledNodeReplacement,
+			EnableGresGPUCount:    enabledGresGPUCount,
+		},
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create slurm nodes controller", "controller", soperatorchecks.SlurmNodesControllerName)
 		os.Exit(1)
