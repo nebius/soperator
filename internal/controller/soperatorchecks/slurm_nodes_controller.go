@@ -176,6 +176,8 @@ func (c *SlurmNodesController) processDegradedNode(
 		return c.processKillTaskFailed(ctx, k8sNode, slurmClusterName, node)
 	case consts.SlurmNodeReasonNodeReplacement:
 		return c.processSlurmNodeMaintenance(ctx, k8sNode, slurmClusterName, node.Name)
+	case consts.SlurmNodeReasonGresGPUCount:
+		return c.processSlurmNodeFalsePositiveDrain(ctx, slurmClusterName, node)
 	default:
 		return fmt.Errorf("unknown node reason: node name %s, reason %s, instance id %s",
 			node.Name, node.Reason, node.InstanceID)
@@ -507,6 +509,18 @@ func (c *SlurmNodesController) processMaintenance(
 	}
 
 	return drainFn()
+}
+
+func (c *SlurmNodesController) processSlurmNodeFalsePositiveDrain(
+	ctx context.Context,
+	slurmClusterName types.NamespacedName,
+	slurmNode slurmapi.Node) error {
+
+	log.FromContext(ctx).WithName("SlurmNodesController.processSlurmNodeFalsePositiveDrain").V(1).
+		WithValues("drainReason", slurmNode.Reason.OriginalReason).
+		Info("undraining false positive drain")
+
+	return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
 }
 
 func (c *SlurmNodesController) drainSlurmNodesWithConditionUpdate(

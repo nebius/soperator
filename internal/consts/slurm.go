@@ -18,6 +18,8 @@ const (
 	SlurmNodeReasonKillTaskFailed  string = "Kill task failed"
 	SlurmNodeReasonNodeReplacement string = "Soperator auto-healing: node replacement process"
 	SlurmNodeReasonNodeReboot      string = "Soperator auto-healing: node reboot process"
+
+	SlurmNodeReasonGresGPUCount string = "gres/gpu count reported lower than configured"
 )
 
 var SlurmNodeReasonsMap = map[string]struct{}{
@@ -25,6 +27,7 @@ var SlurmNodeReasonsMap = map[string]struct{}{
 	SlurmNodeReasonKillTaskFailed:  {},
 	SlurmNodeReasonNodeReplacement: {},
 	SlurmNodeReasonNodeReboot:      {},
+	SlurmNodeReasonGresGPUCount:    {},
 }
 
 const (
