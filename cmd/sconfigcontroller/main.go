@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/controller/sconfigcontroller"
 	"nebius.ai/slurm-operator/internal/jwt"
 	"nebius.ai/slurm-operator/internal/slurmapi"
@@ -55,6 +56,7 @@ func init() {
 
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(slurmv1.AddToScheme(scheme))
+	utilruntime.Must(slurmv1alpha1.AddToScheme(scheme))
 }
 
 func getZapOpts(logFormat, logLevel string) []zap.Opts {
@@ -196,6 +198,14 @@ func main() {
 		fileStore,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create controller", sconfigcontroller.SConfigControllerName)
+		os.Exit(1)
+	}
+
+	if err := (&sconfigcontroller.JailedConfigReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "JailedConfig")
 		os.Exit(1)
 	}
 
