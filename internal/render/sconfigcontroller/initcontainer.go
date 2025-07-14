@@ -26,7 +26,6 @@ func renderInitContainerSConfigController() corev1.Container {
 		},
 		Command: []string{"/bin/sh", "-c"}, // Use bash to execute the script
 		Args: []string{
-			"sh", "-c",
 			fmt.Sprintf(
 				"mkdir -p %[1]s && chown 1001:1001 %[1]s && chmod 755 %[1]s",
 				consts.DefaultPathEtcSlurm,
