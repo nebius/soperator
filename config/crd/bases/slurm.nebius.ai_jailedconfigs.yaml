@@ -39,10 +39,81 @@ spec:
           spec:
             description: spec defines the desired state of JailedConfig
             properties:
-              foo:
-                description: foo is an example field of JailedConfig. Edit jailedconfig_types.go
-                  to remove/update
-                type: string
+              configMap:
+                description: |-
+                  Reference to ConfigMap to read content from
+                  This does not use corev1.ObjectReference, because ObjectReference itself so:
+                  > Instead of using this type, create a locally provided and used type that is well-focused on your reference.
+                properties:
+                  name:
+                    description: '`name` is the name of the ConfigMap.'
+                    type: string
+                required:
+                - name
+                type: object
+              defaultMode:
+                description: |-
+                  defaultMode is optional: mode bits used to set permissions on created files by default.
+                  Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+                  YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+                  Defaults to 0644.
+                format: int32
+                type: integer
+              items:
+                description: |-
+                  If unspecified, each key-value pair in the Data field of the referenced
+                  ConfigMap will be materialized as a file whose name is the
+                  key and content is the value. If specified, the listed keys will be
+                  materialized into the specified paths, and unlisted keys will not be
+                  present. If a key is specified which is not present in the ConfigMap,
+                  the jailed config setup will error. Paths must be
+                  absolute and may not contain the '.' or '..' segments
+                items:
+                  description: Maps a string key to a path within a volume.
+                  properties:
+                    key:
+                      description: key is the key to project.
+                      type: string
+                    mode:
+                      description: |-
+                        mode is Optional: mode bits used to set permissions on this file.
+                        Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+                        YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+                        If not specified, the volume defaultMode will be used.
+                        This might be in conflict with other options that affect the file
+                        mode, like fsGroup, and the result can be other mode bits set.
+                      format: int32
+                      type: integer
+                    path:
+                      description: |-
+                        path is the relative path of the file to map the key to.
+                        May not be an absolute path.
+                        May not contain the path element '..'.
+                        May not start with the string '..'.
+                      type: string
+                  required:
+                  - key
+                  - path
+                  type: object
+                type: array
+                x-kubernetes-list-type: atomic
+              updateActions:
+                description: |-
+                  updateActions are optional: it is a list of action to perform after materializing files
+                  They will be performed sequentially, in same order as in spec
+                  `Reconfigure` will call reconfigure endpoint and wait until slurmd restarts on every node
+                  See https://slurm.schedmd.com/rest_api.html#slurmV0043GetReconfigure
+                  See https://slurm.schedmd.com/rest_api.html#slurmV0043GetNodes
+                items:
+                  description: UpdateAction is a single action that can be performed
+                    after materializing files
+                  enum:
+                  - Reconfigure
+                  type: string
+                type: array
+                x-kubernetes-list-type: atomic
+            required:
+            - configMap
             type: object
           status:
             description: status defines the observed state of JailedConfig
