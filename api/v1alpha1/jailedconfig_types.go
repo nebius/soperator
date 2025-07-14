@@ -17,22 +17,63 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+// TODO add docs
+// +kubebuilder:validation:Enum=Reconfigure
+type UpdateAction string
+
+const (
+	// TODO docs
+	Reconfigure UpdateAction = "Reconfigure"
+)
+
+// TODO rework ObjectReference to bespoke reference type
+// https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533
+
 // JailedConfigSpec defines the desired state of JailedConfig
+// It is mostly same as corev1.ConfigMapVolumeSource, except it _requires_ absolute paths in `Items`,
+// because there's no `VolumeMount` analog here, only `Volume`
 type JailedConfigSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	// The following markers will use OpenAPI v3 schema to validate the value
 	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
 
-	// foo is an example field of JailedConfig. Edit jailedconfig_types.go to remove/update
+	// TODO fix docs
+	ConfigMap *corev1.ObjectReference `json:"configMap,omitempty"`
+
+	// TODO fix docs
+	// items if unspecified, each key-value pair in the Data field of the referenced
+	// ConfigMap will be projected into the volume as a file whose name is the
+	// key and content is the value. If specified, the listed keys will be
+	// projected into the specified paths, and unlisted keys will not be
+	// present. If a key is specified which is not present in the ConfigMap,
+	// the volume setup will error unless it is marked optional. Paths must be
+	// relative and may not contain the '..' path or start with '..'.
 	// +optional
-	Foo *string `json:"foo,omitempty"`
+	// +listType=atomic
+	Items []corev1.KeyToPath `json:"items,omitempty"`
+
+	// TODO fix docs
+	// defaultMode is optional: mode bits used to set permissions on created files by default.
+	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+	// Defaults to 0644.
+	// Directories within the path are not affected by this setting.
+	// This might be in conflict with other options that affect the file
+	// mode, like fsGroup, and the result can be other mode bits set.
+	// +optional
+	DefaultMode *int32 `json:"defaultMode,omitempty"`
+
+	// +optional
+	// +listType=atomic
+	UpdateActions []UpdateAction `json:"updateActions,omitempty"`
 }
 
 // JailedConfigStatus defines the observed state of JailedConfig.
