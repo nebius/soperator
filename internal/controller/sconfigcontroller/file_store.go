@@ -260,5 +260,10 @@ func (s *FileStore) Write(filePath string, content []byte) (err error) {
 }
 
 func (s *FileStore) Chmod(path string, mode uint32) error {
-	panic("unimplemented")
+	filePath := filepath.Join(s.path, path)
+
+	if err := os.Chmod(filePath, os.FileMode(mode)); err != nil {
+		return fmt.Errorf("chmod %q %#o: %w", filePath, mode, err)
+	}
+	return nil
 }
