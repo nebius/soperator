@@ -6,3 +6,8 @@ slack:
 alertManager:
   replicas: 1
   port: 9093
+
+dataSourceUrl: "http://vmsingle-metrics-victoria-metrics-k8s-stack:8429"
+
+interval:
+  evaluation: 30s

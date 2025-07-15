@@ -1,31 +1,35 @@
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMAlert
 metadata:
-  name: slurm-job-records
-  namespace: monitoring-system
+  name: {{ include "son.rule.name" (dict "context" . "value" (include "son.rule.group.records" .)) }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "son.labels" . | nindent 4 }}
 spec:
-  evaluationInterval: 30s
+  evaluationInterval: {{ include "son.alert.evaluationInterval" . }}
   datasource:
-    url: http://vmsingle-metrics-victoria-metrics-k8s-stack:8429
+    url: {{ include "son.alert.dataSourceUrl" . | quote }}
   notifiers:
-    - url: blackhole://
+    - url: {{ "blackhole://" | quote }}
   ruleSelector:
     matchLabels:
-      vmrule-group: slack-records
+      {{- include "son.rule.groupLabel" (dict "context" . "value" (include "son.rule.group.records" .)) | nindent 6 }}
 
 ---
 
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMAlert
 metadata:
-  name: slurm-job
-  namespace: monitoring-system
+  name: {{ include "son.rule.name" (dict "context" . "value" (include "son.rule.group.slack" .)) }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "son.labels" . | nindent 4 }}
 spec:
-  evaluationInterval: 30s
+  evaluationInterval: {{ include "son.alert.evaluationInterval" . }}
   datasource:
-    url: http://vmsingle-metrics-victoria-metrics-k8s-stack:8429
+    url: {{ include "son.alert.dataSourceUrl" . | quote }}
   notifiers:
-    - url: http://vmalertmanager-slack:9093
+    - url: {{ include "son.alertManager.url" . | quote}}
   ruleSelector:
     matchLabels:
-      vmrule-group: slack
+      {{- include "son.rule.groupLabel" (dict "context" . "value" (include "son.rule.group.slack" .)) | nindent 6 }}

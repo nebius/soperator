@@ -12,3 +12,8 @@
 {{- define "son.alertManager.port" -}}
 {{- default .Values.alertManager.port 9093 }}
 {{- end }}
+
+{{/* AlertManager URL. */}}
+{{- define "son.alertManager.url" -}}
+{{ printf "http://vmalertmanager-%s:%s" (include "son.alertManager.name" .) (include "son.alertManager.port" .) }}
+{{- end }}
