@@ -82,6 +82,15 @@ func (s *FileStore) Add(name, content, subPath string) (err error) {
 		return err
 	}
 
+	// os.CreateTemp uses 600 & umask by default, and os.Create uses o666 & umask
+	// For now fixed 644 should be fine
+	// TODO make this configurable
+	err = os.Chmod(tempFileName, 0o644)
+	if err != nil {
+		err = fmt.Errorf("chmod temp file: %w", err)
+		return err
+	}
+
 	err = os.Rename(tempFileName, filePath)
 	if err != nil {
 		err = fmt.Errorf("rename temp file: %w", err)
