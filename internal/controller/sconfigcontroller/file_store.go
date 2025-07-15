@@ -1,6 +1,7 @@
 package sconfigcontroller
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,25 +32,38 @@ func ensureDir(dirPath string) error {
 	}
 }
 
-func (s *FileStore) Add(name, content, subPath string) error {
+func (s *FileStore) Add(name, content, subPath string) (err error) {
 	dirPath := filepath.Join(s.path, subPath)
 
-	if err := ensureDir(dirPath); err != nil {
+	if err = ensureDir(dirPath); err != nil {
 		return err
 	}
 
 	file, err := os.Create(fmt.Sprintf("%s/%s", dirPath, name))
 	if err != nil {
-		return fmt.Errorf("open file: %w", err)
+		err = fmt.Errorf("open file: %w", err)
+		return err
 	}
 
-	defer file.Close()
+	defer func() {
+		// Errors from file.Close() are especially important on NFS/virtiofs/... for close-to-open sync
+		// man 5 nfs
+		// > Close-to-open cache consistency
+		// > ...
+		// > When the application closes the file, the NFS client writes back
+		// > any pending changes to the file so that the next opener can view
+		// > the changes.  This also gives the NFS client an opportunity to
+		// > report write errors to the application via the return code from
+		// > close(2).
+		err = errors.Join(err, file.Close())
+	}()
 
 	if _, err = file.Write([]byte(content)); err != nil {
-		return fmt.Errorf("write file: %w", err)
+		err = fmt.Errorf("write file: %w", err)
+		return err
 	}
 
-	return nil
+	return err
 }
 
 func (s *FileStore) SetExecutable(name, subPath string) error {
