@@ -34,12 +34,13 @@ func ensureDir(dirPath string) error {
 
 func (s *FileStore) Add(name, content, subPath string) (err error) {
 	dirPath := filepath.Join(s.path, subPath)
+	filePath := filepath.Join(dirPath, name)
 
 	if err = ensureDir(dirPath); err != nil {
 		return err
 	}
 
-	file, err := os.Create(fmt.Sprintf("%s/%s", dirPath, name))
+	file, err := os.Create(filePath)
 	if err != nil {
 		err = fmt.Errorf("open file: %w", err)
 		return err
