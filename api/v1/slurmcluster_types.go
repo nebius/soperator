@@ -989,7 +989,7 @@ type SlurmNodeWorker struct {
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
-	WaitForController *bool `json:"waitForContainerReady,omitempty"`
+	WaitForController *bool `json:"waitForController,omitempty"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node

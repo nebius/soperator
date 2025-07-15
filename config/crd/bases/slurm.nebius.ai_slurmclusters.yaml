@@ -16110,7 +16110,7 @@ spec:
                         - jail
                         - spool
                         type: object
-                      waitForContainerReady:
+                      waitForController:
                         default: false
                         description: WaitForController defines whether to wait for
                           the slurmctld to be ready before starting the slurmd.
