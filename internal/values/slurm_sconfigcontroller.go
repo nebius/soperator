@@ -14,25 +14,32 @@ type SConfigController struct {
 	Container  Container
 	VolumeJail slurmv1.NodeVolume
 
-	Maintenance consts.MaintenanceMode
+	Maintenance         consts.MaintenanceMode
+	JailSlurmConfigPath string
 }
 
 func buildSConfigControllerFrom(
 	node slurmv1.SlurmNode,
 	container slurmv1.NodeContainer,
 	maintenance consts.MaintenanceMode,
+	jailSlurmConfigPath string,
 ) SConfigController {
 	containerSConfigController := buildContainerFrom(
 		container,
 		consts.ContainerNameSConfigController,
 	)
+	if jailSlurmConfigPath == "" {
+		jailSlurmConfigPath = consts.DefaultPathEtcSlurm
+	}
+
 	res := SConfigController{
 		SlurmNode: node,
 		Container: containerSConfigController,
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),
 		},
-		Maintenance: maintenance,
+		Maintenance:         maintenance,
+		JailSlurmConfigPath: jailSlurmConfigPath,
 	}
 
 	return res
