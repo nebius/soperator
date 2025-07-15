@@ -47,7 +47,6 @@ type JailedConfigReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	// TODO add ctor
 	slurmAPIClient slurmapi.Client
 	fileStore      Store
 }
@@ -209,6 +208,20 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func NewJailedConfigReconciler(
+	client client.Client,
+	scheme *runtime.Scheme,
+	slurmAPIClient slurmapi.Client,
+	fileStore Store,
+) *JailedConfigReconciler {
+	return &JailedConfigReconciler{
+		Client:         client,
+		Scheme:         scheme,
+		slurmAPIClient: slurmAPIClient,
+		fileStore:      fileStore,
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
