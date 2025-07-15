@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFileStore_Add(t *testing.T) {
+func TestFileStore_Write(t *testing.T) {
 	tempDir := t.TempDir()
 
 	tests := []struct {
@@ -39,7 +39,7 @@ func TestFileStore_Add(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fs := NewFileStore(tt.path)
-			err := fs.Add(tt.fileName, tt.content, tt.subPath)
+			err := fs.Write(filepath.Join(tt.subPath, tt.fileName), []byte(tt.content))
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -173,7 +173,7 @@ func TestFileStore_SetExecutable(t *testing.T) {
 			setup: func(fs *FileStore) (string, string, error) {
 				fileName := "script.sh"
 				subPath := "bin"
-				err := fs.Add(fileName, "#!/bin/bash\necho test", subPath)
+				err := fs.Write(filepath.Join(subPath, fileName), []byte("#!/bin/bash\necho test"))
 				return fileName, subPath, err
 			},
 			expectError: false,
