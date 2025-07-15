@@ -15,6 +15,8 @@ type FileStore struct {
 	path string
 }
 
+var _ Store = &FileStore{}
+
 func NewFileStore(path string) *FileStore {
 	return &FileStore{
 		path: path,
@@ -152,4 +154,12 @@ func (s *FileStore) SetExecutable(name, subPath string) error {
 		return fmt.Errorf("chmod +x %q: %w", filePath, err)
 	}
 	return nil
+}
+
+func (s *FileStore) Write(path string, content []byte) error {
+	panic("unimplemented")
+}
+
+func (s *FileStore) Chmod(path string, mode uint32) error {
+	panic("unimplemented")
 }

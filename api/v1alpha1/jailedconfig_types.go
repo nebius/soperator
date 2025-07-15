@@ -45,6 +45,7 @@ type JailedConfigSpec struct {
 	// The following markers will use OpenAPI v3 schema to validate the value
 	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
 
+	// TODO support multiple configmaps as a single jailed config, to force atomic reconfigures
 	// TODO fix docs
 	ConfigMap *corev1.ObjectReference `json:"configMap,omitempty"`
 
