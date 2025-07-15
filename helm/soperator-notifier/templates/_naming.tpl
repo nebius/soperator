@@ -25,3 +25,10 @@ If release name contains chart name it will be used as a full name.
 {{- define "son.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
+
+{{/* --- */}}
+
+{{/* Slack webhook secret name. */}}
+{{- define "son.slackWebhookSecretName" -}}
+{{- printf "%s-%s" (include "son.name" .) "slack-webhook" | trunc 63 | trimSuffix "-" }}
+{{- end }}

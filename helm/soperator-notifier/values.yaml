@@ -1,1 +1,4 @@
 namespace: monitoring-system
+
+slack:
+  webhookUrl: "https://hooks.slack.com/services/XXXXXXXXXXX/YYYYYYYYYYY/ZZZZZZZZZZZZZZZZZZZZZZZZ"
