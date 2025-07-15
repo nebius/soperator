@@ -984,6 +984,12 @@ type SlurmNodeWorker struct {
 	//
 	// +kubebuilder:validation:Optional
 	PriorityClass string `json:"priorityClass,omitempty"`
+
+	// WaitForController defines whether to wait for the slurmctld to be ready before starting the slurmd.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	WaitForController *bool `json:"waitForContainerReady,omitempty"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node
