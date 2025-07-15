@@ -4,6 +4,9 @@ set -e # Exit immediately if any command returns a non-zero error code
 
 PARTITION="background"
 
+echo "Cancelling currently active jobs with the same name..."
+scancel --partition="$PARTITION" --name="$ACTIVE_CHECK_NAME"
+
 echo "Setting Extra field to all nodes..."
 NUM_NODES=0
 for node in $(sinfo -N --partition="$PARTITION" --responding --states="IDLE,MIXED,ALLOCATED" --noheader -o "%N" | tr '\n' ' '); do
