@@ -324,8 +324,9 @@ type SConfigController struct {
 	Node      SlurmNode     `json:"node,omitempty"`
 	Container NodeContainer `json:"container,omitempty"`
 
-	// ConfigsPath defines the path where the Slurm configs are stored in the jail.
+	// JailSlurmConfigPath defines the path where the Slurm configs are stored in the jail.
 	// Defaults to /mnt/jail/etc/slurm
+	// +kubebuilder:deprecation:warning="The JailSlurmConfigPath field is deprecated and will be removed in a 1.22.0 release"
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="/mnt/jail/etc/slurm"
 	JailSlurmConfigPath string `json:"jailSlurmConfigPath,omitempty"`
@@ -987,6 +988,7 @@ type SlurmNodeWorker struct {
 
 	// WaitForController defines whether to wait for the slurmctld to be ready before starting the slurmd.
 	//
+	// +kubebuilder:deprecation:warning="The WaitForController field is deprecated and will be removed in a 1.22.0 release"
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	WaitForController *bool `json:"waitForController,omitempty"`

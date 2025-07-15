@@ -18577,7 +18577,7 @@ spec:
                   jailSlurmConfigPath:
                     default: /mnt/jail/etc/slurm
                     description: |-
-                      ConfigsPath defines the path where the Slurm configs are stored in the jail.
+                      JailSlurmConfigPath defines the path where the Slurm configs are stored in the jail.
                       Defaults to /mnt/jail/etc/slurm
                     type: string
                   node:
