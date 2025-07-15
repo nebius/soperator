@@ -9,5 +9,5 @@ spec:
   replicaCount: {{ include "son.alertManager.replicas" . }}
   configSelector:
     matchLabels:
-      {{- include "son.label.configMatcher" . | nindent 6 }}
+      {{- include "son.config.label.match" . | nindent 6 }}
   port: {{ include "son.alertManager.port" . }}

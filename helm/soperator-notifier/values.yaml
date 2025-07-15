@@ -11,3 +11,6 @@ dataSourceUrl: "http://vmsingle-metrics-victoria-metrics-k8s-stack:8429"
 
 interval:
   evaluation: 30s
+  alerted: 1h
+
+ignoreSystemJobs: true

@@ -26,9 +26,25 @@ If release name contains chart name it will be used as a full name.
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
+{{/* Common labels */}}
+{{- define "son.labels" -}}
+helm.sh/chart: {{ include "son.chart" . }}
+{{ include "son.selectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{/* Selector labels */}}
+{{- define "son.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "son.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
 {{/* --- */}}
 
-{{/* Slack webhook secret name. */}}
-{{- define "son.slackWebhookSecretName" -}}
-{{- printf "%s-%s" (include "son.name" .) "slack-webhook" | trunc 63 | trimSuffix "-" }}
+{{/* Function to wrap AlertManager's Go template into string. */}}
+{{- define "son.wrapTemplate" -}}
+{{ "{{ " }}{{ . }}{{ " }}"}}
 {{- end }}

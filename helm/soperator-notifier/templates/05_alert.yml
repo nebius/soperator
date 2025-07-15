@@ -13,7 +13,7 @@ spec:
     - url: {{ "blackhole://" | quote }}
   ruleSelector:
     matchLabels:
-      {{- include "son.rule.groupLabel" (dict "context" . "value" (include "son.rule.group.records" .)) | nindent 6 }}
+      {{- include "son.rule.groupMatchLabel" (dict "context" . "value" (include "son.rule.group.records" .)) | nindent 6 }}
 
 ---
 
@@ -32,4 +32,4 @@ spec:
     - url: {{ include "son.alertManager.url" . | quote}}
   ruleSelector:
     matchLabels:
-      {{- include "son.rule.groupLabel" (dict "context" . "value" (include "son.rule.group.slack" .)) | nindent 6 }}
+      {{- include "son.rule.groupMatchLabel" (dict "context" . "value" (include "son.rule.group.slack" .)) | nindent 6 }}
