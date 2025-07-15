@@ -38,7 +38,11 @@ func RenderDeploymentExporter(clusterValues *values.SlurmCluster) (*appsv1.Deplo
 	if err != nil {
 		return nil, err
 	}
-	initContainers := append(clusterValues.SlurmExporter.CustomInitContainers, minNoopContainer)
+
+	// Add init container to wait for passwd file
+	waitForPasswdContainer := renderWaitForPasswdContainer()
+
+	initContainers := append(clusterValues.SlurmExporter.CustomInitContainers, minNoopContainer, waitForPasswdContainer)
 
 	podTemplateSpec := renderPodTemplateSpec(
 		clusterValues,
@@ -94,4 +98,22 @@ func renderMinimalNoopContainer() (corev1.Container, error) {
 			},
 		},
 	}, nil
+}
+
+func renderWaitForPasswdContainer() corev1.Container {
+	return corev1.Container{
+		Name:    "wait-for-passwd",
+		Image:   "cr.eu-north1.nebius.cloud/soperator/busybox:latest",
+		Command: []string{"sh", "-c"},
+		Args: []string{
+			"until [ -f /mnt/jail-passwd ]; do " +
+				"echo 'Waiting for jail passwd file to be created...'; " +
+				"sleep 5; done; " +
+				"echo 'Passwd file found, exporter can start'",
+		},
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		VolumeMounts: []corev1.VolumeMount{
+			common.RenderVolumeMountJailPasswdReadOnly(),
+		},
+	}
 }

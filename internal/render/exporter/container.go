@@ -33,7 +33,7 @@ func renderContainerExporter(clusterValues *values.SlurmCluster) corev1.Containe
 			Limits:   common.CopyNonCPUResources(clusterValues.SlurmExporter.Container.Resources),
 		},
 		VolumeMounts: []corev1.VolumeMount{
-			common.RenderVolumeMountJail(),
+			common.RenderVolumeMountJailPasswdReadOnly(),
 		},
 	}
 }

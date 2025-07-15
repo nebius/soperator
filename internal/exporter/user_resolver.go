@@ -16,7 +16,7 @@ type UserResolver struct {
 // NewUserResolver creates a new UserResolver.
 func NewUserResolver() *UserResolver {
 	return &UserResolver{
-		passwdPath: "/mnt/jail/etc/passwd",
+		passwdPath: "/mnt/jail-passwd",
 	}
 }
 

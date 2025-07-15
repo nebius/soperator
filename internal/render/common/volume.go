@@ -174,6 +174,16 @@ func RenderVolumeMountJail() corev1.VolumeMount {
 	}
 }
 
+// RenderVolumeMountJailPasswdReadOnly renders [corev1.VolumeMount] for read-only jail passwd file access
+func RenderVolumeMountJailPasswdReadOnly() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameJail,
+		MountPath: "/mnt/jail-passwd",
+		SubPath:   "etc/passwd",
+		ReadOnly:  true,
+	}
+}
+
 // endregion Jail
 
 // region JailSnapshot
