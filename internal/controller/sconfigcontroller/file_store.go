@@ -40,29 +40,54 @@ func (s *FileStore) Add(name, content, subPath string) (err error) {
 		return err
 	}
 
-	file, err := os.Create(filePath)
+	tempFile, err := os.CreateTemp(dirPath, name)
 	if err != nil {
-		err = fmt.Errorf("open file: %w", err)
+		err = fmt.Errorf("create temp file: %w", err)
 		return err
 	}
+	tempFileName := tempFile.Name()
 
 	defer func() {
-		// Errors from file.Close() are especially important on NFS/virtiofs/... for close-to-open sync
-		// man 5 nfs
-		// > Close-to-open cache consistency
-		// > ...
-		// > When the application closes the file, the NFS client writes back
-		// > any pending changes to the file so that the next opener can view
-		// > the changes.  This also gives the NFS client an opportunity to
-		// > report write errors to the application via the return code from
-		// > close(2).
-		err = errors.Join(err, file.Close())
+		if tempFileName != "" {
+			// Remove left-over temp file
+			err = errors.Join(err, os.Remove(tempFileName))
+		}
 	}()
 
-	if _, err = file.Write([]byte(content)); err != nil {
-		err = fmt.Errorf("write file: %w", err)
+	defer func() {
+		if tempFile != nil {
+			// Errors from file.Close() are especially important on NFS/virtiofs/... for close-to-open sync
+			// man 5 nfs
+			// > Close-to-open cache consistency
+			// > ...
+			// > When the application closes the file, the NFS client writes back
+			// > any pending changes to the file so that the next opener can view
+			// > the changes.  This also gives the NFS client an opportunity to
+			// > report write errors to the application via the return code from
+			// > close(2).
+			err = errors.Join(err, tempFile.Close())
+		}
+	}()
+
+	if _, err = tempFile.Write([]byte(content)); err != nil {
+		err = fmt.Errorf("write temp file: %w", err)
 		return err
 	}
+
+	err = tempFile.Close()
+	// Resetting here to avoid double call to Close in defer
+	tempFile = nil
+	if err != nil {
+		err = fmt.Errorf("close temp file: %w", err)
+		return err
+	}
+
+	err = os.Rename(tempFileName, filePath)
+	if err != nil {
+		err = fmt.Errorf("rename temp file: %w", err)
+		return err
+	}
+	tempFileName = ""
 
 	return err
 }
