@@ -24,7 +24,9 @@ RUN apt-get update &&  \
           *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
         esac && \
         echo "Using architecture: ${ARCH_DEB}" && \
-    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${ARCH_DEB}/cuda-keyring_1.1-1_all.deb && \
+    UBUNTU_VERSION_ID=$(grep VERSION_ID /etc/os-release | cut -d'"' -f2 | tr -d .) && \
+        echo "Using architecture: ${ARCH_DEB}, ubuntu version: ubuntu${UBUNTU_VERSION_ID}" && \
+        wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${UBUNTU_VERSION_ID}/${ARCH_DEB}/cuda-keyring_1.1-1_all.deb && \
     dpkg -i cuda-keyring_1.1-1_all.deb && \
     rm -rf cuda-keyring_1.1-1_all.deb && \
     ln -snf /usr/share/zoneinfo/Etc/UTC /etc/localtime && \

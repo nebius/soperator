@@ -30,7 +30,7 @@ CHART_ACTIVECHECK_PATH       = $(CHART_PATH)/soperator-activechecks
 CHART_DCGM_EXPORTER_PATH     = $(CHART_PATH)/soperator-dcgm-exporter
 
 SLURM_VERSION		  		= 24.11.5
-UBUNTU_VERSION		  		= jammy
+UBUNTU_VERSION		  		?= noble
 VERSION               		= $(shell cat VERSION)
 
 IMAGE_VERSION		  = $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)
