@@ -2,6 +2,9 @@
 
 set -e # Exit immediately if any command returns a non-zero error code
 
+echo "Cancelling currently active jobs..."
+scancel -n "$ACTIVE_CHECK_NAME"
+
 echo "Setting Extra field to all nodes..."
 for node in $(sinfo -N --noheader -o "%N" | tr '\n' ' '); do
     echo "Updating node: $node"
