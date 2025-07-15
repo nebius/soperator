@@ -16,6 +16,7 @@ import (
 // MetricsCollector exposes SLURM metrics by implementing prometheus.Collector interface
 type MetricsCollector struct {
 	slurmAPIClient slurmapi.Client
+	userResolver   *UserResolver
 
 	nodeInfo       *prometheus.Desc
 	jobInfo        *prometheus.Desc
@@ -38,9 +39,10 @@ type MetricsCollector struct {
 func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 	return &MetricsCollector{
 		slurmAPIClient: slurmAPIClient,
+		userResolver:   NewUserResolver(),
 
 		nodeInfo: prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "address"}, nil),
-		jobInfo:  prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "standard_error", "standard_output", "array_job_id", "array_task_id"}, nil),
+		jobInfo:  prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "user_id", "standard_error", "standard_output", "array_job_id", "array_task_id"}, nil),
 		jobNode:  prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
 		nodeGPUSeconds: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "slurm_node_gpu_seconds_total",
@@ -125,7 +127,9 @@ func (c *MetricsCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	for slurmJobMetric := range c.slurmJobMetrics(ctx, jobs) {
+	resolvedJobs := c.resolveJobUsernames(ctx, jobs)
+
+	for slurmJobMetric := range c.slurmJobMetrics(ctx, resolvedJobs) {
 		ch <- slurmJobMetric
 	}
 
@@ -171,12 +175,44 @@ func (c *MetricsCollector) slurmNodeMetrics(
 	}
 }
 
+func (c *MetricsCollector) resolveJobUsernames(ctx context.Context, jobs []slurmapi.Job) []slurmapi.Job {
+	logger := log.FromContext(ctx).WithName(ControllerName)
+
+	userMap, err := c.userResolver.GetUserMap()
+	if err != nil {
+		logger.Error(err, "Failed to get user map from passwd file")
+		return jobs // Return jobs as-is if we can't get user map
+	}
+
+	resolvedJobs := make([]slurmapi.Job, 0, len(jobs))
+	for _, job := range jobs {
+		resolvedJob := job
+
+		if job.UserName == "" && job.UserID != nil {
+			if username, exists := userMap[*job.UserID]; exists {
+				resolvedJob.UserName = username
+			} else {
+				logger.Error(nil, "User ID not found in passwd file", "job_id", job.GetIDString(), "user_id", *job.UserID)
+			}
+		}
+
+		resolvedJobs = append(resolvedJobs, resolvedJob)
+	}
+
+	return resolvedJobs
+}
+
 func (c *MetricsCollector) slurmJobMetrics(
 	ctx context.Context, slurmJobs []slurmapi.Job,
 ) iter.Seq[prometheus.Metric] {
 	return func(yield func(prometheus.Metric) bool) {
 		logger := log.FromContext(ctx).WithName(ControllerName)
 		for _, job := range slurmJobs {
+			userID := ""
+			if job.UserID != nil {
+				userID = strconv.Itoa(int(*job.UserID))
+			}
+
 			jobLabels := []string{
 				job.GetIDString(),
 				job.State,
@@ -184,6 +220,7 @@ func (c *MetricsCollector) slurmJobMetrics(
 				job.Partition,
 				job.Name,
 				job.UserName,
+				userID,
 				job.StandardError,
 				job.StandardOutput,
 				job.GetArrayJobIDString(),
