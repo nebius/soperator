@@ -30,6 +30,8 @@ const (
 	// See https://slurm.schedmd.com/rest_api.html#slurmV0043GetReconfigure
 	// See https://slurm.schedmd.com/rest_api.html#slurmV0043GetNodes
 	UpdateActionReconfigure UpdateAction = "Reconfigure"
+
+	DefaultMode int32 = 0o644
 )
 
 // ConfigMapReference holds a reference to v1.ConfigMap

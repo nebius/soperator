@@ -102,6 +102,7 @@ func main() {
 		enableHTTP2          bool
 		logFormat            string
 		logLevel             string
+		jailPath             string
 		configsPath          string
 		clusterNamespace     string
 		clusterName          string
@@ -123,7 +124,7 @@ func main() {
 	flag.StringVar(&logFormat, "log-format", "json", "Log format: plain or json")
 	flag.StringVar(&logLevel, "log-level", "debug", "Log level: debug, info, warn, error, dpanic, panic, fatal")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
-	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 1*time.Minute, "The maximum duration allowed for caching sync")
+	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
 	flag.StringVar(&configsPath, "configs-path", "/mnt/jail/etc/slurm", "Path where to store configs")
 	flag.StringVar(&clusterNamespace, "cluster-namespace", "default", "Soperator cluster namespace")
 	flag.StringVar(&clusterName, "cluster-name", "soperator", "Name of the soperator cluster controller")
@@ -201,10 +202,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&sconfigcontroller.JailedConfigReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+	jailFs := &sconfigcontroller.PrefixFs{
+		Prefix: jailPath,
+	}
+
+	if err := (sconfigcontroller.NewJailedConfigReconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		slurmAPIClient,
+		jailFs,
+	)).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "JailedConfig")
 		os.Exit(1)
 	}

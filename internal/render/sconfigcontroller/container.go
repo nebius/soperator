@@ -14,12 +14,14 @@ func renderContainerSConfigController(
 	// Create a copy of the container's limits and add non-CPU resources from Requests
 	limits := common.CopyNonCPUResources(container.Resources)
 
+	jailMount := common.RenderVolumeMountJail()
+
 	return corev1.Container{
 		Name:            consts.ContainerNameSConfigController,
 		Image:           container.Image,
 		ImagePullPolicy: container.ImagePullPolicy,
 		VolumeMounts: []corev1.VolumeMount{
-			common.RenderVolumeMountJail(),
+			jailMount,
 		},
 		Resources: corev1.ResourceRequirements{
 			Limits:   limits,
@@ -32,6 +34,7 @@ func renderContainerSConfigController(
 			fmt.Sprintf("--cluster-namespace=%s", clusterNamespace),
 			fmt.Sprintf("--cluster-name=%s", clusterName),
 			fmt.Sprintf("--configs-path=%s", jailConfigPath),
+			fmt.Sprintf("--jail-path=%s", jailMount.MountPath),
 			fmt.Sprintf("--slurmapiserver=%s", slurmAPIServer),
 			"--leader-elect",
 		},
