@@ -1,10 +1,13 @@
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMAlertmanager
 metadata:
-  name: slack
-  namespace: monitoring-system
+  name: {{ include "son.alertManager.name" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "son.labels" . | nindent 4 }}
 spec:
-  replicaCount: 1
+  replicaCount: {{ include "son.alertManager.replicas" . }}
   configSelector:
     matchLabels:
-      slack-route: "enabled"
+      {{- include "son.label.configMatcher" . | nindent 6 }}
+  port: {{ include "son.alertManager.port" . }}

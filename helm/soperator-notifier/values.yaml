@@ -2,3 +2,7 @@ namespace: monitoring-system
 
 slack:
   webhookUrl: "https://hooks.slack.com/services/XXXXXXXXXXX/YYYYYYYYYYY/ZZZZZZZZZZZZZZZZZZZZZZZZ"
+
+alertManager:
+  replicas: 1
+  port: 9093
