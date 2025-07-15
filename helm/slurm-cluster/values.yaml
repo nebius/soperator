@@ -498,6 +498,7 @@ sConfigController:
       cpu: "250m"
       memory: "256Mi"
       ephemeralStorage: "500Mi"
+  jailSlurmConfigPath: /mnt/jail/etc/slurm
 telemetry: {}
 # jobsTelemetry:
 #   otelCollectorHttpHost: vmsingle-slurm.monitoring-system.svc.cluster.local
