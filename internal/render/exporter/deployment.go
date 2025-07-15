@@ -106,7 +106,7 @@ func renderWaitForPasswdContainer() corev1.Container {
 		Image:   "cr.eu-north1.nebius.cloud/soperator/busybox:latest",
 		Command: []string{"sh", "-c"},
 		Args: []string{
-			"until [ -f /mnt/jail-passwd ]; do " +
+			"until [ -f /mnt/jail-etc/passwd ]; do " +
 				"echo 'Waiting for jail passwd file to be created...'; " +
 				"sleep 5; done; " +
 				"echo 'Passwd file found, exporter can start'",
