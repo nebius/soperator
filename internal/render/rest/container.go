@@ -46,6 +46,7 @@ func renderContainerREST(containerParams values.Container, threadCount *int32, m
 		}},
 		VolumeMounts: []corev1.VolumeMount{
 			common.RenderVolumeMountSlurmConfigs(),
+			common.RenderVolumeMountJailReadOnly(),
 		},
 		// TODO: Http check?
 		LivenessProbe: &corev1.Probe{

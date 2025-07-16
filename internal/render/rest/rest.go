@@ -20,6 +20,7 @@ func RenderDeploymentREST(
 	namespace string,
 	valuesREST *values.SlurmREST,
 	nodeFilter []slurmv1.K8sNodeFilter,
+	volumeSources []slurmv1.VolumeSource,
 ) (deployment *appsv1.Deployment, err error) {
 	if valuesREST == nil || !valuesREST.Enabled {
 		return nil, errors.New("REST API is not enabled")
@@ -35,6 +36,7 @@ func RenderDeploymentREST(
 		clusterName,
 		valuesREST,
 		nodeFilter,
+		volumeSources,
 		matchLabels,
 	)
 	if err != nil {
