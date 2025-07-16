@@ -10,4 +10,4 @@ spec:
   configSelector:
     matchLabels:
       {{- include "son.config.label.match" . | nindent 6 }}
-  port: {{ include "son.alertManager.port" . }}
+  port: {{ include "son.alertManager.port" . | quote }}
