@@ -10,7 +10,7 @@ ln -s /mnt/jail/etc/gshadow /etc/gshadow
 chown -h 0:42 /etc/{shadow,gshadow}
 
 echo "Symlink slurm configs from jail(sconfigcontroller)"
-rm -rf /etc/slurm && ln -s /mnt/jail/slurm /etc/slurm
+rm -rf /etc/slurm && ln -s /mnt/jail/etc/slurm /etc/slurm
 
 echo "Bind-mount munge key from K8S secret"
 mount --bind /mnt/munge-key/munge.key /etc/munge/munge.key

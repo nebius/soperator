@@ -85,8 +85,8 @@ observability:
     namespace: logs-system
     logs:
       version: 0.117.*
-      interval: 5m
-      timeout: 5m
+      interval: 15m
+      timeout: 15m
       values:
         jailLogs:
           enabled: true
@@ -229,20 +229,20 @@ soperator:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 1.8.*
+    version: 1.8.0
     releaseName: soperator-kruise
     overrideValues:
       crds:
         managed: true
-      resources:
-        limits:
-          cpu: 1000m
-          memory: 2Gi
-        requests:
-          cpu: 1000m
-          memory: 2Gi
       manager:
         replicas: 2
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 1000m
+            memory: 2Gi
       featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true"
   soperatorChecks:
     enabled: true

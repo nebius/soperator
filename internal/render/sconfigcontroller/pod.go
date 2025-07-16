@@ -50,11 +50,12 @@ func BasePodTemplateSpec(
 					clusterNamespace,
 					clusterName,
 					slurmAPIServer,
+					sConfigController.JailSlurmConfigPath,
 					sConfigController.Container,
 				),
 			},
 			InitContainers: []corev1.Container{
-				renderInitContainerSConfigController(),
+				renderInitContainerSConfigController(sConfigController.JailSlurmConfigPath),
 			},
 			Volumes:            volumes,
 			ServiceAccountName: naming.BuildServiceAccountSconfigControllerName(clusterName),

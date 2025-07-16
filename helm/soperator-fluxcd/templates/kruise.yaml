@@ -31,7 +31,7 @@ spec:
   interval: {{ .Values.soperator.kruise.interval }}
   timeout: {{ .Values.soperator.kruise.timeout }}
   releaseName: {{ .Values.soperator.kruise.releaseName }}
-  targetNamespace: {{ .Values.soperator.namespace }}
+  targetNamespace: {{ .Values.slurmCluster.namespace }}
   {{- if .Values.soperator.kruise.overrideValues }}
   values:
     {{- toYaml .Values.soperator.kruise.overrideValues | nindent 4 }}
@@ -48,12 +48,6 @@ spec:
   postRenderers:
   - kustomize:
       patches:
-      - patch: |
-          - op: add
-            path: /spec/template/spec/containers/0/resources/limits/cpu
-            value: null
-        target:
-          kind: Deployment
       - target:
           kind: MutatingWebhookConfiguration
           name: kruise-mutating-webhook-configuration
@@ -64,7 +58,7 @@ spec:
               - key: kubernetes.io/metadata.name
                 operator: In
                 values:
-                  - {{ .Values.soperator.namespace }}
+                  - {{ .Values.slurmCluster.namespace }}
       - target:
           kind: ValidatingWebhookConfiguration
           name: kruise-validating-webhook-configuration
@@ -75,61 +69,61 @@ spec:
               - key: kubernetes.io/metadata.name
                 operator: In
                 values:
-                  - {{ .Values.soperator.namespace }}
+                  - {{ .Values.slurmCluster.namespace }}
           - op: replace
             path: /webhooks/1/namespaceSelector/matchExpressions
             value:
               - key: kubernetes.io/metadata.name
                 operator: In
                 values:
-                  - {{ .Values.soperator.namespace }}
+                  - {{ .Values.slurmCluster.namespace }}
           - op: replace
             path: /webhooks/2/namespaceSelector/matchExpressions
             value:
               - key: kubernetes.io/metadata.name
                 operator: In
                 values:
-                  - {{ .Values.soperator.namespace }}
+                  - {{ .Values.slurmCluster.namespace }}
           - op: replace
             path: /webhooks/3/namespaceSelector/matchExpressions
             value:
               - key: kubernetes.io/metadata.name
                 operator: In
                 values:
-                  - {{ .Values.soperator.namespace }}
+                  - {{ .Values.slurmCluster.namespace }}
           - op: replace
             path: /webhooks/4/namespaceSelector/matchExpressions
             value:
               - key: kubernetes.io/metadata.name
                 operator: In
                 values:
-                  - {{ .Values.soperator.namespace }}
+                  - {{ .Values.slurmCluster.namespace }}
           - op: replace
             path: /webhooks/5/namespaceSelector/matchExpressions
             value:
               - key: kubernetes.io/metadata.name
                 operator: In
                 values:
-                  - {{ .Values.soperator.namespace }}
+                  - {{ .Values.slurmCluster.namespace }}
           - op: replace
             path: /webhooks/6/namespaceSelector/matchExpressions
             value:
               - key: kubernetes.io/metadata.name
                 operator: In
                 values:
-                  - {{ .Values.soperator.namespace }}
+                  - {{ .Values.slurmCluster.namespace }}
           - op: replace
             path: /webhooks/7/namespaceSelector/matchExpressions
             value:
               - key: kubernetes.io/metadata.name
                 operator: In
                 values:
-                  - {{ .Values.soperator.namespace }}
+                  - {{ .Values.slurmCluster.namespace }}
           - op: replace
             path: /webhooks/8/namespaceSelector/matchExpressions
             value:
               - key: kubernetes.io/metadata.name
                 operator: In
                 values:
-                  - {{ .Values.soperator.namespace }}
+                  - {{ .Values.slurmCluster.namespace }}
 {{- end }}

@@ -34,6 +34,7 @@ func renderPodTemplateSpec(
 			InitContainers:     initContainers,
 			Containers:         []corev1.Container{renderContainerExporter(clusterValues)},
 			ServiceAccountName: ServiceAccountName,
+			Volumes:            []corev1.Volume{},
 		},
 	}
 	return result

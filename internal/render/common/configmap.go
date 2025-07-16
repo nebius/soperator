@@ -159,7 +159,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 			}
 		}
 	default:
-		res.AddProperty("PartitionName", "main Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
+		res.AddProperty("PartitionName", "main Nodes=ALL Default=YES PriorityTier=10 MaxTime=INFINITE State=UP OverSubscribe=YES")
+		res.AddProperty("PartitionName", "background Nodes=ALL Default=NO PriorityTier=1 PreemptMode=OFF Hidden=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
 	}
 
 	res.AddComment("")

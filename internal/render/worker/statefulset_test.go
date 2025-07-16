@@ -77,6 +77,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 					},
 				},
 			},
+			WaitForController: ptr.To(true),
 		}
 	}
 
@@ -98,7 +99,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 			secrets:        secret,
 			clusterType:    consts.ClusterTypeCPU,
 			expectedEnvVar: "",
-			expectedInitCt: 1,
+			expectedInitCt: 2,
 		},
 		{
 			name:           "CGROUP V1 GPU",
@@ -106,7 +107,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 			secrets:        secret,
 			clusterType:    consts.ClusterTypeGPU,
 			expectedEnvVar: "",
-			expectedInitCt: 2,
+			expectedInitCt: 3,
 		},
 		{
 			name:           "CGROUP V2",
@@ -114,7 +115,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 			secrets:        secret,
 			clusterType:    consts.ClusterTypeCPU,
 			expectedEnvVar: consts.CGroupV2Env,
-			expectedInitCt: 1,
+			expectedInitCt: 2,
 		},
 		{
 			name:           "CGROUP V2 GPU",
@@ -122,7 +123,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 			secrets:        secret,
 			clusterType:    consts.ClusterTypeGPU,
 			expectedEnvVar: consts.CGroupV2Env,
-			expectedInitCt: 2,
+			expectedInitCt: 3,
 		},
 	}
 
@@ -132,11 +133,69 @@ func Test_RenderStatefulSet(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, consts.ContainerNameSlurmd, result.Spec.Template.Spec.Containers[0].Name)
-			if tt.clusterType == consts.ClusterTypeGPU {
-				assert.Equal(t, consts.ContainerNameToolkitValidation, result.Spec.Template.Spec.InitContainers[1].Name)
-			}
 			assert.Equal(t, tt.expectedInitCt, len(result.Spec.Template.Spec.InitContainers))
 			assert.Equal(t, consts.ContainerNameMunge, result.Spec.Template.Spec.InitContainers[0].Name)
+			assert.Equal(t, consts.ContainerNameWaitForController, result.Spec.Template.Spec.InitContainers[1].Name)
+			if tt.clusterType == consts.ClusterTypeGPU {
+				assert.Equal(t, consts.ContainerNameToolkitValidation, result.Spec.Template.Spec.InitContainers[2].Name)
+			}
+
+			// Verify core expected volumes are present and no slurm-configs volume
+			volumes := result.Spec.Template.Spec.Volumes
+			var hasJail, hasMungeKey, hasMungeSocket, hasSlurmConfigs bool
+
+			for _, volume := range volumes {
+				switch volume.Name {
+				case consts.VolumeNameJail:
+					hasJail = true
+				case consts.VolumeNameMungeKey:
+					hasMungeKey = true
+				case consts.VolumeNameMungeSocket:
+					hasMungeSocket = true
+				case consts.VolumeNameSlurmConfigs:
+					hasSlurmConfigs = true
+				}
+			}
+
+			assert.True(t, hasJail, "Worker StatefulSet should have jail volume")
+			assert.True(t, hasMungeKey, "Worker StatefulSet should have munge-key volume")
+			assert.True(t, hasMungeSocket, "Worker StatefulSet should have munge-socket volume")
+			assert.False(t, hasSlurmConfigs, "Worker StatefulSet should NOT have slurm-configs volume")
 		})
+	}
+}
+
+func Test_RenderContainerWaitForController(t *testing.T) {
+	testCluster := "test-cluster"
+	container := &values.Container{
+		NodeContainer: slurmv1.NodeContainer{
+			Image:           "test-image",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+		},
+	}
+
+	result := worker.RenderContainerWaitForController(container, testCluster)
+
+	assert.Equal(t, consts.ContainerNameWaitForController, result.Name)
+	assert.Equal(t, container.Image, result.Image)
+	assert.Equal(t, container.ImagePullPolicy, result.ImagePullPolicy)
+	assert.Equal(t, []string{"/opt/bin/slurm/wait-for-controller.sh"}, result.Command)
+	assert.Equal(t, 1, len(result.Env))
+	assert.Equal(t, "CONTROLLER_SERVICE", result.Env[0].Name)
+	assert.Contains(t, result.Env[0].Value, "controller")
+	assert.Equal(t, 2, len(result.VolumeMounts))
+
+	// Verify exact volume mount values and no unexpected mounts
+	expectedMounts := map[string]string{
+		consts.VolumeNameJail:        consts.VolumeMountPathJail,
+		consts.VolumeNameMungeSocket: consts.VolumeMountPathMungeSocket,
+	}
+
+	assert.Equal(t, len(expectedMounts), len(result.VolumeMounts))
+
+	for _, mount := range result.VolumeMounts {
+		expectedPath, exists := expectedMounts[mount.Name]
+		assert.True(t, exists, "Unexpected volume mount: %s", mount.Name)
+		assert.Equal(t, expectedPath, mount.MountPath, "Wrong mount path for volume %s", mount.Name)
 	}
 }

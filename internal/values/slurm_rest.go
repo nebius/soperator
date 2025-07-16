@@ -2,6 +2,8 @@ package values
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -17,6 +19,7 @@ type SlurmREST struct {
 	ContainerREST        Container
 	CustomInitContainers []corev1.Container
 	Service              Service
+	VolumeJail           slurmv1.NodeVolume
 	Maintenance          *consts.MaintenanceMode
 }
 
@@ -38,5 +41,8 @@ func buildRestFrom(clusterName string, maintenance *consts.MaintenanceMode, rest
 		CustomInitContainers: rest.CustomInitContainers,
 		Service:              buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeREST, clusterName)),
 		Maintenance:          maintenance,
+		VolumeJail: slurmv1.NodeVolume{
+			VolumeSourceName: ptr.To(consts.VolumeNameJail),
+		},
 	}
 }

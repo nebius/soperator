@@ -192,8 +192,12 @@ COPY images/worker/slurmd_entrypoint.sh /opt/bin/slurm/
 # Copy supervisord entrypoint script
 COPY images/worker/supervisord_entrypoint.sh /opt/bin/slurm/
 
+# Copy wait-for-controller script
+COPY images/worker/wait-for-controller.sh /opt/bin/slurm/
+
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh && \
-    chmod +x /opt/bin/slurm/supervisord_entrypoint.sh
+    chmod +x /opt/bin/slurm/supervisord_entrypoint.sh && \
+    chmod +x /opt/bin/slurm/wait-for-controller.sh
 
 # Start supervisord that manages both slurmd and sshd as child processes
 ENTRYPOINT ["/opt/bin/slurm/supervisord_entrypoint.sh"]

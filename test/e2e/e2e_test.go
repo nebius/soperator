@@ -199,6 +199,9 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 	// Not HA, so it'll k8s cluster will be created faster
 	tfVars["etcd_cluster_size"] = 1
 
+	// cleanup_bucket_on_destroy = false
+	tfVars["cleanup_bucket_on_destroy"] = true
+
 	return tfVars
 }
 

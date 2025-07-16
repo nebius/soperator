@@ -32,7 +32,7 @@ mkdir -p /mnt/jail/opt/soperator-home
 ln -s /mnt/jail/opt/soperator-home /opt/soperator-home
 
 echo "Symlink slurm configs from jail(sconfigcontroller)"
-rm -rf /etc/slurm && ln -s /mnt/jail/slurm /etc/slurm
+rm -rf /etc/slurm && ln -s /mnt/jail/etc/slurm /etc/slurm
 
 echo "Bind-mount gpubenchmark from container to jail"
 touch /mnt/jail/usr/bin/gpubench

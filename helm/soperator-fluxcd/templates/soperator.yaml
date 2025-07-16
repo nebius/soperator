@@ -16,6 +16,7 @@ spec:
       version: {{ .Values.soperator.version }}
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  - name: {{ include "soperator-fluxcd.fullname" . }}-kruise
   {{- if .Values.certManager.enabled }}
   - name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
   {{- end }}
@@ -67,6 +68,8 @@ spec:
           }} 
           isPrometheusCrdInstalled: true
           {{- end }}
+      kruise:
+        installOperator: false
     {{- end }}
   {{- end }}
   valuesFrom:

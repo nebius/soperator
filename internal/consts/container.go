@@ -8,6 +8,7 @@ const (
 	ContainerNameREST              = Slurmrestd
 	ContainerNameSshd              = SshdName
 	ContainerNameToolkitValidation = "toolkit-validation"
+	ContainerNameWaitForController = "wait-for-controller"
 	ContainerNameNCCLBenchmark     = ncclBenchmark
 	ContainerNamePopulateJail      = populateJail
 	ContainerNameExporter          = Exporter

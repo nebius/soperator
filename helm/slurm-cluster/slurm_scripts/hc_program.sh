@@ -18,6 +18,22 @@ chroot /mnt/jail /bin/bash -s <<-'EOF'
         health_checker
     )
 
+    GPU_COUNT=$(nvidia-smi --list-gpus 2>/dev/null | wc -l || echo 0)
+    echo "Found ${GPU_COUNT} GPUs"
+
+    # Only add hc_* checks if we have exactly 8 GPUs
+    if [[ "${GPU_COUNT}" -eq 8 ]]; then
+        checks+=(
+            hc_host_service
+            hc_xid
+            hc_ib_link_state
+            hc_ib_counters
+            hc_ib_pkey
+        )
+    else
+        echo "Skipping hc_* checks because GPU_COUNT=${GPU_COUNT} (need 8)"
+    fi
+
     pushd /opt/slurm_scripts || exit 0
     for check in "${checks[@]}"; do
         script="${check}.sh"
