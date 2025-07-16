@@ -177,7 +177,9 @@ RUN apt update && \
         libpmix2 \
         libpmix-dev \
         bsdmainutils \
-        kmod && \
+        kmod \
+        tmux \
+        aptitude && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
