@@ -11,6 +11,8 @@ spec:
     url: {{ include "son.alert.dataSourceUrl" . | quote }}
   notifiers:
     - url: {{ "blackhole://" | quote }}
+  remoteWrite:
+    url: {{ include "son.alert.dataSourceUrl" . | quote }}
   ruleSelector:
     matchLabels:
       {{- include "son.rule.groupMatchLabel" (dict "context" . "value" (include "son.rule.group.records" .)) | nindent 6 }}

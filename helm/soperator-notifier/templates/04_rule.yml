@@ -11,13 +11,13 @@ spec:
     - name: {{ include "son.rule.groupName" (include "son.rule.group.records" .) }}
       rules:
         - record: {{ include "son.rule.alertedRecord" (include "son.slack.severity.error" .) }}
-          expr: '{{ printf "max_over_time(slurm_job_info{%s}[%s]" (include "son.rule.jobSelector.error" .) (include "son.rule.alertedInterval" .) }}'
+          expr: {{ printf "max_over_time(slurm_job_info{%s}[%s])" (include "son.rule.jobSelector.error" .) (include "son.rule.alertedInterval" .) }}
 
         - record: {{ include "son.rule.alertedRecord" (include "son.slack.severity.warning" .) }}
-          expr: '{{ printf "max_over_time(slurm_job_info{%s}[%s]" (include "son.rule.jobSelector.warning" .) (include "son.rule.alertedInterval" .) }}'
+          expr: {{ printf "max_over_time(slurm_job_info{%s}[%s])" (include "son.rule.jobSelector.warning" .) (include "son.rule.alertedInterval" .) }}
 
         - record: {{ include "son.rule.alertedRecord" (include "son.slack.severity.good" .) }}
-          expr: '{{ printf "max_over_time(slurm_job_info{%s}[%s]" (include "son.rule.jobSelector.good" .) (include "son.rule.alertedInterval" .) }}'
+          expr: {{ printf "max_over_time(slurm_job_info{%s}[%s])" (include "son.rule.jobSelector.good" .) (include "son.rule.alertedInterval" .) }}
 
 ---
 
