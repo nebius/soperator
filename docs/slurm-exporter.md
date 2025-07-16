@@ -83,6 +83,7 @@ slurm_node_fails_total{node_name="worker-2",state_base="DOWN",state_is_drain="tr
 - `slurm_partition`: SLURM partition name
 - `job_name`: User-defined job name
 - `user_name`: Username who submitted the job
+- `user_id`: Numeric user ID who submitted the job
 - `standard_error`: Path to stderr file
 - `standard_output`: Path to stdout file
 - `array_job_id`: Array job ID (if applicable)
@@ -90,7 +91,7 @@ slurm_node_fails_total{node_name="worker-2",state_base="DOWN",state_is_drain="tr
 
 **Example:**
 ```prometheus
-slurm_job_info{job_id="12345",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",job_name="training_job",user_name="researcher",standard_error="/home/researcher/job.err",standard_output="/home/researcher/job.out",array_job_id="",array_task_id=""} 1
+slurm_job_info{job_id="12345",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",job_name="training_job",user_name="researcher",user_id="1000",standard_error="/home/researcher/job.err",standard_output="/home/researcher/job.out",array_job_id="",array_task_id=""} 1
 ```
 
 #### Gauge `slurm_node_job`

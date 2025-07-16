@@ -25,8 +25,9 @@ type SlurmExporter struct {
 
 	CustomInitContainers []corev1.Container
 
-	// VolumeJail is a volume that is used to mount the jail directory for the Slurm Exporter.
-	// Deprecated: will be removed when Slurm Exporter will be replaced with Soperator Exporter.
+	// VolumeJail is a volume that is used to mount the jail directory for the Soperator Exporter.
+	//
+	// Deprecated: not required anymore.
 	VolumeJail slurmv1.NodeVolume
 
 	Maintenance *consts.MaintenanceMode

@@ -17,9 +17,13 @@ func BasePodTemplateSpec(
 	clusterName string,
 	valuesREST *values.SlurmREST,
 	nodeFilters []slurmv1.K8sNodeFilter,
+	volumeSources []slurmv1.VolumeSource,
 	matchLabels map[string]string,
 ) (*corev1.PodTemplateSpec, error) {
-	volumes := []corev1.Volume{common.RenderVolumeSlurmConfigs(clusterName)}
+	volumes := []corev1.Volume{
+		common.RenderVolumeSlurmConfigs(clusterName),
+		common.RenderVolumeJailFromSource(volumeSources, *valuesREST.VolumeJail.VolumeSourceName),
+	}
 
 	nodeFilter, err := utils.GetBy(
 		nodeFilters,

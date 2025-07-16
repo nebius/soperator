@@ -80,6 +80,7 @@ func (r SlurmClusterReconciler) ReconcileREST(
 						clusterValues.Namespace,
 						&clusterValues.NodeRest,
 						clusterValues.NodeFilters,
+						clusterValues.VolumeSources,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")

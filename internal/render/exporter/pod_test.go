@@ -7,8 +7,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -26,6 +28,9 @@ func TestRenderPodTemplateSpec(t *testing.T) {
 			Container: slurmv1.NodeContainer{
 				Image: "exporter-image:latest",
 			},
+			VolumeJail: slurmv1.NodeVolume{
+				VolumeSourceName: ptr.To(consts.VolumeNameJail),
+			},
 		},
 		NodeFilters: []slurmv1.K8sNodeFilter{
 			{
@@ -36,6 +41,14 @@ func TestRenderPodTemplateSpec(t *testing.T) {
 			},
 		},
 		NodeRest: values.SlurmREST{},
+		VolumeSources: []slurmv1.VolumeSource{
+			{
+				Name: consts.VolumeNameJail,
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			},
+		},
 	}
 	initContainers := []corev1.Container{}
 	matchLabels := map[string]string{"app": "slurm-exporter"}

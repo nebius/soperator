@@ -174,6 +174,15 @@ func RenderVolumeMountJail() corev1.VolumeMount {
 	}
 }
 
+// RenderVolumeMountJailReadOnly renders [corev1.VolumeMount] defining the mounting path for jail contents in read-only mode
+func RenderVolumeMountJailReadOnly() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameJail,
+		MountPath: consts.VolumeMountPathJail,
+		ReadOnly:  true,
+	}
+}
+
 // endregion Jail
 
 // region JailSnapshot

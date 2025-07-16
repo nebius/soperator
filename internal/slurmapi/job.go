@@ -18,6 +18,7 @@ type Job struct {
 	StateReason    string
 	Partition      string
 	UserName       string
+	UserID         *int32
 	StandardError  string
 	StandardOutput string
 	Nodes          string
@@ -53,6 +54,10 @@ func JobFromAPI(apiJob api.V0041JobInfo) (Job, error) {
 
 	if apiJob.Partition != nil {
 		job.Partition = *apiJob.Partition
+	}
+
+	if apiJob.UserId != nil {
+		job.UserID = apiJob.UserId
 	}
 
 	if apiJob.UserName != nil {

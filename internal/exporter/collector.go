@@ -40,7 +40,7 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 		slurmAPIClient: slurmAPIClient,
 
 		nodeInfo: prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "address"}, nil),
-		jobInfo:  prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "standard_error", "standard_output", "array_job_id", "array_task_id"}, nil),
+		jobInfo:  prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "user_id", "standard_error", "standard_output", "array_job_id", "array_task_id"}, nil),
 		jobNode:  prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
 		nodeGPUSeconds: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "slurm_node_gpu_seconds_total",
@@ -177,6 +177,11 @@ func (c *MetricsCollector) slurmJobMetrics(
 	return func(yield func(prometheus.Metric) bool) {
 		logger := log.FromContext(ctx).WithName(ControllerName)
 		for _, job := range slurmJobs {
+			userID := ""
+			if job.UserID != nil {
+				userID = strconv.Itoa(int(*job.UserID))
+			}
+
 			jobLabels := []string{
 				job.GetIDString(),
 				job.State,
@@ -184,6 +189,7 @@ func (c *MetricsCollector) slurmJobMetrics(
 				job.Partition,
 				job.Name,
 				job.UserName,
+				userID,
 				job.StandardError,
 				job.StandardOutput,
 				job.GetArrayJobIDString(),
