@@ -1,5 +1,5 @@
 {{- $ignoreFilter := "" }}
-{{- if .Values.ignoreSystemJobs }}
+{{- if .Values.slack.ignoreSystemJobs }}
 {{- $ignoreFilter = printf ", %s" (include "son.rule.jobSelector.system" .) }}
 {{- end -}}
 
