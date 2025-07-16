@@ -10,22 +10,23 @@ if [[ -z "${SLURM_JOB_GPUS:-}" ]]; then
     exit 0
 fi
 
-# Build up an array of "-i <gpu_index>" arguments for nvidia-smi
-# SLURM_JOB_GPUS is a comma-separated list of GPU indices, e.g. "0,2"
-IFS=',' read -ra _gpus <<< "${SLURM_JOB_GPUS}"
-nvidia_args=()
-for gpu in "${_gpus[@]}"; do
-    nvidia_args+=( -i "${gpu}" )
+# Split the comma-separated list of allocated GPU indices into an array
+IFS=',' read -ra ALLOC_GPUS <<< "${SLURM_JOB_GPUS}"
+
+processes=""
+# For each allocated GPU, check for running compute apps
+for gpu in "${ALLOC_GPUS[@]}"; do
+    out=$(chroot /run/nvidia/driver nvidia-smi \
+        -i "${gpu}" \
+        --query-compute-apps="gpu_serial,process_name,pid,used_memory" \
+        --format="csv,noheader" 2>/dev/null || echo "")
+    if [[ -n "${out}" ]]; then
+        processes+=$'\n'"GPU ${gpu}: ${out}"
+    fi
 done
 
-processes=$(chroot /run/nvidia/driver nvidia-smi \
-    "${nvidia_args[@]}" \
-    --query-compute-apps="gpu_serial,process_name" \
-    --format="csv,noheader" || echo '')
-
 if [[ -n "${processes}" ]]; then
-    echo "Found processes running on GPUs"
-    echo "${processes}"
+    echo "Found processes running on allocated GPUs: ${processes}"
 
     # Return failure details
     echo "GPUs are in use by processes not managed by Slurm" >&3
