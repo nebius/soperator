@@ -58,9 +58,9 @@ func renderContainerRebooter(rebooter slurmv1alpha1.Rebooter) corev1.Container {
 			"-log-format=" + rebooter.LogFormat,
 		},
 		Resources: createResourceRequirements(
-			*rebooter.Resources.Limits.Cpu(),
 			*rebooter.Resources.Requests.Cpu(),
 			*rebooter.Resources.Requests.Memory(),
+			*rebooter.Resources.Limits.Memory(),
 		),
 		Env:            rebooter.Env,
 		ReadinessProbe: rebooter.ReadinessProbe,
