@@ -1,3 +1,23 @@
+{{/* AlertManager config name. */}}
+{{- define "son.config.name" -}}
+{{- include "son.name" . }}
+{{- end }}
+
+{{/* How long to wait before sending the initial notification. */}}
+{{- define "son.config.route.groupWait" -}}
+{{ default .Values.interval.group_wait "30s" }}
+{{- end }}
+
+{{/* How long to wait before sending the initial notification. */}}
+{{- define "son.config.route.groupInterval" -}}
+{{ default .Values.interval.group "5m" }}
+{{- end }}
+
+{{/* How long to wait before sending the initial notification. */}}
+{{- define "son.config.route.repeatInterval" -}}
+{{ default .Values.interval.repeat "25h" }}
+{{- end }}
+
 {{/* Labels */}}
 
 {{/* Label for matching AlertManager with its config */}}
@@ -12,32 +32,32 @@ severity
 
 {{/* Job ID label key. */}}
 {{- define "son.config.label.job.id" -}}
-job-id
+job_id
 {{- end }}
 
 {{/* Job name label key. */}}
 {{- define "son.config.label.job.name" -}}
-job-name
+job_name
 {{- end }}
 
 {{/* Job state label key. */}}
 {{- define "son.config.label.job.state" -}}
-job-state
+job_state
 {{- end }}
 
 {{/* Job state reason label key. */}}
 {{- define "son.config.label.job.stateReason" -}}
-job-state-reason
+job_state_reason
 {{- end }}
 
 {{/* Job user label key. */}}
 {{- define "son.config.label.job.user" -}}
-job-user
+job_user
 {{- end }}
 
 {{/* Alert key label key. */}}
 {{- define "son.config.label.alertKey" -}}
-alert-key
+alert_key
 {{- end }}
 
 {{/* --- */}}

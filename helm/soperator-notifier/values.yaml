@@ -1,7 +1,15 @@
 namespace: monitoring-system
 
 slack:
-  webhookUrl: "https://hooks.slack.com/services/XXXXXXXXXXX/YYYYYYYYYYY/ZZZZZZZZZZZZZZZZZZZZZZZZ"
+  # Slack Webhook URL in the following format:
+  # https://hooks.slack.com/services/XXXXXXXXXXX/YYYYYYYYYYY/ZZZZZZZZZZZZZZZZZZZZZZZZ
+  webhookUrl:
+
+  severityColor:
+    error: danger
+    warning: "#F28B30"
+    good: good
+    unknown: "#807F83"
 
 alertManager:
   replicas: 1
@@ -12,5 +20,14 @@ dataSourceUrl: "http://vmsingle-metrics-victoria-metrics-k8s-stack:8429"
 interval:
   evaluation: 30s
   alerted: 1h
+
+  # How long to wait before sending the initial notification.
+  group_wait: 30s
+
+  # How long to wait before sending an updated notification.
+  group: 5m
+
+  # How long to wait before repeating the last notification.
+  repeat: 25h
 
 ignoreSystemJobs: true

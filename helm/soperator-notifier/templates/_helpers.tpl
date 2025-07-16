@@ -48,3 +48,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "son.wrapTemplate" -}}
 {{ "{{ " }}{{ . }}{{ " }}"}}
 {{- end }}
+
+{{/* Function to wrap AlertManager's Go template into string with left whitespace trimming. */}}
+{{- define "son.wrapTemplateTrimL" -}}
+{{ "{{- " }}{{ . }}{{ " }}"}}
+{{- end }}
+
+{{/* Function to wrap AlertManager's Go template into string with left and right whitespace trimming. */}}
+{{- define "son.wrapTemplateTrimLR" -}}
+{{ "{{- " }}{{ . }}{{ " -}}"}}
+{{- end }}

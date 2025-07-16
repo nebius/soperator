@@ -1,80 +1,83 @@
+{{- $slackReceiver := "slack-channel" | quote -}}
+
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMAlertmanagerConfig
 metadata:
-  name: slack-config
-  namespace: monitoring-system
+  name: {{ include "son.config.name" . }}
+  namespace: {{ .Values.namespace }}
   labels:
-    slack-route: "enabled"
+    {{- include "son.labels" . | nindent 4 }}
+    {{- include "son.config.label.match" . | nindent 4 }}
 spec:
   route:
-    receiver: "slack-channel"
+    receiver: {{ $slackReceiver }}
     group_by:
       - alertname
-      - severity
-    group_wait:  30s
-    group_interval: 5m
-    repeat_interval: 25h
+      - {{ include "son.config.label.severity" . }}
+    group_wait:  {{ include "son.config.route.groupWait" . }}
+    group_interval: {{ include "son.config.route.groupInterval" . }}
+    repeat_interval: {{ include "son.config.route.repeatInterval" . }}
   receivers:
-    - name: "slack-channel"
+    - name: {{ $slackReceiver }}
       slack_configs:
         - api_url:
-            name: slack-webhook
-            key: url
-          title: "{{ .CommonAnnotations.title }}"
-          # language=gotemplate
+            name: {{ include "son.slack.webhook.secret.name" . }}
+            key: {{ include "son.slack.webhook.secret.key" . }}
+          title: {{ include "son.wrapTemplate" ".CommonAnnotations.title" | quote }}
+          title_link: '{{ include "son.wrapTemplate" "define \"son.slack.msg.titleLink\"" }}{{ include "son.wrapTemplate" "\"\"" }}{{ include "son.wrapTemplate" "end" }}'
           text: |-
-            {{ range .Alerts }}
-            {{- $id := .Labels.job_id }}
-            {{- $job := .Labels.job_name }}
-            {{- $state := .Labels.job_state }}
-            {{- $reason := .Labels.job_state_reason }}
-            {{- $user := .Labels.job_user }}
+            {{ include "son.wrapTemplate" "range .Alerts" }}
+            {{ include "son.wrapTemplateTrimL" (printf "$id := .Labels.%s" (include "son.config.label.job.id" . )) }}
+            {{ include "son.wrapTemplateTrimL" (printf "$job := .Labels.%s" (include "son.config.label.job.name" . )) }}
+            {{ include "son.wrapTemplateTrimL" (printf "$state := .Labels.%s" (include "son.config.label.job.state" . )) }}
+            {{ include "son.wrapTemplateTrimL" (printf "$reason := .Labels.%s" (include "son.config.label.job.stateReason" . )) }}
+            {{ include "son.wrapTemplateTrimL" (printf "$user := .Labels.%s" (include "son.config.label.job.user" . )) }}
 
-            {{- if eq $state "FAILED" }}
-            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} has *FAILED* (reason: `{{ $reason }}`)
+            {{ include "son.wrapTemplateTrimL" (printf "if eq $state \"%s\"" (include "son.config.jobStatus.failed" .)) }}
+            {{ include "son.slack.msg.jobPrefix" . }} has *FAILED* {{ include "son.slack.msg.jobReason" . }}.
 
-            {{- else if eq $state "NODE_FAIL" }}
-            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was terminated due to a *NODE FAILURE* (reason: `{{ $reason }}`). It should be automatically restarted under the same job ID.
+            {{ include "son.wrapTemplateTrimL" (printf "else if eq $state \"%s\"" (include "son.config.jobStatus.nodeFail" .)) }}
+            {{ include "son.slack.msg.jobPrefix" . }} was terminated due to a *NODE FAILURE* {{ include "son.slack.msg.jobReason" . }}. It should be automatically restarted under the same job ID.
 
-            {{- else if eq $state "OUT_OF_MEMORY" }}
-            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was killed for *EXCEEDING ITS MEMORY LIMIT* (reason: `{{ $reason }}`)
+            {{ include "son.wrapTemplateTrimL" (printf "else if eq $state \"%s\"" (include "son.config.jobStatus.oom" .)) }}
+            {{ include "son.slack.msg.jobPrefix" . }} was killed for *EXCEEDING ITS MEMORY LIMIT* {{ include "son.slack.msg.jobReason" . }}.
 
-            {{- else if eq $state "CANCELLED" }}
-            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was *CANCELLED* (reason: `{{ $reason }}`). If this was not done manually, it may indicate an error
+            {{ include "son.wrapTemplateTrimL" (printf "else if eq $state \"%s\"" (include "son.config.jobStatus.cancelled" .)) }}
+            {{ include "son.slack.msg.jobPrefix" . }} was *CANCELLED* {{ include "son.slack.msg.jobReason" . }}. If this was not done manually, it may indicate an error.
 
-            {{- else if eq $state "BOOT_FAIL" }}
-            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was removed from the queue due to an *EPHEMERAL NODE LAUNCH FAILURE* (reason: `{{ $reason }}`)
+            {{ include "son.wrapTemplateTrimL" (printf "else if eq $state \"%s\"" (include "son.config.jobStatus.bootFail" .)) }}
+            {{ include "son.slack.msg.jobPrefix" . }} was removed from the queue due to an *EPHEMERAL NODE LAUNCH FAILURE* {{ include "son.slack.msg.jobReason" . }}.
 
-            {{- else if eq $state "DEADLINE" }}
-            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was removed from the queue because it *DIDN’T START WITHIN ITS DEADLINE* (reason: `{{ $reason }}`)
+            {{ include "son.wrapTemplateTrimL" (printf "else if eq $state \"%s\"" (include "son.config.jobStatus.deadline" .)) }}
+            {{ include "son.slack.msg.jobPrefix" . }} was removed from the queue because it *DIDN’T START WITHIN ITS DEADLINE* {{ include "son.slack.msg.jobReason" . }}.
 
-            {{- else if eq $state "PREEMPTED" }}
-            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was *PREEMPTED* by a higher-priority job (reason: `{{ $reason }}`)
+            {{ include "son.wrapTemplateTrimL" (printf "else if eq $state \"%s\"" (include "son.config.jobStatus.preempted" .)) }}
+            {{ include "son.slack.msg.jobPrefix" . }} was *PREEMPTED* by a higher-priority job {{ include "son.slack.msg.jobReason" . }}.
 
-            {{- else if eq $state "SUSPENDED" }}
-            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was *SUSPENDED* (reason: `{{ $reason }}`)
+            {{ include "son.wrapTemplateTrimL" (printf "else if eq $state \"%s\"" (include "son.config.jobStatus.suspended" .)) }}
+            {{ include "son.slack.msg.jobPrefix" . }} was *SUSPENDED* {{ include "son.slack.msg.jobReason" . }}.
 
-            {{- else if eq $state "TIMEOUT" }}
-            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was killed for *EXCEEDING ITS TIME LIMIT* (reason: `{{ $reason }}`)
+            {{ include "son.wrapTemplateTrimL" (printf "else if eq $state \"%s\"" (include "son.config.jobStatus.timeout" .)) }}
+            {{ include "son.slack.msg.jobPrefix" . }} was killed for *EXCEEDING ITS TIME LIMIT* {{ include "son.slack.msg.jobReason" . }}.
 
-            {{- else if eq $state "COMPLETED" }}
-            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} *COMPLETED* successfully
+            {{ include "son.wrapTemplateTrimL" (printf "else if eq $state \"%s\"" (include "son.config.jobStatus.completed" .)) }}
+            {{ include "son.slack.msg.jobPrefix" . }} *COMPLETED* successfully.
 
-            {{- else }}
-            Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} ended in state `{{ $state }}` (reason: `{{ $reason }}`)
-            {{- end }}
+            {{ include "son.wrapTemplateTrimL" "else" }}
+            {{ include "son.slack.msg.jobPrefix" . }} ended in state `{{ include "son.wrapTemplate" "$state" }}` {{ include "son.slack.msg.jobReason" . }}.
+            {{ include "son.wrapTemplateTrimL" "end" }}
 
-            {{- end }}
+            {{ include "son.wrapTemplateTrimL" "end" }}
 
-          # language=gotemplate
           color: |-
-            {{- if eq .CommonLabels.severity "error" -}}
-            danger
-            {{- else if eq .CommonLabels.severity "warning" -}}
-            #F28B30
-            {{- else if eq .CommonLabels.severity "good" -}}
-            good
-            {{- else -}}
-            #807F83
-            {{- end -}}
+            {{ include "son.wrapTemplateTrimLR" (printf "if eq .CommonLabels.%s \"%s\"" (include "son.config.label.severity" .) (include "son.slack.severity.error" .)) }}
+            {{ include "son.slack.msg.color.error" . }}
+            {{ include "son.wrapTemplateTrimLR" (printf "else if eq .CommonLabels.%s \"%s\"" (include "son.config.label.severity" .) (include "son.slack.severity.warning" .)) }}
+            {{ include "son.slack.msg.color.warning" . }}
+            {{ include "son.wrapTemplateTrimLR" (printf "else if eq .CommonLabels.%s \"%s\"" (include "son.config.label.severity" .) (include "son.slack.severity.good" .)) }}
+            {{ include "son.slack.msg.color.good" . }}
+            {{ include "son.wrapTemplateTrimLR" "else" }}
+            {{ include "son.slack.msg.color.unknown" . }}
+            {{ include "son.wrapTemplateTrimLR" "end" }}
+
           send_resolved: false
