@@ -5,7 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
+
+	"golang.org/x/sys/unix"
 )
+
+const direntCacheTTL = 15 * time.Second
+const delayBetweenWriteAndReconfigure = direntCacheTTL + 1*time.Second
 
 type FileStore struct {
 	path string
@@ -46,9 +52,10 @@ func (s *FileStore) Add(name, content, subPath string) (err error) {
 		return err
 	}
 	tempFileName := tempFile.Name()
+	deferTempFileRemove := true
 
 	defer func() {
-		if tempFileName != "" {
+		if deferTempFileRemove {
 			// Remove left-over temp file
 			err = errors.Join(err, os.Remove(tempFileName))
 		}
@@ -91,12 +98,44 @@ func (s *FileStore) Add(name, content, subPath string) (err error) {
 		return err
 	}
 
-	err = os.Rename(tempFileName, filePath)
+	// Don't just rename in case of dirent caches
+	// In case this has to work on system without `renameat2`, it can be implemented with os.Link:
+	// generate random name, call os.Link, loop if error is "already exists"
+	// See os.CreateTemp implementation
+	err = unix.Renameat2(unix.AT_FDCWD, tempFileName, unix.AT_FDCWD, filePath, unix.RENAME_EXCHANGE)
 	if err != nil {
-		err = fmt.Errorf("rename temp file: %w", err)
+		if errors.Is(err, os.ErrNotExist) {
+			// We have just created tempFileName, so it's most probably about filePath, we can just rename it
+			// Using RENAME_NOREPLACE to avoid replacing file created after RENAME_EXCHANGE but before this
+			// But at the same time there's no cached dirent, so it should be safe to just rename it and move on
+			err = unix.Renameat2(unix.AT_FDCWD, tempFileName, unix.AT_FDCWD, filePath, unix.RENAME_NOREPLACE)
+			if err != nil {
+				// If rename failed we can just delete temp file and move on
+				err = fmt.Errorf("rename temp to target file (%s => %s): %w", tempFileName, filePath, err)
+			}
+			deferTempFileRemove = false
+			return err
+		}
+
+		// If exchange failed we can just delete temp file and move on
+		err = fmt.Errorf("switch temp and target files (%s and %s): %w", tempFileName, filePath, err)
 		return err
 	}
-	tempFileName = ""
+
+	// Some filesystems can keep directory entries caches for too long without invalidating
+	// This delay is expected to make these caches stale on worker VMs
+	// So when slurmd will restart, it will pick up new inodes for config files
+	// Also it should not keep inodes for old files alive, because only directory entries are cached, not inodes themselves
+	// Deleting earlier can lead to "file not found" errors
+
+	// Renameat2 has succeeded, and from this moment caches are stale, and we can't just remove temp file
+	// without triggering errors on readers
+	deferTempFileRemove = false
+	// TODO sleep do this once per reconciliation, will be done in #1200
+	time.Sleep(delayBetweenWriteAndReconfigure)
+
+	// Delete old entry and free old inode, now that cache is invalidated it should be safe
+	err = os.Remove(tempFileName)
 
 	return err
 }
