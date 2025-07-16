@@ -19,7 +19,6 @@ dataSourceUrl: "http://vmsingle-metrics-victoria-metrics-k8s-stack:8429"
 
 interval:
   evaluation: 30s
-  alerted: 1h
 
   # How long to wait before sending the initial notification.
   group_wait: 30s

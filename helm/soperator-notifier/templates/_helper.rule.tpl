@@ -8,34 +8,19 @@
 slack
 {{- end }}
 
-{{/* Rule group label value for recorded alerts. */}}
-{{- define "son.rule.group.records" -}}
-records
-{{- end }}
-
 {{/* Function to build matching label for Rule group. */}}
 {{- define "son.rule.groupMatchLabel" -}}
-{{ include "son.rule.groupMatchLabelKey" .context }}: {{ .value }}
+{{ include "son.rule.groupMatchLabelKey" . }}: {{ include "son.rule.group.slack" "" }}
 {{- end }}
 
-{{/* Function to build Rule name. */}}
+{{/* Rule name. */}}
 {{- define "son.rule.name" -}}
-{{ printf "%s-%s-%s" (include "son.name" .context) "slurm-job" .value }}
+{{ printf "%s-%s" (include "son.name" .) "slurm-job" }}
 {{- end }}
 
 {{/* Function to build Rule group name. */}}
 {{- define "son.rule.groupName" -}}
-{{ printf "%s-%s" "slurm-job" . }}
-{{- end }}
-
-{{/* Function to build alerted Rule record name. */}}
-{{- define "son.rule.alertedRecord" -}}
-{{ printf "%s_%s_%s" "slurm_job" . "alerted" }}
-{{- end }}
-
-{{/* Alerted record keeping interval. */}}
-{{- define "son.rule.alertedInterval" -}}
-{{ default .Values.interval.alerted "1h" }}
+slurm-job
 {{- end }}
 
 {{/* Function to build Rule labels. */}}

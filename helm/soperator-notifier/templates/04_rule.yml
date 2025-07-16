@@ -1,26 +1,3 @@
-apiVersion: operator.victoriametrics.com/v1beta1
-kind: VMRule
-metadata:
-  name: {{ include "son.rule.name" (dict "context" . "value" (include "son.rule.group.records" .)) }}
-  namespace: {{ .Values.namespace }}
-  labels:
-    {{- include "son.labels" . | nindent 4 }}
-    {{- include "son.rule.groupMatchLabel" (dict "context" . "value" (include "son.rule.group.records" .)) | nindent 4 }}
-spec:
-  groups:
-    - name: {{ include "son.rule.groupName" (include "son.rule.group.records" .) }}
-      rules:
-        - record: {{ include "son.rule.alertedRecord" (include "son.slack.severity.error" .) }}
-          expr: {{ printf "max_over_time(slurm_job_info{%s}[%s])" (include "son.rule.jobSelector.error" .) (include "son.rule.alertedInterval" .) }}
-
-        - record: {{ include "son.rule.alertedRecord" (include "son.slack.severity.warning" .) }}
-          expr: {{ printf "max_over_time(slurm_job_info{%s}[%s])" (include "son.rule.jobSelector.warning" .) (include "son.rule.alertedInterval" .) }}
-
-        - record: {{ include "son.rule.alertedRecord" (include "son.slack.severity.good" .) }}
-          expr: {{ printf "max_over_time(slurm_job_info{%s}[%s])" (include "son.rule.jobSelector.good" .) (include "son.rule.alertedInterval" .) }}
-
----
-
 {{- $ignoreFilter := "" }}
 {{- if .Values.ignoreSystemJobs }}
 {{- $ignoreFilter = printf ", %s" (include "son.rule.jobSelector.system" .) }}
@@ -29,19 +6,18 @@ spec:
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMRule
 metadata:
-  name: {{ include "son.rule.name" (dict "context" . "value" (include "son.rule.group.slack" .)) }}
+  name: {{ include "son.rule.name" . }}
   namespace: {{ .Values.namespace }}
   labels:
     {{- include "son.labels" . | nindent 4 }}
-    {{- include "son.rule.groupMatchLabel" (dict "context" . "value" (include "son.rule.group.slack" .)) | nindent 4 }}
+    {{- include "son.rule.groupMatchLabel" . | nindent 4 }}
 spec:
   groups:
-    - name: {{ include "son.rule.groupName" (include "son.rule.group.slack" .) }}
+    - name: {{ include "son.rule.groupName" "" }}
       rules:
         - alert: SlurmJobError
           expr: |
             {{ printf "changes(slurm_job_info{%s%s}) > 0" (include "son.rule.jobSelector.error" .) $ignoreFilter }}
-            unless ignoring(job_id, job_state, job_name, job_state_reason, user_name) {{ include "son.rule.alertedRecord" (include "son.slack.severity.error" .) }}
           for: 0s
           labels:
 {{ include "son.rule.labels" (dict "context" . "severity" (include "son.slack.severity.error" .)) | indent 12 }}
@@ -51,7 +27,6 @@ spec:
         - alert: SlurmJobWarning
           expr: |
             {{ printf "changes(slurm_job_info{%s%s}) > 0" (include "son.rule.jobSelector.warning" .) $ignoreFilter }}
-            unless ignoring(job_id, job_state, job_name, job_state_reason, user_name) {{ include "son.rule.alertedRecord" (include "son.slack.severity.warning" .) }}
           for: 0s
           labels:
 {{ include "son.rule.labels" (dict "context" . "severity" (include "son.slack.severity.warning" .)) | indent 12 }}
@@ -61,7 +36,6 @@ spec:
         - alert: SlurmJobGood
           expr: |
             {{ printf "changes(slurm_job_info{%s%s}) > 0" (include "son.rule.jobSelector.good" .) $ignoreFilter }}
-            unless ignoring(job_id, job_state, job_name, job_state_reason, user_name) {{ include "son.rule.alertedRecord" (include "son.slack.severity.good" .) }}
           for: 0s
           labels:
 {{ include "son.rule.labels" (dict "context" . "severity" (include "son.slack.severity.good" .)) | indent 12 }}
