@@ -20114,9 +20114,8 @@ spec:
                     type: string
                   topologyPlugin:
                     default: topology/tree
-                    description: |-
-                      TopologyPlugin identifies the plugin to determine network topology for optimizations.
-                      It is set automatically to `topology/tree` if SlurmTopologyConfigMapRefName is specified.
+                    description: TopologyPlugin identifies the plugin to determine
+                      network topology for optimizations.
                     type: string
                 type: object
               slurmNodes:
@@ -32994,12 +32993,6 @@ spec:
                 - rest
                 - worker
                 type: object
-              slurmTopologyConfigMapRefName:
-                description: |-
-                  SlurmTopologyConfigMapRefName is the name of the slurm topology config.
-                  When exists, TopologyPlugin is automatically set to `topology/tree` in slurm.conf
-                  if TopologyPlugin is not explicitly specified in SlurmConfig.
-                type: string
               telemetry:
                 description: Metrics define the desired state of the prometheus or
                   opentelemetry metrics

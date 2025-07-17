@@ -77,9 +77,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					topologyConfig := corev1.ConfigMap{}
-
-					desired := common.RenderConfigMapSlurmConfigs(clusterValues, topologyConfig)
+					desired := common.RenderConfigMapSlurmConfigs(clusterValues)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 

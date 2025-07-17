@@ -89,9 +89,7 @@ func RenderVolumeMountSlurmConfigs() corev1.VolumeMount {
 
 // endregion Slurm configs
 
-// region Slurm topology config
-
-// RenderVolumeProjectedSlurmConfigs renders [corev1.Volume] containing Slurm common configs + topology config file
+// RenderVolumeProjectedSlurmConfigs renders [corev1.Volume] containing Slurm common configs
 func RenderVolumeProjectedSlurmConfigs(clusterName string, additionalProjections ...*corev1.VolumeProjection) corev1.Volume {
 	sources := []corev1.VolumeProjection{
 		{
@@ -116,8 +114,6 @@ func RenderVolumeProjectedSlurmConfigs(clusterName string, additionalProjections
 		},
 	}
 }
-
-// endregion Slurm topology config
 
 // region Spool
 
