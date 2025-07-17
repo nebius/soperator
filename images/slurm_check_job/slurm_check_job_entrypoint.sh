@@ -36,7 +36,7 @@ else
       SBATCH_ERROR="$OUT_PATTERN" \
       /usr/bin/sbatch --parsable \
         --job-name="$ACTIVE_CHECK_NAME" \
-        --chdir=/opt/soperator-home/soperatorchecks \
+        --chdir=/home/soperatorchecks \
         --uid=soperatorchecks \
         /opt/bin/sbatch.sh
     )
