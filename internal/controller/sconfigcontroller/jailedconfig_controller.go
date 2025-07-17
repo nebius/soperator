@@ -350,6 +350,7 @@ func (r *JailedConfigReconciler) reconfigureCluster(ctx context.Context) error {
 		return fmt.Errorf("listing workers via Slurm API: %w", err)
 	}
 
+	// TODO add reconfig wait timeout
 	for {
 		logger.V(1).Info("Checking workers start times after reconfigure")
 		nodesAfter, err := r.slurmAPIClient.SlurmV0041GetNodesWithResponse(ctx, nil)
