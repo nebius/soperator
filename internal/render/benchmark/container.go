@@ -18,8 +18,7 @@ var (
 
 // renderContainerNCCLBenchmark renders [corev1.Container] for slurmctld
 func renderContainerNCCLBenchmark(
-	ncclBenchmark *values.SlurmNCCLBenchmark,
-	clusterName, namespace string) corev1.Container {
+	ncclBenchmark *values.SlurmNCCLBenchmark, namespace string) corev1.Container {
 
 	var sendJobsEvents bool
 	var sendOtelMetricsGrpc bool
