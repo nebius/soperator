@@ -227,6 +227,19 @@ func renderSlurmdEnv(
 			Name:  "SLURM_NODE_EXTRA",
 			Value: slurmNodeExtra,
 		},
+		{
+			Name: "DCGM_HOSTENGINE_HOST",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "status.hostIP",
+				},
+			},
+		},
+		{
+			Name:  "DCGM_HOSTENGINE_PORT",
+			Value: "5555",
+		},
 	}
 	if cgroupVersion == consts.CGroupV2 {
 		envVar = append(envVar, corev1.EnvVar{

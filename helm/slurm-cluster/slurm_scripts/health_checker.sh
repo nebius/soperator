@@ -12,6 +12,9 @@ fi
 # health-checker library uses os.Environ and we need to explicitly export PATH
 export PATH=$PATH
 
+# Set up all necessary variables for health checks
+source /var/spool/slurmd/.healthcheckrc
+
 # Define platform for health-checker
 platform=""
 gpus_on_node=$(nvidia-smi --query-gpu=name --format=csv,noheader | sort | uniq -c)
@@ -30,13 +33,13 @@ echo "Platform found: $platform"
 # Define health-checker checks to run
 case "$SCRIPT_CONTEXT" in
   "prolog")
-    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg"
+    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg,ib_link,dcgmi_discovery"
     ;;
   "epilog")
-    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dcgmi_diag_r1,dmesg"
+    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dcgmi_diag_r1,dmesg,ib_link,dcgmi_discovery"
     ;;
   "hc_program")
-    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg"
+    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg,ib_link,dcgmi_discovery"
     ;;
   *)
     echo "Unknown context: $SCRIPT_CONTEXT" >&2
