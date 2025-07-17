@@ -28,18 +28,18 @@ type SlurmCluster struct {
 	VolumeSources []slurmv1.VolumeSource
 	Secrets       slurmv1.Secrets
 
-	NodeController    SlurmController
-	NodeAccounting    SlurmAccounting
-	NodeRest          SlurmREST
-	NodeWorker        SlurmWorker
-	NodeLogin         SlurmLogin
-	Telemetry         *slurmv1.Telemetry
-	SlurmExporter     SlurmExporter
-	SlurmConfig       slurmv1.SlurmConfig
-	CustomSlurmConfig *string
-	MPIConfig         slurmv1.MPIConfig
-	PlugStackConfig   slurmv1.PlugStackConfig
-	SConfigController SConfigController
+	NodeController                SlurmController
+	NodeAccounting                SlurmAccounting
+	NodeRest                      SlurmREST
+	NodeWorker                    SlurmWorker
+	NodeLogin                     SlurmLogin
+	SlurmExporter                 SlurmExporter
+	SlurmConfig                   slurmv1.SlurmConfig
+	CustomSlurmConfig             *string
+	MPIConfig                     slurmv1.MPIConfig
+	PlugStackConfig               slurmv1.PlugStackConfig
+	SlurmTopologyConfigMapRefName string
+	SConfigController             SConfigController
 }
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD
@@ -79,7 +79,6 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 			cluster.Spec.UseDefaultAppArmorProfile,
 		),
 		NodeLogin:         buildSlurmLoginFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
-		Telemetry:         cluster.Spec.Telemetry,
 		SlurmExporter:     buildSlurmExporterFrom(cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Exporter),
 		SlurmConfig:       cluster.Spec.SlurmConfig,
 		CustomSlurmConfig: cluster.Spec.CustomSlurmConfig,

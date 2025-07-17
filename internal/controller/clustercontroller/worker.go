@@ -284,27 +284,16 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					if clusterValues.Telemetry != nil && clusterValues.Telemetry.JobsTelemetry != nil && clusterValues.Telemetry.JobsTelemetry.SendJobsEvents {
-						desired := worker.RenderRole(clusterValues.Namespace, clusterValues.Name)
-						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-						stepLogger.V(1).Info("Rendered")
-
-						if err := r.Role.Reconcile(stepCtx, cluster, desired); err != nil {
-							stepLogger.Error(err, "Failed to reconcile")
-							return fmt.Errorf("reconciling worker Role: %w", err)
-						}
-					} else {
-						// If SendJobsEvents is set to false or nil, the Role is not necessary because we don't need the permissions.
-						// We need to explicitly delete the Role in case the user initially set JobsEvents to true and then removed it or set it to false.
-						// Without explicit deletion through reconciliation,
-						// The Role will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
-						stepLogger.V(1).Info("Removing")
-						if err := r.Role.Cleanup(stepCtx, cluster, naming.BuildRoleWorkerName(cluster.Name)); err != nil {
-							stepLogger.Error(err, "Failed to remove")
-							return fmt.Errorf("removing worker Role: %w", err)
-						}
-						stepLogger.V(1).Info("Removed")
+					// If SendJobsEvents is set to false or nil, the Role is not necessary because we don't need the permissions.
+					// We need to explicitly delete the Role in case the user initially set JobsEvents to true and then removed it or set it to false.
+					// Without explicit deletion through reconciliation,
+					// The Role will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
+					stepLogger.V(1).Info("Removing")
+					if err := r.Role.Cleanup(stepCtx, cluster, naming.BuildRoleWorkerName(cluster.Name)); err != nil {
+						stepLogger.Error(err, "Failed to remove")
+						return fmt.Errorf("removing worker Role: %w", err)
 					}
+					stepLogger.V(1).Info("Removed")
 					stepLogger.V(1).Info("Reconciled")
 
 					return nil
@@ -317,27 +306,16 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					if clusterValues.Telemetry != nil && clusterValues.Telemetry.JobsTelemetry != nil && clusterValues.Telemetry.JobsTelemetry.SendJobsEvents {
-						desired := worker.RenderRoleBinding(clusterValues.Namespace, clusterValues.Name)
-						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-						stepLogger.V(1).Info("Rendered")
-
-						if err := r.RoleBinding.Reconcile(stepCtx, cluster, desired); err != nil {
-							stepLogger.Error(err, "Failed to reconcile")
-							return fmt.Errorf("reconciling worker RoleBinding: %w", err)
-						}
-					} else {
-						// If SendJobsEvents is set to false or nil, the RoleBinding is not necessary because we don't need the permissions.
-						// We need to explicitly delete the RoleBinding in case the user initially set JobsEvents to true and then removed it or set it to false.
-						// Without explicit deletion through reconciliation,
-						// Еhe RoleBinding will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
-						stepLogger.V(1).Info("Removing")
-						if err := r.RoleBinding.Cleanup(stepCtx, cluster, naming.BuildRoleBindingWorkerName(cluster.Name)); err != nil {
-							stepLogger.Error(err, "Failed to remove")
-							return fmt.Errorf("removing worker Role: %w", err)
-						}
-						stepLogger.V(1).Info("Removed")
+					// If SendJobsEvents is set to false or nil, the RoleBinding is not necessary because we don't need the permissions.
+					// We need to explicitly delete the RoleBinding in case the user initially set JobsEvents to true and then removed it or set it to false.
+					// Without explicit deletion through reconciliation,
+					// Еhe RoleBinding will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
+					stepLogger.V(1).Info("Removing")
+					if err := r.RoleBinding.Cleanup(stepCtx, cluster, naming.BuildRoleBindingWorkerName(cluster.Name)); err != nil {
+						stepLogger.Error(err, "Failed to remove")
+						return fmt.Errorf("removing worker Role: %w", err)
 					}
+					stepLogger.V(1).Info("Removed")
 					stepLogger.V(1).Info("Reconciled")
 
 					return nil

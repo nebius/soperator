@@ -6,7 +6,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/values"
 
@@ -28,21 +27,6 @@ func Test_RenderContainerNCCLBenchmark(t *testing.T) {
 		},
 	}
 
-	metrics := &slurmv1.Telemetry{
-		OpenTelemetryCollector: &slurmv1.MetricsOpenTelemetryCollector{
-			Enabled:               true,
-			ReplicasOtelCollector: 1,
-		},
-		JobsTelemetry: &slurmv1.JobsTelemetry{
-			SendJobsEvents:        true,
-			SendOtelMetrics:       true,
-			OtelCollectorGrpcHost: nil,
-			OtelCollectorHttpHost: nil,
-			OtelCollectorPort:     otelCollectorPort,
-			OtelCollectorPath:     otelCollectorPath,
-		},
-	}
-
 	ncclBenchmark.ContainerNCCLBenchmark.Image = "test-image"
 	ncclBenchmark.ContainerNCCLBenchmark.ImagePullPolicy = "IfNotPresent"
 	ncclBenchmark.NCCLArguments.MinBytes = "1024"
@@ -54,7 +38,7 @@ func Test_RenderContainerNCCLBenchmark(t *testing.T) {
 	ncclBenchmark.FailureActions.SetSlurmNodeDrainState = true
 	ncclBenchmark.Image = "test-image"
 
-	container := renderContainerNCCLBenchmark(ncclBenchmark, metrics, clusterName, namespace)
+	container := renderContainerNCCLBenchmark(ncclBenchmark, clusterName, namespace)
 
 	assert.Equal(t, consts.ContainerNameNCCLBenchmark, container.Name)
 	assert.Equal(t, "test-image", container.Image)
@@ -98,14 +82,7 @@ func Test_RenderContainerNCCLBenchmark_Default(t *testing.T) {
 		},
 	}
 
-	metrics := &slurmv1.Telemetry{
-		OpenTelemetryCollector: &slurmv1.MetricsOpenTelemetryCollector{
-			Enabled:               true,
-			ReplicasOtelCollector: 1,
-		},
-	}
-
-	container := renderContainerNCCLBenchmark(ncclBenchmark, metrics, clusterName, namespace)
+	container := renderContainerNCCLBenchmark(ncclBenchmark, clusterName, namespace)
 
 	assert.Equal(t, "false", getEnvVarValue(container, "SEND_JOBS_EVENTS"))
 	assert.Equal(t, "false", getEnvVarValue(container, "SEND_OTEL_METRICS_HTTP"))

@@ -38,7 +38,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
-	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
@@ -61,11 +60,8 @@ func init() {
 
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	// Check if OpenTelemetryCollector and PodMonitor CRD is installed before adding it to the scheme
+	// Check if CRDs is installed before adding it to the scheme
 	// This is required to avoid errors when the CRD is not installed before the operator starts
-	if check.IsOtelCRDInstalled() {
-		utilruntime.Must(otelv1beta1.AddToScheme(scheme))
-	}
 	if check.IsPrometheusCRDInstalled() {
 		utilruntime.Must(prometheusv1.AddToScheme(scheme))
 	}

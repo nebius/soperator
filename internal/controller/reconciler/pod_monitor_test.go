@@ -29,30 +29,6 @@ func Test_GetPodMonitor(t *testing.T) {
 		expectErr  bool
 	}{
 		{
-			name: "PodMonitor exists",
-			cluster: &slurmv1.SlurmCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      defaultNameCluster,
-					Namespace: defaultNamespace,
-				},
-				Spec: slurmv1.SlurmClusterSpec{
-					Telemetry: &slurmv1.Telemetry{
-						JobsTelemetry: &slurmv1.JobsTelemetry{
-							SendJobsEvents: true,
-						},
-					},
-				},
-			},
-
-			existingPM: &prometheusv1.PodMonitor{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      defaultNameCluster,
-					Namespace: defaultNamespace,
-				},
-			},
-			expectErr: false,
-		},
-		{
 			name: "PodMonitor does not exist",
 			cluster: &slurmv1.SlurmCluster{
 				ObjectMeta: metav1.ObjectMeta{

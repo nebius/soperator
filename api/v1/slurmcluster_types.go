@@ -72,11 +72,6 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Required
 	SlurmNodes SlurmNodes `json:"slurmNodes"`
 
-	// Metrics define the desired state of the prometheus or opentelemetry metrics
-	//
-	// +kubebuilder:validation:Optional
-	Telemetry *Telemetry `json:"telemetry,omitempty"`
-
 	// PartitionConfiguration define partition configuration of slurm worker nodes
 	// https://slurm.schedmd.com/slurm.conf.html#SECTION_PARTITION-CONFIGURATION
 	// +kubebuilder:validation:Optional
@@ -1257,73 +1252,6 @@ type NodeVolumeMount struct {
 	//
 	// +kubebuilder:validation:Optional
 	VolumeClaimTemplateSpec *corev1.PersistentVolumeClaimSpec `json:"volumeClaimTemplateSpec,omitempty"`
-}
-
-type Telemetry struct {
-	// It has to be set to true if OpenTelemetry Operator CRD is used
-	//
-	// +kubebuilder:validation:Optional
-	OpenTelemetryCollector *MetricsOpenTelemetryCollector `json:"openTelemetryCollector,omitempty"`
-	//It has to be set to true if Kubernetes events for Slurm jobs are sent
-	//
-	// +kubebuilder:validation:Optional
-	JobsTelemetry *JobsTelemetry `json:"jobsTelemetry,omitempty"`
-}
-
-type MetricsOpenTelemetryCollector struct {
-	// It has to be set to true if OpenTelemetry Operator is used
-	//
-	// +kubebuilder:default=false
-	Enabled bool `json:"enabled,omitempty"`
-
-	// It references the PodTemplate with the OpenTelemetry Collector configuration
-	//
-	// +kubebuilder:validation:Optional
-	PodTemplateNameRef *string `json:"podTemplateNameRef,omitempty"`
-
-	// It defines the number of replicas for the OpenTelemetry Collector
-	//
-	// +kubebuilder:default=1
-	ReplicasOtelCollector int32 `json:"replicasOtelCollector,omitempty"`
-	// Specifies the port for OtelCollector
-	//
-	// +kubebuilder:default=4317
-	OtelCollectorPort int32 `json:"otelCollectorPort,omitempty"`
-}
-
-// JobsTelemetry
-// XValidation: both OtelCollectorGrpcHost and OtelCollectorHttpHost cannot have values at the same time
-//
-// +kubebuilder:validation:XValidation:rule="!(has(self.otelCollectorGrpcHost) && has(self.otelCollectorHttpHost))",message="Both OtelCollectorGrpcHost and OtelCollectorHttpHost cannot be set at the same time."
-type JobsTelemetry struct {
-	// Defines whether to send Kubernetes events for Slurm NCCLBenchmark jobs
-	//
-	// +kubebuilder:default=false
-	SendJobsEvents bool `json:"sendJobsEvents,omitempty"`
-
-	// Defines whether to send Opentelemetry metrics for Slurm NCCLBenchmark jobs
-	//
-	// +kubebuilder:default=false
-	SendOtelMetrics bool `json:"sendOtelMetrics,omitempty"`
-
-	// Specifies the gRPC OtelCollector host for sending Opentelemetry metrics
-	//
-	// +kubebuilder:validation:Optional
-	OtelCollectorGrpcHost *string `json:"otelCollectorGrpcHost,omitempty"`
-
-	// Specifies the HTTP OtelCollector host for sending Opentelemetry metrics
-	//
-	// +kubebuilder:validation:Optional
-	OtelCollectorHttpHost *string `json:"otelCollectorHttpHost,omitempty"`
-
-	// Specifies the port for OtelCollector
-	//
-	// +kubebuilder:default=4317
-	OtelCollectorPort int32 `json:"otelCollectorPort,omitempty"`
-	// Specifies the path to the OtelCollector endpoint for sending Opentelemetry metrics
-	//
-	// +kubebuilder:default="/v1/metrics"
-	OtelCollectorPath string `json:"otelCollectorPath,omitempty"`
 }
 
 // PodMonitorConfig defines a prometheus PodMonitor object.
