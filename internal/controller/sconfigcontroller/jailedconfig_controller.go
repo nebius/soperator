@@ -170,6 +170,12 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
+	filesBatch := NewReplacedFilesBatch()
+	defer func() {
+		// TODO catch error from cleanup as well
+		_ = filesBatch.Cleanup()
+	}()
+
 	jailPayload, err := makePayload(jailedConfig.Spec.Items, configMap, jailedConfig.Spec.DefaultMode)
 	if err != nil {
 		// Error preparing payload - requeue the request.
@@ -181,15 +187,15 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, fmt.Errorf("invalid path %q in ConfigMap annotations: %w", path, err)
 		}
 
-		err := r.fileStore.Write(path, payload.Data)
+		err = filesBatch.Replace(path, payload.Data, uint32(payload.Mode))
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("writing file %q to fileStore: %w", path, err)
+			return ctrl.Result{}, fmt.Errorf("replacing file %q in fileStore: %w", path, err)
 		}
+	}
 
-		err = r.fileStore.Chmod(path, uint32(payload.Mode))
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("writing file %q to fileStore: %w", path, err)
-		}
+	err = filesBatch.Finish()
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("finishing replacing files in fileStore: %w", err)
 	}
 
 	// TODO throttle reconfiguring calls
