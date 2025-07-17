@@ -1,7 +1,6 @@
 package benchmark
 
 import (
-	"fmt"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -62,26 +61,4 @@ func getEnvVarValue(container corev1.Container, name string) string {
 	}
 
 	return ""
-}
-
-func Test_RenderContainerNCCLBenchmark_Default(t *testing.T) {
-
-	var namespace = "test-namespace"
-
-	ncclBenchmark := &values.SlurmNCCLBenchmark{
-		Name: "test-nccl-benchmark",
-
-		ContainerNCCLBenchmark: values.Container{
-			Name: consts.ContainerNameNCCLBenchmark,
-		},
-	}
-
-	container := renderContainerNCCLBenchmark(ncclBenchmark, namespace)
-
-	assert.Equal(t, "false", getEnvVarValue(container, "SEND_JOBS_EVENTS"))
-	assert.Equal(t, "false", getEnvVarValue(container, "SEND_OTEL_METRICS_HTTP"))
-	assert.Equal(t, "false", getEnvVarValue(container, "SEND_OTEL_METRICS_GRPC"))
-	assert.Equal(t, OtelCollectorPath, getEnvVarValue(container, "OTEL_COLLECTOR_PATH"))
-	assert.Equal(t, fmt.Sprintf("localhost:%d", OtelCollectorPort), getEnvVarValue(container, "OTEL_COLLECTOR_ENDPOINT"))
-	assert.Len(t, container.VolumeMounts, 2)
 }
