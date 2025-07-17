@@ -19,7 +19,6 @@ func RenderDeployment(
 	accounting *values.SlurmAccounting,
 	nodeFilter []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
-	slurmTopologyConfigMapRefName string,
 ) (deployment *appsv1.Deployment, err error) {
 	labels := common.RenderLabels(consts.ComponentTypeAccounting, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeAccounting, clusterName)
@@ -30,7 +29,6 @@ func RenderDeployment(
 		nodeFilter,
 		volumeSources,
 		matchLabels,
-		slurmTopologyConfigMapRefName,
 	)
 	if err != nil {
 		return nil, err

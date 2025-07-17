@@ -232,7 +232,6 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						&clusterValues.Secrets,
 						clusterValues.VolumeSources,
 						&clusterValues.NodeWorker,
-						clusterValues.SlurmTopologyConfigMapRefName,
 						clusterValues.WorkerFeatures,
 					)
 					if err != nil {

@@ -65,7 +65,6 @@ func (r SlurmClusterReconciler) ReconcileNCCLBenchmark(
 						clusterValues.VolumeSources,
 						&clusterValues.NCCLBenchmark,
 						clusterValues.Telemetry,
-						clusterValues.SlurmTopologyConfigMapRefName,
 					)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")

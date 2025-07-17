@@ -175,7 +175,6 @@ func TestRenderSlurmConfigMapAndTopology(t *testing.T) {
 				SlurmConfig: slurmv1.SlurmConfig{
 					TopologyPlugin: "",
 				},
-				SlurmTopologyConfigMapRefName: "",
 			},
 			topologyConfig:           v1.ConfigMap{},
 			expectedTopologyPlugin:   "",
@@ -187,7 +186,6 @@ func TestRenderSlurmConfigMapAndTopology(t *testing.T) {
 				SlurmConfig: slurmv1.SlurmConfig{
 					TopologyPlugin: "",
 				},
-				SlurmTopologyConfigMapRefName: "foo",
 			},
 			topologyConfig: v1.ConfigMap{
 				Data: map[string]string{
@@ -203,7 +201,6 @@ func TestRenderSlurmConfigMapAndTopology(t *testing.T) {
 				SlurmConfig: slurmv1.SlurmConfig{
 					TopologyPlugin: "topology/block",
 				},
-				SlurmTopologyConfigMapRefName: "foo",
 			},
 			topologyConfig: v1.ConfigMap{
 				Data: map[string]string{
@@ -219,7 +216,6 @@ func TestRenderSlurmConfigMapAndTopology(t *testing.T) {
 				SlurmConfig: slurmv1.SlurmConfig{
 					TopologyPlugin: "",
 				},
-				SlurmTopologyConfigMapRefName: "foo",
 			},
 			topologyConfig: v1.ConfigMap{
 				Data: map[string]string{},

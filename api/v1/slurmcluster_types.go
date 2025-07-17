@@ -108,13 +108,6 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:default={ pyxis: { required: true, containerImageSave: "/var/cache/enroot-container-images/" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" } }
 	PlugStackConfig PlugStackConfig `json:"plugStackConfig,omitempty"`
 
-	// SlurmTopologyConfigMapRefName is the name of the slurm topology config.
-	// When exists, TopologyPlugin is automatically set to `topology/tree` in slurm.conf
-	// if TopologyPlugin is not explicitly specified in SlurmConfig.
-	//
-	// +kubebuilder:validation:Optional
-	SlurmTopologyConfigMapRefName string `json:"slurmTopologyConfigMapRefName,omitempty"`
-
 	// SConfigController defines the desired state of controller that watches after configs
 	//
 	// +kubebuilder:validation:Optional
@@ -185,7 +178,6 @@ type SlurmConfig struct {
 	// +kubebuilder:default=60
 	MessageTimeout *int32 `json:"messageTimeout,omitempty"`
 	// TopologyPlugin identifies the plugin to determine network topology for optimizations.
-	// It is set automatically to `topology/tree` if SlurmTopologyConfigMapRefName is specified.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="topology/tree"

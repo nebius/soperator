@@ -117,21 +117,6 @@ func RenderVolumeProjectedSlurmConfigs(clusterName string, additionalProjections
 	}
 }
 
-// RenderVolumeProjectionSlurmTopologyConfig renders [corev1.VolumeProjection]
-// defining the configmap to overlay in /etc/slurm
-func RenderVolumeProjectionSlurmTopologyConfig(slurmTopologyConfigMapRefName string) *corev1.VolumeProjection {
-	if slurmTopologyConfigMapRefName == "" {
-		return nil
-	}
-	return &corev1.VolumeProjection{
-		ConfigMap: &corev1.ConfigMapProjection{
-			LocalObjectReference: corev1.LocalObjectReference{
-				Name: slurmTopologyConfigMapRefName,
-			},
-		},
-	}
-}
-
 // endregion Slurm topology config
 
 // region Spool

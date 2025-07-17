@@ -606,7 +606,6 @@ const (
 	supervisordConfigMapField                    = ".spec.slurmNodes.worker.supervisordConfigMapRefName"
 	sshdLoginConfigMapField                      = ".spec.slurmNodes.login.sshdConfigMapRefName"
 	sshdWorkerConfigMapField                     = ".spec.slurmNodes.worker.sshdConfigMapRefName"
-	slurmTopologyConfigMapField                  = ".spec.slurmTopologyConfigMapRefName"
 	accountingExternalDBPasswordSecretKeyField   = ".spec.slurmNodes.accounting.externalDB.passwordSecretKeyRef.Name"
 	accountingExternalDBTLSServerCASecretField   = ".spec.slurmNodes.accounting.externalDB.tls.serverCASecretRef"
 	accountingExternalDBTLSClientCertSecretField = ".spec.slurmNodes.accounting.externalDB.tls.clientCertSecretRef"
@@ -682,9 +681,6 @@ func (r *SlurmClusterReconciler) setupConfigMapIndexer(mgr ctrl.Manager) error {
 		},
 		sshdWorkerConfigMapField: func(sc *slurmv1.SlurmCluster) string {
 			return sc.Spec.SlurmNodes.Worker.SSHDConfigMapRefName
-		},
-		slurmTopologyConfigMapField: func(sc *slurmv1.SlurmCluster) string {
-			return sc.Spec.SlurmTopologyConfigMapRefName
 		},
 	}
 
