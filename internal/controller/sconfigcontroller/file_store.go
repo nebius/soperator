@@ -6,8 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
 const direntCacheTTL = 15 * time.Second
@@ -99,16 +97,16 @@ func (s *FileStore) Add(name, content, subPath string) (err error) {
 	}
 
 	// Don't just rename in case of dirent caches
-	// In case this has to work on system without `renameat2`, it can be implemented with os.Link:
+	// In case this has to work on system without `renameat2` (or equivalent), it can be implemented with os.Link:
 	// generate random name, call os.Link, loop if error is "already exists"
 	// See os.CreateTemp implementation
-	err = unix.Renameat2(unix.AT_FDCWD, tempFileName, unix.AT_FDCWD, filePath, unix.RENAME_EXCHANGE)
+	err = renameExchange(tempFileName, filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			// We have just created tempFileName, so it's most probably about filePath, we can just rename it
-			// Using RENAME_NOREPLACE to avoid replacing file created after RENAME_EXCHANGE but before this
+			// Using renameNoReplace to avoid replacing file created after renameExchange but before this
 			// But at the same time there's no cached dirent, so it should be safe to just rename it and move on
-			err = unix.Renameat2(unix.AT_FDCWD, tempFileName, unix.AT_FDCWD, filePath, unix.RENAME_NOREPLACE)
+			err = renameNoReplace(tempFileName, filePath)
 			if err != nil {
 				// If rename failed we can just delete temp file and move on
 				err = fmt.Errorf("rename temp to target file (%s => %s): %w", tempFileName, filePath, err)
@@ -128,7 +126,7 @@ func (s *FileStore) Add(name, content, subPath string) (err error) {
 	// Also it should not keep inodes for old files alive, because only directory entries are cached, not inodes themselves
 	// Deleting earlier can lead to "file not found" errors
 
-	// Renameat2 has succeeded, and from this moment caches are stale, and we can't just remove temp file
+	// renameExchange has succeeded, and from this moment caches are stale, and we can't just remove temp file
 	// without triggering errors on readers
 	deferTempFileRemove = false
 	// TODO sleep do this once per reconciliation, will be done in #1200
