@@ -1,0 +1,30 @@
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: ActiveCheck
+metadata:
+  name: "enroot-cleanup"
+spec:
+  checkType: "slurmJob"
+  name: "enroot-cleanup"
+  slurmClusterRefName: {{ .Values.activeCheck.slurmClusterRefName | quote }}
+  schedule: "0 8 * * *" # Once a day at 8:00 UTC
+  suspend: false
+  successfulJobsHistoryLimit: {{ .Values.activeCheck.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.activeCheck.failedJobsHistoryLimit }}
+  runAfterCreation: false
+  slurmJobSpec:
+    sbatchScript: |
+{{ .Files.Get "scripts/enroot-cleanup.sh" | indent 6 }}
+    eachWorkerJobArray: true
+    jobContainer:
+      image: {{ .Values.images.slurmJob | quote }}
+      env:
+{{ toYaml .Values.activeCheck.jobContainer.env | indent 8 }}
+      volumeMounts:
+{{ toYaml .Values.activeCheck.jobContainer.volumeMounts | indent 8 }}
+      volumes:
+{{ toYaml .Values.activeCheck.jobContainer.volumes | indent 8 }}
+    mungeContainer:
+      image: {{ .Values.images.munge | quote }}
+  reactions:
+    setCondition: false
+    drainSlurmNode: false
