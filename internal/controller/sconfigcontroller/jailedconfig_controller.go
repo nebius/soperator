@@ -45,6 +45,8 @@ import (
 
 const (
 	configMapField = ".spec.configMap"
+
+	reconfigureWaitTimeout = 5 * time.Minute
 )
 
 // JailedConfigReconciler reconciles a JailedConfig object
@@ -350,8 +352,12 @@ func (r *JailedConfigReconciler) reconfigureCluster(ctx context.Context) error {
 		return fmt.Errorf("listing workers via Slurm API: %w", err)
 	}
 
-	// TODO add reconfig wait timeout
+	reconfigureWaitDeadline := time.Now().Add(reconfigureWaitTimeout)
 	for {
+		if time.Now().After(reconfigureWaitDeadline) {
+			return fmt.Errorf("nodes did not restart before deadline exceeded: %s", reconfigureWaitDeadline)
+		}
+
 		logger.V(1).Info("Checking workers start times after reconfigure")
 		nodesAfter, err := r.slurmAPIClient.SlurmV0041GetNodesWithResponse(ctx, nil)
 		if err != nil {
@@ -370,7 +376,6 @@ func (r *JailedConfigReconciler) reconfigureCluster(ctx context.Context) error {
 			if !ok {
 				// Node was not present before reconfigure
 				// Assuming it already has new config
-				// TODO requeue here to retrigger reconfigure
 				continue
 			}
 
