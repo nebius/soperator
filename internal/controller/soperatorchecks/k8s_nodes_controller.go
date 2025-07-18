@@ -100,6 +100,10 @@ func (c *K8SNodesController) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	k8sNode, err := getK8SNode(ctx, c.Client, req.Name)
 	if err != nil {
+		if client.IgnoreNotFound(err) == nil {
+			logger.V(1).Info("K8S node not found, skipping reconciliation")
+			return ctrl.Result{}, nil
+		}
 		logger.V(1).Error(err, "Get k8s node produces an error")
 		return ctrl.Result{}, fmt.Errorf("get k8s node: %w", err)
 	}

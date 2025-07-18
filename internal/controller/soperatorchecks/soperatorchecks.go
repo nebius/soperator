@@ -38,6 +38,10 @@ func setK8SNodeCondition(
 
 	node, err := getK8SNode(ctx, c, nodeName)
 	if err != nil {
+		if client.IgnoreNotFound(err) == nil {
+			logger.V(1).Info("K8S node not found, skipping condition update")
+			return nil
+		}
 		return err
 	}
 
@@ -49,9 +53,10 @@ func setK8SNodeCondition(
 		if cond.Type == condition.Type {
 
 			if cond.Status == condition.Status && cond.Reason == string(condition.Reason) {
-				logger.Info("Node already has condition")
-				// TODO: update the LastHeartbeatTime
-				return nil
+				logger.Info("Node already has condition, updating LastHeartbeatTime")
+				node.Status.Conditions[i].LastHeartbeatTime = metav1.Now()
+				patch := client.MergeFrom(node.DeepCopy())
+				return c.Status().Patch(ctx, node, patch)
 			}
 
 			logger.Info("Updating existing condition on node")
@@ -108,7 +113,7 @@ func newNodeCondition(
 func getK8SNode(ctx context.Context, c client.Client, nodeName string) (*corev1.Node, error) {
 	node := &corev1.Node{}
 	if err := c.Get(ctx, client.ObjectKey{Name: nodeName}, node); err != nil {
-		return nil, fmt.Errorf("get node: %w", err)
+		return nil, err
 	}
 	return node, nil
 }
