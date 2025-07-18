@@ -1,0 +1,22 @@
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: ActiveCheck
+metadata:
+  name: "create-user-soperatorchecks"
+spec:
+  checkType: "k8sJob"
+  name: "create-user-soperatorchecks"
+  slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
+  suspend: true
+  runAfterCreation: true
+  k8sJobSpec:
+    jobContainer:
+      command:
+        - bash
+        - -c
+        - |
+{{ .Files.Get "scripts/create-user-soperatorchecks.sh" | indent 10 }}
+      image: {{ .Values.images.k8sJob | quote }}
+      volumeMounts:
+{{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
+      volumes:
+{{ toYaml .Values.jobContainer.volumes | indent 8 }}
