@@ -78,10 +78,31 @@ type JailedConfigSpec struct {
 	UpdateActions []UpdateAction `json:"updateActions,omitempty"`
 }
 
+type JailedConfigConditionType string
+
+const (
+	// FilesWritten indicates whether all files from this config were written to jail
+	FilesWritten JailedConfigConditionType = "FilesWritten"
+	// UpdateActionsCompleted indicates whether all update actions from this config were finished
+	UpdateActionsCompleted JailedConfigConditionType = "UpdateActionsCompleted"
+
+	// ReasonInit means that condition was just initialized
+	ReasonInit = "Init"
+	// ReasonRefresh means that configs has to be refreshed
+	ReasonRefresh = "Refresh"
+	// ReasonSuccess means that something was done successfully
+	ReasonSuccess = "Success"
+)
+
 // JailedConfigStatus defines the observed state of JailedConfig.
 type JailedConfigStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Current state of jailed config
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchMergeKey:"type" patchStrategy:"merge"`
 }
 
 // +kubebuilder:object:root=true
