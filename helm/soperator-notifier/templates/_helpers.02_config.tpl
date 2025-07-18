@@ -5,17 +5,17 @@
 
 {{/* How long to wait before sending the initial notification. */}}
 {{- define "son.config.route.groupWait" -}}
-{{ default .Values.interval.groupWait "30s" }}
+{{ .Values.interval.groupWait | default "30s" }}
 {{- end }}
 
 {{/* How long to wait before sending the initial notification. */}}
 {{- define "son.config.route.groupInterval" -}}
-{{ default .Values.interval.group "5m" }}
+{{ .Values.interval.group | default "5m" }}
 {{- end }}
 
 {{/* How long to wait before sending the initial notification. */}}
 {{- define "son.config.route.repeatInterval" -}}
-{{ default .Values.interval.repeat "25h" }}
+{{ .Values.interval.repeat | default "25h" }}
 {{- end }}
 
 {{/* Labels */}}

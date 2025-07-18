@@ -46,20 +46,20 @@ good
 
 {{/* Color for group with error severity. */}}
 {{- define "son.slack.msg.color.error" -}}
-{{ default .Values.slack.severityColor.error "danger" }}
+{{ .Values.slack.severityColor.error | default "danger" }}
 {{- end }}
 
 {{/* Color for group with warning severity. */}}
 {{- define "son.slack.msg.color.warning" -}}
-{{ default .Values.slack.severityColor.warning "#F28B30" }}
+{{ .Values.slack.severityColor.warning | default "#F28B30" }}
 {{- end }}
 
 {{/* Color for group with good severity. */}}
 {{- define "son.slack.msg.color.good" -}}
-{{ default .Values.slack.severityColor.good "good" }}
+{{ .Values.slack.severityColor.good | default "good" }}
 {{- end }}
 
 {{/* Color for group with unknown severity. */}}
 {{- define "son.slack.msg.color.unknown" -}}
-{{ default .Values.slack.severityColor.unknown "#807F83" }}
+{{ .Values.slack.severityColor.unknown | default "#807F83" }}
 {{- end }}
