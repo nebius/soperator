@@ -47,6 +47,7 @@ type JailedConfigSpec struct {
 
 	// TODO support multiple configmaps as a single jailed config, to force atomic reconfigures
 	// TODO fix docs
+	// TODO use field reference instead of items?
 	ConfigMap *corev1.ObjectReference `json:"configMap,omitempty"`
 
 	// TODO fix docs
@@ -77,10 +78,25 @@ type JailedConfigSpec struct {
 	UpdateActions []UpdateAction `json:"updateActions,omitempty"`
 }
 
+type JailedConfigConditionType string
+
+const (
+	// FilesWritten indicates whether all files from this config were written to jail
+	FilesWritten JailedConfigConditionType = "FilesWritten"
+)
+
 // JailedConfigStatus defines the observed state of JailedConfig.
 type JailedConfigStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Current state of jailed config
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // +kubebuilder:object:root=true
