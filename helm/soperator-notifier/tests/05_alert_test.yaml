@@ -1,0 +1,38 @@
+suite: test alert creation
+release:
+  name: test-name
+  namespace: test-ns
+templates:
+  - templates/05_alert.yml
+set:
+  nameOverride: son
+  slack:
+    webhookUrl: url
+
+tests:
+  - it: should render metadata
+    asserts:
+      - equal:
+          path: metadata.name
+          value: son-slurm-job
+
+  - it: should render spec
+    set:
+      dataSourceUrl: &dataSourceUrl url
+      alertManager:
+        port: "8888"
+      interval:
+        evaluation: &evaluationInterval 1s
+    asserts:
+      - equal:
+          path: spec.evaluationInterval
+          value: *evaluationInterval
+      - equal:
+          path: spec.datasource.url
+          value: *dataSourceUrl
+      - equal:
+          path: spec.notifiers[0].url
+          value: http://vmalertmanager-son:8888
+      - equal:
+          path: spec.ruleSelector.matchLabels["son-vmrule-group"]
+          value: slack
