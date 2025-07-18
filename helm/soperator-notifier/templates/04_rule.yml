@@ -1,0 +1,43 @@
+{{- $ignoreFilter := "" }}
+{{- if .Values.slack.ignoreSystemJobs }}
+{{- $ignoreFilter = printf ", %s" (include "son.rule.jobSelector.system" .) }}
+{{- end -}}
+
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: {{ include "son.rule.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "son.labels" . | nindent 4 }}
+    {{- include "son.rule.groupMatchLabel" . | nindent 4 }}
+spec:
+  groups:
+    - name: {{ include "son.rule.groupName" "" }}
+      rules:
+        - alert: SlurmJobError
+          expr: |
+            {{ printf "changes(slurm_job_info{%s%s}) > 0" (include "son.rule.jobSelector.error" .) $ignoreFilter }}
+          for: 0s
+          labels:
+{{ include "son.rule.labels" (dict "context" . "severity" (include "son.slack.severity.error" .)) | indent 12 }}
+          annotations:
+            title: "SLURM jobs failed"
+
+        - alert: SlurmJobWarning
+          expr: |
+            {{ printf "changes(slurm_job_info{%s%s}) > 0" (include "son.rule.jobSelector.warning" .) $ignoreFilter }}
+          for: 0s
+          labels:
+{{ include "son.rule.labels" (dict "context" . "severity" (include "son.slack.severity.warning" .)) | indent 12 }}
+          annotations:
+            title: "SLURM jobs exited"
+
+        - alert: SlurmJobGood
+          expr: |
+            {{ printf "changes(slurm_job_info{%s%s}) > 0" (include "son.rule.jobSelector.good" .) $ignoreFilter }}
+          for: 0s
+          labels:
+{{ include "son.rule.labels" (dict "context" . "severity" (include "son.slack.severity.good" .)) | indent 12 }}
+          annotations:
+            title: "SLURM jobs completed"

@@ -1,0 +1,16 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAlert
+metadata:
+  name: {{ include "son.rule.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "son.labels" . | nindent 4 }}
+spec:
+  evaluationInterval: {{ include "son.alert.evaluationInterval" . }}
+  datasource:
+    url: {{ include "son.alert.dataSourceUrl" . | quote }}
+  notifiers:
+    - url: {{ include "son.alertManager.url" . | quote}}
+  ruleSelector:
+    matchLabels:
+      {{- include "son.rule.groupMatchLabel" . | nindent 6 }}

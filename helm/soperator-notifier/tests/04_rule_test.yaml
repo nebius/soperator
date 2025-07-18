@@ -1,0 +1,148 @@
+suite: test rule creation
+release:
+  name: test-name
+  namespace: &releaseNs test-ns
+templates:
+  - templates/04_rule.yml
+set:
+  nameOverride: son
+  slack:
+    webhookUrl: url
+
+tests:
+  - it: should render metadata
+    asserts:
+      - equal:
+          path: metadata.name
+          value: son-slurm-job
+
+      - equal:
+          path: metadata.labels["son-vmrule-group"]
+          value: slack
+
+  - it: should render slurm job group
+    asserts:
+      - equal:
+          path: spec.groups[0].name
+          value: slurm-job
+
+  - it: should render rule expressions without system jobs
+    set:
+      slack:
+        ignoreSystemJobs: true
+    asserts:
+      - equal:
+          path: spec.groups[0].rules[0].expr
+          value: |
+            changes(slurm_job_info{job_state=~"FAILED|NODE_FAIL|OUT_OF_MEMORY", user_name!~"^(nebius|soperatorchecks)$"}) > 0
+      - equal:
+          path: spec.groups[0].rules[1].expr
+          value: |
+            changes(slurm_job_info{job_state=~"BOOT_FAIL|CANCELLED|DEADLINE|PREEMPTED|SUSPENDED|TIMEOUT", user_name!~"^(nebius|soperatorchecks)$"}) > 0
+      - equal:
+          path: spec.groups[0].rules[2].expr
+          value: |
+            changes(slurm_job_info{job_state=~"COMPLETED", user_name!~"^(nebius|soperatorchecks)$"}) > 0
+
+  - it: should render rule expressions with system jobs
+    set:
+      slack:
+        ignoreSystemJobs: false
+    asserts:
+      - equal:
+          path: spec.groups[0].rules[0].expr
+          value: |
+            changes(slurm_job_info{job_state=~"FAILED|NODE_FAIL|OUT_OF_MEMORY"}) > 0
+      - equal:
+          path: spec.groups[0].rules[1].expr
+          value: |
+            changes(slurm_job_info{job_state=~"BOOT_FAIL|CANCELLED|DEADLINE|PREEMPTED|SUSPENDED|TIMEOUT"}) > 0
+      - equal:
+          path: spec.groups[0].rules[2].expr
+          value: |
+            changes(slurm_job_info{job_state=~"COMPLETED"}) > 0
+
+  - it: should render rule labels
+    set:
+      slack:
+        ignoreSystemJobs: false
+    asserts:
+      - equal:
+          path: spec.groups[0].rules[0].labels["alert_key"]
+          value: 'job_{{ $labels.job_id }}_{{ $labels.job_state }}'
+      - equal:
+          path: spec.groups[0].rules[1].labels["alert_key"]
+          value: 'job_{{ $labels.job_id }}_{{ $labels.job_state }}'
+      - equal:
+          path: spec.groups[0].rules[2].labels["alert_key"]
+          value: 'job_{{ $labels.job_id }}_{{ $labels.job_state }}'
+
+      - equal:
+          path: spec.groups[0].rules[0].labels["job_id"]
+          value: '{{ $labels.job_id }}'
+      - equal:
+          path: spec.groups[0].rules[1].labels["job_id"]
+          value: '{{ $labels.job_id }}'
+      - equal:
+          path: spec.groups[0].rules[2].labels["job_id"]
+          value: '{{ $labels.job_id }}'
+
+      - equal:
+          path: spec.groups[0].rules[0].labels["job_name"]
+          value: '{{ $labels.job_name }}'
+      - equal:
+          path: spec.groups[0].rules[1].labels["job_name"]
+          value: '{{ $labels.job_name }}'
+      - equal:
+          path: spec.groups[0].rules[2].labels["job_name"]
+          value: '{{ $labels.job_name }}'
+
+      - equal:
+          path: spec.groups[0].rules[0].labels["job_state"]
+          value: '{{ $labels.job_state }}'
+      - equal:
+          path: spec.groups[0].rules[1].labels["job_state"]
+          value: '{{ $labels.job_state }}'
+      - equal:
+          path: spec.groups[0].rules[2].labels["job_state"]
+          value: '{{ $labels.job_state }}'
+
+      - equal:
+          path: spec.groups[0].rules[0].labels["job_state_reason"]
+          value: '{{ $labels.job_state_reason }}'
+      - equal:
+          path: spec.groups[0].rules[1].labels["job_state_reason"]
+          value: '{{ $labels.job_state_reason }}'
+      - equal:
+          path: spec.groups[0].rules[2].labels["job_state_reason"]
+          value: '{{ $labels.job_state_reason }}'
+
+      - equal:
+          path: spec.groups[0].rules[0].labels["job_user"]
+          value: '{{ $labels.user_name }}'
+      - equal:
+          path: spec.groups[0].rules[1].labels["job_user"]
+          value: '{{ $labels.user_name }}'
+      - equal:
+          path: spec.groups[0].rules[2].labels["job_user"]
+          value: '{{ $labels.user_name }}'
+
+      - equal:
+          path: spec.groups[0].rules[0].labels["namespace"]
+          value: *releaseNs
+      - equal:
+          path: spec.groups[0].rules[1].labels["namespace"]
+          value: *releaseNs
+      - equal:
+          path: spec.groups[0].rules[2].labels["namespace"]
+          value: *releaseNs
+
+      - equal:
+          path: spec.groups[0].rules[0].labels["severity"]
+          value: error
+      - equal:
+          path: spec.groups[0].rules[1].labels["severity"]
+          value: warning
+      - equal:
+          path: spec.groups[0].rules[2].labels["severity"]
+          value: good

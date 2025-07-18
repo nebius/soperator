@@ -1,0 +1,33 @@
+suite: test manager creation
+release:
+  name: test-name
+  namespace: test-ns
+templates:
+  - templates/03_manager.yml
+set:
+  nameOverride: &chartName son
+  slack:
+    webhookUrl: url
+
+tests:
+  - it: should render metadata
+    asserts:
+      - equal:
+          path: metadata.name
+          value: *chartName
+
+  - it: should render spec
+    set:
+      alertManager:
+        replicas: &replicaCount 3
+        port: &port "8888"
+    asserts:
+      - equal:
+          path: spec.replicaCount
+          value: *replicaCount
+      - equal:
+          path: spec.port
+          value: *port
+      - equal:
+          path: spec.configSelector.matchLabels["son-slack-route"]
+          value: enabled

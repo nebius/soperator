@@ -1,0 +1,13 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAlertmanager
+metadata:
+  name: {{ include "son.alertManager.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "son.labels" . | nindent 4 }}
+spec:
+  replicaCount: {{ include "son.alertManager.replicas" . }}
+  configSelector:
+    matchLabels:
+      {{- include "son.config.label.match" . | nindent 6 }}
+  port: {{ include "son.alertManager.port" . | quote }}

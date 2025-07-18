@@ -1,0 +1,33 @@
+suite: test common metadata
+release:
+  name: &releaseName test-name
+  namespace: &releaseNs test-ns
+templates:
+  - templates/01_secret.yml
+set:
+  nameOverride: &chartName son
+  slack:
+    webhookUrl: url
+
+tests:
+  - it: should render metadata
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: *releaseNs
+
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: *releaseName
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: Helm
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: *chartName
+      - matchRegex:
+          path: metadata.labels["app.kubernetes.io/version"]
+          pattern: ^\d+\.\d+\.\d+$
+      - matchRegex:
+          path: metadata.labels["helm.sh/chart"]
+          pattern: ^helm-soperator-notifier-\d+\.\d+\.\d+$
