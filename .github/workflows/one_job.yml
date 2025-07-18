@@ -283,10 +283,6 @@ jobs:
           echo "Pushing image of the k8s_check_job ${IMAGE_VERSION}"
           make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_check_job IMAGE_VERSION=${IMAGE_VERSION}
           
-          echo "Building image of the nccl_benchmark ${IMAGE_VERSION}"
-          make docker-build DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_VERSION=${IMAGE_VERSION} IMAGE_NAME=nccl_benchmark DOCKERFILE=nccl_benchmark/nccl_benchmark.dockerfile
-          echo "Pushing image of the nccl_benchmark ${IMAGE_VERSION}"
-          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=nccl_benchmark IMAGE_VERSION=${IMAGE_VERSION}
           
           echo "Building image of the login_sshd ${IMAGE_VERSION}"
           make docker-build DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_VERSION=${IMAGE_VERSION} IMAGE_NAME=login_sshd DOCKERFILE=login/sshd.dockerfile
@@ -405,8 +401,6 @@ jobs:
           echo "Building and push manifest of the k8s_check_job"
           make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_check_job
           
-          echo "Building and push manifest of the nccl_benchmark"
-          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=nccl_benchmark
           
           echo "Building and push manifest of the login_sshd"
           make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd

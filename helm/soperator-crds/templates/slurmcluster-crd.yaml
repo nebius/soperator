@@ -17999,20 +17999,6 @@ spec:
                       Defaults to "OMPI_MCA_btl_tcp_if_include=eth0" to avoid "lo" and "docker" interfaces to be selected by OpenMPI.
                     type: string
                 type: object
-              ncclSettings:
-                description: NCCLSettings
-                properties:
-                  topologyData:
-                    description: TopologyData defines NCCL GPU topology
-                    type: string
-                  topologyType:
-                    default: auto
-                    description: TopologyType define type of NCCL GPU topology
-                    enum:
-                    - auto
-                    - custom
-                    type: string
-                type: object
               partitionConfiguration:
                 description: |-
                   PartitionConfiguration define partition configuration of slurm worker nodes

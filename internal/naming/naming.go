@@ -161,13 +161,6 @@ func BuildConfigMapSSHDConfigsNameWorker(clusterName string) string {
 	}.String()
 }
 
-func BuildConfigMapNCCLTopologyName(clusterName string) string {
-	return namedEntity{
-		clusterName: clusterName,
-		entity:      consts.ConfigMapNameNCCLTopology,
-	}.String()
-}
-
 func BuildConfigMapSysctlName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,

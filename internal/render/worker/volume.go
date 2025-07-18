@@ -32,7 +32,6 @@ func renderVolumesAndClaimTemplateSpecs(
 		renderVolumeSshdConfigs(worker.SSHDConfigMapName),
 		renderVolumeNvidia(),
 		renderVolumeBoot(),
-		renderVolumeNCCLTopology(clusterName),
 		renderVolumeSharedMemory(worker.SharedMemorySize),
 		renderVolumeSysctl(clusterName),
 		renderSupervisordConfigMap(worker.SupervisordConfigMapName),
@@ -177,34 +176,6 @@ func renderVolumeMountBoot() corev1.VolumeMount {
 }
 
 // endregion Boot
-
-// region NCCL Topology
-
-// renderVolumeNCCLTopology renders [corev1.Volume] containing NCCL topology contents
-func renderVolumeNCCLTopology(clusterName string) corev1.Volume {
-	return corev1.Volume{
-		Name: consts.VolumeNameNCCLTopology,
-		VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: naming.BuildConfigMapNCCLTopologyName(clusterName),
-				},
-				DefaultMode: ptr.To(common.DefaultFileMode),
-			},
-		},
-	}
-}
-
-// renderVolumeMountNCCLTopology renders [corev1.VolumeMount] defining the mounting path for NCCL topology
-func renderVolumeMountNCCLTopology() corev1.VolumeMount {
-	return corev1.VolumeMount{
-		Name:      consts.VolumeNameNCCLTopology,
-		MountPath: consts.VolumeMountPathNCCLTopology,
-		ReadOnly:  true,
-	}
-}
-
-// endregion NCCL Topology
 
 // region Shared memory
 
