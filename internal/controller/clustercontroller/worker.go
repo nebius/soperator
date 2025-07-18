@@ -277,50 +277,6 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					return nil
 				},
 			},
-
-			utils.MultiStepExecutionStep{
-				Name: "Slurm Worker Role",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling")
-
-					// If SendJobsEvents is set to false or nil, the Role is not necessary because we don't need the permissions.
-					// We need to explicitly delete the Role in case the user initially set JobsEvents to true and then removed it or set it to false.
-					// Without explicit deletion through reconciliation,
-					// The Role will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
-					stepLogger.V(1).Info("Removing")
-					if err := r.Role.Cleanup(stepCtx, cluster, naming.BuildRoleWorkerName(cluster.Name)); err != nil {
-						stepLogger.Error(err, "Failed to remove")
-						return fmt.Errorf("removing worker Role: %w", err)
-					}
-					stepLogger.V(1).Info("Removed")
-					stepLogger.V(1).Info("Reconciled")
-
-					return nil
-				},
-			},
-
-			utils.MultiStepExecutionStep{
-				Name: "Slurm Worker RoleBinding",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling")
-
-					// If SendJobsEvents is set to false or nil, the RoleBinding is not necessary because we don't need the permissions.
-					// We need to explicitly delete the RoleBinding in case the user initially set JobsEvents to true and then removed it or set it to false.
-					// Without explicit deletion through reconciliation,
-					// Еhe RoleBinding will not be deleted, leading to inconsistency between what is specified in the SlurmCluster kind and the actual state in the cluster.
-					stepLogger.V(1).Info("Removing")
-					if err := r.RoleBinding.Cleanup(stepCtx, cluster, naming.BuildRoleBindingWorkerName(cluster.Name)); err != nil {
-						stepLogger.Error(err, "Failed to remove")
-						return fmt.Errorf("removing worker Role: %w", err)
-					}
-					stepLogger.V(1).Info("Removed")
-					stepLogger.V(1).Info("Reconciled")
-
-					return nil
-				},
-			},
 		)
 	}
 

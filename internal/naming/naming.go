@@ -218,10 +218,6 @@ func BuildRoleWorkerName(clusterName string) string {
 	return clusterName + "-worker-events-role"
 }
 
-func BuildRoleBindingWorkerName(clusterName string) string {
-	return clusterName + "-worker-events-role-binding"
-}
-
 func BuildServiceAccountActiveCheckName(clusterName string) string {
 	return clusterName + "-activecheck-sa"
 }
