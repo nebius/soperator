@@ -28,7 +28,7 @@ interval:
   evaluation: 30s
 
   # How long to wait before sending the initial notification.
-  group_wait: 30s
+  groupWait: 30s
 
   # How long to wait before sending an updated notification.
   group: 5m

@@ -5,7 +5,7 @@
 
 {{/* How long to wait before sending the initial notification. */}}
 {{- define "son.config.route.groupWait" -}}
-{{ default .Values.interval.group_wait "30s" }}
+{{ default .Values.interval.groupWait "30s" }}
 {{- end }}
 
 {{/* How long to wait before sending the initial notification. */}}
