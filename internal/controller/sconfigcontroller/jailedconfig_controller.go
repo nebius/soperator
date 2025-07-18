@@ -198,10 +198,6 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("finishing replacing files in fileStore: %w", err)
 	}
 
-	// TODO throttle reconfiguring calls
-
-	// https://github.com/SchedMD/slurm/blob/dff6513dc96ae422dda876b22e64ee9149c418ec/src/slurmctld/node_mgr.c#L4539-L4551
-
 	for _, action := range jailedConfig.Spec.UpdateActions {
 		switch action {
 		case slurmv1alpha1.Reconfigure:
@@ -305,45 +301,73 @@ func checkApiErrors(responseErrors *v0041.V0041OpenapiErrors) error {
 	return nil
 }
 
+func (r *JailedConfigReconciler) getNodes(ctx context.Context) (*v0041.V0041OpenapiNodesResp, error) {
+	nodesBefore, err := r.slurmAPIClient.SlurmV0041GetNodesWithResponse(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("listing workers via Slurm API: %w", err)
+	}
+	if err = checkStatus(nodesBefore); err != nil {
+		return nil, fmt.Errorf("listing workers via Slurm API: %w", err)
+	}
+	if err = checkApiErrors(nodesBefore.JSON200.Errors); err != nil {
+		return nil, fmt.Errorf("listing workers via Slurm API: %w", err)
+	}
+
+	return nodesBefore.JSON200, nil
+}
+
+func (r *JailedConfigReconciler) getNodesStartTime(ctx context.Context) (map[string]int64, error) {
+	nodes, err := r.getNodes(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	nodeToStart := make(map[string]int64)
+	for _, node := range nodes.Nodes {
+		name := *node.Name
+		if _, ok := nodeToStart[name]; ok {
+			return nil, fmt.Errorf("duplicated worker name in Slurm API: %s", name)
+		}
+
+		if *node.SlurmdStartTime.Infinite {
+			return nil, fmt.Errorf("unexpected infinite start time for worker in Slurm API: %s", name)
+		}
+		if !*node.SlurmdStartTime.Set {
+			return nil, fmt.Errorf("unexpected unset start time for worker in Slurm API: %s", name)
+		}
+		slurmdStartTime := *node.SlurmdStartTime.Number
+
+		nodeToStart[name] = slurmdStartTime
+	}
+
+	return nodeToStart, nil
+}
+
 // Reconfigure REST endpoint will trigger reconfigure on slurm controller
 // REST API would queue this request and wait for response
 // Controller (in daemon mode) would fork, and parent will wait until child is ready, and then respond to reconfigure requests
 // Also child would queue reconfigure messages to all workers. But neither parent nor child would wait for workers to finish
+// See https://github.com/SchedMD/slurm/blob/e39bf73e8194d237582d3f5561d2688d4aee45d3/src/slurmrestd/plugins/openapi/slurmctld/control.c#L46
+// See https://github.com/SchedMD/slurm/blob/e39bf73e8194d237582d3f5561d2688d4aee45d3/src/api/reconfigure.c#L64
+// See https://github.com/SchedMD/slurm/blob/e39bf73e8194d237582d3f5561d2688d4aee45d3/src/slurmctld/proc_req.c#L6621-L6623
+// See https://github.com/SchedMD/slurm/blob/e39bf73e8194d237582d3f5561d2688d4aee45d3/src/slurmctld/proc_req.c#L3128
+// See https://github.com/SchedMD/slurm/blob/e39bf73e8194d237582d3f5561d2688d4aee45d3/src/slurmctld/controller.c#L333-L335
+// See https://github.com/SchedMD/slurm/blob/e39bf73e8194d237582d3f5561d2688d4aee45d3/src/slurmctld/controller.c#L1369
+// See https://github.com/SchedMD/slurm/blob/e39bf73e8194d237582d3f5561d2688d4aee45d3/src/slurmctld/controller.c#L993-L998
 // So, if this action would only wait for reconfigure REST response, and then would try to do one more reconciliation
 // it is possible to change config files right when worker was restarting, and worker can observe inconsistent FS state
 // There is no simple way to check something like worker generation, so this will check that slurmd start time is changed
+// Pattern like this is used in slurm to wait for node reboot
+// See https://github.com/SchedMD/slurm/blob/dff6513dc96ae422dda876b22e64ee9149c418ec/src/slurmctld/node_mgr.c#L4539-L4551
 func (r *JailedConfigReconciler) reconfigureCluster(ctx context.Context) error {
 	logger := logf.FromContext(ctx)
 
 	logger.V(1).Info("Storing workers start times before reconfigure")
-	nodesBefore, err := r.slurmAPIClient.SlurmV0041GetNodesWithResponse(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("listing workers via Slurm API: %w", err)
-	}
-	if err = checkStatus(nodesBefore); err != nil {
-		return fmt.Errorf("listing workers via Slurm API: %w", err)
-	}
-	if err = checkApiErrors(nodesBefore.JSON200.Errors); err != nil {
-		return fmt.Errorf("listing workers via Slurm API: %w", err)
-	}
 
 	// TODO track not just that time has changed, but also that new time is higher than time of request (that would require high degree of clock synchronicity between this controller and worker pods)
-	nodeToStartBefore := make(map[string]int64)
-	for _, node := range nodesBefore.JSON200.Nodes {
-		name := *node.Name
-		if _, ok := nodeToStartBefore[name]; ok {
-			return fmt.Errorf("duplicated worker name in Slurm API: %s", name)
-		}
-
-		if *node.SlurmdStartTime.Infinite {
-			return fmt.Errorf("unexpected infinite start time for worker in Slurm API: %s", name)
-		}
-		if !*node.SlurmdStartTime.Set {
-			return fmt.Errorf("unexpected unsetg start time for worker in Slurm API: %s", name)
-		}
-		slurmdStartTime := *node.SlurmdStartTime.Number
-
-		nodeToStartBefore[name] = slurmdStartTime
+	nodeToStartBefore, err := r.getNodesStartTime(ctx)
+	if err != nil {
+		return err
 	}
 
 	logger.V(1).Info("Requesting Slurm API to reconfigure workers")
@@ -352,10 +376,10 @@ func (r *JailedConfigReconciler) reconfigureCluster(ctx context.Context) error {
 		return fmt.Errorf("requesting Slurm API to reconfigure workers: %w", err)
 	}
 	if err = checkStatus(reconfigureResponse); err != nil {
-		return fmt.Errorf("listing workers via Slurm API: %w", err)
+		return fmt.Errorf("reconfigure via Slurm API: %w", err)
 	}
 	if err = checkApiErrors(reconfigureResponse.JSON200.Errors); err != nil {
-		return fmt.Errorf("listing workers via Slurm API: %w", err)
+		return fmt.Errorf("reconfigure via Slurm API: %w", err)
 	}
 
 	reconfigureWaitDeadline := time.Now().Add(reconfigureWaitTimeout)
@@ -365,33 +389,19 @@ func (r *JailedConfigReconciler) reconfigureCluster(ctx context.Context) error {
 		}
 
 		logger.V(1).Info("Checking workers start times after reconfigure")
-		nodesAfter, err := r.slurmAPIClient.SlurmV0041GetNodesWithResponse(ctx, nil)
+
+		nodeToStartAfter, err := r.getNodesStartTime(ctx)
 		if err != nil {
-			return fmt.Errorf("listing workers via Slurm API: %w", err)
-		}
-		if err = checkStatus(nodesBefore); err != nil {
-			return fmt.Errorf("listing workers via Slurm API: %w", err)
-		}
-		if err = checkApiErrors(nodesBefore.JSON200.Errors); err != nil {
-			return fmt.Errorf("listing workers via Slurm API: %w", err)
+			return err
 		}
 
-		for _, node := range nodesAfter.JSON200.Nodes {
-			name := *node.Name
+		for name, slurmdStartTimeAfter := range nodeToStartAfter {
 			slurmdStartTimeBefore, ok := nodeToStartBefore[name]
 			if !ok {
-				// Node was not present before reconfigure
-				// Assuming it already has new config
+				// Either node already changed its start time, or was not present before reconfigure
+				// Assuming new node already has new config
 				continue
 			}
-
-			if *node.SlurmdStartTime.Infinite {
-				return fmt.Errorf("unexpected infinite start time for worker in Slurm API: %s", name)
-			}
-			if !*node.SlurmdStartTime.Set {
-				return fmt.Errorf("unexpected unsetg start time for worker in Slurm API: %s", name)
-			}
-			slurmdStartTimeAfter := *node.SlurmdStartTime.Number
 
 			if slurmdStartTimeAfter > slurmdStartTimeBefore {
 				// Start time increased, assuming worker has restarted and picker up new config
