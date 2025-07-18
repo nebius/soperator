@@ -28,18 +28,17 @@ type SlurmCluster struct {
 	VolumeSources []slurmv1.VolumeSource
 	Secrets       slurmv1.Secrets
 
-	NodeController                SlurmController
-	NodeAccounting                SlurmAccounting
-	NodeRest                      SlurmREST
-	NodeWorker                    SlurmWorker
-	NodeLogin                     SlurmLogin
-	SlurmExporter                 SlurmExporter
-	SlurmConfig                   slurmv1.SlurmConfig
-	CustomSlurmConfig             *string
-	MPIConfig                     slurmv1.MPIConfig
-	PlugStackConfig               slurmv1.PlugStackConfig
-	SlurmTopologyConfigMapRefName string
-	SConfigController             SConfigController
+	NodeController    SlurmController
+	NodeAccounting    SlurmAccounting
+	NodeRest          SlurmREST
+	NodeWorker        SlurmWorker
+	NodeLogin         SlurmLogin
+	SlurmExporter     SlurmExporter
+	SlurmConfig       slurmv1.SlurmConfig
+	CustomSlurmConfig *string
+	MPIConfig         slurmv1.MPIConfig
+	PlugStackConfig   slurmv1.PlugStackConfig
+	SConfigController SConfigController
 }
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD
