@@ -1,7 +1,4 @@
-# BASE_IMAGE defined here for multistage build
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
-
-FROM $BASE_IMAGE AS worker_slurmd
+FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy AS worker_slurmd
 
 ARG SLURM_VERSION=24.11.5
 ARG OPENMPI_VERSION=4.1.7a1
