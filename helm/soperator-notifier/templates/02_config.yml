@@ -24,6 +24,7 @@ spec:
             name: {{ include "son.slack.webhook.secret.name" . }}
             key: {{ include "son.slack.webhook.secret.key" . }}
           title: {{ include "son.wrapTemplate" ".CommonAnnotations.title" | quote }}
+          # Trick AlertManager to use empty string to remove header links
           title_link: '{{ include "son.wrapTemplate" "define \"son.slack.msg.titleLink\"" }}{{ include "son.wrapTemplate" "\"\"" }}{{ include "son.wrapTemplate" "end" }}'
           text: |-
             {{ include "son.wrapTemplate" "range .Alerts" }}
