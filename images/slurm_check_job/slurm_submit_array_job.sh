@@ -35,7 +35,7 @@ SLURM_OUTPUT=$(
         --extra="${ACTIVE_CHECK_NAME}=true" \
         --array=0-$((NUM_NODES-1)) \
         --nodes=1 \
-        --chdir=/opt/soperator-home/soperatorchecks \
+        --chdir=/home/soperatorchecks \
         --uid=soperatorchecks \
         /opt/bin/sbatch.sh
 )
