@@ -21,7 +21,6 @@ func RenderNCCLBenchmarkCronJob(
 	nodeFilters []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
 	ncclBenchmark *values.SlurmNCCLBenchmark,
-	metrics *slurmv1.Telemetry,
 ) batchv1.CronJob {
 	labels := common.RenderLabels(consts.ComponentTypeBenchmark, clusterName)
 
@@ -64,7 +63,7 @@ func RenderNCCLBenchmarkCronJob(
 								common.RenderVolumeMungeKey(clusterName),
 								common.RenderVolumeJailFromSource(volumeSources, *ncclBenchmark.VolumeJail.VolumeSourceName),
 							},
-							Containers: []corev1.Container{renderContainerNCCLBenchmark(ncclBenchmark, metrics, clusterName, namespace)},
+							Containers: []corev1.Container{renderContainerNCCLBenchmark(ncclBenchmark, namespace)},
 						},
 					},
 				},

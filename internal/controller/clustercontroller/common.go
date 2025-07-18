@@ -14,7 +14,6 @@ import (
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
-	"nebius.ai/slurm-operator/internal/render/otel"
 	"nebius.ai/slurm-operator/internal/render/rest"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
@@ -87,65 +86,6 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					}
 					stepLogger.V(1).Info("Reconciled")
 
-					return nil
-				},
-			},
-			utils.MultiStepExecutionStep{
-				Name: "OpenTelemetry Collector",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling")
-
-					if check.IsOtelCRDInstalled() {
-						if check.IsOtelEnabled(clusterValues.Telemetry) {
-
-							var foundPodTemplate *corev1.PodTemplate
-
-							if clusterValues.Telemetry.OpenTelemetryCollector != nil &&
-								clusterValues.Telemetry.OpenTelemetryCollector.Enabled &&
-								clusterValues.Telemetry.OpenTelemetryCollector.PodTemplateNameRef != nil {
-
-								podTemplateName := *clusterValues.Telemetry.OpenTelemetryCollector.PodTemplateNameRef
-
-								foundPodTemplate = &corev1.PodTemplate{}
-								if err := r.Get(
-									stepCtx,
-									types.NamespacedName{
-										Namespace: clusterValues.Namespace,
-										Name:      podTemplateName,
-									},
-									foundPodTemplate,
-								); err != nil {
-									stepLogger.Error(err, "Failed to get PodTemplate")
-									return fmt.Errorf("getting PodTemplate: %w", err)
-								}
-							}
-
-							desired, err := otel.RenderOtelCollector(
-								clusterValues.Name,
-								clusterValues.Namespace,
-								clusterValues.Telemetry,
-								cluster.Spec.SlurmNodes.Exporter.Enabled,
-								foundPodTemplate,
-							)
-							if err != nil {
-								stepLogger.Error(err, "Failed to render")
-							}
-
-							if desired != nil {
-								stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-								stepLogger.V(1).Info("Rendered")
-							}
-
-							err = r.Otel.Reconcile(stepCtx, cluster, desired)
-							if err != nil {
-								stepLogger.Error(err, "Failed to reconcile")
-								return fmt.Errorf("reconciling OpenTelemetry Collector: %w", err)
-							}
-
-							stepLogger.V(1).Info("Reconciled")
-						}
-					}
 					return nil
 				},
 			},

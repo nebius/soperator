@@ -3,21 +3,14 @@ package check
 import (
 	"os"
 
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
 var (
-	IsOpenTelemetryCollectorCRDInstalled = false
-	IsPrometheusOperatorCRDInstalled     = false
-	IsMariaDbOperatorCRDInstalled        = false
-	IsAppArmorOperatorCRDInstalled       = false
+	IsPrometheusOperatorCRDInstalled = false
+	IsMariaDbOperatorCRDInstalled    = false
+	IsAppArmorOperatorCRDInstalled   = false
 )
-
-func IsOtelCRDInstalled() bool {
-	IsOpenTelemetryCollectorCRDInstalled = os.Getenv("IS_OPENTELEMETRY_COLLECTOR_CRD_INSTALLED") == "true"
-	return IsOpenTelemetryCollectorCRDInstalled
-}
 
 func IsPrometheusCRDInstalled() bool {
 	IsPrometheusOperatorCRDInstalled = os.Getenv("IS_PROMETHEUS_CRD_INSTALLED") == "true"
@@ -37,13 +30,6 @@ func IsAppArmorCRDInstalled() bool {
 func IsPrometheusEnabled(exporter *values.SlurmExporter) bool {
 	if exporter != nil && exporter.Enabled {
 
-		return true
-	}
-	return false
-}
-
-func IsOtelEnabled(telemetry *slurmv1.Telemetry) bool {
-	if telemetry != nil && telemetry.OpenTelemetryCollector != nil && telemetry.OpenTelemetryCollector.Enabled {
 		return true
 	}
 	return false
