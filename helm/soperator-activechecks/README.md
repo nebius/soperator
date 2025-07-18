@@ -5,7 +5,7 @@ This helm chart deploys ActiveCheck to soperator cluster
 ### To install / update:
 
 ```bash
-helm upgrade -n soperator --install all-reduce-perf-nccl ./soperator-activechecks
+helm upgrade -n soperator --install all-reduce-perf-nccl ./soperator-activechecks --set slurmClusterRefName=soperator
 ```
 
 ### To delete:
