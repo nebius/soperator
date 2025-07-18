@@ -4,7 +4,7 @@ apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMAlertmanagerConfig
 metadata:
   name: {{ include "son.config.name" . }}
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "son.labels" . | nindent 4 }}
     {{- include "son.config.label.match" . | nindent 4 }}

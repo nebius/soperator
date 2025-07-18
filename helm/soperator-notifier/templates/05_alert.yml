@@ -2,7 +2,7 @@ apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMAlert
 metadata:
   name: {{ include "son.rule.name" . }}
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "son.labels" . | nindent 4 }}
 spec:

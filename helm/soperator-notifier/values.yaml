@@ -1,6 +1,3 @@
-# Namespace to deploy the Notifier.
-namespace: monitoring-system
-
 # Slack related configuration.
 slack:
   # Slack Webhook URL in the following format:

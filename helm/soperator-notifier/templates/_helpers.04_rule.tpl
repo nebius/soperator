@@ -26,7 +26,7 @@ slurm-job
 {{/* Function to build Rule labels. */}}
 {{- define "son.rule.labels" -}}
 {{ include "son.config.label.severity" . }}: {{ .severity | quote }}
-namespace: {{ .context.Values.namespace | quote }}
+namespace: {{ .context.Release.Namespace | quote }}
 {{ include "son.config.label.job.id" . }}: {{ include "son.wrapTemplate" "$labels.job_id" | quote }}
 {{ include "son.config.label.job.name" . }}: {{ include "son.wrapTemplate" "$labels.job_name" | quote }}
 {{ include "son.config.label.job.state" . }}: {{ include "son.wrapTemplate" "$labels.job_state" | quote }}
