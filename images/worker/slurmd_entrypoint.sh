@@ -31,6 +31,27 @@ feature_conf() {
     fi
 }
 
+echo "Create .healthcheckrc file for prolog/epilog/hc program"
+set_healthcheck_var() {
+  local key="$1"
+  local value="$2"
+
+  if grep -q "^export ${key}=" "$HEALTHCHECK_RC"; then
+    sed -i "s|^export ${key}=.*|export ${key}=${value}|" "$HEALTHCHECK_RC"
+  else
+    echo "export ${key}=${value}" >> "$HEALTHCHECK_RC"
+  fi
+}
+
+HEALTHCHECK_RC="/var/spool/slurmd/.healthcheckrc"
+
+NV_HOSTENGINE_HOST_OVERRIDE="${DCGM_HOSTENGINE_HOST:-127.0.0.1}:${DCGM_HOSTENGINE_PORT:-5555}"
+
+touch "$HEALTHCHECK_RC"
+chmod 600 "$HEALTHCHECK_RC"
+
+set_healthcheck_var "NV_HOSTENGINE_HOST_OVERRIDE" "$NV_HOSTENGINE_HOST_OVERRIDE"
+
 echo "Evaluate variables in the Slurm node 'Extra' field"
 evaluated_extra=$(eval echo "$SLURM_NODE_EXTRA")
 
