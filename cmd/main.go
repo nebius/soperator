@@ -60,7 +60,7 @@ func init() {
 
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	// Check if CRDs is installed before adding it to the scheme
+	// Check if CRDs are installed before adding them to the scheme
 	// This is required to avoid errors when the CRD is not installed before the operator starts
 	if check.IsPrometheusCRDInstalled() {
 		utilruntime.Must(prometheusv1.AddToScheme(scheme))
