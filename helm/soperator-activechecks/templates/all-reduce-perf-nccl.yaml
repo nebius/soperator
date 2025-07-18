@@ -5,11 +5,9 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "all-reduce-perf-nccl"
-  slurmClusterRefName: {{ .Values.activeCheck.slurmClusterRefName | quote }}
+  slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 4,12,20 * * *" # 3 times a day at 4:00, 12:00, and 20:00 UTC
   suspend: false
-  successfulJobsHistoryLimit: {{ .Values.activeCheck.successfulJobsHistoryLimit }}
-  failedJobsHistoryLimit: {{ .Values.activeCheck.failedJobsHistoryLimit }}
   runAfterCreation: true
   slurmJobSpec:
     sbatchScript: |
@@ -18,11 +16,11 @@ spec:
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:
-{{ toYaml .Values.activeCheck.jobContainer.env | indent 8 }}
+{{ toYaml .Values.jobContainer.env | indent 8 }}
       volumeMounts:
-{{ toYaml .Values.activeCheck.jobContainer.volumeMounts | indent 8 }}
+{{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
       volumes:
-{{ toYaml .Values.activeCheck.jobContainer.volumes | indent 8 }}
+{{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
   reactions:

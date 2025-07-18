@@ -1,25 +1,29 @@
-activeCheck:
-  slurmClusterRefName: "soperator"
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 1
-  jobContainer:
-    env:
-      - name: "K8S_POD_NAME"
-        valueFrom:
-          fieldRef:
-            fieldPath: "metadata.name"
-      - name: "K8S_POD_NAMESPACE"
-        valueFrom:
-          fieldRef:
-            fieldPath: "metadata.namespace"
-    volumeMounts:
-      - mountPath: "/mnt/jail"
-        name: "jail"
-    volumes:
-      - name: "jail"
-        persistentVolumeClaim:
-          claimName: "jail-pvc"
+slurmClusterRefName: "soperator"
+jobContainer:
+  env:
+    - name: "K8S_POD_NAME"
+      valueFrom:
+        fieldRef:
+          fieldPath: "metadata.name"
+    - name: "K8S_POD_NAMESPACE"
+      valueFrom:
+        fieldRef:
+          fieldPath: "metadata.namespace"
+  volumeMounts:
+    - mountPath: "/mnt/jail"
+      name: "jail"
+  volumes:
+    - name: "jail"
+      persistentVolumeClaim:
+        claimName: "jail-pvc"
 images:
   slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.21.9-jammy-slurm24.11.5"
   k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:1.21.9-jammy-slurm24.11.5"
   munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.21.9-jammy-slurm24.11.5"
+
+sshCheck:
+  numOfLoginNodes: 2
+createUser:
+  name: "nebius"
+upgradeCuda:
+  cudaVersion: "12.4.1-1"
