@@ -1,30 +1,4 @@
-# BASE_IMAGE defined here for second multistage build
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
-
-# First stage: Build the gpubench application
-FROM golang:1.24 AS gpubench_builder
-
-ARG GO_LDFLAGS=""
-ARG CGO_ENABLED=0
-ARG GOOS=linux
-
-WORKDIR /app
-
-COPY images/worker/gpubench/go.mod images/worker/gpubench/go.sum ./
-
-RUN go mod download
-
-COPY images/worker/gpubench/main.go .
-
-RUN GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
-    go build -o gpubench .
-
-#######################################################################################################################
-# Second stage: Build worker image
-
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
-
-FROM $BASE_IMAGE AS worker_slurmd
+FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy AS worker_slurmd
 
 ARG SLURM_VERSION=24.11.5
 ARG OPENMPI_VERSION=4.1.7a1
@@ -178,8 +152,6 @@ RUN rm -rf /etc/update-motd.d/*
 # Expose the port used for accessing slurmd
 EXPOSE 6818
 
-# Copy binary that performs GPU benchmark
-COPY --from=gpubench_builder /app/gpubench /usr/bin/
 
 # Create dir and file for multilog hack
 RUN mkdir -p /var/log/slurm/multilog && \

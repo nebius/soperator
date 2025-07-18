@@ -37,30 +37,6 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 			utils.MultiStepExecutionStrategyCollectErrors,
 
 			utils.MultiStepExecutionStep{
-				Name: "Slurm Worker NCCL topology ConfigMap",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling")
-
-					desired, err := worker.RenderConfigMapNCCLTopology(clusterValues)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render")
-						return fmt.Errorf("rendering worker NCCL topology ConfigMap: %w", err)
-					}
-					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.V(1).Info("Rendered")
-
-					if err = r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
-						return fmt.Errorf("reconciling worker NCCL topology ConfigMap: %w", err)
-					}
-					stepLogger.V(1).Info("Reconciled")
-
-					return nil
-				},
-			},
-
-			utils.MultiStepExecutionStep{
 				Name: "Slurm Worker sysctl ConfigMap",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)

@@ -161,13 +161,6 @@ func BuildConfigMapSSHDConfigsNameWorker(clusterName string) string {
 	}.String()
 }
 
-func BuildConfigMapNCCLTopologyName(clusterName string) string {
-	return namedEntity{
-		clusterName: clusterName,
-		entity:      consts.ConfigMapNameNCCLTopology,
-	}.String()
-}
-
 func BuildConfigMapSysctlName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,
@@ -183,17 +176,6 @@ func BuildConfigMapSupervisordName(clusterName string) string {
 }
 
 // endregion Worker
-
-// region NCCLBenchmark
-
-func BuildCronJobNCCLBenchmarkName(clusterName string) string {
-	return namedEntity{
-		clusterName: clusterName,
-		entity:      consts.CronJobNameNCCLBenchmark,
-	}.String()
-}
-
-// endregion NCCLBenchmark
 
 // region PopulateJailJob
 

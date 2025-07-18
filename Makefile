@@ -203,7 +203,6 @@ sync-version: yq ## Sync versions from file
 #
 	@# region helm/slurm-cluster/values.yaml
 	@echo 'Syncing helm/slurm-cluster/values.yaml'
-	@$(YQ) -i ".images.ncclBenchmark = \"$(IMAGE_REPO)/nccl_benchmark:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.slurmctld = \"$(IMAGE_REPO)/controller_slurmctld:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.slurmrestd = \"$(IMAGE_REPO)/slurmrestd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.slurmdbd = \"$(IMAGE_REPO)/controller_slurmdbd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"

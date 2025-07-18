@@ -116,47 +116,6 @@ populateJail:
   #  jailSnapshotVolume:
   #    volumeSourceName: "jail-snapshot"
   overwrite: false
-ncclSettings:
-  # TopologyType define type of NCCL GPU topology Enum: auto, custom
-  topologyType: "auto"
-  # TopologyData defines NCCL GPU topology
-  topologyData: ""
-# Periodic checks. e.g. GPU health
-periodicChecks:
-  # NCCL test benchmark
-  ncclBenchmark:
-    # Whether to enable the benchmark
-    enabled: false
-    # CronJob schedule. By default, runs every 3 hours
-    schedule: "0 */3 * * *"
-    # CronJob timeout in seconds. By default, equals to 30 min
-    activeDeadlineSeconds: 1800
-    # Number of successful finished jobs to retain
-    successfulJobsHistoryLimit: 3
-    # Number of failed finished jobs to retain
-    failedJobsHistoryLimit: 24
-    # NCCL test settings
-    ncclArguments:
-      # Minimum memory size to start NCCL with
-      minBytes: "512Mb"
-      # Maximum memory size to finish NCCL with
-      maxBytes: "8Gb"
-      # Multiplication factor between two sequential memory sizes
-      stepFactor: "2"
-      # NCCL timeout in its special format. By default, 20 minutes
-      timeout: "20:00"
-      # Threshold for benchmark result that must be guaranteed. CronJob will fail if the result is less than the threshold
-      thresholdMoreThan: "0"
-      # UseInfiniband defines using NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring env variables for test
-      useInfiniband: true
-    # Actions performed on benchmark failure
-    failureActions:
-      # Whether to drain Slurm node in case of benchmark failure
-      setSlurmNodeDrainState: true
-    # Name of the k8s node filter
-    k8sNodeFilterName: "no-gpu"
-    imagePullPolicy: "IfNotPresent"
-    appArmorProfile: "unconfined"
 slurmConfig: {}
 # defMemPerNode: 1228800
 # defCpuPerGPU: 16
@@ -518,7 +477,6 @@ images:
   sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.21.9-jammy-slurm24.11.5"
   munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.21.9-jammy-slurm24.11.5"
   populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.21.9-jammy-slurm24.11.5"
-  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.21.9-jammy-slurm24.11.5"
   slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.21.9-jammy-slurm24.11.5"
   soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.21.9-jammy-slurm24.11.5"
   sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.21.9

@@ -93,7 +93,6 @@ func renderContainerSlurmd(
 		renderVolumeMountSshdConfigs(),
 		renderVolumeMountNvidia(),
 		renderVolumeMountBoot(),
-		renderVolumeMountNCCLTopology(),
 		renderVolumeMountSharedMemory(),
 		renderVolumeMountSysctl(),
 		renderVolumeMountSupervisordConfigMap(),
