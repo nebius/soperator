@@ -22,13 +22,7 @@ func RenderNCCLBenchmarkCronJob(
 	volumeSources []slurmv1.VolumeSource,
 	ncclBenchmark *values.SlurmNCCLBenchmark,
 	metrics *slurmv1.Telemetry,
-	slurmTopologyConfigMapRefName string,
 ) batchv1.CronJob {
-	// TODO: should we remove slurmTopologyConfigMapRefName?
-	// It was added here: https://github.com/nebius/soperator/pull/512/files#diff-2a4ed2186106058f178b072ccd3375eb12ceedafb804494cd0fda257c3a315a0
-	// and then it was removed here: https://github.com/nebius/soperator/pull/543/files#diff-2a4ed2186106058f178b072ccd3375eb12ceedafb804494cd0fda257c3a315a0
-	_ = slurmTopologyConfigMapRefName
-
 	labels := common.RenderLabels(consts.ComponentTypeBenchmark, clusterName)
 
 	nodeFilter := utils.MustGetBy(
