@@ -201,7 +201,6 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	for _, action := range jailedConfig.Spec.UpdateActions {
 		switch action {
 		case slurmv1alpha1.Reconfigure:
-			// TODO lift polling to reconciliation: store status, requeue etc
 			err = r.reconfigureCluster(ctx)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("reconfiguring Slurm cluster: %w", err)
@@ -413,7 +412,6 @@ func (r *JailedConfigReconciler) reconfigureCluster(ctx context.Context) error {
 			break
 		}
 
-		// TODO lift polling to reconciliation
 		time.Sleep(1 * time.Second)
 	}
 

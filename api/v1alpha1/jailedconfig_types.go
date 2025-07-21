@@ -47,9 +47,9 @@ type JailedConfigSpec struct {
 	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
 
 	// TODO support multiple configmaps as a single jailed config, to force atomic reconfigures
-	//   do we really-really need it?
-	//   changes in a single ConfigMap could be applied non-atomically anyway
-	//   and during initial cluster startup we can wait for multiple JailedConfigs to reach proper state
+	// TODO do we really-really need it?
+	// TODO changes in a single ConfigMap could be applied non-atomically anyway
+	// TODO and during initial cluster startup we can wait for multiple JailedConfigs to reach proper state
 	// TODO fix docs
 	// TODO use field reference instead of items?
 	ConfigMap *corev1.ObjectReference `json:"configMap,omitempty"`
