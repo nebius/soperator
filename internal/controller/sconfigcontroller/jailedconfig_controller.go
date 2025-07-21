@@ -183,10 +183,24 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
 	}
 
+	configMapName := jailedConfig.Spec.ConfigMap.Name
+	configMapNamespace := jailedConfig.Spec.ConfigMap.Namespace
+	if configMapNamespace != "" && configMapNamespace != jailedConfig.Namespace {
+		// JailedConfig tries to reference ConfigMap from another namespace
+		// This is incorrect spec, it does not make sense to requeue this error, only spec change would help
+		return ctrl.Result{}, reconcile.TerminalError(
+			fmt.Errorf(
+				"namespace mismatch: JailedConfig %s vs ConfigMap %s",
+				jailedConfig.Namespace,
+				configMapNamespace,
+			),
+		)
+	}
+
 	configMap := &corev1.ConfigMap{}
 	err = r.Client.Get(ctx, types.NamespacedName{
-		Name:      jailedConfig.Spec.ConfigMap.Name,
-		Namespace: jailedConfig.Spec.ConfigMap.Name,
+		Name:      configMapName,
+		Namespace: jailedConfig.Namespace,
 	}, configMap)
 	if err != nil {
 		// Error reading the object - requeue the request.
