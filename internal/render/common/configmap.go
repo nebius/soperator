@@ -58,13 +58,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	// example: SlurmctldHost=controller-0(controller-0.controller.slurm-poc.svc.cluster.local)
 	for i := int32(0); i < cluster.NodeController.Size; i++ {
-		hostName, hostFQDN := naming.BuildServiceHostFQDN(
-			consts.ComponentTypeController,
-			cluster.Namespace,
-			cluster.Name,
-			i,
-		)
-		res.AddProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", hostName, hostFQDN))
+		svcName := fmt.Sprintf("%s-%d", cluster.NodeController.StatefulSet.Name, i)
+		res.AddProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", svcName, svcName))
 	}
 	res.AddComment("")
 	res.AddProperty("AuthType", "auth/"+consts.Munge)

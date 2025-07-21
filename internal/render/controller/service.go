@@ -11,17 +11,32 @@ import (
 )
 
 // RenderService renders new [corev1.Service] serving Slurm controllers
-func RenderService(namespace, clusterName string, controller *values.SlurmController) corev1.Service {
+func RenderService(namespace, clusterName string, controller *values.SlurmController, podLabels ...map[string]string) corev1.Service {
+	labels := common.RenderLabels(consts.ComponentTypeController, clusterName)
+
+	for _, additionalLabels := range podLabels {
+		for k, v := range additionalLabels {
+			labels[k] = v
+		}
+	}
+
 	return corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      controller.Service.Name,
+			Name:      clusterName,
 			Namespace: namespace,
-			Labels:    common.RenderLabels(consts.ComponentTypeController, clusterName),
+			Labels:    labels,
 		},
 		Spec: corev1.ServiceSpec{
-			Type:      controller.Service.Type,
-			Selector:  common.RenderMatchLabels(consts.ComponentTypeController, clusterName),
-			ClusterIP: "None",
+			Type: controller.Service.Type,
+			Selector: func() map[string]string {
+				selector := map[string]string{}
+				for _, additionalLabels := range podLabels {
+					for k, v := range additionalLabels {
+						selector[k] = v
+					}
+				}
+				return selector
+			}(),
 			Ports: []corev1.ServicePort{{
 				Protocol:   controller.Service.Protocol,
 				Port:       controller.ContainerSlurmctld.Port,
