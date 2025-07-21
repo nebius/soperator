@@ -26,6 +26,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -156,6 +158,31 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("getting JailedConfig: %w", err)
 	}
 
+	err = r.initializeConditions(ctx, jailedConfig)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("initializing conditions: %w", err)
+	}
+
+	err = r.setConditions(
+		ctx,
+		jailedConfig,
+		metav1.Condition{
+			Type:    string(slurmv1alpha1.FilesWritten),
+			Status:  metav1.ConditionFalse,
+			Reason:  slurmv1alpha1.ReasonRefresh,
+			Message: "Refreshing files in jail FS",
+		},
+		metav1.Condition{
+			Type:    string(slurmv1alpha1.UpdateActionsCompleted),
+			Status:  metav1.ConditionFalse,
+			Reason:  slurmv1alpha1.ReasonRefresh,
+			Message: "Refreshing files in jail FS",
+		},
+	)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
+	}
+
 	configMap := &corev1.ConfigMap{}
 	err = r.Client.Get(ctx, types.NamespacedName{
 		Name:      jailedConfig.Spec.ConfigMap.Name,
@@ -193,6 +220,20 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
+	err = r.setConditions(
+		ctx,
+		jailedConfig,
+		metav1.Condition{
+			Type:    string(slurmv1alpha1.FilesWritten),
+			Status:  metav1.ConditionTrue,
+			Reason:  slurmv1alpha1.ReasonSuccess,
+			Message: "Files were written to jail FS",
+		},
+	)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
+	}
+
 	err = filesBatch.Finish()
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("finishing replacing files in fileStore: %w", err)
@@ -208,6 +249,20 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		default:
 			return ctrl.Result{}, fmt.Errorf("unexpected update action %s: %w", action, err)
 		}
+	}
+
+	err = r.setConditions(
+		ctx,
+		jailedConfig,
+		metav1.Condition{
+			Type:    string(slurmv1alpha1.UpdateActionsCompleted),
+			Status:  metav1.ConditionTrue,
+			Reason:  slurmv1alpha1.ReasonSuccess,
+			Message: "Update actions were called successfully",
+		},
+	)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
 	}
 
 	return ctrl.Result{}, nil
@@ -416,4 +471,45 @@ func (r *JailedConfigReconciler) reconfigureCluster(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+type statusPatcher func(status *slurmv1alpha1.JailedConfigStatus)
+
+func (r *JailedConfigReconciler) patchStatus(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig, patcher statusPatcher) error {
+	patch := client.MergeFrom(jailedConfig.DeepCopy())
+	patcher(&jailedConfig.Status)
+
+	if err := r.Status().Patch(ctx, jailedConfig, patch); err != nil {
+		return fmt.Errorf("patching JailedConfig status: %w", err)
+	}
+
+	return nil
+}
+
+func (r *JailedConfigReconciler) initializeCondition(status *slurmv1alpha1.JailedConfigStatus, cond slurmv1alpha1.JailedConfigConditionType) {
+	if meta.FindStatusCondition(status.Conditions, string(metav1.ConditionUnknown)) != nil {
+		// Do nothing
+	}
+
+	_ = meta.SetStatusCondition(&status.Conditions, metav1.Condition{
+		Type:    string(cond),
+		Status:  metav1.ConditionUnknown,
+		Reason:  slurmv1alpha1.ReasonInit,
+		Message: "Conditions was just initialized",
+	})
+}
+
+func (r *JailedConfigReconciler) initializeConditions(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig) error {
+	return r.patchStatus(ctx, jailedConfig, func(status *slurmv1alpha1.JailedConfigStatus) {
+		r.initializeCondition(status, slurmv1alpha1.FilesWritten)
+		r.initializeCondition(status, slurmv1alpha1.UpdateActionsCompleted)
+	})
+}
+
+func (r *JailedConfigReconciler) setConditions(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig, conditions ...metav1.Condition) error {
+	return r.patchStatus(ctx, jailedConfig, func(status *slurmv1alpha1.JailedConfigStatus) {
+		for _, cond := range conditions {
+			_ = meta.SetStatusCondition(&status.Conditions, cond)
+		}
+	})
 }
