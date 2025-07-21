@@ -14,6 +14,9 @@ func RenderPodMonitor(
 	exporterValues values.SlurmExporter,
 ) prometheusv1.PodMonitor {
 	pmConfig := exporterValues.PodMonitorConfig
+	metricRelabelConfigs := getDefaultMetricRelabelConfigs()
+	metricRelabelConfigs = append(metricRelabelConfigs, pmConfig.MetricRelabelConfigs...)
+
 	return prometheusv1.PodMonitor{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterName,
@@ -36,10 +39,21 @@ func RenderPodMonitor(
 					Path:                 consts.ContainerPathExporter,
 					Port:                 ptr.To(consts.ContainerPortNameExporter),
 					Scheme:               consts.ContainerSchemeExporter,
-					MetricRelabelConfigs: pmConfig.MetricRelabelConfigs,
+					MetricRelabelConfigs: metricRelabelConfigs,
 					RelabelConfigs:       pmConfig.RelabelConfig,
 				},
 			},
+		},
+	}
+}
+
+// getDefaultMetricRelabelConfigs returns the default metric relabel configs to drop
+// 'pod', 'instance', and 'container' labels which are added by Kubernetes service discovery
+func getDefaultMetricRelabelConfigs() []prometheusv1.RelabelConfig {
+	return []prometheusv1.RelabelConfig{
+		{
+			Action: "labeldrop",
+			Regex:  "pod|instance|container",
 		},
 	}
 }
