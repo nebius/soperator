@@ -501,15 +501,17 @@ int slurm_spank_task_init_privileged(spank_t spank, int argc, char **argv) {
         // Write config once.
         int lock_fd;
         {
-            const mode_t old_mask = umask(0);
             lock_fd =
                 open(lock_filename, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE);
             if (lock_fd < 0) {
                 snccld_log_error("Cannot open %s: %m", lock_filename);
-                umask(old_mask);
                 goto mount_config_end;
             }
-            umask(old_mask);
+            if (fchmod(lock_fd, SNCCLD_DEFAULT_MODE) != 0) {
+                snccld_log_error("Cannot chmod %s: %m", lock_filename);
+                close(lock_fd);
+                goto mount_config_end;
+            }
 
             if (flock(lock_fd, LOCK_EX | LOCK_NB) == -1) {
                 snccld_log_error("Cannot flock %s: %m", lock_filename);
@@ -518,16 +520,18 @@ int slurm_spank_task_init_privileged(spank_t spank, int argc, char **argv) {
             }
         }
 
-        const mode_t old_mask        = umask(0);
-        const int    mount_config_fd = open(
+        const int mount_config_fd = open(
             mount_config_filename, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE
         );
         if (mount_config_fd < 0) {
             snccld_log_error("Cannot open %s: %m", mount_config_filename);
-            umask(old_mask);
             goto mount_config_unflock;
         }
-        umask(old_mask);
+        if (fchmod(mount_config_fd, SNCCLD_DEFAULT_MODE) != 0) {
+            snccld_log_error("Cannot chmod %s: %m", mount_config_filename);
+            close(mount_config_fd);
+            goto mount_config_unflock;
+        }
 
         FILE *mount_config_f = fdopen(mount_config_fd, "w");
         if (mount_config_f == NULL) {

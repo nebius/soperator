@@ -50,19 +50,21 @@ bool snccld_acquire_lock(
     char *path = _snccld_render_lock_file_path(job_id, step_id, op, hostname);
     snccld_log_debug("Acquiring lock: '%s'", path);
 
-    const mode_t old_mask = umask(0);
     const int fd = open(path, O_CREAT | O_EXCL | O_RDWR, SNCCLD_DEFAULT_MODE);
     if (fd < 0) {
         if (errno == EEXIST) {
             snccld_log_debug("Lock busy/existing: '%s'", path);
         } else {
-            umask(old_mask);
             snccld_log_error("Cannot create lock '%s': %m", path);
         }
         goto acquire_lock_fail;
     }
+    if (fchmod(fd, SNCCLD_DEFAULT_MODE) != 0) {
+        snccld_log_error("Cannot chmod %s: %m", path);
+        close(fd);
+        goto acquire_lock_fail;
+    }
     close(fd);
-    umask(old_mask);
 
     snccld_log_debug("Lock acquired: '%s'", path);
     free(path);
