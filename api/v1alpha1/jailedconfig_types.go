@@ -35,6 +35,7 @@ const (
 
 // TODO rework ObjectReference to bespoke reference type
 // https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533
+// TODO or to AggregateRule, and writing to self spec
 
 // JailedConfigSpec defines the desired state of JailedConfig
 // It is mostly same as corev1.ConfigMapVolumeSource, except it _requires_ absolute paths in `Items`,
@@ -46,6 +47,9 @@ type JailedConfigSpec struct {
 	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
 
 	// TODO support multiple configmaps as a single jailed config, to force atomic reconfigures
+	//   do we really-really need it?
+	//   changes in a single ConfigMap could be applied non-atomically anyway
+	//   and during initial cluster startup we can wait for multiple JailedConfigs to reach proper state
 	// TODO fix docs
 	// TODO use field reference instead of items?
 	ConfigMap *corev1.ObjectReference `json:"configMap,omitempty"`
