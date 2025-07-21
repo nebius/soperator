@@ -23,7 +23,7 @@ func RenderService(namespace, clusterName, svcName string, controller *values.Sl
 
 	return corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      clusterName,
+			Name:      svcName,
 			Namespace: namespace,
 			Labels:    labels,
 		},
