@@ -26,7 +26,15 @@ echo "Create directory for slurm job outputs"
 
 if [[ "$EACH_WORKER_JOB_ARRAY" == "true" ]]; then
     echo "Submitting job using slurm_submit_array_job.sh..."
-    SLURM_JOB_ID=$(/opt/bin/slurm/slurm_submit_array_job.sh | tail -n 1)
+    SUBMIT_OUTPUT=$(/opt/bin/slurm/slurm_submit_array_job.sh)
+    SCRIPT_STATUS=$?
+    if [[ $SCRIPT_STATUS -ne 0 ]]; then
+        echo "Job array submission script failed with exit code $SCRIPT_STATUS"
+        echo "$SUBMIT_OUTPUT"
+        exit 1
+    fi
+
+    SLURM_JOB_ID=$(echo "$SUBMIT_OUTPUT" | tail -n 1)
 else
     echo "Submitting regular Slurm job..."
     OUT_PATTERN='/opt/soperator-outputs/slurm_jobs/%N.%x.%j.out'
