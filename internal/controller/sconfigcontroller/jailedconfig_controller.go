@@ -132,14 +132,14 @@ func validatePayloadPath(path string) error {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
-func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	// TODo add more fields
 	logger := logf.FromContext(ctx)
 
 	logger.V(1).Info("Reconciling JailedConfig", "req", req)
 
 	jailedConfig := &slurmv1alpha1.JailedConfig{}
-	err := r.Client.Get(ctx, req.NamespacedName, jailedConfig)
+	err = r.Client.Get(ctx, req.NamespacedName, jailedConfig)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// JailedConfig not found, so it must have been deleted
@@ -213,8 +213,7 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	filesBatch := NewReplacedFilesBatch()
 	defer func() {
-		// TODO catch error from cleanup as well
-		_ = filesBatch.Cleanup()
+		err = errors.Join(err, filesBatch.Cleanup())
 	}()
 
 	jailPayload, err := makePayload(jailedConfig.Spec.Items, configMap, jailedConfig.Spec.DefaultMode)
