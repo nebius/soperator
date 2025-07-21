@@ -72,7 +72,7 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 
 					for i := int32(0); i < replicas; i++ {
 						svcName := fmt.Sprintf("%s-%d", clusterValues.NodeController.StatefulSet.Name, i)
-						desired := controller.RenderService(clusterValues.Namespace, svcName, &clusterValues.NodeController,
+						desired := controller.RenderService(clusterValues.Namespace, clusterValues.Name, svcName, &clusterValues.NodeController,
 							map[string]string{
 								"statefulset.kubernetes.io/pod-name": fmt.Sprintf("controller-%d", i),
 							})
