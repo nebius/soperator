@@ -50,11 +50,13 @@ ifeq ($(shell uname), Darwin)
 else
     SED_COMMAND = sed -i -e
 endif
+
 ifeq ($(UNSTABLE), true)
     SHORT_SHA 					= $(shell git rev-parse --short=8 HEAD)
     OPERATOR_IMAGE_TAG  		= $(VERSION)-$(SHORT_SHA)
     IMAGE_VERSION		  		= $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
     IMAGE_REPO			  		= $(NEBIUS_REPO)-unstable
+    DOCKER_BUILD_TAGS			= '--tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"'
 endif
 
 .PHONY: all
@@ -287,9 +289,46 @@ run: manifests generate fmt vet ## Run a controller from your host with native t
 	IS_PROMETHEUS_CRD_INSTALLED=true IS_MARIADB_CRD_INSTALLED=true ENABLE_WEBHOOKS=false IS_APPARMOR_CRD_INSTALLED=true go run cmd/main.go \
 	 -log-level=debug -leader-elect=false -operator-namespace=soperator-system --enable-topology-controller=true
 
-.PHONY: docker-build-go-base
-docker-build-go-base: ## Build shared Go base image
-	docker build $(DOCKER_BUILD_ARGS) --tag go-base:latest --target go-base ${DOCKER_IGNORE_CACHE} -f images/common/go-base.dockerfile .
+.PHONY: docker-build-and-push
+docker-build-and-push: ## Build and push docker multi arch image
+ifndef IMAGE_NAME
+	$(error IMAGE_NAME is not set)
+endif
+ifndef DOCKERFILE
+	$(error DOCKERFILE is not set)
+endif
+ifndef UNSTABLE
+	$(error UNSTABLE is not set)
+endif
+# Build amd
+	docker build \
+		--platform linux/amd64 \
+		--target ${IMAGE_NAME} \
+		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64" \
+		-f images/${DOCKERFILE} \
+		${DOCKER_OUTPUT} \
+		$(DOCKER_BUILD_ARGS) \
+		.
+
+	# Build arm
+	docker build \
+		--platform linux/arm64 \
+		--target ${IMAGE_NAME} \
+		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" \
+		-f images/${DOCKERFILE} \
+		$(DOCKER_BUILD_ARGS) \
+		${DOCKER_OUTPUT} \
+		.
+	# Push
+	docker push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
+	docker push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64"
+
+ifeq ($(UNSTABLE), false)
+	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
+	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64"
+	docker push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
+	docker push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64"
+endif
 
 .PHONY: docker-build
 docker-build: ## Build docker image
@@ -317,10 +356,10 @@ docker-manifest: ## Create and push docker manifest for multiple image architect
 ifndef IMAGE_NAME
 	$(error IMAGE_NAME is not set, docker manifest can not be pushed)
 endif
-	docker manifest create "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
+	docker manifest create $(AMEND) "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
 	docker manifest push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 ifeq ($(UNSTABLE), false)
-	docker manifest create "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
+	docker manifest create $(AMEND) "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
 	docker manifest push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 endif
 
