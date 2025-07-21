@@ -261,7 +261,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     }
 
     // Ensure `user_init` ran once per worker.
-    snccld_ensure_dir_exists(SNCCLD_SYSTEM_DIR);
+    snccld_ensure_dir_exists(SNCCLD_SYSTEM_DIR, false);
     if (!snccld_acquire_lock(
             key->job_id, key->step_id, SNCCLD_OPLOCK_OP_USER_INIT, hostname
         )) {
@@ -463,11 +463,11 @@ int slurm_spank_task_init_privileged(spank_t spank, int argc, char **argv) {
             snccld_config.out_dir, hostname, resolved_out_dir
         );
         snccld_log_debug("Ensuring '%s' exists.", resolved_out_dir);
-        snccld_ensure_dir_exists(resolved_out_dir);
+        snccld_ensure_dir_exists(resolved_out_dir, true);
     }
     if (strlen(state->user_log_path) > 0) {
         snccld_log_debug("Ensuring '%s' exists.", state->user_log_path);
-        snccld_ensure_file_exists(state->user_log_path);
+        snccld_ensure_file_exists(state->user_log_path, true);
     }
 
     // Create Enroot bind mounts for the state and log files.
