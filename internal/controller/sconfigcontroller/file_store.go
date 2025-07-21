@@ -218,16 +218,16 @@ func (s *FileStore) Write(filePath string, content []byte) (err error) {
 	}
 
 	// Don't just rename in case of dirent caches
-	// In case this has to work on system without `renameat2`, it can be implemented with os.Link:
+	// In case this has to work on system without `renameat2` (or equivalent), it can be implemented with os.Link:
 	// generate random name, call os.Link, loop if error is "already exists"
 	// See os.CreateTemp implementation
-	err = unix.Renameat2(unix.AT_FDCWD, tempFileName, unix.AT_FDCWD, fullPath, unix.RENAME_EXCHANGE)
+	err = renameExchange(tempFileName, fullPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			// We have just created tempFileName, so it's most probably about fullPath, we can just rename it
-			// Using RENAME_NOREPLACE to avoid replacing file created after RENAME_EXCHANGE but before this
+			// Using renameNoReplace to avoid replacing file created after renameExchange but before this
 			// But at the same time there's no cached dirent, so it should be safe to just rename it and move on
-			err = unix.Renameat2(unix.AT_FDCWD, tempFileName, unix.AT_FDCWD, fullPath, unix.RENAME_NOREPLACE)
+			err = renameNoReplace(tempFileName, fullPath)
 			if err != nil {
 				// If rename failed we can just delete temp file and move on
 				err = fmt.Errorf("rename temp to target file (%s => %s): %w", tempFileName, fullPath, err)
@@ -247,7 +247,7 @@ func (s *FileStore) Write(filePath string, content []byte) (err error) {
 	// Also it should not keep inodes for old files alive, because only directory entries are cached, not inodes themselves
 	// Deleting earlier can lead to "file not found" errors
 
-	// Renameat2 has succeeded, and from this moment caches are stale, and we can't just remove temp file
+	// renameExchange has succeeded, and from this moment caches are stale, and we can't just remove temp file
 	// without triggering errors on readers
 	deferTempFileRemove = false
 	// TODO sleep do this once per reconciliation, will be done in #1200
@@ -341,16 +341,16 @@ func (batch *ReplacedFilesBatch) Replace(filePath string, content []byte, mode u
 	}
 
 	// Don't just rename in case of dirent caches
-	// In case this has to work on system without `renameat2`, it can be implemented with os.Link:
+	// In case this has to work on system without `renameat2` (or equivalent), it can be implemented with os.Link:
 	// generate random name, call os.Link, loop if error is "already exists"
 	// See os.CreateTemp implementation
-	err = unix.Renameat2(unix.AT_FDCWD, tempFileName, unix.AT_FDCWD, filePath, unix.RENAME_EXCHANGE)
+	err = renameExchange(tempFileName, filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			// We have just created tempFileName, so it's most probably about fullPath, we can just rename it
-			// Using RENAME_NOREPLACE to avoid replacing file created after RENAME_EXCHANGE but before this
+			// Using renameNoReplace to avoid replacing file created after renameExchange but before this
 			// But at the same time there's no cached dirent, so it should be safe to just rename it and move on
-			err = unix.Renameat2(unix.AT_FDCWD, tempFileName, unix.AT_FDCWD, filePath, unix.RENAME_NOREPLACE)
+			err = renameNoReplace(tempFileName, filePath)
 			if err != nil {
 				// If rename failed we can just delete temp file and move on
 				err = fmt.Errorf("rename temp to target file (%s => %s): %w", tempFileName, filePath, err)
@@ -375,7 +375,7 @@ func (batch *ReplacedFilesBatch) Replace(filePath string, content []byte, mode u
 	// Also it should keep inodes for old files alive while caches are alive, because only directory entries are cached, not inodes themselves
 	// Deleting earlier can lead to "file not found" errors
 
-	// Renameat2 has succeeded, and from this moment caches are stale, and we can't just remove temp file
+	// renameExchange has succeeded, and from this moment caches are stale, and we can't just remove temp file
 	// without triggering errors on readers
 	deferTempFileRemove = false
 
@@ -395,7 +395,7 @@ func (batch *ReplacedFilesBatch) Cleanup() error {
 
 	errs := make([]error, 0)
 	for _, file := range batch.pendingFiles {
-		err := unix.Renameat2(unix.AT_FDCWD, file.tempName, unix.AT_FDCWD, file.targetName, unix.RENAME_NOREPLACE)
+		err := renameNoReplace(file.tempName, file.targetName)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -415,7 +415,7 @@ func (batch *ReplacedFilesBatch) Cleanup() error {
 }
 
 func (batch *ReplacedFilesBatch) Finish() error {
-	// Renameat2 has succeeded, but caches are stale, and we can't just remove temp file
+	// renameExchange has succeeded, but caches are stale, and we can't just remove temp file
 	// without triggering errors on readers
 	time.Sleep(delayBetweenWriteAndReconfigure)
 
