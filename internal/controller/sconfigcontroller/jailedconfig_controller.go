@@ -147,13 +147,13 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			// * Truncate/replace file with empty one
 			// Replacing files with tombstones is not universal: tombstone can't be part of resource,
 			// and hardcoding tombstone here is not flexible for arbitrary file format
-			// Unlinking and truncating can lead to issues if between deleting resource and deleting file user will change it, but that's expected0
+			// Unlinking and truncating can lead to issues if between deleting resource and deleting file user will change it, but that's expected
 
 			logger.V(1).Info("JailedConfig resource not found. Ignoring since object must have been be deleted")
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		return ctrl.Result{Requeue: true}, fmt.Errorf("getting JailedConfig: %w", err)
+		return ctrl.Result{}, fmt.Errorf("getting JailedConfig: %w", err)
 	}
 
 	configMap := &corev1.ConfigMap{}
@@ -163,7 +163,7 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}, configMap)
 	if err != nil {
 		// Error reading the object - requeue the request.
-		return ctrl.Result{Requeue: true}, fmt.Errorf("getting ConfigMap: %w", err)
+		return ctrl.Result{}, fmt.Errorf("getting ConfigMap: %w", err)
 	}
 
 	if len(jailedConfig.Spec.Items) == 0 {
@@ -179,7 +179,7 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	jailPayload, err := makePayload(jailedConfig.Spec.Items, configMap, jailedConfig.Spec.DefaultMode)
 	if err != nil {
 		// Error preparing payload - requeue the request.
-		return ctrl.Result{Requeue: true}, fmt.Errorf("getting JailedConfig payload: %w", err)
+		return ctrl.Result{}, fmt.Errorf("making JailedConfig payload: %w", err)
 	}
 
 	for path, payload := range jailPayload {
