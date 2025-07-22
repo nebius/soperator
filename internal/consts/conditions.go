@@ -59,7 +59,8 @@ const (
 type ActiveCheckSlurmJobStatus string
 
 const (
-	ActiveCheckSlurmJobStatusComplete ActiveCheckSlurmJobStatus = "Complete"
-	ActiveCheckSlurmJobStatusFailed   ActiveCheckSlurmJobStatus = "Failed"
-	ActiveCheckSlurmJobStatusDegraded ActiveCheckSlurmJobStatus = "Degraded"
+	ActiveCheckSlurmJobStatusInProgress ActiveCheckSlurmJobStatus = "InProgress"
+	ActiveCheckSlurmJobStatusComplete   ActiveCheckSlurmJobStatus = "Complete"
+	ActiveCheckSlurmJobStatusFailed     ActiveCheckSlurmJobStatus = "Failed"
+	ActiveCheckSlurmJobStatusDegraded   ActiveCheckSlurmJobStatus = "Degraded"
 )

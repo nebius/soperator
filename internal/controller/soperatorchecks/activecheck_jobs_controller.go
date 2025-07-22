@@ -176,16 +176,32 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			return ctrl.Result{}, err
 		}
 
-		for _, slurmJob := range slurmJobs {
-			if !slurmJob.IsTerminalState() {
-				return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
-			}
-		}
-
-		var failReasons []string
 		var jobName string
 		var submitTime *metav1.Time
+		failReasons := activeCheck.Status.SlurmJobsStatus.LastJobFailReasons
+		lastEndTime := activeCheck.Status.SlurmJobsStatus.LastJobEndTime
+		requeue := false
 		for _, slurmJob := range slurmJobs {
+			if fmt.Sprint(slurmJob.ID) == slurmJobID {
+				jobName = slurmJob.Name
+				submitTime = slurmJob.SubmitTime
+			}
+
+			// Job is not yet finished
+			if slurmJob.EndTime == nil {
+				requeue = true
+				continue
+			}
+
+			// Job has already been seen in one of the previous reconciler runs
+			if activeCheck.Status.SlurmJobsStatus.LastJobEndTime != nil && !slurmJob.EndTime.After(activeCheck.Status.SlurmJobsStatus.LastJobEndTime.Time) {
+				continue
+			}
+
+			if lastEndTime == nil || slurmJob.EndTime.After(lastEndTime.Time) {
+				lastEndTime = slurmJob.EndTime
+			}
+
 			if slurmJob.IsFailedState() {
 				if slurmJob.StateReason != "" {
 					failReasons = append(failReasons, slurmJob.StateReason)
@@ -219,15 +235,12 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 					}
 				}
 			}
-
-			if fmt.Sprint(slurmJob.ID) == slurmJobID {
-				jobName = slurmJob.Name
-				submitTime = slurmJob.SubmitTime
-			}
 		}
 
 		var state consts.ActiveCheckSlurmJobStatus
 		switch {
+		case requeue == true:
+			state = consts.ActiveCheckSlurmJobStatusInProgress
 		case len(failReasons) == 0:
 			state = consts.ActiveCheckSlurmJobStatusComplete
 		case len(failReasons) == len(slurmJobs):
@@ -242,6 +255,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			LastJobState:       state,
 			LastJobFailReasons: failReasons,
 			LastJobSubmitTime:  submitTime,
+			LastJobEndTime:     lastEndTime,
 			LastTransitionTime: metav1.Now(),
 		}
 
@@ -252,6 +266,10 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		if err != nil {
 			logger.Error(err, "Failed to reconcile ActiveCheckJob")
 			return ctrl.Result{}, fmt.Errorf("reconciling ActiveCheckJob: %w", err)
+		}
+
+		if requeue == true {
+			return ctrl.Result{Requeue: true, RequeueAfter: 30 * time.Second}, nil
 		}
 	} else if activeCheck.Spec.CheckType == "k8sJob" {
 		newStatus := slurmv1alpha1.ActiveCheckK8sJobsStatus{
