@@ -317,5 +317,8 @@ RUN rm -rf /etc/update-motd.d/*
 COPY images/jail/motd/ /etc/update-motd.d/
 RUN chmod +x /etc/update-motd.d/*
 
+# Save the initial jail version to a file
+COPY VERSION /etc/soperator-jail-version
+
 # Update linker cache
 RUN ldconfig
