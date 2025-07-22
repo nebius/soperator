@@ -56,7 +56,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 
 	res.AddProperty("ClusterName", cluster.Name)
 	res.AddComment("")
-	// example: SlurmctldHost=controller-0(controller-0.controller.slurm-poc.svc.cluster.local)
+	// example: SlurmctldHost=controller-0(controller-0)
+	// beause in kubernetes, dns uses the dot notation to separate the service name and the namespace
 	for i := int32(0); i < cluster.NodeController.Size; i++ {
 		svcName := fmt.Sprintf("%s-%d", cluster.NodeController.StatefulSet.Name, i)
 		res.AddProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", svcName, svcName))

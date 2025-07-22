@@ -1,6 +1,7 @@
 package clustercontroller
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"strings"
@@ -63,11 +64,7 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					replicas := int32(1)
-					if clusterValues.NodeController.StatefulSet.Replicas > 0 {
-						replicas = clusterValues.NodeController.StatefulSet.Replicas
-					}
-
+					replicas := cmp.Or(clusterValues.NodeController.StatefulSet.Replicas, 1)
 					createdServices := map[string]bool{}
 
 					for i := int32(0); i < replicas; i++ {
