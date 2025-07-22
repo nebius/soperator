@@ -1,30 +1,4 @@
-# BASE_IMAGE defined here for second multistage build
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
-
-# First stage: Build the gpubench application
-FROM golang:1.24 AS gpubench_builder
-
-ARG GO_LDFLAGS=""
-ARG CGO_ENABLED=0
-ARG GOOS=linux
-
-WORKDIR /app
-
-COPY images/worker/gpubench/go.mod images/worker/gpubench/go.sum ./
-
-RUN go mod download
-
-COPY images/worker/gpubench/main.go .
-
-RUN GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
-    go build -o gpubench .
-
-#######################################################################################################################
-# Second stage: Build worker image
-
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
-
-FROM $BASE_IMAGE AS worker_slurmd
+FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS worker_slurmd
 
 ARG SLURM_VERSION=24.11.5
 ARG OPENMPI_VERSION=4.1.7a1
@@ -90,7 +64,9 @@ ENV PATH=$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
 # Add Nebius public registry
 RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
-    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" > /etc/apt/sources.list.d/nebius.list
+    codename="$(. /etc/os-release && echo $VERSION_CODENAME)" && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ $codename main" > /etc/apt/sources.list.d/nebius.list && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" >> /etc/apt/sources.list.d/nebius.list
 
 RUN apt-get update && \
     apt -y install \
@@ -118,7 +94,7 @@ RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
 
 # Install parallel because it's required for enroot operation
 RUN apt-get update && \
-    apt -y install parallel=20210822+ds-2 && \
+    apt -y install parallel=20240222+ds-2 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -178,8 +154,6 @@ RUN rm -rf /etc/update-motd.d/*
 # Expose the port used for accessing slurmd
 EXPOSE 6818
 
-# Copy binary that performs GPU benchmark
-COPY --from=gpubench_builder /app/gpubench /usr/bin/
 
 # Create dir and file for multilog hack
 RUN mkdir -p /var/log/slurm/multilog && \

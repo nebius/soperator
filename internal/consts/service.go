@@ -10,6 +10,5 @@ const (
 	NodeConfigurator      = "node-configurator"
 	SConfigControllerName = "sconfigctrl"
 
-	ncclBenchmark = "nccl-benchmark"
-	populateJail  = "populate-jail"
+	populateJail = "populate-jail"
 )

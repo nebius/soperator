@@ -34,12 +34,6 @@ func TestBuildConfigMapSecurityLimitsName(t *testing.T) {
 			expected:      "test-cluster-controller-security-limits",
 		},
 		{
-			name:          "Benchmark component",
-			componentType: consts.ComponentTypeBenchmark,
-			clusterName:   "test-cluster",
-			expected:      "test-cluster-nccl-benchmark-security-limits",
-		},
-		{
 			name:          "Exporter component",
 			componentType: consts.ComponentTypeExporter,
 			clusterName:   "test-cluster",

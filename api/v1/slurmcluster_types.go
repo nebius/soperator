@@ -37,19 +37,10 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:default="none"
 	Maintenance *consts.MaintenanceMode `json:"maintenance,omitempty"`
 
-	// NCCLSettings
-	// +kubebuilder:validation:Optional
-	NCCLSettings NCCLSettings `json:"ncclSettings,omitempty"`
-
 	// PopulateJail defines the k8s Job that performs initial jail file system population
 	//
 	// +kubebuilder:validation:Required
 	PopulateJail PopulateJail `json:"populateJail"`
-
-	// PeriodicChecks define the k8s CronJobs performing cluster checks
-	//
-	// +kubebuilder:validation:Required
-	PeriodicChecks PeriodicChecks `json:"periodicChecks"`
 
 	// K8sNodeFilters define the k8s node filters used in Slurm node specifications
 	//
@@ -71,11 +62,6 @@ type SlurmClusterSpec struct {
 	//
 	// +kubebuilder:validation:Required
 	SlurmNodes SlurmNodes `json:"slurmNodes"`
-
-	// Metrics define the desired state of the prometheus or opentelemetry metrics
-	//
-	// +kubebuilder:validation:Optional
-	Telemetry *Telemetry `json:"telemetry,omitempty"`
 
 	// PartitionConfiguration define partition configuration of slurm worker nodes
 	// https://slurm.schedmd.com/slurm.conf.html#SECTION_PARTITION-CONFIGURATION
@@ -107,13 +93,6 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={ pyxis: { required: true, containerImageSave: "/var/cache/enroot-container-images/" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" } }
 	PlugStackConfig PlugStackConfig `json:"plugStackConfig,omitempty"`
-
-	// SlurmTopologyConfigMapRefName is the name of the slurm topology config.
-	// When exists, TopologyPlugin is automatically set to `topology/tree` in slurm.conf
-	// if TopologyPlugin is not explicitly specified in SlurmConfig.
-	//
-	// +kubebuilder:validation:Optional
-	SlurmTopologyConfigMapRefName string `json:"slurmTopologyConfigMapRefName,omitempty"`
 
 	// SConfigController defines the desired state of controller that watches after configs
 	//
@@ -185,7 +164,6 @@ type SlurmConfig struct {
 	// +kubebuilder:default=60
 	MessageTimeout *int32 `json:"messageTimeout,omitempty"`
 	// TopologyPlugin identifies the plugin to determine network topology for optimizations.
-	// It is set automatically to `topology/tree` if SlurmTopologyConfigMapRefName is specified.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="topology/tree"
@@ -388,21 +366,6 @@ type HealthCheckNodeState struct {
 	State string `json:"state"`
 }
 
-type NCCLSettings struct {
-
-	// TopologyType define type of NCCL GPU topology
-	//
-	// +kubebuilder:validation:Enum=auto;custom
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="auto"
-	TopologyType string `json:"topologyType,omitempty"`
-
-	// TopologyData defines NCCL GPU topology
-	//
-	// +kubebuilder:validation:Optional
-	TopologyData string `json:"topologyData,omitempty"`
-}
-
 type PopulateJail struct {
 	// Image defines the populate jail container image
 	//
@@ -439,133 +402,6 @@ type PopulateJail struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="unconfined"
 	AppArmorProfile string `json:"appArmorProfile,omitempty"`
-}
-
-// PeriodicChecks define the k8s CronJobs performing cluster checks
-type PeriodicChecks struct {
-	// NCCLBenchmark defines the desired state of nccl benchmark
-	//
-	// +kubebuilder:validation:Required
-	NCCLBenchmark NCCLBenchmark `json:"ncclBenchmark"`
-}
-
-// NCCLBenchmark defines the desired state of nccl benchmark
-type NCCLBenchmark struct {
-	// Enabled defines whether the CronJob should be scheduled
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	Enabled bool `json:"enabled,omitempty"`
-
-	// Schedule defines the CronJob schedule.
-	// By default, runs benchmark every 3 hours
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="0 */3 * * *"
-	Schedule string `json:"schedule,omitempty"`
-
-	// ActiveDeadlineSeconds defines the CronJob timeout in seconds
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=1800
-	ActiveDeadlineSeconds int64 `json:"activeDeadlineSeconds,omitempty"`
-
-	// SuccessfulJobsHistoryLimit defines the number of successful finished jobs to retain
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=3
-	SuccessfulJobsHistoryLimit int32 `json:"successfulJobsHistoryLimit,omitempty"`
-
-	// FailedJobsHistoryLimit defines the number of failed finished jobs to retain
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=16
-	FailedJobsHistoryLimit int32 `json:"failedJobsHistoryLimit,omitempty"`
-
-	// Image defines the nccl container image
-	//
-	// +kubebuilder:validation:Required
-	Image string `json:"image"`
-
-	// ImagePullPolicy defines the image pull policy
-	//
-	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="IfNotPresent"
-	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
-
-	// NCCLArguments define nccl settings
-	//
-	// +kubebuilder:validation:Optional
-	NCCLArguments NCCLArguments `json:"ncclArguments,omitempty"`
-
-	// FailureActions define actions performed on benchmark failure
-	//
-	// +kubebuilder:validation:Optional
-	FailureActions FailureActions `json:"failureActions,omitempty"`
-
-	// K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
-	// Must correspond to the name of one of [K8sNodeFilter]
-	//
-	// +kubebuilder:validation:Required
-	K8sNodeFilterName string `json:"k8sNodeFilterName"`
-
-	// AppArmorProfile defines the AppArmor profile for the Slurm node
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="unconfined"
-	AppArmorProfile string `json:"appArmorProfile,omitempty"`
-}
-
-// NCCLArguments define nccl settings for periodic nccl benchmark
-type NCCLArguments struct {
-	// MinBytes defines the minimum memory size to start nccl with
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="512Mb"
-	MinBytes string `json:"minBytes,omitempty"`
-
-	// MaxBytes defines the maximum memory size to finish nccl with
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="8Gb"
-	MaxBytes string `json:"maxBytes,omitempty"`
-
-	// StepFactor defines the multiplication factor between two sequential memory sizes
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="2"
-	StepFactor string `json:"stepFactor,omitempty"`
-
-	// Timeout defines the timeout for nccl in its special format
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="20:00"
-	Timeout string `json:"timeout,omitempty"`
-
-	// ThresholdMoreThan defines the threshold for benchmark result that must be guaranteed.
-	// CronJob will fail if the result is less than the threshold
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="0"
-	ThresholdMoreThan string `json:"thresholdMoreThan,omitempty"`
-
-	// UseInfiniband defines using NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring env variables for test.
-	// According to NVIDIA these env vars should be used only for debugging.
-	// https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=true
-	UseInfiniband bool `json:"useInfiniband,omitempty"`
-}
-
-// FailureActions define actions performed on benchmark failure
-type FailureActions struct {
-	// SetSlurmNodeDrainState defines whether to drain Slurm node in case of benchmark failure
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	SetSlurmNodeDrainState bool `json:"setSlurmNodeDrainState,omitempty"`
 }
 
 // K8sNodeFilter defines the k8s node filter used in Slurm node specifications
@@ -1304,12 +1140,12 @@ type MetricsOpenTelemetryCollector struct {
 //
 // +kubebuilder:validation:XValidation:rule="!(has(self.otelCollectorGrpcHost) && has(self.otelCollectorHttpHost))",message="Both OtelCollectorGrpcHost and OtelCollectorHttpHost cannot be set at the same time."
 type JobsTelemetry struct {
-	// Defines whether to send Kubernetes events for Slurm NCCLBenchmark jobs
+	// Defines whether to send Kubernetes events for Slurm jobs
 	//
 	// +kubebuilder:default=false
 	SendJobsEvents bool `json:"sendJobsEvents,omitempty"`
 
-	// Defines whether to send Opentelemetry metrics for Slurm NCCLBenchmark jobs
+	// Defines whether to send Opentelemetry metrics for Slurm jobs
 	//
 	// +kubebuilder:default=false
 	SendOtelMetrics bool `json:"sendOtelMetrics,omitempty"`

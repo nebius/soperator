@@ -21,7 +21,6 @@ const (
 	securityLimits         = "security-limits"
 	securityLimitsConfFile = "limits.conf"
 
-	ncclTopology        = "nccl-topology"
 	sysctl              = "sysctl"
 	sysctlConfFile      = sysctl + ".conf"
 	supervisord         = "supervisord"
@@ -49,7 +48,6 @@ const (
 	VolumeNameSSHDKeys                 = "sshd-keys"
 	VolumeMountPathSSHDKeys            = "/etc/ssh/sshd_keys"
 	VolumeNameSecurityLimits           = securityLimits
-	VolumeNameNCCLTopology             = ncclTopology
 	VolumeNameSharedMemory             = "dev-shm"
 	VolumeNameSysctl                   = sysctl
 	VolumeNameSupervisordConfigMap     = "supervisord-config"
@@ -74,7 +72,6 @@ const (
 	VolumeMountSubPathSSHRootKeys           = authorizedKeys
 	VolumeMountPathSecurityLimits           = "/etc/security/" + securityLimitsConfFile
 	VolumeMountSubPathSecurityLimits        = securityLimitsConfFile
-	VolumeMountPathNCCLTopology             = "/run/nvidia-topologyd"
 	VolumeMountPathSharedMemory             = "/dev/shm"
 	VolumeMountPathSysctl                   = "/etc/" + sysctlConfFile
 	VolumeMountSubPathSysctl                = sysctlConfFile

@@ -13,8 +13,6 @@ import (
 type SlurmWorker struct {
 	slurmv1.SlurmNode
 
-	NCCLSettings slurmv1.NCCLSettings
-
 	ContainerToolkitValidation Container
 	ContainerSlurmd            Container
 	ContainerMunge             Container
@@ -51,7 +49,6 @@ func buildSlurmWorkerFrom(
 	clusterName string,
 	maintenance *consts.MaintenanceMode,
 	worker *slurmv1.SlurmNodeWorker,
-	ncclSettings *slurmv1.NCCLSettings,
 	useDefaultAppArmorProfile bool,
 ) SlurmWorker {
 	supervisordConfigName := worker.SupervisordConfigMapRefName
@@ -67,8 +64,7 @@ func buildSlurmWorkerFrom(
 	}
 
 	res := SlurmWorker{
-		SlurmNode:    *worker.SlurmNode.DeepCopy(),
-		NCCLSettings: *ncclSettings.DeepCopy(),
+		SlurmNode: *worker.SlurmNode.DeepCopy(),
 		ContainerToolkitValidation: Container{
 			NodeContainer: slurmv1.NodeContainer{
 				Image:           "cr.eu-north1.nebius.cloud/soperator/gpu-operator-validator:v23.9.1", // Mirrored nvcr.io/nvidia/cloud-native/gpu-operator-validator:v23.9.1

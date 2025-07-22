@@ -7,7 +7,6 @@ import (
 	"time"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
-	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -61,7 +60,6 @@ import (
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;delete;patch
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;delete;patch
 //+kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;update;patch;delete;create
-//+kubebuilder:rbac:groups=opentelemetry.io,resources=opentelemetrycollectors,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=podmonitors,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=core,resources=podtemplates,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;update;patch;delete;create
@@ -85,7 +83,6 @@ type SlurmClusterReconciler struct {
 	ServiceAccount      *reconciler.ServiceAccountReconciler
 	Role                *reconciler.RoleReconciler
 	RoleBinding         *reconciler.RoleBindingReconciler
-	Otel                *reconciler.OtelReconciler
 	PodMonitor          *reconciler.PodMonitorReconciler
 	Deployment          *reconciler.DeploymentReconciler
 	MariaDb             *reconciler.MariaDbReconciler
@@ -107,7 +104,6 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 		ServiceAccount:      reconciler.NewServiceAccountReconciler(r),
 		Role:                reconciler.NewRoleReconciler(r),
 		RoleBinding:         reconciler.NewRoleBindingReconciler(r),
-		Otel:                reconciler.NewOtelReconciler(r),
 		PodMonitor:          reconciler.NewPodMonitorReconciler(r),
 		Deployment:          reconciler.NewDeploymentReconciler(r),
 		MariaDb:             reconciler.NewMariaDbReconciler(r),
@@ -229,9 +225,6 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 				return ctrl.Result{}, err
 			}
 			if err = r.ReconcileAccounting(ctx, cluster, clusterValues); err != nil {
-				return ctrl.Result{}, err
-			}
-			if err = r.ReconcileNCCLBenchmark(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
 			if err = r.ReconcileWorkers(ctx, cluster, clusterValues); err != nil {
@@ -606,16 +599,12 @@ const (
 	supervisordConfigMapField                    = ".spec.slurmNodes.worker.supervisordConfigMapRefName"
 	sshdLoginConfigMapField                      = ".spec.slurmNodes.login.sshdConfigMapRefName"
 	sshdWorkerConfigMapField                     = ".spec.slurmNodes.worker.sshdConfigMapRefName"
-	slurmTopologyConfigMapField                  = ".spec.slurmTopologyConfigMapRefName"
 	accountingExternalDBPasswordSecretKeyField   = ".spec.slurmNodes.accounting.externalDB.passwordSecretKeyRef.Name"
 	accountingExternalDBTLSServerCASecretField   = ".spec.slurmNodes.accounting.externalDB.tls.serverCASecretRef"
 	accountingExternalDBTLSClientCertSecretField = ".spec.slurmNodes.accounting.externalDB.tls.clientCertSecretRef"
 )
 
 func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency int, cacheSyncTimeout time.Duration) error {
-	if err := r.setupPodTemplateIndexer(mgr); err != nil {
-		return err
-	}
 	if err := r.setupConfigMapIndexer(mgr); err != nil {
 		return err
 	}
@@ -662,16 +651,6 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 	return controllerBuilder.Complete(r)
 }
 
-func (r *SlurmClusterReconciler) setupPodTemplateIndexer(mgr ctrl.Manager) error {
-	return mgr.GetFieldIndexer().IndexField(context.Background(), &slurmv1.SlurmCluster{}, podTemplateField, func(rawObj client.Object) []string {
-		slurmCluster := rawObj.(*slurmv1.SlurmCluster)
-		if slurmCluster.Spec.Telemetry == nil || slurmCluster.Spec.Telemetry.OpenTelemetryCollector == nil || slurmCluster.Spec.Telemetry.OpenTelemetryCollector.PodTemplateNameRef == nil {
-			return nil
-		}
-		return []string{*slurmCluster.Spec.Telemetry.OpenTelemetryCollector.PodTemplateNameRef}
-	})
-}
-
 func (r *SlurmClusterReconciler) setupConfigMapIndexer(mgr ctrl.Manager) error {
 	indexers := map[string]func(*slurmv1.SlurmCluster) string{
 		supervisordConfigMapField: func(sc *slurmv1.SlurmCluster) string {
@@ -682,9 +661,6 @@ func (r *SlurmClusterReconciler) setupConfigMapIndexer(mgr ctrl.Manager) error {
 		},
 		sshdWorkerConfigMapField: func(sc *slurmv1.SlurmCluster) string {
 			return sc.Spec.SlurmNodes.Worker.SSHDConfigMapRefName
-		},
-		slurmTopologyConfigMapField: func(sc *slurmv1.SlurmCluster) string {
-			return sc.Spec.SlurmTopologyConfigMapRefName
 		},
 	}
 
@@ -886,13 +862,6 @@ func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Func
 				&corev1.ServiceAccount{},
 			},
 			Predicate: saPredicate,
-		},
-		{
-			Check: check.IsOpenTelemetryCollectorCRDInstalled,
-			Objects: []client.Object{
-				&otelv1beta1.OpenTelemetryCollector{},
-			},
-			Predicate: predicate.GenerationChangedPredicate{},
 		},
 		{
 			Check: check.IsPrometheusOperatorCRDInstalled,

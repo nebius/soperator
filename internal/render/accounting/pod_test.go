@@ -59,7 +59,7 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 	}
 
 	result, err := accounting.BasePodTemplateSpec(
-		defaultNameCluster, acc, defaultNodeFilter, defaultVolumeSources, matchLabels, slurmTopologyConfigMapRefName,
+		defaultNameCluster, acc, defaultNodeFilter, defaultVolumeSources, matchLabels,
 	)
 	assert.NoError(t, err)
 

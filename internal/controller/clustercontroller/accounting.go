@@ -353,7 +353,6 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						&clusterValues.NodeAccounting,
 						clusterValues.NodeFilters,
 						clusterValues.VolumeSources,
-						clusterValues.SlurmTopologyConfigMapRefName,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")

@@ -39,8 +39,15 @@ SLURM_OUTPUT=$(
         --uid=soperatorchecks \
         /opt/bin/sbatch.sh
 )
+
+SBATCH_STATUS=$?
+if [[ $SBATCH_STATUS -ne 0 ]]; then
+    echo "sbatch failed with exit code $SBATCH_STATUS"
+    exit 1
+fi
+
 if [[ -z "$SLURM_OUTPUT" ]]; then
-    echo "Failed to submit Slurm job"
+    echo "Empty output from sbatch"
     exit 1
 fi
 

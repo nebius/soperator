@@ -30,7 +30,7 @@ CHART_ACTIVECHECK_PATH       = $(CHART_PATH)/soperator-activechecks
 CHART_DCGM_EXPORTER_PATH     = $(CHART_PATH)/soperator-dcgm-exporter
 
 SLURM_VERSION		  		= 24.11.5
-UBUNTU_VERSION		  		= jammy
+UBUNTU_VERSION		  		?= noble
 VERSION               		= $(shell cat VERSION)
 
 IMAGE_VERSION		  = $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)
@@ -203,7 +203,6 @@ sync-version: yq ## Sync versions from file
 #
 	@# region helm/slurm-cluster/values.yaml
 	@echo 'Syncing helm/slurm-cluster/values.yaml'
-	@$(YQ) -i ".images.ncclBenchmark = \"$(IMAGE_REPO)/nccl_benchmark:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.slurmctld = \"$(IMAGE_REPO)/controller_slurmctld:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.slurmrestd = \"$(IMAGE_REPO)/slurmrestd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.slurmdbd = \"$(IMAGE_REPO)/controller_slurmdbd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"

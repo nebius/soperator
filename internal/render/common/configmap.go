@@ -22,7 +22,7 @@ import (
 // [consts.ConfigMapKeySpankConfig] - SPANK plugins config
 // [consts.ConfigMapKeyGresConfig] - GRES config
 // [consts.ConfigMapKeyMPIConfig] - PMIx config
-func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig corev1.ConfigMap) corev1.ConfigMap {
+func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) corev1.ConfigMap {
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapSlurmConfigsName(cluster.Name),
@@ -33,7 +33,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster, topologyConfig co
 			Labels: renderConfigMapSlurmConfigsLabels(consts.ComponentTypeController, cluster.Name),
 		},
 		Data: map[string]string{
-			consts.ConfigMapKeySlurmConfig:       generateSlurmConfig(cluster, topologyConfig).Render(),
+			consts.ConfigMapKeySlurmConfig:       generateSlurmConfig(cluster).Render(),
 			consts.ConfigMapKeyRESTConfig:        generateRESTConfig().Render(),
 			consts.ConfigMapKeyCustomSlurmConfig: generateCustomSlurmConfig(cluster).Render(),
 			consts.ConfigMapKeyCGroupConfig:      generateCGroupConfig(cluster).Render(),
@@ -51,20 +51,16 @@ func renderConfigMapSlurmConfigsLabels(componentType consts.ComponentType, clust
 	return labels
 }
 
-func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.ConfigMap) renderutils.ConfigFile {
+func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
 
 	res.AddProperty("ClusterName", cluster.Name)
 	res.AddComment("")
-	// example: SlurmctldHost=controller-0(controller-0.controller.slurm-poc.svc.cluster.local)
+	// example: SlurmctldHost=controller-0(controller-0)
+	// beause in kubernetes, dns uses the dot notation to separate the service name and the namespace
 	for i := int32(0); i < cluster.NodeController.Size; i++ {
-		hostName, hostFQDN := naming.BuildServiceHostFQDN(
-			consts.ComponentTypeController,
-			cluster.Namespace,
-			cluster.Name,
-			i,
-		)
-		res.AddProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", hostName, hostFQDN))
+		svcName := fmt.Sprintf("%s-%d", cluster.NodeController.StatefulSet.Name, i)
+		res.AddProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", svcName, svcName))
 	}
 	res.AddComment("")
 	res.AddProperty("AuthType", "auth/"+consts.Munge)
@@ -193,13 +189,6 @@ func generateSlurmConfig(cluster *values.SlurmCluster, topologyConfig corev1.Con
 			res.AddComment("REST API")
 			res.AddProperty("AuthAltTypes", "auth/jwt")
 			res.AddProperty("AuthAltParameters", "jwt_key="+consts.RESTJWTKeyPath)
-		}
-	}
-
-	if cluster.SlurmConfig.TopologyPlugin == "" && topologyConfig.Data != nil {
-		if _, ok := topologyConfig.Data[consts.ConfigMapKeyTopologyConfig]; ok {
-			res.AddComment("AUTO TOPOLOGY, triggered by slurmTopologyConfigMapRefName")
-			res.AddProperty("TopologyPlugin", "topology/tree")
 		}
 	}
 
@@ -372,8 +361,6 @@ func RenderConfigMapSecurityLimits(componentType consts.ComponentType, cluster *
 		}
 	case consts.ComponentTypeController:
 		data = cluster.NodeController.ContainerSlurmctld.NodeContainer.SecurityLimitsConfig
-	case consts.ComponentTypeBenchmark:
-		data = cluster.NCCLBenchmark.ContainerNCCLBenchmark.NodeContainer.SecurityLimitsConfig
 	}
 
 	if data == "" {

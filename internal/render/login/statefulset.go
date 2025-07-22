@@ -27,7 +27,6 @@ func RenderStatefulSet(
 	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	login *values.SlurmLogin,
-	slurmTopologyConfigMapRefName string,
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeLogin, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName)
@@ -39,7 +38,7 @@ func RenderStatefulSet(
 	)
 
 	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecs(
-		clusterName, secrets, volumeSources, login, slurmTopologyConfigMapRefName)
+		clusterName, secrets, volumeSources, login)
 	if err != nil {
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}

@@ -33,20 +33,6 @@ func renderContainerSlurmctld(container *values.Container, customMounts []slurmv
 			Protocol:      corev1.ProtocolTCP,
 		}},
 		VolumeMounts: volumeMounts,
-		ReadinessProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{
-						"scontrol",
-						"ping",
-					},
-				},
-			},
-			TimeoutSeconds:   common.DefaultProbeTimeoutSeconds,
-			PeriodSeconds:    common.DefaultProbePeriodSeconds,
-			SuccessThreshold: common.DefaultProbeSuccessThreshold,
-			FailureThreshold: common.DefaultProbeFailureThreshold,
-		},
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{

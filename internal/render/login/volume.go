@@ -15,13 +15,7 @@ func renderVolumesAndClaimTemplateSpecs(
 	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	login *values.SlurmLogin,
-	slurmTopologyConfigMapRefName string,
 ) (volumes []corev1.Volume, pvcTemplateSpecs []values.PVCTemplateSpec, err error) {
-	// TODO: should we remove slurmTopologyConfigMapRefName?
-	// It was added here: https://github.com/nebius/soperator/pull/512/files#diff-7b22c3a71b5e99d01467ef50b9d060d03cf76d9cede340519df7d4ed99e75fd2
-	// and then it was removed here: https://github.com/nebius/soperator/pull/543/files#diff-7b22c3a71b5e99d01467ef50b9d060d03cf76d9cede340519df7d4ed99e75fd2
-	_ = slurmTopologyConfigMapRefName
-
 	volumes = []corev1.Volume{
 		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeMungeSocket(),

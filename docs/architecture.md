@@ -149,22 +149,9 @@ it, effectively removing the node from the pool for new job scheduling.
 In the future, we’re planning to integrate with Nebius Cloud to not only drain problematic Slurm nodes but replace them
 with fresh ones. We’ll also try to leave room for integration with other cloud providers and on-premise K8s clusters.
 
-There are two kinds of health checks in our solution:
-1. **Quick checks** that take up to 10 seconds and don’t interfere with user workloads when run in parallel. These are
-   implemented as Slurm’s `HealthCheckProgram`. They make sure the system recognizes GPUs correctly and there are no
-   critical software or hardware issues.
-2. **Longer checks** that take several minutes and run as regular Slurm jobs. Currently, we only have one such check
-   that runs NCCL benchmarks. These checks queue up with user jobs and don’t interfere with them.
-
-Here’s a diagram explaining how longer checks work. It’s not 100% accurate (especially the bash scripts), but it shows
-the general idea.
-<img src="images/gpu_benchmark_diagram.svg" alt="GPU Benchmark Diagram" width="100%" height="auto"/>
-
-Soperator creates a Kubernetes CronJob that launches benchmarks on each node on a set schedule.
-
-The benchmark job consists of running the NCCL test `all_reduce_perf` and comparing the resulting bus bandwidth to a
-configured threshold. If the result doesn’t meet the mark, the job itself changes the state of the current node to
-`DRAINED`, excluding it from running further jobs.
+We have **quick health checks** that take up to 10 seconds and don't interfere with user workloads when run in parallel. These are
+implemented as Slurm's `HealthCheckProgram`. They make sure the system recognizes GPUs correctly and there are no
+critical software or hardware issues.
 
 
 ### Easy scaling
