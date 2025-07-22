@@ -47,7 +47,7 @@ func renderContainerToolkitValidation(container *values.Container) corev1.Contai
 }
 
 // RenderContainerWaitForController renders init [corev1.Container] that waits for controller readiness
-func RenderContainerWaitForController(container *values.Container, clusterName string) corev1.Container {
+func RenderContainerWaitForController(container *values.Container, controllerPort int32) corev1.Container {
 	return corev1.Container{
 		Name:            consts.ContainerNameWaitForController,
 		Image:           container.Image,
@@ -58,7 +58,11 @@ func RenderContainerWaitForController(container *values.Container, clusterName s
 		Env: []corev1.EnvVar{
 			{
 				Name:  "CONTROLLER_SERVICE",
-				Value: naming.BuildServiceName(consts.ComponentTypeController, clusterName),
+				Value: fmt.Sprintf("%s-%d", consts.ComponentTypeController, 0),
+			},
+			{
+				Name:  "CONTROLLER_PORT",
+				Value: strconv.FormatInt(int64(controllerPort), 10),
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
