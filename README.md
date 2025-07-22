@@ -191,6 +191,8 @@ It includes, among other things:
 - A detailed description of the Soperator [architecture](docs/architecture.md).
 - The [full list of features](docs/features.md) that this solution provides comparing to typical Slurm installations.
 - A more complete description of the existing [limitations](docs/limitations.md).
+- Comprehensive [metrics collection and processing](docs/metrics-pipeline.md) documentation.
+- Detailed [logs collection and aggregation](docs/logs-pipeline.md) pipeline guide.
 
 
 
