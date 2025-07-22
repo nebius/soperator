@@ -13,8 +13,14 @@ FROM $BASE_IMAGE AS populate_jail
 ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt update && \
-    apt install -y rclone rsync && \
+    apt install -y rsync && \
     apt clean
+
+# Install Rclone
+COPY images/common/scripts/install_rclone.sh /opt/bin/
+RUN chmod +x /opt/bin/install_rclone.sh && \
+    /opt/bin/install_rclone.sh && \
+    rm /opt/bin/install_rclone.sh
 
 COPY --from=untaped /jail /jail
 
