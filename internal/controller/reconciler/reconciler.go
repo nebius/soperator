@@ -25,6 +25,7 @@ import (
 	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/logfield"
 )
 
@@ -208,6 +209,8 @@ func (r Reconciler) reconcile(
 				existing = &mariadbv1alpha1.Grant{}
 			case *apparmor.AppArmorProfile:
 				existing = &apparmor.AppArmorProfile{}
+			case *slurmv1alpha1.JailedConfig:
+				existing = &slurmv1alpha1.JailedConfig{}
 			default:
 				return errors.New(fmt.Sprintf("unimplemented resolver for resource type %T", desired))
 			}

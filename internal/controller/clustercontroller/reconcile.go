@@ -32,6 +32,7 @@ import (
 	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
@@ -77,6 +78,7 @@ type SlurmClusterReconciler struct {
 	*reconciler.Reconciler
 
 	ConfigMap           *reconciler.ConfigMapReconciler
+	JailedConfig        *reconciler.JailedConfigReconciler
 	Secret              *reconciler.SecretReconciler
 	CronJob             *reconciler.CronJobReconciler
 	Job                 *reconciler.JobReconciler
@@ -99,6 +101,7 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 	return &SlurmClusterReconciler{
 		Reconciler:          r,
 		ConfigMap:           reconciler.NewConfigMapReconciler(r),
+		JailedConfig:        reconciler.NewJailedConfigReconciler(r),
 		Secret:              reconciler.NewSecretReconciler(r),
 		CronJob:             reconciler.NewCronJobReconciler(r),
 		Job:                 reconciler.NewJobReconciler(r),
@@ -858,6 +861,7 @@ func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Func
 				&corev1.ConfigMap{},
 				&corev1.Secret{},
 				&kruisev1b1.StatefulSet{},
+				&slurmv1alpha1.JailedConfig{},
 			},
 			Predicate: predicate.GenerationChangedPredicate{},
 		},
