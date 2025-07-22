@@ -40,6 +40,7 @@ import (
 
 const SConfigControllerName = "sconfigcontroller"
 
+// TODO rework further
 type Store interface {
 	// TODO drop after migration
 	Add(name, content, subPath string) error

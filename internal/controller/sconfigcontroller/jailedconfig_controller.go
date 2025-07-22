@@ -58,12 +58,28 @@ type JailedConfigReconciler struct {
 
 	slurmAPIClient slurmapi.Client
 	fileStore      Store
+	// TODO use this clock in file store as well
+	clock Clock
+	fs    FS
 }
 
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/finalizers,verbs=update
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=configmaps,verbs=get;list;watch
+
+// Clock is used to fake timing for testing
+type Clock interface {
+	Now() time.Time
+	Sleep(duration time.Duration)
+}
+
+type realClock struct{}
+
+var _ Clock = realClock{}
+
+func (_ realClock) Now() time.Time               { return time.Now() }
+func (_ realClock) Sleep(duration time.Duration) { time.Sleep(duration) }
 
 // mostly copy-pasted from k8s ConfigMap volumes
 // See https://github.com/kubernetes/kubernetes/blob/b266ac2c3e42c2c4843f81e20213d2b2f43e450a/pkg/volume/configmap/configmap.go/
@@ -211,7 +227,7 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	filesBatch := NewReplacedFilesBatch()
+	filesBatch := NewReplacedFilesBatch(r.fs)
 	defer func() {
 		err = errors.Join(err, filesBatch.Cleanup())
 	}()
@@ -297,6 +313,10 @@ func NewJailedConfigReconciler(
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *JailedConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.clock == nil {
+		r.clock = realClock{}
+	}
+
 	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &slurmv1alpha1.JailedConfig{}, configMapField, func(rawObj client.Object) []string {
 		jailedConfig := rawObj.(*slurmv1alpha1.JailedConfig)
 		if jailedConfig.Spec.ConfigMap == nil {
@@ -449,9 +469,9 @@ func (r *JailedConfigReconciler) reconfigureCluster(ctx context.Context) error {
 		return fmt.Errorf("reconfigure via Slurm API: %w", err)
 	}
 
-	reconfigureWaitDeadline := time.Now().Add(reconfigureWaitTimeout)
+	reconfigureWaitDeadline := r.clock.Now().Add(reconfigureWaitTimeout)
 	for {
-		if time.Now().After(reconfigureWaitDeadline) {
+		if r.clock.Now().After(reconfigureWaitDeadline) {
 			return fmt.Errorf("nodes did not restart before deadline exceeded: %s", reconfigureWaitDeadline)
 		}
 
@@ -480,7 +500,7 @@ func (r *JailedConfigReconciler) reconfigureCluster(ctx context.Context) error {
 			break
 		}
 
-		time.Sleep(1 * time.Second)
+		r.clock.Sleep(1 * time.Second)
 	}
 
 	return nil

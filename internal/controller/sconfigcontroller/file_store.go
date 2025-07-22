@@ -268,35 +268,55 @@ func (s *FileStore) Chmod(path string, mode uint32) error {
 	return nil
 }
 
-type replacedFile struct {
-	targetName string
-	tempName   string
+type FS interface {
+	// ensureDir
+	// OR
+	// os.Stat + os.IsNotExist + os.MkdirAll
+
+	// os.CreateTemp
+	// tempFile.Write
+	// tempFile.Close
+
+	// os.Remove
+
+	// os.Chmod
+
+	// renameExchange
+	// renameNoReplace
+	// errors.Is(err, os.ErrNotExist)
+
+	// time.Sleep(delayBetweenWriteAndReconfigure)
+
+	MkdirAll(path string, mode os.FileMode) error
+
+	PrepareNewFile(oldFile string, content []byte, mode os.FileMode) (tempFileName string, err error)
+
+	RenameExchange(oldPath, newPath string) error
+
+	RenameNoReplace(oldPath, newPath string) error
+
+	Remove(name string) error
+
+	SyncCaches() error
 }
 
-// ReplacedFilesBatch is used to batch files replacement together and wait for dirent caches invalidation just once
-type ReplacedFilesBatch struct {
-	pendingFiles []replacedFile
+type realFs struct{}
+
+var _ FS = &realFs{}
+
+func (r *realFs) MkdirAll(path string, mode os.FileMode) error {
+	return os.MkdirAll(path, mode)
 }
 
-func NewReplacedFilesBatch() *ReplacedFilesBatch {
-	return &ReplacedFilesBatch{}
-}
-
-func (batch *ReplacedFilesBatch) Replace(filePath string, content []byte, mode uint32) (err error) {
-	baseName := filepath.Base(filePath)
-	dirPath := filepath.Dir(filePath)
-
-	// TODO is it necessary here?
-	if err = ensureDir(dirPath); err != nil {
-		return err
-	}
+func (r *realFs) PrepareNewFile(oldFile string, content []byte, mode os.FileMode) (tempFileName string, err error) {
+	baseName := filepath.Base(oldFile)
+	dirPath := filepath.Dir(oldFile)
 
 	tempFile, err := os.CreateTemp(dirPath, baseName)
 	if err != nil {
-		err = fmt.Errorf("create temp file: %w", err)
-		return err
+		return "", fmt.Errorf("create temp file: %w", err)
 	}
-	tempFileName := tempFile.Name()
+	tempFileName = tempFile.Name()
 	deferTempFileRemove := true
 
 	defer func() {
@@ -323,7 +343,7 @@ func (batch *ReplacedFilesBatch) Replace(filePath string, content []byte, mode u
 
 	if _, err = tempFile.Write(content); err != nil {
 		err = fmt.Errorf("write temp file: %w", err)
-		return err
+		return "", err
 	}
 
 	err = tempFile.Close()
@@ -331,26 +351,95 @@ func (batch *ReplacedFilesBatch) Replace(filePath string, content []byte, mode u
 	tempFile = nil
 	if err != nil {
 		err = fmt.Errorf("close temp file: %w", err)
+		return "", err
+	}
+
+	err = os.Chmod(tempFileName, mode)
+	if err != nil {
+		err = fmt.Errorf("chmod temp file: %w", err)
+		return "", err
+	}
+
+	// Caller take control over temp file
+	deferTempFileRemove = false
+	return tempFileName, nil
+}
+
+func (r *realFs) RenameExchange(oldPath, newPath string) error {
+	return renameExchange(oldPath, newPath)
+}
+
+func (r *realFs) RenameNoReplace(oldPath, newPath string) error {
+	return renameNoReplace(oldPath, newPath)
+}
+
+func (r *realFs) Remove(name string) error {
+	return os.Remove(name)
+}
+
+func (r *realFs) SyncCaches() error {
+	// Some filesystems can keep directory entries caches for too long without invalidating
+	// This delay is expected to make these caches stale on worker VMs
+	// So when slurmd will restart, it will pick up new inodes for config files
+	// Also it should keep inodes for old files alive while caches are alive, because only directory entries are cached, not inodes themselves
+	// Deleting earlier can lead to "file not found" errors
+	time.Sleep(delayBetweenWriteAndReconfigure)
+	return nil
+}
+
+type replacedFile struct {
+	targetName string
+	tempName   string
+}
+
+// ReplacedFilesBatch is used to batch files replacement together and wait for dirent caches invalidation just once
+type ReplacedFilesBatch struct {
+	fs           FS
+	pendingFiles []replacedFile
+}
+
+func NewReplacedFilesBatch(fs FS) *ReplacedFilesBatch {
+	return &ReplacedFilesBatch{
+		fs:           fs,
+		pendingFiles: nil,
+	}
+}
+
+func (batch *ReplacedFilesBatch) Replace(filePath string, content []byte, mode uint32) (err error) {
+	dirPath := filepath.Dir(filePath)
+
+	err = batch.fs.MkdirAll(dirPath, 0o755)
+	if err != nil {
+		err = fmt.Errorf("preparing dir for file: %w", err)
 		return err
 	}
 
-	err = os.Chmod(tempFileName, os.FileMode(mode))
+	tempFileName, err := batch.fs.PrepareNewFile(filePath, content, os.FileMode(mode))
 	if err != nil {
-		err = fmt.Errorf("chmod temp file: %w", err)
+		err = fmt.Errorf("preparing new file: %w", err)
 		return err
 	}
+
+	deferTempFileRemove := true
+
+	defer func() {
+		if deferTempFileRemove {
+			// Remove left-over temp file
+			err = errors.Join(err, batch.fs.Remove(tempFileName))
+		}
+	}()
 
 	// Don't just rename in case of dirent caches
 	// In case this has to work on system without `renameat2` (or equivalent), it can be implemented with os.Link:
 	// generate random name, call os.Link, loop if error is "already exists"
 	// See os.CreateTemp implementation
-	err = renameExchange(tempFileName, filePath)
+	err = batch.fs.RenameExchange(tempFileName, filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			// We have just created tempFileName, so it's most probably about fullPath, we can just rename it
-			// Using renameNoReplace to avoid replacing file created after renameExchange but before this
-			// But at the same time there's no cached dirent, so it should be safe to just rename it and move on
-			err = renameNoReplace(tempFileName, filePath)
+			// We have just created tempFileName, so error is most probably about fullPath, we can just rename it
+			// Using RenameNoReplace to avoid replacing file created after RenameExchange but before this
+			// But at the same time there's no cached dirent for old file, so it should be safe to just rename it and move on
+			err = batch.fs.RenameNoReplace(tempFileName, filePath)
 			if err != nil {
 				// If rename failed we can just delete temp file and move on
 				err = fmt.Errorf("rename temp to target file (%s => %s): %w", tempFileName, filePath, err)
@@ -395,13 +484,13 @@ func (batch *ReplacedFilesBatch) Cleanup() error {
 
 	errs := make([]error, 0)
 	for _, file := range batch.pendingFiles {
-		err := renameNoReplace(file.tempName, file.targetName)
+		err := batch.fs.RenameNoReplace(file.tempName, file.targetName)
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
 
-		err = os.Remove(file.tempName)
+		err = batch.fs.Remove(file.tempName)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -417,13 +506,19 @@ func (batch *ReplacedFilesBatch) Cleanup() error {
 func (batch *ReplacedFilesBatch) Finish() error {
 	// renameExchange has succeeded, but caches are stale, and we can't just remove temp file
 	// without triggering errors on readers
-	time.Sleep(delayBetweenWriteAndReconfigure)
+	err := batch.fs.SyncCaches()
+	if err != nil {
+		// At this moment it's not clear if it is safe to clean up temp files or not
+		// Just assuming there's nothing to clean up
+		batch.pendingFiles = nil
+		return err
+	}
 
 	// Now caches should be invalidated, and old files are not needed
 	// Removing temp paths from FS
 	errs := make([]error, 0)
 	for _, file := range batch.pendingFiles {
-		err := os.Remove(file.tempName)
+		err := batch.fs.Remove(file.tempName)
 		if err != nil {
 			errs = append(errs, err)
 			continue
