@@ -242,7 +242,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 		var state consts.ActiveCheckSlurmJobStatus
 		switch {
-		case requeue == true:
+		case requeue:
 			state = consts.ActiveCheckSlurmJobStatusInProgress
 		case len(failReasons) == 0:
 			state = consts.ActiveCheckSlurmJobStatusComplete
@@ -271,7 +271,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			return ctrl.Result{}, fmt.Errorf("reconciling ActiveCheckJob: %w", err)
 		}
 
-		if requeue == true {
+		if requeue {
 			return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
 		}
 	} else if activeCheck.Spec.CheckType == "k8sJob" {
