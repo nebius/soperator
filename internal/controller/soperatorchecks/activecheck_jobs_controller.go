@@ -178,7 +178,10 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 		var jobName string
 		var submitTime *metav1.Time
-		failReasons := activeCheck.Status.SlurmJobsStatus.LastJobFailReasons
+		var failReasons []string
+		if activeCheck.Status.SlurmJobsStatus.LastJobId == slurmJobID {
+			failReasons = activeCheck.Status.SlurmJobsStatus.LastJobFailReasons
+		}
 		lastEndTime := activeCheck.Status.SlurmJobsStatus.LastJobEndTime
 		requeue := false
 		for _, slurmJob := range slurmJobs {
@@ -188,7 +191,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			}
 
 			// Job is not yet finished
-			if slurmJob.EndTime == nil {
+			if !slurmJob.IsTerminalState() || slurmJob.EndTime == nil {
 				requeue = true
 				continue
 			}
@@ -269,7 +272,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		}
 
 		if requeue == true {
-			return ctrl.Result{Requeue: true, RequeueAfter: 30 * time.Second}, nil
+			return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
 		}
 	} else if activeCheck.Spec.CheckType == "k8sJob" {
 		newStatus := slurmv1alpha1.ActiveCheckK8sJobsStatus{
