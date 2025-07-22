@@ -108,7 +108,7 @@ At the moment, the following information is gathered and can be viewed by users:
 - K8s node metrics: CPU, memory, network, disk usage, etc.
 - K8s pod resource metrics: resource usage by pods & containers.
 - NVIDIA GPU metrics: GPU utilization, power, temperature, etc.
-- Slurm metrics: comprehensive monitoring of nodes, jobs, and controller performance. See [SLURM Exporter](slurm-exporter.md) for detailed metrics documentation.
+- Slurm metrics: comprehensive monitoring of nodes, jobs, and controller performance. See [SLURM Exporter](slurm-exporter.md) for detailed metrics documentation and [Metrics Pipeline](metrics-pipeline.md) for the complete collection and processing architecture.
 
 
 ### Centralized Logging Scheme
@@ -161,4 +161,6 @@ The logging system automatically extracts metadata from filenames and creates th
 - `job_id`, `job_step_id`: For NCCL logs
 - `job_name`, `job_array_id`: For Slurm job logs
 - `slurm_script_name`, `slurm_script_context`: For script logs
+
+For comprehensive documentation of the complete logs collection and processing pipeline, see [Logs Pipeline](logs-pipeline.md).
 
