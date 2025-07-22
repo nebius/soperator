@@ -1,8 +1,10 @@
 package clustercontroller
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
@@ -11,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -47,7 +50,6 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					stepLogger.V(1).Info("Rendered")
 
 					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling controller security limits configmap: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
@@ -62,17 +64,45 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					desired := controller.RenderService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeController)
-					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.V(1).Info("Rendered")
+					replicas := cmp.Or(clusterValues.NodeController.StatefulSet.Replicas, 1)
+					createdServices := map[string]bool{}
 
-					var controllerNamePtr *string = nil
-					if err := r.Service.Reconcile(stepCtx, cluster, &desired, controllerNamePtr); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
-						return fmt.Errorf("reconciling controller Service: %w", err)
+					for i := int32(0); i < replicas; i++ {
+						svcName := fmt.Sprintf("%s-%d", clusterValues.NodeController.StatefulSet.Name, i)
+						desired := controller.RenderService(clusterValues.Namespace, clusterValues.Name, svcName, &clusterValues.NodeController,
+							map[string]string{
+								"statefulset.kubernetes.io/pod-name": fmt.Sprintf("controller-%d", i),
+							})
+						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+						stepLogger.V(1).Info("Rendered per-pod service", "service", svcName)
+						var controllerNamePtr *string = nil
+						if err := r.Service.Reconcile(stepCtx, cluster, &desired, controllerNamePtr); err != nil {
+							return fmt.Errorf("reconciling controller Service %s: %w", svcName, err)
+						}
+						createdServices[svcName] = true
 					}
-					stepLogger.V(1).Info("Reconciled")
 
+					svcList := &corev1.ServiceList{}
+					if err := r.List(stepCtx, svcList, client.InNamespace(clusterValues.Namespace)); err != nil {
+						return fmt.Errorf("listing services for cleanup: %w", err)
+					}
+					prefix := clusterValues.NodeController.StatefulSet.Name + "-"
+					for _, svc := range svcList.Items {
+						if svc.Namespace != clusterValues.Namespace {
+							continue
+						}
+						if !strings.HasPrefix(svc.Name, prefix) {
+							continue
+						}
+						if _, ok := createdServices[svc.Name]; !ok {
+							stepLogger.Info("Deleting excess service", "service", svc.Name)
+							if err := r.Service.Delete(stepCtx, &svc, []client.DeleteOption{}...); err != nil {
+								return fmt.Errorf("deleting excess service %s: %w", svc.Name, err)
+							}
+						}
+					}
+
+					stepLogger.V(1).Info("Reconciled per-pod services")
 					return nil
 				},
 			},
@@ -99,13 +129,11 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 
 					deps, err := r.getControllersStatefulSetDependencies(stepCtx, clusterValues)
 					if err != nil {
-						stepLogger.Error(err, "Failed to retrieve dependencies")
 						return fmt.Errorf("retrieving dependencies for controller StatefulSet: %w", err)
 					}
 					stepLogger.V(1).Info("Retrieved dependencies")
 
 					if err = r.AdvancedStatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling controller StatefulSet: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
@@ -117,7 +145,6 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 	}
 
 	if err := reconcileControllersImpl(); err != nil {
-		logger.Error(err, "Failed to reconcile Slurm Controllers")
 		return fmt.Errorf("reconciling Slurm Controllers: %w", err)
 	}
 	logger.Info("Reconciled Slurm Controllers")
@@ -130,7 +157,6 @@ func (r SlurmClusterReconciler) ValidateControllers(
 	cluster *slurmv1.SlurmCluster,
 	clusterValues *values.SlurmCluster,
 ) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
 
 	existing := &kruisev1b1.StatefulSet{}
 	err := r.Get(
@@ -145,7 +171,6 @@ func (r SlurmClusterReconciler) ValidateControllers(
 		if apierrors.IsNotFound(err) {
 			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 		}
-		logger.Error(err, "Failed to get controller StatefulSet")
 		return ctrl.Result{}, fmt.Errorf("getting controller StatefulSet: %w", err)
 	}
 
