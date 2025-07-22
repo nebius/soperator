@@ -130,6 +130,7 @@ func makePayload(mappings []corev1.KeyToPath, configMap *corev1.ConfigMap, defau
 	return payload, nil
 }
 
+// TODO check path traversals
 func validatePayloadPath(path string) error {
 	switch {
 	case !strings.HasPrefix(path, "/"):
