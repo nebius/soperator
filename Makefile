@@ -218,6 +218,7 @@ sync-version: yq ## Sync versions from file
 	@# region helm/soperator-activechecks/values.yaml
 	@echo 'Syncing helm/soperator-activechecks/values.yaml'
 	@$(YQ) -i ".images.munge = \"$(IMAGE_REPO)/munge:$(IMAGE_VERSION)\"" "helm/soperator-activechecks/values.yaml"
+	@$(YQ) -i ".images.k8sJob = \"$(IMAGE_REPO)/k8s_check_job:$(IMAGE_VERSION)\"" "helm/soperator-activechecks/values.yaml"
 	@$(YQ) -i ".images.slurmJob = \"$(IMAGE_REPO)/slurm_check_job:$(IMAGE_VERSION)\"" "helm/soperator-activechecks/values.yaml"
 	@# endregion helm/soperator-activechecks/values.yaml
 

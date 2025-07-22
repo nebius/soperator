@@ -1,0 +1,25 @@
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: ActiveCheck
+metadata:
+  name: "ssh-check"
+spec:
+  checkType: "k8sJob"
+  name: "ssh-check"
+  slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
+  suspend: true
+  runAfterCreation: true
+  k8sJobSpec:
+    jobContainer:
+      command:
+        - bash
+        - -c
+        - |
+{{ .Files.Get "scripts/ssh-check.sh" | indent 10 }}
+      image: {{ .Values.images.k8sJob | quote }}
+      env:
+        - name: NUM_OF_LOGIN_NODES
+          value: {{ .Values.sshCheck.numOfLoginNodes | quote }}
+      volumeMounts:
+{{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
+      volumes:
+{{ toYaml .Values.jobContainer.volumes | indent 8 }}
