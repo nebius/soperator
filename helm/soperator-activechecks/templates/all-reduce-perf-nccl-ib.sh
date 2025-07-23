@@ -1,0 +1,28 @@
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: ActiveCheck
+metadata:
+  name: "all-reduce-perf-nccl-ib"
+spec:
+  checkType: "slurmJob"
+  name: "all-reduce-perf-nccl-ib"
+  slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
+  schedule: "0 10 * * *" # Once a day at 10:00 UTC
+  suspend: false
+  runAfterCreation: true
+  slurmJobSpec:
+    sbatchScript: |
+{{ .Files.Get "scripts/all-reduce-perf-nccl-ib.sh" | indent 6 }}
+    eachWorkerJobArray: true
+    jobContainer:
+      image: {{ .Values.images.slurmJob | quote }}
+      env:
+{{ toYaml .Values.jobContainer.env | indent 8 }}
+      volumeMounts:
+{{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
+      volumes:
+{{ toYaml .Values.jobContainer.volumes | indent 8 }}
+    mungeContainer:
+      image: {{ .Values.images.munge | quote }}
+  reactions:
+    setCondition: true
+    drainSlurmNode: true
