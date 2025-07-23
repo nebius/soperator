@@ -57,7 +57,6 @@ type JailedConfigReconciler struct {
 	Scheme *runtime.Scheme
 
 	slurmAPIClient slurmapi.Client
-	fileStore      Store
 	// TODO use this clock in file store as well
 	clock Clock
 	fs    FS
@@ -246,7 +245,7 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		err = filesBatch.Replace(path, payload.Data, uint32(payload.Mode))
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("replacing file %q in fileStore: %w", path, err)
+			return ctrl.Result{}, fmt.Errorf("replacing file %q in FS: %w", path, err)
 		}
 	}
 
@@ -266,7 +265,7 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	err = filesBatch.Finish()
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("finishing replacing files in fileStore: %w", err)
+		return ctrl.Result{}, fmt.Errorf("finishing replacing files in FS: %w", err)
 	}
 
 	for _, action := range jailedConfig.Spec.UpdateActions {
@@ -302,13 +301,13 @@ func NewJailedConfigReconciler(
 	client client.Client,
 	scheme *runtime.Scheme,
 	slurmAPIClient slurmapi.Client,
-	fileStore Store,
+	fs FS,
 ) *JailedConfigReconciler {
 	return &JailedConfigReconciler{
 		Client:         client,
 		Scheme:         scheme,
 		slurmAPIClient: slurmAPIClient,
-		fileStore:      fileStore,
+		fs:             fs,
 	}
 }
 

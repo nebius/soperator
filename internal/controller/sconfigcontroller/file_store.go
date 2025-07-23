@@ -300,15 +300,23 @@ type FS interface {
 	SyncCaches() error
 }
 
-type realFs struct{}
-
-var _ FS = &realFs{}
-
-func (r *realFs) MkdirAll(path string, mode os.FileMode) error {
-	return os.MkdirAll(path, mode)
+type PrefixFs struct {
+	Prefix string
 }
 
-func (r *realFs) PrepareNewFile(oldFile string, content []byte, mode os.FileMode) (tempFileName string, err error) {
+var _ FS = &PrefixFs{}
+
+func (pfs *PrefixFs) addPrefix(path string) string {
+	return filepath.Join(pfs.Prefix, path)
+}
+
+func (pfs *PrefixFs) MkdirAll(path string, mode os.FileMode) error {
+	return os.MkdirAll(pfs.addPrefix(path), mode)
+}
+
+func (pfs *PrefixFs) PrepareNewFile(oldFile string, content []byte, mode os.FileMode) (tempFileName string, err error) {
+	oldFile = pfs.addPrefix(oldFile)
+
 	baseName := filepath.Base(oldFile)
 	dirPath := filepath.Dir(oldFile)
 
@@ -365,19 +373,19 @@ func (r *realFs) PrepareNewFile(oldFile string, content []byte, mode os.FileMode
 	return tempFileName, nil
 }
 
-func (r *realFs) RenameExchange(oldPath, newPath string) error {
-	return renameExchange(oldPath, newPath)
+func (pfs *PrefixFs) RenameExchange(oldPath, newPath string) error {
+	return renameExchange(pfs.addPrefix(oldPath), pfs.addPrefix(newPath))
 }
 
-func (r *realFs) RenameNoReplace(oldPath, newPath string) error {
-	return renameNoReplace(oldPath, newPath)
+func (pfs *PrefixFs) RenameNoReplace(oldPath, newPath string) error {
+	return renameNoReplace(pfs.addPrefix(oldPath), pfs.addPrefix(newPath))
 }
 
-func (r *realFs) Remove(name string) error {
-	return os.Remove(name)
+func (pfs *PrefixFs) Remove(name string) error {
+	return os.Remove(pfs.addPrefix(name))
 }
 
-func (r *realFs) SyncCaches() error {
+func (pfs *PrefixFs) SyncCaches() error {
 	// Some filesystems can keep directory entries caches for too long without invalidating
 	// This delay is expected to make these caches stale on worker VMs
 	// So when slurmd will restart, it will pick up new inodes for config files
