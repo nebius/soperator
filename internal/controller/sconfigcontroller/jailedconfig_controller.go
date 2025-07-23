@@ -228,6 +228,7 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if len(jailedConfig.Spec.Items) == 0 {
+		// TODO this return is happening, but reconciliation keeps looping
 		return ctrl.Result{}, nil
 	}
 
@@ -336,7 +337,7 @@ func (r *JailedConfigReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&slurmv1alpha1.JailedConfig{}).
+		For(&slurmv1alpha1.JailedConfig{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Watches(
 			&corev1.ConfigMap{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForConfigMap),
