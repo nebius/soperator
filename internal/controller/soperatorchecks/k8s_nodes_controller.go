@@ -296,7 +296,7 @@ func (c *K8SNodesController) processNotReadyCondition(ctx context.Context, k8sNo
 	return c.deleteK8SNode(ctx, k8sNode)
 }
 
-func (c *K8SNodesController) shouldRequeueForNotReady(k8sNode *corev1.Node) time.Duration {
+func (c *K8SNodesController) requeueDurationForNotReady(k8sNode *corev1.Node) time.Duration {
 	var readyCondition corev1.NodeCondition
 	for _, cond := range k8sNode.Status.Conditions {
 		if cond.Type == corev1.NodeReady {
