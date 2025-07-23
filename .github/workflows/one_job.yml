@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - dev
+      - soperator-release-*
     tags:
       - 'build**'  # Trigger on tags starting with "build"
     paths-ignore:
@@ -57,7 +58,15 @@ jobs:
 
       - name: Generate version file
         run: |
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+          # Check if VERSION file was changed in this push
+          VERSION_CHANGED="false"
+          if [ "${{ github.event_name }}" == "push" ]; then
+            # Get the list of changed files
+            git diff --name-only HEAD^ HEAD | grep -q "^VERSION$" && VERSION_CHANGED="true"
+          fi
+
+          # Build stable releases only on main/release branches when VERSION changes
+          if [[ ("${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" =~ "^refs/heads/soperator-release-") && "$VERSION_CHANGED" == "true" ]]; then
             make get-version UNSTABLE=false >> version.txt
             echo "false" >> version.txt
           else
