@@ -18,19 +18,20 @@ if [ -n "$SLURM_JOB_GPUS" ]; then
             health_checker
         )
 
-        GPU_COUNT=$(nvidia-smi --list-gpus 2>/dev/null | wc -l || echo 0)
-        echo "Found ${GPU_COUNT} GPUs"
-
-        # Only add hc_* checks if we have exactly 8 GPUs
-        if [[ "${GPU_COUNT}" -eq 8 ]]; then
+        gpus_on_node=$(nvidia-smi --query-gpu=name --format=csv,noheader | sort | uniq -c)
+        if [[ "${gpus_on_node}" == *"8 NVIDIA"* ]]; then
             checks+=(
                 hc_xid
-                hc_ib_link_state
                 hc_ib_counters
-                hc_ib_pkey
             )
+            if [[ "${gpus_on_node}" == *"8 NVIDIA H100"* ]] || [[ "${gpus_on_node}" == *"8 NVIDIA H200"* ]]; then
+                checks+=(
+                    hc_ib_link_state
+                    hc_ib_pkey
+                )
+            fi
         else
-            echo "Skipping hc_* checks because GPU_COUNT=${GPU_COUNT} (need 8)"
+            echo "Skipping hc_* checks because there are no 8 GPUs"
         fi
 
         pushd /opt/slurm_scripts || exit 0
