@@ -28,6 +28,7 @@ type Job struct {
 	ArrayJobID     *int32
 	ArrayTaskID    *int32
 	SubmitTime     *metav1.Time
+	EndTime        *metav1.Time
 }
 
 func JobFromAPI(apiJob api.V0041JobInfo) (Job, error) {
@@ -90,6 +91,7 @@ func JobFromAPI(apiJob api.V0041JobInfo) (Job, error) {
 	job.ArrayJobID = convertToInt(apiJob.ArrayJobId)
 	job.ArrayTaskID = convertToInt(apiJob.ArrayTaskId)
 	job.SubmitTime = convertToMetav1Time(apiJob.SubmitTime)
+	job.EndTime = convertToMetav1Time(apiJob.EndTime)
 
 	return job, nil
 }
