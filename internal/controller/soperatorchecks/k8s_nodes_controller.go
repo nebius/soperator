@@ -267,7 +267,7 @@ func (c *K8SNodesController) processNotReadyCondition(ctx context.Context, k8sNo
 		}
 	}
 
-	if readyCondition.Status == corev1.ConditionTrue {
+	if readyCondition.Status == corev1.ConditionTrue || readyCondition.Type == "" {
 		logger.Info("node is ready or condition not found, no action needed")
 		return nil
 	}
@@ -292,7 +292,7 @@ func (c *K8SNodesController) shouldRequeueForNotReady(k8sNode *corev1.Node) time
 		}
 	}
 
-	if readyCondition.Status == corev1.ConditionTrue {
+	if readyCondition.Status == corev1.ConditionTrue || readyCondition.Type == "" {
 		return 0
 	}
 
