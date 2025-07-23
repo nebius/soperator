@@ -637,10 +637,10 @@ func (c *SlurmNodesController) slurmNodesFullyDrained(
 			}
 			_, completing := node.States[api.V0041NodeStateCOMPLETING]
 			logger.Info("slurm node", "nodeStates", node.States)
-			// When prologe is running, node is in COMPLETING state and both IDLE and DRAIN states are set.
+			// When epilog is running, node is in COMPLETING state and both IDLE and DRAIN states are set.
 			// Example: State=IDLE+COMPLETING+DRAIN+DYNAMIC_NORM
 			// We consider node fully drained when it is in IDLE+DRAIN+DYNAMIC_NORM states.
-			if !node.IsIdleDrained() && !completing {
+			if !node.IsIdleDrained() || !completing {
 				logger.Info("slurm node is not fully drained", "nodeStates", node.States)
 				return false, nil
 			}
