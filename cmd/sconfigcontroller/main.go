@@ -212,7 +212,7 @@ func main() {
 		mgr.GetScheme(),
 		slurmAPIClient,
 		jailFs,
-	)).SetupWithManager(mgr); err != nil {
+	)).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "JailedConfig")
 		os.Exit(1)
 	}

@@ -42,6 +42,7 @@ import (
 	v0041 "github.com/SlinkyProject/slurm-client/api/v0041"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
 
@@ -315,7 +316,7 @@ func NewJailedConfigReconciler(
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *JailedConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *JailedConfigReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency int, cacheSyncTimeout time.Duration) error {
 	if r.clock == nil {
 		r.clock = realClock{}
 	}
@@ -341,6 +342,7 @@ func (r *JailedConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		Named("jailedconfig").
+		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
 		Complete(r)
 }
 
