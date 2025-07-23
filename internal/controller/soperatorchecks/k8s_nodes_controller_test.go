@@ -153,7 +153,7 @@ func TestK8SNodesController_processNotReadyCondition(t *testing.T) {
 	}
 }
 
-func TestK8SNodesController_shouldRequeueForNotReady(t *testing.T) {
+func TestK8SNodesController_requeueDurationForNotReady(t *testing.T) {
 	tests := []struct {
 		name              string
 		node              *corev1.Node
@@ -226,7 +226,7 @@ func TestK8SNodesController_shouldRequeueForNotReady(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			duration := controller.shouldRequeueForNotReady(tt.node)
+			duration := controller.requeueDurationForNotReady(tt.node)
 
 			if tt.expectRequeue {
 				assert.Greater(t, duration, time.Duration(0), "Should return positive duration for requeue")

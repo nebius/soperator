@@ -129,7 +129,7 @@ func (c *K8SNodesController) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{}, fmt.Errorf("process NotReady condition: %w", err)
 		}
 
-		if requeueAfter := c.shouldRequeueForNotReady(k8sNode); requeueAfter > 0 {
+		if requeueAfter := c.requeueDurationForNotReady(k8sNode); requeueAfter > 0 {
 			logger.Info("requeuing reconciliation for NotReady node", "requeueAfter", requeueAfter)
 			return ctrl.Result{RequeueAfter: requeueAfter}, nil
 		}
