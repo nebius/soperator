@@ -321,6 +321,7 @@ func (r *JailedConfigReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 		r.clock = realClock{}
 	}
 
+	// TODO fix this to work with object reference
 	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &slurmv1alpha1.JailedConfig{}, configMapField, func(rawObj client.Object) []string {
 		jailedConfig := rawObj.(*slurmv1alpha1.JailedConfig)
 		if jailedConfig.Spec.ConfigMap == nil {
@@ -347,8 +348,11 @@ func (r *JailedConfigReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 }
 
 func (r *JailedConfigReconciler) findObjectsForConfigMap(ctx context.Context, configMapObject client.Object) []reconcile.Request {
+	// TODO filter incoming configmap by namespace from CLI
+
 	jailedConfigs := &slurmv1alpha1.JailedConfigList{}
 	listOps := &client.ListOptions{
+		// TODO fix this to work with object reference
 		FieldSelector: fields.OneTermEqualSelector(configMapField, configMapObject.GetName()),
 		Namespace:     configMapObject.GetNamespace(),
 	}
