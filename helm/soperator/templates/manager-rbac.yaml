@@ -148,6 +148,7 @@ rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
+  - jailedconfigs
   - nodeconfigurators
   - nodesets
   - slurmclusters
@@ -162,6 +163,7 @@ rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
+  - jailedconfigs/finalizers
   - nodeconfigurators/finalizers
   - nodesets/finalizers
   - slurmclusters/finalizers
@@ -170,6 +172,7 @@ rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
+  - jailedconfigs/status
   - nodeconfigurators/status
   - nodesets/status
   - slurmclusters/status
