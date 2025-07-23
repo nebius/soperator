@@ -18,6 +18,7 @@ package sconfigcontroller
 
 import (
 	"context"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -25,6 +26,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
 )
 
 // JailedConfigReconciler reconciles a JailedConfig object
@@ -55,9 +57,10 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *JailedConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *JailedConfigReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency int, cacheSyncTimeout time.Duration) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&slurmv1alpha1.JailedConfig{}).
 		Named("jailedconfig").
+		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
 		Complete(r)
 }
