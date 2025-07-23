@@ -86,6 +86,50 @@ jobs:
           echo "Version: $VERSION"
           echo "Unstable: $UNSTABLE"
 
+  lint:
+    runs-on: self-hosted
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@6c439dc8bdf85cadbbce9ed30d1c7b959517bc49 # v2.12.2
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install GO
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: 'go.mod'
+          cache: false
+
+      # These steps are not a matrix to avoid allocating 3 jobs on runners for something this small
+      - name: golangci-lint on linux/amd64
+        uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
+        with:
+          version: v2.0.2 # version of golangci-lint, should be in sync with Makefile.
+        env:
+          GOEXPERIMENT: synctest
+          GOARCH: amd64
+          GOOS: linux
+      - name: golangci-lint on linux/arm64
+        uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
+        with:
+          version: v2.0.2 # version of golangci-lint, should be in sync with Makefile.
+        env:
+          GOEXPERIMENT: synctest
+          GOARCH: arm64
+          GOOS: linux
+      - name: golangci-lint on darwin/arm64
+        uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
+        with:
+          version: v2.0.2 # version of golangci-lint, should be in sync with Makefile.
+        env:
+          GOEXPERIMENT: synctest
+          GOARCH: arm64
+          GOOS: darwin
+
   build:
     runs-on: ${{ matrix.runner }}
     needs: pre-build
@@ -112,13 +156,6 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: false
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
-        with:
-          version: v2.0.2 # version of golangci-lint, should be in sync with Makefile.
-        env:
-          GOEXPERIMENT: synctest
 
       - name: Download version artifact
         uses: actions/download-artifact@v4
