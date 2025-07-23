@@ -290,26 +290,7 @@ func (r *WorkerTopologyReconciler) ParseNodeTopologyLabels(data map[string]strin
 }
 
 func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, namespace string, config string) error {
-	configMap := &corev1.ConfigMap{
-		TypeMeta: ctrl.TypeMeta{
-			APIVersion: corev1.SchemeGroupVersion.Version,
-			Kind:       "ConfigMap",
-		},
-		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.ConfigMapNameTopologyConfig,
-			Namespace: namespace,
-			Labels: map[string]string{
-				consts.LabelSConfigControllerSourceKey: consts.LabelSConfigControllerSourceValue,
-			},
-			Annotations: map[string]string{
-				consts.AnnotationSConfigControllerSourceKey: consts.DefaultSConfigControllerSourcePath,
-			},
-		},
-		Data: map[string]string{
-			"topology.conf": config,
-		},
-	}
-
+	configMap := r.renderTopologyConfigMap(namespace, config)
 	return r.Client.Patch(ctx, configMap, client.Apply,
 		client.ForceOwnership, client.FieldOwner(WorkerTopologyReconcilerName))
 }
