@@ -104,6 +104,8 @@ func main() {
 		logFormat              string
 		logLevel               string
 		enabledNodeReplacement bool
+		deleteNotReadyNodes    bool
+		notReadyTimeout        time.Duration
 
 		reconcileTimeout time.Duration
 		maxConcurrency   int
@@ -133,6 +135,8 @@ func main() {
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 5*time.Minute, "The maximum duration allowed for caching sync")
 	flag.BoolVar(&enabledNodeReplacement, "enable-node-replacement", true, "Enable node replacement controller")
+	flag.DurationVar(&notReadyTimeout, "not-ready-timeout", 15*time.Minute, "The timeout after which a NotReady node will be deleted. Nodes can be NotReady for more than 10 minutes when GPU operator is starting.")
+	flag.BoolVar(&deleteNotReadyNodes, "delete-not-ready-nodes", true, "If set, NotReady nodes will be deleted after the not-ready timeout is reached. If false, they will be marked as NotReady but not deleted.")
 	flag.Parse()
 
 	opts := getZapOpts(logFormat, logLevel)
@@ -227,6 +231,8 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		mgr.GetEventRecorderFor(soperatorchecks.K8SNodesControllerName),
+		notReadyTimeout,
+		deleteNotReadyNodes,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create k8s nodes controller", "controller", soperatorchecks.K8SNodesControllerName)
 		os.Exit(1)

@@ -28,17 +28,27 @@ var (
 
 type K8SNodesController struct {
 	*reconciler.Reconciler
+	// NotReadyTimeout is the duration after which a NotReady node will be deleted.
+	// Nodes can be NotReady for more than 10 minutes when GPU operator is starting on the node.
+	NotReadyTimeout time.Duration
+	// DeleteNotReadyNodes indicates whether NotReady nodes should be deleted after the NotReady timeout is reached.
+	// If false, they will be marked as NotReady but not deleted.
+	DeleteNotReadyNodes bool
 }
 
 func NewK8SNodesController(
 	client client.Client,
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
+	notReadyTimeout time.Duration,
+	deleteNotReadyNodes bool,
 ) *K8SNodesController {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
 	return &K8SNodesController{
-		Reconciler: r,
+		Reconciler:          r,
+		NotReadyTimeout:     notReadyTimeout,
+		DeleteNotReadyNodes: deleteNotReadyNodes,
 	}
 }
 
@@ -114,13 +124,15 @@ func (c *K8SNodesController) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, fmt.Errorf("process reboot condition: %w", err)
 	}
 
-	if err := c.processNotReadyCondition(ctx, k8sNode); err != nil {
-		return ctrl.Result{}, fmt.Errorf("process NotReady condition: %w", err)
-	}
+	if c.DeleteNotReadyNodes {
+		if err := c.processNotReadyCondition(ctx, k8sNode); err != nil {
+			return ctrl.Result{}, fmt.Errorf("process NotReady condition: %w", err)
+		}
 
-	if requeueAfter := c.shouldRequeueForNotReady(k8sNode); requeueAfter > 0 {
-		logger.Info("requeuing reconciliation for NotReady node", "requeueAfter", requeueAfter)
-		return ctrl.Result{RequeueAfter: requeueAfter}, nil
+		if requeueAfter := c.shouldRequeueForNotReady(k8sNode); requeueAfter > 0 {
+			logger.Info("requeuing reconciliation for NotReady node", "requeueAfter", requeueAfter)
+			return ctrl.Result{RequeueAfter: requeueAfter}, nil
+		}
 	}
 
 	return ctrl.Result{}, nil
@@ -273,11 +285,12 @@ func (c *K8SNodesController) processNotReadyCondition(ctx context.Context, k8sNo
 	}
 
 	notReadyDuration := time.Since(readyCondition.LastTransitionTime.Time)
-	if notReadyDuration < 5*time.Minute {
+	if notReadyDuration < c.NotReadyTimeout {
 		return nil
 	}
 
-	logger.Info("node is NotReady for more than 5 minutes, deleting node and undrain slurm node", "duration", notReadyDuration)
+	logger.Info("node is NotReady for more than configured timeout",
+		"duration", notReadyDuration, "timeout", c.NotReadyTimeout)
 
 	logger.Info("deleting k8s node due to NotReady status")
 	return c.deleteK8SNode(ctx, k8sNode)
@@ -297,8 +310,8 @@ func (c *K8SNodesController) shouldRequeueForNotReady(k8sNode *corev1.Node) time
 	}
 
 	notReadyDuration := time.Since(readyCondition.LastTransitionTime.Time)
-	if notReadyDuration < 5*time.Minute {
-		return 5*time.Minute - notReadyDuration + 30*time.Second
+	if notReadyDuration < c.NotReadyTimeout {
+		return c.NotReadyTimeout - notReadyDuration + 30*time.Second
 	}
 
 	return 0

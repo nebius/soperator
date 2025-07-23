@@ -60,7 +60,7 @@ func TestK8SNodesController_processNotReadyCondition(t *testing.T) {
 			expectDeletion: false,
 		},
 		{
-			name: "node not ready less than 5 minutes - no action",
+			name: "node not ready less than 15 minutes - no action",
 			node: &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-node",
@@ -70,7 +70,7 @@ func TestK8SNodesController_processNotReadyCondition(t *testing.T) {
 						{
 							Type:               corev1.NodeReady,
 							Status:             corev1.ConditionFalse,
-							LastTransitionTime: metav1.Time{Time: time.Now().Add(-2 * time.Minute)},
+							LastTransitionTime: metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
 						},
 					},
 				},
@@ -79,7 +79,7 @@ func TestK8SNodesController_processNotReadyCondition(t *testing.T) {
 			expectDeletion: false,
 		},
 		{
-			name: "node not ready more than 5 minutes - delete node",
+			name: "node not ready more than 15 minutes - delete node",
 			node: &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-node",
@@ -89,7 +89,7 @@ func TestK8SNodesController_processNotReadyCondition(t *testing.T) {
 						{
 							Type:               corev1.NodeReady,
 							Status:             corev1.ConditionFalse,
-							LastTransitionTime: metav1.Time{Time: time.Now().Add(-6 * time.Minute)},
+							LastTransitionTime: metav1.Time{Time: time.Now().Add(-16 * time.Minute)},
 						},
 					},
 				},
@@ -98,7 +98,7 @@ func TestK8SNodesController_processNotReadyCondition(t *testing.T) {
 			expectDeletion: true,
 		},
 		{
-			name: "node not ready more than 5 minutes with drain condition - undrain and delete",
+			name: "node not ready more than 15 minutes with drain condition - undrain and delete",
 			node: &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-node",
@@ -108,7 +108,7 @@ func TestK8SNodesController_processNotReadyCondition(t *testing.T) {
 						{
 							Type:               corev1.NodeReady,
 							Status:             corev1.ConditionFalse,
-							LastTransitionTime: metav1.Time{Time: time.Now().Add(-6 * time.Minute)},
+							LastTransitionTime: metav1.Time{Time: time.Now().Add(-16 * time.Minute)},
 						},
 						{
 							Type:   consts.SlurmNodeDrain,
@@ -130,7 +130,7 @@ func TestK8SNodesController_processNotReadyCondition(t *testing.T) {
 				Build()
 
 			recorder := record.NewFakeRecorder(10)
-			controller := NewK8SNodesController(client, scheme, recorder)
+			controller := NewK8SNodesController(client, scheme, recorder, 15*time.Minute, true)
 
 			ctx := context.Background()
 			err := controller.processNotReadyCondition(ctx, tt.node)
@@ -185,7 +185,7 @@ func TestK8SNodesController_shouldRequeueForNotReady(t *testing.T) {
 			expectRequeue: false,
 		},
 		{
-			name: "node not ready for 1 minute - requeue in ~4 minutes",
+			name: "node not ready for 1 minute - requeue in ~14 minutes",
 			node: &corev1.Node{
 				Status: corev1.NodeStatus{
 					Conditions: []corev1.NodeCondition{
@@ -198,18 +198,18 @@ func TestK8SNodesController_shouldRequeueForNotReady(t *testing.T) {
 				},
 			},
 			expectRequeue:     true,
-			expectMinDuration: 4*time.Minute + 20*time.Second, // ~4 minutes + buffer - some tolerance
-			expectMaxDuration: 4*time.Minute + 40*time.Second, // ~4 minutes + buffer + some tolerance
+			expectMinDuration: 14*time.Minute + 20*time.Second, // ~14 minutes + buffer - some tolerance
+			expectMaxDuration: 14*time.Minute + 40*time.Second, // ~14 minutes + buffer + some tolerance
 		},
 		{
-			name: "node not ready for 6 minutes - no requeue",
+			name: "node not ready for 16 minutes - no requeue",
 			node: &corev1.Node{
 				Status: corev1.NodeStatus{
 					Conditions: []corev1.NodeCondition{
 						{
 							Type:               corev1.NodeReady,
 							Status:             corev1.ConditionFalse,
-							LastTransitionTime: metav1.Time{Time: time.Now().Add(-6 * time.Minute)},
+							LastTransitionTime: metav1.Time{Time: time.Now().Add(-16 * time.Minute)},
 						},
 					},
 				},
@@ -222,7 +222,7 @@ func TestK8SNodesController_shouldRequeueForNotReady(t *testing.T) {
 	require.NoError(t, corev1.AddToScheme(scheme))
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
-	controller := NewK8SNodesController(client, scheme, recorder)
+	controller := NewK8SNodesController(client, scheme, recorder, 15*time.Minute, true)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -290,7 +290,7 @@ func TestK8SNodesController_Reconcile_NotReadyFlow(t *testing.T) {
 			expectNodeDeletion: false,
 		},
 		{
-			name: "not ready for 6 minutes - delete node, no requeue",
+			name: "not ready for 16 minutes - delete node, no requeue",
 			node: &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-node",
@@ -300,7 +300,7 @@ func TestK8SNodesController_Reconcile_NotReadyFlow(t *testing.T) {
 						{
 							Type:               corev1.NodeReady,
 							Status:             corev1.ConditionFalse,
-							LastTransitionTime: metav1.Time{Time: time.Now().Add(-6 * time.Minute)},
+							LastTransitionTime: metav1.Time{Time: time.Now().Add(-16 * time.Minute)},
 						},
 					},
 				},
@@ -319,7 +319,7 @@ func TestK8SNodesController_Reconcile_NotReadyFlow(t *testing.T) {
 				Build()
 
 			recorder := record.NewFakeRecorder(10)
-			controller := NewK8SNodesController(client, scheme, recorder)
+			controller := NewK8SNodesController(client, scheme, recorder, 15*time.Minute, true)
 
 			ctx := context.Background()
 			req := ctrl.Request{
