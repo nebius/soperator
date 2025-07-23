@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
+	"path/filepath"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -129,14 +129,17 @@ func makePayload(mappings []corev1.KeyToPath, configMap *corev1.ConfigMap, defau
 	return payload, nil
 }
 
-// TODO check path traversals
 func validatePayloadPath(path string) error {
-	switch {
-	case !strings.HasPrefix(path, "/"):
+	if !filepath.IsAbs(path) {
 		return fmt.Errorf("invalid path %q: must be absolute", path)
-	default:
-		return nil
 	}
+	parts := filepath.SplitList(path)
+	for _, part := range parts {
+		if part == "." || part == ".." {
+			return fmt.Errorf("invalid path %q: must not contain path traversal", path)
+		}
+	}
+	return nil
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to

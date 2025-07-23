@@ -307,6 +307,12 @@ type PrefixFs struct {
 var _ FS = &PrefixFs{}
 
 func (pfs *PrefixFs) addPrefix(path string) string {
+	// Treat relative path as relative-to-root
+	if !filepath.IsAbs(path) {
+		path = filepath.Join("/", path)
+	}
+	// Clean for absolute paths should remove all of `.` and `..` sections, should be safe to join w.r.t path traversing
+	path = filepath.Clean(path)
 	return filepath.Join(pfs.Prefix, path)
 }
 
