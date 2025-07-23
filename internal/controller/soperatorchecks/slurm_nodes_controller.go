@@ -640,7 +640,7 @@ func (c *SlurmNodesController) slurmNodesFullyDrained(
 			// When epilog is running, node is in COMPLETING state and both IDLE and DRAIN states are set.
 			// Example: State=IDLE+COMPLETING+DRAIN+DYNAMIC_NORM
 			// We consider node fully drained when it is in IDLE+DRAIN+DYNAMIC_NORM states.
-			if !node.IsIdleDrained() || !isCompleting {
+			if !node.IsIdleDrained() || isCompleting {
 				logger.Info("slurm node is not fully drained", "nodeStates", node.States)
 				return false, nil
 			}
