@@ -29,7 +29,7 @@ const (
 
 	ReasonSlurmNodeDegraded ReasonConditionType = "SlurmNodeDegraded"
 
-	ReasonNodeNoteReady ReasonConditionType = "NodeNotReady"
+	ReasonNodeNotReady ReasonConditionType = "NodeNotReady"
 )
 
 const (
