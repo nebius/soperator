@@ -165,6 +165,8 @@ type ActiveCheckSlurmJobsStatus struct {
 	LastJobFailReasons []string `json:"lastJobFailReasons"`
 	// +kubebuilder:validation:Optional
 	LastJobSubmitTime *metav1.Time `json:"lastJobSubmitTime"`
+	// +kubebuilder:validation:Optional
+	LastJobEndTime *metav1.Time `json:"lastJobEndTime"`
 }
 
 // ActiveCheckStatus defines the observed state of ActiveCheck.
