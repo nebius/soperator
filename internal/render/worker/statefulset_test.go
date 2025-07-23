@@ -52,6 +52,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 			},
 		},
 	}
+	controllerPort := int32(6817)
 
 	createWorker := func() *values.SlurmWorker {
 		return &values.SlurmWorker{
@@ -129,7 +130,9 @@ func Test_RenderStatefulSet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := worker.RenderStatefulSet(testNamespace, testCluster, tt.clusterType, nodeFilter, tt.secrets, volumeSource, tt.worker, testTopologyConfig, nil)
+			result, err := worker.RenderStatefulSet(
+				testNamespace, testCluster, tt.clusterType, nodeFilter, tt.secrets, volumeSource, tt.worker, testTopologyConfig, nil, controllerPort,
+			)
 			assert.NoError(t, err)
 
 			assert.Equal(t, consts.ContainerNameSlurmd, result.Spec.Template.Spec.Containers[0].Name)
@@ -166,7 +169,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 }
 
 func Test_RenderContainerWaitForController(t *testing.T) {
-	testCluster := "test-cluster"
+	controllerPort := int32(6817)
 	container := &values.Container{
 		NodeContainer: slurmv1.NodeContainer{
 			Image:           "test-image",
@@ -174,15 +177,17 @@ func Test_RenderContainerWaitForController(t *testing.T) {
 		},
 	}
 
-	result := worker.RenderContainerWaitForController(container, testCluster)
+	result := worker.RenderContainerWaitForController(container, controllerPort)
 
 	assert.Equal(t, consts.ContainerNameWaitForController, result.Name)
 	assert.Equal(t, container.Image, result.Image)
 	assert.Equal(t, container.ImagePullPolicy, result.ImagePullPolicy)
 	assert.Equal(t, []string{"/opt/bin/slurm/wait-for-controller.sh"}, result.Command)
-	assert.Equal(t, 1, len(result.Env))
+	assert.Equal(t, 2, len(result.Env))
 	assert.Equal(t, "CONTROLLER_SERVICE", result.Env[0].Name)
-	assert.Contains(t, result.Env[0].Value, "controller")
+	assert.Equal(t, "controller-0", result.Env[0].Value)
+	assert.Equal(t, "CONTROLLER_PORT", result.Env[1].Name)
+	assert.Equal(t, "6817", result.Env[1].Value)
 	assert.Equal(t, 2, len(result.VolumeMounts))
 
 	// Verify exact volume mount values and no unexpected mounts

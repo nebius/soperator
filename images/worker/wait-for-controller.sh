@@ -2,6 +2,7 @@
 
 echo "Waiting for Slurm controller to be ready..."
 controller_service="${CONTROLLER_SERVICE}"
+controller_port="${CONTROLLER_PORT:-6817}"  # Default to 6817 if not set
 max_attempts=60
 attempt=0
 
@@ -13,17 +14,17 @@ rm -rf /etc/slurm && ln -s /mnt/jail/etc/slurm /etc/slurm
 echo "Checking controller service DNS resolution..."
 attempt=0
 while [ $attempt -lt $max_attempts ]; do
-	if nslookup "$controller_service" >/dev/null 2>&1; then
-		echo "Controller service is resolvable via DNS"
+	if timeout 1 bash -c "</dev/tcp/$controller_service/$controller_port" >/dev/null 2>&1; then
+		echo "Controller service is reachable on port $controller_port"
 		break
 	fi
-	echo "Attempt $((attempt + 1))/$max_attempts: Waiting for controller service DNS..."
+	echo "Attempt $((attempt + 1))/$max_attempts: Waiting for controller service TCP port $controller_port..."
 	attempt=$((attempt + 1))
 	sleep 5
 done
 
-if ! nslookup "$controller_service" >/dev/null 2>&1; then
-	echo "ERROR: Controller service DNS not resolvable after $max_attempts attempts"
+if ! timeout 1 bash -c "</dev/tcp/$controller_service/$controller_port" >/dev/null 2>&1; then
+	echo "ERROR: Controller service TCP port $controller_port not reachable after $max_attempts attempts"
 	exit 1
 fi
 
