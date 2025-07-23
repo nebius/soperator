@@ -292,7 +292,7 @@ func (c *K8SNodesController) shouldRequeueForNotReady(k8sNode *corev1.Node) time
 		}
 	}
 
-	if readyCondition.Status == corev1.ConditionTrue || readyCondition.Type == "" {
+	if readyCondition.Status == corev1.ConditionTrue {
 		return 0
 	}
 
