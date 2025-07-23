@@ -88,10 +88,13 @@ slurm_node_fails_total{node_name="worker-2",state_base="DOWN",state_is_drain="tr
 - `standard_output`: Path to stdout file
 - `array_job_id`: Array job ID (if applicable)
 - `array_task_id`: Array task ID (if applicable)
+- `submit_time`: When the job was submitted (Unix timestamp seconds, empty if not available)
+- `start_time`: When the job started execution (Unix timestamp seconds, empty if not available)
+- `end_time`: When the job completed (Unix timestamp seconds, empty if not available)
 
 **Example:**
 ```prometheus
-slurm_job_info{job_id="12345",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",job_name="training_job",user_name="researcher",user_id="1000",standard_error="/home/researcher/job.err",standard_output="/home/researcher/job.out",array_job_id="",array_task_id=""} 1
+slurm_job_info{job_id="12345",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",job_name="training_job",user_name="researcher",user_id="1000",standard_error="/home/researcher/job.err",standard_output="/home/researcher/job.out",array_job_id="",array_task_id="",submit_time="1722697200",start_time="1722697230",end_time=""} 1
 ```
 
 #### Gauge `slurm_node_job`
