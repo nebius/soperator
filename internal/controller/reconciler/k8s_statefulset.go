@@ -3,6 +3,7 @@ package reconciler
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -47,11 +48,26 @@ func (r *StatefulSetReconciler) patch(existing, desired client.Object) (client.P
 	patchImpl := func(dst, src *appsv1.StatefulSet) client.Patch {
 		res := client.MergeFrom(dst.DeepCopy())
 
+		if dst.Labels == nil {
+			dst.Labels = make(map[string]string)
+		}
+		maps.Copy(dst.Labels, src.Labels)
+
+		if len(src.Annotations) > 0 {
+			if dst.Annotations == nil {
+				dst.Annotations = make(map[string]string)
+			}
+			maps.Copy(dst.Annotations, src.Annotations)
+		}
+
 		dst.Spec.Template.ObjectMeta.Labels = src.Spec.Template.ObjectMeta.Labels
 		// Copy annotations from the desired StatefulSet to the existing StatefulSet
 		// This is necessary because after the StatefulSet is created, patches recreate map of annotations and StatefulSet loses its annotations
-		for k, v := range src.Spec.Template.ObjectMeta.Annotations {
-			dst.Spec.Template.ObjectMeta.Annotations[k] = v
+		if len(src.Spec.Template.ObjectMeta.Annotations) > 0 {
+			if dst.Spec.Template.ObjectMeta.Annotations == nil {
+				dst.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
+			}
+			maps.Copy(dst.Spec.Template.ObjectMeta.Annotations, src.Spec.Template.ObjectMeta.Annotations)
 		}
 		dst.Spec.Replicas = src.Spec.Replicas
 		dst.Spec.UpdateStrategy = src.Spec.UpdateStrategy
