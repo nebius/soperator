@@ -87,7 +87,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	topologyLabelsConfigMap, err := r.handleTopologyConfigMapFunctional(ctx, req, slurmCluster, logger)
 	if err != nil {
-		logger.Error(err, "Warnming: cannot handle topology ConfigMap")
+		logger.Error(err, "Warning: cannot handle topology ConfigMap")
 		return DefaultRequeueResult, nil
 	}
 
