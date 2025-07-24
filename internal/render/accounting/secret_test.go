@@ -9,18 +9,22 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/accounting"
-	"nebius.ai/slurm-operator/internal/render/common"
 )
 
 func Test_RenderSecret(t *testing.T) {
-
 	secret, err := accounting.RenderSecret(defaultNamespace, defaultNameCluster, acc, defaultSecret, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, secret)
 	assert.Equal(t, naming.BuildSecretSlurmdbdConfigsName(defaultNameCluster), secret.Name)
 	assert.Equal(t, defaultNamespace, secret.Namespace)
-	assert.Equal(t, common.RenderLabels(consts.ComponentTypeAccounting, defaultNameCluster), secret.Labels)
-
+	assert.Equal(t, consts.ComponentTypeAccounting.String(), secret.Labels[consts.LabelComponentKey])
+	assert.Equal(t, defaultNameCluster, secret.Labels[consts.LabelInstanceKey])
+	assert.Equal(t, consts.LabelNameValue, secret.Labels[consts.LabelNameKey])
+	assert.Equal(t, consts.LabelPartOfValue, secret.Labels[consts.LabelPartOfKey])
+	assert.Equal(t, consts.LabelManagedByValue, secret.Labels[consts.LabelManagedByKey])
+	assert.Equal(t, consts.LabelSConfigControllerSourceValue, secret.Labels[consts.LabelSConfigControllerSourceKey])
+	assert.Equal(t, consts.DefaultSConfigControllerSourcePath, secret.Annotations[consts.AnnotationSConfigControllerSourceKey])
+	// Check that secret data contains the expected key
 	_, ok := secret.Data[consts.ConfigMapKeySlurmdbdConfig]
 	assert.True(t, ok)
 }

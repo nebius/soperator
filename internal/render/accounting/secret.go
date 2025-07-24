@@ -57,14 +57,16 @@ func RenderSecret(
 		),
 	}
 
+	annotains := map[string]string{
+		consts.AnnotationSConfigControllerSourceKey: consts.DefaultSConfigControllerSourcePath,
+	}
+
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: namespace,
-			Labels:    labels,
-			Annotations: map[string]string{
-				consts.AnnotationSConfigControllerSourceKey: consts.DefaultSConfigControllerSourcePath,
-			},
+			Name:        secretName,
+			Namespace:   namespace,
+			Labels:      labels,
+			Annotations: annotains,
 		},
 		Data: data,
 	}, nil
