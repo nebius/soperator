@@ -24,6 +24,11 @@ type Fs interface {
 	SyncCaches() error
 }
 
+const (
+	direntCacheTTL                  = 15 * time.Second
+	delayBetweenWriteAndReconfigure = direntCacheTTL + 1*time.Second
+)
+
 type PrefixFs struct {
 	Prefix string
 }

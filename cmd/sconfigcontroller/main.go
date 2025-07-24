@@ -189,19 +189,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	fileStore := sconfigcontroller.NewFileStore(configsPath)
-
-	if err = sconfigcontroller.NewController(
-		mgr.GetClient(),
-		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(sconfigcontroller.SConfigControllerName),
-		slurmAPIClient,
-		fileStore,
-	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", sconfigcontroller.SConfigControllerName)
-		os.Exit(1)
-	}
-
 	jailFs := &sconfigcontroller.PrefixFs{
 		Prefix: jailPath,
 	}
