@@ -50,6 +50,7 @@ func RenderSecret(
 	}
 	secretName := naming.BuildSecretSlurmdbdConfigsName(clusterName)
 	labels := common.RenderLabels(consts.ComponentTypeAccounting, clusterName)
+	labels[consts.LabelSConfigControllerSourceKey] = consts.LabelSConfigControllerSourceValue
 	data := map[string][]byte{
 		consts.ConfigMapKeySlurmdbdConfig: []byte(generateSlurdbdConfig(
 			clusterName, accounting, passwordName, isRESTenabled).Render(),
@@ -61,6 +62,9 @@ func RenderSecret(
 			Name:      secretName,
 			Namespace: namespace,
 			Labels:    labels,
+			Annotations: map[string]string{
+				consts.AnnotationSConfigControllerSourceKey: consts.DefaultSConfigControllerSourcePath,
+			},
 		},
 		Data: data,
 	}, nil
