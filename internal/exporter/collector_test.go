@@ -12,6 +12,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -45,7 +46,7 @@ func TestMetricsCollector_Describe(t *testing.T) {
 
 	// Base metrics
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,instance_id,state_base,state_is_drain,state_is_maintenance,state_is_reserved,address}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_job_info", help: "Slurm job detail information", constLabels: {}, variableLabels: {job_id,job_state,job_state_reason,slurm_partition,job_name,user_name,user_id,standard_error,standard_output,array_job_id,array_task_id}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_job_info", help: "Slurm job detail information", constLabels: {}, variableLabels: {job_id,job_state,job_state_reason,slurm_partition,job_name,user_name,user_id,standard_error,standard_output,array_job_id,array_task_id,submit_time,start_time,end_time}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_job", help: "Slurm job node information", constLabels: {}, variableLabels: {job_id,node_name}}`)
 
 	// RPC metrics
@@ -101,6 +102,11 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 
 		arrayTaskID := int32(42)
 		userID := int32(1000)
+
+		// Define timestamps for the test job
+		submitTime := metav1.NewTime(time.Unix(1722697200, 0)) // 2024-08-03 10:00:00 UTC
+		startTime := metav1.NewTime(time.Unix(1722697230, 0))  // 2024-08-03 10:00:30 UTC
+
 		// Mock successful ListJobs response
 		testJobs := []slurmapi.Job{
 			{
@@ -116,6 +122,9 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 				Nodes:          "node-[1,2]",
 				ArrayJobID:     nil,
 				ArrayTaskID:    &arrayTaskID,
+				SubmitTime:     &submitTime,
+				StartTime:      &startTime,
+				EndTime:        nil, // Job is still running
 			},
 		}
 		mockClient.EXPECT().ListJobs(mock.Anything).Return(testJobs, nil)
@@ -144,7 +153,7 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 			`GAUGE; slurm_node_info{address="10.0.0.2",instance_id="instance-2",node_name="node-2",state_base="IDLE",state_is_drain="true",state_is_maintenance="false",state_is_reserved="false"} 1`,
 			`COUNTER; slurm_node_gpu_seconds_total{node_name="node-1",state_base="ALLOCATED",state_is_drain="false",state_is_maintenance="false",state_is_reserved="false"} 20`,
 			`COUNTER; slurm_node_gpu_seconds_total{node_name="node-2",state_base="IDLE",state_is_drain="true",state_is_maintenance="false",state_is_reserved="false"} 10`,
-			`GAUGE; slurm_job_info{array_job_id="",array_task_id="42",job_id="12345",job_name="test_job",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr",standard_output="/path/to/stdout",user_id="1000",user_name="testuser"} 1`,
+			`GAUGE; slurm_job_info{array_job_id="",array_task_id="42",end_time="",job_id="12345",job_name="test_job",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr",standard_output="/path/to/stdout",start_time="1722697230",submit_time="1722697200",user_id="1000",user_name="testuser"} 1`,
 			`GAUGE; slurm_node_job{job_id="12345",node_name="node-1"} 1`,
 			`GAUGE; slurm_node_job{job_id="12345",node_name="node-2"} 1`,
 			`GAUGE; slurm_controller_server_thread_count 1`,
