@@ -232,22 +232,24 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	filesBatch := NewReplacedFilesBatch(r.fs)
-	defer func() {
-		err = errors.Join(err, filesBatch.Cleanup())
-	}()
-
 	jailPayload, err := makePayload(jailedConfig.Spec.Items, configMap, jailedConfig.Spec.DefaultMode)
 	if err != nil {
 		// Error preparing payload - requeue the request.
 		return ctrl.Result{}, fmt.Errorf("making JailedConfig payload: %w", err)
 	}
 
-	for path, payload := range jailPayload {
+	for path := range jailPayload {
 		if err := validatePayloadPath(path); err != nil {
 			return ctrl.Result{}, fmt.Errorf("invalid path %q in ConfigMap annotations: %w", path, err)
 		}
+	}
 
+	filesBatch := NewReplacedFilesBatch(r.fs)
+	defer func() {
+		err = errors.Join(err, filesBatch.Cleanup())
+	}()
+
+	for path, payload := range jailPayload {
 		err = filesBatch.Replace(path, payload.Data, uint32(payload.Mode))
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("replacing file %q in FS: %w", path, err)
