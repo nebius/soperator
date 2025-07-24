@@ -48,9 +48,15 @@ func (r *SecretReconciler) patch(existing, desired client.Object) (client.Patch,
 	patchImpl := func(dst, src *corev1.Secret) client.Patch {
 		res := client.MergeFrom(dst.DeepCopy())
 
-		dst.Data = src.Data
 		maps.Copy(dst.Labels, src.Labels)
-		maps.Copy(dst.Annotations, src.Annotations)
+		if len(src.Annotations) > 0 {
+			if dst.Annotations == nil {
+				dst.Annotations = make(map[string]string, len(src.Annotations))
+			}
+			maps.Copy(dst.Annotations, src.Annotations) // dst ← src
+		}
+
+		dst.Data = src.Data
 
 		return res
 	}
