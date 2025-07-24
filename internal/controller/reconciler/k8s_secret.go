@@ -3,6 +3,7 @@ package reconciler
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,6 +49,8 @@ func (r *SecretReconciler) patch(existing, desired client.Object) (client.Patch,
 		res := client.MergeFrom(dst.DeepCopy())
 
 		dst.Data = src.Data
+		maps.Copy(dst.Labels, src.Labels)
+		maps.Copy(dst.Annotations, src.Annotations)
 
 		return res
 	}
