@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/controller/sconfigcontroller"
 	"nebius.ai/slurm-operator/internal/jwt"
 	"nebius.ai/slurm-operator/internal/slurmapi"
@@ -55,6 +56,7 @@ func init() {
 
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(slurmv1.AddToScheme(scheme))
+	utilruntime.Must(slurmv1alpha1.AddToScheme(scheme))
 }
 
 func getZapOpts(logFormat, logLevel string) []zap.Opts {
@@ -100,6 +102,7 @@ func main() {
 		enableHTTP2          bool
 		logFormat            string
 		logLevel             string
+		jailPath             string
 		configsPath          string
 		clusterNamespace     string
 		clusterName          string
@@ -122,6 +125,7 @@ func main() {
 	flag.StringVar(&logLevel, "log-level", "debug", "Log level: debug, info, warn, error, dpanic, panic, fatal")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 5*time.Minute, "The maximum duration allowed for caching sync")
+	flag.StringVar(&jailPath, "jail-path", "/mnt/jail", "Path where jail is mounted")
 	flag.StringVar(&configsPath, "configs-path", "/mnt/jail/etc/slurm", "Path where to store configs")
 	flag.StringVar(&clusterNamespace, "cluster-namespace", "default", "Soperator cluster namespace")
 	flag.StringVar(&clusterName, "cluster-name", "soperator", "Name of the soperator cluster controller")
@@ -196,6 +200,20 @@ func main() {
 		fileStore,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create controller", sconfigcontroller.SConfigControllerName)
+		os.Exit(1)
+	}
+
+	jailFs := &sconfigcontroller.PrefixFs{
+		Prefix: jailPath,
+	}
+
+	if err := (sconfigcontroller.NewJailedConfigReconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		slurmAPIClient,
+		jailFs,
+	)).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "JailedConfig")
 		os.Exit(1)
 	}
 

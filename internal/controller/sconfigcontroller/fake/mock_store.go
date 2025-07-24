@@ -65,6 +65,53 @@ func (_c *MockStore_Add_Call) RunAndReturn(run func(string, string, string) erro
 	return _c
 }
 
+// Chmod provides a mock function with given fields: path, mode
+func (_m *MockStore) Chmod(path string, mode uint32) error {
+	ret := _m.Called(path, mode)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Chmod")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, uint32) error); ok {
+		r0 = rf(path, mode)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockStore_Chmod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Chmod'
+type MockStore_Chmod_Call struct {
+	*mock.Call
+}
+
+// Chmod is a helper method to define mock.On call
+//   - path string
+//   - mode uint32
+func (_e *MockStore_Expecter) Chmod(path interface{}, mode interface{}) *MockStore_Chmod_Call {
+	return &MockStore_Chmod_Call{Call: _e.mock.On("Chmod", path, mode)}
+}
+
+func (_c *MockStore_Chmod_Call) Run(run func(path string, mode uint32)) *MockStore_Chmod_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(uint32))
+	})
+	return _c
+}
+
+func (_c *MockStore_Chmod_Call) Return(_a0 error) *MockStore_Chmod_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockStore_Chmod_Call) RunAndReturn(run func(string, uint32) error) *MockStore_Chmod_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetExecutable provides a mock function with given fields: name, subPath
 func (_m *MockStore) SetExecutable(name string, subPath string) error {
 	ret := _m.Called(name, subPath)
@@ -108,6 +155,53 @@ func (_c *MockStore_SetExecutable_Call) Return(_a0 error) *MockStore_SetExecutab
 }
 
 func (_c *MockStore_SetExecutable_Call) RunAndReturn(run func(string, string) error) *MockStore_SetExecutable_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Write provides a mock function with given fields: path, content
+func (_m *MockStore) Write(path string, content []byte) error {
+	ret := _m.Called(path, content)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Write")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, []byte) error); ok {
+		r0 = rf(path, content)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockStore_Write_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Write'
+type MockStore_Write_Call struct {
+	*mock.Call
+}
+
+// Write is a helper method to define mock.On call
+//   - path string
+//   - content []byte
+func (_e *MockStore_Expecter) Write(path interface{}, content interface{}) *MockStore_Write_Call {
+	return &MockStore_Write_Call{Call: _e.mock.On("Write", path, content)}
+}
+
+func (_c *MockStore_Write_Call) Run(run func(path string, content []byte)) *MockStore_Write_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].([]byte))
+	})
+	return _c
+}
+
+func (_c *MockStore_Write_Call) Return(_a0 error) *MockStore_Write_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockStore_Write_Call) RunAndReturn(run func(string, []byte) error) *MockStore_Write_Call {
 	_c.Call.Return(run)
 	return _c
 }

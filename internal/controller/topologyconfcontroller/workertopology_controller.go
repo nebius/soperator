@@ -151,34 +151,8 @@ func (r *WorkerTopologyReconciler) handleTopologyConfigMapFunctional(
 	return topologyLabelsConfigMap, nil
 }
 
-func (r *WorkerTopologyReconciler) createDefaultTopologyConfigMap(
-	ctx context.Context, req ctrl.Request, slurmCluster *slurmv1.SlurmCluster, logger logr.Logger) error {
-	logger.Info("Node topology labels ConfigMap not found, creating with default topology")
-	listASTS := &kruisev1b1.StatefulSetList{}
-
-	if err := r.getAdvancedSTS(ctx, slurmCluster.Name, listASTS); err != nil {
-		return fmt.Errorf("get advanced stateful sets: %w", err)
-	}
-	config := InitializeTopologyConf(listASTS)
-	if err := r.updateTopologyConfigMap(ctx, req.Namespace, config); err != nil {
-		return err
-	}
-	logger.Info("Successfully created default topology ConfigMap")
-	return nil
-}
-
-// EnsureTopologyConfigMap ensures that the ConfigMap for topology configuration exists.
-func (r *WorkerTopologyReconciler) EnsureTopologyConfigMap(
-	ctx context.Context, namespace, clusterName string,
-) error {
-
-	listASTS := &kruisev1b1.StatefulSetList{}
-
-	if err := r.getAdvancedSTS(ctx, clusterName, listASTS); err != nil {
-		return fmt.Errorf("get advanced stateful sets: %w", err)
-	}
-	config := InitializeTopologyConf(listASTS)
-	configMap := &corev1.ConfigMap{
+func (r *WorkerTopologyReconciler) renderTopologyConfigMap(namespace string, config string) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
 		TypeMeta: ctrl.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.Version,
 			Kind:       "ConfigMap",
@@ -194,11 +168,45 @@ func (r *WorkerTopologyReconciler) EnsureTopologyConfigMap(
 			},
 		},
 		Data: map[string]string{
-			"topology.conf": config,
+			consts.ConfigMapKeyTopologyConfig: config,
 		},
 	}
+}
 
-	if err := r.Client.Create(ctx, configMap); err != nil {
+func (r *WorkerTopologyReconciler) makeDefaultTopologyConfig(ctx context.Context, clusterName string) (string, error) {
+	listASTS := &kruisev1b1.StatefulSetList{}
+	if err := r.getAdvancedSTS(ctx, clusterName, listASTS); err != nil {
+		return "", fmt.Errorf("get advanced stateful sets: %w", err)
+	}
+	return InitializeTopologyConf(listASTS), nil
+}
+
+func (r *WorkerTopologyReconciler) createDefaultTopologyConfigMap(
+	ctx context.Context, req ctrl.Request, slurmCluster *slurmv1.SlurmCluster, logger logr.Logger) error {
+	logger.Info("Node topology labels ConfigMap not found, creating with default topology")
+
+	config, err := r.makeDefaultTopologyConfig(ctx, slurmCluster.Name)
+	if err != nil {
+		return err
+	}
+	if err := r.updateTopologyConfigMap(ctx, req.Namespace, config); err != nil {
+		return err
+	}
+	logger.Info("Successfully created default topology ConfigMap")
+	return nil
+}
+
+// EnsureTopologyConfigMap ensures that the ConfigMap for topology configuration exists.
+func (r *WorkerTopologyReconciler) EnsureTopologyConfigMap(
+	ctx context.Context, namespace, clusterName string,
+) error {
+	config, err := r.makeDefaultTopologyConfig(ctx, clusterName)
+	if err != nil {
+		return err
+	}
+	configMap := r.renderTopologyConfigMap(namespace, config)
+
+	if err = r.Client.Create(ctx, configMap); err != nil {
 		return client.IgnoreAlreadyExists(err)
 	}
 
@@ -299,26 +307,7 @@ func (r *WorkerTopologyReconciler) ParseNodeTopologyLabels(data map[string]strin
 }
 
 func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, namespace string, config string) error {
-	configMap := &corev1.ConfigMap{
-		TypeMeta: ctrl.TypeMeta{
-			APIVersion: corev1.SchemeGroupVersion.Version,
-			Kind:       "ConfigMap",
-		},
-		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.ConfigMapNameTopologyConfig,
-			Namespace: namespace,
-			Labels: map[string]string{
-				consts.LabelSConfigControllerSourceKey: consts.LabelSConfigControllerSourceValue,
-			},
-			Annotations: map[string]string{
-				consts.AnnotationSConfigControllerSourceKey: consts.DefaultSConfigControllerSourcePath,
-			},
-		},
-		Data: map[string]string{
-			"topology.conf": config,
-		},
-	}
-
+	configMap := r.renderTopologyConfigMap(namespace, config)
 	return r.Client.Patch(ctx, configMap, client.Apply,
 		client.ForceOwnership, client.FieldOwner(WorkerTopologyReconcilerName))
 }

@@ -40,9 +40,14 @@ import (
 
 const SConfigControllerName = "sconfigcontroller"
 
+// TODO rework further
 type Store interface {
+	// TODO drop after migration
 	Add(name, content, subPath string) error
+	// TODO drop after migration
 	SetExecutable(name, subPath string) error
+	Write(path string, content []byte) error
+	Chmod(path string, mode uint32) error
 }
 
 // SConfigControllerReconciler reconciles a SConfigController object
