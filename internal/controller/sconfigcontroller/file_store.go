@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -316,6 +317,15 @@ func (pfs *PrefixFs) addPrefix(path string) string {
 	return filepath.Join(pfs.Prefix, path)
 }
 
+func (pfs *PrefixFs) removePrefix(path string) (string, error) {
+	trimmed, found := strings.CutPrefix(path, pfs.Prefix)
+	if !found {
+		return "", fmt.Errorf("path %q does not have prefix %q", path, pfs.Prefix)
+	}
+
+	return trimmed, nil
+}
+
 func (pfs *PrefixFs) MkdirAll(path string, mode os.FileMode) error {
 	return os.MkdirAll(pfs.addPrefix(path), mode)
 }
@@ -376,7 +386,9 @@ func (pfs *PrefixFs) PrepareNewFile(oldFile string, content []byte, mode os.File
 
 	// Caller take control over temp file
 	deferTempFileRemove = false
-	return tempFileName, nil
+	// tempFileName is a path returned directly from FS, and it contains current prefix,
+	// which is not okay to feed back to prefix fs methods
+	return pfs.removePrefix(tempFileName)
 }
 
 func (pfs *PrefixFs) RenameExchange(oldPath, newPath string) error {
