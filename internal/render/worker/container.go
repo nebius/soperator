@@ -47,7 +47,7 @@ func renderContainerToolkitValidation(container *values.Container) corev1.Contai
 }
 
 // RenderContainerWaitForController renders init [corev1.Container] that waits for controller readiness
-func RenderContainerWaitForController(container *values.Container, controllerPort int32) corev1.Container {
+func RenderContainerWaitForController(container *values.Container) corev1.Container {
 	return corev1.Container{
 		Name:            consts.ContainerNameWaitForController,
 		Image:           container.Image,
@@ -55,16 +55,7 @@ func RenderContainerWaitForController(container *values.Container, controllerPor
 		Command: []string{
 			"/opt/bin/slurm/wait-for-controller.sh",
 		},
-		Env: []corev1.EnvVar{
-			{
-				Name:  "CONTROLLER_SERVICE",
-				Value: fmt.Sprintf("%s-%d", consts.ComponentTypeController, 0),
-			},
-			{
-				Name:  "CONTROLLER_PORT",
-				Value: strconv.FormatInt(int64(controllerPort), 10),
-			},
-		},
+		Env: []corev1.EnvVar{},
 		VolumeMounts: []corev1.VolumeMount{
 			common.RenderVolumeMountJail(),
 			common.RenderVolumeMountMungeSocket(),
