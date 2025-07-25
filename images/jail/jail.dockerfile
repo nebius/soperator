@@ -120,7 +120,7 @@ FROM cuda AS jail
 
 ARG SLURM_VERSION=24.11.5
 ARG GDRCOPY_VERSION=2.5
-ARG NC_HEALTH_CHECKER=1.0.0-137.250708
+ARG NC_HEALTH_CHECKER=1.0.0-145.250724
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -183,16 +183,11 @@ RUN apt update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install health-check library
-# TODO: install for arm when it's available
-RUN if [ "$ARCH" = "amd64" ]; then \
-      apt-get update && \
-      apt-get install -y nc-health-checker=${NC_HEALTH_CHECKER} && \
-      apt-get clean && \
-      rm -rf /var/lib/apt/lists/* ; \
-    else \
-      echo "Skipping nc-health-checker installation for architecture: $ARCH" ; \
-    fi
+# Install Nebius health-check library
+RUN apt-get update && \
+    apt-get install -y nc-health-checker=${NC_HEALTH_CHECKER} && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install python
 COPY images/common/scripts/install_python.sh /opt/bin/
