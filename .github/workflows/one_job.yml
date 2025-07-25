@@ -49,6 +49,8 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
 
       - name: Install GO
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
@@ -61,12 +63,19 @@ jobs:
           # Check if VERSION file was changed in this push
           VERSION_CHANGED="false"
           if [ "${{ github.event_name }}" == "push" ]; then
-            # Get the list of changed files
-            git diff --name-only HEAD^ HEAD | grep -q "^VERSION$" && VERSION_CHANGED="true"
+            # Get the list of changed files with proper error handling
+            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD) || {
+              echo "Error: git diff failed with exit code $?"
+              exit 1
+            }
+            
+            if echo "$CHANGED_FILES" | grep -q "^VERSION$"; then
+              VERSION_CHANGED="true"
+            fi
           fi
 
-          # Build stable releases only on main/release branches when VERSION changes
-          if [[ ("${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" =~ "^refs/heads/soperator-release-") && "$VERSION_CHANGED" == "true" ]]; then
+          # Build stable releases when VERSION changes
+          if [[ "$VERSION_CHANGED" == "true" ]]; then
             make get-version UNSTABLE=false >> version.txt
             echo "false" >> version.txt
           else
