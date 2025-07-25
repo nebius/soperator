@@ -306,7 +306,6 @@ endif
 		--target ${IMAGE_NAME} \
 		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64" \
 		-f images/${DOCKERFILE} \
-		${DOCKER_OUTPUT} \
 		$(DOCKER_BUILD_ARGS) \
 		.
 
@@ -317,7 +316,6 @@ endif
 		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" \
 		-f images/${DOCKERFILE} \
 		$(DOCKER_BUILD_ARGS) \
-		${DOCKER_OUTPUT} \
 		.
 	# Push
 	docker push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
@@ -330,26 +328,28 @@ ifeq ($(UNSTABLE), false)
 	docker push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64"
 endif
 
-.PHONY: docker-build
-docker-build: ## Build docker image
-ifndef IMAGE_NAME
-	$(error IMAGE_NAME is not set, docker image cannot be built)
+.PHONY: docker-build-jail
+docker-build: ## Build jail
+ifndef IMAGE_VERSION
+	$(error IMAGE_VERSION is not set, docker image cannot be built)
 endif
-ifndef DOCKERFILE
-	$(error DOCKERFILE is not set, docker image cannot be built)
-endif
-	docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} -f images/${DOCKERFILE} ${DOCKER_OUTPUT} .
+	# Build amd
+	DOCKER_BUILDKIT=1 docker build \
+		--platform linux/amd64 \
+		--target jail \
+		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-amd64" \
+		-f images/jail/jail.dockerfile \
+		--output type=tar,dest=images/jail_rootfs_amd64.tar \
+		.
 
-.PHONY: docker-push
-docker-push: ## Push docker image
-ifndef IMAGE_NAME
-	$(error IMAGE_NAME is not set, docker image can not be pushed)
-endif
-	docker push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
-ifeq ($(UNSTABLE), false)
-	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
-	docker push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
-endif
+	# Build arm
+	DOCKER_BUILDKIT=1 docker build \
+		--platform linux/arm64 \
+		--target jail \
+		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-arm64" \
+		-f images/jail/jail.dockerfile \
+		--output type=tar,dest=images/jail_rootfs_arm64.tar \
+		.
 
 .PHONY: docker-manifest
 docker-manifest: ## Create and push docker manifest for multiple image architecture

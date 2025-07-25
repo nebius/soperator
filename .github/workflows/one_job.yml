@@ -255,19 +255,17 @@ jobs:
           echo "Common images were built"
 
           echo "Removing previous jail rootfs tar archive"
-          rm -f images/jail_rootfs.tar
+          rm -f images/jail_rootfs*.tar
 
-#          echo "Building tarball for jail"
-#          make docker-build DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_VERSION=${IMAGE_VERSION} IMAGE_NAME=jail DOCKERFILE=jail/jail.dockerfile DOCKER_OUTPUT="--output type=tar,dest=images/jail_rootfs.tar"
-#          echo "Built tarball jail_rootfs.tar"
-#
-#          echo "Building image of the populate_jail ${IMAGE_VERSION}"
-#          make docker-build DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_VERSION=${IMAGE_VERSION} IMAGE_NAME=populate_jail DOCKERFILE=populate_jail/populate_jail.dockerfile
-#          echo "Pushing image of the populate_jail ${IMAGE_VERSION}"
-#          make docker-push  UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail IMAGE_VERSION=${IMAGE_VERSION}
-#
-#          echo "Removing jail rootfs tar archive to speedup further docker builds."
-#          rm -f images/jail_rootfs.tar
-#
-#          echo "Pushing Helm charts"
-#          make release-helm UNSTABLE="${UNSTABLE}" OPERATOR_IMAGE_TAG="$OPERATOR_IMAGE_TAG"
+          echo "Building tarball for jail"
+          make docker-build-jail UNSTABLE="${UNSTABLE}" IMAGE_VERSION=${IMAGE_VERSION}
+
+          echo "Building and pushing image of the populate_jail ${IMAGE_VERSION}"
+          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail DOCKERFILE=DOCKERFILE=populate_jail/populate_jail.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
+          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail IMAGE_VERSION="${IMAGE_VERSION}"
+          
+          echo "Removing jail rootfs tar archive to speedup further docker builds."
+          rm -f images/jail_rootfs*.tar
+
+          echo "Pushing Helm charts"
+          make release-helm UNSTABLE="${UNSTABLE}" OPERATOR_IMAGE_TAG="$OPERATOR_IMAGE_TAG"
