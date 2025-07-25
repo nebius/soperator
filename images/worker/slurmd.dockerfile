@@ -82,7 +82,7 @@ RUN apt-get update && \
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
 COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
-    ALT_ARCH=${ALT_ARCH} /opt/bin/install_chroot_plugin.sh && \
+    /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
 # Install NCCL debug plugin
