@@ -245,7 +245,7 @@ jobs:
           make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_check_job IMAGE_VERSION="${IMAGE_VERSION}"
 
           echo "Building and pushing image of the login_sshd ${IMAGE_VERSION}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd DOCKERFILE=DOCKERFILE=login/sshd.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
+          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd DOCKERFILE=login/sshd.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
           make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd IMAGE_VERSION="${IMAGE_VERSION}"
 
           echo "Building and pushing image of the worker_slurmd ${IMAGE_VERSION}"
