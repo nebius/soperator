@@ -30,7 +30,6 @@ func RenderStatefulSet(
 	worker *values.SlurmWorker,
 	slurmTopologyConfigMapRefName string,
 	workerFeatures []slurmv1.WorkerFeature,
-	controllerPort int32,
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeWorker, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeWorker, clusterName)
@@ -53,7 +52,7 @@ func RenderStatefulSet(
 		common.RenderContainerMunge(&worker.ContainerMunge),
 	}
 	if worker.WaitForController != nil && *worker.WaitForController {
-		initContainers = append(initContainers, RenderContainerWaitForController(&worker.ContainerSlurmd, controllerPort))
+		initContainers = append(initContainers, RenderContainerWaitForController(&worker.ContainerSlurmd))
 	}
 	if clusterType == consts.ClusterTypeGPU {
 		initContainers = append(initContainers, renderContainerToolkitValidation(&worker.ContainerToolkitValidation))
