@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/values"

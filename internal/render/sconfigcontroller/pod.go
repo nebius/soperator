@@ -34,6 +34,14 @@ func BasePodTemplateSpec(
 		return nil, err
 	}
 
+	var securityContext *corev1.PodSecurityContext = nil
+	if sConfigController.RunAsUid != nil || sConfigController.RunAsGid != nil {
+		securityContext = &corev1.PodSecurityContext{
+			RunAsUser:  sConfigController.RunAsUid,
+			RunAsGroup: sConfigController.RunAsGid,
+		}
+	}
+
 	return &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: matchLabels,
@@ -55,10 +63,15 @@ func BasePodTemplateSpec(
 				),
 			},
 			InitContainers: []corev1.Container{
-				renderInitContainerSConfigController(sConfigController.JailSlurmConfigPath),
+				renderInitContainerSConfigController(
+					sConfigController.JailSlurmConfigPath,
+					sConfigController.RunAsUid,
+					sConfigController.RunAsGid,
+				),
 			},
 			Volumes:            volumes,
 			ServiceAccountName: naming.BuildServiceAccountSconfigControllerName(clusterName),
+			SecurityContext:    securityContext,
 		},
 	}, nil
 }

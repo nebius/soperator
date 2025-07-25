@@ -3051,6 +3051,20 @@ spec:
                     required:
                     - k8sNodeFilterName
                     type: object
+                  runAsGid:
+                    description: |-
+                      RunAsGid defines GID to run SConfigController process
+                      This will be manifested as GID of files maintained by SConfigController
+                      Defaults to whatever is set in sconfigcontroller image
+                    format: int64
+                    type: integer
+                  runAsUid:
+                    description: |-
+                      RunAsUid defines UID to run SConfigController process
+                      This will be manifested as UID of files maintained by SConfigController
+                      Defaults to whatever is set in sconfigcontroller image
+                    format: int64
+                    type: integer
                 type: object
               secrets:
                 description: Secrets define the [corev1.Secret] references needed
