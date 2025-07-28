@@ -1,8 +1,6 @@
 package sconfigcontroller
 
 import (
-	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
@@ -24,12 +22,16 @@ func renderInitContainerSConfigController(jailConfigPath string) corev1.Containe
 		VolumeMounts: []corev1.VolumeMount{
 			common.RenderVolumeMountJail(),
 		},
+		Env: []corev1.EnvVar{
+			{
+				Name:  "JAIL_CONFIG_PATH",
+				Value: jailConfigPath,
+			},
+		},
 		Command: []string{"/bin/sh", "-c"}, // Use bash to execute the script
 		Args: []string{
-			fmt.Sprintf(
-				"mkdir -p %[1]s && chown 1001:1001 %[1]s && chmod 755 %[1]s",
-				jailConfigPath,
-			),
+			// Quotes around variables are load-bearing, so shell would treat them as single string each
+			"mkdir -p \"${JAIL_CONFIG_PATH}\" && chown 1001:1001 \"${JAIL_CONFIG_PATH}\" && chmod 755 \"${JAIL_CONFIG_PATH}\"",
 		},
 	}
 }
