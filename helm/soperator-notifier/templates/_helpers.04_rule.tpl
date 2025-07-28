@@ -50,7 +50,7 @@ job_state=~"{{ include "son.config.jobStatus.bootFail" . }}|{{ include "son.conf
 job_state=~"{{ include "son.config.jobStatus.completed" . }}"
 {{- end }}
 
-{{/* MetricsQL selector for good jobs. */}}
+{{/* MetricsQL selector for system jobs. */}}
 {{- define "son.rule.jobSelector.system" -}}
 user_name!~"^(nebius|soperatorchecks)$"
 {{- end }}

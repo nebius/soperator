@@ -2,6 +2,7 @@
 slack:
   # Slack Webhook URL in the following format:
   # https://hooks.slack.com/services/XXXXXXXXXXX/YYYYYYYYYYY/ZZZZZZZZZZZZZZZZZZZZZZZZ
+  # This field is required.
   webhookUrl:
 
   # Whether to disable sending messages on changes of system job (health checks, etc.) statuses.
