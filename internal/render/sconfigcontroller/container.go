@@ -10,7 +10,7 @@ import (
 )
 
 func renderContainerSConfigController(
-	clusterNamespace, clusterName, slurmAPIServer, jailConfigPath string, container values.Container) corev1.Container {
+	clusterNamespace, clusterName, slurmAPIServer string, container values.Container) corev1.Container {
 	// Create a copy of the container's limits and add non-CPU resources from Requests
 	limits := common.CopyNonCPUResources(container.Resources)
 
@@ -33,7 +33,6 @@ func renderContainerSConfigController(
 		Args: []string{
 			fmt.Sprintf("--cluster-namespace=%s", clusterNamespace),
 			fmt.Sprintf("--cluster-name=%s", clusterName),
-			fmt.Sprintf("--configs-path=%s", jailConfigPath),
 			fmt.Sprintf("--jail-path=%s", jailMount.MountPath),
 			fmt.Sprintf("--slurmapiserver=%s", slurmAPIServer),
 			"--leader-elect",

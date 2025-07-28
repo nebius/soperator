@@ -40,7 +40,6 @@ func TestRenderContainerSConfigController(t *testing.T) {
 			expectedArgs: []string{
 				"--cluster-namespace=default",
 				"--cluster-name=test-cluster",
-				"--configs-path=/etc/slurm",
 				"--jail-path=/mnt/jail",
 				"--slurmapiserver=http://slurm-api-server",
 				"--leader-elect",
@@ -65,7 +64,6 @@ func TestRenderContainerSConfigController(t *testing.T) {
 			expectedArgs: []string{
 				"--cluster-namespace=custom-namespace",
 				"--cluster-name=custom-cluster",
-				"--configs-path=/custom/path",
 				"--jail-path=/mnt/jail",
 				"--slurmapiserver=https://custom-slurm-api",
 				"--leader-elect",
@@ -81,7 +79,6 @@ func TestRenderContainerSConfigController(t *testing.T) {
 				tt.clusterNamespace,
 				tt.clusterName,
 				tt.slurmAPIServer,
-				tt.jailConfigPath,
 				tt.container,
 			)
 
