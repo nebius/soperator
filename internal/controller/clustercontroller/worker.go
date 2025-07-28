@@ -209,7 +209,6 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						clusterValues.VolumeSources,
 						&clusterValues.NodeWorker,
 						clusterValues.WorkerFeatures,
-						clusterValues.NodeController.ContainerSlurmctld.Port,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
