@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - dev
+      - soperator-release-*
     tags:
       - 'build**'  # Trigger on tags starting with "build"
     paths-ignore:
@@ -41,6 +42,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0  # Fetch git history for the VERSION file changes detection
 
       - name: Install GO
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
@@ -50,13 +53,20 @@ jobs:
 
       - name: Generate version file
         run: |
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            make get-version UNSTABLE=false >> version.txt
-            echo "false" >> version.txt
-          else
-            make get-version UNSTABLE=true >> version.txt
-            echo "true" >> version.txt
+          UNSTABLE="true"
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" =~ ^refs/heads/soperator-release- ]]; then
+            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD) || {
+              echo "Error: git diff failed with exit code $?"
+              exit 1
+            }
+
+            if echo "$CHANGED_FILES" | grep -q "^VERSION$"; then
+              UNSTABLE="false"
+            fi
           fi
+
+          make get-version UNSTABLE=${UNSTABLE} >> version.txt
+          echo "${UNSTABLE}" >> version.txt
 
       - name: Upload version file
         uses: actions/upload-artifact@v4
