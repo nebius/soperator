@@ -192,6 +192,8 @@ It includes, among other things:
 - The [full list of features](docs/features.md) that this solution provides comparing to typical Slurm installations.
 - A more complete description of the existing [limitations](docs/limitations.md).
 - The [release process](docs/releases.md) for both soperator and nebius-solutions-library repositories.
+- [Metrics collection and processing](docs/metrics-pipeline.md) documentation.
+- [Logs collection and aggregation](docs/logs-pipeline.md) pipeline guide.
 
 
 
