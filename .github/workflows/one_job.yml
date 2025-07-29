@@ -129,7 +129,7 @@ jobs:
           GOOS: darwin
 
   build:
-    runs-on: [self-hosted, X64]
+    runs-on: [self-hosted, X64] # warm
     needs: pre-build
     steps:
       - name: Checkout repository
