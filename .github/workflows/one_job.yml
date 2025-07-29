@@ -200,10 +200,8 @@ jobs:
           echo "Updating CRDs & auto-generated code (included in test step) & run tests"
           make test-coverage UNSTABLE="${UNSTABLE}"
           
-          echo "Building shared Go base image"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="false" IMAGE_NAME=go-base IMAGE_REPO="cr.eu-north1.nebius.cloud/soperator" DOCKERFILE=common/go-base.dockerfile IMAGE_VERSION=latest
-          echo "Building and push manifest of the Go base image"
-          make docker-manifest AMEND="--amend" UNSTABLE="false" IMAGE_NAME=go-base IMAGE_REPO="cr.eu-north1.nebius.cloud/soperator" IMAGE_VERSION=latest
+          echo "Building local go base image"
+          make docker-build-go-base
           
           echo "Building and pushing image of the soperatorchecks ${OPERATOR_IMAGE_TAG}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks DOCKERFILE=soperatorchecks/soperatorchecks.dockerfile IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"

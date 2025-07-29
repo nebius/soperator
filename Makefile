@@ -291,6 +291,24 @@ run: manifests generate fmt vet ## Run a controller from your host with native t
 	IS_PROMETHEUS_CRD_INSTALLED=true IS_MARIADB_CRD_INSTALLED=true ENABLE_WEBHOOKS=false IS_APPARMOR_CRD_INSTALLED=true go run cmd/main.go \
 	 -log-level=debug -leader-elect=false -operator-namespace=soperator-system --enable-topology-controller=true
 
+.PHONY: docker-build-go-base
+docker-build-go-base: ## Build go-base image locally
+# Build amd
+	docker build \
+		--platform linux/amd64 \
+		--target go-base \
+		-t go-base:amd64 \
+		-f images/common/go-base.dockerfile \
+		.
+
+	# Build arm
+	docker build \
+		--platform linux/arm64 \
+		--target go-base \
+		-t go-base:arm64 \
+		-f images/common/go-base.dockerfile \
+		.
+
 .PHONY: docker-build-and-push
 docker-build-and-push: ## Build and push docker multi arch image
 ifndef IMAGE_NAME
@@ -303,7 +321,7 @@ ifndef UNSTABLE
 	$(error UNSTABLE is not set)
 endif
 # Build amd
-	docker build \
+	DOCKER_BUILDKIT=1 docker build \
 		--platform linux/amd64 \
 		--target ${IMAGE_NAME} \
 		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64" \
@@ -312,7 +330,7 @@ endif
 		.
 
 	# Build arm
-	docker build \
+	DOCKER_BUILDKIT=1 docker build \
 		--platform linux/arm64 \
 		--target ${IMAGE_NAME} \
 		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" \

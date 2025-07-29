@@ -1,4 +1,4 @@
-FROM cr.eu-north1.nebius.cloud/soperator/go-base:latest AS sconfigcontroller_builder
+FROM go-base:${TARGETARCH} AS sconfigcontroller_builder
 
 ARG GO_LDFLAGS=""
 ARG BUILD_TIME

@@ -1,4 +1,4 @@
-FROM cr.eu-north1.nebius.cloud/soperator/go-base:latest AS rebooter_builder
+FROM go-base:${TARGETARCH} AS rebooter_builder
 
 ARG GO_LDFLAGS=""
 ARG BUILD_TIME
