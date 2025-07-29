@@ -13,7 +13,7 @@ jobs:
 
   check_labels:
     name: Check labels
-    runs-on: self-hosted
+    runs-on: [self-hosted, X64]
     steps:
       - uses: docker://agilepathway/pull-request-label-checker:latest
         with:
