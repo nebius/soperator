@@ -3,11 +3,8 @@
 set -e # Exit immediately if any command returns a non-zero error code
 set -u  # Treat unset variables as an error and exit immediately
 
-# Check if ALT_ARCH is set and not empty
-if [ -z "${ALT_ARCH:-}" ]; then
-  echo "❌ ALT_ARCH is not set. Please set the ALT_ARCH environment variable (e.g., x86_64, aarch64)."
-  exit 1
-fi
+# ALT_ARCH has the extended form like: x86_64, aarch64
+ALT_ARCH="$(uname -m)"
 
 SNCCLD_SRC_DIR=/usr/src/soperator/spank/nccld-debug
 

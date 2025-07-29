@@ -3,10 +3,6 @@ FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS worker_slurmd
 ARG SLURM_VERSION=24.11.5
 ARG OPENMPI_VERSION=4.1.7a1
 ARG PYXIS_VERSION=0.21.0
-# ARCH has the short form like: amd64, arm64
-ARG ARCH
-# ALT_ARCH has the extended form like: x86_64, aarch64
-ARG ALT_ARCH
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -59,7 +55,11 @@ RUN chmod +x /opt/bin/install_openmpi.sh && \
     /opt/bin/install_openmpi.sh && \
     rm /opt/bin/install_openmpi.sh
 
-ENV LD_LIBRARY_PATH=/lib/${ALT_ARCH}-linux-gnu:/usr/lib/${ALT_ARCH}-linux-gnu:/usr/local/cuda/targets/${ALT_ARCH}-linux/lib:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib
+RUN arch=$(uname -m) && \
+    if [ "$arch" = "x86_64" ]; then alt_arch="x86_64"; \
+    elif [ "$arch" = "aarch64" ]; then alt_arch="aarch64"; \
+    else echo "Unsupported arch: $arch" && exit 1; fi && \
+    echo "LD_LIBRARY_PATH=/lib/${alt_arch}-linux-gnu:/usr/lib/${alt_arch}-linux-gnu:/usr/local/cuda/targets/${alt_arch}-linux/lib:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib" >> /etc/environment
 ENV PATH=$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
 # Add Nebius public registry
@@ -82,14 +82,14 @@ RUN apt-get update && \
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
 COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
-    ALT_ARCH=${ALT_ARCH} /opt/bin/install_chroot_plugin.sh && \
+    /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
 # Install NCCL debug plugin
 COPY images/common/spank-nccl-debug/src /usr/src/soperator/spank/nccld-debug
 COPY images/common/scripts/install_nccld_debug_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
-    ALT_ARCH=${ALT_ARCH} /opt/bin/install_nccld_debug_plugin.sh && \
+    /opt/bin/install_nccld_debug_plugin.sh && \
     rm /opt/bin/install_nccld_debug_plugin.sh
 
 # Install parallel because it's required for enroot operation

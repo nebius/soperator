@@ -4,11 +4,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
 ENV LANG=en_US.UTF-8
 
-# ARCH has the short form like: amd64, arm64
-ARG ARCH
-# ALT_ARCH has the extended form like: x86_64, aarch64
-ARG ALT_ARCH
-
 RUN apt-get update &&  \
     apt-get install -y --no-install-recommends \
       gnupg2  \
