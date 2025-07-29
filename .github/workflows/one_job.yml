@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - dev
       - soperator-release-*
     tags:
       - 'build**'  # Trigger on tags starting with "build"
