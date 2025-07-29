@@ -3,12 +3,9 @@ name: "Create GitHub release with automatic changelog"
 on:
   push:
     branches:
-      - main
-    paths-ignore:
-      - '.github/**'
-      - '.dockerignore'
-      - '.editorconfig'
-      - '.gitignore'
+      - 'soperator-release-*'
+    paths:
+      - 'VERSION'
 
 jobs:
   tag:
@@ -24,11 +21,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get previous tag
+      - name: Get previous tag from current branch
         id: get-previous-tag
-        uses: actions-ecosystem/action-get-latest-tag@b7c32daec3395a9616f88548363a42652b22d435 # v1.6.0
-        with:
-          semver_only: true
+        run: |
+          # Get the latest release tag (semantic version) that's reachable from the current commit
+          # Match tags like: 1.2.3 (without 'v' prefix)
+          PREV_TAG=$(git tag --merged HEAD^ | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          if [ -z "$PREV_TAG" ]; then
+            echo "Error: No previous release tag found in current branch history"
+            echo "This is unexpected - there should be previous releases in the history"
+            exit 1
+          fi
+          echo "tag=${PREV_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "Found previous tag: ${PREV_TAG}"
 
       - name: Get version
         id: get-version
@@ -111,8 +116,7 @@ jobs:
                   "pattern": "^(other|docs|doc|dependencies|deps|feat|feature|fix|bug|test|.*)",
                   "target": "$1"
                 }
-              ],
-              "base_branches": ["dev"]
+              ]
             }
           token: ${{ secrets.GITHUB_TOKEN }}
 
