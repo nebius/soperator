@@ -278,7 +278,6 @@ RUN chmod +x /usr/bin/nvidia-smi-hostpid
 COPY images/jail/scripts/soperator_instance_login.sh /opt/soperator_utils/soperator_instance_login.sh
 COPY images/jail/scripts/slurm_task_info.sh /opt/soperator_utils/slurm_task_info.sh
 COPY images/jail/scripts/worker_nvidia_bug_report.sh /opt/soperator_utils/worker_nvidia_bug_report.sh
-COPY images/jail/scripts/node_ranks.sh /opt/soperator_utils/node_ranks.sh
 RUN chmod -R 755 /opt/soperator_utils && \
     echo 'export PATH="/opt/soperator_utils:$PATH"' > /etc/profile.d/path_soperator_utils.sh && \
     chmod 755 /etc/profile.d/path_soperator_utils.sh
