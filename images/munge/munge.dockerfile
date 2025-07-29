@@ -1,6 +1,4 @@
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
-
-FROM $BASE_IMAGE AS munge
+FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS munge
 
 ARG DEBIAN_FRONTEND=noninteractive
 

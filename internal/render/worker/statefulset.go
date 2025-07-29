@@ -28,7 +28,6 @@ func RenderStatefulSet(
 	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	worker *values.SlurmWorker,
-	slurmTopologyConfigMapRefName string,
 	workerFeatures []slurmv1.WorkerFeature,
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeWorker, clusterName)
@@ -41,7 +40,7 @@ func RenderStatefulSet(
 	)
 
 	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecs(
-		clusterName, secrets, volumeSources, worker, slurmTopologyConfigMapRefName,
+		clusterName, secrets, volumeSources, worker,
 	)
 	if err != nil {
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
@@ -52,7 +51,7 @@ func RenderStatefulSet(
 		common.RenderContainerMunge(&worker.ContainerMunge),
 	}
 	if worker.WaitForController != nil && *worker.WaitForController {
-		initContainers = append(initContainers, RenderContainerWaitForController(&worker.ContainerSlurmd, clusterName))
+		initContainers = append(initContainers, RenderContainerWaitForController(&worker.ContainerSlurmd))
 	}
 	if clusterType == consts.ClusterTypeGPU {
 		initContainers = append(initContainers, renderContainerToolkitValidation(&worker.ContainerToolkitValidation))

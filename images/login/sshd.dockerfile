@@ -1,13 +1,9 @@
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
+ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:noble
 
 FROM $BASE_IMAGE AS login_sshd
 
 ARG SLURM_VERSION=24.11.5
 ARG PYXIS_VERSION=0.21.0
-# ARCH has the short form like: amd64, arm64
-ARG ARCH
-# ALT_ARCH has the extended form like: x86_64, aarch64
-ARG ALT_ARCH
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -57,15 +53,19 @@ RUN apt-get update && \
     rm -rf /etc/ssh/ssh_host*key*
 
 # Create dummy library for replacing GPU-specific libraries with it
-RUN mkdir -p /usr/src/dummy && \
+RUN ALT_ARCH="$(uname -m)" && \
+    mkdir -p /usr/src/dummy && \
     cd /usr/src/dummy && \
-    echo "int main() { return 0; }" > dummy.c && \
+    echo 'int main() { return 0; }' > dummy.c && \
     gcc -shared -o libdummy.so dummy.c && \
+    mkdir -p "/lib/${ALT_ARCH}-linux-gnu" && \
     cp libdummy.so "/lib/${ALT_ARCH}-linux-gnu/"
 
 # Add Nebius public registry
 RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
-    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" > /etc/apt/sources.list.d/nebius.list
+    codename="$(. /etc/os-release && echo $VERSION_CODENAME)" && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ $codename main" > /etc/apt/sources.list.d/nebius.list && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" >> /etc/apt/sources.list.d/nebius.list
 
 RUN apt-get update && \
     apt -y install \
@@ -80,19 +80,19 @@ RUN apt-get update && \
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
 COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
-    ALT_ARCH=${ALT_ARCH} /opt/bin/install_chroot_plugin.sh && \
+    /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
 # Install NCCL debug plugin
 COPY images/common/spank-nccl-debug/src /usr/src/soperator/spank/nccld-debug
 COPY images/common/scripts/install_nccld_debug_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
-    ALT_ARCH=${ALT_ARCH} /opt/bin/install_nccld_debug_plugin.sh && \
+    /opt/bin/install_nccld_debug_plugin.sh && \
     rm /opt/bin/install_nccld_debug_plugin.sh
 
 # Install parallel because it's required for enroot operation
 RUN apt-get update && \
-    apt -y install parallel=20210822+ds-2 && \
+    apt -y install parallel=20240222+ds-2 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

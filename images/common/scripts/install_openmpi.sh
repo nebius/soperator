@@ -2,11 +2,13 @@
 
 set -e # Exit immediately if any command returns a non-zero error code
 
-OPENMPI_VERSION=4.1.7a1-1.2310055
+OPENMPI_VERSION=4.1.7a1-1.2404066
 OPENMPI_VERSION_SHORT=4.1.7a1
-UCX_VERSION=1.16.0-1.2310213
-OFED_VERSION=23.10-2.1.3.1
-DISTRO=$(. /etc/os-release; echo "$ID""$VERSION_ID")
+OFED_VERSION=24.04-0.7.0.0
+
+UCX_VERSION=1.17.0-1.2404066
+
+DISTRO=$(. /etc/os-release; echo "${ID}${VERSION_ID}")
 ALT_ARCH="$(uname -m)"
 
 cd /etc/apt/sources.list.d || exit

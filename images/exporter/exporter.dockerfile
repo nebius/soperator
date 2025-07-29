@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
+ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:noble
 
 # First stage: Build the prometheus-slurm-exporter from source
 FROM golang:1.22 AS exporter_builder
@@ -22,7 +22,7 @@ RUN wget https://github.com/vpenso/prometheus-slurm-exporter/archive/refs/tags/$
 WORKDIR /app/prometheus-slurm-exporter-${VERSION_EXPORTER}
 
 RUN GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
-    go build -o prometheus-slurm-exporter . && \
+    go build -v -o prometheus-slurm-exporter . && \
     mv prometheus-slurm-exporter /app/
 
 #######################################################################################################################
@@ -30,10 +30,6 @@ RUN GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 FROM $BASE_IMAGE AS exporter
 
 ARG SLURM_VERSION=24.11.5
-# ARCH has the short form like: amd64, arm64
-ARG ARCH
-# ALT_ARCH has the extended form like: x86_64, aarch64
-ARG ALT_ARCH
 
 # Install dependencies
 RUN apt-get update && \
@@ -72,7 +68,9 @@ RUN apt-get update && \
 
 # Add Nebius public registry
 RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
-    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" > /etc/apt/sources.list.d/nebius.list
+    codename="$(. /etc/os-release && echo $VERSION_CODENAME)" && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ $codename main" > /etc/apt/sources.list.d/nebius.list && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" >> /etc/apt/sources.list.d/nebius.list
 
 RUN apt-get update && \
     apt -y install \
@@ -87,7 +85,7 @@ RUN apt-get update && \
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
 COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
-    ALT_ARCH=${ALT_ARCH} /opt/bin/install_chroot_plugin.sh && \
+    /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
 # Update linker cache

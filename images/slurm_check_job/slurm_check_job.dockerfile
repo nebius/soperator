@@ -1,13 +1,9 @@
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
+ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:noble
 
 FROM $BASE_IMAGE AS slurm_check_job
 
 ARG SLURM_VERSION=24.11.5
 ARG PYXIS_VERSION=0.21.0
-# ARCH has the short form like: amd64, arm64
-ARG ARCH
-# ALT_ARCH has the extended form like: x86_64, aarch64
-ARG ALT_ARCH
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -47,7 +43,9 @@ RUN apt-get update && \
 
 # Add Nebius public registry
 RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
-    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" > /etc/apt/sources.list.d/nebius.list
+    codename="$(. /etc/os-release && echo $VERSION_CODENAME)" && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ $codename main" > /etc/apt/sources.list.d/nebius.list && \
+    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" >> /etc/apt/sources.list.d/nebius.list
 
 RUN apt-get update && \
     apt -y install \
@@ -62,12 +60,12 @@ RUN apt-get update && \
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
 COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
-    ALT_ARCH=${ALT_ARCH} /opt/bin/install_chroot_plugin.sh && \
+    /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
 # Install parallel because it's required for enroot operation
 RUN apt-get update && \
-    apt -y install parallel=20210822+ds-2 && \
+    apt -y install parallel=20240222+ds-2 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -97,9 +95,10 @@ RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
     chmod +x /opt/bin/slurm/bind_slurm_common.sh
 
 # Install kubectl
-RUN KUBECTL_VERSION=$(curl -Ls https://dl.k8s.io/release/stable.txt) && \
+RUN ARCH="$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')" && \
+    KUBECTL_VERSION="$(curl -Ls https://dl.k8s.io/release/stable.txt)" && \
     echo "Downloading kubectl from https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" && \
-    curl -LO https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl && \
+    curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" && \
     install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
     rm kubectl
 

@@ -258,6 +258,9 @@ spec:
         enabled: false
       prometheus-node-exporter:
         enabled: true
+        extraArgs:
+          - '--collector.ethtool.device-exclude=ibp.*'
+          - '--no-collector.infiniband'
       victoria-metrics-operator:
         admissionWebhooks:
           enable: true

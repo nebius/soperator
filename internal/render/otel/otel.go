@@ -86,7 +86,7 @@ func RenderOtelCollector(
 						"prometheus": map[string]interface{}{
 							"endpoint":                         "0.0.0.0:9102",
 							"send_timestamps":                  true,
-							"metric_expiration":                "180m", // 3h CronJob NCClBenchmark interval
+							"metric_expiration":                "180m",
 							"enable_open_metrics":              true,
 							"add_metric_suffixes":              false,
 							"resource_to_telemetry_conversion": map[string]interface{}{"enabled": true},

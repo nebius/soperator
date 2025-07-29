@@ -166,6 +166,9 @@ func (c *SlurmNodesController) processDegradedNode(
 
 	k8sNode, err := getK8SNode(ctx, c.Client, node.InstanceID)
 	if err != nil {
+		if client.IgnoreNotFound(err) == nil {
+			return c.undrainSlurmNode(ctx, slurmClusterName, node.Name)
+		}
 		return fmt.Errorf("get k8s node: %w", err)
 	}
 
@@ -632,8 +635,12 @@ func (c *SlurmNodesController) slurmNodesFullyDrained(
 			if err != nil {
 				return false, err
 			}
+			_, isCompleting := node.States[api.V0041NodeStateCOMPLETING]
 			logger.Info("slurm node", "nodeStates", node.States)
-			if !node.IsIdleDrained() {
+			// When epilog is running, node is in COMPLETING state and both IDLE and DRAIN states are set.
+			// Example: State=IDLE+COMPLETING+DRAIN+DYNAMIC_NORM
+			// We consider node fully drained when it is in IDLE+DRAIN+DYNAMIC_NORM states.
+			if !node.IsIdleDrained() || isCompleting {
 				logger.Info("slurm node is not fully drained", "nodeStates", node.States)
 				return false, nil
 			}

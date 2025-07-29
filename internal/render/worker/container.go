@@ -47,7 +47,7 @@ func renderContainerToolkitValidation(container *values.Container) corev1.Contai
 }
 
 // RenderContainerWaitForController renders init [corev1.Container] that waits for controller readiness
-func RenderContainerWaitForController(container *values.Container, clusterName string) corev1.Container {
+func RenderContainerWaitForController(container *values.Container) corev1.Container {
 	return corev1.Container{
 		Name:            consts.ContainerNameWaitForController,
 		Image:           container.Image,
@@ -55,12 +55,7 @@ func RenderContainerWaitForController(container *values.Container, clusterName s
 		Command: []string{
 			"/opt/bin/slurm/wait-for-controller.sh",
 		},
-		Env: []corev1.EnvVar{
-			{
-				Name:  "CONTROLLER_SERVICE",
-				Value: naming.BuildServiceName(consts.ComponentTypeController, clusterName),
-			},
-		},
+		Env: []corev1.EnvVar{},
 		VolumeMounts: []corev1.VolumeMount{
 			common.RenderVolumeMountJail(),
 			common.RenderVolumeMountMungeSocket(),
@@ -93,7 +88,6 @@ func renderContainerSlurmd(
 		renderVolumeMountSshdConfigs(),
 		renderVolumeMountNvidia(),
 		renderVolumeMountBoot(),
-		renderVolumeMountNCCLTopology(),
 		renderVolumeMountSharedMemory(),
 		renderVolumeMountSysctl(),
 		renderVolumeMountSupervisordConfigMap(),

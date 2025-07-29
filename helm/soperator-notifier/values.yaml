@@ -1,0 +1,38 @@
+# Slack related configuration.
+slack:
+  # Slack Webhook URL in the following format:
+  # https://hooks.slack.com/services/XXXXXXXXXXX/YYYYYYYYYYY/ZZZZZZZZZZZZZZZZZZZZZZZZ
+  # This field is required.
+  webhookUrl:
+
+  # Whether to disable sending messages on changes of system job (health checks, etc.) statuses.
+  ignoreSystemJobs: true
+
+  # Severity group colors.
+  severityColor:
+    error: danger
+    warning: "#F28B30"
+    good: good
+    unknown: "#807F83"
+
+# AlertManager deployment configuration.
+alertManager:
+  replicas: 1
+  port: 9093
+
+# Where to scrape the job metrics from.
+dataSourceUrl: "http://vmsingle-metrics-victoria-metrics-k8s-stack:8429"
+
+# Configuration of time periods.
+interval:
+  # How often to evaluate rules by default.
+  evaluation: 30s
+
+  # How long to wait before sending the initial notification.
+  groupWait: 30s
+
+  # How long to wait before sending an updated notification.
+  group: 5m
+
+  # How long to wait before repeating the last notification.
+  repeat: 25h

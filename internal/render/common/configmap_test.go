@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -165,7 +164,6 @@ func TestRenderSlurmConfigMapAndTopology(t *testing.T) {
 	tests := []struct {
 		name                     string
 		cluster                  values.SlurmCluster
-		topologyConfig           v1.ConfigMap
 		expectedTopologyPlugin   string
 		unexpectedTopologyPlugin string
 	}{
@@ -175,26 +173,8 @@ func TestRenderSlurmConfigMapAndTopology(t *testing.T) {
 				SlurmConfig: slurmv1.SlurmConfig{
 					TopologyPlugin: "",
 				},
-				SlurmTopologyConfigMapRefName: "",
 			},
-			topologyConfig:           v1.ConfigMap{},
 			expectedTopologyPlugin:   "",
-			unexpectedTopologyPlugin: "",
-		},
-		{
-			name: "Default topology config",
-			cluster: values.SlurmCluster{
-				SlurmConfig: slurmv1.SlurmConfig{
-					TopologyPlugin: "",
-				},
-				SlurmTopologyConfigMapRefName: "foo",
-			},
-			topologyConfig: v1.ConfigMap{
-				Data: map[string]string{
-					consts.ConfigMapKeyTopologyConfig: "# foo",
-				},
-			},
-			expectedTopologyPlugin:   "topology/tree",
 			unexpectedTopologyPlugin: "",
 		},
 		{
@@ -202,12 +182,6 @@ func TestRenderSlurmConfigMapAndTopology(t *testing.T) {
 			cluster: values.SlurmCluster{
 				SlurmConfig: slurmv1.SlurmConfig{
 					TopologyPlugin: "topology/block",
-				},
-				SlurmTopologyConfigMapRefName: "foo",
-			},
-			topologyConfig: v1.ConfigMap{
-				Data: map[string]string{
-					consts.ConfigMapKeyTopologyConfig: "# foo",
 				},
 			},
 			expectedTopologyPlugin:   "topology/block",
@@ -219,10 +193,6 @@ func TestRenderSlurmConfigMapAndTopology(t *testing.T) {
 				SlurmConfig: slurmv1.SlurmConfig{
 					TopologyPlugin: "",
 				},
-				SlurmTopologyConfigMapRefName: "foo",
-			},
-			topologyConfig: v1.ConfigMap{
-				Data: map[string]string{},
 			},
 			expectedTopologyPlugin:   "",
 			unexpectedTopologyPlugin: "",
@@ -232,7 +202,7 @@ func TestRenderSlurmConfigMapAndTopology(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			result := RenderConfigMapSlurmConfigs(&tt.cluster, tt.topologyConfig)
+			result := RenderConfigMapSlurmConfigs(&tt.cluster)
 			assert.NotNil(t, result)
 
 			if tt.expectedTopologyPlugin == "" {

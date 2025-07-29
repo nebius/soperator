@@ -1,8 +1,12 @@
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy
+ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:noble
+ARG TARGETARCH
 
 # First stage: untap jail_rootfs.tar
 FROM $BASE_IMAGE AS untaped
-COPY images/jail_rootfs.tar /jail_rootfs.tar
+
+ARG TARGETARCH
+
+COPY images/jail_rootfs_${TARGETARCH}.tar /jail_rootfs.tar
 RUN mkdir /jail && \
     tar -xvf /jail_rootfs.tar -C /jail && \
     rm /jail_rootfs.tar

@@ -28,6 +28,8 @@ const (
 	ReasonNodeNoRebootNeeded ReasonConditionType = "NodeNoRebootNeeded"
 
 	ReasonSlurmNodeDegraded ReasonConditionType = "SlurmNodeDegraded"
+
+	ReasonNodeNotReady ReasonConditionType = "NodeNotReady"
 )
 
 const (
@@ -41,6 +43,8 @@ const (
 	MessageMaintenanceScheduled    MessageConditionType = "Maintenance is scheduled on k8s node"
 	MessageHardwareIssuesSuspected MessageConditionType = "Hardware issues suspected on k8s node"
 	MessageNodeIsRebooted          MessageConditionType = "Node is rebooted"
+
+	MessageNodeIsNotReady MessageConditionType = "Node is NotReady for more than 5 minutes, undrain before deletion"
 )
 
 // ActiveCheckK8sJobStatus defines status for ActiveCheck k8s job.
@@ -59,7 +63,8 @@ const (
 type ActiveCheckSlurmJobStatus string
 
 const (
-	ActiveCheckSlurmJobStatusComplete ActiveCheckSlurmJobStatus = "Complete"
-	ActiveCheckSlurmJobStatusFailed   ActiveCheckSlurmJobStatus = "Failed"
-	ActiveCheckSlurmJobStatusDegraded ActiveCheckSlurmJobStatus = "Degraded"
+	ActiveCheckSlurmJobStatusInProgress ActiveCheckSlurmJobStatus = "InProgress"
+	ActiveCheckSlurmJobStatusComplete   ActiveCheckSlurmJobStatus = "Complete"
+	ActiveCheckSlurmJobStatusFailed     ActiveCheckSlurmJobStatus = "Failed"
+	ActiveCheckSlurmJobStatusDegraded   ActiveCheckSlurmJobStatus = "Degraded"
 )

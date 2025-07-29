@@ -1140,20 +1140,6 @@ spec:
                       Defaults to "OMPI_MCA_btl_tcp_if_include=eth0" to avoid "lo" and "docker" interfaces to be selected by OpenMPI.
                     type: string
                 type: object
-              ncclSettings:
-                description: NCCLSettings
-                properties:
-                  topologyData:
-                    description: TopologyData defines NCCL GPU topology
-                    type: string
-                  topologyType:
-                    default: auto
-                    description: TopologyType define type of NCCL GPU topology
-                    enum:
-                    - auto
-                    - custom
-                    type: string
-                type: object
               partitionConfiguration:
                 description: |-
                   PartitionConfiguration define partition configuration of slurm worker nodes
@@ -1175,117 +1161,6 @@ spec:
                     items:
                       type: string
                     type: array
-                type: object
-              periodicChecks:
-                description: PeriodicChecks define the k8s CronJobs performing cluster
-                  checks
-                properties:
-                  ncclBenchmark:
-                    description: NCCLBenchmark defines the desired state of nccl benchmark
-                    properties:
-                      activeDeadlineSeconds:
-                        default: 1800
-                        description: ActiveDeadlineSeconds defines the CronJob timeout
-                          in seconds
-                        format: int64
-                        type: integer
-                      appArmorProfile:
-                        default: unconfined
-                        description: AppArmorProfile defines the AppArmor profile
-                          for the Slurm node
-                        type: string
-                      enabled:
-                        default: false
-                        description: Enabled defines whether the CronJob should be
-                          scheduled
-                        type: boolean
-                      failedJobsHistoryLimit:
-                        default: 16
-                        description: FailedJobsHistoryLimit defines the number of
-                          failed finished jobs to retain
-                        format: int32
-                        type: integer
-                      failureActions:
-                        description: FailureActions define actions performed on benchmark
-                          failure
-                        properties:
-                          setSlurmNodeDrainState:
-                            default: false
-                            description: SetSlurmNodeDrainState defines whether to
-                              drain Slurm node in case of benchmark failure
-                            type: boolean
-                        type: object
-                      image:
-                        description: Image defines the nccl container image
-                        type: string
-                      imagePullPolicy:
-                        default: IfNotPresent
-                        description: ImagePullPolicy defines the image pull policy
-                        enum:
-                        - Always
-                        - Never
-                        - IfNotPresent
-                        type: string
-                      k8sNodeFilterName:
-                        description: |-
-                          K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
-                          Must correspond to the name of one of [K8sNodeFilter]
-                        type: string
-                      ncclArguments:
-                        description: NCCLArguments define nccl settings
-                        properties:
-                          maxBytes:
-                            default: 8Gb
-                            description: MaxBytes defines the maximum memory size
-                              to finish nccl with
-                            type: string
-                          minBytes:
-                            default: 512Mb
-                            description: MinBytes defines the minimum memory size
-                              to start nccl with
-                            type: string
-                          stepFactor:
-                            default: "2"
-                            description: StepFactor defines the multiplication factor
-                              between two sequential memory sizes
-                            type: string
-                          thresholdMoreThan:
-                            default: "0"
-                            description: |-
-                              ThresholdMoreThan defines the threshold for benchmark result that must be guaranteed.
-                              CronJob will fail if the result is less than the threshold
-                            type: string
-                          timeout:
-                            default: "20:00"
-                            description: Timeout defines the timeout for nccl in its
-                              special format
-                            type: string
-                          useInfiniband:
-                            default: true
-                            description: |-
-                              UseInfiniband defines using NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring env variables for test.
-                              According to NVIDIA these env vars should be used only for debugging.
-                              https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html
-                            type: boolean
-                        type: object
-                      schedule:
-                        default: 0 */3 * * *
-                        description: |-
-                          Schedule defines the CronJob schedule.
-                          By default, runs benchmark every 3 hours
-                        type: string
-                      successfulJobsHistoryLimit:
-                        default: 3
-                        description: SuccessfulJobsHistoryLimit defines the number
-                          of successful finished jobs to retain
-                        format: int32
-                        type: integer
-                    required:
-                    - image
-                    - k8sNodeFilterName
-                    type: object
-                required:
-                - ncclBenchmark
                 type: object
               plugStackConfig:
                 default:
@@ -3255,9 +3130,8 @@ spec:
                     type: string
                   topologyPlugin:
                     default: topology/tree
-                    description: |-
-                      TopologyPlugin identifies the plugin to determine network topology for optimizations.
-                      It is set automatically to `topology/tree` if SlurmTopologyConfigMapRefName is specified.
+                    description: TopologyPlugin identifies the plugin to determine
+                      network topology for optimizations.
                     type: string
                 type: object
               slurmNodes:
@@ -16135,79 +16009,6 @@ spec:
                 - rest
                 - worker
                 type: object
-              slurmTopologyConfigMapRefName:
-                description: |-
-                  SlurmTopologyConfigMapRefName is the name of the slurm topology config.
-                  When exists, TopologyPlugin is automatically set to `topology/tree` in slurm.conf
-                  if TopologyPlugin is not explicitly specified in SlurmConfig.
-                type: string
-              telemetry:
-                description: Metrics define the desired state of the prometheus or
-                  opentelemetry metrics
-                properties:
-                  jobsTelemetry:
-                    description: It has to be set to true if Kubernetes events for
-                      Slurm jobs are sent
-                    properties:
-                      otelCollectorGrpcHost:
-                        description: Specifies the gRPC OtelCollector host for sending
-                          Opentelemetry metrics
-                        type: string
-                      otelCollectorHttpHost:
-                        description: Specifies the HTTP OtelCollector host for sending
-                          Opentelemetry metrics
-                        type: string
-                      otelCollectorPath:
-                        default: /v1/metrics
-                        description: Specifies the path to the OtelCollector endpoint
-                          for sending Opentelemetry metrics
-                        type: string
-                      otelCollectorPort:
-                        default: 4317
-                        description: Specifies the port for OtelCollector
-                        format: int32
-                        type: integer
-                      sendJobsEvents:
-                        default: false
-                        description: Defines whether to send Kubernetes events for
-                          Slurm NCCLBenchmark jobs
-                        type: boolean
-                      sendOtelMetrics:
-                        default: false
-                        description: Defines whether to send Opentelemetry metrics
-                          for Slurm NCCLBenchmark jobs
-                        type: boolean
-                    type: object
-                    x-kubernetes-validations:
-                    - message: Both OtelCollectorGrpcHost and OtelCollectorHttpHost
-                        cannot be set at the same time.
-                      rule: '!(has(self.otelCollectorGrpcHost) && has(self.otelCollectorHttpHost))'
-                  openTelemetryCollector:
-                    description: It has to be set to true if OpenTelemetry Operator
-                      CRD is used
-                    properties:
-                      enabled:
-                        default: false
-                        description: It has to be set to true if OpenTelemetry Operator
-                          is used
-                        type: boolean
-                      otelCollectorPort:
-                        default: 4317
-                        description: Specifies the port for OtelCollector
-                        format: int32
-                        type: integer
-                      podTemplateNameRef:
-                        description: It references the PodTemplate with the OpenTelemetry
-                          Collector configuration
-                        type: string
-                      replicasOtelCollector:
-                        default: 1
-                        description: It defines the number of replicas for the OpenTelemetry
-                          Collector
-                        format: int32
-                        type: integer
-                    type: object
-                type: object
               useDefaultAppArmorProfile:
                 default: false
                 description: Generate and set default AppArmor profile for the Slurm
@@ -18021,7 +17822,6 @@ spec:
                 type: array
             required:
             - k8sNodeFilters
-            - periodicChecks
             - populateJail
             - secrets
             - slurmNodes

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"nebius.ai/slurm-operator/internal/slurmapi"
@@ -40,7 +41,7 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 		slurmAPIClient: slurmAPIClient,
 
 		nodeInfo: prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "address"}, nil),
-		jobInfo:  prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "user_id", "standard_error", "standard_output", "array_job_id", "array_task_id"}, nil),
+		jobInfo:  prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "user_id", "standard_error", "standard_output", "array_job_id", "array_task_id", "submit_time", "start_time", "end_time"}, nil),
 		jobNode:  prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
 		nodeGPUSeconds: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "slurm_node_gpu_seconds_total",
@@ -194,6 +195,9 @@ func (c *MetricsCollector) slurmJobMetrics(
 				job.StandardOutput,
 				job.GetArrayJobIDString(),
 				job.GetArrayTaskIDString(),
+				timeToUnixString(job.SubmitTime),
+				timeToUnixString(job.StartTime),
+				timeToUnixString(job.EndTime),
 			}
 			yield(prometheus.MustNewConstMetric(c.jobInfo, prometheus.GaugeValue, 1, jobLabels...))
 
@@ -258,4 +262,11 @@ func (c *MetricsCollector) slurmRPCMetrics(
 			}
 		}
 	}
+}
+
+func timeToUnixString(t *metav1.Time) string {
+	if t == nil {
+		return ""
+	}
+	return strconv.FormatInt(t.Unix(), 10)
 }

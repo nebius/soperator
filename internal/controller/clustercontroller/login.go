@@ -199,7 +199,6 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 						&clusterValues.Secrets,
 						clusterValues.VolumeSources,
 						&clusterValues.NodeLogin,
-						clusterValues.SlurmTopologyConfigMapRefName,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
