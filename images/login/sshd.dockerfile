@@ -53,7 +53,7 @@ RUN apt-get update && \
     rm -rf /etc/ssh/ssh_host*key*
 
 # Create dummy library for replacing GPU-specific libraries with it
-RUN ALT_ARCH="$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')" && \
+RUN ALT_ARCH="$(uname -m)" && \
     mkdir -p /usr/src/dummy && \
     cd /usr/src/dummy && \
     echo 'int main() { return 0; }' > dummy.c && \
