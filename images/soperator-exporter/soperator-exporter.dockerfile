@@ -1,4 +1,4 @@
-FROM cr.eu-north1.nebius.cloud/soperator/go-base:latest AS exporter-builder
+FROM go-base:${TARGETARCH} AS exporter-builder
 
 ARG GO_LDFLAGS=""
 ARG BUILD_TIME
