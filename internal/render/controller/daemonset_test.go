@@ -55,7 +55,7 @@ func TestRenderDaemonSet(t *testing.T) {
 				"app.kubernetes.io/instance":      "test-cluster",
 				"slurm.nebius.ai/controller-type": "placeholder",
 			},
-			expectName: "test-controller-daemonset",
+			expectName: "test-controller-daemonset-placeholder",
 		},
 	}
 
