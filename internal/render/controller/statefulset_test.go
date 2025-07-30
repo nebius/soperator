@@ -32,9 +32,8 @@ func TestRenderStatefulSet(t *testing.T) {
 					K8sNodeFilterName: "test-filter",
 				},
 				StatefulSet: values.StatefulSet{
-					Name:           "test-controller-sts",
-					Replicas:       1,
-					MaxUnavailable: intstr.FromInt32(1),
+					Name:     "test-controller-sts",
+					Replicas: 1,
 				},
 				Service: values.Service{
 					Name: "test-controller-svc",
