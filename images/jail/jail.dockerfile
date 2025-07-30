@@ -216,6 +216,15 @@ RUN apt-get update && \
 # Create directory for bind-mounting it from the host. It's needed for sbatch to work
 RUN mkdir -m 755 -p /var/spool/slurmd
 
+# Install nvidia-container-toolkit (for enroot usage)
+COPY images/common/scripts/install_container_toolkit.sh /opt/bin/
+RUN chmod +x /opt/bin/install_container_toolkit.sh && \
+    /opt/bin/install_container_toolkit.sh && \
+    rm /opt/bin/install_container_toolkit.sh
+
+# Copy NVIDIA Container Toolkit config
+COPY images/common/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
+
 # Install nvtop GPU monitoring utility
 RUN add-apt-repository -y ppa:quentiumyt/nvtop && \
     apt install -y nvtop && \
