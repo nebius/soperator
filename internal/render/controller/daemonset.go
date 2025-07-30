@@ -35,7 +35,7 @@ func RenderDaemonSet(
 
 	return appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      controller.DaemonSet.Name,
+			Name:      controller.DaemonSet.Name + "-placeholder",
 			Namespace: namespace,
 			Labels:    labels,
 		},
@@ -60,9 +60,12 @@ func RenderDaemonSet(
 					InitContainers: []corev1.Container{
 						common.RenderContainerMungeSleep(&controller.ContainerMunge),
 					},
-					Containers: []corev1.Container{
-						renderContainerSlurmctldSleep(&controller.ContainerSlurmctld),
-					},
+					Containers: append(
+						[]corev1.Container{
+							renderContainerSlurmctldSleep(&controller.ContainerSlurmctld),
+						},
+						renderCustomContainersSleep(controller.CustomInitContainers)...,
+					),
 					RestartPolicy:                 corev1.RestartPolicyAlways,
 					TerminationGracePeriodSeconds: ptr.To(common.DefaultPodTerminationGracePeriodSeconds),
 					SecurityContext:               &corev1.PodSecurityContext{},
@@ -73,4 +76,23 @@ func RenderDaemonSet(
 			},
 		},
 	}
+}
+
+// renderCustomContainersSleep converts custom init containers to sleep containers
+func renderCustomContainersSleep(customInitContainers []corev1.Container) []corev1.Container {
+	if len(customInitContainers) == 0 {
+		return nil
+	}
+
+	result := make([]corev1.Container, len(customInitContainers))
+	for i, container := range customInitContainers {
+		sleepContainer := container.DeepCopy()
+		sleepContainer.Command = []string{"sleep"}
+		sleepContainer.Args = []string{"infinity"}
+		sleepContainer.Resources = corev1.ResourceRequirements{}
+		sleepContainer.VolumeMounts = nil
+		sleepContainer.Env = nil
+		result[i] = *sleepContainer
+	}
+	return result
 }
