@@ -6,7 +6,7 @@ on:
       - main
       - soperator-release-*
     tags:
-      - 'build**'  # Trigger on tags starting with "build"
+      - '**'  # Trigger on any tag
     paths-ignore:
       - 'docs/**'
       - 'CODEOWNERS'
@@ -53,15 +53,11 @@ jobs:
       - name: Generate version file
         run: |
           UNSTABLE="true"
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" =~ ^refs/heads/soperator-release- ]]; then
-            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD) || {
-              echo "Error: git diff failed with exit code $?"
-              exit 1
-            }
-
-            if echo "$CHANGED_FILES" | grep -q "^VERSION$"; then
-              UNSTABLE="false"
-            fi
+          if [[ "${{ github.ref }}" =~ ^refs/tags/[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Detected semantic version tag - building stable release"
+            UNSTABLE="false"
+          else
+            echo "Building unstable version"
           fi
 
           make get-version UNSTABLE=${UNSTABLE} >> version.txt
