@@ -10,12 +10,14 @@ on:
       - unlabeled
 
 jobs:
-
   check_labels:
     name: Check labels
-    runs-on: [self-hosted, X64]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pr-${{ github.head_ref }}
+      cancel-in-progress: true
     steps:
       - uses: docker://agilepathway/pull-request-label-checker:latest
         with:
-          one_of: feat,feature,test,fix,bug,dependencies,deps,doc,docs,documentation,other,ignore-for-release
+          any_of: feat,feature,test,fix,bug,dependencies,deps,doc,docs,documentation,other,ignore-for-release
           repo_token: ${{ secrets.GITHUB_TOKEN }}
