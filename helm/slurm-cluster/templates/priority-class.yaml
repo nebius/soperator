@@ -1,6 +1,16 @@
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
-  name: {{ include "slurm-cluster.name" . }}
+  name: {{ include "slurm-cluster.name" . }}-slurm-worker
 value: 1000000
 globalDefault: false
+description: "Priority class for Slurm worker nodes in the cluster. This is used to ensure that Slurm worker pods are scheduled with a higher priority than other pods."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "slurm-cluster.name" . }}-slurm-controller
+value: 1000001
+globalDefault: false
+preemptionPolicy: Never
+description: "Priority class for Slurm controller nodes in the cluster. This is used to ensure that Slurm controller pods are scheduled with a higher priority than worker pods."

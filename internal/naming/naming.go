@@ -86,6 +86,14 @@ func BuildStatefulSetName(componentType consts.ComponentType) string {
 	}.String()
 }
 
+func BuildDaemonSetName(componentType consts.ComponentType) string {
+	return namedEntity{
+		componentType: &componentType,
+		clusterName:   "",
+		entity:        "",
+	}.String()
+}
+
 func BuildDeploymentName(componentType consts.ComponentType) string {
 	return namedEntity{
 		componentType: &componentType,

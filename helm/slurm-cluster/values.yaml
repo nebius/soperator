@@ -277,8 +277,8 @@ slurmNodes:
       #     cpu: "50m"
       #     memory: "64Mi"
   controller:
-    size: 2
     k8sNodeFilterName: "no-gpu"
+    priorityClass: ""
     slurmctld:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
