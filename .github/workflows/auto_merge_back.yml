@@ -174,23 +174,23 @@ jobs:
             --title "${PR_TITLE}" \
             --assignee "${USERNAME}" \
             --label "ignore-for-release" \
-            --body "$(cat <<EOF
+            --body "$(cat <<'EOF'
 ## Merge back from release branch
 
 This PR merges changes from the release branch back to the main branch.
 
 ### Source Information
-- **Source branch**: \`${RELEASE_BRANCH}\`
-- **Target branch**: \`main\`
-- **Commit**: ${COMMIT_SHA}
-- **Author**: ${AUTHOR_NAME} <${AUTHOR_EMAIL}>
-- **GitHub user**: @${USERNAME}
-${ORIGINAL_PR_LINE}
+- **Source branch**: `'"${RELEASE_BRANCH}"'`
+- **Target branch**: `main`
+- **Commit**: '"${COMMIT_SHA}"'
+- **Author**: '"${AUTHOR_NAME}"' <'"${AUTHOR_EMAIL}"'>
+- **GitHub user**: @'"${USERNAME}"'
+'"${ORIGINAL_PR_LINE}"'
 
 ### Commit Message
-\`\`\`
-${COMMIT_MESSAGE}
-\`\`\`
+```
+'"${COMMIT_MESSAGE}"'
+```
 
 ---
 *This PR was automatically created by the merge-back workflow.*
