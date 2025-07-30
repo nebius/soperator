@@ -388,7 +388,9 @@ spec:
         cpu: {{ required ".Values.sConfigController.container.resources.cpu must be provided." .Values.sConfigController.container.resources.cpu | quote}}
         memory: {{ required ".Values.sConfigController.container.resources.memory must be provided." .Values.sConfigController.container.resources.memory | quote}}
         ephemeral-storage: {{ required ".Values.sConfigController.container.resources.ephemeralStorage must be provided." .Values.sConfigController.container.resources.ephemeralStorage | quote}}
-    jailSlurmConfigPath: {{ .Values.sConfigController.jailSlurmConfigPath | quote }} 
+    jailSlurmConfigPath: {{ .Values.sConfigController.jailSlurmConfigPath | quote }}
+    runAsUid: {{ .Values.sConfigController.runAsUid }}
+    runAsGid: {{ .Values.sConfigController.runAsGid }}
   {{- if .Values.telemetry }}
   telemetry:
     {{- if .Values.telemetry.jobsTelemetry }}

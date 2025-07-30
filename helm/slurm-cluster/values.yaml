@@ -458,6 +458,9 @@ sConfigController:
       memory: "256Mi"
       ephemeralStorage: "500Mi"
   jailSlurmConfigPath: /mnt/jail/etc/slurm
+  # These should match UID and GID in sconfigcontroller image
+  runAsUid: 1001
+  runAsGid: 1001
 telemetry: {}
 # jobsTelemetry:
 #   otelCollectorHttpHost: vmsingle-slurm.monitoring-system.svc.cluster.local

@@ -308,6 +308,18 @@ type SConfigController struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="/mnt/jail/etc/slurm"
 	JailSlurmConfigPath string `json:"jailSlurmConfigPath,omitempty"`
+
+	// RunAsUid defines UID to run SConfigController process
+	// This will be manifested as UID of files maintained by SConfigController
+	// Defaults to whatever is set in sconfigcontroller image
+	// +kubebuilder:validation:Optional
+	RunAsUid *int64 `json:"runAsUid,omitempty"`
+
+	// RunAsGid defines GID to run SConfigController process
+	// This will be manifested as GID of files maintained by SConfigController
+	// Defaults to whatever is set in sconfigcontroller image
+	// +kubebuilder:validation:Optional
+	RunAsGid *int64 `json:"runAsGid,omitempty"`
 }
 
 type PartitionConfiguration struct {
