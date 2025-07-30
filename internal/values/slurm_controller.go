@@ -31,7 +31,7 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 	// Controller always has 1 replica
 	statefulSet := buildStatefulSetWithMaxUnavailableFrom(
 		naming.BuildStatefulSetName(consts.ComponentTypeController),
-		1,
+		consts.ZeroReplicas,
 		nil,
 	)
 

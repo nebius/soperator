@@ -46,7 +46,7 @@ func RenderStatefulSet(
 	}
 
 	// Controller always has 1 replica
-	replicas := ptr.To(int32(1))
+	replicas := ptr.To(consts.ZeroReplicas)
 	if check.IsMaintenanceActive(controller.Maintenance) {
 		replicas = ptr.To(consts.ZeroReplicas)
 	}
