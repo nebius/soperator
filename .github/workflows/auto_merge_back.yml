@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - 'soperator-release-*'
-      - 'release-1.21/merge-back-to-main'  # Temporary for testing
 
 jobs:
   create-merge-back-pr:
@@ -27,10 +26,7 @@ jobs:
       - name: Get commit information
         id: commit-info
         run: |
-          # TEMPORARY: Hardcode test values
-          .github/workflows/scripts/auto-merge-back/get-commit-info.sh \
-            "36f3084390c48f3a42fcc2ccb2a883bd0a0c172d" \
-            "soperator-release-1.21"
+          .github/workflows/scripts/auto-merge-back/get-commit-info.sh
       
       - name: Get GitHub username from email
         id: get-username
