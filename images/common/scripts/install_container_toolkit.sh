@@ -4,7 +4,7 @@ set -e # Exit immediately if any command returns a non-zero error code
 
 # 1.17.4 latest working version
 # since 1.17.7 there was commit that breaks CUDA
-NVIDIA_TOOLKIT_VERSION=1.17.4-1
+NVIDIA_TOOLKIT_VERSION=1.17.8-1
 
 # Install nvidia-container-toolkit for propagating NVIDIA drivers to containers
 curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
