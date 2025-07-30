@@ -1,10 +1,8 @@
 package clustercontroller
 
 import (
-	"cmp"
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
@@ -13,7 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -64,45 +61,16 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					replicas := cmp.Or(clusterValues.NodeController.StatefulSet.Replicas, 1)
-					createdServices := map[string]bool{}
+					desired := controller.RenderService(clusterValues.Namespace, clusterValues.Name, clusterValues.NodeController.Service.Name, &clusterValues.NodeController, nil)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("Rendered controller service")
 
-					for i := int32(0); i < replicas; i++ {
-						svcName := fmt.Sprintf("%s-%d", clusterValues.NodeController.StatefulSet.Name, i)
-						desired := controller.RenderService(clusterValues.Namespace, clusterValues.Name, svcName, &clusterValues.NodeController,
-							map[string]string{
-								"statefulset.kubernetes.io/pod-name": fmt.Sprintf("controller-%d", i),
-							})
-						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-						stepLogger.V(1).Info("Rendered per-pod service", "service", svcName)
-						var controllerNamePtr *string = nil
-						if err := r.Service.Reconcile(stepCtx, cluster, &desired, controllerNamePtr); err != nil {
-							return fmt.Errorf("reconciling controller Service %s: %w", svcName, err)
-						}
-						createdServices[svcName] = true
+					var controllerNamePtr *string = nil
+					if err := r.Service.Reconcile(stepCtx, cluster, &desired, controllerNamePtr); err != nil {
+						return fmt.Errorf("reconciling controller Service: %w", err)
 					}
 
-					svcList := &corev1.ServiceList{}
-					if err := r.List(stepCtx, svcList, client.InNamespace(clusterValues.Namespace)); err != nil {
-						return fmt.Errorf("listing services for cleanup: %w", err)
-					}
-					prefix := clusterValues.NodeController.StatefulSet.Name + "-"
-					for _, svc := range svcList.Items {
-						if svc.Namespace != clusterValues.Namespace {
-							continue
-						}
-						if !strings.HasPrefix(svc.Name, prefix) {
-							continue
-						}
-						if _, ok := createdServices[svc.Name]; !ok {
-							stepLogger.Info("Deleting excess service", "service", svc.Name)
-							if err := r.Service.Delete(stepCtx, &svc, []client.DeleteOption{}...); err != nil {
-								return fmt.Errorf("deleting excess service %s: %w", svc.Name, err)
-							}
-						}
-					}
-
-					stepLogger.V(1).Info("Reconciled per-pod services")
+					stepLogger.V(1).Info("Reconciled controller service")
 					return nil
 				},
 			},
@@ -136,6 +104,40 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 						return fmt.Errorf("reconciling controller StatefulSet: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
+
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Controller DaemonSet",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling DaemonSet")
+
+					desired, err := controller.RenderDaemonSet(
+						clusterValues.Namespace,
+						clusterValues.Name,
+						clusterValues.NodeFilters,
+						clusterValues.VolumeSources,
+						&clusterValues.NodeController,
+					)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render DaemonSet")
+						return fmt.Errorf("rendering controller DaemonSet: %w", err)
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("Rendered DaemonSet")
+
+					deps, err := r.getControllersDaemonSetDependencies(stepCtx, clusterValues)
+					if err != nil {
+						return fmt.Errorf("retrieving dependencies for controller DaemonSet: %w", err)
+					}
+					stepLogger.V(1).Info("Retrieved dependencies for DaemonSet")
+
+					if err = r.DaemonSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
+						return fmt.Errorf("reconciling controller DaemonSet: %w", err)
+					}
+					stepLogger.V(1).Info("Reconciled DaemonSet")
 
 					return nil
 				},
@@ -204,6 +206,44 @@ func (r SlurmClusterReconciler) ValidateControllers(
 }
 
 func (r SlurmClusterReconciler) getControllersStatefulSetDependencies(
+	ctx context.Context,
+	clusterValues *values.SlurmCluster,
+) ([]metav1.Object, error) {
+	var res []metav1.Object
+
+	mungeKeySecret := &corev1.Secret{}
+	if err := r.Get(
+		ctx,
+		types.NamespacedName{
+			Namespace: clusterValues.Namespace,
+			Name:      naming.BuildSecretMungeKeyName(clusterValues.Name),
+		},
+		mungeKeySecret,
+	); err != nil {
+		return []metav1.Object{}, err
+	}
+	res = append(res, mungeKeySecret)
+
+	if clusterValues.NodeAccounting.Enabled {
+		slurmdbdSecret := &corev1.Secret{}
+		if err := r.Get(
+			ctx,
+			types.NamespacedName{
+				Namespace: clusterValues.Namespace,
+				Name:      naming.BuildSecretSlurmdbdConfigsName(clusterValues.Name),
+			},
+			slurmdbdSecret,
+		); err != nil {
+			return []metav1.Object{}, err
+		}
+		res = append(res, slurmdbdSecret)
+	}
+
+	return res, nil
+}
+
+// getControllersDaemonSetDependencies returns the dependencies required for the controller DaemonSet.
+func (r SlurmClusterReconciler) getControllersDaemonSetDependencies(
 	ctx context.Context,
 	clusterValues *values.SlurmCluster,
 ) ([]metav1.Object, error) {

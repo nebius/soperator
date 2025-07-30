@@ -23732,6 +23732,10 @@ spec:
                         required:
                         - image
                         type: object
+                      priorityClassName:
+                        description: PriorityClassName defines the priority class
+                          for the Slurm controller pods
+                        type: string
                       size:
                         description: Size defines the number of node instances
                         format: int32

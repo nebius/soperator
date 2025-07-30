@@ -15,6 +15,8 @@ func RenderService(namespace, clusterName, svcName string, controller *values.Sl
 	labels := common.RenderLabels(consts.ComponentTypeController, clusterName)
 
 	selector := common.RenderMatchLabels(consts.ComponentTypeController, clusterName)
+	selector[consts.LabelControllerType] = consts.LabelControllerTypeMain
+
 	for _, additionalLabels := range podLabels {
 		for k, v := range additionalLabels {
 			selector[k] = v

@@ -3,7 +3,9 @@ package controller
 import (
 	"fmt"
 
+	appspub "github.com/openkruise/kruise-api/apps/pub"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +30,9 @@ func RenderStatefulSet(
 	labels := common.RenderLabels(consts.ComponentTypeController, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeController, clusterName)
 
+	labels[consts.LabelControllerType] = consts.LabelControllerTypeMain
+	matchLabels[consts.LabelControllerType] = consts.LabelControllerTypeMain
+
 	nodeFilter := utils.MustGetBy(
 		nodeFilters,
 		controller.K8sNodeFilterName,
@@ -40,7 +45,8 @@ func RenderStatefulSet(
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
-	replicas := &controller.StatefulSet.Replicas
+	// Controller always has 1 replica
+	replicas := ptr.To(int32(1))
 	if check.IsMaintenanceActive(controller.Maintenance) {
 		replicas = ptr.To(consts.ZeroReplicas)
 	}
@@ -58,10 +64,7 @@ func RenderStatefulSet(
 			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
-					MaxUnavailable:  &controller.StatefulSet.MaxUnavailable,
-					PodUpdatePolicy: kruisev1b1.RecreatePodUpdateStrategyType,
-					Partition:       ptr.To(int32(0)),
-					MinReadySeconds: ptr.To(int32(0)),
+					PodUpdatePolicy: kruisev1b1.InPlaceIfPossiblePodUpdateStrategyType,
 				},
 			},
 			Selector: &metav1.LabelSelector{
@@ -90,6 +93,11 @@ func RenderStatefulSet(
 					},
 				},
 				Spec: corev1.PodSpec{
+					ReadinessGates: []corev1.PodReadinessGate{
+						{
+							ConditionType: appspub.InPlaceUpdateReady,
+						},
+					},
 					Affinity:     nodeFilter.Affinity,
 					NodeSelector: nodeFilter.NodeSelector,
 					Tolerations:  nodeFilter.Tolerations,
@@ -106,6 +114,7 @@ func RenderStatefulSet(
 					SecurityContext:               &corev1.PodSecurityContext{},
 					SchedulerName:                 corev1.DefaultSchedulerName,
 					DNSPolicy:                     corev1.DNSClusterFirst,
+					PriorityClassName:             controller.PriorityClassName,
 				},
 			},
 		},
