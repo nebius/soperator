@@ -112,7 +112,8 @@ void snccld_ensure_file_exists(const char *path, const bool as_user) {
 
     int fd;
     if (as_user) {
-        fd = open(path_absolute, O_CREAT | O_WRONLY | O_TRUNC);
+        const int user_file_mode = 0666;
+        fd = open(path_absolute, O_CREAT | O_WRONLY | O_TRUNC, user_file_mode);
     } else {
         fd = open(
             path_absolute, O_CREAT | O_WRONLY | O_TRUNC, SNCCLD_DEFAULT_MODE
