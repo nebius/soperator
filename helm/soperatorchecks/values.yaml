@@ -32,7 +32,7 @@ checks:
       slurmOperatorWatchNamespaces: '*'
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/soperatorchecks
-      tag: 1.21.9
+      tag: 1.21.10
     imagePullPolicy: Always
     resources:
       limits:
