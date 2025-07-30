@@ -1,0 +1,183 @@
+name: "Auto merge back to dev"
+
+on:
+  push:
+    branches:
+      - 'soperator-release-*'
+
+jobs:
+  create-merge-back-pr:
+    name: Create merge back PR
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      
+      - name: Get commit information
+        id: commit-info
+        run: |
+          # Get commit details
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          COMMIT_MESSAGE="$(git log -1 --pretty=format:'%s' ${COMMIT_SHA})"
+          COMMIT_AUTHOR_NAME="$(git log -1 --pretty=format:'%an' ${COMMIT_SHA})"
+          COMMIT_AUTHOR_EMAIL="$(git log -1 --pretty=format:'%ae' ${COMMIT_SHA})"
+          
+          # Extract branch name
+          RELEASE_BRANCH="${{ github.ref_name }}"
+          
+          # Save outputs
+          echo "sha=${COMMIT_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "short_sha=${SHORT_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "message=${COMMIT_MESSAGE}" >> "${GITHUB_OUTPUT}"
+          echo "author_name=${COMMIT_AUTHOR_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "author_email=${COMMIT_AUTHOR_EMAIL}" >> "${GITHUB_OUTPUT}"
+          echo "release_branch=${RELEASE_BRANCH}" >> "${GITHUB_OUTPUT}"
+          
+          echo "Commit SHA: ${COMMIT_SHA}"
+          echo "Commit Message: ${COMMIT_MESSAGE}"
+          echo "Author: ${COMMIT_AUTHOR_NAME} <${COMMIT_AUTHOR_EMAIL}>"
+          echo "Release Branch: ${RELEASE_BRANCH}"
+      
+      - name: Get GitHub username from email
+        id: get-username
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Try to get GitHub username from commit author email
+          AUTHOR_EMAIL="${{ steps.commit-info.outputs.author_email }}"
+          
+          # First try to search for user by email
+          echo "Searching for GitHub user with email: ${AUTHOR_EMAIL}"
+          
+          # Use GitHub API to search for users
+          # Note: This might not always work if email is private
+          USERNAME=""
+          
+          # Try to extract username from noreply email format
+          if [[ "${AUTHOR_EMAIL}" =~ ^[0-9]+\+(.+)@users\.noreply\.github\.com$ ]]; then
+            USERNAME="${BASH_REMATCH[1]}"
+            echo "Extracted username from noreply email: ${USERNAME}"
+          else
+            # Try to get username from recent commits by this author in the repo
+            echo "Checking recent commits for author username..."
+            USERNAME=$(gh api "repos/${{ github.repository }}/commits?author=${AUTHOR_EMAIL}" \
+              --jq '.[0].author.login' 2>/dev/null || echo "")
+          fi
+          
+          # Fallback to workflow actor if username not found
+          if [ -z "${USERNAME}" ]; then
+            USERNAME="${{ github.actor }}"
+            echo "Could not determine GitHub username from email, using workflow actor: ${USERNAME}"
+          else
+            echo "Found GitHub username: ${USERNAME}"
+          fi
+          
+          echo "username=${USERNAME}" >> "${GITHUB_OUTPUT}"
+      
+      - name: Check if commit is from PR
+        id: pr-info
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if this commit is associated with a PR
+          COMMIT_SHA="${{ steps.commit-info.outputs.sha }}"
+          RELEASE_BRANCH="${{ steps.commit-info.outputs.release_branch }}"
+          
+          # Search for PRs that were merged into this release branch and contain this commit
+          PR_INFO=$(gh pr list --state merged --base "${RELEASE_BRANCH}" --json number,title,mergeCommit \
+            --jq ".[] | select(.mergeCommit.oid == \"${COMMIT_SHA}\") | {number, title}" \
+            2>/dev/null || echo "")
+          
+          if [ -n "${PR_INFO}" ]; then
+            PR_NUMBER=$(echo "${PR_INFO}" | jq -r '.number')
+            PR_TITLE=$(echo "${PR_INFO}" | jq -r '.title')
+            echo "Found PR #${PR_NUMBER}: ${PR_TITLE}"
+            echo "pr_number=${PR_NUMBER}" >> "${GITHUB_OUTPUT}"
+            echo "pr_title=${PR_TITLE}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "No associated PR found for this commit"
+            echo "pr_number=" >> "${GITHUB_OUTPUT}"
+            echo "pr_title=" >> "${GITHUB_OUTPUT}"
+          fi
+      
+      - name: Create merge back branch
+        id: create-branch
+        run: |
+          # Create branch name
+          RELEASE_BRANCH="${{ steps.commit-info.outputs.release_branch }}"
+          SHORT_SHA="${{ steps.commit-info.outputs.short_sha }}"
+          NEW_BRANCH="merge-to-main-from/${RELEASE_BRANCH}-${SHORT_SHA}"
+          
+          # Create and push the branch
+          git checkout -b "${NEW_BRANCH}"
+          git push origin "${NEW_BRANCH}"
+          
+          echo "branch=${NEW_BRANCH}" >> "${GITHUB_OUTPUT}"
+          echo "Created branch: ${NEW_BRANCH}"
+      
+      - name: Create pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Determine PR title
+          PR_TITLE_FROM_COMMIT="${{ steps.pr-info.outputs.pr_title }}"
+          COMMIT_MESSAGE="${{ steps.commit-info.outputs.message }}"
+          
+          if [ -n "${PR_TITLE_FROM_COMMIT}" ]; then
+            PR_TITLE="Merge to main: ${PR_TITLE_FROM_COMMIT}"
+          else
+            PR_TITLE="Merge to main: ${COMMIT_MESSAGE}"
+          fi
+          
+          # Create PR body
+          AUTHOR_NAME="${{ steps.commit-info.outputs.author_name }}"
+          AUTHOR_EMAIL="${{ steps.commit-info.outputs.author_email }}"
+          USERNAME="${{ steps.get-username.outputs.username }}"
+          RELEASE_BRANCH="${{ steps.commit-info.outputs.release_branch }}"
+          COMMIT_SHA="${{ steps.commit-info.outputs.sha }}"
+          PR_NUMBER="${{ steps.pr-info.outputs.pr_number }}"
+          
+          PR_BODY="## Merge back from release branch
+
+This PR merges changes from the release branch back to the main branch.
+
+### Source Information
+- **Source branch**: \`${RELEASE_BRANCH}\`
+- **Target branch**: \`main\`
+- **Commit**: ${COMMIT_SHA}
+- **Author**: ${AUTHOR_NAME} <${AUTHOR_EMAIL}>
+- **GitHub user**: @${USERNAME}"
+          
+          if [ -n "${PR_NUMBER}" ]; then
+            PR_BODY="${PR_BODY}
+- **Original PR**: #${PR_NUMBER}"
+          fi
+          
+          PR_BODY="${PR_BODY}
+
+### Commit Message
+\`\`\`
+${COMMIT_MESSAGE}
+\`\`\`
+
+---
+*This PR was automatically created by the merge-back workflow.*"
+          
+          # Create the PR
+          gh pr create \
+            --base "main" \
+            --head "${{ steps.create-branch.outputs.branch }}" \
+            --title "${PR_TITLE}" \
+            --body "${PR_BODY}" \
+            --assignee "${USERNAME}" \
+            --label "ignore-for-release"
+          
+          echo "Pull request created successfully"
