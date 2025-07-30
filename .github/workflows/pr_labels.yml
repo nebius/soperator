@@ -13,6 +13,9 @@ jobs:
   check_labels:
     name: Check labels
     runs-on: ubuntu-latest
+    concurrency:
+      group: pr-${{ github.head_ref }}
+      cancel-in-progress: true
     steps:
       - uses: docker://agilepathway/pull-request-label-checker:latest
         with:
