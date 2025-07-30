@@ -84,26 +84,12 @@ func TestRenderDaemonSet(t *testing.T) {
 				},
 			}
 
-			volumeSources := []slurmv1.VolumeSource{
-				{
-					Name: "test-volume",
-					VolumeSource: corev1.VolumeSource{
-						EmptyDir: &corev1.EmptyDirVolumeSource{},
-					},
-				},
-			}
-
-			result, err := RenderDaemonSet(
+			result := RenderDaemonSet(
 				tt.namespace,
 				tt.clusterName,
 				nodeFilters,
-				volumeSources,
 				tt.controller,
 			)
-
-			if err != nil {
-				t.Fatalf("RenderDaemonSet() error = %v", err)
-			}
 
 			// Check basic metadata
 			if result.Name != tt.expectName {
@@ -257,17 +243,12 @@ func TestRenderDaemonSetNodeAffinity(t *testing.T) {
 		},
 	}
 
-	result, err := RenderDaemonSet(
+	result := RenderDaemonSet(
 		"test-namespace",
 		"test-cluster",
 		nodeFilters,
-		[]slurmv1.VolumeSource{},
 		controller,
 	)
-
-	if err != nil {
-		t.Fatalf("RenderDaemonSet() error = %v", err)
-	}
 
 	// Check node selector
 	expectedNodeSelector := map[string]string{

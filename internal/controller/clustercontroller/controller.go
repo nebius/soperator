@@ -114,17 +114,12 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling DaemonSet")
 
-					desired, err := controller.RenderDaemonSet(
+					desired := controller.RenderDaemonSet(
 						clusterValues.Namespace,
 						clusterValues.Name,
 						clusterValues.NodeFilters,
-						clusterValues.VolumeSources,
 						&clusterValues.NodeController,
 					)
-					if err != nil {
-						stepLogger.Error(err, "Failed to render DaemonSet")
-						return fmt.Errorf("rendering controller DaemonSet: %w", err)
-					}
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered DaemonSet")
 

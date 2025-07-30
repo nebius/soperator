@@ -19,9 +19,8 @@ func RenderDaemonSet(
 	namespace,
 	clusterName string,
 	nodeFilters []slurmv1.K8sNodeFilter,
-	volumeSources []slurmv1.VolumeSource,
 	controller *values.SlurmController,
-) (appsv1.DaemonSet, error) {
+) appsv1.DaemonSet {
 	labels := common.RenderLabels(consts.ComponentTypeController, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeController, clusterName)
 
@@ -73,5 +72,5 @@ func RenderDaemonSet(
 				},
 			},
 		},
-	}, nil
+	}
 }
