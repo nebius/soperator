@@ -84,7 +84,7 @@ func TestRenderDaemonSet(t *testing.T) {
 				},
 			}
 
-			result := RenderDaemonSet(
+			result := RenderPlaceholderDaemonSet(
 				tt.namespace,
 				tt.clusterName,
 				nodeFilters,
@@ -243,7 +243,7 @@ func TestRenderDaemonSetNodeAffinity(t *testing.T) {
 		},
 	}
 
-	result := RenderDaemonSet(
+	result := RenderPlaceholderDaemonSet(
 		"test-namespace",
 		"test-cluster",
 		nodeFilters,

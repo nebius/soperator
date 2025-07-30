@@ -15,7 +15,7 @@ import (
 )
 
 // RenderDaemonSet renders new [appsv1.DaemonSet] containing additional Slurm controller pods
-func RenderDaemonSet(
+func RenderPlaceholderDaemonSet(
 	namespace,
 	clusterName string,
 	nodeFilters []slurmv1.K8sNodeFilter,
@@ -58,7 +58,7 @@ func RenderDaemonSet(
 					NodeSelector: nodeFilter.NodeSelector,
 					Tolerations:  nodeFilter.Tolerations,
 					InitContainers: []corev1.Container{
-						common.RenderContainerMungeSleep(&controller.ContainerMunge),
+						common.RenderPlaceholderContainerMunge(&controller.ContainerMunge),
 					},
 					Containers: append(
 						[]corev1.Container{

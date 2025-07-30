@@ -114,7 +114,7 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling DaemonSet")
 
-					desired := controller.RenderDaemonSet(
+					desired := controller.RenderPlaceholderDaemonSet(
 						clusterValues.Namespace,
 						clusterValues.Name,
 						clusterValues.NodeFilters,
