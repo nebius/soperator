@@ -90,6 +90,25 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 				},
 			},
 			utils.MultiStepExecutionStep{
+				Name: "Slurm configs JailedConfigs",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling")
+
+					desired := common.RenderJailedConfigSlurmConfigs(clusterValues)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("Rendered")
+
+					if err := r.JailedConfig.Reconcile(stepCtx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return fmt.Errorf("reconciling JailedConfig with Slurm configs: %w", err)
+					}
+					stepLogger.V(1).Info("Reconciled")
+
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
 				Name: "Munge key Secret",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)

@@ -23,9 +23,6 @@ const (
 	LabelNodeConfiguratorKey   = "slurm.nebius.ai/node-configurator"
 	LabelNodeConfiguratorValue = "true"
 
-	LabelSConfigControllerSourceKey   = "sconficontroller.slurm.nebius.ai"
-	LabelSConfigControllerSourceValue = "true"
-
 	TopologyLabelPrefix = "topology.nebius.com"
 	TierOnePrefix       = TopologyLabelPrefix + "/tier-1"
 )

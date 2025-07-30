@@ -58,7 +58,6 @@ func BasePodTemplateSpec(
 					clusterNamespace,
 					clusterName,
 					slurmAPIServer,
-					sConfigController.JailSlurmConfigPath,
 					sConfigController.Container,
 				),
 			},

@@ -2,12 +2,14 @@ package common
 
 import (
 	"fmt"
+	"path/filepath"
 	"reflect"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	renderutils "nebius.ai/slurm-operator/internal/render/utils"
@@ -27,10 +29,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) corev1.ConfigMap 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapSlurmConfigsName(cluster.Name),
 			Namespace: cluster.Namespace,
-			Annotations: map[string]string{
-				consts.AnnotationSConfigControllerSourceKey: consts.DefaultSConfigControllerSourcePath,
-			},
-			Labels: renderConfigMapSlurmConfigsLabels(consts.ComponentTypeController, cluster.Name),
+			Labels:    RenderLabels(consts.ComponentTypeController, cluster.Name),
 		},
 		Data: map[string]string{
 			consts.ConfigMapKeySlurmConfig:       generateSlurmConfig(cluster).Render(),
@@ -44,11 +43,33 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) corev1.ConfigMap 
 	}
 }
 
-func renderConfigMapSlurmConfigsLabels(componentType consts.ComponentType, clusterName string) map[string]string {
-	labels := RenderLabels(componentType, clusterName)
-	labels[consts.LabelSConfigControllerSourceKey] = consts.LabelSConfigControllerSourceValue
+// RenderConfigMapSlurmConfigs renders new [slurmv1alpha1.JailedConfig] for every config in `RenderConfigMapSlurmConfigs` result
+func RenderJailedConfigSlurmConfigs(cluster *values.SlurmCluster) slurmv1alpha1.JailedConfig {
+	// This must match ConfigMap name in `RenderConfigMapSlurmConfigs`
+	name := naming.BuildConfigMapSlurmConfigsName(cluster.Name)
 
-	return labels
+	return slurmv1alpha1.JailedConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      naming.BuildConfigMapSlurmConfigsName(cluster.Name),
+			Namespace: cluster.Namespace,
+			Labels:    RenderLabels(consts.ComponentTypeController, cluster.Name),
+		},
+		Spec: slurmv1alpha1.JailedConfigSpec{
+			ConfigMap: slurmv1alpha1.ConfigMapReference{
+				Name: name,
+			},
+			Items: []corev1.KeyToPath{
+				{Key: consts.ConfigMapKeySlurmConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeySlurmConfig)},
+				{Key: consts.ConfigMapKeyRESTConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyRESTConfig)},
+				{Key: consts.ConfigMapKeyCustomSlurmConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyCustomSlurmConfig)},
+				{Key: consts.ConfigMapKeyCGroupConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyCGroupConfig)},
+				{Key: consts.ConfigMapKeySpankConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeySpankConfig)},
+				{Key: consts.ConfigMapKeyGresConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyGresConfig)},
+				{Key: consts.ConfigMapKeyMPIConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyMPIConfig)},
+			},
+			UpdateActions: []slurmv1alpha1.UpdateAction{slurmv1alpha1.UpdateActionReconfigure},
+		},
+	}
 }
 
 func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {

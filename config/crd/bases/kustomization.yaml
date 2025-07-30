@@ -3,3 +3,4 @@ resources:
 - slurm.nebius.ai_nodeconfigurators.yaml
 - slurm.nebius.ai_nodesets.yaml
 - slurm.nebius.ai_slurmclusters.yaml
+- slurm.nebius.ai_jailedconfigs.yaml
