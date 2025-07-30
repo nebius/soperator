@@ -16,7 +16,7 @@
 
 #include <slurm/spank.h>
 
-spank_err_t snccld_mkdir_p(const char *path, mode_t mode) {
+spank_err_t snccld_mkdir_p(const char *path, const bool as_user) {
     char  tmp[PATH_MAX + 1] = "";
     char *p                 = NULL;
 
@@ -34,23 +34,40 @@ spank_err_t snccld_mkdir_p(const char *path, mode_t mode) {
         if (*p == '/') {
             *p = '\0';
 
-            const mode_t old_mask = umask(0);
-            if (mkdir(tmp, mode) != 0 && errno != EEXIST) {
-                umask(old_mask);
+            const int ret = mkdir(tmp, SNCCLD_DEFAULT_MODE);
+            if (ret != 0) {
+                if (errno != EEXIST) {
+                    snccld_log_error("Cannot mkdir %s: %m", tmp);
+                    return ESPANK_ERROR;
+                }
+
+                // Directory already exists, skipping.
+                *p = '/';
+                continue;
+            }
+
+            if (!as_user && chmod(tmp, SNCCLD_DEFAULT_MODE) != 0) {
+                snccld_log_error("Cannot chmod %s: %m", tmp);
                 return ESPANK_ERROR;
             }
-            umask(old_mask);
 
             *p = '/';
         }
     }
 
-    const mode_t old_mask = umask(0);
-    if (mkdir(tmp, mode) != 0 && errno != EEXIST) {
-        umask(old_mask);
+    const int ret = mkdir(tmp, SNCCLD_DEFAULT_MODE);
+    if (ret != 0) {
+        if (errno != EEXIST) {
+            snccld_log_error("Cannot mkdir %s: %m", tmp);
+            return ESPANK_ERROR;
+        }
+        // Directory already exists.
+    }
+
+    if (!as_user && chmod(tmp, SNCCLD_DEFAULT_MODE) != 0) {
+        snccld_log_error("Cannot chmod %s: %m", tmp);
         return ESPANK_ERROR;
     }
-    umask(old_mask);
 
     return ESPANK_SUCCESS;
 }
@@ -84,36 +101,38 @@ void snccld_split_file_path(const char *path, char **dir_out, char **file_out) {
     }
 }
 
-void snccld_ensure_file_exists(const char *path) {
+void snccld_ensure_file_exists(const char *path, const bool as_user) {
     char *dir = NULL, *file = NULL;
     snccld_split_file_path(path, &dir, &file);
 
-    snccld_mkdir_p(dir, SNCCLD_DEFAULT_MODE);
+    snccld_mkdir_p(dir, as_user);
 
-    char user_debug_file_absolute[PATH_MAX + 1] = "";
-    snprintf(
-        user_debug_file_absolute,
-        sizeof(user_debug_file_absolute),
-        "%s/%s",
-        dir,
-        file
-    );
+    char path_absolute[PATH_MAX + 1] = "";
+    snprintf(path_absolute, sizeof(path_absolute), "%s/%s", dir, file);
 
-    const mode_t old_mask           = umask(0);
-    const int    user_debug_file_fd = open(
-        user_debug_file_absolute,
-        O_CREAT | O_WRONLY | O_TRUNC,
-        SNCCLD_DEFAULT_MODE
-    );
-    if (user_debug_file_fd < 0) {
-        snccld_log_error("Cannot create file: '%s'", user_debug_file_absolute);
+    int fd;
+    if (as_user) {
+        const int user_file_mode = 0666;
+        fd = open(path_absolute, O_CREAT | O_WRONLY | O_TRUNC, user_file_mode);
     } else {
-        snccld_log_debug("File created: '%s'", user_debug_file_absolute);
-        close(user_debug_file_fd);
+        fd = open(
+            path_absolute, O_CREAT | O_WRONLY | O_TRUNC, SNCCLD_DEFAULT_MODE
+        );
     }
-    umask(old_mask);
+
+    if (fd < 0) {
+        snccld_log_error("Cannot create file: '%s'", path_absolute);
+    } else {
+        snccld_log_debug("File created: '%s'", path_absolute);
+
+        if (!as_user && fchmod(fd, SNCCLD_DEFAULT_MODE) != 0) {
+            snccld_log_error("Cannot chmod %s: %m", path_absolute);
+        }
+
+        close(fd);
+    }
 }
 
-inline void snccld_ensure_dir_exists(const char *path) {
-    snccld_mkdir_p(path, SNCCLD_DEFAULT_MODE);
+inline void snccld_ensure_dir_exists(const char *path, const bool as_user) {
+    snccld_mkdir_p(path, as_user);
 }
