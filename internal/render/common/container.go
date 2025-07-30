@@ -92,7 +92,7 @@ func RenderContainerMunge(container *values.Container, opts ...RenderOption) cor
 
 // RenderContainerMungeSleep renders [corev1.Container] for munge in sleep mode for DaemonSet
 func RenderContainerMungeSleep(container *values.Container) corev1.Container {
-	// Since 1.29 is native sidecar support, we can use the native restart policy
+	// Since Kubernetes 1.29 has native sidecar support, we can use the native restart policy
 	restartPolicy := corev1.ContainerRestartPolicy("Always")
 
 	return corev1.Container{
