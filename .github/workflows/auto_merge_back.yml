@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'soperator-release-*'
+      - 'release-1.21/merge-back-to-main'  # Temporary for testing
 
 jobs:
   create-merge-back-pr:
@@ -24,14 +25,18 @@ jobs:
         id: commit-info
         run: |
           # Get commit details
-          COMMIT_SHA="${{ github.sha }}"
+          # TEMPORARY: Hardcode test commit
+          COMMIT_SHA="36f3084390c48f3a42fcc2ccb2a883bd0a0c172d"  # PR #1319: Fix bump version detection
+          # COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
           COMMIT_MESSAGE="$(git log -1 --pretty=format:'%s' ${COMMIT_SHA})"
           COMMIT_AUTHOR_NAME="$(git log -1 --pretty=format:'%an' ${COMMIT_SHA})"
           COMMIT_AUTHOR_EMAIL="$(git log -1 --pretty=format:'%ae' ${COMMIT_SHA})"
           
           # Extract branch name
-          RELEASE_BRANCH="${{ github.ref_name }}"
+          # TEMPORARY: Hardcode release branch for testing
+          RELEASE_BRANCH="soperator-release-1.21"
+          # RELEASE_BRANCH="${{ github.ref_name }}"
           
           # Save outputs
           echo "sha=${COMMIT_SHA}" >> "${GITHUB_OUTPUT}"
@@ -92,29 +97,40 @@ jobs:
           RELEASE_BRANCH="${{ steps.commit-info.outputs.release_branch }}"
           
           # Search for PRs that were merged into this release branch and contain this commit
-          PR_INFO=$(gh pr list --state merged --base "${RELEASE_BRANCH}" --json number,title,mergeCommit \
-            --jq ".[] | select(.mergeCommit.oid == \"${COMMIT_SHA}\") | {number, title}" \
+          PR_INFO=$(gh pr list --state merged --base "${RELEASE_BRANCH}" --json number,title,mergeCommit,headRefName \
+            --jq ".[] | select(.mergeCommit.oid == \"${COMMIT_SHA}\") | {number, title, headRefName}" \
             2>/dev/null || echo "")
           
           if [ -n "${PR_INFO}" ]; then
             PR_NUMBER=$(echo "${PR_INFO}" | jq -r '.number')
             PR_TITLE=$(echo "${PR_INFO}" | jq -r '.title')
+            PR_HEAD_REF=$(echo "${PR_INFO}" | jq -r '.headRefName')
             echo "Found PR #${PR_NUMBER}: ${PR_TITLE}"
+            echo "Original branch: ${PR_HEAD_REF}"
             echo "pr_number=${PR_NUMBER}" >> "${GITHUB_OUTPUT}"
             echo "pr_title=${PR_TITLE}" >> "${GITHUB_OUTPUT}"
+            echo "pr_head_ref=${PR_HEAD_REF}" >> "${GITHUB_OUTPUT}"
           else
             echo "No associated PR found for this commit"
             echo "pr_number=" >> "${GITHUB_OUTPUT}"
             echo "pr_title=" >> "${GITHUB_OUTPUT}"
+            echo "pr_head_ref=" >> "${GITHUB_OUTPUT}"
           fi
       
       - name: Create merge back branch
         id: create-branch
         run: |
           # Create branch name
-          RELEASE_BRANCH="${{ steps.commit-info.outputs.release_branch }}"
+          PR_HEAD_REF="${{ steps.pr-info.outputs.pr_head_ref }}"
           SHORT_SHA="${{ steps.commit-info.outputs.short_sha }}"
-          NEW_BRANCH="merge-to-main-from/${RELEASE_BRANCH}-${SHORT_SHA}"
+          
+          # Use original PR branch name if available, otherwise use release branch with SHA
+          if [ -n "${PR_HEAD_REF}" ]; then
+            NEW_BRANCH="merge-to-main-from/${PR_HEAD_REF}"
+          else
+            RELEASE_BRANCH="${{ steps.commit-info.outputs.release_branch }}"
+            NEW_BRANCH="merge-to-main-from/${RELEASE_BRANCH}-${SHORT_SHA}"
+          fi
           
           # Create and push the branch
           git checkout -b "${NEW_BRANCH}"
