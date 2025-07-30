@@ -161,7 +161,21 @@ jobs:
           COMMIT_SHA="${{ steps.commit-info.outputs.sha }}"
           PR_NUMBER="${{ steps.pr-info.outputs.pr_number }}"
           
-          PR_BODY="## Merge back from release branch
+          # Create the PR using heredoc for body
+          if [ -n "${PR_NUMBER}" ]; then
+            ORIGINAL_PR_LINE="- **Original PR**: #${PR_NUMBER}"
+          else
+            ORIGINAL_PR_LINE=""
+          fi
+          
+          gh pr create \
+            --base "main" \
+            --head "${{ steps.create-branch.outputs.branch }}" \
+            --title "${PR_TITLE}" \
+            --assignee "${USERNAME}" \
+            --label "ignore-for-release" \
+            --body "$(cat <<EOF
+## Merge back from release branch
 
 This PR merges changes from the release branch back to the main branch.
 
@@ -170,14 +184,8 @@ This PR merges changes from the release branch back to the main branch.
 - **Target branch**: \`main\`
 - **Commit**: ${COMMIT_SHA}
 - **Author**: ${AUTHOR_NAME} <${AUTHOR_EMAIL}>
-- **GitHub user**: @${USERNAME}"
-          
-          if [ -n "${PR_NUMBER}" ]; then
-            PR_BODY="${PR_BODY}
-- **Original PR**: #${PR_NUMBER}"
-          fi
-          
-          PR_BODY="${PR_BODY}
+- **GitHub user**: @${USERNAME}
+${ORIGINAL_PR_LINE}
 
 ### Commit Message
 \`\`\`
@@ -185,15 +193,8 @@ ${COMMIT_MESSAGE}
 \`\`\`
 
 ---
-*This PR was automatically created by the merge-back workflow.*"
-          
-          # Create the PR
-          gh pr create \
-            --base "main" \
-            --head "${{ steps.create-branch.outputs.branch }}" \
-            --title "${PR_TITLE}" \
-            --body "${PR_BODY}" \
-            --assignee "${USERNAME}" \
-            --label "ignore-for-release"
+*This PR was automatically created by the merge-back workflow.*
+EOF
+          )"
           
           echo "Pull request created successfully"
