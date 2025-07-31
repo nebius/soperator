@@ -23,6 +23,4 @@ jobs:
       - name: Run auto merge-back workflow
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          chmod +x .github/workflows/scripts/auto-merge-back.sh
-          .github/workflows/scripts/auto-merge-back.sh
+        run: .github/workflows/scripts/auto-merge-back.sh

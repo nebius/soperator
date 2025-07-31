@@ -1,19 +1,20 @@
 #!/bin/bash
-set -euo pipefail
 
-# ============================================
+# Exit on error
+set -e
+# Exit on undefined variable
+set -u
+# Exit on pipe failure
+set -o pipefail
+
 # Auto Merge-Back Workflow Script
-# ============================================
-# This script automatically creates pull requests to merge changes
-# from release branches back to the main branch.
+# Creates pull requests to merge changes from release branches back to main
 #
-# It performs the following steps:
-# 1. Extracts commit information
-# 2. Finds the GitHub username for the commit author
-# 3. Checks if the commit came from a PR to get original details
-# 4. Creates a new branch for the merge-back
-# 5. Creates a pull request to main
-# ============================================
+# GitHub provides these environment variables automatically:
+# - GITHUB_SHA: The commit SHA that triggered the workflow
+# - GITHUB_REF_NAME: The branch name (e.g., "soperator-release-1.21")
+# - GITHUB_REPOSITORY: The repository name (e.g., "nebius/soperator")
+# - GITHUB_ACTOR: The user who triggered the workflow
 
 # Global variables
 declare COMMIT_SHA
@@ -29,9 +30,6 @@ declare PR_HEAD_REF
 declare PR_BODY
 declare NEW_BRANCH
 
-# ============================================
-# FUNCTION: Get commit information
-# ============================================
 get_commit_info() {
     echo "=== Getting commit information ==="
     
@@ -50,9 +48,6 @@ get_commit_info() {
     echo "Release Branch: ${RELEASE_BRANCH}"
 }
 
-# ============================================
-# FUNCTION: Get GitHub username from email
-# ============================================
 get_github_username() {
     echo "=== Finding GitHub username ==="
     echo "Searching for GitHub user with email: ${COMMIT_AUTHOR_EMAIL}"
@@ -79,9 +74,6 @@ get_github_username() {
     fi
 }
 
-# ============================================
-# FUNCTION: Get PR information
-# ============================================
 get_pr_info() {
     echo "=== Checking for associated pull request ==="
     
@@ -107,9 +99,6 @@ get_pr_info() {
     fi
 }
 
-# ============================================
-# FUNCTION: Create merge-back branch
-# ============================================
 create_merge_branch() {
     echo "=== Creating merge-back branch ==="
     
@@ -127,9 +116,6 @@ create_merge_branch() {
     echo "Created branch: ${NEW_BRANCH}"
 }
 
-# ============================================
-# FUNCTION: Create pull request
-# ============================================
 create_pull_request() {
     echo "=== Creating pull request ==="
     
@@ -173,25 +159,12 @@ ${COMMIT_MESSAGE}
     echo "Pull request created successfully"
 }
 
-# ============================================
-# MAIN EXECUTION
-# ============================================
 main() {
-    echo "========================================"
-    echo "Auto Merge-Back Workflow"
-    echo "========================================"
-    
-    # Execute all steps
     get_commit_info
     get_github_username
     get_pr_info
     create_merge_branch
     create_pull_request
-    
-    echo "========================================"
-    echo "Workflow completed successfully"
-    echo "========================================"
 }
 
-# Run main function
 main "$@"
