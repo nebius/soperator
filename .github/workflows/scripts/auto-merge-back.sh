@@ -1,11 +1,8 @@
 #!/bin/bash
 
-# Exit on error
-set -e
-# Exit on undefined variable
-set -u
-# Exit on pipe failure
-set -o pipefail
+set -e          # Exit on error
+set -u          # Exit on undefined variable
+set -o pipefail # Exit on pipe failure
 
 # Auto Merge-Back Workflow Script
 # Creates pull requests to merge changes from release branches back to main
@@ -18,7 +15,7 @@ set -o pipefail
 
 # Global variables
 declare COMMIT_SHA
-declare SHORT_SHA
+declare COMMIT_SHORT_SHA
 declare COMMIT_MESSAGE
 declare COMMIT_AUTHOR_NAME
 declare COMMIT_AUTHOR_EMAIL
@@ -35,7 +32,7 @@ get_commit_info() {
     
     # Get commit details
     COMMIT_SHA="${GITHUB_SHA}"
-    SHORT_SHA="${COMMIT_SHA:0:7}"
+    COMMIT_SHORT_SHA="${COMMIT_SHA:0:7}"
     COMMIT_MESSAGE="$(git log -1 --pretty=format:'%s' ${COMMIT_SHA})"
     COMMIT_AUTHOR_NAME="$(git log -1 --pretty=format:'%an' ${COMMIT_SHA})"
     COMMIT_AUTHOR_EMAIL="$(git log -1 --pretty=format:'%ae' ${COMMIT_SHA})"
@@ -106,7 +103,7 @@ create_merge_branch() {
     if [ -n "${PR_HEAD_REF}" ]; then
         NEW_BRANCH="merge-to-main-from/${PR_HEAD_REF}"
     else
-        NEW_BRANCH="merge-to-main-from/${RELEASE_BRANCH}-${SHORT_SHA}"
+        NEW_BRANCH="merge-to-main-from/${RELEASE_BRANCH}-${COMMIT_SHORT_SHA}"
     fi
     
     # Create and push the branch
@@ -139,7 +136,7 @@ create_pull_request() {
 ${PR_BODY}"
     else
         # Fallback for commits without PRs
-        pr_body="This is merge back of commit ${SHORT_SHA} by @${USERNAME}
+        pr_body="This is merge back of commit ${COMMIT_SHORT_SHA} by @${USERNAME}
 
 Commit message:
 \`\`\`
