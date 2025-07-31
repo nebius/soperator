@@ -216,7 +216,7 @@ RUN apt-get update && \
 # Create directory for bind-mounting it from the host. It's needed for sbatch to work
 RUN mkdir -m 755 -p /var/spool/slurmd
 
-# Install nvidia-container-toolkit
+# Install nvidia-container-toolkit (for enroot usage)
 COPY images/common/scripts/install_container_toolkit.sh /opt/bin/
 RUN chmod +x /opt/bin/install_container_toolkit.sh && \
     /opt/bin/install_container_toolkit.sh && \
