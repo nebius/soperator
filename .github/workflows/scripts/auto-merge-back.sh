@@ -35,16 +35,12 @@ get_commit_info() {
     echo "=== Getting commit information ==="
     
     # Get commit details
-    # TEMPORARY: Hardcode test commit
-    COMMIT_SHA="36f3084390c48f3a42fcc2ccb2a883bd0a0c172d"  # PR #1319: Fix bump version detection
-    # COMMIT_SHA="${GITHUB_SHA}"
+    COMMIT_SHA="${GITHUB_SHA}"
     SHORT_SHA="${COMMIT_SHA:0:7}"
     COMMIT_MESSAGE="$(git log -1 --pretty=format:'%s' ${COMMIT_SHA})"
     COMMIT_AUTHOR_NAME="$(git log -1 --pretty=format:'%an' ${COMMIT_SHA})"
     COMMIT_AUTHOR_EMAIL="$(git log -1 --pretty=format:'%ae' ${COMMIT_SHA})"
-    # TEMPORARY: Hardcode release branch for testing
-    RELEASE_BRANCH="soperator-release-1.21"
-    # RELEASE_BRANCH="${GITHUB_REF_NAME}"
+    RELEASE_BRANCH="${GITHUB_REF_NAME}"
     
     # Log for debugging
     echo "Commit SHA: ${COMMIT_SHA}"
