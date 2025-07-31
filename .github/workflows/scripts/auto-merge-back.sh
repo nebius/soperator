@@ -26,6 +26,7 @@ declare USERNAME
 declare PR_NUMBER
 declare PR_TITLE
 declare PR_HEAD_REF
+declare PR_BODY
 declare NEW_BRANCH
 
 # ============================================
@@ -86,14 +87,15 @@ get_pr_info() {
     
     # Search for PRs that were merged into this release branch and contain this commit
     local pr_info=$(gh pr list --state merged --base "${RELEASE_BRANCH}" \
-        --json number,title,mergeCommit,headRefName \
-        --jq ".[] | select(.mergeCommit.oid == \"${COMMIT_SHA}\") | {number, title, headRefName}" \
+        --json number,title,mergeCommit,headRefName,body \
+        --jq ".[] | select(.mergeCommit.oid == \"${COMMIT_SHA}\") | {number, title, headRefName, body}" \
         2>/dev/null || echo "")
     
     if [ -n "${pr_info}" ]; then
         PR_NUMBER=$(echo "${pr_info}" | jq -r '.number')
         PR_TITLE=$(echo "${pr_info}" | jq -r '.title')
         PR_HEAD_REF=$(echo "${pr_info}" | jq -r '.headRefName')
+        PR_BODY=$(echo "${pr_info}" | jq -r '.body // ""')
         echo "Found PR #${PR_NUMBER}: ${PR_TITLE}"
         echo "Original branch: ${PR_HEAD_REF}"
     else
@@ -101,6 +103,7 @@ get_pr_info() {
         PR_NUMBER=""
         PR_TITLE=""
         PR_HEAD_REF=""
+        PR_BODY=""
     fi
 }
 
@@ -140,31 +143,23 @@ create_pull_request() {
     echo "PR Title: ${pr_title}"
     
     # Build PR body
-    local pr_body="## Merge back from release branch
-
-This PR merges changes from the release branch back to the main branch.
-
-### Source Information
-- **Source branch**: \`${RELEASE_BRANCH}\`
-- **Target branch**: \`main\`
-- **Commit**: ${COMMIT_SHA}
-- **Author**: ${COMMIT_AUTHOR_NAME} <${COMMIT_AUTHOR_EMAIL}>
-- **GitHub user**: @${USERNAME}"
-    
+    local pr_body
     if [ -n "${PR_NUMBER}" ]; then
-        pr_body="${pr_body}
-- **Original PR**: #${PR_NUMBER}"
-    fi
-    
-    pr_body="${pr_body}
+        # If we have a PR, use its description
+        pr_body="This is merge back of the [Pull Request #${PR_NUMBER}](https://github.com/${GITHUB_REPOSITORY}/pull/${PR_NUMBER}) by @${USERNAME}
 
-### Commit Message
+# Original PR Description
+
+${PR_BODY}"
+    else
+        # Fallback for commits without PRs
+        pr_body="This is merge back of commit ${SHORT_SHA} by @${USERNAME}
+
+Commit message:
 \`\`\`
 ${COMMIT_MESSAGE}
-\`\`\`
-
----
-*This PR was automatically created by the merge-back workflow.*"
+\`\`\`"
+    fi
     
     # Create the PR
     gh pr create \
