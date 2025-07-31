@@ -21,6 +21,7 @@ type MetricsCollector struct {
 	nodeInfo       *prometheus.Desc
 	jobInfo        *prometheus.Desc
 	jobNode        *prometheus.Desc
+	jobDuration    *prometheus.Desc
 	nodeGPUSeconds *prometheus.CounterVec
 	nodeFails      *prometheus.CounterVec
 
@@ -40,9 +41,10 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 	return &MetricsCollector{
 		slurmAPIClient: slurmAPIClient,
 
-		nodeInfo: prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "address"}, nil),
-		jobInfo:  prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "user_id", "standard_error", "standard_output", "array_job_id", "array_task_id", "submit_time", "start_time", "end_time"}, nil),
-		jobNode:  prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
+		nodeInfo:    prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "address"}, nil),
+		jobInfo:     prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "user_id", "standard_error", "standard_output", "array_job_id", "array_task_id", "submit_time", "start_time", "end_time", "finished_time"}, nil),
+		jobNode:     prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
+		jobDuration: prometheus.NewDesc("slurm_job_duration_seconds", "Slurm job duration in seconds", []string{"job_id"}, nil),
 		nodeGPUSeconds: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "slurm_node_gpu_seconds_total",
 			Help: "Total GPU seconds on Slurm nodes",
@@ -68,6 +70,7 @@ func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.nodeInfo
 	ch <- c.jobInfo
 	ch <- c.jobNode
+	ch <- c.jobDuration
 	c.nodeGPUSeconds.Describe(ch)
 	c.nodeFails.Describe(ch)
 
@@ -183,6 +186,11 @@ func (c *MetricsCollector) slurmJobMetrics(
 				userID = strconv.Itoa(int(*job.UserID))
 			}
 
+			var finishedTime string
+			if job.IsTerminalState() && job.EndTime != nil && job.EndTime.Unix() != 0 {
+				finishedTime = timeToUnixString(job.EndTime)
+			}
+
 			jobLabels := []string{
 				job.GetIDString(),
 				job.State,
@@ -198,8 +206,26 @@ func (c *MetricsCollector) slurmJobMetrics(
 				timeToUnixString(job.SubmitTime),
 				timeToUnixString(job.StartTime),
 				timeToUnixString(job.EndTime),
+				finishedTime,
 			}
 			yield(prometheus.MustNewConstMetric(c.jobInfo, prometheus.GaugeValue, 1, jobLabels...))
+
+			// Calculate job duration
+			if job.StartTime != nil && job.StartTime.Unix() != 0 {
+				var endTime time.Time
+				if job.IsTerminalState() && job.EndTime != nil && job.EndTime.Unix() != 0 {
+					endTime = job.EndTime.Time
+				} else if !job.IsTerminalState() {
+					endTime = time.Now()
+				}
+
+				if !endTime.IsZero() {
+					duration := endTime.Sub(job.StartTime.Time).Seconds()
+					if duration > 0 {
+						yield(prometheus.MustNewConstMetric(c.jobDuration, prometheus.GaugeValue, duration, job.GetIDString()))
+					}
+				}
+			}
 
 			nodeList, err := job.GetNodeList()
 			if err != nil {
@@ -265,7 +291,7 @@ func (c *MetricsCollector) slurmRPCMetrics(
 }
 
 func timeToUnixString(t *metav1.Time) string {
-	if t == nil {
+	if t == nil || t.Unix() == 0 {
 		return ""
 	}
 	return strconv.FormatInt(t.Unix(), 10)
