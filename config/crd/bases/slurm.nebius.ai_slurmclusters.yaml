@@ -19,10 +19,10 @@ spec:
       jsonPath: .status.phase
       name: Status
       type: string
-    - description: The number of controller nodes
-      jsonPath: .spec.slurmNodes.controller.size
+    - description: The controller node filter
+      jsonPath: .spec.slurmNodes.controller.k8sNodeFilterName
       name: Controllers
-      type: integer
+      type: string
     - description: The number of worker nodes
       jsonPath: .spec.slurmNodes.worker.size
       name: Workers
@@ -6874,10 +6874,6 @@ spec:
                         description: PriorityClassName defines the priority class
                           for the Slurm controller pods
                         type: string
-                      size:
-                        description: Size defines the number of node instances
-                        format: int32
-                        type: integer
                       slurmctld:
                         description: Slurmctld represents the Slurm control daemon
                           configuration
