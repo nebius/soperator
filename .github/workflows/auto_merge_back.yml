@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'soperator-release-*'
+      - 'release-1.21/merge-back-to-main'  # Temporary for testing
 
 jobs:
   create-merge-back-pr:
@@ -20,50 +21,9 @@ jobs:
         with:
           fetch-depth: 0
       
-      - name: Make scripts executable
-        run: chmod +x .github/workflows/scripts/auto-merge-back/*.sh
-      
-      - name: Get commit information
-        id: commit-info
-        run: |
-          .github/workflows/scripts/auto-merge-back/get-commit-info.sh
-      
-      - name: Get GitHub username from email
-        id: get-username
+      - name: Run auto merge-back workflow
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          .github/workflows/scripts/auto-merge-back/get-github-username.sh \
-            "${{ steps.commit-info.outputs.author_email }}"
-      
-      - name: Check if commit is from PR
-        id: pr-info
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          .github/workflows/scripts/auto-merge-back/get-pr-info.sh \
-            "${{ steps.commit-info.outputs.sha }}" \
-            "${{ steps.commit-info.outputs.release_branch }}"
-      
-      - name: Create merge back branch
-        id: create-branch
-        run: |
-          .github/workflows/scripts/auto-merge-back/create-merge-branch.sh \
-            "${{ steps.pr-info.outputs.pr_head_ref }}" \
-            "${{ steps.commit-info.outputs.release_branch }}" \
-            "${{ steps.commit-info.outputs.short_sha }}"
-      
-      - name: Create pull request
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          .github/workflows/scripts/auto-merge-back/create-pr.sh \
-            "${{ steps.pr-info.outputs.pr_title }}" \
-            "${{ steps.commit-info.outputs.message }}" \
-            "${{ steps.commit-info.outputs.release_branch }}" \
-            "${{ steps.commit-info.outputs.sha }}" \
-            "${{ steps.commit-info.outputs.author_name }}" \
-            "${{ steps.commit-info.outputs.author_email }}" \
-            "${{ steps.get-username.outputs.username }}" \
-            "${{ steps.pr-info.outputs.pr_number }}" \
-            "${{ steps.create-branch.outputs.branch }}"
+          chmod +x .github/workflows/scripts/auto-merge-back.sh
+          .github/workflows/scripts/auto-merge-back.sh
