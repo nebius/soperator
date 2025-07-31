@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'soperator-release-*'
+      - 'release-1.21/merge-back-to-main'  # Temporary for testing
 
 jobs:
   create-merge-back-pr:
