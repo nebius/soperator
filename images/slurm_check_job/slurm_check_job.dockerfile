@@ -2,7 +2,7 @@ ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:noble
 
 FROM $BASE_IMAGE AS slurm_check_job
 
-ARG SLURM_VERSION=24.11.5
+ARG SLURM_VERSION=24.11.6
 ARG PYXIS_VERSION=0.21.0
 
 ARG DEBIAN_FRONTEND=noninteractive

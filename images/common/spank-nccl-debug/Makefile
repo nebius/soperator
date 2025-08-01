@@ -11,7 +11,7 @@ endif
 TARGET_COMPILATION_MODE ?= release
 
 # https://github.com/SchedMD/slurm/tags
-SLURM_VERSION ?= 24.11.5.1
+SLURM_VERSION ?= 24.11.6.1
 # Replace underscores and dashes with dots
 SLURM_VERSION_BRANCH = $(subst _,-,$(subst .,-,$(SLURM_VERSION)))
 
