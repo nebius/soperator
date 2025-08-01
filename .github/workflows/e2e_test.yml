@@ -1,9 +1,6 @@
 name: E2E test soperator
 
 on:
-  schedule:
-    # Every hour
-    - cron: '0 */1 * * *'
   workflow_dispatch:
     inputs:
       terraform_repo:
