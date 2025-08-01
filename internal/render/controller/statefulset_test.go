@@ -28,12 +28,11 @@ func TestRenderStatefulSet(t *testing.T) {
 			namespace:   "test-namespace",
 			clusterName: "test-cluster",
 			controller: &values.SlurmController{
-				SlurmNode: slurmv1.SlurmNode{
-					K8sNodeFilterName: "test-filter",
-				},
+				K8sNodeFilterName: "test-filter",
 				StatefulSet: values.StatefulSet{
-					Name:     "test-controller-sts",
-					Replicas: 1,
+					Name:           "test-controller-sts",
+					Replicas:       1,
+					MaxUnavailable: intstr.FromInt32(1),
 				},
 				Service: values.Service{
 					Name: "test-controller-svc",
@@ -207,9 +206,7 @@ func TestRenderStatefulSet(t *testing.T) {
 func TestRenderStatefulSetWithMaintenance(t *testing.T) {
 	maintenanceMode := consts.MaintenanceMode("enabled")
 	controller := &values.SlurmController{
-		SlurmNode: slurmv1.SlurmNode{
-			K8sNodeFilterName: "test-filter",
-		},
+		K8sNodeFilterName: "test-filter",
 		StatefulSet: values.StatefulSet{
 			Name:           "test-controller-sts",
 			Replicas:       1,

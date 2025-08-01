@@ -26,9 +26,7 @@ func TestRenderDaemonSet(t *testing.T) {
 			namespace:   "test-namespace",
 			clusterName: "test-cluster",
 			controller: &values.SlurmController{
-				SlurmNode: slurmv1.SlurmNode{
-					K8sNodeFilterName: "test-filter",
-				},
+				K8sNodeFilterName: "test-filter",
 				DaemonSet: values.DaemonSet{
 					Name: "test-controller-daemonset",
 				},
@@ -203,9 +201,7 @@ func TestRenderDaemonSet(t *testing.T) {
 
 func TestRenderDaemonSetNodeAffinity(t *testing.T) {
 	controller := &values.SlurmController{
-		SlurmNode: slurmv1.SlurmNode{
-			K8sNodeFilterName: "test-filter",
-		},
+		K8sNodeFilterName: "test-filter",
 		DaemonSet: values.DaemonSet{
 			Name: "test-controller-daemonset",
 		},

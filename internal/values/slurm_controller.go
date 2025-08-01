@@ -10,11 +10,11 @@ import (
 
 // SlurmController contains the data needed to deploy and reconcile the Slurm Controllers
 type SlurmController struct {
-	slurmv1.SlurmNode
-
-	ContainerSlurmctld   Container
-	ContainerMunge       Container
+	K8sNodeFilterName    string
 	CustomInitContainers []corev1.Container
+
+	ContainerSlurmctld Container
+	ContainerMunge     Container
 
 	Service     Service
 	StatefulSet StatefulSet
@@ -40,7 +40,8 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 	)
 
 	res := SlurmController{
-		SlurmNode: *controller.SlurmNode.DeepCopy(),
+		K8sNodeFilterName:    controller.K8sNodeFilterName,
+		CustomInitContainers: controller.CustomInitContainers,
 		ContainerSlurmctld: buildContainerFrom(
 			controller.Slurmctld,
 			consts.ContainerNameSlurmctld,
@@ -49,15 +50,14 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 			controller.Munge,
 			consts.ContainerNameMunge,
 		),
-		CustomInitContainers: controller.CustomInitContainers,
-		Service:              buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeController, clusterName)),
-		StatefulSet:          statefulSet,
-		DaemonSet:            daemonSet,
-		VolumeSpool:          *controller.Volumes.Spool.DeepCopy(),
-		VolumeJail:           *controller.Volumes.Jail.DeepCopy(),
-		CustomVolumeMounts:   controller.Volumes.CustomMounts,
-		Maintenance:          maintenance,
-		PriorityClassName:    controller.PriorityClassName,
+		Service:            buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeController, clusterName)),
+		StatefulSet:        statefulSet,
+		DaemonSet:          daemonSet,
+		VolumeSpool:        *controller.Volumes.Spool.DeepCopy(),
+		VolumeJail:         *controller.Volumes.Jail.DeepCopy(),
+		CustomVolumeMounts: controller.Volumes.CustomMounts,
+		Maintenance:        maintenance,
+		PriorityClassName:  controller.PriorityClassName,
 	}
 
 	for _, customVolumeMount := range controller.Volumes.CustomMounts {

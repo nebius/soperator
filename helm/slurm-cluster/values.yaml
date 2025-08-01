@@ -301,7 +301,13 @@ slurmNodes:
     customInitContainers: []
     volumes:
       spool:
-        volumeSourceName: "controller-spool"
+        volumeClaimTemplateSpec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 50Gi
+          storageClassName: "compute-csi-network-ssd-ext4"
       jail:
         volumeSourceName: "jail"
       customMounts: []

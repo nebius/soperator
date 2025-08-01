@@ -740,7 +740,16 @@ type AccountingSlurmConf struct {
 
 // SlurmNodeController defines the configuration for the Slurm controller node
 type SlurmNodeController struct {
-	SlurmNode `json:",inline"`
+	// CustomInitContainers represent additional init containers that should be added to created Pods
+	//
+	// +kubebuilder:validation:Optional
+	CustomInitContainers []corev1.Container `json:"customInitContainers,omitempty"`
+
+	// K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
+	// Must correspond to the name of one of [K8sNodeFilter]
+	//
+	// +kubebuilder:validation:Required
+	K8sNodeFilterName string `json:"k8sNodeFilterName"`
 
 	// Slurmctld represents the Slurm control daemon configuration
 	//
@@ -1248,7 +1257,7 @@ func (s *SlurmClusterStatus) SetCondition(condition metav1.Condition) {
 // SlurmCluster is the Schema for the slurmclusters API
 //
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.phase`,description="The phase of Slurm cluster creation."
-// +kubebuilder:printcolumn:name="Controllers",type=integer,JSONPath=`.spec.slurmNodes.controller.size`,description="The number of controller nodes"
+// +kubebuilder:printcolumn:name="Controllers",type=string,JSONPath=`.spec.slurmNodes.controller.k8sNodeFilterName`,description="The controller node filter"
 // +kubebuilder:printcolumn:name="Workers",type=integer,JSONPath=`.spec.slurmNodes.worker.size`,description="The number of worker nodes"
 // +kubebuilder:printcolumn:name="Login",type=integer,JSONPath=`.spec.slurmNodes.login.size`,description="The number of login nodes"
 // +kubebuilder:printcolumn:name="Accounting",type=boolean,JSONPath=`.spec.slurmNodes.accounting.enabled`,description="Whether accounting is enabled"
