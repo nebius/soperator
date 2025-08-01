@@ -88,13 +88,18 @@ slurm_node_fails_total{node_name="worker-2",state_base="DOWN",state_is_drain="tr
 - `standard_output`: Path to stdout file
 - `array_job_id`: Array job ID (if applicable)
 - `array_task_id`: Array task ID (if applicable)
-- `submit_time`: When the job was submitted (Unix timestamp seconds, empty if not available)
-- `start_time`: When the job started execution (Unix timestamp seconds, empty if not available)
-- `end_time`: When the job completed (Unix timestamp seconds, empty if not available)
+- `submit_time`: When the job was submitted (Unix timestamp seconds, empty if not available or zero)
+- `start_time`: When the job started execution (Unix timestamp seconds, empty if not available or zero)
+- `end_time`: When the job completed (Unix timestamp seconds, empty if not available or zero). 
+  **Warning:** For non-terminal states like RUNNING, this may contain a future timestamp representing 
+  the forecasted end time based on the job's time limit
+- `finished_time`: When the job actually finished for terminal states only (Unix timestamp seconds, 
+  empty for non-terminal states or if end_time is zero). Unlike `end_time`, this field only contains 
+  actual completion times, never forecasted values
 
 **Example:**
 ```prometheus
-slurm_job_info{job_id="12345",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",job_name="training_job",user_name="researcher",user_id="1000",standard_error="/home/researcher/job.err",standard_output="/home/researcher/job.out",array_job_id="",array_task_id="",submit_time="1722697200",start_time="1722697230",end_time=""} 1
+slurm_job_info{job_id="12345",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",job_name="training_job",user_name="researcher",user_id="1000",standard_error="/home/researcher/job.err",standard_output="/home/researcher/job.out",array_job_id="",array_task_id="",submit_time="1722697200",start_time="1722697230",end_time="",finished_time=""} 1
 ```
 
 #### Gauge `slurm_node_job`
@@ -108,6 +113,25 @@ slurm_job_info{job_id="12345",job_state="RUNNING",job_state_reason="None",slurm_
 **Example:**
 ```prometheus
 slurm_node_job{job_id="12345",node_name="worker-1"} 1
+```
+
+#### Gauge `slurm_job_duration_seconds`
+
+**Description:** Job duration in seconds. For running jobs, this is the time elapsed since the job started.
+For completed jobs, this is the total execution time.
+
+**Labels:**
+- `job_id`: SLURM job identifier
+
+**Notes:**
+- Only exported for jobs with a valid start time
+- For non-terminal states (RUNNING, etc.): duration = current_time - start_time
+- For terminal states (COMPLETED, FAILED, etc.): duration = end_time - start_time (only if end_time is valid)
+
+**Example:**
+```prometheus
+slurm_job_duration_seconds{job_id="12345"} 300.5
+slurm_job_duration_seconds{job_id="12346"} 7200
 ```
 
 ### Controller RPC Metrics

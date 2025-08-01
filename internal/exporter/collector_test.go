@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -35,8 +36,8 @@ func TestMetricsCollector_Describe(t *testing.T) {
 		descriptors = append(descriptors, desc)
 	}
 
-	// Should have base descriptors plus RPC metrics: nodeInfo, jobInfo, jobNode + 4 RPC metrics + 1 controller metric
-	assert.GreaterOrEqual(t, len(descriptors), 8)
+	// Should have base descriptors plus RPC metrics: nodeInfo, jobInfo, jobNode, jobDuration + 4 RPC metrics + 1 controller metric
+	assert.GreaterOrEqual(t, len(descriptors), 9)
 
 	// Verify descriptor names
 	found := make(map[string]bool)
@@ -46,8 +47,9 @@ func TestMetricsCollector_Describe(t *testing.T) {
 
 	// Base metrics
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,instance_id,state_base,state_is_drain,state_is_maintenance,state_is_reserved,address}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_job_info", help: "Slurm job detail information", constLabels: {}, variableLabels: {job_id,job_state,job_state_reason,slurm_partition,job_name,user_name,user_id,standard_error,standard_output,array_job_id,array_task_id,submit_time,start_time,end_time}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_job_info", help: "Slurm job detail information", constLabels: {}, variableLabels: {job_id,job_state,job_state_reason,slurm_partition,job_name,user_name,user_id,standard_error,standard_output,array_job_id,array_task_id,submit_time,start_time,end_time,finished_time}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_job", help: "Slurm job node information", constLabels: {}, variableLabels: {job_id,node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_job_duration_seconds", help: "Slurm job duration in seconds", constLabels: {}, variableLabels: {job_id}}`)
 
 	// RPC metrics
 	assert.Contains(t, found, `Desc{fqName: "slurm_controller_rpc_calls_total", help: "Total count of RPC calls by message type", constLabels: {}, variableLabels: {message_type}}`)
@@ -153,7 +155,7 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 			`GAUGE; slurm_node_info{address="10.0.0.2",instance_id="instance-2",node_name="node-2",state_base="IDLE",state_is_drain="true",state_is_maintenance="false",state_is_reserved="false"} 1`,
 			`COUNTER; slurm_node_gpu_seconds_total{node_name="node-1",state_base="ALLOCATED",state_is_drain="false",state_is_maintenance="false",state_is_reserved="false"} 20`,
 			`COUNTER; slurm_node_gpu_seconds_total{node_name="node-2",state_base="IDLE",state_is_drain="true",state_is_maintenance="false",state_is_reserved="false"} 10`,
-			`GAUGE; slurm_job_info{array_job_id="",array_task_id="42",end_time="",job_id="12345",job_name="test_job",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr",standard_output="/path/to/stdout",start_time="1722697230",submit_time="1722697200",user_id="1000",user_name="testuser"} 1`,
+			`GAUGE; slurm_job_info{array_job_id="",array_task_id="42",end_time="",finished_time="",job_id="12345",job_name="test_job",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr",standard_output="/path/to/stdout",start_time="1722697230",submit_time="1722697200",user_id="1000",user_name="testuser"} 1`,
 			`GAUGE; slurm_node_job{job_id="12345",node_name="node-1"} 1`,
 			`GAUGE; slurm_node_job{job_id="12345",node_name="node-2"} 1`,
 			`GAUGE; slurm_controller_server_thread_count 1`,
@@ -599,6 +601,161 @@ func TestMetricsCollector_GetDiag_NilFields(t *testing.T) {
 // toPrometheusLikeString returns metric text representation like Prometheus does, with some extra additions.
 // E.g.:
 // GAUGE; slurm_node_info{address="10.0.0.1",instance_id="computeinstance-xyz",node_name="worker-0",state_base="idle",state_is_drain="false",state_is_maintenance="false",state_is_reserved="false"} 1
+func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
+	log.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	mockClient := &fake.MockClient{}
+	collector := NewMetricsCollector(mockClient)
+
+	// Mock minimal node response
+	mockClient.EXPECT().ListNodes(mock.Anything).Return([]slurmapi.Node{}, nil)
+
+	// Mock GetDiag response
+	serverThreadCount := int32(1)
+	mockClient.EXPECT().GetDiag(mock.Anything).Return(&api.V0041OpenapiDiagResp{
+		Statistics: api.V0041StatsMsg{
+			ServerThreadCount: &serverThreadCount,
+		},
+	}, nil)
+
+	// Define timestamps for test jobs
+	submitTime := metav1.NewTime(time.Unix(1722697200, 0)) // 2024-08-03 10:00:00 UTC
+	startTime := metav1.NewTime(time.Unix(1722697230, 0))  // 2024-08-03 10:00:30 UTC
+	endTime := metav1.NewTime(time.Unix(1722697260, 0))    // 2024-08-03 10:01:00 UTC
+	zeroTime := metav1.NewTime(time.Unix(0, 0))            // Unix epoch (should be treated as empty)
+	userID := int32(1000)
+
+	testJobs := []slurmapi.Job{
+		{
+			// Completed job - should have finished_time
+			ID:             12345,
+			Name:           "completed_job",
+			State:          "COMPLETED",
+			StateReason:    "None",
+			Partition:      "gpu",
+			UserName:       "testuser",
+			UserID:         &userID,
+			StandardError:  "/path/to/stderr1",
+			StandardOutput: "/path/to/stdout1",
+			Nodes:          "node-1",
+			SubmitTime:     &submitTime,
+			StartTime:      &startTime,
+			EndTime:        &endTime,
+		},
+		{
+			// Running job - should NOT have finished_time
+			ID:             12346,
+			Name:           "running_job",
+			State:          "RUNNING",
+			StateReason:    "None",
+			Partition:      "cpu",
+			UserName:       "testuser",
+			UserID:         &userID,
+			StandardError:  "/path/to/stderr2",
+			StandardOutput: "/path/to/stdout2",
+			Nodes:          "node-2",
+			SubmitTime:     &submitTime,
+			StartTime:      &startTime,
+			EndTime:        &endTime, // Future forecast end time
+		},
+		{
+			// Failed job with zero EndTime - should NOT have finished_time
+			ID:             12347,
+			Name:           "failed_job_no_end",
+			State:          "FAILED",
+			StateReason:    "OutOfMemory",
+			Partition:      "cpu",
+			UserName:       "testuser",
+			UserID:         &userID,
+			StandardError:  "/path/to/stderr3",
+			StandardOutput: "/path/to/stdout3",
+			Nodes:          "node-3",
+			SubmitTime:     &submitTime,
+			StartTime:      &startTime,
+			EndTime:        &zeroTime,
+		},
+		{
+			// Job with zero times - should have empty time strings
+			ID:             12348,
+			Name:           "pending_job",
+			State:          "PENDING",
+			StateReason:    "Resources",
+			Partition:      "cpu",
+			UserName:       "testuser",
+			UserID:         &userID,
+			StandardError:  "/path/to/stderr4",
+			StandardOutput: "/path/to/stdout4",
+			Nodes:          "",
+			SubmitTime:     &submitTime,
+			StartTime:      &zeroTime,
+			EndTime:        &zeroTime,
+		},
+	}
+
+	mockClient.EXPECT().ListJobs(mock.Anything).Return(testJobs, nil)
+
+	ch := make(chan prometheus.Metric, 20)
+	go func() {
+		collector.Collect(ch)
+		close(ch)
+	}()
+
+	var metrics []prometheus.Metric
+	for metric := range ch {
+		metrics = append(metrics, metric)
+	}
+
+	var metricsText []string
+	for _, metric := range metrics {
+		metricsText = append(metricsText, toPrometheusLikeString(t, metric))
+	}
+
+	// Check job info metrics
+	expectedJobMetrics := []string{
+		// Completed job has finished_time
+		`GAUGE; slurm_job_info{array_job_id="",array_task_id="",end_time="1722697260",finished_time="1722697260",job_id="12345",job_name="completed_job",job_state="COMPLETED",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr1",standard_output="/path/to/stdout1",start_time="1722697230",submit_time="1722697200",user_id="1000",user_name="testuser"} 1`,
+		// Running job has no finished_time
+		`GAUGE; slurm_job_info{array_job_id="",array_task_id="",end_time="1722697260",finished_time="",job_id="12346",job_name="running_job",job_state="RUNNING",job_state_reason="None",slurm_partition="cpu",standard_error="/path/to/stderr2",standard_output="/path/to/stdout2",start_time="1722697230",submit_time="1722697200",user_id="1000",user_name="testuser"} 1`,
+		// Failed job with zero EndTime has no finished_time and empty end_time
+		`GAUGE; slurm_job_info{array_job_id="",array_task_id="",end_time="",finished_time="",job_id="12347",job_name="failed_job_no_end",job_state="FAILED",job_state_reason="OutOfMemory",slurm_partition="cpu",standard_error="/path/to/stderr3",standard_output="/path/to/stdout3",start_time="1722697230",submit_time="1722697200",user_id="1000",user_name="testuser"} 1`,
+		// Pending job has empty start_time and end_time
+		`GAUGE; slurm_job_info{array_job_id="",array_task_id="",end_time="",finished_time="",job_id="12348",job_name="pending_job",job_state="PENDING",job_state_reason="Resources",slurm_partition="cpu",standard_error="/path/to/stderr4",standard_output="/path/to/stdout4",start_time="",submit_time="1722697200",user_id="1000",user_name="testuser"} 1`,
+	}
+
+	for _, expected := range expectedJobMetrics {
+		assert.Contains(t, metricsText, expected)
+	}
+
+	// Check job duration metrics
+	// Completed job should have duration = 30 seconds
+	assert.Contains(t, metricsText, `GAUGE; slurm_job_duration_seconds{job_id="12345"} 30`)
+	// Running job should have duration > 30 seconds (since it's still running)
+	foundRunningDuration := false
+	for _, metric := range metricsText {
+		if strings.Contains(metric, `slurm_job_duration_seconds{job_id="12346"}`) {
+			foundRunningDuration = true
+			// Extract the duration value
+			parts := strings.Split(metric, " ")
+			if len(parts) == 3 {
+				duration, err := strconv.ParseFloat(parts[2], 64)
+				assert.NoError(t, err)
+				assert.Greater(t, duration, 30.0, "Running job duration should be > 30 seconds")
+			}
+		}
+	}
+	assert.True(t, foundRunningDuration, "Should find duration metric for running job")
+	// Failed job with zero end time should NOT have duration metric (terminal state without valid end time)
+	for _, metric := range metricsText {
+		assert.NotContains(t, metric, `slurm_job_duration_seconds{job_id="12347"}`)
+	}
+	// Pending job with zero start time should NOT have duration metric
+	for _, metric := range metricsText {
+		assert.NotContains(t, metric, `slurm_job_duration_seconds{job_id="12348"}`)
+	}
+
+	mockClient.AssertExpectations(t)
+}
+
 func toPrometheusLikeString(t *testing.T, metric prometheus.Metric) string {
 	var pb dto.Metric
 	if err := metric.Write(&pb); err != nil {
