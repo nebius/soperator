@@ -110,7 +110,7 @@ func (r *ServiceReconciler) patch(existing, desired client.Object) (client.Patch
 		dst.Spec.Ports = append([]corev1.ServicePort{}, src.Spec.Ports...)
 
 		// None is legacy format for the service controller
-		// We rewrited the HA controller architecture in Issue #1325
+		// We rewrote the HA controller architecture in Issue #1325
 		if src.Spec.ClusterIP == "None" {
 			dst.Spec.ClusterIP = ""
 		}
