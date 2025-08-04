@@ -21,7 +21,7 @@ jobs:
           # Configuration
           RELEASE_BRANCH="soperator-release-1.21"
 
-          HOUR=$(date -u +%H)
+          HOUR=$(date -u +%-H)  # %-H removes leading zeros to avoid octal interpretation
           if [ $((HOUR % 2)) -eq 0 ]; then
             echo "ref=main" >> $GITHUB_OUTPUT
             echo "terraform_ref=main" >> $GITHUB_OUTPUT
