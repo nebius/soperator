@@ -29,8 +29,9 @@ concurrency:
 
 jobs:
   e2e-test:
-    runs-on: 
-     - e2e-tests
+    runs-on:
+      - self-hosted
+      - e2e-tests
 
     environment: e2e
 

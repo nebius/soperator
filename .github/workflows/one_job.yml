@@ -38,7 +38,9 @@ concurrency:
 
 jobs:
   pre-build:
-    runs-on: self-hosted
+    runs-on:
+      - self-hosted
+      - build
 
     steps:
       - name: Checkout repository
@@ -87,7 +89,9 @@ jobs:
           echo "Unstable: $UNSTABLE"
 
   lint:
-    runs-on: self-hosted
+    runs-on:
+      - self-hosted
+      - build
 
     steps:
       - name: Checkout repository
@@ -126,7 +130,10 @@ jobs:
           GOOS: darwin
 
   build:
-    runs-on: [self-hosted, X64]
+    runs-on:
+      - self-hosted
+      - X64
+      - build
     needs: pre-build
     steps:
       - name: Checkout repository
