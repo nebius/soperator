@@ -1,8 +1,6 @@
 #!/bin/bash
 #SBATCH --deadline="now+6hours"
 #SBATCH --time=00:05:00
-#SBATCH --mem=2G
-#SBATCH --cpus-per-task=1
 #SBATCH --exclusive
 
 platform=""
