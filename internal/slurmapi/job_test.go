@@ -8,6 +8,7 @@ import (
 	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/utils/ptr"
 )
 
 func TestJobFromAPI(t *testing.T) {
@@ -20,17 +21,17 @@ func TestJobFromAPI(t *testing.T) {
 		{
 			name: "complete job",
 			apiJob: api.V0041JobInfo{
-				JobId:          ptr(int32(12345)),
-				Name:           ptr("test_job"),
+				JobId:          ptr.To(int32(12345)),
+				Name:           ptr.To("test_job"),
 				JobState:       &[]api.V0041JobInfoJobState{api.V0041JobInfoJobStateCOMPLETED},
-				StateReason:    ptr("None"),
-				Partition:      ptr("gpu"),
-				UserName:       ptr("testuser"),
-				StandardError:  ptr("/path/to/stderr"),
-				StandardOutput: ptr("/path/to/stdout"),
-				Nodes:          ptr("gpu[001-003]"),
-				ScheduledNodes: ptr("gpu001,gpu002"),
-				RequiredNodes:  ptr("gpu[001-005]"),
+				StateReason:    ptr.To("None"),
+				Partition:      ptr.To("gpu"),
+				UserName:       ptr.To("testuser"),
+				StandardError:  ptr.To("/path/to/stderr"),
+				StandardOutput: ptr.To("/path/to/stdout"),
+				Nodes:          ptr.To("gpu[001-003]"),
+				ScheduledNodes: ptr.To("gpu001,gpu002"),
+				RequiredNodes:  ptr.To("gpu[001-005]"),
 			},
 			want: Job{
 				ID:             12345,
@@ -50,7 +51,7 @@ func TestJobFromAPI(t *testing.T) {
 		{
 			name: "minimal job",
 			apiJob: api.V0041JobInfo{
-				JobId:    ptr(int32(123)),
+				JobId:    ptr.To(int32(123)),
 				JobState: &[]api.V0041JobInfoJobState{api.V0041JobInfoJobStateCOMPLETED},
 			},
 			want: Job{
@@ -62,7 +63,7 @@ func TestJobFromAPI(t *testing.T) {
 		{
 			name: "job without ID",
 			apiJob: api.V0041JobInfo{
-				Name: ptr("test"),
+				Name: ptr.To("test"),
 			},
 			want:    Job{},
 			wantErr: true,
@@ -70,7 +71,7 @@ func TestJobFromAPI(t *testing.T) {
 		{
 			name: "job without State",
 			apiJob: api.V0041JobInfo{
-				JobId: ptr(int32(123)),
+				JobId: ptr.To(int32(123)),
 			},
 			want:    Job{},
 			wantErr: true,
@@ -111,7 +112,7 @@ func TestJobFromAPI_SmokeTest(t *testing.T) {
 				Nodes:          "worker-[1,0]",
 				ScheduledNodes: "",
 				RequiredNodes:  "",
-				NodeCount:      ptr(int32(2)),
+				NodeCount:      ptr.To(int32(2)),
 			},
 			wantErr: false,
 		},
@@ -272,6 +273,6 @@ func TestJob_GetIDString(t *testing.T) {
 	}
 }
 
-func ptr[T any](v T) *T {
-	return &v
-}
+// func ptr.To[T any](v T) *T {
+// 	return &v
+// }

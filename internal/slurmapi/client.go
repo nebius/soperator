@@ -6,7 +6,9 @@ import (
 	"net/http"
 
 	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api0043 "github.com/SlinkyProject/slurm-client/api/v0043"
 	"github.com/hashicorp/go-retryablehttp"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -23,7 +25,13 @@ func DefaultHTTPClient() *http.Client {
 }
 
 type client struct {
+	/**
+	 * Refactor: hide the APIs of a specific SLURM REST API version
+	 * Create methods like PostNode() in which we can decide which version to use.
+	 */
 	api.ClientWithResponsesInterface
+
+	client0043 api0043.ClientWithResponsesInterface
 
 	tokenIssuer tokenIssuer
 }
@@ -51,6 +59,17 @@ func NewClient(server string, tokenIssuer tokenIssuer, httpClient *http.Client) 
 	}
 
 	apiClient.ClientWithResponsesInterface = c
+
+	c0043, err := api0043.NewClientWithResponses(
+		server,
+		api0043.WithHTTPClient(httpClient),
+		api0043.WithRequestEditorFn(apiClient.setHeaders),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create client: %v", err)
+	}
+
+	apiClient.client0043 = c0043
 
 	return apiClient, nil
 }
@@ -178,4 +197,19 @@ func (c *client) GetDiag(ctx context.Context) (*api.V0041OpenapiDiagResp, error)
 	}
 
 	return getDiagResp.JSON200, nil
+}
+
+func (c *client) PostMaintenanceReservation(ctx context.Context, name string, nodeList []string) error {
+	resp, err := c.client0043.SlurmV0043PostReservationWithResponse(ctx, api0043.V0043ReservationDescMsg{
+		Name:     ptr.To(name),
+		NodeList: ptr.To(api0043.V0043HostlistString(nodeList)),
+		Flags:    ptr.To([]api0043.V0043ReservationDescMsgFlags{api0043.V0043ReservationDescMsgFlagsMAINT}),
+	})
+	if err != nil {
+		return fmt.Errorf("post reservation: %w", err)
+	}
+	if resp.JSON200.Errors != nil && len(*resp.JSON200.Errors) != 0 {
+		return fmt.Errorf("post reservation returned errors: %v", *resp.JSON200.Errors)
+	}
+	return nil
 }

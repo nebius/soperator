@@ -316,6 +316,54 @@ func (_c *MockClient_ListNodes_Call) RunAndReturn(run func(context.Context) ([]s
 	return _c
 }
 
+// PostMaintenanceReservation provides a mock function with given fields: ctx, name, nodeList
+func (_m *MockClient) PostMaintenanceReservation(ctx context.Context, name string, nodeList []string) error {
+	ret := _m.Called(ctx, name, nodeList)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PostMaintenanceReservation")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []string) error); ok {
+		r0 = rf(ctx, name, nodeList)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClient_PostMaintenanceReservation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PostMaintenanceReservation'
+type MockClient_PostMaintenanceReservation_Call struct {
+	*mock.Call
+}
+
+// PostMaintenanceReservation is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+//   - nodeList []string
+func (_e *MockClient_Expecter) PostMaintenanceReservation(ctx interface{}, name interface{}, nodeList interface{}) *MockClient_PostMaintenanceReservation_Call {
+	return &MockClient_PostMaintenanceReservation_Call{Call: _e.mock.On("PostMaintenanceReservation", ctx, name, nodeList)}
+}
+
+func (_c *MockClient_PostMaintenanceReservation_Call) Run(run func(ctx context.Context, name string, nodeList []string)) *MockClient_PostMaintenanceReservation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].([]string))
+	})
+	return _c
+}
+
+func (_c *MockClient_PostMaintenanceReservation_Call) Return(_a0 error) *MockClient_PostMaintenanceReservation_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClient_PostMaintenanceReservation_Call) RunAndReturn(run func(context.Context, string, []string) error) *MockClient_PostMaintenanceReservation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SlurmV0041DeleteJobWithResponse provides a mock function with given fields: ctx, jobId, params, reqEditors
 func (_m *MockClient) SlurmV0041DeleteJobWithResponse(ctx context.Context, jobId string, params *v0041.SlurmV0041DeleteJobParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041DeleteJobResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
