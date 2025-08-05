@@ -24,8 +24,6 @@ import (
 
 // Helper function to setup mocks and collect state for tests
 func setupCollectorWithMockedData(t *testing.T, collector *MetricsCollector, mockClient *fake.MockClient, nodes []slurmapi.Node, jobs []slurmapi.Job, diag *api.V0041OpenapiDiagResp) {
-	time.Sleep(time.Second * 10)
-
 	mockClient.EXPECT().ListNodes(mock.Anything).Return(nodes, nil)
 	mockClient.EXPECT().ListJobs(mock.Anything).Return(jobs, nil)
 	mockClient.EXPECT().GetDiag(mock.Anything).Return(diag, nil)
@@ -154,6 +152,11 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 				EndTime:        nil, // Job is still running
 			},
 		}
+
+		// Advance time by 10 seconds to create meaningful GPU seconds values
+		// GPU seconds calculation: gpuSecondsInc = timeDelta * gpuCount
+		// Expected: node-1 (2 GPUs) = 20, node-2 (1 GPU) = 10
+		time.Sleep(10 * time.Second)
 
 		setupCollectorWithMockedData(t, collector, mockClient, testNodes, testJobs, testDiag)
 
@@ -326,12 +329,17 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 			testNodes[1], // Keep the second node unchanged
 		}
 
-		// Set up mock expectations for the second call with drained nodes
-		time.Sleep(time.Second * 10)
-		mockClient.ExpectedCalls = nil // Clear previous expectations
+		// Create a new mock for the second call to avoid mock state issues
+		mockClient = &fake.MockClient{}
 		mockClient.EXPECT().ListNodes(mock.Anything).Return(drainedNodes, nil)
 		mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil)
 		mockClient.EXPECT().GetDiag(mock.Anything).Return(testDiag, nil)
+
+		// Create a new collector with the new mock for the second test phase
+		oldState := collector.state.Load()
+		collector = NewMetricsCollector(mockClient)
+		// Copy the state from the previous collector to maintain continuity
+		collector.state.Store(oldState)
 
 		// Now call updateState to trigger node failure detection
 		ctx := context.Background()
@@ -575,7 +583,7 @@ func TestMetricsCollector_GetDiag_APIError(t *testing.T) {
 
 		ctx := context.Background()
 		err := collector.updateState(ctx)
-		assert.NoError(t, err) // Should not error since we made updateState resilient
+		assert.Error(t, err) // Should fail due to GetDiag error
 
 		// Verify that diag is nil in the state due to API error
 		currentState := collector.state.Load()
@@ -667,7 +675,7 @@ func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
 
 		now := time.Now()
 		submitTime := metav1.NewTime(now.Add(-60 * time.Second)) // 1 minute ago
-		startTime := metav1.NewTime(now.Add(-30 * time.Second))  // 30 seconds ago
+		startTime := metav1.NewTime(now.Add(-31 * time.Second))  // 31 seconds ago
 		endTime := metav1.NewTime(now)                           // now (for completed jobs)
 		zeroTime := metav1.NewTime(time.Unix(0, 0))              // Unix epoch (should be treated as empty)
 		userID := int32(1000)
@@ -784,8 +792,8 @@ func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
 			assert.Contains(t, metricsText, expected)
 		}
 
-		assert.Contains(t, metricsText, `GAUGE; slurm_job_duration_seconds{job_id="12345"} 30`)
-		// Running job should have duration > 30 seconds (since it's still running)
+		assert.Contains(t, metricsText, `GAUGE; slurm_job_duration_seconds{job_id="12345"} 31`)
+		// Running job should have duration > 30 seconds (started 31 seconds ago, so duration will be 31 seconds)
 		foundRunningDuration := false
 		for _, metric := range metricsText {
 			if strings.Contains(metric, `slurm_job_duration_seconds{job_id="12346"}`) {

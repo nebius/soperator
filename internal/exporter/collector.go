@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"context"
+	"fmt"
 	"iter"
 	"strconv"
 	"sync/atomic"
@@ -66,6 +67,57 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 	return collector
 }
 
+func (c *MetricsCollector) updateGPUSecondsMetrics(ctx context.Context, nodes []slurmapi.Node, previousTime time.Time, currentTime time.Time) time.Time {
+	logger := log.FromContext(ctx).WithName(ControllerName)
+
+	for _, node := range nodes {
+		tres, err := slurmapi.ParseTrackableResources(node.Tres)
+		if err != nil {
+			logger.Error(err, "Failed to parse trackable resources", "tres", node.Tres)
+			continue
+		}
+
+		gpuSecondsInc := currentTime.Sub(previousTime).Seconds() * float64(tres.GPUCount)
+		c.nodeGPUSeconds.WithLabelValues(
+			node.Name,
+			string(node.BaseState()),
+			strconv.FormatBool(node.IsDrainState()),
+			strconv.FormatBool(node.IsMaintenanceState()),
+			strconv.FormatBool(node.IsReservedState()),
+		).Add(gpuSecondsInc)
+	}
+
+	return currentTime
+}
+
+func (c *MetricsCollector) updateNodeFailureMetrics(currentNodes []slurmapi.Node, previousNodes []slurmapi.Node) {
+	previousNodesMap := make(map[string]slurmapi.Node, len(previousNodes))
+	for _, node := range previousNodes {
+		previousNodesMap[node.Name] = node
+	}
+
+	for _, node := range currentNodes {
+		if existingNode, exists := previousNodesMap[node.Name]; exists {
+			wasFailed := existingNode.IsDownState() || existingNode.IsDrainState()
+			isFailed := node.IsDownState() || node.IsDrainState()
+			if !wasFailed && isFailed {
+				var reason string
+				if node.Reason != nil {
+					reason = node.Reason.Reason
+				}
+				c.nodeFails.WithLabelValues(
+					node.Name,
+					string(node.BaseState()),
+					strconv.FormatBool(node.IsDrainState()),
+					strconv.FormatBool(node.IsMaintenanceState()),
+					strconv.FormatBool(node.IsReservedState()),
+					reason,
+				).Inc()
+			}
+		}
+	}
+}
+
 // Describe implements the prometheus.Collector interface
 func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.nodeInfo
@@ -103,76 +155,24 @@ func (c *MetricsCollector) updateState(ctx context.Context) error {
 
 	nodes, err := c.slurmAPIClient.ListNodes(ctx)
 	if err != nil {
-		logger.Error(err, "Failed to get nodes from SLURM API")
-		return err
+		return fmt.Errorf("get nodes from SLURM API: %w", err)
 	}
 	newState.nodes = nodes
 
-	// Create temporary map for node failure detection
-	previousNodesMap := make(map[string]slurmapi.Node, len(previousState.nodes))
-	for _, node := range previousState.nodes {
-		previousNodesMap[node.Name] = node
-	}
-
-	// Process nodes: detect failures and update GPU seconds
-	for _, node := range nodes {
-		// Check for node failures by comparing with previous state
-		if existingNode, exists := previousNodesMap[node.Name]; exists {
-			wasFailed := existingNode.IsDownState() || existingNode.IsDrainState()
-			isFailed := node.IsDownState() || node.IsDrainState()
-			if !wasFailed && isFailed {
-				var reason string
-				if node.Reason != nil {
-					reason = node.Reason.Reason
-				}
-				c.nodeFails.WithLabelValues(
-					node.Name,
-					string(node.BaseState()),
-					strconv.FormatBool(node.IsDrainState()),
-					strconv.FormatBool(node.IsMaintenanceState()),
-					strconv.FormatBool(node.IsReservedState()),
-					reason,
-				).Inc()
-			}
-		}
-
-		// Update GPU seconds
-		tres, err := slurmapi.ParseTrackableResources(node.Tres)
-		if err != nil {
-			logger.Error(err, "Failed to parse trackable resources", "tres", node.Tres)
-		} else {
-			gpuSecondsInc := now.Sub(previousState.lastGPUSecondsUpdate).Seconds() * float64(tres.GPUCount)
-			c.nodeGPUSeconds.WithLabelValues(
-				node.Name,
-				string(node.BaseState()),
-				strconv.FormatBool(node.IsDrainState()),
-				strconv.FormatBool(node.IsMaintenanceState()),
-				strconv.FormatBool(node.IsReservedState()),
-			).Add(gpuSecondsInc)
-		}
-	}
-
-	// CRITICAL: Update lastGPUSecondsUpdate AFTER successfully calculating and adding GPU seconds increments.
-	// This timestamp is used to calculate the time delta for the next collection cycle's GPU seconds.
-	// It must only be updated after the GPU seconds metrics have been successfully updated to ensure
-	// accurate accounting of GPU utilization over time.
-	newState.lastGPUSecondsUpdate = now
+	c.updateNodeFailureMetrics(nodes, previousState.nodes)
+	newState.lastGPUSecondsUpdate = c.updateGPUSecondsMetrics(ctx, nodes, previousState.lastGPUSecondsUpdate, now)
 
 	jobs, err := c.slurmAPIClient.ListJobs(ctx)
 	if err != nil {
-		logger.Error(err, "Failed to get jobs from SLURM API")
-		return err
+		return fmt.Errorf("get jobs from SLURM API: %w", err)
 	}
 	newState.jobs = jobs
 
 	diag, err := c.slurmAPIClient.GetDiag(ctx)
 	if err != nil {
-		logger.Error(err, "Failed to get diagnostics from SLURM API")
-		// Continue without diagnostics - other metrics should still work
-		newState.diag = nil
-	} else {
-		newState.diag = diag
+		return fmt.Errorf("get diag from SLURM API: %w", err)
 	}
+	newState.diag = diag
 
 	logger.Info("Collected metrics", "elapsed_seconds", time.Since(now).Seconds())
 
@@ -199,7 +199,7 @@ func (c *MetricsCollector) Collect(ch chan<- prometheus.Metric) {
 		ch <- slurmJobMetric
 	}
 
-	for rpcMetric := range c.slurmRPCMetrics(ctx, state.diag) {
+	for rpcMetric := range c.slurmRPCMetrics(state.diag) {
 		ch <- rpcMetric
 	}
 }
@@ -284,7 +284,7 @@ func (c *MetricsCollector) slurmJobMetrics(ctx context.Context, slurmJobs []slur
 	}
 }
 
-func (c *MetricsCollector) slurmRPCMetrics(_ context.Context, diag *api.V0041OpenapiDiagResp) iter.Seq[prometheus.Metric] {
+func (c *MetricsCollector) slurmRPCMetrics(diag *api.V0041OpenapiDiagResp) iter.Seq[prometheus.Metric] {
 	return func(yield func(prometheus.Metric) bool) {
 		if diag == nil {
 			return
