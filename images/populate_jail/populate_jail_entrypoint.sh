@@ -14,6 +14,9 @@ populate_jail_rootfs() {
       --no-cache --no-extra-verify --option local.connections=64 \
       --json
 
+    echo "Set permissions for jail directory"
+    chmod 755 /mnt/jail # Permissions 755 are only allowed permissions for OpenSSH ChrootDirectory feature
+
     # TODO: Move this to an active check/action when it's implemented
     echo "Generate an internal SSH keypair for user root"
     mkdir -p /mnt/jail/root/.ssh
