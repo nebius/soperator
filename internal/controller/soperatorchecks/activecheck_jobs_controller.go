@@ -164,6 +164,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			return ctrl.Result{}, fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 		}
 
+		// TODO: slurm-job-id may contain a list of job IDs
 		slurmJobID, ok := k8sJob.Annotations["slurm-job-id"]
 		if !ok {
 			logger.Error(err, "failed to get slurm job id")

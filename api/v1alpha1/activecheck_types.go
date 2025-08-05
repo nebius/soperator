@@ -89,6 +89,10 @@ type ActiveCheckSpec struct {
 	// Reactions defines reaction on specific check
 	// +kubebuilder:validation:Optional
 	Reactions Reactions `json:"reactions,omitempty"`
+
+	// ReservationPrefix: If set, the ActiveCheck is run on all reservations starting with this prefix
+	// +kubebuilder:validation:Optional
+	ReservationPrefix string `json:"reservationPrefix,omitempty"`
 }
 
 type Reactions struct {

@@ -24,7 +24,21 @@ mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
 echo "Create directory for slurm job outputs"
 (umask 000; mkdir -p "/mnt/jail/opt/soperator-outputs/slurm_jobs")
 
-if [[ "$EACH_WORKER_JOB_ARRAY" == "true" ]]; then
+
+if [[ ! -z "$RESERVATION_PREFIX" ]]; then
+    echo "Submitting job using slurm_submit_reservation_jobs.sh..."
+    SUBMIT_OUTPUT=$(/opt/bin/slurm/slurm_submit_suspecious_reservation_jobs.sh)
+    SCRIPT_STATUS=$?
+    if [[ $SCRIPT_STATUS -ne 0 ]]; then
+        echo "Job submission script for reservation failed with exit code $SCRIPT_STATUS"
+        echo "$SUBMIT_OUTPUT"
+        exit 1
+    fi
+
+    # will contain multiple job ids
+    SLURM_JOB_ID="$SLURM_OUTPUT"
+
+elif [[ "$EACH_WORKER_JOB_ARRAY" == "true" ]]; then
     echo "Submitting job using slurm_submit_array_job.sh..."
     SUBMIT_OUTPUT=$(/opt/bin/slurm/slurm_submit_array_job.sh)
     SCRIPT_STATUS=$?
