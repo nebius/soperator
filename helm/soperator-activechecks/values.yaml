@@ -32,3 +32,4 @@ upgradeCuda:
   cudaVersion: "12.4.1-1"
 upgradeHealthChecker:
   healthCheckerVersion: "1.0.0-146.250808"
+reservationPrefix: soperatorchecks.suspicious
