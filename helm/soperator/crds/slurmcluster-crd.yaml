@@ -24474,6 +24474,12 @@ spec:
                     description: |
                       Exporter represents the Slurm exporter node configuration
                     properties:
+                      collectionInterval:
+                        default: 30s
+                        description: CollectionInterval specifies how often to collect
+                          metrics from SLURM APIs
+                        pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
+                        type: string
                       customInitContainers:
                         description: CustomInitContainers represent additional init
                           containers that should be added to created Pods
