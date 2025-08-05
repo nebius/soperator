@@ -1,0 +1,29 @@
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: ActiveCheck
+metadata:
+  name: "gpu-fryer"
+spec:
+  checkType: "slurmJob"
+  name: "gpu-fryer"
+  slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
+  schedule: "0 0 */3 * *" # every 3d day (3, 6, 9, etc...)
+  suspend: false
+  runAfterCreation: true
+  slurmJobSpec:
+    sbatchScript: |
+{{ tpl (.Files.Get "scripts/gpu-fryer.sh") . | indent 6 }}
+    eachWorkerJobArray: true
+    jobContainer:
+      image: {{ .Values.images.slurmJob | quote }}
+      env:
+{{ toYaml .Values.jobContainer.env | indent 8 }}
+      volumeMounts:
+{{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
+      volumes:
+{{ toYaml .Values.jobContainer.volumes | indent 8 }}
+    mungeContainer:
+      image: {{ .Values.images.munge | quote }}
+  # Do not add any reactions right now, only monitor
+  reactions:
+    setCondition: false
+    drainSlurmNode: false
