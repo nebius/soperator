@@ -24,6 +24,8 @@ type Params struct {
 	SlurmAPIServer string
 	// SlurmClusterID is the namespaced name of the SlurmCluster resource
 	SlurmClusterID types.NamespacedName
+	// CollectionInterval specifies how often to collect metrics from SLURM APIs
+	CollectionInterval time.Duration
 }
 
 // Exporter collects metrics from a SLURM cluster and exports them in Prometheus format
@@ -76,6 +78,8 @@ func (e *Exporter) Start(ctx context.Context, addr string) error {
 		Handler: mux,
 	}
 
+	go e.collectionLoop(ctx)
+
 	go func() {
 		logger.Info("Starting metrics server", "addr", addr)
 		if err := e.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -84,6 +88,34 @@ func (e *Exporter) Start(ctx context.Context, addr string) error {
 	}()
 
 	return nil
+}
+
+// collectionLoop runs in the background and periodically collects metrics
+func (e *Exporter) collectionLoop(ctx context.Context) {
+	logger := log.FromContext(ctx).WithName(ControllerName)
+	logger.Info("Starting metrics collection loop", "interval", e.params.CollectionInterval)
+
+	ticker := time.NewTicker(e.params.CollectionInterval)
+	defer ticker.Stop()
+
+	if err := e.collector.updateState(ctx); err != nil {
+		logger.Error(err, "Initial metrics collection failed")
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("Stopping metrics collection loop")
+			return
+		case <-e.stopCh:
+			logger.Info("Stopping metrics collection loop via stop channel")
+			return
+		case <-ticker.C:
+			if err := e.collector.updateState(ctx); err != nil {
+				logger.Error(err, "Metrics collection failed")
+			}
+		}
+	}
 }
 
 // Stop stops the SLURM metrics exporter

@@ -991,6 +991,12 @@ type SlurmExporter struct {
 	//
 	// +kubebuilder:validation:Optional
 	ExporterContainer NodeContainer `json:"exporterContainer"`
+
+	// CollectionInterval specifies how often to collect metrics from SLURM APIs
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="30s"
+	CollectionInterval prometheusv1.Duration `json:"collectionInterval,omitempty"`
 }
 
 // ExporterContainer defines the configuration for one of node containers

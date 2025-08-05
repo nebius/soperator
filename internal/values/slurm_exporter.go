@@ -1,6 +1,7 @@
 package values
 
 import (
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
@@ -34,6 +35,9 @@ type SlurmExporter struct {
 
 	// Container represents the main container for the Soperator Exporter.
 	Container slurmv1.NodeContainer
+
+	// CollectionInterval specifies how often to collect metrics from SLURM APIs
+	CollectionInterval prometheusv1.Duration
 }
 
 func buildSlurmExporterFrom(maintenance *consts.MaintenanceMode, exporter *slurmv1.SlurmExporter) SlurmExporter {
@@ -50,7 +54,8 @@ func buildSlurmExporterFrom(maintenance *consts.MaintenanceMode, exporter *slurm
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),
 		},
-		Maintenance: maintenance,
-		Container:   *exporter.ExporterContainer.DeepCopy(),
+		Maintenance:        maintenance,
+		Container:          *exporter.ExporterContainer.DeepCopy(),
+		CollectionInterval: exporter.CollectionInterval,
 	}
 }

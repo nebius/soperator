@@ -8,12 +8,22 @@ The exporter integrates seamlessly with the Prometheus monitoring stack and enab
 
 ### Key Features
 
+- **Asynchronous metrics collection** with configurable intervals (default: 30s)
 - **Real-time monitoring** of SLURM nodes, jobs, and controller performance
 - **Prometheus-native metrics** with standardized naming conventions
 - **Rich labeling** for detailed filtering and aggregation
 - **Controller RPC diagnostics** similar to SLURM's `sdiag` command
 - **Kubernetes-native deployment** as part of Soperator
 
+## Configuration
+
+### Command Line Flags
+
+When running the exporter directly, you can configure the collection interval with:
+
+```bash
+./soperator-exporter --collection-interval=30s
+```
 
 ## Exported Metrics
 

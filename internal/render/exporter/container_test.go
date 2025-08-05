@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/values"
@@ -33,6 +34,7 @@ func TestRenderContainerExporter(t *testing.T) {
 				Image:     imageExporter,
 				Resources: resourceExporter,
 			},
+			CollectionInterval: prometheusv1.Duration("30s"),
 		},
 		NodeRest: values.SlurmREST{
 			Service: values.Service{Name: "rest-service"},
@@ -57,6 +59,7 @@ func TestRenderContainerExporter(t *testing.T) {
 			"--cluster-namespace=soperator-ns",
 			"--cluster-name=test-cluster",
 			"--slurm-api-server=http://rest-service.soperator-ns.svc:6817",
+			"--collection-interval=30s",
 		},
 	}
 
