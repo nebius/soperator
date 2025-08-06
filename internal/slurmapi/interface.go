@@ -14,4 +14,5 @@ type Client interface {
 	ListJobs(ctx context.Context) ([]Job, error)
 	GetDiag(ctx context.Context) (*api.V0041OpenapiDiagResp, error)
 	PostMaintenanceReservation(ctx context.Context, name string, nodeList []string) error
+	StopReservation(ctx context.Context, name string) error
 }

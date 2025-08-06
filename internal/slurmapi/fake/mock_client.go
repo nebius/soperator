@@ -5722,6 +5722,53 @@ func (_c *MockClient_SlurmdbV0041PostWckeysWithResponse_Call) RunAndReturn(run f
 	return _c
 }
 
+// StopReservation provides a mock function with given fields: ctx, name
+func (_m *MockClient) StopReservation(ctx context.Context, name string) error {
+	ret := _m.Called(ctx, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StopReservation")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, name)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClient_StopReservation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StopReservation'
+type MockClient_StopReservation_Call struct {
+	*mock.Call
+}
+
+// StopReservation is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+func (_e *MockClient_Expecter) StopReservation(ctx interface{}, name interface{}) *MockClient_StopReservation_Call {
+	return &MockClient_StopReservation_Call{Call: _e.mock.On("StopReservation", ctx, name)}
+}
+
+func (_c *MockClient_StopReservation_Call) Run(run func(ctx context.Context, name string)) *MockClient_StopReservation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockClient_StopReservation_Call) Return(_a0 error) *MockClient_StopReservation_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClient_StopReservation_Call) RunAndReturn(run func(context.Context, string) error) *MockClient_StopReservation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockClient creates a new instance of MockClient. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockClient(t interface {

@@ -213,3 +213,19 @@ func (c *client) PostMaintenanceReservation(ctx context.Context, name string, no
 	}
 	return nil
 }
+
+func (c *client) StopReservation(ctx context.Context, name string) error {
+	resp, err := c.client0043.SlurmV0043PostReservationWithResponse(ctx, api0043.V0043ReservationDescMsg{
+		Name: ptr.To(name),
+		Duration: &api0043.V0043Uint32NoValStruct{
+			Number: ptr.To(int32(0)),
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("stop reservation: %w", err)
+	}
+	if resp.JSON200.Errors != nil && len(*resp.JSON200.Errors) != 0 {
+		return fmt.Errorf("stop reservation returned errors: %v", *resp.JSON200.Errors)
+	}
+	return nil
+}
