@@ -6,4 +6,5 @@ const (
 
 	ActiveCheckEachWorkerJobArrayEnv = "EACH_WORKER_JOB_ARRAY"
 	ActiveCheckNameEnv               = "ACTIVE_CHECK_NAME"
+	ReservationPrefixEnv             = "RESERVATION_PREFIX"
 )
