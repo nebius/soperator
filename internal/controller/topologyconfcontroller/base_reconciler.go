@@ -23,12 +23,8 @@ func (r *BaseReconciler) GetOrCreateConfigMap(
 	configMap *corev1.ConfigMap,
 	owner client.Object,
 ) error {
-	logger := log.FromContext(ctx).WithValues(
-		"configmap", fmt.Sprintf("%s/%s", configMap.Namespace, configMap.Name),
-	)
 	err := r.Client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap)
 	if client.IgnoreNotFound(err) != nil {
-		logger.Error(err, "Failed to get ConfigMap")
 		return err
 	}
 
@@ -51,13 +47,11 @@ func (r *BaseReconciler) CreateConfigMap(
 
 	if owner != nil {
 		if err := ctrl.SetControllerReference(owner, configMap, r.Scheme); err != nil {
-			logger.Error(err, "Failed to set controller reference for ConfigMap")
 			return fmt.Errorf("failed to set controller reference: %w", err)
 		}
 	}
 
 	if err := r.Client.Create(ctx, configMap, client.FieldOwner(WorkerTopologyReconcilerName)); err != nil {
-		logger.Error(err, "Failed to create ConfigMap")
 		return fmt.Errorf("failed to create ConfigMap %s/%s: %w", configMap.Namespace, configMap.Name, err)
 	}
 
