@@ -22,8 +22,9 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
-  reactions:
-    setCondition: true
-  successReactions:
-    removeReservation:
-      prefix: .Values.reservationPrefix
+  # No reactions for now until we implement a meaningful extensive check
+  # successReactions:
+  #   removeReservation:
+  #     prefix: .Values.reservationPrefix
+  # failureReactions:
+  #   setHardwareIssuesSuspected: true
