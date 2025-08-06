@@ -437,8 +437,7 @@ func processAddReservation(ctx context.Context, addReservation *slurmv1alpha1.Re
 			return fmt.Errorf("get node list: %w", err)
 		}
 		for _, node := range nodes {
-			reservationName := fmt.Sprintf("%s-%s", addReservation.Prefix, node)
-			err := slurmAPIClient.PostMaintenanceReservation(ctx, reservationName, []string{node})
+			err := addReservationForNode(ctx, addReservation.Prefix, node, slurmAPIClient)
 			if err != nil {
 				return fmt.Errorf("post reservation: %w", err)
 			}
@@ -454,7 +453,7 @@ func processRemoveReservation(ctx context.Context, removeReservation *slurmv1alp
 			return fmt.Errorf("get node list: %w", err)
 		}
 		for _, node := range nodes {
-			reservationName := fmt.Sprintf("%s-%s", removeReservation.Prefix, node)
+			reservationName := reservationNameForNode(removeReservation.Prefix, node)
 			err := slurmAPIClient.StopReservation(ctx, reservationName)
 			if err != nil {
 				return fmt.Errorf("stop reservation: %w", err)
@@ -462,4 +461,13 @@ func processRemoveReservation(ctx context.Context, removeReservation *slurmv1alp
 		}
 	}
 	return nil
+}
+
+func reservationNameForNode(reservationPrefix string, nodeName string) string {
+	return fmt.Sprintf("%s-%s", reservationPrefix, nodeName)
+}
+
+func addReservationForNode(ctx context.Context, reservationPrefix string, nodeName string, slurmAPIClient slurmapi.Client) error {
+	reservationName := reservationNameForNode(reservationPrefix, nodeName)
+	return slurmAPIClient.PostMaintenanceReservation(ctx, reservationName, []string{nodeName})
 }
