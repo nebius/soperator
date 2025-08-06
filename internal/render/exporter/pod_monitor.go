@@ -42,6 +42,15 @@ func RenderPodMonitor(
 					MetricRelabelConfigs: metricRelabelConfigs,
 					RelabelConfigs:       pmConfig.RelabelConfig,
 				},
+				{
+					Interval:             pmConfig.Interval,
+					ScrapeTimeout:        pmConfig.ScrapeTimeout,
+					Path:                 consts.ContainerPathMonitoring,
+					Port:                 ptr.To(consts.ContainerPortNameMonitoring),
+					Scheme:               consts.ContainerSchemeMonitoring,
+					MetricRelabelConfigs: metricRelabelConfigs,
+					RelabelConfigs:       pmConfig.RelabelConfig,
+				},
 			},
 		},
 	}

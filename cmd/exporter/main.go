@@ -40,6 +40,7 @@ type Flags struct {
 	logFormat          string
 	logLevel           string
 	metricsAddr        string
+	monitoringAddr     string
 	slurmAPIServer     string
 	clusterNamespace   string
 	clusterName        string
@@ -84,6 +85,7 @@ func parseFlags() Flags {
 	flag.StringVar(&flags.logFormat, "log-format", "json", "Log format: plain or json")
 	flag.StringVar(&flags.logLevel, "log-level", "debug", "Log level: debug, info, warn, error, dpanic, panic, fatal")
 	flag.StringVar(&flags.metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&flags.monitoringAddr, "monitoring-bind-address", ":8081", "The address the monitoring endpoint binds to.")
 	flag.StringVar(&flags.slurmAPIServer, "slurm-api-server", "http://localhost:6820", "The address of the Slurm REST API server.")
 	flag.StringVar(&flags.clusterNamespace, "cluster-namespace", "soperator", "The namespace of the Slurm cluster")
 	flag.StringVar(&flags.clusterName, "cluster-name", "", "The name of the Slurm cluster (required)")
@@ -149,6 +151,11 @@ func main() {
 
 	if err := clusterExporter.Start(ctx, flags.metricsAddr); err != nil {
 		log.Error(err, "Failed to start metrics exporter")
+		os.Exit(1)
+	}
+
+	if err := clusterExporter.StartMonitoring(ctx, flags.monitoringAddr); err != nil {
+		log.Error(err, "Failed to start monitoring server")
 		os.Exit(1)
 	}
 

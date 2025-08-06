@@ -28,6 +28,10 @@ func renderContainerExporter(clusterValues *values.SlurmCluster) corev1.Containe
 				Name:          consts.ContainerPortNameExporter,
 				ContainerPort: consts.ContainerPortExporter,
 			},
+			{
+				Name:          consts.ContainerPortNameMonitoring,
+				ContainerPort: consts.ContainerPortMonitoring,
+			},
 		},
 		Resources: corev1.ResourceRequirements{
 			Requests: clusterValues.SlurmExporter.Container.Resources,

@@ -19,11 +19,18 @@ The exporter integrates seamlessly with the Prometheus monitoring stack and enab
 
 ### Command Line Flags
 
-When running the exporter directly, you can configure the collection interval with:
+When running the exporter directly, you can configure various settings:
 
 ```bash
-./soperator-exporter --collection-interval=30s
+./soperator-exporter \
+  --collection-interval=30s \
+  --metrics-bind-address=:8080 \
+  --monitoring-bind-address=:8081
 ```
+
+- `--collection-interval`: How often to collect metrics from SLURM APIs (default: 30s)
+- `--metrics-bind-address`: Address for the main metrics endpoint (default: :8080)
+- `--monitoring-bind-address`: Address for the self-monitoring metrics endpoint (default: :8081)
 
 ## Exported Metrics
 
@@ -209,6 +216,69 @@ slurm_controller_rpc_user_duration_seconds_total{user="researcher",user_id="1000
 **Example:**
 ```prometheus
 slurm_controller_server_thread_count 1
+```
+
+### Self-Monitoring Metrics (Port 8081)
+
+The exporter provides self-monitoring metrics to track its own health and performance.
+These metrics are available on a separate endpoint (default port 8081) to avoid mixing operational metrics with business metrics.
+
+#### Gauge `slurm_exporter_collection_duration_seconds`
+
+**Description:** Duration of the most recent metrics collection from SLURM APIs
+
+**Example:**
+```prometheus
+slurm_exporter_collection_duration_seconds 0.34
+```
+
+#### Counter `slurm_exporter_collection_attempts_total`
+
+**Description:** Total number of metrics collection attempts
+
+**Example:**
+```prometheus
+slurm_exporter_collection_attempts_total 150
+```
+
+#### Counter `slurm_exporter_collection_failures_total`
+
+**Description:** Total number of failed metrics collection attempts
+
+**Example:**
+```prometheus
+slurm_exporter_collection_failures_total 3
+```
+
+#### Counter `slurm_exporter_metrics_requests_total`
+
+**Description:** Total number of requests to the `/metrics` endpoint
+
+**Example:**
+```prometheus
+slurm_exporter_metrics_requests_total 245
+```
+
+#### Gauge `slurm_exporter_metrics_exported`
+
+**Description:** Number of metrics exported in the last scrape
+
+**Example:**
+```prometheus
+slurm_exporter_metrics_exported 127
+```
+
+### Accessing Self-Monitoring Metrics
+
+To access self-monitoring metrics:
+
+```bash
+# Default monitoring port
+curl http://localhost:8081/metrics
+
+# Or with custom monitoring address
+./soperator-exporter --monitoring-bind-address=:9090
+curl http://localhost:9090/metrics
 ```
 
 ## Grafana Dashboard Example
