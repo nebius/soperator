@@ -6,7 +6,7 @@ spec:
   checkType: "slurmJob"
   name: "extensive-check"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  schedule: "0 10 * * *" # Once a day at 10:00 UTC
+  schedule: "0 0 1 1 *" # Once a year at 00:00 UTC
   suspend: true
   runAfterCreation: false
   slurmJobSpec:

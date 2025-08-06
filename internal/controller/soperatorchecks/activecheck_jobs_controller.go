@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -431,43 +432,44 @@ func executeSuccessReactions(ctx context.Context, slurmJob slurmapi.Job, activeC
 }
 
 func processAddReservation(ctx context.Context, addReservation *slurmv1alpha1.ReservationSpec, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client) error {
-	if addReservation != nil && addReservation.Prefix != "" {
-		nodes, err := slurmJob.GetNodeList()
+	if addReservation == nil || addReservation.Prefix == "" {
+		return nil
+	}
+
+	nodes, err := slurmJob.GetNodeList()
+	if err != nil {
+		return fmt.Errorf("get node list: %w", err)
+	}
+	for _, node := range nodes {
+		err := addReservationForNode(ctx, addReservation.Prefix, node, slurmAPIClient)
 		if err != nil {
-			return fmt.Errorf("get node list: %w", err)
-		}
-		for _, node := range nodes {
-			err := addReservationForNode(ctx, addReservation.Prefix, node, slurmAPIClient)
-			if err != nil {
-				return fmt.Errorf("post reservation: %w", err)
-			}
+			return fmt.Errorf("post reservation: %w", err)
 		}
 	}
 	return nil
 }
 
 func processRemoveReservation(ctx context.Context, removeReservation *slurmv1alpha1.ReservationSpec, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client) error {
-	if removeReservation != nil && removeReservation.Prefix != "" {
-		nodes, err := slurmJob.GetNodeList()
+	if removeReservation == nil && removeReservation.Prefix == "" {
+		return nil
+	}
+
+	nodes, err := slurmJob.GetNodeList()
+	if err != nil {
+		return fmt.Errorf("get node list: %w", err)
+	}
+	for _, node := range nodes {
+		reservationName := naming.BuildSlurmReservationNameForNode(removeReservation.Prefix, node)
+		err := slurmAPIClient.StopReservation(ctx, reservationName)
 		if err != nil {
-			return fmt.Errorf("get node list: %w", err)
-		}
-		for _, node := range nodes {
-			reservationName := reservationNameForNode(removeReservation.Prefix, node)
-			err := slurmAPIClient.StopReservation(ctx, reservationName)
-			if err != nil {
-				return fmt.Errorf("stop reservation: %w", err)
-			}
+			return fmt.Errorf("stop reservation: %w", err)
 		}
 	}
+
 	return nil
 }
 
-func reservationNameForNode(reservationPrefix string, nodeName string) string {
-	return fmt.Sprintf("%s-%s", reservationPrefix, nodeName)
-}
-
 func addReservationForNode(ctx context.Context, reservationPrefix string, nodeName string, slurmAPIClient slurmapi.Client) error {
-	reservationName := reservationNameForNode(reservationPrefix, nodeName)
+	reservationName := naming.BuildSlurmReservationNameForNode(reservationPrefix, nodeName)
 	return slurmAPIClient.PostMaintenanceReservation(ctx, reservationName, []string{nodeName})
 }
