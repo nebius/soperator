@@ -25,4 +25,5 @@ spec:
       image: {{ .Values.images.munge | quote }}
   reactions:
     setCondition: true
-    drainSlurmNode: true
+    addReservation:
+      prefix: .Values.reservationPrefix

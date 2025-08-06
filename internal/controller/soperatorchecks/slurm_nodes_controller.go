@@ -29,10 +29,6 @@ import (
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
 
-const (
-	MaintenanceReservationPrefix = "soperatorchecks.suspicious"
-)
-
 var (
 	SlurmNodesControllerName = "soperatorchecks.slurmnodes"
 
@@ -208,43 +204,10 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
 	}
 
-	// Leaving this here just in case we need to use the reason of the health check.
-	// reason, message, err := parseHealthCheckReason(nodeReason.OriginalReason)
-	_, _, err := parseHealthCheckReason(nodeReason.OriginalReason)
-	if err != nil {
-		return fmt.Errorf("parse health check reason: %w", err)
-	}
-
-	// HardwareIssuesSuspected will be set by extensive health checks to indicate that this node can no longer be used.
-	// If it was already set, we don't need to do anything here
-	// THIS IS THE DESIRED BEHAVIOUR. I'm not sure whether HardwareIssuesSuspected is being set by other places or not
-
-	var hardwareIssuesCondition corev1.NodeCondition
-	for _, cond := range k8sNode.Status.Conditions {
-		if cond.Type == consts.HardwareIssuesSuspected {
-			hardwareIssuesCondition = cond
-			break
-		}
-	}
-	if hardwareIssuesCondition.Status == corev1.ConditionTrue {
-		// Node is still hardware degraded, skip
-		logger.V(1).Info("skip, still hardware degraded")
-		return nil
-	}
-
-	logger.V(1).Info("reserving slurm node for more extensive health checks")
-
-	// Create a maintenance reservation for this slurm node to prevent work from being scheduled on it.
-	err = c.createMaintenanceReservationForSlurmNode(ctx, slurmClusterName, slurmNode.Name)
-	if err != nil {
-		return fmt.Errorf("failed to create maintenance reservaiton for slurm node: %w", err)
-	}
-
-	// Undrain node after creating the reservation to allow health checks to run.
-	err = c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
-	if err != nil {
-		return fmt.Errorf("failed to undrain slurm node after creating a maintenance reservaiton: %w", err)
-	}
+	// Healthchecks have success and failure reactions.
+	// When a healthcheckfails, we can already create a reservation using failureReaction.addReservation
+	// There is no need to reactions.drainSlurmNode then execute logic here to handle DRAINED sturm nodes with [HC] reasonß
+	_ = nodeReason
 
 	return nil
 }
@@ -650,35 +613,6 @@ func (c *SlurmNodesController) slurmNodesFullyDrained(
 
 	logger.Info("all slurm nodes are fully drained")
 	return true, nil
-}
-
-func (c *SlurmNodesController) createMaintenanceReservationForSlurmNode(
-	ctx context.Context,
-	slurmClusterName types.NamespacedName,
-	slurmNodeName string,
-) error {
-	logger := log.FromContext(ctx).WithName("SlurmNodesController.createMaintenanceReservationForSlurmNode").V(1).
-		WithValues(
-			"slurmNodeName", slurmNodeName,
-			"slurmCluster", slurmClusterName,
-		)
-	logger.Info("create maintenance reservation for slurm node")
-
-	slurmAPIClient, found := c.slurmAPIClients.GetClient(slurmClusterName)
-	if !found {
-		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
-	}
-
-	// MaintenanceReservationPrefix is added to identify the reservations created by soperator
-	reservationName := fmt.Sprintf("%s.%s.%d", MaintenanceReservationPrefix, slurmNodeName, time.Now().UnixMilli())
-
-	err := slurmAPIClient.PostMaintenanceReservation(ctx, reservationName, []string{slurmNodeName})
-	if err != nil {
-		return fmt.Errorf("post reservation slurm node: %w", err)
-	}
-
-	logger.V(1).Info("slurm node added to a maintenance reservation")
-	return nil
 }
 
 func (c *SlurmNodesController) undrainSlurmNode(

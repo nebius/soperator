@@ -33,5 +33,5 @@ upgradeCuda:
 upgradeHealthChecker:
   healthCheckerVersion: "1.0.0-145.250724"
 runCheckOnReservation:
-  reservationPrefix: soperatorchecks.suspicious
   targetActiveCheckName: extensive-check
+reservationPrefix: soperatorchecks.suspicious

@@ -18,7 +18,7 @@ spec:
       image: {{ .Values.images.k8sJob | quote }}
       env:
         - name: RESERVATION_PREFEX
-          value: {{ .Values.runCheckOnReservation.reservationPrefix | quote }}
+          value: {{ .Values.reservationPrefix | quote }}
         - name: TARGET_ACTIVE_CHECK_NAME
           value: {{ .Values.runCheckOnReservation.targetActiveCheckName | quote }}
       volumeMounts:
