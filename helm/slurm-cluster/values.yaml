@@ -277,8 +277,8 @@ slurmNodes:
       #     cpu: "50m"
       #     memory: "64Mi"
   controller:
-    size: 2
     k8sNodeFilterName: "no-gpu"
+    priorityClass: ""
     slurmctld:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
@@ -301,7 +301,13 @@ slurmNodes:
     customInitContainers: []
     volumes:
       spool:
-        volumeSourceName: "controller-spool"
+        volumeClaimTemplateSpec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 50Gi
+          storageClassName: "compute-csi-network-ssd-ext4"
       jail:
         volumeSourceName: "jail"
       customMounts: []
@@ -458,6 +464,9 @@ sConfigController:
       memory: "256Mi"
       ephemeralStorage: "500Mi"
   jailSlurmConfigPath: /mnt/jail/etc/slurm
+  # These should match UID and GID in sconfigcontroller image
+  runAsUid: 1001
+  runAsGid: 1001
 telemetry: {}
 # jobsTelemetry:
 #   otelCollectorHttpHost: vmsingle-slurm.monitoring-system.svc.cluster.local
@@ -471,15 +480,15 @@ telemetry: {}
 #   otelCollectorPort: 8429
 
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.21.9-noble-slurm24.11.5"
-  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.21.9-noble-slurm24.11.5"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.21.9-noble-slurm24.11.5"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.21.9-noble-slurm24.11.5"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.21.9-noble-slurm24.11.5"
-  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.21.9-noble-slurm24.11.5"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.21.9-noble-slurm24.11.5"
-  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.21.9-noble-slurm24.11.5"
-  sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.21.9
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.21.10-noble-slurm24.11.6"
+  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.21.10-noble-slurm24.11.6"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.21.10-noble-slurm24.11.6"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.21.10-noble-slurm24.11.6"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.21.10-noble-slurm24.11.6"
+  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.21.10-noble-slurm24.11.6"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.21.10-noble-slurm24.11.6"
+  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.21.10-noble-slurm24.11.6"
+  sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.21.10
   mariaDB: docker-registry1.mariadb.com/library/mariadb:11.4.3
 # Configuration for slurm scripts.
 slurmScripts:

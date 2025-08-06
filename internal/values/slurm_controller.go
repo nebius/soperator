@@ -10,24 +10,38 @@ import (
 
 // SlurmController contains the data needed to deploy and reconcile the Slurm Controllers
 type SlurmController struct {
-	slurmv1.SlurmNode
-
-	ContainerSlurmctld   Container
-	ContainerMunge       Container
+	K8sNodeFilterName    string
 	CustomInitContainers []corev1.Container
+
+	ContainerSlurmctld Container
+	ContainerMunge     Container
 
 	Service     Service
 	StatefulSet StatefulSet
+	DaemonSet   DaemonSet
 
 	VolumeSpool        slurmv1.NodeVolume
 	VolumeJail         slurmv1.NodeVolume
 	CustomVolumeMounts []slurmv1.NodeVolumeMount
 	Maintenance        *consts.MaintenanceMode
+	PriorityClassName  string
 }
 
 func buildSlurmControllerFrom(clusterName string, maintenance *consts.MaintenanceMode, controller *slurmv1.SlurmNodeController) SlurmController {
+	// Controller always has 1 replica
+	statefulSet := buildStatefulSetWithMaxUnavailableFrom(
+		naming.BuildStatefulSetName(consts.ComponentTypeController),
+		consts.SingleReplicas,
+		nil,
+	)
+
+	daemonSet := buildDaemonSetFrom(
+		naming.BuildDaemonSetName(consts.ComponentTypeController),
+	)
+
 	res := SlurmController{
-		SlurmNode: *controller.SlurmNode.DeepCopy(),
+		K8sNodeFilterName:    controller.K8sNodeFilterName,
+		CustomInitContainers: controller.CustomInitContainers,
 		ContainerSlurmctld: buildContainerFrom(
 			controller.Slurmctld,
 			consts.ContainerNameSlurmctld,
@@ -36,16 +50,14 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 			controller.Munge,
 			consts.ContainerNameMunge,
 		),
-		CustomInitContainers: controller.CustomInitContainers,
-		Service:              buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeController, clusterName)),
-		StatefulSet: buildStatefulSetFrom(
-			naming.BuildStatefulSetName(consts.ComponentTypeController),
-			controller.SlurmNode.Size,
-		),
+		Service:            buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeController, clusterName)),
+		StatefulSet:        statefulSet,
+		DaemonSet:          daemonSet,
 		VolumeSpool:        *controller.Volumes.Spool.DeepCopy(),
 		VolumeJail:         *controller.Volumes.Jail.DeepCopy(),
 		CustomVolumeMounts: controller.Volumes.CustomMounts,
 		Maintenance:        maintenance,
+		PriorityClassName:  controller.PriorityClassName,
 	}
 
 	for _, customVolumeMount := range controller.Volumes.CustomMounts {

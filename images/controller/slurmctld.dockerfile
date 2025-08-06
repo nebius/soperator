@@ -1,8 +1,6 @@
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:noble
+FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS controller_slurmctld
 
-FROM $BASE_IMAGE AS controller_slurmctld
-
-ARG SLURM_VERSION=24.11.5
+ARG SLURM_VERSION=24.11.6
 
 ARG DEBIAN_FRONTEND=noninteractive
 

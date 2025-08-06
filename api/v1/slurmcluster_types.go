@@ -308,6 +308,18 @@ type SConfigController struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="/mnt/jail/etc/slurm"
 	JailSlurmConfigPath string `json:"jailSlurmConfigPath,omitempty"`
+
+	// RunAsUid defines UID to run SConfigController process
+	// This will be manifested as UID of files maintained by SConfigController
+	// Defaults to whatever is set in sconfigcontroller image
+	// +kubebuilder:validation:Optional
+	RunAsUid *int64 `json:"runAsUid,omitempty"`
+
+	// RunAsGid defines GID to run SConfigController process
+	// This will be manifested as GID of files maintained by SConfigController
+	// Defaults to whatever is set in sconfigcontroller image
+	// +kubebuilder:validation:Optional
+	RunAsGid *int64 `json:"runAsGid,omitempty"`
 }
 
 type PartitionConfiguration struct {
@@ -728,7 +740,16 @@ type AccountingSlurmConf struct {
 
 // SlurmNodeController defines the configuration for the Slurm controller node
 type SlurmNodeController struct {
-	SlurmNode `json:",inline"`
+	// CustomInitContainers represent additional init containers that should be added to created Pods
+	//
+	// +kubebuilder:validation:Optional
+	CustomInitContainers []corev1.Container `json:"customInitContainers,omitempty"`
+
+	// K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
+	// Must correspond to the name of one of [K8sNodeFilter]
+	//
+	// +kubebuilder:validation:Required
+	K8sNodeFilterName string `json:"k8sNodeFilterName"`
 
 	// Slurmctld represents the Slurm control daemon configuration
 	//
@@ -744,6 +765,11 @@ type SlurmNodeController struct {
 	//
 	// +kubebuilder:validation:Required
 	Volumes SlurmNodeControllerVolumes `json:"volumes"`
+
+	// PriorityClassName defines the priority class for the Slurm controller pods
+	//
+	// +kubebuilder:validation:Optional
+	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 // SlurmNodeControllerVolumes define the volumes for the Slurm controller node
@@ -965,6 +991,12 @@ type SlurmExporter struct {
 	//
 	// +kubebuilder:validation:Optional
 	ExporterContainer NodeContainer `json:"exporterContainer"`
+
+	// CollectionInterval specifies how often to collect metrics from SLURM APIs
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="30s"
+	CollectionInterval prometheusv1.Duration `json:"collectionInterval,omitempty"`
 }
 
 // ExporterContainer defines the configuration for one of node containers
@@ -1231,7 +1263,7 @@ func (s *SlurmClusterStatus) SetCondition(condition metav1.Condition) {
 // SlurmCluster is the Schema for the slurmclusters API
 //
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.phase`,description="The phase of Slurm cluster creation."
-// +kubebuilder:printcolumn:name="Controllers",type=integer,JSONPath=`.spec.slurmNodes.controller.size`,description="The number of controller nodes"
+// +kubebuilder:printcolumn:name="Controllers",type=string,JSONPath=`.spec.slurmNodes.controller.k8sNodeFilterName`,description="The controller node filter"
 // +kubebuilder:printcolumn:name="Workers",type=integer,JSONPath=`.spec.slurmNodes.worker.size`,description="The number of worker nodes"
 // +kubebuilder:printcolumn:name="Login",type=integer,JSONPath=`.spec.slurmNodes.login.size`,description="The number of login nodes"
 // +kubebuilder:printcolumn:name="Accounting",type=boolean,JSONPath=`.spec.slurmNodes.accounting.enabled`,description="Whether accounting is enabled"

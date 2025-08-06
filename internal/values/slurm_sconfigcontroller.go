@@ -16,6 +16,9 @@ type SConfigController struct {
 
 	Maintenance         consts.MaintenanceMode
 	JailSlurmConfigPath string
+
+	RunAsUid *int64
+	RunAsGid *int64
 }
 
 func buildSConfigControllerFrom(
@@ -23,6 +26,8 @@ func buildSConfigControllerFrom(
 	container slurmv1.NodeContainer,
 	maintenance consts.MaintenanceMode,
 	jailSlurmConfigPath string,
+	runAsUid *int64,
+	runAsGid *int64,
 ) SConfigController {
 	containerSConfigController := buildContainerFrom(
 		container,
@@ -40,6 +45,8 @@ func buildSConfigControllerFrom(
 		},
 		Maintenance:         maintenance,
 		JailSlurmConfigPath: jailSlurmConfigPath,
+		RunAsUid:            runAsUid,
+		RunAsGid:            runAsGid,
 	}
 
 	return res

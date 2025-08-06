@@ -1,6 +1,6 @@
 FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS worker_slurmd
 
-ARG SLURM_VERSION=24.11.5
+ARG SLURM_VERSION=24.11.6
 ARG OPENMPI_VERSION=4.1.7a1
 ARG PYXIS_VERSION=0.21.0
 

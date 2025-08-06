@@ -21,12 +21,12 @@
  *
  * @param path Absolute path of the directory to make on.
  *             Trailing slash is handled.
- * @param mode Directory mode.
+ * @param as_user Whether to create directories as user (w/o umask 0).
  *
  * @retval ESPANK_SUCCESS Successfully created the directory.
  * @retval ESPANK_ERROR Something went wrong.
  */
-spank_err_t snccld_mkdir_p(const char *path, mode_t mode);
+spank_err_t snccld_mkdir_p(const char *path, bool as_user);
 
 /**
  * Check if the directory exists.
@@ -54,15 +54,17 @@ void snccld_split_file_path(const char *path, char **dir_out, char **file_out);
  * If it doesn't exist, it will be created.
  *
  * @param path Path to the file to ensure its existence.
+ * @param as_user Whether to create directory and file as user (w/o umask 0).
  */
-void snccld_ensure_file_exists(const char *path);
+void snccld_ensure_file_exists(const char *path, bool as_user);
 
 /**
  * Ensure the directory exists.
  * If it doesn't exist, it will be created.
  *
  * @param path Path to the directory to ensure its existence.
+ * @param as_user Whether to create directory as user (w/o umask 0).
  */
-void snccld_ensure_dir_exists(const char *path);
+void snccld_ensure_dir_exists(const char *path, bool as_user);
 
 #endif // SNCCLD_UTIL_DIR_FILE_H

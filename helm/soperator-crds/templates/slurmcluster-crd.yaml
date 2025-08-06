@@ -16881,10 +16881,10 @@ spec:
       jsonPath: .status.phase
       name: Status
       type: string
-    - description: The number of controller nodes
-      jsonPath: .spec.slurmNodes.controller.size
+    - description: The controller node filter
+      jsonPath: .spec.slurmNodes.controller.k8sNodeFilterName
       name: Controllers
-      type: integer
+      type: string
     - description: The number of worker nodes
       jsonPath: .spec.slurmNodes.worker.size
       name: Workers
@@ -19913,6 +19913,20 @@ spec:
                     required:
                     - k8sNodeFilterName
                     type: object
+                  runAsGid:
+                    description: |-
+                      RunAsGid defines GID to run SConfigController process
+                      This will be manifested as GID of files maintained by SConfigController
+                      Defaults to whatever is set in sconfigcontroller image
+                    format: int64
+                    type: integer
+                  runAsUid:
+                    description: |-
+                      RunAsUid defines UID to run SConfigController process
+                      This will be manifested as UID of files maintained by SConfigController
+                      Defaults to whatever is set in sconfigcontroller image
+                    format: int64
+                    type: integer
                 type: object
               secrets:
                 description: Secrets define the [corev1.Secret] references needed
@@ -23718,10 +23732,10 @@ spec:
                         required:
                         - image
                         type: object
-                      size:
-                        description: Size defines the number of node instances
-                        format: int32
-                        type: integer
+                      priorityClassName:
+                        description: PriorityClassName defines the priority class
+                          for the Slurm controller pods
+                        type: string
                       slurmctld:
                         description: Slurmctld represents the Slurm control daemon
                           configuration
@@ -24460,6 +24474,12 @@ spec:
                     description: |
                       Exporter represents the Slurm exporter node configuration
                     properties:
+                      collectionInterval:
+                        default: 30s
+                        description: CollectionInterval specifies how often to collect
+                          metrics from SLURM APIs
+                        pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
+                        type: string
                       customInitContainers:
                         description: CustomInitContainers represent additional init
                           containers that should be added to created Pods

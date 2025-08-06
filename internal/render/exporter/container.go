@@ -20,6 +20,7 @@ func renderContainerExporter(clusterValues *values.SlurmCluster) corev1.Containe
 			fmt.Sprintf("--cluster-namespace=%s", clusterValues.Namespace),
 			fmt.Sprintf("--cluster-name=%s", clusterValues.Name),
 			fmt.Sprintf("--slurm-api-server=%s", rest.GetServiceURL(clusterValues.Namespace, &clusterValues.NodeRest)),
+			fmt.Sprintf("--collection-interval=%s", clusterValues.SlurmExporter.CollectionInterval),
 		},
 		ImagePullPolicy: clusterValues.SlurmExporter.Container.ImagePullPolicy,
 		Ports: []corev1.ContainerPort{

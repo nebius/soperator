@@ -37,12 +37,13 @@ import (
 )
 
 type Flags struct {
-	logFormat        string
-	logLevel         string
-	metricsAddr      string
-	slurmAPIServer   string
-	clusterNamespace string
-	clusterName      string
+	logFormat          string
+	logLevel           string
+	metricsAddr        string
+	slurmAPIServer     string
+	clusterNamespace   string
+	clusterName        string
+	collectionInterval string
 }
 
 func getZapOpts(logFormat, logLevel string) []zap.Opts {
@@ -86,6 +87,7 @@ func parseFlags() Flags {
 	flag.StringVar(&flags.slurmAPIServer, "slurm-api-server", "http://localhost:6820", "The address of the Slurm REST API server.")
 	flag.StringVar(&flags.clusterNamespace, "cluster-namespace", "soperator", "The namespace of the Slurm cluster")
 	flag.StringVar(&flags.clusterName, "cluster-name", "", "The name of the Slurm cluster (required)")
+	flag.StringVar(&flags.collectionInterval, "collection-interval", "30s", "How often to collect metrics from SLURM APIs")
 	flag.Parse()
 
 	if flags.clusterName == "" {
@@ -126,11 +128,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	collectionInterval, err := time.ParseDuration(flags.collectionInterval)
+	if err != nil {
+		log.Error(err, "Failed to parse collection interval")
+		os.Exit(1)
+	}
+
 	clusterExporter := exporter.NewClusterExporter(
 		slurmAPIClient,
 		exporter.Params{
-			SlurmAPIServer: flags.slurmAPIServer,
-			SlurmClusterID: slurmClusterID,
+			SlurmAPIServer:     flags.slurmAPIServer,
+			SlurmClusterID:     slurmClusterID,
+			CollectionInterval: collectionInterval,
 		},
 	)
 
