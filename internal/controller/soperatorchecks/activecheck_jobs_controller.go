@@ -217,7 +217,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 					return ctrl.Result{}, fmt.Errorf("executing failure reactions: %w", err)
 				}
 			} else {
-				err = executeSuccessReactions(ctx, slurmJob, activeCheck, slurmAPIClient, logger)
+				err = executeSuccessReactions(ctx, slurmJob, activeCheck, slurmAPIClient)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("executing success reactions: %w", err)
 				}
@@ -421,7 +421,7 @@ func executeFailureReactions(ctx context.Context, slurmJob slurmapi.Job, activeC
 	return nil
 }
 
-func executeSuccessReactions(ctx context.Context, slurmJob slurmapi.Job, activeCheck *slurmv1alpha1.ActiveCheck, slurmAPIClient slurmapi.Client, logger logr.Logger) error {
+func executeSuccessReactions(ctx context.Context, slurmJob slurmapi.Job, activeCheck *slurmv1alpha1.ActiveCheck, slurmAPIClient slurmapi.Client) error {
 	successReactions := activeCheck.Spec.SuccessReactions
 
 	err := processRemoveReservation(ctx, successReactions.RemoveReservation, slurmJob, slurmAPIClient)

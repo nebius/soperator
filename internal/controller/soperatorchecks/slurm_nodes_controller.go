@@ -211,6 +211,7 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 
 	For backward compatability, we add some logic here to handle already drained slurm nodes with [HC] reason and create a reservation for them then undrain them.
 	*/
+	_ = nodeReason
 
 	// If hardware issue condition is set, leave the node drained until MK8S deletes it
 	var hardwareIssuesCondition corev1.NodeCondition
