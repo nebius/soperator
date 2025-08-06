@@ -23,7 +23,7 @@ images:
   k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:1.21.10-noble-slurm24.11.6"
   munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.21.10-noble-slurm24.11.6"
 # Pyxis syntax with '#' separator for registry
-activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-bbed9d0"
+activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-b8189f7"
 sshCheck:
   numOfLoginNodes: 2
 createUser:
