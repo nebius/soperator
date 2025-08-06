@@ -138,7 +138,7 @@ func (r *WorkerTopologyReconciler) handleTopologyConfigMapFunctional(
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logger.Info("Node topology labels ConfigMap not found, creating with default topology")
-			if err = r.createDefaultTopologyConfigMap(ctx, req, slurmCluster, logger); err != nil {
+			if err = r.EnsureTopologyConfigMap(ctx, req.Namespace, slurmCluster.Name); err != nil {
 				return nil, fmt.Errorf("create default topology config map: %w", err)
 			}
 			return nil, fmt.Errorf("config map %s not found, created with default topology", err)
@@ -149,22 +149,6 @@ func (r *WorkerTopologyReconciler) handleTopologyConfigMapFunctional(
 
 	logger.Info("Node topology labels ConfigMap found", "configMap", topologyLabelsConfigMap.Name)
 	return topologyLabelsConfigMap, nil
-}
-
-func (r *WorkerTopologyReconciler) createDefaultTopologyConfigMap(
-	ctx context.Context, req ctrl.Request, slurmCluster *slurmv1.SlurmCluster, logger logr.Logger) error {
-	logger.Info("Node topology labels ConfigMap not found, creating with default topology")
-	listASTS := &kruisev1b1.StatefulSetList{}
-
-	if err := r.getAdvancedSTS(ctx, slurmCluster.Name, listASTS); err != nil {
-		return fmt.Errorf("get advanced stateful sets: %w", err)
-	}
-	config := InitializeTopologyConf(listASTS)
-	if err := r.updateTopologyConfigMap(ctx, req.Namespace, config); err != nil {
-		return err
-	}
-	logger.Info("Successfully created default topology ConfigMap")
-	return nil
 }
 
 // EnsureTopologyConfigMap ensures that the ConfigMap for topology configuration exists.
@@ -178,31 +162,7 @@ func (r *WorkerTopologyReconciler) EnsureTopologyConfigMap(
 		return fmt.Errorf("get advanced stateful sets: %w", err)
 	}
 	config := InitializeTopologyConf(listASTS)
-	configMap := &corev1.ConfigMap{
-		TypeMeta: ctrl.TypeMeta{
-			APIVersion: corev1.SchemeGroupVersion.Version,
-			Kind:       "ConfigMap",
-		},
-		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.ConfigMapNameTopologyConfig,
-			Namespace: namespace,
-			Labels: map[string]string{
-				consts.LabelSConfigControllerSourceKey: consts.LabelSConfigControllerSourceValue,
-			},
-			Annotations: map[string]string{
-				consts.AnnotationSConfigControllerSourceKey: consts.DefaultSConfigControllerSourcePath,
-			},
-		},
-		Data: map[string]string{
-			"topology.conf": config,
-		},
-	}
-
-	if err := r.Client.Create(ctx, configMap); err != nil {
-		return client.IgnoreAlreadyExists(err)
-	}
-
-	return nil
+	return r.updateTopologyConfigMap(ctx, namespace, config)
 }
 
 func (r *WorkerTopologyReconciler) getAdvancedSTS(
