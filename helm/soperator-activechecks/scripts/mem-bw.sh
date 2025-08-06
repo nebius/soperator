@@ -18,7 +18,9 @@ fi
 
 echo "Platform found: $platform"
 echo "Running mem_bw check on $(hostname)..."
-HC_OUTPUT=$(srun --container-image=cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-fb02e2a --container-mounts=$(which health-checker):/usr/local/bin/health-checker --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n mem_bw --json-log")
+HC_OUTPUT=$(srun --container-image={{ .Values.activeCheckImage }} \
+  --container-mounts=$(which health-checker):/usr/local/bin/health-checker --cpu-bind=verbose,cores \
+  bash -c "health-checker run -e soperator -p $platform -n mem_bw --json-log")
 HC_EXIT_CODE=$?
 
 echo "Health checker output: $HC_OUTPUT"
