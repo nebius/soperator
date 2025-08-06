@@ -95,6 +95,7 @@ spec:
           enabled: true
         collectors:
           - pods
+          - nodes
         vmServiceScrape:
           spec:
             endpoints:
