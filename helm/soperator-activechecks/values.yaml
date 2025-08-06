@@ -30,3 +30,5 @@ createUser:
   name: "nebius"
 upgradeCuda:
   cudaVersion: "12.4.1-1"
+upgradeHealthChecker:
+  healthCheckerVersion: "1.0.0-145.250724"

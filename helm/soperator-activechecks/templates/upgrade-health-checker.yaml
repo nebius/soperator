@@ -1,11 +1,12 @@
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
-  name: "upgrade-cuda"
+  name: "upgrade-health-checker"
 spec:
   checkType: "k8sJob"
-  name: "upgrade-cuda"
+  name: "upgrade-health-checker"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
+  # We should run this upgrade manually
   suspend: true
   runAfterCreation: false
   k8sJobSpec:
@@ -14,11 +15,8 @@ spec:
         - bash
         - -c
         - |
-{{ .Files.Get "scripts/upgrade-cuda.sh" | indent 10 }}
+{{ tpl (.Files.Get "scripts/upgrade-health-checker.sh") . | indent 10 }}
       image: {{ .Values.images.k8sJob | quote }}
-      env:
-        - name: CUDA_VERSION
-          value: {{ .Values.upgradeCuda.cudaVersion | quote }}
       volumeMounts:
 {{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
       volumes:
