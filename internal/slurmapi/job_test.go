@@ -272,7 +272,3 @@ func TestJob_GetIDString(t *testing.T) {
 		t.Errorf("Job.GetIDString() = %v, want %v", got, want)
 	}
 }
-
-// func ptr.To[T any](v T) *T {
-// 	return &v
-// }
