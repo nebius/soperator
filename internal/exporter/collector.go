@@ -35,12 +35,16 @@ type MetricsCollector struct {
 
 	// Atomic pointer to the current state for lock-free reads
 	state atomic.Pointer[metricsCollectorState]
+
+	// Monitoring contains self-monitoring metrics
+	Monitoring *MonitoringMetrics
 }
 
 // NewMetricsCollector creates a new MetricsCollector
 func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 	collector := &MetricsCollector{
 		slurmAPIClient: slurmAPIClient,
+		Monitoring:     NewMonitoringMetrics(),
 
 		nodeInfo:    prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "address"}, nil),
 		jobInfo:     prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "user_id", "standard_error", "standard_output", "array_job_id", "array_task_id", "submit_time", "start_time", "end_time", "finished_time"}, nil),
@@ -135,9 +139,14 @@ func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // updateState fetches data from SLURM APIs and atomically updates the collector state
-func (c *MetricsCollector) updateState(ctx context.Context) error {
+func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
-	now := time.Now()
+	startTime := time.Now()
+
+	defer func() {
+		duration := time.Since(startTime).Seconds()
+		c.Monitoring.RecordCollection(duration, err)
+	}()
 
 	previousState := c.state.Load()
 	if previousState == nil {
@@ -160,7 +169,7 @@ func (c *MetricsCollector) updateState(ctx context.Context) error {
 	newState.nodes = nodes
 
 	c.updateNodeFailureMetrics(nodes, previousState.nodes)
-	newState.lastGPUSecondsUpdate = c.updateGPUSecondsMetrics(ctx, nodes, previousState.lastGPUSecondsUpdate, now)
+	newState.lastGPUSecondsUpdate = c.updateGPUSecondsMetrics(ctx, nodes, previousState.lastGPUSecondsUpdate, time.Now())
 
 	jobs, err := c.slurmAPIClient.ListJobs(ctx)
 	if err != nil {
@@ -174,13 +183,31 @@ func (c *MetricsCollector) updateState(ctx context.Context) error {
 	}
 	newState.diag = diag
 
-	logger.Info("Collected metrics", "elapsed_seconds", time.Since(now).Seconds())
+	logger.Info("Collected metrics", "elapsed_seconds", time.Since(startTime).Seconds())
 
 	return nil
 }
 
 // Collect implements the prometheus.Collector interface
 func (c *MetricsCollector) Collect(ch chan<- prometheus.Metric) {
+	metricsChan := make(chan prometheus.Metric)
+	go func() {
+		c.collectImpl(metricsChan)
+		close(metricsChan)
+	}()
+
+	var metricsCount float64
+	for metric := range metricsChan {
+		ch <- metric
+		metricsCount++
+	}
+
+	// Record the number of metrics exported
+	c.Monitoring.RecordMetricsExported(metricsCount)
+}
+
+// collectImpl performs the actual metrics collection
+func (c *MetricsCollector) collectImpl(ch chan<- prometheus.Metric) {
 	ctx := context.Background()
 
 	state := c.state.Load()

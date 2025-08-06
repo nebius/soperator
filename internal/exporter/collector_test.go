@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -863,4 +865,101 @@ func toPrometheusLikeString(t *testing.T, metric prometheus.Metric) string {
 	}
 
 	return fmt.Sprintf("%s; %s%s %g", metricType, metricName, labelsString, value)
+}
+
+func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
+	log.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	synctest.Run(func() {
+		mockClient := &fake.MockClient{}
+		collector := NewMetricsCollector(mockClient)
+
+		// Mock successful response
+		testNodes := []slurmapi.Node{
+			{
+				Name:       "node-1",
+				InstanceID: "instance-1",
+				Address:    "10.0.0.1",
+				States: map[api.V0041NodeState]struct{}{
+					api.V0041NodeStateIDLE: {},
+				},
+				Tres: "cpu=8,mem=32000,billing=8,gres/gpu=2",
+			},
+		}
+
+		testJobs := []slurmapi.Job{
+			{
+				ID:    123,
+				Name:  "test-job",
+				State: "RUNNING",
+			},
+		}
+
+		serverThreadCount := int32(1)
+		testDiag := &api.V0041OpenapiDiagResp{
+			Statistics: api.V0041StatsMsg{
+				ServerThreadCount: &serverThreadCount,
+			},
+		}
+
+		// Setup mocks for successful collection
+		mockClient.EXPECT().ListNodes(mock.Anything).Return(testNodes, nil)
+		mockClient.EXPECT().ListJobs(mock.Anything).Return(testJobs, nil)
+		mockClient.EXPECT().GetDiag(mock.Anything).Return(testDiag, nil)
+
+		ctx := context.Background()
+
+		// Test successful collection
+		err := collector.updateState(ctx)
+		assert.NoError(t, err)
+
+		// Test failed collection - create a new mock client to avoid call conflicts
+		mockClientFail := &fake.MockClient{}
+		collector.slurmAPIClient = mockClientFail
+		mockClientFail.EXPECT().ListNodes(mock.Anything).Return(nil, errors.New("API error"))
+		err = collector.updateState(ctx)
+		assert.Error(t, err)
+
+		// Create registry to check monitoring metrics
+		registry := prometheus.NewRegistry()
+		require.NoError(t, collector.Monitoring.Register(registry))
+
+		// Collect metrics to trigger metric counting
+		metricsChan := make(chan prometheus.Metric, 100)
+		go func() {
+			collector.Collect(metricsChan)
+			close(metricsChan)
+		}()
+
+		var metricsCount int
+		for range metricsChan {
+			metricsCount++
+		}
+
+		// Verify monitoring metrics
+		metricFamilies, err := registry.Gather()
+		require.NoError(t, err)
+
+		var attemptsTotal, failuresTotal, exportedCount float64
+
+		for _, mf := range metricFamilies {
+			if len(mf.Metric) == 0 {
+				continue
+			}
+			switch *mf.Name {
+			case "slurm_exporter_collection_attempts_total":
+				attemptsTotal = *mf.Metric[0].Counter.Value
+			case "slurm_exporter_collection_failures_total":
+				failuresTotal = *mf.Metric[0].Counter.Value
+			case "slurm_exporter_metrics_exported":
+				exportedCount = *mf.Metric[0].Gauge.Value
+			}
+		}
+
+		t.Logf("Monitoring metrics: attempts=%f, failures=%f, exported=%f, collected=%d", attemptsTotal, failuresTotal, exportedCount, metricsCount)
+		assert.Equal(t, float64(2), attemptsTotal, "Expected 2 collection attempts (1 success + 1 failure)")
+		assert.Equal(t, float64(1), failuresTotal, "Expected 1 collection failure")
+		assert.Greater(t, exportedCount, float64(0), "Expected some metrics to be exported")
+		assert.Greater(t, metricsCount, 0, "Expected some metrics to be collected")
+	})
 }
