@@ -86,6 +86,10 @@ spec:
           - '--metric-allowlist=kube_pod_container_resource_requests'
           - '--metric-allowlist=kube_pod_container_resource_limits'
           - '--metric-allowlist=kube_pod_container_status_restarts_total'
+          - '--metric-allowlist=kube_pod_container_status_terminated_reason'
+          - '--metric-allowlist=kube_pod_container_status_terminated_signal'
+          - '--metric-allowlist=kube_node_status_condition'
+          - '--metric-allowlist=kube_node_info'
         prometheusScrape: false
         selfMonitor:
           enabled: true
