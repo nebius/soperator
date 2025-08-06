@@ -25,6 +25,6 @@ spec:
   # No reactions for now until we implement a meaningful extensive check
   # successReactions:
   #   removeReservation:
-  #     prefix: .Values.reservationPrefix
+  #     prefix: {{ .Values.reservationPrefix | quote }}
   # failureReactions:
   #   setHardwareIssuesSuspected: true

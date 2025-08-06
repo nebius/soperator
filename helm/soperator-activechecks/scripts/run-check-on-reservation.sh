@@ -1,7 +1,5 @@
 set -e
 
-apt update && apt install -y retry
-
 echo "Submitting k8s jobs for active check $TARGET_ACTIVE_CHECK_NAME for reserved nodes with prefix $RESERVATION_PREFIX ..."
 for reservationName in $(scontrol show reservation --json | jq ".reservations.[] | select(.name | startswith(\"$RESERVATION_PREFIX\")) | .name"); do
   jobName="$TARGET_ACTIVE_CHECK_NAME-$reservationName"

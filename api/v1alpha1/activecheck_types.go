@@ -121,7 +121,7 @@ type Reactions struct {
 }
 
 type ReservationSpec struct {
-	Prefix string
+	Prefix string `json:"prefix,omitempty"`
 }
 
 type ContainerSpec struct {

@@ -17,7 +17,7 @@ spec:
 {{ .Files.Get "scripts/run-check-on-reservation.sh" | indent 10 }}
       image: {{ .Values.images.k8sJob | quote }}
       env:
-        - name: RESERVATION_PREFEX
+        - name: RESERVATION_PREFIX
           value: {{ .Values.reservationPrefix | quote }}
         - name: TARGET_ACTIVE_CHECK_NAME
           value: {{ .Values.runCheckOnReservation.targetActiveCheckName | quote }}

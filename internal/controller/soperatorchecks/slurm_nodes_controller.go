@@ -207,7 +207,7 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 	/**
 	Health checks have success and failure reactions.
 	When a health check fails, we can already create a reservation using failureReaction.addReservation
-	There is no need to reactions.drainSlurmNode then execute logic here to handle DRAINED sturm nodes with [HC] reasonß
+	There is no need to reactions.drainSlurmNode then execute logic here to handle DRAINED clurm nodes with [HC] reason
 
 	For backward compatability, we add some logic here to handle already drained slurm nodes with [HC] reason and create a reservation for them then undrain them.
 	*/

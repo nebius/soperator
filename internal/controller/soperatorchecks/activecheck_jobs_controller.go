@@ -425,7 +425,7 @@ func executeSuccessReactions(ctx context.Context, slurmJob slurmapi.Job, activeC
 
 	err := processRemoveReservation(ctx, successReactions.RemoveReservation, slurmJob, slurmAPIClient)
 	if err != nil {
-		return fmt.Errorf("adding reservation: %w", err)
+		return fmt.Errorf("removing reservation: %w", err)
 	}
 	return nil
 }

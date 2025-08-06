@@ -24,4 +24,4 @@ spec:
       image: {{ .Values.images.munge | quote }}
   reactions:
     addReservation:
-      prefix: .Values.reservationPrefix
+      prefix: {{ .Values.reservationPrefix | quote }}
