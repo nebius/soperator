@@ -265,7 +265,7 @@ func parseHealthCheckReason(healthCheckReason string) (consts.ReasonConditionTyp
 	}
 
 	// Extract reason and message
-	rawReason := strings.TrimPrefix(parts[0], "[HC] ")
+	rawReason := strings.TrimPrefix(parts[0], "[node_problem] ")
 	message := parts[1]
 
 	// https://github.com/kubernetes/apimachinery/blob/release-1.33/pkg/apis/meta/v1/types.go#L1642

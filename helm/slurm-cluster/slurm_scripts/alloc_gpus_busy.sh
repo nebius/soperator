@@ -2,7 +2,7 @@
 
 set -eox pipefail
 
-echo "[$(date)] Check if there are any processes running on allocated GPUs"
+echo "[$(date)] Check if there are any pids running on allocated GPUs"
 
 # If no GPUs were allocated by Slurm, nothing to do
 if [[ -z "${SLURM_JOB_GPUS:-}" ]]; then
@@ -10,26 +10,25 @@ if [[ -z "${SLURM_JOB_GPUS:-}" ]]; then
     exit 0
 fi
 
-# Split the comma-separated list of allocated GPU indices into an array
-IFS=',' read -ra ALLOC_GPUS <<< "${SLURM_JOB_GPUS}"
-
-processes=""
 # For each allocated GPU, check for running compute apps
-for gpu in "${ALLOC_GPUS[@]}"; do
-    out=$(chroot /run/nvidia/driver nvidia-smi \
-        -i "${gpu}" \
-        --query-compute-apps="gpu_serial,process_name,pid,used_memory" \
-        --format="csv,noheader" 2>/dev/null || echo "")
-    if [[ -n "${out}" ]]; then
-        processes+=$'\n'"GPU ${gpu}: ${out}"
-    fi
-done
+pids=$(chroot /run/nvidia/driver /bin/bash -c "
+  IFS=',' read -ra ALLOC_GPUS <<< \"\${SLURM_JOB_GPUS}\"
+  for gpu in \"\${ALLOC_GPUS[@]}\"; do
+      pid=\$(nvidia-smi \
+          -i \"\${gpu}\" \
+          --query-compute-apps='pid' \
+          --format='csv,noheader' 2>/dev/null || echo '')
+      if [[ -n \"\${pid}\" ]]; then
+          echo \"\${pid}\"
+      fi
+  done
+" | paste -sd ',' -)
 
-if [[ -n "${processes}" ]]; then
-    echo "Found processes running on allocated GPUs: ${processes}"
+if [[ -n "${pids}" ]]; then
+    echo "Found PIDs running on allocated GPUs: ${pids}"
 
     # Return failure details
-    echo "GPUs are in use by processes not managed by Slurm" >&3
+    echo "Allocated GPUs are used by processes not managed by Slurm, please stop them: PID $pids" >&3
     exit 1
 fi
 

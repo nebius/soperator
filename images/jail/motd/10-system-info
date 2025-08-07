@@ -17,11 +17,10 @@ NUM_PROCESSES=$(ps -e --no-headers | wc -l)
 printf "\tProcesses: %s\n" "${NUM_PROCESSES}"
 
 DISK_USAGE_CMD="
-  findmnt -o SIZE,USE%,TARGET --types virtiofs,tmpfs,nfs4,overlay,ext4 \
-    | grep -vE \"/dev|/usr/lib|/secrets|/usr/bin/enroot|/etc/enroot|/munge|/etc\" \
-    | grep -vE \"/usr/bin/sacct|/usr/bin/salloc|/usr/bin/sbatch|/usr/bin/scancel|/usr/bin/scrontab|/usr/bin/sdiag|/usr/bin/sinfo|/usr/bin/squeue|/usr/bin/srun|/usr/bin/sstat|/usr/bin/sacctmgr|/usr/bin/sattach|/usr/bin/sbcast|/usr/bin/scontrol|/usr/bin/scrun|/usr/bin/sh5util|/usr/bin/sprio|/usr/bin/sreport|/usr/bin/sshare|/usr/bin/strigger|/usr/share/bash-completion/completions/slurm_completion.sh\" \
-    | sed 's/SIZE/Size/' | sed 's/USE%/Use%/' | sed 's/TARGET/Directory/' \
+  findmnt -o SIZE,USE%,FSTYPE,TARGET --types virtiofs,tmpfs,nfs4,overlay,ext4 \
+    | grep -vE '/dev|/run|/sys|/etc|/usr|/opt|/proc|/var' \
+    | sed 's/SIZE/Size/' | sed 's/USE%/Use%/' | sed 's/FSTYPE/FSType/' | sed 's/TARGET/Directory/' \
     | sed 's/^/  /'
 "
-printf "  Disk usage:\n"
+printf "  File system usage:\n"
 chroot /mnt/jail /bin/sh -c "${DISK_USAGE_CMD}" 2>/dev/null
