@@ -295,7 +295,7 @@ func (r *ActiveCheckJobReconciler) updateSlurmNodeWithReaction(
 		return fmt.Errorf("get node list: %w", err)
 	}
 
-	failureMessage := fmt.Sprintf("[HC] Failed %s: job %d [slurm_job]", activeCheck.Name, slurmJob.ID)
+	failureMessage := fmt.Sprintf("[node_problem] Failed %s: job %d [slurm_job]", activeCheck.Name, slurmJob.ID)
 	reason := consts.SlurmNodeReasonActiveCheckFailedUnknown
 	if activeCheck.Spec.Reactions.SetCondition {
 		reason = failureMessage
