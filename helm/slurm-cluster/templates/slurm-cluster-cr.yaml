@@ -24,7 +24,7 @@ spec:
     healthCheckInterval: 300
     healthCheckProgram: /opt/slurm_scripts/hc_program.sh
     healthCheckNodeState:
-    - state: NONDRAINED_IDLE
+    - state: IDLE
     - state: ALLOC
     - state: MIXED
     - state: CYCLE

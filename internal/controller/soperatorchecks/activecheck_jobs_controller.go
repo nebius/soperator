@@ -218,7 +218,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 					reason := consts.SlurmNodeReasonActiveCheckFailedUnknown
 					if activeCheck.Spec.Reactions.SetCondition {
-						reason = fmt.Sprintf("[HC] Failed %s: job %d [slurm_job]", activeCheckName, slurmJob.ID)
+						reason = fmt.Sprintf("[node_problem] Failed %s: job %d [slurm_job]", activeCheckName, slurmJob.ID)
 					}
 					for _, node := range nodes {
 						resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, node,
