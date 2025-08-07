@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"maps"
 
+	appspub "github.com/openkruise/kruise-api/apps/pub"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,6 +78,11 @@ func RenderStatefulSet(
 	}
 
 	spec := corev1.PodSpec{
+		ReadinessGates: []corev1.PodReadinessGate{
+			{
+				ConditionType: appspub.InPlaceUpdateReady,
+			},
+		},
 		PriorityClassName:  worker.PriorityClass,
 		ServiceAccountName: naming.BuildServiceAccountWorkerName(clusterName),
 		Affinity:           nodeFilter.Affinity,
@@ -117,7 +124,7 @@ func RenderStatefulSet(
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
 					MaxUnavailable:  &worker.StatefulSet.MaxUnavailable,
-					PodUpdatePolicy: kruisev1b1.RecreatePodUpdateStrategyType,
+					PodUpdatePolicy: kruisev1b1.InPlaceIfPossiblePodUpdateStrategyType,
 					Partition:       ptr.To(int32(0)),
 					MinReadySeconds: ptr.To(int32(0)),
 				},
