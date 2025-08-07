@@ -5,6 +5,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"nebius.ai/slurm-operator/internal/consts"
 
@@ -793,6 +794,16 @@ type SlurmNodeControllerVolumes struct {
 // SlurmNodeWorker defines the configuration for the Slurm worker node
 type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
+
+	// The maximum number of worker pods that can be unavailable during the update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// Absolute number is calculated from percentage by rounding down.
+	// Also, maxUnavailable can just be allowed to work with Parallel podManagementPolicy.
+	// Defaults to 20%.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="20%"
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
 	// Slurmd represents the Slurm daemon service configuration
 	//

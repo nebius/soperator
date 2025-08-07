@@ -85,9 +85,10 @@ func buildSlurmWorkerFrom(
 		SupervisordConfigMapName:    supervisordConfigName,
 		WorkerAnnotations:           worker.WorkerAnnotations,
 		Service:                     buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeWorker, clusterName)),
-		StatefulSet: buildStatefulSetFrom(
+		StatefulSet: buildStatefulSetWithMaxUnavailableFrom(
 			naming.BuildStatefulSetName(consts.ComponentTypeWorker),
 			worker.SlurmNode.Size,
+			worker.MaxUnavailable,
 		),
 		VolumeSpool:               *worker.Volumes.Spool.DeepCopy(),
 		VolumeJail:                *worker.Volumes.Jail.DeepCopy(),

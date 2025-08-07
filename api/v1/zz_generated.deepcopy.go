@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"nebius.ai/slurm-operator/internal/consts"
 )
 
@@ -1007,6 +1008,11 @@ func (in *SlurmNodeLoginVolumes) DeepCopy() *SlurmNodeLoginVolumes {
 func (in *SlurmNodeWorker) DeepCopyInto(out *SlurmNodeWorker) {
 	*out = *in
 	in.SlurmNode.DeepCopyInto(&out.SlurmNode)
+	if in.MaxUnavailable != nil {
+		in, out := &in.MaxUnavailable, &out.MaxUnavailable
+		*out = new(intstr.IntOrString)
+		**out = **in
+	}
 	in.Slurmd.DeepCopyInto(&out.Slurmd)
 	in.Munge.DeepCopyInto(&out.Munge)
 	if in.WorkerAnnotations != nil {
