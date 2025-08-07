@@ -82,18 +82,98 @@ func getZapOpts(logFormat, logLevel string) []zap.Opts {
 func parseFlags() Flags {
 	var flags Flags
 
-	flag.StringVar(&flags.logFormat, "log-format", "json", "Log format: plain or json")
-	flag.StringVar(&flags.logLevel, "log-level", "debug", "Log level: debug, info, warn, error, dpanic, panic, fatal")
-	flag.StringVar(&flags.metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&flags.monitoringAddr, "monitoring-bind-address", ":8081", "The address the monitoring endpoint binds to.")
-	flag.StringVar(&flags.slurmAPIServer, "slurm-api-server", "http://localhost:6820", "The address of the Slurm REST API server.")
-	flag.StringVar(&flags.clusterNamespace, "cluster-namespace", "soperator", "The namespace of the Slurm cluster")
-	flag.StringVar(&flags.clusterName, "cluster-name", "", "The name of the Slurm cluster (required)")
-	flag.StringVar(&flags.collectionInterval, "collection-interval", "30s", "How often to collect metrics from SLURM APIs")
+	// flagConfig represents configuration for a single flag/env var pair
+	type flagConfig struct {
+		flagName   string
+		envName    string
+		defaultVal string
+		usage      string
+		target     *string
+	}
+
+	configs := []flagConfig{
+		{
+			flagName:   "log-format",
+			envName:    "SLURM_EXPORTER_LOG_FORMAT",
+			defaultVal: "json",
+			usage:      "Log format: plain or json",
+			target:     &flags.logFormat,
+		},
+		{
+			flagName:   "log-level",
+			envName:    "SLURM_EXPORTER_LOG_LEVEL",
+			defaultVal: "debug",
+			usage:      "Log level: debug, info, warn, error, dpanic, panic, fatal",
+			target:     &flags.logLevel,
+		},
+		{
+			flagName:   "metrics-bind-address",
+			envName:    "SLURM_EXPORTER_METRICS_BIND_ADDRESS",
+			defaultVal: ":8080",
+			usage:      "The address the metric endpoint binds to.",
+			target:     &flags.metricsAddr,
+		},
+		{
+			flagName:   "monitoring-bind-address",
+			envName:    "SLURM_EXPORTER_MONITORING_BIND_ADDRESS",
+			defaultVal: ":8081",
+			usage:      "The address the monitoring endpoint binds to.",
+			target:     &flags.monitoringAddr,
+		},
+		{
+			flagName:   "slurm-api-server",
+			envName:    "SLURM_EXPORTER_SLURM_API_SERVER",
+			defaultVal: "http://localhost:6820",
+			usage:      "The address of the Slurm REST API server.",
+			target:     &flags.slurmAPIServer,
+		},
+		{
+			flagName:   "cluster-namespace",
+			envName:    "SLURM_EXPORTER_CLUSTER_NAMESPACE",
+			defaultVal: "soperator",
+			usage:      "The namespace of the Slurm cluster",
+			target:     &flags.clusterNamespace,
+		},
+		{
+			flagName:   "cluster-name",
+			envName:    "SLURM_EXPORTER_CLUSTER_NAME",
+			defaultVal: "",
+			usage:      "The name of the Slurm cluster (required)",
+			target:     &flags.clusterName,
+		},
+		{
+			flagName:   "collection-interval",
+			envName:    "SLURM_EXPORTER_COLLECTION_INTERVAL",
+			defaultVal: "30s",
+			usage:      "How often to collect metrics from SLURM APIs",
+			target:     &flags.collectionInterval,
+		},
+	}
+
+	for _, cfg := range configs {
+		flag.StringVar(cfg.target, cfg.flagName, cfg.defaultVal, cfg.usage)
+	}
+
 	flag.Parse()
 
+	// Build a set of flags that were explicitly passed on the command line
+	passedFlags := make(map[string]struct{})
+	flag.Visit(func(f *flag.Flag) {
+		passedFlags[f.Name] = struct{}{}
+	})
+
+	// Apply environment variables if CLI flags were not explicitly set
+	// Priority: CLI flag > Environment variable > Default value
+	for _, cfg := range configs {
+		if _, passed := passedFlags[cfg.flagName]; !passed {
+			if envVal := os.Getenv(cfg.envName); envVal != "" {
+				*cfg.target = envVal
+			}
+		}
+	}
+
 	if flags.clusterName == "" {
-		_, _ = fmt.Fprintf(os.Stderr, "Error: cluster-name is required\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Error: cluster-name is required (set via --cluster-name flag or SLURM_EXPORTER_CLUSTER_NAME env var)\n")
 		flag.Usage()
 		os.Exit(1)
 	}
