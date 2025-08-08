@@ -193,29 +193,6 @@ func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace string) 
 	}
 }
 
-func (r *WorkerTopologyReconciler) makeDefaultTopologyConfig(ctx context.Context, clusterName string) (string, error) {
-	listASTS := &kruisev1b1.StatefulSetList{}
-	if err := r.getAdvancedSTS(ctx, clusterName, listASTS); err != nil {
-		return "", fmt.Errorf("get advanced stateful sets: %w", err)
-	}
-	return InitializeTopologyConf(listASTS), nil
-}
-
-func (r *WorkerTopologyReconciler) createDefaultTopologyConfigMap(
-	ctx context.Context, req ctrl.Request, slurmCluster *slurmv1.SlurmCluster, logger logr.Logger) error {
-	logger.Info("Node topology labels ConfigMap not found, creating with default topology")
-
-	config, err := r.makeDefaultTopologyConfig(ctx, slurmCluster.Name)
-	if err != nil {
-		return err
-	}
-	if err := r.updateTopologyConfigMap(ctx, req.Namespace, config); err != nil {
-		return err
-	}
-	logger.Info("Successfully created default topology ConfigMap")
-	return nil
-}
-
 // EnsureTopologyConfigMap ensures that the ConfigMap for topology configuration exists.
 func (r *WorkerTopologyReconciler) EnsureTopologyConfigMap(
 	ctx context.Context, namespace, clusterName string,

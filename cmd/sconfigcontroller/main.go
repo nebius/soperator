@@ -125,7 +125,6 @@ func main() {
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 1*time.Minute, "The maximum duration allowed for caching sync")
 	flag.StringVar(&jailPath, "jail-path", "/mnt/jail", "Path where jail is mounted")
-	flag.StringVar(&configsPath, "configs-path", "/mnt/jail/etc/slurm", "Path where to store configs")
 	flag.StringVar(&clusterNamespace, "cluster-namespace", "default", "Soperator cluster namespace")
 	flag.StringVar(&clusterName, "cluster-name", "soperator", "Name of the soperator cluster controller")
 	flag.StringVar(&slurmAPIServer, "slurmapiserver", "http://localhost:6820", "Address of the SlurmAPI")
