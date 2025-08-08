@@ -277,3 +277,14 @@ helmReleaseTriggerOperator:
         cpu: 100m
         memory: 128Mi
   overrideValues: null
+notifier:
+  enabled: false
+  interval: 5m
+  timeout: 5m
+  version: 1.21.10
+  namespace: monitoring-system
+  releaseName: soperator-notifier
+  values:
+    slack:
+      webhookUrl: null
+  overrideValues: null

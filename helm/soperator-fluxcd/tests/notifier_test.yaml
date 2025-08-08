@@ -1,0 +1,70 @@
+suite: test notifier
+templates:
+  - templates/notifier.yaml
+
+set:
+  observability:
+    enabled: true
+    vmStack:
+      enabled: true
+  notifier:
+    enabled: true
+
+tests:
+  - it: should not be created if no VMSingle present
+    set:
+      observability:
+        enabled: false
+        vmStack:
+          enabled: false
+    asserts:
+      - notFailedTemplate: {}
+      - hasDocuments:
+          count: 0
+
+  - it: should handle enabled flag gracefully
+    set:
+      notifier:
+        enabled: false
+    asserts:
+      - notFailedTemplate: {}
+      - hasDocuments:
+          count: 0
+
+  - it: should fail if no webhook provided
+    asserts:
+      - failedTemplate:
+          errorMessage: "Slack Webhook is required."
+
+  - it: should work with no other values provided
+    set:
+      notifier:
+        values:
+          slack:
+            webhookUrl: &slackUrl "http://foo.bar/x/y/z"
+    asserts:
+      - notFailedTemplate: {}
+      - isKind:
+          of: HelmRelease
+      - equal:
+          path: spec.values.nameOverride
+          value: "soperator-notifier"
+      - equal:
+          path: spec.values.slack.webhookUrl
+          value: *slackUrl
+
+  - it: should handle complex nested custom values
+    set:
+      notifier:
+        values:
+          slack:
+            webhookUrl: "http://foo.bar/x/y/z"
+        overrideValues:
+          dataSourceUrl: &dataSourceUrl "http://bar.baz/x/y/z:6969"
+    asserts:
+      - notFailedTemplate: { }
+      - isKind:
+          of: HelmRelease
+      - equal:
+          path: spec.values.dataSourceUrl
+          value: *dataSourceUrl

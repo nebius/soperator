@@ -1,0 +1,48 @@
+{{ if and (and .Values.notifier .Values.notifier.enabled) (and .Values.observability (and .Values.observability.enabled (and .Values.observability.vmStack .Values.observability.vmStack.enabled))) }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-soperator-notifier
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: helm-soperator-notifier
+      interval: {{ .Values.notifier.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+      version: {{ .Values.notifier.version }}
+  dependsOn:
+    - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+    - name: {{ include "soperator-fluxcd.fullname" . }}-vm-logs
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  interval: {{ .Values.notifier.interval }}
+  timeout: {{ .Values.notifier.timeout }}
+  releaseName: {{ .Values.notifier.releaseName }}
+  targetNamespace: {{ .Values.notifier.namespace }}
+  values:
+    {{- if .Values.notifier.overrideValues }}
+    {{- toYaml .Values.notifier.overrideValues | nindent 4 }}
+    {{- else }}
+    nameOverride: {{ .Values.notifier.releaseName }}
+    slack:
+      webhookUrl: {{ required "Slack Webhook is required." .Values.notifier.values.slack.webhookUrl | quote }}
+    {{- end }}
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-soperator-notifier
+      optional: true
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: soperator-notifier
+      optional: true
+      valuesKey: values.yaml
+{{- end }}
