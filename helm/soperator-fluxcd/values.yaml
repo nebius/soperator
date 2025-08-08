@@ -142,6 +142,7 @@ observability:
             promscrape.maxScrapeSize: "33554432"
             promscrape.dropOriginalLabels: "true"
             promscrape.streamParse: "true"
+          externalLabels: {}
           remoteWriteSettings: {}
           remoteWrite:
             - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8429/api/v1/write

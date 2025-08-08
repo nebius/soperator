@@ -281,6 +281,12 @@ spec:
           {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
           {{- $hasVmagentSpec := .Values.observability.vmStack.values.vmagent.spec }}
 
+          {{- $hasExternalLabels := and $hasVmagentSpec $hasVmagentSpec.externalLabels }}
+          {{- if and $hasExternalLabels (gt (len $hasExternalLabels) 0) }}
+          externalLabels:
+            {{- toYaml $hasExternalLabels | nindent 12 }}
+          {{- end }}
+
           remoteWriteSettings:
           {{- $hasRemoteWriteSettings := and $hasVmagentSpec $hasVmagentSpec.remoteWriteSettings }}
           {{- $remoteWriteSettingsNotEmpty := and $hasRemoteWriteSettings (gt (len $hasVmagentSpec.remoteWriteSettings) 0) }}
@@ -288,6 +294,9 @@ spec:
             label:
               cluster: "%{CLUSTER_NAME}"
               container_id: {{ .Values.observability.projectId  }}
+              {{- if and $hasExternalLabels (gt (len $hasExternalLabels) 0) }}
+              {{- toYaml $hasExternalLabels | nindent 14 }}
+              {{- end }}
           {{- if and $hasVmagentSpec $hasVmagentSpec.remoteWriteSettings }}
           {{- toYaml $hasVmagentSpec.remoteWriteSettings | nindent 12 }}
           {{- end }}

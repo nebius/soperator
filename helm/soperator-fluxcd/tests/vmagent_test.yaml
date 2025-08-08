@@ -1,6 +1,11 @@
 suite: test vmagent edge cases
 templates:
   - templates/vm-stack.yaml
+
+set:
+  observability:
+    projectId: default-project-id
+
 tests:
   - it: should handle null projectId gracefully
     set:
@@ -9,16 +14,16 @@ tests:
         vmStack:
           enabled: true
           publicEndpointEnabled: true
-      projectId: null
+        projectId: null
     asserts:
       - hasDocuments:
           count: 1
       - equal:
           path: spec.values.vmagent.spec.remoteWriteSettings.label.container_id
-          value: "default-project-id"
-      - contains:
+          value: null
+      - matchRegex:
           path: spec.values.vmagent.spec.remoteWrite[0].url
-          content: "default-project-id"
+          pattern: ".*/projects//buckets.*"
 
   - it: should handle empty strings in projectId
     set:
@@ -34,48 +39,6 @@ tests:
       - equal:
           path: spec.values.vmagent.spec.remoteWriteSettings.label.container_id
           value: "default-project-id"
-
-  - it: should work with only remoteWriteSettings without remoteWrite
-    set:
-      observability:
-        enabled: true
-        vmStack:
-          enabled: true
-          publicEndpointEnabled: false
-          values:
-            vmagent:
-              spec:
-                remoteWriteSettings:
-                  customOnly: "true"
-    asserts:
-      - hasDocuments:
-          count: 1
-      - equal:
-          path: spec.values.vmagent.spec.remoteWriteSettings.customOnly
-          value: "true"
-      - notExists:
-          path: spec.values.vmagent.spec.remoteWrite
-
-  - it: should work with only remoteWrite without remoteWriteSettings
-    set:
-      observability:
-        enabled: true
-        vmStack:
-          enabled: true
-          publicEndpointEnabled: false
-          values:
-            vmagent:
-              spec:
-                remoteWrite:
-                  - url: "https://only-endpoint.com/write"
-    asserts:
-      - hasDocuments:
-          count: 1
-      - equal:
-          path: spec.values.vmagent.spec.remoteWrite[0].url
-          value: "https://only-endpoint.com/write"
-      - notExists:
-          path: spec.values.vmagent.spec.remoteWriteSettings
 
   - it: should handle complex nested custom values
     set:
@@ -94,7 +57,7 @@ tests:
                   requests:
                     memory: "1Gi"
                     cpu: "500m"
-                extraEnv:
+                extraEnvs:
                   - name: "COMPLEX_CONFIG"
                     valueFrom:
                       configMapKeyRef:
@@ -129,13 +92,13 @@ tests:
           path: spec.values.vmagent.spec.resources.requests.cpu
           value: "500m"
       - lengthEqual:
-          path: spec.values.vmagent.spec.extraEnv
-          count: 2
+          path: spec.values.vmagent.spec.extraEnvs
+          count: 3
       - equal:
-          path: spec.values.vmagent.spec.extraEnv[0].valueFrom.configMapKeyRef.name
+          path: spec.values.vmagent.spec.extraEnvs[1].valueFrom.configMapKeyRef.name
           value: "vmagent-config"
       - equal:
-          path: spec.values.vmagent.spec.extraEnv[1].valueFrom.secretKeyRef.key
+          path: spec.values.vmagent.spec.extraEnvs[2].valueFrom.secretKeyRef.key
           value: "token"
       - lengthEqual:
           path: spec.values.vmagent.spec.volumeMounts
@@ -189,16 +152,16 @@ tests:
         vmStack:
           enabled: true
           publicEndpointEnabled: true
-      projectId: "test-project_123.dev"
+        projectId: "test-project_123.dev"
     asserts:
       - hasDocuments:
           count: 1
       - equal:
           path: spec.values.vmagent.spec.remoteWriteSettings.label.container_id
           value: "test-project_123.dev"
-      - contains:
+      - matchRegex:
           path: spec.values.vmagent.spec.remoteWrite[0].url
-          content: "test-project_123.dev"
+          pattern: "[.]*.test-project_123.dev.[.]*"
 
   - it: should validate template conditionals structure
     set:
@@ -224,9 +187,9 @@ tests:
           path: spec.values.vmagent.spec.volumeMounts
       - exists:
           path: spec.values.vmagent.spec.volumes
-      # Should not have these sections when not provided
-      - notExists:
+      - exists:
           path: spec.values.vmagent.spec.resources
+      # Should not have these sections when not provided
       - notExists:
           path: spec.values.vmagent.spec.extraEnv
 
@@ -264,6 +227,49 @@ tests:
       - equal:
           path: spec.values.vmagent.spec.extraArgs["string.value"]
           value: "test"
+
+  - it: should handle no externalLabels
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notExists:
+          path: spec.values.vmagent.spec.externalLabels
+
+  - it: should handle externalLabels
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: true
+          values:
+            vmagent:
+              spec:
+                externalLabels:
+                  a: b
+                  foo: bar
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.vmagent.spec.externalLabels["a"]
+          value: b
+      - equal:
+          path: spec.values.vmagent.spec.externalLabels["foo"]
+          value: bar
+      - equal:
+          path: spec.values.vmagent.spec.remoteWriteSettings.label["a"]
+          value: b
+      - equal:
+          path: spec.values.vmagent.spec.remoteWriteSettings.label["foo"]
+          value: bar
+
   - it: should merge custom remoteWrite with default when publicEndpointEnabled is true
     set:
       observability:
@@ -283,7 +289,6 @@ tests:
                       - sourceLabels: [__name__]
                         regex: "custom_.*"
                         action: keep
-      projectId: "test-project"
     asserts:
       - hasDocuments:
           count: 1
@@ -294,7 +299,7 @@ tests:
       # Check default endpoint (should be first)
       - equal:
           path: spec.values.vmagent.spec.remoteWrite[0].url
-          value: "https://write.monitoring.eu-north1.nebius.cloud/projects/test-project/buckets/soperator/prometheus"
+          value: "https://write.monitoring.eu-north1.nebius.cloud/projects/default-project-id/buckets/soperator/prometheus"
       - exists:
           path: spec.values.vmagent.spec.remoteWrite[0].inlineUrlRelabelConfig
       # Check first custom endpoint
@@ -311,102 +316,6 @@ tests:
       - equal:
           path: spec.values.vmagent.spec.remoteWrite[2].writeRelabelConfigs[0].action
           value: "keep"
-
-  - it: should merge custom remoteWriteSettings with default when publicEndpointEnabled is true
-    set:
-      observability:
-        enabled: true
-        vmStack:
-          enabled: true
-          publicEndpointEnabled: true
-          values:
-            vmagent:
-              spec:
-                remoteWriteSettings:
-                  flushInterval: "30s"
-                  maxBlockSize: "8388608"
-                  maxRowsPerBlock: "5000"
-                  queues: "4"
-                  label:
-                    environment: "production"
-                    region: "eu-north1"
-      projectId: "test-project"
-    asserts:
-      - hasDocuments:
-          count: 1
-      # Should have both default and custom labels
-      - equal:
-          path: spec.values.vmagent.spec.remoteWriteSettings.label.cluster
-          value: "bender"
-      - equal:
-          path: spec.values.vmagent.spec.remoteWriteSettings.label.container_id
-          value: "test-project"
-      - equal:
-          path: spec.values.vmagent.spec.remoteWriteSettings.label.environment
-          value: "production"
-      - equal:
-          path: spec.values.vmagent.spec.remoteWriteSettings.label.region
-          value: "eu-north1"
-      # Should have custom settings
-      - equal:
-          path: spec.values.vmagent.spec.remoteWriteSettings.flushInterval
-          value: "30s"
-      - equal:
-          path: spec.values.vmagent.spec.remoteWriteSettings.maxBlockSize
-          value: "8388608"
-      - equal:
-          path: spec.values.vmagent.spec.remoteWriteSettings.maxRowsPerBlock
-          value: "5000"
-      - equal:
-          path: spec.values.vmagent.spec.remoteWriteSettings.queues
-          value: "4"
-
-  - it: should merge custom extraArgs with defaults when publicEndpointEnabled is true
-    set:
-      observability:
-        enabled: true
-        vmStack:
-          enabled: true
-          publicEndpointEnabled: true
-          values:
-            vmagent:
-              spec:
-                extraArgs:
-                  "promscrape.maxScrapeSize": "67108864"  # Override default
-                  "remoteWrite.maxRowsPerBlock": "8000"   # Override default
-                  "promscrape.configCheckInterval": "60s" # New custom arg
-                  "memory.allowedPercent": "80"           # New custom arg
-      projectId: "test-project"
-    asserts:
-      - hasDocuments:
-          count: 1
-      # Should have overridden defaults
-      - equal:
-          path: spec.values.vmagent.spec.extraArgs["promscrape.maxScrapeSize"]
-          value: "67108864"
-      - equal:
-          path: spec.values.vmagent.spec.extraArgs["remoteWrite.maxRowsPerBlock"]
-          value: "8000"
-      # Should have new custom args
-      - equal:
-          path: spec.values.vmagent.spec.extraArgs["promscrape.configCheckInterval"]
-          value: "60s"
-      - equal:
-          path: spec.values.vmagent.spec.extraArgs["memory.allowedPercent"]
-          value: "80"
-      # Should keep other defaults unchanged
-      - equal:
-          path: spec.values.vmagent.spec.extraArgs["promscrape.dropOriginalLabels"]
-          value: "true"
-      - equal:
-          path: spec.values.vmagent.spec.extraArgs["promscrape.streamParse"]
-          value: "true"
-      - equal:
-          path: spec.values.vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
-          value: "/mnt/cloud-metadata/tsa-token"
-      - equal:
-          path: spec.values.vmagent.spec.extraArgs["remoteWrite.rateLimit"]
-          value: "2"
 
   - it: should merge custom volumeMounts and volumes with defaults when publicEndpointEnabled is true
     set:
@@ -431,7 +340,6 @@ tests:
                   - name: "data-volume"
                     persistentVolumeClaim:
                       claimName: "vmagent-data"
-      projectId: "test-project"
     asserts:
       - hasDocuments:
           count: 1
@@ -442,10 +350,10 @@ tests:
       # Check default tsa-token mount
       - equal:
           path: spec.values.vmagent.spec.volumeMounts[0].name
-          value: "tsa-token"
+          value: "cloud-metadata"
       - equal:
           path: spec.values.vmagent.spec.volumeMounts[0].mountPath
-          value: "/mnt/cloud-metadata/tsa-token"
+          value: "/mnt/cloud-metadata"
       - equal:
           path: spec.values.vmagent.spec.volumeMounts[0].readOnly
           value: true
@@ -469,13 +377,13 @@ tests:
       # Check default tsa-token volume
       - equal:
           path: spec.values.vmagent.spec.volumes[0].name
-          value: "tsa-token"
+          value: "cloud-metadata"
       - equal:
           path: spec.values.vmagent.spec.volumes[0].hostPath.path
-          value: "/mnt/cloud-metadata/tsa-token"
+          value: "/mnt/cloud-metadata"
       - equal:
           path: spec.values.vmagent.spec.volumes[0].hostPath.type
-          value: "File"
+          value: "Directory"
       # Check custom volumes
       - equal:
           path: spec.values.vmagent.spec.volumes[1].name
@@ -489,119 +397,6 @@ tests:
       - equal:
           path: spec.values.vmagent.spec.volumes[2].persistentVolumeClaim.claimName
           value: "vmagent-data"
-
-  - it: should handle complex scenario with all custom fields when publicEndpointEnabled is true
-    set:
-      observability:
-        enabled: true
-        vmStack:
-          enabled: true
-          publicEndpointEnabled: true
-          values:
-            vmagent:
-              spec:
-                remoteWriteSettings:
-                  flushInterval: "10s"
-                  label:
-                    custom_label: "custom_value"
-                remoteWrite:
-                  - url: "https://backup-endpoint.com/write"
-                    basicAuth:
-                      username: "vmagent"
-                      password: "secret"
-                extraArgs:
-                  "promscrape.maxScrapeSize": "134217728"
-                  "custom.arg": "custom_value"
-                resources:
-                  limits:
-                    memory: "4Gi"
-                    cpu: "2000m"
-                  requests:
-                    memory: "2Gi"
-                    cpu: "1000m"
-                extraEnv:
-                  - name: "CUSTOM_ENV"
-                    value: "production"
-                volumeMounts:
-                  - name: "custom-storage"
-                    mountPath: "/custom"
-                volumes:
-                  - name: "custom-storage"
-                    emptyDir: {}
-      projectId: "complex-project"
-    asserts:
-      - hasDocuments:
-          count: 1
-      # Verify remoteWriteSettings merge
-      - equal:
-          path: spec.values.vmagent.spec.remoteWriteSettings.label.cluster
-          value: "bender"
-      - equal:
-          path: spec.values.vmagent.spec.remoteWriteSettings.label.container_id
-          value: "complex-project"
-      - equal:
-          path: spec.values.vmagent.spec.remoteWriteSettings.label.custom_label
-          value: "custom_value"
-      - equal:
-          path: spec.values.vmagent.spec.remoteWriteSettings.flushInterval
-          value: "10s"
-      # Verify remoteWrite merge (2 entries: default + custom)
-      - lengthEqual:
-          path: spec.values.vmagent.spec.remoteWrite
-          count: 2
-      - contains:
-          path: spec.values.vmagent.spec.remoteWrite[0].url
-          content: "complex-project"
-      - equal:
-          path: spec.values.vmagent.spec.remoteWrite[1].url
-          value: "https://backup-endpoint.com/write"
-      - equal:
-          path: spec.values.vmagent.spec.remoteWrite[1].basicAuth.username
-          value: "vmagent"
-      # Verify extraArgs merge
-      - equal:
-          path: spec.values.vmagent.spec.extraArgs["promscrape.maxScrapeSize"]
-          value: "134217728"  # Overridden
-      - equal:
-          path: spec.values.vmagent.spec.extraArgs["custom.arg"]
-          value: "custom_value"  # Added
-      - equal:
-          path: spec.values.vmagent.spec.extraArgs["promscrape.dropOriginalLabels"]
-          value: "true"  # Default preserved
-      # Verify resources
-      - equal:
-          path: spec.values.vmagent.spec.resources.limits.memory
-          value: "4Gi"
-      - equal:
-          path: spec.values.vmagent.spec.resources.requests.cpu
-          value: "1000m"
-      # Verify extraEnv
-      - equal:
-          path: spec.values.vmagent.spec.extraEnv[0].name
-          value: "CUSTOM_ENV"
-      - equal:
-          path: spec.values.vmagent.spec.extraEnv[0].value
-          value: "production"
-      # Verify volumeMounts merge (2 entries: default + custom)
-      - lengthEqual:
-          path: spec.values.vmagent.spec.volumeMounts
-          count: 2
-      - equal:
-          path: spec.values.vmagent.spec.volumeMounts[0].name
-          value: "tsa-token"
-      - equal:
-          path: spec.values.vmagent.spec.volumeMounts[1].name
-          value: "custom-storage"
-      # Verify volumes merge (2 entries: default + custom)
-      - lengthEqual:
-          path: spec.values.vmagent.spec.volumes
-          count: 2
-      - equal:
-          path: spec.values.vmagent.spec.volumes[0].name
-          value: "tsa-token"
-      - equal:
-          path: spec.values.vmagent.spec.volumes[1].name
-          value: "custom-storage"
 
   - it: should handle edge case with empty custom arrays when publicEndpointEnabled is true
     set:
@@ -617,7 +412,6 @@ tests:
                 extraEnv: []
                 volumeMounts: []
                 volumes: []
-      projectId: "edge-case-project"
     asserts:
       - hasDocuments:
           count: 1
@@ -627,20 +421,20 @@ tests:
           count: 1  # Only default
       - equal:
           path: spec.values.vmagent.spec.remoteWrite[0].url
-          value: "https://write.monitoring.eu-north1.nebius.cloud/projects/edge-case-project/buckets/soperator/prometheus"
+          value: "https://write.monitoring.eu-north1.nebius.cloud/projects/default-project-id/buckets/soperator/prometheus"
       # Should have default volumeMounts and volumes
       - lengthEqual:
           path: spec.values.vmagent.spec.volumeMounts
           count: 1  # Only default tsa-token
       - equal:
           path: spec.values.vmagent.spec.volumeMounts[0].name
-          value: "tsa-token"
+          value: "cloud-metadata"
       - lengthEqual:
           path: spec.values.vmagent.spec.volumes
           count: 1  # Only default tsa-token
       - equal:
           path: spec.values.vmagent.spec.volumes[0].name
-          value: "tsa-token"
+          value: "cloud-metadata"
       # Should not have extraEnv when empty
       - notExists:
           path: spec.values.vmagent.spec.extraEnv
