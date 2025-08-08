@@ -20105,6 +20105,18 @@ spec:
                     required:
                     - k8sNodeFilterName
                     type: object
+                  reconfigurePollInterval:
+                    default: 20s
+                    description: |-
+                      ReconfigurePollInterval defines the interval for polling node restart status during reconfiguration.
+                      Defaults to 20s
+                    type: string
+                  reconfigureWaitTimeout:
+                    default: 1m
+                    description: |-
+                      ReconfigureWaitTimeout defines the maximum time to wait for all nodes to restart during reconfiguration.
+                      Must be greater than ReconfigurePollInterval. Defaults to 1m
+                    type: string
                   runAsGid:
                     description: |-
                       RunAsGid defines GID to run SConfigController process
@@ -20120,6 +20132,10 @@ spec:
                     format: int64
                     type: integer
                 type: object
+                x-kubernetes-validations:
+                - message: ReconfigureWaitTimeout must be greater than ReconfigurePollInterval
+                  rule: '!has(self.reconfigureWaitTimeout) || !has(self.reconfigurePollInterval)
+                    || duration(self.reconfigureWaitTimeout) > duration(self.reconfigurePollInterval)'
               secrets:
                 description: Secrets define the [corev1.Secret] references needed
                   for Slurm cluster operation
