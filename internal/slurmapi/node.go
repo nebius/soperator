@@ -114,6 +114,35 @@ func (n *Node) IsDownState() bool {
 	return exists
 }
 
+func (n *Node) IsFailState() bool {
+	_, exists := n.States[api.V0041NodeStateFAIL]
+	return exists
+}
+
+// IsNotUsable returns true if the node is in a not usable state.
+// A node is considered not usable when in state DOWN+*, IDLE+DRAIN+*, or IDLE+FAIL+* (where * represents any additional flags).
+// Note: RUNNING+DRAIN is not considered not usable until the job completes and base state changes to IDLE.
+func (n *Node) IsNotUsable() bool {
+	baseState := n.BaseState()
+
+	// DOWN+* is always not usable
+	if baseState == api.V0041NodeStateDOWN {
+		return true
+	}
+
+	// IDLE+DRAIN+* is not usable
+	if baseState == api.V0041NodeStateIDLE && n.IsDrainState() {
+		return true
+	}
+
+	// IDLE+FAIL+* is not usable
+	if baseState == api.V0041NodeStateIDLE && n.IsFailState() {
+		return true
+	}
+
+	return false
+}
+
 var baseStates = []api.V0041NodeState{
 	api.V0041NodeStateUNKNOWN,
 	api.V0041NodeStateDOWN,

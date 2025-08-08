@@ -16,16 +16,36 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"nebius.ai/slurm-operator/internal/slurmapi"
-	"nebius.ai/slurm-operator/internal/slurmapi/fake"
+	slurmfake "nebius.ai/slurm-operator/internal/slurmapi/fake"
 )
 
+// Helper function to create a test collector with fake clients
+func createTestCollector(t *testing.T) *MetricsCollector {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	fakeK8sClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	mockSlurmClient := &slurmfake.MockClient{}
+
+	configMapName := types.NamespacedName{
+		Name:      "test-exporter-state",
+		Namespace: "test-namespace",
+	}
+
+	return NewMetricsCollector(mockSlurmClient, fakeK8sClient, configMapName)
+}
+
 // Helper function to setup mocks and collect state for tests
-func setupCollectorWithMockedData(t *testing.T, collector *MetricsCollector, mockClient *fake.MockClient, nodes []slurmapi.Node, jobs []slurmapi.Job, diag *api.V0041OpenapiDiagResp) {
+func setupCollectorWithMockedData(t *testing.T, collector *MetricsCollector, mockClient *slurmfake.MockClient, nodes []slurmapi.Node, jobs []slurmapi.Job, diag *api.V0041OpenapiDiagResp) {
 	mockClient.EXPECT().ListNodes(mock.Anything).Return(nodes, nil)
 	mockClient.EXPECT().ListJobs(mock.Anything).Return(jobs, nil)
 	mockClient.EXPECT().GetDiag(mock.Anything).Return(diag, nil)
@@ -50,8 +70,7 @@ func setupCollectorWithMockedData(t *testing.T, collector *MetricsCollector, moc
 }
 
 func TestMetricsCollector_Describe(t *testing.T) {
-	mockClient := &fake.MockClient{}
-	collector := NewMetricsCollector(mockClient)
+	collector := createTestCollector(t)
 
 	ch := make(chan *prometheus.Desc, 10)
 	go func() {
@@ -64,8 +83,8 @@ func TestMetricsCollector_Describe(t *testing.T) {
 		descriptors = append(descriptors, desc)
 	}
 
-	// Should have base descriptors plus RPC metrics: nodeInfo, jobInfo, jobNode, jobDuration + 4 RPC metrics + 1 controller metric
-	assert.GreaterOrEqual(t, len(descriptors), 9)
+	// Should have base descriptors plus RPC metrics: nodeInfo, jobInfo, jobNode, jobDuration + 4 RPC metrics + 1 controller metric + 1 MTTR metric
+	assert.GreaterOrEqual(t, len(descriptors), 10)
 
 	// Verify descriptor names
 	found := make(map[string]bool)
@@ -93,8 +112,12 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	synctest.Run(func() {
-		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient)
+		mockClient := &slurmfake.MockClient{}
+		scheme := runtime.NewScheme()
+		require.NoError(t, corev1.AddToScheme(scheme))
+		fakeK8sClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+		configMapName := types.NamespacedName{Name: "test", Namespace: "test"}
+		collector := NewMetricsCollector(mockClient, fakeK8sClient, configMapName)
 
 		// Mock successful ListNodes response
 		testNodes := []slurmapi.Node{
@@ -201,8 +224,12 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 func TestMetricsCollector_Collect_APIError(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	mockClient := &fake.MockClient{}
-	collector := NewMetricsCollector(mockClient)
+	mockClient := &slurmfake.MockClient{}
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	fakeK8sClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	configMapName := types.NamespacedName{Name: "test", Namespace: "test"}
+	collector := NewMetricsCollector(mockClient, fakeK8sClient, configMapName)
 
 	// Mock failed ListNodes response - with early return, other APIs won't be called
 	mockClient.EXPECT().ListNodes(mock.Anything).Return(nil, assert.AnError)
@@ -234,8 +261,12 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	synctest.Run(func() {
-		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient)
+		mockClient := &slurmfake.MockClient{}
+		scheme := runtime.NewScheme()
+		require.NoError(t, corev1.AddToScheme(scheme))
+		fakeK8sClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+		configMapName := types.NamespacedName{Name: "test", Namespace: "test"}
+		collector := NewMetricsCollector(mockClient, fakeK8sClient, configMapName)
 
 		// Mock nodes with different states to test the node fails metric with new labels
 		testNodes := []slurmapi.Node{
@@ -332,14 +363,14 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 		}
 
 		// Create a new mock for the second call to avoid mock state issues
-		mockClient = &fake.MockClient{}
+		mockClient = &slurmfake.MockClient{}
 		mockClient.EXPECT().ListNodes(mock.Anything).Return(drainedNodes, nil)
 		mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil)
 		mockClient.EXPECT().GetDiag(mock.Anything).Return(testDiag, nil)
 
 		// Create a new collector with the new mock for the second test phase
 		oldState := collector.state.Load()
-		collector = NewMetricsCollector(mockClient)
+		collector = NewMetricsCollector(mockClient, fakeK8sClient, configMapName)
 		// Copy the state from the previous collector to maintain continuity
 		collector.state.Store(oldState)
 
@@ -377,8 +408,12 @@ func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	synctest.Run(func() {
-		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient)
+		mockClient := &slurmfake.MockClient{}
+		scheme := runtime.NewScheme()
+		require.NoError(t, corev1.AddToScheme(scheme))
+		fakeK8sClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+		configMapName := types.NamespacedName{Name: "test", Namespace: "test"}
+		collector := NewMetricsCollector(mockClient, fakeK8sClient, configMapName)
 
 		// Mock realistic RPC diagnostics data based on production output
 		serverThreadCount := int32(1)
@@ -469,8 +504,12 @@ func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	synctest.Run(func() {
-		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient)
+		mockClient := &slurmfake.MockClient{}
+		scheme := runtime.NewScheme()
+		require.NoError(t, corev1.AddToScheme(scheme))
+		fakeK8sClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+		configMapName := types.NamespacedName{Name: "test", Namespace: "test"}
+		collector := NewMetricsCollector(mockClient, fakeK8sClient, configMapName)
 
 		serverThreadCount := int32(0)
 		rpcsByMessageType := api.V0041StatsMsgRpcsByType{
@@ -563,8 +602,12 @@ func TestMetricsCollector_GetDiag_APIError(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	synctest.Run(func() {
-		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient)
+		mockClient := &slurmfake.MockClient{}
+		scheme := runtime.NewScheme()
+		require.NoError(t, corev1.AddToScheme(scheme))
+		fakeK8sClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+		configMapName := types.NamespacedName{Name: "test", Namespace: "test"}
+		collector := NewMetricsCollector(mockClient, fakeK8sClient, configMapName)
 
 		// Mock successful node and job calls
 		testNodes := []slurmapi.Node{
@@ -625,8 +668,12 @@ func TestMetricsCollector_GetDiag_NilFields(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	synctest.Run(func() {
-		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient)
+		mockClient := &slurmfake.MockClient{}
+		scheme := runtime.NewScheme()
+		require.NoError(t, corev1.AddToScheme(scheme))
+		fakeK8sClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+		configMapName := types.NamespacedName{Name: "test", Namespace: "test"}
+		collector := NewMetricsCollector(mockClient, fakeK8sClient, configMapName)
 
 		// Mock GetDiag response with nil fields
 		testDiag := &api.V0041OpenapiDiagResp{
@@ -672,8 +719,12 @@ func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	synctest.Run(func() {
-		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient)
+		mockClient := &slurmfake.MockClient{}
+		scheme := runtime.NewScheme()
+		require.NoError(t, corev1.AddToScheme(scheme))
+		fakeK8sClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+		configMapName := types.NamespacedName{Name: "test", Namespace: "test"}
+		collector := NewMetricsCollector(mockClient, fakeK8sClient, configMapName)
 
 		now := time.Now()
 		submitTime := metav1.NewTime(now.Add(-60 * time.Second)) // 1 minute ago
@@ -849,6 +900,10 @@ func toPrometheusLikeString(t *testing.T, metric prometheus.Metric) string {
 	case pb.GetCounter() != nil:
 		metricType = "COUNTER"
 		value = pb.GetCounter().GetValue()
+	case pb.GetHistogram() != nil:
+		metricType = "HISTOGRAM"
+		// For histograms, we'll use the sample count as the value for display
+		value = float64(pb.GetHistogram().GetSampleCount())
 	default:
 		t.Fatalf("metric %q has unexpected type", metricName)
 	}
@@ -871,8 +926,12 @@ func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	synctest.Run(func() {
-		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient)
+		mockClient := &slurmfake.MockClient{}
+		scheme := runtime.NewScheme()
+		require.NoError(t, corev1.AddToScheme(scheme))
+		fakeK8sClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+		configMapName := types.NamespacedName{Name: "test", Namespace: "test"}
+		collector := NewMetricsCollector(mockClient, fakeK8sClient, configMapName)
 
 		// Mock successful response
 		testNodes := []slurmapi.Node{
@@ -914,7 +973,7 @@ func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Test failed collection - create a new mock client to avoid call conflicts
-		mockClientFail := &fake.MockClient{}
+		mockClientFail := &slurmfake.MockClient{}
 		collector.slurmAPIClient = mockClientFail
 		mockClientFail.EXPECT().ListNodes(mock.Anything).Return(nil, errors.New("API error"))
 		err = collector.updateState(ctx)
@@ -961,5 +1020,110 @@ func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
 		assert.Equal(t, float64(1), failuresTotal, "Expected 1 collection failure")
 		assert.Greater(t, exportedCount, float64(0), "Expected some metrics to be exported")
 		assert.Greater(t, metricsCount, 0, "Expected some metrics to be collected")
+	})
+}
+
+func TestMetricsCollector_NodeTimeToRestoreMetric(t *testing.T) {
+	log.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	synctest.Run(func() {
+		collector := createTestCollector(t)
+		mockClient := collector.slurmAPIClient.(*slurmfake.MockClient)
+
+		// Test node that starts as usable, then becomes not-usable, then restored
+		// First call: Node is usable (IDLE)
+		usableNode := slurmapi.Node{
+			Name:        "test-node",
+			ClusterName: "test-cluster",
+			InstanceID:  "test-instance",
+			States: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE: {},
+			},
+			Address: "10.0.0.1",
+		}
+
+		mockClient.EXPECT().ListNodes(mock.Anything).Return([]slurmapi.Node{usableNode}, nil).Once()
+		mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+		mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
+
+		ctx := context.Background()
+		err := collector.updateState(ctx)
+		assert.NoError(t, err)
+
+		// Verify node is not tracked initially
+		state := collector.state.Load()
+		assert.NotNil(t, state)
+		assert.Empty(t, state.nodeNotUsableTimestamps)
+
+		// Second call: Node becomes not-usable (IDLE+DRAIN)
+		notUsableNode := slurmapi.Node{
+			Name:        "test-node",
+			ClusterName: "test-cluster",
+			InstanceID:  "test-instance",
+			States: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE:  {},
+				api.V0041NodeStateDRAIN: {},
+			},
+			Address: "10.0.0.1",
+		}
+
+		mockClient.EXPECT().ListNodes(mock.Anything).Return([]slurmapi.Node{notUsableNode}, nil).Once()
+		mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+		mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
+
+		err = collector.updateState(ctx)
+		assert.NoError(t, err)
+
+		// Verify node is now tracked
+		state = collector.state.Load()
+		assert.NotNil(t, state)
+		assert.Len(t, state.nodeNotUsableTimestamps, 1)
+		assert.Contains(t, state.nodeNotUsableTimestamps, "test-node")
+
+		// Third call: Node becomes usable again (IDLE only)
+		restoredNode := slurmapi.Node{
+			Name:        "test-node",
+			ClusterName: "test-cluster",
+			InstanceID:  "test-instance",
+			States: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE: {},
+			},
+			Address: "10.0.0.1",
+		}
+
+		mockClient.EXPECT().ListNodes(mock.Anything).Return([]slurmapi.Node{restoredNode}, nil).Once()
+		mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+		mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
+
+		err = collector.updateState(ctx)
+		assert.NoError(t, err)
+
+		// Verify node is no longer tracked (restored)
+		state = collector.state.Load()
+		assert.NotNil(t, state)
+		assert.Empty(t, state.nodeNotUsableTimestamps)
+
+		// Collect metrics and verify MTTR histogram was updated
+		ch := make(chan prometheus.Metric, 50)
+		go func() {
+			collector.Collect(ch)
+			close(ch)
+		}()
+
+		var foundTimeToRestoreMetric bool
+		for metric := range ch {
+			metricString := toPrometheusLikeString(t, metric)
+			if strings.Contains(metricString, "slurm_node_time_to_restore_seconds") {
+				foundTimeToRestoreMetric = true
+				// Should have the histogram buckets for our test node
+				assert.Contains(t, metricString, `node_name="test-node"`)
+				break
+			}
+		}
+
+		// The metric should exist even if no observations yet, as it's a histogram with buckets
+		assert.True(t, foundTimeToRestoreMetric, "Expected to find slurm_node_time_to_restore_seconds metric")
+
+		mockClient.AssertExpectations(t)
 	})
 }
