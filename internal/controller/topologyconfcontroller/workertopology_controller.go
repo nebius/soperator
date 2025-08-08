@@ -2,6 +2,8 @@ package topologyconfcontroller
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -73,8 +75,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	slurmCluster := &slurmv1.SlurmCluster{}
 	if err := r.Client.Get(ctx, req.NamespacedName, slurmCluster); err != nil {
-		logger.Error(err, "Get SlurmCluster", "SlurmCluster", req.Name, "Namespace", req.Namespace)
-		return DefaultRequeueResult, nil
+		return ctrl.Result{}, fmt.Errorf("get SlurmCluster %q in namespace %q: %w", req.Name, req.Namespace, err)
 	}
 
 	shouldReconcileCluster := isClusterReconciliationNeeded(slurmCluster)
@@ -83,16 +84,12 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return DefaultRequeueResult, nil
 	}
 
-	if err := r.EnsureTopologyConfigMap(ctx, req.Namespace, slurmCluster.Name); err != nil {
-		logger.Error(err, "Ensure topology ConfigMap")
-		return DefaultRequeueResult, nil
-	}
-
 	topologyLabelsConfigMap, err := r.handleTopologyConfigMapFunctional(ctx, req, slurmCluster, logger)
 	if err != nil {
-		logger.Error(err, "Warnming: cannot handle topology ConfigMap")
-		return DefaultRequeueResult, nil
+		return ctrl.Result{}, fmt.Errorf("handle topology ConfigMap: %w", err)
 	}
+
+	existingTopologyConfig := topologyLabelsConfigMap.Data[consts.ConfigMapKeyTopologyConfig]
 
 	logger.Info(
 		"Using ConfigMap for topology node labels",
@@ -103,8 +100,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	labelSelector := client.MatchingLabels{consts.LabelComponentKey: consts.ComponentTypeWorker.String()}
 	podList, err := r.getPodList(ctx, labelSelector, req.Namespace)
 	if err != nil {
-		logger.Error(err, "list pods with label", "labelSelector", labelSelector)
-		return DefaultRequeueResult, nil
+		return ctrl.Result{}, fmt.Errorf("list pods with label %v: %w", labelSelector, err)
 	}
 
 	if len(podList.Items) == 0 {
@@ -115,16 +111,20 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	podsByNode := r.GetPodsByNode(podList.Items)
 	logger.Info("Pods organized by node", "podsByNode", podsByNode)
 
-	topologyConfig, err := r.BuildTopologyConfig(ctx, topologyLabelsConfigMap, podsByNode)
+	desiredTopologyConfig, err := r.BuildTopologyConfig(ctx, topologyLabelsConfigMap, podsByNode)
 	if err != nil {
-		logger.Error(err, "build topology config")
+		return ctrl.Result{}, fmt.Errorf("build topology config: %w", err)
+	}
+	logger.Info("Built topology config", "topologyConfig", desiredTopologyConfig)
+
+	if r.calculateConfigHash(desiredTopologyConfig) == r.calculateConfigHash(existingTopologyConfig) {
+		logger.Info("Topology config unchanged, skipping update")
 		return DefaultRequeueResult, nil
 	}
-	logger.Info("Built topology config", "topologyConfig", topologyConfig)
 
-	if err := r.updateTopologyConfigMap(ctx, req.Namespace, topologyConfig); err != nil {
+	if err := r.updateTopologyConfigMap(ctx, req.Namespace, desiredTopologyConfig); err != nil {
 		logger.Error(err, "Update ConfigMap with topology config")
-		return DefaultRequeueResult, nil
+		return ctrl.Result{}, fmt.Errorf("update ConfigMap with topology config: %w", err)
 	}
 
 	logger.Info("Reconciliation completed successfully")
@@ -137,21 +137,31 @@ func isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
 
 func (r *WorkerTopologyReconciler) handleTopologyConfigMapFunctional(
 	ctx context.Context, req ctrl.Request, slurmCluster *slurmv1.SlurmCluster, logger logr.Logger) (*corev1.ConfigMap, error) {
-	topologyLabelsConfigMap, err := r.getNodeTopologyLabelsConfigMap(ctx)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			logger.Info("Node topology labels ConfigMap not found, creating with default topology")
-			if err = r.EnsureTopologyConfigMap(ctx, req.Namespace, slurmCluster.Name); err != nil {
-				return nil, fmt.Errorf("create default topology config map: %w", err)
-			}
-			return nil, fmt.Errorf("config map %s not found, created with default topology", err)
-		}
-
-		return nil, fmt.Errorf("get node topology labels config map: %w", err)
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      consts.ConfigMapNameTopologyNodeLabels,
+			Namespace: r.namespace,
+		},
 	}
 
-	logger.Info("Node topology labels ConfigMap found", "configMap", topologyLabelsConfigMap.Name)
-	return topologyLabelsConfigMap, nil
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap); err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("Node topology labels ConfigMap not found, creating with default topology")
+			if err = r.CreateDefaultTopologyConfigMap(ctx, req.Namespace, slurmCluster.Name); err != nil {
+				return nil, fmt.Errorf("create default topology config map in namespace %q: %w", req.Namespace, err)
+			}
+			if err := r.Client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap); err != nil {
+				return nil, fmt.Errorf("get config map after creation in namespace %q: %w", req.Namespace, err)
+			}
+			logger.Info("Created and retrieved default topology ConfigMap", "configMap", configMap.Name, "namespace", configMap.Namespace)
+			return configMap, nil
+		}
+
+		return nil, fmt.Errorf("get node topology labels config map in namespace %q: %w", req.Namespace, err)
+	}
+
+	logger.Info("Node topology labels ConfigMap found", "configMap", configMap.Name, "namespace", configMap.Namespace)
+	return configMap, nil
 }
 
 func (r *WorkerTopologyReconciler) renderTopologyConfigMap(namespace string, config string) *corev1.ConfigMap {
@@ -194,8 +204,34 @@ func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace string) 
 	}
 }
 
+// HasExistingTopologyConfig checks if the ConfigMap exists and has non-empty topology configuration.
+// Returns the ConfigMap if it exists and has valid topology config, otherwise returns nil and an error.
+func (r *WorkerTopologyReconciler) HasExistingTopologyConfig(
+	ctx context.Context, namespace string,
+) (*corev1.ConfigMap, error) {
+	configMap := &corev1.ConfigMap{}
+	err := r.Client.Get(ctx, client.ObjectKey{
+		Name:      consts.ConfigMapNameTopologyConfig,
+		Namespace: namespace,
+	}, configMap)
+
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get topology ConfigMap: %w", err)
+	}
+
+	topologyConfig, exists := configMap.Data[consts.ConfigMapKeyTopologyConfig]
+	if !exists || strings.TrimSpace(topologyConfig) == "" {
+		return nil, nil
+	}
+
+	return configMap, nil
+}
+
 // EnsureTopologyConfigMap ensures that the ConfigMap for topology configuration exists.
-func (r *WorkerTopologyReconciler) EnsureTopologyConfigMap(
+func (r *WorkerTopologyReconciler) CreateDefaultTopologyConfigMap(
 	ctx context.Context, namespace, clusterName string,
 ) error {
 	listASTS, err := r.GetStatefulSetsWithFallback(ctx, namespace, clusterName)
@@ -332,6 +368,11 @@ func (r *WorkerTopologyReconciler) ParseNodeTopologyLabels(data map[string]strin
 	return result, nil
 }
 
+func (r *WorkerTopologyReconciler) calculateConfigHash(config string) string {
+	hash := sha256.Sum256([]byte(strings.TrimSpace(config)))
+	return hex.EncodeToString(hash[:])
+}
+
 func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, namespace string, config string) error {
 	configMap := r.renderTopologyConfigMap(namespace, config)
 	err := r.Client.Patch(ctx, configMap, client.Apply,
@@ -349,22 +390,6 @@ func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, 
 	}
 
 	return nil
-}
-
-// getNodeTopologyLabelsConfigMap retrieves the ConfigMap used to store node topology information.
-func (r *WorkerTopologyReconciler) getNodeTopologyLabelsConfigMap(ctx context.Context) (*corev1.ConfigMap, error) {
-	configMap := &corev1.ConfigMap{
-		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.ConfigMapNameTopologyNodeLabels,
-			Namespace: r.namespace,
-		},
-	}
-
-	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap); err != nil {
-		return configMap, err
-	}
-
-	return configMap, nil
 }
 
 func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
