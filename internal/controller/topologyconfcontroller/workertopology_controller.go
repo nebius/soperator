@@ -157,7 +157,7 @@ func (r *WorkerTopologyReconciler) handleTopologyConfigMapFunctional(
 func (r *WorkerTopologyReconciler) renderTopologyConfigMap(namespace string, config string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		TypeMeta: ctrl.TypeMeta{
-			APIVersion: corev1.SchemeGroupVersion.Version,
+			APIVersion: corev1.SchemeGroupVersion.String(),
 			Kind:       "ConfigMap",
 		},
 		ObjectMeta: ctrl.ObjectMeta{
@@ -173,7 +173,7 @@ func (r *WorkerTopologyReconciler) renderTopologyConfigMap(namespace string, con
 func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace string) *v1alpha1.JailedConfig {
 	return &v1alpha1.JailedConfig{
 		TypeMeta: ctrl.TypeMeta{
-			APIVersion: v1alpha1.GroupVersion.Version,
+			APIVersion: v1alpha1.GroupVersion.String(),
 			Kind:       "JailedConfig",
 		},
 		ObjectMeta: ctrl.ObjectMeta{
