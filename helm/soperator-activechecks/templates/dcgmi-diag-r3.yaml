@@ -5,6 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "dcgmi-diag-r3"
+  dependsOn: [ "create-user-soperatorchecks" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   suspend: true
   runAfterCreation: true

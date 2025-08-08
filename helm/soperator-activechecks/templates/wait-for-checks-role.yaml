@@ -1,0 +1,9 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: activecheck-waiter-role
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: ["slurm.nebius.ai"]
+    resources: ["activechecks"]
+    verbs: ["get", "list"]
