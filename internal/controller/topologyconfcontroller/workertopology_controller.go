@@ -84,16 +84,20 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return DefaultRequeueResult, nil
 	}
 
-	topologyLabelsConfigMap, err := r.handleTopologyConfigMapFunctional(ctx, req, slurmCluster, logger)
+	existingTopologyConfigMap, err := r.EnsureWorkerTopologyConfigMap(ctx, req.Namespace, slurmCluster.Name, logger)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("ensure worker topology ConfigMap: %w", err)
+	}
+
+	nodeTopologyLabelsConfigMap, err := r.getNodeTopologyLabelsConfigMap(ctx, req, logger)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("handle topology ConfigMap: %w", err)
 	}
-	existingTopologyConfig := topologyLabelsConfigMap.Data[consts.ConfigMapKeyTopologyConfig]
 
 	logger.Info(
 		"Using ConfigMap for topology node labels",
-		"ConfigMapName", topologyLabelsConfigMap.Name,
-		"ConfigMapNamespace", topologyLabelsConfigMap.Namespace,
+		"ConfigMapName", nodeTopologyLabelsConfigMap.Name,
+		"ConfigMapNamespace", nodeTopologyLabelsConfigMap.Namespace,
 	)
 
 	labelSelector := client.MatchingLabels{consts.LabelComponentKey: consts.ComponentTypeWorker.String()}
@@ -110,12 +114,13 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	podsByNode := r.GetPodsByNode(podList.Items)
 	logger.Info("Pods organized by node", "podsByNode", podsByNode)
 
-	desiredTopologyConfig, err := r.BuildTopologyConfig(ctx, topologyLabelsConfigMap, podsByNode)
+	desiredTopologyConfig, err := r.BuildTopologyConfig(ctx, nodeTopologyLabelsConfigMap, podsByNode)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("build topology config: %w", err)
 	}
 	logger.Info("Built topology config", "topologyConfig", desiredTopologyConfig)
 
+	existingTopologyConfig := existingTopologyConfigMap.Data[consts.ConfigMapKeyTopologyConfig]
 	if r.calculateConfigHash(desiredTopologyConfig) == r.calculateConfigHash(existingTopologyConfig) {
 		logger.Info("Topology config unchanged, skipping update")
 		return DefaultRequeueResult, nil
@@ -134,8 +139,35 @@ func isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
 	return slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyTree
 }
 
-func (r *WorkerTopologyReconciler) handleTopologyConfigMapFunctional(
-	ctx context.Context, req ctrl.Request, slurmCluster *slurmv1.SlurmCluster, logger logr.Logger) (*corev1.ConfigMap, error) {
+func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
+	ctx context.Context, namespace string, clusterName string, logger logr.Logger,
+) (*corev1.ConfigMap, error) {
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      consts.ConfigMapNameTopologyConfig,
+			Namespace: namespace,
+		},
+	}
+
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap); err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("Worker topology ConfigMap not found, creating with default topology")
+			if err = r.CreateDefaultTopologyConfigMap(ctx, namespace, clusterName); err != nil {
+				return nil, fmt.Errorf("create default topology config map in namespace %q: %w", namespace, err)
+			}
+			if err := r.Client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap); err != nil {
+				return nil, fmt.Errorf("get config map after creation in namespace %q: %w", namespace, err)
+			}
+			logger.Info("Created and retrieved default topology ConfigMap", "configMap", configMap.Name, "namespace", configMap.Namespace)
+			return configMap, nil
+		}
+	}
+
+	return configMap, nil
+}
+
+func (r *WorkerTopologyReconciler) getNodeTopologyLabelsConfigMap(
+	ctx context.Context, req ctrl.Request, logger logr.Logger) (*corev1.ConfigMap, error) {
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: ctrl.ObjectMeta{
 			Name:      consts.ConfigMapNameTopologyNodeLabels,
@@ -144,19 +176,7 @@ func (r *WorkerTopologyReconciler) handleTopologyConfigMapFunctional(
 	}
 
 	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap); err != nil {
-		if apierrors.IsNotFound(err) {
-			logger.Info("Node topology labels ConfigMap not found, creating with default topology")
-			if err = r.CreateDefaultTopologyConfigMap(ctx, req.Namespace, slurmCluster.Name); err != nil {
-				return nil, fmt.Errorf("create default topology config map in namespace %q: %w", req.Namespace, err)
-			}
-			if err := r.Client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap); err != nil {
-				return nil, fmt.Errorf("get config map after creation in namespace %q: %w", req.Namespace, err)
-			}
-			logger.Info("Created and retrieved default topology ConfigMap", "configMap", configMap.Name, "namespace", configMap.Namespace)
-			return configMap, nil
-		}
-
-		return nil, fmt.Errorf("get node topology labels config map in namespace %q: %w", req.Namespace, err)
+		return configMap, fmt.Errorf("get node topology labels config map in namespace %q: %w", req.Namespace, err)
 	}
 
 	logger.Info("Node topology labels ConfigMap found", "configMap", configMap.Name, "namespace", configMap.Namespace)
