@@ -16,6 +16,8 @@ const (
 
 	headerContentType     = "Content-Type"
 	headerApplicationJson = "application/json"
+
+	SlurmUserSoperatorchecks = "soperatorchecks"
 )
 
 func DefaultHTTPClient() *http.Client {
@@ -204,6 +206,7 @@ func (c *client) PostMaintenanceReservation(ctx context.Context, name string, no
 		Name:     ptr.To(name),
 		NodeList: ptr.To(api0043.V0043HostlistString(nodeList)),
 		Flags:    ptr.To([]api0043.V0043ReservationDescMsgFlags{api0043.V0043ReservationDescMsgFlagsMAINT}),
+		Users:    ptr.To([]string{SlurmUserSoperatorchecks}),
 	})
 	if err != nil {
 		return fmt.Errorf("post reservation: %w", err)
