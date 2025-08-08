@@ -155,14 +155,45 @@ func (r *WorkerTopologyReconciler) handleTopologyConfigMapFunctional(
 func (r *WorkerTopologyReconciler) EnsureTopologyConfigMap(
 	ctx context.Context, namespace, clusterName string,
 ) error {
+	listASTS, err := r.GetStatefulSetsWithFallback(ctx, namespace, clusterName)
+	if err != nil {
+		return fmt.Errorf("get StatefulSets with fallback: %w", err)
+	}
 
+	config := InitializeTopologyConf(listASTS)
+	return r.updateTopologyConfigMap(ctx, namespace, config)
+}
+
+// GetStatefulSetsWithFallback retrieves StatefulSets for the cluster and creates a fallback
+// StatefulSet based on SlurmCluster spec if none are found.
+func (r *WorkerTopologyReconciler) GetStatefulSetsWithFallback(
+	ctx context.Context, namespace, clusterName string,
+) (*kruisev1b1.StatefulSetList, error) {
 	listASTS := &kruisev1b1.StatefulSetList{}
 
 	if err := r.getAdvancedSTS(ctx, clusterName, listASTS); err != nil {
-		return fmt.Errorf("get advanced stateful sets: %w", err)
+		return nil, fmt.Errorf("get advanced stateful sets: %w", err)
 	}
-	config := InitializeTopologyConf(listASTS)
-	return r.updateTopologyConfigMap(ctx, namespace, config)
+
+	if len(listASTS.Items) == 0 {
+		slurmCluster := &slurmv1.SlurmCluster{}
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: namespace}, slurmCluster); err != nil {
+			return nil, fmt.Errorf("get SlurmCluster for fallback topology: %w", err)
+		}
+
+		fallbackSTS := kruisev1b1.StatefulSet{
+			ObjectMeta: ctrl.ObjectMeta{
+				Name: "worker",
+			},
+			Spec: kruisev1b1.StatefulSetSpec{
+				Replicas: &slurmCluster.Spec.SlurmNodes.Worker.Size,
+			},
+		}
+
+		listASTS.Items = []kruisev1b1.StatefulSet{fallbackSTS}
+	}
+
+	return listASTS, nil
 }
 
 func (r *WorkerTopologyReconciler) getAdvancedSTS(
