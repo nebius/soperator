@@ -88,7 +88,6 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("handle topology ConfigMap: %w", err)
 	}
-
 	existingTopologyConfig := topologyLabelsConfigMap.Data[consts.ConfigMapKeyTopologyConfig]
 
 	logger.Info(
@@ -202,32 +201,6 @@ func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace string) 
 			},
 		},
 	}
-}
-
-// HasExistingTopologyConfig checks if the ConfigMap exists and has non-empty topology configuration.
-// Returns the ConfigMap if it exists and has valid topology config, otherwise returns nil and an error.
-func (r *WorkerTopologyReconciler) HasExistingTopologyConfig(
-	ctx context.Context, namespace string,
-) (*corev1.ConfigMap, error) {
-	configMap := &corev1.ConfigMap{}
-	err := r.Client.Get(ctx, client.ObjectKey{
-		Name:      consts.ConfigMapNameTopologyConfig,
-		Namespace: namespace,
-	}, configMap)
-
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("get topology ConfigMap: %w", err)
-	}
-
-	topologyConfig, exists := configMap.Data[consts.ConfigMapKeyTopologyConfig]
-	if !exists || strings.TrimSpace(topologyConfig) == "" {
-		return nil, nil
-	}
-
-	return configMap, nil
 }
 
 // EnsureTopologyConfigMap ensures that the ConfigMap for topology configuration exists.
