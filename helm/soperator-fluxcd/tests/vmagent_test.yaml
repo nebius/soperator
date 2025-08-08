@@ -270,6 +270,49 @@ tests:
       - equal:
           path: spec.values.vmagent.spec.extraArgs["string.value"]
           value: "test"
+
+  - it: should handle no externalLabels
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notExists:
+          path: spec.values.vmagent.spec.externalLabels
+
+  - it: should handle externalLabels
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: true
+          values:
+            vmagent:
+              spec:
+                externalLabels:
+                  a: b
+                  foo: bar
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.vmagent.spec.externalLabels["a"]
+          value: b
+      - equal:
+          path: spec.values.vmagent.spec.externalLabels["foo"]
+          value: bar
+      - equal:
+          path: spec.values.vmagent.spec.remoteWriteSettings.label["a"]
+          value: b
+      - equal:
+          path: spec.values.vmagent.spec.remoteWriteSettings.label["foo"]
+          value: bar
+
   - it: should merge custom remoteWrite with default when publicEndpointEnabled is true
     set:
       observability:
