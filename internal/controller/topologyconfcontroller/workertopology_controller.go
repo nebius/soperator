@@ -40,6 +40,7 @@ var (
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;update;create;patch
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs,verbs=get;list;watch;create;patch
 
 type WorkerTopologyReconciler struct {
 	BaseReconciler
@@ -336,7 +337,7 @@ func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, 
 	err := r.Client.Patch(ctx, configMap, client.Apply,
 		client.ForceOwnership, client.FieldOwner(WorkerTopologyReconcilerName))
 	if err != nil {
-		return err
+		return fmt.Errorf("patch ConfigMap %s: %w", configMap.Name, err)
 	}
 
 	jailedConfig := r.renderTopologyJailedConfig(namespace)
@@ -344,7 +345,7 @@ func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, 
 	err = r.Client.Patch(ctx, jailedConfig, client.Apply,
 		client.ForceOwnership, client.FieldOwner(WorkerTopologyReconcilerName))
 	if err != nil {
-		return err
+		return fmt.Errorf("patch JailedConfig %s: %w", jailedConfig.Name, err)
 	}
 
 	return nil
