@@ -87,6 +87,8 @@ func newTestJailedConfigController(
 		mgr.GetScheme(),
 		apiClient,
 		fakeFs,
+		5*time.Second, // Poll interval for tests
+		1*time.Minute, // Wait timeout for tests
 	)
 
 	sctrl.clock = clock

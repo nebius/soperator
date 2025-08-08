@@ -107,8 +107,10 @@ func main() {
 		clusterName          string
 		slurmAPIServer       string
 
-		maxConcurrency   int
-		cacheSyncTimeout time.Duration
+		maxConcurrency          int
+		cacheSyncTimeout        time.Duration
+		reconfigurePollInterval time.Duration
+		reconfigureWaitTimeout  time.Duration
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
@@ -124,6 +126,8 @@ func main() {
 	flag.StringVar(&logLevel, "log-level", "debug", "Log level: debug, info, warn, error, dpanic, panic, fatal")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 1*time.Minute, "The maximum duration allowed for caching sync")
+	flag.DurationVar(&reconfigurePollInterval, "reconfigure-poll-interval", 20*time.Second, "The interval for polling node restart status during reconfiguration")
+	flag.DurationVar(&reconfigureWaitTimeout, "reconfigure-wait-timeout", 1*time.Minute, "The maximum time to wait for all nodes to restart during reconfiguration")
 	flag.StringVar(&jailPath, "jail-path", "/mnt/jail", "Path where jail is mounted")
 	flag.StringVar(&clusterNamespace, "cluster-namespace", "default", "Soperator cluster namespace")
 	flag.StringVar(&clusterName, "cluster-name", "soperator", "Name of the soperator cluster controller")
@@ -197,6 +201,8 @@ func main() {
 		mgr.GetScheme(),
 		slurmAPIClient,
 		jailFs,
+		reconfigurePollInterval,
+		reconfigureWaitTimeout,
 	)).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "JailedConfig")
 		os.Exit(1)

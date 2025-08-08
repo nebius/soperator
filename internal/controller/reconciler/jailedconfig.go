@@ -46,7 +46,6 @@ func (r *JailedConfigReconciler) patch(existing, desired client.Object) (client.
 	patchImpl := func(dst, src *slurmv1alpha1.JailedConfig) client.Patch {
 		res := client.MergeFrom(dst.DeepCopy())
 
-		// TODO is this correct?
 		dst.Spec = src.Spec
 
 		return res

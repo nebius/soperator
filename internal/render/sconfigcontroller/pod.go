@@ -58,7 +58,7 @@ func BasePodTemplateSpec(
 					clusterNamespace,
 					clusterName,
 					slurmAPIServer,
-					sConfigController.Container,
+					sConfigController,
 				),
 			},
 			InitContainers: []corev1.Container{

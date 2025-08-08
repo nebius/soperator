@@ -52,7 +52,8 @@ import (
 const (
 	configMapField = ".spec.configMap.name"
 
-	reconfigureWaitTimeout = 5 * time.Minute
+	defaultReconfigureWaitTimeout  = 1 * time.Minute
+	defaultReconfigurePollInterval = 20 * time.Second
 )
 
 // JailedConfigReconciler reconciles a JailedConfig object
@@ -60,9 +61,11 @@ type JailedConfigReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	slurmAPIClient slurmapi.Client
-	clock          Clock
-	fs             Fs
+	slurmAPIClient          slurmapi.Client
+	clock                   Clock
+	fs                      Fs
+	reconfigurePollInterval time.Duration
+	reconfigureWaitTimeout  time.Duration
 }
 
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs,verbs=get;list;watch;create;update;patch;delete
@@ -296,12 +299,22 @@ func NewJailedConfigReconciler(
 	scheme *runtime.Scheme,
 	slurmAPIClient slurmapi.Client,
 	fs Fs,
+	reconfigurePollInterval time.Duration,
+	reconfigureWaitTimeout time.Duration,
 ) *JailedConfigReconciler {
+	if reconfigurePollInterval == 0 {
+		reconfigurePollInterval = defaultReconfigurePollInterval
+	}
+	if reconfigureWaitTimeout == 0 {
+		reconfigureWaitTimeout = defaultReconfigureWaitTimeout
+	}
 	return &JailedConfigReconciler{
-		Client:         client,
-		Scheme:         scheme,
-		slurmAPIClient: slurmAPIClient,
-		fs:             fs,
+		Client:                  client,
+		Scheme:                  scheme,
+		slurmAPIClient:          slurmAPIClient,
+		fs:                      fs,
+		reconfigurePollInterval: reconfigurePollInterval,
+		reconfigureWaitTimeout:  reconfigureWaitTimeout,
 	}
 }
 
@@ -452,7 +465,7 @@ func (r *JailedConfigReconciler) pollSlurmNodesRestart(ctx context.Context, node
 		select {
 		case <-ctx.Done():
 			return context.DeadlineExceeded
-		case <-r.clock.After(1 * time.Second):
+		case <-r.clock.After(r.reconfigurePollInterval):
 			// Do nothing and loop
 		}
 	}
@@ -499,7 +512,7 @@ func (r *JailedConfigReconciler) reconfigureCluster(ctx context.Context) error {
 		return fmt.Errorf("reconfigure via Slurm API: %w", err)
 	}
 
-	pollCtx, cancel := context.WithTimeout(ctx, reconfigureWaitTimeout)
+	pollCtx, cancel := context.WithTimeout(ctx, r.reconfigureWaitTimeout)
 	defer cancel()
 	err = r.pollSlurmNodesRestart(pollCtx, nodeToStartBefore)
 	if errors.Is(err, context.DeadlineExceeded) {
