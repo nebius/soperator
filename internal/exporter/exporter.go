@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"nebius.ai/slurm-operator/internal/slurmapi"
@@ -51,10 +52,17 @@ type Exporter struct {
 }
 
 // NewClusterExporter creates a new SLURM cluster exporter
-func NewClusterExporter(slurmAPIClient slurmapi.Client, params Params) *Exporter {
+func NewClusterExporter(slurmAPIClient slurmapi.Client, k8sClient client.Client, params Params) *Exporter {
 	registry := prometheus.NewRegistry()
 	monitoringRegistry := prometheus.NewRegistry()
-	collector := NewMetricsCollector(slurmAPIClient)
+
+	// ConfigMap name for state persistence
+	configMapName := types.NamespacedName{
+		Name:      "soperator-exporter-state",
+		Namespace: params.SlurmClusterID.Namespace,
+	}
+
+	collector := NewMetricsCollector(slurmAPIClient, k8sClient, configMapName)
 
 	return &Exporter{
 		params:             params,

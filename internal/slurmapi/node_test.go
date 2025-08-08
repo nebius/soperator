@@ -74,3 +74,117 @@ func TestNodeFromAPI(t *testing.T) {
 		})
 	}
 }
+
+func TestNode_IsNotUsable(t *testing.T) {
+	tests := []struct {
+		name     string
+		states   map[api.V0041NodeState]struct{}
+		expected bool
+	}{
+		{
+			name: "DOWN state is not usable",
+			states: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateDOWN: {},
+			},
+			expected: true,
+		},
+		{
+			name: "DOWN+DRAIN state is not usable",
+			states: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateDOWN:  {},
+				api.V0041NodeStateDRAIN: {},
+			},
+			expected: true,
+		},
+		{
+			name: "IDLE+DRAIN state is not usable",
+			states: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE:  {},
+				api.V0041NodeStateDRAIN: {},
+			},
+			expected: true,
+		},
+		{
+			name: "IDLE+FAIL state is not usable",
+			states: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE: {},
+				api.V0041NodeStateFAIL: {},
+			},
+			expected: true,
+		},
+		{
+			name: "IDLE+FAIL+DRAIN state is not usable",
+			states: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE:  {},
+				api.V0041NodeStateFAIL:  {},
+				api.V0041NodeStateDRAIN: {},
+			},
+			expected: true,
+		},
+		{
+			name: "IDLE state is usable",
+			states: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE: {},
+			},
+			expected: false,
+		},
+		{
+			name: "ALLOCATED state is usable",
+			states: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateALLOCATED: {},
+			},
+			expected: false,
+		},
+		{
+			name: "RUNNING+DRAIN state is usable (job still running)",
+			states: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateALLOCATED: {}, // RUNNING is represented as ALLOCATED in API
+				api.V0041NodeStateDRAIN:     {},
+			},
+			expected: false,
+		},
+		{
+			name: "MIXED state is usable",
+			states: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateMIXED: {},
+			},
+			expected: false,
+		},
+		{
+			name: "MIXED+DRAIN state is usable",
+			states: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateMIXED: {},
+				api.V0041NodeStateDRAIN: {},
+			},
+			expected: false,
+		},
+		{
+			name: "IDLE+MAINTENANCE state is usable",
+			states: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE:        {},
+				api.V0041NodeStateMAINTENANCE: {},
+			},
+			expected: false,
+		},
+		{
+			name: "IDLE+RESERVED state is usable",
+			states: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE:     {},
+				api.V0041NodeStateRESERVED: {},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			node := &Node{
+				Name:   "test-node",
+				States: tt.states,
+			}
+
+			result := node.IsNotUsable()
+			assert.Equal(t, tt.expected, result, "IsNotUsable() should return %v for states %v", tt.expected, tt.states)
+		})
+	}
+}

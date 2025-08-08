@@ -11,6 +11,9 @@ import (
 	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"nebius.ai/slurm-operator/internal/slurmapi"
@@ -19,13 +22,16 @@ import (
 // MetricsCollector exposes SLURM metrics by implementing prometheus.Collector interface
 type MetricsCollector struct {
 	slurmAPIClient slurmapi.Client
+	k8sClient      client.Client
+	configMapName  types.NamespacedName
 
-	nodeInfo       *prometheus.Desc
-	jobInfo        *prometheus.Desc
-	jobNode        *prometheus.Desc
-	jobDuration    *prometheus.Desc
-	nodeGPUSeconds *prometheus.CounterVec
-	nodeFails      *prometheus.CounterVec
+	nodeInfo          *prometheus.Desc
+	jobInfo           *prometheus.Desc
+	jobNode           *prometheus.Desc
+	jobDuration       *prometheus.Desc
+	nodeGPUSeconds    *prometheus.CounterVec
+	nodeFails         *prometheus.CounterVec
+	nodeTimeToRestore *prometheus.HistogramVec
 
 	rpcCallsTotal               *prometheus.Desc
 	rpcDurationSecondsTotal     *prometheus.Desc
@@ -41,9 +47,11 @@ type MetricsCollector struct {
 }
 
 // NewMetricsCollector creates a new MetricsCollector
-func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
+func NewMetricsCollector(slurmAPIClient slurmapi.Client, k8sClient client.Client, configMapName types.NamespacedName) *MetricsCollector {
 	collector := &MetricsCollector{
 		slurmAPIClient: slurmAPIClient,
+		k8sClient:      k8sClient,
+		configMapName:  configMapName,
 		Monitoring:     NewMonitoringMetrics(),
 
 		nodeInfo:    prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "address"}, nil),
@@ -58,6 +66,11 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 			Name: "slurm_node_fails_total",
 			Help: "Total number of times a node has failed (went from not down/drain to down/drain state)",
 		}, []string{"node_name", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "reason"}),
+		nodeTimeToRestore: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "slurm_node_time_to_restore_seconds",
+			Help:    "Time taken for a node to restore from not usable state to usable state",
+			Buckets: []float64{60, 300, 600, 1800, 3600, 7200, 14400, 28800, 86400, 172800, 604800}, // 1m to 1w
+		}, []string{"node_name", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved"}),
 
 		rpcCallsTotal:               prometheus.NewDesc("slurm_controller_rpc_calls_total", "Total count of RPC calls by message type", []string{"message_type"}, nil),
 		rpcDurationSecondsTotal:     prometheus.NewDesc("slurm_controller_rpc_duration_seconds_total", "Total time spent processing RPCs by message type", []string{"message_type"}, nil),
@@ -66,7 +79,25 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 		controllerServerThreadCount: prometheus.NewDesc("slurm_controller_server_thread_count", "Number of server threads", nil, nil),
 	}
 
-	collector.state.Store(newMetricsCollectorState())
+	// Load initial not-usable timestamps from ConfigMap at startup
+	logger := ctrl.Log.WithName(ControllerName)
+	initialTimestamps := make(map[string]time.Time)
+	if loadedTimestamps, err := LoadNotUsableTimestamps(context.Background(), k8sClient, configMapName); err != nil {
+		logger.Error(err, "Failed to load not-usable timestamps from ConfigMap at startup, continuing with empty state",
+			"configmap", configMapName)
+	} else {
+		initialTimestamps = loadedTimestamps
+		logger.Info("Successfully loaded not-usable timestamps from ConfigMap at startup",
+			"configmap", configMapName,
+			"count", len(loadedTimestamps))
+	}
+
+	// Initialize state with loaded timestamps
+	initialState := &metricsCollectorState{
+		lastGPUSecondsUpdate:    time.Now(),
+		nodeNotUsableTimestamps: initialTimestamps,
+	}
+	collector.state.Store(initialState)
 
 	return collector
 }
@@ -122,6 +153,57 @@ func (c *MetricsCollector) updateNodeFailureMetrics(currentNodes []slurmapi.Node
 	}
 }
 
+// updateNodeRestoreMetrics tracks MTTR by monitoring node state transitions and updating timestamps
+func (c *MetricsCollector) updateNodeRestoreMetrics(ctx context.Context, currentNodes []slurmapi.Node, currentTimestamps map[string]time.Time, currentTime time.Time) (map[string]time.Time, bool) {
+	logger := log.FromContext(ctx).WithName(ControllerName)
+
+	// Start with a copy of current timestamps
+	updatedTimestamps := make(map[string]time.Time, len(currentTimestamps))
+	for k, v := range currentTimestamps {
+		updatedTimestamps[k] = v
+	}
+
+	changed := false
+
+	// Process each current node for state transitions
+	for _, node := range currentNodes {
+		isNotUsable := node.IsNotUsable()
+		_, wasTracked := updatedTimestamps[node.Name]
+
+		if isNotUsable && !wasTracked {
+			// Node entered not-usable state - record timestamp
+			updatedTimestamps[node.Name] = currentTime
+			changed = true
+			logger.Info("Node entered not-usable state", "node", node.Name, "timestamp", currentTime)
+		} else if !isNotUsable && wasTracked {
+			// Node restored from not-usable state - calculate duration and record metric
+			notUsableStartTime := updatedTimestamps[node.Name]
+			restoreDuration := currentTime.Sub(notUsableStartTime).Seconds()
+
+			// Record histogram metric
+			c.nodeTimeToRestore.WithLabelValues(
+				node.Name,
+				string(node.BaseState()),
+				strconv.FormatBool(node.IsDrainState()),
+				strconv.FormatBool(node.IsMaintenanceState()),
+				strconv.FormatBool(node.IsReservedState()),
+			).Observe(restoreDuration)
+
+			logger.Info("Node restored from not-usable state",
+				"node", node.Name,
+				"duration_seconds", restoreDuration,
+				"not_usable_since", notUsableStartTime,
+			)
+
+			// Remove from timestamps
+			delete(updatedTimestamps, node.Name)
+			changed = true
+		}
+	}
+
+	return updatedTimestamps, changed
+}
+
 // Describe implements the prometheus.Collector interface
 func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.nodeInfo
@@ -130,6 +212,7 @@ func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.jobDuration
 	c.nodeGPUSeconds.Describe(ch)
 	c.nodeFails.Describe(ch)
+	c.nodeTimeToRestore.Describe(ch)
 
 	ch <- c.rpcCallsTotal
 	ch <- c.rpcDurationSecondsTotal
@@ -154,7 +237,8 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 	}
 
 	newState := &metricsCollectorState{
-		lastGPUSecondsUpdate: previousState.lastGPUSecondsUpdate,
+		lastGPUSecondsUpdate:    previousState.lastGPUSecondsUpdate,
+		nodeNotUsableTimestamps: previousState.nodeNotUsableTimestamps,
 	}
 
 	// Always update state with whatever data we successfully collect (even if partial)
@@ -170,6 +254,17 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 
 	c.updateNodeFailureMetrics(nodes, previousState.nodes)
 	newState.lastGPUSecondsUpdate = c.updateGPUSecondsMetrics(ctx, nodes, previousState.lastGPUSecondsUpdate, time.Now())
+
+	// Update MTTR tracking and node not-usable timestamps
+	updatedTimestamps, changed := c.updateNodeRestoreMetrics(ctx, nodes, newState.nodeNotUsableTimestamps, time.Now())
+	newState.nodeNotUsableTimestamps = updatedTimestamps
+
+	// Save timestamps to ConfigMap if they were changed
+	if changed {
+		if err := SaveNotUsableTimestamps(ctx, c.k8sClient, c.configMapName, updatedTimestamps, nodes); err != nil {
+			logger.Error(err, "Failed to save timestamps to ConfigMap")
+		}
+	}
 
 	jobs, err := c.slurmAPIClient.ListJobs(ctx)
 	if err != nil {
@@ -221,6 +316,7 @@ func (c *MetricsCollector) collectImpl(ch chan<- prometheus.Metric) {
 
 	c.nodeGPUSeconds.Collect(ch)
 	c.nodeFails.Collect(ch)
+	c.nodeTimeToRestore.Collect(ch)
 
 	for slurmJobMetric := range c.slurmJobMetrics(ctx, state.jobs) {
 		ch <- slurmJobMetric
