@@ -5,6 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "cuda-samples"
+  dependsOn: [ "create-user-soperatorchecks" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 0 */3 * *" # every 3d day (3, 6, 9, etc...)
   suspend: false
