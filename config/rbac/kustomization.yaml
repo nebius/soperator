@@ -38,3 +38,7 @@ resources:
 - nodeconfigurator_admin_role.yaml
 - nodeconfigurator_editor_role.yaml
 - nodeconfigurator_viewer_role.yaml
+- jailedconfig_admin_role.yaml
+- jailedconfig_editor_role.yaml
+- jailedconfig_viewer_role.yaml
+

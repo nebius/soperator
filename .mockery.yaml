@@ -11,6 +11,16 @@ packages:
           filename: "mock_{{ .InterfaceName | camelcase | firstLower }}.go"
   nebius.ai/slurm-operator/internal/controller/sconfigcontroller:
     interfaces:
+      Clock:
+        config:
+          dir: "{{.InterfaceDirRelative}}/fake"
+          outpkg: "fake"
+          filename: "mock_{{ .InterfaceName | camelcase | firstLower }}.go"
+      Fs:
+        config:
+          dir: "{{.InterfaceDirRelative}}/fake"
+          outpkg: "fake"
+          filename: "mock_{{ .InterfaceName | camelcase | firstLower }}.go"
       Store:
         config:
           dir: "{{.InterfaceDirRelative}}/fake"
