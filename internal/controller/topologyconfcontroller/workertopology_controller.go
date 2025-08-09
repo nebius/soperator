@@ -41,7 +41,7 @@ var (
 
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;update;create;patch
-// +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs,verbs=get;list;watch;create;patch
 
 type WorkerTopologyReconciler struct {
@@ -223,7 +223,7 @@ func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace string) 
 	}
 }
 
-// EnsureTopologyConfigMap ensures that the ConfigMap for topology configuration exists.
+// CreateDefaultTopologyConfigMap creates the ConfigMap for topology configuration with default values.
 func (r *WorkerTopologyReconciler) CreateDefaultTopologyConfigMap(
 	ctx context.Context, namespace, clusterName string,
 ) error {
@@ -233,7 +233,20 @@ func (r *WorkerTopologyReconciler) CreateDefaultTopologyConfigMap(
 	}
 
 	config := InitializeTopologyConf(listASTS)
-	return r.updateTopologyConfigMap(ctx, namespace, config)
+
+	configMap := r.renderTopologyConfigMap(namespace, config)
+	err = r.Client.Create(ctx, configMap)
+	if err != nil {
+		return fmt.Errorf("create ConfigMap %s: %w", configMap.Name, err)
+	}
+
+	jailedConfig := r.renderTopologyJailedConfig(namespace)
+	err = r.Client.Create(ctx, jailedConfig)
+	if err != nil {
+		return fmt.Errorf("create JailedConfig %s: %w", jailedConfig.Name, err)
+	}
+
+	return nil
 }
 
 // GetStatefulSetsWithFallback retrieves StatefulSets for the cluster and creates a fallback
@@ -368,18 +381,16 @@ func (r *WorkerTopologyReconciler) calculateConfigHash(config string) string {
 
 func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, namespace string, config string) error {
 	configMap := r.renderTopologyConfigMap(namespace, config)
-	err := r.Client.Patch(ctx, configMap, client.Apply,
-		client.ForceOwnership, client.FieldOwner(WorkerTopologyReconcilerName))
+	err := r.Client.Update(ctx, configMap)
 	if err != nil {
-		return fmt.Errorf("patch ConfigMap %s: %w", configMap.Name, err)
+		return fmt.Errorf("update ConfigMap %s: %w", configMap.Name, err)
 	}
 
 	jailedConfig := r.renderTopologyJailedConfig(namespace)
 
-	err = r.Client.Patch(ctx, jailedConfig, client.Apply,
-		client.ForceOwnership, client.FieldOwner(WorkerTopologyReconcilerName))
+	err = r.Client.Update(ctx, jailedConfig)
 	if err != nil {
-		return fmt.Errorf("patch JailedConfig %s: %w", jailedConfig.Name, err)
+		return fmt.Errorf("update JailedConfig %s: %w", jailedConfig.Name, err)
 	}
 
 	return nil
