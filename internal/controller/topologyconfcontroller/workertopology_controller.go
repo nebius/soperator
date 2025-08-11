@@ -152,7 +152,7 @@ func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
 	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap); err != nil {
 		if apierrors.IsNotFound(err) {
 			logger.Info("Worker topology ConfigMap not found, creating with default topology")
-			if err = r.CreateDefaultTopologyConfigMap(ctx, namespace, clusterName); err != nil {
+			if err = r.createDefaultTopologyConfigMap(ctx, namespace, clusterName); err != nil {
 				return nil, fmt.Errorf("create default topology config map in namespace %q: %w", namespace, err)
 			}
 			if err := r.Client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap); err != nil {
@@ -224,7 +224,7 @@ func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace string) 
 }
 
 // CreateDefaultTopologyConfigMap creates the ConfigMap for topology configuration with default values.
-func (r *WorkerTopologyReconciler) CreateDefaultTopologyConfigMap(
+func (r *WorkerTopologyReconciler) createDefaultTopologyConfigMap(
 	ctx context.Context, namespace, clusterName string,
 ) error {
 	listASTS, err := r.GetStatefulSetsWithFallback(ctx, namespace, clusterName)
@@ -234,15 +234,17 @@ func (r *WorkerTopologyReconciler) CreateDefaultTopologyConfigMap(
 
 	config := InitializeTopologyConf(listASTS)
 
+	// Create ConfigMap
 	configMap := r.renderTopologyConfigMap(namespace, config)
 	err = r.Client.Create(ctx, configMap)
-	if err != nil {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("create ConfigMap %s: %w", configMap.Name, err)
 	}
 
+	// Create JailedConfig
 	jailedConfig := r.renderTopologyJailedConfig(namespace)
 	err = r.Client.Create(ctx, jailedConfig)
-	if err != nil {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("create JailedConfig %s: %w", jailedConfig.Name, err)
 	}
 
@@ -380,17 +382,42 @@ func (r *WorkerTopologyReconciler) calculateConfigHash(config string) string {
 }
 
 func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, namespace string, config string) error {
-	configMap := r.renderTopologyConfigMap(namespace, config)
-	err := r.Client.Update(ctx, configMap)
+	configMapKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
+	existingConfigMap := &corev1.ConfigMap{}
+	err := r.Client.Get(ctx, configMapKey, existingConfigMap)
 	if err != nil {
-		return fmt.Errorf("update ConfigMap %s: %w", configMap.Name, err)
+		return fmt.Errorf("get ConfigMap %s: %w", consts.ConfigMapNameTopologyConfig, err)
 	}
 
-	jailedConfig := r.renderTopologyJailedConfig(namespace)
-
-	err = r.Client.Update(ctx, jailedConfig)
+	existingConfigMap.Data[consts.ConfigMapKeyTopologyConfig] = config
+	err = r.Client.Update(ctx, existingConfigMap)
 	if err != nil {
-		return fmt.Errorf("update JailedConfig %s: %w", jailedConfig.Name, err)
+		return fmt.Errorf("update ConfigMap %s: %w", existingConfigMap.Name, err)
+	}
+
+	jailedConfigKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
+	existingJailedConfig := &v1alpha1.JailedConfig{}
+	err = r.Client.Get(ctx, jailedConfigKey, existingJailedConfig)
+	if err != nil {
+		return fmt.Errorf("get JailedConfig %s: %w", consts.ConfigMapNameTopologyConfig, err)
+	}
+
+	desiredSpec := v1alpha1.JailedConfigSpec{
+		ConfigMap: v1alpha1.ConfigMapReference{
+			Name: consts.ConfigMapNameTopologyConfig,
+		},
+		Items: []corev1.KeyToPath{
+			{
+				Key:  consts.ConfigMapKeyTopologyConfig,
+				Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyTopologyConfig),
+			},
+		},
+	}
+	existingJailedConfig.Spec = desiredSpec
+
+	err = r.Client.Update(ctx, existingJailedConfig)
+	if err != nil {
+		return fmt.Errorf("update JailedConfig %s: %w", existingJailedConfig.Name, err)
 	}
 
 	return nil
