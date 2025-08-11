@@ -220,10 +220,6 @@ func BuildRoleBindingActiveCheckName(clusterName string) string {
 	return clusterName + "-activecheck-role-binding"
 }
 
-func BuildOtelSvcEndpoint(clusterName string) string {
-	return fmt.Sprintf("%s-collector", clusterName)
-}
-
 func BuildSecretSlurmdbdConfigsName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,

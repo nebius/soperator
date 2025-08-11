@@ -38,9 +38,6 @@ spec:
             }}
         - name: IS_MARIADB_CRD_INSTALLED
           value: {{ quote .Values.controllerManager.manager.env.isMariadbCrdInstalled }}
-        - name: IS_OPENTELEMETRY_COLLECTOR_CRD_INSTALLED
-          value: {{ quote .Values.controllerManager.manager.env.isOpentelemetryCollectorCrdInstalled
-            }}
         - name: SLURM_OPERATOR_WATCH_NAMESPACES
           value: {{ quote .Values.controllerManager.manager.env.slurmOperatorWatchNamespaces
             }}
