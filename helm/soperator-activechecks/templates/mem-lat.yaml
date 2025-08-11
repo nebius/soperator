@@ -11,7 +11,7 @@ spec:
   runAfterCreation: true
   slurmJobSpec:
     sbatchScript: |
-{{ .Files.Get "scripts/mem-lat.sh" | indent 6 }}
+{{ tpl (.Files.Get "scripts/mem-lat.sh") . | indent 6 }}
     eachWorkerJobArray: true
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
