@@ -34,7 +34,6 @@ func TestRenderDeployment(t *testing.T) {
 				VolumeJail: slurmv1.NodeVolume{
 					VolumeSourceName: ptr.To("test-volume-source"),
 				},
-				JailSlurmConfigPath: "/etc/slurm",
 			},
 		},
 	}

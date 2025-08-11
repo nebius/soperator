@@ -213,7 +213,6 @@ spec:
     worker:
       cgroupVersion: {{ .Values.slurmNodes.worker.cgroupVersion | quote }}
       enableGDRCopy: {{ default false .Values.slurmNodes.worker.enableGDRCopy }}
-      waitForController: {{ default false .Values.slurmNodes.worker.waitForController }}
       priorityClass: {{ default (printf "%s-%s" (include "slurm-cluster.name" .) "slurm-worker") .Values.slurmNodes.worker.priorityClass | quote }}
       {{- if .Values.slurmNodes.worker.slurmNodeExtra }}
       slurmNodeExtra: {{ .Values.slurmNodes.worker.slurmNodeExtra | quote }}

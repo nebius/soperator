@@ -50,11 +50,9 @@ func RenderStatefulSet(
 
 	// Since 1.29 is native sidecar support, we can use the native restart policy
 	initContainers := []corev1.Container{
-		common.RenderContainerMunge(&worker.ContainerMunge),
+		common.RenderContainerMunge(&worker.ContainerMunge), RenderContainerWaitForController(&worker.ContainerSlurmd),
 	}
-	if worker.WaitForController != nil && *worker.WaitForController {
-		initContainers = append(initContainers, RenderContainerWaitForController(&worker.ContainerSlurmd))
-	}
+
 	initContainers = append(initContainers, worker.CustomInitContainers...)
 
 	slurmdContainer, err := renderContainerSlurmd(
