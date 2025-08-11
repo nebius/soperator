@@ -19,7 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
-	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
@@ -197,8 +196,6 @@ func (r Reconciler) reconcile(
 				existing = &rbacv1.RoleBinding{}
 			case *kruisev1b1.StatefulSet:
 				existing = &kruisev1b1.StatefulSet{}
-			case *otelv1beta1.OpenTelemetryCollector:
-				existing = &otelv1beta1.OpenTelemetryCollector{}
 			case *appsv1.Deployment:
 				existing = &appsv1.Deployment{}
 			case *prometheusv1.PodMonitor:
