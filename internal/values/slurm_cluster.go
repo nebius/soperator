@@ -86,6 +86,8 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 			cluster.Spec.SConfigController.JailSlurmConfigPath,
 			cluster.Spec.SConfigController.RunAsUid,
 			cluster.Spec.SConfigController.RunAsGid,
+			cluster.Spec.SConfigController.ReconfigurePollInterval,
+			cluster.Spec.SConfigController.ReconfigureWaitTimeout,
 		),
 	}
 

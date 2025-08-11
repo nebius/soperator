@@ -38,6 +38,21 @@ func RenderRole(clusterNamespace, clusterName string) rbacv1.Role {
 				Resources: []string{"events"},
 				Verbs:     []string{"create", "patch"},
 			},
+			{
+				APIGroups: []string{"slurm.nebius.ai"},
+				Resources: []string{"jailedconfigs"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+			},
+			{
+				APIGroups: []string{"slurm.nebius.ai"},
+				Resources: []string{"jailedconfigs/status"},
+				Verbs:     []string{"get", "update", "patch"},
+			},
+			{
+				APIGroups: []string{"slurm.nebius.ai"},
+				Resources: []string{"jailedconfigs/finalizers"},
+				Verbs:     []string{"update"},
+			},
 		},
 	}
 }

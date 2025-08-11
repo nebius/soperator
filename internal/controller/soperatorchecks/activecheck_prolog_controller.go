@@ -2,11 +2,13 @@ package soperatorchecks
 
 import (
 	"context"
+	"path/filepath"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -16,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	"nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 )
@@ -99,21 +102,50 @@ func (r *ActiveCheckPrologReconciler) updatePrologConfigMap(ctx context.Context,
 		ObjectMeta: ctrl.ObjectMeta{
 			Name:      consts.ConfigMapNameActiveCheckPrologScript,
 			Namespace: namespace,
-			Labels: map[string]string{
-				consts.LabelSConfigControllerSourceKey: consts.LabelSConfigControllerSourceValue,
-			},
-			Annotations: map[string]string{
-				consts.AnnotationSConfigControllerSourceKey:     consts.DefaultSConfigControllerSourcePath,
-				consts.AnnotationSConfigControllerExecutableKey: consts.DefaultSConfigControllerExecutableValue,
-			},
 		},
 		Data: map[string]string{
 			consts.ConfigMapKeyActiveCheckPrologScript: config,
 		},
 	}
 
-	return r.Client.Patch(ctx, configMap, client.Apply,
+	err := r.Client.Patch(ctx, configMap, client.Apply,
 		client.ForceOwnership, client.FieldOwner(SlurmActiveCheckPrologControllerName))
+
+	if err != nil {
+		return err
+	}
+
+	jailedConfig := &v1alpha1.JailedConfig{
+		TypeMeta: ctrl.TypeMeta{
+			APIVersion: v1alpha1.GroupVersion.Version,
+			Kind:       "JailedConfig",
+		},
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      consts.ConfigMapNameActiveCheckPrologScript,
+			Namespace: namespace,
+		},
+		Spec: v1alpha1.JailedConfigSpec{
+			ConfigMap: v1alpha1.ConfigMapReference{
+				Name: consts.ConfigMapNameActiveCheckPrologScript,
+			},
+			Items: []corev1.KeyToPath{
+				{
+					Key:  consts.ConfigMapKeyActiveCheckPrologScript,
+					Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyActiveCheckPrologScript),
+					Mode: ptr.To(int32(0o755)),
+				},
+			},
+		},
+	}
+
+	err = r.Client.Patch(ctx, jailedConfig, client.Apply,
+		client.ForceOwnership, client.FieldOwner(SlurmActiveCheckPrologControllerName))
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *ActiveCheckPrologReconciler) getPrologScript() string {

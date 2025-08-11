@@ -17,8 +17,10 @@ type SConfigController struct {
 	Maintenance         consts.MaintenanceMode
 	JailSlurmConfigPath string
 
-	RunAsUid *int64
-	RunAsGid *int64
+	RunAsUid                *int64
+	RunAsGid                *int64
+	ReconfigurePollInterval *string
+	ReconfigureWaitTimeout  *string
 }
 
 func buildSConfigControllerFrom(
@@ -28,6 +30,8 @@ func buildSConfigControllerFrom(
 	jailSlurmConfigPath string,
 	runAsUid *int64,
 	runAsGid *int64,
+	reconfigurePollInterval *string,
+	reconfigureWaitTimeout *string,
 ) SConfigController {
 	containerSConfigController := buildContainerFrom(
 		container,
@@ -43,10 +47,12 @@ func buildSConfigControllerFrom(
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),
 		},
-		Maintenance:         maintenance,
-		JailSlurmConfigPath: jailSlurmConfigPath,
-		RunAsUid:            runAsUid,
-		RunAsGid:            runAsGid,
+		Maintenance:             maintenance,
+		JailSlurmConfigPath:     jailSlurmConfigPath,
+		RunAsUid:                runAsUid,
+		RunAsGid:                runAsGid,
+		ReconfigurePollInterval: reconfigurePollInterval,
+		ReconfigureWaitTimeout:  reconfigureWaitTimeout,
 	}
 
 	return res

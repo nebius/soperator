@@ -299,6 +299,8 @@ type PluginConfigCustom struct {
 	Arguments map[string]string `json:"arguments,omitempty"`
 }
 
+// SConfigController represents the SConfig Controller configuration
+// +kubebuilder:validation:XValidation:rule="!has(self.reconfigureWaitTimeout) || !has(self.reconfigurePollInterval) || duration(self.reconfigureWaitTimeout) > duration(self.reconfigurePollInterval)",message="ReconfigureWaitTimeout must be greater than ReconfigurePollInterval"
 type SConfigController struct {
 	Node      SlurmNode     `json:"node,omitempty"`
 	Container NodeContainer `json:"container,omitempty"`
@@ -321,6 +323,18 @@ type SConfigController struct {
 	// Defaults to whatever is set in sconfigcontroller image
 	// +kubebuilder:validation:Optional
 	RunAsGid *int64 `json:"runAsGid,omitempty"`
+
+	// ReconfigurePollInterval defines the interval for polling node restart status during reconfiguration.
+	// Defaults to 20s
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="20s"
+	ReconfigurePollInterval *string `json:"reconfigurePollInterval,omitempty"`
+
+	// ReconfigureWaitTimeout defines the maximum time to wait for all nodes to restart during reconfiguration.
+	// Must be greater than ReconfigurePollInterval. Defaults to 1m
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="1m"
+	ReconfigureWaitTimeout *string `json:"reconfigureWaitTimeout,omitempty"`
 }
 
 type PartitionConfiguration struct {
