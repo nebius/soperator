@@ -63,7 +63,6 @@ func BasePodTemplateSpec(
 			},
 			InitContainers: []corev1.Container{
 				renderInitContainerSConfigController(
-					sConfigController.JailSlurmConfigPath,
 					sConfigController.RunAsUid,
 					sConfigController.RunAsGid,
 				),

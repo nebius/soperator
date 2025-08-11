@@ -305,13 +305,6 @@ type SConfigController struct {
 	Node      SlurmNode     `json:"node,omitempty"`
 	Container NodeContainer `json:"container,omitempty"`
 
-	// JailSlurmConfigPath defines the path where the Slurm configs are stored in the jail.
-	// Defaults to /mnt/jail/etc/slurm
-	// +kubebuilder:deprecation:warning="The JailSlurmConfigPath field is deprecated and will be removed in a 1.22.0 release"
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="/mnt/jail/etc/slurm"
-	JailSlurmConfigPath string `json:"jailSlurmConfigPath,omitempty"`
-
 	// RunAsUid defines UID to run SConfigController process
 	// This will be manifested as UID of files maintained by SConfigController
 	// Defaults to whatever is set in sconfigcontroller image
@@ -872,13 +865,6 @@ type SlurmNodeWorker struct {
 	//
 	// +kubebuilder:validation:Optional
 	PriorityClass string `json:"priorityClass,omitempty"`
-
-	// WaitForController defines whether to wait for the slurmctld to be ready before starting the slurmd.
-	//
-	// +kubebuilder:deprecation:warning="The WaitForController field is deprecated and will be removed in a 1.22.0 release"
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	WaitForController *bool `json:"waitForController,omitempty"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node

@@ -18644,12 +18644,6 @@ spec:
                     required:
                     - image
                     type: object
-                  jailSlurmConfigPath:
-                    default: /mnt/jail/etc/slurm
-                    description: |-
-                      JailSlurmConfigPath defines the path where the Slurm configs are stored in the jail.
-                      Defaults to /mnt/jail/etc/slurm
-                    type: string
                   node:
                     description: SlurmNode represents the common configuration for
                       a Slurm node.
@@ -33086,11 +33080,6 @@ spec:
                         - jail
                         - spool
                         type: object
-                      waitForController:
-                        default: false
-                        description: WaitForController defines whether to wait for
-                          the slurmctld to be ready before starting the slurmd.
-                        type: boolean
                       workerAnnotations:
                         additionalProperties:
                           type: string

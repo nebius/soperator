@@ -15,7 +15,6 @@ const defaultUid int64 = 1001
 const defaultGid int64 = 1001
 
 func renderInitContainerSConfigController(
-	jailConfigPath string,
 	runAsUid *int64,
 	runAsGid *int64,
 ) corev1.Container {
@@ -49,7 +48,7 @@ func renderInitContainerSConfigController(
 		Env: []corev1.EnvVar{
 			{
 				Name:  "JAIL_CONFIG_PATH",
-				Value: jailConfigPath,
+				Value: "/mnt/jail/etc/slurm",
 			},
 			{
 				Name:  "JAIL_UID",

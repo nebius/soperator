@@ -76,7 +76,6 @@ func Test_RenderStatefulSet(t *testing.T) {
 					},
 				},
 			},
-			WaitForController: ptr.To(true),
 		}
 	}
 
