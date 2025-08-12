@@ -13,22 +13,11 @@ fi
 export PATH=$PATH
 
 # Define platform for health-checker
-platform=""
-gpus_on_node=$(nvidia-smi --query-gpu=name --format=csv,noheader | sort | uniq -c)
-if [[ "${gpus_on_node}" == *"8 NVIDIA H100"* ]]; then
-  platform="8xH100"
-elif [[ "${gpus_on_node}" == *"8 NVIDIA H200"* ]]; then
-  platform="8xH200"
-elif [[ "${gpus_on_node}" == *"8 NVIDIA B200"* ]]; then
-  platform="8xB200"
-else
-  echo "Unsupported platform" >&2
-  exit 0
-fi
-echo "Platform found: $platform"
+platform="$CHECKS_PLATFORM_TAG"
+echo "Platform: $platform"
 
 # Define health-checker checks to run
-case "$SCRIPT_CONTEXT" in
+case "$CHECKS_CONTEXT" in
   "prolog")
     checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg"
     ;;
@@ -39,13 +28,13 @@ case "$SCRIPT_CONTEXT" in
     checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg"
     ;;
   *)
-    echo "Unknown context: $SCRIPT_CONTEXT" >&2
+    echo "Unknown context: $CHECKS_CONTEXT" >&2
     exit 0
     ;;
 esac
 
 exit_code=0
-details=$(health-checker run -e soperator -p $platform -f mk8s-txt -n $checks 2>&1) || exit_code=$?
+details=$(health-checker run -e soperator -p "$platform" -f mk8s-txt -n "$checks" 2>&1) || exit_code=$?
 if [[ $exit_code -eq 1 ]]; then
     echo "Health-checker failed with exit code 1."
     echo "$details"

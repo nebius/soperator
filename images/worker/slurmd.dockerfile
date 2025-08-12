@@ -138,6 +138,9 @@ COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
 # Copy script for bind-mounting slurm into the jail
 COPY images/common/scripts/bind_slurm_common.sh /opt/bin/slurm/
 
+# Copy script for rebooting K8s nodes
+COPY images/common/scripts/reboot.sh /opt/bin/slurm/
+
 RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
     chmod +x /opt/bin/slurm/bind_slurm_common.sh
 
