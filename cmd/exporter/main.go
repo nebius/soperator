@@ -14,22 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
-Copyright 2025.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package main
 
 import (
@@ -129,35 +113,22 @@ func parseFlags() Flags {
 	flag.StringVar(&flags.kubeconfigPath, "kubeconfig-path", "", "Path to a kubeconfig for out-of-cluster use (optional)")
 	flag.BoolVar(&flags.standalone, "standalone", false, "Run without Kubernetes (skip k8s client/JWT)")
 
-	// NEW: static token; if empty we will also check SLURM_JWT env var
+	// static token (optional); can also come from SLURM_EXPORTER_TOKEN
 	flag.StringVar(&flags.staticToken, "static-token", "", "Static JWT to send in X-SLURM-USER-TOKEN (use with rest_auth/jwt)")
 
+	flag.Parse()
 	passedFlags := make(map[string]struct{})
-    flag.Visit(func(f *flag.Flag) {
-        passedFlags[f.Name] = struct{}{}
-    })
+	flag.Visit(func(f *flag.Flag) { passedFlags[f.Name] = struct{}{} })
+	for _, cfg := range configs {
+		if _, passed := passedFlags[cfg.flagName]; !passed {
+			if envVal := os.Getenv(cfg.envName); envVal != "" {
+				*cfg.target = envVal
+			}
+		}
+	}
 
-    // Apply environment variables if CLI flags were not explicitly set
-    // Priority: CLI flag > Environment variable > Default value
-    for _, cfg := range configs {
-        if _, passed := passedFlags[cfg.flagName]; !passed {
-            if envVal := os.Getenv(cfg.envName); envVal != "" {
-                *cfg.target = envVal
-            }
-        }
-    }
-	// env fallback for non-passed flags
 	if flags.staticToken == "" {
-      if v := os.Getenv("SLURM_EXPORTER_TOKEN"); v != "" {
-        flags.staticToken = v
-    } else if v := os.Getenv("SLURM_JWT"); v != "" { // legacy compat
-        flags.staticToken = v
-      }
-    }
-
-	// static-token also from env if not provided as flag
-	if flags.staticToken == "" {
-		if v := os.Getenv("SLURM_JWT"); v != "" {
+		if v := os.Getenv("SLURM_EXPORTER_TOKEN"); v != "" {
 			flags.staticToken = v
 		}
 	}
