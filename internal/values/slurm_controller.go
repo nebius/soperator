@@ -24,7 +24,7 @@ type SlurmController struct {
 	VolumeJail         slurmv1.NodeVolume
 	CustomVolumeMounts []slurmv1.NodeVolumeMount
 	Maintenance        *consts.MaintenanceMode
-	PriorityClassName  string
+	PriorityClass      string
 }
 
 func buildSlurmControllerFrom(clusterName string, maintenance *consts.MaintenanceMode, controller *slurmv1.SlurmNodeController) SlurmController {
@@ -57,7 +57,7 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 		VolumeJail:         *controller.Volumes.Jail.DeepCopy(),
 		CustomVolumeMounts: controller.Volumes.CustomMounts,
 		Maintenance:        maintenance,
-		PriorityClassName:  controller.PriorityClassName,
+		PriorityClass:      controller.PriorityClass,
 	}
 
 	for _, customVolumeMount := range controller.Volumes.CustomMounts {

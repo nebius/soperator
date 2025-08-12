@@ -67,7 +67,7 @@ func TestRenderStatefulSet(t *testing.T) {
 				VolumeJail: slurmv1.NodeVolume{
 					VolumeSourceName: ptr.To("test-volume"),
 				},
-				PriorityClassName: "test-priority",
+				PriorityClass: "test-priority",
 			},
 			expectLabels: map[string]string{
 				"app.kubernetes.io/component":     "controller",
@@ -168,8 +168,8 @@ func TestRenderStatefulSet(t *testing.T) {
 			}
 
 			// Check priority class
-			if result.Spec.Template.Spec.PriorityClassName != tt.controller.PriorityClassName {
-				t.Errorf("PriorityClassName = %v, want %v", result.Spec.Template.Spec.PriorityClassName, tt.controller.PriorityClassName)
+			if result.Spec.Template.Spec.PriorityClassName != tt.controller.PriorityClass {
+				t.Errorf("PriorityClassName = %v, want %v", result.Spec.Template.Spec.PriorityClassName, tt.controller.PriorityClass)
 			}
 
 			// Check containers

@@ -46,7 +46,7 @@ func TestRenderDaemonSet(t *testing.T) {
 						AppArmorProfile: "unconfined",
 					},
 				},
-				PriorityClassName: "test-priority",
+				PriorityClass: "test-priority",
 			},
 			expectLabels: map[string]string{
 				"app.kubernetes.io/component":     "controller",
@@ -127,8 +127,8 @@ func TestRenderDaemonSet(t *testing.T) {
 			}
 
 			// Check priority class
-			if result.Spec.Template.Spec.PriorityClassName != tt.controller.PriorityClassName {
-				t.Errorf("PriorityClassName = %v, want %v", result.Spec.Template.Spec.PriorityClassName, tt.controller.PriorityClassName)
+			if result.Spec.Template.Spec.PriorityClassName != tt.controller.PriorityClass {
+				t.Errorf("PriorityClass = %v, want %v", result.Spec.Template.Spec.PriorityClassName, tt.controller.PriorityClass)
 			}
 
 			// Check update strategy

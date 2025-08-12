@@ -774,10 +774,10 @@ type SlurmNodeController struct {
 	// +kubebuilder:validation:Required
 	Volumes SlurmNodeControllerVolumes `json:"volumes"`
 
-	// PriorityClassName defines the priority class for the Slurm controller pods
+	// PriorityClass defines the priority class for the Slurm controller pods
 	//
 	// +kubebuilder:validation:Optional
-	PriorityClassName string `json:"priorityClassName,omitempty"`
+	PriorityClass string `json:"priorityClass,omitempty"`
 }
 
 // SlurmNodeControllerVolumes define the volumes for the Slurm controller node
