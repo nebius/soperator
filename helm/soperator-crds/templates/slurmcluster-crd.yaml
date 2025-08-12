@@ -23934,9 +23934,9 @@ spec:
                         required:
                         - image
                         type: object
-                      priorityClassName:
-                        description: PriorityClassName defines the priority class
-                          for the Slurm controller pods
+                      priorityClass:
+                        description: PriorityClass defines the priority class for
+                          the Slurm controller pods
                         type: string
                       slurmctld:
                         description: Slurmctld represents the Slurm control daemon

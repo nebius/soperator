@@ -114,7 +114,7 @@ func RenderStatefulSet(
 					SecurityContext:               &corev1.PodSecurityContext{},
 					SchedulerName:                 corev1.DefaultSchedulerName,
 					DNSPolicy:                     corev1.DNSClusterFirst,
-					PriorityClassName:             controller.PriorityClassName,
+					PriorityClassName:             controller.PriorityClass,
 				},
 			},
 		},
