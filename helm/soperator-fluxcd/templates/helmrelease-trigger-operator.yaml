@@ -8,7 +8,7 @@ metadata:
 spec:
   chart:
     spec:
-      chart: helmrelease-trigger-operator
+      chart: helm-helmrelease-trigger-operator
       interval: {{ .Values.helmReleaseTriggerOperator.interval }}
       sourceRef:
         kind: HelmRepository

@@ -265,12 +265,12 @@ helmReleaseTriggerOperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 0.2.0
+  version: 0.0.1
   namespace: flux-system
   releaseName: helmrelease-trigger
   values:
     enableHrAutodiscovery: true
-    repository: "ghcr.io/uburro/helmrelease-trigger-operator"
+    repository: "cr.eu-north1.nebius.cloud/soperator/helmrelease-trigger-operator"
     resources:
       limits:
         memory: 128Mi
