@@ -52,6 +52,8 @@ spec:
         filelog:
           include:
             - "/mnt/jail/opt/soperator-outputs/*/*.out"
+          exclude:
+            - "/mnt/jail/opt/soperator-outputs/health_checker_cmd_stdout/*.out"
           include_file_name: true  # Adds attributes["log.file.name"]
           include_file_path: true  # Adds attributes["log.file.path"]
           preserve_leading_whitespaces: true
@@ -122,6 +124,40 @@ spec:
               if: resource["log_type"] == "slurm_scripts" and attributes["script_context"] != nil
             - type: remove
               field: attributes.base_name
+          retry_on_failure:
+            enabled: true
+          start_at: end  # Start reading from the end of the file on startup.
+          storage: file_storage  # Storage for the state (file offsets).
+        filelog/health_checker:
+          include:
+            - "/mnt/jail/opt/soperator-outputs/health_checker_cmd_stdout/*.out"
+          include_file_name: true  # Adds attributes["log.file.name"]
+          include_file_path: true  # Adds attributes["log.file.path"]
+          preserve_leading_whitespaces: true
+          poll_interval: {{ .Values.observability.opentelemetry.logs.values.jailLogs.pollInterval | default "5s" }}
+          operators:
+            # Extract check_name and run_id
+            - id: extract_check_name_and_run_id
+              type: regex_parser
+              parse_from: attributes["log.file.name"]
+              regex: ^(?P<check_name>.+)\.(?P<run_id>[0-9a-fA-F-]+)\.out$
+            - type: copy
+              from: attributes.check_name
+              to: resource["health_checker.check_name"]
+            - type: copy
+              from: attributes.run_id
+              to: resource["health_checker.run_id"]
+
+            # Add namespace
+            - type: add
+              field: resource["k8s.namespace.name"]
+              value: {{ .Values.slurmCluster.namespace | default "soperator" | quote }}
+
+            # Add log_type
+            - type: add
+              field: resource["log_type"]
+              value: "health_checker_cmd_stdout"
+
           retry_on_failure:
             enabled: true
           start_at: end  # Start reading from the end of the file on startup.
@@ -213,6 +249,7 @@ spec:
           logs:
             receivers:
             - filelog
+            - filelog/health_checker
             processors:
             - k8sattributes
             - transform
