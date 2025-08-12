@@ -49,7 +49,7 @@ spec:
             drop:
             - ALL
         image:
-          repository: {{ .Values.helmReleaseTriggerOperator.repository | default "cr.eu-north1.nebius.cloud/soperator/helmrelease-trigger-operator" | quote }}
+          repository: {{ .Values.helmReleaseTriggerOperator.values.repository | default "cr.eu-north1.nebius.cloud/soperator/helmrelease-trigger-operator" | quote }}
           tag: {{ .Values.helmReleaseTriggerOperator.version | quote}}
         resources: {{- toYaml .Values.helmReleaseTriggerOperator.values.resources | nindent 8 }}
       replicas: 1
