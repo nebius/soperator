@@ -141,6 +141,11 @@ func (r Reconciler) EnsureUpdated(
 			return fmt.Errorf("setting controller reference: %w", err)
 		}
 
+		// Copy essential metadata from existing resource to desired resource
+		// This is required for the Update operation to work correctly
+		desired.SetResourceVersion(existing.GetResourceVersion())
+		desired.SetUID(existing.GetUID())
+
 		if err = r.Update(ctx, desired); err != nil {
 			logger.Error(err, "Failed to update resource")
 			return fmt.Errorf("updating resource: %w", err)
