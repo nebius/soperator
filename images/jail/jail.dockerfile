@@ -215,7 +215,7 @@ RUN rm -rf -- /root/..?* /root/.[!.]* /root/* && \
     cp -a /etc/skel/. /root/
 
 # Copy createuser utility script
-COPY images/jail/scripts/createuser.sh /usr/bin/createuser
+COPY images/jail/scripts/createuser.py /usr/bin/createuser
 RUN chmod +x /usr/bin/createuser
 
 # Replace SSH "message of the day" scripts
