@@ -152,7 +152,7 @@ RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
 RUN rm -rf /home
 
 # Delete SSH "message of the day" scripts because they aren't needed on worker nodes
-RUN rm -rf /etc/update-motd.d/*
+RUN rm -rf /etc/update-motd.d
 
 # Expose the port used for accessing slurmd
 EXPOSE 6818
