@@ -7,9 +7,14 @@
 
 echo "Running extensive health check..."
 
-sleep 3600 # 1 hour
+sleep 30
 
-HEALTH_CHECK_PASSED=$(($RANDOM % 2))
+# Always fail in order not to remove the reservation until we implement a real extensive check
+HEALTH_CHECK_PASSED=$((0))
+
+# For testing: use this line to randomly fail or succeed
+# HEALTH_CHECK_PASSED=$(($RANDOM % 2))
+
 echo "HEALTH_CHECK_PASSED=$HEALTH_CHECK_PASSED"
 
 if [[ $HEALTH_CHECK_PASSED -eq 1 ]]; then

@@ -36,8 +36,7 @@ spec:
         spec:
           containers:
           - name: run-extensive-check-on-reservations
-            # TODO replace with stable image
-            image: cr.eu-north1.nebius.cloud/soperator-unstable/slurm_check_job:1.21.10-noble-slurm24.11.6-2e1138d0
+            image: cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.21.10-noble-slurm25.05.2
             imagePullPolicy: IfNotPresent
             securityContext:
               capabilities:

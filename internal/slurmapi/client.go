@@ -259,7 +259,7 @@ func (c *client) PostMaintenanceReservation(ctx context.Context, name string, no
 	resp, err := c.client0043.SlurmV0043PostReservationWithResponse(ctx, api0043.V0043ReservationDescMsg{
 		Name:     ptr.To(name),
 		NodeList: ptr.To(api0043.V0043HostlistString(nodeList)),
-		Flags:    ptr.To([]api0043.V0043ReservationDescMsgFlags{api0043.V0043ReservationDescMsgFlagsMAINT}),
+		Flags:    ptr.To([]api0043.V0043ReservationDescMsgFlags{api0043.V0043ReservationDescMsgFlagsMAINT, api0043.V0043ReservationDescMsgFlagsIGNOREJOBS}),
 		Users:    ptr.To([]string{SlurmUserSoperatorchecks}),
 		StartTime: &api0043.V0043Uint64NoValStruct{
 			Number: ptr.To(time.Now().Unix()),

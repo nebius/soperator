@@ -278,7 +278,6 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		}
 
 		logger = logger.WithValues(logfield.ResourceKV(activeCheck)...)
-		logger.Info("this here")
 		logger.V(1).Info("Rendered")
 
 		err = r.Status().Update(ctx, activeCheck)
