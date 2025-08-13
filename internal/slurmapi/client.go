@@ -261,6 +261,13 @@ func (c *client) PostMaintenanceReservation(ctx context.Context, name string, no
 		NodeList: ptr.To(api0043.V0043HostlistString(nodeList)),
 		Flags:    ptr.To([]api0043.V0043ReservationDescMsgFlags{api0043.V0043ReservationDescMsgFlagsMAINT}),
 		Users:    ptr.To([]string{SlurmUserSoperatorchecks}),
+		StartTime: &api0043.V0043Uint64NoValStruct{
+			Number: ptr.To(time.Now().Unix()),
+			Set:    ptr.To(true),
+		},
+		Duration: &api0043.V0043Uint32NoValStruct{
+			Infinite: ptr.To(true),
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("post reservation: %w", err)
@@ -283,6 +290,7 @@ func (c *client) StopReservation(ctx context.Context, name string) error {
 		Name: ptr.To(name),
 		Duration: &api0043.V0043Uint32NoValStruct{
 			Number: ptr.To(int32(0)),
+			Set:    ptr.To(true),
 		},
 	})
 	if err != nil {
