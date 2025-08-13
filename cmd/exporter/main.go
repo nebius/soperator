@@ -155,24 +155,24 @@ func main() {
 
 	// optional k8s
 	var cfg *rest.Config
-	var err error
-	if !flags.standalone {
-		cfg, err = rest.InClusterConfig()
-		if err != nil && flags.kubeconfigPath != "" {
-			cfg, err = clientcmd.BuildConfigFromFlags("", flags.kubeconfigPath)
-			if err != nil {
-				cfg = nil
-			}
-		}
-	}
-	var ctrlClient client.Client
-	if cfg != nil {
-		ctrlClient, err = client.New(cfg, client.Options{})
-		if err != nil {
-			log.Error(err, "Failed to create Kubernetes client, continuing in standalone mode")
-			ctrlClient = nil
-		}
-	}
+    if !flags.standalone {
+        cfg, icErr := rest.InClusterConfig()
+        if icErr != nil && flags.kubeconfigPath != "" {
+            cfg, kcErr := clientcmd.BuildConfigFromFlags("", flags.kubeconfigPath)
+            if kcErr != nil {
+                log.Info("No in-cluster config and kubeconfig-path failed; continuing standalone",
+                    "kubeconfig-path", flags.kubeconfigPath, "error", kcErr)
+            }
+        }
+    }
+    var ctrlClient client.Client
+    if cfg != nil {
+        if c, err := client.New(cfg, client.Options{}); err == nil {
+            ctrlClient = c
+        } else {
+            log.Info("Failed to create Kubernetes client; continuing standalone", "error", err)
+        }
+    }
 
 	// choose issuer: k8s → jwt; else static-token; else none
 	var issuer interface{ Issue(context.Context) (string, error) }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"reflect"
+	"net/url"
 	"time"
 
 	api "github.com/SlinkyProject/slurm-client/api/v0041"
@@ -39,15 +39,14 @@ type tokenIssuer interface {
 
 func NewClient(server string, tokenIssuer tokenIssuer, httpClient *http.Client) (Client, error) {
 	if server == "" {
-		return nil, fmt.Errorf("unable to create client: empty server URL")
-	}
-	if httpClient == nil {
-		httpClient = DefaultHTTPClient()
-	}
-
-	apiClient := &client{
-		tokenIssuer: normalizeIssuer(tokenIssuer),
-	}
+        return nil, fmt.Errorf("unable to create client: empty server URL")
+    }
+    if _, err := url.ParseRequestURI(server); err != nil {
+        return nil, fmt.Errorf("unable to create client: invalid server URL: %w", err)
+    }
+    if httpClient == nil {
+        httpClient = DefaultHTTPClient()
+    }
 
 	c, err := api.NewClientWithResponses(
 		server,
@@ -79,12 +78,11 @@ func normalizeIssuer(t tokenIssuer) tokenIssuer {
 func (c *client) setHeaders(ctx context.Context, req *http.Request) error {
 	req.Header.Set(headerContentType, headerApplicationJson)
 
-	ti := normalizeIssuer(c.tokenIssuer)
-	if ti == nil {
-		return nil
-	}
+	if c.tokenIssuer == nil {
+        return nil
+    }
 
-	token, err := ti.Issue(ctx)
+    token, err := c.tokenIssuer.Issue(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to issue jwt: %w", err)
 	}
