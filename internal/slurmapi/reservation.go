@@ -9,13 +9,10 @@ type Reservation struct {
 	NodeList *string
 }
 
-func ReservationFromAPI(reservation api0043.V0043ReservationInfo) (Reservation, error) {
-	var res Reservation
-
-	res = Reservation{
+func ReservationFromAPI(reservation api0043.V0043ReservationInfo) Reservation {
+	res := Reservation{
 		Name:     *reservation.Name,
 		NodeList: reservation.NodeList,
 	}
-
-	return res, nil
+	return res
 }

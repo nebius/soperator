@@ -213,7 +213,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 					return ctrl.Result{}, fmt.Errorf("executing failure reactions: %w", err)
 				}
 			} else {
-				err = executeSuccessReactions(ctx, slurmJob, activeCheck, slurmAPIClient, logger)
+				err = executeSuccessReactions(ctx, slurmJob, activeCheck, slurmAPIClient)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("executing success reactions: %w", err)
 				}
@@ -382,12 +382,11 @@ func executeFailureReactions(ctx context.Context, slurmJob slurmapi.Job, activeC
 		failureReactions = &activeCheck.Spec.Reactions
 	}
 
-	
 	if failureReactions.DrainSlurmNode || failureReactions.CommentSlurmNode {
 		err := updateSlurmNodeWithReaction(ctx, logger, slurmJob, activeCheck, slurmAPIClient)
 		if err != nil {
 			return fmt.Errorf("update slurm node with reaction: %w", err)
-			}
+		}
 	}
 
 	err := processAddReservation(ctx, failureReactions.AddReservation, slurmJob, slurmAPIClient, logger)
@@ -397,8 +396,8 @@ func executeFailureReactions(ctx context.Context, slurmJob slurmapi.Job, activeC
 	return nil
 }
 
-func executeSuccessReactions(ctx context.Context, slurmJob slurmapi.Job, activeCheck *slurmv1alpha1.ActiveCheck, slurmAPIClient slurmapi.Client, logger logr.Logger) error {
-	
+func executeSuccessReactions(ctx context.Context, slurmJob slurmapi.Job, activeCheck *slurmv1alpha1.ActiveCheck, slurmAPIClient slurmapi.Client) error {
+
 	successReactions := activeCheck.Spec.SuccessReactions
 	if successReactions == nil {
 		return nil

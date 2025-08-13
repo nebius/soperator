@@ -250,10 +250,8 @@ func (c *client) GetReservation(ctx context.Context, name string) (Reservation, 
 		return Reservation{}, fmt.Errorf("expected only one reservation in response for get %s request, got %d", name, reservationsLength)
 	}
 
-	reservation, err := ReservationFromAPI(resp.JSON200.Reservations[0])
-	if err != nil {
-		return Reservation{}, fmt.Errorf("convert reservation from api response: %w", err)
-	}
+	reservation := ReservationFromAPI(resp.JSON200.Reservations[0])
+
 	return reservation, nil
 }
 
