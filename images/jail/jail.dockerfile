@@ -201,7 +201,9 @@ RUN chmod 644 /etc/passwd /etc/group && chown 0:0 /etc/passwd /etc/group && \
 # Setup the default $HOME directory content
 RUN rm -rf -- /etc/skel/..?* /etc/skel/.[!.]* /etc/skel/*
 COPY images/jail/skel/ /etc/skel/
-RUN chmod 755 /etc/skel/.slurm && \
+RUN chmod 755 /etc/skel/.ssh && \
+    chmod 600 /etc/skel/.ssh/config && \
+    chmod 755 /etc/skel/.slurm && \
     chmod 644 /etc/skel/.slurm/defaults && \
     chmod 644 /etc/skel/.bash_logout && \
     chmod 644 /etc/skel/.bashrc && \
