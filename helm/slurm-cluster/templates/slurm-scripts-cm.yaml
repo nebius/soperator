@@ -43,12 +43,6 @@ data:
   boot_disk_full.sh: |-
 {{ tpl (.Files.Get "slurm_scripts/boot_disk_full.sh") . | indent 4 }}
 
-  check_runner.py: |-
-{{ tpl (.Files.Get "slurm_scripts/check_runner.py") . | indent 4 }}
-
-  checks.json: |-
-{{ tpl (.Files.Get "slurm_scripts/checks.json") . | indent 4 }}
-
   cleanup_enroot.sh: |-
 {{ tpl (.Files.Get "slurm_scripts/cleanup_enroot.sh") . | indent 4 }}
 
@@ -84,6 +78,12 @@ data:
 
   unmap_job_dcgm.sh: |-
 {{ tpl (.Files.Get "slurm_scripts/unmap_job_dcgm.sh") . | indent 4 }}
+
+  check_runner.py: |
+{{ tpl (.Files.Get "slurm_scripts/check_runner.py") . | indent 4 }}
+
+  checks.json: |
+{{ tpl (.Files.Get "slurm_scripts/checks.json") . | indent 4 }}
 
 {{- if .Values.slurmScripts.custom }}
 {{- range $name, $content := .Values.slurmScripts.custom }}

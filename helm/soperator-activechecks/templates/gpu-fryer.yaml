@@ -5,6 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "gpu-fryer"
+  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 0 */3 * *" # every 3d day (3, 6, 9, etc...)
   suspend: false
@@ -27,3 +28,4 @@ spec:
   reactions:
     setCondition: false
     drainSlurmNode: false
+    commentSlurmNode: true

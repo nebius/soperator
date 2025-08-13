@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -149,12 +150,15 @@ func (r *ActiveCheckReconciler) Reconcile(
 		return ctrl.Result{}, fmt.Errorf("getting SlurmCluster: %w", err)
 	}
 
-	if maintenance.IsMaintenanceActive(slurmCluster.Spec.Maintenance) {
-		logger.Info(fmt.Sprintf(
-			"Slurm cluster maintenance status is %s, skip ActiveCheck reconcile",
-			*slurmCluster.Spec.Maintenance,
-		))
-		return ctrl.Result{}, nil
+	dependenciesReady, err := r.dependenciesReady(ctx, logger, check, slurmCluster)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if !dependenciesReady {
+		logger.Info("Not all dependencies are ready, requeueing in 1 minute.")
+		return ctrl.Result{
+			RequeueAfter: time.Minute,
+		}, nil
 	}
 
 	reconcileActiveChecksImpl := func() error {
@@ -321,4 +325,68 @@ func (r *ActiveCheckReconciler) runAfterCreation(
 	}
 
 	return r.Client.Create(ctx, render.RenderK8sJob(check, cronJob))
+}
+
+func (r *ActiveCheckReconciler) dependenciesReady(
+	ctx context.Context,
+	logger logr.Logger,
+	check *slurmv1alpha1.ActiveCheck,
+	slurmCluster *slurmv1.SlurmCluster,
+) (bool, error) {
+	if maintenance.IsMaintenanceActive(slurmCluster.Spec.Maintenance) {
+		logger.Info(fmt.Sprintf(
+			"Slurm cluster maintenance status is %s, skip ActiveCheck reconcile",
+			*slurmCluster.Spec.Maintenance,
+		))
+		return false, nil
+	}
+	if slurmCluster.Status.Phase == nil || *slurmCluster.Status.Phase != slurmv1.PhaseClusterAvailable {
+		logger.Info(fmt.Sprintf(
+			"Slurm cluster is not available yet: %s, skip ActiveCheck reconcile",
+			*slurmCluster.Status.Phase,
+		))
+		return false, nil
+	}
+
+	for _, prerequisiteCheckName := range check.Spec.DependsOn {
+		prerequisiteCheck := &slurmv1alpha1.ActiveCheck{}
+		err := r.Get(ctx, types.NamespacedName{
+			Namespace: check.Namespace,
+			Name:      prerequisiteCheckName,
+		}, prerequisiteCheck)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.Info(fmt.Sprintf(
+					"Prerequisite ActiveCheck %s is not created yet, skip ActiveCheck reconcile",
+					prerequisiteCheckName,
+				))
+				return false, nil
+			}
+			return false, fmt.Errorf("failed to get prerequisite ActiveCheck: %w", err)
+		}
+
+		// TODO: common status?
+		switch prerequisiteCheck.Spec.CheckType {
+		case "k8sJob": // TODO: const
+			if prerequisiteCheck.Status.K8sJobsStatus.LastJobStatus != consts.ActiveCheckK8sJobStatusComplete {
+				logger.Info(fmt.Sprintf(
+					"Prerequisite ActiveCheck %s is not ready yet, status %s",
+					prerequisiteCheckName, prerequisiteCheck.Status.K8sJobsStatus.LastJobStatus,
+				))
+				return false, nil
+			}
+		case "slurmJob": // TODO: const
+			if prerequisiteCheck.Status.SlurmJobsStatus.LastJobState != consts.ActiveCheckSlurmJobStatusComplete {
+				logger.Info(fmt.Sprintf(
+					"Prerequisite ActiveCheck %s is not ready yet, status %s",
+					prerequisiteCheckName, prerequisiteCheck.Status.SlurmJobsStatus.LastJobState,
+				))
+				return false, nil
+			}
+		default:
+			return false, fmt.Errorf("unknown prerequisite ActiveCheck type: %s", prerequisiteCheck.Spec.CheckType)
+		}
+	}
+
+	return true, nil
 }

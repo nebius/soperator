@@ -5,6 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "mem-bw"
+  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 16 * * *" # 1 time a day at 16:00 UTC
   suspend: false
@@ -26,3 +27,4 @@ spec:
   reactions:
     setCondition: false
     drainSlurmNode: false
+    commentSlurmNode: true
