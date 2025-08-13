@@ -157,20 +157,20 @@ func main() {
 	var cfg *rest.Config
 	var err error
 	if !flags.standalone {
-    cfg, err = rest.InClusterConfig()
-    if err != nil && flags.kubeconfigPath != "" {
-        log.Info("Failed to get in-cluster config, trying kubeconfig file", "kubeconfig", flags.kubeconfigPath, "error", err)
-        cfg, err = clientcmd.BuildConfigFromFlags("", flags.kubeconfigPath)
-        if err != nil {
-            log.Info("Failed to load kubeconfig file, continuing without Kubernetes client", "kubeconfig", flags.kubeconfigPath, "error", err)
-            cfg = nil
-        } else {
-            log.Info("Successfully loaded kubeconfig file")
+      cfg, err = rest.InClusterConfig()
+      if err != nil && flags.kubeconfigPath != "" {
+          log.Info("Failed to get in-cluster config, trying kubeconfig file", "kubeconfig", flags.kubeconfigPath, "error", err)
+          cfg, err = clientcmd.BuildConfigFromFlags("", flags.kubeconfigPath)
+          if err != nil {
+              log.Info("Failed to load kubeconfig file, continuing without Kubernetes client", "kubeconfig", flags.kubeconfigPath, "error", err)
+              cfg = nil
+          } else {
+              log.Info("Successfully loaded kubeconfig file")
+          }
+      } else if err != nil {
+          log.Info("Failed to get in-cluster config, continuing without Kubernetes client", "error", err)
         }
-    } else if err != nil {
-        log.Info("Failed to get in-cluster config, continuing without Kubernetes client", "error", err)
     }
-}
 	var ctrlClient client.Client
 	if cfg != nil {
 		ctrlClient, err = client.New(cfg, client.Options{})
