@@ -263,7 +263,7 @@ func (c *SlurmNodesController) createMaintenanceReservationForSlurmNode(
 		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 	}
 
-	err := addReservationForNode(ctx, MaintenanceReservationPrefix, slurmNodeName, slurmAPIClient)
+	err := addReservationForNode(ctx, MaintenanceReservationPrefix, slurmNodeName, slurmAPIClient, logger)
 	if err != nil {
 		return fmt.Errorf("create reservation: %w", err)
 	}

@@ -208,16 +208,12 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			}
 
 			if slurmJob.IsFailedState() {
-				if slurmJob.StateReason != "" {
-					failReasons = append(failReasons, slurmJob.StateReason)
-				}
-
 				err = executeFailureReactions(ctx, slurmJob, activeCheck, slurmAPIClient, logger)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("executing failure reactions: %w", err)
 				}
 			} else {
-				err = executeSuccessReactions(ctx, slurmJob, activeCheck, slurmAPIClient)
+				err = executeSuccessReactions(ctx, slurmJob, activeCheck, slurmAPIClient, logger)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("executing success reactions: %w", err)
 				}
@@ -295,7 +291,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 	return ctrl.Result{}, nil
 }
 
-func (r *ActiveCheckJobReconciler) updateSlurmNodeWithReaction(
+func updateSlurmNodeWithReaction(
 	ctx context.Context,
 	logger logr.Logger,
 	slurmJob slurmapi.Job,
@@ -386,43 +382,27 @@ func executeFailureReactions(ctx context.Context, slurmJob slurmapi.Job, activeC
 		failureReactions = &activeCheck.Spec.Reactions
 	}
 
-	if failureReactions.DrainSlurmNode {
-		nodes, err := slurmJob.GetNodeList()
+	
+	if failureReactions.DrainSlurmNode || failureReactions.CommentSlurmNode {
+		err := updateSlurmNodeWithReaction(ctx, logger, slurmJob, activeCheck, slurmAPIClient)
 		if err != nil {
-			return fmt.Errorf("get node list: %w", err)
-		}
-
-		reason := consts.SlurmNodeReasonActiveCheckFailedUnknown
-		if failureReactions.SetCondition {
-			reason = fmt.Sprintf("[HC] Failed %s: job %d [slurm_job]", activeCheck.Name, slurmJob.ID)
-		}
-		for _, node := range nodes {
-			resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, node,
-				api.V0041UpdateNodeMsg{
-					Reason: ptr.To(reason),
-					State:  ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateDRAIN}),
-				},
-			)
-			if err != nil {
-				return fmt.Errorf("post drain slurm node: %w", err)
+			return fmt.Errorf("update slurm node with reaction: %w", err)
 			}
-			if resp.JSON200.Errors != nil && len(*resp.JSON200.Errors) != 0 {
-				return fmt.Errorf("post drain returned errors: %v", *resp.JSON200.Errors)
-			}
-
-			logger.V(1).Info("slurm node state is updated to DRAIN")
-		}
 	}
 
-	err := processAddReservation(ctx, failureReactions.AddReservation, slurmJob, slurmAPIClient)
+	err := processAddReservation(ctx, failureReactions.AddReservation, slurmJob, slurmAPIClient, logger)
 	if err != nil {
 		return fmt.Errorf("adding reservation: %w", err)
 	}
 	return nil
 }
 
-func executeSuccessReactions(ctx context.Context, slurmJob slurmapi.Job, activeCheck *slurmv1alpha1.ActiveCheck, slurmAPIClient slurmapi.Client) error {
+func executeSuccessReactions(ctx context.Context, slurmJob slurmapi.Job, activeCheck *slurmv1alpha1.ActiveCheck, slurmAPIClient slurmapi.Client, logger logr.Logger) error {
+	
 	successReactions := activeCheck.Spec.SuccessReactions
+	if successReactions == nil {
+		return nil
+	}
 
 	err := processRemoveReservation(ctx, successReactions.RemoveReservation, slurmJob, slurmAPIClient)
 	if err != nil {
@@ -431,7 +411,7 @@ func executeSuccessReactions(ctx context.Context, slurmJob slurmapi.Job, activeC
 	return nil
 }
 
-func processAddReservation(ctx context.Context, addReservation *slurmv1alpha1.ReservationSpec, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client) error {
+func processAddReservation(ctx context.Context, addReservation *slurmv1alpha1.ReservationSpec, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client, logger logr.Logger) error {
 	if addReservation == nil || addReservation.Prefix == "" {
 		return nil
 	}
@@ -441,7 +421,7 @@ func processAddReservation(ctx context.Context, addReservation *slurmv1alpha1.Re
 		return fmt.Errorf("get node list: %w", err)
 	}
 	for _, node := range nodes {
-		err := addReservationForNode(ctx, addReservation.Prefix, node, slurmAPIClient)
+		err := addReservationForNode(ctx, addReservation.Prefix, node, slurmAPIClient, logger)
 		if err != nil {
 			return fmt.Errorf("post reservation: %w", err)
 		}
@@ -469,7 +449,16 @@ func processRemoveReservation(ctx context.Context, removeReservation *slurmv1alp
 	return nil
 }
 
-func addReservationForNode(ctx context.Context, reservationPrefix string, nodeName string, slurmAPIClient slurmapi.Client) error {
+func addReservationForNode(ctx context.Context, reservationPrefix string, nodeName string, slurmAPIClient slurmapi.Client, logger logr.Logger) error {
 	reservationName := naming.BuildSlurmReservationNameForNode(reservationPrefix, nodeName)
+
+	_, err := slurmAPIClient.GetReservation(ctx, reservationName)
+	if err == nil {
+		// Reservation is found, don't create a new one
+		logger.Info("previous reservation was found. Not creating a new reservation", "name", reservationName)
+		return nil
+	}
+
+	logger.Info("adding reservation for node", "name", reservationName)
 	return slurmAPIClient.PostMaintenanceReservation(ctx, reservationName, []string{nodeName})
 }

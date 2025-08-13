@@ -231,6 +231,32 @@ func (c *client) GetDiag(ctx context.Context) (*api.V0041OpenapiDiagResp, error)
 	return getDiagResp.JSON200, nil
 }
 
+func (c *client) GetReservation(ctx context.Context, name string) (Reservation, error) {
+	resp, err := c.client0043.SlurmV0043GetReservationWithResponse(ctx, name, &api0043.SlurmV0043GetReservationParams{})
+	if err != nil {
+		return Reservation{}, fmt.Errorf("get reservation: %w", err)
+	}
+	if resp == nil {
+		return Reservation{}, fmt.Errorf("get reservation response is nil")
+	}
+	if resp.JSON200 == nil {
+		return Reservation{}, fmt.Errorf("json200 field is nil")
+	}
+	if resp.JSON200.Errors != nil && len(*resp.JSON200.Errors) != 0 {
+		return Reservation{}, fmt.Errorf("get reservation responded with errors: %v", *resp.JSON200.Errors)
+	}
+
+	if reservationsLength := len(resp.JSON200.Reservations); reservationsLength != 1 {
+		return Reservation{}, fmt.Errorf("expected only one reservation in response for get %s request, got %d", name, reservationsLength)
+	}
+
+	reservation, err := ReservationFromAPI(resp.JSON200.Reservations[0])
+	if err != nil {
+		return Reservation{}, fmt.Errorf("convert reservation from api response: %w", err)
+	}
+	return reservation, nil
+}
+
 func (c *client) PostMaintenanceReservation(ctx context.Context, name string, nodeList []string) error {
 	resp, err := c.client0043.SlurmV0043PostReservationWithResponse(ctx, api0043.V0043ReservationDescMsg{
 		Name:     ptr.To(name),

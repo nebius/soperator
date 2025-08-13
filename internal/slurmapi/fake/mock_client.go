@@ -200,6 +200,63 @@ func (_c *MockClient_GetNode_Call) RunAndReturn(run func(context.Context, string
 	return _c
 }
 
+// GetReservation provides a mock function with given fields: ctx, name
+func (_m *MockClient) GetReservation(ctx context.Context, name string) (slurmapi.Reservation, error) {
+	ret := _m.Called(ctx, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetReservation")
+	}
+
+	var r0 slurmapi.Reservation
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (slurmapi.Reservation, error)); ok {
+		return rf(ctx, name)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) slurmapi.Reservation); ok {
+		r0 = rf(ctx, name)
+	} else {
+		r0 = ret.Get(0).(slurmapi.Reservation)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_GetReservation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetReservation'
+type MockClient_GetReservation_Call struct {
+	*mock.Call
+}
+
+// GetReservation is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+func (_e *MockClient_Expecter) GetReservation(ctx interface{}, name interface{}) *MockClient_GetReservation_Call {
+	return &MockClient_GetReservation_Call{Call: _e.mock.On("GetReservation", ctx, name)}
+}
+
+func (_c *MockClient_GetReservation_Call) Run(run func(ctx context.Context, name string)) *MockClient_GetReservation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockClient_GetReservation_Call) Return(_a0 slurmapi.Reservation, _a1 error) *MockClient_GetReservation_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_GetReservation_Call) RunAndReturn(run func(context.Context, string) (slurmapi.Reservation, error)) *MockClient_GetReservation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListJobs provides a mock function with given fields: ctx
 func (_m *MockClient) ListJobs(ctx context.Context) ([]slurmapi.Job, error) {
 	ret := _m.Called(ctx)
