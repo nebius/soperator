@@ -155,24 +155,30 @@ func main() {
 
 	// optional k8s
 	var cfg *rest.Config
-    if !flags.standalone {
-        cfg, icErr := rest.InClusterConfig()
-        if icErr != nil && flags.kubeconfigPath != "" {
-            cfg, kcErr := clientcmd.BuildConfigFromFlags("", flags.kubeconfigPath)
-            if kcErr != nil {
-                log.Info("No in-cluster config and kubeconfig-path failed; continuing standalone",
-                    "kubeconfig-path", flags.kubeconfigPath, "error", kcErr)
-            }
-        }
-    }
-    var ctrlClient client.Client
-    if cfg != nil {
-        if c, err := client.New(cfg, client.Options{}); err == nil {
-            ctrlClient = c
+	var err error
+	if !flags.standalone {
+    cfg, err = rest.InClusterConfig()
+    if err != nil && flags.kubeconfigPath != "" {
+        log.Info("Failed to get in-cluster config, trying kubeconfig file", "kubeconfig", flags.kubeconfigPath, "error", err)
+        cfg, err = clientcmd.BuildConfigFromFlags("", flags.kubeconfigPath)
+        if err != nil {
+            log.Info("Failed to load kubeconfig file, continuing without Kubernetes client", "kubeconfig", flags.kubeconfigPath, "error", err)
+            cfg = nil
         } else {
-            log.Info("Failed to create Kubernetes client; continuing standalone", "error", err)
+            log.Info("Successfully loaded kubeconfig file")
         }
+    } else if err != nil {
+        log.Info("Failed to get in-cluster config, continuing without Kubernetes client", "error", err)
     }
+}
+	var ctrlClient client.Client
+	if cfg != nil {
+		ctrlClient, err = client.New(cfg, client.Options{})
+		if err != nil {
+			log.Error(err, "Failed to create Kubernetes client, continuing in standalone mode")
+			ctrlClient = nil
+		}
+	}
 
 	// choose issuer: k8s → jwt; else static-token; else none
 	var issuer interface{ Issue(context.Context) (string, error) }
