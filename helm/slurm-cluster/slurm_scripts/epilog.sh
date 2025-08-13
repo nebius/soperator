@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euxo pipefail
+
 if ! /usr/bin/python3 -c "import sys; sys.exit(0)" >/dev/null 2>&1; then
     echo "Python is not installed or not working" >&2
     exit 0

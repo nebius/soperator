@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eox
+set -euxo pipefail
 
 echo "[$(date)] Map the Slurm job with DCGM metrics"
 

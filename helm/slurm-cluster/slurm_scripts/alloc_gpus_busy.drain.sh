@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eox pipefail
+set -euxo pipefail
 
 echo "[$(date)] Check if there are any pids running on allocated GPUs"
 
