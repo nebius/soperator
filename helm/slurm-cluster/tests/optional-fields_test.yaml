@@ -1,0 +1,324 @@
+suite: test optional kubebuilder default values
+templates:
+  - templates/slurm-cluster-cr.yaml
+tests:
+  # Test that mpiConfig is rendered when provided in values
+  - it: should include mpiConfig when provided in values
+    set:
+      clusterName: test-cluster
+      k8sNodeFilters:
+        - name: gpu
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: "nebius.com/node-group-id"
+                        operator: In
+                        values:
+                          - "test-node-group"
+      volumeSources:
+        - name: jail
+          persistentVolumeClaim:
+            claimName: "jail-pvc"
+      populateJail:
+        k8sNodeFilterName: "gpu"
+      slurmNodes:
+        accounting:
+          k8sNodeFilterName: "no-gpu"
+        controller:
+          k8sNodeFilterName: "no-gpu"
+          volumes:
+            spool:
+              volumeClaimTemplateSpec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 50Gi
+            jail:
+              volumeSourceName: "jail"
+        worker:
+          size: 2
+          k8sNodeFilterName: "gpu"
+          volumes:
+            jail:
+              volumeSourceName: "jail"
+        login:
+          size: 2
+          k8sNodeFilterName: "no-gpu"
+          sshRootPublicKeys:
+            - "ssh-ed25519 test-key"
+          sshdServiceType: "LoadBalancer"
+          volumes:
+            jail:
+              volumeSourceName: "jail"
+        exporter:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          volumes:
+            jail:
+              volumeSourceName: "jail"
+        rest:
+          size: 2
+          k8sNodeFilterName: "no-gpu"
+      sConfigController:
+        node:
+          k8sNodeFilterName: "system"
+          size: 1
+      images:
+        slurmctld: "test-image"
+        slurmrestd: "test-image"
+        slurmd: "test-image"
+        sshd: "test-image"
+        munge: "test-image"
+        populateJail: "test-image"
+        slurmdbd: "test-image"
+        soperatorExporter: "test-image"
+        sConfigController: "test-image"
+        mariaDB: "test-image"
+    asserts:
+      - exists:
+          path: spec.mpiConfig
+
+  # Test that exporter optional fields are included when provided in values
+  - it: should include exporter optional fields when provided in values
+    set:
+      clusterName: test-cluster
+      k8sNodeFilters:
+        - name: gpu
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: "nebius.com/node-group-id"
+                        operator: In
+                        values:
+                          - "test-node-group"
+      volumeSources:
+        - name: jail
+          persistentVolumeClaim:
+            claimName: "jail-pvc"
+      populateJail:
+        k8sNodeFilterName: "gpu"
+      slurmNodes:
+        accounting:
+          k8sNodeFilterName: "no-gpu"
+        controller:
+          k8sNodeFilterName: "no-gpu"
+          volumes:
+            spool:
+              volumeClaimTemplateSpec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 50Gi
+            jail:
+              volumeSourceName: "jail"
+        worker:
+          size: 2
+          k8sNodeFilterName: "gpu"
+          volumes:
+            jail:
+              volumeSourceName: "jail"
+        login:
+          size: 2
+          k8sNodeFilterName: "no-gpu"
+          sshRootPublicKeys:
+            - "ssh-ed25519 test-key"
+          sshdServiceType: "LoadBalancer"
+          volumes:
+            jail:
+              volumeSourceName: "jail"
+        exporter:
+          enabled: true
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          volumes:
+            jail:
+              volumeSourceName: "jail"
+        rest:
+          size: 2
+          k8sNodeFilterName: "no-gpu"
+      sConfigController:
+        node:
+          k8sNodeFilterName: "system"
+          size: 1
+      images:
+        slurmctld: "test-image"
+        slurmrestd: "test-image"
+        slurmd: "test-image"
+        sshd: "test-image"
+        munge: "test-image"
+        populateJail: "test-image"
+        slurmdbd: "test-image"
+        soperatorExporter: "test-image"
+        sConfigController: "test-image"
+        mariaDB: "test-image"
+    asserts:
+      - exists:
+          path: spec.slurmNodes.exporter.collectionInterval
+      - exists:
+          path: spec.slurmNodes.exporter.podMonitorConfig
+
+  # Test that worker maxUnavailable is included when provided in values
+  - it: should include worker maxUnavailable when provided in values
+    set:
+      clusterName: test-cluster
+      k8sNodeFilters:
+        - name: gpu
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: "nebius.com/node-group-id"
+                        operator: In
+                        values:
+                          - "test-node-group"
+      volumeSources:
+        - name: jail
+          persistentVolumeClaim:
+            claimName: "jail-pvc"
+      populateJail:
+        k8sNodeFilterName: "gpu"
+      slurmNodes:
+        accounting:
+          k8sNodeFilterName: "no-gpu"
+        controller:
+          k8sNodeFilterName: "no-gpu"
+          volumes:
+            spool:
+              volumeClaimTemplateSpec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 50Gi
+            jail:
+              volumeSourceName: "jail"
+        worker:
+          size: 2
+          k8sNodeFilterName: "gpu"
+          volumes:
+            jail:
+              volumeSourceName: "jail"
+        login:
+          size: 2
+          k8sNodeFilterName: "no-gpu"
+          sshRootPublicKeys:
+            - "ssh-ed25519 test-key"
+          sshdServiceType: "LoadBalancer"
+          volumes:
+            jail:
+              volumeSourceName: "jail"
+        exporter:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          volumes:
+            jail:
+              volumeSourceName: "jail"
+        rest:
+          size: 2
+          k8sNodeFilterName: "no-gpu"
+      sConfigController:
+        node:
+          k8sNodeFilterName: "system"
+          size: 1
+      images:
+        slurmctld: "test-image"
+        slurmrestd: "test-image"
+        slurmd: "test-image"
+        sshd: "test-image"
+        munge: "test-image"
+        populateJail: "test-image"
+        slurmdbd: "test-image"
+        soperatorExporter: "test-image"
+        sConfigController: "test-image"
+        mariaDB: "test-image"
+    asserts:
+      - exists:
+          path: spec.slurmNodes.worker.maxUnavailable
+
+  # Test that sConfigController optional fields are included when provided in values
+  - it: should include sConfigController optional fields when provided in values
+    set:
+      clusterName: test-cluster
+      k8sNodeFilters:
+        - name: gpu
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: "nebius.com/node-group-id"
+                        operator: In
+                        values:
+                          - "test-node-group"
+      volumeSources:
+        - name: jail
+          persistentVolumeClaim:
+            claimName: "jail-pvc"
+      populateJail:
+        k8sNodeFilterName: "gpu"
+      slurmNodes:
+        accounting:
+          k8sNodeFilterName: "no-gpu"
+        controller:
+          k8sNodeFilterName: "no-gpu"
+          volumes:
+            spool:
+              volumeClaimTemplateSpec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 50Gi
+            jail:
+              volumeSourceName: "jail"
+        worker:
+          size: 2
+          k8sNodeFilterName: "gpu"
+          volumes:
+            jail:
+              volumeSourceName: "jail"
+        login:
+          size: 2
+          k8sNodeFilterName: "no-gpu"
+          sshRootPublicKeys:
+            - "ssh-ed25519 test-key"
+          sshdServiceType: "LoadBalancer"
+          volumes:
+            jail:
+              volumeSourceName: "jail"
+        exporter:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          volumes:
+            jail:
+              volumeSourceName: "jail"
+        rest:
+          size: 2
+          k8sNodeFilterName: "no-gpu"
+      sConfigController:
+        node:
+          k8sNodeFilterName: "system"
+          size: 1
+      images:
+        slurmctld: "test-image"
+        slurmrestd: "test-image"
+        slurmd: "test-image"
+        sshd: "test-image"
+        munge: "test-image"
+        populateJail: "test-image"
+        slurmdbd: "test-image"
+        soperatorExporter: "test-image"
+        sConfigController: "test-image"
+        mariaDB: "test-image"
+    asserts:
+      - exists:
+          path: spec.sConfigController.reconfigurePollInterval
+      - exists:
+          path: spec.sConfigController.reconfigureWaitTimeout

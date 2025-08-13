@@ -1,0 +1,307 @@
+suite: test default values from kubebuilder annotations
+templates:
+  - templates/slurm-cluster-cr.yaml
+tests:
+  # Test clusterType default value
+  - it: should set clusterType to default gpu
+    set:
+      clusterName: test-cluster
+    asserts:
+      - equal:
+          path: spec.clusterType
+          value: gpu
+
+  # Test maintenance default value
+  - it: should set maintenance to default none
+    set:
+      clusterName: test-cluster
+    asserts:
+      - equal:
+          path: spec.maintenance
+          value: none
+
+  # Test slurmConfig default values
+  - it: should set slurmConfig default values
+    set:
+      clusterName: test-cluster
+    asserts:
+      - equal:
+          path: spec.slurmConfig.defMemPerNode
+          value: 1048576
+      - equal:
+          path: spec.slurmConfig.defCpuPerGPU
+          value: 4
+      - equal:
+          path: spec.slurmConfig.completeWait
+          value: 5
+      - equal:
+          path: spec.slurmConfig.prolog
+          value: "/opt/slurm_scripts/prolog.sh"
+      - equal:
+          path: spec.slurmConfig.epilog
+          value: "/opt/slurm_scripts/epilog.sh"
+      - equal:
+          path: spec.slurmConfig.taskPluginParam
+          value: ""
+      - equal:
+          path: spec.slurmConfig.maxJobCount
+          value: 10000
+      - equal:
+          path: spec.slurmConfig.minJobAge
+          value: 86400
+      - equal:
+          path: spec.slurmConfig.messageTimeout
+          value: 60
+      - equal:
+          path: spec.slurmConfig.topologyPlugin
+          value: "topology/tree"
+      - equal:
+          path: spec.slurmConfig.topologyParam
+          value: "SwitchAsNodeRank"
+
+  # Test mpiConfig default values  
+  - it: should set mpiConfig default values
+    set:
+      clusterName: test-cluster
+      mpiConfig:
+        pmixEnv: "OMPI_MCA_btl_tcp_if_include=eth0"
+    asserts:
+      - equal:
+          path: spec.mpiConfig.pmixEnv
+          value: "OMPI_MCA_btl_tcp_if_include=eth0"
+
+  # Test plugStackConfig default values
+  - it: should set plugStackConfig default values
+    set:
+      clusterName: test-cluster
+    asserts:
+      - equal:
+          path: spec.plugStackConfig.pyxis.required
+          value: true
+      - equal:
+          path: spec.plugStackConfig.pyxis.containerImageSave
+          value: "/var/cache/enroot-container-images/"
+      - equal:
+          path: spec.plugStackConfig.ncclDebug.required
+          value: false
+      - equal:
+          path: spec.plugStackConfig.ncclDebug.enabled
+          value: true
+      - equal:
+          path: spec.plugStackConfig.ncclDebug.logLevel
+          value: "INFO"
+      - equal:
+          path: spec.plugStackConfig.ncclDebug.outputToFile
+          value: true
+      - equal:
+          path: spec.plugStackConfig.ncclDebug.outputToStdOut
+          value: false
+      - equal:
+          path: spec.plugStackConfig.ncclDebug.outputDirectory
+          value: "/opt/soperator-outputs/nccl_logs"
+      - equal:
+          path: spec.plugStackConfig.customPlugins
+          value: []
+
+  # Test partitionConfiguration default values
+  - it: should set partitionConfiguration default values
+    set:
+      clusterName: test-cluster
+    asserts:
+      - equal:
+          path: spec.partitionConfiguration.configType
+          value: default
+      - equal:
+          path: spec.partitionConfiguration.rawConfig
+          value: []
+
+  # Test populateJail default values
+  - it: should set populateJail default values
+    set:
+      clusterName: test-cluster
+      populateJail:
+        k8sNodeFilterName: "gpu"
+    asserts:
+      - equal:
+          path: spec.populateJail.imagePullPolicy
+          value: "IfNotPresent"
+      - equal:
+          path: spec.populateJail.appArmorProfile
+          value: "unconfined"
+      - equal:
+          path: spec.populateJail.overwrite
+          value: false
+
+  # Test worker maxUnavailable default value
+  - it: should set worker maxUnavailable default value
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        worker:
+          size: 2
+          k8sNodeFilterName: "gpu"
+          maxUnavailable: "20%"
+    asserts:
+      - equal:
+          path: spec.slurmNodes.worker.maxUnavailable
+          value: "20%"
+
+  # Test worker cgroupVersion default value
+  - it: should set worker cgroupVersion default value
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        worker:
+          size: 2
+          k8sNodeFilterName: "gpu"
+    asserts:
+      - equal:
+          path: spec.slurmNodes.worker.cgroupVersion
+          value: "v2"
+
+  # Test worker enableGDRCopy default value
+  - it: should set worker enableGDRCopy default value
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        worker:
+          size: 2
+          k8sNodeFilterName: "gpu"
+    asserts:
+      - equal:
+          path: spec.slurmNodes.worker.enableGDRCopy
+          value: false
+
+  # Test worker sharedMemorySize default value
+  - it: should set worker sharedMemorySize default value
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        worker:
+          size: 2
+          k8sNodeFilterName: "gpu"
+    asserts:
+      - equal:
+          path: spec.slurmNodes.worker.volumes.sharedMemorySize
+          value: "64Gi"
+
+  # Test accounting defaults
+  - it: should set accounting default values
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        accounting:
+          k8sNodeFilterName: "no-gpu"
+    asserts:
+      - equal:
+          path: spec.slurmNodes.accounting.enabled
+          value: false
+      - equal:
+          path: spec.slurmNodes.accounting.slurmConfig.accountingStorageTRES
+          value: "CPU,Mem,Node,VMem,Gres/gpu"
+      - equal:
+          path: spec.slurmNodes.accounting.slurmConfig.jobAcctGatherType
+          value: "jobacct_gather/cgroup"
+      - equal:
+          path: spec.slurmNodes.accounting.slurmConfig.jobAcctGatherFrequency
+          value: 30
+      - equal:
+          path: spec.slurmNodes.accounting.slurmdbdConfig.archiveEvents
+          value: "yes"
+      - equal:
+          path: spec.slurmNodes.accounting.slurmdbdConfig.debugLevel
+          value: "info"
+      - equal:
+          path: spec.slurmNodes.accounting.slurmdbdConfig.tcpTimeout
+          value: 2
+
+  # Test login sshdServiceNodePort default value
+  - it: should set login sshdServiceNodePort default value
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        login:
+          size: 2
+          k8sNodeFilterName: "no-gpu"
+          sshdServiceType: "NodePort"
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.sshdServiceNodePort
+          value: 30022
+
+  # Test exporter defaults
+  - it: should set exporter default values
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        exporter:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          collectionInterval: "30s"
+          podMonitorConfig:
+            jobLabel: "slurm-exporter"
+    asserts:
+      - equal:
+          path: spec.slurmNodes.exporter.enabled
+          value: true
+      - equal:
+          path: spec.slurmNodes.exporter.collectionInterval
+          value: "30s"
+      - equal:
+          path: spec.slurmNodes.exporter.podMonitorConfig.jobLabel
+          value: "slurm-exporter"
+
+  # Test rest defaults
+  - it: should set rest default values
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        rest:
+          size: 2
+          k8sNodeFilterName: "no-gpu"
+    asserts:
+      - equal:
+          path: spec.slurmNodes.rest.enabled
+          value: false
+      - equal:
+          path: spec.slurmNodes.rest.threadCount
+          value: 3
+      - equal:
+          path: spec.slurmNodes.rest.maxConnections
+          value: 10
+
+  # Test sConfigController defaults
+  - it: should set sConfigController default values
+    set:
+      clusterName: test-cluster
+      sConfigController:
+        node:
+          size: 1
+          k8sNodeFilterName: "system"
+        reconfigurePollInterval: "20s"
+        reconfigureWaitTimeout: "1m"
+    asserts:
+      - equal:
+          path: spec.sConfigController.node.size
+          value: 1
+      - equal:
+          path: spec.sConfigController.runAsUid
+          value: 1001
+      - equal:
+          path: spec.sConfigController.runAsGid
+          value: 1001
+      - equal:
+          path: spec.sConfigController.reconfigurePollInterval
+          value: "20s"
+      - equal:
+          path: spec.sConfigController.reconfigureWaitTimeout
+          value: "1m"
+
+  # Test useDefaultAppArmorProfile default value
+  - it: should set useDefaultAppArmorProfile default value
+    set:
+      clusterName: test-cluster
+    asserts:
+      - equal:
+          path: spec.useDefaultAppArmorProfile
+          value: false
