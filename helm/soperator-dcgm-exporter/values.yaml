@@ -27,7 +27,7 @@ daemonSet:
     nvidia.com/gpu.deploy.dcgm-exporter: "true"
 
 serviceMonitor:
-  scrapeInterval: 15s
+  scrapeInterval: 30s
   metricRelabelings:
     - action: labeldrop
       regex: feature_node_kubernetes_io_.*|kubernetes_io_.*|nvidia_com_gpu.*
