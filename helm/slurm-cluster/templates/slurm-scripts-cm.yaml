@@ -52,9 +52,6 @@ data:
   cleanup_enroot.sh: |-
 {{ tpl (.Files.Get "slurm_scripts/cleanup_enroot.sh") . | indent 4 }}
 
-  free_shmem.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/free_shmem.sh") . | indent 4 }}
-
   hc_host_service.sh: |-
 {{ tpl (.Files.Get "slurm_scripts/hc_host_service.sh") . | indent 4 }}
 
@@ -72,6 +69,15 @@ data:
 
   health_checker.sh: |-
 {{ tpl (.Files.Get "slurm_scripts/health_checker.sh") . | indent 4 }}
+
+  job_tmpfs_delete.sh: |-
+{{ tpl (.Files.Get "slurm_scripts/job_tmpfs_delete.sh") . | indent 4 }}
+
+  job_tmpfs_delete_leftover.sh: |-
+{{ tpl (.Files.Get "slurm_scripts/job_tmpfs_delete_leftover.sh") . | indent 4 }}
+
+  job_tmpfs_recreate.sh: |-
+{{ tpl (.Files.Get "slurm_scripts/job_tmpfs_recreate.sh") . | indent 4 }}
 
   map_job_dcgm.sh: |-
 {{ tpl (.Files.Get "slurm_scripts/map_job_dcgm.sh") . | indent 4 }}

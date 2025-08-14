@@ -53,6 +53,7 @@ class Check(typing.NamedTuple):
   # What contexts this check should run in.
   # Supported values:
   # - "any" - any context
+  # - "none" - never run
   # - "prolog" - run in Slurm job Prolog script (on each node, before the job)
   # - "epilog" - run in Slurm job Epilog script (on each node, after the job)
   # - "hc_program" - run in Slurm HealthCheckProgram script (on each node, periodically)
