@@ -183,7 +183,7 @@ func main() {
 
 	// choose issuer: k8s → jwt; else static-token; else none
 	var issuer interface {
-		Issue(context.Context) (string, error)
+		Issue(ctx context.Context) (string, error)
 	}
 	switch {
 	case ctrlClient != nil:
