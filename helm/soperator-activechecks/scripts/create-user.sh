@@ -1,7 +1,5 @@
 set -ex
 
-apt update && apt install -y retry
-
 echo "Creating ${USER_NAME} user..."
 
 retry -d 2 -t 10 -- ssh -i /mnt/jail/opt/soperator-home/soperatorchecks/.ssh/soperatorchecks_id_ecdsa \

@@ -1,7 +1,5 @@
 set -e
 
-apt update && apt install -y retry
-
 echo "Checking ssh connectivity to login nodes..."
 for ((i=0; i<${NUM_OF_LOGIN_NODES}; i++)); do
   echo "Connecting to node login-$i via jumphost..."
