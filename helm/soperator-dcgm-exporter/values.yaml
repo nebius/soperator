@@ -6,8 +6,6 @@ metricsPort: 9400
 
 serviceType: ClusterIP
 
-scrapeInterval: 15s
-
 daemonSet:
   # init container
   toolkitValidation:
@@ -27,6 +25,14 @@ daemonSet:
 
   nodeSelector:
     nvidia.com/gpu.deploy.dcgm-exporter: "true"
+
+serviceMonitor:
+  scrapeInterval: 30s
+  metricRelabelings:
+    - action: labeldrop
+      regex: feature_node_kubernetes_io_.*|kubernetes_io_.*|nvidia_com_gpu.*
+    - action: labeldrop
+      regex: UUID|DCGM_FI_PROCESS_NAME|DCGM_FI_DEV_SERIAL|DCGM_FI_DEV_NAME|job|pci_bus_id|prometheus
 
 serviceAccount:
   annotations: {}

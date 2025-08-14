@@ -7,9 +7,11 @@ metadata:
   {{- include "soperator-dcgm-exporter.labels" . | nindent 4 }}
 spec:
   endpoints:
-  - interval: {{ .Values.scrapeInterval }}
+  - interval: {{ .Values.serviceMonitor.scrapeInterval }}
     path: /metrics
     port: gpu-metrics
+    metricRelabelings:
+    {{- toYaml .Values.serviceMonitor.metricRelabelings | nindent 4 }}
     relabelings:
     - action: replace
       regex: nvidia-dcgm-exporter
