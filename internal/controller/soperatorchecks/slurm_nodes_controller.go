@@ -40,6 +40,7 @@ type SlurmNodesController struct {
 	slurmAPIClients        *slurmapi.ClientSet
 	reconcileTimeout       time.Duration
 	enabledNodeReplacement bool
+	apiReader              client.Reader // Direct API reader for pagination
 }
 
 func NewSlurmNodesController(
@@ -49,6 +50,7 @@ func NewSlurmNodesController(
 	slurmAPIClients *slurmapi.ClientSet,
 	reconcileTimeout time.Duration,
 	enabledNodeReplacement bool,
+	apiReader client.Reader,
 ) *SlurmNodesController {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
@@ -57,6 +59,7 @@ func NewSlurmNodesController(
 		slurmAPIClients:        slurmAPIClients,
 		reconcileTimeout:       reconcileTimeout,
 		enabledNodeReplacement: enabledNodeReplacement,
+		apiReader:              apiReader,
 	}
 }
 
@@ -432,7 +435,7 @@ func (c *SlurmNodesController) processK8SNodesMaintenance(ctx context.Context) e
 	nextToken := ""
 
 	for {
-		listK8SNodesResp, err := listK8SNodes(ctx, c.Client, consts.DefaultLimit, nextToken)
+		listK8SNodesResp, err := listK8SNodesWithReader(ctx, c.apiReader, consts.DefaultLimit, nextToken)
 		if err != nil {
 			return fmt.Errorf("list k8s nodes: %w", err)
 		}

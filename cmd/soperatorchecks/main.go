@@ -223,6 +223,7 @@ func main() {
 		slurmAPIClients,
 		reconcileTimeout,
 		enabledNodeReplacement,
+		mgr.GetAPIReader(),
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create slurm nodes controller", "controller", soperatorchecks.SlurmNodesControllerName)
 		os.Exit(1)
