@@ -253,6 +253,7 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			soperatorNamespace,
+			mgr.GetAPIReader(),
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			setupLog.Error(
 				err,
