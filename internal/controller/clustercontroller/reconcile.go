@@ -485,6 +485,13 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 				}
 			}
 
+			if res, err := r.ValidateSConfigController(ctx, cluster, clusterValues); err != nil {
+				logger.Error(err, "Failed to validate Slurm SConfigController")
+				return ctrl.Result{}, fmt.Errorf("validating Slurm SConfigController: %w", err)
+			} else if res.Requeue {
+				return res, nil
+			}
+
 			return ctrl.Result{}, nil
 		},
 	)
@@ -559,6 +566,19 @@ func (r *SlurmClusterReconciler) setUpConditions(ctx context.Context, cluster *s
 						Status:  metav1.ConditionUnknown,
 						Reason:  "Reconciling",
 						Message: "Reconciling Slurm Login",
+					})
+				})
+			},
+		},
+		utils.MultiStepExecutionStep{
+			Name: "SConfigController",
+			Func: func(stepCtx context.Context) error {
+				return r.patchStatus(stepCtx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:    slurmv1.ConditionClusterSConfigControllerAvailable,
+						Status:  metav1.ConditionUnknown,
+						Reason:  "Reconciling",
+						Message: "Reconciling Slurm SConfigController",
 					})
 				})
 			},
