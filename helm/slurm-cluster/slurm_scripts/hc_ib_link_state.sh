@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eox pipefail
+set -euxo pipefail
 
 echo "[$(date)] Check if all IB ports have correct state, phys_state, and rate"
 

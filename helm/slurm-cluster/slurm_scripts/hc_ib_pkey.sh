@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eox pipefail
+set -euxo pipefail
 
 echo "[$(date)] Check if corresponding PKeys for each IB device and each port are equal"
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eox
+set -euxo pipefail
 
 echo "[$(date)] Check if node boot disk is full"
 

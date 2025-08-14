@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eox pipefail
+set -euxo pipefail
 
 echo "[$(date)] Check if no process are running on GPUs"
 

@@ -20,7 +20,7 @@ FROM cuda AS jail
 
 ARG SLURM_VERSION=24.11.6
 ARG GDRCOPY_VERSION=2.5
-ARG NC_HEALTH_CHECKER=1.0.0-145.250724
+ARG NC_HEALTH_CHECKER=1.0.0-146.250808
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -201,7 +201,9 @@ RUN chmod 644 /etc/passwd /etc/group && chown 0:0 /etc/passwd /etc/group && \
 # Setup the default $HOME directory content
 RUN rm -rf -- /etc/skel/..?* /etc/skel/.[!.]* /etc/skel/*
 COPY images/jail/skel/ /etc/skel/
-RUN chmod 755 /etc/skel/.slurm && \
+RUN chmod 755 /etc/skel/.ssh && \
+    chmod 600 /etc/skel/.ssh/config && \
+    chmod 755 /etc/skel/.slurm && \
     chmod 644 /etc/skel/.slurm/defaults && \
     chmod 644 /etc/skel/.bash_logout && \
     chmod 644 /etc/skel/.bashrc && \
@@ -215,7 +217,7 @@ RUN rm -rf -- /root/..?* /root/.[!.]* /root/* && \
     cp -a /etc/skel/. /root/
 
 # Copy createuser utility script
-COPY images/jail/scripts/createuser.sh /usr/bin/createuser
+COPY images/jail/scripts/createuser.py /usr/bin/createuser
 RUN chmod +x /usr/bin/createuser
 
 # Replace SSH "message of the day" scripts

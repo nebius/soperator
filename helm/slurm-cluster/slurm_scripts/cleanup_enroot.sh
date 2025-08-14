@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eox
+set -euxo pipefail
 
 echo "[$(date)] Cleanup leftover enroot containers if the job is restarted with the same ID"
 
