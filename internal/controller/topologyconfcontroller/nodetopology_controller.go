@@ -34,16 +34,19 @@ var (
 type NodeTopologyReconciler struct {
 	BaseReconciler
 	Namespace string
+	// https://github.com/kubernetes-sigs/controller-runtime/issues/3044
+	APIReader client.Reader // Direct API reader for pagination
 }
 
 func NewNodeTopologyReconciler(
-	client client.Client, scheme *runtime.Scheme, namespace string) *NodeTopologyReconciler {
+	client client.Client, scheme *runtime.Scheme, namespace string, apiReader client.Reader) *NodeTopologyReconciler {
 	return &NodeTopologyReconciler{
 		BaseReconciler: BaseReconciler{
 			Client: client,
 			Scheme: scheme,
 		},
 		Namespace: namespace,
+		APIReader: apiReader,
 	}
 }
 
@@ -258,13 +261,15 @@ func (r *NodeTopologyReconciler) initializeConfigMapWithAllNodes(ctx context.Con
 
 	for {
 		listOptions := []client.ListOption{
-			client.Limit(64),
+			client.Limit(consts.DefaultLimit),
 		}
 		if continueToken != "" {
 			listOptions = append(listOptions, client.Continue(continueToken))
 		}
 
-		if err := r.Client.List(ctx, nodeList, listOptions...); err != nil {
+		// Use APIReader instead of cached client for pagination support
+		// https://github.com/kubernetes-sigs/controller-runtime/issues/3044
+		if err := r.APIReader.List(ctx, nodeList, listOptions...); err != nil {
 			return fmt.Errorf("list nodes: %w", err)
 		}
 
