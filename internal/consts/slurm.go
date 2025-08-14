@@ -15,9 +15,10 @@ const (
 
 const (
 	SlurmNodeReasonHC              string = "[node_problem]"
+	SlurmNodeComputeMaintenance    string = SlurmNodeReasonHC + " compute_maintenance"
 	SlurmNodeReasonKillTaskFailed  string = "Kill task failed"
-	SlurmNodeReasonNodeReplacement string = "Soperator auto-healing: node replacement process"
-	SlurmNodeReasonNodeReboot      string = "Soperator auto-healing: node reboot process"
+	SlurmNodeReasonNodeReplacement string = SlurmNodeComputeMaintenance + ": node replacement process"
+	SlurmNodeReasonNodeReboot      string = SlurmNodeComputeMaintenance + ": node reboot process"
 )
 
 var SlurmNodeReasonsMap = map[string]struct{}{
