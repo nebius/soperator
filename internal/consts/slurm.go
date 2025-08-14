@@ -21,7 +21,7 @@ var (
 	SlurmNodeReasonNodeReboot      string = SlurmNodeComputeMaintenance + ": node reboot process"
 )
 
-// oreder of reasons is important, because we use it to determine if node is in maintenance
+// order of reasons is important, because we use it to determine if node is in maintenance
 var SlurmNodeReasonsList = []string{
 	SlurmNodeReasonKillTaskFailed,
 	SlurmNodeReasonNodeReplacement,
