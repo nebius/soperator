@@ -49,7 +49,7 @@ type Flags struct {
 	collectionInterval string
 
 	// modes
-	kubeconfigPath string 
+	kubeconfigPath string
 	standalone     bool
 
 	// auth
@@ -143,6 +143,7 @@ func parseFlags() Flags {
 
 // simple issuer that returns a fixed token
 type staticIssuer struct{ tok string }
+
 func (s staticIssuer) Issue(_ context.Context) (string, error) { return s.tok, nil }
 
 func main() {
@@ -157,20 +158,20 @@ func main() {
 	var cfg *rest.Config
 	var err error
 	if !flags.standalone {
-      cfg, err = rest.InClusterConfig()
-      if err != nil && flags.kubeconfigPath != "" {
-          log.Info("Failed to get in-cluster config, trying kubeconfig file", "kubeconfig", flags.kubeconfigPath, "error", err)
-          cfg, err = clientcmd.BuildConfigFromFlags("", flags.kubeconfigPath)
-          if err != nil {
-              log.Info("Failed to load kubeconfig file, continuing without Kubernetes client", "kubeconfig", flags.kubeconfigPath, "error", err)
-              cfg = nil
-          } else {
-              log.Info("Successfully loaded kubeconfig file")
-          }
-      } else if err != nil {
-          log.Info("Failed to get in-cluster config, continuing without Kubernetes client", "error", err)
-        }
-    }
+		cfg, err = rest.InClusterConfig()
+		if err != nil && flags.kubeconfigPath != "" {
+			log.Info("Failed to get in-cluster config, trying kubeconfig file", "kubeconfig", flags.kubeconfigPath, "error", err)
+			cfg, err = clientcmd.BuildConfigFromFlags("", flags.kubeconfigPath)
+			if err != nil {
+				log.Info("Failed to load kubeconfig file, continuing without Kubernetes client", "kubeconfig", flags.kubeconfigPath, "error", err)
+				cfg = nil
+			} else {
+				log.Info("Successfully loaded kubeconfig file")
+			}
+		} else if err != nil {
+			log.Info("Failed to get in-cluster config, continuing without Kubernetes client", "error", err)
+		}
+	}
 	var ctrlClient client.Client
 	if cfg != nil {
 		ctrlClient, err = client.New(cfg, client.Options{})
@@ -181,7 +182,9 @@ func main() {
 	}
 
 	// choose issuer: k8s → jwt; else static-token; else none
-	var issuer interface{ Issue(context.Context) (string, error) }
+	var issuer interface {
+		Issue(context.Context) (string, error)
+	}
 	switch {
 	case ctrlClient != nil:
 		issuer = jwt.NewToken(ctrlClient).For(slurmClusterID, "root").WithRegistry(jwt.NewTokenRegistry().Build())
