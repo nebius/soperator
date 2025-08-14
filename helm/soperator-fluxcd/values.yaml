@@ -78,7 +78,8 @@ observability:
   enabled: true
   clusterName: soperator
   publicEndpointEnabled: true
-  projectId: project-e00h61cxzwnf6zksvdn77
+  logsProjectId: default-project-id
+  metricsProjectId: default-project-id
   region: eu-north1
   opentelemetry:
     enabled: true
