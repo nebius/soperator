@@ -140,7 +140,7 @@ func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types
 				continue
 			}
 
-			for wellKnownReason := range consts.SlurmNodeReasonsMap {
+			for _, wellKnownReason := range consts.SlurmNodeReasonsList {
 				if strings.Contains(node.Reason.Reason, wellKnownReason) {
 					// For simplicity, we keep only well known part
 					node.Reason.OriginalReason = node.Reason.Reason
@@ -173,12 +173,12 @@ func (c *SlurmNodesController) processDegradedNode(
 	}
 
 	switch node.Reason.Reason {
-	case consts.SlurmNodeReasonHC:
-		return c.processHealthCheckFailed(ctx, k8sNode, slurmClusterName, node, node.Reason)
 	case consts.SlurmNodeReasonKillTaskFailed, consts.SlurmNodeReasonNodeReboot:
 		return c.processKillTaskFailed(ctx, k8sNode, slurmClusterName, node)
 	case consts.SlurmNodeReasonNodeReplacement:
 		return c.processSlurmNodeMaintenance(ctx, k8sNode, slurmClusterName, node.Name)
+	case consts.SlurmNodeReasonHC:
+		return c.processHealthCheckFailed(ctx, k8sNode, slurmClusterName, node, node.Reason)
 	default:
 		return fmt.Errorf("unknown node reason: node name %s, reason %s, instance id %s",
 			node.Name, node.Reason, node.InstanceID)

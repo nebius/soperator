@@ -13,7 +13,7 @@ const (
 	SlurmDefaultDebugLevel = "verbose"
 )
 
-const (
+var (
 	SlurmNodeReasonHC              string = "[node_problem]"
 	SlurmNodeComputeMaintenance    string = SlurmNodeReasonHC + " compute_maintenance"
 	SlurmNodeReasonKillTaskFailed  string = "Kill task failed"
@@ -21,11 +21,12 @@ const (
 	SlurmNodeReasonNodeReboot      string = SlurmNodeComputeMaintenance + ": node reboot process"
 )
 
-var SlurmNodeReasonsMap = map[string]struct{}{
-	SlurmNodeReasonHC:              {},
-	SlurmNodeReasonKillTaskFailed:  {},
-	SlurmNodeReasonNodeReplacement: {},
-	SlurmNodeReasonNodeReboot:      {},
+// oreder of reasons is important, because we use it to determine if node is in maintenance
+var SlurmNodeReasonsList = []string{
+	SlurmNodeReasonKillTaskFailed,
+	SlurmNodeReasonNodeReplacement,
+	SlurmNodeReasonNodeReboot,
+	SlurmNodeReasonHC,
 }
 
 const (
