@@ -1,6 +1,6 @@
 FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS controller_slurmdbd
 
-ARG SLURM_VERSION=24.11.6
+ARG SLURM_VERSION=25.05.2
 
 ARG DEBIAN_FRONTEND=noninteractive
 

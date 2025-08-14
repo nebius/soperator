@@ -30,7 +30,7 @@ CHART_ACTIVECHECK_PATH        = $(CHART_PATH)/soperator-activechecks
 CHART_DCGM_EXPORTER_PATH      = $(CHART_PATH)/soperator-dcgm-exporter
 CHART_SOPERATOR_NOTIFIER_PATH = $(CHART_PATH)/soperator-notifier
 
-SLURM_VERSION		  		= 24.11.6
+SLURM_VERSION		  		= 25.05.2
 UBUNTU_VERSION		  		?= noble
 VERSION               		= $(shell cat VERSION)
 
