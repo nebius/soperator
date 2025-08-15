@@ -1,0 +1,23 @@
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: ActiveCheck
+metadata:
+  name: "soperator-outputs-logs-cleaner"
+spec:
+  checkType: "k8sJob"
+  schedule: "0 */2 * * *" # every 2 hours
+  name: "soperator-outputs-logs-cleaner"
+  slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
+  suspend: false
+  runAfterCreation: false
+  k8sJobSpec:
+    jobContainer:
+      command:
+        - bash
+        - -c
+        - |
+{{ .Files.Get "scripts/soperator-outputs-logs-cleaner.sh" | indent 10 }}
+      image: {{ .Values.images.k8sJob | quote }}
+      volumeMounts:
+{{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
+      volumes:
+{{ toYaml .Values.jobContainer.volumes | indent 8 }}

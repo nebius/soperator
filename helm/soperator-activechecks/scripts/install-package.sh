@@ -1,7 +1,5 @@
 set -e
 
-apt update && apt install -y retry
-
 echo "Installing libcudnn8"
 
 # If we have more than one login node and create user on one of them,
