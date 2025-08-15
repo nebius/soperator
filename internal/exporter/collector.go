@@ -274,7 +274,9 @@ func (c *MetricsCollector) slurmNodeMetrics(slurmNodes []slurmapi.Node) iter.Seq
 				strconv.FormatBool(node.IsReservedState()),
 				node.Address,
 			}
-			yield(prometheus.MustNewConstMetric(c.nodeInfo, prometheus.GaugeValue, 1, labels...))
+			if !yield(prometheus.MustNewConstMetric(c.nodeInfo, prometheus.GaugeValue, 1, labels...)) {
+				return
+			}
 		}
 	}
 }
@@ -310,7 +312,9 @@ func (c *MetricsCollector) slurmJobMetrics(ctx context.Context, slurmJobs []slur
 				timeToUnixString(job.EndTime),
 				finishedTime,
 			}
-			yield(prometheus.MustNewConstMetric(c.jobInfo, prometheus.GaugeValue, 1, jobLabels...))
+			if !yield(prometheus.MustNewConstMetric(c.jobInfo, prometheus.GaugeValue, 1, jobLabels...)) {
+				return
+			}
 
 			// Calculate job duration
 			if job.StartTime != nil && job.StartTime.Unix() != 0 {
@@ -324,7 +328,9 @@ func (c *MetricsCollector) slurmJobMetrics(ctx context.Context, slurmJobs []slur
 				if !endTime.IsZero() {
 					duration := endTime.Sub(job.StartTime.Time).Seconds()
 					if duration > 0 {
-						yield(prometheus.MustNewConstMetric(c.jobDuration, prometheus.GaugeValue, duration, job.GetIDString()))
+						if !yield(prometheus.MustNewConstMetric(c.jobDuration, prometheus.GaugeValue, duration, job.GetIDString())) {
+							return
+						}
 					}
 				}
 			}
@@ -336,7 +342,9 @@ func (c *MetricsCollector) slurmJobMetrics(ctx context.Context, slurmJobs []slur
 			}
 			for _, nodeName := range nodeList {
 				jobNodeLabels := []string{job.GetIDString(), nodeName}
-				yield(prometheus.MustNewConstMetric(c.jobNode, prometheus.GaugeValue, 1, jobNodeLabels...))
+				if !yield(prometheus.MustNewConstMetric(c.jobNode, prometheus.GaugeValue, 1, jobNodeLabels...)) {
+					return
+				}
 			}
 		}
 	}
@@ -351,19 +359,25 @@ func (c *MetricsCollector) slurmRPCMetrics(diag *api.V0041OpenapiDiagResp) iter.
 		stats := diag.Statistics
 
 		if stats.ServerThreadCount != nil {
-			yield(prometheus.MustNewConstMetric(c.controllerServerThreadCount, prometheus.GaugeValue, float64(*stats.ServerThreadCount)))
+			if !yield(prometheus.MustNewConstMetric(c.controllerServerThreadCount, prometheus.GaugeValue, float64(*stats.ServerThreadCount))) {
+				return
+			}
 		}
 		if stats.RpcsByMessageType != nil {
 			for _, rpc := range *stats.RpcsByMessageType {
 				messageType := rpc.MessageType
 
 				if rpc.Count > 0 {
-					yield(prometheus.MustNewConstMetric(c.rpcCallsTotal, prometheus.CounterValue, float64(rpc.Count), messageType))
+					if !yield(prometheus.MustNewConstMetric(c.rpcCallsTotal, prometheus.CounterValue, float64(rpc.Count), messageType)) {
+						return
+					}
 				}
 
 				if rpc.TotalTime > 0 {
 					durationSeconds := float64(rpc.TotalTime) / 1_000_000
-					yield(prometheus.MustNewConstMetric(c.rpcDurationSecondsTotal, prometheus.CounterValue, durationSeconds, messageType))
+					if !yield(prometheus.MustNewConstMetric(c.rpcDurationSecondsTotal, prometheus.CounterValue, durationSeconds, messageType)) {
+						return
+					}
 				}
 			}
 		}
@@ -374,12 +388,16 @@ func (c *MetricsCollector) slurmRPCMetrics(diag *api.V0041OpenapiDiagResp) iter.
 				userID := strconv.Itoa(int(userRpc.UserId))
 
 				if userRpc.Count > 0 {
-					yield(prometheus.MustNewConstMetric(c.rpcUserCallsTotal, prometheus.CounterValue, float64(userRpc.Count), user, userID))
+					if !yield(prometheus.MustNewConstMetric(c.rpcUserCallsTotal, prometheus.CounterValue, float64(userRpc.Count), user, userID)) {
+						return
+					}
 				}
 
 				if userRpc.TotalTime > 0 {
 					durationSeconds := float64(userRpc.TotalTime) / 1_000_000
-					yield(prometheus.MustNewConstMetric(c.rpcUserDurationSecondsTotal, prometheus.CounterValue, durationSeconds, user, userID))
+					if !yield(prometheus.MustNewConstMetric(c.rpcUserDurationSecondsTotal, prometheus.CounterValue, durationSeconds, user, userID)) {
+						return
+					}
 				}
 			}
 		}
@@ -446,7 +464,9 @@ func (c *MetricsCollector) nodeTimeToRestoreMetrics(state *metricsCollectorState
 
 		for nodeName, restoration := range state.recentRestorations {
 			// Emit the metric
-			yield(prometheus.MustNewConstMetric(c.nodeTimeToRestore, prometheus.GaugeValue, restoration.duration, nodeName))
+			if !yield(prometheus.MustNewConstMetric(c.nodeTimeToRestore, prometheus.GaugeValue, restoration.duration, nodeName)) {
+				return
+			}
 
 			// Increment scrape count
 			restoration.scrapeCount++
