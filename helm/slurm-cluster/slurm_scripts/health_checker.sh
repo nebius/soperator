@@ -19,13 +19,13 @@ echo "Platform: $platform"
 # Define health-checker checks to run
 case "$CHECKS_CONTEXT" in
   "prolog")
-    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg"
+    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg,ib_link"
     ;;
   "epilog")
-    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dcgmi_diag_r1,dmesg"
+    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dcgmi_diag_r1,dmesg,ib_link"
     ;;
   "hc_program")
-    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg"
+    checks="module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg,ib_link"
     ;;
   *)
     echo "Unknown context: $CHECKS_CONTEXT" >&2
