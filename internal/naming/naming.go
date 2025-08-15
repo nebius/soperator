@@ -256,3 +256,7 @@ func BuildRoleSConfigControllerName(clusterName string) string {
 func BuildConfigMapSbatchScriptName(scriptName string) string {
 	return "sbatch-script-" + scriptName
 }
+
+func BuildSlurmReservationNameForNode(reservationPrefix string, nodeName string) string {
+	return fmt.Sprintf("%s-%s", reservationPrefix, nodeName)
+}

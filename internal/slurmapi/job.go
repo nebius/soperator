@@ -159,6 +159,10 @@ func (j Job) IsFailedState() bool {
 	return j.State == string(api.V0041JobInfoJobStateFAILED)
 }
 
+func (j Job) IsCompletedState() bool {
+	return j.State == string(api.V0041JobInfoJobStateCOMPLETED)
+}
+
 func parseNodeList(nodeString string) ([]string, error) {
 	if nodeString == "" {
 		return nil, nil
