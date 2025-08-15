@@ -3,11 +3,19 @@ package clustercontroller
 import (
 	"context"
 	"fmt"
+	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
+	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/rest"
 	"nebius.ai/slurm-operator/internal/render/sconfigcontroller"
 	"nebius.ai/slurm-operator/internal/utils"
@@ -131,4 +139,60 @@ func (r SlurmClusterReconciler) ReconcileSConfigController(
 	}
 	logger.V(1).Info("Reconciled SConfigController")
 	return nil
+}
+
+func (r SlurmClusterReconciler) ValidateSConfigController(
+	ctx context.Context,
+	cluster *slurmv1.SlurmCluster,
+	clusterValues *values.SlurmCluster,
+) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
+	existing := &appsv1.Deployment{}
+	err := r.Get(
+		ctx,
+		types.NamespacedName{
+			Namespace: clusterValues.Namespace,
+			Name:      naming.BuildDeploymentName(consts.ComponentTypeSConfigController),
+		},
+		existing,
+	)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+		}
+		logger.Error(err, "Failed to get SConfigController Deployment")
+		return ctrl.Result{}, fmt.Errorf("getting SConfigController Deployment: %w", err)
+	}
+
+	targetReplicas := int32(1)
+	if existing.Spec.Replicas != nil {
+		targetReplicas = *existing.Spec.Replicas
+	}
+	if existing.Status.AvailableReplicas != targetReplicas {
+		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+			status.SetCondition(metav1.Condition{
+				Type:   slurmv1.ConditionClusterSConfigControllerAvailable,
+				Status: metav1.ConditionFalse, Reason: "NotAvailable",
+				Message: "Slurm SConfigController is not available yet",
+			})
+			status.ReadySConfigController = &existing.Status.AvailableReplicas
+		}); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 10}, nil
+	} else {
+		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+			status.SetCondition(metav1.Condition{
+				Type:   slurmv1.ConditionClusterSConfigControllerAvailable,
+				Status: metav1.ConditionTrue, Reason: "Available",
+				Message: "Slurm SConfigController is available",
+			})
+			status.ReadySConfigController = &existing.Status.AvailableReplicas
+		}); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	return ctrl.Result{}, nil
 }

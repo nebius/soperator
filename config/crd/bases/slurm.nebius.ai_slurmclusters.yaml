@@ -19,22 +19,26 @@ spec:
       jsonPath: .status.phase
       name: Status
       type: string
-    - description: The controller node filter
-      jsonPath: .spec.slurmNodes.controller.k8sNodeFilterName
+    - description: Whether controllers are ready
+      jsonPath: .status.conditions[?(@.type=="ControllersAvailable")].status
       name: Controllers
       type: string
-    - description: The number of worker nodes
-      jsonPath: .spec.slurmNodes.worker.size
+    - description: The number of ready worker pods
+      jsonPath: .status.readyWorkers
       name: Workers
       type: integer
-    - description: The number of login nodes
-      jsonPath: .spec.slurmNodes.login.size
+    - description: The number of ready login pods
+      jsonPath: .status.readyLogin
       name: Login
       type: integer
-    - description: Whether accounting is enabled
-      jsonPath: .spec.slurmNodes.accounting.enabled
+    - description: Whether SConfigController is ready
+      jsonPath: .status.conditions[?(@.type=="SConfigControllerAvailable")].status
+      name: SConfigCtrl
+      type: string
+    - description: Whether accounting is ready
+      jsonPath: .status.conditions[?(@.type=="AccountingAvailable")].status
       name: Accounting
-      type: boolean
+      type: string
     name: v1
     schema:
       openAPIV3Schema:
@@ -17958,6 +17962,19 @@ spec:
                 type: array
               phase:
                 type: string
+              readyLogin:
+                description: ReadyLogin represents the number of ready login pods
+                format: int32
+                type: integer
+              readySConfigController:
+                description: ReadySConfigController represents the number of ready
+                  SConfigController pods
+                format: int32
+                type: integer
+              readyWorkers:
+                description: ReadyWorkers represents the number of ready worker pods
+                format: int32
+                type: integer
             type: object
         type: object
     served: true

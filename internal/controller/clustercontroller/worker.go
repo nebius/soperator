@@ -300,6 +300,7 @@ func (r SlurmClusterReconciler) ValidateWorkers(
 				Status: metav1.ConditionFalse, Reason: "NotAvailable",
 				Message: "Slurm workers are not available yet",
 			})
+			status.ReadyWorkers = &existing.Status.AvailableReplicas
 		}); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -311,6 +312,7 @@ func (r SlurmClusterReconciler) ValidateWorkers(
 				Status: metav1.ConditionTrue, Reason: "Available",
 				Message: "Slurm workers are available",
 			})
+			status.ReadyWorkers = &existing.Status.AvailableReplicas
 		}); err != nil {
 			return ctrl.Result{}, err
 		}

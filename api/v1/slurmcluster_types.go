@@ -1173,12 +1173,13 @@ type PodMonitorConfig struct {
 const (
 	KindSlurmCluster = "SlurmCluster"
 
-	ConditionClusterCommonAvailable      = "CommonAvailable"
-	ConditionClusterControllersAvailable = "ControllersAvailable"
-	ConditionClusterWorkersAvailable     = "WorkersAvailable"
-	ConditionClusterLoginAvailable       = "LoginAvailable"
-	ConditionClusterAccountingAvailable  = "AccountingAvailable"
-	ConditionClusterPopulateJailMode     = "PopulateJailMode"
+	ConditionClusterCommonAvailable            = "CommonAvailable"
+	ConditionClusterControllersAvailable       = "ControllersAvailable"
+	ConditionClusterWorkersAvailable           = "WorkersAvailable"
+	ConditionClusterLoginAvailable             = "LoginAvailable"
+	ConditionClusterAccountingAvailable        = "AccountingAvailable"
+	ConditionClusterSConfigControllerAvailable = "SConfigControllerAvailable"
+	ConditionClusterPopulateJailMode           = "PopulateJailMode"
 
 	PhaseClusterReconciling  = "Reconciling"
 	PhaseClusterNotAvailable = "Not available"
@@ -1192,6 +1193,18 @@ type SlurmClusterStatus struct {
 
 	// +kubebuilder:validation:Optional
 	Phase *string `json:"phase,omitempty"`
+
+	// ReadyWorkers represents the number of ready worker pods
+	// +kubebuilder:validation:Optional
+	ReadyWorkers *int32 `json:"readyWorkers,omitempty"`
+
+	// ReadyLogin represents the number of ready login pods
+	// +kubebuilder:validation:Optional
+	ReadyLogin *int32 `json:"readyLogin,omitempty"`
+
+	// ReadySConfigController represents the number of ready SConfigController pods
+	// +kubebuilder:validation:Optional
+	ReadySConfigController *int32 `json:"readySConfigController,omitempty"`
 }
 
 func (s *SlurmClusterStatus) SetCondition(condition metav1.Condition) {
@@ -1207,10 +1220,11 @@ func (s *SlurmClusterStatus) SetCondition(condition metav1.Condition) {
 // SlurmCluster is the Schema for the slurmclusters API
 //
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.phase`,description="The phase of Slurm cluster creation."
-// +kubebuilder:printcolumn:name="Controllers",type=string,JSONPath=`.spec.slurmNodes.controller.k8sNodeFilterName`,description="The controller node filter"
-// +kubebuilder:printcolumn:name="Workers",type=integer,JSONPath=`.spec.slurmNodes.worker.size`,description="The number of worker nodes"
-// +kubebuilder:printcolumn:name="Login",type=integer,JSONPath=`.spec.slurmNodes.login.size`,description="The number of login nodes"
-// +kubebuilder:printcolumn:name="Accounting",type=boolean,JSONPath=`.spec.slurmNodes.accounting.enabled`,description="Whether accounting is enabled"
+// +kubebuilder:printcolumn:name="Controllers",type=string,JSONPath=`.status.conditions[?(@.type=="ControllersAvailable")].status`,description="Whether controllers are ready"
+// +kubebuilder:printcolumn:name="Workers",type=integer,JSONPath=`.status.readyWorkers`,description="The number of ready worker pods"
+// +kubebuilder:printcolumn:name="Login",type=integer,JSONPath=`.status.readyLogin`,description="The number of ready login pods"
+// +kubebuilder:printcolumn:name="SConfigCtrl",type=string,JSONPath=`.status.conditions[?(@.type=="SConfigControllerAvailable")].status`,description="Whether SConfigController is ready"
+// +kubebuilder:printcolumn:name="Accounting",type=string,JSONPath=`.status.conditions[?(@.type=="AccountingAvailable")].status`,description="Whether accounting is ready"
 type SlurmCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
