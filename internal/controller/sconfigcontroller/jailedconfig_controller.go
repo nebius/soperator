@@ -47,6 +47,7 @@ import (
 	v0041 "github.com/SlinkyProject/slurm-client/api/v0041"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
@@ -173,11 +174,24 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			logger.V(1).Info("JailedConfig resource not found. Ignoring since object must have been be deleted")
 			return ctrl.Result{}, nil
 		}
-		// Error reading the object - requeue the request.
 		return ctrl.Result{}, fmt.Errorf("getting JailedConfig: %w", err)
 	}
 
-	err = r.initializeConditions(ctx, jailedConfig)
+	// Check if this JailedConfig has aggregation key
+	aggregationKey, hasAggregationKey := jailedConfig.Labels[consts.LabelJailedAggregationKey]
+	if !hasAggregationKey {
+		// Process individual JailedConfig without aggregation
+		return r.reconcileIndividual(ctx, jailedConfig)
+	}
+
+	// Process JailedConfig with aggregation
+	return r.reconcileWithAggregation(ctx, jailedConfig, aggregationKey)
+}
+
+func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig) (ctrl.Result, error) {
+	logger := logf.FromContext(ctx)
+
+	err := r.initializeConditions(ctx, jailedConfig)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("initializing conditions: %w", err)
 	}
@@ -210,7 +224,6 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		Namespace: jailedConfig.Namespace,
 	}, configMap)
 	if err != nil {
-		// Error reading the object - requeue the request.
 		return ctrl.Result{}, fmt.Errorf("getting ConfigMap: %w", err)
 	}
 
@@ -221,7 +234,6 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	jailPayload, err := makePayload(jailedConfig.Spec.Items, configMap, defaultMode)
 	if err != nil {
-		// Error preparing payload - requeue the request.
 		return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("making JailedConfig payload: %w", err))
 	}
 
@@ -292,6 +304,164 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
 	}
+
+	return ctrl.Result{}, nil
+}
+
+func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig, aggregationKey string) (ctrl.Result, error) {
+	logger := logf.FromContext(ctx)
+
+	// Get all JailedConfigs with the same aggregation key in the same namespace
+	jailedConfigs := &slurmv1alpha1.JailedConfigList{}
+	err := r.Client.List(ctx, jailedConfigs,
+		client.InNamespace(jailedConfig.Namespace),
+		client.MatchingLabels{consts.LabelJailedAggregationKey: aggregationKey},
+	)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("listing JailedConfigs with aggregation key %q: %w", aggregationKey, err)
+	}
+
+	logger.V(1).Info("Found JailedConfigs for aggregation", "count", len(jailedConfigs.Items), "aggregationKey", aggregationKey)
+
+	for i := range jailedConfigs.Items {
+		config := &jailedConfigs.Items[i]
+		err := r.initializeConditions(ctx, config)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("initializing conditions for %s/%s: %w", config.Namespace, config.Name, err)
+		}
+
+		err = r.setConditions(
+			ctx,
+			config,
+			metav1.Condition{
+				Type:    string(slurmv1alpha1.FilesWritten),
+				Status:  metav1.ConditionFalse,
+				Reason:  slurmv1alpha1.ReasonRefresh,
+				Message: "Refreshing files in jail FS (aggregated)",
+			},
+			metav1.Condition{
+				Type:    string(slurmv1alpha1.UpdateActionsCompleted),
+				Status:  metav1.ConditionFalse,
+				Reason:  slurmv1alpha1.ReasonRefresh,
+				Message: "Refreshing files in jail FS (aggregated)",
+			},
+		)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("setting conditions for %s/%s: %w", config.Namespace, config.Name, err)
+		}
+	}
+
+	var totalFilesCount int
+	filesBatch := NewReplacedFilesBatch(r.fs)
+	defer func() {
+		err = errors.Join(err, filesBatch.Cleanup())
+	}()
+
+	for i := range jailedConfigs.Items {
+		config := &jailedConfigs.Items[i]
+
+		configMap := &corev1.ConfigMap{}
+		err = r.Client.Get(ctx, types.NamespacedName{
+			Name:      config.Spec.ConfigMap.Name,
+			Namespace: config.Namespace,
+		}, configMap)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("getting ConfigMap %s for %s/%s: %w", config.Spec.ConfigMap.Name, config.Namespace, config.Name, err)
+		}
+
+		defaultMode := config.Spec.DefaultMode
+		if defaultMode == nil {
+			defaultMode = ptr.To(slurmv1alpha1.DefaultMode)
+		}
+
+		jailPayload, err := makePayload(config.Spec.Items, configMap, defaultMode)
+		if err != nil {
+			return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("making JailedConfig payload for %s/%s: %w", config.Namespace, config.Name, err))
+		}
+
+		for path := range jailPayload {
+			if err := validatePayloadPath(path); err != nil {
+				return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("invalid config path %q in %s/%s: %w", path, config.Namespace, config.Name, err))
+			}
+		}
+
+		totalFilesCount += len(jailPayload)
+
+		for path, payload := range jailPayload {
+			err = filesBatch.Replace(path, payload.Data, os.FileMode(payload.Mode))
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("replacing file %q for %s/%s: %w", path, config.Namespace, config.Name, err)
+			}
+		}
+	}
+
+	logger.V(1).Info("Going to write files for aggregated group", "totalFiles", totalFilesCount, "configs", len(jailedConfigs.Items))
+
+	for i := range jailedConfigs.Items {
+		config := &jailedConfigs.Items[i]
+		err = r.setConditions(
+			ctx,
+			config,
+			metav1.Condition{
+				Type:    string(slurmv1alpha1.FilesWritten),
+				Status:  metav1.ConditionTrue,
+				Reason:  slurmv1alpha1.ReasonSuccess,
+				Message: "Files were written to jail FS (aggregated)",
+			},
+		)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("setting files written condition for %s/%s: %w", config.Namespace, config.Name, err)
+		}
+	}
+
+	// Finish writing all files to disk
+	err = filesBatch.Finish()
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("finishing replacing files in FS: %w", err)
+	}
+
+	logger.V(1).Info("Finished syncing caches for written files (aggregated)")
+
+	needsReconfigure := false
+	for i := range jailedConfigs.Items {
+		config := &jailedConfigs.Items[i]
+		for _, action := range config.Spec.UpdateActions {
+			if action == slurmv1alpha1.UpdateActionReconfigure {
+				needsReconfigure = true
+				break
+			}
+		}
+		if needsReconfigure {
+			break
+		}
+	}
+
+	if needsReconfigure {
+		logger.V(1).Info("Performing reconfigure for aggregated group", "aggregationKey", aggregationKey)
+		err = r.reconfigureCluster(ctx)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("reconfiguring Slurm cluster for aggregated group: %w", err)
+		}
+	}
+
+	for i := range jailedConfigs.Items {
+		config := &jailedConfigs.Items[i]
+		err = r.setConditions(
+			ctx,
+			config,
+			metav1.Condition{
+				Type:    string(slurmv1alpha1.UpdateActionsCompleted),
+				Status:  metav1.ConditionTrue,
+				Reason:  slurmv1alpha1.ReasonSuccess,
+				Message: "Update actions were called successfully (aggregated)",
+			},
+		)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("setting update actions completed condition for %s/%s: %w", config.Namespace, config.Name, err)
+		}
+	}
+
+	logger.V(1).Info("Completed aggregated reconciliation", "aggregationKey", aggregationKey, "configs", len(jailedConfigs.Items))
 
 	return ctrl.Result{}, nil
 }
