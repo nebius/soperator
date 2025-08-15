@@ -40,6 +40,7 @@ type SlurmNodesController struct {
 	slurmAPIClients        *slurmapi.ClientSet
 	reconcileTimeout       time.Duration
 	enabledNodeReplacement bool
+	apiReader              client.Reader // Direct API reader for pagination
 }
 
 func NewSlurmNodesController(
@@ -49,6 +50,7 @@ func NewSlurmNodesController(
 	slurmAPIClients *slurmapi.ClientSet,
 	reconcileTimeout time.Duration,
 	enabledNodeReplacement bool,
+	apiReader client.Reader,
 ) *SlurmNodesController {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
@@ -57,6 +59,7 @@ func NewSlurmNodesController(
 		slurmAPIClients:        slurmAPIClients,
 		reconcileTimeout:       reconcileTimeout,
 		enabledNodeReplacement: enabledNodeReplacement,
+		apiReader:              apiReader,
 	}
 }
 
@@ -140,7 +143,7 @@ func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types
 				continue
 			}
 
-			for wellKnownReason := range consts.SlurmNodeReasonsMap {
+			for _, wellKnownReason := range consts.SlurmNodeReasonsList {
 				if strings.Contains(node.Reason.Reason, wellKnownReason) {
 					// For simplicity, we keep only well known part
 					node.Reason.OriginalReason = node.Reason.Reason
@@ -173,12 +176,12 @@ func (c *SlurmNodesController) processDegradedNode(
 	}
 
 	switch node.Reason.Reason {
-	case consts.SlurmNodeReasonHC:
-		return c.processHealthCheckFailed(ctx, k8sNode, slurmClusterName, node, node.Reason)
 	case consts.SlurmNodeReasonKillTaskFailed, consts.SlurmNodeReasonNodeReboot:
 		return c.processKillTaskFailed(ctx, k8sNode, slurmClusterName, node)
 	case consts.SlurmNodeReasonNodeReplacement:
 		return c.processSlurmNodeMaintenance(ctx, k8sNode, slurmClusterName, node.Name)
+	case consts.SlurmNodeReasonHC:
+		return c.processHealthCheckFailed(ctx, k8sNode, slurmClusterName, node, node.Reason)
 	default:
 		return fmt.Errorf("unknown node reason: node name %s, reason %s, instance id %s",
 			node.Name, node.Reason, node.InstanceID)
@@ -432,7 +435,7 @@ func (c *SlurmNodesController) processK8SNodesMaintenance(ctx context.Context) e
 	nextToken := ""
 
 	for {
-		listK8SNodesResp, err := listK8SNodes(ctx, c.Client, consts.DefaultLimit, nextToken)
+		listK8SNodesResp, err := listK8SNodesWithReader(ctx, c.apiReader, consts.DefaultLimit, nextToken)
 		if err != nil {
 			return fmt.Errorf("list k8s nodes: %w", err)
 		}
