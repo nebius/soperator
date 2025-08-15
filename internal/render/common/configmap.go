@@ -48,11 +48,14 @@ func RenderJailedConfigSlurmConfigs(cluster *values.SlurmCluster) slurmv1alpha1.
 	// This must match ConfigMap name in `RenderConfigMapSlurmConfigs`
 	name := naming.BuildConfigMapSlurmConfigsName(cluster.Name)
 
+	labels := RenderLabels(consts.ComponentTypeController, cluster.Name)
+	labels[consts.LabelJailedAggregationKey] = consts.LabelJailedAggregationCommonValue
+
 	return slurmv1alpha1.JailedConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapSlurmConfigsName(cluster.Name),
 			Namespace: cluster.Namespace,
-			Labels:    RenderLabels(consts.ComponentTypeController, cluster.Name),
+			Labels:    labels,
 		},
 		Spec: slurmv1alpha1.JailedConfigSpec{
 			ConfigMap: slurmv1alpha1.ConfigMapReference{
