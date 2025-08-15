@@ -293,7 +293,7 @@ spec:
           {{- if $hasPublicEndpoint }}
             label:
               cluster: "%{CLUSTER_NAME}"
-              container_id: {{ .Values.observability.projectId  }}
+              container_id: {{ .Values.observability.metricsProjectId  }}
               {{- if and $hasExternalLabels (gt (len $hasExternalLabels) 0) }}
               {{- toYaml $hasExternalLabels | nindent 14 }}
               {{- end }}
@@ -308,7 +308,7 @@ spec:
           {{- $hasRemoteWrite := and $hasVmagentSpec $hasVmagentSpec.remoteWrite }}
           {{- $remoteWriteNotEmpty := and $hasRemoteWrite (gt (len $hasVmagentSpec.remoteWrite) 0) }}
           {{- if $hasPublicEndpoint }}
-            - url: https://write.monitoring.{{ .Values.observability.region }}.nebius.cloud/projects/{{ .Values.observability.projectId }}/buckets/soperator/prometheus
+            - url: https://write.monitoring.{{ .Values.observability.region }}.nebius.cloud/projects/{{ .Values.observability.metricsProjectId }}/buckets/soperator/prometheus
               inlineUrlRelabelConfig:
                 - action: labeldrop
                   regex: feature_node_kubernetes_io_.*|kubernetes_io_.*|nvidia_com_gpu.*

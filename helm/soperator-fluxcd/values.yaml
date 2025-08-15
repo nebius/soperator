@@ -78,7 +78,8 @@ observability:
   enabled: true
   clusterName: soperator
   publicEndpointEnabled: true
-  projectId: project-e00h61cxzwnf6zksvdn77
+  logsProjectId: default-project-id
+  metricsProjectId: default-project-id
   region: eu-north1
   opentelemetry:
     enabled: true
@@ -184,7 +185,7 @@ observability:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 1.21.10
+    version: 1.21.11
     namespace: soperator
     releaseName: soperator-dcgm-exporter
     values:
@@ -203,7 +204,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.21.10
+  version: 1.21.11
   namespace: soperator
   releaseName: soperator
   values: null
@@ -219,7 +220,7 @@ soperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.21.10
+  version: 1.21.11
   namespace: "soperator-system"
   releaseName: soperator-controller
   values:
@@ -282,7 +283,7 @@ notifier:
   enabled: false
   interval: 5m
   timeout: 5m
-  version: 1.21.10
+  version: 1.21.11
   namespace: monitoring-system
   releaseName: soperator-notifier
   values:
