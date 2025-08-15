@@ -46,3 +46,7 @@ spec:
       name: backup-schedule
       valuesKey: values.yaml
       optional: true
+    - kind: ConfigMap
+      name: terraform-opentelemetry-collector
+      optional: true
+      valuesKey: values.yaml
