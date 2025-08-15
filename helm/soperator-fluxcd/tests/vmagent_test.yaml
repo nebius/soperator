@@ -4,7 +4,7 @@ templates:
 
 set:
   observability:
-    projectId: default-project-id
+    metricsProjectId: default-project-id
 
 tests:
   - it: should handle null projectId gracefully
@@ -14,7 +14,7 @@ tests:
         vmStack:
           enabled: true
           publicEndpointEnabled: true
-        projectId: null
+        metricsProjectId: null
     asserts:
       - hasDocuments:
           count: 1
@@ -32,7 +32,7 @@ tests:
         vmStack:
           enabled: true
           publicEndpointEnabled: true
-      projectId: ""
+      metricsProjectId: ""
     asserts:
       - hasDocuments:
           count: 1
@@ -152,7 +152,7 @@ tests:
         vmStack:
           enabled: true
           publicEndpointEnabled: true
-        projectId: "test-project_123.dev"
+        metricsProjectId: "test-project_123.dev"
     asserts:
       - hasDocuments:
           count: 1
