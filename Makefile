@@ -101,7 +101,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	GOEXPERIMENT=synctest go test ./... # TODO: remove "GOEXPERIMENT=synctest" from everywhere after upgrading to Go 1.25.
+	GOEXPERIMENT=synctest go test $(or $(TESTARGS),./...) # TODO: remove "GOEXPERIMENT=synctest" from everywhere after upgrading to Go 1.25.
 
 .PHONY: test-coverage
 test-coverage: manifests generate fmt vet envtest ## Run tests with coverage.

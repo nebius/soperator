@@ -208,6 +208,7 @@ func main() {
 
 	clusterExporter := exporter.NewClusterExporter(
 		slurmAPIClient,
+		ctrlClient,
 		exporter.Params{
 			SlurmAPIServer:     flags.slurmAPIServer,
 			SlurmClusterID:     slurmClusterID,
