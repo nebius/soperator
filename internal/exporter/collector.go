@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"maps"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -172,13 +173,14 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 	newState := &metricsCollectorState{
 		lastGPUSecondsUpdate:    previousState.lastGPUSecondsUpdate,
 		nodeNotUsableTimestamps: make(map[string]time.Time),
-		recentRestorations:      make(map[string]float64),
+		recentRestorations:      make(map[string]restorationInfo),
 	}
 
 	// Copy existing timestamps from previous state
-	for nodeName, timestamp := range previousState.nodeNotUsableTimestamps {
-		newState.nodeNotUsableTimestamps[nodeName] = timestamp
-	}
+	maps.Copy(newState.nodeNotUsableTimestamps, previousState.nodeNotUsableTimestamps)
+
+	// Copy existing recent restorations from previous state
+	maps.Copy(newState.recentRestorations, previousState.recentRestorations)
 
 	// Always update state with whatever data we successfully collect (even if partial)
 	defer func() {
@@ -416,7 +418,10 @@ func (c *MetricsCollector) updateNodeStateTransitions(currentNodes []slurmapi.No
 				// Transition to usable - calculate MTTR if we have timestamp
 				if startTime, hasTimestamp := newState.nodeNotUsableTimestamps[currentNode.Name]; hasTimestamp {
 					duration := currentTime.Sub(startTime).Seconds()
-					newState.recentRestorations[currentNode.Name] = duration
+					newState.recentRestorations[currentNode.Name] = restorationInfo{
+						duration:    duration,
+						scrapeCount: 0,
+					}
 					delete(newState.nodeNotUsableTimestamps, currentNode.Name)
 				}
 			}
@@ -437,11 +442,24 @@ func (c *MetricsCollector) updateNodeStateTransitions(currentNodes []slurmapi.No
 // nodeTimeToRestoreMetrics generates MTTR metrics for recently restored nodes
 func (c *MetricsCollector) nodeTimeToRestoreMetrics(state *metricsCollectorState) iter.Seq[prometheus.Metric] {
 	return func(yield func(prometheus.Metric) bool) {
-		for nodeName, duration := range state.recentRestorations {
-			yield(prometheus.MustNewConstMetric(c.nodeTimeToRestore, prometheus.GaugeValue, duration, nodeName))
+		nodesToDelete := make([]string, 0)
+
+		for nodeName, restoration := range state.recentRestorations {
+			// Emit the metric
+			yield(prometheus.MustNewConstMetric(c.nodeTimeToRestore, prometheus.GaugeValue, restoration.duration, nodeName))
+
+			// Increment scrape count
+			restoration.scrapeCount++
+			state.recentRestorations[nodeName] = restoration
+
+			// Mark for deletion if we've reached the persistence limit
+			if restoration.scrapeCount >= mttrPersistenceScrapes {
+				nodesToDelete = append(nodesToDelete, nodeName)
+			}
 		}
-		// Clear recent restorations after emitting metrics
-		for nodeName := range state.recentRestorations {
+
+		// Clean up restorations that have been scraped enough times
+		for _, nodeName := range nodesToDelete {
 			delete(state.recentRestorations, nodeName)
 		}
 	}

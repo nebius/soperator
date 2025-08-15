@@ -1171,7 +1171,7 @@ func TestMetricsCollector_MTTR_Tracking(t *testing.T) {
 		}
 		assert.True(t, foundMTTR, "Expected to find MTTR metric after node restoration")
 
-		// Fourth collection: MTTR metric should not appear again (cleared after emission)
+		// Fourth collection: MTTR metric should still appear (persists for multiple scrapes)
 		mockClient.On("ListNodes", mock.Anything).Return(restoredNodes, nil).Once()
 		mockClient.On("ListJobs", mock.Anything).Return([]slurmapi.Job{}, nil).Once()
 		mockClient.On("GetDiag", mock.Anything).Return(&api.V0041OpenapiDiagResp{}, nil).Once()
@@ -1188,11 +1188,78 @@ func TestMetricsCollector_MTTR_Tracking(t *testing.T) {
 			metricsText = append(metricsText, toPrometheusLikeString(t, metric))
 		}
 
-		// MTTR metric should not appear again
+		// MTTR metric should still appear (second scrape)
+		foundMTTR = false
+		for _, metric := range metricsText {
+			if strings.Contains(metric, "slurm_node_time_to_restore_seconds") {
+				foundMTTR = true
+				break
+			}
+		}
+		assert.True(t, foundMTTR, "Expected MTTR metric to persist for multiple scrapes (scrape 2)")
+
+		// Fifth collection: MTTR metric should still appear (third scrape)
+		mockClient.On("ListNodes", mock.Anything).Return(restoredNodes, nil).Once()
+		mockClient.On("ListJobs", mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+		mockClient.On("GetDiag", mock.Anything).Return(&api.V0041OpenapiDiagResp{}, nil).Once()
+
+		err = collector.updateState(ctx)
+		require.NoError(t, err)
+
+		ch = make(chan prometheus.Metric, 100)
+		collector.Collect(ch)
+		close(ch)
+
+		metricsText = []string{}
+		for metric := range ch {
+			metricsText = append(metricsText, toPrometheusLikeString(t, metric))
+		}
+
+		// MTTR metric should still appear (third scrape - last one)
+		foundMTTR = false
+		for _, metric := range metricsText {
+			if strings.Contains(metric, "slurm_node_time_to_restore_seconds") {
+				foundMTTR = true
+				break
+			}
+		}
+		assert.True(t, foundMTTR, "Expected MTTR metric to persist for multiple scrapes (scrape 3)")
+
+		// Sixth collection: MTTR metric should not appear anymore (exceeded persistence limit)
+		mockClient.On("ListNodes", mock.Anything).Return(restoredNodes, nil).Once()
+		mockClient.On("ListJobs", mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+		mockClient.On("GetDiag", mock.Anything).Return(&api.V0041OpenapiDiagResp{}, nil).Once()
+
+		err = collector.updateState(ctx)
+		require.NoError(t, err)
+
+		ch = make(chan prometheus.Metric, 100)
+		collector.Collect(ch)
+		close(ch)
+
+		metricsText = []string{}
+		for metric := range ch {
+			metricsText = append(metricsText, toPrometheusLikeString(t, metric))
+		}
+
+		// MTTR metric should not appear anymore (exceeded persistence limit)
 		for _, metric := range metricsText {
 			assert.NotContains(t, metric, "slurm_node_time_to_restore_seconds")
 		}
 
 		mockClient.AssertExpectations(t)
 	}()
+}
+
+func TestMTTRPersistenceConfiguration(t *testing.T) {
+	// Test that the persistence constant is set to a reasonable value
+	assert.Equal(t, 3, mttrPersistenceScrapes, "MTTR persistence should be set to 3 scrapes")
+
+	// Test restorationInfo struct
+	info := restorationInfo{
+		duration:    42.5,
+		scrapeCount: 1,
+	}
+	assert.Equal(t, 42.5, info.duration)
+	assert.Equal(t, 1, info.scrapeCount)
 }
