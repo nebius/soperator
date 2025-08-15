@@ -55,15 +55,6 @@ data:
   hc_host_service.sh: |-
 {{ tpl (.Files.Get "slurm_scripts/hc_host_service.sh") . | indent 4 }}
 
-  hc_ib_counters.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/hc_ib_counters.sh") . | indent 4 }}
-
-  hc_ib_link_state.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/hc_ib_link_state.sh") . | indent 4 }}
-
-  hc_ib_pkey.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/hc_ib_pkey.sh") . | indent 4 }}
-
   hc_xid.sh: |-
 {{ tpl (.Files.Get "slurm_scripts/hc_xid.sh") . | indent 4 }}
 
