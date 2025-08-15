@@ -22222,7 +22222,7 @@ spec:
                           acctGatherProfileType:
                             type: string
                           jobAcctGatherFrequency:
-                            default: 30
+                            default: 0
                             type: integer
                           jobAcctGatherParams:
                             enum:

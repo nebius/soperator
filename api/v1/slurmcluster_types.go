@@ -728,7 +728,7 @@ type AccountingSlurmConf struct {
 	// +kubebuilder:default="jobacct_gather/cgroup"
 	JobAcctGatherType *string `json:"jobAcctGatherType,omitempty"`
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=30
+	// +kubebuilder:default=0
 	JobAcctGatherFrequency *int `json:"jobAcctGatherFrequency,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum="NoShared";"UsePss";"OverMemoryKill";"DisableGPUAcct"
