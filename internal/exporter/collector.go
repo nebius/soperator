@@ -20,12 +20,13 @@ import (
 type MetricsCollector struct {
 	slurmAPIClient slurmapi.Client
 
-	nodeInfo       *prometheus.Desc
-	jobInfo        *prometheus.Desc
-	jobNode        *prometheus.Desc
-	jobDuration    *prometheus.Desc
-	nodeGPUSeconds *prometheus.CounterVec
-	nodeFails      *prometheus.CounterVec
+	nodeInfo          *prometheus.Desc
+	jobInfo           *prometheus.Desc
+	jobNode           *prometheus.Desc
+	jobDuration       *prometheus.Desc
+	nodeTimeToRestore *prometheus.Desc
+	nodeGPUSeconds    *prometheus.CounterVec
+	nodeFails         *prometheus.CounterVec
 
 	rpcCallsTotal               *prometheus.Desc
 	rpcDurationSecondsTotal     *prometheus.Desc
@@ -46,10 +47,11 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 		slurmAPIClient: slurmAPIClient,
 		Monitoring:     NewMonitoringMetrics(),
 
-		nodeInfo:    prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "address"}, nil),
-		jobInfo:     prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "user_id", "standard_error", "standard_output", "array_job_id", "array_task_id", "submit_time", "start_time", "end_time", "finished_time"}, nil),
-		jobNode:     prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
-		jobDuration: prometheus.NewDesc("slurm_job_duration_seconds", "Slurm job duration in seconds", []string{"job_id"}, nil),
+		nodeInfo:          prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "address"}, nil),
+		jobInfo:           prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "user_id", "standard_error", "standard_output", "array_job_id", "array_task_id", "submit_time", "start_time", "end_time", "finished_time"}, nil),
+		jobNode:           prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
+		jobDuration:       prometheus.NewDesc("slurm_job_duration_seconds", "Slurm job duration in seconds", []string{"job_id"}, nil),
+		nodeTimeToRestore: prometheus.NewDesc("slurm_node_time_to_restore_seconds", "Time taken for a node to restore from not usable state", []string{"node_name"}, nil),
 		nodeGPUSeconds: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "slurm_node_gpu_seconds_total",
 			Help: "Total GPU seconds on Slurm nodes",
@@ -69,6 +71,19 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 	collector.state.Store(newMetricsCollectorState())
 
 	return collector
+}
+
+// isNodeNotUsable determines if a node is in a not usable state
+func isNodeNotUsable(node slurmapi.Node) bool {
+	// Returns true for DOWN+* states
+	if node.IsDownState() {
+		return true
+	}
+	// Returns true for IDLE+DRAIN+* states (but not RUNNING+DRAIN)
+	if node.BaseState() == api.V0041NodeStateIDLE && node.IsDrainState() {
+		return true
+	}
+	return false
 }
 
 func (c *MetricsCollector) updateGPUSecondsMetrics(ctx context.Context, nodes []slurmapi.Node, previousTime time.Time, currentTime time.Time) time.Time {
@@ -128,6 +143,7 @@ func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.jobInfo
 	ch <- c.jobNode
 	ch <- c.jobDuration
+	ch <- c.nodeTimeToRestore
 	c.nodeGPUSeconds.Describe(ch)
 	c.nodeFails.Describe(ch)
 
@@ -154,7 +170,14 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 	}
 
 	newState := &metricsCollectorState{
-		lastGPUSecondsUpdate: previousState.lastGPUSecondsUpdate,
+		lastGPUSecondsUpdate:    previousState.lastGPUSecondsUpdate,
+		nodeNotUsableTimestamps: make(map[string]time.Time),
+		recentRestorations:      make(map[string]float64),
+	}
+
+	// Copy existing timestamps from previous state
+	for nodeName, timestamp := range previousState.nodeNotUsableTimestamps {
+		newState.nodeNotUsableTimestamps[nodeName] = timestamp
 	}
 
 	// Always update state with whatever data we successfully collect (even if partial)
@@ -168,6 +191,8 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 	}
 	newState.nodes = nodes
 
+	// Update MTTR tracking before updating failure metrics
+	c.updateNodeStateTransitions(nodes, newState, previousState.nodes)
 	c.updateNodeFailureMetrics(nodes, previousState.nodes)
 	newState.lastGPUSecondsUpdate = c.updateGPUSecondsMetrics(ctx, nodes, previousState.lastGPUSecondsUpdate, time.Now())
 
@@ -224,6 +249,10 @@ func (c *MetricsCollector) collectImpl(ch chan<- prometheus.Metric) {
 
 	for slurmJobMetric := range c.slurmJobMetrics(ctx, state.jobs) {
 		ch <- slurmJobMetric
+	}
+
+	for mttrMetric := range c.nodeTimeToRestoreMetrics(state) {
+		ch <- mttrMetric
 	}
 
 	for rpcMetric := range c.slurmRPCMetrics(state.diag) {
@@ -351,6 +380,69 @@ func (c *MetricsCollector) slurmRPCMetrics(diag *api.V0041OpenapiDiagResp) iter.
 					yield(prometheus.MustNewConstMetric(c.rpcUserDurationSecondsTotal, prometheus.CounterValue, durationSeconds, user, userID))
 				}
 			}
+		}
+	}
+}
+
+// updateNodeStateTransitions tracks transitions between usable and not usable states for MTTR calculation
+func (c *MetricsCollector) updateNodeStateTransitions(currentNodes []slurmapi.Node, newState *metricsCollectorState, previousNodes []slurmapi.Node) {
+	currentTime := time.Now()
+
+	// Note: timestamps are already copied in updateState function
+
+	// Create map of current nodes for efficient lookup
+	currentNodesMap := make(map[string]slurmapi.Node)
+	for _, node := range currentNodes {
+		currentNodesMap[node.Name] = node
+	}
+
+	// Create map of previous nodes for efficient lookup
+	previousNodesMap := make(map[string]slurmapi.Node)
+	for _, node := range previousNodes {
+		previousNodesMap[node.Name] = node
+	}
+
+	// Check all current nodes for state transitions
+	for _, currentNode := range currentNodes {
+		if previousNode, exists := previousNodesMap[currentNode.Name]; exists {
+			// Node existed before - check for transitions
+			wasNotUsable := isNodeNotUsable(previousNode)
+			isNotUsable := isNodeNotUsable(currentNode)
+
+			if !wasNotUsable && isNotUsable {
+				// Transition to not usable - record timestamp
+				newState.nodeNotUsableTimestamps[currentNode.Name] = currentTime
+			} else if wasNotUsable && !isNotUsable {
+				// Transition to usable - calculate MTTR if we have timestamp
+				if startTime, hasTimestamp := newState.nodeNotUsableTimestamps[currentNode.Name]; hasTimestamp {
+					duration := currentTime.Sub(startTime).Seconds()
+					newState.recentRestorations[currentNode.Name] = duration
+					delete(newState.nodeNotUsableTimestamps, currentNode.Name)
+				}
+			}
+		} else if isNodeNotUsable(currentNode) {
+			// New node in not usable state - record timestamp
+			newState.nodeNotUsableTimestamps[currentNode.Name] = currentTime
+		}
+	}
+
+	// Clean up timestamps for nodes that no longer exist
+	for nodeName := range newState.nodeNotUsableTimestamps {
+		if _, exists := currentNodesMap[nodeName]; !exists {
+			delete(newState.nodeNotUsableTimestamps, nodeName)
+		}
+	}
+}
+
+// nodeTimeToRestoreMetrics generates MTTR metrics for recently restored nodes
+func (c *MetricsCollector) nodeTimeToRestoreMetrics(state *metricsCollectorState) iter.Seq[prometheus.Metric] {
+	return func(yield func(prometheus.Metric) bool) {
+		for nodeName, duration := range state.recentRestorations {
+			yield(prometheus.MustNewConstMetric(c.nodeTimeToRestore, prometheus.GaugeValue, duration, nodeName))
+		}
+		// Clear recent restorations after emitting metrics
+		for nodeName := range state.recentRestorations {
+			delete(state.recentRestorations, nodeName)
 		}
 	}
 }
