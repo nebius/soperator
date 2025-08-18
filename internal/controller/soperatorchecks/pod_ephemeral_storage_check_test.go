@@ -464,7 +464,10 @@ func TestGetEphemeralStorageStatsFromNode(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v1/nodes/test-node/proxy/stats/summary" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(mockStats)
+			if err := json.NewEncoder(w).Encode(mockStats); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		} else {
 			http.NotFound(w, r)
 		}
