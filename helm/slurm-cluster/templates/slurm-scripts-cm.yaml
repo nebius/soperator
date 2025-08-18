@@ -52,14 +52,14 @@ data:
   cleanup_enroot.sh: |-
 {{ tpl (.Files.Get "slurm_scripts/cleanup_enroot.sh") . | indent 4 }}
 
+  gpu_health_check.py: |-
+{{ tpl (.Files.Get "slurm_scripts/gpu_health_check.py") . | indent 4 }}
+
   hc_host_service.sh: |-
 {{ tpl (.Files.Get "slurm_scripts/hc_host_service.sh") . | indent 4 }}
 
   hc_xid.sh: |-
 {{ tpl (.Files.Get "slurm_scripts/hc_xid.sh") . | indent 4 }}
-
-  health_checker.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/health_checker.sh") . | indent 4 }}
 
   job_tmpfs_delete.sh: |-
 {{ tpl (.Files.Get "slurm_scripts/job_tmpfs_delete.sh") . | indent 4 }}

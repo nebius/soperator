@@ -165,8 +165,8 @@
     "need_env": []
   },
   {
-    "name": "health_checker",
-    "command": "./health_checker.sh",
+    "name": "gpu_health_check",
+    "command": "/usr/bin/python3 gpu_health_check.py",
     "platforms": ["8xH100", "8xH200", "8xB200"],
     "skip_for_cpu_jobs": true,
     "contexts": ["any"],
