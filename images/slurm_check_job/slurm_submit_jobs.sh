@@ -1,8 +1,8 @@
 #!/bin/bash
 
-set -e # Exit immediately if any command returns a non-zero error code
+set -euxo pipefail # Exit immediately if any command returns a non-zero error code
 
-PARTITION="background"
+PARTITION="hidden"
 
 echo "Cancelling currently active jobs with the same name..."
 scancel --partition="$PARTITION" --name="$ACTIVE_CHECK_NAME"
@@ -50,6 +50,8 @@ for node in $(sinfo -N --partition="$PARTITION" --responding --json | jq -r "$JQ
     fi
 
     JOB_IDS+=("$JOB_ID")
+
+    sleep 0.3 # avoid DDoS-ing the controller
 done
 
 if [[ ${#JOB_IDS[@]} -eq 0 ]]; then
