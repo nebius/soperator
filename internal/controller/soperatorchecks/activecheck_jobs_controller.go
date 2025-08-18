@@ -3,6 +3,7 @@ package soperatorchecks
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	api "github.com/SlinkyProject/slurm-client/api/v0041"
@@ -165,50 +166,56 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			return ctrl.Result{}, fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 		}
 
-		slurmJobID, ok := k8sJob.Annotations["slurm-job-id"]
+		slurmJobIDs, ok := k8sJob.Annotations["slurm-job-id"]
 		if !ok {
 			logger.Error(err, "failed to get slurm job id")
 			return ctrl.Result{}, err
 		}
-
-		slurmJobs, err := slurmAPIClient.GetJobsByID(ctx, slurmJobID)
-		if err != nil {
-			logger.Error(err, "failed to get slurm job status")
-			return ctrl.Result{}, err
-		}
+		ids := strings.Split(slurmJobIDs, ",")
+		firstJobId := ids[0]
 
 		var jobName string
 		var submitTime *metav1.Time
 		var failReasons []string
-		if activeCheck.Status.SlurmJobsStatus.LastJobId == slurmJobID {
+		if activeCheck.Status.SlurmJobsStatus.LastJobId == firstJobId {
 			failReasons = activeCheck.Status.SlurmJobsStatus.LastJobFailReasons
 		}
-		lastEndTime := activeCheck.Status.SlurmJobsStatus.LastJobEndTime
 		requeue := false
-		for _, slurmJob := range slurmJobs {
-			if fmt.Sprint(slurmJob.ID) == slurmJobID {
-				jobName = slurmJob.Name
-				submitTime = slurmJob.SubmitTime
+		totalJobs := 0
+		lastEndTime := activeCheck.Status.SlurmJobsStatus.LastJobEndTime
+		for _, slurmJobID := range ids {
+			slurmJobs, err := slurmAPIClient.GetJobsByID(ctx, slurmJobID)
+			if err != nil {
+				logger.Error(err, "failed to get slurm job status")
+				return ctrl.Result{}, err
 			}
+			totalJobs += len(slurmJobs)
 
-			// Job is not yet finished
-			if !slurmJob.IsTerminalState() || slurmJob.EndTime == nil {
-				requeue = true
-				continue
-			}
+			for _, slurmJob := range slurmJobs {
+				if fmt.Sprint(slurmJob.ID) == firstJobId {
+					jobName = slurmJob.Name
+					submitTime = slurmJob.SubmitTime
+				}
 
-			// Job has already been seen in one of the previous reconciler runs
-			if activeCheck.Status.SlurmJobsStatus.LastJobEndTime != nil && !slurmJob.EndTime.After(activeCheck.Status.SlurmJobsStatus.LastJobEndTime.Time) {
-				continue
-			}
+				// Job is not yet finished
+				if !slurmJob.IsTerminalState() || slurmJob.EndTime == nil {
+					requeue = true
+					continue
+				}
 
-			if lastEndTime == nil || slurmJob.EndTime.After(lastEndTime.Time) {
-				lastEndTime = slurmJob.EndTime
-			}
+				// Job has already been seen in one of the previous reconciler runs
+				if activeCheck.Status.SlurmJobsStatus.LastJobEndTime != nil && !slurmJob.EndTime.After(activeCheck.Status.SlurmJobsStatus.LastJobEndTime.Time) {
+					continue
+				}
 
-			if slurmJob.IsFailedState() {
-				if err := r.updateSlurmNodeWithReaction(ctx, logger, slurmJob, activeCheck, slurmAPIClient); err != nil {
-					return ctrl.Result{}, fmt.Errorf("get node list: %w", err)
+				if lastEndTime == nil || slurmJob.EndTime.After(lastEndTime.Time) {
+					lastEndTime = slurmJob.EndTime
+				}
+
+				if slurmJob.IsFailedState() {
+					if err := r.updateSlurmNodeWithReaction(ctx, logger, slurmJob, activeCheck, slurmAPIClient); err != nil {
+						return ctrl.Result{}, fmt.Errorf("get node list: %w", err)
+					}
 				}
 			}
 		}
@@ -219,14 +226,14 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			state = consts.ActiveCheckSlurmJobStatusInProgress
 		case len(failReasons) == 0:
 			state = consts.ActiveCheckSlurmJobStatusComplete
-		case len(failReasons) == len(slurmJobs):
+		case len(failReasons) == totalJobs:
 			state = consts.ActiveCheckSlurmJobStatusFailed
 		default:
 			state = consts.ActiveCheckSlurmJobStatusDegraded
 		}
 
 		activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{
-			LastJobId:          slurmJobID,
+			LastJobId:          firstJobId,
 			LastJobName:        jobName,
 			LastJobState:       state,
 			LastJobFailReasons: failReasons,

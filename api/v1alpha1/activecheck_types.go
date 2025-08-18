@@ -134,10 +134,14 @@ type SlurmJobSpec struct {
 	// Multiline sbatch script
 	// +kubebuilder:validation:Optional
 	SbatchScript *string `json:"sbatchScript,omitempty"`
-	// Run sbatch script on each worker exactly once
+	// Run sbatch script on each worker exactly once using job array
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	EachWorkerJobArray bool `json:"eachWorkerJobArray,omitempty"`
+	// Run sbatch script on each worker exactly once using separate jobs
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	EachWorkerJobs bool `json:"eachWorkerJobs,omitempty"`
 }
 
 // ActiveCheckK8sJobsStatus defines the observed state of ActiveCheck k8s jobs.
