@@ -33,4 +33,7 @@ const (
 
 	TopologyLabelPrefix = "topology.nebius.com"
 	TierOnePrefix       = TopologyLabelPrefix + "/tier-1"
+
+	LabelJailedAggregationKey         = "slurm.nebius.ai/jailed-aggregation"
+	LabelJailedAggregationCommonValue = "common"
 )

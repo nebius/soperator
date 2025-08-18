@@ -208,6 +208,9 @@ func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace string) 
 		ObjectMeta: ctrl.ObjectMeta{
 			Name:      consts.ConfigMapNameTopologyConfig,
 			Namespace: namespace,
+			Labels: map[string]string{
+				consts.LabelJailedAggregationKey: consts.LabelJailedAggregationCommonValue,
+			},
 		},
 		Spec: v1alpha1.JailedConfigSpec{
 			ConfigMap: v1alpha1.ConfigMapReference{
