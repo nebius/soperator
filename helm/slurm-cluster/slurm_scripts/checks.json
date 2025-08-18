@@ -208,50 +208,5 @@
     "run_in_jail": true,
     "log": "slurm_scripts/$worker.$name.$context.out",
     "need_env": []
-  },
-  {
-    "name": "hc_ib_counters",
-    "command": "./hc_ib_counters.sh",
-    "platforms": ["8xH100", "8xH200", "8xB200"],
-    "skip_for_cpu_jobs": true,
-    "contexts": ["any"],
-    "node_states": ["any"],
-    "on_fail": "drain",
-    "on_ok": "none",
-    "reason_base": "[node_problem] $name",
-    "reason_append_details": true,
-    "run_in_jail": true,
-    "log": "slurm_scripts/$worker.$name.$context.out",
-    "need_env": []
-  },
-  {
-    "name": "hc_ib_link_state",
-    "command": "./hc_ib_link_state.sh",
-    "platforms": ["8xH100", "8xH200"],
-    "skip_for_cpu_jobs": true,
-    "contexts": ["any"],
-    "node_states": ["any"],
-    "on_fail": "drain",
-    "on_ok": "none",
-    "reason_base": "[node_problem] $name",
-    "reason_append_details": true,
-    "run_in_jail": true,
-    "log": "slurm_scripts/$worker.$name.$context.out",
-    "need_env": []
-  },
-  {
-    "name": "hc_ib_pkey",
-    "command": "./hc_ib_pkey.sh",
-    "platforms": ["8xH100", "8xH200"],
-    "skip_for_cpu_jobs": true,
-    "contexts": ["any"],
-    "node_states": ["any"],
-    "on_fail": "drain",
-    "on_ok": "none",
-    "reason_base": "[node_problem] $name",
-    "reason_append_details": true,
-    "run_in_jail": true,
-    "log": "slurm_scripts/$worker.$name.$context.out",
-    "need_env": []
   }
 ]
