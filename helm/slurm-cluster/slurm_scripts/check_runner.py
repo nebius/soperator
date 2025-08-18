@@ -132,8 +132,8 @@ try:
   CHECKS_OUTPUTS_BASE_DIR = os.environ["CHECKS_OUTPUTS_BASE_DIR"]
   CHECKS_CONTEXT = os.environ["CHECKS_CONTEXT"]
   CHECKS_CONFIG = os.environ["CHECKS_CONFIG"]
-except Exception as e:
-  logging.error(f"Failed to get environment variable '{e.args[0]}', exiting: {e}")
+except KeyError as ke:
+  logging.error(f"Failed to get environment variable '{ke.args[0]}', exiting: {ke}")
   sys.exit(0)
 
 def main():
@@ -142,7 +142,10 @@ def main():
 
   # Print environment
   for key, value in os.environ.items():
-    if key.startswith("SLURM_") or key.startswith("SLURMD_") or key.startswith("CUDA_") or key.startswith("CHECKS_"):
+    slurm_var = key.startswith("SLURM_") or key.startswith("SLURMD_") or key.startswith("CUDA_")
+    check_runner_var = key.startswith("CHECKS_")
+    path_var = key == "PATH"
+    if slurm_var or check_runner_var or path_var:
       logging.info(f"Environment {key}=\"{value}\"")
 
   # Skip all checks if requested in the job comment
@@ -342,6 +345,8 @@ def get_platform_tags() -> typing.List[str]:
         tags.append(f"{count}xB200")
 
     tags.append(f"{count}xGPU")
+
+    logging.info(f"Detected platform tags: {', '.join(tags)}")
     return tags
 
   except Exception as e:
