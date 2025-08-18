@@ -225,7 +225,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 				}
 			default:
 				// Do nothing. The job could have been cancelled or interrupted. The job will run again.
-				logger.Info(fmt.Sprintf("unhandled state. The job is probably cancelled or interrrupted and it will run again. Current state: %s ", slurmJob.State))
+				logger.Info(fmt.Sprintf("unhandled state. The job is probably cancelled or interrupted and it will run again. Current state: %s ", slurmJob.State))
 			}
 			final = true
 		}

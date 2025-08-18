@@ -211,7 +211,12 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 
 	For backward compatability, we add some logic here to handle already drained slurm nodes with [HC] reason and create a reservation for them then undrain them.
 	*/
-	_ = nodeReason
+
+	// Make sure is drained because of a health check failure.
+	_, _, err := parseHealthCheckReason(nodeReason.OriginalReason)
+	if err != nil {
+		return fmt.Errorf("parse health check reason: %w", err)
+	}
 
 	// If hardware issue condition is set, leave the node drained until MK8S deletes it
 	var hardwareIssuesCondition corev1.NodeCondition
@@ -230,7 +235,7 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 	logger.V(1).Info("creating a slurm reservation for drained node with [HC] reason")
 
 	// Create a maintenance reservation for this slurm node to prevent work from being scheduled on it.
-	err := c.createMaintenanceReservationForSlurmNode(ctx, slurmClusterName, slurmNode.Name)
+	err = c.createMaintenanceReservationForSlurmNode(ctx, slurmClusterName, slurmNode.Name)
 	if err != nil {
 		return fmt.Errorf("failed to create maintenance reservaiton for slurm node: %w", err)
 	}

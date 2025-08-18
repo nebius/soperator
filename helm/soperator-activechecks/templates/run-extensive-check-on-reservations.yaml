@@ -1,5 +1,5 @@
 apiVersion: batch/v1
-kind: ConJob
+kind: CronJob
 metadata:
   name: "run-extensive-check-on-reservations"
   labels:
@@ -36,7 +36,7 @@ spec:
         spec:
           containers:
           - name: run-extensive-check-on-reservations
-            image: cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.21.10-noble-slurm25.05.2
+            image: {{ .Values.images.slurmJob | quote }}
             imagePullPolicy: IfNotPresent
             securityContext:
               capabilities:
@@ -66,7 +66,7 @@ spec:
             - mountPath: /mnt/jail
               name: jail
           initContainers:
-          - image: cr.eu-north1.nebius.cloud/soperator/munge:1.21.5-jammy-slurm25.05.2
+          - image: {{ .Values.images.munge | quote }}
             livenessProbe:
               exec:
                 command:
@@ -101,8 +101,8 @@ spec:
               name: munge-socket
           dnsPolicy: ClusterFirst
           restartPolicy: Never
-          serviceAccount: soperator-activecheck-sa
-          serviceAccountName: soperator-activecheck-sa
+          serviceAccount: run-extensive-check-on-reservations
+          serviceAccountName: run-extensive-check-on-reservations
           schedulerName: default-scheduler
           terminationGracePeriodSeconds: 30
           volumes:
@@ -123,3 +123,45 @@ spec:
               secretName: soperator-munge
           - emptyDir: {}
             name: munge-socket
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: run-extensive-check-on-reservations
+  namespace: soperator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: run-extensive-check-on-reservations
+  namespace: soperator
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs
+  verbs:
+  - list
+  - get
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - get
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: run-extensive-check-on-reservations
+  namespace: soperator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: run-extensive-check-on-reservations
+subjects:
+- kind: ServiceAccount
+  name: run-extensive-check-on-reservations
+  namespace: soperator
