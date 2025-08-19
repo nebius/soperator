@@ -112,7 +112,9 @@ RUN rm -rf /home
 # Copy & run the entrypoint script
 COPY images/slurm_check_job/slurm_check_job_entrypoint.sh /opt/bin/slurm/
 COPY images/slurm_check_job/slurm_submit_array_job.sh /opt/bin/slurm/
+COPY images/slurm_check_job/slurm_submit_jobs.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/slurm_check_job_entrypoint.sh \
-    && chmod +x /opt/bin/slurm/slurm_submit_array_job.sh
+    && chmod +x /opt/bin/slurm/slurm_submit_array_job.sh \
+    && chmod +x /opt/bin/slurm/slurm_submit_jobs.sh
 
 ENTRYPOINT ["/opt/bin/slurm/slurm_check_job_entrypoint.sh"]

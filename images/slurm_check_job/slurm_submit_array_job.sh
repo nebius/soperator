@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e # Exit immediately if any command returns a non-zero error code
+set -euxo pipefail # Exit immediately if any command returns a non-zero error code
 
 PARTITION="background"
 

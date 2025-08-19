@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e # Exit immediately if any command returns a non-zero error code
+set -euxo pipefail # Exit immediately if any command returns a non-zero error code
 
 echo "Link users from jail"
 ln -s /mnt/jail/etc/passwd /etc/passwd
@@ -24,12 +24,23 @@ mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
 echo "Create directory for slurm job outputs"
 (umask 000; mkdir -p "/mnt/jail/opt/soperator-outputs/slurm_jobs")
 
-if [[ "$EACH_WORKER_JOB_ARRAY" == "true" ]]; then
+if [[ "${EACH_WORKER_JOB_ARRAY:-}" == "true" ]]; then
     echo "Submitting job using slurm_submit_array_job.sh..."
     SUBMIT_OUTPUT=$(/opt/bin/slurm/slurm_submit_array_job.sh)
     SCRIPT_STATUS=$?
     if [[ $SCRIPT_STATUS -ne 0 ]]; then
         echo "Job array submission script failed with exit code $SCRIPT_STATUS"
+        echo "$SUBMIT_OUTPUT"
+        exit 1
+    fi
+
+    SLURM_JOB_ID=$(echo "$SUBMIT_OUTPUT" | tail -n 1)
+elif [[ "${EACH_WORKER_JOBS:-}" == "true" ]]; then
+    echo "Submitting job using slurm_submit_jobs.sh..."
+    SUBMIT_OUTPUT=$(/opt/bin/slurm/slurm_submit_jobs.sh)
+    SCRIPT_STATUS=$?
+    if [[ $SCRIPT_STATUS -ne 0 ]]; then
+        echo "Job submission script failed with exit code $SCRIPT_STATUS"
         echo "$SUBMIT_OUTPUT"
         exit 1
     fi
