@@ -36,4 +36,6 @@ const (
 
 	LabelJailedAggregationKey         = "slurm.nebius.ai/jailed-aggregation"
 	LabelJailedAggregationCommonValue = "common"
+
+	AnnotationConfigHash = "slurm.nebius.ai/config-hash"
 )
