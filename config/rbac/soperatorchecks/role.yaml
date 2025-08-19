@@ -133,3 +133,13 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - slurm.nebius.ai
+  resources:
+  - jailedconfigs
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - watch
