@@ -93,6 +93,11 @@ try:
         log_json(res_desc=f"Unknown context '{CHECKS_CONTEXT}'")
         sys.exit(0)
 
+    # Set custom options for health-checker
+    env = os.environ.copy()
+    env["HC_DCGMI_DIAG_R1_DEBUGLOGFILE"] = "/dev/null"
+    env["HC_DCGMI_DIAG_R1_DEBUGLEVEL"] = "NONE"
+
     # Run Nebius GPU health-checker
     cmd = [
         "health-checker", "run",
@@ -103,7 +108,7 @@ try:
         "--tests-stdout-path", "/opt/soperator-outputs/health_checker_cmd_stdout",
         "--log-level", "info",
     ]
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, env=os.environ.copy())
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, env=env)
     result = get_hc_result(proc)
     #print(result)
 
