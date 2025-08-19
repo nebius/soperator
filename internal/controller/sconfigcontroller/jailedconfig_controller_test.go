@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -717,7 +718,7 @@ func TestJailedConfigReconciler_CalculateConfigHash(t *testing.T) {
 	}
 }
 
-func TestJailedConfigReconciler_ShouldSkipReconciliation(t *testing.T) {
+func TestJailedConfigReconciler_needsReconciliation(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -867,8 +868,9 @@ func TestJailedConfigReconciler_ShouldSkipReconciliation(t *testing.T) {
 				tc.configMap.Annotations[consts.AnnotationConfigHash] = correctHash
 			}
 
-			result := sctrl.shouldSkipReconciliation(tc.jailedConfig, tc.configMap)
-			require.Equal(t, tc.expectedSkip, result, "Expected skip result: %s", tc.expectedReason)
+			result := sctrl.needsReconciliation(tc.jailedConfig, tc.configMap)
+			expectedNeedsReconciliation := !tc.expectedSkip // invert logic: skip=false means needs=true
+			require.Equal(t, expectedNeedsReconciliation, result, "Expected needs reconciliation result: %s", tc.expectedReason)
 		})
 	}
 }
@@ -961,7 +963,7 @@ func TestJailedConfigReconciler_SaveConfigHash(t *testing.T) {
 	}
 }
 
-func TestJailedConfigReconciler_ShouldSkipAggregatedReconciliation(t *testing.T) {
+func TestJailedConfigReconciler_shouldAggregatedReconciliation(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -1134,13 +1136,136 @@ func TestJailedConfigReconciler_ShouldSkipAggregatedReconciliation(t *testing.T)
 				}
 			}
 
-			result, err := sctrl.shouldSkipAggregatedReconciliation(context.Background(), tc.jailedConfigs)
+			result, err := sctrl.shouldAggregatedReconciliation(context.Background(), tc.jailedConfigs)
 
 			if tc.expectedError {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tc.expectedSkip, result)
+				expectedNeedsReconciliation := !tc.expectedSkip // invert logic: skip=false means needs=true
+				require.Equal(t, expectedNeedsReconciliation, result)
+			}
+		})
+	}
+}
+
+func TestJailedConfigReconciler_ShouldInitializeConditions(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name                    string
+		existingConditions      []metav1.Condition
+		expectInitializeCall    bool
+		expectedConditionsCount int
+	}{
+		{
+			name:                    "no existing conditions",
+			existingConditions:      []metav1.Condition{},
+			expectInitializeCall:    true,
+			expectedConditionsCount: 2, // FilesWritten + UpdateActionsCompleted
+		},
+		{
+			name: "only FilesWritten condition exists",
+			existingConditions: []metav1.Condition{
+				{
+					Type:   string(slurmv1alpha1.FilesWritten),
+					Status: metav1.ConditionTrue,
+				},
+			},
+			expectInitializeCall:    false,
+			expectedConditionsCount: 2, // FilesWritten + UpdateActionsCompleted (added)
+		},
+		{
+			name: "only UpdateActionsCompleted condition exists",
+			existingConditions: []metav1.Condition{
+				{
+					Type:   string(slurmv1alpha1.UpdateActionsCompleted),
+					Status: metav1.ConditionTrue,
+				},
+			},
+			expectInitializeCall:    false,
+			expectedConditionsCount: 2, // FilesWritten (added) + UpdateActionsCompleted
+		},
+		{
+			name: "both conditions already exist",
+			existingConditions: []metav1.Condition{
+				{
+					Type:   string(slurmv1alpha1.FilesWritten),
+					Status: metav1.ConditionTrue,
+				},
+				{
+					Type:   string(slurmv1alpha1.UpdateActionsCompleted),
+					Status: metav1.ConditionFalse,
+				},
+			},
+			expectInitializeCall:    false,
+			expectedConditionsCount: 2, // Both already exist, no changes
+		},
+		{
+			name: "conditions exist with other types",
+			existingConditions: []metav1.Condition{
+				{
+					Type:   "SomeOtherCondition",
+					Status: metav1.ConditionTrue,
+				},
+				{
+					Type:   string(slurmv1alpha1.FilesWritten),
+					Status: metav1.ConditionTrue,
+				},
+			},
+			expectInitializeCall:    false,
+			expectedConditionsCount: 3, // SomeOtherCondition + FilesWritten + UpdateActionsCompleted (added)
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			jailedConfig := &slurmv1alpha1.JailedConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-config",
+					Namespace: "test-ns",
+				},
+				Status: slurmv1alpha1.JailedConfigStatus{
+					Conditions: tc.existingConditions,
+				},
+			}
+
+			// Create fake client with the jailedconfig
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			require.NoError(t, slurmv1alpha1.AddToScheme(scheme))
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithStatusSubresource(jailedConfig).
+				WithObjects(jailedConfig).
+				Build()
+
+			sctrl := &JailedConfigReconciler{
+				Client: fakeClient,
+			}
+
+			err := sctrl.shouldInitializeConditions(context.Background(), jailedConfig)
+			require.NoError(t, err)
+
+			// Check that the expected number of conditions exist
+			require.Len(t, jailedConfig.Status.Conditions, tc.expectedConditionsCount)
+
+			// Check that both required conditions exist
+			filesWrittenCondition := meta.FindStatusCondition(jailedConfig.Status.Conditions, string(slurmv1alpha1.FilesWritten))
+			require.NotNil(t, filesWrittenCondition, "FilesWritten condition should exist")
+
+			updateActionsCondition := meta.FindStatusCondition(jailedConfig.Status.Conditions, string(slurmv1alpha1.UpdateActionsCompleted))
+			require.NotNil(t, updateActionsCondition, "UpdateActionsCompleted condition should exist")
+
+			// If conditions were just initialized, they should have Unknown status and Init reason
+			if tc.expectInitializeCall {
+				require.Equal(t, metav1.ConditionUnknown, filesWrittenCondition.Status)
+				require.Equal(t, string(slurmv1alpha1.ReasonInit), filesWrittenCondition.Reason)
+				require.Equal(t, metav1.ConditionUnknown, updateActionsCondition.Status)
+				require.Equal(t, string(slurmv1alpha1.ReasonInit), updateActionsCondition.Reason)
 			}
 		})
 	}
