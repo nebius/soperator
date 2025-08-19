@@ -1,0 +1,48 @@
+{{ if .Values.soperatorActiveChecks.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-soperator-activechecks
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: helm-soperator-activechecks
+      interval: {{ .Values.soperatorActiveChecks.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+      version: {{ .Values.soperatorActiveChecks.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster
+  - name: {{ include "soperator-fluxcd.fullname" . }}-soperatorchecks  
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  interval: {{ .Values.soperatorActiveChecks.interval }}
+  timeout: {{ .Values.soperatorActiveChecks.timeout }}
+  releaseName: {{ .Values.soperatorActiveChecks.releaseName }}
+  targetNamespace: {{ .Values.soperatorActiveChecks.namespace }}
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  values:
+  {{- if .Values.soperatorActiveChecks.overrideValues }}
+    {{- toYaml .Values.soperatorActiveChecks.overrideValues | nindent 4 }}
+  {{- else }}
+    clusterName: soperator
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: terrraform-soperator-activechecks
+    optional: true
+    valuesKey: values.yaml
+  - kind: ConfigMap
+    name: soperator-activechecks
+    optional: true
+    valuesKey: values.yaml
+{{- end }}
