@@ -6,7 +6,7 @@ spec:
   checkType: "slurmJob"
   name: "ib-write-lat-cpu"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  schedule: "0 13 * * *" # 1 time a day at 13:00 UTC
+  schedule: "0 12 * * *" # 1 time a day at 12:00 UTC
   suspend: false
   runAfterCreation: true
   slurmJobSpec:
@@ -23,6 +23,8 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
+  # Do not add any reactions right now, only monitor
   reactions:
-    setCondition: true
-    drainSlurmNode: true
+    setCondition: false
+    drainSlurmNode: false
+    commentSlurmNode: true

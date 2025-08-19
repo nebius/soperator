@@ -1,33 +1,35 @@
 #!/bin/bash
-#SBATCH --deadline="now+12hours"
-#SBATCH --nodes=1
-#SBATCH --ntasks=2
+#SBATCH --deadline="now+6hours"
+#SBATCH --time=10:00
 #SBATCH --cpus-per-task=2
-#SBATCH --time=00:10:00
 
-set -euo pipefail
+platform=""
+gpus_on_node=$(nvidia-smi --query-gpu=name --format=csv,noheader | sort | uniq -c)
+if [[ "${gpus_on_node}" == *"8 NVIDIA H100"* ]]; then
+  platform="8xH100"
+elif [[ "${gpus_on_node}" == *"8 NVIDIA H200"* ]]; then
+  platform="8xH200"
+elif [[ "${gpus_on_node}" == *"8 NVIDIA B200"* ]]; then
+  platform="8xB200"
+else
+  echo "Unsupported platform"
+  exit 0
+fi
 
-PORT=18001
+echo "Platform found: $platform"
+echo "Running ib_write_bw_cpu check on $(hostname)..."
+HC_OUTPUT=$(srun --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n ib_write_bw --json-log")
+HC_EXIT_CODE=$?
 
-echo "===== CPU-to-CPU RDMA Test Starting ====="
-echo "[INFO] Running ib_write_bw server/client across 2 tasks on same node using port $PORT"
-echo "[INFO] SLURM Node: $(hostname)"
-echo "[INFO] SLURM Job ID: $SLURM_JOB_ID"
-echo "-----------------------------------------"
+echo "Health checker output: $HC_OUTPUT"
+echo "Health checker job step exit code: $HC_EXIT_CODE"
+HC_STATUS=$(echo "$HC_OUTPUT" | awk '/^\s*{/,/^\s*}/' | jq -r '.status')
 
-srun --ntasks=2 --exclusive --cpu-bind=cores bash -c "
-  set -e
-  if [[ \$SLURM_PROCID -eq 0 ]]; then
-    echo \"[SERVER] Starting ib_write_bw --port=$PORT\"
-    ib_write_bw --port=$PORT
-  else
-    sleep 2
-    echo \"[CLIENT] Starting ib_write_bw localhost --port=$PORT\"
-    ib_write_bw localhost --port=$PORT
-  fi
-" || {
-  echo "[ERROR] RDMA test failed — ib_write_bw exited with non-zero status"
+echo "Health checker status: $HC_STATUS"
+if [[ "$HC_STATUS" == "ERROR" && $HC_EXIT_CODE -eq 1 ]]; then
+  echo "Health-checker reported status=ERROR and exited with non-zero status."
   exit 1
-}
-
-echo "===== RDMA Test Complete: SUCCESS ====="
+else
+  echo "Health-checker passed or returned non-ERROR status."
+  exit 0
+fi

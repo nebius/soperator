@@ -23,6 +23,8 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
+  # Do not add any reactions right now, only monitor
   reactions:
-    setCondition: true
-    drainSlurmNode: true
+    setCondition: false
+    drainSlurmNode: false
+    commentSlurmNode: true
