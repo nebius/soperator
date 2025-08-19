@@ -32,7 +32,7 @@ for node in $(sinfo -N --partition="$PARTITION" --responding --json | jq -r "$JQ
         updated_json=$(echo "$extra_json" | jq -c --arg key "$ACTIVE_CHECK_NAME" --argjson val true '.[$key] = $val')
         scontrol update NodeName="$node" Extra="$updated_json"
         exit 0
-    ) 9>"/mnt/jail/etc/active_check_${node}.lock" && NUM_NODES=$(( NUM_NODES + 1 ))
+    ) 9>"/mnt/jail/etc/soperatorchecks/active_check_${node}.lock" && NUM_NODES=$(( NUM_NODES + 1 ))
 done
 
 echo "Submitting Slurm array job..."

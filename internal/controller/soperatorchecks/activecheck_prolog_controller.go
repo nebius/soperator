@@ -174,7 +174,7 @@ echo "Running embedded prolog on node: $NODE_NAME"
 
 	sudo scontrol update NodeName="$NODE_NAME" Extra="$updated_json"
 
-) 9>"/etc/active_check_${NODE_NAME}.lock"
+) 9>"/etc/soperatorchecks/active_check_${NODE_NAME}.lock"
 
 echo "prolog completed for $NODE_NAME"`
 }

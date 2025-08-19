@@ -8,3 +8,6 @@ if [ ! -f /mnt/jail/opt/soperator-home/soperatorchecks/.ssh/soperatorchecks_id_e
   ssh-keygen -t ecdsa -f /mnt/jail/opt/soperator-home/soperatorchecks/.ssh/soperatorchecks_id_ecdsa -N '' -C soperatorchecks
   cat /mnt/jail/opt/soperator-home/soperatorchecks/.ssh/soperatorchecks_id_ecdsa.pub >> /mnt/jail/opt/soperator-home/soperatorchecks/.ssh/authorized_keys
 fi
+
+mkdir -p /mnt/jail/etc/soperatorchecks
+chown soperatorchecks:soperatorchecks /mnt/jail/etc/soperatorchecks
