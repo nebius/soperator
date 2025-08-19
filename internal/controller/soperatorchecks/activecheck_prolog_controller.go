@@ -118,7 +118,7 @@ func (r *ActiveCheckPrologReconciler) updatePrologConfigMap(ctx context.Context,
 
 	jailedConfig := &v1alpha1.JailedConfig{
 		TypeMeta: ctrl.TypeMeta{
-			APIVersion: v1alpha1.GroupVersion.Version,
+			APIVersion: v1alpha1.GroupVersion.String(),
 			Kind:       "JailedConfig",
 		},
 		ObjectMeta: ctrl.ObjectMeta{
