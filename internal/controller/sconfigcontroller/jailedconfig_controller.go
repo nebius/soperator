@@ -18,11 +18,14 @@ package sconfigcontroller
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -74,7 +77,7 @@ type JailedConfigReconciler struct {
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/finalizers,verbs=update
-// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=configmaps,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;patch
 
 // Clock is used to fake timing for testing
 type Clock interface {
@@ -227,6 +230,12 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 		return ctrl.Result{}, fmt.Errorf("getting ConfigMap: %w", err)
 	}
 
+	// Check if we can skip reconciliation
+	if r.shouldSkipReconciliation(jailedConfig, configMap) {
+		logger.V(1).Info("Skipping reconciliation: config hash unchanged and all conditions are met")
+		return ctrl.Result{}, nil
+	}
+
 	defaultMode := jailedConfig.Spec.DefaultMode
 	if defaultMode == nil {
 		defaultMode = ptr.To(slurmv1alpha1.DefaultMode)
@@ -305,6 +314,13 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 		return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
 	}
 
+	// Save config hash in ConfigMap annotation after successful reconciliation
+	err = r.saveConfigHash(ctx, configMap)
+	if err != nil {
+		logger.V(1).Info("Failed to save config hash annotation", "error", err)
+		return ctrl.Result{}, fmt.Errorf("saving config hash: %w", err)
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -322,6 +338,16 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 	}
 
 	logger.V(1).Info("Found JailedConfigs for aggregation", "count", len(jailedConfigs.Items), "aggregationKey", aggregationKey)
+
+	// Check if we can skip aggregated reconciliation
+	canSkip, err := r.shouldSkipAggregatedReconciliation(ctx, jailedConfigs.Items)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("checking if aggregated reconciliation can be skipped: %w", err)
+	}
+	if canSkip {
+		logger.V(1).Info("Skipping aggregated reconciliation: all config hashes unchanged and all conditions are met", "aggregationKey", aggregationKey)
+		return ctrl.Result{}, nil
+	}
 
 	for i := range jailedConfigs.Items {
 		config := &jailedConfigs.Items[i]
@@ -462,6 +488,27 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 	}
 
 	logger.V(1).Info("Completed aggregated reconciliation", "aggregationKey", aggregationKey, "configs", len(jailedConfigs.Items))
+
+	// Save hashes of all ConfigMaps after successful aggregated reconciliation
+	for i := range jailedConfigs.Items {
+		config := &jailedConfigs.Items[i]
+
+		configMap := &corev1.ConfigMap{}
+		err = r.Client.Get(ctx, types.NamespacedName{
+			Name:      config.Spec.ConfigMap.Name,
+			Namespace: config.Namespace,
+		}, configMap)
+		if err != nil {
+			logger.V(1).Info("Failed to get ConfigMap for hash update", "configMap", config.Spec.ConfigMap.Name, "error", err)
+			continue
+		}
+
+		err = r.saveConfigHash(ctx, configMap)
+		if err != nil {
+			logger.V(1).Info("Failed to save config hash annotation for aggregated config", "configMap", config.Spec.ConfigMap.Name, "error", err)
+			return ctrl.Result{}, fmt.Errorf("saving config hash for %s/%s: %w", config.Namespace, config.Name, err)
+		}
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -747,4 +794,106 @@ func (r *JailedConfigReconciler) setConditions(ctx context.Context, jailedConfig
 			_ = meta.SetStatusCondition(&status.Conditions, cond)
 		}
 	})
+}
+
+func (r *JailedConfigReconciler) calculateConfigHash(configMap *corev1.ConfigMap) string {
+	// Create a simple hash from all ConfigMap data
+	var hashData strings.Builder
+
+	// Add all Data as a single string
+	hashData.WriteString(fmt.Sprintf("data:%+v;", configMap.Data))
+
+	// Add all BinaryData as a single string
+	hashData.WriteString(fmt.Sprintf("binarydata:%+v;", configMap.BinaryData))
+
+	hash := sha256.Sum256([]byte(hashData.String()))
+	return hex.EncodeToString(hash[:])
+}
+
+// shouldSkipReconciliation checks if reconciliation can be skipped
+// when all conditions are met and config hash has not changed
+func (r *JailedConfigReconciler) shouldSkipReconciliation(jailedConfig *slurmv1alpha1.JailedConfig, configMap *corev1.ConfigMap) bool {
+	filesWrittenCondition := meta.FindStatusCondition(jailedConfig.Status.Conditions, string(slurmv1alpha1.FilesWritten))
+	updateActionsCondition := meta.FindStatusCondition(jailedConfig.Status.Conditions, string(slurmv1alpha1.UpdateActionsCompleted))
+
+	if filesWrittenCondition == nil || filesWrittenCondition.Status != metav1.ConditionTrue {
+		return false
+	}
+
+	if updateActionsCondition == nil || updateActionsCondition.Status != metav1.ConditionTrue {
+		return false
+	}
+	currentHash := r.calculateConfigHash(configMap)
+
+	if configMap.Annotations == nil {
+		return false
+	}
+
+	savedHash, exists := configMap.Annotations[consts.AnnotationConfigHash]
+	if !exists {
+		return false
+	}
+
+	return currentHash == savedHash
+}
+
+// saveConfigHash saves config hash in ConfigMap annotation
+func (r *JailedConfigReconciler) saveConfigHash(ctx context.Context, configMap *corev1.ConfigMap) error {
+	currentHash := r.calculateConfigHash(configMap)
+
+	if configMap.Annotations == nil {
+		configMap.Annotations = make(map[string]string)
+	}
+	if savedHash, exists := configMap.Annotations[consts.AnnotationConfigHash]; exists && savedHash == currentHash {
+		return nil
+	}
+
+	patch := client.MergeFrom(configMap.DeepCopy())
+	configMap.Annotations[consts.AnnotationConfigHash] = currentHash
+
+	return r.Client.Patch(ctx, configMap, patch)
+}
+
+// shouldSkipAggregatedReconciliation checks if aggregated reconciliation can be skipped
+func (r *JailedConfigReconciler) shouldSkipAggregatedReconciliation(ctx context.Context, jailedConfigs []slurmv1alpha1.JailedConfig) (bool, error) {
+	for i := range jailedConfigs {
+		config := &jailedConfigs[i]
+
+		filesWrittenCondition := meta.FindStatusCondition(config.Status.Conditions, string(slurmv1alpha1.FilesWritten))
+		updateActionsCondition := meta.FindStatusCondition(config.Status.Conditions, string(slurmv1alpha1.UpdateActionsCompleted))
+
+		if filesWrittenCondition == nil || filesWrittenCondition.Status != metav1.ConditionTrue {
+			return false, nil
+		}
+
+		if updateActionsCondition == nil || updateActionsCondition.Status != metav1.ConditionTrue {
+			return false, nil
+		}
+	}
+
+	for i := range jailedConfigs {
+		config := &jailedConfigs[i]
+
+		configMap := &corev1.ConfigMap{}
+		err := r.Client.Get(ctx, types.NamespacedName{
+			Name:      config.Spec.ConfigMap.Name,
+			Namespace: config.Namespace,
+		}, configMap)
+		if err != nil {
+			return false, err
+		}
+
+		currentHash := r.calculateConfigHash(configMap)
+
+		if configMap.Annotations == nil {
+			return false, nil
+		}
+
+		savedHash, exists := configMap.Annotations[consts.AnnotationConfigHash]
+		if !exists || currentHash != savedHash {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
