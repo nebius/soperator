@@ -1,13 +1,17 @@
 set -ex
 
 echo "Creating soperatorchecks user..."
-chroot /mnt/jail /bin/bash -c 'id "soperatorchecks" || echo "" | createuser soperatorchecks --home /opt/soperator-home/soperatorchecks --gecos ""'
+chroot /mnt/jail /bin/bash -s <<'EOF'
 
-if [ ! -f /mnt/jail/opt/soperator-home/soperatorchecks/.ssh/soperatorchecks_id_ecdsa ]; then
+id "soperatorchecks" || echo "" | createuser soperatorchecks --home /opt/soperator-home/soperatorchecks --gecos ""
+
+if [ ! -f /opt/soperator-home/soperatorchecks/.ssh/soperatorchecks_id_ecdsa ]; then
   echo "Generating ssh key..."
-  ssh-keygen -t ecdsa -f /mnt/jail/opt/soperator-home/soperatorchecks/.ssh/soperatorchecks_id_ecdsa -N '' -C soperatorchecks
-  cat /mnt/jail/opt/soperator-home/soperatorchecks/.ssh/soperatorchecks_id_ecdsa.pub >> /mnt/jail/opt/soperator-home/soperatorchecks/.ssh/authorized_keys
+  ssh-keygen -t ecdsa -f /opt/soperator-home/soperatorchecks/.ssh/soperatorchecks_id_ecdsa -N '' -C soperatorchecks
+  cat /opt/soperator-home/soperatorchecks/.ssh/soperatorchecks_id_ecdsa.pub >> /opt/soperator-home/soperatorchecks/.ssh/authorized_keys
 fi
 
-mkdir -p /mnt/jail/etc/soperatorchecks
-chown soperatorchecks:soperatorchecks /mnt/jail/etc/soperatorchecks
+mkdir -p /etc/soperatorchecks
+chown soperatorchecks:soperatorchecks /etc/soperatorchecks
+
+EOF

@@ -176,5 +176,7 @@ echo "Running embedded prolog on node: $NODE_NAME"
 
 ) 9>"/etc/soperatorchecks/active_check_${NODE_NAME}.lock"
 
+chown soperatorchecks:soperatorchecks /etc/soperatorchecks/active_check_${NODE_NAME}.lock
+
 echo "prolog completed for $NODE_NAME"`
 }
