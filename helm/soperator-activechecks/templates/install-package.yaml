@@ -7,7 +7,7 @@ spec:
   name: "install-package"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   suspend: true
-  runAfterCreation: true
+  runAfterCreation: false
   k8sJobSpec:
     jobContainer:
       command:

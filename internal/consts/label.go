@@ -26,6 +26,14 @@ const (
 	LabelSConfigControllerSourceKey   = "sconficontroller.slurm.nebius.ai"
 	LabelSConfigControllerSourceValue = "true"
 
+	// Controller type labels
+	LabelControllerType            = "slurm.nebius.ai/controller-type"
+	LabelControllerTypeMain        = "main"
+	LabelControllerTypePlaceholder = "placeholder"
+
 	TopologyLabelPrefix = "topology.nebius.com"
 	TierOnePrefix       = TopologyLabelPrefix + "/tier-1"
+
+	LabelJailedAggregationKey         = "slurm.nebius.ai/jailed-aggregation"
+	LabelJailedAggregationCommonValue = "common"
 )

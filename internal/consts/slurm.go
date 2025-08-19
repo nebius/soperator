@@ -13,18 +13,20 @@ const (
 	SlurmDefaultDebugLevel = "verbose"
 )
 
-const (
-	SlurmNodeReasonHC              string = "[HC]"
+var (
+	SlurmNodeReasonHC              string = "[node_problem]"
+	SlurmNodeComputeMaintenance    string = SlurmNodeReasonHC + " compute_maintenance"
 	SlurmNodeReasonKillTaskFailed  string = "Kill task failed"
-	SlurmNodeReasonNodeReplacement string = "Soperator auto-healing: node replacement process"
-	SlurmNodeReasonNodeReboot      string = "Soperator auto-healing: node reboot process"
+	SlurmNodeReasonNodeReplacement string = SlurmNodeComputeMaintenance + ": node replacement process"
+	SlurmNodeReasonNodeReboot      string = SlurmNodeComputeMaintenance + ": node reboot process"
 )
 
-var SlurmNodeReasonsMap = map[string]struct{}{
-	SlurmNodeReasonHC:              {},
-	SlurmNodeReasonKillTaskFailed:  {},
-	SlurmNodeReasonNodeReplacement: {},
-	SlurmNodeReasonNodeReboot:      {},
+// order of reasons is important, because we use it to determine if node is in maintenance
+var SlurmNodeReasonsList = []string{
+	SlurmNodeReasonKillTaskFailed,
+	SlurmNodeReasonNodeReplacement,
+	SlurmNodeReasonNodeReboot,
+	SlurmNodeReasonHC,
 }
 
 const (

@@ -41,8 +41,6 @@ type SlurmWorker struct {
 	SharedMemorySize          *resource.Quantity
 	UseDefaultAppArmorProfile bool
 	Maintenance               *consts.MaintenanceMode
-
-	WaitForController *bool
 }
 
 func buildSlurmWorkerFrom(
@@ -85,9 +83,10 @@ func buildSlurmWorkerFrom(
 		SupervisordConfigMapName:    supervisordConfigName,
 		WorkerAnnotations:           worker.WorkerAnnotations,
 		Service:                     buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeWorker, clusterName)),
-		StatefulSet: buildStatefulSetFrom(
+		StatefulSet: buildStatefulSetWithMaxUnavailableFrom(
 			naming.BuildStatefulSetName(consts.ComponentTypeWorker),
 			worker.SlurmNode.Size,
+			worker.MaxUnavailable,
 		),
 		VolumeSpool:               *worker.Volumes.Spool.DeepCopy(),
 		VolumeJail:                *worker.Volumes.Jail.DeepCopy(),
@@ -100,7 +99,6 @@ func buildSlurmWorkerFrom(
 		SSHDConfigMapName:         sshdConfigMapName,
 		IsSSHDConfigMapDefault:    isSSHDConfigDefault,
 		Maintenance:               maintenance,
-		WaitForController:         worker.WaitForController,
 	}
 	for _, jailSubMount := range worker.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()

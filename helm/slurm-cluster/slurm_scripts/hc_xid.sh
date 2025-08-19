@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eox pipefail
+set -euxo pipefail
 
 echo "[$(date)] Check for critical NVIDIA Xid / Sxid errors"
 

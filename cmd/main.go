@@ -149,7 +149,7 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.StringVar(&logFormat, "log-format", "json", "Log format: plain or json")
 	flag.StringVar(&logLevel, "log-level", "info", "Log level: debug, info, warn, error, dpanic, panic, fatal")
-	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 5*time.Minute, "The maximum duration allowed for caching sync")
+	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.BoolVar(&topologyControllerEnabled, "enable-topology-controller", false, "if set, the topology controller will be enabled.")
 	flag.Parse()
@@ -253,6 +253,7 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			soperatorNamespace,
+			mgr.GetAPIReader(),
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			setupLog.Error(
 				err,

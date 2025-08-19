@@ -7,7 +7,7 @@ spec:
   name: "upgrade-cuda"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   suspend: true
-  runAfterCreation: true
+  runAfterCreation: false
   k8sJobSpec:
     jobContainer:
       command:

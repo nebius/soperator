@@ -86,6 +86,14 @@ func BuildStatefulSetName(componentType consts.ComponentType) string {
 	}.String()
 }
 
+func BuildDaemonSetName(componentType consts.ComponentType) string {
+	return namedEntity{
+		componentType: &componentType,
+		clusterName:   "",
+		entity:        "",
+	}.String()
+}
+
 func BuildDeploymentName(componentType consts.ComponentType) string {
 	return namedEntity{
 		componentType: &componentType,
@@ -210,10 +218,6 @@ func BuildRoleActiveCheckName(clusterName string) string {
 
 func BuildRoleBindingActiveCheckName(clusterName string) string {
 	return clusterName + "-activecheck-role-binding"
-}
-
-func BuildOtelSvcEndpoint(clusterName string) string {
-	return fmt.Sprintf("%s-collector", clusterName)
 }
 
 func BuildSecretSlurmdbdConfigsName(clusterName string) string {

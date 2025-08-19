@@ -5,6 +5,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"nebius.ai/slurm-operator/internal/consts"
 
@@ -298,16 +299,35 @@ type PluginConfigCustom struct {
 	Arguments map[string]string `json:"arguments,omitempty"`
 }
 
+// SConfigController represents the SConfig Controller configuration
+// +kubebuilder:validation:XValidation:rule="!has(self.reconfigureWaitTimeout) || !has(self.reconfigurePollInterval) || duration(self.reconfigureWaitTimeout) > duration(self.reconfigurePollInterval)",message="ReconfigureWaitTimeout must be greater than ReconfigurePollInterval"
 type SConfigController struct {
 	Node      SlurmNode     `json:"node,omitempty"`
 	Container NodeContainer `json:"container,omitempty"`
 
-	// JailSlurmConfigPath defines the path where the Slurm configs are stored in the jail.
-	// Defaults to /mnt/jail/etc/slurm
-	// +kubebuilder:deprecation:warning="The JailSlurmConfigPath field is deprecated and will be removed in a 1.22.0 release"
+	// RunAsUid defines UID to run SConfigController process
+	// This will be manifested as UID of files maintained by SConfigController
+	// Defaults to whatever is set in sconfigcontroller image
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="/mnt/jail/etc/slurm"
-	JailSlurmConfigPath string `json:"jailSlurmConfigPath,omitempty"`
+	RunAsUid *int64 `json:"runAsUid,omitempty"`
+
+	// RunAsGid defines GID to run SConfigController process
+	// This will be manifested as GID of files maintained by SConfigController
+	// Defaults to whatever is set in sconfigcontroller image
+	// +kubebuilder:validation:Optional
+	RunAsGid *int64 `json:"runAsGid,omitempty"`
+
+	// ReconfigurePollInterval defines the interval for polling node restart status during reconfiguration.
+	// Defaults to 20s
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="20s"
+	ReconfigurePollInterval *string `json:"reconfigurePollInterval,omitempty"`
+
+	// ReconfigureWaitTimeout defines the maximum time to wait for all nodes to restart during reconfiguration.
+	// Must be greater than ReconfigurePollInterval. Defaults to 1m
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="1m"
+	ReconfigureWaitTimeout *string `json:"reconfigureWaitTimeout,omitempty"`
 }
 
 type PartitionConfiguration struct {
@@ -708,7 +728,7 @@ type AccountingSlurmConf struct {
 	// +kubebuilder:default="jobacct_gather/cgroup"
 	JobAcctGatherType *string `json:"jobAcctGatherType,omitempty"`
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=30
+	// +kubebuilder:default=0
 	JobAcctGatherFrequency *int `json:"jobAcctGatherFrequency,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum="NoShared";"UsePss";"OverMemoryKill";"DisableGPUAcct"
@@ -728,7 +748,16 @@ type AccountingSlurmConf struct {
 
 // SlurmNodeController defines the configuration for the Slurm controller node
 type SlurmNodeController struct {
-	SlurmNode `json:",inline"`
+	// CustomInitContainers represent additional init containers that should be added to created Pods
+	//
+	// +kubebuilder:validation:Optional
+	CustomInitContainers []corev1.Container `json:"customInitContainers,omitempty"`
+
+	// K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
+	// Must correspond to the name of one of [K8sNodeFilter]
+	//
+	// +kubebuilder:validation:Required
+	K8sNodeFilterName string `json:"k8sNodeFilterName"`
 
 	// Slurmctld represents the Slurm control daemon configuration
 	//
@@ -744,6 +773,11 @@ type SlurmNodeController struct {
 	//
 	// +kubebuilder:validation:Required
 	Volumes SlurmNodeControllerVolumes `json:"volumes"`
+
+	// PriorityClass defines the priority class for the Slurm controller pods
+	//
+	// +kubebuilder:validation:Optional
+	PriorityClass string `json:"priorityClass,omitempty"`
 }
 
 // SlurmNodeControllerVolumes define the volumes for the Slurm controller node
@@ -767,6 +801,16 @@ type SlurmNodeControllerVolumes struct {
 // SlurmNodeWorker defines the configuration for the Slurm worker node
 type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
+
+	// The maximum number of worker pods that can be unavailable during the update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// Absolute number is calculated from percentage by rounding down.
+	// Also, maxUnavailable can just be allowed to work with Parallel podManagementPolicy.
+	// Defaults to 20%.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="20%"
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
 	// Slurmd represents the Slurm daemon service configuration
 	//
@@ -821,13 +865,6 @@ type SlurmNodeWorker struct {
 	//
 	// +kubebuilder:validation:Optional
 	PriorityClass string `json:"priorityClass,omitempty"`
-
-	// WaitForController defines whether to wait for the slurmctld to be ready before starting the slurmd.
-	//
-	// +kubebuilder:deprecation:warning="The WaitForController field is deprecated and will be removed in a 1.22.0 release"
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	WaitForController *bool `json:"waitForController,omitempty"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node
@@ -965,6 +1002,12 @@ type SlurmExporter struct {
 	//
 	// +kubebuilder:validation:Optional
 	ExporterContainer NodeContainer `json:"exporterContainer"`
+
+	// CollectionInterval specifies how often to collect metrics from SLURM APIs
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="30s"
+	CollectionInterval prometheusv1.Duration `json:"collectionInterval,omitempty"`
 }
 
 // ExporterContainer defines the configuration for one of node containers
@@ -1103,73 +1146,6 @@ type NodeVolumeMount struct {
 	VolumeClaimTemplateSpec *corev1.PersistentVolumeClaimSpec `json:"volumeClaimTemplateSpec,omitempty"`
 }
 
-type Telemetry struct {
-	// It has to be set to true if OpenTelemetry Operator CRD is used
-	//
-	// +kubebuilder:validation:Optional
-	OpenTelemetryCollector *MetricsOpenTelemetryCollector `json:"openTelemetryCollector,omitempty"`
-	//It has to be set to true if Kubernetes events for Slurm jobs are sent
-	//
-	// +kubebuilder:validation:Optional
-	JobsTelemetry *JobsTelemetry `json:"jobsTelemetry,omitempty"`
-}
-
-type MetricsOpenTelemetryCollector struct {
-	// It has to be set to true if OpenTelemetry Operator is used
-	//
-	// +kubebuilder:default=false
-	Enabled bool `json:"enabled,omitempty"`
-
-	// It references the PodTemplate with the OpenTelemetry Collector configuration
-	//
-	// +kubebuilder:validation:Optional
-	PodTemplateNameRef *string `json:"podTemplateNameRef,omitempty"`
-
-	// It defines the number of replicas for the OpenTelemetry Collector
-	//
-	// +kubebuilder:default=1
-	ReplicasOtelCollector int32 `json:"replicasOtelCollector,omitempty"`
-	// Specifies the port for OtelCollector
-	//
-	// +kubebuilder:default=4317
-	OtelCollectorPort int32 `json:"otelCollectorPort,omitempty"`
-}
-
-// JobsTelemetry
-// XValidation: both OtelCollectorGrpcHost and OtelCollectorHttpHost cannot have values at the same time
-//
-// +kubebuilder:validation:XValidation:rule="!(has(self.otelCollectorGrpcHost) && has(self.otelCollectorHttpHost))",message="Both OtelCollectorGrpcHost and OtelCollectorHttpHost cannot be set at the same time."
-type JobsTelemetry struct {
-	// Defines whether to send Kubernetes events for Slurm jobs
-	//
-	// +kubebuilder:default=false
-	SendJobsEvents bool `json:"sendJobsEvents,omitempty"`
-
-	// Defines whether to send Opentelemetry metrics for Slurm jobs
-	//
-	// +kubebuilder:default=false
-	SendOtelMetrics bool `json:"sendOtelMetrics,omitempty"`
-
-	// Specifies the gRPC OtelCollector host for sending Opentelemetry metrics
-	//
-	// +kubebuilder:validation:Optional
-	OtelCollectorGrpcHost *string `json:"otelCollectorGrpcHost,omitempty"`
-
-	// Specifies the HTTP OtelCollector host for sending Opentelemetry metrics
-	//
-	// +kubebuilder:validation:Optional
-	OtelCollectorHttpHost *string `json:"otelCollectorHttpHost,omitempty"`
-
-	// Specifies the port for OtelCollector
-	//
-	// +kubebuilder:default=4317
-	OtelCollectorPort int32 `json:"otelCollectorPort,omitempty"`
-	// Specifies the path to the OtelCollector endpoint for sending Opentelemetry metrics
-	//
-	// +kubebuilder:default="/v1/metrics"
-	OtelCollectorPath string `json:"otelCollectorPath,omitempty"`
-}
-
 // PodMonitorConfig defines a prometheus PodMonitor object.
 type PodMonitorConfig struct {
 	// JobLabel to add to the PodMonitor object. If not set, the default value is "slurm-exporter"
@@ -1197,12 +1173,13 @@ type PodMonitorConfig struct {
 const (
 	KindSlurmCluster = "SlurmCluster"
 
-	ConditionClusterCommonAvailable      = "CommonAvailable"
-	ConditionClusterControllersAvailable = "ControllersAvailable"
-	ConditionClusterWorkersAvailable     = "WorkersAvailable"
-	ConditionClusterLoginAvailable       = "LoginAvailable"
-	ConditionClusterAccountingAvailable  = "AccountingAvailable"
-	ConditionClusterPopulateJailMode     = "PopulateJailMode"
+	ConditionClusterCommonAvailable            = "CommonAvailable"
+	ConditionClusterControllersAvailable       = "ControllersAvailable"
+	ConditionClusterWorkersAvailable           = "WorkersAvailable"
+	ConditionClusterLoginAvailable             = "LoginAvailable"
+	ConditionClusterAccountingAvailable        = "AccountingAvailable"
+	ConditionClusterSConfigControllerAvailable = "SConfigControllerAvailable"
+	ConditionClusterPopulateJailMode           = "PopulateJailMode"
 
 	PhaseClusterReconciling  = "Reconciling"
 	PhaseClusterNotAvailable = "Not available"
@@ -1216,6 +1193,18 @@ type SlurmClusterStatus struct {
 
 	// +kubebuilder:validation:Optional
 	Phase *string `json:"phase,omitempty"`
+
+	// ReadyWorkers represents the number of ready worker pods
+	// +kubebuilder:validation:Optional
+	ReadyWorkers *int32 `json:"readyWorkers,omitempty"`
+
+	// ReadyLogin represents the number of ready login pods
+	// +kubebuilder:validation:Optional
+	ReadyLogin *int32 `json:"readyLogin,omitempty"`
+
+	// ReadySConfigController represents the number of ready SConfigController pods
+	// +kubebuilder:validation:Optional
+	ReadySConfigController *int32 `json:"readySConfigController,omitempty"`
 }
 
 func (s *SlurmClusterStatus) SetCondition(condition metav1.Condition) {
@@ -1231,10 +1220,11 @@ func (s *SlurmClusterStatus) SetCondition(condition metav1.Condition) {
 // SlurmCluster is the Schema for the slurmclusters API
 //
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.phase`,description="The phase of Slurm cluster creation."
-// +kubebuilder:printcolumn:name="Controllers",type=integer,JSONPath=`.spec.slurmNodes.controller.size`,description="The number of controller nodes"
-// +kubebuilder:printcolumn:name="Workers",type=integer,JSONPath=`.spec.slurmNodes.worker.size`,description="The number of worker nodes"
-// +kubebuilder:printcolumn:name="Login",type=integer,JSONPath=`.spec.slurmNodes.login.size`,description="The number of login nodes"
-// +kubebuilder:printcolumn:name="Accounting",type=boolean,JSONPath=`.spec.slurmNodes.accounting.enabled`,description="Whether accounting is enabled"
+// +kubebuilder:printcolumn:name="Controllers",type=string,JSONPath=`.status.conditions[?(@.type=="ControllersAvailable")].status`,description="Whether controllers are ready"
+// +kubebuilder:printcolumn:name="Workers",type=integer,JSONPath=`.status.readyWorkers`,description="The number of ready worker pods"
+// +kubebuilder:printcolumn:name="Login",type=integer,JSONPath=`.status.readyLogin`,description="The number of ready login pods"
+// +kubebuilder:printcolumn:name="SConfigCtrl",type=string,JSONPath=`.status.conditions[?(@.type=="SConfigControllerAvailable")].status`,description="Whether SConfigController is ready"
+// +kubebuilder:printcolumn:name="Accounting",type=string,JSONPath=`.status.conditions[?(@.type=="AccountingAvailable")].status`,description="Whether accounting is ready"
 type SlurmCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

@@ -1,0 +1,126 @@
+suite: test config creation
+release:
+  name: test-name
+  namespace: test-ns
+templates:
+  - templates/02_config.yml
+set:
+  nameOverride: &chartName son
+  slack:
+    webhookUrl: url
+
+vars:
+  receiverName: &receiverName slack-channel
+
+tests:
+  - it: should render metadata
+    asserts:
+      - equal:
+          path: metadata.name
+          value: *chartName
+      - equal:
+          path: metadata.labels["son-slack-route"]
+          value: enabled
+
+  - it: should render route
+    set:
+      interval:
+        groupWait: &intervalGroupWait 1s
+        group: &intervalGroup 2s
+        repeat: &intervalRepeat 3s
+    asserts:
+      - equal:
+          path: spec.route.receiver
+          value: *receiverName
+      - equal:
+          path: spec.route.group_wait
+          value: *intervalGroupWait
+      - equal:
+          path: spec.route.group_interval
+          value: *intervalGroup
+      - equal:
+          path: spec.route.repeat_interval
+          value: *intervalRepeat
+
+  - it: should render receiver
+    set:
+      slack:
+        severityColor:
+          error: a
+          warning: b
+          good: c
+          unknown: d
+    asserts:
+      - equal:
+          path: spec.receivers[0].name
+          value: *receiverName
+      - equal:
+          path: spec.receivers[0].slack_configs[0].api_url.name
+          value: son-slack-webhook
+      - equal:
+          path: spec.receivers[0].slack_configs[0].api_url.key
+          value: url
+      - equal:
+          path: spec.receivers[0].slack_configs[0].title
+          value: '{{ .CommonAnnotations.title }}'
+      - equal:
+          path: spec.receivers[0].slack_configs[0].title_link
+          value: '{{ define "son.slack.msg.titleLink" }}{{ "" }}{{ end }}'
+
+      - equal:
+          path: spec.receivers[0].slack_configs[0].text
+          value: |-
+            {{ range .Alerts }}
+            {{- $id := .Labels.job_id }}
+            {{- $job := .Labels.job_name }}
+            {{- $state := .Labels.job_state }}
+            {{- $reason := .Labels.job_state_reason }}
+            {{- $user := .Labels.job_user }}
+            
+            {{- if eq $state "FAILED" }}
+            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} has *FAILED* (reason: `{{ $reason }}`).
+            
+            {{- else if eq $state "NODE_FAIL" }}
+            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was terminated due to a *NODE FAILURE* (reason: `{{ $reason }}`). It should be automatically restarted under the same job ID.
+            
+            {{- else if eq $state "OUT_OF_MEMORY" }}
+            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was killed for *EXCEEDING ITS MEMORY LIMIT* (reason: `{{ $reason }}`).
+            
+            {{- else if eq $state "CANCELLED" }}
+            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was *CANCELLED* (reason: `{{ $reason }}`). If this was not done manually, it may indicate an error.
+            
+            {{- else if eq $state "BOOT_FAIL" }}
+            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was removed from the queue due to an *EPHEMERAL NODE LAUNCH FAILURE* (reason: `{{ $reason }}`).
+            
+            {{- else if eq $state "DEADLINE" }}
+            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was removed from the queue because it *DIDN’T START WITHIN ITS DEADLINE* (reason: `{{ $reason }}`).
+            
+            {{- else if eq $state "PREEMPTED" }}
+            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was *PREEMPTED* by a higher-priority job (reason: `{{ $reason }}`).
+            
+            {{- else if eq $state "SUSPENDED" }}
+            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was *SUSPENDED* (reason: `{{ $reason }}`).
+            
+            {{- else if eq $state "TIMEOUT" }}
+            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was killed for *EXCEEDING ITS TIME LIMIT* (reason: `{{ $reason }}`).
+            
+            {{- else if eq $state "COMPLETED" }}
+            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} *COMPLETED* successfully.
+            
+            {{- else }}
+            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} ended in state `{{ $state }}` (reason: `{{ $reason }}`).
+            {{- end }}
+            
+            {{- end }}
+      - equal:
+          path: spec.receivers[0].slack_configs[0].color
+          value: |-
+            {{- if eq .CommonLabels.severity "error" -}}
+            a
+            {{- else if eq .CommonLabels.severity "warning" -}}
+            b
+            {{- else if eq .CommonLabels.severity "good" -}}
+            c
+            {{- else -}}
+            d
+            {{- end -}}

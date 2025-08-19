@@ -18,18 +18,19 @@ SHELL = /usr/bin/env bash -o pipefail
 # Limit the scope of generation otherwise it will try to generate configs for non-controller code
 GENPATH = "./api/v1;./api/v1alpha1;"
 
-CHART_PATH            		 = helm
-CHART_OPERATOR_PATH   		 = $(CHART_PATH)/soperator
-CHART_SOPERATORCHECKS_PATH   = $(CHART_PATH)/soperatorchecks
-CHART_NODECONFIGURATOR_PATH  = $(CHART_PATH)/nodeconfigurator
-CHART_OPERATOR_CRDS_PATH   	 = $(CHART_PATH)/soperator-crds
-CHART_CLUSTER_PATH    		 = $(CHART_PATH)/slurm-cluster
-CHART_STORAGE_PATH    		 = $(CHART_PATH)/slurm-cluster-storage
-CHART_FLUXCD_PATH    		 = $(CHART_PATH)/soperator-fluxcd
-CHART_ACTIVECHECK_PATH       = $(CHART_PATH)/soperator-activechecks
-CHART_DCGM_EXPORTER_PATH     = $(CHART_PATH)/soperator-dcgm-exporter
+CHART_PATH            		  = helm
+CHART_OPERATOR_PATH   		  = $(CHART_PATH)/soperator
+CHART_SOPERATORCHECKS_PATH    = $(CHART_PATH)/soperatorchecks
+CHART_NODECONFIGURATOR_PATH   = $(CHART_PATH)/nodeconfigurator
+CHART_OPERATOR_CRDS_PATH   	  = $(CHART_PATH)/soperator-crds
+CHART_CLUSTER_PATH    		  = $(CHART_PATH)/slurm-cluster
+CHART_STORAGE_PATH    		  = $(CHART_PATH)/slurm-cluster-storage
+CHART_FLUXCD_PATH    		  = $(CHART_PATH)/soperator-fluxcd
+CHART_ACTIVECHECK_PATH        = $(CHART_PATH)/soperator-activechecks
+CHART_DCGM_EXPORTER_PATH      = $(CHART_PATH)/soperator-dcgm-exporter
+CHART_SOPERATOR_NOTIFIER_PATH = $(CHART_PATH)/soperator-notifier
 
-SLURM_VERSION		  		= 24.11.5
+SLURM_VERSION		  		= 24.11.6
 UBUNTU_VERSION		  		?= noble
 VERSION               		= $(shell cat VERSION)
 
@@ -50,6 +51,7 @@ ifeq ($(shell uname), Darwin)
 else
     SED_COMMAND = sed -i -e
 endif
+
 ifeq ($(UNSTABLE), true)
     SHORT_SHA 					= $(shell git rev-parse --short=8 HEAD)
     OPERATOR_IMAGE_TAG  		= $(VERSION)-$(SHORT_SHA)
@@ -190,6 +192,7 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_FLUXCD_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_ACTIVECHECK_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_DCGM_EXPORTER_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_NOTIFIER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_CRDS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
@@ -199,6 +202,7 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_FLUXCD_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_ACTIVECHECK_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_DCGM_EXPORTER_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_NOTIFIER_PATH)/Chart.yaml"
 	@# endregion helm chart versions
 #
 	@# region helm/slurm-cluster/values.yaml
@@ -261,6 +265,7 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".slurmCluster.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".soperator.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".observability.dcgmExporter.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
+	@$(YQ) -i ".notifier.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@# endregion helm/soperator-fluxcd/values.yaml
 
 	@# region internal/consts
@@ -288,39 +293,94 @@ run: manifests generate fmt vet ## Run a controller from your host with native t
 	 -log-level=debug -leader-elect=false -operator-namespace=soperator-system --enable-topology-controller=true
 
 .PHONY: docker-build-go-base
-docker-build-go-base: ## Build shared Go base image
-	docker build $(DOCKER_BUILD_ARGS) --tag go-base:latest --target go-base ${DOCKER_IGNORE_CACHE} -f images/common/go-base.dockerfile .
+docker-build-go-base: ## Build go-base image locally
+# Build amd
+	docker build \
+		--platform linux/amd64 \
+		--target go-base \
+		-t go-base:amd64 \
+		-f images/common/go-base.dockerfile \
+		.
 
-.PHONY: docker-build
-docker-build: ## Build docker image
+	# Build arm
+	docker build \
+		--platform linux/arm64 \
+		--target go-base \
+		-t go-base:arm64 \
+		-f images/common/go-base.dockerfile \
+		.
+
+.PHONY: docker-build-and-push
+docker-build-and-push: ## Build and push docker multi arch image
 ifndef IMAGE_NAME
-	$(error IMAGE_NAME is not set, docker image cannot be built)
+	$(error IMAGE_NAME is not set)
 endif
 ifndef DOCKERFILE
-	$(error DOCKERFILE is not set, docker image cannot be built)
+	$(error DOCKERFILE is not set)
 endif
-	docker build $(DOCKER_BUILD_ARGS) --tag $(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION} --target ${IMAGE_NAME} ${DOCKER_IGNORE_CACHE} ${DOCKER_LOAD} -f images/${DOCKERFILE} ${DOCKER_OUTPUT} .
+ifndef UNSTABLE
+	$(error UNSTABLE is not set)
+endif
+# Build amd
+	DOCKER_BUILDKIT=1 docker build \
+		--platform linux/amd64 \
+		--target ${IMAGE_NAME} \
+		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64" \
+		-f images/${DOCKERFILE} \
+		$(DOCKER_BUILD_ARGS) \
+		.
 
-.PHONY: docker-push
-docker-push: ## Push docker image
-ifndef IMAGE_NAME
-	$(error IMAGE_NAME is not set, docker image can not be pushed)
-endif
-	docker push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+	# Build arm
+	DOCKER_BUILDKIT=1 docker build \
+		--platform linux/arm64 \
+		--target ${IMAGE_NAME} \
+		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" \
+		-f images/${DOCKERFILE} \
+		$(DOCKER_BUILD_ARGS) \
+		.
+	# Push
+	docker push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
+	docker push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64"
+
 ifeq ($(UNSTABLE), false)
-	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
-	docker push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
+	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64"
+	docker push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
+	docker push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64"
 endif
+
+.PHONY: docker-build-jail
+docker-build-jail: ## Build jail
+ifndef IMAGE_VERSION
+	$(error IMAGE_VERSION is not set, docker image cannot be built)
+endif
+	# Build amd
+	DOCKER_BUILDKIT=1 docker build \
+		--platform linux/amd64 \
+		--target jail \
+		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-amd64" \
+		-f images/jail/jail.dockerfile \
+		--output type=tar,dest=images/jail_rootfs_amd64.tar \
+		.
+
+	# Build arm
+	DOCKER_BUILDKIT=1 docker build \
+		--platform linux/arm64 \
+		--target jail \
+		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-arm64" \
+		-f images/jail/jail.dockerfile \
+		--output type=tar,dest=images/jail_rootfs_arm64.tar \
+		.
 
 .PHONY: docker-manifest
 docker-manifest: ## Create and push docker manifest for multiple image architecture
 ifndef IMAGE_NAME
 	$(error IMAGE_NAME is not set, docker manifest can not be pushed)
 endif
-	docker manifest create "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
+	docker manifest create $(AMEND) "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
 	docker manifest push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 ifeq ($(UNSTABLE), false)
-	docker manifest create "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
+	docker manifest create $(AMEND) "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
 	docker manifest push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 endif
 
@@ -446,7 +506,9 @@ $(YQ): $(LOCALBIN)
 helmtest: check-helm
 	@echo "Running helm unittest"
 	@helm unittest $(CHART_PATH)/soperator-fluxcd
+	@helm unittest $(CHART_PATH)/slurm-cluster
 	@helm unittest $(CHART_PATH)/slurm-cluster-storage
+	@helm unittest $(CHART_PATH)/soperator-notifier
 
 check-helm:
 	@echo "Checking Helm installation..."

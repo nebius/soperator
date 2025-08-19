@@ -45,7 +45,9 @@ func (r *StatefulSetReconciler) Reconcile(
 
 func (r *StatefulSetReconciler) patch(existing, desired client.Object) (client.Patch, error) {
 	patchImpl := func(dst, src *appsv1.StatefulSet) client.Patch {
-		res := client.MergeFrom(dst.DeepCopy())
+		original := dst.DeepCopy()
+
+		res := client.MergeFrom(original)
 
 		dst.Spec.Template.ObjectMeta.Labels = src.Spec.Template.ObjectMeta.Labels
 		// Copy annotations from the desired StatefulSet to the existing StatefulSet

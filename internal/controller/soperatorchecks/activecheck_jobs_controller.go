@@ -6,6 +6,7 @@ import (
 	"time"
 
 	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -206,36 +207,8 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			}
 
 			if slurmJob.IsFailedState() {
-				if slurmJob.StateReason != "" {
-					failReasons = append(failReasons, slurmJob.StateReason)
-				}
-
-				if activeCheck.Spec.Reactions.DrainSlurmNode {
-					nodes, err := slurmJob.GetNodeList()
-					if err != nil {
-						return ctrl.Result{}, fmt.Errorf("get node list: %w", err)
-					}
-
-					reason := consts.SlurmNodeReasonActiveCheckFailedUnknown
-					if activeCheck.Spec.Reactions.SetCondition {
-						reason = fmt.Sprintf("[HC] Failed %s: job %d [slurm_job]", activeCheckName, slurmJob.ID)
-					}
-					for _, node := range nodes {
-						resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, node,
-							api.V0041UpdateNodeMsg{
-								Reason: ptr.To(reason),
-								State:  ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateDRAIN}),
-							},
-						)
-						if err != nil {
-							return ctrl.Result{}, fmt.Errorf("post drain slurm node: %w", err)
-						}
-						if resp.JSON200.Errors != nil && len(*resp.JSON200.Errors) != 0 {
-							return ctrl.Result{}, fmt.Errorf("post drain returned errors: %v", *resp.JSON200.Errors)
-						}
-
-						logger.V(1).Info("slurm node state is updated to DRAIN")
-					}
+				if err := r.updateSlurmNodeWithReaction(ctx, logger, slurmJob, activeCheck, slurmAPIClient); err != nil {
+					return ctrl.Result{}, fmt.Errorf("get node list: %w", err)
 				}
 			}
 		}
@@ -308,6 +281,48 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 	logger.Info("Reconciled ActiveCheckJob")
 	return ctrl.Result{}, nil
+}
+
+func (r *ActiveCheckJobReconciler) updateSlurmNodeWithReaction(
+	ctx context.Context,
+	logger logr.Logger,
+	slurmJob slurmapi.Job,
+	activeCheck *slurmv1alpha1.ActiveCheck,
+	slurmAPIClient slurmapi.Client,
+) error {
+	nodes, err := slurmJob.GetNodeList()
+	if err != nil {
+		return fmt.Errorf("get node list: %w", err)
+	}
+
+	failureMessage := fmt.Sprintf("[node_problem] Failed %s: job %d [slurm_job]", activeCheck.Name, slurmJob.ID)
+	reason := consts.SlurmNodeReasonActiveCheckFailedUnknown
+	if activeCheck.Spec.Reactions.SetCondition {
+		reason = failureMessage
+	}
+	for _, node := range nodes {
+		updateReq := api.V0041UpdateNodeMsg{}
+		if activeCheck.Spec.Reactions.DrainSlurmNode {
+			updateReq.Reason = ptr.To(reason)
+			updateReq.State = ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateDRAIN})
+		}
+		if activeCheck.Spec.Reactions.CommentSlurmNode {
+			updateReq.Comment = ptr.To(failureMessage)
+		}
+
+		resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, node, updateReq)
+		if err != nil {
+			return fmt.Errorf("post update slurm node: %w", err)
+		}
+		if resp.JSON200.Errors != nil && len(*resp.JSON200.Errors) != 0 {
+			return fmt.Errorf("post update returned errors: %v", *resp.JSON200.Errors)
+		}
+
+		logger.V(1).Info(fmt.Sprintf("slurm node is updated, drain: %t, comment %t",
+			activeCheck.Spec.Reactions.DrainSlurmNode, activeCheck.Spec.Reactions.CommentSlurmNode))
+	}
+
+	return nil
 }
 
 func (r *ActiveCheckJobReconciler) getActiveCheckNameFromJob(ctx context.Context, k8sJob *batchv1.Job) (string, error) {

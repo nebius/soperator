@@ -11,3 +11,5 @@ pushd /tmp || exit 1
   ./aws/install
   rm -rf /tmp/*
 popd || exit 1
+
+rm -rf /usr/local/aws-cli/v2/*/dist/awscli/examples

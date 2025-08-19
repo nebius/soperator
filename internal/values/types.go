@@ -77,7 +77,38 @@ func buildStatefulSetFrom(
 	}
 }
 
+func buildStatefulSetWithMaxUnavailableFrom(
+	name string,
+	size int32,
+	maxUnavailable *intstr.IntOrString,
+) StatefulSet {
+	result := StatefulSet{
+		Name:     name,
+		Replicas: size,
+	}
+
+	if maxUnavailable != nil {
+		result.MaxUnavailable = *maxUnavailable
+	}
+
+	return result
+}
+
 // endregion StatefulSet
+
+// region DaemonSet
+
+type DaemonSet struct {
+	Name string
+}
+
+func buildDaemonSetFrom(name string) DaemonSet {
+	return DaemonSet{
+		Name: name,
+	}
+}
+
+// endregion DaemonSet
 
 // region CR version
 

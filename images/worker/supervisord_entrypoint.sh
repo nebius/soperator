@@ -24,6 +24,9 @@ ln -s /mnt/jail/etc/shadow /etc/shadow
 ln -s /mnt/jail/etc/gshadow /etc/gshadow
 chown -h 0:42 /etc/{shadow,gshadow}
 
+echo "Link SSH \"message of the day\" scripts from jail"
+ln -s /mnt/jail/etc/update-motd.d /etc/update-motd.d
+
 echo "Link home from jail because slurmd uses it"
 ln -s /mnt/jail/home /home
 

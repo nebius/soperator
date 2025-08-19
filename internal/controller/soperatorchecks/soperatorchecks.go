@@ -118,9 +118,9 @@ func getK8SNode(ctx context.Context, c client.Client, nodeName string) (*corev1.
 	return node, nil
 }
 
-func listK8SNodes(ctx context.Context, c client.Client, limit int64, nextToken string) (corev1.NodeList, error) {
+func listK8SNodesWithReader(ctx context.Context, reader client.Reader, limit int64, nextToken string) (corev1.NodeList, error) {
 	nodes := &corev1.NodeList{}
-	if err := c.List(ctx, nodes, &client.ListOptions{
+	if err := reader.List(ctx, nodes, &client.ListOptions{
 		Limit:    limit,
 		Continue: nextToken,
 	}); err != nil {

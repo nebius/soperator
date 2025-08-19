@@ -78,7 +78,8 @@ observability:
   enabled: true
   clusterName: soperator
   publicEndpointEnabled: true
-  projectId: project-e00h61cxzwnf6zksvdn77
+  logsProjectId: default-project-id
+  metricsProjectId: default-project-id
   region: eu-north1
   opentelemetry:
     enabled: true
@@ -142,6 +143,7 @@ observability:
             promscrape.maxScrapeSize: "33554432"
             promscrape.dropOriginalLabels: "true"
             promscrape.streamParse: "true"
+          externalLabels: {}
           remoteWriteSettings: {}
           remoteWrite:
             - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8429/api/v1/write
@@ -183,7 +185,7 @@ observability:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 1.21.9
+    version: 1.21.11
     namespace: soperator
     releaseName: soperator-dcgm-exporter
     values:
@@ -202,7 +204,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.21.9
+  version: 1.21.11
   namespace: soperator
   releaseName: soperator
   values: null
@@ -218,7 +220,7 @@ soperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.21.9
+  version: 1.21.11
   namespace: "soperator-system"
   releaseName: soperator-controller
   values:
@@ -264,16 +266,27 @@ helmReleaseTriggerOperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 0.2.0
+  version: 0.0.1
   namespace: flux-system
   releaseName: helmrelease-trigger
   values:
     enableHrAutodiscovery: true
-    repository: "ghcr.io/uburro/helmrelease-trigger-operator"
+    repository: "cr.eu-north1.nebius.cloud/soperator/helmrelease-trigger-operator"
     resources:
       limits:
         memory: 128Mi
       requests:
         cpu: 100m
         memory: 128Mi
+  overrideValues: null
+notifier:
+  enabled: false
+  interval: 5m
+  timeout: 5m
+  version: 1.21.11
+  namespace: monitoring-system
+  releaseName: soperator-notifier
+  values:
+    slack:
+      webhookUrl: null
   overrideValues: null

@@ -1,0 +1,51 @@
+name: E2E Test Scheduler
+
+on:
+  schedule:
+    # Every hour - alternates between main and release branches
+    - cron: '0 */1 * * *'
+  workflow_dispatch:  # Allow manual trigger for testing
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  trigger-e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Determine branch and terraform ref
+        id: select_params
+        run: |
+          # Configuration
+          RELEASE_BRANCH="soperator-release-1.21"
+
+          HOUR=$(date -u +%-H)  # %-H removes leading zeros to avoid octal interpretation
+          if [ $((HOUR % 2)) -eq 0 ]; then
+            echo "ref=main" >> $GITHUB_OUTPUT
+            echo "terraform_ref=main" >> $GITHUB_OUTPUT
+            echo "Even hour ($HOUR UTC) - Testing main branch with terraform main"
+          else
+            echo "ref=$RELEASE_BRANCH" >> $GITHUB_OUTPUT
+            echo "terraform_ref=$RELEASE_BRANCH" >> $GITHUB_OUTPUT
+            echo "Odd hour ($HOUR UTC) - Testing $RELEASE_BRANCH branch with terraform $RELEASE_BRANCH"
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Trigger E2E test workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REF="${{ steps.select_params.outputs.ref }}"
+          TERRAFORM_REF="${{ steps.select_params.outputs.terraform_ref }}"
+
+          echo "Triggering E2E test on branch: $REF"
+          echo "With terraform ref: $TERRAFORM_REF"
+
+          gh workflow run e2e_test.yml \
+            --ref "$REF" \
+            -f terraform_repo_ref="$TERRAFORM_REF"
+          echo "E2E test workflow triggered successfully"

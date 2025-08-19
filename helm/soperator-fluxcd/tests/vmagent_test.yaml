@@ -1,0 +1,440 @@
+suite: test vmagent edge cases
+templates:
+  - templates/vm-stack.yaml
+
+set:
+  observability:
+    metricsProjectId: default-project-id
+
+tests:
+  - it: should handle null projectId gracefully
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: true
+        metricsProjectId: null
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.vmagent.spec.remoteWriteSettings.label.container_id
+          value: null
+      - matchRegex:
+          path: spec.values.vmagent.spec.remoteWrite[0].url
+          pattern: ".*/projects//buckets.*"
+
+  - it: should handle empty strings in projectId
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: true
+      metricsProjectId: ""
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.vmagent.spec.remoteWriteSettings.label.container_id
+          value: "default-project-id"
+
+  - it: should handle complex nested custom values
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: true
+          values:
+            vmagent:
+              spec:
+                resources:
+                  limits:
+                    memory: "2Gi"
+                    cpu: "1000m"
+                  requests:
+                    memory: "1Gi"
+                    cpu: "500m"
+                extraEnvs:
+                  - name: "COMPLEX_CONFIG"
+                    valueFrom:
+                      configMapKeyRef:
+                        name: "vmagent-config"
+                        key: "config.yaml"
+                  - name: "SECRET_TOKEN"
+                    valueFrom:
+                      secretKeyRef:
+                        name: "vmagent-secrets"
+                        key: "token"
+                volumeMounts:
+                  - name: "config-volume"
+                    mountPath: "/etc/vmagent"
+                    readOnly: true
+                  - name: "cache-volume"
+                    mountPath: "/tmp/cache"
+                volumes:
+                  - name: "config-volume"
+                    configMap:
+                      name: "vmagent-config"
+                      defaultMode: 0644
+                  - name: "cache-volume"
+                    emptyDir:
+                      sizeLimit: "1Gi"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.vmagent.spec.resources.limits.memory
+          value: "2Gi"
+      - equal:
+          path: spec.values.vmagent.spec.resources.requests.cpu
+          value: "500m"
+      - lengthEqual:
+          path: spec.values.vmagent.spec.extraEnvs
+          count: 3
+      - equal:
+          path: spec.values.vmagent.spec.extraEnvs[1].valueFrom.configMapKeyRef.name
+          value: "vmagent-config"
+      - equal:
+          path: spec.values.vmagent.spec.extraEnvs[2].valueFrom.secretKeyRef.key
+          value: "token"
+      - lengthEqual:
+          path: spec.values.vmagent.spec.volumeMounts
+          count: 3  # 2 custom + 1 tsa-token
+      - lengthEqual:
+          path: spec.values.vmagent.spec.volumes
+          count: 3   # 2 custom + 1 tsa-token
+
+  - it: should override default extraArgs correctly
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: true
+          values:
+            vmagent:
+              spec:
+                extraArgs:
+                  "promscrape.dropOriginalLabels": "false"  # Override default
+                  "remoteWrite.rateLimit": "10"             # Override default
+                  "promscrape.maxScrapeSize": "67108864"    # Override default
+                  "custom.newArg": "newValue"               # Add new
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.vmagent.spec.extraArgs["promscrape.dropOriginalLabels"]
+          value: "false"
+      - equal:
+          path: spec.values.vmagent.spec.extraArgs["remoteWrite.rateLimit"]
+          value: "10"
+      - equal:
+          path: spec.values.vmagent.spec.extraArgs["promscrape.maxScrapeSize"]
+          value: "67108864"
+      - equal:
+          path: spec.values.vmagent.spec.extraArgs["custom.newArg"]
+          value: "newValue"
+      # Ensure other defaults are still present
+      - equal:
+          path: spec.values.vmagent.spec.extraArgs["promscrape.streamParse"]
+          value: "true"
+      - equal:
+          path: spec.values.vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
+          value: "/mnt/cloud-metadata/tsa-token"
+
+  - it: should handle special characters in projectId
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: true
+        metricsProjectId: "test-project_123.dev"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.vmagent.spec.remoteWriteSettings.label.container_id
+          value: "test-project_123.dev"
+      - matchRegex:
+          path: spec.values.vmagent.spec.remoteWrite[0].url
+          pattern: "[.]*.test-project_123.dev.[.]*"
+
+  - it: should validate template conditionals structure
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: true
+          values:
+            vmagent:
+              spec: {}  # Empty spec to test conditional blocks
+    asserts:
+      - hasDocuments:
+          count: 1
+      # Should still have default values for public endpoint
+      - exists:
+          path: spec.values.vmagent.spec.remoteWriteSettings
+      - exists:
+          path: spec.values.vmagent.spec.remoteWrite
+      - exists:
+          path: spec.values.vmagent.spec.extraArgs
+      - exists:
+          path: spec.values.vmagent.spec.volumeMounts
+      - exists:
+          path: spec.values.vmagent.spec.volumes
+      - exists:
+          path: spec.values.vmagent.spec.resources
+      # Should not have these sections when not provided
+      - notExists:
+          path: spec.values.vmagent.spec.extraEnv
+
+  - it: should handle boolean and numeric values in extraArgs
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: false
+          values:
+            vmagent:
+              spec:
+                extraArgs:
+                  "flag.enabled": true
+                  "flag.disabled": false
+                  "numeric.value": 42
+                  "float.value": 3.14
+                  "string.value": "test"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.vmagent.spec.extraArgs["flag.enabled"]
+          value: true
+      - equal:
+          path: spec.values.vmagent.spec.extraArgs["flag.disabled"]
+          value: false
+      - equal:
+          path: spec.values.vmagent.spec.extraArgs["numeric.value"]
+          value: 42
+      - equal:
+          path: spec.values.vmagent.spec.extraArgs["float.value"]
+          value: 3.14
+      - equal:
+          path: spec.values.vmagent.spec.extraArgs["string.value"]
+          value: "test"
+
+  - it: should handle no externalLabels
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notExists:
+          path: spec.values.vmagent.spec.externalLabels
+
+  - it: should handle externalLabels
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: true
+          values:
+            vmagent:
+              spec:
+                externalLabels:
+                  a: b
+                  foo: bar
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.vmagent.spec.externalLabels["a"]
+          value: b
+      - equal:
+          path: spec.values.vmagent.spec.externalLabels["foo"]
+          value: bar
+      - equal:
+          path: spec.values.vmagent.spec.remoteWriteSettings.label["a"]
+          value: b
+      - equal:
+          path: spec.values.vmagent.spec.remoteWriteSettings.label["foo"]
+          value: bar
+
+  - it: should merge custom remoteWrite with default when publicEndpointEnabled is true
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: true
+          values:
+            vmagent:
+              spec:
+                remoteWrite:
+                  - url: "https://custom-endpoint.com/write"
+                    headers:
+                      Authorization: "Bearer custom-token"
+                  - url: "https://secondary-endpoint.com/write"
+                    writeRelabelConfigs:
+                      - sourceLabels: [__name__]
+                        regex: "custom_.*"
+                        action: keep
+    asserts:
+      - hasDocuments:
+          count: 1
+      # Should have both default and custom remoteWrite entries
+      - lengthEqual:
+          path: spec.values.vmagent.spec.remoteWrite
+          count: 3  # 1 default + 2 custom
+      # Check default endpoint (should be first)
+      - equal:
+          path: spec.values.vmagent.spec.remoteWrite[0].url
+          value: "https://write.monitoring.eu-north1.nebius.cloud/projects/default-project-id/buckets/soperator/prometheus"
+      - exists:
+          path: spec.values.vmagent.spec.remoteWrite[0].inlineUrlRelabelConfig
+      # Check first custom endpoint
+      - equal:
+          path: spec.values.vmagent.spec.remoteWrite[1].url
+          value: "https://custom-endpoint.com/write"
+      - equal:
+          path: spec.values.vmagent.spec.remoteWrite[1].headers.Authorization
+          value: "Bearer custom-token"
+      # Check second custom endpoint
+      - equal:
+          path: spec.values.vmagent.spec.remoteWrite[2].url
+          value: "https://secondary-endpoint.com/write"
+      - equal:
+          path: spec.values.vmagent.spec.remoteWrite[2].writeRelabelConfigs[0].action
+          value: "keep"
+
+  - it: should merge custom volumeMounts and volumes with defaults when publicEndpointEnabled is true
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: true
+          values:
+            vmagent:
+              spec:
+                volumeMounts:
+                  - name: "custom-config"
+                    mountPath: "/etc/custom-config"
+                    readOnly: true
+                  - name: "data-volume"
+                    mountPath: "/data"
+                volumes:
+                  - name: "custom-config"
+                    configMap:
+                      name: "vmagent-custom-config"
+                  - name: "data-volume"
+                    persistentVolumeClaim:
+                      claimName: "vmagent-data"
+    asserts:
+      - hasDocuments:
+          count: 1
+      # Should have both default and custom volumeMounts
+      - lengthEqual:
+          path: spec.values.vmagent.spec.volumeMounts
+          count: 3  # 1 default tsa-token + 2 custom
+      # Check default tsa-token mount
+      - equal:
+          path: spec.values.vmagent.spec.volumeMounts[0].name
+          value: "cloud-metadata"
+      - equal:
+          path: spec.values.vmagent.spec.volumeMounts[0].mountPath
+          value: "/mnt/cloud-metadata"
+      - equal:
+          path: spec.values.vmagent.spec.volumeMounts[0].readOnly
+          value: true
+      # Check custom mounts
+      - equal:
+          path: spec.values.vmagent.spec.volumeMounts[1].name
+          value: "custom-config"
+      - equal:
+          path: spec.values.vmagent.spec.volumeMounts[1].mountPath
+          value: "/etc/custom-config"
+      - equal:
+          path: spec.values.vmagent.spec.volumeMounts[2].name
+          value: "data-volume"
+      - equal:
+          path: spec.values.vmagent.spec.volumeMounts[2].mountPath
+          value: "/data"
+      # Should have both default and custom volumes
+      - lengthEqual:
+          path: spec.values.vmagent.spec.volumes
+          count: 3  # 1 default tsa-token + 2 custom
+      # Check default tsa-token volume
+      - equal:
+          path: spec.values.vmagent.spec.volumes[0].name
+          value: "cloud-metadata"
+      - equal:
+          path: spec.values.vmagent.spec.volumes[0].hostPath.path
+          value: "/mnt/cloud-metadata"
+      - equal:
+          path: spec.values.vmagent.spec.volumes[0].hostPath.type
+          value: "Directory"
+      # Check custom volumes
+      - equal:
+          path: spec.values.vmagent.spec.volumes[1].name
+          value: "custom-config"
+      - equal:
+          path: spec.values.vmagent.spec.volumes[1].configMap.name
+          value: "vmagent-custom-config"
+      - equal:
+          path: spec.values.vmagent.spec.volumes[2].name
+          value: "data-volume"
+      - equal:
+          path: spec.values.vmagent.spec.volumes[2].persistentVolumeClaim.claimName
+          value: "vmagent-data"
+
+  - it: should handle edge case with empty custom arrays when publicEndpointEnabled is true
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: true
+          values:
+            vmagent:
+              spec:
+                remoteWrite: []
+                extraEnv: []
+                volumeMounts: []
+                volumes: []
+    asserts:
+      - hasDocuments:
+          count: 1
+      # Should still have defaults when custom arrays are empty
+      - lengthEqual:
+          path: spec.values.vmagent.spec.remoteWrite
+          count: 1  # Only default
+      - equal:
+          path: spec.values.vmagent.spec.remoteWrite[0].url
+          value: "https://write.monitoring.eu-north1.nebius.cloud/projects/default-project-id/buckets/soperator/prometheus"
+      # Should have default volumeMounts and volumes
+      - lengthEqual:
+          path: spec.values.vmagent.spec.volumeMounts
+          count: 1  # Only default tsa-token
+      - equal:
+          path: spec.values.vmagent.spec.volumeMounts[0].name
+          value: "cloud-metadata"
+      - lengthEqual:
+          path: spec.values.vmagent.spec.volumes
+          count: 1  # Only default tsa-token
+      - equal:
+          path: spec.values.vmagent.spec.volumes[0].name
+          value: "cloud-metadata"
+      # Should not have extraEnv when empty
+      - notExists:
+          path: spec.values.vmagent.spec.extraEnv

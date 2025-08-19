@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/values"
@@ -33,6 +34,7 @@ func TestRenderContainerExporter(t *testing.T) {
 				Image:     imageExporter,
 				Resources: resourceExporter,
 			},
+			CollectionInterval: prometheusv1.Duration("30s"),
 		},
 		NodeRest: values.SlurmREST{
 			Service: values.Service{Name: "rest-service"},
@@ -57,6 +59,13 @@ func TestRenderContainerExporter(t *testing.T) {
 			"--cluster-namespace=soperator-ns",
 			"--cluster-name=test-cluster",
 			"--slurm-api-server=http://rest-service.soperator-ns.svc:6817",
+			// NOTE: --collection-interval removed for forward compatibility
+		},
+		Env: []corev1.EnvVar{
+			{Name: "SLURM_EXPORTER_CLUSTER_NAMESPACE", Value: "soperator-ns"},
+			{Name: "SLURM_EXPORTER_CLUSTER_NAME", Value: "test-cluster"},
+			{Name: "SLURM_EXPORTER_SLURM_API_SERVER", Value: "http://rest-service.soperator-ns.svc:6817"},
+			{Name: "SLURM_EXPORTER_COLLECTION_INTERVAL", Value: "30s"},
 		},
 	}
 
@@ -69,4 +78,5 @@ func TestRenderContainerExporter(t *testing.T) {
 	assert.Equal(t, want.Image, got.Image)
 	assert.Equal(t, want.Resources, got.Resources)
 	assert.Equal(t, want.Args, got.Args)
+	assert.Equal(t, want.Env, got.Env)
 }

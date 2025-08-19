@@ -5,7 +5,8 @@ import (
 )
 
 const (
-	SlurmCluster = consts.Slurm + ".cluster"
+	SlurmCluster      = consts.Slurm + ".cluster"
+	SlurmJailedConfig = consts.Slurm + ".jailedConfig"
 )
 
 const (
@@ -17,4 +18,11 @@ const (
 
 	SubResourceKind = SlurmCluster + ".subResourceKind"
 	SubResourceName = SlurmCluster + ".subResourceName"
+
+	JailedConfigNamespace = SlurmJailedConfig + ".namespace"
+	JailedConfigName      = SlurmJailedConfig + ".name"
+
+	JailedConfigFilesCount = SlurmJailedConfig + ".filesCount"
+
+	JailedConfigNodesLeft = SlurmJailedConfig + ".nodesLeft"
 )

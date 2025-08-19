@@ -8,16 +8,31 @@ echo "Cancelling currently active jobs with the same name..."
 scancel --partition="$PARTITION" --name="$ACTIVE_CHECK_NAME"
 
 echo "Setting Extra field to all nodes..."
+JQ_EXCLUDE_BAD_NODES='
+.sinfo[]
+| select(
+    (
+      .node.state
+      | map(test("^(DOWN|ERROR|DRAIN|RESERVED|INVALID_REG|NOT_RESPONDING|POWER_DOWN|POWERING_DOWN|REBOOT_ISSUED|REBOOT_REQUESTED)$"))
+      | any
+    )
+    | not
+  )
+| .nodes.nodes[]
+'
 NUM_NODES=0
-for node in $(sinfo -N --partition="$PARTITION" --responding --states="IDLE,MIXED,ALLOCATED" --noheader -o "%N" | tr '\n' ' '); do
-    echo "Updating node: $node"
-    extra_json=$(scontrol show node "$node" | awk -F= '/Extra=/{print $2}')
-    if [[ -z "$extra_json" || "$extra_json" == "none" ]]; then
-        extra_json="{}"
-    fi
-    updated_json=$(echo "$extra_json" | jq -c --arg key "$ACTIVE_CHECK_NAME" --argjson val true '.[$key] = $val')
-    scontrol update NodeName="$node" Extra="$updated_json"
-    NUM_NODES=$(( NUM_NODES + 1 ))
+for node in $(sinfo -N --partition="$PARTITION" --responding --json | jq -r "$JQ_EXCLUDE_BAD_NODES"); do
+    (
+        flock 9
+        echo "Updating node: $node"
+        extra_json=$(scontrol show node "$node" | awk -F= '/Extra=/{print $2}')
+        if [[ -z "$extra_json" || "$extra_json" == "none" ]]; then
+            extra_json="{}"
+        fi
+        updated_json=$(echo "$extra_json" | jq -c --arg key "$ACTIVE_CHECK_NAME" --argjson val true '.[$key] = $val')
+        scontrol update NodeName="$node" Extra="$updated_json"
+        exit 0
+    ) 9>"/mnt/jail/etc/active_check_${node}.lock" && NUM_NODES=$(( NUM_NODES + 1 ))
 done
 
 echo "Submitting Slurm array job..."

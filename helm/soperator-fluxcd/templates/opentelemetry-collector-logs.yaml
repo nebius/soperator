@@ -63,7 +63,7 @@ spec:
             initial_interval: 200ms
           timeout: 5s
           headers:
-            iam-container: {{ .Values.observability.projectId }}
+            iam-container: {{ .Values.observability.logsProjectId }}
           auth:
             authenticator: bearertokenauth
         {{- end }}

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eox
+set -euxo pipefail
 
 echo "[$(date)] Unmap the Slurm job with DCGM metrics"
 
@@ -9,12 +9,12 @@ echo "[$(date)] Unmap the Slurm job with DCGM metrics"
 #   check those before changing it here
 metrics_dir="/var/run/nebius/slurm"
 
-if [[ -z "${CUDA_VISIBLE_DEVICES:-}" ]]; then
+if [[ -z "${SLURM_JOB_GPUS:-}" ]]; then
     echo "No GPU devices are requested by user" >&2
     exit 0
 fi
 
-IFS=',' read -ra cuda_devs <<< "$CUDA_VISIBLE_DEVICES"
+IFS=',' read -ra cuda_devs <<< "$SLURM_JOB_GPUS"
 
 for gpu_id in "${cuda_devs[@]}"; do
     [[ -z "$gpu_id" ]] && continue

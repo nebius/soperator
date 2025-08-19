@@ -32,6 +32,7 @@ import (
 	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
@@ -68,18 +69,23 @@ import (
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=security-profiles-operator.x-k8s.io,resources=apparmorprofiles,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch;
+//+kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/finalizers,verbs=update
 
 // SlurmClusterReconciler reconciles a SlurmCluster object
 type SlurmClusterReconciler struct {
 	*reconciler.Reconciler
 
 	ConfigMap           *reconciler.ConfigMapReconciler
+	JailedConfig        *reconciler.JailedConfigReconciler
 	Secret              *reconciler.SecretReconciler
 	CronJob             *reconciler.CronJobReconciler
 	Job                 *reconciler.JobReconciler
 	Service             *reconciler.ServiceReconciler
 	StatefulSet         *reconciler.StatefulSetReconciler
 	AdvancedStatefulSet *reconciler.AdvancedStatefulSetReconciler
+	DaemonSet           *reconciler.DaemonSetReconciler
 	ServiceAccount      *reconciler.ServiceAccountReconciler
 	Role                *reconciler.RoleReconciler
 	RoleBinding         *reconciler.RoleBindingReconciler
@@ -95,12 +101,14 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 	return &SlurmClusterReconciler{
 		Reconciler:          r,
 		ConfigMap:           reconciler.NewConfigMapReconciler(r),
+		JailedConfig:        reconciler.NewJailedConfigReconciler(r),
 		Secret:              reconciler.NewSecretReconciler(r),
 		CronJob:             reconciler.NewCronJobReconciler(r),
 		Job:                 reconciler.NewJobReconciler(r),
 		Service:             reconciler.NewServiceReconciler(r),
 		StatefulSet:         reconciler.NewStatefulSetReconciler(r),
 		AdvancedStatefulSet: reconciler.NewAdvancedStatefulSetReconciler(r),
+		DaemonSet:           reconciler.NewDaemonSetReconciler(r),
 		ServiceAccount:      reconciler.NewServiceAccountReconciler(r),
 		Role:                reconciler.NewRoleReconciler(r),
 		RoleBinding:         reconciler.NewRoleBindingReconciler(r),
@@ -477,6 +485,13 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 				}
 			}
 
+			if res, err := r.ValidateSConfigController(ctx, cluster, clusterValues); err != nil {
+				logger.Error(err, "Failed to validate Slurm SConfigController")
+				return ctrl.Result{}, fmt.Errorf("validating Slurm SConfigController: %w", err)
+			} else if res.Requeue {
+				return res, nil
+			}
+
 			return ctrl.Result{}, nil
 		},
 	)
@@ -551,6 +566,19 @@ func (r *SlurmClusterReconciler) setUpConditions(ctx context.Context, cluster *s
 						Status:  metav1.ConditionUnknown,
 						Reason:  "Reconciling",
 						Message: "Reconciling Slurm Login",
+					})
+				})
+			},
+		},
+		utils.MultiStepExecutionStep{
+			Name: "SConfigController",
+			Func: func(stepCtx context.Context) error {
+				return r.patchStatus(stepCtx, cluster, func(status *slurmv1.SlurmClusterStatus) {
+					status.SetCondition(metav1.Condition{
+						Type:    slurmv1.ConditionClusterSConfigControllerAvailable,
+						Status:  metav1.ConditionUnknown,
+						Reason:  "Reconciling",
+						Message: "Reconciling Slurm SConfigController",
 					})
 				})
 			},
@@ -853,6 +881,7 @@ func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Func
 				&corev1.ConfigMap{},
 				&corev1.Secret{},
 				&kruisev1b1.StatefulSet{},
+				&slurmv1alpha1.JailedConfig{},
 			},
 			Predicate: predicate.GenerationChangedPredicate{},
 		},

@@ -9,6 +9,8 @@ jobContainer:
       valueFrom:
         fieldRef:
           fieldPath: "metadata.namespace"
+    - name: "SNCCLD_ENABLED"
+      value: "false"
   volumeMounts:
     - mountPath: "/mnt/jail"
       name: "jail"
@@ -17,12 +19,16 @@ jobContainer:
       persistentVolumeClaim:
         claimName: "jail-pvc"
 images:
-  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.21.9-noble-slurm24.11.5"
-  k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:1.21.9-noble-slurm24.11.5"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.21.9-noble-slurm24.11.5"
+  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.21.11-noble-slurm24.11.6"
+  k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:1.21.11-noble-slurm24.11.6"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.21.11-noble-slurm24.11.6"
+# Pyxis syntax with '#' separator for registry
+activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-b8189f7"
 sshCheck:
   numOfLoginNodes: 2
 createUser:
   name: "nebius"
 upgradeCuda:
   cudaVersion: "12.4.1-1"
+upgradeHealthChecker:
+  healthCheckerVersion: "1.0.0-146.250808"

@@ -76,7 +76,6 @@ func Test_RenderStatefulSet(t *testing.T) {
 					},
 				},
 			},
-			WaitForController: ptr.To(true),
 		}
 	}
 
@@ -101,28 +100,12 @@ func Test_RenderStatefulSet(t *testing.T) {
 			expectedInitCt: 2,
 		},
 		{
-			name:           "CGROUP V1 GPU",
-			worker:         createWorker(),
-			secrets:        secret,
-			clusterType:    consts.ClusterTypeGPU,
-			expectedEnvVar: "",
-			expectedInitCt: 3,
-		},
-		{
 			name:           "CGROUP V2",
 			worker:         createWorker(),
 			secrets:        secret,
 			clusterType:    consts.ClusterTypeCPU,
 			expectedEnvVar: consts.CGroupV2Env,
 			expectedInitCt: 2,
-		},
-		{
-			name:           "CGROUP V2 GPU",
-			worker:         createWorker(),
-			secrets:        secret,
-			clusterType:    consts.ClusterTypeGPU,
-			expectedEnvVar: consts.CGroupV2Env,
-			expectedInitCt: 3,
 		},
 	}
 
@@ -137,9 +120,6 @@ func Test_RenderStatefulSet(t *testing.T) {
 			assert.Equal(t, tt.expectedInitCt, len(result.Spec.Template.Spec.InitContainers))
 			assert.Equal(t, consts.ContainerNameMunge, result.Spec.Template.Spec.InitContainers[0].Name)
 			assert.Equal(t, consts.ContainerNameWaitForController, result.Spec.Template.Spec.InitContainers[1].Name)
-			if tt.clusterType == consts.ClusterTypeGPU {
-				assert.Equal(t, consts.ContainerNameToolkitValidation, result.Spec.Template.Spec.InitContainers[2].Name)
-			}
 
 			// Verify core expected volumes are present and no slurm-configs volume
 			volumes := result.Spec.Template.Spec.Volumes

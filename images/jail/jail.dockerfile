@@ -1,104 +1,4 @@
-FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS cuda
-
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=Etc/UTC
-ENV LANG=en_US.UTF-8
-
-# ARCH has the short form like: amd64, arm64
-ARG ARCH
-# ALT_ARCH has the extended form like: x86_64, aarch64
-ARG ALT_ARCH
-
-RUN apt-get update &&  \
-    apt-get install -y --no-install-recommends \
-      gnupg2  \
-      ca-certificates \
-      locales \
-      tzdata \
-      wget \
-      curl && \
-    ARCH=$(uname -m) && \
-        case "$ARCH" in \
-          x86_64) ARCH_DEB=x86_64 ;; \
-          aarch64) ARCH_DEB=sbsa ;; \
-          *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
-        esac && \
-        echo "Using architecture: ${ARCH_DEB}" && \
-    UBUNTU_VERSION_ID=$(grep VERSION_ID /etc/os-release | cut -d'"' -f2 | tr -d .) && \
-        echo "Using architecture: ${ARCH_DEB}, ubuntu version: ubuntu${UBUNTU_VERSION_ID}" && \
-        wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${UBUNTU_VERSION_ID}/${ARCH_DEB}/cuda-keyring_1.1-1_all.deb && \
-    dpkg -i cuda-keyring_1.1-1_all.deb && \
-    rm -rf cuda-keyring_1.1-1_all.deb && \
-    ln -snf /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
-    locale-gen en_US.UTF-8 && \
-    dpkg-reconfigure locales tzdata && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-ENV LANG="en_US.UTF-8" \
-	LC_CTYPE="en_US.UTF-8" \
-	LC_NUMERIC="en_US.UTF-8" \
-	LC_TIME="en_US.UTF-8" \
-	LC_COLLATE="en_US.UTF-8" \
-	LC_MONETARY="en_US.UTF-8" \
-	LC_MESSAGES="en_US.UTF-8" \
-	LC_PAPER="en_US.UTF-8" \
-	LC_NAME="en_US.UTF-8" \
-	LC_ADDRESS="en_US.UTF-8" \
-	LC_TELEPHONE="en_US.UTF-8" \
-	LC_MEASUREMENT="en_US.UTF-8" \
-	LC_IDENTIFICATION="en_US.UTF-8"
-
-ENV PATH=/usr/local/cuda/bin:${PATH}
-
-# nvidia-container-runtime
-ENV NVIDIA_VISIBLE_DEVICES=all
-ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
-
-# Add Nebius public registry
-RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
-    codename="$(. /etc/os-release && echo $VERSION_CODENAME)" && \
-    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ $codename main" > /etc/apt/sources.list.d/nebius.list && \
-    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" >> /etc/apt/sources.list.d/nebius.list
-
-
-# Install mock packages for NVIDIA drivers
-COPY images/common/scripts/install_driver_mocks.sh /opt/bin/
-RUN chmod +x /opt/bin/install_driver_mocks.sh && \
-    /opt/bin/install_driver_mocks.sh && \
-    rm /opt/bin/install_driver_mocks.sh
-
-# About CUDA packages https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#meta-packages
-RUN apt update && \
-    apt install -y \
-        cuda=12.9.0-1 \
-        libcublas-dev-12-9 \
-        libcudnn9-cuda-12=9.10.1.4-1 \
-        libcudnn9-dev-cuda-12=9.10.1.4-1 \
-        libcudnn9-headers-cuda-12=9.10.1.4-1 \
-        libnccl-dev=2.26.5-1+cuda12.9 \
-        libnccl2=2.26.5-1+cuda12.9 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Disable automatic upgrades for CUDA packages
-RUN apt-mark hold \
-    cuda=12.9.0-1 \
-    libcublas-dev-12-9 \
-    libcudnn9-cuda-12=9.10.1.4-1 \
-    libcudnn9-dev-cuda-12=9.10.1.4-1 \
-    libcudnn9-headers-cuda-12=9.10.1.4-1 \
-    libnccl-dev=2.26.5-1+cuda12.9 \
-    libnccl2=2.26.5-1+cuda12.9
-
-COPY images/jail/pin_packages/cuda-pins /etc/apt/preferences.d/
-COPY images/jail/pin_packages/nebius-pins /etc/apt/preferences.d/
-RUN apt update
-
-RUN echo "export PATH=\$PATH:/usr/local/cuda/bin" > /etc/profile.d/path_cuda.sh && \
-    . /etc/profile.d/path_cuda.sh
-
-ENV LIBRARY_PATH=/usr/local/cuda/lib64/stubs
+FROM cr.eu-north1.nebius.cloud/soperator/cuda_base:12.9.0-ubuntu24.04-nccl2.26.5-1-295cb71 AS cuda
 
 # Download NCCL tests executables
 ARG CUDA_VERSION=12.9.0
@@ -118,9 +18,9 @@ RUN ARCH=$(uname -m) && \
 
 FROM cuda AS jail
 
-ARG SLURM_VERSION=24.11.5
+ARG SLURM_VERSION=24.11.6
 ARG GDRCOPY_VERSION=2.5
-ARG NC_HEALTH_CHECKER=1.0.0-145.250724
+ARG NC_HEALTH_CHECKER=1.0.0-146.250808
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -221,7 +121,7 @@ RUN apt-get update && \
 # Create directory for bind-mounting it from the host. It's needed for sbatch to work
 RUN mkdir -m 755 -p /var/spool/slurmd
 
-# Install nvidia-container-toolkit
+# Install nvidia-container-toolkit (for enroot usage)
 COPY images/common/scripts/install_container_toolkit.sh /opt/bin/
 RUN chmod +x /opt/bin/install_container_toolkit.sh && \
     /opt/bin/install_container_toolkit.sh && \
@@ -283,6 +183,7 @@ RUN chmod +x /usr/bin/nvidia-smi-hostpid
 COPY images/jail/scripts/soperator_instance_login.sh /opt/soperator_utils/soperator_instance_login.sh
 COPY images/jail/scripts/slurm_task_info.sh /opt/soperator_utils/slurm_task_info.sh
 COPY images/jail/scripts/worker_nvidia_bug_report.sh /opt/soperator_utils/worker_nvidia_bug_report.sh
+COPY images/jail/scripts/fs_usage.sh /opt/soperator_utils/fs_usage.sh
 RUN chmod -R 755 /opt/soperator_utils && \
     echo 'export PATH="/opt/soperator_utils:$PATH"' > /etc/profile.d/path_soperator_utils.sh && \
     chmod 755 /etc/profile.d/path_soperator_utils.sh
@@ -300,7 +201,9 @@ RUN chmod 644 /etc/passwd /etc/group && chown 0:0 /etc/passwd /etc/group && \
 # Setup the default $HOME directory content
 RUN rm -rf -- /etc/skel/..?* /etc/skel/.[!.]* /etc/skel/*
 COPY images/jail/skel/ /etc/skel/
-RUN chmod 755 /etc/skel/.slurm && \
+RUN chmod 755 /etc/skel/.ssh && \
+    chmod 600 /etc/skel/.ssh/config && \
+    chmod 755 /etc/skel/.slurm && \
     chmod 644 /etc/skel/.slurm/defaults && \
     chmod 644 /etc/skel/.bash_logout && \
     chmod 644 /etc/skel/.bashrc && \
@@ -314,13 +217,16 @@ RUN rm -rf -- /root/..?* /root/.[!.]* /root/* && \
     cp -a /etc/skel/. /root/
 
 # Copy createuser utility script
-COPY images/jail/scripts/createuser.sh /usr/bin/createuser
+COPY images/jail/scripts/createuser.py /usr/bin/createuser
 RUN chmod +x /usr/bin/createuser
 
 # Replace SSH "message of the day" scripts
 RUN rm -rf /etc/update-motd.d/*
 COPY images/jail/motd/ /etc/update-motd.d/
 RUN chmod +x /etc/update-motd.d/*
+
+# Save the initial jail version to a file
+COPY VERSION /etc/soperator-jail-version
 
 # Update linker cache
 RUN ldconfig

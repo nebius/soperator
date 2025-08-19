@@ -3,7 +3,6 @@ package worker
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
@@ -16,35 +15,6 @@ import (
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/values"
 )
-
-// renderContainerToolkitValidation renders init [corev1.Container] for toolkit validation
-func renderContainerToolkitValidation(container *values.Container) corev1.Container {
-	return corev1.Container{
-		Name:            consts.ContainerNameToolkitValidation,
-		Image:           container.Image,
-		ImagePullPolicy: container.ImagePullPolicy,
-		Command: []string{
-			"sh",
-		},
-		Args: []string{
-			"-c",
-			strings.Join(
-				[]string{
-					fmt.Sprintf("until [ -f %s/validations/toolkit-ready ]; do", consts.VolumeMountPathNvidia),
-					"echo 'waiting for nvidia container stack to be setup';",
-					"sleep 5;",
-					"done",
-				},
-				" ",
-			),
-		},
-		VolumeMounts: []corev1.VolumeMount{
-			renderVolumeMountNvidia(),
-		},
-		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
-		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-	}
-}
 
 // RenderContainerWaitForController renders init [corev1.Container] that waits for controller readiness
 func RenderContainerWaitForController(container *values.Container) corev1.Container {

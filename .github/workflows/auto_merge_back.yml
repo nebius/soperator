@@ -1,0 +1,26 @@
+name: "Auto merge back to main"
+
+on:
+  push:
+    branches:
+      - 'soperator-release-*'
+
+jobs:
+  create-merge-back-pr:
+    name: Create merge back PR
+    runs-on: self-hosted
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Run auto merge-back workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: .github/workflows/scripts/auto-merge-back.sh

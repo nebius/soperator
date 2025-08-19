@@ -15,8 +15,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
@@ -32,16 +34,19 @@ var (
 type NodeTopologyReconciler struct {
 	BaseReconciler
 	Namespace string
+	// https://github.com/kubernetes-sigs/controller-runtime/issues/3044
+	APIReader client.Reader // Direct API reader for pagination
 }
 
 func NewNodeTopologyReconciler(
-	client client.Client, scheme *runtime.Scheme, namespace string) *NodeTopologyReconciler {
+	client client.Client, scheme *runtime.Scheme, namespace string, apiReader client.Reader) *NodeTopologyReconciler {
 	return &NodeTopologyReconciler{
 		BaseReconciler: BaseReconciler{
 			Client: client,
 			Scheme: scheme,
 		},
 		Namespace: namespace,
+		APIReader: apiReader,
 	}
 }
 
@@ -231,11 +236,68 @@ func (r *NodeTopologyReconciler) getOrCreateTopologyLabelsConfigMap(ctx context.
 		},
 	}
 
-	if err := r.GetOrCreateConfigMap(ctx, configMap, nil); err != nil {
-		return nil, fmt.Errorf("get or create ConfigMap: %w", err)
+	err := r.Client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return nil, fmt.Errorf("get ConfigMap: %w", err)
+		}
+
+		if err := r.initializeConfigMapWithAllNodes(ctx, configMap); err != nil {
+			return nil, fmt.Errorf("initialize ConfigMap with all nodes: %w", err)
+		}
 	}
 
 	return configMap, nil
+}
+
+// initializeConfigMapWithAllNodes creates ConfigMap and populates it with all nodes that have tier labels
+func (r *NodeTopologyReconciler) initializeConfigMapWithAllNodes(ctx context.Context, configMap *corev1.ConfigMap) error {
+	logger := log.FromContext(ctx).WithName(NodeTopologyReconcilerName)
+
+	configMap.Data = make(map[string]string)
+
+	nodeList := &corev1.NodeList{}
+	continueToken := ""
+
+	for {
+		listOptions := []client.ListOption{
+			client.Limit(consts.DefaultLimit),
+		}
+		if continueToken != "" {
+			listOptions = append(listOptions, client.Continue(continueToken))
+		}
+
+		// Use APIReader instead of cached client for pagination support
+		// https://github.com/kubernetes-sigs/controller-runtime/issues/3044
+		if err := r.APIReader.List(ctx, nodeList, listOptions...); err != nil {
+			return fmt.Errorf("list nodes: %w", err)
+		}
+
+		for _, node := range nodeList.Items {
+			if _, hasTierLabel := node.Labels[consts.TierOnePrefix]; hasTierLabel {
+				tierData := ExtractTierLabels(node.Labels, consts.TopologyLabelPrefix)
+				if len(tierData) > 0 {
+					tierDataJSON, err := json.Marshal(tierData)
+					if err != nil {
+						logger.Error(err, "Failed to serialize tier data for node", "node", node.Name)
+						continue
+					}
+					configMap.Data[node.Name] = string(tierDataJSON)
+				}
+			}
+		}
+
+		continueToken = nodeList.Continue
+		if continueToken == "" {
+			break
+		}
+	}
+	if err := r.Client.Create(ctx, configMap); err != nil {
+		return fmt.Errorf("create ConfigMap: %w", err)
+	}
+
+	logger.Info("Initialized ConfigMap with all nodes", "nodesCount", len(configMap.Data))
+	return nil
 }
 
 func (r *NodeTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
@@ -274,6 +336,55 @@ func (r *NodeTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 				return exists
 			},
 		})).
+		Watches(&corev1.ConfigMap{},
+			handler.EnqueueRequestsFromMapFunc(r.reconcileConfigMapToRequests),
+			builder.WithPredicates(predicate.Funcs{
+				CreateFunc: func(e event.CreateEvent) bool {
+					return false
+				},
+				UpdateFunc: func(e event.UpdateEvent) bool {
+					return false
+				},
+				DeleteFunc: func(e event.DeleteEvent) bool {
+					cm, ok := e.Object.(*corev1.ConfigMap)
+					if !ok {
+						return false
+					}
+					return cm.Name == consts.ConfigMapNameTopologyNodeLabels && cm.Namespace == r.Namespace
+				},
+				GenericFunc: func(e event.GenericEvent) bool {
+					return false
+				},
+			})).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
 		Complete(r)
+}
+
+// reconcileConfigMapToRequests handles ConfigMap deletion and recreates it
+func (r *NodeTopologyReconciler) reconcileConfigMapToRequests(ctx context.Context, obj client.Object) []reconcile.Request {
+	cm, ok := obj.(*corev1.ConfigMap)
+	if !ok {
+		return nil
+	}
+
+	if cm.Name == consts.ConfigMapNameTopologyNodeLabels && cm.Namespace == r.Namespace {
+		logger := log.FromContext(ctx).WithName(NodeTopologyReconcilerName)
+		logger.Info("Topology node labels ConfigMap was deleted, recreating it", "configMap", cm.Name)
+
+		configMap := &corev1.ConfigMap{
+			ObjectMeta: ctrl.ObjectMeta{
+				Name:      consts.ConfigMapNameTopologyNodeLabels,
+				Namespace: r.Namespace,
+			},
+		}
+
+		if err := r.initializeConfigMapWithAllNodes(ctx, configMap); err != nil {
+			logger.Error(err, "Failed to recreate topology node labels ConfigMap")
+		} else {
+			logger.Info("Successfully recreated topology node labels ConfigMap")
+		}
+	}
+
+	// Return empty slice since we don't need to trigger any node reconciliation
+	return []reconcile.Request{}
 }

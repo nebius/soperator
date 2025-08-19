@@ -116,18 +116,24 @@ populateJail:
   #  jailSnapshotVolume:
   #    volumeSourceName: "jail-snapshot"
   overwrite: false
-slurmConfig: {}
-# defMemPerNode: 1228800
-# defCpuPerGPU: 16
-# completeWait: 5
-# debugFlags: "Cgroup,CPU_Bind,Gres,JobComp,Priority,Script,SelectType,Steps,TraceJobs"
-# epilog: "/path/to/epilog.sh"
-# prolog: "/path/to/prolog.sh"
-# taskPluginParam: "Verbose"
-# maxJobCount: 10000
-# minJobAge: 86400
-
+slurmConfig:
+  defMemPerNode: 1048576
+  defCpuPerGPU: 4
+  completeWait: 5
+  prolog: /opt/slurm_scripts/prolog.sh
+  epilog: /opt/slurm_scripts/epilog.sh
+  taskPluginParam: ""
+  maxJobCount: 10000
+  minJobAge: 86400
+  messageTimeout: 60
+  topologyPlugin: "topology/tree"
+  topologyParam: "SwitchAsNodeRank"
+mpiConfig:
+  pmixEnv: "OMPI_MCA_btl_tcp_if_include=eth0"
 plugStackConfig:
+  pyxis:
+    required: true
+    containerImageSave: "/var/cache/enroot-container-images/"
   ncclDebug:
     required: false
     enabled: true
@@ -135,9 +141,7 @@ plugStackConfig:
     outputToFile: true
     outputToStdOut: false
     outputDirectory: "/opt/soperator-outputs/nccl_logs"
-#  pyxis:
-#    required: true
-#    containerImageSave: "/var/cache/enroot-container-images/"
+  customPlugins: []
 #  customPlugins:
 #    - required: true
 #      path: custom.so
@@ -148,34 +152,30 @@ slurmNodes:
   accounting:
     enabled: false
     k8sNodeFilterName: "no-gpu"
-    slurmConfig: {}
-    # accountingStorageTRES: "gres/gpu,license/iop1"
-    # accountingStoreFlags: job_comment,job_env,job_extra,job_script,no_stdio
-    # acctGatherInterconnectType: "acct_gather_interconnect/ofed"
-    # acctGatherFilesystemType: "acct_gather_filesystem/lustre"
-    # jobAcctGatherType: "jobacct_gather/cgroup"
-    # jobAcctGatherFrequency: 30
-    # priorityWeightAge: 1
-    # priorityWeightFairshare: 1
-    # priorityWeightQOS: 1
-    # priorityWeightTRES: ""
-    slurmdbdConfig: {}
-    # archiveEvents: "yes"
-    # archiveJobs: "yes"
-    # archiveSteps: "yes"
-    # archiveSuspend: "yes"
-    # archiveResv: "yes"
-    # archiveUsage: "yes"
-    # archiveTXN: "yes"
-    # debugLevel: "info"
-    # tcpTimeout: 120
-    # purgeEventAfter: "1month"
-    # purgeJobAfter: "1month"
-    # purgeStepAfter: "1month"
-    # purgeSuspendAfter: "12month"
-    # purgeResvAfter: "1month"
-    # purgeUsageAfter: "1month"
-    # debugFlags: "DB_ARCHIVE"
+    slurmConfig:
+      accountingStorageTRES: "CPU,Mem,Node,VMem,Gres/gpu"
+      jobAcctGatherType: "jobacct_gather/cgroup"
+      jobAcctGatherFrequency: 30
+      priorityWeightAge: 0
+      priorityWeightFairshare: 0
+      priorityWeightQOS: 0
+    slurmdbdConfig:
+      archiveEvents: "yes"
+      archiveJobs: "yes"
+      archiveResvs: "yes"
+      archiveSteps: "no"
+      archiveSuspend: "no"
+      archiveTXN: "no"
+      archiveUsage: "yes"
+      debugLevel: "info"
+      tcpTimeout: 2
+      purgeEventAfter: "1month"
+      purgeJobAfter: "12month"
+      purgeResvAfter: "1month"
+      purgeStepAfter: "1month"
+      purgeSuspendAfter: "1month"
+      purgeTXNAfter: "12month"
+      purgeUsageAfter: "24month"
     slurmdbd:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
@@ -197,7 +197,7 @@ slurmNodes:
     externalDB:
       enabled: false
       # host: ""
-      # port: 3306
+      port: 3306
       # user: ""
       # passwordSecretKeyRef:
       #   name: ""
@@ -241,7 +241,7 @@ slurmNodes:
       # capabilities:
       #   add: ["NET_ADMIN", "SYS_TIME"]
       metrics:
-        enabled: false
+        enabled: true
         # username: ""
         # serviceMonitor: {}
         # jobLabel: ""
@@ -277,8 +277,8 @@ slurmNodes:
       #     cpu: "50m"
       #     memory: "64Mi"
   controller:
-    size: 2
     k8sNodeFilterName: "no-gpu"
+    priorityClass: ""
     slurmctld:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
@@ -301,16 +301,22 @@ slurmNodes:
     customInitContainers: []
     volumes:
       spool:
-        volumeSourceName: "controller-spool"
+        volumeClaimTemplateSpec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 50Gi
+          storageClassName: "compute-csi-network-ssd-ext4"
       jail:
         volumeSourceName: "jail"
       customMounts: []
   worker:
     size: 2
+    maxUnavailable: "20%"
     k8sNodeFilterName: "gpu"
     cgroupVersion: v2
     enableGDRCopy: false
-    waitForController: true
     priorityClass: ""
     slurmNodeExtra: ""
     supervisordConfigMapRefName: ""
@@ -360,6 +366,7 @@ slurmNodes:
       #     subPath: "prolog.sh"
       #     readOnly: true
       #     volumeSourceName: "slurm-prolog"
+      sharedMemorySize: "64Gi"
   login:
     size: 2
     k8sNodeFilterName: "no-gpu"
@@ -409,6 +416,11 @@ slurmNodes:
     enabled: true
     size: 1
     k8sNodeFilterName: "no-gpu"
+    podMonitorConfig:
+      jobLabel: "slurm-exporter"
+      interval: "30s"
+      scrapeTimeout: "28s"
+    collectionInterval: "30s"
     exporter:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
@@ -457,7 +469,11 @@ sConfigController:
       cpu: "250m"
       memory: "256Mi"
       ephemeralStorage: "500Mi"
-  jailSlurmConfigPath: /mnt/jail/etc/slurm
+  # These should match UID and GID in sconfigcontroller image
+  runAsUid: 1001
+  runAsGid: 1001
+  reconfigurePollInterval: "20s"
+  reconfigureWaitTimeout: "1m"
 telemetry: {}
 # jobsTelemetry:
 #   otelCollectorHttpHost: vmsingle-slurm.monitoring-system.svc.cluster.local
@@ -471,15 +487,15 @@ telemetry: {}
 #   otelCollectorPort: 8429
 
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.21.9-noble-slurm24.11.5"
-  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.21.9-noble-slurm24.11.5"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.21.9-noble-slurm24.11.5"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.21.9-noble-slurm24.11.5"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.21.9-noble-slurm24.11.5"
-  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.21.9-noble-slurm24.11.5"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.21.9-noble-slurm24.11.5"
-  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.21.9-noble-slurm24.11.5"
-  sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.21.9
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.21.11-noble-slurm24.11.6"
+  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.21.11-noble-slurm24.11.6"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.21.11-noble-slurm24.11.6"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.21.11-noble-slurm24.11.6"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.21.11-noble-slurm24.11.6"
+  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.21.11-noble-slurm24.11.6"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.21.11-noble-slurm24.11.6"
+  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.21.11-noble-slurm24.11.6"
+  sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.21.11
   mariaDB: docker-registry1.mariadb.com/library/mariadb:11.4.3
 # Configuration for slurm scripts.
 slurmScripts:

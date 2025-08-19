@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"reflect"
+	"time"
 
 	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	"github.com/hashicorp/go-retryablehttp"
@@ -19,6 +21,9 @@ const (
 func DefaultHTTPClient() *http.Client {
 	retryClient := retryablehttp.NewClient()
 	retryClient.Logger = nil
+	retryClient.RetryMax = 3
+	retryClient.RetryWaitMin = 250 * time.Millisecond
+	retryClient.RetryWaitMax = 2 * time.Second
 	return retryClient.StandardClient()
 }
 
@@ -33,12 +38,15 @@ type tokenIssuer interface {
 }
 
 func NewClient(server string, tokenIssuer tokenIssuer, httpClient *http.Client) (Client, error) {
-	if httpClient != nil {
+	if server == "" {
+		return nil, fmt.Errorf("unable to create client: empty server URL")
+	}
+	if httpClient == nil {
 		httpClient = DefaultHTTPClient()
 	}
 
 	apiClient := &client{
-		tokenIssuer: tokenIssuer,
+		tokenIssuer: normalizeIssuer(tokenIssuer),
 	}
 
 	c, err := api.NewClientWithResponses(
@@ -55,14 +63,36 @@ func NewClient(server string, tokenIssuer tokenIssuer, httpClient *http.Client) 
 	return apiClient, nil
 }
 
+// normalizeIssuer converts a typed-nil inside an interface to a real nil.
+func normalizeIssuer(t tokenIssuer) tokenIssuer {
+	if t == nil {
+		return nil
+	}
+	v := reflect.ValueOf(t)
+	// handle pointers or interfaces wrapping a nil pointer
+	if (v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface) && v.IsNil() {
+		return nil
+	}
+	return t
+}
+
 func (c *client) setHeaders(ctx context.Context, req *http.Request) error {
-	token, err := c.tokenIssuer.Issue(ctx)
+	req.Header.Set(headerContentType, headerApplicationJson)
+
+	ti := normalizeIssuer(c.tokenIssuer)
+	if ti == nil {
+		return nil
+	}
+
+	token, err := ti.Issue(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to issue jwt: %w", err)
 	}
+	if token == "" {
+		return nil
+	}
 
-	req.Header.Add(headerSlurmUserToken, token)
-	req.Header.Add(headerContentType, headerApplicationJson)
+	req.Header.Set(headerSlurmUserToken, token)
 	return nil
 }
 

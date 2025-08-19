@@ -270,6 +270,7 @@ func (r SlurmClusterReconciler) ValidateLogin(
 				Status: metav1.ConditionFalse, Reason: "NotAvailable",
 				Message: "Slurm login is not available yet",
 			})
+			status.ReadyLogin = &existing.Status.AvailableReplicas
 		}); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -281,6 +282,8 @@ func (r SlurmClusterReconciler) ValidateLogin(
 				Status: metav1.ConditionTrue, Reason: "Available",
 				Message: "Slurm login is available",
 			})
+			// Update ready login count
+			status.ReadyLogin = &existing.Status.AvailableReplicas
 		}); err != nil {
 			return ctrl.Result{}, err
 		}
