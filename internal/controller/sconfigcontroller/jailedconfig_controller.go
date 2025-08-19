@@ -77,7 +77,7 @@ type JailedConfigReconciler struct {
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/finalizers,verbs=update
-// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;patch
+// +kubebuilder:rbac:groups="core",resources=configmaps,verbs=get;list;watch;patch
 
 // Clock is used to fake timing for testing
 type Clock interface {
@@ -194,9 +194,19 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig) (ctrl.Result, error) {
 	logger := logf.FromContext(ctx)
 
-	err := r.initializeConditions(ctx, jailedConfig)
+	err := r.shouldInitializeConditions(ctx, jailedConfig)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("initializing conditions: %w", err)
+	}
+
+	configMap := &corev1.ConfigMap{}
+	needsReconcile, err := r.shouldReconciliation(ctx, jailedConfig, configMap)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("checking if reconciliation should be skipped: %w", err)
+	}
+	if !needsReconcile {
+		logger.V(1).Info("Skipping reconciliation: config unchanged and conditions met")
+		return ctrl.Result{}, nil
 	}
 
 	err = r.setConditions(
@@ -217,23 +227,6 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 	)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
-	}
-
-	configMapName := jailedConfig.Spec.ConfigMap.Name
-
-	configMap := &corev1.ConfigMap{}
-	err = r.Client.Get(ctx, types.NamespacedName{
-		Name:      configMapName,
-		Namespace: jailedConfig.Namespace,
-	}, configMap)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("getting ConfigMap: %w", err)
-	}
-
-	// Check if we can skip reconciliation
-	if r.shouldSkipReconciliation(jailedConfig, configMap) {
-		logger.V(1).Info("Skipping reconciliation: config hash unchanged and all conditions are met")
-		return ctrl.Result{}, nil
 	}
 
 	defaultMode := jailedConfig.Spec.DefaultMode
@@ -339,19 +332,18 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 
 	logger.V(1).Info("Found JailedConfigs for aggregation", "count", len(jailedConfigs.Items), "aggregationKey", aggregationKey)
 
-	// Check if we can skip aggregated reconciliation
-	canSkip, err := r.shouldSkipAggregatedReconciliation(ctx, jailedConfigs.Items)
+	needsReconcile, err := r.shouldAggregatedReconciliation(ctx, jailedConfigs.Items)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("checking if aggregated reconciliation can be skipped: %w", err)
 	}
-	if canSkip {
+	if !needsReconcile {
 		logger.V(1).Info("Skipping aggregated reconciliation: all config hashes unchanged and all conditions are met", "aggregationKey", aggregationKey)
 		return ctrl.Result{}, nil
 	}
 
 	for i := range jailedConfigs.Items {
 		config := &jailedConfigs.Items[i]
-		err := r.initializeConditions(ctx, config)
+		err := r.shouldInitializeConditions(ctx, config)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("initializing conditions for %s/%s: %w", config.Namespace, config.Name, err)
 		}
@@ -511,6 +503,43 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *JailedConfigReconciler) shouldInitializeConditions(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig) error {
+	conditions := jailedConfig.Status.Conditions
+	if len(conditions) == 0 {
+		err := r.initializeConditions(ctx, jailedConfig)
+		if err != nil {
+			return fmt.Errorf("initializing conditions: %w", err)
+		}
+	}
+
+	filesWrittenCondition := meta.FindStatusCondition(conditions, string(slurmv1alpha1.FilesWritten))
+	updateActionsCondition := meta.FindStatusCondition(conditions, string(slurmv1alpha1.UpdateActionsCompleted))
+
+	if filesWrittenCondition == nil {
+		r.initializeCondition(&jailedConfig.Status, slurmv1alpha1.FilesWritten)
+	}
+	if updateActionsCondition == nil {
+		r.initializeCondition(&jailedConfig.Status, slurmv1alpha1.UpdateActionsCompleted)
+	}
+	return nil
+
+}
+
+func (r *JailedConfigReconciler) shouldReconciliation(
+	ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig, configMap *corev1.ConfigMap) (bool, error) {
+	err := r.Client.Get(ctx, types.NamespacedName{
+		Name:      jailedConfig.Spec.ConfigMap.Name,
+		Namespace: jailedConfig.Namespace,
+	}, configMap)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, fmt.Errorf("ConfigMap %s/%s not found: %w", jailedConfig.Namespace, jailedConfig.Spec.ConfigMap.Name, err)
+		}
+		return false, fmt.Errorf("getting ConfigMap %s/%s: %w", jailedConfig.Namespace, jailedConfig.Spec.ConfigMap.Name, err)
+	}
+	return r.needsReconciliation(jailedConfig, configMap), nil
 }
 
 func NewJailedConfigReconciler(
@@ -810,31 +839,31 @@ func (r *JailedConfigReconciler) calculateConfigHash(configMap *corev1.ConfigMap
 	return hex.EncodeToString(hash[:])
 }
 
-// shouldSkipReconciliation checks if reconciliation can be skipped
-// when all conditions are met and config hash has not changed
-func (r *JailedConfigReconciler) shouldSkipReconciliation(jailedConfig *slurmv1alpha1.JailedConfig, configMap *corev1.ConfigMap) bool {
+// needsReconciliation checks if reconciliation is needed
+// Returns true if reconciliation should proceed, false if it can be skipped
+func (r *JailedConfigReconciler) needsReconciliation(jailedConfig *slurmv1alpha1.JailedConfig, configMap *corev1.ConfigMap) bool {
 	filesWrittenCondition := meta.FindStatusCondition(jailedConfig.Status.Conditions, string(slurmv1alpha1.FilesWritten))
 	updateActionsCondition := meta.FindStatusCondition(jailedConfig.Status.Conditions, string(slurmv1alpha1.UpdateActionsCompleted))
 
 	if filesWrittenCondition == nil || filesWrittenCondition.Status != metav1.ConditionTrue {
-		return false
+		return true
 	}
 
 	if updateActionsCondition == nil || updateActionsCondition.Status != metav1.ConditionTrue {
-		return false
+		return true
 	}
 	currentHash := r.calculateConfigHash(configMap)
 
 	if configMap.Annotations == nil {
-		return false
+		return true
 	}
 
 	savedHash, exists := configMap.Annotations[consts.AnnotationConfigHash]
 	if !exists {
-		return false
+		return true
 	}
 
-	return currentHash == savedHash
+	return currentHash != savedHash
 }
 
 // saveConfigHash saves config hash in ConfigMap annotation
@@ -854,8 +883,9 @@ func (r *JailedConfigReconciler) saveConfigHash(ctx context.Context, configMap *
 	return r.Client.Patch(ctx, configMap, patch)
 }
 
-// shouldSkipAggregatedReconciliation checks if aggregated reconciliation can be skipped
-func (r *JailedConfigReconciler) shouldSkipAggregatedReconciliation(ctx context.Context, jailedConfigs []slurmv1alpha1.JailedConfig) (bool, error) {
+// shouldAggregatedReconciliation checks if aggregated reconciliation is needed
+// Returns true if reconciliation should proceed, false if it can be skipped
+func (r *JailedConfigReconciler) shouldAggregatedReconciliation(ctx context.Context, jailedConfigs []slurmv1alpha1.JailedConfig) (bool, error) {
 	for i := range jailedConfigs {
 		config := &jailedConfigs[i]
 
@@ -863,11 +893,11 @@ func (r *JailedConfigReconciler) shouldSkipAggregatedReconciliation(ctx context.
 		updateActionsCondition := meta.FindStatusCondition(config.Status.Conditions, string(slurmv1alpha1.UpdateActionsCompleted))
 
 		if filesWrittenCondition == nil || filesWrittenCondition.Status != metav1.ConditionTrue {
-			return false, nil
+			return true, nil
 		}
 
 		if updateActionsCondition == nil || updateActionsCondition.Status != metav1.ConditionTrue {
-			return false, nil
+			return true, nil
 		}
 	}
 
@@ -883,17 +913,10 @@ func (r *JailedConfigReconciler) shouldSkipAggregatedReconciliation(ctx context.
 			return false, err
 		}
 
-		currentHash := r.calculateConfigHash(configMap)
-
-		if configMap.Annotations == nil {
-			return false, nil
-		}
-
-		savedHash, exists := configMap.Annotations[consts.AnnotationConfigHash]
-		if !exists || currentHash != savedHash {
-			return false, nil
+		if r.needsReconciliation(config, configMap) {
+			return true, nil
 		}
 	}
 
-	return true, nil
+	return false, nil
 }
