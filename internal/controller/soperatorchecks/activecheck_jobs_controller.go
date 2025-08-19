@@ -213,6 +213,10 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 				}
 
 				if slurmJob.IsFailedState() {
+					if slurmJob.StateReason != "" {
+						failReasons = append(failReasons, slurmJob.StateReason)
+					}
+
 					if err := r.updateSlurmNodeWithReaction(ctx, logger, slurmJob, activeCheck, slurmAPIClient); err != nil {
 						return ctrl.Result{}, fmt.Errorf("get node list: %w", err)
 					}
