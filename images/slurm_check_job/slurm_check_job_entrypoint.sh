@@ -24,7 +24,7 @@ mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
 echo "Create directory for slurm job outputs"
 (umask 000; mkdir -p "/mnt/jail/opt/soperator-outputs/slurm_jobs")
 
-if [[ "$EACH_WORKER_JOB_ARRAY" == "true" ]]; then
+if [[ "${EACH_WORKER_JOB_ARRAY:-}" == "true" ]]; then
     echo "Submitting job using slurm_submit_array_job.sh..."
     SUBMIT_OUTPUT=$(/opt/bin/slurm/slurm_submit_array_job.sh)
     SCRIPT_STATUS=$?
@@ -35,7 +35,7 @@ if [[ "$EACH_WORKER_JOB_ARRAY" == "true" ]]; then
     fi
 
     SLURM_JOB_ID=$(echo "$SUBMIT_OUTPUT" | tail -n 1)
-elif [[ "$EACH_WORKER_JOBS" == "true" ]]; then
+elif [[ "${EACH_WORKER_JOBS:-}" == "true" ]]; then
     echo "Submitting job using slurm_submit_jobs.sh..."
     SUBMIT_OUTPUT=$(/opt/bin/slurm/slurm_submit_jobs.sh)
     SCRIPT_STATUS=$?
