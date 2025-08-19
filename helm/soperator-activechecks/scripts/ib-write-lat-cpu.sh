@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --deadline="now+6hours"
-#SBATCH --time=10:00
-#SBATCH --cpus-per-task=2
+#SBATCH --time=00:05:00
+#SBATCH --exclusive
 
 platform=""
 gpus_on_node=$(nvidia-smi --query-gpu=name --format=csv,noheader | sort | uniq -c)
