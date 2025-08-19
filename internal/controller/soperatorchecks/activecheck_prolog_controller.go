@@ -73,6 +73,7 @@ func (r *ActiveCheckPrologReconciler) SetupWithManager(mgr ctrl.Manager,
 
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;update;create;patch
+// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs,verbs=get;list;watch;create;patch
 
 // Reconcile reconciles all resources necessary for active checks controller
 func (r *ActiveCheckPrologReconciler) Reconcile(
@@ -117,7 +118,7 @@ func (r *ActiveCheckPrologReconciler) updatePrologConfigMap(ctx context.Context,
 
 	jailedConfig := &v1alpha1.JailedConfig{
 		TypeMeta: ctrl.TypeMeta{
-			APIVersion: v1alpha1.GroupVersion.Version,
+			APIVersion: v1alpha1.GroupVersion.String(),
 			Kind:       "JailedConfig",
 		},
 		ObjectMeta: ctrl.ObjectMeta{
