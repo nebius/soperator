@@ -34,7 +34,7 @@ for node in $(sinfo -N --partition="$PARTITION" --responding --json | jq -r "$JQ
         exit 0
     ) 9>"/mnt/jail/etc/soperatorchecks/active_check_${node}.lock" && NUM_NODES=$(( NUM_NODES + 1 ))
 
-    chroot /mnt/jail /bin/bash bash -c "chown soperatorchecks:soperatorchecks /etc/soperatorchecks/active_check_${node}.lock"
+    chroot /mnt/jail /bin/bash -c "chown soperatorchecks:soperatorchecks /etc/soperatorchecks/active_check_${node}.lock"
 done
 
 echo "Submitting Slurm array job..."
