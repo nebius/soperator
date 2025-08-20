@@ -18,7 +18,9 @@ fi
 
 echo "Platform found: $platform"
 echo "Running ib_write_bw_cpu check on $(hostname)..."
-HC_OUTPUT=$(srun --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n ib_write_bw --json-log")
+HC_OUTPUT=$(srun --container-image={{ .Values.perftestImage }} \
+  --container-mounts=$(which health-checker):/usr/local/bin/health-checker --cpu-bind=verbose,cores \
+  bash -c "health-checker run -e soperator -p 8xB200 -n ib_write_bw --json-log")
 HC_EXIT_CODE=$?
 
 echo "Health checker output: $HC_OUTPUT"

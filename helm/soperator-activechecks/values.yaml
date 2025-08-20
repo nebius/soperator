@@ -24,6 +24,7 @@ images:
   munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.21.11-noble-slurm24.11.6"
 # Pyxis syntax with '#' separator for registry
 activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-b8189f7"
+perftestImage: "cr.eu-north1.nebius.cloud#soperator-unstable/activecheck-perftest:20250820-1255"
 sshCheck:
   numOfLoginNodes: 2
 createUser:
