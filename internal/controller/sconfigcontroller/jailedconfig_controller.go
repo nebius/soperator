@@ -485,25 +485,10 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 
 	logger.V(1).Info("Completed aggregated reconciliation", "aggregationKey", aggregationKey, "configs", len(jailedConfigs.Items))
 
-	// Save hashes of all ConfigMaps after successful aggregated reconciliation
-	for i := range jailedConfigs.Items {
-		config := &jailedConfigs.Items[i]
-
-		configMap := &corev1.ConfigMap{}
-		err = r.Client.Get(ctx, types.NamespacedName{
-			Name:      config.Spec.ConfigMap.Name,
-			Namespace: config.Namespace,
-		}, configMap)
-		if err != nil {
-			logger.V(1).Info("Failed to get ConfigMap for hash update", "configMap", config.Spec.ConfigMap.Name, "error", err)
-			continue
-		}
-	}
-
 	return ctrl.Result{}, nil
 }
 
-// setConditions sets the provided conditions on the JailedConfig status
+// hasFailedFilesWrittenCondition checks if the JailedConfig has a failed FilesWritten condition.
 func hasFailedFilesWrittenCondition(config *slurmv1alpha1.JailedConfig) bool {
 	condition := meta.FindStatusCondition(config.Status.Conditions, string(slurmv1alpha1.FilesWritten))
 	return condition != nil && condition.Reason == string(slurmv1alpha1.ReasonNotFound)
@@ -528,7 +513,6 @@ func (r *JailedConfigReconciler) shouldInitializeConditions(ctx context.Context,
 		r.initializeCondition(&jailedConfig.Status, slurmv1alpha1.UpdateActionsCompleted)
 	}
 	return nil
-
 }
 
 func NewJailedConfigReconciler(
