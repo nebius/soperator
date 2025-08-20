@@ -54,6 +54,8 @@ type Flags struct {
 
 	// auth
 	staticToken string
+	scontrolPath      string
+	keyRotationInterval string
 }
 
 func getZapOpts(logFormat, logLevel string) []zap.Opts {
@@ -115,6 +117,8 @@ func parseFlags() Flags {
 
 	// static token (optional); can also come from SLURM_EXPORTER_TOKEN
 	flag.StringVar(&flags.staticToken, "static-token", "", "Static JWT to send in X-SLURM-USER-TOKEN (use with rest_auth/jwt)")
+	flag.StringVar(&flags.scontrolPath, "scontrol-path", "scontrol", "Path to scontrol command for standalone mode")
+	flag.StringVar(&flags.keyRotationInterval, "key-rotation-interval", "30m", "Key rotation interval for standalone mode (e.g., 30m, 1h)")
 
 	flag.Parse()
 	passedFlags := make(map[string]struct{})
@@ -130,6 +134,16 @@ func parseFlags() Flags {
 	if flags.staticToken == "" {
 		if v := os.Getenv("SLURM_EXPORTER_TOKEN"); v != "" {
 			flags.staticToken = v
+		}
+	}
+	if flags.scontrolPath == "scontrol" {
+		if v := os.Getenv("SLURM_EXPORTER_SCONTROL_PATH"); v != "" {
+			flags.scontrolPath = v
+		}
+	}
+	if flags.keyRotationInterval == "30m" {
+		if v := os.Getenv("SLURM_EXPORTER_KEY_ROTATION_INTERVAL"); v != "" {
+			flags.keyRotationInterval = v
 		}
 	}
 
@@ -185,9 +199,22 @@ func main() {
 	var issuer interface {
 		Issue(ctx context.Context) (string, error)
 	}
+	var standaloneIssuer *jwt.StandaloneTokenIssuer
+
 	switch {
 	case ctrlClient != nil:
 		issuer = jwt.NewToken(ctrlClient).For(slurmClusterID, "root").WithRegistry(jwt.NewTokenRegistry().Build())
+	case flags.standalone:
+		standaloneIssuer = jwt.NewStandaloneTokenIssuer(slurmClusterID, "root")
+		standaloneIssuer.WithScontrolPath(flags.scontrolPath)
+
+		// Parse and set rotation interval
+		if rotationInterval, err := time.ParseDuration(flags.keyRotationInterval); err == nil {
+			standaloneIssuer.WithRotationInterval(rotationInterval)
+		} else {
+			log.Error(err, "Failed to parse key rotation interval, using default", "interval", flags.keyRotationInterval)
+		}
+		issuer = standaloneIssuer
 	case flags.staticToken != "":
 		issuer = staticIssuer{tok: flags.staticToken}
 	default:
@@ -217,6 +244,15 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	if standaloneIssuer != nil {
+		if err := standaloneIssuer.Start(ctx); err != nil {
+			log.Error(err, "Failed to start standalone token issuer")
+			os.Exit(1)
+		}
+		defer standaloneIssuer.Stop()
+		log.Info("Started standalone token issuer")
+	}
 
 	if err := clusterExporter.Start(ctx, flags.metricsAddr); err != nil {
 		log.Error(err, "Failed to start metrics exporter")
