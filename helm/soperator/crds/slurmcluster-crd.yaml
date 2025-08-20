@@ -7248,7 +7248,19 @@ spec:
     singular: jailedconfig
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: Status of files writing
+      jsonPath: .status.conditions[?(@.type=='FilesWritten')].reason
+      name: Files Written
+      type: string
+    - description: Status of update actions
+      jsonPath: .status.conditions[?(@.type=='UpdateActionsCompleted')].reason
+      name: Update Actions
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: JailedConfig is the Schema for the jailedconfigs API

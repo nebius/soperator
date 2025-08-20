@@ -113,6 +113,9 @@ type JailedConfigStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Files Written",type="string",JSONPath=".status.conditions[?(@.type=='FilesWritten')].reason",description="Status of files writing"
+// +kubebuilder:printcolumn:name="Update Actions",type="string",JSONPath=".status.conditions[?(@.type=='UpdateActionsCompleted')].reason",description="Status of update actions"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // JailedConfig is the Schema for the jailedconfigs API
 type JailedConfig struct {
