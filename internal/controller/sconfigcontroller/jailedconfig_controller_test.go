@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -829,6 +830,157 @@ func TestHasFailedFilesWrittenCondition(t *testing.T) {
 
 			result := hasFailedFilesWrittenCondition(tc.jailedConfig)
 			require.Equal(t, tc.expectedResult, result, "Expected result for test case: %s", tc.name)
+		})
+	}
+}
+
+func TestSetUpdateActionsCompletedForConfigs(t *testing.T) {
+	t.Parallel()
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, slurmv1alpha1.AddToScheme(scheme))
+
+	tests := []struct {
+		name             string
+		configs          []slurmv1alpha1.JailedConfig
+		needsReconfigure bool
+		expectError      bool
+	}{
+		{
+			name:             "empty configs - should not fail",
+			configs:          []slurmv1alpha1.JailedConfig{},
+			needsReconfigure: false,
+			expectError:      false,
+		},
+		{
+			name: "single config - no reconfigure needed",
+			configs: []slurmv1alpha1.JailedConfig{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-config-1",
+						Namespace: "default",
+					},
+				},
+			},
+			needsReconfigure: false,
+			expectError:      false,
+		},
+		{
+			name: "single config - reconfigure needed, files written successfully",
+			configs: []slurmv1alpha1.JailedConfig{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-config-1",
+						Namespace: "default",
+					},
+					Status: slurmv1alpha1.JailedConfigStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   string(slurmv1alpha1.FilesWritten),
+								Status: metav1.ConditionTrue,
+								Reason: string(slurmv1alpha1.ReasonSuccess),
+							},
+						},
+					},
+				},
+			},
+			needsReconfigure: true,
+			expectError:      false,
+		},
+		{
+			name: "single config - reconfigure needed, files not written",
+			configs: []slurmv1alpha1.JailedConfig{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-config-1",
+						Namespace: "default",
+					},
+					Status: slurmv1alpha1.JailedConfigStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   string(slurmv1alpha1.FilesWritten),
+								Status: metav1.ConditionFalse,
+								Reason: string(slurmv1alpha1.ReasonNotFound),
+							},
+						},
+					},
+				},
+			},
+			needsReconfigure: true,
+			expectError:      false,
+		},
+		{
+			name: "multiple configs - mixed scenarios",
+			configs: []slurmv1alpha1.JailedConfig{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-config-1",
+						Namespace: "default",
+					},
+					Status: slurmv1alpha1.JailedConfigStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   string(slurmv1alpha1.FilesWritten),
+								Status: metav1.ConditionTrue,
+								Reason: string(slurmv1alpha1.ReasonSuccess),
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-config-2",
+						Namespace: "default",
+					},
+					Status: slurmv1alpha1.JailedConfigStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   string(slurmv1alpha1.FilesWritten),
+								Status: metav1.ConditionFalse,
+								Reason: string(slurmv1alpha1.ReasonNotFound),
+							},
+						},
+					},
+				},
+			},
+			needsReconfigure: true,
+			expectError:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Create objects to add to fake client
+			var clientObjects []client.Object
+			for i := range tt.configs {
+				clientObjects = append(clientObjects, &tt.configs[i])
+			}
+
+			fakeClientBuilder := fake.NewClientBuilder().WithScheme(scheme)
+			if len(clientObjects) > 0 {
+				fakeClientBuilder = fakeClientBuilder.WithObjects(clientObjects...)
+				// Add status subresources for each object
+				for _, obj := range clientObjects {
+					fakeClientBuilder = fakeClientBuilder.WithStatusSubresource(obj)
+				}
+			}
+			fakeClient := fakeClientBuilder.Build()
+
+			reconciler := &JailedConfigReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			ctx := context.Background()
+			err := reconciler.setUpdateActionsCompletedForConfigs(ctx, tt.configs, tt.needsReconfigure)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }

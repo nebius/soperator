@@ -222,6 +222,7 @@ func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace string) 
 					Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyTopologyConfig),
 				},
 			},
+			UpdateActions: []v1alpha1.UpdateAction{v1alpha1.UpdateActionReconfigure},
 		},
 	}
 }

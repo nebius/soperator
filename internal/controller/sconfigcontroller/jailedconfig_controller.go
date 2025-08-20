@@ -291,23 +291,35 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("reconfiguring Slurm cluster: %w", err)
 			}
+			err = r.setConditions(
+				ctx,
+				jailedConfig,
+				metav1.Condition{
+					Type:    string(slurmv1alpha1.UpdateActionsCompleted),
+					Status:  metav1.ConditionTrue,
+					Reason:  slurmv1alpha1.ReasonSuccess,
+					Message: "Update actions were called successfully",
+				},
+			)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
+			}
 		default:
-			return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("unexpected update action %s: %w", action, err))
+			err = r.setConditions(
+				ctx,
+				jailedConfig,
+				metav1.Condition{
+					Type:    string(slurmv1alpha1.UpdateActionsCompleted),
+					Status:  metav1.ConditionTrue,
+					Reason:  slurmv1alpha1.ReasonMissingAction,
+					Message: fmt.Sprintf("Update action %s is not supported", action),
+				},
+			)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
+			}
+			return ctrl.Result{}, fmt.Errorf("unexpected update action %s: %w", action, err)
 		}
-	}
-
-	err = r.setConditions(
-		ctx,
-		jailedConfig,
-		metav1.Condition{
-			Type:    string(slurmv1alpha1.UpdateActionsCompleted),
-			Status:  metav1.ConditionTrue,
-			Reason:  slurmv1alpha1.ReasonSuccess,
-			Message: "Update actions were called successfully",
-		},
-	)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
 	}
 
 	return ctrl.Result{}, nil
@@ -465,35 +477,10 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 		}
 	}
 
-	for i := range jailedConfigs.Items {
-		jailedConfig := &jailedConfigs.Items[i]
-		if hasFailedFilesWrittenCondition(jailedConfig) {
-			err = r.setConditions(
-				ctx,
-				jailedConfig,
-				metav1.Condition{
-					Type:    string(slurmv1alpha1.UpdateActionsCompleted),
-					Status:  metav1.ConditionFalse,
-					Reason:  slurmv1alpha1.ReasonNotWritten,
-					Message: "Update actions were not called because files were not written (aggregated)"},
-			)
-			if err != nil {
-				return ctrl.Result{}, fmt.Errorf("setting update actions completed condition for %s/%s: %w", jailedConfig.Namespace, jailedConfig.Name, err)
-			}
-		}
-		err = r.setConditions(
-			ctx,
-			jailedConfig,
-			metav1.Condition{
-				Type:    string(slurmv1alpha1.UpdateActionsCompleted),
-				Status:  metav1.ConditionTrue,
-				Reason:  slurmv1alpha1.ReasonSuccess,
-				Message: "Update actions were called successfully (aggregated)",
-			},
-		)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("setting update actions completed condition for %s/%s: %w", jailedConfig.Namespace, jailedConfig.Name, err)
-		}
+	// Set UpdateActionsCompleted condition for all configs based on whether reconfigure was needed and files were written
+	err = r.setUpdateActionsCompletedForConfigs(ctx, jailedConfigs.Items, needsReconfigure)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	logger.V(1).Info("Completed aggregated reconciliation", "aggregationKey", aggregationKey, "configs", len(jailedConfigs.Items))
@@ -505,6 +492,46 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 func hasFailedFilesWrittenCondition(jailedConfig *slurmv1alpha1.JailedConfig) bool {
 	condition := meta.FindStatusCondition(jailedConfig.Status.Conditions, string(slurmv1alpha1.FilesWritten))
 	return condition != nil && condition.Reason == string(slurmv1alpha1.ReasonNotFound)
+}
+
+// setUpdateActionsCompletedForConfigs sets the UpdateActionsCompleted condition for all provided configs
+// based on whether reconfigure was needed and their individual FilesWritten status
+func (r *JailedConfigReconciler) setUpdateActionsCompletedForConfigs(ctx context.Context, configs []slurmv1alpha1.JailedConfig, needsReconfigure bool) error {
+	for i := range configs {
+		jailedConfig := &configs[i]
+
+		var condition metav1.Condition
+		if needsReconfigure {
+			if hasFailedFilesWrittenCondition(jailedConfig) {
+				condition = metav1.Condition{
+					Type:    string(slurmv1alpha1.UpdateActionsCompleted),
+					Status:  metav1.ConditionFalse,
+					Reason:  slurmv1alpha1.ReasonNotWritten,
+					Message: "Update actions were not called because files were not written (aggregated)",
+				}
+			} else {
+				condition = metav1.Condition{
+					Type:    string(slurmv1alpha1.UpdateActionsCompleted),
+					Status:  metav1.ConditionTrue,
+					Reason:  slurmv1alpha1.ReasonSuccess,
+					Message: "Update actions were called successfully (aggregated)",
+				}
+			}
+		} else {
+			condition = metav1.Condition{
+				Type:    string(slurmv1alpha1.UpdateActionsCompleted),
+				Status:  metav1.ConditionTrue,
+				Reason:  slurmv1alpha1.ReasonSuccess,
+				Message: "Update actions were not called because no reconfigure needed (aggregated)",
+			}
+		}
+
+		err := r.setConditions(ctx, jailedConfig, condition)
+		if err != nil {
+			return fmt.Errorf("setting update actions completed condition for %s/%s: %w", jailedConfig.Namespace, jailedConfig.Name, err)
+		}
+	}
+	return nil
 }
 
 func (r *JailedConfigReconciler) shouldInitializeConditions(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig) error {

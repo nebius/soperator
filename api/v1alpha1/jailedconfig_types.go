@@ -98,6 +98,8 @@ const (
 	ReasonNotFound = "NotFound"
 	// ReasonNotWritten means that files were not written
 	ReasonNotWritten = "NotWritten"
+	// ReasonMissingAction means that there are no actions to perform
+	ReasonMissingAction = "MissingAction"
 )
 
 // JailedConfigStatus defines the observed state of JailedConfig.
