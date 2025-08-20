@@ -7253,9 +7253,9 @@ spec:
       jsonPath: .status.conditions[?(@.type=='FilesWritten')].reason
       name: Files Written
       type: string
-    - description: Status of update actions
+    - description: Status of reconfiguration
       jsonPath: .status.conditions[?(@.type=='UpdateActionsCompleted')].reason
-      name: Update Actions
+      name: Reconfiguration Status
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
