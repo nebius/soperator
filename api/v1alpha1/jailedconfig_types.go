@@ -94,6 +94,10 @@ const (
 	ReasonRefresh = "Refresh"
 	// ReasonSuccess means that something was done successfully
 	ReasonSuccess = "Success"
+	// ReasonNotFound means that something was not found
+	ReasonNotFound = "NotFound"
+	// ReasonNotWritten means that files were not written
+	ReasonNotWritten = "NotWritten"
 )
 
 // JailedConfigStatus defines the observed state of JailedConfig.

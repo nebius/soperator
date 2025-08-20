@@ -53,11 +53,6 @@ func RenderRole(clusterNamespace, clusterName string) rbacv1.Role {
 				Resources: []string{"jailedconfigs/finalizers"},
 				Verbs:     []string{"update"},
 			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"configmaps"},
-				Verbs:     []string{"get", "list", "watch", "patch"},
-			},
 		},
 	}
 }
