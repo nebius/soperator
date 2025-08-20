@@ -96,21 +96,29 @@ func (s *StandaloneTokenIssuer) rotationLoop(ctx context.Context) {
 
 // rotateToken generates a new Slurm token
 func (s *StandaloneTokenIssuer) rotateToken(ctx context.Context) error {
+	logger := log.FromContext(ctx).WithName("standalone-token-issuer")
+
+	lifespanSeconds := int(s.rotationInterval.Seconds())
+	logger.Info("Rotating Slurm token", "rotation_interval", s.rotationInterval, "lifespan_seconds", lifespanSeconds)
+
 	token, err := s.getSlurmToken(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get new Slurm token: %w", err)
 	}
 
 	s.setToken(token)
+	logger.Info("Successfully generated new Slurm token", "token_length", len(token))
 	return nil
 }
 
 // getSlurmToken gets a fresh Slurm token for API calls
 func (s *StandaloneTokenIssuer) getSlurmToken(ctx context.Context) (string, error) {
-	cmd := exec.CommandContext(ctx, s.scontrolPath, "token", "username=root")
+	lifespanSeconds := int(s.rotationInterval.Seconds())
+
+	cmd := exec.CommandContext(ctx, s.scontrolPath, "token", "username=root", fmt.Sprintf("lifespan=%d", lifespanSeconds))
 	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("scontrol token username=root failed: %w", err)
+		return "", fmt.Errorf("scontrol token username=root lifespan=%d failed: %w", lifespanSeconds, err)
 	}
 
 	// Parse the output - scontrol token username returns "SLURM_JWT=value"
