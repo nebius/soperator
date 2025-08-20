@@ -42,7 +42,6 @@ import (
 	v0041 "github.com/SlinkyProject/slurm-client/api/v0041"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
-	"nebius.ai/slurm-operator/internal/consts"
 	fakes "nebius.ai/slurm-operator/internal/controller/sconfigcontroller/fake"
 	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
 )
@@ -138,12 +137,6 @@ func withDefaultMode(defaultMode *int32) testOption {
 func withUpdateActions(actions []slurmv1alpha1.UpdateAction) testOption {
 	return func(args *testOptions) {
 		args.jailedConfig.Spec.UpdateActions = actions
-	}
-}
-
-func withMissingConfigMap() testOption {
-	return func(args *testOptions) {
-		args.jailedConfig.Spec.ConfigMap.Name = ""
 	}
 }
 
@@ -593,16 +586,6 @@ func TestJailedConfigReconciler_Reconfigure(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestJailedConfigReconciler_MissingConfigMapInSpec(t *testing.T) {
-	sctrl, request, _, _, _ := prepareTest( //nolint:dogsled
-		t,
-		withMissingConfigMap(),
-	)
-
-	_, err := sctrl.Reconcile(context.Background(), request)
-	require.ErrorContains(t, err, "not found")
-}
-
 func TestJailedConfigReconciler_MissingConfigMapKeyInItems(t *testing.T) {
 	sctrl, request, _, _, _ := prepareTest( //nolint:dogsled
 		t,
@@ -617,536 +600,6 @@ func TestJailedConfigReconciler_MissingConfigMapKeyInItems(t *testing.T) {
 
 	_, err := sctrl.Reconcile(context.Background(), request)
 	require.ErrorContains(t, err, "references non-existent config key")
-}
-
-func TestJailedConfigReconciler_CalculateConfigHash(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name     string
-		cm1      *corev1.ConfigMap
-		cm2      *corev1.ConfigMap
-		expected bool // true if hashes should be equal
-	}{
-		{
-			name: "identical configmaps",
-			cm1: &corev1.ConfigMap{
-				Data: map[string]string{
-					"key1": "value1",
-					"key2": "value2",
-				},
-				BinaryData: map[string][]byte{
-					"binary1": {1, 2, 3},
-				},
-			},
-			cm2: &corev1.ConfigMap{
-				Data: map[string]string{
-					"key1": "value1",
-					"key2": "value2",
-				},
-				BinaryData: map[string][]byte{
-					"binary1": {1, 2, 3},
-				},
-			},
-			expected: true,
-		},
-		{
-			name: "different data values",
-			cm1: &corev1.ConfigMap{
-				Data: map[string]string{
-					"key1": "value1",
-				},
-			},
-			cm2: &corev1.ConfigMap{
-				Data: map[string]string{
-					"key1": "value2",
-				},
-			},
-			expected: false,
-		},
-		{
-			name: "different binary data",
-			cm1: &corev1.ConfigMap{
-				BinaryData: map[string][]byte{
-					"binary1": {1, 2, 3},
-				},
-			},
-			cm2: &corev1.ConfigMap{
-				BinaryData: map[string][]byte{
-					"binary1": {1, 2, 4},
-				},
-			},
-			expected: false,
-		},
-		{
-			name:     "empty configmaps",
-			cm1:      &corev1.ConfigMap{},
-			cm2:      &corev1.ConfigMap{},
-			expected: true,
-		},
-		{
-			name: "different keys",
-			cm1: &corev1.ConfigMap{
-				Data: map[string]string{
-					"key1": "value1",
-				},
-			},
-			cm2: &corev1.ConfigMap{
-				Data: map[string]string{
-					"key2": "value1",
-				},
-			},
-			expected: false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			sctrl, _, _, _, _ := prepareTest(t) //nolint:dogsled
-
-			hash1 := sctrl.calculateConfigHash(tc.cm1)
-			hash2 := sctrl.calculateConfigHash(tc.cm2)
-
-			if tc.expected {
-				require.Equal(t, hash1, hash2, "Expected hashes to be equal")
-			} else {
-				require.NotEqual(t, hash1, hash2, "Expected hashes to be different")
-			}
-		})
-	}
-}
-
-func TestJailedConfigReconciler_needsReconciliation(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name           string
-		jailedConfig   *slurmv1alpha1.JailedConfig
-		configMap      *corev1.ConfigMap
-		expectedSkip   bool
-		expectedReason string
-	}{
-		{
-			name: "should skip - all conditions true and hash matches",
-			jailedConfig: &slurmv1alpha1.JailedConfig{
-				Status: slurmv1alpha1.JailedConfigStatus{
-					Conditions: []metav1.Condition{
-						{
-							Type:   string(slurmv1alpha1.FilesWritten),
-							Status: metav1.ConditionTrue,
-						},
-						{
-							Type:   string(slurmv1alpha1.UpdateActionsCompleted),
-							Status: metav1.ConditionTrue,
-						},
-					},
-				},
-			},
-			configMap: &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						consts.AnnotationConfigHash: "", // Will be set to calculated hash
-					},
-				},
-				Data: map[string]string{
-					"key1": "value1",
-				},
-			},
-			expectedSkip:   true,
-			expectedReason: "all conditions met and hash matches",
-		},
-		{
-			name: "should not skip - FilesWritten condition false",
-			jailedConfig: &slurmv1alpha1.JailedConfig{
-				Status: slurmv1alpha1.JailedConfigStatus{
-					Conditions: []metav1.Condition{
-						{
-							Type:   string(slurmv1alpha1.FilesWritten),
-							Status: metav1.ConditionFalse,
-						},
-						{
-							Type:   string(slurmv1alpha1.UpdateActionsCompleted),
-							Status: metav1.ConditionTrue,
-						},
-					},
-				},
-			},
-			configMap: &corev1.ConfigMap{
-				Data: map[string]string{
-					"key1": "value1",
-				},
-			},
-			expectedSkip:   false,
-			expectedReason: "FilesWritten condition not true",
-		},
-		{
-			name: "should not skip - UpdateActionsCompleted condition missing",
-			jailedConfig: &slurmv1alpha1.JailedConfig{
-				Status: slurmv1alpha1.JailedConfigStatus{
-					Conditions: []metav1.Condition{
-						{
-							Type:   string(slurmv1alpha1.FilesWritten),
-							Status: metav1.ConditionTrue,
-						},
-					},
-				},
-			},
-			configMap: &corev1.ConfigMap{
-				Data: map[string]string{
-					"key1": "value1",
-				},
-			},
-			expectedSkip:   false,
-			expectedReason: "UpdateActionsCompleted condition missing",
-		},
-		{
-			name: "should not skip - no annotations",
-			jailedConfig: &slurmv1alpha1.JailedConfig{
-				Status: slurmv1alpha1.JailedConfigStatus{
-					Conditions: []metav1.Condition{
-						{
-							Type:   string(slurmv1alpha1.FilesWritten),
-							Status: metav1.ConditionTrue,
-						},
-						{
-							Type:   string(slurmv1alpha1.UpdateActionsCompleted),
-							Status: metav1.ConditionTrue,
-						},
-					},
-				},
-			},
-			configMap: &corev1.ConfigMap{
-				Data: map[string]string{
-					"key1": "value1",
-				},
-			},
-			expectedSkip:   false,
-			expectedReason: "no annotations",
-		},
-		{
-			name: "should not skip - hash mismatch",
-			jailedConfig: &slurmv1alpha1.JailedConfig{
-				Status: slurmv1alpha1.JailedConfigStatus{
-					Conditions: []metav1.Condition{
-						{
-							Type:   string(slurmv1alpha1.FilesWritten),
-							Status: metav1.ConditionTrue,
-						},
-						{
-							Type:   string(slurmv1alpha1.UpdateActionsCompleted),
-							Status: metav1.ConditionTrue,
-						},
-					},
-				},
-			},
-			configMap: &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						consts.AnnotationConfigHash: "different-hash",
-					},
-				},
-				Data: map[string]string{
-					"key1": "value1",
-				},
-			},
-			expectedSkip:   false,
-			expectedReason: "hash mismatch",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			sctrl, _, _, _, _ := prepareTest(t) //nolint:dogsled
-
-			// For the test case that expects skip=true, set the correct hash
-			if tc.expectedSkip {
-				correctHash := sctrl.calculateConfigHash(tc.configMap)
-				tc.configMap.Annotations[consts.AnnotationConfigHash] = correctHash
-			}
-
-			result := sctrl.needsReconciliation(tc.jailedConfig, tc.configMap)
-			expectedNeedsReconciliation := !tc.expectedSkip // invert logic: skip=false means needs=true
-			require.Equal(t, expectedNeedsReconciliation, result, "Expected needs reconciliation result: %s", tc.expectedReason)
-		})
-	}
-}
-
-func TestJailedConfigReconciler_SaveConfigHash(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name                string
-		initialAnnotations  map[string]string
-		expectedAnnotations map[string]string
-	}{
-		{
-			name:               "no initial annotations",
-			initialAnnotations: nil,
-			expectedAnnotations: map[string]string{
-				consts.AnnotationConfigHash: "", // Will be set to calculated hash
-			},
-		},
-		{
-			name: "existing annotations",
-			initialAnnotations: map[string]string{
-				"other-annotation": "value",
-			},
-			expectedAnnotations: map[string]string{
-				"other-annotation":          "value",
-				consts.AnnotationConfigHash: "", // Will be set to calculated hash
-			},
-		},
-		{
-			name: "hash already correct",
-			initialAnnotations: map[string]string{
-				consts.AnnotationConfigHash: "", // Will be set to calculated hash
-			},
-			expectedAnnotations: map[string]string{
-				consts.AnnotationConfigHash: "", // Should remain the same
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			configMap := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "test-cm",
-					Namespace:   "test-ns",
-					Annotations: tc.initialAnnotations,
-				},
-				Data: map[string]string{
-					"key1": "value1",
-				},
-			}
-
-			sctrl, _, _, _, _ := prepareTest(t) //nolint:dogsled
-
-			// Calculate expected hash
-			expectedHash := sctrl.calculateConfigHash(configMap)
-
-			// Set the expected hash in test expectations
-			for key, value := range tc.expectedAnnotations {
-				if key == consts.AnnotationConfigHash && value == "" {
-					tc.expectedAnnotations[key] = expectedHash
-				}
-			}
-
-			// For the "hash already correct" test case, set the initial hash
-			if tc.name == "hash already correct" {
-				configMap.Annotations[consts.AnnotationConfigHash] = expectedHash
-			}
-
-			// Create a fake client with the configmap
-			scheme := runtime.NewScheme()
-			require.NoError(t, corev1.AddToScheme(scheme))
-			require.NoError(t, slurmv1alpha1.AddToScheme(scheme))
-
-			fakeClient := fake.NewClientBuilder().
-				WithScheme(scheme).
-				WithObjects(configMap).
-				Build()
-
-			sctrl.Client = fakeClient
-
-			err := sctrl.saveConfigHash(context.Background(), configMap)
-			require.NoError(t, err)
-
-			require.Equal(t, tc.expectedAnnotations, configMap.Annotations)
-		})
-	}
-}
-
-func TestJailedConfigReconciler_shouldAggregatedReconciliation(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name          string
-		jailedConfigs []slurmv1alpha1.JailedConfig
-		configMaps    []*corev1.ConfigMap
-		expectedSkip  bool
-		expectedError bool
-	}{
-		{
-			name: "should skip - all configs have conditions true and hashes match",
-			jailedConfigs: []slurmv1alpha1.JailedConfig{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "config1",
-						Namespace: "test",
-					},
-					Spec: slurmv1alpha1.JailedConfigSpec{
-						ConfigMap: slurmv1alpha1.ConfigMapReference{Name: "cm1"},
-					},
-					Status: slurmv1alpha1.JailedConfigStatus{
-						Conditions: []metav1.Condition{
-							{Type: string(slurmv1alpha1.FilesWritten), Status: metav1.ConditionTrue},
-							{Type: string(slurmv1alpha1.UpdateActionsCompleted), Status: metav1.ConditionTrue},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "config2",
-						Namespace: "test",
-					},
-					Spec: slurmv1alpha1.JailedConfigSpec{
-						ConfigMap: slurmv1alpha1.ConfigMapReference{Name: "cm2"},
-					},
-					Status: slurmv1alpha1.JailedConfigStatus{
-						Conditions: []metav1.Condition{
-							{Type: string(slurmv1alpha1.FilesWritten), Status: metav1.ConditionTrue},
-							{Type: string(slurmv1alpha1.UpdateActionsCompleted), Status: metav1.ConditionTrue},
-						},
-					},
-				},
-			},
-			configMaps: []*corev1.ConfigMap{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cm1",
-						Namespace: "test",
-						Annotations: map[string]string{
-							consts.AnnotationConfigHash: "", // Will be set to calculated hash
-						},
-					},
-					Data: map[string]string{"key1": "value1"},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cm2",
-						Namespace: "test",
-						Annotations: map[string]string{
-							consts.AnnotationConfigHash: "", // Will be set to calculated hash
-						},
-					},
-					Data: map[string]string{"key2": "value2"},
-				},
-			},
-			expectedSkip:  true,
-			expectedError: false,
-		},
-		{
-			name: "should not skip - one config has false condition",
-			jailedConfigs: []slurmv1alpha1.JailedConfig{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "config1",
-						Namespace: "test",
-					},
-					Spec: slurmv1alpha1.JailedConfigSpec{
-						ConfigMap: slurmv1alpha1.ConfigMapReference{Name: "cm1"},
-					},
-					Status: slurmv1alpha1.JailedConfigStatus{
-						Conditions: []metav1.Condition{
-							{Type: string(slurmv1alpha1.FilesWritten), Status: metav1.ConditionFalse},
-							{Type: string(slurmv1alpha1.UpdateActionsCompleted), Status: metav1.ConditionTrue},
-						},
-					},
-				},
-			},
-			configMaps: []*corev1.ConfigMap{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cm1",
-						Namespace: "test",
-					},
-					Data: map[string]string{"key1": "value1"},
-				},
-			},
-			expectedSkip:  false,
-			expectedError: false,
-		},
-		{
-			name: "should not skip - hash mismatch",
-			jailedConfigs: []slurmv1alpha1.JailedConfig{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "config1",
-						Namespace: "test",
-					},
-					Spec: slurmv1alpha1.JailedConfigSpec{
-						ConfigMap: slurmv1alpha1.ConfigMapReference{Name: "cm1"},
-					},
-					Status: slurmv1alpha1.JailedConfigStatus{
-						Conditions: []metav1.Condition{
-							{Type: string(slurmv1alpha1.FilesWritten), Status: metav1.ConditionTrue},
-							{Type: string(slurmv1alpha1.UpdateActionsCompleted), Status: metav1.ConditionTrue},
-						},
-					},
-				},
-			},
-			configMaps: []*corev1.ConfigMap{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cm1",
-						Namespace: "test",
-						Annotations: map[string]string{
-							consts.AnnotationConfigHash: "wrong-hash",
-						},
-					},
-					Data: map[string]string{"key1": "value1"},
-				},
-			},
-			expectedSkip:  false,
-			expectedError: false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			// Create fake client with the configmaps
-			scheme := runtime.NewScheme()
-			require.NoError(t, corev1.AddToScheme(scheme))
-			require.NoError(t, slurmv1alpha1.AddToScheme(scheme))
-
-			objs := make([]client.Object, len(tc.configMaps))
-			for i, cm := range tc.configMaps {
-				objs[i] = cm
-			}
-
-			fakeClient := fake.NewClientBuilder().
-				WithScheme(scheme).
-				WithObjects(objs...).
-				Build()
-
-			sctrl := &JailedConfigReconciler{
-				Client: fakeClient,
-			}
-
-			// For test cases that expect skip=true, set correct hashes
-			if tc.expectedSkip {
-				for _, cm := range tc.configMaps {
-					correctHash := sctrl.calculateConfigHash(cm)
-					if cm.Annotations == nil {
-						cm.Annotations = make(map[string]string)
-					}
-					cm.Annotations[consts.AnnotationConfigHash] = correctHash
-					// Update the ConfigMap in the fake client
-					err := fakeClient.Update(context.Background(), cm)
-					require.NoError(t, err)
-				}
-			}
-
-			result, err := sctrl.shouldAggregatedReconciliation(context.Background(), tc.jailedConfigs)
-
-			if tc.expectedError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				expectedNeedsReconciliation := !tc.expectedSkip // invert logic: skip=false means needs=true
-				require.Equal(t, expectedNeedsReconciliation, result)
-			}
-		})
-	}
 }
 
 func TestJailedConfigReconciler_ShouldInitializeConditions(t *testing.T) {
@@ -1267,6 +720,115 @@ func TestJailedConfigReconciler_ShouldInitializeConditions(t *testing.T) {
 				require.Equal(t, metav1.ConditionUnknown, updateActionsCondition.Status)
 				require.Equal(t, string(slurmv1alpha1.ReasonInit), updateActionsCondition.Reason)
 			}
+		})
+	}
+}
+
+func TestHasFailedFilesWrittenCondition(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name           string
+		jailedConfig   *slurmv1alpha1.JailedConfig
+		expectedResult bool
+	}{
+		{
+			name: "no conditions - should return false",
+			jailedConfig: &slurmv1alpha1.JailedConfig{
+				Status: slurmv1alpha1.JailedConfigStatus{
+					Conditions: []metav1.Condition{},
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "no FilesWritten condition - should return false",
+			jailedConfig: &slurmv1alpha1.JailedConfig{
+				Status: slurmv1alpha1.JailedConfigStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(slurmv1alpha1.UpdateActionsCompleted),
+							Status: metav1.ConditionTrue,
+							Reason: string(slurmv1alpha1.ReasonSuccess),
+						},
+					},
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "FilesWritten condition with Success reason - should return false",
+			jailedConfig: &slurmv1alpha1.JailedConfig{
+				Status: slurmv1alpha1.JailedConfigStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(slurmv1alpha1.FilesWritten),
+							Status: metav1.ConditionTrue,
+							Reason: string(slurmv1alpha1.ReasonSuccess),
+						},
+					},
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "FilesWritten condition with Failed reason - should return true",
+			jailedConfig: &slurmv1alpha1.JailedConfig{
+				Status: slurmv1alpha1.JailedConfigStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(slurmv1alpha1.FilesWritten),
+							Status: metav1.ConditionFalse,
+							Reason: string(slurmv1alpha1.ReasonNotFound),
+						},
+					},
+				},
+			},
+			expectedResult: true,
+		},
+		{
+			name: "FilesWritten condition with Failed reason and other conditions - should return true",
+			jailedConfig: &slurmv1alpha1.JailedConfig{
+				Status: slurmv1alpha1.JailedConfigStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(slurmv1alpha1.UpdateActionsCompleted),
+							Status: metav1.ConditionTrue,
+							Reason: string(slurmv1alpha1.ReasonSuccess),
+						},
+						{
+							Type:   string(slurmv1alpha1.FilesWritten),
+							Status: metav1.ConditionFalse,
+							Reason: string(slurmv1alpha1.ReasonNotFound),
+						},
+					},
+				},
+			},
+			expectedResult: true,
+		},
+		{
+			name: "FilesWritten condition with Refresh reason - should return false",
+			jailedConfig: &slurmv1alpha1.JailedConfig{
+				Status: slurmv1alpha1.JailedConfigStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(slurmv1alpha1.FilesWritten),
+							Status: metav1.ConditionFalse,
+							Reason: string(slurmv1alpha1.ReasonRefresh),
+						},
+					},
+				},
+			},
+			expectedResult: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := hasFailedFilesWrittenCondition(tc.jailedConfig)
+			require.Equal(t, tc.expectedResult, result, "Expected result for test case: %s", tc.name)
 		})
 	}
 }
