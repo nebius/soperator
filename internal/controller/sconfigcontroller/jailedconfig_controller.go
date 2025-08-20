@@ -74,7 +74,7 @@ type JailedConfigReconciler struct {
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/finalizers,verbs=update
-// +kubebuilder:rbac:groups="core",resources=configmaps,verbs=get;list;watch;patch
+// +kubebuilder:rbac:groups="core",resources=configmaps,verbs=get;list;watch
 
 // Clock is used to fake timing for testing
 type Clock interface {
