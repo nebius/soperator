@@ -33,11 +33,14 @@ import (
 
 var (
 	WorkerTopologyReconcilerName = "workerTopologyReconciler"
+	DefaultRequeueResult         = ctrl.Result{
+		RequeueAfter: 1 * time.Minute,
+		Requeue:      true,
+	}
 )
 
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;update;create;patch
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs,verbs=get;list;watch;create;patch
 
@@ -67,36 +70,19 @@ func NewWorkerTopologyReconciler(
 func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithName(WorkerTopologyReconcilerName)
 	logger.Info(
-		"Starting reconciliation", "Pod", req.Name, "Namespace", req.Namespace,
+		"Starting reconciliation", "SlurmCluster", req.Name, "Namespace", req.Namespace,
 	)
 
-	pod := &corev1.Pod{}
-	if err := r.Client.Get(ctx, req.NamespacedName, pod); err != nil {
-		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
-		}
-		return ctrl.Result{}, fmt.Errorf("get Pod %q in namespace %q: %w", req.Name, req.Namespace, err)
+	slurmCluster := &slurmv1.SlurmCluster{}
+	if err := r.Client.Get(ctx, req.NamespacedName, slurmCluster); err != nil {
+		return ctrl.Result{}, fmt.Errorf("get SlurmCluster %q in namespace %q: %w", req.Name, req.Namespace, err)
 	}
 
-	slurmClusterList := &slurmv1.SlurmClusterList{}
-	if err := r.Client.List(ctx, slurmClusterList, client.InNamespace(req.Namespace)); err != nil {
-		return ctrl.Result{}, fmt.Errorf("list SlurmClusters in namespace %q: %w", req.Namespace, err)
-	}
+	shouldReconcileCluster := isClusterReconciliationNeeded(slurmCluster)
 
-	var slurmCluster *slurmv1.SlurmCluster
-	for i := range slurmClusterList.Items {
-		if slurmClusterList.Items[i].Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyTree {
-			slurmCluster = &slurmClusterList.Items[i]
-			break
-		}
+	if !shouldReconcileCluster {
+		return DefaultRequeueResult, nil
 	}
-
-	if slurmCluster == nil {
-		logger.Info("No SlurmCluster found with topology tree plugin in namespace", "namespace", req.Namespace)
-		return ctrl.Result{}, nil
-	}
-
-	logger.Info("Found SlurmCluster with topology tree plugin", "cluster", slurmCluster.Name)
 
 	existingTopologyConfigMap, err := r.EnsureWorkerTopologyConfigMap(ctx, req.Namespace, slurmCluster.Name, logger)
 	if err != nil {
@@ -122,7 +108,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	if len(podList.Items) == 0 {
 		logger.Info("No pods found with label", "labelSelector", labelSelector)
-		return ctrl.Result{}, nil
+		return DefaultRequeueResult, nil
 	}
 
 	podsByNode := r.GetPodsByNode(podList.Items)
@@ -137,7 +123,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	existingTopologyConfig := existingTopologyConfigMap.Data[consts.ConfigMapKeyTopologyConfig]
 	if r.calculateConfigHash(desiredTopologyConfig) == r.calculateConfigHash(existingTopologyConfig) {
 		logger.Info("Topology config unchanged, skipping update")
-		return ctrl.Result{}, nil
+		return DefaultRequeueResult, nil
 	}
 
 	if err := r.updateTopologyConfigMap(ctx, req.Namespace, desiredTopologyConfig); err != nil {
@@ -146,7 +132,11 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	logger.Info("Reconciliation completed successfully")
-	return ctrl.Result{}, nil
+	return DefaultRequeueResult, nil
+}
+
+func isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
+	return slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyTree
 }
 
 func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
@@ -349,9 +339,6 @@ func (r *WorkerTopologyReconciler) getPodList(
 func (r *WorkerTopologyReconciler) GetPodsByNode(pods []corev1.Pod) map[string][]string {
 	podsByNode := make(map[string][]string, len(pods))
 	for _, pod := range pods {
-		if pod.Spec.NodeName == "" || pod.Status.Phase != corev1.PodRunning {
-			continue
-		}
 		podsByNode[pod.Spec.NodeName] = append(podsByNode[pod.Spec.NodeName], pod.Name)
 	}
 	return podsByNode
@@ -443,64 +430,20 @@ func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, 
 func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 	maxConcurrency int, cacheSyncTimeout time.Duration) error {
 	return ctrl.NewControllerManagedBy(mgr).Named(WorkerTopologyReconcilerName).
-		For(&corev1.Pod{}, builder.WithPredicates(predicate.Funcs{
+		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
-				pod, ok := e.Object.(*corev1.Pod)
-				if !ok {
-					return false
-				}
-				return r.shouldReconcileForPod(pod)
+				return true
 			},
 			DeleteFunc: func(e event.DeleteEvent) bool {
 				return false
 			},
 			UpdateFunc: func(e event.UpdateEvent) bool {
-				newPod, ok := e.ObjectNew.(*corev1.Pod)
-				if !ok {
-					return false
-				}
-				oldPod, ok := e.ObjectOld.(*corev1.Pod)
-				if !ok {
-					return false
-				}
-
-				if oldPod.Status.Phase != corev1.PodRunning && newPod.Status.Phase == corev1.PodRunning {
-					return r.shouldReconcileForPod(newPod)
-				}
 				return false
 			},
 			GenericFunc: func(e event.GenericEvent) bool {
-				pod, ok := e.Object.(*corev1.Pod)
-				if !ok {
-					return false
-				}
-				return r.shouldReconcileForPod(pod)
+				return false
 			},
 		})).
-		WithOptions(controllerconfig.ControllerOptionsWithRateLimit(maxConcurrency, cacheSyncTimeout, 15*time.Second, 1*time.Minute)).
+		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
 		Complete(r)
-}
-
-// shouldReconcileForPod checks if reconciliation should be triggered for the given pod
-func (r *WorkerTopologyReconciler) shouldReconcileForPod(pod *corev1.Pod) bool {
-	if pod.Labels[consts.LabelComponentKey] != consts.ComponentTypeWorker.String() {
-		return false
-	}
-	if pod.Status.Phase != corev1.PodRunning {
-		return false
-	}
-
-	ctx := context.Background()
-	slurmClusterList := &slurmv1.SlurmClusterList{}
-	if err := r.Client.List(ctx, slurmClusterList, client.InNamespace(pod.Namespace)); err != nil {
-		return false
-	}
-
-	for _, cluster := range slurmClusterList.Items {
-		if cluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyTree {
-			return true
-		}
-	}
-
-	return false
 }
