@@ -27,7 +27,11 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
+	"nebius.ai/slurm-operator/internal/jwt"
+	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/slurmapi"
+
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
 )
 
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
@@ -277,10 +281,25 @@ func (r *PodEphemeralStorageCheck) handleHighStorageUsage(ctx context.Context, p
 		info.PodName, info.PodNamespace,
 		info.UsagePercent, info.UsedBytes, info.LimitBytes)
 
-	slurmNodeName, err := r.getSlurmNode(ctx, types.NamespacedName{
+	namespacedName := types.NamespacedName{
 		Name:      pod.Spec.NodeName,
 		Namespace: pod.Namespace,
-	}, pod.Spec.NodeName)
+	}
+
+	slurmClusterName, err := r.getSlurmClusterName(ctx, pod.Namespace)
+	if slurmClusterName == "" {
+		return fmt.Errorf("getting SlurmCluster not found for pod %s/%s", pod.Namespace, pod.Name)
+	}
+
+	jwtToken := jwt.NewToken(r.Client).For(namespacedName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
+	slurmAPIServer := fmt.Sprintf("http://%s.%s:6820", naming.BuildServiceName(consts.ComponentTypeREST, slurmClusterName), pod.Namespace)
+	slurmAPIClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
+	if err != nil {
+		return fmt.Errorf("creating slurm api client: %w", err)
+	}
+	r.slurmAPIClients.AddClient(namespacedName, slurmAPIClient)
+
+	slurmNodeName, err := r.getSlurmNode(ctx, namespacedName, pod.Spec.NodeName)
 	if err != nil {
 		return fmt.Errorf("getting Slurm node: %w for pod %s/%s", err, pod.Namespace, pod.Name)
 	}
@@ -416,6 +435,21 @@ func (r *PodEphemeralStorageCheck) getEphemeralStorageLimitForPod(pod corev1.Pod
 	}
 
 	return uint64(totalLimit)
+}
+
+func (r *PodEphemeralStorageCheck) getSlurmClusterName(ctx context.Context, namespace string) (string, error) {
+	SlurmClusterList := &slurmv1.SlurmClusterList{}
+	if err := r.List(
+		ctx, SlurmClusterList, client.InNamespace(namespace),
+	); err != nil {
+		return "", fmt.Errorf("listing SlurmCluster in namespace %s: %w", namespace, err)
+	}
+	slurmClusterName := ""
+	if len(SlurmClusterList.Items) > 0 {
+		slurmClusterName = SlurmClusterList.Items[0].Name
+	}
+
+	return slurmClusterName, nil
 }
 
 func (c *PodEphemeralStorageCheck) getSlurmNode(
