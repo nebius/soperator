@@ -284,6 +284,23 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 
 	logger.V(1).Info("Finished syncing caches for written files")
 
+	if len(jailedConfig.Spec.UpdateActions) == 0 {
+		logger.V(1).Info("No update actions specified, skipping further processing")
+		err = r.setConditions(
+			ctx,
+			jailedConfig,
+			metav1.Condition{
+				Type:    string(slurmv1alpha1.UpdateActionsCompleted),
+				Status:  metav1.ConditionTrue,
+				Reason:  slurmv1alpha1.ReasonMissingAction,
+				Message: "No update actions specified, skipping further processing",
+			},
+		)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
+		}
+	}
+
 	for _, action := range jailedConfig.Spec.UpdateActions {
 		switch action {
 		case slurmv1alpha1.UpdateActionReconfigure:
@@ -304,24 +321,8 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
 			}
-		default:
-			err = r.setConditions(
-				ctx,
-				jailedConfig,
-				metav1.Condition{
-					Type:    string(slurmv1alpha1.UpdateActionsCompleted),
-					Status:  metav1.ConditionTrue,
-					Reason:  slurmv1alpha1.ReasonMissingAction,
-					Message: fmt.Sprintf("Update action %s is not supported", action),
-				},
-			)
-			if err != nil {
-				return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
-			}
-			return ctrl.Result{}, fmt.Errorf("unexpected update action %s: %w", action, err)
 		}
 	}
-
 	return ctrl.Result{}, nil
 }
 
