@@ -8,6 +8,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -24,14 +25,13 @@ import (
 
 	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/jwt"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/slurmapi"
-
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
 )
 
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
@@ -276,33 +276,68 @@ func (r *PodEphemeralStorageCheck) handleHighStorageUsage(ctx context.Context, p
 		"usagePercent", fmt.Sprintf("%.2f%%", info.UsagePercent),
 		"threshold", fmt.Sprintf("%.2f%%", r.usageThreshold),
 	)
-	r.Recorder.Eventf(pod, corev1.EventTypeWarning, consts.HighEphemeralStorageUsage,
-		"Pod %s in namespace %s is using %.2f%% of its ephemeral storage limit (%d bytes used, %d bytes limit)",
-		info.PodName, info.PodNamespace,
-		info.UsagePercent, info.UsedBytes, info.LimitBytes)
 
-	namespacedName := types.NamespacedName{
-		Name:      pod.Spec.NodeName,
+	r.Client.Create(ctx, &corev1.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: pod.Namespace,
+			Name:      fmt.Sprintf("%s-%s-ephemeral-storage-warning", pod.Name, pod.Namespace),
+			Labels: map[string]string{
+				consts.LabelComponentKey: consts.ComponentTypeWorker.String(),
+				consts.LabelManagedByKey: consts.LabelManagedByValue,
+			},
+		},
+		InvolvedObject: corev1.ObjectReference{
+			Kind:      "Pod",
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			UID:       pod.UID,
+		},
+		Reason: consts.HighEphemeralStorageUsage,
+		Message: fmt.Sprintf("Pod %s in namespace %s is using %.2f%% of its ephemeral storage limit (%d bytes used, %d bytes limit)",
+			info.PodName, info.PodNamespace,
+			info.UsagePercent, info.UsedBytes, info.LimitBytes),
+		Type: corev1.EventTypeWarning,
+	})
+
+	slurmClusterName, err := r.getSlurmClusterName(ctx, pod.Namespace)
+	if err != nil {
+		return fmt.Errorf("getting SlurmCluster name: %w for pod %s/%s", err, pod.Namespace, pod.Name)
+	}
+	if slurmClusterName == "" {
+		return fmt.Errorf("not found SlurmCluster for pod %s/%s", pod.Namespace, pod.Name)
+	}
+
+	slurmClusterNamespacedName := types.NamespacedName{
+		Name:      slurmClusterName,
 		Namespace: pod.Namespace,
 	}
 
-	slurmClusterName, err := r.getSlurmClusterName(ctx, pod.Namespace)
-	if slurmClusterName == "" {
-		return fmt.Errorf("getting SlurmCluster not found for pod %s/%s", pod.Namespace, pod.Name)
-	}
-
-	jwtToken := jwt.NewToken(r.Client).For(namespacedName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
-	slurmAPIServer := fmt.Sprintf("http://%s.%s:6820", naming.BuildServiceName(consts.ComponentTypeREST, slurmClusterName), pod.Namespace)
-	slurmAPIClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
+	err = r.InitSlurmAPIClients(slurmClusterNamespacedName, slurmClusterName, pod)
 	if err != nil {
-		return fmt.Errorf("creating slurm api client: %w", err)
+		return fmt.Errorf("initializing Slurm API clients: %w", err)
 	}
-	r.slurmAPIClients.AddClient(namespacedName, slurmAPIClient)
 
-	slurmNodeName, err := r.getSlurmNode(ctx, namespacedName, pod.Spec.NodeName)
+	slurmNodeName, err := r.getSlurmNode(ctx, slurmClusterNamespacedName, pod.Name)
 	if err != nil {
 		return fmt.Errorf("getting Slurm node: %w for pod %s/%s", err, pod.Namespace, pod.Name)
 	}
+	if err := r.checkSlurmNodeDrainStatus(ctx, slurmNodeName, pod); err != nil {
+		if err.Error() == "node needs draining" {
+			err = r.drainSlurmNode(ctx, slurmClusterNamespacedName, slurmNodeName.Name, info.UsedBytes)
+			if err != nil {
+				return fmt.Errorf("draining Slurm node: %w for pod %s/%s", err, pod.Namespace, pod.Name)
+			}
+		} else {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *PodEphemeralStorageCheck) checkSlurmNodeDrainStatus(ctx context.Context, slurmNodeName slurmapi.Node, pod *corev1.Pod) error {
+	logger := log.FromContext(ctx).WithName(PodEphemeralStorageCheckName)
+
 	if slurmNodeName.Name == "" {
 		return fmt.Errorf("slurm node not found for pod %s/%s", pod.Namespace, pod.Name)
 	}
@@ -315,15 +350,8 @@ func (r *PodEphemeralStorageCheck) handleHighStorageUsage(ctx context.Context, p
 		logger.V(1).Info("slurm node is fully drained", "nodeStates", slurmNodeName.States)
 		return nil
 	}
-	err = r.drainSlurmNode(ctx, types.NamespacedName{
-		Name:      pod.Spec.NodeName,
-		Namespace: pod.Namespace,
-	}, slurmNodeName.Name, info.UsedBytes)
-	if err != nil {
-		return fmt.Errorf("draining Slurm node: %w for pod %s/%s", err, pod.Namespace, pod.Name)
-	}
 
-	return nil
+	return fmt.Errorf("node needs draining")
 }
 
 func (r *PodEphemeralStorageCheck) findWorkerPods(ctx context.Context, namespace string) ([]corev1.Pod, error) {
@@ -450,6 +478,19 @@ func (r *PodEphemeralStorageCheck) getSlurmClusterName(ctx context.Context, name
 	}
 
 	return slurmClusterName, nil
+}
+
+// InitSlurmAPIClients initializes Slurm API clients for the given Slurm cluster
+func (r *PodEphemeralStorageCheck) InitSlurmAPIClients(
+	slurmClusterNamespacedName types.NamespacedName, slurmClusterName string, pod *corev1.Pod) error {
+	jwtToken := jwt.NewToken(r.Client).For(slurmClusterNamespacedName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
+	slurmAPIServer := fmt.Sprintf("http://%s.%s:6820", naming.BuildServiceName(consts.ComponentTypeREST, slurmClusterName), pod.Namespace)
+	slurmAPIClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
+	if err != nil {
+		return fmt.Errorf("creating slurm api client: %w", err)
+	}
+	r.slurmAPIClients.AddClient(slurmClusterNamespacedName, slurmAPIClient)
+	return nil
 }
 
 func (c *PodEphemeralStorageCheck) getSlurmNode(
