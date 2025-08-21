@@ -40,13 +40,19 @@ cleanup() {
 
     # Kill NFS processes
     for process in rpc.nfsd rpc.mountd rpcbind; do
-        if pid=$(pidof "$process" 2>/dev/null); then
-            log "Stopping $process (PID: $pid)"
-            kill -TERM $pid 2>/dev/null || true
+        if pgrep "$process" >/dev/null 2>&1; then
+            log "Stopping all instances of $process"
+
+            # Send TERM signal to all instances
+            pkill -TERM "$process" 2>/dev/null || true
+
             # Wait briefly for graceful shutdown
             sleep 1
-            if kill -0 $pid 2>/dev/null; then
-                kill -KILL $pid 2>/dev/null || true
+
+            # Force kill any remaining instances
+            if pgrep "$process" >/dev/null 2>&1; then
+                log "Force killing remaining instances of $process"
+                pkill -KILL "$process" 2>/dev/null || true
             fi
         fi
     done
