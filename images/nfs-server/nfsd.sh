@@ -137,7 +137,6 @@ start_nfsd() {
     if [[ $? -ne 0 ]]; then
         error_exit "Failed to start NFS daemon"
     fi
-
     log "NFS daemon started successfully"
 }
 
