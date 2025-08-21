@@ -20,7 +20,6 @@ A production-ready NFS server container. Features fast recovery, performance tun
 | `GRACE_TIME` | NFS grace period in seconds | `10` | - |
 | `LEASE_TIME` | NFS lease time in seconds | `10` | - |
 | `THREADS` | Number of NFS daemon threads | `8` | -  |
-| `EXTRA_ARGS` | Additional nfsd arguments | `""` | - |
 
 ## Basic Usage
 

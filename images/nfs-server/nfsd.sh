@@ -13,7 +13,6 @@ SYNC="${SYNC:-}"
 GRACE_TIME="${GRACE_TIME:-10}"
 LEASE_TIME="${LEASE_TIME:-10}"
 THREADS="${THREADS:-8}"
-EXTRA_ARGS="${EXTRA_ARGS:-}"
 
 # Logging function
 log() {
@@ -131,12 +130,8 @@ start_nfsd() {
         --no-nfs-version 3 \
         --grace-time "$GRACE_TIME" \
         --lease-time "$LEASE_TIME" \
-        $EXTRA_ARGS \
         "$THREADS"
 
-    if [[ $? -ne 0 ]]; then
-        error_exit "Failed to start NFS daemon"
-    fi
     log "NFS daemon started successfully"
 }
 
