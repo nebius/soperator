@@ -188,7 +188,6 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		if activeCheck.Status.SlurmJobsStatus.LastJobId == slurmJobID {
 			failReasons = activeCheck.Status.SlurmJobsStatus.LastJobFailReasons
 		}
-		lastEndTime := activeCheck.Status.SlurmJobsStatus.LastJobEndTime
 		requeue := false
 		final := false
 		for _, slurmJob := range slurmJobs {
@@ -206,10 +205,6 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			// Job has already been seen in one of the previous reconciler runs
 			if k8sJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime] != "" {
 				continue
-			}
-
-			if lastEndTime == nil || slurmJob.EndTime.After(lastEndTime.Time) {
-				lastEndTime = slurmJob.EndTime
 			}
 
 			switch {
@@ -264,7 +259,6 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			LastJobState:       state,
 			LastJobFailReasons: failReasons,
 			LastJobSubmitTime:  submitTime,
-			LastJobEndTime:     lastEndTime,
 			LastTransitionTime: metav1.Now(),
 		}
 
