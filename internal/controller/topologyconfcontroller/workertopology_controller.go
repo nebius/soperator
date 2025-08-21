@@ -101,7 +101,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	)
 
 	labelSelector := client.MatchingLabels{consts.LabelComponentKey: consts.ComponentTypeWorker.String()}
-	fieldSelector := client.MatchingFields{consts.FieldStatusPhase: consts.StatusPhaseRunning}
+	fieldSelector := client.MatchingFields{consts.FieldStatusPhase: string(corev1.PodRunning)}
 	podList, err := r.getPodList(ctx, labelSelector, fieldSelector, req.Namespace)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("list pods with label %v: %w", labelSelector, err)
@@ -434,10 +434,14 @@ func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 
 	ctx := context.Background()
 
-	// Index pods by their status.
+	// Index pods by their status and worker label.
 	if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Pod{}, consts.FieldStatusPhase,
 		func(o client.Object) []string {
-			return []string{string(o.(*corev1.Pod).Status.Phase)}
+			if o.(*corev1.Pod).Status.Phase == corev1.PodRunning &&
+				o.(*corev1.Pod).Labels[consts.LabelComponentKey] == consts.ComponentTypeWorker.String() {
+				return []string{string(o.(*corev1.Pod).Status.Phase)}
+			}
+			return []string{}
 		}); err != nil {
 		return fmt.Errorf("failed to setup %s field indexer: %w", consts.FieldStatusPhase, err)
 	}
