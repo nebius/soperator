@@ -2,6 +2,8 @@
 
 set -e # Exit immediately if any command returns a non-zero error code
 
+PARTITION="background"
+
 echo "Link users from jail"
 ln -s /mnt/jail/etc/passwd /etc/passwd
 ln -s /mnt/jail/etc/group /etc/group
@@ -36,6 +38,7 @@ if [[ ! -z "$RESERVATION_NAME" ]]; then
         --job-name="$ACTIVE_CHECK_NAME" \
         --chdir=/opt/soperator-home/soperatorchecks \
         --uid=soperatorchecks \
+        --partition="$PARTITION" \
         /opt/bin/sbatch.sh
     )
     if [[ -z "$SLURM_OUTPUT" ]]; then
@@ -66,6 +69,7 @@ else
         --job-name="$ACTIVE_CHECK_NAME" \
         --chdir=/opt/soperator-home/soperatorchecks \
         --uid=soperatorchecks \
+        --partition="$PARTITION" \
         /opt/bin/sbatch.sh
     )
     if [[ -z "$SLURM_OUTPUT" ]]; then
