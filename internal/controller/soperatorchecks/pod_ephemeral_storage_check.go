@@ -448,7 +448,11 @@ func (c *PodEphemeralStorageCheck) drainSlurmNode(
 			"delete leftover containers from 'ssh %s enroot list' and 'ssh %s docker ps -a', "+
 			"reboot the node using 'scontrol reboot %s', "+
 			"or stop-start the InstanceId from 'scontrol show node %s'",
-		usage, slurmNodeName, slurmNodeName, slurmNodeName, slurmNodeName, slurmNodeName,
+		"%s of node boot disk is used. Clean up volumes from 'ssh %s /opt/soperator_utils/fs_usage.sh -l', "+
+			"delete leftover containers from 'ssh %s enroot list' and 'ssh %s docker ps -a', "+
+			"reboot the node using 'scontrol reboot %s', "+
+			"or stop-start the InstanceId from 'scontrol show node %s'",
+		formatBytes(usage), slurmNodeName, slurmNodeName, slurmNodeName, slurmNodeName, slurmNodeName,
 	)
 	reason := consts.SlurmUserReasonHC + " " + message
 	logger := log.FromContext(ctx).WithName("SlurmNodesController.drainSlurmNode").
