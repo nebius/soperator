@@ -184,7 +184,7 @@ observability:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 1.21.11
+    version: 1.21.12
     namespace: soperator
     releaseName: soperator-dcgm-exporter
     values:
@@ -203,7 +203,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.21.11
+  version: 1.21.12
   namespace: soperator
   releaseName: soperator
   values: null
@@ -219,7 +219,7 @@ soperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.21.11
+  version: 1.21.12
   namespace: "soperator-system"
   releaseName: soperator-controller
   values:
