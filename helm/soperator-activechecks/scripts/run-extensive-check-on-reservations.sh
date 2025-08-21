@@ -1,3 +1,5 @@
+#!/bin/bash
+
 set -e # Exit immediately if any command returns a non-zero error code
 
 echo "Link users from jail"
@@ -24,12 +26,12 @@ whatToDo () {
   # We can do that inside extensive-check using SBATCH --time=10:00
 
   slurmJobId=$(kubectl get job $jobName -o json | jq -r '.metadata.annotations."slurm-job-id"')
-  if [ "$slurmJobId" = "" ];then
+  if [[ "$slurmJobId" == "" ]]; then
     echo "create"
     return 0
   fi
   slurmJobState=$(scontrol show job $slurmJobId --json | jq -r '.jobs|.[0]|.job_state[0]')
-  if [ "$slurmJobState" = "RUNNING" ];then
+  if [[ "$slurmJobState" == "RUNNING"  ||  "$slurmJobState" == "PENDING" ]]; then
     echo "noop"
     return 0
   fi
@@ -41,8 +43,8 @@ whatToDo () {
 create() {
   echo "creating job: $jobName"
   kubectl create job --from=cronjob/$TARGET_ACTIVE_CHECK_NAME $jobName --dry-run=client -o "json" \
-  | jq --arg RESERVATION_NAME "$reservationName" '.spec.template.spec.containers[0].env += [{ name: "RESERVATION_NAME", value:$RESERVATION_NAME }]' \
-  | kubectl apply -f -
+    | jq --arg RESERVATION_NAME "$reservationName" '.spec.template.spec.containers[0].env += [{ name: "RESERVATION_NAME", value:$RESERVATION_NAME }]' \
+    | kubectl apply -f -
 }
 
 delete() {
@@ -56,9 +58,9 @@ for reservationName in $(scontrol show reservation --json | jq -r --arg RESERVAT
   jobName="$TARGET_ACTIVE_CHECK_NAME-$reservationName"
 
   action=$(whatToDo)
-  if [ "$action" = "create" ]; then
+  if [[ "$action" == "create" ]]; then
     create
-  elif [ "$action" = "delete_create" ]; then
+  elif [[ "$action" == "delete_create" ]]; then
     delete
     create
   else
