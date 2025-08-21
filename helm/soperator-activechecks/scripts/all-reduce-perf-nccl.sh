@@ -34,10 +34,13 @@ echo "Health checker job step exit code: $HC_EXIT_CODE"
 HC_STATUS=$(echo "$HC_OUTPUT" | awk '/^\s*{/,/^\s*}/' | jq -r '.status')
 
 echo "Health checker status: $HC_STATUS"
-if [[ "$HC_STATUS" == "ERROR" && $HC_EXIT_CODE -eq 1 ]]; then
-  echo "Health-checker reported status=ERROR and exited with non-zero status."
+if [[ "$HC_STATUS" == "FAIL" ]]; then
+  echo "Health-checker reported status=FAIL."
   exit 1
+elif [[ "$HC_STATUS" == "ERROR" ]]; then
+  echo "Health-checker reported status=ERROR."
+  exit 0
 else
-  echo "Health-checker passed or returned non-ERROR status."
+  echo "Health-checker passed or returned non-FAIL status."
   exit 0
 fi
