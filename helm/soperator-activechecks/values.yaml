@@ -32,4 +32,6 @@ upgradeCuda:
   cudaVersion: "12.4.1-1"
 upgradeHealthChecker:
   healthCheckerVersion: "1.0.0-146.250808"
-reservationPrefix: soperatorchecks.suspicious
+  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.21.12-jammy-slurm24.11.5"
+  k8sJob: "cr.eu-north1.nebius.cloud/soperator/ubuntu:jammy"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.21.12-jammy-slurm24.11.5"
