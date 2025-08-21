@@ -158,14 +158,25 @@ echo "Active check name: $ACTIVE_CHECK_NAME"
 NODE_NAME=$(hostname)
 echo "Running embedded prolog on node: $NODE_NAME"
 
-extra_json=$(scontrol show node "$NODE_NAME" | awk -F= '/Extra=/{print $2}')
-if [[ -z "$extra_json" || "$extra_json" == "none" ]]; then
-    extra_json="{}"
-fi
+(
+    flock 9
 
-updated_json=$(echo "$extra_json" | jq -c --arg key "$ACTIVE_CHECK_NAME" 'del(.[$key])')
+	extra_json=$(scontrol show node "$NODE_NAME" | awk -F= '/Extra=/{print $2}')
+	if [[ -z "$extra_json" || "$extra_json" == "none" ]]; then
+	    extra_json="{}"
+	fi
 
-sudo scontrol update NodeName="$NODE_NAME" Extra="$updated_json"
+	echo "Extra before: $extra_json"
+
+	updated_json=$(echo "$extra_json" | jq -c --arg key "$ACTIVE_CHECK_NAME" 'del(.[$key])')
+
+	echo "Extra after: $updated_json"
+
+	sudo scontrol update NodeName="$NODE_NAME" Extra="$updated_json"
+
+) 9>"/etc/soperatorchecks/active_check_${NODE_NAME}.lock"
+
+chown soperatorchecks:soperatorchecks /etc/soperatorchecks/active_check_${NODE_NAME}.lock
 
 echo "prolog completed for $NODE_NAME"`
 }

@@ -1,19 +1,18 @@
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
-  name: "enroot-cleanup"
+  name: "prepull-container-image"
 spec:
   checkType: "slurmJob"
-  name: "enroot-cleanup"
-  dependsOn: [ "create-user-soperatorchecks" ]
+  name: "prepull-container-image"
+  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  schedule: "0 8 * * *" # Once a day at 8:00 UTC
-  suspend: false
-  runAfterCreation: false
+  suspend: true
+  runAfterCreation: true
   slurmJobSpec:
     sbatchScript: |
-{{ .Files.Get "scripts/enroot-cleanup.sh" | indent 6 }}
-    eachWorkerJobArray: true
+{{ tpl (.Files.Get "scripts/prepull-container-image.sh") . | indent 6 }}
+    eachWorkerJobArray: false
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:
@@ -24,6 +23,3 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
-  reactions:
-    setCondition: false
-    drainSlurmNode: false
