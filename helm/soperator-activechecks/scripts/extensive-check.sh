@@ -1,6 +1,7 @@
 #!/bin/bash
+#SBATCH --deadline="now+24hours"
 #SBATCH --time=01:00:00
-#SBATCH --gpus-per-node=8
+#SBATCH --exclusive
 
 echo "Upgrading nc-health-checker to the version 1.0.0-147.250819"
 # We could use `retry -d 2 -t 10 --` here but it's not currently installed in jail.
@@ -77,8 +78,7 @@ gpu_fryer() {
 funcs_to_test=(
   all_reduce_without_ib
   all_reduce_with_ib
-  # mem_bw: gives an error on B200: Error: unable to bind thread to core 159 with hwid 159
-  #         Let's keep it out for now.
+  mem_bw
   mem_lat
   cuda_samples
   dcgmi_diag_r2
