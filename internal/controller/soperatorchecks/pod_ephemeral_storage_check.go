@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -21,11 +22,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
+	"nebius.ai/slurm-operator/internal/slurmapi"
 )
+
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 
 var (
 	PodEphemeralStorageCheckName = "soperatorchecks.pod-ephemeral-storage-check"
@@ -67,15 +74,17 @@ type PodEphemeralStorageCheck struct {
 	clientset        kubernetes.Interface
 	restConfig       *rest.Config
 	usageThreshold   float64
+	slurmAPIClients  *slurmapi.ClientSet
 }
 
 func NewPodEphemeralStorageCheck(
 	client client.Client,
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
-	reconcileTimeout time.Duration,
 	restConfig *rest.Config,
+	reconcileTimeout time.Duration,
 	usageThreshold float64,
+	slurmAPIClients *slurmapi.ClientSet,
 ) (*PodEphemeralStorageCheck, error) {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
@@ -90,6 +99,7 @@ func NewPodEphemeralStorageCheck(
 		clientset:        clientset,
 		restConfig:       restConfig,
 		usageThreshold:   usageThreshold,
+		slurmAPIClients:  slurmAPIClients,
 	}, nil
 }
 
@@ -108,18 +118,10 @@ func (r *PodEphemeralStorageCheck) SetupWithManager(mgr ctrl.Manager, maxConcurr
 				return r.isPodRelevant(pod)
 			},
 			DeleteFunc: func(e event.DeleteEvent) bool {
-				pod, ok := e.Object.(*corev1.Pod)
-				if !ok {
-					return false
-				}
-				return r.isPodRelevant(pod)
+				return false
 			},
 			UpdateFunc: func(e event.UpdateEvent) bool {
-				pod, ok := e.ObjectNew.(*corev1.Pod)
-				if !ok {
-					return false
-				}
-				return r.isPodRelevant(pod)
+				return false
 			},
 		}).
 		WithOptions(controllerconfig.ControllerOptionsWithRateLimit(maxConcurrency, cacheSyncTimeout, 15*time.Second, 1*time.Minute)).
@@ -235,8 +237,7 @@ func (r *PodEphemeralStorageCheck) ReconcilePodEphemeralStorageCheckForPod(ctx c
 
 	storageInfos, err := r.getEphemeralStorageStatsFromNode(ctx, pod.Spec.NodeName, []corev1.Pod{*pod})
 	if err != nil {
-		logger.Error(err, "Failed to get ephemeral storage stats", "node", pod.Spec.NodeName)
-		return err
+		return fmt.Errorf("getting ephemeral storage stats: %w, pod: %s/%s", err, pod.Namespace, pod.Name)
 	}
 
 	for _, info := range storageInfos {
@@ -250,12 +251,54 @@ func (r *PodEphemeralStorageCheck) ReconcilePodEphemeralStorageCheckForPod(ctx c
 		)
 
 		if info.UsagePercent > r.usageThreshold {
-			logger.Info("High ephemeral storage usage detected",
-				"pod", info.PodName,
-				"usagePercent", fmt.Sprintf("%.2f%%", info.UsagePercent),
-				"threshold", fmt.Sprintf("%.2f%%", r.usageThreshold),
-			)
+			if err := r.handleHighStorageUsage(ctx, pod, info); err != nil {
+				return err
+			}
 		}
+
+	}
+
+	return nil
+}
+
+func (r *PodEphemeralStorageCheck) handleHighStorageUsage(ctx context.Context, pod *corev1.Pod, info EphemeralStorageInfo) error {
+	logger := log.FromContext(ctx).WithName(PodEphemeralStorageCheckName)
+
+	logger.Info("High ephemeral storage usage detected",
+		"pod", info.PodName,
+		"usagePercent", fmt.Sprintf("%.2f%%", info.UsagePercent),
+		"threshold", fmt.Sprintf("%.2f%%", r.usageThreshold),
+	)
+	r.Recorder.Eventf(pod, corev1.EventTypeWarning, consts.HighEphemeralStorageUsage,
+		"Pod %s in namespace %s is using %.2f%% of its ephemeral storage limit (%d bytes used, %d bytes limit)",
+		info.PodName, info.PodNamespace,
+		info.UsagePercent, info.UsedBytes, info.LimitBytes)
+
+	slurmNodeName, err := r.getSlurmNode(ctx, types.NamespacedName{
+		Name:      pod.Spec.NodeName,
+		Namespace: pod.Namespace,
+	}, pod.Spec.NodeName)
+	if err != nil {
+		return fmt.Errorf("getting Slurm node: %w for pod %s/%s", err, pod.Namespace, pod.Name)
+	}
+	if slurmNodeName.Name == "" {
+		return fmt.Errorf("slurm node not found for pod %s/%s", pod.Namespace, pod.Name)
+	}
+	_, isCompleting := slurmNodeName.States[api.V0041NodeStateCOMPLETING]
+	logger.Info("slurm node", "nodeStates", slurmNodeName.States)
+	// When epilog is running, node is in COMPLETING state and both IDLE and DRAIN states are set.
+	// Example: State=IDLE+COMPLETING+DRAIN+DYNAMIC_NORM
+	// We consider node fully drained when it is in IDLE+DRAIN+DYNAMIC_NORM states.
+	if slurmNodeName.IsIdleDrained() || !isCompleting {
+		logger.V(1).Info("slurm node is fully drained", "nodeStates", slurmNodeName.States)
+		return nil
+	}
+	err = r.drainSlurmNode(ctx, types.NamespacedName{
+		Name:      pod.Spec.NodeName,
+		Namespace: pod.Namespace,
+	}, slurmNodeName.Name, info.UsedBytes)
+	if err != nil {
+		return fmt.Errorf("draining Slurm node: %w for pod %s/%s", err, pod.Namespace, pod.Name)
 	}
 
 	return nil
@@ -370,4 +413,67 @@ func (r *PodEphemeralStorageCheck) getEphemeralStorageLimitForPod(pod corev1.Pod
 	}
 
 	return uint64(totalLimit)
+}
+
+func (c *PodEphemeralStorageCheck) getSlurmNode(
+	ctx context.Context,
+	slurmClusterName types.NamespacedName,
+	slurmNodeName string,
+) (slurmapi.Node, error) {
+
+	slurmAPIClient, found := c.slurmAPIClients.GetClient(slurmClusterName)
+	if !found {
+		return slurmapi.Node{}, fmt.Errorf("slurm cluster %v not found", slurmClusterName)
+	}
+
+	node, err := slurmAPIClient.GetNode(ctx, slurmNodeName)
+	if err != nil {
+		return slurmapi.Node{}, fmt.Errorf("get node: %w", err)
+	}
+
+	return node, nil
+}
+
+func (c *PodEphemeralStorageCheck) drainSlurmNode(
+	ctx context.Context,
+	slurmClusterName types.NamespacedName,
+	slurmNodeName string,
+	usage uint64,
+) error {
+	message := fmt.Sprintf(
+		"%d of node boot disk is used. Clean up volumes from 'ssh %s /opt/soperator_utils/fs_usage.sh -l', "+
+			"delete leftover containers from 'ssh %s enroot list' and 'ssh %s docker ps -a', "+
+			"reboot the node using 'scontrol reboot %s', "+
+			"or stop-start the InstanceId from 'scontrol show node %s'",
+		usage, slurmNodeName, slurmNodeName, slurmNodeName, slurmNodeName, slurmNodeName,
+	)
+	reason := consts.SlurmUserReasonHC + " " + message
+	logger := log.FromContext(ctx).WithName("SlurmNodesController.drainSlurmNode").
+		WithValues(
+			"slurmNodeName", slurmNodeName,
+			"drainReason", reason,
+			"slurmCluster", slurmClusterName,
+		)
+	logger.Info("draining slurm node")
+
+	slurmAPIClient, found := c.slurmAPIClients.GetClient(slurmClusterName)
+	if !found {
+		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
+	}
+
+	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
+		api.V0041UpdateNodeMsg{
+			Reason: ptr.To(string(reason)),
+			State:  ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateDRAIN}),
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("post drain slurm node: %w", err)
+	}
+	if resp.JSON200.Errors != nil && len(*resp.JSON200.Errors) != 0 {
+		return fmt.Errorf("post drain returned errors: %v", *resp.JSON200.Errors)
+	}
+
+	logger.V(1).Info("slurm node state is updated to DRAIN")
+	return nil
 }

@@ -146,7 +146,7 @@ func main() {
 	flag.BoolVar(&enabledNodeReplacement, "enable-node-replacement", true, "Enable node replacement controller")
 	flag.DurationVar(&notReadyTimeout, "not-ready-timeout", 15*time.Minute, "The timeout after which a NotReady node will be deleted. Nodes can be NotReady for more than 10 minutes when GPU operator is starting.")
 	flag.BoolVar(&deleteNotReadyNodes, "delete-not-ready-nodes", true, "If set, NotReady nodes will be deleted after the not-ready timeout is reached. If false, they will be marked as NotReady but not deleted.")
-	flag.Float64Var(&ephemeralStorageThreshold, "ephemeral-storage-threshold", 80.0, "The threshold percentage for ephemeral storage usage warnings (default 80%)")
+	flag.Float64Var(&ephemeralStorageThreshold, "ephemeral-storage-threshold", 85.0, "The threshold percentage for ephemeral storage usage warnings (default 80%)")
 	flag.Parse()
 
 	// Validate ephemeral storage threshold
@@ -296,9 +296,10 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		mgr.GetEventRecorderFor(soperatorchecks.PodEphemeralStorageCheckName),
-		reconcileTimeoutPodEphemeralStorageCheck,
 		ctrl.GetConfigOrDie(),
+		reconcileTimeoutPodEphemeralStorageCheck,
 		ephemeralStorageThreshold,
+		slurmAPIClients,
 	)
 	if err != nil {
 		setupLog.Error(err, "unable to create pod ephemeral storage check", "controller", "PodEphemeralStorageCheck")

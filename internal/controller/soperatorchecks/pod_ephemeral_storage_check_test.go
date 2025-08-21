@@ -23,6 +23,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/slurmapi"
 )
 
 func createTestPodEphemeralStorageCheck(t *testing.T, objects ...client.Object) *PodEphemeralStorageCheck {
@@ -37,13 +38,17 @@ func createTestPodEphemeralStorageCheck(t *testing.T, objects ...client.Object) 
 
 	recorder := record.NewFakeRecorder(100)
 
+	// Create a mock slurmapi.ClientSet
+	slurmAPIClients := &slurmapi.ClientSet{}
+
 	controller, err := NewPodEphemeralStorageCheck(
 		fakeClient,
 		scheme,
 		recorder,
-		time.Minute,
 		&rest.Config{},
+		time.Minute,
 		80.0,
+		slurmAPIClients,
 	)
 	require.NoError(t, err)
 	return controller
