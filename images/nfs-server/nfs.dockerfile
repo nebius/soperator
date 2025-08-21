@@ -1,4 +1,4 @@
-FROM alpine:3.22
+FROM alpine:3.22 AS nfs-server
 
 # Install necessary packages for NFS server
 RUN apk add --no-cache --update \
