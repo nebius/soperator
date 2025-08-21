@@ -33,8 +33,6 @@ echo "Platform found: $platform"
 echo "Listing available health checks for platform $platform"
 health-checker list -e soperator -p $platform
 
-CONTAINER_IMAGE="cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-b8189f7"
-
 all_reduce_without_ib() {
   health-checker run -e soperator -p $platform -n all_reduce_without_ib --report-format json-pretty
 }
@@ -44,21 +42,21 @@ all_reduce_with_ib() {
 }
 
 mem_bw() {
-  srun --container-image="$CONTAINER_IMAGE" \
+  srun --container-image="$ACTIVE_CHECKS_IMAGE" \
   --container-mounts=$(which health-checker):/usr/local/bin/health-checker \
   --cpu-bind=verbose,cores \
   bash -c "health-checker run -e soperator -p $platform -n mem_bw --report-format json-pretty"
 }
 
 mem_lat() {
-  srun --container-image="$CONTAINER_IMAGE" \
+  srun --container-image="$ACTIVE_CHECKS_IMAGE" \
        --container-mounts=$(which health-checker):/usr/local/bin/health-checker \
        --cpu-bind=verbose,cores \
        bash -c "health-checker run -e soperator -p $platform -n mem_lat --report-format json-pretty"
 }
 
 cuda_samples() {
-  srun --container-image="$CONTAINER_IMAGE" \
+  srun --container-image="$ACTIVE_CHECKS_IMAGE" \
         --container-mounts=$(which health-checker):/usr/local/bin/health-checker \
         --cpu-bind=verbose \
         bash -c "health-checker run -e soperator -p $platform -n deviceQuery,vectorAdd,simpleMultiGPU,p2pBandwidthLatencyTest --report-format json-pretty"
@@ -69,7 +67,7 @@ dcgmi_diag_r2() {
 }
 
 gpu_fryer() {
-  srun --container-image="$CONTAINER_IMAGE" \
+  srun --container-image="$ACTIVE_CHECKS_IMAGE" \
   --container-mounts=$(which health-checker):/usr/local/bin/health-checker \
   --cpu-bind=verbose \
   bash -c "HC_GPU_FRYER_DURATION=300 health-checker run -e soperator -p $platform -n gpu_fryer --report-format json-pretty"
