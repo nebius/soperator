@@ -29,11 +29,13 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -171,6 +173,14 @@ func main() {
 		Cache: cache.Options{
 			DefaultNamespaces: map[string]cache.Config{
 				clusterNamespace: {},
+			},
+		},
+		Client: ctrlclient.Options{
+			Cache: &ctrlclient.CacheOptions{
+				DisableFor: []ctrlclient.Object{
+					&corev1.Secret{},
+					&corev1.ConfigMap{},
+				},
 			},
 		},
 	})

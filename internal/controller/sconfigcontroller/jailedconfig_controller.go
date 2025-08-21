@@ -74,7 +74,7 @@ type JailedConfigReconciler struct {
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/finalizers,verbs=update
-// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=configmaps,verbs=get;list;watch
+// +kubebuilder:rbac:groups="core",resources=configmaps,verbs=get;list;watch
 
 // Clock is used to fake timing for testing
 type Clock interface {
@@ -191,9 +191,25 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig) (ctrl.Result, error) {
 	logger := logf.FromContext(ctx)
 
-	err := r.initializeConditions(ctx, jailedConfig)
+	err := r.shouldInitializeConditions(ctx, jailedConfig)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("initializing conditions: %w", err)
+	}
+
+	configMap := &corev1.ConfigMap{}
+	err = r.Client.Get(ctx, types.NamespacedName{
+		Name:      jailedConfig.Spec.ConfigMap.Name,
+		Namespace: jailedConfig.Namespace,
+	}, configMap)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// ConfigMap not found, so it must have been deleted or never existed
+			// When ConfigMap would be created, it would trigger reconciliation of JailedConfig,
+			// so we can just skip this reconciliation and wait for next one
+			logger.Info(fmt.Sprintf("ConfigMap %s not found, skipping JailedConfig reconciliation", jailedConfig.Spec.ConfigMap.Name))
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, fmt.Errorf("getting ConfigMap %s: %w", jailedConfig.Spec.ConfigMap.Name, err)
 	}
 
 	err = r.setConditions(
@@ -214,17 +230,6 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 	)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
-	}
-
-	configMapName := jailedConfig.Spec.ConfigMap.Name
-
-	configMap := &corev1.ConfigMap{}
-	err = r.Client.Get(ctx, types.NamespacedName{
-		Name:      configMapName,
-		Namespace: jailedConfig.Namespace,
-	}, configMap)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("getting ConfigMap: %w", err)
 	}
 
 	defaultMode := jailedConfig.Spec.DefaultMode
@@ -279,6 +284,23 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 
 	logger.V(1).Info("Finished syncing caches for written files")
 
+	if len(jailedConfig.Spec.UpdateActions) == 0 {
+		logger.V(1).Info("No update actions specified, skipping further processing")
+		err = r.setConditions(
+			ctx,
+			jailedConfig,
+			metav1.Condition{
+				Type:    string(slurmv1alpha1.UpdateActionsCompleted),
+				Status:  metav1.ConditionTrue,
+				Reason:  slurmv1alpha1.ReasonMissingAction,
+				Message: "No update actions specified, skipping further processing",
+			},
+		)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
+		}
+	}
+
 	for _, action := range jailedConfig.Spec.UpdateActions {
 		switch action {
 		case slurmv1alpha1.UpdateActionReconfigure:
@@ -286,25 +308,21 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("reconfiguring Slurm cluster: %w", err)
 			}
-		default:
-			return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("unexpected update action %s: %w", action, err))
+			err = r.setConditions(
+				ctx,
+				jailedConfig,
+				metav1.Condition{
+					Type:    string(slurmv1alpha1.UpdateActionsCompleted),
+					Status:  metav1.ConditionTrue,
+					Reason:  slurmv1alpha1.ReasonSuccess,
+					Message: "Update actions were called successfully",
+				},
+			)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
+			}
 		}
 	}
-
-	err = r.setConditions(
-		ctx,
-		jailedConfig,
-		metav1.Condition{
-			Type:    string(slurmv1alpha1.UpdateActionsCompleted),
-			Status:  metav1.ConditionTrue,
-			Reason:  slurmv1alpha1.ReasonSuccess,
-			Message: "Update actions were called successfully",
-		},
-	)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
-	}
-
 	return ctrl.Result{}, nil
 }
 
@@ -324,15 +342,15 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 	logger.V(1).Info("Found JailedConfigs for aggregation", "count", len(jailedConfigs.Items), "aggregationKey", aggregationKey)
 
 	for i := range jailedConfigs.Items {
-		config := &jailedConfigs.Items[i]
-		err := r.initializeConditions(ctx, config)
+		jailedConfig := &jailedConfigs.Items[i]
+		err := r.shouldInitializeConditions(ctx, jailedConfig)
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("initializing conditions for %s/%s: %w", config.Namespace, config.Name, err)
+			return ctrl.Result{}, fmt.Errorf("initializing conditions for %s/%s: %w", jailedConfig.Namespace, jailedConfig.Name, err)
 		}
 
 		err = r.setConditions(
 			ctx,
-			config,
+			jailedConfig,
 			metav1.Condition{
 				Type:    string(slurmv1alpha1.FilesWritten),
 				Status:  metav1.ConditionFalse,
@@ -347,7 +365,7 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 			},
 		)
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("setting conditions for %s/%s: %w", config.Namespace, config.Name, err)
+			return ctrl.Result{}, fmt.Errorf("setting conditions for %s/%s: %w", jailedConfig.Namespace, jailedConfig.Name, err)
 		}
 	}
 
@@ -358,30 +376,50 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 	}()
 
 	for i := range jailedConfigs.Items {
-		config := &jailedConfigs.Items[i]
+		jailedConfig := &jailedConfigs.Items[i]
 
 		configMap := &corev1.ConfigMap{}
 		err = r.Client.Get(ctx, types.NamespacedName{
-			Name:      config.Spec.ConfigMap.Name,
-			Namespace: config.Namespace,
+			Name:      jailedConfig.Spec.ConfigMap.Name,
+			Namespace: jailedConfig.Namespace,
 		}, configMap)
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("getting ConfigMap %s for %s/%s: %w", config.Spec.ConfigMap.Name, config.Namespace, config.Name, err)
+			if apierrors.IsNotFound(err) {
+				// ConfigMap not found, so it must have been deleted or never existed
+				// When ConfigMap would be created, it would trigger reconciliation of JailedConfig,
+				// so we can just skip this reconciliation and wait for next one
+				logger.Info(fmt.Sprintf("ConfigMap %s not found, skipping JailedConfig reconciliation", jailedConfig.Spec.ConfigMap.Name))
+				err = r.setConditions(
+					ctx,
+					jailedConfig,
+					metav1.Condition{
+						Type:    string(slurmv1alpha1.FilesWritten),
+						Status:  metav1.ConditionFalse,
+						Reason:  slurmv1alpha1.ReasonNotFound,
+						Message: "ConfigMap not found, files were not written (aggregated)",
+					},
+				)
+				if err != nil {
+					return ctrl.Result{}, fmt.Errorf("setting files written condition for %s/%s: %w", jailedConfig.Namespace, jailedConfig.Name, err)
+				}
+				continue
+			}
+			return ctrl.Result{}, fmt.Errorf("getting ConfigMap %s for %s/%s: %w", jailedConfig.Spec.ConfigMap.Name, jailedConfig.Namespace, jailedConfig.Name, err)
 		}
 
-		defaultMode := config.Spec.DefaultMode
+		defaultMode := jailedConfig.Spec.DefaultMode
 		if defaultMode == nil {
 			defaultMode = ptr.To(slurmv1alpha1.DefaultMode)
 		}
 
-		jailPayload, err := makePayload(config.Spec.Items, configMap, defaultMode)
+		jailPayload, err := makePayload(jailedConfig.Spec.Items, configMap, defaultMode)
 		if err != nil {
-			return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("making JailedConfig payload for %s/%s: %w", config.Namespace, config.Name, err))
+			return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("making JailedConfig payload for %s/%s: %w", jailedConfig.Namespace, jailedConfig.Name, err))
 		}
 
 		for path := range jailPayload {
 			if err := validatePayloadPath(path); err != nil {
-				return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("invalid config path %q in %s/%s: %w", path, config.Namespace, config.Name, err))
+				return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("invalid config path %q in %s/%s: %w", path, jailedConfig.Namespace, jailedConfig.Name, err))
 			}
 		}
 
@@ -390,18 +428,13 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 		for path, payload := range jailPayload {
 			err = filesBatch.Replace(path, payload.Data, os.FileMode(payload.Mode))
 			if err != nil {
-				return ctrl.Result{}, fmt.Errorf("replacing file %q for %s/%s: %w", path, config.Namespace, config.Name, err)
+				return ctrl.Result{}, fmt.Errorf("replacing file %q for %s/%s: %w", path, jailedConfig.Namespace, jailedConfig.Name, err)
 			}
 		}
-	}
-
-	logger.V(1).Info("Going to write files for aggregated group", "totalFiles", totalFilesCount, "configs", len(jailedConfigs.Items))
-
-	for i := range jailedConfigs.Items {
-		config := &jailedConfigs.Items[i]
+		logger.V(1).Info("Done writing files for JailedConfig", "name", jailedConfig.Name, "filesCount", i+1, "totalFilesCount", totalFilesCount)
 		err = r.setConditions(
 			ctx,
-			config,
+			jailedConfig,
 			metav1.Condition{
 				Type:    string(slurmv1alpha1.FilesWritten),
 				Status:  metav1.ConditionTrue,
@@ -410,10 +443,11 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 			},
 		)
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("setting files written condition for %s/%s: %w", config.Namespace, config.Name, err)
+			return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
 		}
 	}
 
+	logger.V(1).Info("Going to write files for aggregated group", "totalFiles", totalFilesCount, "configs", len(jailedConfigs.Items))
 	// Finish writing all files to disk
 	err = filesBatch.Finish()
 	if err != nil {
@@ -424,8 +458,8 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 
 	needsReconfigure := false
 	for i := range jailedConfigs.Items {
-		config := &jailedConfigs.Items[i]
-		for _, action := range config.Spec.UpdateActions {
+		jailedConfig := &jailedConfigs.Items[i]
+		for _, action := range jailedConfig.Spec.UpdateActions {
 			if action == slurmv1alpha1.UpdateActionReconfigure {
 				needsReconfigure = true
 				break
@@ -444,26 +478,82 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 		}
 	}
 
-	for i := range jailedConfigs.Items {
-		config := &jailedConfigs.Items[i]
-		err = r.setConditions(
-			ctx,
-			config,
-			metav1.Condition{
-				Type:    string(slurmv1alpha1.UpdateActionsCompleted),
-				Status:  metav1.ConditionTrue,
-				Reason:  slurmv1alpha1.ReasonSuccess,
-				Message: "Update actions were called successfully (aggregated)",
-			},
-		)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("setting update actions completed condition for %s/%s: %w", config.Namespace, config.Name, err)
-		}
+	// Set UpdateActionsCompleted condition for all configs based on whether reconfigure was needed and files were written
+	err = r.setUpdateActionsCompletedForConfigs(ctx, jailedConfigs.Items, needsReconfigure)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	logger.V(1).Info("Completed aggregated reconciliation", "aggregationKey", aggregationKey, "configs", len(jailedConfigs.Items))
 
 	return ctrl.Result{}, nil
+}
+
+// hasFailedFilesWrittenCondition checks if the JailedConfig has a failed FilesWritten condition.
+func hasFailedFilesWrittenCondition(jailedConfig *slurmv1alpha1.JailedConfig) bool {
+	condition := meta.FindStatusCondition(jailedConfig.Status.Conditions, string(slurmv1alpha1.FilesWritten))
+	return condition != nil && condition.Reason == string(slurmv1alpha1.ReasonNotFound)
+}
+
+// setUpdateActionsCompletedForConfigs sets the UpdateActionsCompleted condition for all provided configs
+// based on whether reconfigure was needed and their individual FilesWritten status
+func (r *JailedConfigReconciler) setUpdateActionsCompletedForConfigs(ctx context.Context, configs []slurmv1alpha1.JailedConfig, needsReconfigure bool) error {
+	for i := range configs {
+		jailedConfig := &configs[i]
+
+		var condition metav1.Condition
+		if needsReconfigure {
+			if hasFailedFilesWrittenCondition(jailedConfig) {
+				condition = metav1.Condition{
+					Type:    string(slurmv1alpha1.UpdateActionsCompleted),
+					Status:  metav1.ConditionFalse,
+					Reason:  slurmv1alpha1.ReasonNotWritten,
+					Message: "Update actions were not called because files were not written (aggregated)",
+				}
+			} else {
+				condition = metav1.Condition{
+					Type:    string(slurmv1alpha1.UpdateActionsCompleted),
+					Status:  metav1.ConditionTrue,
+					Reason:  slurmv1alpha1.ReasonSuccess,
+					Message: "Update actions were called successfully (aggregated)",
+				}
+			}
+		} else {
+			condition = metav1.Condition{
+				Type:    string(slurmv1alpha1.UpdateActionsCompleted),
+				Status:  metav1.ConditionTrue,
+				Reason:  slurmv1alpha1.ReasonSuccess,
+				Message: "Update actions were not called because no reconfigure needed (aggregated)",
+			}
+		}
+
+		err := r.setConditions(ctx, jailedConfig, condition)
+		if err != nil {
+			return fmt.Errorf("setting update actions completed condition for %s/%s: %w", jailedConfig.Namespace, jailedConfig.Name, err)
+		}
+	}
+	return nil
+}
+
+func (r *JailedConfigReconciler) shouldInitializeConditions(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig) error {
+	conditions := jailedConfig.Status.Conditions
+	if len(conditions) == 0 {
+		err := r.initializeConditions(ctx, jailedConfig)
+		if err != nil {
+			return fmt.Errorf("initializing conditions: %w", err)
+		}
+	}
+
+	filesWrittenCondition := meta.FindStatusCondition(conditions, string(slurmv1alpha1.FilesWritten))
+	updateActionsCondition := meta.FindStatusCondition(conditions, string(slurmv1alpha1.UpdateActionsCompleted))
+
+	if filesWrittenCondition == nil {
+		r.initializeCondition(&jailedConfig.Status, slurmv1alpha1.FilesWritten)
+	}
+	if updateActionsCondition == nil {
+		r.initializeCondition(&jailedConfig.Status, slurmv1alpha1.UpdateActionsCompleted)
+	}
+	return nil
 }
 
 func NewJailedConfigReconciler(

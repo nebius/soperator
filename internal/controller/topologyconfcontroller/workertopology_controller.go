@@ -101,7 +101,8 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	)
 
 	labelSelector := client.MatchingLabels{consts.LabelComponentKey: consts.ComponentTypeWorker.String()}
-	podList, err := r.getPodList(ctx, labelSelector, req.Namespace)
+	fieldSelector := client.MatchingFields{consts.FieldStatusPhase: string(corev1.PodRunning)}
+	podList, err := r.getPodList(ctx, labelSelector, fieldSelector, req.Namespace)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("list pods with label %v: %w", labelSelector, err)
 	}
@@ -222,6 +223,7 @@ func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace string) 
 					Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyTopologyConfig),
 				},
 			},
+			UpdateActions: []v1alpha1.UpdateAction{v1alpha1.UpdateActionReconfigure},
 		},
 	}
 }
@@ -319,12 +321,13 @@ func InitializeTopologyConf(asts *kruisev1b1.StatefulSetList) string {
 
 // getPodList retrieves the list of pods in the specified namespace with the given label selector.
 func (r *WorkerTopologyReconciler) getPodList(
-	ctx context.Context, labelSelector client.MatchingLabels, namespace string,
+	ctx context.Context, labelSelector client.MatchingLabels, fieldSelector client.MatchingFields, namespace string,
 ) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(namespace),
 		labelSelector,
+		fieldSelector,
 	}
 
 	if err := r.Client.List(ctx, podList, listOpts...); err != nil {
@@ -428,6 +431,20 @@ func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, 
 
 func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 	maxConcurrency int, cacheSyncTimeout time.Duration) error {
+
+	ctx := context.Background()
+
+	// Index pods by their status and worker label.
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Pod{}, consts.FieldStatusPhase,
+		func(o client.Object) []string {
+			if o.(*corev1.Pod).Status.Phase == corev1.PodRunning &&
+				o.(*corev1.Pod).Labels[consts.LabelComponentKey] == consts.ComponentTypeWorker.String() {
+				return []string{string(o.(*corev1.Pod).Status.Phase)}
+			}
+			return []string{}
+		}); err != nil {
+		return fmt.Errorf("failed to setup %s field indexer: %w", consts.FieldStatusPhase, err)
+	}
 	return ctrl.NewControllerManagedBy(mgr).Named(WorkerTopologyReconcilerName).
 		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {

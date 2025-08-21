@@ -85,7 +85,7 @@ type JailedConfigConditionType string
 const (
 	// FilesWritten indicates whether all files from this config were written to jail
 	FilesWritten JailedConfigConditionType = "FilesWritten"
-	// UpdateActionsCompleted indicates whether all update actions from this config were finished
+	// UpdateActionsCompleted indicates whether all update actions were completed
 	UpdateActionsCompleted JailedConfigConditionType = "UpdateActionsCompleted"
 
 	// ReasonInit means that condition was just initialized
@@ -94,6 +94,12 @@ const (
 	ReasonRefresh = "Refresh"
 	// ReasonSuccess means that something was done successfully
 	ReasonSuccess = "Success"
+	// ReasonNotFound means that something was not found
+	ReasonNotFound = "NotFound"
+	// ReasonNotWritten means that files were not written
+	ReasonNotWritten = "NotWritten"
+	// ReasonMissingAction means that there are no actions to perform
+	ReasonMissingAction = "MissingAction"
 )
 
 // JailedConfigStatus defines the observed state of JailedConfig.
@@ -109,6 +115,9 @@ type JailedConfigStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Files Written",type="string",JSONPath=".status.conditions[?(@.type=='FilesWritten')].reason",description="Status of files writing"
+// +kubebuilder:printcolumn:name="Reconfiguration Status",type="string",JSONPath=".status.conditions[?(@.type=='UpdateActionsCompleted')].reason",description="Status of reconfiguration"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // JailedConfig is the Schema for the jailedconfigs API
 type JailedConfig struct {

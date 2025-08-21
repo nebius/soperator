@@ -23,9 +23,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -136,12 +138,6 @@ func withDefaultMode(defaultMode *int32) testOption {
 func withUpdateActions(actions []slurmv1alpha1.UpdateAction) testOption {
 	return func(args *testOptions) {
 		args.jailedConfig.Spec.UpdateActions = actions
-	}
-}
-
-func withMissingConfigMap() testOption {
-	return func(args *testOptions) {
-		args.jailedConfig.Spec.ConfigMap.Name = ""
 	}
 }
 
@@ -591,16 +587,6 @@ func TestJailedConfigReconciler_Reconfigure(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestJailedConfigReconciler_MissingConfigMapInSpec(t *testing.T) {
-	sctrl, request, _, _, _ := prepareTest( //nolint:dogsled
-		t,
-		withMissingConfigMap(),
-	)
-
-	_, err := sctrl.Reconcile(context.Background(), request)
-	require.ErrorContains(t, err, "not found")
-}
-
 func TestJailedConfigReconciler_MissingConfigMapKeyInItems(t *testing.T) {
 	sctrl, request, _, _, _ := prepareTest( //nolint:dogsled
 		t,
@@ -615,4 +601,386 @@ func TestJailedConfigReconciler_MissingConfigMapKeyInItems(t *testing.T) {
 
 	_, err := sctrl.Reconcile(context.Background(), request)
 	require.ErrorContains(t, err, "references non-existent config key")
+}
+
+func TestJailedConfigReconciler_ShouldInitializeConditions(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name                    string
+		existingConditions      []metav1.Condition
+		expectInitializeCall    bool
+		expectedConditionsCount int
+	}{
+		{
+			name:                    "no existing conditions",
+			existingConditions:      []metav1.Condition{},
+			expectInitializeCall:    true,
+			expectedConditionsCount: 2, // FilesWritten + UpdateActionsCompleted
+		},
+		{
+			name: "only FilesWritten condition exists",
+			existingConditions: []metav1.Condition{
+				{
+					Type:   string(slurmv1alpha1.FilesWritten),
+					Status: metav1.ConditionTrue,
+				},
+			},
+			expectInitializeCall:    false,
+			expectedConditionsCount: 2, // FilesWritten + UpdateActionsCompleted (added)
+		},
+		{
+			name: "only UpdateActionsCompleted condition exists",
+			existingConditions: []metav1.Condition{
+				{
+					Type:   string(slurmv1alpha1.UpdateActionsCompleted),
+					Status: metav1.ConditionTrue,
+				},
+			},
+			expectInitializeCall:    false,
+			expectedConditionsCount: 2, // FilesWritten (added) + UpdateActionsCompleted
+		},
+		{
+			name: "both conditions already exist",
+			existingConditions: []metav1.Condition{
+				{
+					Type:   string(slurmv1alpha1.FilesWritten),
+					Status: metav1.ConditionTrue,
+				},
+				{
+					Type:   string(slurmv1alpha1.UpdateActionsCompleted),
+					Status: metav1.ConditionFalse,
+				},
+			},
+			expectInitializeCall:    false,
+			expectedConditionsCount: 2, // Both already exist, no changes
+		},
+		{
+			name: "conditions exist with other types",
+			existingConditions: []metav1.Condition{
+				{
+					Type:   "SomeOtherCondition",
+					Status: metav1.ConditionTrue,
+				},
+				{
+					Type:   string(slurmv1alpha1.FilesWritten),
+					Status: metav1.ConditionTrue,
+				},
+			},
+			expectInitializeCall:    false,
+			expectedConditionsCount: 3, // SomeOtherCondition + FilesWritten + UpdateActionsCompleted (added)
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			jailedConfig := &slurmv1alpha1.JailedConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-config",
+					Namespace: "test-ns",
+				},
+				Status: slurmv1alpha1.JailedConfigStatus{
+					Conditions: tc.existingConditions,
+				},
+			}
+
+			// Create fake client with the jailedconfig
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			require.NoError(t, slurmv1alpha1.AddToScheme(scheme))
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithStatusSubresource(jailedConfig).
+				WithObjects(jailedConfig).
+				Build()
+
+			sctrl := &JailedConfigReconciler{
+				Client: fakeClient,
+			}
+
+			err := sctrl.shouldInitializeConditions(context.Background(), jailedConfig)
+			require.NoError(t, err)
+
+			// Check that the expected number of conditions exist
+			require.Len(t, jailedConfig.Status.Conditions, tc.expectedConditionsCount)
+
+			// Check that both required conditions exist
+			filesWrittenCondition := meta.FindStatusCondition(jailedConfig.Status.Conditions, string(slurmv1alpha1.FilesWritten))
+			require.NotNil(t, filesWrittenCondition, "FilesWritten condition should exist")
+
+			updateActionsCondition := meta.FindStatusCondition(jailedConfig.Status.Conditions, string(slurmv1alpha1.UpdateActionsCompleted))
+			require.NotNil(t, updateActionsCondition, "UpdateActionsCompleted condition should exist")
+
+			// If conditions were just initialized, they should have Unknown status and Init reason
+			if tc.expectInitializeCall {
+				require.Equal(t, metav1.ConditionUnknown, filesWrittenCondition.Status)
+				require.Equal(t, string(slurmv1alpha1.ReasonInit), filesWrittenCondition.Reason)
+				require.Equal(t, metav1.ConditionUnknown, updateActionsCondition.Status)
+				require.Equal(t, string(slurmv1alpha1.ReasonInit), updateActionsCondition.Reason)
+			}
+		})
+	}
+}
+
+func TestHasFailedFilesWrittenCondition(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name           string
+		jailedConfig   *slurmv1alpha1.JailedConfig
+		expectedResult bool
+	}{
+		{
+			name: "no conditions - should return false",
+			jailedConfig: &slurmv1alpha1.JailedConfig{
+				Status: slurmv1alpha1.JailedConfigStatus{
+					Conditions: []metav1.Condition{},
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "no FilesWritten condition - should return false",
+			jailedConfig: &slurmv1alpha1.JailedConfig{
+				Status: slurmv1alpha1.JailedConfigStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(slurmv1alpha1.UpdateActionsCompleted),
+							Status: metav1.ConditionTrue,
+							Reason: string(slurmv1alpha1.ReasonSuccess),
+						},
+					},
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "FilesWritten condition with Success reason - should return false",
+			jailedConfig: &slurmv1alpha1.JailedConfig{
+				Status: slurmv1alpha1.JailedConfigStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(slurmv1alpha1.FilesWritten),
+							Status: metav1.ConditionTrue,
+							Reason: string(slurmv1alpha1.ReasonSuccess),
+						},
+					},
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "FilesWritten condition with Failed reason - should return true",
+			jailedConfig: &slurmv1alpha1.JailedConfig{
+				Status: slurmv1alpha1.JailedConfigStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(slurmv1alpha1.FilesWritten),
+							Status: metav1.ConditionFalse,
+							Reason: string(slurmv1alpha1.ReasonNotFound),
+						},
+					},
+				},
+			},
+			expectedResult: true,
+		},
+		{
+			name: "FilesWritten condition with Failed reason and other conditions - should return true",
+			jailedConfig: &slurmv1alpha1.JailedConfig{
+				Status: slurmv1alpha1.JailedConfigStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(slurmv1alpha1.UpdateActionsCompleted),
+							Status: metav1.ConditionTrue,
+							Reason: string(slurmv1alpha1.ReasonSuccess),
+						},
+						{
+							Type:   string(slurmv1alpha1.FilesWritten),
+							Status: metav1.ConditionFalse,
+							Reason: string(slurmv1alpha1.ReasonNotFound),
+						},
+					},
+				},
+			},
+			expectedResult: true,
+		},
+		{
+			name: "FilesWritten condition with Refresh reason - should return false",
+			jailedConfig: &slurmv1alpha1.JailedConfig{
+				Status: slurmv1alpha1.JailedConfigStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(slurmv1alpha1.FilesWritten),
+							Status: metav1.ConditionFalse,
+							Reason: string(slurmv1alpha1.ReasonRefresh),
+						},
+					},
+				},
+			},
+			expectedResult: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := hasFailedFilesWrittenCondition(tc.jailedConfig)
+			require.Equal(t, tc.expectedResult, result, "Expected result for test case: %s", tc.name)
+		})
+	}
+}
+
+func TestSetUpdateActionsCompletedForConfigs(t *testing.T) {
+	t.Parallel()
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, slurmv1alpha1.AddToScheme(scheme))
+
+	tests := []struct {
+		name             string
+		configs          []slurmv1alpha1.JailedConfig
+		needsReconfigure bool
+		expectError      bool
+	}{
+		{
+			name:             "empty configs - should not fail",
+			configs:          []slurmv1alpha1.JailedConfig{},
+			needsReconfigure: false,
+			expectError:      false,
+		},
+		{
+			name: "single config - no reconfigure needed",
+			configs: []slurmv1alpha1.JailedConfig{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-config-1",
+						Namespace: "default",
+					},
+				},
+			},
+			needsReconfigure: false,
+			expectError:      false,
+		},
+		{
+			name: "single config - reconfigure needed, files written successfully",
+			configs: []slurmv1alpha1.JailedConfig{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-config-1",
+						Namespace: "default",
+					},
+					Status: slurmv1alpha1.JailedConfigStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   string(slurmv1alpha1.FilesWritten),
+								Status: metav1.ConditionTrue,
+								Reason: string(slurmv1alpha1.ReasonSuccess),
+							},
+						},
+					},
+				},
+			},
+			needsReconfigure: true,
+			expectError:      false,
+		},
+		{
+			name: "single config - reconfigure needed, files not written",
+			configs: []slurmv1alpha1.JailedConfig{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-config-1",
+						Namespace: "default",
+					},
+					Status: slurmv1alpha1.JailedConfigStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   string(slurmv1alpha1.FilesWritten),
+								Status: metav1.ConditionFalse,
+								Reason: string(slurmv1alpha1.ReasonNotFound),
+							},
+						},
+					},
+				},
+			},
+			needsReconfigure: true,
+			expectError:      false,
+		},
+		{
+			name: "multiple configs - mixed scenarios",
+			configs: []slurmv1alpha1.JailedConfig{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-config-1",
+						Namespace: "default",
+					},
+					Status: slurmv1alpha1.JailedConfigStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   string(slurmv1alpha1.FilesWritten),
+								Status: metav1.ConditionTrue,
+								Reason: string(slurmv1alpha1.ReasonSuccess),
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-config-2",
+						Namespace: "default",
+					},
+					Status: slurmv1alpha1.JailedConfigStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   string(slurmv1alpha1.FilesWritten),
+								Status: metav1.ConditionFalse,
+								Reason: string(slurmv1alpha1.ReasonNotFound),
+							},
+						},
+					},
+				},
+			},
+			needsReconfigure: true,
+			expectError:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Create objects to add to fake client
+			var clientObjects []client.Object
+			for i := range tt.configs {
+				clientObjects = append(clientObjects, &tt.configs[i])
+			}
+
+			fakeClientBuilder := fake.NewClientBuilder().WithScheme(scheme)
+			if len(clientObjects) > 0 {
+				fakeClientBuilder = fakeClientBuilder.WithObjects(clientObjects...)
+				// Add status subresources for each object
+				for _, obj := range clientObjects {
+					fakeClientBuilder = fakeClientBuilder.WithStatusSubresource(obj)
+				}
+			}
+			fakeClient := fakeClientBuilder.Build()
+
+			reconciler := &JailedConfigReconciler{
+				Client: fakeClient,
+				Scheme: scheme,
+			}
+
+			ctx := context.Background()
+			err := reconciler.setUpdateActionsCompletedForConfigs(ctx, tt.configs, tt.needsReconfigure)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
