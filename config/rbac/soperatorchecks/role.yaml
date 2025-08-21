@@ -37,20 +37,21 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - nodes/proxy
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - nodes/status
   verbs:
   - get
   - list
   - patch
   - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
-  - list
   - watch
 - apiGroups:
   - ""
