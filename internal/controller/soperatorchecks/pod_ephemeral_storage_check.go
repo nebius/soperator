@@ -37,7 +37,7 @@ import (
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=nodes/proxy,verbs=get;watch;list
-// +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch;list;watch;get
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;
 
@@ -111,6 +111,28 @@ func NewPodEphemeralStorageCheck(
 }
 
 func (r *PodEphemeralStorageCheck) SetupWithManager(mgr ctrl.Manager, maxConcurrency int, cacheSyncTimeout time.Duration) error {
+	ctx := context.Background()
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Event{}, "involvedObject.name", func(rawObj client.Object) []string {
+		event := rawObj.(*corev1.Event)
+		return []string{event.InvolvedObject.Name}
+	}); err != nil {
+		return fmt.Errorf("setting up involvedObject.name indexer: %w", err)
+	}
+
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Event{}, "involvedObject.uid", func(rawObj client.Object) []string {
+		event := rawObj.(*corev1.Event)
+		return []string{string(event.InvolvedObject.UID)}
+	}); err != nil {
+		return fmt.Errorf("setting up involvedObject.uid indexer: %w", err)
+	}
+
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Event{}, "reason", func(rawObj client.Object) []string {
+		event := rawObj.(*corev1.Event)
+		return []string{event.Reason}
+	}); err != nil {
+		return fmt.Errorf("setting up reason indexer: %w", err)
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).Named(PodEphemeralStorageCheckName).
 		For(&corev1.Pod{}).
 		Watches(&kruisev1b1.StatefulSet{},
@@ -277,30 +299,9 @@ func (r *PodEphemeralStorageCheck) handleHighStorageUsage(ctx context.Context, p
 		"threshold", fmt.Sprintf("%.2f%%", r.usageThreshold),
 	)
 
-	event := &corev1.Event{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: pod.Namespace,
-			Name:      fmt.Sprintf("%s-%s-ephemeral-storage-warning", pod.Name, pod.Namespace),
-			Labels: map[string]string{
-				consts.LabelComponentKey: consts.ComponentTypeWorker.String(),
-				consts.LabelManagedByKey: consts.LabelManagedByValue,
-			},
-		},
-		InvolvedObject: corev1.ObjectReference{
-			Kind:      "Pod",
-			Name:      pod.Name,
-			Namespace: pod.Namespace,
-			UID:       pod.UID,
-		},
-		Reason: consts.HighEphemeralStorageUsage,
-		Message: fmt.Sprintf("Pod %s in namespace %s is using %.2f%% of its ephemeral storage limit (%d bytes used, %d bytes limit)",
-			info.PodName, info.PodNamespace,
-			info.UsagePercent, info.UsedBytes, info.LimitBytes),
-		Type: corev1.EventTypeWarning,
-	}
-	err := r.Client.Patch(ctx, event, client.MergeFrom(event))
+	err := r.createEphemeralStorageEvent(ctx, pod, info)
 	if err != nil {
-		return fmt.Errorf("creating or updating event: %w", err)
+		return err
 	}
 
 	slurmClusterName, err := r.getSlurmClusterName(ctx, pod.Namespace)
@@ -337,6 +338,70 @@ func (r *PodEphemeralStorageCheck) handleHighStorageUsage(ctx context.Context, p
 	}
 
 	return nil
+}
+
+func (r *PodEphemeralStorageCheck) createEphemeralStorageEvent(ctx context.Context, pod *corev1.Pod, info EphemeralStorageInfo) error {
+	now := metav1.Now()
+
+	event := &corev1.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:    pod.Namespace,
+			GenerateName: fmt.Sprintf("%s-ephemeral-storage-", pod.Name),
+			Labels: map[string]string{
+				consts.LabelComponentKey: consts.ComponentTypeWorker.String(),
+				consts.LabelManagedByKey: consts.LabelManagedByValue,
+			},
+		},
+		InvolvedObject: corev1.ObjectReference{
+			Kind:            "Pod",
+			Name:            pod.Name,
+			Namespace:       pod.Namespace,
+			UID:             pod.UID,
+			APIVersion:      "v1",
+			ResourceVersion: pod.ResourceVersion,
+		},
+		Reason: consts.HighEphemeralStorageUsage,
+		Message: fmt.Sprintf("Pod %s in namespace %s is using %.2f%% of its ephemeral storage limit (%d bytes used, %d bytes limit)",
+			info.PodName, info.PodNamespace,
+			info.UsagePercent, info.UsedBytes, info.LimitBytes),
+		Type:                corev1.EventTypeWarning,
+		Count:               1,
+		FirstTimestamp:      now,
+		LastTimestamp:       now,
+		ReportingController: PodEphemeralStorageCheckName,
+		ReportingInstance:   PodEphemeralStorageCheckName,
+	}
+
+	eventList := &corev1.EventList{}
+	err := r.List(ctx, eventList,
+		client.InNamespace(pod.Namespace),
+		client.MatchingFields{
+			"involvedObject.name": pod.Name,
+			"involvedObject.uid":  string(pod.UID),
+			"reason":              consts.HighEphemeralStorageUsage,
+		},
+	)
+	if err != nil {
+		err = r.List(ctx, eventList, client.InNamespace(pod.Namespace))
+		if err != nil {
+			return r.Client.Create(ctx, event)
+		}
+	}
+
+	oneHourAgo := metav1.NewTime(now.Add(-time.Hour))
+	for i := range eventList.Items {
+		existingEvent := &eventList.Items[i]
+		if existingEvent.InvolvedObject.Name == pod.Name &&
+			existingEvent.InvolvedObject.UID == pod.UID &&
+			existingEvent.Reason == consts.HighEphemeralStorageUsage &&
+			existingEvent.LastTimestamp.After(oneHourAgo.Time) &&
+			existingEvent.Message == event.Message {
+			existingEvent.Count++
+			existingEvent.LastTimestamp = now
+			return r.Client.Update(ctx, existingEvent)
+		}
+	}
+	return r.Client.Create(ctx, event)
 }
 
 func (r *PodEphemeralStorageCheck) checkSlurmNodeDrainStatus(ctx context.Context, slurmNodeName slurmapi.Node, pod *corev1.Pod) error {

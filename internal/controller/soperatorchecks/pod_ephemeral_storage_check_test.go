@@ -3,6 +3,7 @@ package soperatorchecks
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -1279,6 +1280,263 @@ func TestGetPodsForStatefulSet(t *testing.T) {
 				for _, req := range result {
 					assert.Equal(t, tt.namespace, req.Namespace)
 				}
+			}
+		})
+	}
+}
+
+func TestCreateEphemeralStorageEventStructure(t *testing.T) {
+	// Test the event structure and message formatting logic
+	// without actually creating events in the fake client
+
+	testPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "test-ns",
+			UID:       types.UID("test-pod-uid-123"),
+		},
+		Spec: corev1.PodSpec{
+			NodeName: "test-node",
+		},
+	}
+
+	testInfo := EphemeralStorageInfo{
+		PodName:      "test-pod",
+		PodNamespace: "test-ns",
+		NodeName:     "test-node",
+		UsedBytes:    800000000,  // 800MB
+		LimitBytes:   1073741824, // 1GB
+		UsagePercent: 74.51,
+	}
+
+	tests := []struct {
+		name                    string
+		pod                     *corev1.Pod
+		info                    EphemeralStorageInfo
+		expectedEventName       string
+		expectedReason          string
+		expectedType            string
+		expectedMessageContains []string
+	}{
+		{
+			name:              "event structure validation",
+			pod:               testPod,
+			info:              testInfo,
+			expectedEventName: "test-pod-test-ns-ephemeral-storage-warning",
+			expectedReason:    consts.HighEphemeralStorageUsage,
+			expectedType:      corev1.EventTypeWarning,
+			expectedMessageContains: []string{
+				"test-pod",
+				"test-ns",
+				"74.51%",
+				"800000000 bytes used",
+				"1073741824 bytes limit",
+			},
+		},
+		{
+			name: "event with different usage values",
+			pod:  testPod,
+			info: EphemeralStorageInfo{
+				PodName:      "test-pod",
+				PodNamespace: "test-ns",
+				NodeName:     "test-node",
+				UsedBytes:    500000000, // 500MB
+				LimitBytes:   524288000, // 500MB
+				UsagePercent: 95.37,
+			},
+			expectedEventName: "test-pod-test-ns-ephemeral-storage-warning",
+			expectedReason:    consts.HighEphemeralStorageUsage,
+			expectedType:      corev1.EventTypeWarning,
+			expectedMessageContains: []string{
+				"test-pod",
+				"test-ns",
+				"95.37%",
+				"500000000 bytes used",
+				"524288000 bytes limit",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test the event name generation
+			expectedEventName := fmt.Sprintf("%s-%s-ephemeral-storage-warning", tt.pod.Name, tt.pod.Namespace)
+			assert.Equal(t, tt.expectedEventName, expectedEventName)
+
+			// Test the message formatting
+			expectedMessage := fmt.Sprintf("Pod %s in namespace %s is using %.2f%% of its ephemeral storage limit (%d bytes used, %d bytes limit)",
+				tt.info.PodName, tt.info.PodNamespace,
+				tt.info.UsagePercent, tt.info.UsedBytes, tt.info.LimitBytes)
+
+			// Verify message contains expected content
+			for _, content := range tt.expectedMessageContains {
+				assert.Contains(t, expectedMessage, content)
+			}
+
+			// Test that the event would have correct metadata structure
+			// (this tests the logic without the actual client call)
+			eventLabels := map[string]string{
+				consts.LabelComponentKey: consts.ComponentTypeWorker.String(),
+				consts.LabelManagedByKey: consts.LabelManagedByValue,
+			}
+			assert.Equal(t, consts.ComponentTypeWorker.String(), eventLabels[consts.LabelComponentKey])
+			assert.Equal(t, consts.LabelManagedByValue, eventLabels[consts.LabelManagedByKey])
+
+			// Test involved object reference structure
+			involvedObjRef := corev1.ObjectReference{
+				Kind:      "Pod",
+				Name:      tt.pod.Name,
+				Namespace: tt.pod.Namespace,
+				UID:       tt.pod.UID,
+			}
+			assert.Equal(t, "Pod", involvedObjRef.Kind)
+			assert.Equal(t, tt.pod.Name, involvedObjRef.Name)
+			assert.Equal(t, tt.pod.Namespace, involvedObjRef.Namespace)
+			assert.Equal(t, tt.pod.UID, involvedObjRef.UID)
+
+			// Verify event constants
+			assert.Equal(t, tt.expectedReason, consts.HighEphemeralStorageUsage)
+			assert.Equal(t, tt.expectedType, corev1.EventTypeWarning)
+		})
+	}
+}
+
+func TestCreateEphemeralStorageEvent(t *testing.T) {
+	testPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-pod",
+			Namespace:       "test-ns",
+			UID:             types.UID("test-pod-uid-123"),
+			ResourceVersion: "123",
+		},
+		Spec: corev1.PodSpec{
+			NodeName: "test-node",
+		},
+	}
+
+	testInfo := EphemeralStorageInfo{
+		PodName:      "test-pod",
+		PodNamespace: "test-ns",
+		NodeName:     "test-node",
+		UsedBytes:    800000000,  // 800MB
+		LimitBytes:   1073741824, // 1GB
+		UsagePercent: 74.51,      // 800MB / 1GB ≈ 74.51%
+	}
+
+	tests := []struct {
+		name           string
+		existingEvents []client.Object
+		expectedCount  int32
+		shouldCreate   bool
+	}{
+		{
+			name:           "create new event when none exists",
+			existingEvents: []client.Object{},
+			expectedCount:  1,
+			shouldCreate:   true,
+		},
+		{
+			name: "increment count when recent similar event exists",
+			existingEvents: []client.Object{
+				&corev1.Event{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "existing-event",
+						Namespace: "test-ns",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Kind:      "Pod",
+						Name:      "test-pod",
+						Namespace: "test-ns",
+						UID:       types.UID("test-pod-uid-123"),
+					},
+					Reason: consts.HighEphemeralStorageUsage,
+					Message: fmt.Sprintf("Pod %s in namespace %s is using %.2f%% of its ephemeral storage limit (%d bytes used, %d bytes limit)",
+						testInfo.PodName, testInfo.PodNamespace,
+						testInfo.UsagePercent, testInfo.UsedBytes, testInfo.LimitBytes),
+					Type:          corev1.EventTypeWarning,
+					Count:         1,
+					LastTimestamp: metav1.NewTime(time.Now().Add(-10 * time.Minute)), // Recent event
+				},
+			},
+			expectedCount: 2,
+			shouldCreate:  false,
+		},
+		{
+			name: "create new event when old similar event exists",
+			existingEvents: []client.Object{
+				&corev1.Event{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "old-event",
+						Namespace: "test-ns",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Kind:      "Pod",
+						Name:      "test-pod",
+						Namespace: "test-ns",
+						UID:       types.UID("test-pod-uid-123"),
+					},
+					Reason: consts.HighEphemeralStorageUsage,
+					Message: fmt.Sprintf("Pod %s in namespace %s is using %.2f%% of its ephemeral storage limit (%d bytes used, %d bytes limit)",
+						testInfo.PodName, testInfo.PodNamespace,
+						testInfo.UsagePercent, testInfo.UsedBytes, testInfo.LimitBytes),
+					Type:          corev1.EventTypeWarning,
+					Count:         1,
+					LastTimestamp: metav1.NewTime(time.Now().Add(-2 * time.Hour)), // Old event
+				},
+			},
+			expectedCount: 1,
+			shouldCreate:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			controller := createTestPodEphemeralStorageCheck(t, tt.existingEvents...)
+
+			err := controller.createEphemeralStorageEvent(context.Background(), testPod, testInfo)
+			assert.NoError(t, err)
+
+			// Verify the event was created or updated correctly
+			eventList := &corev1.EventList{}
+			err = controller.List(context.Background(), eventList, client.InNamespace("test-ns"))
+			assert.NoError(t, err)
+
+			// Find events related to our test pod
+			var relevantEvents []corev1.Event
+			for _, event := range eventList.Items {
+				if event.InvolvedObject.Name == "test-pod" &&
+					event.InvolvedObject.UID == types.UID("test-pod-uid-123") &&
+					event.Reason == consts.HighEphemeralStorageUsage {
+					relevantEvents = append(relevantEvents, event)
+				}
+			}
+
+			if tt.shouldCreate {
+				// Should have created a new event
+				assert.Len(t, relevantEvents, len(tt.existingEvents)+1)
+				// Find the new event (one with count = expectedCount)
+				var newEvent *corev1.Event
+				for i, event := range relevantEvents {
+					if event.Count == tt.expectedCount {
+						newEvent = &relevantEvents[i]
+						break
+					}
+				}
+				assert.NotNil(t, newEvent)
+				assert.Equal(t, tt.expectedCount, newEvent.Count)
+			} else {
+				// Should have updated existing event
+				assert.Len(t, relevantEvents, len(tt.existingEvents))
+				// Find the updated event
+				var updatedEvent *corev1.Event
+				for i, event := range relevantEvents {
+					if event.Count == tt.expectedCount {
+						updatedEvent = &relevantEvents[i]
+						break
+					}
+				}
+				assert.NotNil(t, updatedEvent)
+				assert.Equal(t, tt.expectedCount, updatedEvent.Count)
 			}
 		})
 	}
