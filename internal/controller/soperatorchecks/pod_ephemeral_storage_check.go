@@ -317,7 +317,7 @@ func (r *PodEphemeralStorageCheck) handleHighStorageUsage(ctx context.Context, p
 		Namespace: pod.Namespace,
 	}
 
-	err = r.InitSlurmAPIClients(slurmClusterNamespacedName, slurmClusterName, pod)
+	err = r.InitSlurmAPIClients(slurmClusterNamespacedName, slurmClusterName)
 	if err != nil {
 		return fmt.Errorf("initializing Slurm API clients: %w", err)
 	}
@@ -551,9 +551,13 @@ func (r *PodEphemeralStorageCheck) getSlurmClusterName(ctx context.Context, name
 
 // InitSlurmAPIClients initializes Slurm API clients for the given Slurm cluster
 func (r *PodEphemeralStorageCheck) InitSlurmAPIClients(
-	slurmClusterNamespacedName types.NamespacedName, slurmClusterName string, pod *corev1.Pod) error {
+	slurmClusterNamespacedName types.NamespacedName, slurmClusterName string) error {
+	if _, found := r.slurmAPIClients.GetClient(slurmClusterNamespacedName); found {
+		return nil // Client already exists, no need to create a new one
+	}
+
 	jwtToken := jwt.NewToken(r.Client).For(slurmClusterNamespacedName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
-	slurmAPIServer := fmt.Sprintf("http://%s.%s:6820", naming.BuildServiceName(consts.ComponentTypeREST, slurmClusterName), pod.Namespace)
+	slurmAPIServer := fmt.Sprintf("http://%s.%s:6820", naming.BuildServiceName(consts.ComponentTypeREST, slurmClusterName), slurmClusterNamespacedName.Namespace)
 	slurmAPIClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
 	if err != nil {
 		return fmt.Errorf("creating slurm api client: %w", err)
