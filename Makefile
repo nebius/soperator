@@ -295,7 +295,7 @@ run: manifests generate fmt vet ## Run a controller from your host with native t
 .PHONY: docker-build-go-base
 docker-build-go-base: ## Build go-base image locally
 # Build amd
-	docker build \
+	docker buildx build \
 		--platform linux/amd64 \
 		--target go-base \
 		-t go-base:amd64 \
@@ -303,7 +303,7 @@ docker-build-go-base: ## Build go-base image locally
 		.
 
 	# Build arm
-	docker build \
+	docker buildx build \
 		--platform linux/arm64 \
 		--target go-base \
 		-t go-base:arm64 \
@@ -322,7 +322,7 @@ ifndef UNSTABLE
 	$(error UNSTABLE is not set)
 endif
 # Build amd
-	DOCKER_BUILDKIT=1 docker build \
+	DOCKER_BUILDKIT=1 docker buildx build \
 		--platform linux/amd64 \
 		--target ${IMAGE_NAME} \
 		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64" \
@@ -331,7 +331,7 @@ endif
 		.
 
 	# Build arm
-	DOCKER_BUILDKIT=1 docker build \
+	DOCKER_BUILDKIT=1 docker buildx build \
 		--platform linux/arm64 \
 		--target ${IMAGE_NAME} \
 		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" \
@@ -355,7 +355,7 @@ ifndef IMAGE_VERSION
 	$(error IMAGE_VERSION is not set, docker image cannot be built)
 endif
 	# Build amd
-	DOCKER_BUILDKIT=1 docker build \
+	DOCKER_BUILDKIT=1 docker buildx build \
 		--platform linux/amd64 \
 		--target jail \
 		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-amd64" \
@@ -364,7 +364,7 @@ endif
 		.
 
 	# Build arm
-	DOCKER_BUILDKIT=1 docker build \
+	DOCKER_BUILDKIT=1 docker buildx build \
 		--platform linux/arm64 \
 		--target jail \
 		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-arm64" \
