@@ -258,6 +258,6 @@ func BuildConfigMapSbatchScriptName(scriptName string) string {
 }
 
 func BuildSlurmReservationNameForNode(reservationPrefix string, nodeName string) string {
-	
+
 	return fmt.Sprintf("%s-%s", reservationPrefix, nodeName)
 }
