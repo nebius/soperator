@@ -290,4 +290,3 @@ notifier:
     slack:
       webhookUrl: null
   overrideValues: null
-
