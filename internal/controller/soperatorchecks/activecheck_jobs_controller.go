@@ -455,7 +455,7 @@ func processAddReservation(ctx context.Context, addReservation *slurmv1alpha1.Re
 }
 
 func processRemoveReservation(ctx context.Context, removeReservation *slurmv1alpha1.ReservationSpec, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client) error {
-	if removeReservation == nil && removeReservation.Prefix == "" {
+	if removeReservation == nil || removeReservation.Prefix == "" {
 		return nil
 	}
 
