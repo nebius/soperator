@@ -209,6 +209,7 @@ If you failed to install Soperator to your Kubernetes cluster or encounter any o
 > this may not be the case for other clouds.
 
 
+
 ## 🤝 Contribution
 Unfortunately, at the moment we don't have development docs for outside developers who want to participate in this
 project. If you are interested in contribution, create a GitHub issue, and we'll figure something out.
