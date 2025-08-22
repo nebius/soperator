@@ -277,7 +277,7 @@ func (r *PodEphemeralStorageCheck) handleHighStorageUsage(ctx context.Context, p
 		"threshold", fmt.Sprintf("%.2f%%", r.usageThreshold),
 	)
 
-	r.Client.Create(ctx, &corev1.Event{
+	event := &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: pod.Namespace,
 			Name:      fmt.Sprintf("%s-%s-ephemeral-storage-warning", pod.Name, pod.Namespace),
@@ -297,7 +297,11 @@ func (r *PodEphemeralStorageCheck) handleHighStorageUsage(ctx context.Context, p
 			info.PodName, info.PodNamespace,
 			info.UsagePercent, info.UsedBytes, info.LimitBytes),
 		Type: corev1.EventTypeWarning,
-	})
+	}
+	err := r.Client.Patch(ctx, event, client.MergeFrom(event))
+	if err != nil {
+		return fmt.Errorf("creating or updating event: %w", err)
+	}
 
 	slurmClusterName, err := r.getSlurmClusterName(ctx, pod.Namespace)
 	if err != nil {
