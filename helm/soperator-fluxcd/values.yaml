@@ -283,7 +283,7 @@ notifier:
   enabled: false
   interval: 5m
   timeout: 5m
-  version: 1.21.11
+  version: 1.21.12
   namespace: monitoring-system
   releaseName: soperator-notifier
   values:
