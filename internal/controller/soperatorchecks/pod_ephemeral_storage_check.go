@@ -37,7 +37,7 @@ import (
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=nodes/proxy,verbs=get;watch;list
-// +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch;list;watch;get
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch;list;watch;get;update
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;
 
@@ -410,12 +410,11 @@ func (r *PodEphemeralStorageCheck) checkSlurmNodeDrainStatus(ctx context.Context
 	if slurmNodeName.Name == "" {
 		return fmt.Errorf("slurm node not found for pod %s/%s", pod.Namespace, pod.Name)
 	}
-	_, isCompleting := slurmNodeName.States[api.V0041NodeStateCOMPLETING]
 	logger.Info("slurm node", "nodeStates", slurmNodeName.States)
 	// When epilog is running, node is in COMPLETING state and both IDLE and DRAIN states are set.
 	// Example: State=IDLE+COMPLETING+DRAIN+DYNAMIC_NORM
 	// We consider node fully drained when it is in IDLE+DRAIN+DYNAMIC_NORM states.
-	if slurmNodeName.IsIdleDrained() || !isCompleting {
+	if slurmNodeName.IsIdleDrained() {
 		logger.V(1).Info("slurm node is fully drained", "nodeStates", slurmNodeName.States)
 		return nil
 	}
