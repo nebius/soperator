@@ -10,11 +10,11 @@ spec:
   chart:
     spec:
       chart: podinfo
-      version: '6.5.*'
+      version: '6.9.1'
       sourceRef:
         kind: HelmRepository
         name: podinfo
-        namespace: flux-sytem
+        namespace: flux-system
       interval: 5m
   values:
     replicaCount: 10
