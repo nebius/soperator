@@ -2,7 +2,7 @@ apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmChart
 metadata:
   name: podinfo2
-  namespace: podinfo2
+  namespace: flux-system
 spec:
   interval: 10m
   chart: podinfo
