@@ -7,9 +7,14 @@ metadata:
 spec:
   targetNamespace: podinfo
   interval: 10m
-  chartRef:
-    kind: HelmChart
-    name: podinfo
-    namespace: flux-sytem
+  chart:
+    spec:
+      chart: podinfo
+      version: '6.5.*'
+      sourceRef:
+        kind: HelmRepository
+        name: podinfo
+        namespace: flux-sytem
+      interval: 5m
   values:
     replicaCount: 10
