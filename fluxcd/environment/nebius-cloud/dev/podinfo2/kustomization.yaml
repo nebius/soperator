@@ -3,5 +3,5 @@ kind: Kustomization
 resources:
   - ../../../../base/podinfo2
 patches:
- - path: ./release.yaml
+ - path: ./release-patch.yaml
 
