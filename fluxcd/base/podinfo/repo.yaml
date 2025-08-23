@@ -1,0 +1,12 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmChart
+metadata:
+  name: podinfo
+  namespace: default
+spec:
+  interval: 10m
+  chart: podinfo
+  sourceRef:
+    kind: HelmRepository
+    name: podinfo
+  version: "6.x"

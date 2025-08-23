@@ -1,0 +1,17 @@
+
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: podinfo2
+  namespace: podinfo2
+spec:
+  interval: 10m
+  chartRef:
+    kind: HelmChart
+    name: podinfo2
+    namespace: podinfo
+  values:
+    replicaCount: 2
+  dependsOn:
+    - name: podinfo
+
