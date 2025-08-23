@@ -1,9 +1,9 @@
-
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: podinfo2
-  namespace: podinfo2
+  namespace: flux-system
 spec:
   values:
-    replicaCount: 8
+    replicaCount: 5
+
