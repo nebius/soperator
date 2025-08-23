@@ -2,8 +2,6 @@ FROM golang:1.24 AS go-base
 
 WORKDIR /build
 
-RUN mkdir dummy
-
 # Layer 1: Go modules (changes rarely)
 COPY go.mod go.sum ./
 RUN go mod download
