@@ -270,6 +270,10 @@ jobs:
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd DOCKERFILE=worker/slurmd.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
           make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd IMAGE_VERSION="${IMAGE_VERSION}"
 
+          echo "Building and pushing image of the nfs-server ${IMAGE_VERSION}"
+          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=nfs-server DOCKERFILE=nfs-server/nfs.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
+          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=nfs-server IMAGE_VERSION="${IMAGE_VERSION}"
+
           echo "Common images were built"
 
           echo "Removing previous jail rootfs tar archive"
