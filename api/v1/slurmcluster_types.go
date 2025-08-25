@@ -6,6 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	"nebius.ai/slurm-operator/internal/consts"
 
@@ -213,7 +214,7 @@ type PluginConfigPyxis struct {
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=true
-	Required bool `json:"required,omitempty"`
+	Required *bool `json:"required,omitempty"`
 
 	// ContainerImageSave represents an absolute path to the file or directory where SquashFS files will be stored.
 	// If the specified file or directory already exists, it will be reused.
@@ -241,7 +242,7 @@ type PluginConfigNcclDebug struct {
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// LogLevel defines NCCL's log level to be forced.
 	//
@@ -972,7 +973,7 @@ type SlurmExporter struct {
 	// It has to be set to true if Prometheus Operator is used
 	//
 	// +kubebuilder:default=false
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// It references the PodMonitor configuration
 	//
@@ -1244,4 +1245,25 @@ type SlurmClusterList struct {
 
 func init() {
 	SchemeBuilder.Register(&SlurmCluster{}, &SlurmClusterList{})
+}
+
+// SetDefaults sets default values for PluginConfigPyxis
+func (p *PluginConfigPyxis) SetDefaults() {
+	if p.Required == nil {
+		p.Required = ptr.To(true)
+	}
+}
+
+// SetDefaults sets default values for PluginConfigNcclDebug
+func (p *PluginConfigNcclDebug) SetDefaults() {
+	if p.Enabled == nil {
+		p.Enabled = ptr.To(false)
+	}
+}
+
+// SetDefaults sets default values for SlurmExporter
+func (s *SlurmExporter) SetDefaults() {
+	if s.Enabled == nil {
+		s.Enabled = ptr.To(false)
+	}
 }
