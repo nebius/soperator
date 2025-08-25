@@ -183,8 +183,12 @@ func (c *SlurmNodesController) processDegradedNode(
 	case consts.SlurmNodeReasonHC:
 		return c.processHealthCheckFailed(ctx, k8sNode, slurmClusterName, node, node.Reason)
 	default:
-		return fmt.Errorf("unknown node reason: node name %s, reason %s, instance id %s",
-			node.Name, node.Reason, node.InstanceID)
+		log.FromContext(ctx).WithName("SlurmNodesController.processDegradedNode").Info(
+			"unknown node reason",
+			"nodeName", node.Name,
+			"reason", node.Reason.Reason,
+			"instanceID", node.InstanceID)
+		return nil
 	}
 }
 
