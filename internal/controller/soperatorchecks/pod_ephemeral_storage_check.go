@@ -328,7 +328,7 @@ func (r *PodEphemeralStorageCheck) handleHighStorageUsage(ctx context.Context, p
 	}
 	if err := r.checkSlurmNodeDrainStatus(ctx, slurmNodeName, pod); err != nil {
 		if err.Error() == "node needs draining" {
-			err = r.drainSlurmNode(ctx, slurmClusterNamespacedName, slurmNodeName.Name, info.UsedBytes)
+			err = r.drainSlurmNode(ctx, slurmClusterNamespacedName, slurmNodeName.Name, info)
 			if err != nil {
 				return fmt.Errorf("draining Slurm node: %w for pod %s/%s", err, pod.Namespace, pod.Name)
 			}
@@ -411,9 +411,6 @@ func (r *PodEphemeralStorageCheck) checkSlurmNodeDrainStatus(ctx context.Context
 		return fmt.Errorf("slurm node not found for pod %s/%s", pod.Namespace, pod.Name)
 	}
 	logger.Info("slurm node", "nodeStates", slurmNodeName.States)
-	// When epilog is running, node is in COMPLETING state and both IDLE and DRAIN states are set.
-	// Example: State=IDLE+COMPLETING+DRAIN+DYNAMIC_NORM
-	// We consider node fully drained when it is in IDLE+DRAIN+DYNAMIC_NORM states.
 	if slurmNodeName.IsIdleDrained() {
 		logger.V(1).Info("slurm node is fully drained", "nodeStates", slurmNodeName.States)
 		return nil
@@ -588,14 +585,14 @@ func (c *PodEphemeralStorageCheck) drainSlurmNode(
 	ctx context.Context,
 	slurmClusterName types.NamespacedName,
 	slurmNodeName string,
-	usage uint64,
+	info EphemeralStorageInfo,
 ) error {
 	message := fmt.Sprintf(
-		"%d of node boot disk is used. Clean up volumes from 'ssh %s /opt/soperator_utils/fs_usage.sh -l', "+
+		"pod_ephemeral_storage %.2f%% of ephemeral storage is used. Clean up volumes from 'ssh %s /opt/soperator_utils/fs_usage.sh -l', "+
 			"delete leftover containers from 'ssh %s enroot list' and 'ssh %s docker ps -a', "+
 			"reboot the node using 'scontrol reboot %s', "+
 			"or stop-start the InstanceId from 'scontrol show node %s'",
-		usage, slurmNodeName, slurmNodeName, slurmNodeName, slurmNodeName, slurmNodeName,
+		info.UsagePercent, slurmNodeName, slurmNodeName, slurmNodeName, slurmNodeName, slurmNodeName,
 	)
 	reason := consts.SlurmUserReasonHC + " " + message
 	logger := log.FromContext(ctx).WithName("SlurmNodesController.drainSlurmNode").
