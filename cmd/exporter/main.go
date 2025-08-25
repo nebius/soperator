@@ -25,6 +25,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-logr/logr"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
@@ -35,6 +36,7 @@ import (
 
 	"nebius.ai/slurm-operator/internal/exporter"
 	"nebius.ai/slurm-operator/internal/jwt"
+	"nebius.ai/slurm-operator/internal/jwtstandalone"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
 
@@ -53,8 +55,8 @@ type Flags struct {
 	standalone     bool
 
 	// auth
-	staticToken string
-	scontrolPath      string
+	staticToken         string
+	scontrolPath        string
 	keyRotationInterval string
 }
 
@@ -107,6 +109,8 @@ func parseFlags() Flags {
 		{"cluster-namespace", "SLURM_EXPORTER_CLUSTER_NAMESPACE", "soperator", "The namespace of the Slurm cluster", &flags.clusterNamespace},
 		{"cluster-name", "SLURM_EXPORTER_CLUSTER_NAME", "", "The name of the Slurm cluster (required)", &flags.clusterName},
 		{"collection-interval", "SLURM_EXPORTER_COLLECTION_INTERVAL", "30s", "How often to collect metrics from SLURM APIs", &flags.collectionInterval},
+		{"scontrol-path", "SLURM_EXPORTER_SCONTROL_PATH", "scontrol", "Path to scontrol command for standalone mode", &flags.scontrolPath},
+		{"key-rotation-interval", "SLURM_EXPORTER_KEY_ROTATION_INTERVAL", "30m", "Key rotation interval for standalone mode (e.g., 30m, 1h)", &flags.keyRotationInterval},
 	}
 
 	for _, cfg := range configs {
@@ -117,8 +121,6 @@ func parseFlags() Flags {
 
 	// static token (optional); can also come from SLURM_EXPORTER_TOKEN
 	flag.StringVar(&flags.staticToken, "static-token", "", "Static JWT to send in X-SLURM-USER-TOKEN (use with rest_auth/jwt)")
-	flag.StringVar(&flags.scontrolPath, "scontrol-path", "scontrol", "Path to scontrol command for standalone mode")
-	flag.StringVar(&flags.keyRotationInterval, "key-rotation-interval", "30m", "Key rotation interval for standalone mode (e.g., 30m, 1h)")
 
 	flag.Parse()
 	passedFlags := make(map[string]struct{})
@@ -136,16 +138,6 @@ func parseFlags() Flags {
 			flags.staticToken = v
 		}
 	}
-	if flags.scontrolPath == "scontrol" {
-		if v := os.Getenv("SLURM_EXPORTER_SCONTROL_PATH"); v != "" {
-			flags.scontrolPath = v
-		}
-	}
-	if flags.keyRotationInterval == "30m" {
-		if v := os.Getenv("SLURM_EXPORTER_KEY_ROTATION_INTERVAL"); v != "" {
-			flags.keyRotationInterval = v
-		}
-	}
 
 	if flags.clusterName == "" {
 		_, _ = fmt.Fprintf(os.Stderr, "Error: --cluster-name (or SLURM_EXPORTER_CLUSTER_NAME) is required\n")
@@ -159,6 +151,37 @@ func parseFlags() Flags {
 type staticIssuer struct{ tok string }
 
 func (s staticIssuer) Issue(_ context.Context) (string, error) { return s.tok, nil }
+
+func selectTokenIssuer(flags Flags, ctrlClient client.Client, slurmClusterID types.NamespacedName, log logr.Logger) (interface {
+	Issue(ctx context.Context) (string, error)
+}, *jwtstandalone.StandaloneTokenIssuer) {
+	var issuer interface {
+		Issue(ctx context.Context) (string, error)
+	}
+	var standaloneIssuer *jwtstandalone.StandaloneTokenIssuer
+
+	switch {
+	case ctrlClient != nil:
+		issuer = jwt.NewToken(ctrlClient).For(slurmClusterID, "root").WithRegistry(jwt.NewTokenRegistry().Build())
+	case flags.standalone:
+		standaloneIssuer = jwtstandalone.NewStandaloneTokenIssuer(slurmClusterID, "root").
+			WithScontrolPath(flags.scontrolPath)
+		// Parse and set rotation interval
+		if rotationInterval, err := time.ParseDuration(flags.keyRotationInterval); err == nil {
+			standaloneIssuer.WithRotationInterval(rotationInterval)
+		} else {
+			log.Error(err, "Failed to parse key rotation interval, using default", "interval", flags.keyRotationInterval)
+		}
+
+		issuer = standaloneIssuer
+	case flags.staticToken != "":
+		issuer = staticIssuer{tok: flags.staticToken}
+	default:
+		issuer = nil
+	}
+
+	return issuer, standaloneIssuer
+}
 
 func main() {
 	flags := parseFlags()
@@ -195,31 +218,8 @@ func main() {
 		}
 	}
 
-	// choose issuer: k8s → jwt; else static-token; else none
-	var issuer interface {
-		Issue(ctx context.Context) (string, error)
-	}
-	var standaloneIssuer *jwt.StandaloneTokenIssuer
-
-	switch {
-	case ctrlClient != nil:
-		issuer = jwt.NewToken(ctrlClient).For(slurmClusterID, "root").WithRegistry(jwt.NewTokenRegistry().Build())
-	case flags.standalone:
-		standaloneIssuer = jwt.NewStandaloneTokenIssuer(slurmClusterID, "root")
-		standaloneIssuer.WithScontrolPath(flags.scontrolPath)
-
-		// Parse and set rotation interval
-		if rotationInterval, err := time.ParseDuration(flags.keyRotationInterval); err == nil {
-			standaloneIssuer.WithRotationInterval(rotationInterval)
-		} else {
-			log.Error(err, "Failed to parse key rotation interval, using default", "interval", flags.keyRotationInterval)
-		}
-		issuer = standaloneIssuer
-	case flags.staticToken != "":
-		issuer = staticIssuer{tok: flags.staticToken}
-	default:
-		issuer = nil
-	}
+	// Select the appropriate token issuer
+	issuer, standaloneIssuer := selectTokenIssuer(flags, ctrlClient, slurmClusterID, log)
 
 	slurmAPIClient, err := slurmapi.NewClient(flags.slurmAPIServer, issuer, slurmapi.DefaultHTTPClient())
 	if err != nil {
@@ -246,12 +246,7 @@ func main() {
 	defer stop()
 
 	if standaloneIssuer != nil {
-		if err := standaloneIssuer.Start(ctx); err != nil {
-			log.Error(err, "Failed to start standalone token issuer")
-			os.Exit(1)
-		}
-		defer standaloneIssuer.Stop()
-		log.Info("Started standalone token issuer")
+		log.Info("Using standalone token issuer", "scontrol_path", standaloneIssuer.GetScontrolPath(), "rotation_interval", standaloneIssuer.GetRotationInterval())
 	}
 
 	if err := clusterExporter.Start(ctx, flags.metricsAddr); err != nil {
