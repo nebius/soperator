@@ -94,7 +94,7 @@ observability:
           pollInterval: 30s
           resources: {}
         nodeLogs:
-          enabled: false
+          enabled: true
         resources: {}
       overrideValues: null
     events:
