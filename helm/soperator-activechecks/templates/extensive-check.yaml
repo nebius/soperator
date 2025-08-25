@@ -26,8 +26,8 @@ spec:
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:
-      - name: ACTIVE_CHECKS_IMAGE
-        value: {{ .Values.activeCheckImage | quote }}
+        - name: ACTIVE_CHECKS_IMAGE
+          value: {{ .Values.activeCheckImage | quote }}
 {{ toYaml .Values.jobContainer.env | indent 8 }}
       volumeMounts:
 {{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}

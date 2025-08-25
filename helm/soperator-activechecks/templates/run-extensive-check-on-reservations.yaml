@@ -48,7 +48,7 @@ spec:
             - /bin/bash
             - -c
             - |
-{{ .Files.Get "scripts/run-extensive-check-on-reservations.sh" | indent 12 }}
+{{ .Files.Get "scripts/run-extensive-check-on-reservations.sh" | nindent 14 }}
             env:
             - name: RESERVATION_PREFIX
               value: {{ .Values.reservationPrefix | quote }}
