@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --deadline="now+6hours"
-#SBATCH --time=15:00
+#SBATCH --time=5:00
 #SBATCH --gpus-per-node=8
 
 echo "Checking for running GPU processes..."
