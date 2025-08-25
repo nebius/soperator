@@ -20,6 +20,8 @@ JQ_EXCLUDE_BAD_NODES='
   )
 | .nodes.nodes[]
 '
+
+chroot --userspec=soperatorchecks:soperatorchecks /mnt/jail /bin/bash <<'EOF'
 NUM_NODES=0
 for node in $(sinfo -N --partition="$PARTITION" --responding --json | jq -r "$JQ_EXCLUDE_BAD_NODES"); do
     (
@@ -32,8 +34,9 @@ for node in $(sinfo -N --partition="$PARTITION" --responding --json | jq -r "$JQ
         updated_json=$(echo "$extra_json" | jq -c --arg key "$ACTIVE_CHECK_NAME" --argjson val true '.[$key] = $val')
         scontrol update NodeName="$node" Extra="$updated_json"
         exit 0
-    ) 9>"/mnt/jail/etc/active_check_${node}.lock" && NUM_NODES=$(( NUM_NODES + 1 ))
+    ) 9>"/etc/soperatorchecks/active_check_${node}.lock" && NUM_NODES=$(( NUM_NODES + 1 ))
 done
+EOF
 
 echo "Submitting Slurm array job..."
 export SLURM_PROLOG="/etc/slurm/activecheck-prolog.sh"

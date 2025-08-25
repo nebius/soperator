@@ -5,6 +5,7 @@ metadata:
 spec:
   checkType: "k8sJob"
   name: "upgrade-cuda"
+  dependsOn: [ "create-user-soperatorchecks" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   suspend: true
   runAfterCreation: false
