@@ -41,9 +41,14 @@ type SlurmExporter struct {
 }
 
 func buildSlurmExporterFrom(maintenance *consts.MaintenanceMode, exporter *slurmv1.SlurmExporter) SlurmExporter {
+	enabled := false
+	if exporter.Enabled != nil {
+		enabled = *exporter.Enabled
+	}
+
 	return SlurmExporter{
 		SlurmNode:         *exporter.SlurmNode.DeepCopy(),
-		Enabled:           exporter.Enabled,
+		Enabled:           enabled,
 		PodMonitorConfig:  *exporter.PodMonitorConfig.DeepCopy(),
 		ExporterContainer: *exporter.Exporter.DeepCopy(),
 		ContainerMunge: buildContainerFrom(

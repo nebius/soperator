@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -233,7 +234,7 @@ func TestRenderPlugstack(t *testing.T) {
 		result := generateSpankConfig(&values.SlurmCluster{
 			PlugStackConfig: slurmv1.PlugStackConfig{
 				Pyxis: slurmv1.PluginConfigPyxis{
-					Required:           true,
+					Required:           ptr.To(true),
 					ContainerImageSave: "/tmp/",
 				},
 			},
@@ -257,7 +258,7 @@ func TestRenderPlugstack(t *testing.T) {
 			PlugStackConfig: slurmv1.PlugStackConfig{
 				NcclDebug: slurmv1.PluginConfigNcclDebug{
 					Required:        true,
-					Enabled:         true,
+					Enabled:         ptr.To(true),
 					LogLevel:        "TRACE",
 					OutputToFile:    true,
 					OutputDirectory: "/tmp",

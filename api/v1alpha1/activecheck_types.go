@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	"nebius.ai/slurm-operator/internal/consts"
 )
@@ -224,4 +225,14 @@ type ActiveCheckList struct {
 
 func init() {
 	SchemeBuilder.Register(&ActiveCheck{}, &ActiveCheckList{})
+}
+
+// SetDefaults sets default values for ActiveCheckSpec
+func (s *ActiveCheckSpec) SetDefaults() {
+	if s.Suspend == nil {
+		s.Suspend = ptr.To(true)
+	}
+	if s.RunAfterCreation == nil {
+		s.RunAfterCreation = ptr.To(true)
+	}
 }
