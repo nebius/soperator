@@ -1,4 +1,4 @@
-package jwtstandalone
+package tokenstandalone
 
 import (
 	"context"

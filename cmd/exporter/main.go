@@ -36,8 +36,8 @@ import (
 
 	"nebius.ai/slurm-operator/internal/exporter"
 	"nebius.ai/slurm-operator/internal/jwt"
-	"nebius.ai/slurm-operator/internal/jwtstandalone"
 	"nebius.ai/slurm-operator/internal/slurmapi"
+	tokenstandalone "nebius.ai/slurm-operator/internal/token-standalone"
 )
 
 type Flags struct {
@@ -154,17 +154,17 @@ func (s staticIssuer) Issue(_ context.Context) (string, error) { return s.tok, n
 
 func selectTokenIssuer(flags Flags, ctrlClient client.Client, slurmClusterID types.NamespacedName, log logr.Logger) (interface {
 	Issue(ctx context.Context) (string, error)
-}, *jwtstandalone.StandaloneTokenIssuer) {
+}, *tokenstandalone.StandaloneTokenIssuer) {
 	var issuer interface {
 		Issue(ctx context.Context) (string, error)
 	}
-	var standaloneIssuer *jwtstandalone.StandaloneTokenIssuer
+	var standaloneIssuer *tokenstandalone.StandaloneTokenIssuer
 
 	switch {
 	case ctrlClient != nil:
 		issuer = jwt.NewToken(ctrlClient).For(slurmClusterID, "root").WithRegistry(jwt.NewTokenRegistry().Build())
 	case flags.standalone:
-		standaloneIssuer = jwtstandalone.NewStandaloneTokenIssuer(slurmClusterID, "root").
+		standaloneIssuer = tokenstandalone.NewStandaloneTokenIssuer(slurmClusterID, "root").
 			WithScontrolPath(flags.scontrolPath)
 		// Parse and set rotation interval
 		if rotationInterval, err := time.ParseDuration(flags.keyRotationInterval); err == nil {
