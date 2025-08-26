@@ -4,13 +4,6 @@
 #SBATCH --exclusive
 #SBATCH --gpus-per-node=8
 
-echo "Upgrading nc-health-checker to the version 1.0.0-147.250819"
-# We could use `retry -d 2 -t 10 --` here but it's not currently installed in jail.
-ssh -i /mnt/jail/opt/soperator-home/soperatorchecks/.ssh/soperatorchecks_id_ecdsa \
-    -o StrictHostKeyChecking=no \
-    soperatorchecks@login-0.soperator-login-headless-svc.soperator.svc.cluster.local \
-    'flock /var/lock/apt.lock bash -c "sudo apt update && sudo apt install --only-upgrade nc-health-checker=1.0.0-147.250819 && apt-cache policy nc-health-checker"'
-
 echo "Checking for running GPU processes..."
 if [[ -n "$(nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -v '^ *$')" ]]; then
   echo "Another GPU process is currently running. Exiting."
