@@ -990,6 +990,14 @@ spec:
                 - k8sJob
                 - slurmJob
                 type: string
+              dependsOn:
+                description: |-
+                  DependsOn specifies dependency on another active checks that should be completed
+                  before running this one.
+                  Name of another checks in the same namespace.
+                items:
+                  type: string
+                type: array
               failedJobsHistoryLimit:
                 default: 16
                 description: FailedJobsHistoryLimit defines the number of failed finished
