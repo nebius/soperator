@@ -298,7 +298,7 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	// TODO(@itechdima): make `expose_enroot_logs` configurable and enable it once #413 is resolved.
 	res.AddLine(strings.Join(
 		[]string{
-			utils.Ternary(cluster.PlugStackConfig.Pyxis.Required, "required", "optional"),
+			utils.Ternary(cluster.PlugStackConfig.Pyxis.Required != nil && *cluster.PlugStackConfig.Pyxis.Required, "required", "optional"),
 			"spank_pyxis.so",
 			"runtime_path=/run/pyxis",
 			"execute_entrypoint=0",
@@ -315,7 +315,7 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 			[]string{
 				utils.Ternary(opts.Required, "required", "optional"),
 				"spanknccldebug.so",
-				fmt.Sprintf("enabled=%d", utils.Ternary(opts.Enabled, 1, 0)),
+				fmt.Sprintf("enabled=%d", utils.Ternary(opts.Enabled != nil && *opts.Enabled, 1, 0)),
 				fmt.Sprintf("log-level=%s", utils.Ternary(opts.LogLevel != "", opts.LogLevel, "INFO")),
 				fmt.Sprintf("out-file=%d", utils.Ternary(opts.OutputToFile, 1, 0)),
 				fmt.Sprintf("out-dir=%s", utils.Ternary(opts.OutputDirectory != "", opts.OutputDirectory, "/opt/soperator-outputs/nccl_logs")),
