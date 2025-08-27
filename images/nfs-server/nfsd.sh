@@ -6,10 +6,6 @@
 set -euo pipefail
 
 # Default values for NFS server configuration
-SHARED_DIRECTORY="${SHARED_DIRECTORY:-}"
-PERMITTED="${PERMITTED:-*}"
-READ_ONLY="${READ_ONLY:-}"
-SYNC="${SYNC:-}"
 GRACE_TIME="${GRACE_TIME:-10}"
 LEASE_TIME="${LEASE_TIME:-10}"
 THREADS="${THREADS:-8}"
@@ -63,41 +59,17 @@ cleanup() {
 # Set up signal traps
 trap cleanup SIGTERM SIGINT SIGQUIT
 
-# Validate required environment variables
-validate_config() {
-    if [[ -z "$SHARED_DIRECTORY" ]]; then
-        error_exit "SHARED_DIRECTORY environment variable must be set"
-    fi
-
-    if [[ ! -d "$SHARED_DIRECTORY" ]]; then
-        error_exit "Shared directory '$SHARED_DIRECTORY' does not exist"
-    fi
-}
-
-# Generate /etc/exports file
-generate_exports() {
+# Generate /etc/exports file (fallback when ConfigMap is not used)
+check_exports() {
     local exports_file="/etc/exports"
-    local ro_option="rw"
-    local sync_option="async"
 
-    # Set read-only option
-    if [[ -n "${READ_ONLY}" ]]; then
-        ro_option="ro"
+    if [[ -f "$exports_file" ]]; then
+        log "Using existing /etc/exports:"
+        cat "$exports_file"
+        return 0
+    else
+        error_exit "no /etc/exports file found"
     fi
-
-    # Set sync option
-    if [[ -n "${SYNC}" ]]; then
-        sync_option="sync"
-    fi
-
-    # Create exports file
-    cat > "$exports_file" << EOF
-# NFS exports - generated automatically
-$SHARED_DIRECTORY $PERMITTED($ro_option,fsid=0,$sync_option,no_subtree_check,no_auth_nlm,insecure,no_root_squash)
-EOF
-
-    log "Generated /etc/exports:"
-    cat "$exports_file"
 }
 
 # Start RPC services
@@ -195,17 +167,12 @@ monitor_processes() {
 # Main execution
 main() {
     log "Starting NFS server..."
-    log "Shared directory: $SHARED_DIRECTORY"
-    log "Permitted clients: $PERMITTED"
-    log "Read-only: ${READ_ONLY:-false}"
-    log "Sync mode: ${SYNC:-false}"
     log "Grace time: ${GRACE_TIME}s"
     log "Lease time: ${LEASE_TIME}s"
     log "Threads: $THREADS"
 
     # Initialize
-    validate_config
-    generate_exports
+    check_exports
 
     # Start services in order
     start_rpcbind
