@@ -26,7 +26,7 @@ mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
 echo "Create directory for slurm job outputs"
 (umask 000; mkdir -p "/mnt/jail/opt/soperator-outputs/slurm_jobs")
 
-if [[ ! -z "$RESERVATION_NAME" ]]; then
+if [[ -n "${RESERVATION_NAME:-}" ]]; then
     echo "Submitting Slurm job on reservation $RESERVATION_NAME..."
     OUT_PATTERN='/opt/soperator-outputs/slurm_jobs/%N.%x.%j.out'
     # Here we use env variables instead of --output and --error because they do not support %N (node name) parameter.

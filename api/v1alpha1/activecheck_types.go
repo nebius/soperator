@@ -17,6 +17,12 @@ type ActiveCheckSpec struct {
 	// +kubebuilder:validation:Required
 	SlurmClusterRefName string `json:"slurmClusterRefName"`
 
+	// DependsOn specifies dependency on another active checks that should be completed
+	// before running this one.
+	// Name of another checks in the same namespace.
+	// +kubebuilder:validation:Optional
+	DependsOn []string `json:"dependsOn"`
+
 	// Schedule defines the CronJob schedule.
 	// By default, every year - at 00:00 on day-of-month 1 in January
 	// +kubebuilder:validation:Optional

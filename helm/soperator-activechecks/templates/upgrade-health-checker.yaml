@@ -5,6 +5,7 @@ metadata:
 spec:
   checkType: "k8sJob"
   name: "upgrade-health-checker"
+  dependsOn: [ "create-user-soperatorchecks" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   # We should run this upgrade manually
   suspend: true
