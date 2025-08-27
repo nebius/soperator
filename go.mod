@@ -18,7 +18,7 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.81.0
 	github.com/sethvargo/go-password v0.3.1
 	github.com/stretchr/testify v1.10.0
-	github.com/zclconf/go-cty v1.16.0
+	github.com/zclconf/go-cty v1.16.4
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.38.0
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
