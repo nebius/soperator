@@ -2,6 +2,7 @@ package nodeconfigurator
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -27,6 +28,7 @@ func renderPodSpec(nodeConfigurator slurmv1alpha1.NodeConfiguratorSpec) corev1.P
 	priorityClassName := getPriorityClassName(nodeConfigurator)
 
 	return corev1.PodSpec{
+		HostUsers:          ptr.To(false),
 		HostPID:            hostPID,
 		Affinity:           affinity,
 		NodeSelector:       nodeSelector,
