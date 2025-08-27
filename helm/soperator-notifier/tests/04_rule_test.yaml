@@ -30,24 +30,26 @@ tests:
     set:
       slack:
         ignoreSystemJobs: true
+        requireUserMail: true
     asserts:
       - equal:
           path: spec.groups[0].rules[0].expr
           value: |
-            changes(slurm_job_info{job_state=~"FAILED|NODE_FAIL|OUT_OF_MEMORY", user_name!~"^(nebius|soperatorchecks)$"}) > 0
+            changes(slurm_job_info{job_state=~"FAILED|NODE_FAIL|OUT_OF_MEMORY", user_name!~"^(nebius|soperatorchecks)$", user_mail!=""}) > 0
       - equal:
           path: spec.groups[0].rules[1].expr
           value: |
-            changes(slurm_job_info{job_state=~"BOOT_FAIL|CANCELLED|DEADLINE|PREEMPTED|SUSPENDED|TIMEOUT", user_name!~"^(nebius|soperatorchecks)$"}) > 0
+            changes(slurm_job_info{job_state=~"BOOT_FAIL|CANCELLED|DEADLINE|PREEMPTED|SUSPENDED|TIMEOUT", user_name!~"^(nebius|soperatorchecks)$", user_mail!=""}) > 0
       - equal:
           path: spec.groups[0].rules[2].expr
           value: |
-            changes(slurm_job_info{job_state=~"COMPLETED", user_name!~"^(nebius|soperatorchecks)$"}) > 0
+            changes(slurm_job_info{job_state=~"COMPLETED", user_name!~"^(nebius|soperatorchecks)$", user_mail!=""}) > 0
 
   - it: should render rule expressions with system jobs
     set:
       slack:
         ignoreSystemJobs: false
+        requireUserMail: false
     asserts:
       - equal:
           path: spec.groups[0].rules[0].expr
@@ -66,6 +68,7 @@ tests:
     set:
       slack:
         ignoreSystemJobs: false
+        requireUserMail: false
     asserts:
       - equal:
           path: spec.groups[0].rules[0].labels["alert_key"]
