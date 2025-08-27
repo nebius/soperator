@@ -11,11 +11,14 @@ imagePullSecrets: []
 # NFS Server Configuration
 nfs:
   # Required: Directory path inside container to export
-  sharedDirectory: "/exports"
-  # Allowed client IPs/networks (e.g., "10.0.0.0/8,192.168.0.0/16" or "*")
-  permitted: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
-  readOnly: false
-  sync: true
+  sharedDirectory: "/export"
+  # Allowed client IPs/networks (e.g., [10.0.0.0/8,192.168.0.0/16] or ["*"] for world)
+  permitted:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+  # NFS export options applied to all permitted networks
+  shareOptions: "rw,fsid=0,sync,no_subtree_check,no_auth_nlm,insecure,no_root_squash"
   graceTime: 10
   leaseTime: 10
   threads: 8

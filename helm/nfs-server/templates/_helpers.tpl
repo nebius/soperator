@@ -92,6 +92,13 @@ Create the image name
 {{- end }}
 
 {{/*
+Create the name of the exports configmap
+*/}}
+{{- define "nfs-server.exportsConfigMapName" -}}
+{{- printf "%s-exports" (include "nfs-server.fullname" .) }}
+{{- end }}
+
+{{/*
 Create NFS server address for storage class
 */}}
 {{- define "nfs-server.nfsServer" -}}

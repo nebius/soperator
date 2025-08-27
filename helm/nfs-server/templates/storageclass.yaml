@@ -8,7 +8,7 @@ metadata:
 provisioner: nfs.csi.k8s.io
 parameters:
   server: {{ include "nfs-server.nfsServer" . }}
-  share: {{ .Values.nfs.sharedDirectory }}
+  share: /
 reclaimPolicy: {{ .Values.storageClass.reclaimPolicy }}
 volumeBindingMode: {{ .Values.storageClass.volumeBindingMode }}
 allowVolumeExpansion: {{ .Values.storageClass.allowVolumeExpansion }}

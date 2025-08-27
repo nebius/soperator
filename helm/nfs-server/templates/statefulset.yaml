@@ -38,18 +38,6 @@ spec:
           image: {{ include "nfs-server.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            - name: SHARED_DIRECTORY
-              value: {{ .Values.nfs.sharedDirectory | quote }}
-            - name: PERMITTED
-              value: {{ .Values.nfs.permitted | quote }}
-            {{- if .Values.nfs.readOnly }}
-            - name: READ_ONLY
-              value: "true"
-            {{- end }}
-            {{- if .Values.nfs.sync }}
-            - name: SYNC
-              value: "true"
-            {{- end }}
             - name: GRACE_TIME
               value: {{ .Values.nfs.graceTime | quote }}
             - name: LEASE_TIME
@@ -75,6 +63,10 @@ spec:
           volumeMounts:
             - name: nfs-storage
               mountPath: {{ .Values.nfs.sharedDirectory }}
+            - name: exports-config
+              mountPath: /etc/exports
+              subPath: exports
+              readOnly: true
         {{- if .Values.monitoring.enabled }}
         - name: node-exporter
           image: {{ .Values.monitoring.nodeExporter.image.repository }}:{{ .Values.monitoring.nodeExporter.image.tag }}
@@ -113,6 +105,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
+        - name: exports-config
+          configMap:
+            name: {{ include "nfs-server.exportsConfigMapName" . }}
         {{- if .Values.storage.existingClaim }}
         - name: nfs-storage
           persistentVolumeClaim:

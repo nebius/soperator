@@ -6,6 +6,8 @@ A Helm chart for deploying an NFS server on Kubernetes with built-in monitoring 
 
 - **StatefulSet**: Single instance NFS server with persistent storage
 - **Storage Class**: Automatic NFS storage class creation for CSI driver
+- **ConfigMap-based Exports**: NFS exports configuration managed by Helm templates
+- **Multi-subnet Support**: Support for multiple client networks with individual export entries
 - **Monitoring**: Optional NFS metrics collection with node_exporter
 
 ## Prerequisites
@@ -19,10 +21,9 @@ A Helm chart for deploying an NFS server on Kubernetes with built-in monitoring 
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `nfs.sharedDirectory` | Directory path to export | `/exports` |
-| `nfs.permitted` | Allowed client networks | `*` |
-| `nfs.readOnly` | Enable read-only mode | `false` |
-| `nfs.sync` | Enable synchronous writes | `true` |
+| `nfs.sharedDirectory` | Directory path to export | `/export` |
+| `nfs.permitted` | List of allowed client networks (supports multiple subnets and wildcards) | `[10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]` |
+| `nfs.shareOptions` | NFS export options applied to all permitted networks | `rw,fsid=0,sync,no_subtree_check,no_auth_nlm,insecure,no_root_squash` |
 | `nfs.graceTime` | NFS grace period (seconds) | `10` |
 | `nfs.leaseTime` | NFS lease time (seconds) | `10` |
 | `nfs.threads` | Number of NFS daemon threads | `8` |
