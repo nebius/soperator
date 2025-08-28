@@ -23,6 +23,10 @@ spec:
       jsonPath: .status.conditions[?(@.type=='UpdateActionsCompleted')].reason
       name: Reconfiguration Status
       type: string
+    - description: Path of the first item
+      jsonPath: .spec.items[0].path
+      name: Jailed Path
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date

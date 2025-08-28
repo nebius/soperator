@@ -31,6 +31,10 @@ spec:
       jsonPath: .status.slurmJobsStatus.lastJobName
       name: Last Job
       type: string
+    - description: Last job ID
+      jsonPath: .status.slurmJobsStatus.lastJobId
+      name: Last Job ID
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
