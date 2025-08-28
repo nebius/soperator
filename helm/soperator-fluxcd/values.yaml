@@ -314,7 +314,7 @@ csiDriverNfs:
   overrideValues: null
   values: null
 nfsServer:
-  enabled: false
+  enabled: true
   interval: 5m
   timeout: 5m
   version: 1.21.12

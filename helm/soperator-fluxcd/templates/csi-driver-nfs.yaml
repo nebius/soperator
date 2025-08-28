@@ -1,4 +1,4 @@
-{{- if .Values.nfsServer.enabled }}
+{{- if .Values.csiDriverNfs.enabled }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
