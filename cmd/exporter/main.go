@@ -152,19 +152,18 @@ type staticIssuer struct{ tok string }
 
 func (s staticIssuer) Issue(_ context.Context) (string, error) { return s.tok, nil }
 
-func selectTokenIssuer(flags Flags, ctrlClient client.Client, slurmClusterID types.NamespacedName, log logr.Logger) (interface {
+type issuer interface {
 	Issue(ctx context.Context) (string, error)
-}, *tokenstandalone.StandaloneTokenIssuer) {
-	var issuer interface {
-		Issue(ctx context.Context) (string, error)
-	}
-	var standaloneIssuer *tokenstandalone.StandaloneTokenIssuer
+}
+
+func selectTokenIssuer(flags Flags, ctrlClient client.Client, slurmClusterID types.NamespacedName, log logr.Logger) issuer {
+	var issuer issuer
 
 	switch {
 	case ctrlClient != nil:
 		issuer = jwt.NewToken(ctrlClient).For(slurmClusterID, "root").WithRegistry(jwt.NewTokenRegistry().Build())
 	case flags.standalone:
-		standaloneIssuer = tokenstandalone.NewStandaloneTokenIssuer(slurmClusterID, "root").
+		standaloneIssuer := tokenstandalone.NewStandaloneTokenIssuer(slurmClusterID, "root").
 			WithScontrolPath(flags.scontrolPath)
 		// Parse and set rotation interval
 		if rotationInterval, err := time.ParseDuration(flags.keyRotationInterval); err == nil {
@@ -180,7 +179,7 @@ func selectTokenIssuer(flags Flags, ctrlClient client.Client, slurmClusterID typ
 		issuer = nil
 	}
 
-	return issuer, standaloneIssuer
+	return issuer
 }
 
 func main() {
@@ -219,7 +218,7 @@ func main() {
 	}
 
 	// Select the appropriate token issuer
-	issuer, standaloneIssuer := selectTokenIssuer(flags, ctrlClient, slurmClusterID, log)
+	issuer := selectTokenIssuer(flags, ctrlClient, slurmClusterID, log)
 
 	slurmAPIClient, err := slurmapi.NewClient(flags.slurmAPIServer, issuer, slurmapi.DefaultHTTPClient())
 	if err != nil {
@@ -245,8 +244,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if standaloneIssuer != nil {
-		log.Info("Using standalone token issuer", "scontrol_path", standaloneIssuer.GetScontrolPath(), "rotation_interval", standaloneIssuer.GetRotationInterval())
+	if flags.standalone {
+		log.Info("Using standalone token issuer", "scontrol_path", flags.scontrolPath, "rotation_interval", flags.keyRotationInterval)
 	}
 
 	if err := clusterExporter.Start(ctx, flags.metricsAddr); err != nil {
