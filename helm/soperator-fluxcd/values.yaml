@@ -325,8 +325,3 @@ nfsServer:
     nameOverride: nfs-server
     nfs:
       sharedDirectory: "/exported"
-      graceTime: 10
-      leaseTime: 10
-      threads: 8
-    storage:
-      storageClassName: compute-csi-network-ssd-ext4
