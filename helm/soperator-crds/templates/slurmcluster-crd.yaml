@@ -7476,7 +7476,19 @@ spec:
     singular: nodeconfigurator
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: Whether rebooter is enabled
+      jsonPath: .spec.rebooter.enabled
+      name: Rebooter Enabled
+      type: boolean
+    - description: Whether nodeConfigurator is enabled
+      jsonPath: .spec.nodeConfigurator.enabled
+      name: NodeConfigurator Enabled
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: NodeConfigurator is the Schema for the nodeconfigurators API.
@@ -12018,6 +12030,7 @@ spec:
         type: object
     served: true
     storage: true
+    subresources: {}
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
