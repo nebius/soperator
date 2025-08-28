@@ -15,7 +15,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.25.1
 	github.com/onsi/gomega v1.37.0
 	github.com/openkruise/kruise-api v1.8.0
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.81.0
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.85.0
 	github.com/sethvargo/go-password v0.3.1
 	github.com/stretchr/testify v1.10.0
 	github.com/zclconf/go-cty v1.16.4
@@ -23,11 +23,11 @@ require (
 	golang.org/x/crypto v0.41.0
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
 	istio.io/pkg v0.0.0-20241216214326-d70796207df3
-	k8s.io/api v0.33.1
-	k8s.io/apimachinery v0.33.1
-	k8s.io/client-go v0.33.1
-	k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979
-	sigs.k8s.io/controller-runtime v0.20.4
+	k8s.io/api v0.33.3
+	k8s.io/apimachinery v0.33.3
+	k8s.io/client-go v0.33.3
+	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
+	sigs.k8s.io/controller-runtime v0.21.0
 	sigs.k8s.io/security-profiles-operator v0.8.4
 	sigs.k8s.io/yaml v1.6.0
 )
@@ -38,6 +38,7 @@ require (
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
+	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cert-manager/cert-manager v1.17.1 // indirect
 	github.com/containers/common v0.60.4 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
@@ -126,7 +127,7 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.33.0 // indirect
+	k8s.io/apiextensions-apiserver v0.33.3 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
