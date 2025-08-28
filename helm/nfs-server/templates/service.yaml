@@ -19,7 +19,7 @@ spec:
       protocol: TCP
       name: nfs
     - port: {{ .Values.service.rpcPort }}
-      targetPort: rpc
+      targetPort: portmap
       protocol: TCP
       name: portmap
     - port: {{ .Values.service.mountdPort }}
