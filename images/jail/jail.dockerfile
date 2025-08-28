@@ -79,6 +79,7 @@ RUN apt update && \
         bsdmainutils \
         kmod \
         tmux \
+        time \
         aptitude && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
