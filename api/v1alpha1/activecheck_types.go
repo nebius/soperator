@@ -186,6 +186,12 @@ type ActiveCheckStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Type",type=string,JSONPath=`.spec.checkType`,description="The type of the active check"
+// +kubebuilder:printcolumn:name="K8s Job Status",type=string,JSONPath=`.status.k8sJobsStatus.lastJobStatus`,description="Last K8s job status"
+// +kubebuilder:printcolumn:name="Slurm Job Status",type=string,JSONPath=`.status.slurmJobsStatus.lastJobState`,description="Last Slurm job status"
+// +kubebuilder:printcolumn:name="Last Job",type=string,JSONPath=`.status.slurmJobsStatus.lastJobName`,description="Last job name"
+// +kubebuilder:printcolumn:name="Last Job ID",type=string,JSONPath=`.status.slurmJobsStatus.lastJobId`,description="Last job ID"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ActiveCheck is the Schema for the activechecks API.
 type ActiveCheck struct {

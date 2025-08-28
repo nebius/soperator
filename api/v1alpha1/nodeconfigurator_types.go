@@ -137,6 +137,9 @@ type SleepContainer struct {
 }
 
 // NodeConfigurator is the Schema for the nodeconfigurators API.
+// +kubebuilder:printcolumn:name="Rebooter Enabled",type="boolean",JSONPath=".spec.rebooter.enabled",description="Whether rebooter is enabled"
+// +kubebuilder:printcolumn:name="NodeConfigurator Enabled",type="boolean",JSONPath=".spec.nodeConfigurator.enabled",description="Whether nodeConfigurator is enabled"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type NodeConfigurator struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
