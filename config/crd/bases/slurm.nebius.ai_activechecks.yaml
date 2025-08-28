@@ -14,7 +14,27 @@ spec:
     singular: activecheck
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: The type of the active check
+      jsonPath: .spec.checkType
+      name: Type
+      type: string
+    - description: Last K8s job status
+      jsonPath: .status.k8sJobsStatus.lastJobStatus
+      name: K8s Job Status
+      type: string
+    - description: Last Slurm job status
+      jsonPath: .status.slurmJobsStatus.lastJobState
+      name: Slurm Job Status
+      type: string
+    - description: Last job name
+      jsonPath: .status.slurmJobsStatus.lastJobName
+      name: Last Job
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: ActiveCheck is the Schema for the activechecks API.
