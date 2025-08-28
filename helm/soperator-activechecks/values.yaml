@@ -31,4 +31,4 @@ createUser:
 upgradeCuda:
   cudaVersion: "12.4.1-1"
 upgradeHealthChecker:
-  healthCheckerVersion: "1.0.0-146.250808"
+  healthCheckerVersion: "1.0.0-150.250826"
