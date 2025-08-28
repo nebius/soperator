@@ -26,5 +26,11 @@ spec:
       targetPort: mountd
       protocol: TCP
       name: mountd
+    {{- if and .Values.monitoring.enabled .Values.monitoring.serviceMonitor.enabled }}
+    - port: {{ .Values.monitoring.nodeExporter.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+    {{- end }}
   selector:
     {{- include "nfs-server.selectorLabels" . | nindent 4 }}
