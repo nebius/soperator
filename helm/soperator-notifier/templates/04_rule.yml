@@ -3,11 +3,7 @@
 {{- $ignoreFilter = printf ", %s" (include "son.rule.jobSelector.system" .)  }}
 {{ end -}}
 {{- if .Values.slack.requireUserMail }}
-{{- if $ignoreFilter }}
 {{- $ignoreFilter = printf "%s, %s" $ignoreFilter (include "son.rule.jobSelector.require_user_mail" .)  }}
-{{- else }}
-{{- $ignoreFilter = (include "son.rule.jobSelector.require_user_mail" .) }}
-{{- end }}
 {{- end -}}
 
 apiVersion: operator.victoriametrics.com/v1beta1
