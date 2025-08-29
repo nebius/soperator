@@ -76,6 +76,7 @@ tests:
             {{- $state := .Labels.job_state }}
             {{- $reason := .Labels.job_state_reason }}
             {{- $user := .Labels.job_user }}
+            {{- $user_mail := .Labels.job_user_mail }}
             
             {{- if eq $state "FAILED" }}
             - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} has *FAILED* (reason: `{{ $reason }}`).
@@ -110,6 +111,8 @@ tests:
             {{- else }}
             - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} ended in state `{{ $state }}` (reason: `{{ $reason }}`).
             {{- end }}
+            
+            {{ if $user_mail }} | <{{ $user_mail }}>{{ end }}
             
             {{- end }}
       - equal:
