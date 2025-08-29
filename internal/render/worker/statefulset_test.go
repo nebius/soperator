@@ -208,9 +208,20 @@ func TestRenderStatefulSet_HostUsers(t *testing.T) {
 					K8sNodeFilterName: "test-filter",
 					HostUsers:         tc.hostUsers,
 				},
+				VolumeSpool: slurmv1.NodeVolume{
+					VolumeSourceName: ptr.To("test-volume-source"),
+				},
+				VolumeJail: slurmv1.NodeVolume{
+					VolumeSourceName: ptr.To("test-volume-source"),
+				},
 				ContainerSlurmd: values.Container{
 					NodeContainer: slurmv1.NodeContainer{
 						Image: "test-image",
+						Resources: corev1.ResourceList{
+							corev1.ResourceMemory:           resource.MustParse("1Gi"),
+							corev1.ResourceCPU:              resource.MustParse("100m"),
+							corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+						},
 					},
 				},
 				ContainerMunge: values.Container{
@@ -224,13 +235,22 @@ func TestRenderStatefulSet_HostUsers(t *testing.T) {
 				{Name: "test-filter"},
 			}
 
+			volumeSources := []slurmv1.VolumeSource{
+				{
+					Name: "test-volume-source",
+					VolumeSource: corev1.VolumeSource{
+						HostPath: &corev1.HostPathVolumeSource{},
+					},
+				},
+			}
+
 			statefulSet, err := worker.RenderStatefulSet(
 				"test-namespace",
 				"test-cluster",
 				consts.ClusterTypeGPU,
 				nodeFilters,
 				&slurmv1.Secrets{},
-				[]slurmv1.VolumeSource{},
+				volumeSources,
 				workerValue,
 				[]slurmv1.WorkerFeature{},
 			)
