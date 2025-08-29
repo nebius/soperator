@@ -1298,6 +1298,6 @@ func (s *SlurmExporter) SetDefaults() {
 // SetDefaults sets default values for SlurmNodeWorker
 func (w *SlurmNodeWorker) SetDefaults() {
 	if w.HostUsers == nil {
-		w.HostUsers = ptr.To(true)
+		w.HostUsers = ptr.To(false)
 	}
 }
