@@ -48,6 +48,9 @@ func (r *ConfigMapReconciler) patch(existing, desired client.Object) (client.Pat
 		res := client.MergeFrom(dst.DeepCopy())
 
 		dst.Data = src.Data
+		if dst.Labels == nil {
+			dst.Labels = make(map[string]string)
+		}
 		maps.Copy(dst.Labels, src.Labels)
 
 		return res
