@@ -1,0 +1,120 @@
+suite: test priority class functionality
+templates:
+  - slurm-cluster-cr.yaml
+  - priority-class.yaml
+tests:
+  - it: should create all priority classes
+    template: priority-class.yaml
+    values:
+      - ../tests/minimal-config_test.yaml
+    asserts:
+      - hasDocuments:
+          count: 8
+      # Check worker priority class (document 0)
+      - equal:
+          path: metadata.name
+          value: slurm1-slurm-worker
+        documentIndex: 0
+      - equal:
+          path: kind
+          value: PriorityClass
+        documentIndex: 0
+      - equal:
+          path: value
+          value: 1000000
+        documentIndex: 0
+      # Check controller priority class (document 1)
+      - equal:
+          path: metadata.name
+          value: slurm1-slurm-controller
+        documentIndex: 1
+      - equal:
+          path: kind
+          value: PriorityClass
+        documentIndex: 1
+      - equal:
+          path: value
+          value: 1000001
+        documentIndex: 1
+      # Check login priority class (document 2)
+      - equal:
+          path: metadata.name
+          value: slurm1-slurm-login
+        documentIndex: 2
+      - equal:
+          path: kind
+          value: PriorityClass
+        documentIndex: 2
+      - equal:
+          path: value
+          value: 100002
+        documentIndex: 2
+
+  - it: should set correct priority class in slurm cluster CR for all components
+    template: slurm-cluster-cr.yaml
+    values:
+      - ../tests/minimal-config_test.yaml
+    asserts:
+      - equal:
+          path: spec.populateJail.priorityClass
+          value: "slurm1-slurm-populate-jail"
+      - equal:
+          path: spec.slurmNodes.accounting.priorityClass
+          value: "slurm1-slurm-accounting"
+      - equal:
+          path: spec.slurmNodes.controller.priorityClass
+          value: "slurm1-slurm-controller"
+      - equal:
+          path: spec.slurmNodes.worker.priorityClass
+          value: "slurm1-slurm-worker"
+      - equal:
+          path: spec.slurmNodes.login.priorityClass
+          value: "slurm1-slurm-login"
+      - equal:
+          path: spec.slurmNodes.exporter.priorityClass
+          value: "slurm1-slurm-exporter"
+      - equal:
+          path: spec.slurmNodes.rest.priorityClass
+          value: "slurm1-slurm-rest"
+      - equal:
+          path: spec.sConfigController.node.priorityClass
+          value: "slurm1-slurm-sconfigcontroller"
+
+  - it: should allow custom priority classes to be set
+    template: slurm-cluster-cr.yaml
+    values:
+      - ../tests/minimal-config_test.yaml
+    set:
+      populateJail.priorityClass: "custom-populate-jail"
+      slurmNodes.accounting.priorityClass: "custom-accounting"
+      slurmNodes.controller.priorityClass: "custom-controller"
+      slurmNodes.worker.priorityClass: "custom-worker"
+      slurmNodes.login.priorityClass: "custom-login"
+      slurmNodes.exporter.priorityClass: "custom-exporter"
+      slurmNodes.rest.priorityClass: "custom-rest"
+      sConfigController.node.priorityClass: "custom-sconfigcontroller"
+    asserts:
+      - equal:
+          path: spec.populateJail.priorityClass
+          value: "custom-populate-jail"
+      - equal:
+          path: spec.slurmNodes.accounting.priorityClass
+          value: "custom-accounting"
+      - equal:
+          path: spec.slurmNodes.controller.priorityClass
+          value: "custom-controller"
+      - equal:
+          path: spec.slurmNodes.worker.priorityClass
+          value: "custom-worker"
+      - equal:
+          path: spec.slurmNodes.login.priorityClass
+          value: "custom-login"
+      - equal:
+          path: spec.slurmNodes.exporter.priorityClass
+          value: "custom-exporter"
+      - equal:
+          path: spec.slurmNodes.rest.priorityClass
+          value: "custom-rest"
+      - equal:
+          path: spec.sConfigController.node.priorityClass
+          value: "custom-sconfigcontroller"

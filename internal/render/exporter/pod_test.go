@@ -79,3 +79,51 @@ func TestRenderPodTemplateSpec(t *testing.T) {
 	assert.Len(t, result.Spec.Containers, 1)
 	assert.Len(t, result.Spec.InitContainers, len(expectedPodTemplate.Spec.InitContainers))
 }
+
+func Test_renderPodTemplateSpec_PriorityClass(t *testing.T) {
+	tests := []struct {
+		name          string
+		priorityClass string
+		expectedClass string
+	}{
+		{
+			name:          "empty priority class",
+			priorityClass: "",
+			expectedClass: "",
+		},
+		{
+			name:          "custom priority class",
+			priorityClass: "high-priority",
+			expectedClass: "high-priority",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clusterValues := &values.SlurmCluster{
+				SlurmExporter: values.SlurmExporter{
+					SlurmNode: slurmv1.SlurmNode{
+						K8sNodeFilterName: "test-filter",
+						PriorityClass:     tt.priorityClass,
+					},
+					Container: slurmv1.NodeContainer{
+						Image: "test-image",
+					},
+				},
+				NodeFilters: []slurmv1.K8sNodeFilter{
+					{
+						Name: "test-filter",
+					},
+				},
+			}
+
+			initContainers := []corev1.Container{}
+			matchLabels := map[string]string{"app": "test"}
+
+			result := renderPodTemplateSpec(clusterValues, initContainers, matchLabels)
+
+			// Check PriorityClassName
+			assert.Equal(t, tt.expectedClass, result.Spec.PriorityClassName)
+		})
+	}
+}
