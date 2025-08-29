@@ -73,11 +73,12 @@ func BasePodTemplateSpec(
 			},
 		},
 		Spec: corev1.PodSpec{
-			HostUsers:    accounting.HostUsers,
-			Affinity:     nodeFilter.Affinity,
-			Tolerations:  nodeFilter.Tolerations,
-			NodeSelector: nodeFilter.NodeSelector,
-			Hostname:     consts.HostnameAccounting,
+			HostUsers:         accounting.HostUsers,
+			Affinity:          nodeFilter.Affinity,
+			Tolerations:       nodeFilter.Tolerations,
+			NodeSelector:      nodeFilter.NodeSelector,
+			Hostname:          consts.HostnameAccounting,
+			PriorityClassName: accounting.PriorityClass,
 			InitContainers: append(
 				accounting.CustomInitContainers,
 				common.RenderContainerMunge(&accounting.ContainerMunge),

@@ -80,3 +80,38 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 	assert.Equal(t, expected.Spec.NodeSelector, result.Spec.NodeSelector)
 	assert.Equal(t, expected.Spec.Affinity, result.Spec.Affinity)
 }
+
+func Test_BasePodTemplateSpec_PriorityClass(t *testing.T) {
+	tests := []struct {
+		name          string
+		priorityClass string
+		expectedClass string
+	}{
+		{
+			name:          "empty priority class",
+			priorityClass: "",
+			expectedClass: "",
+		},
+		{
+			name:          "custom priority class",
+			priorityClass: "high-priority",
+			expectedClass: "high-priority",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a copy of acc and set PriorityClass
+			testAcc := *acc
+			testAcc.SlurmNode.PriorityClass = tt.priorityClass
+
+			result, err := accounting.BasePodTemplateSpec(
+				defaultNameCluster, &testAcc, defaultNodeFilter, defaultVolumeSources, matchLabels,
+			)
+			assert.NoError(t, err)
+
+			// Check PriorityClassName
+			assert.Equal(t, tt.expectedClass, result.Spec.PriorityClassName)
+		})
+	}
+}

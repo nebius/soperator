@@ -1525,6 +1525,9 @@ spec:
                     description: Overwrite defines whether to overwrite content on
                       the jail volume if it's already populated.
                     type: boolean
+                  priorityClass:
+                    description: PriorityClass for PopulateJail job
+                    type: string
                 required:
                 - image
                 - k8sNodeFilterName
@@ -3051,6 +3054,9 @@ spec:
                         description: |-
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
                           Must correspond to the name of one of [K8sNodeFilter]
+                        type: string
+                      priorityClass:
+                        description: PriorityClass for Slurm node pods
                         type: string
                       size:
                         description: Size defines the number of node instances
@@ -5189,6 +5195,9 @@ spec:
                         required:
                         - image
                         type: object
+                      priorityClass:
+                        description: PriorityClass for Slurm node pods
+                        type: string
                       size:
                         description: Size defines the number of node instances
                         format: int32
@@ -6915,8 +6924,7 @@ spec:
                         - image
                         type: object
                       priorityClass:
-                        description: PriorityClass defines the priority class for
-                          the Slurm controller pods
+                        description: PriorityClass for Slurm controller pods
                         type: string
                       slurmctld:
                         description: Slurmctld represents the Slurm control daemon
@@ -9492,6 +9500,9 @@ spec:
                             pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
                             type: string
                         type: object
+                      priorityClass:
+                        description: PriorityClass for Slurm node pods
+                        type: string
                       size:
                         description: Size defines the number of node instances
                         format: int32
@@ -11231,6 +11242,9 @@ spec:
                         required:
                         - image
                         type: object
+                      priorityClass:
+                        description: PriorityClass for Slurm node pods
+                        type: string
                       size:
                         description: Size defines the number of node instances
                         format: int32
@@ -13495,6 +13509,9 @@ spec:
                         format: int32
                         minimum: 2
                         type: integer
+                      priorityClass:
+                        description: PriorityClass for Slurm node pods
+                        type: string
                       rest:
                         description: SlurmRestNode represents the Slurm REST API daemon
                           configuration
@@ -15107,8 +15124,7 @@ spec:
                         - image
                         type: object
                       priorityClass:
-                        description: PriorityClass defines the priority class for
-                          the Slurm worker node
+                        description: PriorityClass for Slurm node pods
                         type: string
                       size:
                         description: Size defines the number of node instances
