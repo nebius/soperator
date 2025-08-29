@@ -84,6 +84,7 @@ spec:
     imagePullPolicy: {{ default "IfNotPresent" .Values.populateJail.imagePullPolicy | quote }}
     appArmorProfile: {{ default "unconfined" .Values.populateJail.appArmorProfile | quote }}
     k8sNodeFilterName: {{ required "Populate Jail job k8s node filter name must be provided." .Values.populateJail.k8sNodeFilterName | quote }}
+    priorityClass: {{ default (printf "%s-%s" (include "slurm-cluster.name" .) "slurm-populate-jail") .Values.populateJail.priorityClass | quote }}
     {{- if .Values.populateJail.jailSnapshotVolume }}
     jailSnapshotVolume:
       volumeSourceName: {{ required "Jail snapshot volume source name must be provided." .Values.populateJail.jailSnapshotVolume.volumeSourceName | quote }}
@@ -100,6 +101,7 @@ spec:
     accounting:
       enabled: {{ default false .Values.slurmNodes.accounting.enabled }}
       k8sNodeFilterName: {{ required ".Values.slurmNodes.accounting.k8sNodeFilterName must be provided." .Values.slurmNodes.accounting.k8sNodeFilterName | quote }}
+      priorityClass: {{ default (printf "%s-%s" (include "slurm-cluster.name" .) "slurm-accounting") .Values.slurmNodes.accounting.priorityClass | quote }}
       {{- if hasKey .Values.slurmNodes.accounting "hostUsers" }}
       hostUsers: {{ .Values.slurmNodes.accounting.hostUsers }}
       {{- end }}
@@ -309,6 +311,7 @@ spec:
     login:
       size: {{ required ".Values.slurmNodes.login.size must be provided." .Values.slurmNodes.login.size }}
       k8sNodeFilterName: {{ required ".Values.slurmNodes.login.k8sNodeFilterName must be provided." .Values.slurmNodes.login.k8sNodeFilterName | quote }}
+      priorityClass: {{ default (printf "%s-%s" (include "slurm-cluster.name" .) "slurm-login") .Values.slurmNodes.login.priorityClass | quote }}
       {{- if hasKey .Values.slurmNodes.login "hostUsers" }}
       hostUsers: {{ .Values.slurmNodes.login.hostUsers }}
       {{- end }}
@@ -373,6 +376,7 @@ spec:
       enabled: {{ .Values.slurmNodes.exporter.enabled }}
       size: {{ required ".Values.slurmNodes.exporter.size must be provided." .Values.slurmNodes.exporter.size }}
       k8sNodeFilterName: {{ required ".Values.slurmNodes.exporter.k8sNodeFilterName must be provided." .Values.slurmNodes.exporter.k8sNodeFilterName | quote }}
+      priorityClass: {{ default (printf "%s-%s" (include "slurm-cluster.name" .) "slurm-exporter") .Values.slurmNodes.exporter.priorityClass | quote }}
       {{- if hasKey .Values.slurmNodes.exporter "hostUsers" }}
       hostUsers: {{ .Values.slurmNodes.exporter.hostUsers }}
       {{- end }}
@@ -391,6 +395,7 @@ spec:
       enabled: {{ .Values.slurmNodes.rest.enabled }}
       size: {{ required ".Values.slurmNodes.rest.size must be provided." .Values.slurmNodes.rest.size }}
       k8sNodeFilterName: {{ required ".Values.slurmNodes.rest.k8sNodeFilterName must be provided." .Values.slurmNodes.rest.k8sNodeFilterName | quote }}
+      priorityClass: {{ default (printf "%s-%s" (include "slurm-cluster.name" .) "slurm-rest") .Values.slurmNodes.rest.priorityClass | quote }}
       {{- if hasKey .Values.slurmNodes.rest "hostUsers" }}
       hostUsers: {{ .Values.slurmNodes.rest.hostUsers }}
       {{- end }}
@@ -420,6 +425,7 @@ spec:
     node:
       size: {{ required ".Values.sConfigController.node.size must be provided." .Values.sConfigController.node.size }}
       k8sNodeFilterName: {{ required ".Values.sConfigController.node.k8sNodeFilterName must be provided." .Values.sConfigController.node.k8sNodeFilterName | quote }}
+      priorityClass: {{ default (printf "%s-%s" (include "slurm-cluster.name" .) "slurm-sconfigcontroller") .Values.sConfigController.node.priorityClass | quote }}
     container:
       image: {{ required "sConfigController image" .Values.images.sConfigController | quote }}
       imagePullPolicy: {{ default "IfNotPresent" .Values.sConfigController.container.imagePullPolicy | quote }}

@@ -429,6 +429,11 @@ type PopulateJail struct {
 	// +kubebuilder:default="unconfined"
 	AppArmorProfile string `json:"appArmorProfile,omitempty"`
 
+	// PriorityClass for PopulateJail job
+	//
+	// +kubebuilder:validation:Optional
+	PriorityClass string `json:"priorityClass,omitempty"`
+
 	// HostUsers controls if the pod containers can use the host user namespace
 	//
 	// +kubebuilder:validation:Optional
@@ -790,7 +795,7 @@ type SlurmNodeController struct {
 	// +kubebuilder:validation:Required
 	Volumes SlurmNodeControllerVolumes `json:"volumes"`
 
-	// PriorityClass defines the priority class for the Slurm controller pods
+	// PriorityClass for Slurm controller pods
 	//
 	// +kubebuilder:validation:Optional
 	PriorityClass string `json:"priorityClass,omitempty"`
@@ -883,11 +888,6 @@ type SlurmNodeWorker struct {
 	//
 	// +kubebuilder:validation:Optional
 	SlurmNodeExtra string `json:"slurmNodeExtra,omitempty"`
-
-	// PriorityClass defines the priority class for the Slurm worker node
-	//
-	// +kubebuilder:validation:Optional
-	PriorityClass string `json:"priorityClass,omitempty"`
 }
 
 // SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node
@@ -1064,6 +1064,11 @@ type SlurmNode struct {
 	//
 	// +kubebuilder:validation:Required
 	K8sNodeFilterName string `json:"k8sNodeFilterName"`
+
+	// PriorityClass for Slurm node pods
+	//
+	// +kubebuilder:validation:Optional
+	PriorityClass string `json:"priorityClass,omitempty"`
 
 	// HostUsers controls if the pod containers can use the host user namespace
 	//

@@ -32,6 +32,7 @@ func renderPodTemplateSpec(
 			Affinity:           nodeFilter.Affinity,
 			Tolerations:        nodeFilter.Tolerations,
 			NodeSelector:       nodeFilter.NodeSelector,
+			PriorityClassName:  clusterValues.SlurmExporter.PriorityClass,
 			InitContainers:     initContainers,
 			Containers:         []corev1.Container{renderContainerExporter(clusterValues)},
 			ServiceAccountName: ServiceAccountName,

@@ -14,3 +14,57 @@ value: 1000001
 globalDefault: false
 preemptionPolicy: PreemptLowerPriority
 description: "Priority class for Slurm controller nodes in the cluster. This is used to ensure that Slurm controller pods are scheduled with a higher priority than worker pods."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "slurm-cluster.name" . }}-slurm-login
+value: 100002
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Priority class for Slurm login nodes in the cluster. This is used to ensure that Slurm login pods are scheduled with a higher priority than worker pods."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "slurm-cluster.name" . }}-slurm-accounting
+value: 100003
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Priority class for Slurm accounting nodes in the cluster. This is used to ensure that Slurm accounting pods are scheduled with a higher priority than worker pods."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "slurm-cluster.name" . }}-slurm-exporter
+value: 100004
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Priority class for Slurm exporter nodes in the cluster. This is used to ensure that Slurm exporter pods are scheduled with a higher priority than worker pods."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "slurm-cluster.name" . }}-slurm-rest
+value: 100005
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Priority class for Slurm REST API nodes in the cluster. This is used to ensure that Slurm REST API pods are scheduled with a higher priority than worker pods."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "slurm-cluster.name" . }}-slurm-sconfigcontroller
+value: 100006
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Priority class for Slurm SConfig Controller pods in the cluster. This is used to ensure that SConfig Controller pods are scheduled with a higher priority than worker pods."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "slurm-cluster.name" . }}-slurm-populate-jail
+value: 100007
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Priority class for Slurm PopulateJail jobs in the cluster. This is used to ensure that PopulateJail jobs are scheduled with a higher priority than worker pods."
