@@ -34,6 +34,10 @@ spec:
     daemon:
       tolerations:
         - operator: Exists
+      {{- if .Values.securityProfilesOperator.values.daemon.resources }}
+      resources:
+        {{- toYaml .Values.securityProfilesOperator.values.daemon.resources | nindent 8 }}
+      {{- end }}
     enableAppArmor: true
     enableBpfRecorder: false
     enableLogEnricher: false
@@ -54,6 +58,10 @@ spec:
       - effect: NoSchedule
         operator: Exists
     verbosity: 0
+    {{- if .Values.securityProfilesOperator.values.resources }}
+    resources:
+      {{- toYaml .Values.securityProfilesOperator.values.resources | nindent 6 }}
+    {{- end }}
   {{- end }}
   valuesFrom:
   - kind: ConfigMap

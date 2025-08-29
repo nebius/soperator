@@ -198,7 +198,21 @@ securityProfilesOperator:
   version: 0.8.4-soperator
   releaseName: security-profiles-operator
   namespace: security-profiles-operator-system
-  values: null
+  values:
+    daemon:
+      resources:
+        limits:
+          memory: 128Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi
+    resources:
+      limits:
+        cpu: 500m
+        memory: 3Gi
+      requests:
+        cpu: 500m
+        memory: 3Gi
   overrideValues: null
 slurmCluster:
   enabled: true
