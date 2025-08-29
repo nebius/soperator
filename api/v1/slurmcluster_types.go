@@ -329,6 +329,11 @@ type SConfigController struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="1m"
 	ReconfigureWaitTimeout *string `json:"reconfigureWaitTimeout,omitempty"`
+
+	// HostUsers controls if the pod containers can use the host user namespace
+	//
+	// +kubebuilder:validation:Optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
 }
 
 type PartitionConfiguration struct {
@@ -423,6 +428,11 @@ type PopulateJail struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="unconfined"
 	AppArmorProfile string `json:"appArmorProfile,omitempty"`
+
+	// HostUsers controls if the pod containers can use the host user namespace
+	//
+	// +kubebuilder:validation:Optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
 }
 
 // K8sNodeFilter defines the k8s node filter used in Slurm node specifications
@@ -760,6 +770,11 @@ type SlurmNodeController struct {
 	// +kubebuilder:validation:Required
 	K8sNodeFilterName string `json:"k8sNodeFilterName"`
 
+	// HostUsers controls if the pod containers can use the host user namespace
+	//
+	// +kubebuilder:validation:Optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
+
 	// Slurmctld represents the Slurm control daemon configuration
 	//
 	// +kubebuilder:validation:Required
@@ -802,6 +817,13 @@ type SlurmNodeControllerVolumes struct {
 // SlurmNodeWorker defines the configuration for the Slurm worker node
 type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
+
+	// HostUsers controls if the pod containers can use the host user namespace
+	// For workers, defaults to true to allow containers to access host user namespace
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	HostUsers *bool `json:"hostUsers,omitempty"`
 
 	// The maximum number of worker pods that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
@@ -1042,6 +1064,11 @@ type SlurmNode struct {
 	//
 	// +kubebuilder:validation:Required
 	K8sNodeFilterName string `json:"k8sNodeFilterName"`
+
+	// HostUsers controls if the pod containers can use the host user namespace
+	//
+	// +kubebuilder:validation:Optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
 }
 
 // NodeContainer defines the configuration for one of node containers
@@ -1265,5 +1292,12 @@ func (p *PluginConfigNcclDebug) SetDefaults() {
 func (s *SlurmExporter) SetDefaults() {
 	if s.Enabled == nil {
 		s.Enabled = ptr.To(false)
+	}
+}
+
+// SetDefaults sets default values for SlurmNodeWorker
+func (w *SlurmNodeWorker) SetDefaults() {
+	if w.HostUsers == nil {
+		w.HostUsers = ptr.To(true)
 	}
 }

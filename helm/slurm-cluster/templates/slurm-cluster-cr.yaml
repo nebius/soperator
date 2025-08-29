@@ -89,6 +89,9 @@ spec:
       volumeSourceName: {{ required "Jail snapshot volume source name must be provided." .Values.populateJail.jailSnapshotVolume.volumeSourceName | quote }}
     {{- end }}
     overwrite: {{ default false .Values.populateJail.overwrite }}
+    {{- if hasKey .Values.populateJail "hostUsers" }}
+    hostUsers: {{ .Values.populateJail.hostUsers }}
+    {{- end }}
   {{- if .Values.plugStackConfig }}
   plugStackConfig:
     {{- toYaml .Values.plugStackConfig | nindent 4 }}
@@ -97,6 +100,9 @@ spec:
     accounting:
       enabled: {{ default false .Values.slurmNodes.accounting.enabled }}
       k8sNodeFilterName: {{ required ".Values.slurmNodes.accounting.k8sNodeFilterName must be provided." .Values.slurmNodes.accounting.k8sNodeFilterName | quote }}
+      {{- if hasKey .Values.slurmNodes.accounting "hostUsers" }}
+      hostUsers: {{ .Values.slurmNodes.accounting.hostUsers }}
+      {{- end }}
       {{- if .Values.slurmNodes.accounting.slurmConfig }}
       slurmConfig:
         {{- toYaml .Values.slurmNodes.accounting.slurmConfig | nindent 8 }}
@@ -177,6 +183,9 @@ spec:
     controller:
       k8sNodeFilterName: {{ required ".Values.slurmNodes.controller.k8sNodeFilterName must be provided." .Values.slurmNodes.controller.k8sNodeFilterName | quote }}
       priorityClass: {{ default (printf "%s-%s" (include "slurm-cluster.name" .) "slurm-controller") .Values.slurmNodes.controller.priorityClass | quote }}
+      {{- if hasKey .Values.slurmNodes.controller "hostUsers" }}
+      hostUsers: {{ .Values.slurmNodes.controller.hostUsers }}
+      {{- end }}
       slurmctld:
         image: {{ required "slurmctld image" .Values.images.slurmctld | quote }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.controller.slurmctld.imagePullPolicy | quote }}
@@ -223,6 +232,9 @@ spec:
       cgroupVersion: {{ .Values.slurmNodes.worker.cgroupVersion | quote }}
       enableGDRCopy: {{ default false .Values.slurmNodes.worker.enableGDRCopy }}
       priorityClass: {{ default (printf "%s-%s" (include "slurm-cluster.name" .) "slurm-worker") .Values.slurmNodes.worker.priorityClass | quote }}
+      {{- if hasKey .Values.slurmNodes.worker "hostUsers" }}
+      hostUsers: {{ .Values.slurmNodes.worker.hostUsers }}
+      {{- end }}
       {{- if .Values.slurmNodes.worker.slurmNodeExtra }}
       slurmNodeExtra: {{ .Values.slurmNodes.worker.slurmNodeExtra | quote }}
       {{- end }}
@@ -297,6 +309,9 @@ spec:
     login:
       size: {{ required ".Values.slurmNodes.login.size must be provided." .Values.slurmNodes.login.size }}
       k8sNodeFilterName: {{ required ".Values.slurmNodes.login.k8sNodeFilterName must be provided." .Values.slurmNodes.login.k8sNodeFilterName | quote }}
+      {{- if hasKey .Values.slurmNodes.login "hostUsers" }}
+      hostUsers: {{ .Values.slurmNodes.login.hostUsers }}
+      {{- end }}
       sshd:
         image: {{ required "sshd image" .Values.images.sshd | quote }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.login.sshd.imagePullPolicy | quote }}
@@ -358,6 +373,9 @@ spec:
       enabled: {{ .Values.slurmNodes.exporter.enabled }}
       size: {{ required ".Values.slurmNodes.exporter.size must be provided." .Values.slurmNodes.exporter.size }}
       k8sNodeFilterName: {{ required ".Values.slurmNodes.exporter.k8sNodeFilterName must be provided." .Values.slurmNodes.exporter.k8sNodeFilterName | quote }}
+      {{- if hasKey .Values.slurmNodes.exporter "hostUsers" }}
+      hostUsers: {{ .Values.slurmNodes.exporter.hostUsers }}
+      {{- end }}
       {{- if .Values.slurmNodes.exporter.collectionInterval }}
       collectionInterval: {{ .Values.slurmNodes.exporter.collectionInterval | quote }}
       {{- end }}
@@ -373,6 +391,9 @@ spec:
       enabled: {{ .Values.slurmNodes.rest.enabled }}
       size: {{ required ".Values.slurmNodes.rest.size must be provided." .Values.slurmNodes.rest.size }}
       k8sNodeFilterName: {{ required ".Values.slurmNodes.rest.k8sNodeFilterName must be provided." .Values.slurmNodes.rest.k8sNodeFilterName | quote }}
+      {{- if hasKey .Values.slurmNodes.rest "hostUsers" }}
+      hostUsers: {{ .Values.slurmNodes.rest.hostUsers }}
+      {{- end }}
       {{- if .Values.slurmNodes.rest.threadCount }}
       threadCount: {{ .Values.slurmNodes.rest.threadCount }}
       {{- end }}
@@ -393,6 +414,9 @@ spec:
           memory: {{ required ".Values.slurmNodes.rest.rest.resources.memory must be provided." .Values.slurmNodes.rest.rest.resources.memory | quote}}
           ephemeral-storage: {{ required ".Values.slurmNodes.rest.rest.resources.ephemeralStorage must be provided." .Values.slurmNodes.rest.rest.resources.ephemeralStorage | quote}}
   sConfigController:
+    {{- if hasKey .Values.sConfigController "hostUsers" }}
+    hostUsers: {{ .Values.sConfigController.hostUsers }}
+    {{- end }}
     node:
       size: {{ required ".Values.sConfigController.node.size must be provided." .Values.sConfigController.node.size }}
       k8sNodeFilterName: {{ required ".Values.sConfigController.node.k8sNodeFilterName must be provided." .Values.sConfigController.node.k8sNodeFilterName | quote }}

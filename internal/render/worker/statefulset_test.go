@@ -177,3 +177,80 @@ func Test_RenderContainerWaitForController(t *testing.T) {
 		assert.Equal(t, expectedPath, mount.MountPath, "Wrong mount path for volume %s", mount.Name)
 	}
 }
+
+func TestRenderStatefulSet_HostUsers(t *testing.T) {
+	testCases := []struct {
+		name              string
+		hostUsers         *bool
+		expectedHostUsers *bool
+	}{
+		{
+			name:              "when hostUsers is nil (default for workers should be true)",
+			hostUsers:         nil,
+			expectedHostUsers: nil, // nil means not set, field is omitted
+		},
+		{
+			name:              "when hostUsers is false",
+			hostUsers:         ptr.To(false),
+			expectedHostUsers: ptr.To(false),
+		},
+		{
+			name:              "when hostUsers is true",
+			hostUsers:         ptr.To(true),
+			expectedHostUsers: ptr.To(true),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			workerValue := &values.SlurmWorker{
+				SlurmNode: slurmv1.SlurmNode{
+					K8sNodeFilterName: "test-filter",
+					HostUsers:         tc.hostUsers,
+				},
+				ContainerSlurmd: values.Container{
+					NodeContainer: slurmv1.NodeContainer{
+						Image: "test-image",
+					},
+				},
+				ContainerMunge: values.Container{
+					NodeContainer: slurmv1.NodeContainer{
+						Image: "munge-image",
+					},
+				},
+			}
+
+			nodeFilters := []slurmv1.K8sNodeFilter{
+				{Name: "test-filter"},
+			}
+
+			statefulSet, err := worker.RenderStatefulSet(
+				"test-namespace",
+				"test-cluster",
+				consts.ClusterTypeGPU,
+				nodeFilters,
+				&slurmv1.Secrets{},
+				[]slurmv1.VolumeSource{},
+				workerValue,
+				[]slurmv1.WorkerFeature{},
+			)
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Check that HostUsers field is set correctly
+			if tc.expectedHostUsers == nil {
+				if statefulSet.Spec.Template.Spec.HostUsers != nil {
+					t.Errorf("expected HostUsers to be nil, got %v", *statefulSet.Spec.Template.Spec.HostUsers)
+				}
+			} else {
+				if statefulSet.Spec.Template.Spec.HostUsers == nil {
+					t.Errorf("expected HostUsers to be %v, got nil", *tc.expectedHostUsers)
+				} else if *statefulSet.Spec.Template.Spec.HostUsers != *tc.expectedHostUsers {
+					t.Errorf("expected HostUsers to be %v, got %v", *tc.expectedHostUsers, *statefulSet.Spec.Template.Spec.HostUsers)
+				}
+			}
+		})
+	}
+}
