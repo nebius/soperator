@@ -185,7 +185,7 @@ func TestRenderStatefulSet_HostUsers(t *testing.T) {
 		expectedHostUsers *bool
 	}{
 		{
-			name:              "when hostUsers is nil (default for workers should be true)",
+			name:              "when hostUsers is nil (default for workers is false)",
 			hostUsers:         nil,
 			expectedHostUsers: nil, // nil means not set, field is omitted
 		},
