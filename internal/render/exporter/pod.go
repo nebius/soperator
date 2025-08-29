@@ -3,7 +3,6 @@ package exporter
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/utils"
@@ -29,7 +28,7 @@ func renderPodTemplateSpec(
 			Labels: matchLabels,
 		},
 		Spec: corev1.PodSpec{
-			HostUsers:          ptr.To(false),
+			HostUsers:          clusterValues.SlurmExporter.HostUsers,
 			Affinity:           nodeFilter.Affinity,
 			Tolerations:        nodeFilter.Tolerations,
 			NodeSelector:       nodeFilter.NodeSelector,

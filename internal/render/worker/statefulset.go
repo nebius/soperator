@@ -76,7 +76,7 @@ func RenderStatefulSet(
 	}
 
 	spec := corev1.PodSpec{
-		HostUsers: ptr.To(false),
+		HostUsers: worker.HostUsers,
 		ReadinessGates: []corev1.PodReadinessGate{
 			{
 				ConditionType: appspub.InPlaceUpdateReady,

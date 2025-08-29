@@ -54,7 +54,7 @@ func RenderPlaceholderDaemonSet(
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
-					HostUsers:    ptr.To(false),
+					HostUsers:    controller.HostUsers,
 					Affinity:     nodeFilter.Affinity,
 					NodeSelector: nodeFilter.NodeSelector,
 					Tolerations:  nodeFilter.Tolerations,

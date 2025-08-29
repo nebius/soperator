@@ -85,7 +85,7 @@ func RenderStatefulSet(
 					Annotations: renderAnnotations(login, clusterName, namespace),
 				},
 				Spec: corev1.PodSpec{
-					HostUsers:    ptr.To(false),
+					HostUsers:    login.HostUsers,
 					Affinity:     nodeFilter.Affinity,
 					NodeSelector: nodeFilter.NodeSelector,
 					Tolerations:  nodeFilter.Tolerations,
