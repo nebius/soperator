@@ -107,6 +107,7 @@ func RenderStatefulSet(
 					TerminationGracePeriodSeconds: ptr.To(common.DefaultPodTerminationGracePeriodSeconds),
 					SecurityContext:               &corev1.PodSecurityContext{},
 					SchedulerName:                 corev1.DefaultSchedulerName,
+					PriorityClassName:             login.PriorityClass,
 				},
 			},
 		},

@@ -50,9 +50,10 @@ func BasePodTemplateSpec(
 			},
 		},
 		Spec: corev1.PodSpec{
-			Affinity:     nodeFilter.Affinity,
-			Tolerations:  nodeFilter.Tolerations,
-			NodeSelector: nodeFilter.NodeSelector,
+			Affinity:          nodeFilter.Affinity,
+			Tolerations:       nodeFilter.Tolerations,
+			NodeSelector:      nodeFilter.NodeSelector,
+			PriorityClassName: sConfigController.PriorityClass,
 			Containers: []corev1.Container{
 				renderContainerSConfigController(
 					clusterNamespace,
