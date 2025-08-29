@@ -819,7 +819,7 @@ type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
 
 	// HostUsers controls if the pod containers can use the host user namespace
-	// For workers, defaults to true to allow containers to access host user namespace
+	// For workers, defaults to false to allow containers to access host user namespace
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
