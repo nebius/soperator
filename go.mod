@@ -5,7 +5,7 @@ go 1.24.2
 require (
 	github.com/SlinkyProject/slurm-client v0.3.1-20250801102150-043094ce1e4e
 	github.com/go-logr/logr v1.4.3
-	github.com/golang-jwt/jwt/v5 v5.2.2
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/gruntwork-io/terratest v0.48.2
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/hashicorp/hcl/v2 v2.22.0
