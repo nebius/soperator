@@ -146,8 +146,7 @@ spank_err_t snccld_state_write(
         snccld_log_error("Cannot open or truncate state file '%s': %m", path);
         goto state_write_fail;
     }
-    if (fchmod(fd, SNCCLD_DEFAULT_MODE) != 0) {
-        snccld_log_error("Cannot chmod %s: %m", path);
+    if (snccld_ensure_mode(path, SNCCLD_DEFAULT_MODE) != ESPANK_SUCCESS) {
         close(fd);
         goto state_write_fail;
     }

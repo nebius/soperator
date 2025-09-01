@@ -67,4 +67,14 @@ void snccld_ensure_file_exists(const char *path, bool as_user);
  */
 void snccld_ensure_dir_exists(const char *path, bool as_user);
 
+/**
+ * Ensure the directory/file has desired mode.
+ *
+ * @param path Path to the directory/file to ensure its mode.
+ * @param mode Directory/file mode.
+ *
+ * @return ESPANK_SUCCESS, or ESPANK_ERROR.
+ */
+int snccld_ensure_mode(const char *path, mode_t mode);
+
 #endif // SNCCLD_UTIL_DIR_FILE_H
