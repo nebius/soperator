@@ -59,8 +59,7 @@ bool snccld_acquire_lock(
         }
         goto acquire_lock_fail;
     }
-    if (fchmod(fd, SNCCLD_DEFAULT_MODE) != 0) {
-        snccld_log_error("Cannot chmod %s: %m", path);
+    if (snccld_ensure_mode(path, SNCCLD_DEFAULT_MODE) != ESPANK_SUCCESS) {
         close(fd);
         goto acquire_lock_fail;
     }

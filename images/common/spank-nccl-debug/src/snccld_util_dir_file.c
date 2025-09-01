@@ -46,8 +46,8 @@ spank_err_t snccld_mkdir_p(const char *path, const bool as_user) {
                 continue;
             }
 
-            if (!as_user && chmod(tmp, SNCCLD_DEFAULT_MODE) != 0) {
-                snccld_log_error("Cannot chmod %s: %m", tmp);
+            if (!as_user && snccld_ensure_mode(tmp, SNCCLD_DEFAULT_MODE) !=
+                                ESPANK_SUCCESS) {
                 return ESPANK_ERROR;
             }
 
@@ -64,8 +64,8 @@ spank_err_t snccld_mkdir_p(const char *path, const bool as_user) {
         // Directory already exists.
     }
 
-    if (!as_user && chmod(tmp, SNCCLD_DEFAULT_MODE) != 0) {
-        snccld_log_error("Cannot chmod %s: %m", tmp);
+    if (!as_user &&
+        snccld_ensure_mode(tmp, SNCCLD_DEFAULT_MODE) != ESPANK_SUCCESS) {
         return ESPANK_ERROR;
     }
 
@@ -125,8 +125,8 @@ void snccld_ensure_file_exists(const char *path, const bool as_user) {
     } else {
         snccld_log_debug("File created: '%s'", path_absolute);
 
-        if (!as_user && fchmod(fd, SNCCLD_DEFAULT_MODE) != 0) {
-            snccld_log_error("Cannot chmod %s: %m", path_absolute);
+        if (!as_user) {
+            snccld_ensure_mode(path_absolute, SNCCLD_DEFAULT_MODE);
         }
 
         close(fd);
@@ -135,4 +135,36 @@ void snccld_ensure_file_exists(const char *path, const bool as_user) {
 
 inline void snccld_ensure_dir_exists(const char *path, const bool as_user) {
     snccld_mkdir_p(path, as_user);
+}
+
+static inline bool _snccld_needs_chmod(const char *path, const mode_t mode) {
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        return false;
+    }
+
+    // Ignore type bits
+    const mode_t current_permissions =
+        st.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
+
+    return current_permissions != (mode & (S_IRWXU | S_IRWXG | S_IRWXO));
+}
+
+int snccld_ensure_mode(const char *path, const mode_t mode) {
+    const bool needs_chmod = _snccld_needs_chmod(path, mode);
+    if (!needs_chmod) {
+        return ESPANK_SUCCESS;
+    }
+
+    const int rc = chmod(path, mode);
+    if (rc != 0) {
+        if (errno == EPERM) {
+            return ESPANK_SUCCESS;
+        }
+
+        snccld_log_error("Cannot chmod %s: %m", path);
+        return ESPANK_ERROR;
+    }
+
+    return ESPANK_SUCCESS;
 }
