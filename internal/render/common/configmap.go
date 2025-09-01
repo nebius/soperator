@@ -94,7 +94,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	}
 	res.AddProperty("MpiDefault", "pmix")
 	res.AddProperty("MailProg", "/usr/bin/true")
-	res.AddProperty("PluginDir", "/usr/lib/x86_64-linux-gnu/"+consts.Slurm)
+	res.AddProperty("PluginDir", "/usr/lib/"+consts.Slurm)
 	res.AddProperty("ProctrackType", "proctrack/cgroup")
 	res.AddProperty("ReturnToService", 2)
 	res.AddComment("")
