@@ -96,7 +96,7 @@ pushd "${jaildir}"
     echo "Bind-mount slurm chroot plugin from container to the jail"
     mkdir -p "${SLURM_LIB_PATH}"
     touch "${SLURM_LIB_PATH}/chroot.so"
-    mount --bind "/${SLURM_LIB_PATH}/chroot.so" "${SLURM_LIB_PATH}/chroot.so"
+    mount --bind "/${SLURM_LIB_PATH}/chroot.so" "usr/lib/slurm/chroot.so"
 
     echo "Bind-mount /etc/enroot, /usr/share/enroot and /usr/lib/enroot"
     mkdir -p etc/enroot usr/share/enroot usr/lib/enroot
@@ -124,9 +124,7 @@ pushd "${jaildir}"
 
     echo "Bind-mount pyxis plugin from container to the jail"
     touch "${SLURM_LIB_PATH}/spank_pyxis.so"
-    mount --bind "/${SLURM_LIB_PATH}/spank_pyxis.so" "${SLURM_LIB_PATH}/spank_pyxis.so"
-
-    echo "Bind-mount slurm configs"
+    mount --bind "/${SLURM_LIB_PATH}/spank_pyxis.so" "usr/lib/slurm/spank_pyxis.so"
 
     echo 'Creating Soperator output directory'
     ( \
