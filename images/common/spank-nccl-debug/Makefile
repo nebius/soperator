@@ -17,6 +17,11 @@ SLURM_VERSION_BRANCH = $(subst _,-,$(subst .,-,$(SLURM_VERSION)))
 
 SLURM_HEADERS_DIR = vendor/slurm
 
+NODE_COUNT_WORKER ?= 1
+NODE_COUNT_LOGIN ?= 1
+NODE_RANGE_WORKER := $(shell seq 0 $$(($(NODE_COUNT_WORKER) - 1)))
+NODE_RANGE_LOGIN := $(shell seq 0 $$(($(NODE_COUNT_LOGIN) - 1)))
+
 
 all: build
 
@@ -72,28 +77,14 @@ docker-slurm-base:
 
 
 .PHONY: redeploy
-redeploy: _recreate_configmap _restart_pods _remount_lib ;
-
-
-.PHONY: _recreate_configmap _restart_pods _remount_lib
-_recreate_configmap:
-	@kubectl -n soperator delete configmap spanknccldebug && \
-	kubectl -n soperator create configmap spanknccldebug --from-file build/spanknccldebug.so
-
-_restart_pods:
-	@kubectl -n soperator delete pod login-0
-	@kubectl -n soperator delete pod worker-0
-
-	@echo -n 'Waiting for worker-0 to be Running'
-	@until kubectl -n soperator get pod worker-0 -o jsonpath='{.status.phase}' 2>/dev/null | grep -q Running; do \
-		echo -n '.'; sleep 2; \
-	done;
-	@echo '' && echo -n 'Waiting for login-0 to be Running'
-	@until kubectl -n soperator get pod login-0 -o jsonpath='{.status.phase}' 2>/dev/null | grep -q Running; do \
-		echo -n '.'; sleep 2; \
-	done;
-	@echo ''
-
-_remount_lib:
-	kubectl -n soperator exec worker-0 -c slurmd -- mount --bind /usr/lib/x86_64-linux-gnu/slurm/spanknccldebug.so /mnt/jail/usr/lib/x86_64-linux-gnu/slurm/spanknccldebug.so
-	kubectl -n soperator exec login-0  -c sshd   -- mount --bind /usr/lib/x86_64-linux-gnu/slurm/spanknccldebug.so /mnt/jail/usr/lib/x86_64-linux-gnu/slurm/spanknccldebug.so
+redeploy:
+	$(foreach \
+		i, \
+		$(NODE_RANGE_WORKER), \
+		kubectl -n soperator cp ./build/spanknccldebug.so worker-$(i):/usr/lib/x86_64-linux-gnu/slurm/ ; \
+	)
+	$(foreach \
+		i, \
+		$(NODE_RANGE_LOGIN), \
+		kubectl -n soperator cp ./build/spanknccldebug.so login-$(i):/usr/lib/x86_64-linux-gnu/slurm/ ; \
+	)

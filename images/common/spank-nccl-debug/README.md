@@ -165,74 +165,33 @@ make build SLURM_VERSION=<SLURM_VERSION>
 
 ### Deployment on Soperator cluster
 
-#### Disable Soperator
+#### 1. Cluster configuration
+
+Make sure your cluster has `spec.plugStackConfig.ncclDebug.enabled` set to `true`.
+
+#### 2. Build
+
+Once changes are made, you can rebuild the shared library to get a fresh `spanknccldebug.so` file in 
+[./build](./build) directory with:
 
 ```shell
-kubectl -n soperator-system scale deployment soperator-controller-manager --replicas 0
+make build <PARAMS>
 ```
 
-#### ConfigMap creation
+#### 3. kubectl 
 
-```bash
-kubectl -n soperator create configmap spanknccldebug --from-file ./build/spanknccldebug.so
-```
+Make sure you have **kubectl** using needed cluster by default.
 
-#### Volumes
+> [!WARNING]
+> Changes will be performed in the current context.
 
-For `worker`/`login` StatefulSet volumes:
+#### 4. Redeploy
 
-```yaml
-- name: spanknccldebug
-  configMap:
-    name: spanknccldebug
-```
+Run `make redeploy` to copy the plugin's `.so` file onto the cluster pods.
 
-#### Volume mounts
-
-For `worker`/`login` StatefulSets volume mounts:
-
-```yaml
-- name: spanknccldebug
-  mountPath: /usr/lib/x86_64-linux-gnu/slurm/spanknccldebug.so
-  subPath: spanknccldebug.so
-  readOnly: true
-```
-
-#### PlugStack conf
-
-For `soperator-slurm-configs` ConfigMap:
-
-```yaml
-plugstack.conf: >-
-    required chroot.so /mnt/jail
-
-    required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0
-    container_scope=global sbatch_support=1
-    container_image_save=/var/cache/enroot-container-images/
-
-    optional /usr/lib/x86_64-linux-gnu/slurm/spanknccldebug.so enabled=true
-```
-
-#### Restart pods
+> [!TIP]
+> You can set `NODE_COUNT_WORKER` and `NODE_COUNT_LOGIN` to specify a number of worker and login pods on the cluster.
 
 ```shell
-kubectl -n soperator delete pod {worker,login}-0 --wait=false
-```
-or (not reliable)
-```shell
-kubectl-kruise -n soperator rollout restart statefulset.apps.kruise.io/{worker,login}
-```
-
-#### Further redeployment
-
-Once changes are made, you can rebuild the shared library with:
-
-```shell
-make build
-```
-
-and redeploy it onto the cluster via:
-
-```shell
-make redeploy
+make redeploy NODE_COUNT_WORKER=8 NODE_COUNT_LOGIN=3
 ```

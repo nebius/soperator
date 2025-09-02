@@ -507,8 +507,8 @@ int slurm_spank_task_init_privileged(spank_t spank, int argc, char **argv) {
                 snccld_log_error("Cannot open %s: %m", lock_filename);
                 goto mount_config_end;
             }
-            if (fchmod(lock_fd, SNCCLD_DEFAULT_MODE) != 0) {
-                snccld_log_error("Cannot chmod %s: %m", lock_filename);
+            if (snccld_ensure_mode(lock_filename, SNCCLD_DEFAULT_MODE) !=
+                ESPANK_SUCCESS) {
                 close(lock_fd);
                 goto mount_config_end;
             }
@@ -527,8 +527,8 @@ int slurm_spank_task_init_privileged(spank_t spank, int argc, char **argv) {
             snccld_log_error("Cannot open %s: %m", mount_config_filename);
             goto mount_config_unflock;
         }
-        if (fchmod(mount_config_fd, SNCCLD_DEFAULT_MODE) != 0) {
-            snccld_log_error("Cannot chmod %s: %m", mount_config_filename);
+        if (snccld_ensure_mode(mount_config_filename, SNCCLD_DEFAULT_MODE) !=
+            ESPANK_SUCCESS) {
             close(mount_config_fd);
             goto mount_config_unflock;
         }
