@@ -1,0 +1,22 @@
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: ActiveCheck
+metadata:
+  name: "wait-for-topology"
+spec:
+  checkType: "k8sJob"
+  name: "wait-for-topology"
+  slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
+  suspend: true
+  runAfterCreation: true
+  k8sJobSpec:
+    jobContainer:
+      command:
+        - bash
+        - -c
+        - |
+{{ .Files.Get "scripts/wait-for-topology.sh" | indent 10 }}
+      image: {{ .Values.images.k8sJob | quote }}
+      volumeMounts:
+{{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
+      volumes:
+{{ toYaml .Values.jobContainer.volumes | indent 8 }}

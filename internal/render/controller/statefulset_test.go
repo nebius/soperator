@@ -270,3 +270,108 @@ func TestRenderStatefulSetWithMaintenance(t *testing.T) {
 		t.Errorf("Expected 0 replicas during maintenance, got %d", *result.Spec.Replicas)
 	}
 }
+
+func TestRenderStatefulSetHostUsers(t *testing.T) {
+	tests := []struct {
+		name              string
+		hostUsers         *bool
+		expectedHostUsers *bool
+	}{
+		{
+			name:              "hostUsers not set (nil)",
+			hostUsers:         nil,
+			expectedHostUsers: nil,
+		},
+		{
+			name:              "hostUsers set to false",
+			hostUsers:         ptr.To(false),
+			expectedHostUsers: ptr.To(false),
+		},
+		{
+			name:              "hostUsers set to true",
+			hostUsers:         ptr.To(true),
+			expectedHostUsers: ptr.To(true),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			controller := &values.SlurmController{
+				K8sNodeFilterName: "test-filter",
+				HostUsers:         tt.hostUsers,
+				StatefulSet: values.StatefulSet{
+					Name:           "test-controller-sts",
+					Replicas:       1,
+					MaxUnavailable: intstr.FromInt32(1),
+				},
+				Service: values.Service{
+					Name: "test-controller-svc",
+				},
+				ContainerSlurmctld: values.Container{
+					NodeContainer: slurmv1.NodeContainer{
+						Image:           "test-image:latest",
+						ImagePullPolicy: corev1.PullAlways,
+						Port:            6817,
+						AppArmorProfile: "unconfined",
+					},
+					Name: "slurmctld",
+				},
+				ContainerMunge: values.Container{
+					NodeContainer: slurmv1.NodeContainer{
+						Image:           "munge-image:latest",
+						ImagePullPolicy: corev1.PullAlways,
+						AppArmorProfile: "unconfined",
+					},
+				},
+				VolumeSpool: slurmv1.NodeVolume{
+					VolumeSourceName: ptr.To("test-volume"),
+				},
+				VolumeJail: slurmv1.NodeVolume{
+					VolumeSourceName: ptr.To("test-volume"),
+				},
+			}
+
+			nodeFilters := []slurmv1.K8sNodeFilter{
+				{
+					Name: "test-filter",
+				},
+			}
+
+			volumeSources := []slurmv1.VolumeSource{
+				{
+					Name: "test-volume",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+			}
+
+			result, err := RenderStatefulSet(
+				"test-namespace",
+				"test-cluster",
+				nodeFilters,
+				volumeSources,
+				controller,
+			)
+
+			if err != nil {
+				t.Fatalf("RenderStatefulSet() error = %v", err)
+			}
+
+			// Check HostUsers field in PodSpec
+			actualHostUsers := result.Spec.Template.Spec.HostUsers
+
+			if tt.expectedHostUsers == nil {
+				if actualHostUsers != nil {
+					t.Errorf("Expected HostUsers to be nil, got %v", *actualHostUsers)
+				}
+			} else {
+				if actualHostUsers == nil {
+					t.Errorf("Expected HostUsers to be %v, got nil", *tt.expectedHostUsers)
+				} else if *actualHostUsers != *tt.expectedHostUsers {
+					t.Errorf("Expected HostUsers to be %v, got %v", *tt.expectedHostUsers, *actualHostUsers)
+				}
+			}
+		})
+	}
+}

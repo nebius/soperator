@@ -1,0 +1,167 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: "run-extensive-check-on-reservations"
+  labels:
+    app.kubernetes.io/component: soperatorchecks
+    app.kubernetes.io/instance: soperator
+    app.kubernetes.io/managed-by: slurm-operator
+    app.kubernetes.io/name: slurmcluster
+    app.kubernetes.io/part-of: slurm-operator
+spec:
+  name: "run-extensive-check-on-reservations"
+  # This schedule defines how often the extensive-check is executed.
+  # If extensive-check is already running on a node, we don't stop it.
+  schedule: '*/10 * * * *' # every 10 minutes
+  suspend: false
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 16
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      completions: 1
+      parallelism: 1
+      template:
+        metadata:
+          annotations:
+            container.apparmor.security.beta.kubernetes.io/run-extensive-check-on-reservations: unconfined
+            container.apparmor.security.beta.kubernetes.io/munge: unconfined
+          labels:
+            app.kubernetes.io/component: soperatorchecks
+            app.kubernetes.io/instance: soperator
+            app.kubernetes.io/managed-by: slurm-operator
+            app.kubernetes.io/name: slurmcluster
+            app.kubernetes.io/part-of: slurm-operator
+        spec:
+          containers:
+          - name: run-extensive-check-on-reservations
+            image: {{ .Values.images.slurmJob | quote }}
+            imagePullPolicy: IfNotPresent
+            securityContext:
+              capabilities:
+                add:
+                - SYS_ADMIN
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            command:
+            - /bin/bash
+            - -c
+            - |
+{{ .Files.Get "scripts/run-extensive-check-on-reservations.sh" | nindent 14 }}
+            env:
+            - name: RESERVATION_PREFIX
+              value: {{ .Values.reservationPrefix | quote }}
+            - name: TARGET_ACTIVE_CHECK_NAME
+              value: extensive-check
+            volumeMounts:
+            - mountPath: /mnt/slurm-configs
+              name: slurm-configs
+              readOnly: true
+            - mountPath: /mnt/munge-key
+              name: munge-key
+              readOnly: true
+            - mountPath: /run/munge
+              name: munge-socket
+            - mountPath: /mnt/jail
+              name: jail
+          initContainers:
+          - image: {{ .Values.images.munge | quote }}
+            livenessProbe:
+              exec:
+                command:
+                - /bin/sh
+                - -c
+                - /usr/bin/munge -n > /dev/null && exit 0 || exit 1
+              failureThreshold: 3
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 1
+            name: munge
+            securityContext:
+              capabilities:
+                add:
+                - SYS_ADMIN
+            readinessProbe:
+              exec:
+                command:
+                - /bin/sh
+                - -c
+                - test -S /run/munge/munge.socket.2
+              failureThreshold: 3
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 1
+            restartPolicy: Always
+            volumeMounts:
+            - mountPath: /mnt/munge-key
+              name: munge-key
+              readOnly: true
+            - mountPath: /run/munge
+              name: munge-socket
+          dnsPolicy: ClusterFirst
+          restartPolicy: Never
+          serviceAccount: run-extensive-check-on-reservations
+          serviceAccountName: run-extensive-check-on-reservations
+          schedulerName: default-scheduler
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - name: jail
+            persistentVolumeClaim:
+              claimName: jail-pvc
+          - configMap:
+              defaultMode: 420
+              name: soperator-slurm-configs
+            name: slurm-configs
+          - name: munge-key
+            secret:
+              defaultMode: 272
+              items:
+              - key: munge.key
+                mode: 256
+                path: munge.key
+              secretName: soperator-munge
+          - emptyDir: {}
+            name: munge-socket
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: run-extensive-check-on-reservations
+  namespace: soperator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: run-extensive-check-on-reservations
+  namespace: soperator
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs
+  verbs:
+  - list
+  - get
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - get
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: run-extensive-check-on-reservations
+  namespace: soperator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: run-extensive-check-on-reservations
+subjects:
+- kind: ServiceAccount
+  name: run-extensive-check-on-reservations
+  namespace: soperator

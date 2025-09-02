@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "nfs-server.fullname" . }}-configmap-test"
+  labels:
+    {{- include "nfs-server.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "2"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: configmap-test
+      image: alpine:3.18
+      command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Testing ConfigMap exports configuration..."
+
+          # Check if ConfigMap exists and is accessible
+          echo "Checking if exports ConfigMap is mounted..."
+          if [ ! -f /etc/exports ]; then
+            echo "ERROR: /etc/exports file not found!"
+            exit 1
+          fi
+
+          echo "ConfigMap exports file content:"
+          cat /etc/exports
+
+          # Validate exports file format
+          echo "Validating exports file format..."
+
+          # Check that it contains the shared directory
+          if ! grep -q "{{ .Values.nfs.sharedDirectory }}" /etc/exports; then
+            echo "ERROR: Shared directory {{ .Values.nfs.sharedDirectory }} not found in exports!"
+            exit 1
+          fi
+
+          # Check that it contains at least one permitted network
+          {{- range .Values.nfs.permitted }}
+          if ! grep -q "{{ . }}" /etc/exports; then
+            echo "ERROR: Permitted network {{ . }} not found in exports!"
+            exit 1
+          fi
+          echo "✓ Found permitted network: {{ . }}"
+          {{- end }}
+
+          # Check that it contains the expected share options
+          if ! grep -q "{{ .Values.nfs.shareOptions }}" /etc/exports; then
+            echo "ERROR: Share options not found in exports!"
+            exit 1
+          fi
+          echo "✓ Share options validated"
+
+          # Count the number of export lines (excluding comments)
+          EXPORT_LINES=$(grep -v '^#' /etc/exports | grep -v '^$' | wc -l)
+          EXPECTED_LINES={{ len .Values.nfs.permitted }}
+
+          if [ "$EXPORT_LINES" -ne "$EXPECTED_LINES" ]; then
+            echo "ERROR: Expected $EXPECTED_LINES export lines, found $EXPORT_LINES"
+            exit 1
+          fi
+          echo "✓ Found expected number of export lines: $EXPORT_LINES"
+
+          # Validate that each line has the correct format
+          echo "Validating export line formats..."
+          while IFS= read -r line; do
+            if [[ -n "$line" && ! "$line" =~ ^# ]]; then
+              if ! echo "$line" | grep -E "^{{ .Values.nfs.sharedDirectory }} .+\(.+\)$" > /dev/null; then
+                echo "ERROR: Invalid export line format: $line"
+                exit 1
+              fi
+              echo "✓ Valid export line: $line"
+            fi
+          done < /etc/exports
+
+          echo "ConfigMap exports validation completed successfully!"
+      volumeMounts:
+        - name: exports-config
+          mountPath: /etc/exports
+          subPath: exports
+          readOnly: true
+  volumes:
+    - name: exports-config
+      configMap:
+        name: {{ include "nfs-server.exportsConfigMapName" . }}

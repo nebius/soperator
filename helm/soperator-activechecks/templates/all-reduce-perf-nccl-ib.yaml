@@ -5,6 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "all-reduce-perf-nccl-ib"
+  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 10 * * *" # Once a day at 10:00 UTC
   suspend: false
@@ -24,5 +25,5 @@ spec:
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
   reactions:
-    setCondition: true
-    drainSlurmNode: true
+    addReservation:
+      prefix: {{ .Values.reservationPrefix | quote }}
