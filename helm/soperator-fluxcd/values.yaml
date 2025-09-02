@@ -166,6 +166,10 @@ observability:
               requests:
                 storage: 30Gi
           resources: {}
+      prometheusNodeExporter:
+        enabled: true
+        spec:
+          extraArgs: null
     overrideValues: null
   vmLogs:
     enabled: true
