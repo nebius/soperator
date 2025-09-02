@@ -20,7 +20,7 @@ FROM cuda AS jail
 
 ARG SLURM_VERSION=24.11.6
 ARG GDRCOPY_VERSION=2.5
-ARG NC_HEALTH_CHECKER=1.0.0-146.250808
+ARG NC_HEALTH_CHECKER=1.0.0-150.250826
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -79,6 +79,7 @@ RUN apt update && \
         bsdmainutils \
         kmod \
         tmux \
+        time \
         aptitude && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
