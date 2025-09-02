@@ -5,6 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "ib-write-bw-cpu"
+  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 13 * * *" # 1 time a day at 13:00 UTC
   suspend: false

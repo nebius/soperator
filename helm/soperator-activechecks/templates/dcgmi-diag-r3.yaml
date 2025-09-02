@@ -5,9 +5,10 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "dcgmi-diag-r3"
+  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   suspend: true
-  runAfterCreation: true
+  runAfterCreation: false
   slurmJobSpec:
     sbatchScript: |
 {{ .Files.Get "scripts/dcgmi-diag-r3.sh" | indent 6 }}
@@ -23,5 +24,5 @@ spec:
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
   reactions:
-    setCondition: true
-    drainSlurmNode: true
+    addReservation:
+      prefix: {{ .Values.reservationPrefix | quote }}

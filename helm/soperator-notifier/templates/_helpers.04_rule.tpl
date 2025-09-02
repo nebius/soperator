@@ -32,6 +32,7 @@ namespace: {{ .context.Release.Namespace | quote }}
 {{ include "son.config.label.job.state" . }}: {{ include "son.wrapTemplate" "$labels.job_state" | quote }}
 {{ include "son.config.label.job.stateReason" . }}: {{ include "son.wrapTemplate" "$labels.job_state_reason" | quote }}
 {{ include "son.config.label.job.user" . }}: {{ include "son.wrapTemplate" "$labels.user_name" | quote }}
+{{ include "son.config.label.job.user_mail" . }}: {{ include "son.wrapTemplate" "$labels.user_mail" | quote }}
 {{ include "son.config.label.alertKey" . }}: {{ printf "job_%s_%s" (include "son.wrapTemplate" "$labels.job_id") (include "son.wrapTemplate" "$labels.job_state") | quote }}
 {{- end }}
 
@@ -54,3 +55,7 @@ job_state=~"{{ include "son.config.jobStatus.completed" . }}"
 {{- define "son.rule.jobSelector.system" -}}
 user_name!~"^(nebius|soperatorchecks)$"
 {{- end }}
+
+{{- define "son.rule.jobSelector.require_user_mail" -}}
+user_mail!=""
+{{- end}}

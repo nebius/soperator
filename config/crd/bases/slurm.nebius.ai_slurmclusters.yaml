@@ -1291,6 +1291,10 @@ spec:
                     description: AppArmorProfile defines the AppArmor profile for
                       the Slurm node
                     type: string
+                  hostUsers:
+                    description: HostUsers controls if the pod containers can use
+                      the host user namespace
+                    type: boolean
                   image:
                     description: Image defines the populate jail container image
                     type: string
@@ -1589,6 +1593,10 @@ spec:
                     required:
                     - image
                     type: object
+                  hostUsers:
+                    description: HostUsers controls if the pod containers can use
+                      the host user namespace
+                    type: boolean
                   node:
                     description: SlurmNode represents the common configuration for
                       a Slurm node.
@@ -3038,6 +3046,10 @@ spec:
                           - name
                           type: object
                         type: array
+                      hostUsers:
+                        description: HostUsers controls if the pod containers can
+                          use the host user namespace
+                        type: boolean
                       k8sNodeFilterName:
                         description: |-
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
@@ -4684,6 +4696,10 @@ spec:
                               in the secret
                             type: string
                         type: object
+                      hostUsers:
+                        description: HostUsers controls if the pod containers can
+                          use the host user namespace
+                        type: boolean
                       k8sNodeFilterName:
                         description: |-
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
@@ -6842,6 +6858,10 @@ spec:
                           - name
                           type: object
                         type: array
+                      hostUsers:
+                        description: HostUsers controls if the pod containers can
+                          use the host user namespace
+                        type: boolean
                       k8sNodeFilterName:
                         description: |-
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
@@ -9218,6 +9238,10 @@ spec:
                         required:
                         - image
                         type: object
+                      hostUsers:
+                        description: HostUsers controls if the pod containers can
+                          use the host user namespace
+                        type: boolean
                       k8sNodeFilterName:
                         description: |-
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
@@ -11153,6 +11177,10 @@ spec:
                           - name
                           type: object
                         type: array
+                      hostUsers:
+                        description: HostUsers controls if the pod containers can
+                          use the host user namespace
+                        type: boolean
                       k8sNodeFilterName:
                         description: |-
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
@@ -13465,6 +13493,10 @@ spec:
                         default: false
                         description: Enabled defines whether the SlurmRest is enabled
                         type: boolean
+                      hostUsers:
+                        description: HostUsers controls if the pod containers can
+                          use the host user namespace
+                        type: boolean
                       k8sNodeFilterName:
                         description: |-
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
@@ -15012,6 +15044,11 @@ spec:
                         description: |-
                           EnableGDRCopy driver propagation into containers (this feature must also be enabled in NVIDIA GPU operator)
                           https://developer.nvidia.com/gdrcopy
+                        type: boolean
+                      hostUsers:
+                        default: false
+                        description: HostUsers controls if the pod containers can
+                          use the host user namespace
                         type: boolean
                       k8sNodeFilterName:
                         description: |-

@@ -59,6 +59,7 @@ func RenderPopulateJailJob(
 					},
 				},
 				Spec: corev1.PodSpec{
+					HostUsers:         populateJail.HostUsers,
 					Affinity:          nodeFilter.Affinity,
 					NodeSelector:      nodeFilter.NodeSelector,
 					Tolerations:       nodeFilter.Tolerations,

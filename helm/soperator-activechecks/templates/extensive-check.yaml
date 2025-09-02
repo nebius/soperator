@@ -1,0 +1,39 @@
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: ActiveCheck
+metadata:
+  name: "extensive-check"
+spec:
+  name: "extensive-check"
+  checkType: "slurmJob"
+  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
+  slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
+  # extensive-check is suspended and its schedule is not used.
+  # It is being scheduled using `cronjob/run-extensive-check-on-reservations`
+  suspend: true
+  runAfterCreation: false
+  schedule: "0 0 1 1 *"
+  # *JobsHistoryLimit this sould equal the number of worker nodes in the cluster
+  successfulJobsHistoryLimit: 3000
+  failedJobsHistoryLimit: 3000
+  successReactions:
+    removeReservation:
+      prefix: {{ .Values.reservationPrefix | quote }}
+  # No failure reactions for now until we implement a meaningful extensive check
+  # failureReactions:
+  #   setHardwareIssuesSuspected: true
+  slurmJobSpec:
+    sbatchScript: |
+{{ .Files.Get "scripts/extensive-check.sh" | indent 6 }}
+    jobContainer:
+      image: {{ .Values.images.slurmJob | quote }}
+      env:
+        - name: ACTIVE_CHECKS_IMAGE
+          value: {{ .Values.activeCheckImage | quote }}
+{{ toYaml .Values.jobContainer.env | indent 8 }}
+      volumeMounts:
+{{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
+      volumes:
+{{ toYaml .Values.jobContainer.volumes | indent 8 }}
+    mungeContainer:
+      image: {{ .Values.images.munge | quote }}
+

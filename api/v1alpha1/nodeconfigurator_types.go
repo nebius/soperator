@@ -103,6 +103,11 @@ type PodConfig struct {
 	//
 	// +kubebuilder:validation:Optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+
+	// HostUsers controls if the pod containers can use the host user namespace
+	//
+	// +kubebuilder:validation:Optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
 }
 
 type Rebooter struct {
