@@ -31,5 +31,5 @@ createUser:
 upgradeCuda:
   cudaVersion: "12.4.1-1"
 upgradeHealthChecker:
-  healthCheckerVersion: "1.0.0-147.250819"
+  healthCheckerVersion: "1.0.0-150.250826"
 reservationPrefix: soperatorchecks.suspicious
