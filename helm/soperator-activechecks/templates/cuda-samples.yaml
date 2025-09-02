@@ -13,7 +13,7 @@ spec:
   slurmJobSpec:
     sbatchScript: |
 {{ tpl (.Files.Get "scripts/cuda-samples.sh") . | indent 6 }}
-    eachWorkerJobArray: true
+    eachWorkerJobs: true
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:

@@ -13,7 +13,7 @@ spec:
   slurmJobSpec:
     sbatchScript: |
 {{ .Files.Get "scripts/ib-write-bw-cpu.sh" | indent 6 }}
-    eachWorkerJobArray: true
+    eachWorkerJobs: true
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:
