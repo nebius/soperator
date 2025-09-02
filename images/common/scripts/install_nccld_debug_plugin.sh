@@ -24,4 +24,6 @@ gcc \
   -o /usr/lib/"${ALT_ARCH}"-linux-gnu/slurm/spanknccldebug.so \
   ${SNCCLD_SRC_DIR}/*.c
 
+mkdir -p /usr/lib/slurm
+ls -la /usr/lib/slurm/spank*
 ln -sf /usr/lib/"${ALT_ARCH}"-linux-gnu/slurm/spanknccldebug.so /usr/lib/slurm/spanknccldebug.so
