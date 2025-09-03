@@ -263,9 +263,8 @@ spec:
         enabled: false
       prometheus-node-exporter:
         enabled: {{ .Values.observability.vmStack.values.prometheusNodeExporter.enabled }}
-        spec:
-          extraArgs:
-            {{- toYaml .Values.observability.vmStack.values.prometheusNodeExporter.spec.extraArgs | nindent 12 }}
+        extraArgs:
+          {{- toYaml .Values.observability.vmStack.values.prometheusNodeExporter.spec.extraArgs | nindent 12 }}
       victoria-metrics-operator:
         admissionWebhooks:
           enable: true

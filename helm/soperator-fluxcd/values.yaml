@@ -168,8 +168,7 @@ observability:
           resources: {}
       prometheusNodeExporter:
         enabled: true
-        spec:
-          extraArgs: null
+        extraArgs: null
     overrideValues: null
   vmLogs:
     enabled: true
