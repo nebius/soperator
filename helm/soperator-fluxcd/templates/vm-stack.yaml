@@ -262,10 +262,9 @@ spec:
       coreDns:
         enabled: false
       prometheus-node-exporter:
-        enabled: true
+        enabled: {{ .Values.observability.vmStack.values.prometheusNodeExporter.enabled }}
         extraArgs:
-          - '--collector.ethtool.device-exclude=ibp.*'
-          - '--no-collector.infiniband'
+          {{- toYaml .Values.observability.vmStack.values.prometheusNodeExporter.extraArgs | nindent 10 }}
       victoria-metrics-operator:
         admissionWebhooks:
           enable: true
