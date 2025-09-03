@@ -20,7 +20,6 @@ FROM cuda AS jail
 
 ARG SLURM_VERSION=25.05.2
 ARG GDRCOPY_VERSION=2.5
-ARG NC_HEALTH_CHECKER=1.0.0-150.250826
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -81,12 +80,6 @@ RUN apt update && \
         tmux \
         time \
         aptitude && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install Nebius health-check library
-RUN apt-get update && \
-    apt-get install -y nc-health-checker=${NC_HEALTH_CHECKER} && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -228,6 +221,15 @@ RUN chmod +x /etc/update-motd.d/*
 
 # Save the initial jail version to a file
 COPY VERSION /etc/soperator-jail-version
+
+# Moved down to reduce build time
+ARG NC_HEALTH_CHECKER=1.0.0-150.250826
+
+# Install Nebius health-check library
+RUN apt-get update && \
+    apt-get install -y nc-health-checker=${NC_HEALTH_CHECKER} && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Update linker cache
 RUN ldconfig
