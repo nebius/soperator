@@ -17,41 +17,25 @@
 #include <slurm/spank.h>
 
 spank_err_t snccld_mkdir_p(const char *path, const bool as_user) {
-    char  tmp[PATH_MAX + 1] = "";
-    char *p                 = NULL;
-
     if (!path || *path == '\0') {
-        return ESPANK_ERROR;
+        return ESPANK_SUCCESS;
     }
 
+    char tmp[PATH_MAX + 1] = "";
     snprintf(tmp, sizeof(tmp), "%s", path);
+
     const size_t len = strlen(tmp);
-    if (tmp[len - 1] == '/') {
+    if (len > 0 && tmp[len - 1] == '/') {
         tmp[len - 1] = '\0';
     }
 
-    for (p = tmp + 1; *p; p++) {
-        if (*p == '/') {
-            *p = '\0';
-
-            const int ret = mkdir(tmp, SNCCLD_DEFAULT_MODE);
-            if (ret != 0) {
-                if (errno != EEXIST) {
-                    snccld_log_error("Cannot mkdir %s: %m", tmp);
-                    return ESPANK_ERROR;
-                }
-
-                // Directory already exists, skipping.
-                *p = '/';
-                continue;
-            }
-
-            if (!as_user && snccld_ensure_mode(tmp, SNCCLD_DEFAULT_MODE) !=
-                                ESPANK_SUCCESS) {
-                return ESPANK_ERROR;
-            }
-
-            *p = '/';
+    char *slash = strrchr(tmp, '/');
+    if (slash) {
+        *slash                = '\0';
+        const spank_err_t ret = snccld_mkdir_p(tmp, as_user);
+        *slash                = '/';
+        if (ret != ESPANK_SUCCESS) {
+            return ret;
         }
     }
 
@@ -61,7 +45,6 @@ spank_err_t snccld_mkdir_p(const char *path, const bool as_user) {
             snccld_log_error("Cannot mkdir %s: %m", tmp);
             return ESPANK_ERROR;
         }
-        // Directory already exists.
     }
 
     if (!as_user &&
