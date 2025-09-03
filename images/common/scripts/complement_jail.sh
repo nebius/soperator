@@ -131,11 +131,7 @@ pushd "${jaildir}"
     mount --bind "/${SLURM_LIB_PATH}/spank_pyxis.so" "usr/lib/slurm/spank_pyxis.so"
 
     echo 'Creating Soperator output directory'
-    ( \
-      umask 000 ; \
-      mkdir -p opt/soperator-outputs ; \
-      chmod 777 opt/soperator-outputs ; \
-    )
+    mkdir -m 777 -p opt/soperator-outputs
 
     if [ -n "$worker" ]; then
         echo "Bind-mount slurmd spool directory from the host because it should be propagated to the jail"
