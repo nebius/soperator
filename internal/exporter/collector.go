@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"maps"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -20,12 +21,14 @@ import (
 type MetricsCollector struct {
 	slurmAPIClient slurmapi.Client
 
-	nodeInfo       *prometheus.Desc
-	jobInfo        *prometheus.Desc
-	jobNode        *prometheus.Desc
-	jobDuration    *prometheus.Desc
-	nodeGPUSeconds *prometheus.CounterVec
-	nodeFails      *prometheus.CounterVec
+	nodeInfo                   *prometheus.Desc
+	jobInfo                    *prometheus.Desc
+	jobNode                    *prometheus.Desc
+	jobDuration                *prometheus.Desc
+	nodeGPUSeconds             *prometheus.CounterVec
+	nodeFails                  *prometheus.CounterVec
+	nodeUnavailabilityDuration *prometheus.Desc
+	nodeDrainingDuration       *prometheus.Desc
 
 	rpcCallsTotal               *prometheus.Desc
 	rpcDurationSecondsTotal     *prometheus.Desc
@@ -58,6 +61,8 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 			Name: "slurm_node_fails_total",
 			Help: "Total number of times a node has failed (went from not down/drain to down/drain state)",
 		}, []string{"node_name", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "reason"}),
+		nodeUnavailabilityDuration: prometheus.NewDesc("slurm_node_unavailability_duration_seconds", "Duration of the most recent completed unavailability for a node", []string{"node_name"}, nil),
+		nodeDrainingDuration:       prometheus.NewDesc("slurm_node_draining_duration_seconds", "Duration of the most recent completed draining for a node", []string{"node_name"}, nil),
 
 		rpcCallsTotal:               prometheus.NewDesc("slurm_controller_rpc_calls_total", "Total count of RPC calls by message type", []string{"message_type"}, nil),
 		rpcDurationSecondsTotal:     prometheus.NewDesc("slurm_controller_rpc_duration_seconds_total", "Total time spent processing RPCs by message type", []string{"message_type"}, nil),
@@ -69,6 +74,28 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 	collector.state.Store(newMetricsCollectorState())
 
 	return collector
+}
+
+// isNodeUnavailable checks if a node is in unavailable state
+// Unavailable state: DOWN+* or IDLE+DRAIN+*
+func isNodeUnavailable(node slurmapi.Node) bool {
+	if node.IsDownState() {
+		return true
+	}
+	if node.BaseState() == api.V0041NodeStateIDLE && node.IsDrainState() {
+		return true
+	}
+	return false
+}
+
+// isNodeDraining checks if a node is in draining state
+// Draining state: DRAIN+ALLOC+* or DRAIN+MIXED+*
+func isNodeDraining(node slurmapi.Node) bool {
+	if !node.IsDrainState() {
+		return false
+	}
+	baseState := node.BaseState()
+	return baseState == api.V0041NodeStateALLOCATED || baseState == api.V0041NodeStateMIXED
 }
 
 func (c *MetricsCollector) updateGPUSecondsMetrics(ctx context.Context, nodes []slurmapi.Node, previousTime time.Time, currentTime time.Time) time.Time {
@@ -92,6 +119,38 @@ func (c *MetricsCollector) updateGPUSecondsMetrics(ctx context.Context, nodes []
 	}
 
 	return currentTime
+}
+
+func (c *MetricsCollector) updateNodeStateMetrics(currentNodes []slurmapi.Node, previousState *metricsCollectorState, newState *metricsCollectorState, currentTime time.Time) {
+	previousNodesMap := make(map[string]slurmapi.Node)
+	if previousState != nil {
+		for _, node := range previousState.nodes {
+			previousNodesMap[node.Name] = node
+		}
+	}
+
+	for _, node := range currentNodes {
+		previousNode, existed := previousNodesMap[node.Name]
+
+		// Nested helper to process state transitions
+		processTransition := func(stateChecker func(slurmapi.Node) bool, startTimes map[string]time.Time, metrics map[string]float64) {
+			current := stateChecker(node)
+			previous := existed && stateChecker(previousNode)
+
+			if current && !previous {
+				startTimes[node.Name] = currentTime
+			} else if !current && previous {
+				if startTime, ok := startTimes[node.Name]; ok {
+					duration := currentTime.Sub(startTime).Seconds()
+					metrics[node.Name] = duration
+					delete(startTimes, node.Name)
+				}
+			}
+		}
+
+		processTransition(isNodeUnavailable, newState.nodeUnavailabilityStartTimes, newState.nodeUnavailabilityMetrics)
+		processTransition(isNodeDraining, newState.nodeDrainingStartTimes, newState.nodeDrainingMetrics)
+	}
 }
 
 func (c *MetricsCollector) updateNodeFailureMetrics(currentNodes []slurmapi.Node, previousNodes []slurmapi.Node) {
@@ -130,6 +189,8 @@ func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.jobDuration
 	c.nodeGPUSeconds.Describe(ch)
 	c.nodeFails.Describe(ch)
+	ch <- c.nodeUnavailabilityDuration
+	ch <- c.nodeDrainingDuration
 
 	ch <- c.rpcCallsTotal
 	ch <- c.rpcDurationSecondsTotal
@@ -153,9 +214,11 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 		previousState = newMetricsCollectorState()
 	}
 
-	newState := &metricsCollectorState{
-		lastGPUSecondsUpdate: previousState.lastGPUSecondsUpdate,
-	}
+	newState := newMetricsCollectorState()
+	// Copy timestamps for the case we fail to get nodes/jobs, then they will be stored in new state.
+	newState.lastGPUSecondsUpdate = previousState.lastGPUSecondsUpdate
+	maps.Copy(newState.nodeUnavailabilityStartTimes, previousState.nodeUnavailabilityStartTimes)
+	maps.Copy(newState.nodeDrainingStartTimes, previousState.nodeDrainingStartTimes)
 
 	// Always update state with whatever data we successfully collect (even if partial)
 	defer func() {
@@ -169,6 +232,7 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 	newState.nodes = nodes
 
 	c.updateNodeFailureMetrics(nodes, previousState.nodes)
+	c.updateNodeStateMetrics(nodes, previousState, newState, time.Now())
 	newState.lastGPUSecondsUpdate = c.updateGPUSecondsMetrics(ctx, nodes, previousState.lastGPUSecondsUpdate, time.Now())
 
 	jobs, err := c.slurmAPIClient.ListJobs(ctx)
@@ -222,6 +286,14 @@ func (c *MetricsCollector) collectImpl(ch chan<- prometheus.Metric) {
 	c.nodeGPUSeconds.Collect(ch)
 	c.nodeFails.Collect(ch)
 
+	for nodeName, duration := range state.nodeUnavailabilityMetrics {
+		ch <- prometheus.MustNewConstMetric(c.nodeUnavailabilityDuration, prometheus.GaugeValue, duration, nodeName)
+	}
+
+	for nodeName, duration := range state.nodeDrainingMetrics {
+		ch <- prometheus.MustNewConstMetric(c.nodeDrainingDuration, prometheus.GaugeValue, duration, nodeName)
+	}
+
 	for slurmJobMetric := range c.slurmJobMetrics(ctx, state.jobs) {
 		ch <- slurmJobMetric
 	}
@@ -243,7 +315,9 @@ func (c *MetricsCollector) slurmNodeMetrics(slurmNodes []slurmapi.Node) iter.Seq
 				strconv.FormatBool(node.IsReservedState()),
 				node.Address,
 			}
-			yield(prometheus.MustNewConstMetric(c.nodeInfo, prometheus.GaugeValue, 1, labels...))
+			if !yield(prometheus.MustNewConstMetric(c.nodeInfo, prometheus.GaugeValue, 1, labels...)) {
+				return
+			}
 		}
 	}
 }
@@ -280,7 +354,9 @@ func (c *MetricsCollector) slurmJobMetrics(ctx context.Context, slurmJobs []slur
 				timeToUnixString(job.EndTime),
 				finishedTime,
 			}
-			yield(prometheus.MustNewConstMetric(c.jobInfo, prometheus.GaugeValue, 1, jobLabels...))
+			if !yield(prometheus.MustNewConstMetric(c.jobInfo, prometheus.GaugeValue, 1, jobLabels...)) {
+				return
+			}
 
 			// Calculate job duration
 			if job.StartTime != nil && job.StartTime.Unix() != 0 {
@@ -294,7 +370,9 @@ func (c *MetricsCollector) slurmJobMetrics(ctx context.Context, slurmJobs []slur
 				if !endTime.IsZero() {
 					duration := endTime.Sub(job.StartTime.Time).Seconds()
 					if duration > 0 {
-						yield(prometheus.MustNewConstMetric(c.jobDuration, prometheus.GaugeValue, duration, job.GetIDString()))
+						if !yield(prometheus.MustNewConstMetric(c.jobDuration, prometheus.GaugeValue, duration, job.GetIDString())) {
+							return
+						}
 					}
 				}
 			}
@@ -306,7 +384,9 @@ func (c *MetricsCollector) slurmJobMetrics(ctx context.Context, slurmJobs []slur
 			}
 			for _, nodeName := range nodeList {
 				jobNodeLabels := []string{job.GetIDString(), nodeName}
-				yield(prometheus.MustNewConstMetric(c.jobNode, prometheus.GaugeValue, 1, jobNodeLabels...))
+				if !yield(prometheus.MustNewConstMetric(c.jobNode, prometheus.GaugeValue, 1, jobNodeLabels...)) {
+					return
+				}
 			}
 		}
 	}
@@ -321,19 +401,25 @@ func (c *MetricsCollector) slurmRPCMetrics(diag *api.V0041OpenapiDiagResp) iter.
 		stats := diag.Statistics
 
 		if stats.ServerThreadCount != nil {
-			yield(prometheus.MustNewConstMetric(c.controllerServerThreadCount, prometheus.GaugeValue, float64(*stats.ServerThreadCount)))
+			if !yield(prometheus.MustNewConstMetric(c.controllerServerThreadCount, prometheus.GaugeValue, float64(*stats.ServerThreadCount))) {
+				return
+			}
 		}
 		if stats.RpcsByMessageType != nil {
 			for _, rpc := range *stats.RpcsByMessageType {
 				messageType := rpc.MessageType
 
 				if rpc.Count > 0 {
-					yield(prometheus.MustNewConstMetric(c.rpcCallsTotal, prometheus.CounterValue, float64(rpc.Count), messageType))
+					if !yield(prometheus.MustNewConstMetric(c.rpcCallsTotal, prometheus.CounterValue, float64(rpc.Count), messageType)) {
+						return
+					}
 				}
 
 				if rpc.TotalTime > 0 {
 					durationSeconds := float64(rpc.TotalTime) / 1_000_000
-					yield(prometheus.MustNewConstMetric(c.rpcDurationSecondsTotal, prometheus.CounterValue, durationSeconds, messageType))
+					if !yield(prometheus.MustNewConstMetric(c.rpcDurationSecondsTotal, prometheus.CounterValue, durationSeconds, messageType)) {
+						return
+					}
 				}
 			}
 		}
@@ -344,12 +430,16 @@ func (c *MetricsCollector) slurmRPCMetrics(diag *api.V0041OpenapiDiagResp) iter.
 				userID := strconv.Itoa(int(userRpc.UserId))
 
 				if userRpc.Count > 0 {
-					yield(prometheus.MustNewConstMetric(c.rpcUserCallsTotal, prometheus.CounterValue, float64(userRpc.Count), user, userID))
+					if !yield(prometheus.MustNewConstMetric(c.rpcUserCallsTotal, prometheus.CounterValue, float64(userRpc.Count), user, userID)) {
+						return
+					}
 				}
 
 				if userRpc.TotalTime > 0 {
 					durationSeconds := float64(userRpc.TotalTime) / 1_000_000
-					yield(prometheus.MustNewConstMetric(c.rpcUserDurationSecondsTotal, prometheus.CounterValue, durationSeconds, user, userID))
+					if !yield(prometheus.MustNewConstMetric(c.rpcUserDurationSecondsTotal, prometheus.CounterValue, durationSeconds, user, userID)) {
+						return
+					}
 				}
 			}
 		}
