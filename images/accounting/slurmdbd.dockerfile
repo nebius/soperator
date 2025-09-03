@@ -54,8 +54,6 @@ RUN mkdir -p /usr/lib/slurm && \
     for dir in /usr/lib/*-linux-gnu/slurm; do \
       [ -d "$dir" ] && ln -sf $dir/* /usr/lib/slurm/ 2>/dev/null || true; \
     done
-
-
 # Update linker cache
 RUN ldconfig
 
