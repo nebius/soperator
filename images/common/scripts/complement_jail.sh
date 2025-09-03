@@ -98,9 +98,9 @@ pushd "${jaildir}"
     touch usr/lib/slurm/chroot.so
     mount --bind "/${SLURM_LIB_PATH}/chroot.so" "usr/lib/slurm/chroot.so"
 
-     echo "Bind-mount NCCL debug SPANK plugin from container to the jail"
-     touch usr/lib/slurm/spanknccldebug.so
-     mount --bind "/${SLURM_LIB_PATH}/spanknccldebug.so" "usr/lib/slurm/spanknccldebug.so"
+    echo "Bind-mount NCCL debug SPANK plugin from container to the jail"
+    touch usr/lib/slurm/spanknccldebug.so
+    mount --bind "/${SLURM_LIB_PATH}/spanknccldebug.so" "usr/lib/slurm/spanknccldebug.so"
 
     echo "Bind-mount /etc/enroot, /usr/share/enroot and /usr/lib/enroot"
     mkdir -p etc/enroot usr/share/enroot usr/lib/enroot
