@@ -305,7 +305,6 @@ notifier:
       webhookUrl: null
   overrideValues: null
 csiDriverNfs:
-  enabled: true
   interval: 5m
   timeout: 5m
   version: 4.11.0
