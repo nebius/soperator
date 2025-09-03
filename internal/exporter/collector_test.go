@@ -854,6 +854,9 @@ func toPrometheusLikeString(t *testing.T, metric prometheus.Metric) string {
 	case pb.GetCounter() != nil:
 		metricType = "COUNTER"
 		value = pb.GetCounter().GetValue()
+	case pb.GetHistogram() != nil:
+		metricType = "HISTOGRAM"
+		value = float64(pb.GetHistogram().GetSampleCount())
 	default:
 		t.Fatalf("metric %q has unexpected type", metricName)
 	}
@@ -1034,7 +1037,6 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 
 			// Check state after recovery
 			state := collector.state.Load()
-			t.Logf("Unavailability metrics after recovery: %v", state.nodeUnavailabilityMetrics)
 			t.Logf("Current unavailability start times: %v", state.nodeUnavailabilityStartTimes)
 
 			// Collect metrics
@@ -1057,10 +1059,11 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 				if strings.Contains(metricText, "slurm_node_unavailability_duration_seconds") {
 					found = true
 					assert.Contains(t, metricText, "node_name=\"node1\"")
-					// Should have a duration > 0
+					// Should have at least 1 observation with total sum > 0
 					dto := &dto.Metric{}
 					_ = metric.Write(dto)
-					assert.Greater(t, dto.Gauge.GetValue(), 0.0)
+					assert.Greater(t, float64(dto.Histogram.GetSampleCount()), 0.0)
+					assert.Greater(t, dto.Histogram.GetSampleSum(), 0.0)
 					break
 				}
 			}
@@ -1151,10 +1154,11 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 				if strings.Contains(metricText, "slurm_node_draining_duration_seconds") {
 					found = true
 					assert.Contains(t, metricText, "node_name=\"node1\"")
-					// Should have a duration > 0
+					// Should have at least 1 observation with total sum > 0
 					dto := &dto.Metric{}
 					_ = metric.Write(dto)
-					assert.Greater(t, dto.Gauge.GetValue(), 0.0)
+					assert.Greater(t, float64(dto.Histogram.GetSampleCount()), 0.0)
+					assert.Greater(t, dto.Histogram.GetSampleSum(), 0.0)
 					break
 				}
 			}
@@ -1197,9 +1201,9 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 				},
 			}
 
-			mockClient.EXPECT().ListNodes(mock.Anything).Return(idleDrainNodes, nil)
-			mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil)
-			mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil)
+			mockClient.EXPECT().ListNodes(mock.Anything).Return(idleDrainNodes, nil).Once()
+			mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+			mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
 
 			err := collector.updateState(context.Background())
 			assert.NoError(t, err)

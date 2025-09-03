@@ -27,8 +27,8 @@ type MetricsCollector struct {
 	jobDuration                *prometheus.Desc
 	nodeGPUSeconds             *prometheus.CounterVec
 	nodeFails                  *prometheus.CounterVec
-	nodeUnavailabilityDuration *prometheus.Desc
-	nodeDrainingDuration       *prometheus.Desc
+	nodeUnavailabilityDuration *prometheus.HistogramVec
+	nodeDrainingDuration       *prometheus.HistogramVec
 
 	rpcCallsTotal               *prometheus.Desc
 	rpcDurationSecondsTotal     *prometheus.Desc
@@ -41,6 +41,26 @@ type MetricsCollector struct {
 
 	// Monitoring contains self-monitoring metrics
 	Monitoring *MonitoringMetrics
+}
+
+// durationBuckets defines histogram buckets for duration metrics ranging from 30 seconds to 30 days
+var durationBuckets = []float64{
+	30 * time.Second.Seconds(),
+	1 * time.Minute.Seconds(),
+	5 * time.Minute.Seconds(),
+	10 * time.Minute.Seconds(),
+	30 * time.Minute.Seconds(),
+	1 * time.Hour.Seconds(),
+	2 * time.Hour.Seconds(),
+	4 * time.Hour.Seconds(),
+	8 * time.Hour.Seconds(),
+	12 * time.Hour.Seconds(),
+	24 * time.Hour.Seconds(),
+	2 * 24 * time.Hour.Seconds(),
+	3 * 24 * time.Hour.Seconds(),
+	7 * 24 * time.Hour.Seconds(),
+	14 * 24 * time.Hour.Seconds(),
+	30 * 24 * time.Hour.Seconds(),
 }
 
 // NewMetricsCollector creates a new MetricsCollector
@@ -61,8 +81,16 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 			Name: "slurm_node_fails_total",
 			Help: "Total number of times a node has failed (went from not down/drain to down/drain state)",
 		}, []string{"node_name", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "reason"}),
-		nodeUnavailabilityDuration: prometheus.NewDesc("slurm_node_unavailability_duration_seconds", "Duration of the most recent completed unavailability for a node", []string{"node_name"}, nil),
-		nodeDrainingDuration:       prometheus.NewDesc("slurm_node_draining_duration_seconds", "Duration of the most recent completed draining for a node", []string{"node_name"}, nil),
+		nodeUnavailabilityDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "slurm_node_unavailability_duration_seconds",
+			Help:    "Duration of completed node unavailability events (DOWN+* or IDLE+DRAIN+*)",
+			Buckets: durationBuckets,
+		}, []string{"node_name"}),
+		nodeDrainingDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "slurm_node_draining_duration_seconds",
+			Help:    "Duration of completed node draining events (DRAIN+ALLOCATED or DRAIN+MIXED)",
+			Buckets: durationBuckets,
+		}, []string{"node_name"}),
 
 		rpcCallsTotal:               prometheus.NewDesc("slurm_controller_rpc_calls_total", "Total count of RPC calls by message type", []string{"message_type"}, nil),
 		rpcDurationSecondsTotal:     prometheus.NewDesc("slurm_controller_rpc_duration_seconds_total", "Total time spent processing RPCs by message type", []string{"message_type"}, nil),
@@ -133,7 +161,7 @@ func (c *MetricsCollector) updateNodeStateMetrics(currentNodes []slurmapi.Node, 
 		previousNode, existed := previousNodesMap[node.Name]
 
 		// Nested helper to process state transitions
-		processTransition := func(stateChecker func(slurmapi.Node) bool, startTimes map[string]time.Time, metrics map[string]float64) {
+		processTransition := func(stateChecker func(slurmapi.Node) bool, startTimes map[string]time.Time, histogram *prometheus.HistogramVec) {
 			current := stateChecker(node)
 			previous := existed && stateChecker(previousNode)
 
@@ -142,14 +170,14 @@ func (c *MetricsCollector) updateNodeStateMetrics(currentNodes []slurmapi.Node, 
 			} else if !current && previous {
 				if startTime, ok := startTimes[node.Name]; ok {
 					duration := currentTime.Sub(startTime).Seconds()
-					metrics[node.Name] = duration
+					histogram.WithLabelValues(node.Name).Observe(duration)
 					delete(startTimes, node.Name)
 				}
 			}
 		}
 
-		processTransition(isNodeUnavailable, newState.nodeUnavailabilityStartTimes, newState.nodeUnavailabilityMetrics)
-		processTransition(isNodeDraining, newState.nodeDrainingStartTimes, newState.nodeDrainingMetrics)
+		processTransition(isNodeUnavailable, newState.nodeUnavailabilityStartTimes, c.nodeUnavailabilityDuration)
+		processTransition(isNodeDraining, newState.nodeDrainingStartTimes, c.nodeDrainingDuration)
 	}
 }
 
@@ -189,8 +217,8 @@ func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.jobDuration
 	c.nodeGPUSeconds.Describe(ch)
 	c.nodeFails.Describe(ch)
-	ch <- c.nodeUnavailabilityDuration
-	ch <- c.nodeDrainingDuration
+	c.nodeUnavailabilityDuration.Describe(ch)
+	c.nodeDrainingDuration.Describe(ch)
 
 	ch <- c.rpcCallsTotal
 	ch <- c.rpcDurationSecondsTotal
@@ -215,7 +243,7 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 	}
 
 	newState := newMetricsCollectorState()
-	// Copy timestamps for the case we fail to get nodes/jobs, then they will be stored in new state.
+	// Copy timestamps in case we fail to get nodes/jobs, so they will be preserved in the new state.
 	newState.lastGPUSecondsUpdate = previousState.lastGPUSecondsUpdate
 	maps.Copy(newState.nodeUnavailabilityStartTimes, previousState.nodeUnavailabilityStartTimes)
 	maps.Copy(newState.nodeDrainingStartTimes, previousState.nodeDrainingStartTimes)
@@ -285,14 +313,8 @@ func (c *MetricsCollector) collectImpl(ch chan<- prometheus.Metric) {
 
 	c.nodeGPUSeconds.Collect(ch)
 	c.nodeFails.Collect(ch)
-
-	for nodeName, duration := range state.nodeUnavailabilityMetrics {
-		ch <- prometheus.MustNewConstMetric(c.nodeUnavailabilityDuration, prometheus.GaugeValue, duration, nodeName)
-	}
-
-	for nodeName, duration := range state.nodeDrainingMetrics {
-		ch <- prometheus.MustNewConstMetric(c.nodeDrainingDuration, prometheus.GaugeValue, duration, nodeName)
-	}
+	c.nodeUnavailabilityDuration.Collect(ch)
+	c.nodeDrainingDuration.Collect(ch)
 
 	for slurmJobMetric := range c.slurmJobMetrics(ctx, state.jobs) {
 		ch <- slurmJobMetric
