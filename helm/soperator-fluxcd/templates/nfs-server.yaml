@@ -30,12 +30,5 @@ spec:
   values:
   {{- if .Values.nfsServer.overrideValues }}
     {{- toYaml .Values.nfsServer.overrideValues | nindent 4 }}
-  {{- else }}
-    {{- if .Values.observability.prometheusOperator.enabled }}
-      monitoring:
-        enabled: true
-      serviceMonitor:
-        enabled: true
-    {{- end }}
   {{- end }}
 {{- end }}

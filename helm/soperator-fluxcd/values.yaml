@@ -320,7 +320,4 @@ nfsServer:
   namespace: nfs-system
   releaseName: nfs-server
   overrideValues: null
-  values:
-    nameOverride: nfs-server
-    nfs:
-      sharedDirectory: "/exported"
+  values: null
