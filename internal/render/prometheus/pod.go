@@ -57,6 +57,7 @@ func BasePodTemplateSpec(
 			},
 		},
 		Spec: corev1.PodSpec{
+			HostUsers:      valuesExporter.HostUsers,
 			Affinity:       affinity,
 			Tolerations:    tolerations,
 			NodeSelector:   nodeSelector,

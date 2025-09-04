@@ -98,6 +98,7 @@ func RenderStatefulSet(
 							ConditionType: appspub.InPlaceUpdateReady,
 						},
 					},
+					HostUsers:    controller.HostUsers,
 					Affinity:     nodeFilter.Affinity,
 					NodeSelector: nodeFilter.NodeSelector,
 					Tolerations:  nodeFilter.Tolerations,

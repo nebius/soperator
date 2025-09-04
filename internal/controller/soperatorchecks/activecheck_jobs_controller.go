@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -33,10 +34,13 @@ import (
 
 var (
 	SlurmActiveCheckJobControllerName = "soperatorchecks.activecheckjob"
+
+	K8sAnnotationSoperatorChecksFinalStateTime = "soperator-checks-final-state-time"
 )
 
 type ActiveCheckJobReconciler struct {
 	*reconciler.Reconciler
+	Job              *reconciler.JobReconciler
 	slurmAPIClients  *slurmapi.ClientSet
 	reconcileTimeout time.Duration
 }
@@ -52,6 +56,7 @@ func NewActiveCheckJobController(
 
 	return &ActiveCheckJobReconciler{
 		Reconciler:       r,
+		Job:              reconciler.NewJobReconciler(r),
 		slurmAPIClients:  slurmAPIClients,
 		reconcileTimeout: reconcileTimeout,
 	}
@@ -181,8 +186,8 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			failReasons = activeCheck.Status.SlurmJobsStatus.LastJobFailReasons
 		}
 		requeue := false
+		final := false
 		totalJobs := 0
-		lastEndTime := activeCheck.Status.SlurmJobsStatus.LastJobEndTime
 		for _, slurmJobID := range ids {
 			slurmJobs, err := slurmAPIClient.GetJobsByID(ctx, slurmJobID)
 			if err != nil {
@@ -204,25 +209,44 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 				}
 
 				// Job has already been seen in one of the previous reconciler runs
-				if activeCheck.Status.SlurmJobsStatus.LastJobEndTime != nil && !slurmJob.EndTime.After(activeCheck.Status.SlurmJobsStatus.LastJobEndTime.Time) {
+				if k8sJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime] != "" {
 					continue
 				}
 
-				if lastEndTime == nil || slurmJob.EndTime.After(lastEndTime.Time) {
-					lastEndTime = slurmJob.EndTime
-				}
-
-				if slurmJob.IsFailedState() {
-					if slurmJob.StateReason != "" {
-						failReasons = append(failReasons, slurmJob.StateReason)
+				switch {
+				case slurmJob.IsFailedState():
+					err = executeFailureReactions(ctx, slurmJob, activeCheck, slurmAPIClient, logger)
+					if err != nil {
+						return ctrl.Result{}, fmt.Errorf("executing failure reactions: %w", err)
 					}
-
-					if err := r.updateSlurmNodeWithReaction(ctx, logger, slurmJob, activeCheck, slurmAPIClient); err != nil {
-						return ctrl.Result{}, fmt.Errorf("get node list: %w", err)
+				case slurmJob.IsCompletedState():
+					err = executeSuccessReactions(ctx, slurmJob, activeCheck, slurmAPIClient)
+					if err != nil {
+						return ctrl.Result{}, fmt.Errorf("executing success reactions: %w", err)
 					}
+				default:
+					// Do nothing. The job could have been cancelled or interrupted. The job will run again.
+					logger.Info(fmt.Sprintf("unhandled state. The job is probably cancelled or interrupted and it will run again. Current state: %s ", slurmJob.State))
 				}
+				final = true
 			}
 		}
+
+		if final {
+			// Maybe we could delete the job because it will not be processed anymore
+			// Otherwise, we will have many of these jobs and they will keep being listed in every Reconcile()
+			k8sJobPatch := client.MergeFrom(k8sJob.DeepCopy())
+			k8sJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime] = fmt.Sprintf("%d", time.Now().Unix())
+			if err := r.Job.Patch(ctx, k8sJob, k8sJobPatch); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to patch k8s Job: %w", err)
+			}
+		}
+
+		// Updating the ActiveCheck status is relevant for normal active checks
+		// where there is only one instance of the ActiveCheck running at any moment.
+		// For extensive-check, there will be many instances running at the same time.
+		// It doesn't really make sense to update the status of the active check.
+		// Leaving this logic as it is for now.
 
 		var state consts.ActiveCheckSlurmJobStatus
 		switch {
@@ -242,7 +266,6 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			LastJobState:       state,
 			LastJobFailReasons: failReasons,
 			LastJobSubmitTime:  submitTime,
-			LastJobEndTime:     lastEndTime,
 			LastTransitionTime: metav1.Now(),
 		}
 
@@ -258,6 +281,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		if requeue {
 			return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
 		}
+
 	} else if activeCheck.Spec.CheckType == "k8sJob" {
 		newStatus := slurmv1alpha1.ActiveCheckK8sJobsStatus{
 			LastJobScheduleTime:   cronJob.Status.LastScheduleTime,
@@ -294,7 +318,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 	return ctrl.Result{}, nil
 }
 
-func (r *ActiveCheckJobReconciler) updateSlurmNodeWithReaction(
+func updateSlurmNodeWithReaction(
 	ctx context.Context,
 	logger logr.Logger,
 	slurmJob slurmapi.Job,
@@ -377,4 +401,89 @@ func getK8sJobStatus(k8sJob *batchv1.Job) consts.ActiveCheckK8sJobStatus {
 	}
 
 	return consts.ActiveCheckK8sJobStatusUnknown
+}
+
+func executeFailureReactions(ctx context.Context, slurmJob slurmapi.Job, activeCheck *slurmv1alpha1.ActiveCheck, slurmAPIClient slurmapi.Client, logger logr.Logger) error {
+	failureReactions := activeCheck.Spec.FailureReactions
+	if failureReactions == nil {
+		failureReactions = &activeCheck.Spec.Reactions
+	}
+
+	if failureReactions.DrainSlurmNode || failureReactions.CommentSlurmNode {
+		err := updateSlurmNodeWithReaction(ctx, logger, slurmJob, activeCheck, slurmAPIClient)
+		if err != nil {
+			return fmt.Errorf("update slurm node with reaction: %w", err)
+		}
+	}
+
+	err := processAddReservation(ctx, failureReactions.AddReservation, slurmJob, slurmAPIClient, logger)
+	if err != nil {
+		return fmt.Errorf("adding reservation: %w", err)
+	}
+	return nil
+}
+
+func executeSuccessReactions(ctx context.Context, slurmJob slurmapi.Job, activeCheck *slurmv1alpha1.ActiveCheck, slurmAPIClient slurmapi.Client) error {
+	successReactions := activeCheck.Spec.SuccessReactions
+	if successReactions == nil {
+		return nil
+	}
+
+	err := processRemoveReservation(ctx, successReactions.RemoveReservation, slurmJob, slurmAPIClient)
+	if err != nil {
+		return fmt.Errorf("removing reservation: %w", err)
+	}
+	return nil
+}
+
+func processAddReservation(ctx context.Context, addReservation *slurmv1alpha1.ReservationSpec, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client, logger logr.Logger) error {
+	if addReservation == nil || addReservation.Prefix == "" {
+		return nil
+	}
+
+	nodes, err := slurmJob.GetNodeList()
+	if err != nil {
+		return fmt.Errorf("get node list: %w", err)
+	}
+	for _, node := range nodes {
+		err := addReservationForNode(ctx, addReservation.Prefix, node, slurmAPIClient, logger)
+		if err != nil {
+			return fmt.Errorf("post reservation: %w", err)
+		}
+	}
+	return nil
+}
+
+func processRemoveReservation(ctx context.Context, removeReservation *slurmv1alpha1.ReservationSpec, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client) error {
+	if removeReservation == nil || removeReservation.Prefix == "" {
+		return nil
+	}
+
+	nodes, err := slurmJob.GetNodeList()
+	if err != nil {
+		return fmt.Errorf("get node list: %w", err)
+	}
+	for _, node := range nodes {
+		reservationName := naming.BuildSlurmReservationNameForNode(removeReservation.Prefix, node)
+		err := slurmAPIClient.StopReservation(ctx, reservationName)
+		if err != nil {
+			return fmt.Errorf("stop reservation: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func addReservationForNode(ctx context.Context, reservationPrefix string, nodeName string, slurmAPIClient slurmapi.Client, logger logr.Logger) error {
+	reservationName := naming.BuildSlurmReservationNameForNode(reservationPrefix, nodeName)
+
+	_, err := slurmAPIClient.GetReservation(ctx, reservationName)
+	if err == nil {
+		// Reservation is found, don't create a new one
+		logger.Info("previous reservation was found. Not creating a new reservation", "name", reservationName)
+		return nil
+	}
+
+	logger.Info("adding reservation for node", "name", reservationName)
+	return slurmAPIClient.PostMaintenanceReservation(ctx, reservationName, []string{nodeName})
 }

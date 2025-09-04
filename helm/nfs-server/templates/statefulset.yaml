@@ -1,0 +1,142 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "nfs-server.fullname" . }}
+  labels:
+    {{- include "nfs-server.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "nfs-server.fullname" . }}
+  replicas: 1  # we can't have more than one NFS server instance
+  updateStrategy:
+    type: {{ .Values.updateStrategy.type }}
+  selector:
+    matchLabels:
+      {{- include "nfs-server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/exports: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "nfs-server.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "nfs-server.serviceAccountName" . }}
+      {{- if .Values.priorityClass.enabled }}
+      priorityClassName: {{ include "nfs-server.priorityClassName" . }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: nfs-server
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "nfs-server.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: GRACE_TIME
+              value: {{ .Values.nfs.graceTime | quote }}
+            - name: LEASE_TIME
+              value: {{ .Values.nfs.leaseTime | quote }}
+            - name: THREADS
+              value: {{ .Values.nfs.threads | quote }}
+          ports:
+            - containerPort: 2049
+              name: nfs
+            - containerPort: 111
+              name: portmap
+            - containerPort: 20048
+              name: mountd
+          livenessProbe:
+            tcpSocket:
+              port: nfs
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: nfs-storage
+              mountPath: {{ .Values.nfs.sharedDirectory }}
+            - name: exports-config
+              mountPath: /etc/exports
+              subPath: exports
+              readOnly: true
+        {{- if .Values.monitoring.enabled }}
+        - name: node-exporter
+          image: {{ .Values.monitoring.nodeExporter.image.repository }}:{{ .Values.monitoring.nodeExporter.image.tag }}
+          imagePullPolicy: {{ .Values.monitoring.nodeExporter.image.pullPolicy }}
+          args:
+            {{- range .Values.monitoring.nodeExporter.args }}
+            - {{ . }}
+            {{- end }}
+            - --web.listen-address=:{{ .Values.monitoring.nodeExporter.port }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.monitoring.nodeExporter.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.monitoring.nodeExporter.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: proc
+              mountPath: /host/proc
+              readOnly: true
+            - name: sys
+              mountPath: /host/sys
+              readOnly: true
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: exports-config
+          configMap:
+            name: {{ include "nfs-server.exportsConfigMapName" . }}
+        {{- if .Values.storage.existingClaim }}
+        - name: nfs-storage
+          persistentVolumeClaim:
+            claimName: {{ .Values.storage.existingClaim }}
+        {{- end }}
+        {{- if .Values.monitoring.enabled }}
+        - name: proc
+          hostPath:
+            path: /proc
+            type: Directory
+        - name: sys
+          hostPath:
+            path: /sys
+            type: Directory
+        {{- end }}
+  {{- if not .Values.storage.existingClaim }}
+  volumeClaimTemplates:
+    - metadata:
+        name: nfs-storage
+        labels:
+          {{- include "nfs-server.labels" . | nindent 10 }}
+      spec:
+        accessModes:
+          - {{ .Values.storage.accessMode }}
+        {{- if .Values.storage.storageClassName }}
+        storageClassName: {{ .Values.storage.storageClassName }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.storage.size }}
+  {{- end }}
