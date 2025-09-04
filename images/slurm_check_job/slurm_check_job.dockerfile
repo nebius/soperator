@@ -102,6 +102,12 @@ RUN ARCH="$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')" && \
     install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
     rm kubectl
 
+# Create single folder with slurm plugins for all architectures
+RUN mkdir -p /usr/lib/slurm && \
+    for dir in /usr/lib/*-linux-gnu/slurm; do \
+      [ -d "$dir" ] && ln -sf $dir/* /usr/lib/slurm/ 2>/dev/null || true; \
+    done
+
 # Update linker cache
 RUN ldconfig
 
