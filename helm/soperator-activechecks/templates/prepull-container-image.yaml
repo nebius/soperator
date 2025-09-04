@@ -12,7 +12,6 @@ spec:
   slurmJobSpec:
     sbatchScript: |
 {{ tpl (.Files.Get "scripts/prepull-container-image.sh") . | indent 6 }}
-    eachWorkerJobArray: false
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:
