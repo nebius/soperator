@@ -5,6 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "ib-write-lat-cpu"
+  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 12 * * *" # 1 time a day at 12:00 UTC
   suspend: false
@@ -12,7 +13,7 @@ spec:
   slurmJobSpec:
     sbatchScript: |
 {{ .Files.Get "scripts/ib-write-lat-cpu.sh" | indent 6 }}
-    eachWorkerJobArray: true
+    eachWorkerJobs: true
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:

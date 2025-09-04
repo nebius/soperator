@@ -5,6 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "all-reduce-perf-nccl-ib"
+  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 10 * * *" # Once a day at 10:00 UTC
   suspend: false
@@ -12,7 +13,7 @@ spec:
   slurmJobSpec:
     sbatchScript: |
 {{ .Files.Get "scripts/all-reduce-perf-nccl-ib.sh" | indent 6 }}
-    eachWorkerJobArray: true
+    eachWorkerJobs: true
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:

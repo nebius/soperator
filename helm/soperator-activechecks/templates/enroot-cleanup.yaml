@@ -5,6 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "enroot-cleanup"
+  dependsOn: [ "create-user-soperatorchecks" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 8 * * *" # Once a day at 8:00 UTC
   suspend: false
@@ -12,7 +13,7 @@ spec:
   slurmJobSpec:
     sbatchScript: |
 {{ .Files.Get "scripts/enroot-cleanup.sh" | indent 6 }}
-    eachWorkerJobArray: true
+    eachWorkerJobs: true
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:

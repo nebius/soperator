@@ -5,6 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "mem-bw"
+  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 16 * * *" # 1 time a day at 16:00 UTC
   suspend: false
@@ -12,7 +13,7 @@ spec:
   slurmJobSpec:
     sbatchScript: |
 {{ tpl (.Files.Get "scripts/mem-bw.sh") . | indent 6 }}
-    eachWorkerJobArray: true
+    eachWorkerJobs: true
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:
@@ -26,3 +27,4 @@ spec:
   reactions:
     setCondition: false
     drainSlurmNode: false
+    commentSlurmNode: true
