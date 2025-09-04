@@ -46,7 +46,7 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 		slurmAPIClient: slurmAPIClient,
 		Monitoring:     NewMonitoringMetrics(),
 
-		nodeInfo:    prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "address"}, nil),
+		nodeInfo:    prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "address", "reason"}, nil),
 		jobInfo:     prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "user_id", "standard_error", "standard_output", "array_job_id", "array_task_id", "submit_time", "start_time", "end_time", "finished_time"}, nil),
 		jobNode:     prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
 		jobDuration: prometheus.NewDesc("slurm_job_duration_seconds", "Slurm job duration in seconds", []string{"job_id"}, nil),
@@ -234,6 +234,10 @@ func (c *MetricsCollector) collectImpl(ch chan<- prometheus.Metric) {
 func (c *MetricsCollector) slurmNodeMetrics(slurmNodes []slurmapi.Node) iter.Seq[prometheus.Metric] {
 	return func(yield func(prometheus.Metric) bool) {
 		for _, node := range slurmNodes {
+			var reason string
+			if node.Reason != nil {
+				reason = node.Reason.Reason
+			}
 			labels := []string{
 				node.Name,
 				node.InstanceID,
@@ -242,6 +246,7 @@ func (c *MetricsCollector) slurmNodeMetrics(slurmNodes []slurmapi.Node) iter.Seq
 				strconv.FormatBool(node.IsMaintenanceState()),
 				strconv.FormatBool(node.IsReservedState()),
 				node.Address,
+				reason,
 			}
 			yield(prometheus.MustNewConstMetric(c.nodeInfo, prometheus.GaugeValue, 1, labels...))
 		}
