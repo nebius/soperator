@@ -37,7 +37,7 @@ helmRepository:
     url: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
     type: default
   nfsServer:
-    url: oci://cr.eu-north1.nebius.cloud/soperator-unstable
+    url: oci://cr.eu-north1.nebius.cloud/soperator
     type: oci
 ns:
   enabled: true
