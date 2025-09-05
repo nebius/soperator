@@ -45,6 +45,12 @@ spank_err_t snccld_key_get_from(spank_t spank, snccld_state_key_t *key);
 
 /// State of the plugin for the particular job.
 typedef struct {
+    /// Job submitter GID.
+    gid_t user_gid;
+
+    /// Job submitter UID.
+    uid_t user_uid;
+
     /// Absolute path of the named pipe (FIFO).
     char fifo_path[PATH_MAX + 1];
 
