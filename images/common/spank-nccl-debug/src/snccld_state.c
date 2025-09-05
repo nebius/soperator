@@ -64,6 +64,8 @@ static char *_snccld_key_to_state_file_path(
 
 inline snccld_state_t *snccld_state_new() {
     snccld_state_t *res   = malloc(sizeof(snccld_state_t));
+    res->user_gid         = 0;
+    res->user_uid         = 0;
     res->fifo_path[0]     = '\0';
     res->log_path[0]      = '\0';
     res->mounts_path[0]   = '\0';
@@ -79,8 +81,9 @@ inline snccld_state_t *snccld_state_new() {
  * @return State file size in bytes.
  */
 static inline size_t _snccld_state_file_size(void) {
-    const size_t max_len_pid_t = 10;
-    return PATH_MAX * 4 + max_len_pid_t + 5 + 1;
+    const size_t max_len_pid_t     = 10;
+    const size_t max_len_gid_uid_t = 64;
+    return (max_len_gid_uid_t * 2) + (PATH_MAX * 4) + max_len_pid_t + 7 + 1;
 }
 
 char *snccld_state_to_string(const snccld_state_t *state) {
@@ -90,7 +93,9 @@ char *snccld_state_to_string(const snccld_state_t *state) {
     snprintf(
         res,
         buf_size,
-        "%s\n%s\n%s\n%s\n%d\n",
+        "%d\n%d\n%s\n%s\n%s\n%s\n%d\n",
+        state->user_gid,
+        state->user_uid,
         state->fifo_path,
         state->log_path,
         state->mounts_path,
@@ -106,26 +111,46 @@ snccld_state_t *snccld_state_from_string(const char *str) {
 
     char *copy = strdup(str);
     char *p    = copy;
-    for (int line = 0; line < 5; ++line) {
+    for (int line = 0; line < 7; ++line) {
         char *field = strsep(&p, "\n");
         if (!field) {
             continue;
         }
         switch (line) {
             case 0:
-                snprintf(res->fifo_path, PATH_MAX + 1, "%s", field);
+                {
+                    { res->user_gid = (gid_t)atoll(field); }
+                }
                 break;
             case 1:
-                snprintf(res->log_path, PATH_MAX + 1, "%s", field);
+                {
+                    res->user_uid = (uid_t)atoll(field);
+                }
                 break;
             case 2:
-                snprintf(res->mounts_path, PATH_MAX + 1, "%s", field);
+                {
+                    snprintf(res->fifo_path, PATH_MAX + 1, "%s", field);
+                }
                 break;
             case 3:
-                snprintf(res->user_log_path, PATH_MAX + 1, "%s", field);
+                {
+                    snprintf(res->log_path, PATH_MAX + 1, "%s", field);
+                }
                 break;
             case 4:
-                res->tee_pid = (pid_t)atoi(field);
+                {
+                    snprintf(res->mounts_path, PATH_MAX + 1, "%s", field);
+                }
+                break;
+            case 5:
+                {
+                    snprintf(res->user_log_path, PATH_MAX + 1, "%s", field);
+                }
+                break;
+            case 6:
+                {
+                    res->tee_pid = (pid_t)atoi(field);
+                }
                 break;
         }
     }

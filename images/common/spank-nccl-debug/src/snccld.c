@@ -261,7 +261,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     }
 
     // Ensure `user_init` ran once per worker.
-    snccld_ensure_dir_exists(SNCCLD_SYSTEM_DIR, false);
+    snccld_ensure_dir_exists(SNCCLD_SYSTEM_DIR, false, 0, 0);
     if (!snccld_acquire_lock(
             key->job_id, key->step_id, SNCCLD_OPLOCK_OP_USER_INIT, hostname
         )) {
@@ -314,6 +314,17 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     }
 
     snccld_state_t *state = snccld_state_new();
+
+    {
+        gid_t user_gid = 0;
+        uid_t user_uid = 0;
+
+        spank_get_item(spank, S_JOB_GID, &user_gid);
+        spank_get_item(spank, S_JOB_UID, &user_uid);
+
+        state->user_gid = user_gid;
+        state->user_uid = user_uid;
+    }
 
     if (snccld_config.out_file) {
         char resolved_out_dir[PATH_MAX + 1];
@@ -457,17 +468,27 @@ int slurm_spank_task_init_privileged(spank_t spank, int argc, char **argv) {
         goto task_init_p_exit;
     }
 
+#ifndef NDEBUG
+    char *str = snccld_state_to_string(state);
+    snccld_log_debug("State: \n%s", str);
+    free(str);
+#endif
+
     if (snccld_config.out_file) {
         char resolved_out_dir[PATH_MAX + 1];
         snccld_substitute_hostname(
             snccld_config.out_dir, hostname, resolved_out_dir
         );
         snccld_log_debug("Ensuring '%s' exists.", resolved_out_dir);
-        snccld_ensure_dir_exists(resolved_out_dir, true);
+        snccld_ensure_dir_exists(
+            resolved_out_dir, true, state->user_gid, state->user_uid
+        );
     }
     if (strlen(state->user_log_path) > 0) {
         snccld_log_debug("Ensuring '%s' exists.", state->user_log_path);
-        snccld_ensure_file_exists(state->user_log_path, true);
+        snccld_ensure_file_exists(
+            state->user_log_path, true, state->user_gid, state->user_uid
+        );
     }
 
     // Create Enroot bind mounts for the state and log files.

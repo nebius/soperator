@@ -71,8 +71,15 @@ enum _SNCCLD_LOG_LEVEL {
  * @param __fmt Format string.
  * @param ... Variadic arguments to fill in the format string.
  */
+#ifdef NDEBUG
 #define snccld_log_info(__fmt, ...)                                            \
     _snccld_log_impl(_SNCCLD_LOG_LEVEL_INFO, slurm_info, __fmt, ##__VA_ARGS__)
+#else // NDEBUG
+#define snccld_log_info(__fmt, ...)                                            \
+    _snccld_log_impl(                                                          \
+        _SNCCLD_LOG_LEVEL_INFO, slurm_spank_log, __fmt, ##__VA_ARGS__          \
+    )
+#endif // NDEBUG
 
 /**
  * Log error message.
@@ -80,8 +87,15 @@ enum _SNCCLD_LOG_LEVEL {
  * @param __fmt Format string.
  * @param ... Variadic arguments to fill in the format string.
  */
+#ifdef NDEBUG
 #define snccld_log_error(__fmt, ...)                                           \
     _snccld_log_impl(_SNCCLD_LOG_LEVEL_ERROR, slurm_error, __fmt, ##__VA_ARGS__)
+#else // NDEBUG
+#define snccld_log_error(__fmt, ...)                                           \
+    _snccld_log_impl(                                                          \
+        _SNCCLD_LOG_LEVEL_ERROR, slurm_spank_log, __fmt, ##__VA_ARGS__         \
+    )
+#endif // NDEBUG
 
 #ifdef NDEBUG
 #define snccld_log_debug(__fmt, ...)
@@ -94,7 +108,9 @@ enum _SNCCLD_LOG_LEVEL {
  * @param ... Variadic arguments to fill in the format string.
  */
 #define snccld_log_debug(__fmt, ...)                                           \
-    _snccld_log_impl(_SNCCLD_LOG_LEVEL_DEBUG, slurm_debug, __fmt, ##__VA_ARGS__)
+    _snccld_log_impl(                                                          \
+        _SNCCLD_LOG_LEVEL_DEBUG, slurm_spank_log, __fmt, ##__VA_ARGS__         \
+    )
 #endif // NDEBUG
 
 #endif // SNCCLD_LOG_H
