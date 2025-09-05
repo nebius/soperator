@@ -1,0 +1,34 @@
+{{- if .Values.nfsServer.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-nfs-server
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: helm-nfs-server
+      interval: {{ .Values.nfsServer.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-nfs-server
+      version: {{ .Values.nfsServer.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  - name: {{ include "soperator-fluxcd.fullname" . }}-csi-driver-nfs
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+  interval: {{ .Values.nfsServer.interval }}
+  timeout: {{ .Values.nfsServer.timeout }}
+  releaseName: {{ .Values.nfsServer.releaseName }}
+  targetNamespace: {{ .Values.nfsServer.namespace }}
+  values:
+  {{- if .Values.nfsServer.overrideValues }}
+    {{- toYaml .Values.nfsServer.overrideValues | nindent 4 }}
+  {{- end }}
+{{- end }}

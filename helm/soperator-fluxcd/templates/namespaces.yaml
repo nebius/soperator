@@ -27,14 +27,14 @@ spec:
       kind: Namespace
       metadata:
         name: {{ .Values.soperator.namespace | default "soperator-system" }}
-    
+
     {{- if .Values.mariadbOperator.enabled }}
     - apiVersion: v1
       kind: Namespace
       metadata:
         name: {{ .Values.mariadbOperator.namespace | default "mariadb-operator-system" }}
     {{- end }}
-    
+
     {{- if .Values.securityProfilesOperator.enabled }}
     - apiVersion: v1
       kind: Namespace
@@ -117,17 +117,24 @@ spec:
     {{- end }}
     {{- end }}
 
-    
+
     {{- if .Values.certManager.enabled }}
     - apiVersion: v1
       kind: Namespace
       metadata:
         name: {{ .Values.certManager.namespace }}
     {{- end }}
-    
+
     {{- if .Values.backup.enabled }}
     - apiVersion: v1
       kind: Namespace
       metadata:
         name: {{ .Values.backup.namespace }}
+    {{- end }}
+
+    {{- if .Values.nfsServer.enabled }}
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ .Values.nfsServer.namespace | default "nfs-system" }}
     {{- end }}
