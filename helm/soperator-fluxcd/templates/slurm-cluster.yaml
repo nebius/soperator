@@ -43,7 +43,7 @@ spec:
   {{- end }}
   valuesFrom:
   - kind: ConfigMap
-    name: terrraform-slurm-cluster
+    name: terraform-slurm-cluster
     optional: true
     valuesKey: values.yaml
   - kind: ConfigMap
