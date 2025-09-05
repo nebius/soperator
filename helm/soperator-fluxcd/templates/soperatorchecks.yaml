@@ -33,7 +33,7 @@ spec:
   {{- end }}
   valuesFrom:
   - kind: ConfigMap
-    name: terrraform-soperatorchecks
+    name: terraform-soperatorchecks
     optional: true
     valuesKey: values.yaml
   - kind: ConfigMap
