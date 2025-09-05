@@ -47,11 +47,6 @@ spank_err_t snccld_mkdir_p(const char *path, const bool as_user) {
         }
     }
 
-    if (!as_user &&
-        snccld_ensure_mode(tmp, SNCCLD_DEFAULT_MODE) != ESPANK_SUCCESS) {
-        return ESPANK_ERROR;
-    }
-
     return ESPANK_SUCCESS;
 }
 
@@ -117,7 +112,14 @@ void snccld_ensure_file_exists(const char *path, const bool as_user) {
 }
 
 inline void snccld_ensure_dir_exists(const char *path, const bool as_user) {
-    snccld_mkdir_p(path, as_user);
+    const int ret = snccld_mkdir_p(path, as_user);
+    if (ret != ESPANK_SUCCESS) {
+        return;
+    }
+
+    if (!as_user) {
+        snccld_ensure_mode(path, SNCCLD_DEFAULT_MODE);
+    }
 }
 
 static inline bool _snccld_needs_chmod(const char *path, const mode_t mode) {
