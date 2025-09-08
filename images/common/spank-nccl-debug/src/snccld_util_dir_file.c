@@ -54,14 +54,14 @@ spank_err_t snccld_mkdir_p(
     }
 
     if (as_user) {
-        chown(path, user_uid, user_gid);
+        chown(tmp, user_uid, user_gid);
         snccld_log_debug(
-            "Chowned directory: '%s' to %d:%d", path, user_uid, user_gid
+            "Chowned directory: '%s' to %d:%d", tmp, user_uid, user_gid
         );
     } else {
-        snccld_ensure_mode(path, SNCCLD_DEFAULT_MODE);
+        snccld_ensure_mode(tmp, SNCCLD_DEFAULT_MODE);
         snccld_log_debug(
-            "Ensured directory mode: '%s':%o", path, SNCCLD_DEFAULT_MODE
+            "Ensured directory mode: '%s':%o", tmp, SNCCLD_DEFAULT_MODE
         );
     }
 
