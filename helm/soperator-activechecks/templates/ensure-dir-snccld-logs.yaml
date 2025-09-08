@@ -7,6 +7,7 @@ spec:
   checkType: "k8sJob"
   name: "ensure-dir-snccld-logs"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
+  schedule: {{ .Values.ensureDirSnccldLogs.schedule | default "15 0 * * *" | quote }}
   suspend: false
   runAfterCreation: true
   k8sJobSpec:
@@ -19,7 +20,7 @@ spec:
       image: {{ .Values.images.k8sJob | quote }}
       env:
         - name: SNCCLD_LOG_DIR_PATH
-          value: {{ .Values.ensureDirSnccldLogs.dir | quote }}
+          value: {{ .Values.ensureDirSnccldLogs.dir | default "/opt/soperator-outputs/nccl_logs" | quote }}
       volumeMounts:
 {{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
       volumes:
