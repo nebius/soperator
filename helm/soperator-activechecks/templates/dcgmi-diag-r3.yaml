@@ -8,7 +8,7 @@ spec:
   dependsOn: [ "create-user-soperatorchecks", "wait-for-topology" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   suspend: true
-  runAfterCreation: false
+  runAfterCreation: true
   slurmJobSpec:
     sbatchScript: |
 {{ .Files.Get "scripts/dcgmi-diag-r3.sh" | indent 6 }}

@@ -8,12 +8,13 @@ spec:
   dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 16 * * *" # 1 time a day at 16:00 UTC
-  suspend: false
-  runAfterCreation: true
+  suspend: true
+  runAfterCreation: false
   slurmJobSpec:
     sbatchScript: |
 {{ tpl (.Files.Get "scripts/mem-bw.sh") . | indent 6 }}
     eachWorkerJobs: true
+    maxNumberOfJobs: 200
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:

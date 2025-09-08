@@ -1,18 +1,18 @@
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
-  name: "all-reduce-perf-nccl"
+  name: "performance-checks"
 spec:
   checkType: "slurmJob"
-  name: "all-reduce-perf-nccl"
-  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology" ]
+  name: "performance-checks"
+  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  schedule: "0 4,12,20 * * *" # 3 times a day at 4:00, 12:00, and 20:00 UTC
-  suspend: true
-  runAfterCreation: false
+  schedule: "0 */4 * * *" # Every 4 hours
+  suspend: false
+  runAfterCreation: true
   slurmJobSpec:
     sbatchScript: |
-{{ .Files.Get "scripts/all-reduce-perf-nccl.sh" | indent 6 }}
+{{ .Files.Get "scripts/performance-checks.sh" | indent 6 }}
     eachWorkerJobs: true
     maxNumberOfJobs: 200
     jobContainer:

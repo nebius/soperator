@@ -1,7 +1,16 @@
 #!/bin/bash
 #SBATCH --deadline="now+6hours"
-#SBATCH --time=00:05:00
+#SBATCH --time=20:00
+#SBATCH --mem=32G
+#SBATCH --gpus-per-node=8
+#SBATCH --cpus-per-task=16
 #SBATCH --exclusive
+
+echo "Checking for running GPU processes..."
+if [[ -n "$(nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -v '^ *$')" ]]; then
+  echo "Another GPU process is currently running. Exiting."
+  exit 0
+fi
 
 platform=""
 gpus_on_node=$(nvidia-smi --query-gpu=name --format=csv,noheader | sort | uniq -c)
@@ -17,10 +26,10 @@ else
 fi
 
 echo "Platform found: $platform"
-echo "Running ib_write_lat_cpu check on $(hostname)..."
+echo "Running all performance checks on $(hostname)..."
 HC_OUTPUT=$(srun --container-image={{ .Values.activeCheckImage }} \
   --container-mounts=$(which health-checker):/usr/local/bin/health-checker --cpu-bind=verbose,cores \
-  bash -c "health-checker run -e soperator -p $platform -n ib_write_lat --json-log")
+  bash -c "health-checker run -e soperator -p $platform -n all_reduce_without_ib,all_reduce_with_ib,ib_write_bw,ib_write_lat,mem_bw,mem_lat --json-log")
 HC_EXIT_CODE=$?
 
 echo "Health checker output: $HC_OUTPUT"
