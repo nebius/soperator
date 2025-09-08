@@ -109,6 +109,8 @@ jobs:
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
           nebius iam session-management revoke --all-my-active
+          # revoke is async operation and in different region token from source .envrc could be revoked right after it's created
+          sleep 5
           source .envrc
           cd -
 
