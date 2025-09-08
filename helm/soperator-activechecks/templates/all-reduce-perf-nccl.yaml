@@ -8,8 +8,8 @@ spec:
   dependsOn: [ "create-user-soperatorchecks", "wait-for-topology" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 */4 * * *" # Every 4 hours
-  suspend: true
-  runAfterCreation: false
+  suspend: false
+  runAfterCreation: true
   slurmJobSpec:
     sbatchScript: |
 {{ .Files.Get "scripts/all-reduce-perf-nccl.sh" | indent 6 }}

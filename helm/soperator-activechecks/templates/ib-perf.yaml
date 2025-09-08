@@ -8,8 +8,8 @@ spec:
   dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 13 * * *" # 1 time a day at 13:00 UTC
-  suspend: true
-  runAfterCreation: false
+  suspend: false
+  runAfterCreation: true
   slurmJobSpec:
     sbatchScript: |
 {{ tpl (.Files.Get "scripts/ib-perf.sh") . | indent 6 }}
