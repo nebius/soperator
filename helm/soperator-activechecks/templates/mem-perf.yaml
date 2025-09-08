@@ -1,18 +1,18 @@
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
-  name: "mem-lat"
+  name: "mem-perf"
 spec:
   checkType: "slurmJob"
-  name: "mem-lat"
+  name: "mem-perf"
   dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  schedule: "0 15 * * *" # 1 time a day at 15:00 UTC
+  schedule: "0 16 * * *" # 1 time a day at 16:00 UTC
   suspend: true
   runAfterCreation: false
   slurmJobSpec:
     sbatchScript: |
-{{ tpl (.Files.Get "scripts/mem-lat.sh") . | indent 6 }}
+{{ tpl (.Files.Get "scripts/mem-perf.sh") . | indent 6 }}
     eachWorkerJobs: true
     maxNumberOfJobs: 200
     jobContainer:

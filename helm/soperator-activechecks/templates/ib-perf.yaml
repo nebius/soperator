@@ -1,18 +1,18 @@
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
-  name: "all-reduce-perf-nccl-ib"
+  name: "ib-perf"
 spec:
   checkType: "slurmJob"
-  name: "all-reduce-perf-nccl-ib"
-  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology" ]
+  name: "ib-perf"
+  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  schedule: "0 10 * * *" # Once a day at 10:00 UTC
+  schedule: "0 13 * * *" # 1 time a day at 13:00 UTC
   suspend: true
   runAfterCreation: false
   slurmJobSpec:
     sbatchScript: |
-{{ .Files.Get "scripts/all-reduce-perf-nccl-ib.sh" | indent 6 }}
+{{ tpl (.Files.Get "scripts/ib-perf.sh") . | indent 6 }}
     eachWorkerJobs: true
     maxNumberOfJobs: 200
     jobContainer:
@@ -25,6 +25,8 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
+  # Do not add any reactions right now, only monitor
   reactions:
-    setCondition: true
-    drainSlurmNode: true
+    setCondition: false
+    drainSlurmNode: false
+    commentSlurmNode: true
