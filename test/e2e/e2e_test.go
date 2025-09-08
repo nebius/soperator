@@ -23,6 +23,8 @@ type testConfig struct {
 	SoperatorUnstable  bool     `split_words:"true" required:"true"`                // SOPERATOR_UNSTABLE
 	PathToInstallation string   `split_words:"true" required:"true"`                // PATH_TO_INSTALLATION
 	InfinibandFabric   string   `split_words:"true" required:"true"`                // INFINIBAND_FABRIC
+	WorkerPlatform     string   `split_words:"true" required:"true"`                // WORKER_PLATFORM
+	WorkerPreset       string   `split_words:"true" required:"true"`                // WORKER_PRESET
 	SSHKeys            []string `split_words:"true" required:"true"`                // SSH_KEYS
 	O11yAccessToken    string   `split_words:"true" required:"true"`                // O11Y_ACCESS_TOKEN
 	O11ySecretName     string   `split_words:"true" default:"o11y-writer-sa-token"` // O11Y_SECRET_NAME
@@ -177,8 +179,8 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 			"nodes_per_nodegroup":     1,
 			"max_unavailable_percent": 50,
 			"resource": map[string]interface{}{
-				"platform": "gpu-h100-sxm",
-				"preset":   "8gpu-128vcpu-1600gb",
+				"platform": cfg.WorkerPlatform,
+				"preset":   cfg.WorkerPreset,
 			},
 			"boot_disk": map[string]interface{}{
 				"type":                 "NETWORK_SSD",
