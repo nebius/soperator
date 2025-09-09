@@ -22,11 +22,14 @@
  * @param path Absolute path of the directory to make on.
  *             Trailing slash is handled.
  * @param as_user Whether to create directories as user (w/o umask 0).
+ * @param user_gid User GID to set for created directories in case of as_user.
+ * @param user_uid User UID to set for created directories in case of as_user.
  *
  * @retval ESPANK_SUCCESS Successfully created the directory.
  * @retval ESPANK_ERROR Something went wrong.
  */
-spank_err_t snccld_mkdir_p(const char *path, bool as_user);
+spank_err_t
+snccld_mkdir_p(const char *path, bool as_user, gid_t user_gid, uid_t user_uid);
 
 /**
  * Check if the directory exists.
@@ -55,8 +58,12 @@ void snccld_split_file_path(const char *path, char **dir_out, char **file_out);
  *
  * @param path Path to the file to ensure its existence.
  * @param as_user Whether to create directory and file as user (w/o umask 0).
+ * @param user_gid User GID to set for created file in case of as_user.
+ * @param user_uid User UID to set for created file in case of as_user.
  */
-void snccld_ensure_file_exists(const char *path, bool as_user);
+void snccld_ensure_file_exists(
+    const char *path, bool as_user, gid_t user_gid, uid_t user_uid
+);
 
 /**
  * Ensure the directory exists.
@@ -64,8 +71,12 @@ void snccld_ensure_file_exists(const char *path, bool as_user);
  *
  * @param path Path to the directory to ensure its existence.
  * @param as_user Whether to create directory as user (w/o umask 0).
+ * @param user_gid User GID to set for created directories in case of as_user.
+ * @param user_uid User UID to set for created directories in case of as_user.
  */
-void snccld_ensure_dir_exists(const char *path, bool as_user);
+void snccld_ensure_dir_exists(
+    const char *path, bool as_user, gid_t user_gid, uid_t user_uid
+);
 
 /**
  * Ensure the directory/file has desired mode.
