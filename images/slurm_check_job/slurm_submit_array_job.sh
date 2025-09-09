@@ -7,7 +7,7 @@ PARTITION="background"
 echo "Cancelling currently active jobs with the same name..."
 scancel --partition="$PARTITION" --name="$ACTIVE_CHECK_NAME"
 
-echo "Setting Extra field to all nodes..."
+echo "Finding nodes to exclude..."
 JQ_EXCLUDE_BAD_NODES='
 .sinfo[]
 | select(
@@ -21,6 +21,7 @@ JQ_EXCLUDE_BAD_NODES='
 | .nodes.nodes[]
 '
 
+echo "Setting Extra field to all nodes..."
 chroot --userspec=soperatorchecks:soperatorchecks /mnt/jail /usr/bin/env \
     PARTITION="$PARTITION" \
     JQ_EXCLUDE_BAD_NODES="$JQ_EXCLUDE_BAD_NODES" \
@@ -45,6 +46,26 @@ EOF
 
 NUM_NODES=$(cat /mnt/jail/etc/soperatorchecks/$ACTIVE_CHECK_NAME.num_nodes)
 
+LIMIT="${ACTIVE_CHECK_MAX_NUMBER_OF_JOBS:-0}"
+if ! [[ "$LIMIT" =~ ^[0-9]+$ ]]; then
+  LIMIT=0
+fi
+
+if (( LIMIT <= 0 )); then
+  ARRAY_SIZE="$NUM_NODES"
+else
+  if (( NUM_NODES < LIMIT )); then
+    ARRAY_SIZE="$NUM_NODES"
+  else
+    ARRAY_SIZE="$LIMIT"
+  fi
+fi
+
+if (( ARRAY_SIZE <= 0 )); then
+  echo "No nodes to run on (ARRAY_SIZE=$ARRAY_SIZE). Failing."
+  exit 1
+fi
+
 echo "Submitting Slurm array job..."
 export SLURM_PROLOG="/etc/slurm/activecheck-prolog.sh"
 OUT_PATTERN='/opt/soperator-outputs/slurm_jobs/%N.%x.%j.%A.out'
@@ -58,7 +79,7 @@ SLURM_OUTPUT=$(
         --no-requeue \
         --export="ALL,SLURM_PROLOG" \
         --extra="${ACTIVE_CHECK_NAME}=true" \
-        --array=0-$((NUM_NODES-1)) \
+        --array=0-$((ARRAY_SIZE-1)) \
         --nodes=1 \
         --chdir=/opt/soperator-home/soperatorchecks \
         --uid=soperatorchecks \

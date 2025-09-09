@@ -17,10 +17,10 @@ else
 fi
 
 echo "Platform found: $platform"
-echo "Running mem_bw check on $(hostname)..."
+echo "Running mem_perf check on $(hostname)..."
 HC_OUTPUT=$(srun --container-image={{ .Values.activeCheckImage }} \
   --container-mounts=$(which health-checker):/usr/local/bin/health-checker --cpu-bind=verbose,cores \
-  bash -c "health-checker run -e soperator -p $platform -n mem_bw --json-log")
+  bash -c "health-checker run -e soperator -p $platform -n mem_bw,mem_lat --json-log")
 HC_EXIT_CODE=$?
 
 echo "Health checker output: $HC_OUTPUT"
