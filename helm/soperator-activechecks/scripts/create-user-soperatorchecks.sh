@@ -3,7 +3,7 @@ set -ex
 echo "Creating soperatorchecks user..."
 chroot /mnt/jail /bin/bash -s <<'EOF'
 
-id "soperatorchecks" || echo "" | createuser soperatorchecks --home /opt/soperator-home/soperatorchecks --gecos ""
+id "soperatorchecks" || echo "" | soperator-createuser soperatorchecks --home /opt/soperator-home/soperatorchecks --gecos ""
 
 if [ ! -f /opt/soperator-home/soperatorchecks/.ssh/soperatorchecks_id_ecdsa ]; then
   echo "Generating ssh key..."
