@@ -66,8 +66,6 @@ if (( ARRAY_SIZE <= 0 )); then
   exit 1
 fi
 
-
-
 echo "Submitting Slurm array job..."
 export SLURM_PROLOG="/etc/slurm/activecheck-prolog.sh"
 OUT_PATTERN='/opt/soperator-outputs/slurm_jobs/%N.%x.%j.%A.out'
