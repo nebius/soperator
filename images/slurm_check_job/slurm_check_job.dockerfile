@@ -85,15 +85,6 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy script for complementing jail filesystem in runtime
-COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
-
-# Copy script for bind-mounting slurm into the jail
-COPY images/common/scripts/bind_slurm_common.sh /opt/bin/slurm/
-
-RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
-    chmod +x /opt/bin/slurm/bind_slurm_common.sh
-
 # Install kubectl
 RUN ARCH="$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')" && \
     KUBECTL_VERSION="$(curl -Ls https://dl.k8s.io/release/stable.txt)" && \
