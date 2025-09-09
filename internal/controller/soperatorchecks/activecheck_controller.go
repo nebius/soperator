@@ -119,6 +119,8 @@ func (r *ActiveCheckReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 
+	check.Spec.SetDefaults()
+
 	if check.ObjectMeta.DeletionTimestamp.IsZero() == false {
 		if controllerutil.ContainsFinalizer(check, consts.ActiveCheckFinalizer) {
 			return r.reconcileDelete(ctx, check)
