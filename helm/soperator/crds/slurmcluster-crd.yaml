@@ -7306,6 +7306,10 @@ spec:
                 description: ActiveCheckSlurmJobsStatus defines the observed state
                   of ActiveCheck slurm jobs.
                 properties:
+                  lastJobDegradeReasons:
+                    items:
+                      type: string
+                    type: array
                   lastJobFailReasons:
                     items:
                       type: string
@@ -7321,6 +7325,14 @@ spec:
                   lastJobSubmitTime:
                     format: date-time
                     type: string
+                  lastRunDegradeJobs:
+                    items:
+                      type: string
+                    type: array
+                  lastRunFailJobs:
+                    items:
+                      type: string
+                    type: array
                   lastTransitionTime:
                     format: date-time
                     type: string
