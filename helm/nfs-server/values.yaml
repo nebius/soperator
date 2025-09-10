@@ -18,7 +18,7 @@ nfs:
     - 172.16.0.0/12
     - 192.168.0.0/16
   # NFS export options applied to all permitted networks
-  shareOptions: "rw,fsid=0,sync,no_subtree_check,no_auth_nlm,insecure,no_root_squash"
+  shareOptions: "rw,fsid=0,async,no_subtree_check,no_auth_nlm,insecure,no_root_squash"
   graceTime: 10
   leaseTime: 10
   threads: 8
