@@ -198,6 +198,12 @@ type ActiveCheckSlurmJobsStatus struct {
 	// +kubebuilder:validation:Optional
 	LastJobFailReasons []string `json:"lastJobFailReasons"`
 	// +kubebuilder:validation:Optional
+	LastJobDegradeReasons []string `json:"lastJobDegradeReasons"`
+	// +kubebuilder:validation:Optional
+	LastRunFailJobs []string `json:"lastRunFailJobs"`
+	// +kubebuilder:validation:Optional
+	LastRunDegradeJobs []string `json:"lastRunDegradeJobs"`
+	// +kubebuilder:validation:Optional
 	LastJobSubmitTime *metav1.Time `json:"lastJobSubmitTime"`
 }
 

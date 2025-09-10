@@ -102,6 +102,21 @@ func (in *ActiveCheckSlurmJobsStatus) DeepCopyInto(out *ActiveCheckSlurmJobsStat
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.LastJobDegradeReasons != nil {
+		in, out := &in.LastJobDegradeReasons, &out.LastJobDegradeReasons
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.LastRunFailJobs != nil {
+		in, out := &in.LastRunFailJobs, &out.LastRunFailJobs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.LastRunDegradeJobs != nil {
+		in, out := &in.LastRunDegradeJobs, &out.LastRunDegradeJobs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.LastJobSubmitTime != nil {
 		in, out := &in.LastJobSubmitTime, &out.LastJobSubmitTime
 		*out = (*in).DeepCopy()
