@@ -55,6 +55,11 @@ job_state_reason
 job_user
 {{- end }}
 
+{{/* Job user_mail label key. */}}
+{{- define "son.config.label.job.user_mail" -}}
+job_user_mail
+{{- end }}
+
 {{/* Alert key label key. */}}
 {{- define "son.config.label.alertKey" -}}
 alert_key

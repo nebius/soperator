@@ -1,0 +1,19 @@
+{{- if .Values.storageClass.enabled }}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ include "nfs-server.storageClassName" . }}
+  labels:
+    {{- include "nfs-server.labels" . | nindent 4 }}
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: {{ include "nfs-server.nfsServer" . }}
+  share: /
+reclaimPolicy: {{ .Values.storageClass.reclaimPolicy }}
+volumeBindingMode: {{ .Values.storageClass.volumeBindingMode }}
+allowVolumeExpansion: {{ .Values.storageClass.allowVolumeExpansion }}
+{{- with .Values.storageClass.mountOptions }}
+mountOptions:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}

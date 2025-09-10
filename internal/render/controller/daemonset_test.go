@@ -6,6 +6,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -275,5 +276,85 @@ func TestRenderDaemonSetNodeAffinity(t *testing.T) {
 		if toleration.Effect != corev1.TaintEffectNoSchedule {
 			t.Errorf("Toleration effect = %v, want %v", toleration.Effect, corev1.TaintEffectNoSchedule)
 		}
+	}
+}
+
+func TestRenderDaemonSetHostUsers(t *testing.T) {
+	tests := []struct {
+		name              string
+		hostUsers         *bool
+		expectedHostUsers *bool
+	}{
+		{
+			name:              "hostUsers not set (nil)",
+			hostUsers:         nil,
+			expectedHostUsers: nil,
+		},
+		{
+			name:              "hostUsers set to false",
+			hostUsers:         ptr.To(false),
+			expectedHostUsers: ptr.To(false),
+		},
+		{
+			name:              "hostUsers set to true",
+			hostUsers:         ptr.To(true),
+			expectedHostUsers: ptr.To(true),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			controller := &values.SlurmController{
+				K8sNodeFilterName: "test-filter",
+				HostUsers:         tt.hostUsers,
+				DaemonSet: values.DaemonSet{
+					Name: "test-controller-daemonset",
+				},
+				ContainerSlurmctld: values.Container{
+					NodeContainer: slurmv1.NodeContainer{
+						Image:           "test-image:latest",
+						ImagePullPolicy: corev1.PullAlways,
+						Port:            6817,
+						AppArmorProfile: "unconfined",
+					},
+					Name: "slurmctld",
+				},
+				ContainerMunge: values.Container{
+					NodeContainer: slurmv1.NodeContainer{
+						Image:           "munge-image:latest",
+						ImagePullPolicy: corev1.PullAlways,
+						AppArmorProfile: "unconfined",
+					},
+				},
+			}
+
+			nodeFilters := []slurmv1.K8sNodeFilter{
+				{
+					Name: "test-filter",
+				},
+			}
+
+			result := RenderPlaceholderDaemonSet(
+				"test-namespace",
+				"test-cluster",
+				nodeFilters,
+				controller,
+			)
+
+			// Check HostUsers field in PodSpec
+			actualHostUsers := result.Spec.Template.Spec.HostUsers
+
+			if tt.expectedHostUsers == nil {
+				if actualHostUsers != nil {
+					t.Errorf("Expected HostUsers to be nil, got %v", *actualHostUsers)
+				}
+			} else {
+				if actualHostUsers == nil {
+					t.Errorf("Expected HostUsers to be %v, got nil", *tt.expectedHostUsers)
+				} else if *actualHostUsers != *tt.expectedHostUsers {
+					t.Errorf("Expected HostUsers to be %v, got %v", *tt.expectedHostUsers, *actualHostUsers)
+				}
+			}
+		})
 	}
 }

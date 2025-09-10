@@ -6,6 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	"nebius.ai/slurm-operator/internal/consts"
 
@@ -213,7 +214,7 @@ type PluginConfigPyxis struct {
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=true
-	Required bool `json:"required,omitempty"`
+	Required *bool `json:"required,omitempty"`
 
 	// ContainerImageSave represents an absolute path to the file or directory where SquashFS files will be stored.
 	// If the specified file or directory already exists, it will be reused.
@@ -241,7 +242,7 @@ type PluginConfigNcclDebug struct {
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// LogLevel defines NCCL's log level to be forced.
 	//
@@ -328,6 +329,11 @@ type SConfigController struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="1m"
 	ReconfigureWaitTimeout *string `json:"reconfigureWaitTimeout,omitempty"`
+
+	// HostUsers controls if the pod containers can use the host user namespace
+	//
+	// +kubebuilder:validation:Optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
 }
 
 type PartitionConfiguration struct {
@@ -427,6 +433,11 @@ type PopulateJail struct {
 	//
 	// +kubebuilder:validation:Optional
 	PriorityClass string `json:"priorityClass,omitempty"`
+
+	// HostUsers controls if the pod containers can use the host user namespace
+	//
+	// +kubebuilder:validation:Optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
 }
 
 // K8sNodeFilter defines the k8s node filter used in Slurm node specifications
@@ -764,6 +775,11 @@ type SlurmNodeController struct {
 	// +kubebuilder:validation:Required
 	K8sNodeFilterName string `json:"k8sNodeFilterName"`
 
+	// HostUsers controls if the pod containers can use the host user namespace
+	//
+	// +kubebuilder:validation:Optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
+
 	// Slurmctld represents the Slurm control daemon configuration
 	//
 	// +kubebuilder:validation:Required
@@ -806,6 +822,13 @@ type SlurmNodeControllerVolumes struct {
 // SlurmNodeWorker defines the configuration for the Slurm worker node
 type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
+
+	// HostUsers controls if the pod containers can use the host user namespace
+	// For workers, defaults to false to allow containers to access host user namespace
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	HostUsers *bool `json:"hostUsers,omitempty"`
 
 	// The maximum number of worker pods that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
@@ -972,7 +995,7 @@ type SlurmExporter struct {
 	// It has to be set to true if Prometheus Operator is used
 	//
 	// +kubebuilder:default=false
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// It references the PodMonitor configuration
 	//
@@ -1046,6 +1069,11 @@ type SlurmNode struct {
 	//
 	// +kubebuilder:validation:Optional
 	PriorityClass string `json:"priorityClass,omitempty"`
+
+	// HostUsers controls if the pod containers can use the host user namespace
+	//
+	// +kubebuilder:validation:Optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
 }
 
 // NodeContainer defines the configuration for one of node containers
@@ -1249,4 +1277,32 @@ type SlurmClusterList struct {
 
 func init() {
 	SchemeBuilder.Register(&SlurmCluster{}, &SlurmClusterList{})
+}
+
+// SetDefaults sets default values for PluginConfigPyxis
+func (p *PluginConfigPyxis) SetDefaults() {
+	if p.Required == nil {
+		p.Required = ptr.To(true)
+	}
+}
+
+// SetDefaults sets default values for PluginConfigNcclDebug
+func (p *PluginConfigNcclDebug) SetDefaults() {
+	if p.Enabled == nil {
+		p.Enabled = ptr.To(false)
+	}
+}
+
+// SetDefaults sets default values for SlurmExporter
+func (s *SlurmExporter) SetDefaults() {
+	if s.Enabled == nil {
+		s.Enabled = ptr.To(false)
+	}
+}
+
+// SetDefaults sets default values for SlurmNodeWorker
+func (w *SlurmNodeWorker) SetDefaults() {
+	if w.HostUsers == nil {
+		w.HostUsers = ptr.To(false)
+	}
 }

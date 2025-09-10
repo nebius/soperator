@@ -211,29 +211,21 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
 	}
 
-	reason, message, err := parseHealthCheckReason(nodeReason.OriginalReason)
+	/**
+	Health checks have success and failure reactions.
+	When a health check fails, we can already create a reservation using failureReaction.addReservation
+	There is no need to reactions.drainSlurmNode then execute logic here to handle DRAINED slurm nodes with [HC] reason
+
+	For backward compatability, we add some logic here to handle already drained slurm nodes with [HC] reason and create a reservation for them then undrain them.
+	*/
+
+	// Make sure is drained because of a health check failure.
+	_, _, err := parseHealthCheckReason(nodeReason.OriginalReason)
 	if err != nil {
 		return fmt.Errorf("parse health check reason: %w", err)
 	}
 
-	drainWithCondition := func() error {
-		if err := c.drainSlurmNodesWithConditionUpdate(
-			ctx,
-			slurmNode.InstanceID,
-			nodeReason.OriginalReason,
-			// https://github.com/kubernetes/apimachinery/blob/release-1.33/pkg/apis/meta/v1/types.go#L1633-L1643
-			newNodeCondition(
-				consts.HardwareIssuesSuspected,
-				corev1.ConditionTrue,
-				reason,
-				message,
-			),
-		); err != nil {
-			return fmt.Errorf("drain slurm nodes: %w", err)
-		}
-		return nil
-	}
-
+	// If hardware issue condition is set, leave the node drained until MK8S deletes it
 	var hardwareIssuesCondition corev1.NodeCondition
 	for _, cond := range k8sNode.Status.Conditions {
 		if cond.Type == consts.HardwareIssuesSuspected {
@@ -241,19 +233,55 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 			break
 		}
 	}
-	if hardwareIssuesCondition == (corev1.NodeCondition{}) {
-		// No hardware issues condition found
-		logger.V(1).Info("draining because no hardware issues condition found")
-		return drainWithCondition()
-	}
 	if hardwareIssuesCondition.Status == corev1.ConditionTrue {
 		// Node is still hardware degraded, skip
 		logger.V(1).Info("skip, still hardware degraded")
 		return nil
 	}
 
-	logger.V(1).Info("draining, slurm node drained after degraded condition changed")
-	return drainWithCondition()
+	logger.V(1).Info("creating a slurm reservation for drained node with [HC] reason")
+
+	// Create a maintenance reservation for this slurm node to prevent work from being scheduled on it.
+	err = c.createMaintenanceReservationForSlurmNode(ctx, slurmClusterName, slurmNode.Name)
+	if err != nil {
+		return fmt.Errorf("failed to create maintenance reservaiton for slurm node: %w", err)
+	}
+
+	// Undrain node after creating the reservation to allow health checks to run.
+	err = c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
+	if err != nil {
+		return fmt.Errorf("failed to undrain slurm node after creating a maintenance reservaiton: %w", err)
+	}
+
+	return nil
+}
+
+const MaintenanceReservationPrefix = "soperatorchecks.suspicious"
+
+func (c *SlurmNodesController) createMaintenanceReservationForSlurmNode(
+	ctx context.Context,
+	slurmClusterName types.NamespacedName,
+	slurmNodeName string,
+) error {
+	logger := log.FromContext(ctx).WithName("SlurmNodesController.createMaintenanceReservationForSlurmNode").V(1).
+		WithValues(
+			"slurmNodeName", slurmNodeName,
+			"slurmCluster", slurmClusterName,
+		)
+	logger.Info("create maintenance reservation for slurm node")
+
+	slurmAPIClient, found := c.slurmAPIClients.GetClient(slurmClusterName)
+	if !found {
+		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
+	}
+
+	err := addReservationForNode(ctx, MaintenanceReservationPrefix, slurmNodeName, slurmAPIClient, logger)
+	if err != nil {
+		return fmt.Errorf("create reservation: %w", err)
+	}
+
+	logger.V(1).Info("slurm node added to a maintenance reservation")
+	return nil
 }
 
 // https://github.com/kubernetes/apimachinery/blob/release-1.33/pkg/apis/meta/v1/types.go#L1640

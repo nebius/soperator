@@ -28,6 +28,7 @@ func renderPodTemplateSpec(
 			Labels: matchLabels,
 		},
 		Spec: corev1.PodSpec{
+			HostUsers:          clusterValues.SlurmExporter.HostUsers,
 			Affinity:           nodeFilter.Affinity,
 			Tolerations:        nodeFilter.Tolerations,
 			NodeSelector:       nodeFilter.NodeSelector,

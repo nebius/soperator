@@ -28,33 +28,14 @@ However, you can disable its installation if you already have OpenKruise operato
 
 To install the Soperator Helm chart, follow these steps:
 
-### Experimental OCI
-
-Make sure you have experimental OCI-based registries:
-```bash
-export HELM_EXPERIMENTAL_OCI=1
-````
-
-### Add the Helm Repository
+### Install Soperator
 
 For the stable version:
 ```bash
-helm repo add soperator oci://cr.eu-north1.nebius.cloud/soperator
+helm install soperator oci://cr.eu-north1.nebius.cloud/soperator/helm-soperator --namespace soperator-system --create-namespace
 ```
 
 For the dev version:
 ```bash
-helm repo add soperator-dev oci://cr.eu-north1.nebius.cloud/soperator-unstable
-```
-
-### Update Helm Repositories
-
-```bash
-helm repo update
-```
-
-### Install Soperator
-
-```bash
-helm install soperator soperator[-dev]/helm-soperator --namespace soperator-system --create-namespace
+helm install soperator oci://cr.eu-north1.nebius.cloud/soperator-unstable/helm-soperator --namespace soperator-system --create-namespace
 ```

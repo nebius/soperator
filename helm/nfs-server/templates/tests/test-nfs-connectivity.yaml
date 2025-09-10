@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "nfs-server.fullname" . }}-test"
+  labels:
+    {{- include "nfs-server.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: nfs-test
+      image: alpine:3.18
+      command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Installing NFS utilities..."
+          apk add --no-cache nfs-utils
+
+          echo "Testing NFS server connectivity..."
+          NFS_SERVER="{{ include "nfs-server.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local"
+
+          echo "Checking if NFS server is reachable..."
+          nc -z -v $NFS_SERVER {{ .Values.service.nfsPort }}
+
+          echo "Testing showmount command..."
+          showmount -e $NFS_SERVER
+
+          echo "Testing mount functionality..."
+          mkdir -p /mnt/nfs-test
+          mount -t nfs4 $NFS_SERVER:{{ .Values.nfs.sharedDirectory }} /mnt/nfs-test
+
+          echo "Testing write access..."
+          {{- if not .Values.nfs.readOnly }}
+          echo "test-$(date)" > /mnt/nfs-test/test-file.txt
+          cat /mnt/nfs-test/test-file.txt
+          rm /mnt/nfs-test/test-file.txt
+          {{- else }}
+          echo "Read-only mode detected, skipping write test"
+          {{- end }}
+
+          echo "Testing read access..."
+          ls -la /mnt/nfs-test/
+
+          echo "Unmounting NFS share..."
+          umount /mnt/nfs-test
+
+          echo "NFS server test completed successfully!"
+      securityContext:
+        privileged: true
+        runAsUser: 0
+  {{- with .Values.nodeSelector }}
+  nodeSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.tolerations }}
+  tolerations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
