@@ -32,4 +32,8 @@ upgradeCuda:
   cudaVersion: "12.4.1-1"
 upgradeHealthChecker:
   healthCheckerVersion: "1.0.0-150.250826"
+ensureDirSnccldLogs:
+  enabled: false
+  dir: /opt/soperator-outputs/nccl_logs
+  schedule: 15 0 * * *
 reservationPrefix: soperatorchecks.suspicious
