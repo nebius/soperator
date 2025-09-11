@@ -1,6 +1,8 @@
 package soperatorchecks
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
@@ -70,6 +72,12 @@ func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Containe
 		slurmEnvVars = append(slurmEnvVars, corev1.EnvVar{
 			Name:  consts.ActiveCheckEachWorkerJobsEnv,
 			Value: "true",
+		})
+	}
+	if check.Spec.SlurmJobSpec.MaxNumberOfJobs != nil {
+		slurmEnvVars = append(slurmEnvVars, corev1.EnvVar{
+			Name:  consts.ActiveCheckMaxNumberOfJobsEnv,
+			Value: fmt.Sprint(*check.Spec.SlurmJobSpec.MaxNumberOfJobs),
 		})
 	}
 

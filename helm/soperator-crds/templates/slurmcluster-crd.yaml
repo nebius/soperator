@@ -5113,6 +5113,14 @@ spec:
                           type: object
                         type: array
                     type: object
+                  maxNumberOfJobs:
+                    default: 0
+                    description: |-
+                      MaxNumberOfJobs defines the maximum number of simultaneously running jobs.
+                      If it's less than number of workers random MaxNumberOfJobs workers will be chosen.
+                      If MaxNumberOfJobs equals 0 there is no limitation.
+                    format: int64
+                    type: integer
                   mungeContainer:
                     properties:
                       appArmorProfile:

@@ -242,7 +242,7 @@ slurmCluster:
 soperatorActiveChecks:
   enabled: true
   interval: 5m
-  timeout: 50m
+  timeout: 120m
   version: 1.21.12
   releaseName: soperator-activechecks
   namespace: soperator

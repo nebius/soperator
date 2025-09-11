@@ -168,6 +168,12 @@ type SlurmJobSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	EachWorkerJobs bool `json:"eachWorkerJobs,omitempty"`
+	// MaxNumberOfJobs defines the maximum number of simultaneously running jobs.
+	// If it's less than number of workers random MaxNumberOfJobs workers will be chosen.
+	// If MaxNumberOfJobs equals 0 there is no limitation.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=0
+	MaxNumberOfJobs *int64 `json:"maxNumberOfJobs,omitempty"`
 }
 
 // ActiveCheckK8sJobsStatus defines the observed state of ActiveCheck k8s jobs.
