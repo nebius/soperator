@@ -14,14 +14,13 @@ Interactive behavior:
 """
 
 import argparse
-import grp
 import os
 import pwd
+import grp
 import shlex
 import shutil
 import subprocess
 import sys
-
 
 def ensure_root():
   if hasattr(os, "geteuid"):
