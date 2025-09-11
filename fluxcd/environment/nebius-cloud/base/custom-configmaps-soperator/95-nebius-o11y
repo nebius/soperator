@@ -10,4 +10,6 @@ printf "  1. Execute this command on your local computer:\n"
 printf "     \`ssh -L 9428:vm-logs-victoria-logs-single-server.logs-system.svc:9428 -N <USER>@<LOGIN_IP>\`\n"
 printf "  2. Open \`localhost:9428/select/vmui\` in your browser\n"
 
+printf "\nDocumentation: https://docs.nebius.com/slurm-soperator"
+
 printf "\n"
