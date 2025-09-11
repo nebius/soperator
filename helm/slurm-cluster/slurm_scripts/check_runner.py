@@ -46,9 +46,13 @@ class Check(typing.NamedTuple):
   # - "<num>x<gpu_model>" - run on nodes with <num> GPUs of model <gpu_model>
   platforms: typing.List[str] = ["any"]
 
-  # Whether to skip this check for jobs that don't allocate GPUs.
+  # Whether to skip this check for jobs that don't allocate any GPUs.
   # Allows to skip the check for CPU-only jobs in "prolog" and "epilog" contexts even if the node is equipped with GPUs.
   skip_for_cpu_jobs: bool = False
+
+  # Whether to skip this check for jobs that don't allocate all available GPUs.
+  # CPU-only jobs are not considered "partial GPU"
+  skip_for_partial_gpu_jobs: bool = False
 
   # What contexts this check should run in.
   # Supported values:
@@ -186,19 +190,23 @@ def main():
 
 # Filter checks for the current environment
 def filter_applicable_checks(checks: typing.List[Check]) -> typing.List[Check]:
+  slurm_job_num_gpus: int = 0 if SLURM_JOB_GPUS == "" else len(SLURM_JOB_GPUS.split(","))
+
   # Filter by context and skip_for_cpu_jobs
-  slurm_job_cpu_only: bool = SLURM_JOB_GPUS == "" and CHECKS_CONTEXT in ["prolog", "epilog"]
   applicable_checks = [
     check for check in checks
     if ("any" in check.contexts or CHECKS_CONTEXT in check.contexts)
-       and not (check.skip_for_cpu_jobs and slurm_job_cpu_only)
+       and not (check.skip_for_cpu_jobs and slurm_job_num_gpus == 0)
   ]
 
-  # Only detect platform tags and filter by it if needed
+  # Only detect platform tags and filter by platform + skip_for_partial_gpu_jobs if needed
   needs_platform_filter = any(
     "any" not in check.platforms for check in applicable_checks
   )
-  if needs_platform_filter:
+  needs_job_gpu_filter = any(
+    check.skip_for_partial_gpu_jobs for check in applicable_checks
+  )
+  if needs_platform_filter or needs_job_gpu_filter:
     platform_tags = get_platform_tags()
 
     # Filter by platform
@@ -207,6 +215,16 @@ def filter_applicable_checks(checks: typing.List[Check]) -> typing.List[Check]:
       if (
         "any" in check.platforms or
         any(tag in check.platforms for tag in platform_tags)
+      )
+    ]
+
+    # Filter by skip_for_partial_gpu_jobs
+    applicable_checks = [
+      check for check in applicable_checks
+      if (
+        not check.skip_for_partial_gpu_jobs or       # Take for any job if the check flag is false
+        slurm_job_num_gpus == 0 or                   # Take for CPU-only jobs (they are not "partial GPU")
+        f"{slurm_job_num_gpus}xGPU" in platform_tags # Take for full-GPU jobs
       )
     ]
 

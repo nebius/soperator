@@ -6,10 +6,11 @@ SLURM_STATS_CMD="
 
   if [ \"\${CONTROLLERS_EXITCODE}\" = \"0\" ]; then
     printf \"\\nSlurm nodes:\\n\"
-    sinfo --Format=PartitionName:12,CPUs:7,Memory:10,Gres:37,Nodes:8,NodeList:26,StateLong:8,Reason:50 2>/dev/null | sed 's/^/  /'
+    partitions=\$(scontrol show partitions --oneliner | grep -v ' Hidden=YES ' | awk -F'[ =]' '{print \$2}' | paste -sd, -)
+    sinfo --partition=\"\$partitions\" --Format=PartitionName:12,CPUs:7,Memory:10,Gres:37,Nodes:8,NodeList:26,StateLong:8,Reason:50 2>/dev/null | sed 's/^/  /'
     printf \"\\n\"
 
-    QUEUE=\$(squeue --Format=JobID:12,Partition:12,Name:24,UserName:16,State:10,TimeUsed:9,NumNodes:8,ReasonList:50 2>/dev/null | awk 'NR == 1 || \$4 != \"root\"')
+    QUEUE=\$(squeue --partition=\"\$partitions\" --Format=JobID:12,Partition:12,Name:24,UserName:16,State:10,TimeUsed:9,NumNodes:8,ReasonList:50 2>/dev/null)
     QUEUE_LINES=\$(printf \"%s\" \"\${QUEUE}\" | grep -c '^')
     if [ \"\${QUEUE_LINES}\" -le 1 ]; then
       printf \"No user jobs in the queue\\n\"

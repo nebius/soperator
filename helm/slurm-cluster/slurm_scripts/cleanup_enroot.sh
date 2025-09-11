@@ -2,7 +2,7 @@
 
 set -euxo pipefail
 
-echo "[$(date)] Cleanup leftover enroot containers if the job is restarted with the same ID"
+echo "[$(date)] Cleanup leftover enroot containers for this job"
 
 if [[ -z "${SLURM_JOB_ID:-}" ]]; then
     echo "Slurm job ID is not known" >&2
