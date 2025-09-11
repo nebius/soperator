@@ -26,9 +26,9 @@ import (
 
 // Helper function to setup mocks and collect state for tests
 func setupCollectorWithMockedData(t *testing.T, collector *MetricsCollector, mockClient *fake.MockClient, nodes []slurmapi.Node, jobs []slurmapi.Job, diag *api.V0041OpenapiDiagResp) {
-	mockClient.EXPECT().ListNodes(mock.Anything).Return(nodes, nil)
-	mockClient.EXPECT().ListJobs(mock.Anything).Return(jobs, nil)
-	mockClient.EXPECT().GetDiag(mock.Anything).Return(diag, nil)
+	mockClient.EXPECT().ListNodes(mock.Anything).Return(nodes, nil).Once()
+	mockClient.EXPECT().ListJobs(mock.Anything).Return(jobs, nil).Once()
+	mockClient.EXPECT().GetDiag(mock.Anything).Return(diag, nil).Once()
 
 	ctx := context.Background()
 
@@ -853,6 +853,9 @@ func toPrometheusLikeString(t *testing.T, metric prometheus.Metric) string {
 	case pb.GetCounter() != nil:
 		metricType = "COUNTER"
 		value = pb.GetCounter().GetValue()
+	case pb.GetHistogram() != nil:
+		metricType = "HISTOGRAM"
+		value = float64(pb.GetHistogram().GetSampleCount())
 	default:
 		t.Fatalf("metric %q has unexpected type", metricName)
 	}
@@ -965,5 +968,384 @@ func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
 		assert.Equal(t, float64(1), failuresTotal, "Expected 1 collection failure")
 		assert.Greater(t, exportedCount, float64(0), "Expected some metrics to be exported")
 		assert.Greater(t, metricsCount, 0, "Expected some metrics to be collected")
+	})
+}
+
+func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
+	log.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	t.Run("track unavailability state transitions", func(t *testing.T) {
+		synctest.Run(func() {
+			mockClient := &fake.MockClient{}
+			collector := NewMetricsCollector(mockClient)
+
+			healthyNodes := []slurmapi.Node{
+				{
+					Name:       "node1",
+					InstanceID: "instance1",
+					States: map[api.V0041NodeState]struct{}{
+						api.V0041NodeStateIDLE: {},
+					},
+					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
+					Address: "10.0.0.1",
+				},
+			}
+
+			// Setup initial healthy state
+			setupCollectorWithMockedData(t, collector, mockClient, healthyNodes, []slurmapi.Job{}, nil)
+
+			outageNodes := []slurmapi.Node{
+				{
+					Name:       "node1",
+					InstanceID: "instance1",
+					States: map[api.V0041NodeState]struct{}{
+						api.V0041NodeStateDOWN: {},
+					},
+					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
+					Address: "10.0.0.1",
+				},
+			}
+
+			mockClient.EXPECT().ListNodes(mock.Anything).Return(outageNodes, nil).Once()
+			mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+			mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
+
+			time.Sleep(100 * time.Millisecond)
+			err := collector.updateState(context.Background())
+			assert.NoError(t, err)
+
+			recoveredNodes := []slurmapi.Node{
+				{
+					Name:       "node1",
+					InstanceID: "instance1",
+					States: map[api.V0041NodeState]struct{}{
+						api.V0041NodeStateIDLE: {},
+					},
+					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
+					Address: "10.0.0.1",
+				},
+			}
+
+			mockClient.EXPECT().ListNodes(mock.Anything).Return(recoveredNodes, nil).Once()
+			mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+			mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
+
+			time.Sleep(100 * time.Millisecond)
+			err = collector.updateState(context.Background())
+			assert.NoError(t, err)
+
+			// Check state after recovery
+			state := collector.state.Load()
+			t.Logf("Current unavailability start times: %v", state.nodeUnavailabilityStartTimes)
+
+			// Collect metrics
+			ch := make(chan prometheus.Metric, 100)
+			go func() {
+				collector.Collect(ch)
+				close(ch)
+			}()
+
+			var metrics []prometheus.Metric
+			for metric := range ch {
+				metrics = append(metrics, metric)
+			}
+
+			// Check for unavailability duration metric
+			found := false
+			for _, metric := range metrics {
+				metricText := toPrometheusLikeString(t, metric)
+				t.Logf("Metric: %s", metricText)
+				if strings.Contains(metricText, "slurm_node_unavailability_duration_seconds") {
+					found = true
+					assert.Contains(t, metricText, "node_name=\"node1\"")
+					// Should have at least 1 observation with total sum > 0
+					dto := &dto.Metric{}
+					_ = metric.Write(dto)
+					assert.Greater(t, float64(dto.Histogram.GetSampleCount()), 0.0)
+					assert.Greater(t, dto.Histogram.GetSampleSum(), 0.0)
+					break
+				}
+			}
+			assert.True(t, found, "Should have found unavailability duration metric")
+		})
+	})
+
+	t.Run("track draining state transitions", func(t *testing.T) {
+		synctest.Run(func() {
+			mockClient := &fake.MockClient{}
+			collector := NewMetricsCollector(mockClient)
+
+			allocatedNodes := []slurmapi.Node{
+				{
+					Name:       "node1",
+					InstanceID: "instance1",
+					States: map[api.V0041NodeState]struct{}{
+						api.V0041NodeStateALLOCATED: {},
+					},
+					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
+					Address: "10.0.0.1",
+				},
+			}
+
+			// Setup initial allocated state
+			setupCollectorWithMockedData(t, collector, mockClient, allocatedNodes, []slurmapi.Job{}, nil)
+
+			// Node starts draining (DRAIN+ALLOCATED)
+			drainingNodes := []slurmapi.Node{
+				{
+					Name:       "node1",
+					InstanceID: "instance1",
+					States: map[api.V0041NodeState]struct{}{
+						api.V0041NodeStateALLOCATED: {},
+						api.V0041NodeStateDRAIN:     {},
+					},
+					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
+					Address: "10.0.0.1",
+				},
+			}
+
+			mockClient.EXPECT().ListNodes(mock.Anything).Return(drainingNodes, nil).Once()
+			mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+			mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
+
+			time.Sleep(100 * time.Millisecond)
+			err := collector.updateState(context.Background())
+			assert.NoError(t, err)
+
+			// Node finishes draining (back to IDLE)
+			idleNodes := []slurmapi.Node{
+				{
+					Name:       "node1",
+					InstanceID: "instance1",
+					States: map[api.V0041NodeState]struct{}{
+						api.V0041NodeStateIDLE: {},
+					},
+					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
+					Address: "10.0.0.1",
+				},
+			}
+
+			mockClient.EXPECT().ListNodes(mock.Anything).Return(idleNodes, nil).Once()
+			mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+			mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
+
+			// Simulate more time passing
+			time.Sleep(100 * time.Millisecond)
+			err = collector.updateState(context.Background())
+			assert.NoError(t, err)
+
+			// Collect metrics
+			ch := make(chan prometheus.Metric, 100)
+			go func() {
+				collector.Collect(ch)
+				close(ch)
+			}()
+
+			var metrics []prometheus.Metric
+			for metric := range ch {
+				metrics = append(metrics, metric)
+			}
+
+			// Check for draining time metric
+			found := false
+			for _, metric := range metrics {
+				metricText := toPrometheusLikeString(t, metric)
+				if strings.Contains(metricText, "slurm_node_draining_duration_seconds") {
+					found = true
+					assert.Contains(t, metricText, "node_name=\"node1\"")
+					// Should have at least 1 observation with total sum > 0
+					dto := &dto.Metric{}
+					_ = metric.Write(dto)
+					assert.Greater(t, float64(dto.Histogram.GetSampleCount()), 0.0)
+					assert.Greater(t, dto.Histogram.GetSampleSum(), 0.0)
+					break
+				}
+			}
+			assert.True(t, found, "Should have found draining time metric")
+
+			mockClient.AssertExpectations(t)
+		})
+	})
+
+	t.Run("IDLE+DRAIN is considered unavailability", func(t *testing.T) {
+		synctest.Run(func() {
+			mockClient := &fake.MockClient{}
+			collector := NewMetricsCollector(mockClient)
+
+			healthyNodes := []slurmapi.Node{
+				{
+					Name:       "node1",
+					InstanceID: "instance1",
+					States: map[api.V0041NodeState]struct{}{
+						api.V0041NodeStateIDLE: {},
+					},
+					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
+					Address: "10.0.0.1",
+				},
+			}
+
+			// Setup initial healthy state
+			setupCollectorWithMockedData(t, collector, mockClient, healthyNodes, []slurmapi.Job{}, nil)
+
+			idleDrainNodes := []slurmapi.Node{
+				{
+					Name:       "node1",
+					InstanceID: "instance1",
+					States: map[api.V0041NodeState]struct{}{
+						api.V0041NodeStateIDLE:  {},
+						api.V0041NodeStateDRAIN: {},
+					},
+					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
+					Address: "10.0.0.1",
+				},
+			}
+
+			mockClient.EXPECT().ListNodes(mock.Anything).Return(idleDrainNodes, nil).Once()
+			mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+			mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
+
+			err := collector.updateState(context.Background())
+			assert.NoError(t, err)
+
+			// Verify the node is tracked as in unavailability
+			state := collector.state.Load()
+			assert.Contains(t, state.nodeUnavailabilityStartTimes, "node1")
+			assert.NotContains(t, state.nodeDrainingStartTimes, "node1") // Should not be draining
+
+			mockClient.AssertExpectations(t)
+		})
+	})
+
+	t.Run("DRAIN+MIXED is considered draining", func(t *testing.T) {
+		synctest.Run(func() {
+			mockClient := &fake.MockClient{}
+			collector := NewMetricsCollector(mockClient)
+
+			mixedNodes := []slurmapi.Node{
+				{
+					Name:       "node1",
+					InstanceID: "instance1",
+					States: map[api.V0041NodeState]struct{}{
+						api.V0041NodeStateMIXED: {},
+					},
+					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
+					Address: "10.0.0.1",
+				},
+			}
+
+			// Setup initial mixed state
+			setupCollectorWithMockedData(t, collector, mockClient, mixedNodes, []slurmapi.Job{}, nil)
+
+			drainingMixedNodes := []slurmapi.Node{
+				{
+					Name:       "node1",
+					InstanceID: "instance1",
+					States: map[api.V0041NodeState]struct{}{
+						api.V0041NodeStateMIXED: {},
+						api.V0041NodeStateDRAIN: {},
+					},
+					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
+					Address: "10.0.0.1",
+				},
+			}
+
+			mockClient.EXPECT().ListNodes(mock.Anything).Return(drainingMixedNodes, nil).Once()
+			mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+			mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
+
+			err := collector.updateState(context.Background())
+			assert.NoError(t, err)
+
+			// Verify the node is tracked as draining
+			state := collector.state.Load()
+			assert.Contains(t, state.nodeDrainingStartTimes, "node1")
+			assert.NotContains(t, state.nodeUnavailabilityStartTimes, "node1") // Should not be in unavailability
+
+			mockClient.AssertExpectations(t)
+		})
+	})
+}
+
+func TestNodeStateDetectionFunctions(t *testing.T) {
+	t.Run("isNodeUnavailable", func(t *testing.T) {
+		// DOWN state is unavailability
+		downNode := slurmapi.Node{
+			States: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateDOWN: {},
+			},
+		}
+		assert.True(t, isNodeUnavailable(downNode))
+
+		// IDLE+DRAIN is unavailability
+		idleDrainNode := slurmapi.Node{
+			States: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE:  {},
+				api.V0041NodeStateDRAIN: {},
+			},
+		}
+		assert.True(t, isNodeUnavailable(idleDrainNode))
+
+		// Just IDLE is not unavailability
+		idleNode := slurmapi.Node{
+			States: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE: {},
+			},
+		}
+		assert.False(t, isNodeUnavailable(idleNode))
+
+		// ALLOCATED+DRAIN is not unavailability (it's draining)
+		allocDrainNode := slurmapi.Node{
+			States: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateALLOCATED: {},
+				api.V0041NodeStateDRAIN:     {},
+			},
+		}
+		assert.False(t, isNodeUnavailable(allocDrainNode))
+	})
+
+	t.Run("isNodeDraining", func(t *testing.T) {
+		// DRAIN+ALLOCATED is draining
+		drainAllocNode := slurmapi.Node{
+			States: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateALLOCATED: {},
+				api.V0041NodeStateDRAIN:     {},
+			},
+		}
+		assert.True(t, isNodeDraining(drainAllocNode))
+
+		// DRAIN+MIXED is draining
+		drainMixedNode := slurmapi.Node{
+			States: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateMIXED: {},
+				api.V0041NodeStateDRAIN: {},
+			},
+		}
+		assert.True(t, isNodeDraining(drainMixedNode))
+
+		// DRAIN+IDLE is not draining (it's unavailability)
+		drainIdleNode := slurmapi.Node{
+			States: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE:  {},
+				api.V0041NodeStateDRAIN: {},
+			},
+		}
+		assert.False(t, isNodeDraining(drainIdleNode))
+
+		// No DRAIN flag means not draining
+		allocNode := slurmapi.Node{
+			States: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateALLOCATED: {},
+			},
+		}
+		assert.False(t, isNodeDraining(allocNode))
+
+		// DOWN+DRAIN is not draining (it's unavailability)
+		downDrainNode := slurmapi.Node{
+			States: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateDOWN:  {},
+				api.V0041NodeStateDRAIN: {},
+			},
+		}
+		assert.False(t, isNodeDraining(downDrainNode))
 	})
 }
