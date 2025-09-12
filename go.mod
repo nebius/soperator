@@ -1,6 +1,6 @@
 module nebius.ai/slurm-operator
 
-go 1.24.2
+go 1.24.3
 
 require (
 	github.com/SlinkyProject/slurm-client v0.3.1-20250801102150-043094ce1e4e
@@ -23,12 +23,12 @@ require (
 	golang.org/x/crypto v0.41.0
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
 	istio.io/pkg v0.0.0-20241216214326-d70796207df3
-	k8s.io/api v0.33.3
-	k8s.io/apimachinery v0.33.3
-	k8s.io/client-go v0.33.3
+	k8s.io/api v0.33.4
+	k8s.io/apimachinery v0.33.4
+	k8s.io/client-go v0.33.4
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 	sigs.k8s.io/controller-runtime v0.21.0
-	sigs.k8s.io/security-profiles-operator v0.8.4
+	sigs.k8s.io/security-profiles-operator v0.10.0
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -39,10 +39,10 @@ require (
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
-	github.com/cert-manager/cert-manager v1.17.1 // indirect
-	github.com/containers/common v0.60.4 // indirect
+	github.com/cert-manager/cert-manager v1.18.2 // indirect
+	github.com/containers/common v0.64.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/fsnotify/fsnotify v1.8.0 // indirect
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.8.0 // indirect
 	github.com/getkin/kin-openapi v0.132.0 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
@@ -66,11 +66,11 @@ require (
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/runtime-spec v1.2.0 // indirect
+	github.com/opencontainers/runtime-spec v1.2.1 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
-	github.com/seccomp/libseccomp-golang v0.10.0 // indirect
+	github.com/seccomp/libseccomp-golang v0.11.1 // indirect
 	github.com/sethvargo/go-envconfig v1.1.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
@@ -85,7 +85,7 @@ require (
 	golang.org/x/sync v0.16.0 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
-	sigs.k8s.io/release-utils v0.8.1 // indirect
+	sigs.k8s.io/release-utils v0.12.1 // indirect
 )
 
 require (
@@ -122,9 +122,9 @@ require (
 	golang.org/x/sys v0.35.0
 	golang.org/x/term v0.34.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
-	golang.org/x/time v0.11.0 // indirect
+	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/tools v0.36.0 // indirect
-	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
+	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/protobuf v1.36.7 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
