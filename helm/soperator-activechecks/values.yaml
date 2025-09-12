@@ -1,3 +1,5 @@
+# environment could be on of prod, dev, testing
+environment: prod
 slurmClusterRefName: "soperator"
 jobContainer:
   env:

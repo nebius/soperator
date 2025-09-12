@@ -9,7 +9,11 @@ spec:
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 */4 * * *" # Every 4 hours
   suspend: false
+{{- if has .Values.environment (list "prod" "dev" "testing") }}
   runAfterCreation: true
+{{- else }}
+  runAfterCreation: false
+{{- end }}
   slurmJobSpec:
     sbatchScript: |
 {{ .Files.Get "scripts/all-reduce-perf-nccl.sh" | indent 6 }}

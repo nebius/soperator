@@ -9,7 +9,11 @@ spec:
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 16 * * *" # 1 time a day at 16:00 UTC
   suspend: false
+{{- if has .Values.environment (list "prod" "dev" "testing") }}
   runAfterCreation: true
+{{- else }}
+  runAfterCreation: false
+{{- end }}
   slurmJobSpec:
     sbatchScript: |
 {{ tpl (.Files.Get "scripts/mem-perf.sh") . | indent 6 }}

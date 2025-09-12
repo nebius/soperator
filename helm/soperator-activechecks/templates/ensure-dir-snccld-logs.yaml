@@ -9,7 +9,11 @@ spec:
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: {{ .Values.ensureDirSnccldLogs.schedule | default "15 0 * * *" | quote }}
   suspend: false
+{{- if has .Values.environment (list "prod" "dev" "testing") }}
   runAfterCreation: true
+{{- else }}
+  runAfterCreation: false
+{{- end }}
   k8sJobSpec:
     jobContainer:
       command:

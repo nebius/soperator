@@ -9,7 +9,11 @@ spec:
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 0 */3 * *" # every 3d day (3, 6, 9, etc...)
   suspend: false
+{{- if has .Values.environment (list "prod" "testing") }}
   runAfterCreation: true
+{{- else }}
+  runAfterCreation: false
+{{- end }}
   slurmJobSpec:
     sbatchScript: |
 {{ tpl (.Files.Get "scripts/gpu-fryer.sh") . | indent 6 }}
