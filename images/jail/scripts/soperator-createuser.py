@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-createuser: a thin wrapper around Ubuntu/Debian `adduser` with sane defaults.
+soperator-createuser: a thin wrapper around Ubuntu/Debian `adduser` with sane defaults.
 
 Defaults:
 - Uses `--disabled-password` unless --with-password is given or caller overrides.
@@ -86,7 +86,7 @@ def add_to_group(username: str, group: str):
 
 def parse_args():
   p = argparse.ArgumentParser(
-    prog="createuser",
+    prog="soperator-createuser",
     formatter_class=argparse.RawTextHelpFormatter,
     description="Wrapper around `adduser` with safe defaults and SSH setup.",
   )
