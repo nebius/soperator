@@ -8,7 +8,11 @@ spec:
   dependsOn: [ "create-user-soperatorchecks", "wait-for-topology" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   suspend: true
+{{- if has .Values.environment (list "prod") }}
   runAfterCreation: true
+{{- else }}
+  runAfterCreation: false
+{{- end }}
   slurmJobSpec:
     sbatchScript: |
 {{ .Files.Get "scripts/dcgmi-diag-r3.sh" | indent 6 }}

@@ -35,6 +35,7 @@ spec:
     {{- toYaml .Values.soperatorActiveChecks.overrideValues | nindent 4 }}
   {{- else }}
     clusterName: soperator
+    environment: {{ .Values.environment }}
   {{- end }}
   valuesFrom:
   - kind: ConfigMap

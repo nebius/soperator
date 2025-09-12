@@ -7,7 +7,11 @@ spec:
   name: "wait-for-topology"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   suspend: true
+{{- if has .Values.environment (list "prod" "dev" "testing") }}
   runAfterCreation: true
+{{- else }}
+  runAfterCreation: false
+{{- end }}
   k8sJobSpec:
     jobContainer:
       command:

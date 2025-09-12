@@ -116,6 +116,9 @@ func readTFVars(t *testing.T, tfVarsFilename string) map[string]interface{} {
 }
 
 func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[string]interface{} {
+	// environment = "prod"
+	tfVars["environment"] = "testing"
+
 	// slurm_operator_version = "1.19.0"
 	tfVars["slurm_operator_version"] = cfg.SoperatorVersion
 	// slurm_operator_stable = true
