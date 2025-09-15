@@ -181,15 +181,11 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 		var jobName string
 		var submitTime *metav1.Time
-		var failReasons []string
-		var degradeReasons []string
-		var failJobs []string
-		var degradeJobs []string
-		if activeCheck.Status.SlurmJobsStatus.LastJobId == firstJobId {
-			failReasons = activeCheck.Status.SlurmJobsStatus.LastJobFailReasons
-			degradeReasons = activeCheck.Status.SlurmJobsStatus.LastJobDegradeReasons
-			failJobs = activeCheck.Status.SlurmJobsStatus.LastRunFailJobs
-			degradeJobs = activeCheck.Status.SlurmJobsStatus.LastRunDegradeJobs
+		var failJobsAndReasons []slurmv1alpha1.JobAndReason
+		var degradeJobsAndReasons []slurmv1alpha1.JobAndReason
+		if activeCheck.Status.SlurmJobsStatus.LastRunId == firstJobId {
+			failJobsAndReasons = activeCheck.Status.SlurmJobsStatus.LastRunFailJobsAndReasons
+			degradeJobsAndReasons = activeCheck.Status.SlurmJobsStatus.LastRunDegradeJobsAndReasons
 		}
 		requeue := false
 		final := false
@@ -221,8 +217,10 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 				switch {
 				case slurmJob.IsFailedState():
-					failJobs = append(failJobs, fmt.Sprint(slurmJob.ID))
-					failReasons = append(failReasons, slurmJob.StateReason)
+					failJobsAndReasons = append(failJobsAndReasons, slurmv1alpha1.JobAndReason{
+						JobID:  fmt.Sprint(slurmJob.ID),
+						Reason: slurmJob.StateReason,
+					})
 					err = executeFailureReactions(ctx, slurmJob, activeCheck, slurmAPIClient, logger)
 					if err != nil {
 						return ctrl.Result{}, fmt.Errorf("executing failure reactions: %w", err)
@@ -233,8 +231,10 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 						return ctrl.Result{}, fmt.Errorf("executing success reactions: %w", err)
 					}
 				default:
-					degradeJobs = append(degradeJobs, fmt.Sprint(slurmJob.ID))
-					degradeReasons = append(degradeReasons, slurmJob.StateReason)
+					degradeJobsAndReasons = append(failJobsAndReasons, slurmv1alpha1.JobAndReason{
+						JobID:  fmt.Sprint(slurmJob.ID),
+						Reason: slurmJob.StateReason,
+					})
 					// Do nothing. The job could have been cancelled or interrupted. The job will run again.
 					logger.Info(fmt.Sprintf("unhandled state. The job is probably cancelled or interrupted and it will run again. Current state: %s ", slurmJob.State))
 				}
@@ -258,28 +258,26 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		// It doesn't really make sense to update the status of the active check.
 		// Leaving this logic as it is for now.
 
-		var state consts.ActiveCheckSlurmJobStatus
+		var state consts.ActiveCheckSlurmRunStatus
 		switch {
 		case requeue:
-			state = consts.ActiveCheckSlurmJobStatusInProgress
-		case len(failJobs) != 0:
-			state = consts.ActiveCheckSlurmJobStatusFailed
-		case len(degradeJobs) != 0:
-			state = consts.ActiveCheckSlurmJobStatusDegraded
+			state = consts.ActiveCheckSlurmRunStatusInProgress
+		case len(failJobsAndReasons) != 0:
+			state = consts.ActiveCheckSlurmRunStatusFailed
+		case len(degradeJobsAndReasons) != 0:
+			state = consts.ActiveCheckSlurmRunStatusDegraded
 		default:
-			state = consts.ActiveCheckSlurmJobStatusComplete
+			state = consts.ActiveCheckSlurmRunStatusComplete
 		}
 
 		activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{
-			LastJobId:             firstJobId,
-			LastJobName:           jobName,
-			LastJobState:          state,
-			LastJobFailReasons:    failReasons,
-			LastJobDegradeReasons: degradeReasons,
-			LastRunFailJobs:       failJobs,
-			LastRunDegradeJobs:    degradeJobs,
-			LastJobSubmitTime:     submitTime,
-			LastTransitionTime:    metav1.Now(),
+			LastRunId:                    firstJobId,
+			LastRunName:                  jobName,
+			LastRunStatus:                state,
+			LastRunFailJobsAndReasons:    failJobsAndReasons,
+			LastRunDegradeJobsAndReasons: degradeJobsAndReasons,
+			LastRunSubmitTime:            submitTime,
+			LastTransitionTime:           metav1.Now(),
 		}
 
 		logger = logger.WithValues(logfield.ResourceKV(activeCheck)...)

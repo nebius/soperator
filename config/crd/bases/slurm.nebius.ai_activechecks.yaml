@@ -23,17 +23,17 @@ spec:
       jsonPath: .status.k8sJobsStatus.lastJobStatus
       name: K8s Job Status
       type: string
-    - description: Last Slurm job status
-      jsonPath: .status.slurmJobsStatus.lastJobState
-      name: Slurm Job Status
+    - description: Last Slurm run status
+      jsonPath: .status.slurmJobsStatus.lastRunStatus
+      name: Slurm Run Status
       type: string
-    - description: Last job name
-      jsonPath: .status.slurmJobsStatus.lastJobName
-      name: Last Job
+    - description: Last run name
+      jsonPath: .status.slurmJobsStatus.lastRunName
+      name: Last Run Name
       type: string
-    - description: Last job ID
-      jsonPath: .status.slurmJobsStatus.lastJobId
-      name: Last Job ID
+    - description: Last run ID
+      jsonPath: .status.slurmJobsStatus.lastRunId
+      name: Last Run ID
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
@@ -7315,33 +7315,41 @@ spec:
                 description: ActiveCheckSlurmJobsStatus defines the observed state
                   of ActiveCheck slurm jobs.
                 properties:
-                  lastJobDegradeReasons:
+                  lastRunDegradeJobsAndReasons:
                     items:
-                      type: string
+                      properties:
+                        jobID:
+                          type: string
+                        reason:
+                          type: string
+                      required:
+                      - jobID
+                      - reason
+                      type: object
                     type: array
-                  lastJobFailReasons:
+                  lastRunFailJobsAndReasons:
                     items:
-                      type: string
+                      properties:
+                        jobID:
+                          type: string
+                        reason:
+                          type: string
+                      required:
+                      - jobID
+                      - reason
+                      type: object
                     type: array
-                  lastJobId:
+                  lastRunId:
                     type: string
-                  lastJobName:
+                  lastRunName:
                     type: string
-                  lastJobState:
-                    description: ActiveCheckSlurmJobStatus defines status for ActiveCheck
+                  lastRunStatus:
+                    description: ActiveCheckSlurmRunStatus defines status for ActiveCheck
                       slurm job.
                     type: string
-                  lastJobSubmitTime:
+                  lastRunSubmitTime:
                     format: date-time
                     type: string
-                  lastRunDegradeJobs:
-                    items:
-                      type: string
-                    type: array
-                  lastRunFailJobs:
-                    items:
-                      type: string
-                    type: array
                   lastTransitionTime:
                     format: date-time
                     type: string
