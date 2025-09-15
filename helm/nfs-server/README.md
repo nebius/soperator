@@ -43,11 +43,10 @@ The chart creates a dedicated PersistentVolumeClaim (PVC) for storage, which pro
 
 ### Service Configuration
 
-The service type can be set to `headless` for direct pod access.
+The service type is `ClusterIP`.
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `service.headless` | Whether to add `clusterIP: none` to spec or not | `true` |
 | `service.nfsPort` | NFS service port | `2049` |
 | `service.rpcPort` | RPC portmapper port | `111` |
 | `service.mountdPort` | Mount daemon port | `20048` |

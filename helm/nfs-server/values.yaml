@@ -33,7 +33,6 @@ storage:
   existingClaim: ""
 
 service:
-  headless: true
   nfsPort: 2049
   rpcPort: 111
   mountdPort: 20048

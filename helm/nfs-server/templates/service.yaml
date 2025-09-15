@@ -6,9 +6,6 @@ metadata:
     {{- include "nfs-server.labels" . | nindent 4 }}
 spec:
   type: ClusterIP
-  {{- if .Values.service.headless }}
-  clusterIP: None
-  {{- end }}
   ports:
     - port: {{ .Values.service.nfsPort }}
       targetPort: nfs
