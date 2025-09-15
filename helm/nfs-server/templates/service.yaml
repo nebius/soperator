@@ -5,13 +5,9 @@ metadata:
   labels:
     {{- include "nfs-server.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.service.type }}
-  {{- if .Values.service.loadBalancerIP }}
-  loadBalancerIP: {{ .Values.service.loadBalancerIP }}
-  {{- end }}
-  {{- with .Values.service.externalIPs }}
-  externalIPs:
-    {{- toYaml . | nindent 4 }}
+  type: ClusterIP
+  {{- if .Values.service.headless }}
+  clusterIP: None
   {{- end }}
   ports:
     - port: {{ .Values.service.nfsPort }}
