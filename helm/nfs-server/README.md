@@ -4,7 +4,7 @@ A Helm chart for deploying an NFS server on Kubernetes with built-in monitoring 
 
 ## Features
 
-- **StatefulSet**: Single instance NFS server with persistent storage
+- **StatefulSet**: Single instance NFS server with persistent storage via separate PVC
 - **Storage Class**: Automatic NFS storage class creation for CSI driver
 - **ConfigMap-based Exports**: NFS exports configuration managed by Helm templates
 - **Multi-subnet Support**: Support for multiple client networks with individual export entries
@@ -30,6 +30,8 @@ A Helm chart for deploying an NFS server on Kubernetes with built-in monitoring 
 
 ### Storage Configuration
 
+The chart creates a dedicated PersistentVolumeClaim (PVC) for storage, which provides more flexibility than StatefulSet volumeClaimTemplates (allows label changes, resizing, etc.).
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `storage.size` | Size of the backing storage (ignored if existingClaim is set) | `100Gi` |
@@ -37,11 +39,14 @@ A Helm chart for deploying an NFS server on Kubernetes with built-in monitoring 
 | `storage.accessMode` | Volume access mode (ignored if existingClaim is set) | `ReadWriteOnce` |
 | `storage.existingClaim` | Name of existing PVC to use instead of creating new one | `""` |
 
+**Note**: When `storage.existingClaim` is not specified, the chart creates a PVC named `<release-name>-storage`. When `storage.existingClaim` is provided, that PVC is used instead and no new PVC is created.
+
 ### Service Configuration
+
+The service type is `ClusterIP`.
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `service.type` | Kubernetes service type | `ClusterIP` |
 | `service.nfsPort` | NFS service port | `2049` |
 | `service.rpcPort` | RPC portmapper port | `111` |
 | `service.mountdPort` | Mount daemon port | `20048` |

@@ -109,11 +109,9 @@ spec:
         - name: exports-config
           configMap:
             name: {{ include "nfs-server.exportsConfigMapName" . }}
-        {{- if .Values.storage.existingClaim }}
         - name: nfs-storage
           persistentVolumeClaim:
-            claimName: {{ .Values.storage.existingClaim }}
-        {{- end }}
+            claimName: {{ if .Values.storage.existingClaim }}{{ .Values.storage.existingClaim }}{{ else }}{{ include "nfs-server.fullname" . }}-storage{{ end }}
         {{- if .Values.monitoring.enabled }}
         - name: proc
           hostPath:
@@ -124,19 +122,3 @@ spec:
             path: /sys
             type: Directory
         {{- end }}
-  {{- if not .Values.storage.existingClaim }}
-  volumeClaimTemplates:
-    - metadata:
-        name: nfs-storage
-        labels:
-          {{- include "nfs-server.labels" . | nindent 10 }}
-      spec:
-        accessModes:
-          - {{ .Values.storage.accessMode }}
-        {{- if .Values.storage.storageClassName }}
-        storageClassName: {{ .Values.storage.storageClassName }}
-        {{- end }}
-        resources:
-          requests:
-            storage: {{ .Values.storage.size }}
-  {{- end }}

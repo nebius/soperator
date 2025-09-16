@@ -33,14 +33,9 @@ storage:
   existingClaim: ""
 
 service:
-  type: ClusterIP
   nfsPort: 2049
   rpcPort: 111
   mountdPort: 20048
-  # Optional: Load balancer IP for LoadBalancer service type
-  loadBalancerIP: ""
-  # Optional: External IPs
-  externalIPs: []
 
 # Storage Class for NFS provisioner
 storageClass:
