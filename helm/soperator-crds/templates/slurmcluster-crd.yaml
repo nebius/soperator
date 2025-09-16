@@ -7314,7 +7314,7 @@ spec:
                 description: ActiveCheckSlurmJobsStatus defines the observed state
                   of ActiveCheck slurm jobs.
                 properties:
-                  lastRunDegradeJobsAndReasons:
+                  lastRunErrorJobsAndReasons:
                     items:
                       properties:
                         jobID:
