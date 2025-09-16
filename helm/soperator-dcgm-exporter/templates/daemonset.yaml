@@ -60,7 +60,8 @@ spec:
           name: hpc-jobs-dir
       dnsPolicy: ClusterFirst
       initContainers:
-      - command:
+      - name: create-hpc-jobs-dir
+        command:
         - sh
         - -c
         - |
@@ -70,7 +71,6 @@ spec:
           value: {{ quote .Values.kubernetesClusterDomain }}
         image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
         imagePullPolicy: IfNotPresent
-        name: create-hpc-jobs-dir
         resources: {}
         securityContext:
           privileged: true
@@ -78,8 +78,10 @@ spec:
         - mountPath: /var
           mountPropagation: HostToContainer
           name: host-var
-      - args:
-        - until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done 
+      {{- if .Values.driverless }}
+      - name: toolkit-validation
+        args:
+        - until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done
         command:
         - sh
         - -c
@@ -88,7 +90,6 @@ spec:
           value: {{ quote .Values.kubernetesClusterDomain }}
         image: {{ .Values.daemonSet.toolkitValidation.image.repository }}:{{ .Values.daemonSet.toolkitValidation.image.tag | default .Chart.AppVersion }}
         imagePullPolicy: IfNotPresent
-        name: toolkit-validation
         resources: {}
         securityContext:
           privileged: true
@@ -98,10 +99,13 @@ spec:
         - mountPath: /run/nvidia
           mountPropagation: HostToContainer
           name: run-nvidia
+      {{- end }}
       nodeSelector: {{- toYaml .Values.daemonSet.nodeSelector | nindent 8 }}
       priorityClassName: system-node-critical
       restartPolicy: Always
+      {{- if .Values.driverless }}
       runtimeClassName: nvidia
+      {{- end }}
       schedulerName: default-scheduler
       securityContext: {}
       serviceAccountName: {{ include "soperator-dcgm-exporter.name" . }}-sa
@@ -115,10 +119,12 @@ spec:
           path: /var/lib/kubelet/pod-resources
           type: ""
         name: pod-gpu-resources
+      {{- if .Values.driverless }}
       - hostPath:
           path: /run/nvidia
           type: ""
         name: run-nvidia
+      {{- end }}
       - hostPath:
           path: {{ .Values.dcgmHpcJobMappingDir }}
           type: ""

@@ -2,6 +2,8 @@ kubernetesClusterDomain: cluster.local
 
 dcgmHpcJobMappingDir: /var/run/nebius/slurm
 
+driverless: true
+
 metricsPort: 9400
 
 serviceType: ClusterIP
@@ -16,7 +18,7 @@ daemonSet:
   nvidiaDcgmExporter:
     image:
       repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator/image/dcgm-exporter
-      tag: 3.3.7-3.5.0-ubuntu22.04
+      tag: 4.2.3-4.1.3-ubuntu22.04
 
     env:
       dcgmExporterListen: :9400
@@ -24,7 +26,7 @@ daemonSet:
     resources: {}
 
   nodeSelector:
-    nvidia.com/gpu.deploy.dcgm-exporter: "true"
+    nebius.com/gpu: "true"
 
 serviceMonitor:
   scrapeInterval: 30s
