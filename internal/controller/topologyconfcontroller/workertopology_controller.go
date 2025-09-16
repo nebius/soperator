@@ -175,7 +175,7 @@ func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
 			"configMapExists", configMapExists,
 			"jailedConfigExists", jailedConfigExists)
 
-		if err = r.createDefaultTopologyConfigMap(ctx, namespace, clusterName); err != nil {
+		if err = r.createDefaultTopologyResources(ctx, namespace, clusterName); err != nil {
 			return nil, fmt.Errorf("create default topology resources in namespace %q: %w", namespace, err)
 		}
 
@@ -252,8 +252,8 @@ func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace string) 
 	}
 }
 
-// CreateDefaultTopologyConfigMap creates the ConfigMap for topology configuration with default values.
-func (r *WorkerTopologyReconciler) createDefaultTopologyConfigMap(
+// createDefaultTopologyResources creates both ConfigMap and JailedConfig resources for topology configuration with default values.
+func (r *WorkerTopologyReconciler) createDefaultTopologyResources(
 	ctx context.Context, namespace, clusterName string,
 ) error {
 	listASTS, err := r.GetStatefulSetsWithFallback(ctx, namespace, clusterName)

@@ -21,7 +21,7 @@ import (
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 )
 
-func TestWorkerTopologyReconciler_createDefaultTopologyConfigMap(t *testing.T) {
+func TestWorkerTopologyReconciler_createDefaultTopologyResources(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(corev1.AddToScheme(scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
@@ -165,7 +165,7 @@ func TestWorkerTopologyReconciler_createDefaultTopologyConfigMap(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			err := reconciler.createDefaultTopologyConfigMap(ctx, namespace, clusterName)
+			err := reconciler.createDefaultTopologyResources(ctx, namespace, clusterName)
 
 			if tt.expectedError {
 				assert.Error(t, err)
