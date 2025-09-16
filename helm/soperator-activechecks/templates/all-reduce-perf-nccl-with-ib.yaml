@@ -7,7 +7,7 @@ spec:
   name: "all-reduce-perf-nccl-with-ib"
   dependsOn: [ "create-user-soperatorchecks", "wait-for-topology" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  schedule: "0 */4 * * *" # Every 4 hours
+  schedule: "25 5-23*/6 * * *" # 4 times a day at 05:25, 11:25, 17:25 and 23:25 UTC
   suspend: false
   runAfterCreation: true
   slurmJobSpec:

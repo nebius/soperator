@@ -7,7 +7,7 @@ spec:
   checkType: "k8sJob"
   name: "ensure-dir-snccld-logs"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  schedule: {{ .Values.ensureDirSnccldLogs.schedule | default "15 0 * * *" | quote }}
+  schedule: {{ .Values.ensureDirSnccldLogs.schedule | default "0 10 * * *" | quote }} # Once a day at 10:00 UTC
   suspend: false
   runAfterCreation: true
   k8sJobSpec:
