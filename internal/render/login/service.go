@@ -35,6 +35,9 @@ func RenderService(namespace, clusterName string, login *values.SlurmLogin) core
 		if login.Service.LoadBalancerIP != "" {
 			res.Spec.LoadBalancerIP = login.Service.LoadBalancerIP
 		}
+		if len(login.Service.LoadBalancerSourceRanges) > 0 {
+			res.Spec.LoadBalancerSourceRanges = login.Service.LoadBalancerSourceRanges
+		}
 	case corev1.ServiceTypeNodePort:
 		res.Spec.Ports[0].NodePort = login.Service.NodePort
 	}

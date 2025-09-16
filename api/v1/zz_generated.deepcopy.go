@@ -976,6 +976,11 @@ func (in *SlurmNodeLogin) DeepCopyInto(out *SlurmNodeLogin) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.SshdServiceLoadBalancerSourceRanges != nil {
+		in, out := &in.SshdServiceLoadBalancerSourceRanges, &out.SshdServiceLoadBalancerSourceRanges
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	in.Volumes.DeepCopyInto(&out.Volumes)
 }
 
