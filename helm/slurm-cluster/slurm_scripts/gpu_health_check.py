@@ -92,6 +92,9 @@ try:
         log_json(res_desc=f"Failed to get environment variable '{ke.args[0]}'")
         sys.exit(0)
 
+    # Change into /tmp before running health-checker
+    chdir_into_tmp()
+
     # Define tests to run
     tests: str = ""
     if CHECKS_CONTEXT == "prolog":
@@ -153,4 +156,12 @@ try:
 except Exception:
     log_json(res_desc="Unhandled exception")
     #traceback.print_exc()
-    exit(0)
+    sys.exit(0)
+
+# Open the directory from which the checks should be run
+def chdir_into_tmp():
+  try:
+    os.chdir("/tmp")
+  except Exception as e:
+    log_json(res_desc=f"Failed to chdir into /tmp: {e}")
+    sys.exit(0)
