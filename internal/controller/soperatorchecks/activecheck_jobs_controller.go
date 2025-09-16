@@ -161,6 +161,27 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 	}
 
 	if activeCheck.Spec.CheckType == "slurmJob" {
+		// Failed k8s job, probably sbatch submission failed
+		if getK8sJobStatus(k8sJob) == consts.ActiveCheckK8sJobStatusFailed {
+			activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{
+				LastRunId:          "No slurm job",
+				LastRunName:        k8sJob.Name,
+				LastRunStatus:      consts.ActiveCheckSlurmRunStatusError,
+				LastRunSubmitTime:  cronJob.Status.LastScheduleTime,
+				LastTransitionTime: metav1.Now(),
+			}
+
+			logger = logger.WithValues(logfield.ResourceKV(activeCheck)...)
+			logger.V(1).Info("Rendered")
+
+			err = r.Status().Update(ctx, activeCheck)
+			if err != nil {
+				logger.Error(err, "Failed to reconcile ActiveCheckJob")
+				return ctrl.Result{}, fmt.Errorf("reconciling ActiveCheckJob: %w", err)
+			}
+			return ctrl.Result{}, nil
+		}
+
 		slurmClusterName := types.NamespacedName{
 			Namespace: req.Namespace,
 			Name:      activeCheck.Spec.SlurmClusterRefName,
@@ -182,10 +203,10 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		var jobName string
 		var submitTime *metav1.Time
 		var failJobsAndReasons []slurmv1alpha1.JobAndReason
-		var degradeJobsAndReasons []slurmv1alpha1.JobAndReason
+		var errorJobsAndReasons []slurmv1alpha1.JobAndReason
 		if activeCheck.Status.SlurmJobsStatus.LastRunId == firstJobId {
 			failJobsAndReasons = activeCheck.Status.SlurmJobsStatus.LastRunFailJobsAndReasons
-			degradeJobsAndReasons = activeCheck.Status.SlurmJobsStatus.LastRunDegradeJobsAndReasons
+			errorJobsAndReasons = activeCheck.Status.SlurmJobsStatus.LastRunErrorJobsAndReasons
 		}
 		requeue := false
 		final := false
@@ -231,7 +252,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 						return ctrl.Result{}, fmt.Errorf("executing success reactions: %w", err)
 					}
 				default:
-					degradeJobsAndReasons = append(failJobsAndReasons, slurmv1alpha1.JobAndReason{
+					errorJobsAndReasons = append(failJobsAndReasons, slurmv1alpha1.JobAndReason{
 						JobID:  fmt.Sprint(slurmJob.ID),
 						Reason: slurmJob.StateReason,
 					})
@@ -264,20 +285,20 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			state = consts.ActiveCheckSlurmRunStatusInProgress
 		case len(failJobsAndReasons) != 0:
 			state = consts.ActiveCheckSlurmRunStatusFailed
-		case len(degradeJobsAndReasons) != 0:
-			state = consts.ActiveCheckSlurmRunStatusDegraded
+		case len(errorJobsAndReasons) != 0:
+			state = consts.ActiveCheckSlurmRunStatusError
 		default:
 			state = consts.ActiveCheckSlurmRunStatusComplete
 		}
 
 		activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{
-			LastRunId:                    firstJobId,
-			LastRunName:                  jobName,
-			LastRunStatus:                state,
-			LastRunFailJobsAndReasons:    failJobsAndReasons,
-			LastRunDegradeJobsAndReasons: degradeJobsAndReasons,
-			LastRunSubmitTime:            submitTime,
-			LastTransitionTime:           metav1.Now(),
+			LastRunId:                  firstJobId,
+			LastRunName:                jobName,
+			LastRunStatus:              state,
+			LastRunFailJobsAndReasons:  failJobsAndReasons,
+			LastRunErrorJobsAndReasons: errorJobsAndReasons,
+			LastRunSubmitTime:          submitTime,
+			LastTransitionTime:         metav1.Now(),
 		}
 
 		logger = logger.WithValues(logfield.ResourceKV(activeCheck)...)
