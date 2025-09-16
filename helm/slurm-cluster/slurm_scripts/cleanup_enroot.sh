@@ -15,3 +15,5 @@ if [ -n "$containers" ]; then
         enroot remove -f "$c" || true
     done
 fi
+
+exit 0

@@ -190,61 +190,86 @@ def main():
 
 # Filter checks for the current environment
 def filter_applicable_checks(checks: typing.List[Check]) -> typing.List[Check]:
-  slurm_job_num_gpus: int = 0 if SLURM_JOB_GPUS == "" else len(SLURM_JOB_GPUS.split(","))
+  # Filter by context
+  checks = filter_by_context(checks)
+  # Filter by skip_for_cpu_jobs
+  checks = filter_by_skip_for_cpu_jobs(checks)
+  # Filter by platform (needs platform tags)
+  checks = filter_by_platform(checks)
+  # Filter by skip_for_partial_gpu_jobs (needs platform tags)
+  checks = filter_by_skip_for_partial_gpu_jobs(checks)
+  # Filter by node state
+  checks = filter_by_node_state(checks)
+  return checks
 
-  # Filter by context and skip_for_cpu_jobs
-  applicable_checks = [
+def filter_by_context(checks: typing.List[Check]) -> typing.List[Check]:
+  # Skip if all checks don't care
+  if all("any" in check.contexts for check in checks):
+    return checks
+  return [
     check for check in checks
-    if ("any" in check.contexts or CHECKS_CONTEXT in check.contexts)
-       and not (check.skip_for_cpu_jobs and slurm_job_num_gpus == 0)
+    if (
+      "any" in check.contexts or
+      CHECKS_CONTEXT in check.contexts
+    )
   ]
 
-  # Only detect platform tags and filter by platform + skip_for_partial_gpu_jobs if needed
-  needs_platform_filter = any(
-    "any" not in check.platforms for check in applicable_checks
-  )
-  needs_job_gpu_filter = any(
-    check.skip_for_partial_gpu_jobs for check in applicable_checks
-  )
-  if needs_platform_filter or needs_job_gpu_filter:
-    platform_tags = get_platform_tags()
+def filter_by_skip_for_cpu_jobs(checks: typing.List[Check]) -> typing.List[Check]:
+  # Skip if all checks don't care
+  if all(not check.skip_for_cpu_jobs for check in checks):
+    return checks
+  # Skip for non-job-related runs
+  if not job_related_run():
+    return checks
+  num_gpus = get_job_alloc_gpus()
+  return [
+    check for check in checks
+    if not (check.skip_for_cpu_jobs and num_gpus == 0)
+  ]
 
-    # Filter by platform
-    applicable_checks = [
-      check for check in applicable_checks
-      if (
-        "any" in check.platforms or
-        any(tag in check.platforms for tag in platform_tags)
-      )
-    ]
+def filter_by_platform(checks: typing.List[Check]) -> typing.List[Check]:
+  # Skip if all checks don't care
+  if all("any" in check.platforms for check in checks):
+    return checks
+  platform_tags = get_platform_tags()
+  return [
+    check for check in checks
+    if (
+      "any" in check.platforms or
+      any(tag in check.platforms for tag in platform_tags)
+    )
+  ]
 
-    # Filter by skip_for_partial_gpu_jobs
-    applicable_checks = [
-      check for check in applicable_checks
-      if (
-        not check.skip_for_partial_gpu_jobs or       # Take for any job if the check flag is false
-        slurm_job_num_gpus == 0 or                   # Take for CPU-only jobs (they are not "partial GPU")
-        f"{slurm_job_num_gpus}xGPU" in platform_tags # Take for full-GPU jobs
-      )
-    ]
+def filter_by_skip_for_partial_gpu_jobs(checks: typing.List[Check]) -> typing.List[Check]:
+  # Skip if all checks don't care
+  if all(not check.skip_for_partial_gpu_jobs for check in checks):
+    return checks
+  # Skip for non-job-related runs
+  if not job_related_run():
+    return checks
+  job_alloc_gpus = get_job_alloc_gpus()
+  node_platform_tags = get_platform_tags()
+  return [
+    check for check in checks
+    if not (
+      check.skip_for_partial_gpu_jobs and
+      job_alloc_gpus > 0 and
+      f"{job_alloc_gpus}xGPU" not in node_platform_tags
+    )
+  ]
 
-  # Only detect node state and filter by it if needed
-  needs_node_state_filter = any(
-    "any" not in check.node_states for check in applicable_checks
-  )
-  if needs_node_state_filter:
-    node_info = get_node_info()
-
-    # Filter by node state
-    applicable_checks = [
-      check for check in applicable_checks
-      if (
-        "any" in check.node_states or
-        ("drain" in check.node_states and "DRAIN" in node_info.state_flags)
-      )
-    ]
-
-  return applicable_checks
+def filter_by_node_state(checks: typing.List[Check]) -> typing.List[Check]:
+  # Skip if all checks don't care
+  if all("any" in check.node_states for check in checks):
+    return checks
+  node_info = get_node_info()
+  return [
+    check for check in checks
+    if (
+      "any" in check.node_states or
+      ("drain" in check.node_states and "DRAIN" in node_info.state_flags)
+    )
+  ]
 
 # Run a specific check
 def run_check(check: Check, in_jail=False):
@@ -441,6 +466,14 @@ def get_job_info() -> JobInfo:
   except Exception as e:
     logging.warning(f"Failed to get info about Slurm job {SLURM_JOB_ID}: {e}")
     return JobInfo()
+
+def job_related_run() -> bool:
+  return CHECKS_CONTEXT in ("prolog", "epilog")
+
+def get_job_alloc_gpus() -> int:
+  if SLURM_JOB_GPUS == "":
+    return 0
+  return len(SLURM_JOB_GPUS.split(","))
 
 # Open the directory where checks are located
 def chdir_into_checks_dir():
