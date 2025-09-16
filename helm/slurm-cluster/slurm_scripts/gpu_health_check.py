@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import os
+import pathlib
 import subprocess
 import sys
 import traceback
@@ -71,6 +72,16 @@ def get_hc_result(proc: subprocess.CompletedProcess) -> HealthCheckerResult:
         return res
     except Exception:
         return res
+    
+def ensure_output_dir(path_str):
+    path = pathlib.Path("/opt/soperator-outputs/health_checker_cmd_stdout")
+
+    old_umask = os.umask(0)
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        os.chmod(path, 0o777)
+    finally:
+        os.umask(old_umask)
 
 try:
     # Get environment variables
@@ -98,6 +109,8 @@ try:
     env["HC_DCGMI_DIAG_R1_DEBUGLOGFILE"] = "/dev/null"
     env["HC_DCGMI_DIAG_R1_DEBUGLEVEL"] = "NONE"
 
+    output_dir = "/opt/soperator-outputs/health_checker_cmd_stdout"
+    ensure_output_dir(output_dir)
     # Run Nebius GPU health-checker
     cmd = [
         "health-checker", "run",
@@ -105,7 +118,7 @@ try:
         "-p", CHECKS_PLATFORM_TAG,
         "-n", tests,
         "-f", "json-partial",
-        "--tests-stdout-path", "/opt/soperator-outputs/health_checker_cmd_stdout",
+        "--tests-stdout-path", output_dir,
         "--log-level", "info",
     ]
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, env=env)
