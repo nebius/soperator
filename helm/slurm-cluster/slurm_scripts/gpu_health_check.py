@@ -74,7 +74,7 @@ def get_hc_result(proc: subprocess.CompletedProcess) -> HealthCheckerResult:
         return res
     
 def ensure_output_dir(path_str):
-    path = pathlib.Path("/opt/soperator-outputs/health_checker_cmd_stdout")
+    path = pathlib.Path(path_str)
 
     old_umask = os.umask(0)
     try:
