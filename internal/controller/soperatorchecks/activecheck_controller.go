@@ -378,10 +378,10 @@ func (r *ActiveCheckReconciler) dependenciesReady(
 				return false, nil
 			}
 		case "slurmJob": // TODO: const
-			if prerequisiteCheck.Status.SlurmJobsStatus.LastJobState != consts.ActiveCheckSlurmJobStatusComplete {
+			if prerequisiteCheck.Status.SlurmJobsStatus.LastRunStatus != consts.ActiveCheckSlurmRunStatusComplete {
 				logger.Info(fmt.Sprintf(
 					"Prerequisite ActiveCheck %s is not ready yet, status %s",
-					prerequisiteCheckName, prerequisiteCheck.Status.SlurmJobsStatus.LastJobState,
+					prerequisiteCheckName, prerequisiteCheck.Status.SlurmJobsStatus.LastRunStatus,
 				))
 				return false, nil
 			}
