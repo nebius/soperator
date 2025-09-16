@@ -46,7 +46,6 @@ profile %s flags=(attach_disconnected,mediate_deleted) {
 
   /** lrixw,
 
-  deny /usr/lib/x86_64-linux-gnu/libEGL_* w,
   deny /usr/lib/x86_64-linux-gnu/libGLES* w,
   deny /usr/lib/x86_64-linux-gnu/libGLX_nvidia* w,
   deny /usr/lib/x86_64-linux-gnu/libnvcuvid* w,
