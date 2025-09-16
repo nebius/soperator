@@ -20232,7 +20232,7 @@ spec:
                       ends. Default value is no epilog
                     type: string
                   maxJobCount:
-                    default: 10000
+                    default: 20000
                     description: Keep N last jobs in controller memory
                     format: int32
                     type: integer
@@ -20244,7 +20244,7 @@ spec:
                     format: int32
                     type: integer
                   minJobAge:
-                    default: 86400
+                    default: 28800
                     description: Don't remove jobs from controller memory after some
                       time
                     format: int32
