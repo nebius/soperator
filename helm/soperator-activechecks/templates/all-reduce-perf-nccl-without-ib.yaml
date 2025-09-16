@@ -1,10 +1,10 @@
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
-  name: "all-reduce-perf-nccl"
+  name: "all-reduce-perf-nccl-without-ib"
 spec:
   checkType: "slurmJob"
-  name: "all-reduce-perf-nccl"
+  name: "all-reduce-perf-nccl-without-ib"
   dependsOn: [ "create-user-soperatorchecks", "wait-for-topology" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 */4 * * *" # Every 4 hours
@@ -12,9 +12,8 @@ spec:
   runAfterCreation: true
   slurmJobSpec:
     sbatchScript: |
-{{ .Files.Get "scripts/all-reduce-perf-nccl.sh" | indent 6 }}
+{{ .Files.Get "scripts/all-reduce-perf-nccl-without-ib.sh" | indent 6 }}
     eachWorkerJobs: true
-    maxNumberOfJobs: 200
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:
@@ -26,5 +25,5 @@ spec:
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
   reactions:
-    addReservation:
-      prefix: {{ .Values.reservationPrefix | quote }}
+    setCondition: true
+    drainSlurmNode: true
