@@ -321,8 +321,12 @@ spec:
       sshdServiceAnnotations:
       {{- .Values.slurmNodes.login.sshdServiceAnnotations | toYaml | nindent 8 }}
       {{- /*external-dns.alpha.kubernetes.io/hostname: "{{ include "slurm-cluster.name" . }}.slurm-operator.msp-dev.nemax.nebius.cloud."*/ -}}
-      {{- if eq .Values.slurmNodes.login.sshdServiceType "LoadBalancer" }}
+      {{- if and (eq .Values.slurmNodes.login.sshdServiceType "LoadBalancer") .Values.slurmNodes.login.sshdServiceLoadBalancerIP }}
       sshdServiceLoadBalancerIP: {{ .Values.slurmNodes.login.sshdServiceLoadBalancerIP | quote }}
+      {{- end }}
+      {{- if and (eq .Values.slurmNodes.login.sshdServiceType "LoadBalancer") .Values.slurmNodes.login.sshdServiceLoadBalancerSourceRanges }}
+      sshdServiceLoadBalancerSourceRanges:
+        {{- .Values.slurmNodes.login.sshdServiceLoadBalancerSourceRanges | toYaml | nindent 8 }}
       {{- end }}
       {{- if eq .Values.slurmNodes.login.sshdServiceType "NodePort" }}
       sshdServiceNodePort: {{ required "slurmNodes.login.sshdServiceNodePort is required in case of slurmNodes.login.sshdServiceType == `NodePort`" .Values.slurmNodes.login.sshdServiceNodePort }}

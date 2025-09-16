@@ -389,6 +389,9 @@ slurmNodes:
     # Could be needed in case of sshdServiceType == `LoadBalancer`
     # sshdServiceLoadBalancerIP: "192.168.0.1"
     sshdServiceLoadBalancerIP: ""
+    # Source IP ranges allowed to access LoadBalancer (CIDR format)
+    # sshdServiceLoadBalancerSourceRanges: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+    sshdServiceLoadBalancerSourceRanges: []
     # Required in case of sshdServiceType == `NodePort`
     sshdServiceNodePort: 30022
     # Annotations to be configure on login service
