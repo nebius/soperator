@@ -29,7 +29,7 @@ spec:
       remediateLastFailure: true
   values:
     dcgmHpcJobMappingDir: {{ .Values.observability.dcgmExporter.values.hpcJobMapDir }}
-    driverless: {{ .Values.observability.dcgmExporter.values.driverless }}
+    validateToolkit: {{ .Values.observability.dcgmExporter.values.validateToolkit }}
     {{- if .Values.observability.dcgmExporter.values.resources }}
     daemonSet:
       nvidiaDcgmExporter:

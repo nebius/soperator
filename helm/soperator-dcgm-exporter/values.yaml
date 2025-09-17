@@ -2,7 +2,7 @@ kubernetesClusterDomain: cluster.local
 
 dcgmHpcJobMappingDir: /var/run/nebius/slurm
 
-driverless: true
+validateToolkit: true
 
 metricsPort: 9400
 
