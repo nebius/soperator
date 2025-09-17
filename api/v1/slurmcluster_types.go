@@ -958,6 +958,11 @@ type SlurmNodeLogin struct {
 	// +kubebuilder:validation:Optional
 	SshdServiceLoadBalancerIP string `json:"sshdServiceLoadBalancerIP,omitempty"`
 
+	// SshdServiceLoadBalancerSourceRanges represents the source IP ranges for LoadBalancer service
+	//
+	// +kubebuilder:validation:Optional
+	SshdServiceLoadBalancerSourceRanges []string `json:"sshdServiceLoadBalancerSourceRanges,omitempty"`
+
 	// SshdServiceNodePort represents the port to be opened on nodes in case of NodePort type of service
 	//
 	// +kubebuilder:validation:Optional

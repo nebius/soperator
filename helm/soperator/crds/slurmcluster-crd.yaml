@@ -28526,6 +28526,12 @@ spec:
                         description: SshdServiceLoadBalancerIP represents the static
                           IP address of the LoadBalancer service
                         type: string
+                      sshdServiceLoadBalancerSourceRanges:
+                        description: SshdServiceLoadBalancerSourceRanges represents
+                          the source IP ranges for LoadBalancer service
+                        items:
+                          type: string
+                        type: array
                       sshdServiceNodePort:
                         default: 0
                         description: SshdServiceNodePort represents the port to be
