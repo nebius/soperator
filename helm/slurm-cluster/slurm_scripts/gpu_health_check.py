@@ -7,6 +7,14 @@ import sys
 import traceback
 import typing
 
+# Open the directory from which the checks should be run
+def chdir_into_tmp():
+  try:
+    os.chdir("/tmp")
+  except Exception as e:
+    log_json(res_desc=f"Failed to chdir into /tmp: {e}")
+    sys.exit(0)
+
 def log_json(
     res_desc: str,
     hc_json: typing.Any = None,
@@ -156,12 +164,4 @@ try:
 except Exception:
     log_json(res_desc="Unhandled exception")
     #traceback.print_exc()
-    sys.exit(0)
-
-# Open the directory from which the checks should be run
-def chdir_into_tmp():
-  try:
-    os.chdir("/tmp")
-  except Exception as e:
-    log_json(res_desc=f"Failed to chdir into /tmp: {e}")
     sys.exit(0)
