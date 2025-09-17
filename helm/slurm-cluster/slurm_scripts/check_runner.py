@@ -380,11 +380,11 @@ def get_platform_tags() -> typing.List[str]:
 
     tags = []
     if all_same:
-      if "H100" in first:
+      if "NVIDIA H100" in first:
         tags.append(f"{count}xH100")
-      elif "H200" in first:
+      elif "NVIDIA H200" in first:
         tags.append(f"{count}xH200")
-      elif "B200" in first:
+      elif "NVIDIA B200" in first:
         tags.append(f"{count}xB200")
 
     tags.append(f"{count}xGPU")
