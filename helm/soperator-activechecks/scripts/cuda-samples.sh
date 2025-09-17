@@ -26,7 +26,7 @@ echo "Platform found: $platform"
 echo "Running cuda samples check on $(hostname)..."
 HC_OUTPUT=$(srun --cpu-bind=verbose --container-image={{ .Values.activeCheckImage }} \
   --container-mounts=$(which health-checker):/usr/local/bin/health-checker \
-  bash -c "health-checker run -e soperator -p $platform -n deviceQuery,vectorAdd,simpleMultiGPU,p2pBandwidthLatencyTest --json-log")
+  bash -c "health-checker run -e soperator -p $platform -n deviceQuery,vectorAdd,simpleMultiGPU,p2pBandwidthLatencyTest -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout")
 HC_EXIT_CODE=$?
 
 echo "Health checker output: $HC_OUTPUT"
