@@ -73,7 +73,7 @@ def get_hc_result(proc: subprocess.CompletedProcess) -> HealthCheckerResult:
     except Exception:
         return res
     
-def ensure_output_dir(path_str):
+def ensure_output_dir(path_str: str):
     path = pathlib.Path(path_str)
 
     old_umask = os.umask(0)
