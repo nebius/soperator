@@ -2,6 +2,8 @@ kubernetesClusterDomain: cluster.local
 
 dcgmHpcJobMappingDir: /var/run/nebius/slurm
 
+validateToolkit: true
+
 metricsPort: 9400
 
 serviceType: ClusterIP
