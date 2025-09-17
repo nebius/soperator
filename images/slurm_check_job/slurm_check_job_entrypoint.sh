@@ -60,6 +60,7 @@ else
         --job-name="$ACTIVE_CHECK_NAME" \
         --chdir=/opt/soperator-home/soperatorchecks \
         --uid=soperatorchecks \
+        --partition="hidden" \
         /opt/bin/sbatch.sh
     )
     if [[ -z "$SLURM_OUTPUT" ]]; then
