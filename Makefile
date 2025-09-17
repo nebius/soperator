@@ -331,6 +331,7 @@ endif
 		--target ${IMAGE_NAME} \
 		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64" \
 		-f images/${DOCKERFILE} \
+		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
 		$(DOCKER_BUILD_ARGS) \
 		.
 
@@ -340,6 +341,7 @@ endif
 		--target ${IMAGE_NAME} \
 		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" \
 		-f images/${DOCKERFILE} \
+		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
 		$(DOCKER_BUILD_ARGS) \
 		.
 	# Push
@@ -364,6 +366,7 @@ endif
 		--target jail \
 		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-amd64" \
 		-f images/jail/jail.dockerfile \
+		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
 		--output type=tar,dest=images/jail_rootfs_amd64.tar \
 		.
 
@@ -373,6 +376,7 @@ endif
 		--target jail \
 		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-arm64" \
 		-f images/jail/jail.dockerfile \
+		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
 		--output type=tar,dest=images/jail_rootfs_arm64.tar \
 		.
 
