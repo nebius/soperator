@@ -78,34 +78,9 @@ spec:
         - mountPath: /var
           mountPropagation: HostToContainer
           name: host-var
-      {{- if .Values.driverless }}
-      - name: toolkit-validation
-        args:
-        - until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done
-        command:
-        - sh
-        - -c
-        env:
-        - name: KUBERNETES_CLUSTER_DOMAIN
-          value: {{ quote .Values.kubernetesClusterDomain }}
-        image: {{ .Values.daemonSet.toolkitValidation.image.repository }}:{{ .Values.daemonSet.toolkitValidation.image.tag | default .Chart.AppVersion }}
-        imagePullPolicy: IfNotPresent
-        resources: {}
-        securityContext:
-          privileged: true
-        terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
-        volumeMounts:
-        - mountPath: /run/nvidia
-          mountPropagation: HostToContainer
-          name: run-nvidia
-      {{- end }}
       nodeSelector: {{- toYaml .Values.daemonSet.nodeSelector | nindent 8 }}
       priorityClassName: system-node-critical
       restartPolicy: Always
-      {{- if .Values.driverless }}
-      runtimeClassName: nvidia
-      {{- end }}
       schedulerName: default-scheduler
       securityContext: {}
       serviceAccountName: {{ include "soperator-dcgm-exporter.name" . }}-sa
@@ -119,12 +94,6 @@ spec:
           path: /var/lib/kubelet/pod-resources
           type: ""
         name: pod-gpu-resources
-      {{- if .Values.driverless }}
-      - hostPath:
-          path: /run/nvidia
-          type: ""
-        name: run-nvidia
-      {{- end }}
       - hostPath:
           path: {{ .Values.dcgmHpcJobMappingDir }}
           type: ""

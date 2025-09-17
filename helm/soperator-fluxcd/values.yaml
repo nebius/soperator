@@ -193,7 +193,6 @@ observability:
     releaseName: soperator-dcgm-exporter
     values:
       hpcJobMapDir: /var/run/nebius/slurm
-      driverless: true
       resources: {}
 securityProfilesOperator:
   enabled: true
