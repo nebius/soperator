@@ -15,3 +15,7 @@ mkdir -p /etc/soperatorchecks
 chown soperatorchecks:soperatorchecks /etc/soperatorchecks
 
 EOF
+
+# Because of the bug in filestore ssh is unavailable for ~15 sec after new user creation.
+echo "Wait for ssh availability 20 sec..."
+sleep 20
