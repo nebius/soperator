@@ -78,7 +78,7 @@ spec:
         - mountPath: /var
           mountPropagation: HostToContainer
           name: host-var
-      {{- if .Values.driverless }}
+      {{- if .Values.validateToolkit }}
       - name: toolkit-validation
         args:
         - until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done
@@ -103,9 +103,6 @@ spec:
       nodeSelector: {{- toYaml .Values.daemonSet.nodeSelector | nindent 8 }}
       priorityClassName: system-node-critical
       restartPolicy: Always
-      {{- if .Values.driverless }}
-      runtimeClassName: nvidia
-      {{- end }}
       schedulerName: default-scheduler
       securityContext: {}
       serviceAccountName: {{ include "soperator-dcgm-exporter.name" . }}-sa
@@ -119,7 +116,7 @@ spec:
           path: /var/lib/kubelet/pod-resources
           type: ""
         name: pod-gpu-resources
-      {{- if .Values.driverless }}
+      {{- if .Values.validateToolkit }}
       - hostPath:
           path: /run/nvidia
           type: ""
