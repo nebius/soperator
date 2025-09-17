@@ -26,7 +26,7 @@ fi
 
 echo "Platform found: $platform"
 echo "Running all_reduce_perf_nccl check on $(hostname)..."
-HC_OUTPUT=$(srun --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n all_reduce_with_ib --json-log")
+HC_OUTPUT=$(srun --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n all_reduce_with_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info")
 HC_EXIT_CODE=$?
 
 echo "Health checker output: $HC_OUTPUT"
