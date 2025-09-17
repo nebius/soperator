@@ -31,7 +31,7 @@ createUser:
 upgradeCuda:
   cudaVersion: "12.4.1-1"
 upgradeHealthChecker:
-  healthCheckerVersion: "1.0.0-151.250904"
+  healthCheckerVersion: "1.0.0-156.250917"
 ensureDirSnccldLogs:
   enabled: false
   dir: /opt/soperator-outputs/nccl_logs
