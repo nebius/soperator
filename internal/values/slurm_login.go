@@ -37,6 +37,7 @@ func buildSlurmLoginFrom(clusterName string, maintenance *consts.MaintenanceMode
 	svc.Type = login.SshdServiceType
 	svc.Annotations = login.SshdServiceAnnotations
 	svc.LoadBalancerIP = login.SshdServiceLoadBalancerIP
+	svc.LoadBalancerSourceRanges = login.SshdServiceLoadBalancerSourceRanges
 	svc.NodePort = login.SshdServiceNodePort
 
 	headlessSvc := buildServiceFrom(naming.BuildLoginHeadlessServiceName(clusterName))
