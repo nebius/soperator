@@ -143,25 +143,49 @@ func isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
 func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
 	ctx context.Context, namespace string, clusterName string, logger logr.Logger,
 ) (*corev1.ConfigMap, error) {
-	configMap := &corev1.ConfigMap{
-		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.ConfigMapNameTopologyConfig,
-			Namespace: namespace,
-		},
+	configMapKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
+	jailedConfigKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
+
+	configMap := &corev1.ConfigMap{}
+	configMapExists := true
+	err := r.Client.Get(ctx, configMapKey, configMap)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			configMapExists = false
+			logger.Info("Worker topology ConfigMap not found")
+		} else {
+			return nil, fmt.Errorf("get ConfigMap %s: %w", consts.ConfigMapNameTopologyConfig, err)
+		}
 	}
 
-	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap); err != nil {
+	jailedConfig := &v1alpha1.JailedConfig{}
+	jailedConfigExists := true
+	err = r.Client.Get(ctx, jailedConfigKey, jailedConfig)
+	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.Info("Worker topology ConfigMap not found, creating with default topology")
-			if err = r.createDefaultTopologyConfigMap(ctx, namespace, clusterName); err != nil {
-				return nil, fmt.Errorf("create default topology config map in namespace %q: %w", namespace, err)
-			}
-			if err := r.Client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap); err != nil {
-				return nil, fmt.Errorf("get config map after creation in namespace %q: %w", namespace, err)
-			}
-			logger.Info("Created and retrieved default topology ConfigMap", "configMap", configMap.Name, "namespace", configMap.Namespace)
-			return configMap, nil
+			jailedConfigExists = false
+			logger.Info("Worker topology JailedConfig not found")
+		} else {
+			return nil, fmt.Errorf("get JailedConfig %s: %w", consts.ConfigMapNameTopologyConfig, err)
 		}
+	}
+
+	if !configMapExists || !jailedConfigExists {
+		logger.Info("Creating missing topology resources",
+			"configMapExists", configMapExists,
+			"jailedConfigExists", jailedConfigExists)
+
+		if err = r.createDefaultTopologyResources(ctx, namespace, clusterName); err != nil {
+			return nil, fmt.Errorf("create default topology resources in namespace %q: %w", namespace, err)
+		}
+
+		if err := r.Client.Get(ctx, configMapKey, configMap); err != nil {
+			return nil, fmt.Errorf("get config map after creation in namespace %q: %w", namespace, err)
+		}
+
+		logger.Info("Created and retrieved topology resources",
+			"configMap", configMap.Name,
+			"namespace", configMap.Namespace)
 	}
 
 	return configMap, nil
@@ -228,8 +252,8 @@ func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace string) 
 	}
 }
 
-// CreateDefaultTopologyConfigMap creates the ConfigMap for topology configuration with default values.
-func (r *WorkerTopologyReconciler) createDefaultTopologyConfigMap(
+// createDefaultTopologyResources creates both ConfigMap and JailedConfig resources for topology configuration with default values.
+func (r *WorkerTopologyReconciler) createDefaultTopologyResources(
 	ctx context.Context, namespace, clusterName string,
 ) error {
 	listASTS, err := r.GetStatefulSetsWithFallback(ctx, namespace, clusterName)

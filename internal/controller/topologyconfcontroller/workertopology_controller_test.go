@@ -10,6 +10,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,6 +18,7 @@ import (
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 	tc "nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -321,6 +323,165 @@ func TestWorkerTopologyReconciler_GetStatefulSetsWithFallback(t *testing.T) {
 					assert.Equal(t, tt.expectedReplicas, *result.Items[0].Spec.Replicas)
 				}
 			}
+		})
+	}
+}
+
+func TestEnsureWorkerTopologyConfigMap(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, slurmv1.AddToScheme(scheme))
+	require.NoError(t, v1alpha1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kruisev1b1.AddToScheme(scheme))
+
+	ctx := context.Background()
+	namespace := "test-namespace"
+	clusterName := "test-cluster"
+
+	tests := []struct {
+		name                  string
+		existingObjs          []client.Object
+		expectError           bool
+		errorContains         string
+		expectConfigMapCreate bool
+		expectJailedCreate    bool
+	}{
+		{
+			name:                  "Neither ConfigMap nor JailedConfig exist",
+			existingObjs:          []client.Object{},
+			expectError:           false,
+			expectConfigMapCreate: true,
+			expectJailedCreate:    true,
+		},
+		{
+			name: "Only ConfigMap exists",
+			existingObjs: []client.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      consts.ConfigMapNameTopologyConfig,
+						Namespace: namespace,
+					},
+					Data: map[string]string{
+						consts.ConfigMapKeyTopologyConfig: "test-config",
+					},
+				},
+			},
+			expectError:           false,
+			expectConfigMapCreate: false,
+			expectJailedCreate:    true,
+		},
+		{
+			name: "Only JailedConfig exists",
+			existingObjs: []client.Object{
+				&v1alpha1.JailedConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      consts.ConfigMapNameTopologyConfig,
+						Namespace: namespace,
+					},
+					Spec: v1alpha1.JailedConfigSpec{
+						ConfigMap: v1alpha1.ConfigMapReference{
+							Name: consts.ConfigMapNameTopologyConfig,
+						},
+					},
+				},
+			},
+			expectError:           false,
+			expectConfigMapCreate: true,
+			expectJailedCreate:    false,
+		},
+		{
+			name: "Both ConfigMap and JailedConfig exist",
+			existingObjs: []client.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      consts.ConfigMapNameTopologyConfig,
+						Namespace: namespace,
+					},
+					Data: map[string]string{
+						consts.ConfigMapKeyTopologyConfig: "test-config",
+					},
+				},
+				&v1alpha1.JailedConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      consts.ConfigMapNameTopologyConfig,
+						Namespace: namespace,
+					},
+					Spec: v1alpha1.JailedConfigSpec{
+						ConfigMap: v1alpha1.ConfigMapReference{
+							Name: consts.ConfigMapNameTopologyConfig,
+						},
+					},
+				},
+			},
+			expectError:           false,
+			expectConfigMapCreate: false,
+			expectJailedCreate:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Add SlurmCluster for fallback StatefulSet creation
+			slurmCluster := &slurmv1.SlurmCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: slurmv1.SlurmClusterSpec{
+					SlurmNodes: slurmv1.SlurmNodes{
+						Worker: slurmv1.SlurmNodeWorker{
+							SlurmNode: slurmv1.SlurmNode{Size: 2},
+						},
+					},
+				},
+			}
+
+			allObjs := append(tt.existingObjs, slurmCluster)
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(allObjs...).
+				Build()
+
+			reconciler := &tc.WorkerTopologyReconciler{
+				BaseReconciler: tc.BaseReconciler{
+					Client: fakeClient,
+					Scheme: scheme,
+				},
+			}
+
+			logger := log.Log.WithName("test")
+			result, err := reconciler.EnsureWorkerTopologyConfigMap(ctx, namespace, clusterName, logger)
+
+			if tt.expectError {
+				require.Error(t, err)
+				if tt.errorContains != "" {
+					assert.Contains(t, err.Error(), tt.errorContains)
+				}
+				assert.Nil(t, result)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+
+			// Verify ConfigMap exists
+			configMap := &corev1.ConfigMap{}
+			err = fakeClient.Get(ctx, client.ObjectKey{
+				Name:      consts.ConfigMapNameTopologyConfig,
+				Namespace: namespace,
+			}, configMap)
+			require.NoError(t, err)
+			assert.NotEmpty(t, configMap.Data[consts.ConfigMapKeyTopologyConfig])
+
+			// Verify JailedConfig exists
+			jailedConfig := &v1alpha1.JailedConfig{}
+			err = fakeClient.Get(ctx, client.ObjectKey{
+				Name:      consts.ConfigMapNameTopologyConfig,
+				Namespace: namespace,
+			}, jailedConfig)
+			require.NoError(t, err)
+			assert.Equal(t, consts.ConfigMapNameTopologyConfig, jailedConfig.Spec.ConfigMap.Name)
 		})
 	}
 }
