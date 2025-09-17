@@ -1,5 +1,5 @@
 set -euxo pipefail
 
-echo "Cleaning old Soperator outputs (health check logs) if last modify > 4 hours"
+echo "Cleaning old Soperator outputs"
 
-/bin/sh -c "find /mnt/jail/opt/soperator-outputs -type f -mmin +240 -delete"
+find /mnt/jail/opt/soperator-outputs -type f -mmin +30 -delete
