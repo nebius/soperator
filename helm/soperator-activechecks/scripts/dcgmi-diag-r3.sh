@@ -25,7 +25,7 @@ fi
 
 echo "Platform found: $platform"
 echo "Running dcgmi_diag_r3 check on $(hostname)..."
-HC_OUTPUT=$(srun --cpu-bind=verbose,cores bash -c "health-checker run -e soperator-acceptance -p $platform -n dcgmi_diag_r3 --json-log")
+HC_OUTPUT=$(srun --cpu-bind=verbose,cores bash -c "health-checker run -e soperator-acceptance -p $platform -n dcgmi_diag_r3 -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout")
 HC_EXIT_CODE=$?
 
 echo "Health checker output: $HC_OUTPUT"
