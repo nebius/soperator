@@ -46,9 +46,6 @@ data:
   alloc_gpus_busy.sh: |
 {{ tpl (.Files.Get "slurm_scripts/alloc_gpus_busy.sh") . | indent 4 }}
 
-  hc_host_service.sh: |
-{{ tpl (.Files.Get "slurm_scripts/hc_host_service.sh") . | indent 4 }}
-
   hc_xid.sh: |
 {{ tpl (.Files.Get "slurm_scripts/hc_xid.sh") . | indent 4 }}
 

@@ -23,7 +23,6 @@ if [ -n "$SLURM_JOB_GPUS" ]; then
         gpus_on_node=$(nvidia-smi --query-gpu=name --format=csv,noheader | sort | uniq -c)
         if [[ "${gpus_on_node}" == *"8 NVIDIA"* ]]; then
             checks+=(
-                hc_host_service
                 hc_xid
                 hc_ib_counters
             )
