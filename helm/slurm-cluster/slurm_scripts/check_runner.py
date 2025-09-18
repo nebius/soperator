@@ -1,4 +1,3 @@
-import datetime
 import functools
 import json
 import logging
@@ -44,7 +43,7 @@ class Check(typing.NamedTuple):
   # - "CPU" - run on nodes without GPUs
   # - "<num>xGPU" - run on nodes with <num> GPUs of any model
   # - "<num>x<gpu_model>" - run on nodes with <num> GPUs of model <gpu_model>
-  platforms: typing.List[str] = ["any"]
+  platforms: list[str] = ["any"]
 
   # Whether to skip this check for jobs that don't allocate any GPUs.
   # Allows to skip the check for CPU-only jobs in "prolog" and "epilog" contexts even if the node is equipped with GPUs.
@@ -61,13 +60,13 @@ class Check(typing.NamedTuple):
   # - "prolog" - run in Slurm job Prolog script (on each node, before the job)
   # - "epilog" - run in Slurm job Epilog script (on each node, after the job)
   # - "hc_program" - run in Slurm HealthCheckProgram script (on each node, periodically)
-  contexts: typing.List[str] = ["any"]
+  contexts: list[str] = ["any"]
 
   # Nodes in what states this check should run on.
   # Supported values:
   # - "any" - run on nodes in any state and skip state detection
   # - "drain" - run on drained/draining nodes
-  node_states: typing.List[str] = ["any"]
+  node_states: list[str] = ["any"]
 
   # Action to do when the command fails.
   # Supported values:
@@ -119,7 +118,7 @@ class Check(typing.NamedTuple):
   need_env: list[str] = []
 
 class NodeInfo(typing.NamedTuple):
-  state_flags: typing.List[str] = []
+  state_flags: list[str] = []
   reason: str = ""
   comment: str = ""
   real_memory_bytes: int = 0
@@ -141,7 +140,7 @@ except KeyError as ke:
   sys.exit(0)
 
 def main():
-  start_time = datetime.datetime.now()
+  start_time = time.perf_counter()
   logging.info("Started")
 
   # Print environment
@@ -155,11 +154,11 @@ def main():
   # Skip all checks if requested in the job comment
   if SLURM_JOB_COMMENT == "skip_checks":
     logging.info("Job has comment 'skip_checks', exiting")
-    exit(0)
+    sys.exit(0)
 
   # Load checks from a config file
   try:
-    with open(CHECKS_CONFIG) as f:
+    with open(CHECKS_CONFIG, encoding="utf-8") as f:
       checks_data = json.load(f)
     checks = [Check(**entry) for entry in checks_data]
   except Exception as e:
@@ -184,12 +183,12 @@ def main():
     for check in jail_checks:
       run_check(check, in_jail=True)
 
-  end_time = datetime.datetime.now()
-  logging.info(f"Finished in {(end_time - start_time).total_seconds()} seconds")
+  end_time = time.perf_counter()
+  logging.info(f"Finished in {end_time - start_time:.3f} seconds")
   sys.exit(0)
 
 # Filter checks for the current environment
-def filter_applicable_checks(checks: typing.List[Check]) -> typing.List[Check]:
+def filter_applicable_checks(checks: list[Check]) -> list[Check]:
   # Filter by context
   checks = filter_by_context(checks)
   # Filter by skip_for_cpu_jobs
@@ -202,7 +201,7 @@ def filter_applicable_checks(checks: typing.List[Check]) -> typing.List[Check]:
   checks = filter_by_node_state(checks)
   return checks
 
-def filter_by_context(checks: typing.List[Check]) -> typing.List[Check]:
+def filter_by_context(checks: list[Check]) -> list[Check]:
   # Skip if all checks don't care
   if all("any" in check.contexts for check in checks):
     return checks
@@ -214,7 +213,7 @@ def filter_by_context(checks: typing.List[Check]) -> typing.List[Check]:
     )
   ]
 
-def filter_by_skip_for_cpu_jobs(checks: typing.List[Check]) -> typing.List[Check]:
+def filter_by_skip_for_cpu_jobs(checks: list[Check]) -> list[Check]:
   # Skip if all checks don't care
   if all(not check.skip_for_cpu_jobs for check in checks):
     return checks
@@ -227,7 +226,7 @@ def filter_by_skip_for_cpu_jobs(checks: typing.List[Check]) -> typing.List[Check
     if not (check.skip_for_cpu_jobs and num_gpus == 0)
   ]
 
-def filter_by_platform(checks: typing.List[Check]) -> typing.List[Check]:
+def filter_by_platform(checks: list[Check]) -> list[Check]:
   # Skip if all checks don't care
   if all("any" in check.platforms for check in checks):
     return checks
@@ -240,7 +239,7 @@ def filter_by_platform(checks: typing.List[Check]) -> typing.List[Check]:
     )
   ]
 
-def filter_by_skip_for_partial_gpu_jobs(checks: typing.List[Check]) -> typing.List[Check]:
+def filter_by_skip_for_partial_gpu_jobs(checks: list[Check]) -> list[Check]:
   # Skip if all checks don't care
   if all(not check.skip_for_partial_gpu_jobs for check in checks):
     return checks
@@ -258,7 +257,7 @@ def filter_by_skip_for_partial_gpu_jobs(checks: typing.List[Check]) -> typing.Li
     )
   ]
 
-def filter_by_node_state(checks: typing.List[Check]) -> typing.List[Check]:
+def filter_by_node_state(checks: list[Check]) -> list[Check]:
   # Skip if all checks don't care
   if all("any" in check.node_states for check in checks):
     return checks
@@ -283,7 +282,7 @@ def run_check(check: Check, in_jail=False):
   log_abs_path = os.path.join(CHECKS_OUTPUTS_BASE_DIR, log_rel_path)
   if not in_jail:
     log_abs_path = "/mnt/jail" + log_abs_path
-  start_time = datetime.datetime.now()
+  start_time = time.perf_counter()
   logging.info(f"Running check {check.name} ({check.command}), logging to {log_abs_path}")
   logging.info(f"Check spec: {json.dumps(check._asdict(), indent=2)}")
 
@@ -292,7 +291,7 @@ def run_check(check: Check, in_jail=False):
 
   # Execute the check command
   cmd = ["bash", "-c", f"{check.command} 3>&1 1>\"{log_abs_path}\" 2>&1"]
-  result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+  result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
   # Build the reason message
   reason_base = string.Template(check.reason_base.rstrip()).safe_substitute(
@@ -305,8 +304,8 @@ def run_check(check: Check, in_jail=False):
   reason += f" [{CHECKS_CONTEXT}]"
 
   # Log check running time
-  end_time = datetime.datetime.now()
-  logging.info(f"Completed check {check.name} in {(end_time - start_time).total_seconds()} seconds")
+  end_time = time.perf_counter()
+  logging.info(f"Completed check {check.name} in {end_time - start_time:.3f} seconds")
 
   # React to the check result
   if result.returncode != 0:
@@ -362,7 +361,7 @@ def export_needed_env(check: Check):
 # It's guaranteed that the list has at least one item
 # This function returns the cached value for subsequent calls
 @functools.lru_cache(maxsize=1)
-def get_platform_tags() -> typing.List[str]:
+def get_platform_tags() -> list[str]:
   try:
     # Warning: this command can be executed from both jail or host rootfs
     res = subprocess.run(
@@ -547,6 +546,6 @@ def uncomment_node():
 try:
   if __name__ == "__main__":
     main()
-except Exception as e:
-  logging.error(f"Unknown error: {e}")
-  exit(0)
+except Exception:
+  logging.exception("Unknown error")
+  sys.exit(0)
