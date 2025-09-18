@@ -16,3 +16,4 @@ chmod +x /etc/enroot/hooks.d/50-slurm-pytorch.sh
 # Prepare env for running enroot
 mkdir -m 777 /usr/share/enroot/enroot-data
 mkdir -m 755 /run/enroot
+mkdir -m 755 -p /etc/enroot/enroot.conf.d
