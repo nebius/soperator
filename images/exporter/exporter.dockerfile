@@ -29,7 +29,7 @@ RUN GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 # Second stage: Build image for the prometheus-slurm-exporter
 FROM $BASE_IMAGE AS exporter
 
-ARG SLURM_VERSION=25.05.2
+ARG SLURM_VERSION
 
 # Install dependencies
 RUN apt-get update && \

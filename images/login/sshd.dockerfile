@@ -2,7 +2,7 @@ ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:noble
 
 FROM $BASE_IMAGE AS login_sshd
 
-ARG SLURM_VERSION=25.05.2
+ARG SLURM_VERSION
 ARG PYXIS_VERSION=0.21.0
 
 ARG DEBIAN_FRONTEND=noninteractive

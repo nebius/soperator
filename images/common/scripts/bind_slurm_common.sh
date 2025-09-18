@@ -22,7 +22,9 @@ if [ -z "$jaildir" ]; then
 fi
 
 ALT_ARCH="$(uname -m)"
+ALT_LIBDIR="usr/lib/${ALT_ARCH}-linux-gnu"
 SLURM_LIB_PATH="usr/lib/${ALT_ARCH}-linux-gnu/slurm"
+LIBSLURM_REAL=$(find "${ALT_LIBDIR}" -maxdepth 1 -type f -name 'libslurm.so.*' -printf '%f\n' | sort -V | tail -n1)
 
 echo "🔧 Using ALT_ARCH = ${ALT_ARCH}"
 
@@ -34,11 +36,13 @@ pushd "${jaildir}"
     mkdir -p "${SLURM_LIB_PATH}"
     mount --bind "/${SLURM_LIB_PATH}" "${SLURM_LIB_PATH}"
 
-    touch "usr/lib/${ALT_ARCH}-linux-gnu/libslurm.so.43.0.0"
-    mount --bind "/usr/lib/${ALT_ARCH}-linux-gnu/libslurm.so.43.0.0" "usr/lib/${ALT_ARCH}-linux-gnu/libslurm.so.43.0.0"
-    pushd "usr/lib/${ALT_ARCH}-linux-gnu"
-         ln -sf libslurm.so.43.0.0 libslurm.so.43
-         ln -sf libslurm.so.43.0.0 libslurm.so
+    touch "${ALT_LIBDIR}/${LIBSLURM_REAL}"
+    mount --bind "/usr/lib/${ALT_ARCH}-linux-gnu/${LIBSLURM_REAL}" "${ALT_LIBDIR}/${LIBSLURM_REAL}"
+
+    MAJOR=$(printf '%s\n' "$LIBSLURM_REAL" | sed -E 's/.*\.so\.([0-9]+).*/\1/')
+    pushd "${ALT_LIBDIR}"
+        ln -sf "${LIBSLURM_REAL}" "libslurm.so.${MAJOR}"
+        ln -sf "${LIBSLURM_REAL}" "libslurm.so"
     popd
 
     # slurm-smd-dev
