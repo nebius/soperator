@@ -2,7 +2,10 @@
 
 set -euxo pipefail # Exit immediately if any command returns a non-zero error code
 
-PARTITION="background"
+echo "Export SNCCLD_ENABLED variable passed from the K8s job env"
+export SNCCLD_ENABLED
+
+PARTITION="hidden"
 
 echo "Link users from jail"
 ln -s /mnt/jail/etc/passwd /etc/passwd

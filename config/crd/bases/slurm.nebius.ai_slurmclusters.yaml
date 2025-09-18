@@ -3111,9 +3111,9 @@ spec:
                   defCpuPerGPU: 4
                   defMemPerNode: 1048576
                   epilog: ""
-                  maxJobCount: 10000
+                  maxJobCount: 20000
                   messageTimeout: 60
-                  minJobAge: 86400
+                  minJobAge: 28800
                   prolog: ""
                 description: SlurmConfig represents the Slurm configuration in slurm.conf.
                   Not all options are supported.
@@ -3141,7 +3141,7 @@ spec:
                       ends. Default value is no epilog
                     type: string
                   maxJobCount:
-                    default: 10000
+                    default: 20000
                     description: Keep N last jobs in controller memory
                     format: int32
                     type: integer
@@ -3153,7 +3153,7 @@ spec:
                     format: int32
                     type: integer
                   minJobAge:
-                    default: 86400
+                    default: 28800
                     description: Don't remove jobs from controller memory after some
                       time
                     format: int32

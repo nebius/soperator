@@ -7,7 +7,7 @@ spec:
   name: "gpu-fryer"
   dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  schedule: "0 0 */3 * *" # every 3d day (3, 6, 9, etc...)
+  schedule: "15 9-21/12 * * *" # 2 times a day at 9:15 and 21:15 UTC
   suspend: false
   runAfterCreation: true
   slurmJobSpec:

@@ -73,7 +73,7 @@ type SlurmClusterSpec struct {
 	// SlurmConfig represents the Slurm configuration in slurm.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={defMemPerNode: 1048576, defCpuPerGPU: 4, completeWait: 5, epilog: "", prolog: "", maxJobCount: 10000, minJobAge: 86400, messageTimeout: 60}
+	// +kubebuilder:default={defMemPerNode: 1048576, defCpuPerGPU: 4, completeWait: 5, epilog: "", prolog: "", maxJobCount: 20000, minJobAge: 28800, messageTimeout: 60}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 
 	// CustomSlurmConfig represents the raw Slurm configuration from slurm.conf.
@@ -152,12 +152,12 @@ type SlurmConfig struct {
 	// Keep N last jobs in controller memory
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=10000
+	// +kubebuilder:default=20000
 	MaxJobCount *int32 `json:"maxJobCount,omitempty"`
 	// Don't remove jobs from controller memory after some time
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=86400
+	// +kubebuilder:default=28800
 	MinJobAge *int32 `json:"minJobAge,omitempty"`
 	// MessageTimeout specifies the permitted time for a round-trip communication to complete in seconds.
 	// See https://slurm.schedmd.com/slurm.conf.html#OPT_MessageTimeout.

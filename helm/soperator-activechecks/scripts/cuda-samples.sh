@@ -1,13 +1,9 @@
 #!/bin/bash
-#SBATCH --deadline="now+6hours"
-#SBATCH --time=5:00
+#SBATCH --deadline="now+4hours"
+#SBATCH --time=10:00
 #SBATCH --gpus-per-node=8
-
-echo "Checking for running GPU processes..."
-if [[ -n "$(nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -v '^ *$')" ]]; then
-  echo "Another GPU process is currently running. Exiting."
-  exit 0
-fi
+#SBATCH --exclusive
+#SBATCH --mem=0
 
 platform=""
 gpus_on_node=$(nvidia-smi --query-gpu=name --format=csv,noheader | sort | uniq -c)

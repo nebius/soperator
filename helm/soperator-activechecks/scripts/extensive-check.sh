@@ -1,14 +1,9 @@
 #!/bin/bash
 #SBATCH --deadline="now+24hours"
 #SBATCH --time=01:00:00
-#SBATCH --exclusive
 #SBATCH --gpus-per-node=8
-
-echo "Checking for running GPU processes..."
-if [[ -n "$(nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -v '^ *$')" ]]; then
-  echo "Another GPU process is currently running. Exiting."
-  exit 0
-fi
+#SBATCH --exclusive
+#SBATCH --mem=0
 
 platform=""
 gpus_on_node=$(nvidia-smi --query-gpu=name --format=csv,noheader | sort | uniq -c)
@@ -92,7 +87,7 @@ do
   echo "Health checker status: $HC_STATUS"
   if [[ "$HC_STATUS" == "ERROR" || "$HC_STATUS" == "FAIL" || $HC_EXIT_CODE -eq 1 ]]; then
     echo "Health-checker reported status=ERROR and exited with non-zero status."
-    exit 1 # Fail fast 
+    exit 1 # Fail fast
   else
     echo "Health-checker passed or returned non-ERROR status."
   fi
