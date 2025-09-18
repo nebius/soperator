@@ -4,7 +4,7 @@ metadata:
   name: "soperator-outputs-logs-cleaner"
 spec:
   checkType: "k8sJob"
-  schedule: "0 */2 * * *" # every 2 hours
+  schedule: "40 */1 * * *" # At the 40th minute of every hour
   name: "soperator-outputs-logs-cleaner"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   suspend: false

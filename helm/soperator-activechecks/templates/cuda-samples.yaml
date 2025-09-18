@@ -7,7 +7,7 @@ spec:
   name: "cuda-samples"
   dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  schedule: "0 0 */3 * *" # every 3d day (3, 6, 9, etc...)
+  schedule: "30 0-18/6 * * *" # 4 times a day at 00:30, 06:30, 12:30 and 18:30 UTC
   suspend: false
   runAfterCreation: true
   slurmJobSpec:

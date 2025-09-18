@@ -7,14 +7,13 @@ spec:
   name: "mem-perf"
   dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  schedule: "0 16 * * *" # 1 time a day at 16:00 UTC
+  schedule: "20 10-22/12 * * *" # 2 times a day at 10:20 and 22:20 UTC
   suspend: false
   runAfterCreation: true
   slurmJobSpec:
     sbatchScript: |
 {{ tpl (.Files.Get "scripts/mem-perf.sh") . | indent 6 }}
     eachWorkerJobs: true
-    maxNumberOfJobs: 200
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:

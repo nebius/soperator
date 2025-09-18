@@ -7,7 +7,7 @@ spec:
   name: "enroot-cleanup"
   dependsOn: [ "create-user-soperatorchecks" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  schedule: "0 8 * * *" # Once a day at 8:00 UTC
+  schedule: "10 8-20/12 * * *" # 2 times a day at 8:10 and 20:10 UTC
   suspend: false
   runAfterCreation: false
   slurmJobSpec:
