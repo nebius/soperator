@@ -60,7 +60,12 @@ backup:
   version: 4.8.*
   namespace: k8up-system
   releaseName: k8up
-  values: null
+  values:
+    cleanup:
+      pullPolicy: IfNotPresent
+      registry: docker.io
+      repository: alpine/k8s
+      tag: 1.34.0
   overrideValues: null
   schedule:
     interval: 5m
