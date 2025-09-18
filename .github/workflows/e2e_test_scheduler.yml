@@ -18,9 +18,7 @@ jobs:
       - name: Determine branch and terraform ref
         id: select_params
         run: |
-          # Configuration
-          RELEASE_BRANCH="soperator-release-1.21"
-
+          RELEASE_BRANCH="soperator-release-1.22"
           HOUR=$(date -u +%-H)  # %-H removes leading zeros to avoid octal interpretation
           if [ $((HOUR % 2)) -eq 0 ]; then
             echo "ref=main" >> $GITHUB_OUTPUT

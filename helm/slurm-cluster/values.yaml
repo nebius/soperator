@@ -111,6 +111,8 @@ populateJail:
   appArmorProfile: "unconfined"
   # Name of the k8s node filter
   k8sNodeFilterName: "gpu"
+  # Controls if the pod containers can use the host user namespace
+  # hostUsers: false
   # Configuration of the volume containing the custom initial jail content (the default content is used if not set)
   jailSnapshotVolume: null
   #  jailSnapshotVolume:
@@ -152,6 +154,8 @@ slurmNodes:
   accounting:
     enabled: false
     k8sNodeFilterName: "no-gpu"
+    # Controls if the pod containers can use the host user namespace
+    # hostUsers: false
     slurmConfig:
       accountingStorageTRES: "CPU,Mem,Node,VMem,Gres/gpu"
       jobAcctGatherType: "jobacct_gather/cgroup"
@@ -279,6 +283,8 @@ slurmNodes:
   controller:
     k8sNodeFilterName: "no-gpu"
     priorityClass: ""
+    # Controls if the pod containers can use the host user namespace
+    # hostUsers: false
     slurmctld:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
@@ -315,6 +321,9 @@ slurmNodes:
     size: 2
     maxUnavailable: "20%"
     k8sNodeFilterName: "gpu"
+    # Controls if the pod containers can use the host user namespace
+    # For workers, defaults to true to allow containers to access host user namespace
+    # hostUsers: true
     cgroupVersion: v2
     enableGDRCopy: false
     priorityClass: ""
@@ -370,6 +379,8 @@ slurmNodes:
   login:
     size: 2
     k8sNodeFilterName: "no-gpu"
+    # Controls if the pod containers can use the host user namespace
+    # hostUsers: false
     sshd:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
@@ -419,6 +430,8 @@ slurmNodes:
     enabled: true
     size: 1
     k8sNodeFilterName: "no-gpu"
+    # Controls if the pod containers can use the host user namespace
+    # hostUsers: false
     podMonitorConfig:
       jobLabel: "slurm-exporter"
       interval: "30s"
@@ -450,6 +463,8 @@ slurmNodes:
     enabled: false
     size: 2
     k8sNodeFilterName: "no-gpu"
+    # Controls if the pod containers can use the host user namespace
+    # hostUsers: false
     threadCount: 3
     maxConnections: 10
     rest:
@@ -463,6 +478,8 @@ slurmNodes:
         ephemeralStorage: "500Mi"
     customInitContainers: []
 sConfigController:
+  # Controls if the pod containers can use the host user namespace
+  # hostUsers: false
   node:
     k8sNodeFilterName: "system"
     size: 1
@@ -490,15 +507,16 @@ telemetry: {}
 #   otelCollectorPort: 8429
 
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.21.11-noble-slurm24.11.6"
-  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.21.11-noble-slurm24.11.6"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.21.11-noble-slurm24.11.6"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.21.11-noble-slurm24.11.6"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.21.11-noble-slurm24.11.6"
-  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.21.11-noble-slurm24.11.6"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.21.11-noble-slurm24.11.6"
-  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.21.11-noble-slurm24.11.6"
-  sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.21.11
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.21.12-noble-slurm25.05.3"
+  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.21.12-noble-slurm25.05.3"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.21.12-noble-slurm25.05.3"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.21.12-noble-slurm25.05.3"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.21.12-noble-slurm25.05.3"
+  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.21.12-noble-slurm25.05.3"
+  ncclBenchmark: "cr.eu-north1.nebius.cloud/soperator/nccl_benchmark:1.21.12-jammy-slurm24.11.5"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.21.12-noble-slurm25.05.3"
+  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.21.12-noble-slurm25.05.3"
+  sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.21.12
   mariaDB: docker-registry1.mariadb.com/library/mariadb:11.4.3
 # Configuration for slurm scripts.
 slurmScripts:

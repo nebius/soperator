@@ -29,8 +29,9 @@ CHART_FLUXCD_PATH    		  = $(CHART_PATH)/soperator-fluxcd
 CHART_ACTIVECHECK_PATH        = $(CHART_PATH)/soperator-activechecks
 CHART_DCGM_EXPORTER_PATH      = $(CHART_PATH)/soperator-dcgm-exporter
 CHART_SOPERATOR_NOTIFIER_PATH = $(CHART_PATH)/soperator-notifier
+CHART_NFS_SERVER_PATH         = $(CHART_PATH)/nfs-server
 
-SLURM_VERSION		  		= 24.11.6
+SLURM_VERSION		  		= 25.05.3
 UBUNTU_VERSION		  		?= noble
 VERSION               		= $(shell cat VERSION)
 
@@ -193,6 +194,7 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_ACTIVECHECK_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_DCGM_EXPORTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_NOTIFIER_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_CRDS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
@@ -203,6 +205,7 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_ACTIVECHECK_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_DCGM_EXPORTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_NOTIFIER_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
 	@# endregion helm chart versions
 #
 	@# region helm/slurm-cluster/values.yaml
@@ -328,6 +331,7 @@ endif
 		--target ${IMAGE_NAME} \
 		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64" \
 		-f images/${DOCKERFILE} \
+		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
 		$(DOCKER_BUILD_ARGS) \
 		.
 
@@ -337,6 +341,7 @@ endif
 		--target ${IMAGE_NAME} \
 		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" \
 		-f images/${DOCKERFILE} \
+		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
 		$(DOCKER_BUILD_ARGS) \
 		.
 	# Push
@@ -361,6 +366,7 @@ endif
 		--target jail \
 		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-amd64" \
 		-f images/jail/jail.dockerfile \
+		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
 		--output type=tar,dest=images/jail_rootfs_amd64.tar \
 		.
 
@@ -370,6 +376,7 @@ endif
 		--target jail \
 		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-arm64" \
 		-f images/jail/jail.dockerfile \
+		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
 		--output type=tar,dest=images/jail_rootfs_arm64.tar \
 		.
 

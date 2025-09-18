@@ -19,6 +19,7 @@ type Job struct {
 	Partition      string
 	UserName       string
 	UserID         *int32
+	UserMail       string
 	StandardError  string
 	StandardOutput string
 	Nodes          string
@@ -34,7 +35,6 @@ type Job struct {
 
 func JobFromAPI(apiJob api.V0041JobInfo) (Job, error) {
 	job := Job{}
-
 	if apiJob.JobId == nil {
 		return job, fmt.Errorf("job ID is missing")
 	}
@@ -66,6 +66,11 @@ func JobFromAPI(apiJob api.V0041JobInfo) (Job, error) {
 		job.UserName = *apiJob.UserName
 	} else if apiJob.GroupName != nil {
 		job.UserName = *apiJob.GroupName
+	}
+
+	// Slurm API returns mail_user = user_name if mail_user wasn't set explicitly
+	if apiJob.MailUser != nil && job.UserName != *apiJob.MailUser {
+		job.UserMail = *apiJob.MailUser
 	}
 
 	if apiJob.StandardError != nil {
@@ -157,6 +162,10 @@ func (j Job) IsTerminalState() bool {
 
 func (j Job) IsFailedState() bool {
 	return j.State == string(api.V0041JobInfoJobStateFAILED)
+}
+
+func (j Job) IsCompletedState() bool {
+	return j.State == string(api.V0041JobInfoJobStateCOMPLETED)
 }
 
 func parseNodeList(nodeString string) ([]string, error) {

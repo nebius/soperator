@@ -50,6 +50,7 @@ func BasePodTemplateSpec(
 			},
 		},
 		Spec: corev1.PodSpec{
+			HostUsers:         sConfigController.HostUsers,
 			Affinity:          nodeFilter.Affinity,
 			Tolerations:       nodeFilter.Tolerations,
 			NodeSelector:      nodeFilter.NodeSelector,

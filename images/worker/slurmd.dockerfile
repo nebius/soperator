@@ -1,6 +1,6 @@
 FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS worker_slurmd
 
-ARG SLURM_VERSION=24.11.6
+ARG SLURM_VERSION
 ARG OPENMPI_VERSION=4.1.7a1
 ARG PYXIS_VERSION=0.21.0
 
@@ -143,6 +143,12 @@ COPY images/common/scripts/reboot.sh /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
     chmod +x /opt/bin/slurm/bind_slurm_common.sh
+
+# Create single folder with slurm plugins for all architectures
+RUN mkdir -p /usr/lib/slurm && \
+    for dir in /usr/lib/*-linux-gnu/slurm; do \
+      [ -d "$dir" ] && ln -sf $dir/* /usr/lib/slurm/ 2>/dev/null || true; \
+    done
 
 # Update linker cache
 RUN ldconfig

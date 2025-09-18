@@ -5,6 +5,8 @@ set -euxo pipefail # Exit immediately if any command returns a non-zero error co
 echo "Export SNCCLD_ENABLED variable passed from the K8s job env"
 export SNCCLD_ENABLED
 
+PARTITION="hidden"
+
 echo "Link users from jail"
 ln -s /mnt/jail/etc/passwd /etc/passwd
 ln -s /mnt/jail/etc/group /etc/group
@@ -15,9 +17,6 @@ chown -h 0:42 /etc/{shadow,gshadow}
 echo "Link home from jail to use SSH keys from there"
 ln -s /mnt/jail/home /home
 
-echo "Complement jail rootfs"
-/opt/bin/slurm/complement_jail.sh -j /mnt/jail -u /mnt/jail.upper
-
 echo "Symlink slurm configs from jail(sconfigcontroller)"
 rm -rf /etc/slurm && ln -s /mnt/jail/etc/slurm /etc/slurm
 
@@ -27,7 +26,28 @@ mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
 echo "Create directory for slurm job outputs"
 (umask 000; mkdir -p "/mnt/jail/opt/soperator-outputs/slurm_jobs")
 
-if [[ "${EACH_WORKER_JOB_ARRAY:-}" == "true" ]]; then
+if [[ -n "${RESERVATION_NAME:-}" ]]; then
+    echo "Submitting Slurm job on reservation $RESERVATION_NAME..."
+    OUT_PATTERN='/opt/soperator-outputs/slurm_jobs/%N.%x.%j.out'
+    # Here we use env variables instead of --output and --error because they do not support %N (node name) parameter.
+    SLURM_OUTPUT=$(
+      SBATCH_OUTPUT="$OUT_PATTERN" \
+      SBATCH_ERROR="$OUT_PATTERN" \
+      /usr/bin/sbatch --parsable \
+        --reservation="$RESERVATION_NAME" \
+        --job-name="$ACTIVE_CHECK_NAME" \
+        --chdir=/opt/soperator-home/soperatorchecks \
+        --uid=soperatorchecks \
+        --partition="$PARTITION" \
+        /opt/bin/sbatch.sh
+    )
+    if [[ -z "$SLURM_OUTPUT" ]]; then
+        echo "Failed to submit Slurm job"
+        exit 1
+    fi
+    SLURM_JOB_ID="$SLURM_OUTPUT"
+
+elif [[ "${EACH_WORKER_JOB_ARRAY:-}" == "true" ]]; then
     echo "Submitting job using slurm_submit_array_job.sh..."
     SUBMIT_OUTPUT=$(/opt/bin/slurm/slurm_submit_array_job.sh)
     SCRIPT_STATUS=$?
@@ -60,7 +80,7 @@ else
         --job-name="$ACTIVE_CHECK_NAME" \
         --chdir=/opt/soperator-home/soperatorchecks \
         --uid=soperatorchecks \
-        --partition="hidden" \
+        --partition="$PARTITION" \
         /opt/bin/sbatch.sh
     )
     if [[ -z "$SLURM_OUTPUT" ]]; then
