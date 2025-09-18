@@ -56,6 +56,11 @@ spec:
           enabled: false
         serviceMonitor:
           enabled: true
+    cleanup:
+      pullPolicy: {{ .Values.backup.values.cleanup.pullPolicy }}
+      registry: {{ .Values.backup.values.cleanup.registry }}
+      repository: {{ .Values.backup.values.cleanup.repository }}
+      tag: {{ .Values.backup.values.cleanup.tag }}
     {{- end }}
   {{- end }}
   valuesFrom:
