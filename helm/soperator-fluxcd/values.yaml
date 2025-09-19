@@ -193,7 +193,7 @@ observability:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 1.21.11
+    version: 1.22.0
     namespace: soperator
     releaseName: soperator-dcgm-exporter
     values:
@@ -227,7 +227,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.21.11
+  version: 1.22.0
   namespace: soperator
   releaseName: soperator
   values: null
@@ -243,7 +243,7 @@ soperatorActiveChecks:
   enabled: true
   interval: 5m
   timeout: 120m
-  version: 1.21.11
+  version: 1.22.0
   releaseName: soperator-activechecks
   namespace: soperator
   overrideValues: null
@@ -251,7 +251,7 @@ soperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.21.11
+  version: 1.22.0
   namespace: "soperator-system"
   releaseName: soperator-controller
   values:
@@ -314,7 +314,7 @@ notifier:
   enabled: false
   interval: 5m
   timeout: 5m
-  version: 1.21.11
+  version: 1.22.0
   namespace: monitoring-system
   releaseName: soperator-notifier
   values:
