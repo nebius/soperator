@@ -81,7 +81,11 @@ RUN chmod +x /opt/bin/install_enroot.sh && \
 
 # Copy enroot configuration
 COPY images/common/enroot/enroot.conf /etc/enroot/
-RUN chown 0:0 /etc/enroot/enroot.conf && chmod 644 /etc/enroot/enroot.conf
+COPY images/common/enroot/custom-dirs.conf /etc/enroot/enroot.conf.d/
+RUN chown 0:0 /etc/enroot/enroot.conf && \
+    chmod 644 /etc/enroot/enroot.conf && \
+    chown 0:0 /etc/enroot/enroot.conf.d/custom-dirs.conf && \
+    chmod 644 /etc/enroot/enroot.conf.d/custom-dirs.conf
 
 # Install slurm pyxis plugin \
 RUN apt-get update && \
