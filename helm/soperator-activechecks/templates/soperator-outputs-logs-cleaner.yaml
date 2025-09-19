@@ -7,8 +7,8 @@ spec:
   schedule: "40 */1 * * *" # At the 40th minute of every hour
   name: "soperator-outputs-logs-cleaner"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  suspend: false
-  runAfterCreation: false
+  suspend: {{ .Values.checks.soperatorOutputsLogsCleaner.suspend }}
+  runAfterCreation: {{ .Values.checks.soperatorOutputsLogsCleaner.runAfterCreation }}
   k8sJobSpec:
     jobContainer:
       command:

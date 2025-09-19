@@ -1,4 +1,4 @@
-{{- if .Values.ensureDirSnccldLogs.enabled -}}
+{{- if .Values.checks.ensureDirSnccldLogs.enabled -}}
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
@@ -7,9 +7,9 @@ spec:
   checkType: "k8sJob"
   name: "ensure-dir-snccld-logs"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  schedule: {{ .Values.ensureDirSnccldLogs.schedule | default "0 10 * * *" | quote }} # Once a day at 10:00 UTC
-  suspend: false
-  runAfterCreation: true
+  schedule: {{ .Values.checks.ensureDirSnccldLogs.schedule | default "0 10 * * *" | quote }} # Once a day at 10:00 UTC
+  suspend: {{ .Values.checks.ensureDirSnccldLogs.suspend }}
+  runAfterCreation: {{ .Values.checks.ensureDirSnccldLogs.runAfterCreation }}
   k8sJobSpec:
     jobContainer:
       command:
@@ -20,7 +20,7 @@ spec:
       image: {{ .Values.images.k8sJob | quote }}
       env:
         - name: SNCCLD_LOG_DIR_PATH
-          value: {{ .Values.ensureDirSnccldLogs.dir | default "/opt/soperator-outputs/nccl_logs" | quote }}
+          value: {{ .Values.checks.ensureDirSnccldLogs.dir | default "/opt/soperator-outputs/nccl_logs" | quote }}
       volumeMounts:
 {{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
       volumes:

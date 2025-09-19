@@ -8,8 +8,8 @@ spec:
   dependsOn: [ "create-user-soperatorchecks" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   # We should run this upgrade manually
-  suspend: true
-  runAfterCreation: false
+  suspend: {{ .Values.checks.upgradeHealthChecker.suspend }}
+  runAfterCreation: {{ .Values.checks.upgradeHealthChecker.runAfterCreation }}
   k8sJobSpec:
     jobContainer:
       command:

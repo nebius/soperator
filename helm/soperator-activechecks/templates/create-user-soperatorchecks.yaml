@@ -6,8 +6,8 @@ spec:
   checkType: "k8sJob"
   name: "create-user-soperatorchecks"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  suspend: true
-  runAfterCreation: true
+  suspend: {{ .Values.checks.createUserSoperatorChecks.suspend }}
+  runAfterCreation: {{ .Values.checks.createUserSoperatorChecks.runAfterCreation }}
   k8sJobSpec:
     jobContainer:
       command:

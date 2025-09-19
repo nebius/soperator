@@ -7,8 +7,8 @@ spec:
   name: "ssh-check"
   dependsOn: [ "create-user-soperatorchecks" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  suspend: true
-  runAfterCreation: true
+  suspend: {{ .Values.checks.sshCheck.suspend }}
+  runAfterCreation: {{ .Values.checks.sshCheck.runAfterCreation }}
   k8sJobSpec:
     jobContainer:
       command:
@@ -19,7 +19,7 @@ spec:
       image: {{ .Values.images.k8sJob | quote }}
       env:
         - name: NUM_OF_LOGIN_NODES
-          value: {{ .Values.sshCheck.numOfLoginNodes | quote }}
+          value: {{ .Values.checks.sshCheck.numOfLoginNodes | quote }}
       volumeMounts:
 {{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
       volumes:
