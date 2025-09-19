@@ -176,6 +176,8 @@ spec:
           - /var/log/pods/monitoring-system_*/**/*.log
           - /var/log/pods/logs-system_*/**/*.log
           include:
+          - /var/log/pods/gpu-operator_*/**/*.log
+          - /var/log/pods/network-operator_*/**/*.log
           - /var/log/pods/*-system_*/**/*.log
           - /var/log/pods/soperator_*/**/*.log
           include_file_name: false
