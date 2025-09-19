@@ -1,14 +1,14 @@
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
-  name: "create-user-{{ .Values.createUser.name }}"
+  name: "create-user-{{ .Values.checks.createUser.name }}"
 spec:
   checkType: "k8sJob"
-  name: "create-user-{{ .Values.createUser.name }}"
+  name: "create-user-{{ .Values.checks.createUser.name }}"
   dependsOn: [ "create-user-soperatorchecks" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  suspend: true
-  runAfterCreation: true
+  suspend: {{ .Values.checks.createUser.suspend }}
+  runAfterCreation: {{ .Values.checks.createUser.runAfterCreation }}
   k8sJobSpec:
     jobContainer:
       command:
@@ -19,7 +19,7 @@ spec:
       image: {{ .Values.images.k8sJob | quote }}
       env:
         - name: USER_NAME
-          value: {{ .Values.createUser.name | quote }}
+          value: {{ .Values.checks.createUser.name | quote }}
       volumeMounts:
 {{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
       volumes:

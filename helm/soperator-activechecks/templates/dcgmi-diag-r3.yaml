@@ -7,8 +7,8 @@ spec:
   name: "dcgmi-diag-r3"
   dependsOn: [ "create-user-soperatorchecks", "wait-for-topology" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  suspend: true
-  runAfterCreation: true
+  suspend: {{ .Values.checks.dcgmiDiagR3.suspend }}
+  runAfterCreation: {{ .Values.checks.dcgmiDiagR3.runAfterCreation }}
   slurmJobSpec:
     sbatchScript: |
 {{ .Files.Get "scripts/dcgmi-diag-r3.sh" | indent 6 }}
