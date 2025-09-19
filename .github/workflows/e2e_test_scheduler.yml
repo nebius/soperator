@@ -3,7 +3,7 @@ name: E2E Test Scheduler
 on:
   schedule:
     # Every hour - alternates between main and release branches
-    - cron: '0 */1 * * *'
+    - cron: '0 */3 * * *'
   workflow_dispatch:  # Allow manual trigger for testing
 
 permissions:
