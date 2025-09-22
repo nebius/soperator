@@ -9,8 +9,8 @@ spec:
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   # extensive-check is suspended and its schedule is not used.
   # It is being scheduled using `cronjob/run-extensive-check-on-reservations`
-  suspend: true
-  runAfterCreation: false
+  suspend: {{ .Values.checks.extensiveCheck.suspend }}
+  runAfterCreation: {{ .Values.checks.extensiveCheck.runAfterCreation }}
   schedule: "0 0 1 1 *"
   # *JobsHistoryLimit this sould equal the number of worker nodes in the cluster
   successfulJobsHistoryLimit: 3000

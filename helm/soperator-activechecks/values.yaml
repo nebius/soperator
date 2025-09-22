@@ -24,16 +24,72 @@ images:
   munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.21.12-noble-slurm25.05.3"
 # Pyxis syntax with '#' separator for registry
 activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-4ae0b6d"
-sshCheck:
-  numOfLoginNodes: 2
-createUser:
-  name: "nebius"
-upgradeCuda:
-  cudaVersion: "12.4.1-1"
-upgradeHealthChecker:
-  healthCheckerVersion: "1.0.0-156.250917"
-ensureDirSnccldLogs:
-  enabled: false
-  dir: /opt/soperator-outputs/nccl_logs
-  schedule: 15 0 * * *
 reservationPrefix: soperatorchecks.suspicious
+checks:
+  allReducePerfNCCLWithIB:
+    suspend: false
+    runAfterCreation: true
+  allReducePerfNCCLWithoutIB:
+    suspend: false
+    runAfterCreation: true
+  createUserSoperatorChecks:
+    suspend: true
+    runAfterCreation: true
+  createUser:
+    suspend: true
+    runAfterCreation: true
+    name: "nebius"
+  cudaSamples:
+    suspend: false
+    runAfterCreation: true
+  dcgmiDiagR2:
+    suspend: false
+    runAfterCreation: true
+  dcgmiDiagR3:
+    suspend: true
+    runAfterCreation: true
+  enrootCleanup:
+    suspend: false
+    runAfterCreation: false
+  ensureDirSnccldLogs:
+    suspend: false
+    runAfterCreation: true
+    enabled: false
+    dir: /opt/soperator-outputs/nccl_logs
+    schedule: 15 0 * * *
+  extensiveCheck:
+    suspend: true
+    runAfterCreation: false
+  gpuFryer:
+    suspend: false
+    runAfterCreation: true
+  ibPerf:
+    suspend: false
+    runAfterCreation: true
+  installPackage:
+    suspend: true
+    runAfterCreation: false
+  memPerf:
+    suspend: false
+    runAfterCreation: true
+  prepullContainerImage:
+    suspend: true
+    runAfterCreation: true
+  soperatorOutputsLogsCleaner:
+    suspend: false
+    runAfterCreation: false
+  sshCheck:
+    suspend: true
+    runAfterCreation: true
+    numOfLoginNodes: 2
+  upgradeCuda:
+    suspend: true
+    runAfterCreation: false
+    cudaVersion: "12.4.1-1"
+  upgradeHealthChecker:
+    suspend: true
+    runAfterCreation: false
+    healthCheckerVersion: "1.0.0-156.250917"
+  waitForTopology:
+    suspend: true
+    runAfterCreation: true
