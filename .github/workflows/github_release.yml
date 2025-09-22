@@ -1,15 +1,25 @@
 name: "Create GitHub release with automatic changelog"
 
 on:
-  push:
-    branches:
-      - 'soperator-release-*'
-    paths:
-      - 'VERSION'
+  workflow_dispatch:  # Manual trigger via GitHub UI
 
 jobs:
+  # First, build the stable release
+  build:
+    name: Build stable release
+    uses: ./.github/workflows/one_job.yml
+    with:
+      unstable: false
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+
   tag:
     name: Push new tag
+    needs: build  # Wait for build to complete successfully
 
     permissions:
       contents: write

@@ -1,6 +1,14 @@
 name: Build All in one job
 
 on:
+  workflow_call:
+    inputs:
+      unstable:
+        description: 'Build unstable version'
+        type: boolean
+        required: false
+        default: true
+
   push:
     branches:
       - main
@@ -57,9 +65,9 @@ jobs:
       - name: Generate version file
         run: |
           UNSTABLE="true"
-          if [[ "${{ github.ref }}" =~ ^refs/tags/[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Detected semantic version tag - building stable release"
-            UNSTABLE="false"
+          if [[ "${{ github.event_name }}" == "workflow_call" ]]; then
+            UNSTABLE="${{ inputs.unstable }}"
+            echo "Called from workflow_call with unstable=${UNSTABLE}"
           else
             echo "Building unstable version"
           fi
