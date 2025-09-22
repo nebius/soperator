@@ -29,7 +29,7 @@ RUN GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
 # Second stage: Build image for the prometheus-slurm-exporter
 FROM $BASE_IMAGE AS exporter
 
-ARG SLURM_VERSION=24.11.6
+ARG SLURM_VERSION
 
 # Install dependencies
 RUN apt-get update && \
@@ -87,6 +87,12 @@ COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
     /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
+
+# Create single folder with slurm plugins for all architectures
+RUN mkdir -p /usr/lib/slurm && \
+    for dir in /usr/lib/*-linux-gnu/slurm; do \
+      [ -d "$dir" ] && ln -sf $dir/* /usr/lib/slurm/ 2>/dev/null || true; \
+    done
 
 # Update linker cache
 RUN ldconfig

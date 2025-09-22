@@ -36,3 +36,4 @@ ensureDirSnccldLogs:
   enabled: false
   dir: /opt/soperator-outputs/nccl_logs
   schedule: 15 0 * * *
+reservationPrefix: soperatorchecks.suspicious

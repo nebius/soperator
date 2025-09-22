@@ -25,8 +25,10 @@ func renderPodSpec(nodeConfigurator slurmv1alpha1.NodeConfiguratorSpec) corev1.P
 	nodeSelector := getNodeSelector(nodeConfigurator)
 	serviceAccountName := getServiceAccountName(nodeConfigurator)
 	priorityClassName := getPriorityClassName(nodeConfigurator)
+	hostUsers := getHostUsers(nodeConfigurator)
 
 	return corev1.PodSpec{
+		HostUsers:          hostUsers,
 		HostPID:            hostPID,
 		Affinity:           affinity,
 		NodeSelector:       nodeSelector,
@@ -80,4 +82,11 @@ func getPriorityClassName(nodeConfigurator slurmv1alpha1.NodeConfiguratorSpec) s
 		return nodeConfigurator.Rebooter.PriorityClassName
 	}
 	return nodeConfigurator.SleepContainer.PriorityClassName
+}
+
+func getHostUsers(nodeConfigurator slurmv1alpha1.NodeConfiguratorSpec) *bool {
+	if nodeConfigurator.Rebooter.Enabled {
+		return nodeConfigurator.Rebooter.HostUsers
+	}
+	return nodeConfigurator.SleepContainer.HostUsers
 }

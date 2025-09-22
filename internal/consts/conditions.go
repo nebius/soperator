@@ -59,12 +59,12 @@ const (
 	ActiveCheckK8sJobStatusUnknown   ActiveCheckK8sJobStatus = "Unknown"
 )
 
-// ActiveCheckSlurmJobStatus defines status for ActiveCheck slurm job.
-type ActiveCheckSlurmJobStatus string
+// ActiveCheckSlurmRunStatus defines status for ActiveCheck slurm job.
+type ActiveCheckSlurmRunStatus string
 
 const (
-	ActiveCheckSlurmJobStatusInProgress ActiveCheckSlurmJobStatus = "InProgress"
-	ActiveCheckSlurmJobStatusComplete   ActiveCheckSlurmJobStatus = "Complete"
-	ActiveCheckSlurmJobStatusFailed     ActiveCheckSlurmJobStatus = "Failed"
-	ActiveCheckSlurmJobStatusDegraded   ActiveCheckSlurmJobStatus = "Degraded"
+	ActiveCheckSlurmRunStatusInProgress ActiveCheckSlurmRunStatus = "InProgress"
+	ActiveCheckSlurmRunStatusComplete   ActiveCheckSlurmRunStatus = "Complete"
+	ActiveCheckSlurmRunStatusFailed     ActiveCheckSlurmRunStatus = "Failed"
+	ActiveCheckSlurmRunStatusError      ActiveCheckSlurmRunStatus = "Error"
 )

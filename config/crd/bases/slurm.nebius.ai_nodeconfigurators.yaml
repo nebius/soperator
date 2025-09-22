@@ -2529,6 +2529,10 @@ spec:
                       - name
                       type: object
                     type: array
+                  hostUsers:
+                    description: HostUsers controls if the pod containers can use
+                      the host user namespace
+                    type: boolean
                   image:
                     description: Image defines the node-configurator container image
                     properties:
@@ -4028,6 +4032,10 @@ spec:
                     enum:
                     - evict
                     type: string
+                  hostUsers:
+                    description: HostUsers controls if the pod containers can use
+                      the host user namespace
+                    type: boolean
                   image:
                     description: Image defines the node-configurator container image
                     properties:
