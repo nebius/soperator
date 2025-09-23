@@ -115,25 +115,22 @@ jobs:
       - name: golangci-lint on linux/amd64
         uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
         with:
-          version: v2.0.2 # version of golangci-lint, should be in sync with Makefile.
+          version: v2.5.0 # version of golangci-lint, should be in sync with Makefile.
         env:
-          GOEXPERIMENT: synctest
           GOARCH: amd64
           GOOS: linux
       - name: golangci-lint on linux/arm64
         uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
         with:
-          version: v2.0.2 # version of golangci-lint, should be in sync with Makefile.
+          version: v2.5.0 # version of golangci-lint, should be in sync with Makefile.
         env:
-          GOEXPERIMENT: synctest
           GOARCH: arm64
           GOOS: linux
       - name: golangci-lint on darwin/arm64
         uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
         with:
-          version: v2.0.2 # version of golangci-lint, should be in sync with Makefile.
+          version: v2.5.0 # version of golangci-lint, should be in sync with Makefile.
         env:
-          GOEXPERIMENT: synctest
           GOARCH: arm64
           GOOS: darwin
 

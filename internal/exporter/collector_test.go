@@ -92,7 +92,7 @@ func TestMetricsCollector_Describe(t *testing.T) {
 func TestMetricsCollector_Collect_Success(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	synctest.Run(func() {
+	synctest.Test(t, func(t *testing.T) {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient)
 
@@ -234,7 +234,7 @@ func TestMetricsCollector_Collect_APIError(t *testing.T) {
 func TestMetricsCollector_NodeFails(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	synctest.Run(func() {
+	t.Run("NodeFails", func(t *testing.T) {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient)
 
@@ -381,7 +381,7 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	synctest.Run(func() {
+	synctest.Test(t, func(t *testing.T) {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient)
 
@@ -473,7 +473,7 @@ func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	synctest.Run(func() {
+	t.Run("edge cases", func(t *testing.T) {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient)
 
@@ -567,7 +567,7 @@ func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 func TestMetricsCollector_GetDiag_APIError(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	synctest.Run(func() {
+	t.Run("API error handling", func(t *testing.T) {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient)
 
@@ -629,7 +629,7 @@ func TestMetricsCollector_GetDiag_APIError(t *testing.T) {
 func TestMetricsCollector_GetDiag_NilFields(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	synctest.Run(func() {
+	synctest.Test(t, func(t *testing.T) {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient)
 
@@ -676,7 +676,7 @@ func TestMetricsCollector_GetDiag_NilFields(t *testing.T) {
 func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	synctest.Run(func() {
+	synctest.Test(t, func(t *testing.T) {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient)
 
@@ -882,7 +882,7 @@ func toPrometheusLikeString(t *testing.T, metric prometheus.Metric) string {
 func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	synctest.Run(func() {
+	synctest.Test(t, func(t *testing.T) {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient)
 
@@ -980,7 +980,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	t.Run("track unavailability state transitions", func(t *testing.T) {
-		synctest.Run(func() {
+		synctest.Test(t, func(t *testing.T) {
 			mockClient := &fake.MockClient{}
 			collector := NewMetricsCollector(mockClient)
 
@@ -1076,7 +1076,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 	})
 
 	t.Run("track draining state transitions", func(t *testing.T) {
-		synctest.Run(func() {
+		synctest.Test(t, func(t *testing.T) {
 			mockClient := &fake.MockClient{}
 			collector := NewMetricsCollector(mockClient)
 
@@ -1173,7 +1173,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 	})
 
 	t.Run("IDLE+DRAIN is considered unavailability", func(t *testing.T) {
-		synctest.Run(func() {
+		synctest.Test(t, func(t *testing.T) {
 			mockClient := &fake.MockClient{}
 			collector := NewMetricsCollector(mockClient)
 
@@ -1222,7 +1222,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 	})
 
 	t.Run("DRAIN+MIXED is considered draining", func(t *testing.T) {
-		synctest.Run(func() {
+		synctest.Test(t, func(t *testing.T) {
 			mockClient := &fake.MockClient{}
 			collector := NewMetricsCollector(mockClient)
 

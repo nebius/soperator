@@ -94,27 +94,27 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
-	GOEXPERIMENT=synctest go fmt ./...
+	go fmt ./...
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	GOEXPERIMENT=synctest go vet ./...
+	go vet ./...
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	GOEXPERIMENT=synctest go test ./... # TODO: remove "GOEXPERIMENT=synctest" from everywhere after upgrading to Go 1.25.
+	go test ./...
 
 .PHONY: test-coverage
-test-coverage: manifests generate fmt vet envtest ## Run tests with coverage.
-	GOEXPERIMENT=synctest go test ./... -coverprofile cover.out
+test-coverage: manifests generate fmt vet envtest ## Run tests and generate test coverage.
+	go test ./... -coverprofile cover.out
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter & yamllint
-	GOEXPERIMENT=synctest $(GOLANGCI_LINT) run
+	$(GOLANGCI_LINT) run
 
 .PHONY: lint-fix
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
-	GOEXPERIMENT=synctest $(GOLANGCI_LINT) run --fix
+	$(GOLANGCI_LINT) run --fix
 
 .PHONY: helm
 helm: generate manifests kustomize helmify ## Update soperator Helm chart
@@ -447,7 +447,7 @@ MOCKERY        ?= $(LOCALBIN)/mockery
 KUSTOMIZE_VERSION        ?= v5.5.0
 CONTROLLER_TOOLS_VERSION ?= v0.16.4
 ENVTEST_VERSION          ?= release-0.17
-GOLANGCI_LINT_VERSION    ?= v2.0.2  # Should be in sync with the github CI step.
+GOLANGCI_LINT_VERSION    ?= v2.5.0  # Should be in sync with the github CI step.
 HELMIFY_VERSION          ?= 0.4.13
 HELM_VERSION						 ?= v3.18.3
 HELM_UNITTEST_VERSION    ?= 0.8.2
