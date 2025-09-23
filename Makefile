@@ -94,27 +94,27 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
-	GOEXPERIMENT=synctest go fmt ./...
+	go fmt ./...
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	GOEXPERIMENT=synctest go vet ./...
+	go vet ./...
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	GOEXPERIMENT=synctest go test ./... # TODO: remove "GOEXPERIMENT=synctest" from everywhere after upgrading to Go 1.25.
+	go test ./...
 
 .PHONY: test-coverage
-test-coverage: manifests generate fmt vet envtest ## Run tests with coverage.
-	GOEXPERIMENT=synctest go test ./... -coverprofile cover.out
+test-coverage: manifests generate fmt vet envtest ## Run tests and generate test coverage.
+	go test ./... -coverprofile cover.out
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter & yamllint
-	GOEXPERIMENT=synctest $(GOLANGCI_LINT) run
+	$(GOLANGCI_LINT) run
 
 .PHONY: lint-fix
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
-	GOEXPERIMENT=synctest $(GOLANGCI_LINT) run --fix
+	$(GOLANGCI_LINT) run --fix
 
 .PHONY: helm
 helm: generate manifests kustomize helmify ## Update soperator Helm chart
