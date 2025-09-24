@@ -15,10 +15,18 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: The phase of Slurm cluster creation.
+    - description: The phase of NodeSet lifecycle.
       jsonPath: .status.phase
       name: Status
       type: string
+    - description: The desired number of workers.
+      jsonPath: .spec.replicas
+      name: Desired
+      type: integer
+    - description: The current number of workers being ready for some time.
+      jsonPath: .status.replicas
+      name: Ready
+      type: integer
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -974,23 +982,25 @@ spec:
                 type: string
               gpu:
                 description: GPU defines the settings related to GPU support for Slurm
-                  workers
+                  workers.
                 properties:
                   enabled:
+                    default: false
                     description: Enabled indicates whether GPU support is enabled
-                      for the NodeSet.
+                      for the Nodes of the NodeSet.
                     type: boolean
                   nvidia:
                     description: Nvidia contains settings specific to Nvidia GPUs.
                     properties:
                       gdrCopyEnabled:
+                        default: false
                         description: GDRCopyEnabled determines whether GDRCopy should
-                          be enabled for Nvidia GPUs
+                          be enabled for Nvidia GPUs.
                         type: boolean
                     type: object
                 type: object
               munge:
-                description: Slurmd defines the Slurm munge configuration
+                description: Slurmd defines the Slurm munge configuration.
                 properties:
                   image:
                     description: Image defines the image used for the Slurm munge
@@ -1045,21 +1055,60 @@ spec:
                 - image
                 - resources
                 type: object
-              nodeAttributes:
-                description: NodeAttributes specifies additional attributes for Slurm
-                  worker nodes.
+              nodeConfig:
+                description: ExtraConfig provides possibility to define extra values
+                  set for Node in `slurm.conf`.
                 properties:
-                  extra:
+                  dynamic:
+                    default: ""
                     description: |-
-                      Extra defines the string that will be set to the "Extra" field of the corresponding Slurm node.
-                      It can use any environment variables that are available in the slurmd container when it starts.
+                      Dynamic provides a possibility to define extra values per Node (e.g. InstanceId, or Extra fields).
+                      This line supports Go templating, and will be rendered before being passed to the config.
                     type: string
                   features:
                     description: Features defines the list of Slurm Node "Features"
-                      to filter nodes during job scheduling
+                      to filter nodes during job scheduling.
                     items:
                       type: string
                     type: array
+                  gres:
+                    description: GRes specifies general resources available per Node.
+                    items:
+                      description: GRes specifies general resource available for worker
+                        node.
+                      properties:
+                        count:
+                          default: "1"
+                          description: |-
+                            Count specifies a GRes count.
+                            Suffixes as of "K", "M", "G", "T" or "P" may be used to multiply the number by 1024, 1048576, 1073741824, etc. respectively.
+                            Defaults to "1" if not set.
+                          type: string
+                        name:
+                          description: Name represents a GRes type - a high-level
+                            resource name.
+                          type: string
+                        noConsume:
+                          default: false
+                          description: NoConsume allows you to specify that a GRes
+                            does not have a finite number of that resource that gets
+                            consumed as it is requested.
+                          type: boolean
+                        type:
+                          default: ""
+                          description: Type represents a specific type (e.g. model)
+                            of the GRes.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  static:
+                    default: ""
+                    description: |-
+                      Static provides a possibility to define extra values per Node (e.g. CPU topology).
+                      This line will be provided to the config as is.
+                    type: string
                 type: object
               nodeSelector:
                 additionalProperties:
@@ -1082,7 +1131,7 @@ spec:
                 format: int32
                 type: integer
               slurmd:
-                description: Slurmd defines the Slurm worker daemon configuration
+                description: Slurmd defines the Slurm worker daemon configuration.
                 properties:
                   cgroupVersion:
                     default: v2
@@ -5239,14 +5288,98 @@ spec:
           status:
             description: NodeSetStatus defines the observed state of SlurmCluster
             properties:
+              conditions:
+                description: |-
+                  Conditions represent the observations of a NodeSet's current state.
+                  Known types are: ConditionNodeSetConfigUpdated, ConditionNodeSetConfigDynamicUpdated, ConditionNodeSetStatefulSetUpdated, ConditionNodeSetPodsReady, and ConditionNodeSetStatefulSetTerminated.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              labelSelector:
+                description: LabelSelector is label selectors for query over pods
+                  that should match the replica count used by HPA.
+                type: string
+              observedGeneration:
+                description: |-
+                  observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the
+                  StatefulSet's generation, which is updated on mutation by the API Server.
+                format: int64
+                type: integer
               phase:
+                default: Pending
                 description: |-
                   Phase indicates the current phase of the NodeSet lifecycle.
-                  Possible values are: PhaseNodeSetReconciling, PhaseNodeSetNotAvailable, PhaseNodeSetAvailable.
+                  Known values are: PhaseNodeSetPending, PhaseNodeSetConfiguring, PhaseNodeSetProvisioning, PhaseNodeSetReady, PhaseNodeSetDegraded, and PhaseNodeSetTerminating.
                 type: string
+              replicas:
+                description: Replicas is the number of Pods created by the StatefulSet
+                  controller and being in `Ready` state for some time.
+                format: int32
+                type: integer
+            required:
+            - replicas
             type: object
         type: object
     served: true
     storage: true
     subresources:
+      scale:
+        labelSelectorPath: .status.labelSelector
+        specReplicasPath: .spec.replicas
+        statusReplicasPath: .status.replicas
       status: {}

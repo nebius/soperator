@@ -337,17 +337,74 @@ type SConfigController struct {
 }
 
 type PartitionConfiguration struct {
-	// ConfigType
-	// +kubebuilder:validation:Enum=default;custom
+	// ConfigType defines what behaviour should be used for partition generation.
+	//
+	// PartitionConfigTypeDefault - generates 3 standard partitions:
+	//  - `main` - Default partition for regular jobs (PriorityTier=10)
+	//  - `hidden` - Hidden partition for administrative tasks (Hidden=YES)
+	//  - `background` - Low-priority background partition (PriorityTier=1)
+	//
+	// PartitionConfigTypeCustom - uses raw partition configuration strings from RawConfig.
+	//
+	// PartitionConfigTypeStructured - enables NodeSet references and structured partition definitions.
+	//
+	// +kubebuilder:validation:Enum=default;custom;structured
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="default"
 	ConfigType string `json:"configType,omitempty"`
-	// RawConfig define partition configuration as list of string started with PartitionName
+
+	// RawConfig defines partition configuration as list of string started with PartitionName.
+	// It is used when ConfigType == PartitionConfigTypeCustom.
+	//
 	// Example for custom ConfigType:
-	// - PartitionName=low_priority Nodes=worker-[0-15] Default=YES MaxTime=INFINITE State=UP PriorityTier=1
-	// - PartitionName=high_priority  Nodes=worker-[10-20] Default=NO MaxTime=INFINITE State=UP PriorityTier=2
+	//  - PartitionName=low_priority  Nodes=worker-[0-15]  Default=YES MaxTime=INFINITE State=UP PriorityTier=1
+	//  - PartitionName=high_priority Nodes=worker-[10-20] Default=NO  MaxTime=INFINITE State=UP PriorityTier=2
+	//
 	// +kubebuilder:validation:Optional
 	RawConfig []string `json:"rawConfig,omitempty"`
+
+	// Partitions define partition configuration as a list of structured Partition[s].
+	// It is used when ConfigType == PartitionConfigTypeStructured.
+	//
+	// +kubebuilder:validation:Optional
+	Partitions []Partition `json:"partitions,omitempty"`
+}
+
+const (
+	// PartitionConfigTypeDefault behaves to generate `main`, `hidden`, and `background` partitions automatically.
+	PartitionConfigTypeDefault = "default"
+	// PartitionConfigTypeCustom behaves to use custom raw config.
+	PartitionConfigTypeCustom = "custom"
+	// PartitionConfigTypeStructured behaves to use custom structured partition configuration.
+	PartitionConfigTypeStructured = "structured"
+)
+
+// Partition defines a structured configuration of Partition configuration.
+type Partition struct {
+	// Name defines a name of the Partition.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// IsAll allows to define a Partition including all nodes in the cluster.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	IsAll bool `json:"isAll,omitempty"`
+
+	// NodeSetRefs allows to define a Partition including specific NodeSet[s].
+	// Each value must be unique and correspond to one of the NodeSet.Metadata.Name.
+	//
+	// +kubebuilder:validation:Optional
+	NodeSetRefs []string `json:"nodeSetRefs,omitempty"`
+
+	// Config allows to provide additional configuration for a Partition regarding https://slurm.schedmd.com/slurm.conf.html#SECTION_PARTITION-CONFIGURATION.
+	//
+	// Example:
+	//  Default=NO MaxTime=8:00:00 AllowGroups=ml-team State=UP
+	//
+	// +kubebuilder:validation:Optional
+	Config string `json:"config,omitempty"`
 }
 
 type WorkerFeature struct {
