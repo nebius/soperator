@@ -452,7 +452,7 @@ HELMIFY_VERSION          ?= 0.4.13
 HELM_VERSION						 ?= v3.18.3
 HELM_UNITTEST_VERSION    ?= 0.8.2
 YQ_VERSION               ?= 4.44.3
-MOCKERY_VERSION 		 ?= 2.53.4
+MOCKERY_VERSION 		 ?= 2.53.5
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.

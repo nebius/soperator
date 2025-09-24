@@ -19,9 +19,9 @@ jobContainer:
       persistentVolumeClaim:
         claimName: "jail-pvc"
 images:
-  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.22.0-noble-slurm25.05.3"
-  k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:1.22.0-noble-slurm25.05.3"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.22.0-noble-slurm25.05.3"
+  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.22.1-noble-slurm25.05.3"
+  k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:1.22.1-noble-slurm25.05.3"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.22.1-noble-slurm25.05.3"
 # Pyxis syntax with '#' separator for registry
 activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-4ae0b6d"
 reservationPrefix: soperatorchecks.suspicious
