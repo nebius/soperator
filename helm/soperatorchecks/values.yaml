@@ -23,7 +23,7 @@ checks:
     args:
       - --enable-node-replacement=false
       - --log-format=json
-      - --log-level=warn
+      - --log-level=info
       - --reconcile-timeout=3m
       - --max-concurrent-reconciles=1
       - --cache-sync-timeout=2m
