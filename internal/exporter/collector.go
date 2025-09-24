@@ -70,7 +70,7 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 		Monitoring:     NewMonitoringMetrics(),
 
 		nodeInfo:    prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "address", "reason"}, nil),
-		jobInfo:     prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "user_id", "standard_error", "standard_output", "array_job_id", "array_task_id", "submit_time", "start_time", "end_time", "finished_time"}, nil),
+		jobInfo:     prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "user_mail", "user_id", "standard_error", "standard_output", "array_job_id", "array_task_id", "submit_time", "start_time", "end_time", "finished_time"}, nil),
 		jobNode:     prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
 		jobDuration: prometheus.NewDesc("slurm_job_duration_seconds", "Slurm job duration in seconds", []string{"job_id"}, nil),
 		nodeGPUSeconds: prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -370,6 +370,7 @@ func (c *MetricsCollector) slurmJobMetrics(ctx context.Context, slurmJobs []slur
 				job.Partition,
 				job.Name,
 				job.UserName,
+				job.UserMail,
 				userID,
 				job.StandardError,
 				job.StandardOutput,

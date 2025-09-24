@@ -8,8 +8,8 @@ spec:
   dependsOn: [ "create-user-soperatorchecks", "wait-for-topology" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "5 12 * * *" # Once a day at 12:05 UTC
-  suspend: false
-  runAfterCreation: true
+  suspend: {{ .Values.checks.dcgmiDiagR2.suspend }}
+  runAfterCreation: {{ .Values.checks.dcgmiDiagR2.runAfterCreation }}
   slurmJobSpec:
     sbatchScript: |
 {{ .Files.Get "scripts/dcgmi-diag-r2.sh" | indent 6 }}
@@ -25,5 +25,5 @@ spec:
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
   reactions:
-    setCondition: true
-    drainSlurmNode: true
+    addReservation:
+      prefix: {{ .Values.reservationPrefix | quote }}
