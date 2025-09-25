@@ -6,18 +6,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.labelSelector
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="The phase of NodeSet lifecycle."
+// +kubebuilder:printcolumn:name="Desired",type="integer",JSONPath=".spec.replicas",description="The desired number of workers."
+// +kubebuilder:printcolumn:name="Ready",type="integer",JSONPath=".status.replicas",description="The current number of workers being ready for some time."
 
 // NodeSet is the Schema for the nodesets API
-//
-// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.phase`,description="The phase of Slurm cluster creation."
 type NodeSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Status NodeSetStatus `json:"status,omitempty"`
 	Spec   NodeSetSpec   `json:"spec,omitempty"`
+	Status NodeSetStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -32,21 +34,61 @@ type NodeSetList struct {
 
 // NodeSetStatus defines the observed state of SlurmCluster
 type NodeSetStatus struct {
-	// TODO #487 Add conditions
+	// Conditions represent the observations of a NodeSet's current state.
+	// Known types are: ConditionNodeSetConfigUpdated, ConditionNodeSetConfigDynamicUpdated, ConditionNodeSetStatefulSetUpdated, ConditionNodeSetPodsReady, and ConditionNodeSetStatefulSetTerminated.
+	//
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchMergeKey:"type" patchStrategy:"merge"`
 
 	// Phase indicates the current phase of the NodeSet lifecycle.
-	// Possible values are: PhaseNodeSetReconciling, PhaseNodeSetNotAvailable, PhaseNodeSetAvailable.
+	// Known values are: PhaseNodeSetPending, PhaseNodeSetConfiguring, PhaseNodeSetProvisioning, PhaseNodeSetReady, PhaseNodeSetDegraded, and PhaseNodeSetTerminating.
 	//
 	// +kubebuilder:validation:Optional
-	Phase *string `json:"phase,omitempty"`
+	// +kubebuilder:default="Pending"
+	Phase string `json:"phase,omitempty"`
+
+	// Replicas is the number of Pods created by the StatefulSet controller and being in `Ready` state for some time.
+	Replicas int32 `json:"replicas"`
+
+	// LabelSelector is label selectors for query over pods that should match the replica count used by HPA.
+	LabelSelector string `json:"labelSelector,omitempty"`
+
+	// observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the
+	// StatefulSet's generation, which is updated on mutation by the API Server.
+	//
+	// +kubebuilder:validation:Optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 const (
 	KindNodeSet = "NodeSet"
 
-	PhaseNodeSetReconciling  = "Reconciling"
-	PhaseNodeSetNotAvailable = "Not available"
-	PhaseNodeSetAvailable    = "Available"
+	// PhaseNodeSetPending is set when CR is created but not yet processed.
+	PhaseNodeSetPending = "Pending"
+	// PhaseNodeSetConfiguring is set when workers are being configured in `slurm.conf`.
+	PhaseNodeSetConfiguring = "Configuring"
+	// PhaseNodeSetProvisioning is set when worker pods are being provisioned.
+	PhaseNodeSetProvisioning = "Provisioning"
+	// PhaseNodeSetReady is set when worker pods are ready and configured in `slurm.conf`.
+	PhaseNodeSetReady = "Ready"
+	// PhaseNodeSetDegraded is set when any other condition has failed.
+	PhaseNodeSetDegraded = "Degraded"
+	// PhaseNodeSetTerminating is set when NodeSet is being deleted.
+	PhaseNodeSetTerminating = "Terminating"
+
+	// ConditionNodeSetConfigUpdated is set when `slurm.conf` is synced with NodeSetSpec.
+	ConditionNodeSetConfigUpdated = "ConfigUpdated"
+	// ConditionNodeSetConfigDynamicUpdated is set when node configs are updated with dynamic values.
+	ConditionNodeSetConfigDynamicUpdated = "ConfigDynamicUpdated"
+	// ConditionNodeSetStatefulSetUpdated is set when StatefulSet for NodeSet is updated.
+	ConditionNodeSetStatefulSetUpdated = "StatefulSetUpdated"
+	// ConditionNodeSetPodsReady is set when StatefulSet's pods are ready.
+	ConditionNodeSetPodsReady = "PodsReady"
+	// ConditionNodeSetStatefulSetTerminated is set when StatefulSet for NodeSet is terminated.
+	ConditionNodeSetStatefulSetTerminated = "StatefulSetTerminated"
 )
 
 // NodeSetSpec defines the desired state of NodeSet
@@ -55,9 +97,45 @@ type NodeSetSpec struct {
 	//
 	// Defaults to 1 if not specified.
 	//
-	// +kubebuilder:default=1
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas,omitempty"`
+
+	// Slurmd defines the Slurm worker daemon configuration.
+	//
+	// +kubebuilder:validation:Required
+	Slurmd ContainerSlurmdSpec `json:"slurmd"`
+
+	// Slurmd defines the Slurm munge configuration.
+	//
+	// +kubebuilder:validation:Required
+	Munge ContainerMungeSpec `json:"munge"`
+
+	// ExtraConfig provides possibility to define extra values set for Node in `slurm.conf`.
+	NodeConfig NodeConfig `json:"nodeConfig,omitempty"`
+
+	// GPU defines the settings related to GPU support for Slurm workers.
+	//
+	// +kubebuilder:validation:Optional
+	GPU GPUSpec `json:"gpu,omitempty"`
+
+	// ConfigMapRefSupervisord defines the config name of Supervisord for the slurmd container.
+	// Specifying a custom name allows providing custom config for the Supervisord.
+	//
+	// If omitted, the default name and values of config will be used.
+	//
+	// +kubebuilder:validation:Optional
+	ConfigMapRefSupervisord string `json:"configMapRefSupervisord,omitempty"`
+
+	// ConfigMapRefSSHD defines the config name of Slurm SSHD.
+	// Specifying a custom name allows providing custom config for the Slurm SSHD.
+	//
+	// If omitted, the default name and values of config will be used.
+	//
+	// +kubebuilder:validation:Optional
+	ConfigMapRefSSHD string `json:"configMapRefSshd,omitempty"`
+
+	// region Scheduling
 
 	// NodeSelector defines the desired selector for the K8s nodes to place Slurm workers on
 	//
@@ -82,62 +160,7 @@ type NodeSetSpec struct {
 	// +kubebuilder:validation:Optional
 	PriorityClass string `json:"priorityClass,omitempty"`
 
-	// GPU defines the settings related to GPU support for Slurm workers
-	//
-	// +kubebuilder:validation:Optional
-	GPU GPUSpec `json:"gpu,omitempty"`
-
-	// Slurmd defines the Slurm worker daemon configuration
-	//
-	// +kubebuilder:validation:Required
-	Slurmd ContainerSlurmdSpec `json:"slurmd"`
-
-	// Slurmd defines the Slurm munge configuration
-	//
-	// +kubebuilder:validation:Required
-	Munge ContainerMungeSpec `json:"munge"`
-
-	// NodeAttributes specifies additional attributes for Slurm worker nodes.
-	//
-	// +kubebuilder:validation:Optional
-	NodeAttributes WorkerNodeAttributes `json:"nodeAttributes,omitempty"`
-
-	// ConfigMapRefSupervisord defines the config name of Supervisord for the slurmd container.
-	// Specifying a custom name allows providing custom config for the Supervisord.
-	//
-	// If omitted, the default name and values of config will be used.
-	//
-	// +kubebuilder:validation:Optional
-	ConfigMapRefSupervisord string `json:"configMapRefSupervisord,omitempty"`
-
-	// ConfigMapRefSSHD defines the config name of Slurm SSHD.
-	// Specifying a custom name allows providing custom config for the Slurm SSHD.
-	//
-	// If omitted, the default name and values of config will be used.
-	//
-	// +kubebuilder:validation:Optional
-	ConfigMapRefSSHD string `json:"configMapRefSshd,omitempty"`
-}
-
-// GPUSpec defines the settings related to GPU support
-type GPUSpec struct {
-	// Enabled indicates whether GPU support is enabled for the NodeSet.
-	//
-	// +kubebuilder:validation:Optional
-	Enabled bool `json:"enabled,omitempty"`
-
-	// Nvidia contains settings specific to Nvidia GPUs.
-	//
-	// +kubebuilder:validation:Optional
-	Nvidia GPUVendorNvidiaSpec `json:"nvidia,omitempty"`
-}
-
-// GPUVendorNvidiaSpec defines settings specific to Nvidia GPUs
-type GPUVendorNvidiaSpec struct {
-	// GDRCopyEnabled determines whether GDRCopy should be enabled for Nvidia GPUs
-	//
-	// +kubebuilder:validation:Optional
-	GDRCopyEnabled bool `json:"gdrCopyEnabled,omitempty"`
+	// endregion Scheduling
 }
 
 // ContainerSlurmdSpec defines the Slurm worker daemon configuration
@@ -174,20 +197,6 @@ type ContainerSlurmdSpec struct {
 	//
 	// +kubebuilder:validation:Optional
 	Security ContainerSecuritySpec `json:"security,omitempty"`
-}
-
-// WorkerNodeAttributes defines the additional attributes for the NodeSet nodes
-type WorkerNodeAttributes struct {
-	// Extra defines the string that will be set to the "Extra" field of the corresponding Slurm node.
-	// It can use any environment variables that are available in the slurmd container when it starts.
-	//
-	// +kubebuilder:validation:Optional
-	Extra string `json:"extra,omitempty"`
-
-	// Features defines the list of Slurm Node "Features" to filter nodes during job scheduling
-	//
-	// +kubebuilder:validation:Optional
-	Features []string `json:"features,omitempty"`
 }
 
 // ContainerMungeSpec defines the Slurm munge configuration
@@ -260,6 +269,86 @@ type NodeVolumeJailSubMount struct {
 	//
 	// +kubebuilder:validation:Optional
 	VolumeClaimTemplateSpec *corev1.PersistentVolumeClaimSpec `json:"volumeClaimTemplateSpec,omitempty"`
+}
+
+// NodeConfig represent values to be set for Nodes in `slurm.conf`.
+//
+// NOTE: `CPUs` and `RealMemory` fields will be taken from ContainerSlurmdSpec.Resources.
+type NodeConfig struct {
+	// Features defines the list of Slurm Node "Features" to filter nodes during job scheduling.
+	//
+	// +kubebuilder:validation:Optional
+	Features []string `json:"features,omitempty"`
+
+	// GRes specifies general resources available per Node.
+	//
+	// +kubebuilder:validation:Optional
+	GRes []GRes `json:"gres,omitempty"`
+
+	// Static provides a possibility to define extra values per Node (e.g. CPU topology).
+	// This line will be provided to the config as is.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=""
+	Static string `json:"static,omitempty"`
+
+	// Dynamic provides a possibility to define extra values per Node (e.g. InstanceId, or Extra fields).
+	// This line supports Go templating, and will be rendered before being passed to the config.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=""
+	Dynamic string `json:"dynamic,omitempty"`
+}
+
+// GRes specifies general resource available for worker node.
+type GRes struct {
+	// Name represents a GRes type - a high-level resource name.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Type represents a specific type (e.g. model) of the GRes.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=""
+	Type string `json:"type,omitempty"`
+
+	// NoConsume allows you to specify that a GRes does not have a finite number of that resource that gets consumed as it is requested.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	NoConsume bool `json:"noConsume,omitempty"`
+
+	// Count specifies a GRes count.
+	// Suffixes as of "K", "M", "G", "T" or "P" may be used to multiply the number by 1024, 1048576, 1073741824, etc. respectively.
+	// Defaults to "1" if not set.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="1"
+	Count string `json:"count,omitempty"`
+}
+
+// GPUSpec defines the settings related to GPU support
+type GPUSpec struct {
+	// Enabled indicates whether GPU support is enabled for the Nodes of the NodeSet.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Nvidia contains settings specific to Nvidia GPUs.
+	//
+	// +kubebuilder:validation:Optional
+	Nvidia GPUVendorNvidiaSpec `json:"nvidia,omitempty"`
+}
+
+// GPUVendorNvidiaSpec defines settings specific to Nvidia GPUs.
+type GPUVendorNvidiaSpec struct {
+	// GDRCopyEnabled determines whether GDRCopy should be enabled for Nvidia GPUs.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	GDRCopyEnabled bool `json:"gdrCopyEnabled,omitempty"`
 }
 
 func init() {
