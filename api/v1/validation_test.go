@@ -118,7 +118,7 @@ func evaluateCELLogic(spec v1.SlurmClusterSpec) bool {
 	// CEL: !(has(self.partitionConfiguration) && has(self.partitionConfiguration.partitions) &&
 	//       size(self.partitionConfiguration.partitions) > 0 &&
 	//       self.partitionConfiguration.partitions.exists(p, size(p.nodeSetRefs) > 0) &&
-	//       has(self.slurmNodes.worker) && size(self.slurmNodes.worker) > 0)
+	//       self.slurmNodes.worker.size > 0)
 
 	// Check if there are partitions
 	if len(spec.PartitionConfiguration.Partitions) == 0 {
@@ -137,8 +137,8 @@ func evaluateCELLogic(spec v1.SlurmClusterSpec) bool {
 		return true
 	}
 
-	// Check if worker exists and is not empty
-	// Since Worker is now not a pointer, we just check if Size > 0
+	// Check if worker size is greater than zero
+	// Since Worker is not a pointer, we just check if Size > 0
 	if spec.SlurmNodes.Worker.Size == 0 {
 		return true
 	}
