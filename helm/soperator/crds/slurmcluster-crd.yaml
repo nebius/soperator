@@ -34922,7 +34922,6 @@ spec:
                 - exporter
                 - login
                 - rest
-                - worker
                 type: object
               useDefaultAppArmorProfile:
                 default: false
@@ -36841,6 +36840,12 @@ spec:
             - secrets
             - slurmNodes
             type: object
+            x-kubernetes-validations:
+            - message: Worker size must be zero when NodeSetRefs are used in partition
+                configuration
+              rule: '!(has(self.partitionConfiguration) && has(self.partitionConfiguration.partitions)
+                && size(self.partitionConfiguration.partitions) > 0 && self.partitionConfiguration.partitions.exists(p,
+                size(p.nodeSetRefs) > 0) && self.slurmNodes.worker.size > 0)'
           status:
             description: SlurmClusterStatus defines the observed state of SlurmCluster
             properties:

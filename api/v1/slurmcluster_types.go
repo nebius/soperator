@@ -15,6 +15,7 @@ import (
 )
 
 // SlurmClusterSpec defines the desired state of SlurmCluster
+// +kubebuilder:validation:XValidation:rule="!(has(self.partitionConfiguration) && has(self.partitionConfiguration.partitions) && size(self.partitionConfiguration.partitions) > 0 && self.partitionConfiguration.partitions.exists(p, size(p.nodeSetRefs) > 0) && self.slurmNodes.worker.size > 0)",message="Worker size must be zero when NodeSetRefs are used in partition configuration"
 type SlurmClusterSpec struct {
 	// CRVersion defines the version of the Operator the Custom Resource belongs to
 	//
@@ -557,8 +558,9 @@ type SlurmNodes struct {
 
 	// Worker represents the Slurm worker node configuration
 	//
-	// +kubebuilder:validation:Required
-	Worker SlurmNodeWorker `json:"worker"`
+	// +kubebuilder:deprecation:warning="The Worker field is deprecated and will be removed in a future release"
+	// +kubebuilder:validation:Optional
+	Worker SlurmNodeWorker `json:"worker,omitempty"`
 
 	// Login represents the Slurm login node configuration
 	//
