@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
@@ -526,9 +526,9 @@ func TestAddStructuredPartitions(t *testing.T) {
 							Config:      "State=UP",
 						},
 						{
-							Name:        "all-nodes",
-							IsAll:       true,
-							Config:      "Default=YES",
+							Name:   "all-nodes",
+							IsAll:  true,
+							Config: "Default=YES",
 						},
 					},
 				},
