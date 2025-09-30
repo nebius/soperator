@@ -83,7 +83,7 @@ func buildNodeSetNodeNamesMap(nodeSets []slurmv1alpha1.NodeSet) map[string]strin
 		nodeSet := &nodeSets[i]
 		var nodeNames []string
 		for j := int32(0); j < nodeSet.Spec.Replicas; j++ {
-			nodeName := fmt.Sprintf("worker-%s-%d", nodeSet.Name, j)
+			nodeName := fmt.Sprintf("%s-%d", nodeSet.Name, j)
 			nodeNames = append(nodeNames, nodeName)
 		}
 		nodeSetMap[nodeSet.Name] = strings.Join(nodeNames, ",")
