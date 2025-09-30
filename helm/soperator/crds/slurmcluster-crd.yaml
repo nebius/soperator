@@ -19319,6 +19319,14 @@ spec:
                       type: string
                     type: array
                 type: object
+                x-kubernetes-validations:
+                - message: Structured partition configuration requires at least one
+                    partition
+                  rule: self.configType != 'structured' || size(self.partitions) >
+                    0
+                - message: Partition names must be unique
+                  rule: self.configType != 'structured' || size(self.partitions.map(p,
+                    p.name).unique()) == size(self.partitions)
               plugStackConfig:
                 default:
                   ncclDebug:
