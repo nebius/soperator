@@ -90,6 +90,113 @@ spec:
           - '--metric-allowlist=kube_pod_container_status_terminated_signal'
           - '--metric-allowlist=kube_node_status_condition'
           - '--metric-allowlist=kube_node_info'
+          - '--metric-allowlist=kube_customresource_.*'
+        rbac:
+          extraRules:
+            - apiGroups:
+              - slurm.nebius.ai
+              resources:
+              - slurmclusters
+              verbs:
+              - get
+              - list
+              - watch
+        customResourceState:
+          enabled: true
+          config:
+            kind: CustomResourceStateMetrics
+            spec:
+              resources:
+                - groupVersionKind:
+                    group: slurm.nebius.ai
+                    version: v1
+                    kind: SlurmCluster
+                  metrics:
+                    # Info metric for static fields like clusterType and crVersion
+                    - name: slurmcluster_info
+                      help: "Basic static information about the SlurmCluster resource"
+                      each:
+                        type: Info
+                        info:
+                          labelsFromPath:
+                            name: [metadata, name]
+                            namespace: [metadata, namespace]
+                            cluster_type: [spec, clusterType]
+                            cr_version: [spec, crVersion]
+                    # Gauge metrics for all numeric counters
+                    - name: slurmcluster_slurmconfig_max_job_count
+                      help: "Max job count from spec.slurmConfig.maxJobCount"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [spec, slurmConfig, maxJobCount]
+                    - name: slurmcluster_slurmconfig_message_timeout
+                      help: "Message timeout from spec.slurmConfig.messageTimeout"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [spec, slurmConfig, messageTimeout]
+                    - name: slurmcluster_slurmconfig_min_job_age
+                      help: "Min job age from spec.slurmConfig.minJobAge"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [spec, slurmConfig, minJobAge]
+                    - name: slurmcluster_slurmnodes_login_size
+                      help: "Login node count from spec.slurmNodes.login.size"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [spec, slurmNodes, login, size]
+                    - name: slurmcluster_slurmnodes_rest_size
+                      help: "Rest node count from spec.slurmNodes.rest.size"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [spec, slurmNodes, rest, size]
+                    - name: slurmcluster_slurmnodes_worker_size
+                      help: "Worker node count from spec.slurmNodes.worker.size"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [spec, slurmNodes, worker, size]
+                    - name: slurmcluster_ready_login
+                      help: "Ready login nodes from status.readyLogin"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [status, readyLogin]
+                    - name: slurmcluster_ready_sconfig_controller
+                      help: "Ready SConfigController nodes from status.readySConfigController"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [status, readySConfigController]
+                    - name: slurmcluster_ready_workers
+                      help: "Ready workers from status.readyWorkers"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [status, readyWorkers]
+                    # Gauge for list of conditions
+                    - name: slurmcluster_status_condition_status
+                      help: "SlurmCluster conditions status"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [status, conditions]
+                          labelsFromPath:
+                            type: ["type"]
+                          valueFrom: ["status"]
+                    # StateSet for status.phase
+                    - name: slurmcluster_status_phase
+                      help: "Current phase of the SlurmCluster resource"
+                      each:
+                        type: StateSet
+                        stateSet:
+                          labelName: phase
+                          path: [status, phase]
+                          list: ["Available", "Reconciling", "Not available"]
         prometheusScrape: false
         selfMonitor:
           enabled: true
