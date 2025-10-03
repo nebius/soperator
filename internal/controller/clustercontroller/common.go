@@ -7,9 +7,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	slurmav1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -47,13 +49,11 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 						&desired,
 					); getErr != nil {
 						if !apierrors.IsNotFound(getErr) {
-							stepLogger.Error(getErr, "Failed to get")
 							return fmt.Errorf("getting REST JWT Key Secret: %w", getErr)
 						}
 
 						renderedDesired, err := rest.RenderSecret(clusterValues.Name, clusterValues.Namespace)
 						if err != nil {
-							stepLogger.Error(err, "Failed to render")
 							return fmt.Errorf("rendering REST JWT secret key: %w", err)
 						}
 						desired = *renderedDesired.DeepCopy()
@@ -62,7 +62,6 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 
 					if err := r.Secret.Reconcile(stepCtx, cluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling REST JWT secret key: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
@@ -76,12 +75,18 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
+					nodeSetsList := slurmav1alpha1.NodeSetList{}
+					if err := r.List(stepCtx, &nodeSetsList, client.InNamespace(cluster.Namespace)); err != nil {
+						return fmt.Errorf("listing NodeSets: %w", err)
+					}
+
+					clusterValues.NodeSetList = nodeSetsList
+
 					desired := common.RenderConfigMapSlurmConfigs(clusterValues)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered")
 
 					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling ConfigMap with Slurm configs: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
@@ -100,7 +105,6 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					stepLogger.V(1).Info("Rendered")
 
 					if err := r.JailedConfig.Reconcile(stepCtx, cluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling JailedConfig with Slurm configs: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
@@ -124,13 +128,11 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 						&desired,
 					); getErr != nil {
 						if !apierrors.IsNotFound(getErr) {
-							stepLogger.Error(getErr, "Failed to get")
 							return fmt.Errorf("getting Munge Key Secret: %w", getErr)
 						}
 
 						renderedDesired, err := common.RenderMungeKeySecret(clusterValues.Name, clusterValues.Namespace)
 						if err != nil {
-							stepLogger.Error(err, "Failed to render")
 							return fmt.Errorf("rendering Munge Key Secret: %w", err)
 						}
 						desired = *renderedDesired.DeepCopy()
@@ -139,7 +141,6 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 
 					if err := r.Secret.Reconcile(stepCtx, cluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling Munge Key Secret: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
@@ -168,7 +169,6 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					stepLogger.V(1).Info("Rendered")
 
 					if err := r.AppArmorProfile.Reconcile(stepCtx, cluster, desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling AppArmor profiles: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")

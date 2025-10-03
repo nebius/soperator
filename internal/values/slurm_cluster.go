@@ -8,6 +8,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	slurmav1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 )
 
@@ -37,6 +38,7 @@ type SlurmCluster struct {
 	MPIConfig         slurmv1.MPIConfig
 	PlugStackConfig   slurmv1.PlugStackConfig
 	SConfigController SConfigController
+	NodeSetList       slurmav1alpha1.NodeSetList
 }
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD

@@ -337,6 +337,8 @@ type SConfigController struct {
 	HostUsers *bool `json:"hostUsers,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="self.configType != 'structured' || size(self.partitions) > 0",message="Structured partition configuration requires at least one partition"
+// +kubebuilder:validation:XValidation:rule="self.configType != 'structured' || size(self.partitions.map(p, p.name).unique()) == size(self.partitions)",message="Partition names must be unique"
 type PartitionConfiguration struct {
 	// ConfigType defines what behaviour should be used for partition generation.
 	//
