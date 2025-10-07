@@ -145,9 +145,8 @@ func AddPartitionsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *valu
 		case partition.IsAll:
 			res.AddProperty("PartitionName", fmt.Sprintf("%s Nodes=ALL %s", partition.Name, partition.Config))
 		case len(partition.NodeSetRefs) > 0:
-			nodes := make([]string, 0, len(partition.NodeSetRefs))
-			nodes = append(nodes, partition.NodeSetRefs...)
-			res.AddProperty("PartitionName", fmt.Sprintf("%s Nodes=%s %s", partition.Name, strings.Join(nodes, ","), partition.Config))
+			nodes := strings.Join(partition.NodeSetRefs, ",")
+			res.AddProperty("PartitionName", fmt.Sprintf("%s Nodes=%s %s", partition.Name, nodes, partition.Config))
 		default:
 			res.AddComment(fmt.Sprintf("WARNING: Partition %s has no nodeset refs and is not 'all', skipping", partition.Name))
 		}
