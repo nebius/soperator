@@ -338,7 +338,6 @@ type SConfigController struct {
 }
 
 // +kubebuilder:validation:XValidation:rule="self.configType != 'structured' || size(self.partitions) > 0",message="Structured partition configuration requires at least one partition"
-// +kubebuilder:validation:XValidation:rule="self.configType != 'structured' || size(self.partitions.map(p, p.name).unique()) == size(self.partitions)",message="Partition names must be unique"
 type PartitionConfiguration struct {
 	// ConfigType defines what behaviour should be used for partition generation.
 	//
@@ -387,6 +386,7 @@ type Partition struct {
 	// Name defines a name of the Partition.
 	//
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
 	// IsAll allows to define a Partition including all nodes in the cluster.
