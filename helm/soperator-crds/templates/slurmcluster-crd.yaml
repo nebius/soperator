@@ -19295,6 +19295,7 @@ spec:
                           type: boolean
                         name:
                           description: Name defines a name of the Partition.
+                          minLength: 1
                           type: string
                         nodeSetRefs:
                           description: |-
@@ -19324,9 +19325,6 @@ spec:
                     partition
                   rule: self.configType != 'structured' || size(self.partitions) >
                     0
-                - message: Partition names must be unique
-                  rule: self.configType != 'structured' || size(self.partitions.map(p,
-                    p.name).unique()) == size(self.partitions)
               plugStackConfig:
                 default:
                   ncclDebug:
