@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -247,7 +248,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("PreemptType", "preempt/partition_prio")
 	res.AddComment("Partition Configuration")
 	switch cluster.PartitionConfiguration.ConfigType {
-	case "custom":
+	case slurmv1.PartitionConfigTypeCustom:
 		for _, l := range cluster.PartitionConfiguration.RawConfig {
 			line := strings.TrimSpace(l)
 			if strings.HasPrefix(line, "PartitionName") {
@@ -255,7 +256,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 				res.AddProperty("PartitionName", clearLine)
 			}
 		}
-	case "structured":
+	case slurmv1.PartitionConfigTypeStructured:
 		AddNodesToSlurmConfig(res, cluster)
 		AddPartitionsToSlurmConfig(res, cluster)
 		AddNodeSetsToSlurmConfig(res, cluster)
