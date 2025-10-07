@@ -547,9 +547,7 @@ func generateEmptySecurityLimitsConfig() renderutils.ConfigFile {
 
 // RenderRealMemorySlurmd converts resource requirements to memory in mebibytes for Slurm
 func RenderRealMemorySlurmd(resources corev1.ResourceRequirements) int64 {
-	// Convert the memory quantity to bytes
 	memoryInBytes := resources.Requests.Memory().Value()
-	// Convert bytes to mebibytes (1 MiB = 1,048,576 bytes)
-	memoryInMebibytes := memoryInBytes / 1_048_576 // 1 MiB = 1,048,576 bytes
+	memoryInMebibytes := memoryInBytes / 1_048_576
 	return memoryInMebibytes
 }
