@@ -257,9 +257,9 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 			}
 		}
 	case "structured":
-		AddNodeSetsToSlurmConfig(res, cluster)
 		AddNodesToSlurmConfig(res, cluster)
 		AddPartitionsToSlurmConfig(res, cluster)
+		AddNodeSetsToSlurmConfig(res, cluster)
 
 	default:
 		res.AddProperty("PartitionName", "main Nodes=ALL Default=YES PriorityTier=10 MaxTime=INFINITE State=UP OverSubscribe=YES")
