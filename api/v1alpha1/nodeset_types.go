@@ -280,11 +280,6 @@ type NodeConfig struct {
 	// +kubebuilder:validation:Optional
 	Features []string `json:"features,omitempty"`
 
-	// GRes specifies general resources available per Node.
-	//
-	// +kubebuilder:validation:Optional
-	GRes []GRes `json:"gres,omitempty"`
-
 	// Static provides a possibility to define extra values per Node (e.g. CPU topology).
 	// This line will be provided to the config as is.
 	//
@@ -298,34 +293,6 @@ type NodeConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=""
 	Dynamic string `json:"dynamic,omitempty"`
-}
-
-// GRes specifies general resource available for worker node.
-type GRes struct {
-	// Name represents a GRes type - a high-level resource name.
-	//
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// Type represents a specific type (e.g. model) of the GRes.
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=""
-	Type string `json:"type,omitempty"`
-
-	// NoConsume allows you to specify that a GRes does not have a finite number of that resource that gets consumed as it is requested.
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	NoConsume bool `json:"noConsume,omitempty"`
-
-	// Count specifies a GRes count.
-	// Suffixes as of "K", "M", "G", "T" or "P" may be used to multiply the number by 1024, 1048576, 1073741824, etc. respectively.
-	// Defaults to "1" if not set.
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="1"
-	Count string `json:"count,omitempty"`
 }
 
 // GPUSpec defines the settings related to GPU support

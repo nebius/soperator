@@ -1071,38 +1071,6 @@ spec:
                     items:
                       type: string
                     type: array
-                  gres:
-                    description: GRes specifies general resources available per Node.
-                    items:
-                      description: GRes specifies general resource available for worker
-                        node.
-                      properties:
-                        count:
-                          default: "1"
-                          description: |-
-                            Count specifies a GRes count.
-                            Suffixes as of "K", "M", "G", "T" or "P" may be used to multiply the number by 1024, 1048576, 1073741824, etc. respectively.
-                            Defaults to "1" if not set.
-                          type: string
-                        name:
-                          description: Name represents a GRes type - a high-level
-                            resource name.
-                          type: string
-                        noConsume:
-                          default: false
-                          description: NoConsume allows you to specify that a GRes
-                            does not have a finite number of that resource that gets
-                            consumed as it is requested.
-                          type: boolean
-                        type:
-                          default: ""
-                          description: Type represents a specific type (e.g. model)
-                            of the GRes.
-                          type: string
-                      required:
-                      - name
-                      type: object
-                    type: array
                   static:
                     default: ""
                     description: |-
