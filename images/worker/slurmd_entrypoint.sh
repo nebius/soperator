@@ -36,12 +36,10 @@ evaluated_extra=$(eval echo "$SLURM_NODE_EXTRA")
 
 echo "Start slurmd daemon"
 
-# Common slurmd arguments
 slurmd_args=(
   -D
 )
 
-# Add node configuration based on SOPERATOR_NODE_SETS_ON flag
 if [ "${SOPERATOR_NODE_SETS_ON}" = "true" ]; then
   echo "Running slurmd with NodeSets configuration from slurm.conf"
 else
