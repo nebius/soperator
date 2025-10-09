@@ -35,11 +35,22 @@ echo "Evaluate variables in the Slurm node 'Extra' field"
 evaluated_extra=$(eval echo "$SLURM_NODE_EXTRA")
 
 echo "Start slurmd daemon"
-exec /usr/sbin/slurmd \
-  -D \
-  -Z \
-  --instance-id "${INSTANCE_ID}" \
-  --extra "${evaluated_extra}" \
-  --conf \
-  "NodeHostname=${K8S_POD_NAME} NodeAddr=${K8S_POD_NAME}.${K8S_SERVICE_NAME}.${K8S_POD_NAMESPACE}.svc.cluster.local RealMemory=${SLURM_REAL_MEMORY} Gres=${GRES} $(feature_conf)" \
-  2>&1 | tee >(multilog s100000000 n5 /var/log/slurm/multilog)
+
+slurmd_args=(
+  -D
+)
+
+if [ "${SOPERATOR_NODE_SETS_ON}" = "true" ]; then
+  echo "Running slurmd with NodeSets configuration from slurm.conf"
+else
+  echo "Running slurmd with dynamic node configuration"
+  slurmd_args+=(
+    -Z
+    --instance-id "${INSTANCE_ID}"
+    --extra "${evaluated_extra}"
+    --conf
+    "NodeHostname=${K8S_POD_NAME} NodeAddr=${K8S_POD_NAME}.${K8S_SERVICE_NAME}.${K8S_POD_NAMESPACE}.svc RealMemory=${SLURM_REAL_MEMORY} Gres=${GRES} $(feature_conf)"
+  )
+fi
+
+exec /usr/sbin/slurmd "${slurmd_args[@]}" 2>&1 | tee >(multilog s100000000 n5 /var/log/slurm/multilog)
