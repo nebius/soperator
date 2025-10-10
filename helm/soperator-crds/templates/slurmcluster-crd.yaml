@@ -994,6 +994,8 @@ spec:
                   DependsOn specifies dependency on another active checks that should be completed
                   before running this one.
                   Name of another checks in the same namespace.
+                  Note: All checks that the current one depends on must have runAfterCreation: true;
+                  otherwise, the dependency relationship won’t be respected.
                 items:
                   type: string
                 type: array

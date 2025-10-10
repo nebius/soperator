@@ -367,6 +367,14 @@ func (r *ActiveCheckReconciler) dependenciesReady(
 			return false, fmt.Errorf("failed to get prerequisite ActiveCheck: %w", err)
 		}
 
+		if prerequisiteCheck.Spec.RunAfterCreation == nil || !*prerequisiteCheck.Spec.RunAfterCreation {
+			logger.Info(fmt.Sprintf(
+				"Prerequisite ActiveCheck %s runAfterCreation == false, skipping",
+				prerequisiteCheck.Name,
+			))
+			continue
+		}
+
 		// TODO: common status?
 		switch prerequisiteCheck.Spec.CheckType {
 		case "k8sJob": // TODO: const
