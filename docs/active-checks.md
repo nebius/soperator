@@ -1,5 +1,7 @@
 # Active Checks – Health and system checks framework
 
+This doc is prepared based on the `1.22` soperator version and includes description of all the features available in `1.22`.
+
 ## Overview
 
 Active Checks is a framework for running benchmarks and system tests across Kubernetes and Slurm environments.
@@ -15,6 +17,8 @@ Active Checks supports two execution modes:
 - **Slurm Jobs** – checks running on some or all Slurm nodes to validate compute hardware and environment.
 
 Deployment follows a **GitOps model**: Flux deploys ActiveCheck CRs to clusters. Starting from a specific version of soperator, all clusters include Active Checks automatically through Helm charts managed by Flux.
+
+Slurm cluster customers may apply custom Active Check CRs to the cluster (independently of Flux) too.
 
 ## Architecture diagram
 
@@ -180,6 +184,8 @@ Submission modes use partitions as follows:
 - **eachWorkerJobs** (separate job per worker) → `hidden` partition.
 - **eachWorkerJobArray** (job array per worker) → `background` partition.
 
+If neither of `eachWorkerJobs` or `eachWorkerJobArray` is specified the job is running in default submission mode.
+
 Using `background` for job arrays avoids nodes stuck in **PLANNED** and prevents the `main` partition queue from being blocked by large arrays.
 
 ## Observability
@@ -192,7 +198,7 @@ The Active Checks framework integrates with the cluster observability stack.
 - Other logs (e.g., passive checks) also exist under the broader `/soperator-outputs/` path, but are out of scope for this doc.
 
 ### Dashboards
-Results and metrics are visualized in [Grafana](https://grafana.nebius.dev/d/aevt1f8eixhc0f/gpu-health-checker3a-runs). Operators can quickly see:
+Results and metrics are visualized in Grafana. Operators can quickly see:
 - Recent check runs and their outcomes.
 - Historical success/failure rates.
 - Node-level health across multiple checks.
@@ -212,7 +218,7 @@ Active Checks are managed by two controllers. Together they implement a GitOps-f
 
 **High-level flow**
 1. On create/update:
-    - Validate dependencies (`dependsOn`) and check Slurm cluster readiness.
+    - Requeues reconciliation until Slurm cluster is ready and until all the checks from `dependsOn` list have finished successfully.
     - Render and reconcile the CronJob (and ConfigMap if needed).
     - Optionally trigger an immediate run if `runAfterCreation` is set and no prior transition exists.
 2. On delete:
