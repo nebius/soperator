@@ -38,6 +38,8 @@ echo "Start slurmd daemon"
 
 slurmd_args=(
   -D
+  --instance-id "${INSTANCE_ID}"
+  --extra "${evaluated_extra}"
 )
 
 if [ "${SOPERATOR_NODE_SETS_ON}" = "true" ]; then
@@ -46,8 +48,6 @@ else
   echo "Running slurmd with dynamic node configuration"
   slurmd_args+=(
     -Z
-    --instance-id "${INSTANCE_ID}"
-    --extra "${evaluated_extra}"
     --conf
     "NodeHostname=${K8S_POD_NAME} NodeAddr=${K8S_POD_NAME}.${K8S_SERVICE_NAME}.${K8S_POD_NAMESPACE}.svc RealMemory=${SLURM_REAL_MEMORY} Gres=${GRES} $(feature_conf)"
   )
