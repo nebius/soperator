@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -99,18 +100,27 @@ func AddNodeSetsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values
 	}
 }
 
+func AddNodeSetFeaturesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
+	res.AddComment("")
+	res.AddComment("Nodesets")
+	for _, feature := range cluster.WorkerFeatures {
+		if feature.NodesetName != "" {
+			res.AddProperty("Nodeset", fmt.Sprintf("%s Feature=%s", feature.NodesetName, feature.Name))
+		}
+	}
+}
+
 // AddNodesToSlurmConfig adds all node names to the slurm config
 //
 // Example output:
-// NodeName=gb200-0-0 NodeHostname=gb200-0-0 NodeAddr=gb200-0-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
-// NodeName=gb200-0-1 NodeHostname=gb200-0-1 NodeAddr=gb200-0-1.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
+// NodeName=gb200-0-0 NodeHostname=gb200-0-0 NodeAddr=gb200-0-0.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
+// NodeName=gb200-0-1 NodeHostname=gb200-0-1 NodeAddr=gb200-0-1.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
 func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
 	res.AddComment("Nodes section")
 	if len(cluster.NodeSetList.Items) == 0 {
 		res.AddComment("WARNING: No nodesets defined in structured configuration!")
 		return
 	}
-
 	for _, nodeSet := range cluster.NodeSetList.Items {
 		if nodeSet.Spec.Replicas == 0 {
 			res.AddComment(fmt.Sprintf("WARNING: NodeSet %s has 0 replicas, skipping", nodeSet.Name))
@@ -118,7 +128,7 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 		}
 		for i := int32(0); i < nodeSet.Spec.Replicas; i++ {
 			nodeName := fmt.Sprintf("%s-%d", nodeSet.Name, i)
-			nodeAddr := fmt.Sprintf("%s.%s.svc", nodeName, nodeSet.Namespace)
+			nodeAddr := fmt.Sprintf("%s.%s.%s.svc", nodeName, nodeSet.Name, nodeSet.Namespace)
 			realMemory := strconv.FormatInt(RenderRealMemorySlurmd(corev1.ResourceRequirements{Requests: nodeSet.Spec.Slurmd.Resources}), 10)
 			res.AddProperty("NodeName", fmt.Sprintf(
 				"%s NodeHostname=%s NodeAddr=%s RealMemory=%s %s",
@@ -247,7 +257,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("PreemptType", "preempt/partition_prio")
 	res.AddComment("Partition Configuration")
 	switch cluster.PartitionConfiguration.ConfigType {
-	case "custom":
+	case slurmv1.PartitionConfigTypeCustom:
 		for _, l := range cluster.PartitionConfiguration.RawConfig {
 			line := strings.TrimSpace(l)
 			if strings.HasPrefix(line, "PartitionName") {
@@ -255,7 +265,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 				res.AddProperty("PartitionName", clearLine)
 			}
 		}
-	case "structured":
+		AddNodeSetFeaturesToSlurmConfig(res, cluster)
+	case slurmv1.PartitionConfigTypeStructured:
 		AddNodesToSlurmConfig(res, cluster)
 		AddPartitionsToSlurmConfig(res, cluster)
 		AddNodeSetsToSlurmConfig(res, cluster)
@@ -264,14 +275,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		res.AddProperty("PartitionName", "main Nodes=ALL Default=YES PriorityTier=10 MaxTime=INFINITE State=UP OverSubscribe=YES")
 		res.AddProperty("PartitionName", "hidden Nodes=ALL Default=NO PriorityTier=10 PreemptMode=OFF Hidden=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
 		res.AddProperty("PartitionName", "background Nodes=ALL Default=NO PriorityTier=1 PreemptMode=OFF Hidden=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
-	}
-
-	res.AddComment("")
-	res.AddComment("Nodesets")
-	for _, feature := range cluster.WorkerFeatures {
-		if feature.NodesetName != "" {
-			res.AddProperty("Nodeset", fmt.Sprintf("%s Feature=%s", feature.NodesetName, feature.Name))
-		}
+		AddNodeSetFeaturesToSlurmConfig(res, cluster)
 	}
 
 	if cluster.NodeAccounting.Enabled {
