@@ -21,6 +21,7 @@ import (
 	"flag"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 
 	"go.uber.org/zap/zapcore"
@@ -252,12 +253,20 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeConfigurator")
 		os.Exit(1)
 	}
-	if err = (&nodesetcontroller.NodeSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NodeSet")
-		os.Exit(1)
+
+	{
+		nodeSetName := reflect.TypeOf(slurmv1alpha1.NodeSet{}).Name()
+		nodeSetNameLower := strings.ToLower(nodeSetName)
+
+		if err = nodesetcontroller.NewNodeSetReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(nodeSetNameLower+"-controller"),
+		).
+			SetupWithManager(mgr, nodeSetNameLower, maxConcurrency, cacheSyncTimeout); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", nodeSetName)
+			os.Exit(1)
+		}
 	}
 
 	if topologyControllerEnabled {
