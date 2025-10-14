@@ -4,6 +4,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // +kubebuilder:object:root=true
@@ -101,6 +102,23 @@ type NodeSetSpec struct {
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas,omitempty"`
 
+	// MaxUnavailable represents the maximum number of worker pods that can be unavailable during the update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// Absolute number is calculated from percentage by rounding down.
+	// Also, MaxUnavailable can just be allowed to work with [k8s.io/api/apps/v1.ParallelPodManagement].
+	// Defaults to 20%.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="20%"
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
+
+	// EnableHostUserNamespace controls if the pod containers can use the host user namespace.
+	// Defaults to false.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	EnableHostUserNamespace bool `json:"enableHostUserNamespace,omitempty"`
+
 	// Slurmd defines the Slurm worker daemon configuration.
 	//
 	// +kubebuilder:validation:Required
@@ -159,6 +177,11 @@ type NodeSetSpec struct {
 	//
 	// +kubebuilder:validation:Optional
 	PriorityClass string `json:"priorityClass,omitempty"`
+
+	// WorkerAnnotations represent K8S annotations that should be added to the worker pods.
+	//
+	// +kubebuilder:validation:Optional
+	WorkerAnnotations map[string]string `json:"workerAnnotations,omitempty"`
 
 	// endregion Scheduling
 }

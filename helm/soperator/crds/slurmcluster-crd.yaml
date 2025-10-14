@@ -13711,6 +13711,12 @@ spec:
 
                   If omitted, the default name and values of config will be used.
                 type: string
+              enableHostUserNamespace:
+                default: false
+                description: |-
+                  EnableHostUserNamespace controls if the pod containers can use the host user namespace.
+                  Defaults to false.
+                type: boolean
               gpu:
                 description: GPU defines the settings related to GPU support for Slurm
                   workers.
@@ -13730,6 +13736,18 @@ spec:
                         type: boolean
                     type: object
                 type: object
+              maxUnavailable:
+                anyOf:
+                - type: integer
+                - type: string
+                default: 20%
+                description: |-
+                  MaxUnavailable represents the maximum number of worker pods that can be unavailable during the update.
+                  Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+                  Absolute number is calculated from percentage by rounding down.
+                  Also, MaxUnavailable can just be allowed to work with [k8s.io/api/apps/v1.ParallelPodManagement].
+                  Defaults to 20%.
+                x-kubernetes-int-or-string: true
               munge:
                 description: Slurmd defines the Slurm munge configuration.
                 properties:
@@ -17980,6 +17998,12 @@ spec:
                       type: string
                   type: object
                 type: array
+              workerAnnotations:
+                additionalProperties:
+                  type: string
+                description: WorkerAnnotations represent K8S annotations that should
+                  be added to the worker pods.
+                type: object
             required:
             - munge
             - slurmd
