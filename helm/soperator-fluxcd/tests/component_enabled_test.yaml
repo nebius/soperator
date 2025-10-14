@@ -4,6 +4,7 @@ templates:
 excludeTemplates:
   - templates/helmrepository.yaml
   - templates/notifier.yaml
+  - templates/tailscale.yaml
 tests:
   - it: should render jail logs component when jailLogs.enabled=true
     set:
