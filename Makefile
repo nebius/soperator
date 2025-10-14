@@ -445,7 +445,7 @@ MOCKERY        ?= $(LOCALBIN)/mockery
 
 ## Tool Versions
 KUSTOMIZE_VERSION        ?= v5.5.0
-CONTROLLER_TOOLS_VERSION ?= v0.16.4
+CONTROLLER_TOOLS_VERSION ?= v0.19.0
 ENVTEST_VERSION          ?= release-0.17
 GOLANGCI_LINT_VERSION    ?= v2.5.0  # Should be in sync with the github CI step.
 HELMIFY_VERSION          ?= 0.4.13
