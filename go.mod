@@ -15,7 +15,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.26.0
 	github.com/onsi/gomega v1.38.2
 	github.com/openkruise/kruise-api v1.8.0
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.86.0
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.86.1
 	github.com/sethvargo/go-password v0.3.1
 	github.com/stretchr/testify v1.11.1
 	github.com/zclconf/go-cty v1.17.0
