@@ -210,9 +210,10 @@ RUN chmod 755 /etc/skel/.ssh && \
 RUN rm -rf -- /root/..?* /root/.[!.]* /root/* && \
     cp -a /etc/skel/. /root/
 
-# Copy createuser utility script
-COPY images/jail/scripts/createuser.py /usr/bin/createuser
-RUN chmod +x /usr/bin/createuser
+# Copy soperator-createuser utility script
+COPY images/jail/scripts/soperator-createuser.py /usr/bin/soperator-createuser
+RUN chmod +x /usr/bin/soperator-createuser && \
+    ln -sf /usr/bin/soperator-createuser /usr/bin/createuser
 
 # Replace SSH "message of the day" scripts
 RUN rm -rf /etc/update-motd.d/*
