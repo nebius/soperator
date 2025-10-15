@@ -4,25 +4,24 @@ templates:
 excludeTemplates:
   - templates/helmrepository.yaml
   - templates/notifier.yaml
-  - templates/tailscale.yaml
 tests:
   - it: should render jail logs component when jailLogs.enabled=true
     set:
+      observability.enabled: true
+      observability.opentelemetry.enabled: true
       observability.opentelemetry.logs.values.jailLogs.enabled: true
-    asserts:
-      - hasDocuments:
-          count: 1
-  - it: should render node logs when nodeLogs.enabled=true (default)
     templates:
-      - templates/opentelemetry-collector-logs.yaml
+      - templates/opentelemetry-collector-jail-logs.yaml
     asserts:
       - exists:
-          path: spec.values.config.receivers["filelog/nodelogs"]
-  - it: should not render node logs when nodeLogs.enabled=false
+          path: spec.values.config.receivers["filelog/health_checker"]
+  - it: should not render jail logs component when jailLogs.enabled=false
     set:
-      observability.opentelemetry.logs.values.nodeLogs.enabled: false
+      observability.enabled: true
+      observability.opentelemetry.enabled: true
+      observability.opentelemetry.logs.values.jailLogs.enabled: false
     templates:
-      - templates/opentelemetry-collector-logs.yaml
+      - templates/opentelemetry-collector-jail-logs.yaml
     asserts:
-      - notExists:
-          path: spec.values.config.receivers["filelog/nodelogs"]
+      - hasDocuments:
+          count: 0

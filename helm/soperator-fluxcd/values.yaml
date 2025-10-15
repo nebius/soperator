@@ -348,4 +348,4 @@ tailscale:
   enabled: false
   interval: 5m
   timeout: 5m
-  version: 0.0.1
+  version: 2.0.0
