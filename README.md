@@ -94,6 +94,9 @@ Soperator takes this even further, continuously bringing the entire cluster up t
 All user actions are isolated within a dedicated container-like environment, so that an action can't break the
 Slurm cluster itself by accident. This defines a clear boundary between operator and user responsibility.
 
+### Tailscale support
+You can optionally enable [Tailscale](https://github.com/tailscale/tailscale) as a sidecar on login pods and access the cluster securely from your own network.
+
 ### Accounting
 Slurm's accounting system records detailed job information such as:
 
@@ -111,10 +114,10 @@ This helps cluster administrators and users monitor resource utilization, enforc
   Support for mixed configurations based on nodesets (e.g., separate GPU and CPU nodesets) has not been implemented yet.
 - **Single-partition clusters**. Slurm's ability to split clusters into several partitions isn't supported now.
 - **Software versions**. The list of software versions we currently support is quite short.
-    - Linux: Ubuntu [22.04](https://releases.ubuntu.com/jammy/).
-    - Slurm: versions `24.05.5`.
-    - CUDA: version [12.4.1](https://developer.nvidia.com/cuda-12-4-1-download-archive).
-    - Kubernetes: >= [1.29](https://kubernetes.io/blog/2023/12/13/kubernetes-v1-29-release/).
+    - Linux: Ubuntu [24.04](https://releases.ubuntu.com/noble/).
+    - Slurm: versions `25.05.3`.
+    - CUDA: version [12.9](https://docs.nvidia.com/cuda/archive/12.9.0/cuda-toolkit-release-notes/contents.html).
+    - Kubernetes: >= [1.31](https://kubernetes.io/blog/2024/08/13/kubernetes-v1-31-release/).
     - Versions of some preinstalled software packages can't be changed.
 
 
@@ -131,9 +134,9 @@ For [Nebius AI](https://nebius.ai/), we provide a Terraform recipe that creates 
   File storages are distributed filesystems focused on concurrent reads and writes.
 
 Everything specific to Nebius AI is contained in a separate repository:
-[nebius/soperator-terraform](https://github.com/nebius/soperator-terraform).
+[nebius/nebius-solutions-library](https://github.com/nebius/nebius-solutions-library/tree/main/soperator).
 
-[//]: # (TODO: Change repo in the link when it's moved to Nebius SA library)
+[//]: #
 
 
 ### Other clouds and on-premises

@@ -25,3 +25,19 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+  - it: should render tailscale component when tailscale.enabled=true
+    set:
+      tailscale.enabled: true
+    templates:
+      - templates/tailscale.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+  - it: should not render tailscale component when tailscale.enabled=false
+    set:
+      tailscale.enabled: false
+    templates:
+      - templates/tailscale.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
