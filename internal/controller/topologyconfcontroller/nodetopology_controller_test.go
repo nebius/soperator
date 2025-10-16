@@ -18,6 +18,7 @@ import (
 func TestExtractTierLabels(t *testing.T) {
 	// Test data
 	k8sNodeLabels := map[string]string{
+		consts.TopologyLabelPrefix + "/tier-0": "nvl0",
 		consts.TopologyLabelPrefix + "/tier-1": "leaf00",
 		consts.TopologyLabelPrefix + "/other":  "value",
 		consts.TopologyLabelPrefix + "/tier-2": "spine00",
@@ -26,6 +27,7 @@ func TestExtractTierLabels(t *testing.T) {
 
 	// Expected result
 	expected := map[string]string{
+		"tier-0": "nvl0",
 		"tier-1": "leaf00",
 		"tier-2": "spine00",
 	}

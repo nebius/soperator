@@ -55,8 +55,11 @@ func NewNodeTopologyReconciler(
 // Upon detecting a node with a `topologyconf.slurm.nebius.ai/tier-1` label,
 // it records the node’s tier information in the `node-topoly-labels` ConfigMap in a
 // `nodeName: [tier-x: switchName, ...]` format.
+// For the Blackwell architecture (GBX00 racks) `topologyconf.slurm.nebius.ai/tier-1` label
+// is considered as NVL domain of the rack. Remaining `tier-*` labels are considered as
+// IB topology.
 //
-// **Example:**
+// **Example (not considered as a real block topology):**
 //
 // Given the following nodes:
 //
@@ -65,6 +68,7 @@ func NewNodeTopologyReconciler(
 // metadata:
 //
 //	labels:
+//	  topologyconf.slurm.nebius.ai/tier-0: nvl0
 //	  topologyconf.slurm.nebius.ai/tier-1: leaf00
 //	  topologyconf.slurm.nebius.ai/tier-2: spine00
 //	name: nodeA
@@ -75,6 +79,7 @@ func NewNodeTopologyReconciler(
 // metadata:
 //
 //	labels:
+//	  topologyconf.slurm.nebius.ai/tier-0: nvl0
 //	  topologyconf.slurm.nebius.ai/tier-1: leaf00
 //	  topologyconf.slurm.nebius.ai/tier-2: spine00
 //	name: nodeB
@@ -85,6 +90,7 @@ func NewNodeTopologyReconciler(
 // metadata:
 //
 //	labels:
+//	  topologyconf.slurm.nebius.ai/tier-0: nvl1
 //	  topologyconf.slurm.nebius.ai/tier-1: leaf01
 //	  topologyconf.slurm.nebius.ai/tier-2: spine01
 //	name: nodeC
@@ -95,16 +101,17 @@ func NewNodeTopologyReconciler(
 // metadata:
 //
 //	labels:
+//	  topologyconf.slurm.nebius.ai/tier-0: nvl2
 //	  topologyconf.slurm.nebius.ai/tier-1: leaf02
 //	  topologyconf.slurm.nebius.ai/tier-2: spine01
 //	name: nodeD
 //
 // The resulting node-topoly-labels ConfigMap would contain:
 //
-// nodeA: [tier-1: leaf00, tier-2: spine00]
-// nodeB: [tier-1: leaf00, tier-2: spine00]
-// nodeC: [tier-1: leaf01, tier-2: spine01]
-// nodeD: [tier-1: leaf02, tier-2: spine01]
+// nodeA: [tier-0: nvl0, tier-1: leaf00, tier-2: spine00]
+// nodeB: [tier-0: nvl0, tier-1: leaf00, tier-2: spine00]
+// nodeC: [tier-0: nvl1, tier-1: leaf01, tier-2: spine01]
+// nodeD: [tier-0: nvl2, tier-1: leaf02, tier-2: spine01]
 func (r *NodeTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithName(NodeTopologyReconcilerName)
 	logger.Info("Starting reconciliation", "node", req.Name)
@@ -151,8 +158,11 @@ func (r *NodeTopologyReconciler) getNode(ctx context.Context, nodeName string) (
 
 // shouldProcessNode checks if the node has the required tier-1 label
 func (r *NodeTopologyReconciler) shouldProcessNode(node *corev1.Node, nodeName string, logger logr.Logger) bool {
-	if _, hasTierLabel := node.Labels[consts.TierOnePrefix]; !hasTierLabel {
-		logger.V(1).Info("Node missing tier-1 label, skipping", "node", nodeName)
+	_, hasTierZero := node.Labels[consts.TierZeroPrefix]
+	_, hasTierOne := node.Labels[consts.TierOnePrefix]
+
+	if !hasTierZero && !hasTierOne {
+		logger.V(1).Info("Node missing one of tier-0 or tier-1 label, skipping", "node", nodeName)
 		return false
 	}
 	return true

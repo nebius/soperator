@@ -176,6 +176,11 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="SwitchAsNodeRank"
 	TopologyParam string `json:"topologyParam,omitempty"`
+	// TopologyBlockSize represents a schedulable size of a block for a topology/block plugin.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=18
+	TopologyBlockSize *int `json:"topologyBlockSize,omitempty"`
 }
 
 type MPIConfig struct {

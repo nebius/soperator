@@ -32,6 +32,7 @@ const (
 	LabelControllerTypePlaceholder = "placeholder"
 
 	TopologyLabelPrefix = "topology.nebius.com"
+	TierZeroPrefix      = TopologyLabelPrefix + "/tier-0"
 	TierOnePrefix       = TopologyLabelPrefix + "/tier-1"
 
 	LabelJailedAggregationKey         = "slurm.nebius.ai/jailed-aggregation"
