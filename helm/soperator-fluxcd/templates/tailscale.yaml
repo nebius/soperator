@@ -1,0 +1,56 @@
+{{- if .Values.tailscale.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-tailscale
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: raw
+      interval: {{ .Values.tailscale.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-bedag
+      version: {{ .Values.tailscale.version }}
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  interval: {{ .Values.tailscale.interval }}
+  timeout: {{ .Values.tailscale.timeout }}
+  upgrade:
+    crds: Skip
+  values:
+    resources:
+    - apiVersion: rbac.authorization.k8s.io/v1
+      kind: Role
+      metadata:
+        namespace: soperator
+        name: tailscale
+      rules:
+        - apiGroups: [ "" ] # "" indicates the core API group
+          resources: [ "secrets" ]
+          # Create can not be restricted to a resource name.
+          verbs: [ "create" ]
+        - apiGroups: [ "" ] # "" indicates the core API group
+          resourceNames: [ "login-0", "login-1" ]
+          resources: [ "secrets" ]
+          verbs: [ "get", "update", "patch" ]
+        - apiGroups: [ "" ] # "" indicates the core API group
+          resources: [ "events" ]
+          verbs: [ "get", "create", "patch" ]
+    - apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: tailscale
+        namespace: soperator
+      subjects:
+        - kind: ServiceAccount
+          name: default
+      roleRef:
+        kind: Role
+        name: tailscale
+        apiGroup: rbac.authorization.k8s.io
+{{- end }}

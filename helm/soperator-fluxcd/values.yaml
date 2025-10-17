@@ -344,3 +344,8 @@ nfsServer:
   releaseName: nfs-server
   overrideValues: null
   values: null
+tailscale:
+  enabled: false
+  interval: 5m
+  timeout: 5m
+  version: 2.0.0
