@@ -35,4 +35,5 @@ const (
 	SlurmConfigRawStrategyPatch    = "patch"
 	SlurmConfigRawStrategyOverride = "override"
 	SlurmTopologyTree              = "topology/tree"
+	SlurmTopologyBlock             = "topology/block"
 )

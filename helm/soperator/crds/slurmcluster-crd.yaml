@@ -21418,6 +21418,11 @@ spec:
                     default: ""
                     description: Additional parameters for the task plugin
                     type: string
+                  topologyBlockSize:
+                    default: 18
+                    description: TopologyBlockSize represents a schedulable size of
+                      a block for a topology/block plugin.
+                    type: integer
                   topologyParam:
                     default: SwitchAsNodeRank
                     description: TopologyParam is list of comma-separated options

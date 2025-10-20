@@ -36,6 +36,7 @@ controllerManager:
       isApparmorCrdInstalled: "false"
       isPrometheusCrdInstalled: "false"
       slurmOperatorWatchNamespaces: '*'
+      topologyLabelPrefix: "topology.nebius.com"
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/slurm-operator
       tag: 1.22.1
