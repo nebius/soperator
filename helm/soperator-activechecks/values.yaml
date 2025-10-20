@@ -26,6 +26,9 @@ images:
 activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-4ae0b6d"
 reservationPrefix: soperatorchecks.suspicious
 checks:
+  allReducePerfNCCLInDocker:
+    suspend: true
+    runAfterCreation: true
   allReducePerfNCCLWithIB:
     suspend: false
     runAfterCreation: true

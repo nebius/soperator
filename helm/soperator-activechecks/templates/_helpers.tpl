@@ -50,3 +50,20 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+
+{{/*
+Pyxis format for active check image.
+*/}}
+{{- define "activecheck.image.pyxis" -}}
+{{- .Values.activeCheckImage -}}
+{{- end -}}
+
+
+{{/*
+Docker format for active check image.
+Converts from format "reg#repo:tag" to format "reg/repo:tag".
+*/}}
+{{- define "activecheck.image.docker" -}}
+{{- .Values.activeCheckImage | replace "#" "/" -}}
+{{- end -}}
