@@ -1,7 +1,7 @@
 # Or arm64v8
 ARG ARCH="amd64"
 
-ARG SLURM_VERSION="25-05-3-1"
+ARG SLURM_VERSION="25-05-4-1"
 
 FROM ${ARCH}/fedora:42 AS slurm-base
 LABEL org.opencontainers.image.authors="Dmitrii Starov <dstaroff@nebius.com>"
