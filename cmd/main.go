@@ -137,6 +137,10 @@ func main() {
 		watchNsCacheByName = make(map[string]cache.Config)
 		watchNsCacheByName[ns] = cache.Config{}
 	}
+	topologyLabelPrefix := os.Getenv("TOPOLOGY_LABEL_PREFIX")
+	if topologyLabelPrefix == "" {
+		topologyLabelPrefix = consts.DefaultTopologyLabelPrefix
+	}
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -261,6 +265,7 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			soperatorNamespace,
+			topologyLabelPrefix,
 			mgr.GetAPIReader(),
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			setupLog.Error(
