@@ -194,13 +194,13 @@ func renderSlurmdEnv(
 	}
 	if cgroupVersion == consts.CGroupV2 {
 		envVar = append(envVar, corev1.EnvVar{
-			Name:  consts.CGroupV2Env,
+			Name:  consts.EnvCGroupV2,
 			Value: "true",
 		})
 	}
 	if enableGDRCopy {
 		envVar = append(envVar, corev1.EnvVar{
-			Name:  consts.NVIDIAGDRCopy,
+			Name:  consts.EnvNvidiaGDRCopy,
 			Value: "enabled",
 		})
 	}
