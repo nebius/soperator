@@ -247,6 +247,11 @@ type ContainerMungeSpec struct {
 
 // WorkerVolumesSpec defines the volumes for the Slurm worker container
 type WorkerVolumesSpec struct {
+	// Spool represents the spool data volume configuration
+	//
+	// +kubebuilder:validation:Required
+	Spool corev1.VolumeSource `json:"spool"`
+
 	// Jail represents the jail data volume configuration
 	//
 	// +kubebuilder:validation:Required
