@@ -43,7 +43,7 @@ type SlurmWorker struct {
 	Maintenance               *consts.MaintenanceMode
 }
 
-func buildSlurmWorkerFrom(
+func BuildSlurmWorkerFrom(
 	clusterName string,
 	maintenance *consts.MaintenanceMode,
 	worker *slurmv1.SlurmNodeWorker,
