@@ -69,7 +69,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		NodeController:         buildSlurmControllerFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Controller),
 		NodeAccounting:         buildAccountingFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Accounting),
 		NodeRest:               buildRestFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Rest),
-		NodeWorker: buildSlurmWorkerFrom(
+		NodeWorker: BuildSlurmWorkerFrom(
 			cluster.Name,
 			cluster.Spec.Maintenance,
 			&cluster.Spec.SlurmNodes.Worker,
