@@ -1,25 +1,23 @@
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
-  name: "upgrade-cuda"
+  name: "retrigger-checks"
 spec:
   checkType: "k8sJob"
-  name: "upgrade-cuda"
-  dependsOn: [ "create-user-soperatorchecks" ]
+  name: "retrigger-checks"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  suspend: {{ .Values.checks.upgradeCuda.suspend }}
-  runAfterCreation: {{ .Values.checks.upgradeCuda.runAfterCreation }}
+  suspend: true
+  runAfterCreation: false
   k8sJobSpec:
     jobContainer:
       command:
         - bash
         - -c
         - |
-{{ .Files.Get "scripts/upgrade-cuda.sh" | indent 10 }}
+          python3 - <<'PY'
+{{ .Files.Get "scripts/retrigger-checks.py" | indent 10 }}
+          PY
       image: {{ .Values.images.k8sJob | quote }}
-      env:
-        - name: CUDA_VERSION
-          value: {{ .Values.checks.upgradeCuda.cudaVersion | quote }}
       volumeMounts:
 {{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
       volumes:
