@@ -1,0 +1,225 @@
+suite: test nodesets GPU configuration
+templates:
+  - templates/nodesets.yaml
+tests:
+  - it: should configure GPU workers correctly
+    set:
+      nodesets:
+        - name: gpu-workers
+          replicas: 3
+          gpu:
+            enabled: true
+            nvidia:
+              gdrCopyEnabled: false
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: "nebius.com/node-group-id"
+                        operator: In
+                        values:
+                          - "gpu-node-group-id"
+          tolerations:
+            - key: nvidia.com/gpu
+              operator: Exists
+              effect: NoSchedule
+          slurmd:
+            image:
+              repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
+              tag: "1.22.1-noble-slurm25.05.4"
+            resources:
+              cpu: "4"
+              memory: "8Gi"
+              gpu: 8
+            volumes:
+              spool:
+                persistentVolumeClaim:
+                  claimName: "spool-pvc"
+              jail:
+                persistentVolumeClaim:
+                  claimName: "jail-pvc"
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "cr.eu-north1.nebius.cloud/soperator/munge"
+              tag: "1.22.1-noble-slurm25.05.4"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+        - name: cpu-workers
+          replicas: 5
+          gpu:
+            enabled: false
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: "nebius.com/node-group-id"
+                        operator: In
+                        values:
+                          - "cpu-node-group-id"
+          slurmd:
+            image:
+              repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
+              tag: "1.22.1-noble-slurm25.05.4"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                persistentVolumeClaim:
+                  claimName: "spool-pvc"
+              jail:
+                persistentVolumeClaim:
+                  claimName: "jail-pvc"
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "cr.eu-north1.nebius.cloud/soperator/munge"
+              tag: "1.22.1-noble-slurm25.05.4"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+      - equal:
+          path: spec.gpu.enabled
+          value: true
+      - equal:
+          path: spec.gpu.nvidia.gdrCopyEnabled
+          value: false
+      - exists:
+          path: spec.affinity.nodeAffinity
+      - exists:
+          path: spec.tolerations
+      - contains:
+          path: spec.tolerations
+          content:
+            key: nvidia.com/gpu
+            operator: Exists
+            effect: NoSchedule
+
+  - it: should configure CPU workers correctly
+    set:
+      nodesets:
+        - name: gpu-workers
+          replicas: 3
+          gpu:
+            enabled: true
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "4"
+              memory: "8Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+        - name: cpu-workers
+          replicas: 5
+          gpu:
+            enabled: false
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: "nebius.com/node-group-id"
+                        operator: In
+                        values:
+                          - "cpu-node-group-id"
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 5
+      - equal:
+          path: spec.gpu.enabled
+          value: false
+      - notExists:
+          path: spec.gpu.nvidia
+      - exists:
+          path: spec.affinity.nodeAffinity
+
+  - it: should configure slurmd for GPU workers
+    set:
+      nodesets:
+        - name: gpu-workers
+          replicas: 3
+          slurmd:
+            image:
+              repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
+              tag: "1.22.1-noble-slurm25.05.4"
+            port: 6818
+            cgroupVersion: "v2"
+            resources:
+              cpu: "4"
+              memory: "8Gi"
+              gpu: 8
+            volumes:
+              spool:
+                persistentVolumeClaim:
+                  claimName: "spool-pvc"
+              jail:
+                persistentVolumeClaim:
+                  claimName: "jail-pvc"
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "cr.eu-north1.nebius.cloud/soperator/munge"
+              tag: "1.22.1-noble-slurm25.05.4"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.slurmd.image.repository
+          value: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
+      - equal:
+          path: spec.slurmd.image.tag
+          value: "1.22.1-noble-slurm25.05.4"
+      - equal:
+          path: spec.slurmd.port
+          value: 6818
+      - equal:
+          path: spec.slurmd.cgroupVersion
+          value: "v2"
+      - exists:
+          path: spec.slurmd.resources
+      - exists:
+          path: spec.slurmd.volumes.spool
+      - exists:
+          path: spec.slurmd.volumes.jail
