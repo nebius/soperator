@@ -32,6 +32,7 @@ spec:
   timeout: {{ .Values.backup.timeout }}
   releaseName: {{ .Values.backup.releaseName }}
   targetNamespace: {{ .Values.backup.namespace }}
+  {{- include "soperator-fluxcd.driftDetection" .Values.backup.driftDetection | nindent 2 }}
   values:
   {{- if .Values.backup.overrideValues }}
     {{- toYaml .Values.backup.overrideValues | nindent 4 }}

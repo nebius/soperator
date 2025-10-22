@@ -27,6 +27,7 @@ spec:
   timeout: {{ .Values.securityProfilesOperator.timeout }}
   releaseName: {{ .Values.securityProfilesOperator.releaseName }}
   targetNamespace: {{ .Values.securityProfilesOperator.namespace }}
+  {{- include "soperator-fluxcd.driftDetection" .Values.securityProfilesOperator.driftDetection | nindent 2 }}
   values:
   {{- if .Values.securityProfilesOperator.overrideValues }}
     {{- toYaml .Values.securityProfilesOperator.overrideValues | nindent 4 }}

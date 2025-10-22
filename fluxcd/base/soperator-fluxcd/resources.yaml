@@ -16,7 +16,7 @@ metadata:
 spec:
   interval: 60m
   driftDetection:
-    mode: enabled
+    mode: warn
   chart:
     spec:
       chart: helm-soperator-fluxcd

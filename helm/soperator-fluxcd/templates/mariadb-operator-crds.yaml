@@ -14,8 +14,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-mariadb-operator
       version: {{ .Values.mariadbOperator.version }}
-  driftDetection:
-    mode: enabled
+  {{- include "soperator-fluxcd.driftDetection" .Values.mariadbOperator.driftDetection | nindent 2 }}
   install:
     crds: CreateReplace
     remediation:

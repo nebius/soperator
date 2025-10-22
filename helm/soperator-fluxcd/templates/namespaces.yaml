@@ -17,6 +17,7 @@ spec:
     remediation:
       retries: 3
   interval: {{ .Values.ns.interval }}
+  {{- include "soperator-fluxcd.driftDetection" .Values.ns.driftDetection | nindent 2 }}
   values:
     resources:
     - apiVersion: v1

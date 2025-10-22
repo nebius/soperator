@@ -27,6 +27,7 @@ spec:
     remediation:
       retries: 3
       remediateLastFailure: true
+  {{- include "soperator-fluxcd.driftDetection" .Values.observability.vmLogs.driftDetection | nindent 2 }}
   values:
   {{- if .Values.observability.vmStack.overrideValues }}
     {{- toYaml .Values.observability.vmStack.overrideValues | nindent 4 }}

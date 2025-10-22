@@ -29,6 +29,7 @@ spec:
   timeout: {{ .Values.helmReleaseTriggerOperator.timeout }}
   releaseName: {{ .Values.helmReleaseTriggerOperator.releaseName }}
   targetNamespace: {{ .Values.helmReleaseTriggerOperator.namespace }}
+  {{- include "soperator-fluxcd.driftDetection" .Values.helmReleaseTriggerOperator.driftDetection | nindent 2 }}
   values:
   {{- if .Values.helmReleaseTriggerOperator.overrideValues }}
     {{- toYaml .Values.helmReleaseTriggerOperator.overrideValues | nindent 4 }}

@@ -27,6 +27,7 @@ spec:
   timeout: {{ .Values.nfsServer.timeout }}
   releaseName: {{ .Values.nfsServer.releaseName }}
   targetNamespace: {{ .Values.nfsServer.namespace }}
+  {{- include "soperator-fluxcd.driftDetection" .Values.nfsServer.driftDetection | nindent 2 }}
   values:
   {{- if .Values.nfsServer.overrideValues }}
     {{- toYaml .Values.nfsServer.overrideValues | nindent 4 }}

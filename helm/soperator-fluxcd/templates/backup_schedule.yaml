@@ -27,6 +27,7 @@ spec:
   targetNamespace: {{ .Values.slurmCluster.namespace }}
   upgrade:
     crds: Skip
+  {{- include "soperator-fluxcd.driftDetection" .Values.backup.driftDetection | nindent 2 }}
   values:
     resources:
     - apiVersion: k8up.io/v1

@@ -22,6 +22,7 @@ spec:
   timeout: {{ .Values.tailscale.timeout }}
   upgrade:
     crds: Skip
+  {{- include "soperator-fluxcd.driftDetection" .Values.tailscale.driftDetection | nindent 2 }}
   values:
     resources:
     - apiVersion: rbac.authorization.k8s.io/v1

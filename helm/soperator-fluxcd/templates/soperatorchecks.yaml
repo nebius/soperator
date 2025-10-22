@@ -27,6 +27,7 @@ spec:
   timeout: {{ .Values.soperator.soperatorChecks.timeout }}
   releaseName: {{ .Values.soperator.soperatorChecks.releaseName }}
   targetNamespace: {{ .Values.soperator.namespace }}
+  {{- include "soperator-fluxcd.driftDetection" .Values.soperator.soperatorChecks.driftDetection | nindent 2 }}
   {{- if .Values.soperator.soperatorChecks.values }}
   values:
     {{- toYaml .Values.soperator.soperatorChecks.values | nindent 4 }}

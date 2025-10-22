@@ -51,3 +51,14 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Get driftDetection configuration for Helm Releases
+Usage: {{ include "soperator-fluxcd.driftDetection" .Values.release.driftDetection }}
+*/}}
+{{- define "soperator-fluxcd.driftDetection" -}}
+{{- with . -}}
+driftDetection:
+  mode: {{ .mode }}
+{{- end }}
+{{- end }}

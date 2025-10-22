@@ -30,6 +30,7 @@ spec:
   timeout: {{ .Values.observability.opentelemetry.logs.timeout }}
   releaseName: opentelemetry-collector-jail-logs
   targetNamespace: logs-system
+  {{- include "soperator-fluxcd.driftDetection" .Values.observability.opentelemetry.logs.driftDetection | nindent 2 }}
   values:
   {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
   {{- if .Values.observability.opentelemetry.logs.overrideValues }}
