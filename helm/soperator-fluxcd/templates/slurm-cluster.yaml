@@ -39,7 +39,10 @@ spec:
     remediation:
       retries: 3
       remediateLastFailure: true
-  {{- include "soperator-fluxcd.driftDetection" .Values.slurmCluster.driftDetection | nindent 2 }}
+  {{- if .Values.slurmCluster.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.slurmCluster.driftDetection | nindent 4 -}}
+  {{- end }}
   values:
   {{- if .Values.slurmCluster.overrideValues }}
     {{- toYaml .Values.slurmCluster.overrideValues | nindent 4 }}

@@ -59,6 +59,8 @@ certManager:
   overrideValues: null
 backup:
   enabled: true
+  driftDetection:
+    mode: warn
   interval: 5m
   timeout: 5m
   version: 4.8.*

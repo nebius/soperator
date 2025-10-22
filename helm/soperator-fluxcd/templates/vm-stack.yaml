@@ -35,7 +35,10 @@ spec:
   {{- if .Values.observability.vmStack.namespace }}
   targetNamespace: {{ .Values.observability.vmStack.namespace }}
   {{- end }}
-  {{- include "soperator-fluxcd.driftDetection" .Values.observability.vmStack.driftDetection | nindent 2 }}
+  {{- if .Values.observability.vmStack.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.observability.vmStack.driftDetection | nindent 4 -}}
+  {{- end }}
   values:
   {{- if .Values.observability.vmStack.overrideValues }}
     {{- toYaml .Values.observability.vmStack.overrideValues | nindent 4 }}

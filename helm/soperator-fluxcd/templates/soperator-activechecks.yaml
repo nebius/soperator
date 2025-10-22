@@ -30,7 +30,10 @@ spec:
     remediation:
       retries: 3
       remediateLastFailure: true
-  {{- include "soperator-fluxcd.driftDetection" .Values.soperatorActiveChecks.driftDetection | nindent 2 }}
+  {{- if .Values.soperatorActiveChecks.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.soperatorActiveChecks.driftDetection | nindent 4 -}}
+  {{- end }}
   values:
   {{- if .Values.soperatorActiveChecks.overrideValues }}
     {{- toYaml .Values.soperatorActiveChecks.overrideValues | nindent 4 }}

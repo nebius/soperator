@@ -27,7 +27,10 @@ spec:
     remediation:
       retries: 3
       remediateLastFailure: true
-  {{- include "soperator-fluxcd.driftDetection" .Values.observability.dcgmExporter.driftDetection | nindent 2 }}
+  {{- if .Values.observability.dcgmExporter.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.observability.dcgmExporter.driftDetection | nindent 4 -}}
+  {{- end }}
   values:
     dcgmHpcJobMappingDir: {{ .Values.observability.dcgmExporter.values.hpcJobMapDir }}
     validateToolkit: {{ .Values.observability.dcgmExporter.values.validateToolkit }}

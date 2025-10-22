@@ -14,7 +14,10 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-victoriametrics
       version: {{ .Values.observability.vmStack.crds.version }}
-  {{- include "soperator-fluxcd.driftDetection" .Values.observability.vmStack.crds.driftDetection | nindent 2 }}
+  {{- if .Values.observability.vmStack.crds.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.observability.vmStack.crds.driftDetection | nindent 4 -}}
+  {{- end }}
   install:
     crds: CreateReplace
     remediation:

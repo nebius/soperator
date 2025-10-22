@@ -17,7 +17,10 @@ spec:
     remediation:
       retries: 3
   interval: {{ .Values.ns.interval }}
-  {{- include "soperator-fluxcd.driftDetection" .Values.ns.driftDetection | nindent 2 }}
+  {{- if .Values.ns.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.ns.driftDetection | nindent 4 -}}
+  {{- end }}
   values:
     resources:
     - apiVersion: v1

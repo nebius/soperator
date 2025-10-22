@@ -33,7 +33,10 @@ spec:
   timeout: {{ .Values.soperator.timeout }}
   releaseName: {{ .Values.soperator.releaseName }}
   targetNamespace: {{ .Values.soperator.namespace }}
-  {{- include "soperator-fluxcd.driftDetection" .Values.soperator.driftDetection | nindent 2 }}
+  {{- if .Values.soperator.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.soperator.driftDetection | nindent 4 -}}
+  {{- end }}
   values:
   {{- if .Values.soperator.overrideValues }}
     {{- toYaml .Values.soperator.overrideValues | nindent 4 }}

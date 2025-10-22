@@ -28,7 +28,10 @@ spec:
   timeout: {{ .Values.observability.opentelemetry.events.timeout }}
   releaseName: opentelemetry-collector-events
   targetNamespace: logs-system
-  {{- include "soperator-fluxcd.driftDetection" .Values.observability.opentelemetry.events.driftDetection | nindent 2 }}
+  {{- if .Values.observability.opentelemetry.events.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.observability.opentelemetry.events.driftDetection | nindent 4 -}}
+  {{- end }}
   values:
   {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
   {{- if .Values.observability.opentelemetry.events.overrideValues }}

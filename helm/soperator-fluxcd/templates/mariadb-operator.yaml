@@ -31,7 +31,10 @@ spec:
     remediation:
       retries: 3
       remediateLastFailure: true
-  {{- include "soperator-fluxcd.driftDetection" .Values.mariadbOperator.driftDetection | nindent 2 }}
+  {{- if .Values.mariadbOperator.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.mariadbOperator.driftDetection | nindent 4 -}}
+  {{- end }}
   values:
   {{- if .Values.mariadbOperator.overrideValues }}
     {{- toYaml .Values.mariadbOperator.overrideValues | nindent 4 }}

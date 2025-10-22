@@ -14,6 +14,9 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds
       version: {{ .Values.observability.prometheusOperator.version }}
-  {{- include "soperator-fluxcd.driftDetection" .Values.observability.prometheusOperator.driftDetection | nindent 2 }}
+  {{- if .Values.observability.prometheusOperator.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.observability.prometheusOperator.driftDetection | nindent 4 -}}
+  {{- end }}
   interval: 60m
 {{- end }}
