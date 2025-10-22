@@ -27,6 +27,10 @@ spec:
   timeout: {{ .Values.soperator.soperatorChecks.timeout }}
   releaseName: {{ .Values.soperator.soperatorChecks.releaseName }}
   targetNamespace: {{ .Values.soperator.namespace }}
+  {{- if .Values.soperator.soperatorChecks.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.soperator.soperatorChecks.driftDetection | nindent 4 -}}
+  {{- end }}
   {{- if .Values.soperator.soperatorChecks.values }}
   values:
     {{- toYaml .Values.soperator.soperatorChecks.values | nindent 4 }}

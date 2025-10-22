@@ -32,6 +32,10 @@ spec:
   timeout: {{ .Values.soperator.kruise.timeout }}
   releaseName: {{ .Values.soperator.kruise.releaseName }}
   targetNamespace: {{ .Values.slurmCluster.namespace }}
+  {{- if .Values.soperator.kruise.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.soperator.kruise.driftDetection | nindent 4 -}}
+  {{- end }}
   {{- if .Values.soperator.kruise.overrideValues }}
   values:
     {{- toYaml .Values.soperator.kruise.overrideValues | nindent 4 }}

@@ -27,6 +27,10 @@ spec:
   timeout: {{ .Values.nfsServer.timeout }}
   releaseName: {{ .Values.nfsServer.releaseName }}
   targetNamespace: {{ .Values.nfsServer.namespace }}
+  {{- if .Values.nfsServer.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.nfsServer.driftDetection | nindent 4 -}}
+  {{- end }}
   values:
   {{- if .Values.nfsServer.overrideValues }}
     {{- toYaml .Values.nfsServer.overrideValues | nindent 4 }}

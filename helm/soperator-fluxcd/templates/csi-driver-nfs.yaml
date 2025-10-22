@@ -26,6 +26,10 @@ spec:
   timeout: {{ .Values.csiDriverNfs.timeout }}
   releaseName: {{ .Values.csiDriverNfs.releaseName }}
   targetNamespace: {{ .Values.csiDriverNfs.namespace }}
+  {{- if .Values.csiDriverNfs.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.csiDriverNfs.driftDetection | nindent 4 -}}
+  {{- end }}
   values:
   {{- if .Values.csiDriverNfs.overrideValues }}
     {{- toYaml .Values.csiDriverNfs.overrideValues | nindent 4 }}

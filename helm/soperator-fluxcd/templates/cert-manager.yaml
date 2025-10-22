@@ -32,6 +32,10 @@ spec:
   targetNamespace: {{ .Values.certManager.namespace }}
   releaseName: {{ .Values.certManager.releaseName }}
   timeout: {{ .Values.certManager.timeout }}
+  {{- if .Values.certManager.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.certManager.driftDetection | nindent 4 -}}
+  {{- end }}
   values:
   {{- if .Values.certManager.overrideValues }}
     {{- toYaml .Values.certManager.overrideValues | nindent 4 }}

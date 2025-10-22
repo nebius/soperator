@@ -28,6 +28,10 @@ spec:
   timeout: {{ .Values.observability.opentelemetry.logs.timeout }}
   releaseName: opentelemetry-collector-logs
   targetNamespace: logs-system
+  {{- if .Values.observability.opentelemetry.logs.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.observability.opentelemetry.logs.driftDetection | nindent 4 -}}
+  {{- end }}
   values:
   {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
   {{- if .Values.observability.opentelemetry.logs.overrideValues }}

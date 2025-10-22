@@ -27,6 +27,10 @@ spec:
   timeout: {{ .Values.securityProfilesOperator.timeout }}
   releaseName: {{ .Values.securityProfilesOperator.releaseName }}
   targetNamespace: {{ .Values.securityProfilesOperator.namespace }}
+  {{- if .Values.securityProfilesOperator.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.securityProfilesOperator.driftDetection | nindent 4 -}}
+  {{- end }}
   values:
   {{- if .Values.securityProfilesOperator.overrideValues }}
     {{- toYaml .Values.securityProfilesOperator.overrideValues | nindent 4 }}

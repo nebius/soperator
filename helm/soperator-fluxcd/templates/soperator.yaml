@@ -33,6 +33,10 @@ spec:
   timeout: {{ .Values.soperator.timeout }}
   releaseName: {{ .Values.soperator.releaseName }}
   targetNamespace: {{ .Values.soperator.namespace }}
+  {{- if .Values.soperator.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.soperator.driftDetection | nindent 4 -}}
+  {{- end }}
   values:
   {{- if .Values.soperator.overrideValues }}
     {{- toYaml .Values.soperator.overrideValues | nindent 4 }}
@@ -50,10 +54,10 @@ spec:
         {{- if and .Values.soperator.values .Values.soperator.values.manager .Values.soperator.values.manager.resources }}
         resources: {{- toYaml .Values.soperator.values.manager.resources | nindent 10 }}
         {{- end }}
-        {{- if or 
-          .Values.observability.enabled 
-          .Values.observability.prometheusOperator.enabled 
-          .Values.mariadbOperator.enabled 
+        {{- if or
+          .Values.observability.enabled
+          .Values.observability.prometheusOperator.enabled
+          .Values.mariadbOperator.enabled
         }}
         env:
           {{- if .Values.securityProfilesOperator.enabled }}
@@ -62,10 +66,10 @@ spec:
           {{- if .Values.mariadbOperator.enabled }}
           isMariadbCrdInstalled: true
           {{- end }}
-          {{- if and  
-            .Values.observability.enabled 
-            .Values.observability.prometheusOperator.enabled 
-          }} 
+          {{- if and
+            .Values.observability.enabled
+            .Values.observability.prometheusOperator.enabled
+          }}
           isPrometheusCrdInstalled: true
           {{- end }}
       kruise:

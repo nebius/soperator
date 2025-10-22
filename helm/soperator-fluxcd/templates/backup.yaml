@@ -32,6 +32,10 @@ spec:
   timeout: {{ .Values.backup.timeout }}
   releaseName: {{ .Values.backup.releaseName }}
   targetNamespace: {{ .Values.backup.namespace }}
+  {{- if .Values.backup.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.backup.driftDetection | nindent 4 -}}
+  {{- end }}
   values:
   {{- if .Values.backup.overrideValues }}
     {{- toYaml .Values.backup.overrideValues | nindent 4 }}

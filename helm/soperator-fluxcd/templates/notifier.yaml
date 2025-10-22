@@ -28,6 +28,10 @@ spec:
   timeout: {{ .Values.notifier.timeout }}
   releaseName: {{ .Values.notifier.releaseName }}
   targetNamespace: {{ .Values.notifier.namespace }}
+  {{- if .Values.notifier.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.notifier.driftDetection | nindent 4 -}}
+  {{- end }}
   values:
     {{- if .Values.notifier.overrideValues }}
     {{- toYaml .Values.notifier.overrideValues | nindent 4 }}

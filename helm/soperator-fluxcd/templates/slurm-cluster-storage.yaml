@@ -30,6 +30,10 @@ spec:
   timeout: {{ .Values.slurmCluster.slurmClusterStorage.timeout }}
   releaseName: {{ .Values.slurmCluster.slurmClusterStorage.releaseName }}
   targetNamespace: {{ .Values.slurmCluster.namespace }}
+  {{- if .Values.slurmCluster.slurmClusterStorage.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.slurmCluster.slurmClusterStorage.driftDetection | nindent 4 -}}
+  {{- end }}
   {{- if .Values.slurmCluster.slurmClusterStorage.overrideValues }}
   values:
     {{- toYaml .Values.slurmCluster.slurmClusterStorage.overrideValues | nindent 4 }}
