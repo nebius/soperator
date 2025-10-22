@@ -8,7 +8,7 @@ spec:
   dependsOn: [ "create-user-soperatorchecks" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   suspend: {{ .Values.checks.upgradeCuda.suspend }}
-  runAfterCreation: {{ .Values.checks.upgradeCuda.suspend }}
+  runAfterCreation: {{ .Values.checks.upgradeCuda.runAfterCreation }}
   k8sJobSpec:
     jobContainer:
       command:
