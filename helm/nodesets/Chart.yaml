@@ -1,5 +1,5 @@
 apiVersion: v2
-name:  helm-nodesets
+name: helm-nodesets
 description: A Helm chart for deploying Slurm NodeSets - groups of worker nodes with specific characteristics
 # A chart can be either an 'application' or a 'library' chart.
 #
