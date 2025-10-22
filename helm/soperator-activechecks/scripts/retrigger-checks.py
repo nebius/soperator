@@ -1,5 +1,4 @@
 import os
-import sys
 import subprocess
 import logging
 import time
@@ -8,16 +7,12 @@ import datetime
 
 NS = os.environ["NAMESPACE"]
 
-try:
-  logging.Formatter.converter = time.gmtime
-  logging.basicConfig(
-      format='[%(asctime)s.%(msecs)03d UTC] %(levelname)s: %(message)s',
-      datefmt='%Y-%m-%d %H:%M:%S',
-      level=logging.INFO
-  )
-except Exception as e:
-  print(f"Failed to set up logging, exiting: {e}")
-  sys.exit(0)
+logging.Formatter.converter = time.gmtime
+logging.basicConfig(
+    format='[%(asctime)s.%(msecs)03d UTC] %(levelname)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    level=logging.INFO
+)
 
 def run(cmd):
     p = subprocess.run(cmd, capture_output=True, text=True)
