@@ -4,14 +4,7 @@ import subprocess
 import json
 import datetime
 
-NS = os.environ.get("NAMESPACE")
-
-def fail(msg: str, code: int = 1):
-    print(msg, file=sys.stderr)
-    sys.exit(code)
-
-if not NS:
-    fail("missing NAMESPACE var")
+NS = os.environ["NAMESPACE"]
 
 def run(cmd):
     p = subprocess.run(cmd, capture_output=True, text=True)
@@ -24,12 +17,12 @@ def get_active_checks():
         "kubectl", "get", "activechecks.slurm.nebius.ai",
         "-n", NS, "-o", "json"
     ]))
-    res = []
+    active_checks = []
     for it in data.get("items", []):
         rac = it.get("spec", {}).get("runAfterCreation")
-        if rac is True or str(rac).lower() == "true":
-            res.append(it["metadata"]["name"])
-    return res
+        if rac:
+            active_checks.append(it["metadata"]["name"])
+    return active_checks
 
 def cronjob_exists(name: str) -> bool:
     return subprocess.run(
@@ -45,15 +38,16 @@ def trigger(name: str):
     run(cmd)
 
 def main():
-    activechecks = get_active_checks()
-    if not activechecks:
-        print("No CRs with .spec.runAfterCreation=true"); return
+    active_checks = get_active_checks()
+    if not active_checks:
+        print("No CRs with .spec.runAfterCreation=true")
+        return
 
-    for name in activechecks:
+    for name in active_checks:
         if cronjob_exists(name):
             try:
                 trigger(name)
-            except Exception as e:
+            except RuntimeError as e:
                 print(f"❌ {NS}/{name}: {e}")
         else:
             print(f"⚠️  CronJob not found: {NS}/{name}")

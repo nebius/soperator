@@ -16,3 +16,4 @@ chmod 644 /etc/apt/sources.list.d/kubernetes.list
 apt update -y
 apt install -y kubectl
 apt clean
+rm -rf /var/lib/apt/lists/*
