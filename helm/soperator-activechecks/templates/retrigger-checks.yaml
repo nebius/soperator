@@ -17,6 +17,9 @@ spec:
           python3 - <<'PY'
 {{ .Files.Get "scripts/retrigger-checks.py" | indent 10 }}
           PY
+      env:
+      - name: NAMESPACE
+        value: {{ .Release.Namespace | quote }}
       image: {{ .Values.images.k8sJob | quote }}
       volumeMounts:
 {{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
