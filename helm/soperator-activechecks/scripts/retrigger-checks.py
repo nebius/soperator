@@ -1,10 +1,23 @@
 import os
 import sys
 import subprocess
+import logging
+import time
 import json
 import datetime
 
 NS = os.environ["NAMESPACE"]
+
+try:
+  logging.Formatter.converter = time.gmtime
+  logging.basicConfig(
+      format='[%(asctime)s.%(msecs)03d UTC] %(levelname)s: %(message)s',
+      datefmt='%Y-%m-%d %H:%M:%S',
+      level=logging.INFO
+  )
+except Exception as e:
+  print(f"Failed to set up logging, exiting: {e}")
+  sys.exit(0)
 
 def run(cmd):
     p = subprocess.run(cmd, capture_output=True, text=True)
@@ -34,13 +47,13 @@ def trigger(name: str):
     ts = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
     job = f"{name}-manual-{ts}"
     cmd = ["kubectl", "-n", NS, "create", "job", f"--from=cronjob/{name}", job]
-    print(f"Trigger {NS}/{name} -> {job}")
+    logging.info(f"Triggering {NS}/{name} -> {job}")
     run(cmd)
 
 def main():
     active_checks = get_active_checks()
     if not active_checks:
-        print("No CRs with .spec.runAfterCreation=true")
+        logging.info("No CRs with .spec.runAfterCreation=true")
         return
 
     for name in active_checks:
@@ -48,9 +61,9 @@ def main():
             try:
                 trigger(name)
             except RuntimeError as e:
-                print(f"❌ {NS}/{name}: {e}")
+                logging.error(f"{NS}/{name}: {e}")
         else:
-            print(f"⚠️  CronJob not found: {NS}/{name}")
+            logging.warning(f"CronJob not found: {NS}/{name}")
 
 if __name__ == "__main__":
     main()
