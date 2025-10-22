@@ -123,8 +123,8 @@ slurmConfig:
   prolog: /opt/slurm_scripts/prolog.sh
   epilog: /opt/slurm_scripts/epilog.sh
   taskPluginParam: ""
-  maxJobCount: 10000
-  minJobAge: 86400
+  maxJobCount: 20000
+  minJobAge: 28800
   messageTimeout: 60
   topologyPlugin: "topology/tree"
   topologyParam: "SwitchAsNodeRank"
