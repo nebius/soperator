@@ -39,8 +39,8 @@ These tests verify the following kubebuilder default values:
 - `epilog: ""`
 - `prolog: ""`
 - `taskPluginParam: ""`
-- `maxJobCount: 10000`
-- `minJobAge: 86400`
+- `maxJobCount: 20000`
+- `minJobAge: 28800`
 - `messageTimeout: 60`
 - `topologyPlugin: "topology/tree"`
 - `topologyParam: "SwitchAsNodeRank"`
