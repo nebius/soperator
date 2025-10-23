@@ -8,8 +8,8 @@ spec:
   dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "55 1-21/4 * * *" # 6 times a day at 01:55, 05:55, 09:55, 13:55, 17:55 and 21:55 UTC
-  suspend: {{ .Values.checks.ibPerf.suspend }}
-  runAfterCreation: {{ .Values.checks.ibPerf.runAfterCreation }}
+  suspend: {{ .Values.checks.ibGpuPerf.suspend }}
+  runAfterCreation: {{ .Values.checks.ibGpuPerf.runAfterCreation }}
   slurmJobSpec:
     sbatchScript: |
 {{ tpl (.Files.Get "scripts/ib-gpu-perf.sh") . | indent 6 }}

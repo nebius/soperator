@@ -70,6 +70,9 @@ checks:
   gpuFryer:
     suspend: false
     runAfterCreation: true
+  ibGpuPerf:
+    suspend: false
+    runAfterCreation: true
   ibPerf:
     suspend: false
     runAfterCreation: true
