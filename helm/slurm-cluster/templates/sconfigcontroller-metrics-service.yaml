@@ -1,0 +1,17 @@
+{{- if .Values.sConfigController.serviceMonitor.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "slurm-cluster.name" . }}-sconfigcontroller-metrics
+  labels:
+    app.kubernetes.io/name: sconfigcontroller-metrics
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app.kubernetes.io/name: sconfigcontroller
+{{- end}}
