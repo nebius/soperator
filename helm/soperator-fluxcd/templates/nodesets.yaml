@@ -42,7 +42,6 @@ spec:
   {{- if .Values.nodesets.overrideValues }}
     {{- toYaml .Values.nodesets.overrideValues | nindent 4 }}
   {{- else }}
-    # Default values for nodesets
     {{- if .Values.nodesets.values }}
     {{- toYaml .Values.nodesets.values | nindent 4 }}
     {{- end }}
