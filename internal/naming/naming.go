@@ -49,6 +49,14 @@ func BuildServiceName(componentType consts.ComponentType, clusterName string) st
 	}.String()
 }
 
+func BuildNodeSetServiceName(clusterName string, nodeSetName string) string {
+	return namedEntity{
+		componentType: nil,
+		clusterName:   clusterName,
+		entity:        fmt.Sprintf("%s-%s", nodeSetName, entityService),
+	}.String()
+}
+
 func BuildServiceFQDN(
 	componentType consts.ComponentType,
 	namespace,
@@ -83,6 +91,14 @@ func BuildStatefulSetName(componentType consts.ComponentType) string {
 		componentType: &componentType,
 		clusterName:   "",
 		entity:        "",
+	}.String()
+}
+
+func BuildNodeSetStatefulSetName(nodeSetName string) string {
+	return namedEntity{
+		componentType: nil,
+		clusterName:   "",
+		entity:        nodeSetName,
 	}.String()
 }
 
