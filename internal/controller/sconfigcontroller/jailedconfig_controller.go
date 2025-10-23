@@ -679,6 +679,13 @@ func (r *JailedConfigReconciler) getNodesStartTime(ctx context.Context) (map[str
 			return nil, fmt.Errorf("duplicated worker name in Slurm API: %s", name)
 		}
 
+		for _, state := range *node.State {
+			if state == v0041.V0041NodeStateDOWN {
+				// Ignore DOWN nodes, since their start time won't change during reconfigure.
+				continue
+			}
+		}
+
 		if *node.SlurmdStartTime.Infinite {
 			return nil, fmt.Errorf("unexpected infinite start time for worker in Slurm API: %s", name)
 		}
