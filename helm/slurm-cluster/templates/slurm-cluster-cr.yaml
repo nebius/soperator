@@ -75,7 +75,7 @@ spec:
         defaultMode: 500
     {{- range .Values.volumeSources }}
     - name: {{ .name | quote }}
-      {{- omit . "name" | toYaml | nindent 6 }}
+      {{- omit . "name" "createPVC" "storageClassName" "size" | toYaml | nindent 6 }}
     {{- end }}
   secrets: {{ toYaml .Values.secrets | nindent 4 }}
   populateJail:
