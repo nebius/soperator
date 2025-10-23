@@ -32,7 +32,6 @@ spec:
   maintenance: {{ default "none" .Values.maintenance | quote  }}
   crVersion: {{ .Chart.Version }}
   useDefaultAppArmorProfile: {{ .Values.useDefaultAppArmorProfile }}
-  pause: {{ .Values.pause }}
   clusterType: {{ .Values.clusterType }}
   partitionConfiguration:
     configType: {{ (default "default" .Values.partitionConfiguration.configType) }}
