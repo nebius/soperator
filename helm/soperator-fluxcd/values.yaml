@@ -269,6 +269,17 @@ slurmCluster:
     timeout: 5m
     values: null
     overrideValues: null
+nodesets:
+  enabled: false
+  driftDetection:
+    mode: warn
+  interval: 5m
+  timeout: 5m
+  version: 1.22.1
+  namespace: soperator
+  releaseName: soperator-nodesets
+  values: null
+  overrideValues: null
 soperatorActiveChecks:
   enabled: true
   driftDetection:

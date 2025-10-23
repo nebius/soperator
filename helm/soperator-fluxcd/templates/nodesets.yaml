@@ -1,0 +1,59 @@
+{{- if .Values.nodesets.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-nodesets
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: helm-nodesets
+      interval: {{ .Values.nodesets.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+      version: {{ .Values.nodesets.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+{{- if .Values.slurmCluster.enabled }}
+  - name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster
+{{- end }}
+
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  interval: {{ .Values.nodesets.interval }}
+  timeout: {{ .Values.nodesets.timeout }}
+  releaseName: {{ .Values.nodesets.releaseName }}
+  targetNamespace: {{ .Values.nodesets.namespace }}
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  {{- if .Values.nodesets.driftDetection }}
+  driftDetection:
+    {{- toYaml .Values.nodesets.driftDetection | nindent 4 -}}
+  {{- end }}
+  values:
+  {{- if .Values.nodesets.overrideValues }}
+    {{- toYaml .Values.nodesets.overrideValues | nindent 4 }}
+  {{- else }}
+    # Default values for nodesets
+    {{- if .Values.nodesets.values }}
+    {{- toYaml .Values.nodesets.values | nindent 4 }}
+    {{- end }}
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: terraform-nodesets
+    optional: true
+    valuesKey: values.yaml
+  - kind: ConfigMap
+    name: nodesets
+    optional: true
+    valuesKey: values.yaml
+{{- end }}
