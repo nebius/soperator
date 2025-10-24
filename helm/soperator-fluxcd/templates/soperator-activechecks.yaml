@@ -16,7 +16,7 @@ spec:
       version: {{ .Values.soperatorActiveChecks.version }}
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster
-  - name: {{ include "soperator-fluxcd.fullname" . }}-soperatorchecks
+  - name: {{ include "soperator-fluxcd.fullname" . }}-soperatorchecks  
   install:
     crds: Skip
     remediation:
@@ -30,10 +30,6 @@ spec:
     remediation:
       retries: 3
       remediateLastFailure: true
-  {{- if .Values.soperatorActiveChecks.driftDetection }}
-  driftDetection:
-    {{- toYaml .Values.soperatorActiveChecks.driftDetection | nindent 4 -}}
-  {{- end }}
   values:
   {{- if .Values.soperatorActiveChecks.overrideValues }}
     {{- toYaml .Values.soperatorActiveChecks.overrideValues | nindent 4 }}

@@ -41,15 +41,11 @@ helmRepository:
     type: oci
 ns:
   enabled: true
-  driftDetection:
-    mode: warn
   interval: 5m
   timeout: 5m
   version: 2.0.0
 certManager:
   enabled: true
-  driftDetection:
-    mode: warn
   interval: 5m
   timeout: 5m
   version: v1.17.*
@@ -59,8 +55,6 @@ certManager:
   overrideValues: null
 backup:
   enabled: true
-  driftDetection:
-    mode: warn
   interval: 5m
   timeout: 5m
   version: 4.8.*
@@ -84,8 +78,6 @@ backup:
       spec: {}
 mariadbOperator:
   enabled: true
-  driftDetection:
-    mode: warn
   interval: 5m
   timeout: 5m
   version: 0.38.*
@@ -102,8 +94,6 @@ observability:
   region: eu-north1
   opentelemetry:
     enabled: true
-    driftDetection:
-      mode: warn
     namespace: logs-system
     logs:
       version: 0.117.*
@@ -127,16 +117,12 @@ observability:
       overrideValues: null
   prometheusOperator:
     enabled: true
-    driftDetection:
-      mode: warn
     interval: 5m
     timeout: 5m
     version: 19.1.*
     namespace: monitoring-system
   vmStack:
     enabled: true
-    driftDetection:
-      mode: warn
     crds:
       interval: 5m
       timeout: 5m
@@ -197,8 +183,6 @@ observability:
     overrideValues: null
   vmLogs:
     enabled: true
-    driftDetection:
-      mode: warn
     interval: 5m
     timeout: 5m
     version: 0.9.*
@@ -213,8 +197,6 @@ observability:
     overrideValues: null
   dcgmExporter:
     enabled: true
-    driftDetection:
-      mode: warn
     interval: 5m
     timeout: 5m
     version: 1.22.1
@@ -226,8 +208,6 @@ observability:
       resources: {}
 securityProfilesOperator:
   enabled: true
-  driftDetection:
-    mode: warn
   interval: 5m
   timeout: 5m
   version: 0.8.4-soperator
@@ -251,8 +231,6 @@ securityProfilesOperator:
   overrideValues: null
 slurmCluster:
   enabled: true
-  driftDetection:
-    mode: warn
   interval: 5m
   timeout: 5m
   version: 1.22.1
@@ -262,8 +240,6 @@ slurmCluster:
   overrideValues: null
   slurmClusterStorage:
     enabled: true
-    driftDetection:
-      mode: warn
     releaseName: slurm-cluster-storage
     interval: 5m
     timeout: 5m
@@ -282,8 +258,6 @@ nodesets:
   overrideValues: null
 soperatorActiveChecks:
   enabled: true
-  driftDetection:
-    mode: warn
   interval: 5m
   timeout: 120m
   version: 1.22.1
@@ -292,8 +266,6 @@ soperatorActiveChecks:
   overrideValues: null
 soperator:
   enabled: true
-  driftDetection:
-    mode: warn
   interval: 5m
   timeout: 5m
   version: 1.22.1
@@ -324,8 +296,6 @@ soperator:
       featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true"
   soperatorChecks:
     enabled: true
-    driftDetection:
-      mode: warn
     interval: 5m
     timeout: 5m
     releaseName: soperator-checks
@@ -333,8 +303,6 @@ soperator:
     overrideValues: null
   nodeConfigurator:
     enabled: true
-    driftDetection:
-      mode: warn
     interval: 5m
     timeout: 5m
     releaseName: soperator-node-configurator
@@ -344,8 +312,6 @@ soperator:
     overrideValues: null
 helmReleaseTriggerOperator:
   enabled: true
-  driftDetection:
-    mode: warn
   interval: 5m
   timeout: 5m
   version: 0.0.1
@@ -363,8 +329,6 @@ helmReleaseTriggerOperator:
   overrideValues: null
 notifier:
   enabled: false
-  driftDetection:
-    mode: warn
   interval: 5m
   timeout: 5m
   version: 1.22.1
@@ -376,8 +340,6 @@ notifier:
   overrideValues: null
 csiDriverNfs:
   interval: 5m
-  driftDetection:
-    mode: warn
   timeout: 5m
   version: 4.11.0
   namespace: nfs-system
@@ -386,8 +348,6 @@ csiDriverNfs:
   values: null
 nfsServer:
   enabled: true
-  driftDetection:
-    mode: warn
   interval: 5m
   timeout: 5m
   version: 1.21.12
@@ -397,8 +357,6 @@ nfsServer:
   values: null
 tailscale:
   enabled: false
-  driftDetection:
-    mode: warn
   interval: 5m
   timeout: 5m
   version: 2.0.0
