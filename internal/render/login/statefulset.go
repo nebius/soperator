@@ -130,7 +130,7 @@ func renderAnnotations(login *values.SlurmLogin, clusterName, namespace string) 
 		fmt.Sprintf(
 			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
 		): mungeAppArmorProfile,
-		consts.DefaultContainerAnnotationName: consts.ContainerNameSshd,
+		consts.AnnotationDefaultContainerName: consts.ContainerNameSshd,
 	}
 
 	return annotations
