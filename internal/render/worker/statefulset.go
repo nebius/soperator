@@ -170,7 +170,7 @@ func renderAnnotations(worker *values.SlurmWorker, clusterName, namespace string
 		fmt.Sprintf(
 			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
 		): mungeAppArmorProfile,
-		consts.DefaultContainerAnnotationName: consts.ContainerNameSlurmd,
+		consts.AnnotationDefaultContainerName: consts.ContainerNameSlurmd,
 	}
 
 	maps.Copy(annotations, worker.WorkerAnnotations)
