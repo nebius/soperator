@@ -1,41 +1,17 @@
-{{ if .Values.metricsService.enabled }}
+{{- if .Values.serviceMonitor.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "soperatorchecks.fullname" . }}-checks-metrics-service
+  name: {{ include "soperatorchecks.fullname" . }}-metrics
   labels:
-  {{- include "soperatorchecks.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "soperatorchecks.name" . }}-metrics
 spec:
-  type: {{ .Values.metricsService.type }}
-  selector:
-    control-plane: controller-manager
-  {{- include "soperatorchecks.selectorLabels" . | nindent 4 }}
+  type: ClusterIP
   ports:
-	{{- .Values.metricsService.ports | toYaml | nindent 2 }}
----
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: {{ include "soperatorchecks.fullname" . }}-checks-metrics-service
-  labels:
-  {{- include "soperatorchecks.labels" . | nindent 4 }}
-spec:
+  - name: https-metrics
+    port: 8443
+    protocol: TCP
+    targetPort: 8443
   selector:
-    matchLabels:
-      {{- include "soperatorchecks.labels" . | nindent 6 }}
-  namespaceSelector:
-    matchNames:
-    - {{ .Release.Namespace | quote }}
-  endpoints:
-  - port: metrics
-    interval: {{ .Values.metricsService.serviceMonitor.interval }}
-    scrapeTimeout: {{ .Values.metricsService.serviceMonitor.scrapeTimeout }}
-    {{- if .Values.metricsService.serviceMonitor.metricRelabelings }}
-    metricRelabelings:
-      {{- toYaml .Values.metricsService.serviceMonitor.metricRelabelings | nindent 6 }}
-    {{- end }}
-    {{- if .Values.metricsService.serviceMonitor.relabelings }}
-    relabelings:
-      {{- toYaml .Values.metricsService.serviceMonitor.relabelings | nindent 6 }}
-    {{- end }}
-{{ end }}
+    {{- include "soperatorchecks.selectorLabels" . | nindent 4 }}
+{{- end }}

@@ -1,0 +1,17 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nodeconfigurator.name" . }}-rebooter-metrics
+  labels:
+    app.kubernetes.io/name: {{ include "nodeconfigurator.name" . }}-rebooter-metrics
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app.kubernetes.io/component: node-configurator
+{{- end }}

@@ -33,3 +33,8 @@ rebooter:
   priorityClassName: ""
   serviceAccountName: ""
 initContainers: []
+serviceMonitor:
+  enabled: true
+  jobLabel: "rebooter"
+  interval: "30s"
+  scrapeTimeout: "28s"
