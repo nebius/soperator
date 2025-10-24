@@ -233,6 +233,7 @@ func prepareSlurmApi(
 				Number:   &slurmdStartTimeBefore,
 				Set:      ptr.To(true),
 			},
+			State: &[]v0041.V0041NodeState{v0041.V0041NodeStateALLOCATED},
 		})
 	}
 
@@ -250,6 +251,7 @@ func prepareSlurmApi(
 				Number:   &slurmdStartTime,
 				Set:      ptr.To(true),
 			},
+			State: &[]v0041.V0041NodeState{v0041.V0041NodeStateALLOCATED},
 		})
 	}
 
@@ -262,6 +264,7 @@ func prepareSlurmApi(
 				Number:   &slurmdStartTimeAfter,
 				Set:      ptr.To(true),
 			},
+			State: &[]v0041.V0041NodeState{v0041.V0041NodeStateALLOCATED},
 		})
 	}
 
