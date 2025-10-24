@@ -5,6 +5,6 @@ const (
 
 	AnnotationApparmorKey          = "container.apparmor.security.beta.kubernetes.io"
 	AnnotationDefaultContainerName = "kubectl.kubernetes.io/default-container"
-	AnnotationClusterName          = "slurm.nebius.ai/cluster"
-	AnnotationActiveCheckName      = "slurm.nebius.ai/activecheck"
+	AnnotationClusterName          = K8sGroupNameSoperator + "/cluster"
+	AnnotationActiveCheckName      = K8sGroupNameSoperator + "/activecheck"
 )
