@@ -22,10 +22,6 @@ spec:
   timeout: {{ .Values.tailscale.timeout }}
   upgrade:
     crds: Skip
-  {{- if .Values.tailscale.driftDetection }}
-  driftDetection:
-    {{- toYaml .Values.tailscale.driftDetection | nindent 4 -}}
-  {{- end }}
   values:
     resources:
     - apiVersion: rbac.authorization.k8s.io/v1

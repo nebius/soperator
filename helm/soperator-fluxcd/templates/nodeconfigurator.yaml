@@ -29,10 +29,6 @@ spec:
     remediation:
       retries: 3
       remediateLastFailure: true
-  {{- if .Values.soperator.nodeConfigurator.driftDetection }}
-  driftDetection:
-    {{- toYaml .Values.soperator.nodeConfigurator.driftDetection | nindent 4 -}}
-  {{- end }}
   values:
   {{- if .Values.soperator.nodeConfigurator.overrideValues }}
     {{- toYaml .Values.soperator.nodeConfigurator.overrideValues | nindent 4 }}
@@ -42,7 +38,7 @@ spec:
     rebooter:
       enabled: true
       {{- if and .Values.soperator.nodeConfigurator.values.rebooter .Values.soperator.nodeConfigurator.values.rebooter.resources }}
-      resources:
+      resources: 
       {{- toYaml .Values.soperator.nodeConfigurator.values.rebooter.resources | nindent 8 }}
       {{- end }}
       generateRBAC: true
