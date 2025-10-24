@@ -6,12 +6,14 @@ spec:
   checkType: "slurmJob"
   name: "ensure-healthy-nodes"
   dependsOn:
+  - "all-reduce-perf-nccl-in-docker"
   - "all-reduce-perf-nccl-with-ib"
   - "all-reduce-perf-nccl-without-ib"
   - "cuda-samples"
   - "dcgmi-diag-r2"
   - "dcgmi-diag-r3"
   - "gpu-fryer"
+  - "ib-gpu-perf"
   - "ib-perf"
   - "mem-perf"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
