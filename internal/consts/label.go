@@ -17,17 +17,17 @@ const (
 
 	LabelManagedByKey   = "app.kubernetes.io/managed-by"
 	LabelManagedByValue = slurmOperator
-	LabelValidateKey    = "slurm.nebius.ai/webhook"
+	LabelValidateKey    = K8sGroupNameSoperator + "/webhook"
 	LabelValidateValue  = "true"
 
-	LabelNodeConfiguratorKey   = "slurm.nebius.ai/node-configurator"
+	LabelNodeConfiguratorKey   = K8sGroupNameSoperator + "/node-configurator"
 	LabelNodeConfiguratorValue = "true"
 
-	LabelSConfigControllerSourceKey   = "sconficontroller.slurm.nebius.ai"
+	LabelSConfigControllerSourceKey   = "sconfigcontroller." + K8sGroupNameSoperator
 	LabelSConfigControllerSourceValue = "true"
 
 	// Controller type labels
-	LabelControllerType            = "slurm.nebius.ai/controller-type"
+	LabelControllerType            = K8sGroupNameSoperator + "/controller-type"
 	LabelControllerTypeMain        = "main"
 	LabelControllerTypePlaceholder = "placeholder"
 
@@ -35,8 +35,8 @@ const (
 	TierZeroSuffix             = "/tier-0"
 	TierOneSuffix              = "/tier-1"
 
-	LabelJailedAggregationKey         = "slurm.nebius.ai/jailed-aggregation"
+	LabelJailedAggregationKey         = K8sGroupNameSoperator + "/jailed-aggregation"
 	LabelJailedAggregationCommonValue = "common"
 
-	AnnotationConfigHash = "slurm.nebius.ai/config-hash"
+	AnnotationConfigHash = K8sGroupNameSoperator + "/config-hash"
 )
