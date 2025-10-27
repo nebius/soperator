@@ -11,11 +11,6 @@ jobs:
     with:
       unstable: false
     secrets: inherit
-    permissions:
-      contents: read
-      packages: write
-      attestations: write
-      id-token: write
 
   tag:
     name: Push new tag
@@ -36,7 +31,9 @@ jobs:
         run: |
           # Get the latest release tag (semantic version) that's reachable from the current commit
           # Match tags like: 1.2.3 (without 'v' prefix)
-          PREV_TAG=$(git tag --merged HEAD^ | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          # Exclude current version to support hotfix re-runs
+          CURRENT_VERSION="$(cat VERSION)"
+          PREV_TAG=$(git tag --merged HEAD^ | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${CURRENT_VERSION}$" | sort -V | tail -1)
           if [ -z "$PREV_TAG" ]; then
             echo "Error: No previous release tag found in current branch history"
             echo "This is unexpected - there should be previous releases in the history"
@@ -51,11 +48,11 @@ jobs:
           VERSION="$(cat VERSION)"
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
 
-      - name: Push new tag
-        uses: pxpm/github-tag-action@07a0f099a1db2ef2c50367665450b9f6ef3b6e9d # 1.0.1
-        with:
-          repo-token: "${{ secrets.GITHUB_TOKEN }}"
-          tag: ${{ steps.get-version.outputs.version }}
+      - name: Push new tag (force update if exists)
+        run: |
+          VERSION="${{ steps.get-version.outputs.version }}"
+          git tag -f "${VERSION}"
+          git push -f origin "${VERSION}"
 
     outputs:
       previous-tag: ${{ steps.get-previous-tag.outputs.tag }}
