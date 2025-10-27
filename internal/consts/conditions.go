@@ -9,9 +9,9 @@ const (
 	// SoperatorChecks related conditions to distinguish what happened to the k8s node.
 	SoperatorChecksK8SNodeDegraded    corev1.NodeConditionType = "SoperatorChecksNodeDegraded"
 	SoperatorChecksK8SNodeMaintenance corev1.NodeConditionType = "SoperatorChecksNodeMaintenance"
-	// External condition to react in soperator checks.
-	K8SNodeMaintenanceScheduled corev1.NodeConditionType = "NebiusMaintenanceScheduled"
-	HardwareIssuesSuspected     corev1.NodeConditionType = "HardwareIssuesSuspected"
+	HardwareIssuesSuspected           corev1.NodeConditionType = "HardwareIssuesSuspected"
+
+	DefaultMaintenanceConditionType corev1.NodeConditionType = "NebiusMaintenanceScheduled"
 )
 
 type ReasonConditionType string

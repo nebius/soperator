@@ -45,6 +45,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/soperatorchecks"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 
@@ -101,16 +102,17 @@ func getZapOpts(logFormat, logLevel string) []zap.Opts {
 
 func main() {
 	var (
-		metricsAddr            string
-		enableLeaderElection   bool
-		probeAddr              string
-		secureMetrics          bool
-		enableHTTP2            bool
-		logFormat              string
-		logLevel               string
-		enabledNodeReplacement bool
-		deleteNotReadyNodes    bool
-		notReadyTimeout        time.Duration
+		metricsAddr              string
+		enableLeaderElection     bool
+		probeAddr                string
+		secureMetrics            bool
+		enableHTTP2              bool
+		logFormat                string
+		logLevel                 string
+		enabledNodeReplacement   bool
+		deleteNotReadyNodes      bool
+		notReadyTimeout          time.Duration
+		maintenanceConditionType string
 
 		reconcileTimeout                         time.Duration
 		reconcileTimeoutPodEphemeralStorageCheck time.Duration
@@ -148,6 +150,7 @@ func main() {
 	flag.DurationVar(&notReadyTimeout, "not-ready-timeout", 15*time.Minute, "The timeout after which a NotReady node will be deleted. Nodes can be NotReady for more than 10 minutes when GPU operator is starting.")
 	flag.BoolVar(&deleteNotReadyNodes, "delete-not-ready-nodes", true, "If set, NotReady nodes will be deleted after the not-ready timeout is reached. If false, they will be marked as NotReady but not deleted.")
 	flag.Float64Var(&ephemeralStorageThreshold, "ephemeral-storage-threshold", 85.0, "The threshold percentage for ephemeral storage usage warnings (default 85%)")
+	flag.StringVar(&maintenanceConditionType, "maintenance-condition-type", string(consts.DefaultMaintenanceConditionType), "The condition type for scheduled maintenance")
 	flag.Parse()
 
 	// Validate ephemeral storage threshold
@@ -235,6 +238,7 @@ func main() {
 		mgr.GetScheme(),
 		mgr.GetEventRecorderFor(soperatorchecks.SlurmAPIClientsControllerName),
 		slurmAPIClients,
+		corev1.NodeConditionType(maintenanceConditionType),
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create slurm api clients controller", "controller", soperatorchecks.SlurmAPIClientsControllerName)
 		os.Exit(1)
@@ -247,6 +251,7 @@ func main() {
 		reconcileTimeout,
 		enabledNodeReplacement,
 		mgr.GetAPIReader(),
+		corev1.NodeConditionType(maintenanceConditionType),
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create slurm nodes controller", "controller", soperatorchecks.SlurmNodesControllerName)
 		os.Exit(1)
@@ -257,6 +262,7 @@ func main() {
 		mgr.GetEventRecorderFor(soperatorchecks.K8SNodesControllerName),
 		notReadyTimeout,
 		deleteNotReadyNodes,
+		corev1.NodeConditionType(maintenanceConditionType),
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		setupLog.Error(err, "unable to create k8s nodes controller", "controller", soperatorchecks.K8SNodesControllerName)
 		os.Exit(1)
