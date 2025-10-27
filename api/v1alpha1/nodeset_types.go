@@ -247,24 +247,35 @@ type ContainerMungeSpec struct {
 
 // WorkerVolumesSpec defines the volumes for the Slurm worker container
 type WorkerVolumesSpec struct {
+	// Spool represents the spool data volume configuration
+	//
+	// +kubebuilder:validation:Required
+	Spool corev1.VolumeSource `json:"spool"`
+
 	// Jail represents the jail data volume configuration
 	//
 	// +kubebuilder:validation:Required
 	Jail corev1.VolumeSource `json:"jail"`
 
-	// JailSubMounts defines the configuration of volume mounts within the jail volume
+	// JailSubMounts define the configuration of volume mounts within the jail volume
 	//
-	// +kubebuilder:validation:Required
-	JailSubMounts []NodeVolumeJailSubMount `json:"jailSubMounts"`
+	// +kubebuilder:validation:Optional
+	JailSubMounts []NodeVolumeMount `json:"jailSubMounts"`
+
+	// CustomVolumeMounts define the configuration of volume mounts within the worker container
+	//
+	// +kubebuilder:validation:Optional
+	CustomVolumeMounts []NodeVolumeMount `json:"customVolumeMounts"`
 
 	// SharedMemorySize defines the size of the shared memory (/dev/shm)
 	//
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="64Gi"
 	SharedMemorySize *resource.Quantity `json:"sharedMemorySize,omitempty"`
 }
 
-// NodeVolumeJailSubMount defines the configuration of volume mount within the jail volume
-type NodeVolumeJailSubMount struct {
+// NodeVolumeMount defines the configuration of volume mount
+type NodeVolumeMount struct {
 	// Name defines the name of the sub-mount
 	//
 	// +kubebuilder:validation:Required

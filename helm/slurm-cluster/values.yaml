@@ -125,8 +125,8 @@ slurmConfig:
   prolog: /opt/slurm_scripts/prolog.sh
   epilog: /opt/slurm_scripts/epilog.sh
   taskPluginParam: ""
-  maxJobCount: 10000
-  minJobAge: 86400
+  maxJobCount: 20000
+  minJobAge: 28800
   messageTimeout: 60
   topologyPlugin: "topology/tree"
   topologyParam: "SwitchAsNodeRank"
@@ -494,18 +494,11 @@ sConfigController:
   runAsGid: 1001
   reconfigurePollInterval: "20s"
   reconfigureWaitTimeout: "1m"
-telemetry: {}
-# jobsTelemetry:
-#   otelCollectorHttpHost: vmsingle-slurm.monitoring-system.svc.cluster.local
-#   otelCollectorPath: /opentelemetry/api/v1/push
-#   otelCollectorPort: 8429
-#   sendJobsEvents: true
-#   sendOtelMetrics: true
-# openTelemetryCollector:
-#   enabled: true
-#   replicasOtelCollector: 1
-#   otelCollectorPort: 8429
-
+  serviceMonitor:
+    enabled: true
+    jobLabel: "sconfigcontroller"
+    interval: "30s"
+    scrapeTimeout: "28s"
 images:
   slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.22.1-noble-slurm25.05.4"
   slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.22.1-noble-slurm25.05.4"

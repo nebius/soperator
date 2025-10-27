@@ -5,5 +5,5 @@
 #SBATCH --mem=0
 
 echo "Cleaning up Enroot containers on node: $(hostname)"
-srun bash -c "enroot list | grep -E '^pyxis_[0-9]+\.[^.]*$' | xargs -r -n1 -- enroot remove --force"
+srun bash -c "enroot list | grep -E '^pyxis_[0-9]+\.[^.]*$' | xargs -r -n1 -- sudo enroot remove --force"
 echo "Cleanup done."

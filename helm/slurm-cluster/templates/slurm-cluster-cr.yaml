@@ -32,7 +32,6 @@ spec:
   maintenance: {{ default "none" .Values.maintenance | quote  }}
   crVersion: {{ .Chart.Version }}
   useDefaultAppArmorProfile: {{ .Values.useDefaultAppArmorProfile }}
-  pause: {{ .Values.pause }}
   clusterType: {{ .Values.clusterType }}
   partitionConfiguration:
     configType: {{ (default "default" .Values.partitionConfiguration.configType) }}
@@ -76,7 +75,7 @@ spec:
         defaultMode: 500
     {{- range .Values.volumeSources }}
     - name: {{ .name | quote }}
-      {{- omit . "name" | toYaml | nindent 6 }}
+      {{- omit . "name" "createPVC" "storageClassName" "size" | toYaml | nindent 6 }}
     {{- end }}
   secrets: {{ toYaml .Values.secrets | nindent 4 }}
   populateJail:
@@ -445,42 +444,3 @@ spec:
     {{- if .Values.sConfigController.reconfigureWaitTimeout }}
     reconfigureWaitTimeout: {{ .Values.sConfigController.reconfigureWaitTimeout | quote }}
     {{- end }}
-  {{- if .Values.telemetry }}
-  telemetry:
-    {{- if .Values.telemetry.jobsTelemetry }}
-    jobsTelemetry:
-      {{- if .Values.telemetry.jobsTelemetry.otelCollectorHttpHost }}
-      otelCollectorHttpHost: {{ .Values.telemetry.jobsTelemetry.otelCollectorHttpHost | quote }}
-      {{- end }}
-      {{- if .Values.telemetry.jobsTelemetry.otelCollectorGrpcHost }}
-      otelCollectorGrpcHost: {{ .Values.telemetry.jobsTelemetry.otelCollectorGrpcHost | quote }}
-      {{- end }}
-      {{- if .Values.telemetry.jobsTelemetry.otelCollectorPath }}
-      otelCollectorPath: {{ .Values.telemetry.jobsTelemetry.otelCollectorPath | quote }}
-      {{- end }}
-      {{- if .Values.telemetry.jobsTelemetry.otelCollectorPort }}
-      otelCollectorPort: {{ .Values.telemetry.jobsTelemetry.otelCollectorPort }}
-      {{- end }}
-      {{- if .Values.telemetry.jobsTelemetry.sendJobsEvents }}
-      sendJobsEvents: {{ .Values.telemetry.jobsTelemetry.sendJobsEvents }}
-      {{- end }}
-      {{- if .Values.telemetry.jobsTelemetry.sendOtelMetrics }}
-      sendOtelMetrics: {{ .Values.telemetry.jobsTelemetry.sendOtelMetrics }}
-      {{- end }}
-    {{- end }}
-    {{- if .Values.telemetry.openTelemetryCollector }}
-    openTelemetryCollector:
-      {{- if .Values.telemetry.openTelemetryCollector.enabled }}
-      enabled: {{ .Values.telemetry.openTelemetryCollector.enabled }}
-      {{- end }}
-      {{- if .Values.telemetry.jobsTelemetry.otelCollectorHttpHost }}
-      podTemplateNameRef: {{ .Values.telemetry.openTelemetryCollector.podTemplateNameRef | quote }}
-      {{- end }}
-      {{- if .Values.telemetry.jobsTelemetry.replicasOtelCollector }}
-      replicasOtelCollector: {{ .Values.telemetry.openTelemetryCollector.replicasOtelCollector }}
-      {{- end }}
-      {{- if .Values.telemetry.jobsTelemetry.otelCollectorPort }}
-      otelCollectorPort: {{ .Values.telemetry.openTelemetryCollector.OtelCollectorPort }}
-      {{- end }}
-    {{- end }}
-  {{- end }}

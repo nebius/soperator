@@ -51,6 +51,8 @@ readarray -t SELECTED_NODES < <(printf "%s\n" "${NODES[@]}" | shuf -n "$ARRAY_SI
 JOB_IDS=()
 for node in "${SELECTED_NODES[@]}"; do
     echo "Submitting Slurm job for node $node..."
+
+    # Here we use env variables instead of --output and --error because they do not support %N (node name) parameter.
     OUT_PATTERN='/opt/soperator-outputs/slurm_jobs/%N.%x.%j.out'
     JOB_ID=$(
         SBATCH_OUTPUT="$OUT_PATTERN" \
@@ -64,17 +66,16 @@ for node in "${SELECTED_NODES[@]}"; do
             --chdir=/opt/soperator-home/soperatorchecks \
             --uid=soperatorchecks \
             /opt/bin/sbatch.sh
-    )
-
-    SBATCH_STATUS=$?
-    if [[ $SBATCH_STATUS -ne 0 ]]; then
-        echo "sbatch failed for node $node with exit code $SBATCH_STATUS"
-        continue
-    fi
+    ) || { echo "sbatch submission failed for node $node, skipping..."; continue; }
 
     if [[ -z "$JOB_ID" ]]; then
         echo "Empty output from sbatch for node $node"
         continue
+    fi
+
+    if [[ ! "$JOB_ID" =~ ^[0-9]+$ ]]; then
+      echo "Unexpected sbatch output for node $node: $JOB_ID"
+      continue
     fi
 
     JOB_IDS+=("$JOB_ID")

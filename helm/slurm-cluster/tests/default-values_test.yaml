@@ -45,10 +45,10 @@ tests:
           value: ""
       - equal:
           path: spec.slurmConfig.maxJobCount
-          value: 10000
+          value: 20000
       - equal:
           path: spec.slurmConfig.minJobAge
-          value: 86400
+          value: 28800
       - equal:
           path: spec.slurmConfig.messageTimeout
           value: 60

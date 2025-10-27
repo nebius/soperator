@@ -41,3 +41,33 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+  - it: should render nodesets component when nodesets.enabled=true
+    set:
+      nodesets.enabled: true
+    templates:
+      - templates/nodesets.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: HelmRelease
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-nodesets
+      - equal:
+          path: spec.chart.spec.chart
+          value: helm-nodesets
+      - equal:
+          path: spec.releaseName
+          value: soperator-nodesets
+      - equal:
+          path: spec.targetNamespace
+          value: soperator
+  - it: should not render nodesets component when nodesets.enabled=false
+    set:
+      nodesets.enabled: false
+    templates:
+      - templates/nodesets.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
