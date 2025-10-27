@@ -9,7 +9,7 @@ jobs:
     name: Build stable release
     uses: ./.github/workflows/one_job.yml
     with:
-      unstable: false
+      unstable: 'false'
     secrets: inherit
 
   tag:
