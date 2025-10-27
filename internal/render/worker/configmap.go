@@ -113,14 +113,14 @@ func RenderConfigMapSSHDConfigs(
 			Labels:    common.RenderLabels(componentType, cluster.Name),
 		},
 		Data: map[string]string{
-			consts.ConfigMapKeySshdConfig: generateSshdConfig(cluster).Render(),
+			consts.ConfigMapKeySshdConfig: generateSshdConfig(&cluster.NodeLogin).Render(),
 		},
 	}
 }
 
-func generateSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
+func generateSshdConfig(login *values.SlurmLogin) renderutils.ConfigFile {
 	res := &renderutils.MultilineStringConfig{}
-	res.AddLine(fmt.Sprintf("Port %d", cluster.NodeLogin.ContainerSshd.Port))
+	res.AddLine(fmt.Sprintf("Port %d", login.ContainerSshd.Port))
 	res.AddLine("PermitRootLogin yes")
 	res.AddLine("PasswordAuthentication no")
 	res.AddLine("ChallengeResponseAuthentication no")
