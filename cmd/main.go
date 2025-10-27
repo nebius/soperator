@@ -53,6 +53,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/nodeconfigurator"
 	"nebius.ai/slurm-operator/internal/controller/nodesetcontroller"
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
+	"nebius.ai/slurm-operator/internal/feature"
 	webhookcorev1 "nebius.ai/slurm-operator/internal/webhook/v1"
 	//+kubebuilder:scaffold:imports
 )
@@ -159,6 +160,7 @@ func main() {
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.BoolVar(&topologyControllerEnabled, "enable-topology-controller", false, "if set, the topology controller will be enabled.")
+	cli.AddFeatureGatesFlag()
 	flag.Parse()
 	opts := getZapOpts(logFormat, logLevel)
 	zapLogger := zap.New(opts...)
@@ -191,6 +193,10 @@ func main() {
 	})
 
 	var err error
+
+	if err = cli.ProcessFeatureGates(); err != nil {
+		cli.Fail(setupLog, err, "unable to process feature gates")
+	}
 
 	if soperatorNamespace == "" {
 		if soperatorNamespace, err = getCurrentNamespace(); err != nil {
@@ -250,7 +256,7 @@ func main() {
 		cli.Fail(setupLog, err, "unable to create controller", "controller", "NodeConfigurator")
 	}
 
-	{
+	if feature.Gate.Enabled(feature.NodeSetWorkers) {
 		nodeSetName := reflect.TypeOf(slurmv1alpha1.NodeSet{}).Name()
 		nodeSetNameLower := strings.ToLower(nodeSetName)
 
