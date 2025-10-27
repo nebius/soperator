@@ -37,10 +37,11 @@ var (
 
 type SlurmNodesController struct {
 	*reconciler.Reconciler
-	slurmAPIClients        *slurmapi.ClientSet
-	reconcileTimeout       time.Duration
-	enabledNodeReplacement bool
-	apiReader              client.Reader // Direct API reader for pagination
+	slurmAPIClients          *slurmapi.ClientSet
+	reconcileTimeout         time.Duration
+	enabledNodeReplacement   bool
+	apiReader                client.Reader // Direct API reader for pagination
+	MaintenanceConditionType corev1.NodeConditionType
 }
 
 func NewSlurmNodesController(
@@ -51,15 +52,21 @@ func NewSlurmNodesController(
 	reconcileTimeout time.Duration,
 	enabledNodeReplacement bool,
 	apiReader client.Reader,
+	maintenanceConditionType corev1.NodeConditionType,
 ) *SlurmNodesController {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
+	if maintenanceConditionType == "" {
+		maintenanceConditionType = consts.DefaultMaintenanceConditionType
+	}
+
 	return &SlurmNodesController{
-		Reconciler:             r,
-		slurmAPIClients:        slurmAPIClients,
-		reconcileTimeout:       reconcileTimeout,
-		enabledNodeReplacement: enabledNodeReplacement,
-		apiReader:              apiReader,
+		Reconciler:               r,
+		slurmAPIClients:          slurmAPIClients,
+		reconcileTimeout:         reconcileTimeout,
+		enabledNodeReplacement:   enabledNodeReplacement,
+		apiReader:                apiReader,
+		MaintenanceConditionType: maintenanceConditionType,
 	}
 }
 
@@ -530,7 +537,7 @@ func (c *SlurmNodesController) processMaintenance(
 		maintenanceCondition corev1.NodeCondition
 	)
 	for _, cond := range k8sNode.Status.Conditions {
-		if cond.Type == consts.K8SNodeMaintenanceScheduled {
+		if cond.Type == c.MaintenanceConditionType {
 			maintenanceCondition = cond
 			continue
 		}
