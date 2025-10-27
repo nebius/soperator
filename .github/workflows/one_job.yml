@@ -5,9 +5,9 @@ on:
     inputs:
       unstable:
         description: 'Build unstable version'
-        type: boolean
+        type: string
         required: false
-        default: true
+        default: 'true'
 
   push:
     branches:
