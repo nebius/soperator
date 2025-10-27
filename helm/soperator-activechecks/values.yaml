@@ -23,7 +23,7 @@ images:
   k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:1.22.1-noble-slurm25.05.4"
   munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.22.1-noble-slurm25.05.4"
 # Pyxis syntax with '#' separator for registry
-activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-b28f43b"
+activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-60db3ac"
 reservationPrefix: soperatorchecks.suspicious
 checks:
   allReducePerfNCCLInDocker:
