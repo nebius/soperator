@@ -95,6 +95,10 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 	}
 	// endregion Get parental cluster
 
+	if err = r.setUpConditions(ctx, nodeSet); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	logger.Info("Finished reconciliation")
 
 	return ctrl.Result{}, nil
