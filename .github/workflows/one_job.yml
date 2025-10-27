@@ -64,13 +64,8 @@ jobs:
 
       - name: Generate version file
         run: |
-          UNSTABLE="true"
-          if [[ "${{ github.event_name }}" == "workflow_call" ]]; then
-            UNSTABLE="${{ inputs.unstable }}"
-            echo "Called from workflow_call with unstable=${UNSTABLE}"
-          else
-            echo "Building unstable version"
-          fi
+          UNSTABLE="${{ inputs.unstable || 'true' }}"
+          echo "Building with unstable=${UNSTABLE}"
 
           make get-version UNSTABLE=${UNSTABLE} >> version.txt
           echo "${UNSTABLE}" >> version.txt
