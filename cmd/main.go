@@ -47,6 +47,7 @@ import (
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/check"
+	"nebius.ai/slurm-operator/internal/cli"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
 	"nebius.ai/slurm-operator/internal/controller/nodeconfigurator"
@@ -193,8 +194,7 @@ func main() {
 
 	if soperatorNamespace == "" {
 		if soperatorNamespace, err = getCurrentNamespace(); err != nil {
-			setupLog.Error(err, "unable to get operator namespace")
-			os.Exit(1)
+			cli.Fail(setupLog, err, "unable to get operator namespace")
 		}
 	}
 
@@ -226,8 +226,7 @@ func main() {
 		},
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to start manager")
 	}
 
 	if err = clustercontroller.NewSlurmClusterReconciler(
@@ -235,14 +234,12 @@ func main() {
 		mgr.GetScheme(),
 		mgr.GetEventRecorderFor(consts.SlurmCluster+"-controller"),
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", reflect.TypeOf(slurmv1.SlurmCluster{}).Name())
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to create controller", "controller", reflect.TypeOf(slurmv1.SlurmCluster{}).Name())
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err = webhookcorev1.SetupSecretWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Secret")
-			os.Exit(1)
+			cli.Fail(setupLog, err, "unable to create webhook", "webhook", "Secret")
 		}
 	}
 
@@ -250,8 +247,7 @@ func main() {
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NodeConfigurator")
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to create controller", "controller", "NodeConfigurator")
 	}
 
 	{
@@ -264,8 +260,7 @@ func main() {
 			mgr.GetEventRecorderFor(nodeSetNameLower+"-controller"),
 		).
 			SetupWithManager(mgr, nodeSetNameLower, maxConcurrency, cacheSyncTimeout); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", nodeSetName)
-			os.Exit(1)
+			cli.Fail(setupLog, err, "unable to create controller", "controller", nodeSetName)
 		}
 	}
 
@@ -277,13 +272,10 @@ func main() {
 			topologyLabelPrefix,
 			mgr.GetAPIReader(),
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-			setupLog.Error(
-				err,
+			cli.Fail(setupLog, err,
 				"unable to create controller",
-				"controller",
-				topologyconfcontroller.NodeTopologyReconcilerName,
+				"controller", topologyconfcontroller.NodeTopologyReconcilerName,
 			)
-			os.Exit(1)
 		}
 
 		if err = topologyconfcontroller.NewWorkerTopologyReconciler(
@@ -291,30 +283,24 @@ func main() {
 			mgr.GetScheme(),
 			soperatorNamespace,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-			setupLog.Error(
-				err,
+			cli.Fail(setupLog, err,
 				"unable to create controller",
-				"controller",
-				topologyconfcontroller.WorkerTopologyReconcilerName,
+				"controller", topologyconfcontroller.WorkerTopologyReconcilerName,
 			)
-			os.Exit(1)
 		}
 	}
 	//+kubebuilder:scaffold:builder
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
-		os.Exit(1)
+	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		cli.Fail(setupLog, err, "unable to set up health check")
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
-		os.Exit(1)
+	if err = mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		cli.Fail(setupLog, err, "unable to set up ready check")
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
-		os.Exit(1)
+	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		cli.Fail(setupLog, err, "problem running manager")
 	}
 }
 

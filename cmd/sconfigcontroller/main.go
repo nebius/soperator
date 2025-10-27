@@ -19,7 +19,6 @@ package main
 import (
 	"crypto/tls"
 	"flag"
-	"os"
 	"time"
 
 	"go.uber.org/zap/zapcore"
@@ -44,6 +43,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/cli"
 	"nebius.ai/slurm-operator/internal/controller/sconfigcontroller"
 	"nebius.ai/slurm-operator/internal/jwt"
 	"nebius.ai/slurm-operator/internal/slurmapi"
@@ -193,8 +193,7 @@ func main() {
 		},
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to start manager")
 	}
 
 	jwtToken := jwt.NewToken(mgr.GetClient()).
@@ -206,15 +205,14 @@ func main() {
 
 	slurmAPIClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
 	if err != nil {
-		setupLog.Error(err, "unable to start Slurm API Client")
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to start Slurm API Client")
 	}
 
 	jailFs := &sconfigcontroller.PrefixFs{
 		Prefix: jailPath,
 	}
 
-	if err := (sconfigcontroller.NewJailedConfigReconciler(
+	if err = (sconfigcontroller.NewJailedConfigReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		slurmAPIClient,
@@ -222,22 +220,18 @@ func main() {
 		reconfigurePollInterval,
 		reconfigureWaitTimeout,
 	)).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "JailedConfig")
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to create controller", "controller", "JailedConfig")
 	}
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
-		os.Exit(1)
+	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		cli.Fail(setupLog, err, "unable to set up health check")
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
-		os.Exit(1)
+	if err = mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		cli.Fail(setupLog, err, "unable to set up ready check")
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
-		os.Exit(1)
+	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		cli.Fail(setupLog, err, "unable to start manager")
 	}
 }
