@@ -115,7 +115,8 @@ COPY images/jail/motd/ /etc/update-motd.d/
 RUN chmod +x /etc/update-motd.d/*
 
 # Install python
-RUN apt-get install -y \
+RUN apt-get update && \
+    apt-get install -y \
         python3.12="3.12.3-1ubuntu0.8" \
         python3.12-dev="3.12.3-1ubuntu0.8" \
         python3.12-venv="3.12.3-1ubuntu0.8" \
