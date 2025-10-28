@@ -7,6 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
@@ -15,6 +16,9 @@ import (
 )
 
 type SlurmNodeSet struct {
+	Name            string
+	ParentalCluster client.ObjectKey
+
 	NodeSelector  map[string]string
 	Affinity      *corev1.Affinity
 	Tolerations   []corev1.Toleration
@@ -56,6 +60,12 @@ func BuildSlurmNodeSetFrom(
 ) SlurmNodeSet {
 	nsSpec := &nodeSet.Spec
 	res := SlurmNodeSet{
+		Name: nodeSet.Name,
+		ParentalCluster: client.ObjectKey{
+			Namespace: nodeSet.Namespace,
+			Name:      clusterName,
+		},
+		//
 		NodeSelector:  maps.Clone(nsSpec.NodeSelector),
 		Affinity:      nsSpec.Affinity.DeepCopy(),
 		Tolerations:   slices.Clone(nsSpec.Tolerations),
