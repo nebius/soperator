@@ -21,6 +21,10 @@ type namedEntity struct {
 	// nil if common
 	componentType *consts.ComponentType
 
+	// componentSpecifier defines whether the entity belongs to particular component.
+	// empty if nothing
+	componentSpecifier string
+
 	// entity is an optional K8S resource marker (e.g. "sts", "svc", etc.)
 	// empty if nothing
 	entity string
@@ -33,6 +37,9 @@ func (e namedEntity) String() string {
 	}
 	if e.componentType != nil {
 		es = append(es, (*e.componentType).String())
+	}
+	if e.componentSpecifier != "" {
+		es = append(es, e.componentSpecifier)
 	}
 	if e.entity != "" {
 		es = append(es, e.entity)
@@ -159,6 +166,15 @@ func BuildConfigMapSecurityLimitsName(componentType consts.ComponentType, cluste
 		componentType: &componentType,
 		clusterName:   clusterName,
 		entity:        consts.ConfigMapNameSecurityLimits,
+	}.String()
+}
+
+func BuildConfigMapSecurityLimitsForNodeSetName(clusterName, nodeSetName string) string {
+	return namedEntity{
+		clusterName:        clusterName,
+		componentType:      &consts.ComponentTypeNodeSet,
+		componentSpecifier: nodeSetName,
+		entity:             consts.ConfigMapNameSecurityLimits,
 	}.String()
 }
 

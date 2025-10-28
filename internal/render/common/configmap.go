@@ -490,6 +490,25 @@ func RenderConfigMapSecurityLimits(componentType consts.ComponentType, cluster *
 	}
 }
 
+// RenderConfigMapSecurityLimitsForNodeSet renders new [corev1.ConfigMap] containing security limits config file for particular NodeSet
+func RenderConfigMapSecurityLimitsForNodeSet(nodeSet *values.SlurmNodeSet) corev1.ConfigMap {
+	data := nodeSet.ContainerSlurmd.NodeContainer.SecurityLimitsConfig
+	if data == "" {
+		data = generateUnlimitedSecurityLimitsConfig().Render()
+	}
+
+	return corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      naming.BuildConfigMapSecurityLimitsForNodeSetName(nodeSet.ParentalCluster.Name, nodeSet.Name),
+			Namespace: nodeSet.ParentalCluster.Namespace,
+			Labels:    RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name),
+		},
+		Data: map[string]string{
+			consts.ConfigMapKeySecurityLimits: data,
+		},
+	}
+}
+
 func generateUnlimitedSecurityLimitsConfig() renderutils.ConfigFile {
 	res := &renderutils.MultilineStringConfig{}
 	res.AddLine("# Set core file size to unlimited (-c)")
