@@ -1,0 +1,11 @@
+---
+
+- name: Ensure gdrcopy packages are installed
+  ansible.builtin.apt:
+    name:
+      - gdrcopy=2.5-1
+      - gdrcopy-tests=2.5-1
+      - libgdrapi=2.5-1
+    state: present
+  tags:
+    - gdrcopy

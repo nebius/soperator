@@ -1,0 +1,103 @@
+---
+
+- name: Collect host facts
+  ansible.builtin.setup:
+  tags:
+    - slurm
+    - slurm-packages
+    - slurm-client-packages
+
+- name: Show system info
+  ansible.builtin.debug:
+    msg:
+      - "Architecture: {{ ansible_architecture }}"
+      - "Distro version: ubuntu{{ ansible_distribution_version }}"
+  tags:
+    - slurm
+    - slurm-packages
+    - slurm-client-packages
+
+- name: Divert files
+  community.general.dpkg_divert:
+    path: "{{ item }}"
+    state: present
+    rename: false
+    holder: LOCAL
+  loop:
+    - "/usr/lib/{{ ansible_architecture }}-linux-gnu/libnss_slurm.so.2"
+    - /usr/share/bash-completion/completions/slurm_completion.sh
+  tags:
+    - slurm
+    - slurm-packages
+    - slurm-client-packages
+
+- name: Find actual libslurm.so.* shared object (not symlink)
+  ansible.builtin.find:
+    paths: "/usr/lib/{{ ansible_architecture }}-linux-gnu"
+    patterns: "libslurm.so.*.0.0"
+    file_type: file
+  register: slurm_libslurm_so_file
+  tags:
+    - slurm
+    - slurm-packages
+    - slurm-client-packages
+
+- name: Ensure diversion is set for the real libslurm.so.* shared object
+  community.general.dpkg_divert:
+    path: "{{ item.path }}"
+    state: present
+    rename: false
+    holder: LOCAL
+  loop: "{{ slurm_libslurm_so_file.files }}"
+  when: slurm_libslurm_so_file.matched > 0
+  tags:
+    - slurm
+    - slurm-packages
+    - slurm-client-packages
+
+- name: Divert Slurm client binaries to protect from package overwrites
+  community.general.dpkg_divert:
+    path: "/usr/bin/{{ item }}"
+    state: present
+    rename: false
+    holder: LOCAL
+  loop:
+    - sacct
+    - salloc
+    - sbatch
+    - scancel
+    - scrontab
+    - sdiag
+    - sinfo
+    - squeue
+    - srun
+    - sstat
+    - sacctmgr
+    - sattach
+    - sbcast
+    - scontrol
+    - scrun
+    - sh5util
+    - sprio
+    - sreport
+    - sshare
+    - strigger
+  tags:
+    - slurm
+    - slurm-packages
+    - slurm-client-packages
+
+- name: Install Slurm client packages
+  ansible.builtin.apt:
+    name: >-
+      {{
+        slurm.client_packages
+        | map('regex_replace', '$', '=' ~ slurm.version ~ '-1')
+        | list
+      }}
+    state: present
+    update_cache: true
+  tags:
+    - slurm
+    - slurm-packages
+    - slurm-client-packages
