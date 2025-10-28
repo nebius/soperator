@@ -7,17 +7,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	slurmav1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/check"
+	"nebius.ai/slurm-operator/internal/feature"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/render/rest"
 	"nebius.ai/slurm-operator/internal/utils"
+	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -75,12 +75,19 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					nodeSetsList := slurmav1alpha1.NodeSetList{}
-					if err := r.List(stepCtx, &nodeSetsList, client.InNamespace(cluster.Namespace)); err != nil {
-						return fmt.Errorf("listing NodeSets: %w", err)
+					{
+						nodeSetsEnabled := feature.Gate.Enabled(feature.NodeSetWorkers)
+						if !nodeSetsEnabled && clusterValues.PartitionConfiguration.ConfigType == slurmv1.PartitionConfigTypeStructured {
+							return fmt.Errorf("structured partitions are not supported without nodesets")
+						}
+						if nodeSetsEnabled {
+							nodeSets, err := resourcegetter.ListNodeSetsByClusterRef(stepCtx, r.Client, types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name})
+							if err != nil {
+								return err
+							}
+							clusterValues.NodeSets = nodeSets
+						}
 					}
-
-					clusterValues.NodeSetList = nodeSetsList
 
 					desired := common.RenderConfigMapSlurmConfigs(clusterValues)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
