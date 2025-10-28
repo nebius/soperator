@@ -38,7 +38,7 @@ type SlurmCluster struct {
 	MPIConfig         slurmv1.MPIConfig
 	PlugStackConfig   slurmv1.PlugStackConfig
 	SConfigController SConfigController
-	NodeSetList       slurmav1alpha1.NodeSetList
+	NodeSets          []slurmav1alpha1.NodeSet
 }
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD

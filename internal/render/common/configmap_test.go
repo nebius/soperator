@@ -403,23 +403,21 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					Namespace: "soperator",
 					Name:      "slurm-test",
 				},
-				NodeSetList: slurmv1alpha1.NodeSetList{
-					Items: []slurmv1alpha1.NodeSet{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "nodeA",
-								Namespace: "soperator",
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeA",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 1,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
 							},
-							Spec: slurmv1alpha1.NodeSetSpec{
-								Replicas: 1,
-								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
-									Resources: corev1.ResourceList{
-										corev1.ResourceMemory: resource.MustParse("2Gi"),
-									},
-								},
-								NodeConfig: slurmv1alpha1.NodeConfig{
-									Static: "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
-								},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								Static: "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
 							},
 						},
 					},
@@ -434,23 +432,21 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					Namespace: "soperator",
 					Name:      "slurm-test",
 				},
-				NodeSetList: slurmv1alpha1.NodeSetList{
-					Items: []slurmv1alpha1.NodeSet{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "nodeB",
-								Namespace: "soperator",
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeB",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 3,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("4Gi"),
+								},
 							},
-							Spec: slurmv1alpha1.NodeSetSpec{
-								Replicas: 3,
-								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
-									Resources: corev1.ResourceList{
-										corev1.ResourceMemory: resource.MustParse("4Gi"),
-									},
-								},
-								NodeConfig: slurmv1alpha1.NodeConfig{
-									Static: "Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
-								},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								Static: "Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
 							},
 						},
 					},
@@ -467,40 +463,38 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					Namespace: "soperator",
 					Name:      "slurm-test",
 				},
-				NodeSetList: slurmv1alpha1.NodeSetList{
-					Items: []slurmv1alpha1.NodeSet{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "nodeC",
-								Namespace: "soperator",
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeC",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 2,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("8Gi"),
+								},
 							},
-							Spec: slurmv1alpha1.NodeSetSpec{
-								Replicas: 2,
-								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
-									Resources: corev1.ResourceList{
-										corev1.ResourceMemory: resource.MustParse("8Gi"),
-									},
-								},
-								NodeConfig: slurmv1alpha1.NodeConfig{
-									Static: "Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
-								},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								Static: "Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
 							},
 						},
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "nodeD",
-								Namespace: "soperator",
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeD",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 1,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("16Gi"),
+								},
 							},
-							Spec: slurmv1alpha1.NodeSetSpec{
-								Replicas: 1,
-								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
-									Resources: corev1.ResourceList{
-										corev1.ResourceMemory: resource.MustParse("16Gi"),
-									},
-								},
-								NodeConfig: slurmv1alpha1.NodeConfig{
-									Static: "Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
-								},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								Static: "Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
 							},
 						},
 					},
@@ -517,23 +511,21 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					Namespace: "soperator",
 					Name:      "slurm-test",
 				},
-				NodeSetList: slurmv1alpha1.NodeSetList{
-					Items: []slurmv1alpha1.NodeSet{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "nodeE",
-								Namespace: "soperator",
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeE",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 0,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
 							},
-							Spec: slurmv1alpha1.NodeSetSpec{
-								Replicas: 0,
-								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
-									Resources: corev1.ResourceList{
-										corev1.ResourceMemory: resource.MustParse("2Gi"),
-									},
-								},
-								NodeConfig: slurmv1alpha1.NodeConfig{
-									Static: "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
-								},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								Static: "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
 							},
 						},
 					},
@@ -548,9 +540,7 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					Namespace: "soperator",
 					Name:      "slurm-test",
 				},
-				NodeSetList: slurmv1alpha1.NodeSetList{
-					Items: []slurmv1alpha1.NodeSet{},
-				},
+				NodeSets: []slurmv1alpha1.NodeSet{},
 			},
 			expected: "#WARNING: No nodesets defined in structured configuration!",
 		},
@@ -583,23 +573,21 @@ func TestAddNodeSetsToSlurmConfig(t *testing.T) {
 					Namespace: "soperator",
 					Name:      "slurm-test",
 				},
-				NodeSetList: slurmv1alpha1.NodeSetList{
-					Items: []slurmv1alpha1.NodeSet{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "nodeA",
-								Namespace: "soperator",
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeA",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 1,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
 							},
-							Spec: slurmv1alpha1.NodeSetSpec{
-								Replicas: 1,
-								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
-									Resources: corev1.ResourceList{
-										corev1.ResourceMemory: resource.MustParse("2Gi"),
-									},
-								},
-								NodeConfig: slurmv1alpha1.NodeConfig{
-									Static: "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
-								},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								Static: "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
 							},
 						},
 					},
@@ -614,23 +602,21 @@ func TestAddNodeSetsToSlurmConfig(t *testing.T) {
 					Namespace: "soperator",
 					Name:      "slurm-test",
 				},
-				NodeSetList: slurmv1alpha1.NodeSetList{
-					Items: []slurmv1alpha1.NodeSet{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "nodeB",
-								Namespace: "soperator",
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeB",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 3,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("4Gi"),
+								},
 							},
-							Spec: slurmv1alpha1.NodeSetSpec{
-								Replicas: 3,
-								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
-									Resources: corev1.ResourceList{
-										corev1.ResourceMemory: resource.MustParse("4Gi"),
-									},
-								},
-								NodeConfig: slurmv1alpha1.NodeConfig{
-									Static: "Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
-								},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								Static: "Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
 							},
 						},
 					},
@@ -645,40 +631,38 @@ func TestAddNodeSetsToSlurmConfig(t *testing.T) {
 					Namespace: "soperator",
 					Name:      "slurm-test",
 				},
-				NodeSetList: slurmv1alpha1.NodeSetList{
-					Items: []slurmv1alpha1.NodeSet{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "nodeC",
-								Namespace: "soperator",
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeC",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 2,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("8Gi"),
+								},
 							},
-							Spec: slurmv1alpha1.NodeSetSpec{
-								Replicas: 2,
-								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
-									Resources: corev1.ResourceList{
-										corev1.ResourceMemory: resource.MustParse("8Gi"),
-									},
-								},
-								NodeConfig: slurmv1alpha1.NodeConfig{
-									Static: "Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
-								},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								Static: "Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
 							},
 						},
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "nodeD",
-								Namespace: "soperator",
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeD",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 1,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("16Gi"),
+								},
 							},
-							Spec: slurmv1alpha1.NodeSetSpec{
-								Replicas: 1,
-								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
-									Resources: corev1.ResourceList{
-										corev1.ResourceMemory: resource.MustParse("16Gi"),
-									},
-								},
-								NodeConfig: slurmv1alpha1.NodeConfig{
-									Static: "Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
-								},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								Static: "Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
 							},
 						},
 					},
@@ -694,23 +678,21 @@ func TestAddNodeSetsToSlurmConfig(t *testing.T) {
 					Namespace: "soperator",
 					Name:      "slurm-test",
 				},
-				NodeSetList: slurmv1alpha1.NodeSetList{
-					Items: []slurmv1alpha1.NodeSet{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "nodeE",
-								Namespace: "soperator",
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeE",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 0,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
 							},
-							Spec: slurmv1alpha1.NodeSetSpec{
-								Replicas: 0,
-								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
-									Resources: corev1.ResourceList{
-										corev1.ResourceMemory: resource.MustParse("2Gi"),
-									},
-								},
-								NodeConfig: slurmv1alpha1.NodeConfig{
-									Static: "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
-								},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								Static: "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
 							},
 						},
 					},
