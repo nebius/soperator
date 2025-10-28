@@ -10,7 +10,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/logfield"
 )
 
@@ -30,11 +29,11 @@ func NewStatefulSetReconciler(r *Reconciler) *StatefulSetReconciler {
 
 func (r *StatefulSetReconciler) Reconcile(
 	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
+	owner client.Object,
 	desired *appsv1.StatefulSet,
 	deps ...metav1.Object,
 ) error {
-	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
+	if err := r.reconcile(ctx, owner, desired, r.patch, deps...); err != nil {
 		log.FromContext(ctx).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile StatefulSet")
