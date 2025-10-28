@@ -18,7 +18,11 @@ import (
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/state"
+	"nebius.ai/slurm-operator/internal/logfield"
+	"nebius.ai/slurm-operator/internal/render/common"
+	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
+	"nebius.ai/slurm-operator/internal/values"
 )
 
 func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha1.NodeSet) (ctrl.Result, error) {
@@ -99,6 +103,17 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		return ctrl.Result{}, err
 	}
 
+	nodeSetValues := values.BuildSlurmNodeSetFrom(
+		nodeSet,
+		cluster.Name,
+		cluster.Spec.Maintenance,
+		cluster.Spec.UseDefaultAppArmorProfile,
+	)
+
+	if err = r.ReconcileNodeSetWorkers(ctx, nodeSet, &nodeSetValues); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	logger.Info("Finished reconciliation")
 
 	return ctrl.Result{}, nil
@@ -130,5 +145,48 @@ func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv
 		return fmt.Errorf("patching %s status: %w", slurmv1alpha1.KindNodeSet, err)
 	}
 
+	return nil
+}
+
+// ReconcileNodeSetWorkers reconciles all resources necessary for deploying Slurm NodeSet workers
+func (r NodeSetReconciler) ReconcileNodeSetWorkers(
+	ctx context.Context,
+	nodeSet *slurmv1alpha1.NodeSet,
+	nodeSetValues *values.SlurmNodeSet,
+) error {
+	logger := log.FromContext(ctx)
+
+	steps := []utils.MultiStepExecutionStep{
+		{
+			Name: "Security limits ConfigMap",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
+
+				desired := common.RenderConfigMapSecurityLimitsForNodeSet(nodeSetValues)
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				stepLogger.V(1).Info("Rendered")
+
+				if err := r.ConfigMap.Reconcile(stepCtx, nodeSet, &desired); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling worker security limits configmap: %w", err)
+				}
+				stepLogger.V(1).Info("Reconciled")
+
+				return nil
+			},
+		},
+	}
+
+	if err := utils.ExecuteMultiStep(ctx,
+		"Reconciliation of Slurm NodeSet workers",
+		utils.MultiStepExecutionStrategyCollectErrors,
+		steps...,
+	); err != nil {
+		logger.Error(err, "Failed to reconcile Slurm NodeSet workers")
+		return fmt.Errorf("reconciling Slurm NodeSet workers: %w", err)
+	}
+
+	logger.Info("Reconciled Slurm NodeSet workers")
 	return nil
 }
