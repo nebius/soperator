@@ -1,0 +1,9 @@
+---
+
+- name: Ensure dcgmi package is installed
+  ansible.builtin.apt:
+    name:
+      - datacenter-gpu-manager-4-cuda12=1:4.4.1-1
+    state: present
+  tags:
+    - dcgmi

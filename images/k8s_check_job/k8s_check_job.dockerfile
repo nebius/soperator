@@ -15,8 +15,7 @@ RUN chmod +x /opt/bin/install_kubectl.sh && \
     rm /opt/bin/install_kubectl.sh
 
 # Install python
-RUN apt-get update && \
-    apt-get install -y \
+RUN apt-get install -y \
         python3.12="3.12.3-1ubuntu0.8" \
         python3.12-dev="3.12.3-1ubuntu0.8" \
         python3.12-venv="3.12.3-1ubuntu0.8" \

@@ -1,0 +1,18 @@
+---
+
+# Order of roles here is the same as in jail.dockerfile
+- name: Run all
+  hosts: all
+  become: false
+  gather_facts: true
+  roles:
+    - common-packages
+    - python
+    - openmpi
+    - nvtop
+    - dcgmi
+    - gdrcopy
+    - nvidia-container-toolkit
+    - docker-cli
+    - slurm
+    - nc-health-checker
