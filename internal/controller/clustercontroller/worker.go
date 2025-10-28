@@ -14,12 +14,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/feature"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/render/worker"
 	"nebius.ai/slurm-operator/internal/utils"
+	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -62,7 +65,30 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					if !clusterValues.NodeWorker.IsSSHDConfigMapDefault {
+					nodeSetsEnabled := feature.Gate.Enabled(feature.NodeSetWorkers)
+					var needToReconcile bool
+
+					switch nodeSetsEnabled {
+					case false:
+						needToReconcile = clusterValues.NodeWorker.IsSSHDConfigMapDefault
+					case true:
+						nodeSetsWithCustomSSHDConfigMap := len(
+							sliceutils.Filter(
+								sliceutils.Map(
+									clusterValues.NodeSets,
+									func(nodeSet slurmv1alpha1.NodeSet) string {
+										return nodeSet.Spec.ConfigMapRefSSHD
+									},
+								),
+								func(configMapRef string) bool {
+									return len(configMapRef) > 0
+								},
+							),
+						)
+						needToReconcile = nodeSetsWithCustomSSHDConfigMap < len(clusterValues.NodeSets)
+					}
+
+					if !needToReconcile {
 						stepLogger.V(1).Info("Use custom SSHD ConfigMap from reference")
 						stepLogger.V(1).Info("Reconciled")
 						return nil
