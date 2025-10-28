@@ -11,7 +11,8 @@ curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-contai
     tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
 
 apt-get update
-apt-get install -y nvidia-container-toolkit=${NVIDIA_TOOLKIT_VERSION} \
+apt-get install -y \
+    nvidia-container-toolkit=${NVIDIA_TOOLKIT_VERSION} \
     nvidia-container-toolkit-base=${NVIDIA_TOOLKIT_VERSION} \
     libnvidia-container-tools=${NVIDIA_TOOLKIT_VERSION} \
     libnvidia-container1=${NVIDIA_TOOLKIT_VERSION}
