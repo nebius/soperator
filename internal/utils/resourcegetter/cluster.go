@@ -2,10 +2,10 @@ package resourcegetter
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -26,11 +26,14 @@ func GetClusterInNamespace(ctx context.Context, r client.Reader, namespace strin
 
 	if len(clusterList.Items) == 0 {
 		logger.V(1).Info(fmt.Sprintf("No %s resources found in namespace %q", slurmv1.KindSlurmCluster, namespace))
-		return nil, nil
+		return nil, apierrors.NewNotFound(schema.GroupResource{
+			Group:    slurmv1.GroupVersion.Group,
+			Resource: "slurmclusters",
+		}, fmt.Sprintf("no SlurmCluster found in namespace %s", namespace))
 	}
 
 	if len(clusterList.Items) > 1 {
-		err := errors.New(fmt.Sprintf("multiple %s resources found in namespace %q", slurmv1.KindSlurmCluster, namespace))
+		err := fmt.Errorf("multiple %s resources found in namespace %q", slurmv1.KindSlurmCluster, namespace)
 		logger.Error(err, fmt.Sprintf("%d %s resources found in namespace %q. This should not happen and definitely is a bug", len(clusterList.Items), slurmv1.KindSlurmCluster, namespace))
 		return nil, err
 	}
@@ -46,7 +49,7 @@ func GetCluster(ctx context.Context, r client.Reader, name types.NamespacedName)
 	if err := r.Get(ctx, name, &cluster); err != nil {
 		if apierrors.IsNotFound(err) {
 			logger.V(1).Info(fmt.Sprintf("%s %q is not found in namespace %q", slurmv1.KindSlurmCluster, name.Name, name.Namespace))
-			return nil, nil
+			return nil, err
 		}
 		logger.Error(err, fmt.Sprintf("Failed to get %s %q in namespace %q", slurmv1.KindSlurmCluster, name.Name, name.Namespace))
 		return nil, fmt.Errorf("getting %s: %w", slurmv1.KindSlurmCluster, err)
