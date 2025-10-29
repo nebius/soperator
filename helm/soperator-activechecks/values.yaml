@@ -23,7 +23,7 @@ images:
   k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:1.22.1-noble-slurm25.05.4"
   munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.22.1-noble-slurm25.05.4"
 # Pyxis syntax with '#' separator for registry
-activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-b28f43b"
+activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-00ce55c"
 reservationPrefix: soperatorchecks.suspicious
 checks:
   allReducePerfNCCLInDocker:
@@ -70,6 +70,9 @@ checks:
   gpuFryer:
     suspend: false
     runAfterCreation: true
+  ibGpuPerf:
+    suspend: false
+    runAfterCreation: true
   ibPerf:
     suspend: false
     runAfterCreation: true
@@ -96,7 +99,7 @@ checks:
   upgradeHealthChecker:
     suspend: true
     runAfterCreation: false
-    healthCheckerVersion: "1.0.0-159.251021"
+    healthCheckerVersion: "1.0.0-160.251028"
   waitForTopology:
     suspend: true
     runAfterCreation: true

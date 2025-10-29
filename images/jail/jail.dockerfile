@@ -224,7 +224,7 @@ RUN chmod +x /etc/update-motd.d/*
 COPY VERSION /etc/soperator-jail-version
 
 # Moved down to reduce build time
-ARG NC_HEALTH_CHECKER=1.0.0-159.251021
+ARG NC_HEALTH_CHECKER=1.0.0-160.251028
 
 # Install Nebius health-check library
 RUN apt-get update && \
