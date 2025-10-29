@@ -252,7 +252,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 						return ctrl.Result{}, fmt.Errorf("executing success reactions: %w", err)
 					}
 				default:
-					errorJobsAndReasons = append(failJobsAndReasons, slurmv1alpha1.JobAndReason{
+					errorJobsAndReasons = append(errorJobsAndReasons, slurmv1alpha1.JobAndReason{
 						JobID:  fmt.Sprint(slurmJob.ID),
 						Reason: slurmJob.StateReason,
 					})
