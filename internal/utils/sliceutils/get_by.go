@@ -24,5 +24,5 @@ func MustGetBy[T any, V constraints.Ordered](slice []T, value V, getter func(T) 
 			return v
 		}
 	}
-	panic(fmt.Sprintf("value with value \"%v\" not found", value))
+	panic(fmt.Sprintf("element with value \"%v\" not found", value))
 }
