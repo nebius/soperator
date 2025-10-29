@@ -105,7 +105,7 @@ func BuildSlurmNodeSetFrom(
 			nsSpec.MaxUnavailable,
 		),
 		Service:         buildServiceFrom(naming.BuildNodeSetServiceName(clusterName, nodeSet.Name)),
-		ServiceUmbrella: buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeWorker, clusterName)),
+		ServiceUmbrella: buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeNodeSet, clusterName)),
 		//
 		VolumeSpool:      *nsSpec.Slurmd.Volumes.Spool.DeepCopy(),
 		VolumeJail:       *nsSpec.Slurmd.Volumes.Jail.DeepCopy(),
