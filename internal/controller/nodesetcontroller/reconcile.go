@@ -6,7 +6,6 @@ import (
 	"maps"
 	"time"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -80,11 +79,8 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 	} else {
 		cluster, err = resourcegetter.GetClusterInNamespace(ctx, r.Client, nodeSet.Namespace)
 	}
-	if err != nil || cluster == nil {
-		logger.Error(err, "Failed to get parental cluster in namespace")
-		return ctrl.Result{
-			RequeueAfter: time.Minute,
-		}, errors.Wrap(err, "getting parental cluster")
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("getting parental cluster: %w", err)
 	}
 
 	if !hasClusterRef {
@@ -98,7 +94,7 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 			logger.Error(err, "Failed to patch parental cluster annotation")
 			return ctrl.Result{
 				RequeueAfter: time.Minute,
-			}, errors.Wrap(err, "patching parental cluster annotation")
+			}, fmt.Errorf("patching parental cluster annotation: %w", err)
 		}
 	}
 	// endregion Get parental cluster
