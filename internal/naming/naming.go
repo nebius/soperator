@@ -50,17 +50,18 @@ func (e namedEntity) String() string {
 
 func BuildServiceName(componentType consts.ComponentType, clusterName string) string {
 	return namedEntity{
-		componentType: &componentType,
 		clusterName:   clusterName,
+		componentType: &componentType,
 		entity:        entityService,
 	}.String()
 }
 
 func BuildNodeSetServiceName(clusterName string, nodeSetName string) string {
 	return namedEntity{
-		componentType: nil,
-		clusterName:   clusterName,
-		entity:        fmt.Sprintf("%s-%s", nodeSetName, entityService),
+		clusterName:        clusterName,
+		componentType:      &consts.ComponentTypeNodeSet,
+		componentSpecifier: nodeSetName,
+		entity:             entityService,
 	}.String()
 }
 

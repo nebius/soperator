@@ -223,30 +223,30 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					return nil
 				},
 			},
+
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Worker Service",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling")
+
+					desired := worker.RenderService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeWorker)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("Rendered")
+
+					if err := r.Service.Reconcile(stepCtx, cluster, &desired, nil); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return fmt.Errorf("reconciling worker Service: %w", err)
+					}
+					stepLogger.V(1).Info("Reconciled")
+
+					return nil
+				},
+			},
 		)
 	}
 
 	steps = append(steps,
-		utils.MultiStepExecutionStep{
-			Name: "Slurm Worker Service",
-			Func: func(stepCtx context.Context) error {
-				stepLogger := log.FromContext(stepCtx)
-				stepLogger.V(1).Info("Reconciling")
-
-				desired := worker.RenderService(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeWorker)
-				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-				stepLogger.V(1).Info("Rendered")
-
-				if err := r.Service.Reconcile(stepCtx, cluster, &desired, nil); err != nil {
-					stepLogger.Error(err, "Failed to reconcile")
-					return fmt.Errorf("reconciling worker Service: %w", err)
-				}
-				stepLogger.V(1).Info("Reconciled")
-
-				return nil
-			},
-		},
-
 		utils.MultiStepExecutionStep{
 			Name: "Slurm Worker StatefulSet",
 			Func: func(stepCtx context.Context) error {
