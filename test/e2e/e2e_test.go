@@ -190,7 +190,8 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 			"gpu_cluster": map[string]interface{}{
 				"infiniband_fabric": cfg.InfinibandFabric,
 			},
-			"preemptible": struct{}{},
+			// User regular nodes for now
+			// "preemptible": struct{}{},
 		},
 	}
 
