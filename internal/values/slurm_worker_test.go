@@ -21,7 +21,7 @@ func TestBuildSlurmWorkerFrom(t *testing.T) {
 		},
 	}
 
-	result := BuildSlurmWorkerFrom(clusterName, ptr.To(consts.ModeNone), worker, false)
+	result := buildSlurmWorkerFrom(clusterName, ptr.To(consts.ModeNone), worker, false)
 
 	if !reflect.DeepEqual(result.SlurmNode, worker.SlurmNode) {
 		t.Errorf("Expected SlurmNode to be %v, but got %v", *worker.SlurmNode.DeepCopy(), result.SlurmNode)

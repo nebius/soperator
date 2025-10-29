@@ -8,6 +8,7 @@ import (
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
+	"github.com/pkg/errors"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -38,8 +39,11 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controller/state"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
+	"nebius.ai/slurm-operator/internal/feature"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/utils"
+	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
+	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -219,6 +223,33 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 	clusterValues, err := values.BuildSlurmClusterFrom(ctx, cluster)
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+
+	if feature.Gate.Enabled(feature.NodeSetWorkers) {
+		nodeSets, err := resourcegetter.ListNodeSetsByClusterRef(ctx, r.Client, client.ObjectKeyFromObject(cluster))
+		if err != nil {
+			logger.Error(err, fmt.Sprintf("Failed to list %s", slurmv1alpha1.KindNodeSet))
+			return ctrl.Result{}, errors.Wrap(err, "listing node sets")
+		}
+
+		// Set cluster type to GPU if at least one NodeSet has GPU enabled
+		if len(
+			sliceutils.Filter(
+				sliceutils.Map(
+					nodeSets,
+					func(nodeSet slurmv1alpha1.NodeSet) bool {
+						return nodeSet.Spec.GPU.Enabled
+					},
+				),
+				func(b bool) bool {
+					return b
+				},
+			),
+		) > 0 {
+			clusterValues.ClusterType = consts.ClusterTypeGPU
+		} else {
+			clusterValues.ClusterType = consts.ClusterTypeCPU
+		}
 	}
 
 	if err = r.setUpConditions(ctx, cluster); err != nil {

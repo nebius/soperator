@@ -6,7 +6,6 @@ import (
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -32,10 +31,10 @@ type SlurmNodeSet struct {
 	AppArmorProfileDefault bool
 
 	SupervisorDConfigMapDefault bool
-	SupervisorDConfigMapName    *string
+	SupervisorDConfigMapName    string
 
 	SSHDConfigMapDefault bool
-	SSHDConfigMapName    *string
+	SSHDConfigMapName    string
 
 	GPU *slurmv1alpha1.GPUSpec
 
@@ -49,7 +48,8 @@ type SlurmNodeSet struct {
 	CustomVolumeMounts []slurmv1alpha1.NodeVolumeMount
 	SharedMemorySize   *resource.Quantity
 
-	Maintenance *consts.MaintenanceMode
+	Maintenance             *consts.MaintenanceMode
+	EnableHostUserNamespace bool
 }
 
 func BuildSlurmNodeSetFrom(
@@ -111,7 +111,8 @@ func BuildSlurmNodeSetFrom(
 		VolumeJail:       *nsSpec.Slurmd.Volumes.Jail.DeepCopy(),
 		SharedMemorySize: nsSpec.Slurmd.Volumes.SharedMemorySize,
 		//
-		Maintenance: maintenance,
+		Maintenance:             maintenance,
+		EnableHostUserNamespace: nsSpec.EnableHostUserNamespace,
 	}
 
 	// region Submounts
@@ -128,12 +129,12 @@ func BuildSlurmNodeSetFrom(
 	// region SupervisorDConfig
 	{
 		var (
-			supervisordConfigMapName *string
+			supervisordConfigMapName = nsSpec.ConfigMapRefSupervisord
 			supervisordConfigDefault = false
 		)
 		if nsSpec.ConfigMapRefSupervisord == "" {
 			supervisordConfigDefault = true
-			supervisordConfigMapName = ptr.To(naming.BuildConfigMapSupervisordName(clusterName))
+			supervisordConfigMapName = naming.BuildConfigMapSupervisordName(clusterName)
 		}
 		res.SupervisorDConfigMapName = supervisordConfigMapName
 		res.SupervisorDConfigMapDefault = supervisordConfigDefault
@@ -143,12 +144,12 @@ func BuildSlurmNodeSetFrom(
 	// region SSHDConfig
 	{
 		var (
-			sshdConfigMapName *string
+			sshdConfigMapName = nsSpec.ConfigMapRefSSHD
 			sshdConfigDefault = false
 		)
 		if nsSpec.ConfigMapRefSSHD == "" {
 			sshdConfigDefault = true
-			sshdConfigMapName = ptr.To(naming.BuildConfigMapSSHDConfigsNameWorker(clusterName))
+			sshdConfigMapName = naming.BuildConfigMapSSHDConfigsNameWorker(clusterName)
 		}
 		res.SSHDConfigMapName = sshdConfigMapName
 		res.SSHDConfigMapDefault = sshdConfigDefault
