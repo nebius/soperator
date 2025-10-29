@@ -243,50 +243,50 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					return nil
 				},
 			},
+
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Worker StatefulSet",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling")
+
+					desired, err := worker.RenderStatefulSet(
+						clusterValues.Namespace,
+						clusterValues.Name,
+						clusterValues.ClusterType,
+						clusterValues.NodeFilters,
+						&clusterValues.Secrets,
+						clusterValues.VolumeSources,
+						&clusterValues.NodeWorker,
+						clusterValues.WorkerFeatures,
+					)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return fmt.Errorf("rendering worker StatefulSet: %w", err)
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("Rendered")
+
+					deps, err := r.getWorkersStatefulSetDependencies(stepCtx, clusterValues)
+					if err != nil {
+						stepLogger.Error(err, "Failed to retrieve dependencies")
+						return fmt.Errorf("retrieving dependencies for worker StatefulSet: %w", err)
+					}
+					stepLogger.V(1).Info("Retrieved dependencies")
+
+					if err = r.AdvancedStatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return fmt.Errorf("reconciling worker StatefulSet: %w", err)
+					}
+					stepLogger.V(1).Info("Reconciled")
+
+					return nil
+				},
+			},
 		)
 	}
 
 	steps = append(steps,
-		utils.MultiStepExecutionStep{
-			Name: "Slurm Worker StatefulSet",
-			Func: func(stepCtx context.Context) error {
-				stepLogger := log.FromContext(stepCtx)
-				stepLogger.V(1).Info("Reconciling")
-
-				desired, err := worker.RenderStatefulSet(
-					clusterValues.Namespace,
-					clusterValues.Name,
-					clusterValues.ClusterType,
-					clusterValues.NodeFilters,
-					&clusterValues.Secrets,
-					clusterValues.VolumeSources,
-					&clusterValues.NodeWorker,
-					clusterValues.WorkerFeatures,
-				)
-				if err != nil {
-					stepLogger.Error(err, "Failed to render")
-					return fmt.Errorf("rendering worker StatefulSet: %w", err)
-				}
-				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-				stepLogger.V(1).Info("Rendered")
-
-				deps, err := r.getWorkersStatefulSetDependencies(stepCtx, clusterValues)
-				if err != nil {
-					stepLogger.Error(err, "Failed to retrieve dependencies")
-					return fmt.Errorf("retrieving dependencies for worker StatefulSet: %w", err)
-				}
-				stepLogger.V(1).Info("Retrieved dependencies")
-
-				if err = r.AdvancedStatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
-					stepLogger.Error(err, "Failed to reconcile")
-					return fmt.Errorf("reconciling worker StatefulSet: %w", err)
-				}
-				stepLogger.V(1).Info("Reconciled")
-
-				return nil
-			},
-		},
-
 		utils.MultiStepExecutionStep{
 			Name: "Slurm Worker ServiceAccount",
 			Func: func(stepCtx context.Context) error {

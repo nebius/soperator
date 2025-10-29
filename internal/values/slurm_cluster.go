@@ -65,11 +65,11 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		PopulateJail:           buildSlurmPopulateJailFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.PopulateJail),
 		NodeFilters:            buildNodeFiltersFrom(cluster.Spec.K8sNodeFilters),
 		VolumeSources:          buildVolumeSourcesFrom(cluster.Spec.VolumeSources),
-		Secrets:                buildSecretsFrom(&cluster.Spec.Secrets),
+		Secrets:                BuildSecretsFrom(&cluster.Spec.Secrets),
 		NodeController:         buildSlurmControllerFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Controller),
 		NodeAccounting:         buildAccountingFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Accounting),
 		NodeRest:               buildRestFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Rest),
-		NodeWorker: BuildSlurmWorkerFrom(
+		NodeWorker: buildSlurmWorkerFrom(
 			cluster.Name,
 			cluster.Spec.Maintenance,
 			&cluster.Spec.SlurmNodes.Worker,

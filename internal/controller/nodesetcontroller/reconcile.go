@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -19,6 +21,7 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/state"
 	"nebius.ai/slurm-operator/internal/logfield"
+	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/render/worker"
 	"nebius.ai/slurm-operator/internal/utils"
@@ -224,6 +227,46 @@ func (r NodeSetReconciler) ReconcileNodeSetWorkers(
 				return nil
 			},
 		},
+
+		{
+			Name: "Worker StatefulSet",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
+
+				cluster, err := resourcegetter.GetCluster(ctx, r.Client, nodeSetValues.ParentalCluster)
+				if err != nil {
+					stepLogger.Error(err, "Failed to get parental cluster")
+					return fmt.Errorf("getting %s parental cluster %s/%s: %w", slurmv1alpha1.KindNodeSet, nodeSetValues.ParentalCluster.Namespace, nodeSetValues.ParentalCluster.Name, err)
+				}
+
+				desired, err := worker.RenderNodeSetStatefulSet(
+					nodeSetValues,
+					ptr.To(values.BuildSecretsFrom(&cluster.Spec.Secrets)),
+				)
+				if err != nil {
+					stepLogger.Error(err, "Failed to render")
+					return fmt.Errorf("rendering worker StatefulSet: %w", err)
+				}
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				stepLogger.V(1).Info("Rendered")
+
+				deps, err := r.getWorkersStatefulSetDependencies(stepCtx, nodeSetValues)
+				if err != nil {
+					stepLogger.Error(err, "Failed to retrieve dependencies")
+					return fmt.Errorf("retrieving dependencies for worker StatefulSet: %w", err)
+				}
+				stepLogger.V(1).Info("Retrieved dependencies")
+
+				if err = r.AdvancedStatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling worker StatefulSet: %w", err)
+				}
+				stepLogger.V(1).Info("Reconciled")
+
+				return nil
+			},
+		},
 	}
 
 	if err := utils.ExecuteMultiStep(ctx,
@@ -237,4 +280,74 @@ func (r NodeSetReconciler) ReconcileNodeSetWorkers(
 
 	logger.Info("Reconciled Slurm NodeSet workers")
 	return nil
+}
+
+func (r NodeSetReconciler) getWorkersStatefulSetDependencies(
+	ctx context.Context,
+	nodeSet *values.SlurmNodeSet,
+	// clusterValues *values.SlurmCluster,
+) ([]metav1.Object, error) {
+	var res []metav1.Object
+
+	mungeKeySecret := &corev1.Secret{}
+	if err := r.Get(
+		ctx,
+		types.NamespacedName{
+			Namespace: nodeSet.ParentalCluster.Namespace,
+			Name:      naming.BuildSecretMungeKeyName(nodeSet.ParentalCluster.Name),
+		},
+		mungeKeySecret,
+	); err != nil {
+		return []metav1.Object{}, err
+	}
+	res = append(res, mungeKeySecret)
+
+	//if clusterValues.NodeAccounting.Enabled {
+	//	slurmdbdSecret := &corev1.Secret{}
+	//	if err := r.Get(
+	//		ctx,
+	//		types.NamespacedName{
+	//			Namespace: clusterValues.Namespace,
+	//			Name:      naming.BuildSecretSlurmdbdConfigsName(clusterValues.Name),
+	//		},
+	//		slurmdbdSecret,
+	//	); err != nil {
+	//		return []metav1.Object{}, err
+	//	}
+	//	res = append(res, slurmdbdSecret)
+	//}
+
+	if nodeSet.SupervisorDConfigMapName != "" {
+		superviserdConfigMap := &corev1.ConfigMap{}
+		err := r.Get(
+			ctx,
+			types.NamespacedName{
+				Namespace: nodeSet.ParentalCluster.Namespace,
+				Name:      nodeSet.SupervisorDConfigMapName,
+			},
+			superviserdConfigMap,
+		)
+		if err != nil {
+			return []metav1.Object{}, err
+		}
+		res = append(res, superviserdConfigMap)
+	}
+
+	if nodeSet.SSHDConfigMapName != "" {
+		sshdConfigMap := &corev1.ConfigMap{}
+		err := r.Get(
+			ctx,
+			types.NamespacedName{
+				Namespace: nodeSet.ParentalCluster.Namespace,
+				Name:      nodeSet.SSHDConfigMapName,
+			},
+			sshdConfigMap,
+		)
+		if err != nil {
+			return []metav1.Object{}, err
+		}
+		res = append(res, sshdConfigMap)
+	}
+
+	return res, nil
 }
