@@ -1,7 +1,7 @@
 package consts
 
 const (
-	ActiveCheckFinalizer                    = "slurm.nebius.ai/activecheck-finalizer"
+	ActiveCheckFinalizer                    = K8sGroupNameSoperator + "/activecheck-finalizer"
 	SlurmNodeReasonActiveCheckFailedUnknown = "Soperator activecheck unknown: node drain process"
 
 	ActiveCheckEachWorkerJobArrayEnv = "EACH_WORKER_JOB_ARRAY"

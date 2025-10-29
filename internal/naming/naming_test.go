@@ -1,11 +1,13 @@
-package naming
+package naming_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/naming"
 )
 
 func TestBuildConfigMapSecurityLimitsName(t *testing.T) {
@@ -43,8 +45,34 @@ func TestBuildConfigMapSecurityLimitsName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := BuildConfigMapSecurityLimitsName(tt.componentType, tt.clusterName)
+			result := naming.BuildConfigMapSecurityLimitsName(tt.componentType, tt.clusterName)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestBuildConfigMapSecurityLimitsForNodeSetName(t *testing.T) {
+	clusterName := "test-cluster"
+	template := "%s-nodeset-%s-security-limits"
+
+	tests := []struct {
+		nodeSetName string
+	}{
+		{
+			nodeSetName: "worker",
+		},
+		{
+			nodeSetName: "worker-cpu",
+		},
+		{
+			nodeSetName: "gpu",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("Nodeset %s", tt.nodeSetName), func(t *testing.T) {
+			result := naming.BuildConfigMapSecurityLimitsForNodeSetName(clusterName, tt.nodeSetName)
+			assert.Equal(t, fmt.Sprintf(template, clusterName, tt.nodeSetName), result)
 		})
 	}
 }

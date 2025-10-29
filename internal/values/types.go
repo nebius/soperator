@@ -161,7 +161,7 @@ type PVCTemplateSpec struct {
 
 // region Secret
 
-func buildSecretsFrom(secrets *slurmv1.Secrets) slurmv1.Secrets {
+func BuildSecretsFrom(secrets *slurmv1.Secrets) slurmv1.Secrets {
 	return *secrets.DeepCopy()
 }
 

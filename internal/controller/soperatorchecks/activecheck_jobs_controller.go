@@ -400,9 +400,9 @@ func (r *ActiveCheckJobReconciler) getActiveCheckNameFromJob(ctx context.Context
 	}
 
 	pod := &podList.Items[0]
-	activeCheckName, ok := pod.Annotations[consts.AnnotationActiveCheckKey]
+	activeCheckName, ok := pod.Annotations[consts.AnnotationActiveCheckName]
 	if !ok {
-		return "", fmt.Errorf("annotation %s not found on pod %s", consts.AnnotationActiveCheckKey, pod.Name)
+		return "", fmt.Errorf("annotation %s not found on pod %s", consts.AnnotationActiveCheckName, pod.Name)
 	}
 
 	return activeCheckName, nil

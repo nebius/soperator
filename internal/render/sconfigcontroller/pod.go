@@ -46,7 +46,7 @@ func BasePodTemplateSpec(
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: matchLabels,
 			Annotations: map[string]string{
-				consts.DefaultContainerAnnotationName: consts.ContainerNameSConfigController,
+				consts.AnnotationDefaultContainerName: consts.ContainerNameSConfigController,
 			},
 		},
 		Spec: corev1.PodSpec{

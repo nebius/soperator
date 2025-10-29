@@ -30,3 +30,48 @@ func RenderService(namespace, clusterName string, worker *values.SlurmWorker) co
 		},
 	}
 }
+
+// RenderNodeSetUmbrellaService renders new [corev1.Service] serving all workers from all NodeSets
+func RenderNodeSetUmbrellaService(nodeSet *values.SlurmNodeSet) corev1.Service {
+	return corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      nodeSet.ServiceUmbrella.Name,
+			Namespace: nodeSet.ParentalCluster.Namespace,
+			Labels:    common.RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name),
+		},
+		Spec: corev1.ServiceSpec{
+			Type:      nodeSet.ServiceUmbrella.Type,
+			Selector:  common.RenderMatchLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name),
+			ClusterIP: corev1.ClusterIPNone,
+			Ports: []corev1.ServicePort{{
+				Protocol:   nodeSet.ServiceUmbrella.Protocol,
+				Port:       nodeSet.ContainerSlurmd.Port,
+				TargetPort: intstr.FromString(nodeSet.ContainerSlurmd.Name),
+			}},
+		},
+	}
+}
+
+// RenderNodeSetService renders new [corev1.Service] serving all workers from particular NodeSets
+func RenderNodeSetService(nodeSet *values.SlurmNodeSet) corev1.Service {
+	selector := common.RenderMatchLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
+	selector[consts.LabelNodeSetKey] = nodeSet.Name
+
+	return corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      nodeSet.Service.Name,
+			Namespace: nodeSet.ParentalCluster.Namespace,
+			Labels:    common.RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name),
+		},
+		Spec: corev1.ServiceSpec{
+			Type:      nodeSet.Service.Type,
+			Selector:  selector,
+			ClusterIP: corev1.ClusterIPNone,
+			Ports: []corev1.ServicePort{{
+				Protocol:   nodeSet.Service.Protocol,
+				Port:       nodeSet.ContainerSlurmd.Port,
+				TargetPort: intstr.FromString(nodeSet.ContainerSlurmd.Name),
+			}},
+		},
+	}
+}

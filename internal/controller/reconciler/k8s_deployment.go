@@ -10,7 +10,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/logfield"
 )
 
@@ -30,12 +29,12 @@ func NewDeploymentReconciler(r *Reconciler) *DeploymentReconciler {
 
 func (r *DeploymentReconciler) Reconcile(
 	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
+	owner client.Object,
 	desired appsv1.Deployment,
 	deps ...metav1.Object,
 ) error {
 	logger := log.FromContext(ctx)
-	if err := r.reconcile(ctx, cluster, &desired, r.patch, deps...); err != nil {
+	if err := r.reconcile(ctx, owner, &desired, r.patch, deps...); err != nil {
 		logger.V(1).
 			WithValues(logfield.ResourceKV(&desired)...).
 			Error(err, "Failed to reconcile Deployment ")
@@ -46,14 +45,14 @@ func (r *DeploymentReconciler) Reconcile(
 
 func (r *DeploymentReconciler) Cleanup(
 	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
+	owner client.Object,
 	resourceName string,
 ) error {
 	logger := log.FromContext(ctx)
 
 	deployment := &appsv1.Deployment{}
 	err := r.Get(ctx, client.ObjectKey{
-		Namespace: cluster.Namespace,
+		Namespace: owner.GetNamespace(),
 		Name:      resourceName,
 	}, deployment)
 
@@ -66,7 +65,7 @@ func (r *DeploymentReconciler) Cleanup(
 		return fmt.Errorf("getting Deployment %s: %w", resourceName, err)
 	}
 
-	if !metav1.IsControlledBy(deployment, cluster) {
+	if !metav1.IsControlledBy(deployment, owner) {
 		logger.V(1).Info("Deployment is not owned by controller, skipping deletion", "name", resourceName)
 		return nil
 	}

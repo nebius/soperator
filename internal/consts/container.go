@@ -7,7 +7,6 @@ const (
 	ContainerNameSlurmd            = SlurmdName
 	ContainerNameREST              = Slurmrestd
 	ContainerNameSshd              = SshdName
-	ContainerNameToolkitValidation = "toolkit-validation"
 	ContainerNameWaitForController = "wait-for-controller"
 	ContainerNamePopulateJail      = populateJail
 	ContainerNameExporter          = Exporter

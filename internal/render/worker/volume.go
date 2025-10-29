@@ -109,6 +109,71 @@ func renderVolumesAndClaimTemplateSpecs(
 	return volumes, pvcTemplateSpecs, nil
 }
 
+func renderVolumesAndClaimTemplateSpecsForNodeSet(
+	nodeSet *values.SlurmNodeSet,
+	secrets *slurmv1.Secrets,
+) (volumes []corev1.Volume, pvcTemplateSpecs []values.PVCTemplateSpec, err error) {
+	volumes = []corev1.Volume{
+		common.RenderVolumeMungeKey(nodeSet.ParentalCluster.Name),
+		common.RenderVolumeMungeSocket(),
+		common.RenderVolumeSecurityLimitsForNodeSet(nodeSet.ParentalCluster.Name, nodeSet.Name),
+		common.RenderVolumeSshdKeys(secrets.SshdKeysName),
+		common.RenderVolumeSshdRootKeys(nodeSet.ParentalCluster.Name),
+		common.RenderVolumeInMemory(nodeSet.ContainerSlurmd.Resources.Memory()),
+		common.RenderVolumeTmpDisk(),
+		renderVolumeBoot(),
+		renderVolumeSharedMemory(nodeSet.SharedMemorySize),
+		renderVolumeSysctl(nodeSet.ParentalCluster.Name),
+		renderSupervisordConfigMap(nodeSet.SupervisorDConfigMapName),
+		renderVolumeSshdConfigs(nodeSet.SSHDConfigMapName),
+	}
+	if nodeSet.GPU.Enabled {
+		volumes = append(volumes, renderVolumeNvidia())
+	}
+
+	// region Worker Spool
+	volumes = append(volumes,
+		corev1.Volume{
+			Name:         common.RenderVolumeNameSpool(consts.ComponentTypeWorker),
+			VolumeSource: nodeSet.VolumeSpool,
+		},
+	)
+	// endregion Worker Spool
+
+	// region Jail
+	volumes = append(volumes,
+		corev1.Volume{
+			Name:         consts.VolumeNameJail,
+			VolumeSource: nodeSet.VolumeJail,
+		},
+	)
+	// endregion Jail
+
+	// region Jail sub-mounts
+	for _, subMount := range nodeSet.JailSubMounts {
+		if v, s, err := common.AddVolumeOrSpecVanilla(subMount.Name, subMount.VolumeSource, subMount.VolumeClaimTemplateSpec); err != nil {
+			return nil, nil, err
+		} else {
+			volumes = append(volumes, v...)
+			pvcTemplateSpecs = append(pvcTemplateSpecs, s...)
+		}
+	}
+	// endregion Jail sub-mounts
+
+	// region Custom mounts
+	for _, customMount := range nodeSet.CustomVolumeMounts {
+		if v, s, err := common.AddVolumeOrSpecVanilla(customMount.Name, customMount.VolumeSource, customMount.VolumeClaimTemplateSpec); err != nil {
+			return nil, nil, err
+		} else {
+			volumes = append(volumes, v...)
+			pvcTemplateSpecs = append(pvcTemplateSpecs, s...)
+		}
+	}
+	// endregion Custom mounts
+
+	return volumes, pvcTemplateSpecs, nil
+}
+
 func renderSupervisordConfigMap(name string) corev1.Volume {
 	return corev1.Volume{
 		Name: consts.VolumeNameSupervisordConfigMap,

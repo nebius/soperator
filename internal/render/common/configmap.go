@@ -83,12 +83,12 @@ func RenderJailedConfigSlurmConfigs(cluster *values.SlurmCluster) slurmv1alpha1.
 // Nodeset=h100 Nodes=h100--[0-1]
 func AddNodeSetsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
 	res.AddComment("NodeSet section")
-	if len(cluster.NodeSetList.Items) == 0 {
+	if len(cluster.NodeSets) == 0 {
 		res.AddComment("WARNING: No nodesets defined in structured configuration!")
 		return
 	}
 
-	for _, nodeSet := range cluster.NodeSetList.Items {
+	for _, nodeSet := range cluster.NodeSets {
 		switch {
 		case nodeSet.Spec.Replicas == 1:
 			res.AddProperty("NodeSet", fmt.Sprintf("%s Nodes=%s-0", nodeSet.Name, nodeSet.Name))
@@ -117,11 +117,11 @@ func AddNodeSetFeaturesToSlurmConfig(res *renderutils.PropertiesConfig, cluster 
 // NodeName=gb200-0-1 NodeHostname=gb200-0-1 NodeAddr=gb200-0-1.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
 func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
 	res.AddComment("Nodes section")
-	if len(cluster.NodeSetList.Items) == 0 {
+	if len(cluster.NodeSets) == 0 {
 		res.AddComment("WARNING: No nodesets defined in structured configuration!")
 		return
 	}
-	for _, nodeSet := range cluster.NodeSetList.Items {
+	for _, nodeSet := range cluster.NodeSets {
 		if nodeSet.Spec.Replicas == 0 {
 			res.AddComment(fmt.Sprintf("WARNING: NodeSet %s has 0 replicas, skipping", nodeSet.Name))
 			continue
@@ -483,6 +483,25 @@ func RenderConfigMapSecurityLimits(componentType consts.ComponentType, cluster *
 			Name:      naming.BuildConfigMapSecurityLimitsName(componentType, cluster.Name),
 			Namespace: cluster.Namespace,
 			Labels:    RenderLabels(componentType, cluster.Name),
+		},
+		Data: map[string]string{
+			consts.ConfigMapKeySecurityLimits: data,
+		},
+	}
+}
+
+// RenderConfigMapSecurityLimitsForNodeSet renders new [corev1.ConfigMap] containing security limits config file for particular NodeSet
+func RenderConfigMapSecurityLimitsForNodeSet(nodeSet *values.SlurmNodeSet) corev1.ConfigMap {
+	data := nodeSet.ContainerSlurmd.NodeContainer.SecurityLimitsConfig
+	if data == "" {
+		data = generateUnlimitedSecurityLimitsConfig().Render()
+	}
+
+	return corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      naming.BuildConfigMapSecurityLimitsForNodeSetName(nodeSet.ParentalCluster.Name, nodeSet.Name),
+			Namespace: nodeSet.ParentalCluster.Namespace,
+			Labels:    RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name),
 		},
 		Data: map[string]string{
 			consts.ConfigMapKeySecurityLimits: data,

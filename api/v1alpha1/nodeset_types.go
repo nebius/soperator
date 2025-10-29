@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -62,6 +63,13 @@ type NodeSetStatus struct {
 	//
 	// +kubebuilder:validation:Optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+}
+
+func (s *NodeSetStatus) SetCondition(condition metav1.Condition) bool {
+	if s.Conditions == nil {
+		s.Conditions = make([]metav1.Condition, 0)
+	}
+	return meta.SetStatusCondition(&s.Conditions, condition)
 }
 
 const (

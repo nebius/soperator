@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -24,6 +26,11 @@ type Image struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="IfNotPresent"
 	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
+}
+
+// GetURI combines image repository and tag into one string.
+func (i Image) GetURI() string {
+	return fmt.Sprintf("%s:%s", i.Repository, i.Tag)
 }
 
 // StatusMetadata holds metadata of application update status

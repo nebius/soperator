@@ -21,6 +21,10 @@ type namedEntity struct {
 	// nil if common
 	componentType *consts.ComponentType
 
+	// componentSpecifier defines whether the entity belongs to particular component.
+	// empty if nothing
+	componentSpecifier string
+
 	// entity is an optional K8S resource marker (e.g. "sts", "svc", etc.)
 	// empty if nothing
 	entity string
@@ -34,6 +38,9 @@ func (e namedEntity) String() string {
 	if e.componentType != nil {
 		es = append(es, (*e.componentType).String())
 	}
+	if e.componentSpecifier != "" {
+		es = append(es, e.componentSpecifier)
+	}
 	if e.entity != "" {
 		es = append(es, e.entity)
 	}
@@ -43,9 +50,18 @@ func (e namedEntity) String() string {
 
 func BuildServiceName(componentType consts.ComponentType, clusterName string) string {
 	return namedEntity{
-		componentType: &componentType,
 		clusterName:   clusterName,
+		componentType: &componentType,
 		entity:        entityService,
+	}.String()
+}
+
+func BuildNodeSetServiceName(clusterName string, nodeSetName string) string {
+	return namedEntity{
+		clusterName:        clusterName,
+		componentType:      &consts.ComponentTypeNodeSet,
+		componentSpecifier: nodeSetName,
+		entity:             entityService,
 	}.String()
 }
 
@@ -56,6 +72,16 @@ func BuildServiceFQDN(
 ) string {
 	// <svcName>.<namespace>.svc.cluster.local
 	svcName := BuildServiceName(componentType, clusterName)
+	return fmt.Sprintf("%s.%s.svc.cluster.local", svcName, namespace)
+}
+
+func BuildNodeSetServiceFQDN(
+	namespace,
+	clusterName string,
+	nodeSetName string,
+) string {
+	// <svcName>.<namespace>.svc.cluster.local
+	svcName := BuildNodeSetServiceName(clusterName, nodeSetName)
 	return fmt.Sprintf("%s.%s.svc.cluster.local", svcName, namespace)
 }
 
@@ -83,6 +109,14 @@ func BuildStatefulSetName(componentType consts.ComponentType) string {
 		componentType: &componentType,
 		clusterName:   "",
 		entity:        "",
+	}.String()
+}
+
+func BuildNodeSetStatefulSetName(nodeSetName string) string {
+	return namedEntity{
+		componentType: nil,
+		clusterName:   "",
+		entity:        nodeSetName,
 	}.String()
 }
 
@@ -143,6 +177,15 @@ func BuildConfigMapSecurityLimitsName(componentType consts.ComponentType, cluste
 		componentType: &componentType,
 		clusterName:   clusterName,
 		entity:        consts.ConfigMapNameSecurityLimits,
+	}.String()
+}
+
+func BuildConfigMapSecurityLimitsForNodeSetName(clusterName, nodeSetName string) string {
+	return namedEntity{
+		clusterName:        clusterName,
+		componentType:      &consts.ComponentTypeNodeSet,
+		componentSpecifier: nodeSetName,
+		entity:             consts.ConfigMapNameSecurityLimits,
 	}.String()
 }
 
