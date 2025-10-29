@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -92,9 +91,7 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		})
 		if err = r.Patch(ctx, nodeSet, client.MergeFrom(nodeSetBase)); err != nil {
 			logger.Error(err, "Failed to patch parental cluster annotation")
-			return ctrl.Result{
-				RequeueAfter: time.Minute,
-			}, fmt.Errorf("patching parental cluster annotation: %w", err)
+			return ctrl.Result{}, fmt.Errorf("patching parental cluster annotation: %w", err)
 		}
 	}
 	// endregion Get parental cluster
