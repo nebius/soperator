@@ -20,6 +20,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/state"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/render/common"
+	"nebius.ai/slurm-operator/internal/render/worker"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
 	"nebius.ai/slurm-operator/internal/values"
@@ -170,6 +171,53 @@ func (r NodeSetReconciler) ReconcileNodeSetWorkers(
 				if err := r.ConfigMap.Reconcile(stepCtx, nodeSet, &desired); err != nil {
 					stepLogger.Error(err, "Failed to reconcile")
 					return fmt.Errorf("reconciling worker security limits configmap: %w", err)
+				}
+				stepLogger.V(1).Info("Reconciled")
+
+				return nil
+			},
+		},
+
+		{
+			Name: "Umbrella worker Service",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
+
+				desired := worker.RenderNodeSetUmbrellaService(nodeSetValues)
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				stepLogger.V(1).Info("Rendered")
+
+				// Cluster has to be the owner of the umbrella service, as it should not be deleted by deleting one of node sets
+				cluster, err := resourcegetter.GetCluster(ctx, r.Client, nodeSetValues.ParentalCluster)
+				if err != nil {
+					stepLogger.Error(err, "Failed to get parental cluster")
+					return fmt.Errorf("getting %s parental cluster %s/%s: %w", slurmv1alpha1.KindNodeSet, nodeSetValues.ParentalCluster.Namespace, nodeSetValues.ParentalCluster.Name, err)
+				}
+
+				if err = r.Service.Reconcile(stepCtx, cluster, &desired, nil); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling umbrella worker Service: %w", err)
+				}
+				stepLogger.V(1).Info("Reconciled")
+
+				return nil
+			},
+		},
+
+		{
+			Name: "Nodeset worker Service",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
+
+				desired := worker.RenderNodeSetService(nodeSetValues)
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				stepLogger.V(1).Info("Rendered")
+
+				if err := r.Service.Reconcile(stepCtx, nodeSet, &desired, nil); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling worker Service: %w", err)
 				}
 				stepLogger.V(1).Info("Reconciled")
 
