@@ -44,7 +44,7 @@ func RenderDefaultConfigMapSupervisord(cluster *values.SlurmCluster) corev1.Conf
 	data := generateDefaultSupervisordConfig().Render()
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cluster.NodeWorker.SupervisordConfigMapName,
+			Name:      naming.BuildConfigMapSupervisordName(cluster.Name),
 			Namespace: cluster.Namespace,
 			Labels:    common.RenderLabels(consts.ComponentTypeWorker, cluster.Name),
 		},
