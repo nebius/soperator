@@ -225,6 +225,12 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.mariaDB = \"docker-registry1.mariadb.com/library/mariadb:11.4.3\"" "helm/slurm-cluster/values.yaml"
 	@# endregion helm/slurm-cluster/values.yaml
 
+	@# region helm/nodesets/values.yaml
+	@echo 'Syncing helm/nodesets/values.yaml'
+	@$(YQ) -i ".images.munge = \"$(IMAGE_REPO)/munge:$(IMAGE_VERSION)\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".images.slurmd = \"$(IMAGE_REPO)/worker_slurmd:$(IMAGE_VERSION)\"" "helm/nodesets/values.yaml"
+	@# endregion helm/nodesets/values.yaml
+
 	@# region helm/soperator-activechecks/values.yaml
 	@echo 'Syncing helm/soperator-activechecks/values.yaml'
 	@$(YQ) -i ".images.munge = \"$(IMAGE_REPO)/munge:$(IMAGE_VERSION)\"" "helm/soperator-activechecks/values.yaml"
