@@ -42,12 +42,10 @@ nodesets: {}
 #   maxUnavailable: 1
 #   # Enable host user namespace
 #   enableHostUserNamespace: false
-
 #   # Annotations for worker pods
 #   workerAnnotations:
 #     prometheus.io/scrape: "true"
 #     prometheus.io/port: "9090"
-
 #   # Slurmd configuration
 #   slurmd:
 #     # Override default image from values.images.slurmd if needed
