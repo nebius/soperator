@@ -38,7 +38,7 @@ spec:
     rawConfig:
       {{- default list .Values.partitionConfiguration.rawConfig | toYaml | nindent 6 }}
   workerFeatures:
-    {{- range .Values.workerFeatures }}
+    {{- range (default list .Values.workerFeatures) }}
     - name: {{ .name | quote }}
       hostlistExpr: {{ .hostlistExpr | quote }}
       nodesetName: {{ .nodesetName | quote }}

@@ -58,6 +58,8 @@ spec:
       {{- with .slurmd.image.pullPolicy }}
       pullPolicy: {{ . }}
       {{- end }}
+    {{- else }}
+    image: {{ required "slurmd image" $.Values.images.slurmd | quote }}
     {{- end }}
     {{- with .slurmd.port }}
     port: {{ . }}
@@ -103,6 +105,8 @@ spec:
       {{- with .munge.image.pullPolicy }}
       pullPolicy: {{ . }}
       {{- end }}
+    {{- else }}
+    image: {{ required "munge image" $.Values.images.munge | quote }}
     {{- end }}
     {{- with .munge.resources }}
     resources:
