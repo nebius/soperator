@@ -36,19 +36,15 @@ nodesets: {}
 #     - key: nvidia.com/gpu
 #       operator: Exists
 #       effect: NoSchedule
-#   # Priority class for the worker pods
 #   priorityClass: "soperator-worker-high-priority"
 #   # Maximum number of unavailable replicas during updates
 #   maxUnavailable: 1
-#   # Enable host user namespace
 #   enableHostUserNamespace: false
-#   # Annotations for worker pods
 #   workerAnnotations:
 #     prometheus.io/scrape: "true"
 #     prometheus.io/port: "9090"
 #   # Slurmd configuration
 #   slurmd:
-#     # Override default image from values.images.slurmd if needed
 #     image:
 #       repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
 #       tag: "1.22.1-noble-slurm25.05.4"
@@ -82,7 +78,6 @@ nodesets: {}
 #     security:
 #       appArmorProfile: "unconfined"
 #       limitsConfig: ""
-
 #   # Munge configuration
 #   munge:
 #     # Override default image from values.images.munge if needed
@@ -97,13 +92,11 @@ nodesets: {}
 #     security:
 #       appArmorProfile: "unconfined"
 #       limitsConfig: ""
-
 #   # GPU configuration
 #   gpu:
 #     enabled: true
 #     nvidia:
 #       gdrCopyEnabled: false
-
 #   # Node configuration
 #   nodeConfig:
 #     features:
@@ -111,21 +104,16 @@ nodesets: {}
 #       - "cuda"
 #     static: "Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=1"
 #     dynamic: "InstanceId={{ .PodName }}"
-
 #   # Custom ConfigMap references (optional)
 #   # configMapRefSshd: "custom-sshd-config"
 #   # configMapRefSupervisord: "custom-supervisord-config"
-
 #   # Custom init containers (optional)
 #   customInitContainers: []
 #   #   - name: setup-gpu
 #   #     image: nvidia/cuda:11.8-base-ubuntu20.04
 #   #     command: ["sh", "-c", "nvidia-smi"]
-
-# # Example CPU NodeSet
 # - name: cpu-workers
 #   replicas: 5
-
 #   affinity:
 #     nodeAffinity: 
 #       requiredDuringSchedulingIgnoredDuringExecution:
@@ -135,16 +123,10 @@ nodesets: {}
 #                 operator: In
 #                 values:
 #                   - "cpu-node-group-id"
-
 #   priorityClass: "soperator-worker-high-priority"
 #   maxUnavailable: 2
 #   enableHostUserNamespace: false
-
 #   slurmd:
-#     image:
-#       repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
-#       tag: "1.22.1-noble-slurm25.05.4"
-#       pullPolicy: "IfNotPresent"
 #     port: 6818
 #     cgroupVersion: "v2"
 #     resources:
@@ -173,12 +155,6 @@ nodesets: {}
 #     security:
 #       appArmorProfile: "unconfined"
 #       limitsConfig: ""
-
-#   munge:
-#     image:
-#       repository: "cr.eu-north1.nebius.cloud/soperator/munge"
-#       tag: "1.22.1-noble-slurm25.05.4"
-#       pullPolicy: "IfNotPresent"
 #     resources:
 #       cpu: "500m"
 #       memory: "500Mi"
@@ -186,10 +162,8 @@ nodesets: {}
 #     security:
 #       appArmorProfile: "unconfined"
 #       limitsConfig: ""
-
 #   gpu:
 #     enabled: false
-
 #   nodeConfig:
 #     features:
 #       - "cpu"
