@@ -6,8 +6,8 @@ spec:
   checkType: "k8sJob"
   name: "wait-for-topology"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  suspend: true
-  runAfterCreation: true
+  suspend: {{ .Values.checks.waitForTopology.suspend }}
+  runAfterCreation: {{ .Values.checks.waitForTopology.runAfterCreation }}
   k8sJobSpec:
     jobContainer:
       command:

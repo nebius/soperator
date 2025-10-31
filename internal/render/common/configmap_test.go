@@ -5,10 +5,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
+	renderutils "nebius.ai/slurm-operator/internal/render/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -233,7 +239,7 @@ func TestRenderPlugstack(t *testing.T) {
 		result := generateSpankConfig(&values.SlurmCluster{
 			PlugStackConfig: slurmv1.PlugStackConfig{
 				Pyxis: slurmv1.PluginConfigPyxis{
-					Required:           true,
+					Required:           ptr.To(true),
 					ContainerImageSave: "/tmp/",
 				},
 			},
@@ -257,7 +263,7 @@ func TestRenderPlugstack(t *testing.T) {
 			PlugStackConfig: slurmv1.PlugStackConfig{
 				NcclDebug: slurmv1.PluginConfigNcclDebug{
 					Required:        true,
-					Enabled:         true,
+					Enabled:         ptr.To(true),
 					LogLevel:        "TRACE",
 					OutputToFile:    true,
 					OutputDirectory: "/tmp",
@@ -315,4 +321,535 @@ func TestRenderPlugstack(t *testing.T) {
 		assert.Contains(t, result, "required /lol/kek.so lol=kek")
 		assert.Contains(t, result, "required /kek/lol.so kek=lol")
 	})
+}
+
+func Test_RenderRealMemorySlurmd(t *testing.T) {
+	tests := []struct {
+		name           string
+		container      corev1.ResourceRequirements
+		resourceMemory string // Original memory resource as a string (e.g., "512Mi", "1G")
+		expectedValue  int64  // Expected memory value in mebibytes
+	}{
+		{
+			name: "Valid memory resource - 512Mi",
+			container: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("512Mi"),
+				},
+				Requests: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("512Mi"),
+				},
+			},
+			resourceMemory: "512Mi", // Input memory value
+			expectedValue:  512,     // Expected value in MiB
+		},
+		{
+			name: "Valid memory resource - 1G",
+			container: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("1G"),
+				},
+				Requests: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("1G"),
+				},
+			},
+			resourceMemory: "1G", // Input memory value
+			expectedValue:  953,  // Expected value in MiB (1G = 1024MB, 1024MB / 1.048576 = 953MiB)
+		},
+		{
+			name: "Valid memory resource - 1000MB",
+			container: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("1000M"),
+				},
+				Requests: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("1000M"),
+				},
+			},
+			resourceMemory: "1000M", // Input memory value
+			expectedValue:  953,     // Expected value in MiB (1000MB / 1.048576 = 953MiB)
+		},
+		{
+			name:           "No memory resource",
+			container:      corev1.ResourceRequirements{},
+			resourceMemory: "", // No memory specified
+			expectedValue:  0,  // Expected value in MiB
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Call the function under test
+			value := RenderRealMemorySlurmd(tt.container)
+
+			// Validate the value
+			if value != tt.expectedValue {
+				t.Errorf("renderRealMemorySlurmd() = %v, expectedValue %v (from %s)", value, tt.expectedValue, tt.resourceMemory)
+			}
+		})
+	}
+}
+
+func TestAddNodesToSlurmConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		cluster  *values.SlurmCluster
+		expected string
+	}{
+		{
+			name: "Single nodeset with 1 replica",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSetList: slurmv1alpha1.NodeSetList{
+					Items: []slurmv1alpha1.NodeSet{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "nodeA",
+								Namespace: "soperator",
+							},
+							Spec: slurmv1alpha1.NodeSetSpec{
+								Replicas: 1,
+								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+									Resources: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("2Gi"),
+									},
+								},
+								NodeConfig: slurmv1alpha1.NodeConfig{
+									Static: "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeName=nodeA-0 NodeHostname=nodeA-0 NodeAddr=nodeA-0.nodeA.soperator.svc RealMemory=2048 Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
+		},
+		{
+			name: "Single nodeset with multiple replicas",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSetList: slurmv1alpha1.NodeSetList{
+					Items: []slurmv1alpha1.NodeSet{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "nodeB",
+								Namespace: "soperator",
+							},
+							Spec: slurmv1alpha1.NodeSetSpec{
+								Replicas: 3,
+								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+									Resources: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("4Gi"),
+									},
+								},
+								NodeConfig: slurmv1alpha1.NodeConfig{
+									Static: "Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeName=nodeB-0 NodeHostname=nodeB-0 NodeAddr=nodeB-0.nodeB.soperator.svc RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
+				"NodeName=nodeB-1 NodeHostname=nodeB-1 NodeAddr=nodeB-1.nodeB.soperator.svc RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
+				"NodeName=nodeB-2 NodeHostname=nodeB-2 NodeAddr=nodeB-2.nodeB.soperator.svc RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+		},
+		{
+			name: "Multiple nodesets with varying replicas",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSetList: slurmv1alpha1.NodeSetList{
+					Items: []slurmv1alpha1.NodeSet{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "nodeC",
+								Namespace: "soperator",
+							},
+							Spec: slurmv1alpha1.NodeSetSpec{
+								Replicas: 2,
+								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+									Resources: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("8Gi"),
+									},
+								},
+								NodeConfig: slurmv1alpha1.NodeConfig{
+									Static: "Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+								},
+							},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "nodeD",
+								Namespace: "soperator",
+							},
+							Spec: slurmv1alpha1.NodeSetSpec{
+								Replicas: 1,
+								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+									Resources: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("16Gi"),
+									},
+								},
+								NodeConfig: slurmv1alpha1.NodeConfig{
+									Static: "Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeName=nodeC-0 NodeHostname=nodeC-0 NodeAddr=nodeC-0.nodeC.soperator.svc RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
+				"NodeName=nodeC-1 NodeHostname=nodeC-1 NodeAddr=nodeC-1.nodeC.soperator.svc RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
+				"NodeName=nodeD-0 NodeHostname=nodeD-0 NodeAddr=nodeD-0.nodeD.soperator.svc RealMemory=16384 Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+		},
+		{
+			name: "Nodeset with zero replicas",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSetList: slurmv1alpha1.NodeSetList{
+					Items: []slurmv1alpha1.NodeSet{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "nodeE",
+								Namespace: "soperator",
+							},
+							Spec: slurmv1alpha1.NodeSetSpec{
+								Replicas: 0,
+								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+									Resources: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("2Gi"),
+									},
+								},
+								NodeConfig: slurmv1alpha1.NodeConfig{
+									Static: "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: "#WARNING: NodeSet nodeE has 0 replicas, skipping",
+		},
+		{
+			name: "Nodeset with zero replicas",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSetList: slurmv1alpha1.NodeSetList{
+					Items: []slurmv1alpha1.NodeSet{},
+				},
+			},
+			expected: "#WARNING: No nodesets defined in structured configuration!",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := &renderutils.PropertiesConfig{}
+			AddNodesToSlurmConfig(res, tt.cluster)
+			result := res.Render()
+
+			// Check if the expected string is present in the result
+			if !strings.Contains(result, tt.expected) {
+				t.Errorf("Expected string not found in result.\nExpected to contain:\n%s\n\nGot:\n%s", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestAddNodeSetsToSlurmConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		cluster  *values.SlurmCluster
+		expected string
+	}{
+		{
+			name: "Single nodeset with 1 replica",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSetList: slurmv1alpha1.NodeSetList{
+					Items: []slurmv1alpha1.NodeSet{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "nodeA",
+								Namespace: "soperator",
+							},
+							Spec: slurmv1alpha1.NodeSetSpec{
+								Replicas: 1,
+								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+									Resources: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("2Gi"),
+									},
+								},
+								NodeConfig: slurmv1alpha1.NodeConfig{
+									Static: "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeSet=nodeA Nodes=nodeA-0",
+		},
+		{
+			name: "Single nodeset with multiple replicas",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSetList: slurmv1alpha1.NodeSetList{
+					Items: []slurmv1alpha1.NodeSet{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "nodeB",
+								Namespace: "soperator",
+							},
+							Spec: slurmv1alpha1.NodeSetSpec{
+								Replicas: 3,
+								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+									Resources: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("4Gi"),
+									},
+								},
+								NodeConfig: slurmv1alpha1.NodeConfig{
+									Static: "Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeSet=nodeB Nodes=nodeB-[0-2]",
+		},
+		{
+			name: "Multiple nodesets with varying replicas",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSetList: slurmv1alpha1.NodeSetList{
+					Items: []slurmv1alpha1.NodeSet{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "nodeC",
+								Namespace: "soperator",
+							},
+							Spec: slurmv1alpha1.NodeSetSpec{
+								Replicas: 2,
+								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+									Resources: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("8Gi"),
+									},
+								},
+								NodeConfig: slurmv1alpha1.NodeConfig{
+									Static: "Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+								},
+							},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "nodeD",
+								Namespace: "soperator",
+							},
+							Spec: slurmv1alpha1.NodeSetSpec{
+								Replicas: 1,
+								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+									Resources: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("16Gi"),
+									},
+								},
+								NodeConfig: slurmv1alpha1.NodeConfig{
+									Static: "Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeSet=nodeC Nodes=nodeC-[0-1]\n" +
+				"NodeSet=nodeD Nodes=nodeD-0",
+		},
+		{
+			name: "Nodeset with zero replicas",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSetList: slurmv1alpha1.NodeSetList{
+					Items: []slurmv1alpha1.NodeSet{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "nodeE",
+								Namespace: "soperator",
+							},
+							Spec: slurmv1alpha1.NodeSetSpec{
+								Replicas: 0,
+								Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+									Resources: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("2Gi"),
+									},
+								},
+								NodeConfig: slurmv1alpha1.NodeConfig{
+									Static: "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: "#WARNING: NodeSet nodeE has 0 replicas, skipping",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := &renderutils.PropertiesConfig{}
+			AddNodeSetsToSlurmConfig(res, tt.cluster)
+			result := res.Render()
+
+			// Check if the expected string is present in the result
+			if !strings.Contains(result, tt.expected) {
+				t.Errorf("Expected string not found in result.\nExpected to contain:\n%s\n\nGot:\n%s", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestAddPartitionsToSlurmConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		cluster  *values.SlurmCluster
+		expected string
+	}{
+		{
+			name: "Single partition with isAll",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:   "main",
+							IsAll:  true,
+							Config: "Default=YES PriorityTier=10 MaxTime=INFINITE State=UP",
+						},
+					},
+				},
+			},
+			expected: "PartitionName=main Nodes=ALL Default=YES PriorityTier=10 MaxTime=INFINITE State=UP",
+		},
+		{
+			name: "Single partition with nodeset refs",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:        "gpu",
+							NodeSetRefs: []string{"nodeA", "nodeB"},
+							Config:      "Default=NO PriorityTier=5 State=UP",
+						},
+					},
+				},
+			},
+			expected: "PartitionName=gpu Nodes=nodeA,nodeB Default=NO PriorityTier=5 State=UP",
+		},
+		{
+			name: "Multiple partitions with varying configurations",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:        "high-priority",
+							NodeSetRefs: []string{"nodeC"},
+							Config:      "Default=YES PriorityTier=10 State=UP",
+						},
+						{
+							Name:   "all-nodes",
+							IsAll:  true,
+							Config: "Default=NO PriorityTier=1 State=UP",
+						},
+					},
+				},
+			},
+			expected: "PartitionName=all-nodes Nodes=ALL Default=NO PriorityTier=1 State=UP",
+		},
+		{
+			name: "Partition with no nodeset refs and not isAll",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:   "invalid",
+							Config: "Default=NO State=UP",
+						},
+					},
+				},
+			},
+			expected: "#WARNING: Partition invalid has no nodeset refs and is not 'all', skipping",
+		},
+		{
+			name: "No partitions defined",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{},
+				},
+			},
+			expected: "#WARNING: No partitions defined in structured configuration!",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := &renderutils.PropertiesConfig{}
+			AddPartitionsToSlurmConfig(res, tt.cluster)
+			result := res.Render()
+
+			// Check if the expected string is present in the result
+			if !strings.Contains(result, tt.expected) {
+				t.Errorf("Expected string not found in result.\nExpected to contain:\n%s\n\nGot:\n%s", tt.expected, result)
+			}
+		})
+	}
 }

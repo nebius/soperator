@@ -143,6 +143,11 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{Requeue: true}, fmt.Errorf("getting SlurmCluster: %w", err)
 	}
 
+	slurmCluster.Spec.PlugStackConfig.Pyxis.SetDefaults()
+	slurmCluster.Spec.PlugStackConfig.NcclDebug.SetDefaults()
+	slurmCluster.Spec.SlurmNodes.Exporter.SetDefaults()
+	slurmCluster.Spec.SlurmNodes.Worker.SetDefaults()
+
 	// If cluster marked for deletion, we have nothing to do
 	if slurmCluster.GetDeletionTimestamp() != nil {
 		return ctrl.Result{}, nil
@@ -251,9 +256,6 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 				}
 			}
 			if err = r.ReconcileREST(ctx, cluster, clusterValues); err != nil {
-				return ctrl.Result{}, err
-			}
-			if err = r.ReconcileExporter(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
 			if err = r.ReconcileSoperatorExporter(ctx, cluster, clusterValues); err != nil {

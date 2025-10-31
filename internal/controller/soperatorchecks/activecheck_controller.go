@@ -119,6 +119,8 @@ func (r *ActiveCheckReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 
+	check.Spec.SetDefaults()
+
 	if check.ObjectMeta.DeletionTimestamp.IsZero() == false {
 		if controllerutil.ContainsFinalizer(check, consts.ActiveCheckFinalizer) {
 			return r.reconcileDelete(ctx, check)
@@ -365,6 +367,14 @@ func (r *ActiveCheckReconciler) dependenciesReady(
 			return false, fmt.Errorf("failed to get prerequisite ActiveCheck: %w", err)
 		}
 
+		if prerequisiteCheck.Spec.RunAfterCreation == nil || !*prerequisiteCheck.Spec.RunAfterCreation {
+			logger.Info(fmt.Sprintf(
+				"Prerequisite ActiveCheck %s runAfterCreation == false, skipping",
+				prerequisiteCheck.Name,
+			))
+			continue
+		}
+
 		// TODO: common status?
 		switch prerequisiteCheck.Spec.CheckType {
 		case "k8sJob": // TODO: const
@@ -376,10 +386,10 @@ func (r *ActiveCheckReconciler) dependenciesReady(
 				return false, nil
 			}
 		case "slurmJob": // TODO: const
-			if prerequisiteCheck.Status.SlurmJobsStatus.LastJobState != consts.ActiveCheckSlurmJobStatusComplete {
+			if prerequisiteCheck.Status.SlurmJobsStatus.LastRunStatus != consts.ActiveCheckSlurmRunStatusComplete {
 				logger.Info(fmt.Sprintf(
 					"Prerequisite ActiveCheck %s is not ready yet, status %s",
-					prerequisiteCheckName, prerequisiteCheck.Status.SlurmJobsStatus.LastJobState,
+					prerequisiteCheckName, prerequisiteCheck.Status.SlurmJobsStatus.LastRunStatus,
 				))
 				return false, nil
 			}

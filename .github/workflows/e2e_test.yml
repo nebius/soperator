@@ -55,7 +55,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Install GO
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version-file: 'go.mod'
           cache: false
@@ -72,16 +72,32 @@ jobs:
           unzip -q awscliv2.zip
           sudo ./aws/install --update
 
-      - name: Find latest successful build run on current branch
+      - name: Find latest build run on current branch
         id: find_build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Looking for build run on branch: ${{ github.ref_name }}"
-          run_id=$(gh api -X GET \
+
+          run_info=$(gh api -X GET \
             "/repos/${{ github.repository }}/actions/workflows/one_job.yml/runs" \
-            -F branch=${{ github.ref_name }} -F status=success \
-            --jq '.workflow_runs[0].id')
+            -F branch="${{ github.ref_name }}" -F per_page=1 \
+            --jq '.workflow_runs[0] | {id: .id, status: .status, conclusion: .conclusion}')
+          
+          run_id=$(jq -r '.id' <<<"$run_info")
+          status=$(jq -r '.status' <<<"$run_info")
+          conclusion=$(jq -r '.conclusion' <<<"$run_info")
+
+          echo "Latest build workflow:"
+          echo "  run_id: $run_id"
+          echo "  status: $status"
+          echo "  conclusion: $conclusion"
+          
+          if [[ "$conclusion" == "failure" || "$conclusion" == "cancelled" ]]; then
+            echo "❌ Latest build workflow failed or was cancelled"
+            exit 1
+          fi
+          
           echo "run_id=$run_id" >> $GITHUB_OUTPUT
 
       - name: Download artifact with version
@@ -120,7 +136,7 @@ jobs:
           aws configure set region $NEBIUS_REGION
           aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
 
-          GOEXPERIMENT=synctest go test -v -timeout 2h --tags=e2e ./test/e2e/...
+          go test -v -timeout 2h --tags=e2e ./test/e2e/...
 
       - name: Add errors output to job summary
         if: ${{ always() }}

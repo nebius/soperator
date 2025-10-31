@@ -163,12 +163,19 @@ func BuildTopologyGraph(
 //
 // The labels must be in the format "tier-N" where N is a positive integer starting from 1.
 // If any label is missing (or empty), it returns an error.
+// In case of "tier-0" label provided - we ignore it and check only remaining "tear-N" labels.
+// ("tier-0" used for defining block, not IB topology)
 func labelsToPath(labels map[string]string) ([]string, error) {
 	if len(labels) == 0 {
 		return nil, fmt.Errorf("no labels found for node")
 	}
 	pathToRoot := make([]string, 0, len(labels))
-	for i := range len(labels) {
+
+	numOfTiers := len(labels)
+	if _, hasTierZero := labels["tier-0"]; hasTierZero {
+		numOfTiers--
+	}
+	for i := range numOfTiers {
 		key := "tier-" + strconv.Itoa(i+1)
 		curTierLabel := labels[key]
 		if curTierLabel == "" {
