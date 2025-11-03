@@ -1,6 +1,7 @@
 #!/bin/bash
-#SBATCH --deadline="now+3hours"
-#SBATCH --time=10:00
+#SBATCH --deadline="now+8hours"
+#SBATCH --time=20:00
+#SBATCH --gpus-per-node=8
 #SBATCH --exclusive
 #SBATCH --mem=0
 
@@ -18,10 +19,10 @@ else
 fi
 
 echo "Platform found: $platform"
-echo "Running ib_perf check on $(hostname)..."
-HC_OUTPUT=$(srun --container-image={{ .Values.activeCheckImage }} \
+echo "Running ib_gpu_perf check on $(hostname)..."
+HC_OUTPUT=$(srun --container-image={{ include "activecheck.image.pyxis" . }} \
   --container-mounts=$(which health-checker):/usr/local/bin/health-checker --cpu-bind=verbose,cores \
-  bash -c "health-checker run -e soperator -p $platform -n ib_write_bw,ib_write_lat -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout")
+  bash -c "health-checker run -e soperator -p $platform -n ^ib_write_bw_gpu.*$,^ib_send_lat_gpu.*$,^ib_read_lat_gpu.*$ -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout")
 HC_EXIT_CODE=$?
 
 echo "Health checker output: $HC_OUTPUT"
