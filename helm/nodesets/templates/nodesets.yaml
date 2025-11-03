@@ -1,0 +1,145 @@
+{{- range .Values.nodesets }}
+---
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: NodeSet
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  {{- with .annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "nodesets.labels" $ | nindent 4 }}
+    {{- with .labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .replicas | default 1 }}
+  {{- with .affinity }}
+  affinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .nodeSelector }}
+  nodeSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .tolerations }}
+  tolerations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .priorityClass }}
+  priorityClass: {{ . }}
+  {{- end }}
+  {{- with .maxUnavailable }}
+  maxUnavailable: {{ . }}
+  {{- end }}
+  {{- with .enableHostUserNamespace }}
+  enableHostUserNamespace: {{ . }}
+  {{- end }}
+  {{- with .workerAnnotations }}
+  workerAnnotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .configMapRefSshd }}
+  configMapRefSshd: {{ . }}
+  {{- end }}
+  {{- with .configMapRefSupervisord }}
+  configMapRefSupervisord: {{ . }}
+  {{- end }}
+  {{- if .slurmd }}
+  slurmd:
+    {{- if .slurmd.image }}
+    image:
+      repository: {{ .slurmd.image.repository }}
+      {{- with .slurmd.image.tag }}
+      tag: {{ . }}
+      {{- end }}
+      {{- with .slurmd.image.pullPolicy }}
+      pullPolicy: {{ . }}
+      {{- end }}
+    {{- else }}
+    image: {{ required "slurmd image" $.Values.images.slurmd | quote }}
+    {{- end }}
+    {{- with .slurmd.port }}
+    port: {{ . }}
+    {{- end }}
+    {{- with .slurmd.cgroupVersion }}
+    cgroupVersion: {{ . }}
+    {{- end }}
+    {{- with .slurmd.resources }}
+    resources:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- if .slurmd.volumes }}
+    volumes:
+      {{- if .slurmd.volumes.spool }}
+      spool:
+        {{- toYaml .slurmd.volumes.spool | nindent 8 }}
+      {{- end }}
+      {{- if .slurmd.volumes.jail }}
+      jail:
+        {{- toYaml .slurmd.volumes.jail | nindent 8 }}
+      {{- end }}
+      {{- with .slurmd.volumes.jailSubMounts }}
+      jailSubMounts:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .slurmd.volumes.sharedMemorySize }}
+      sharedMemorySize: {{ . }}
+      {{- end }}
+    {{- end }}
+    {{- with .slurmd.security }}
+    security:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
+  {{- if .munge }}
+  munge:
+    {{- if .munge.image }}
+    image:
+      repository: {{ .munge.image.repository }}
+      {{- with .munge.image.tag }}
+      tag: {{ . }}
+      {{- end }}
+      {{- with .munge.image.pullPolicy }}
+      pullPolicy: {{ . }}
+      {{- end }}
+    {{- else }}
+    image: {{ required "munge image" $.Values.images.munge | quote }}
+    {{- end }}
+    {{- with .munge.resources }}
+    resources:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .munge.security }}
+    security:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
+  {{- if .gpu }}
+  gpu:
+    enabled: {{ .gpu.enabled | default false }}
+    {{- if .gpu.nvidia }}
+    nvidia:
+      gdrCopyEnabled: {{ .gpu.nvidia.gdrCopyEnabled | default false }}
+    {{- end }}
+  {{- end }}
+  {{- if .nodeConfig }}
+  nodeConfig:
+    {{- with .nodeConfig.features }}
+    features:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .nodeConfig.static }}
+    static: {{ . }}
+    {{- end }}
+    {{- with .nodeConfig.dynamic }}
+    dynamic: {{ . }}
+    {{- end }}
+  {{- end }}
+  {{- with .customInitContainers }}
+  customInitContainers:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

@@ -44,14 +44,15 @@ func BasePodTemplateSpec(
 			},
 		},
 		Spec: corev1.PodSpec{
+			HostUsers:         valuesREST.HostUsers,
 			Affinity:          nodeFilter.Affinity,
 			Tolerations:       nodeFilter.Tolerations,
 			NodeSelector:      nodeFilter.NodeSelector,
 			Hostname:          consts.HostnameREST,
-			PriorityClassName: valuesREST.PriorityClass,
 			InitContainers:    valuesREST.CustomInitContainers,
 			Containers:        []corev1.Container{renderContainerREST(valuesREST.ContainerREST, valuesREST.ThreadCount, valuesREST.MaxConnections)},
 			Volumes:           volumes,
+			PriorityClassName: valuesREST.PriorityClass,
 		},
 	}, nil
 }

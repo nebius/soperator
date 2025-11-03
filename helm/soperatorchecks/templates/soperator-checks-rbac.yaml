@@ -24,7 +24,11 @@ rules:
   - events
   verbs:
   - create
+  - get
+  - list
   - patch
+  - update
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -34,6 +38,15 @@ rules:
   - get
   - list
   - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes/proxy
+  - pods
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - ""
@@ -48,19 +61,19 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - pods
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - secrets
   verbs:
   - get
   - list
   - update
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - statefulsets
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - batch

@@ -30,6 +30,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -136,6 +137,10 @@ func main() {
 		watchNsCacheByName = make(map[string]cache.Config)
 		watchNsCacheByName[ns] = cache.Config{}
 	}
+	topologyLabelPrefix := os.Getenv("TOPOLOGY_LABEL_PREFIX")
+	if topologyLabelPrefix == "" {
+		topologyLabelPrefix = consts.DefaultTopologyLabelPrefix
+	}
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -154,7 +159,13 @@ func main() {
 	flag.BoolVar(&topologyControllerEnabled, "enable-topology-controller", false, "if set, the topology controller will be enabled.")
 	flag.Parse()
 	opts := getZapOpts(logFormat, logLevel)
-	ctrl.SetLogger(zap.New(opts...))
+	zapLogger := zap.New(opts...)
+	ctrl.SetLogger(zapLogger)
+
+	// Configure klog to use the same logger as controller-runtime
+	// This ensures that leader election logs are in the same format
+	klog.SetLogger(zapLogger.WithName("klog"))
+
 	setupLog := ctrl.Log.WithName("setup")
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
@@ -193,10 +204,11 @@ func main() {
 			SecureServing: secureMetrics,
 			TLSOpts:       tlsOpts,
 		},
-		WebhookServer:          webhookServer,
-		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "e21479ae.nebius.ai",
+		WebhookServer:           webhookServer,
+		HealthProbeBindAddress:  probeAddr,
+		LeaderElection:          enableLeaderElection,
+		LeaderElectionID:        "e21479ae.nebius.ai",
+		LeaderElectionNamespace: soperatorNamespace,
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -253,6 +265,7 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			soperatorNamespace,
+			topologyLabelPrefix,
 			mgr.GetAPIReader(),
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			setupLog.Error(
