@@ -59,7 +59,9 @@ spec:
       pullPolicy: {{ . }}
       {{- end }}
     {{- else }}
-    image: {{ required "slurmd image" $.Values.images.slurmd | quote }}
+    image:
+      repository: {{ required "slurmd image repository" $.Values.images.slurmd.repository | quote }}
+      tag: {{ required "slurmd image tag" $.Values.images.slurmd.tag | quote }}
     {{- end }}
     {{- with .slurmd.port }}
     port: {{ . }}
@@ -71,21 +73,21 @@ spec:
     resources:
       {{- toYaml . | nindent 6 }}
     {{- end }}
-    {{- if .slurmd.volumes }}
+    {{- with .slurmd.volumes }}
     volumes:
-      {{- if .slurmd.volumes.spool }}
+      {{- with .spool }}
       spool:
-        {{- toYaml .slurmd.volumes.spool | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .slurmd.volumes.jail }}
+      {{- with .jail }}
       jail:
-        {{- toYaml .slurmd.volumes.jail | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .slurmd.volumes.jailSubMounts }}
+      {{- with .jailSubMounts }}
       jailSubMounts:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .slurmd.volumes.sharedMemorySize }}
+      {{- with .sharedMemorySize }}
       sharedMemorySize: {{ . }}
       {{- end }}
     {{- end }}
@@ -106,7 +108,9 @@ spec:
       pullPolicy: {{ . }}
       {{- end }}
     {{- else }}
-    image: {{ required "munge image" $.Values.images.munge | quote }}
+    image:
+      repository: {{ required "munge image repository" $.Values.images.munge.repository | quote }}
+      tag: {{ required "munge image tag" $.Values.images.munge.tag | quote }}
     {{- end }}
     {{- with .munge.resources }}
     resources:
