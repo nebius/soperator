@@ -44,7 +44,7 @@ chart() {
   helm dependency update "${HELM_PATH}/${CHART_NAME}"
 
   echo "Packaging chart ${CHART_NAME} as ${CHART_TARGET}."
-  helm package -d "${RELEASE_PATH}" "${HELM_PATH}/${CHART_NAME}"
+  helm package --version "${CHART_VERSION}" -d "${RELEASE_PATH}" "${HELM_PATH}/${CHART_NAME}"
 
   echo "Pushing helm-${CHART_TARGET} to Container registry - ${OCI_REPO}"
   helm push "${RELEASE_PATH}/helm-${CHART_TARGET}" "${OCI_REPO}"
