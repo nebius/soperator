@@ -71,21 +71,21 @@ spec:
     resources:
       {{- toYaml . | nindent 6 }}
     {{- end }}
-    {{- if .slurmd.volumes }}
+    {{- with .slurmd.volumes }}
     volumes:
-      {{- if .slurmd.volumes.spool }}
+      {{- with .spool }}
       spool:
-        {{- toYaml .slurmd.volumes.spool | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .slurmd.volumes.jail }}
+      {{- with .jail }}
       jail:
-        {{- toYaml .slurmd.volumes.jail | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .slurmd.volumes.jailSubMounts }}
+      {{- with .jailSubMounts }}
       jailSubMounts:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .slurmd.volumes.sharedMemorySize }}
+      {{- with .sharedMemorySize }}
       sharedMemorySize: {{ . }}
       {{- end }}
     {{- end }}
