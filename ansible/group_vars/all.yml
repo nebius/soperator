@@ -8,7 +8,7 @@ slurm:
     - slurm-smd-libnss-slurm
     - slurm-smd
 
-nc_health_checker_version: 1.0.0-159.251021
+nc_health_checker_version: 1.0.0-162.251030
 
 common_packages:
   - { name: autoconf, version: "2.71-3" }
@@ -43,3 +43,11 @@ dpkg_arch_map:
   armv7l: armhf
 
 nvidia_toolkit_version: 1.17.8-1
+
+cuda_dpkg_arch_map:
+  x86_64: x86_64
+  aarch64: sbsa
+
+libnccl_version: 2.26.5-1
+
+packages_repo_url: "https://github.com/nebius/slurm-deb-packages/releases/download"

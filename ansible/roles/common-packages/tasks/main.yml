@@ -1,5 +1,35 @@
 ---
 
+- name: Collect host facts
+  ansible.builtin.setup:
+  tags:
+    - packages
+    - common-packages
+
+- name: Download Nebius public GPG key
+  ansible.builtin.get_url:
+    url: https://dr.nebius.cloud/public.gpg
+    dest: /usr/share/keyrings/nebius.gpg.pub
+    mode: "0644"
+  tags:
+    - nebius-repo
+    - packages
+    - common-packages
+
+- name: Add Nebius APT repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/nebius.list
+    content: |
+      deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ {{ ansible_distribution_release }} main
+      deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main
+    owner: root
+    group: root
+    mode: "0644"
+  tags:
+    - nebius
+    - packages
+    - common-packages
+
 - name: Ensure required packages are installed
   ansible.builtin.apt:
     name: >-

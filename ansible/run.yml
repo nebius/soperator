@@ -3,10 +3,12 @@
 # Order of roles here is the same as in jail.dockerfile
 - name: Run all
   hosts: all
-  become: false
+  become: true
   gather_facts: true
   roles:
     - common-packages
+    - skel
+    - motd
     - python
     - openmpi
     - nvtop
@@ -16,3 +18,15 @@
     - docker-cli
     - slurm
     - nc-health-checker
+  tags:
+    - run-all
+
+- name: Install Cuda
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - common-packages
+    - cuda
+  tags:
+    - upgrade-cuda
