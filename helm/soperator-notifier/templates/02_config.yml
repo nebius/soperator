@@ -23,6 +23,7 @@ spec:
         - api_url:
             name: {{ include "son.slack.webhook.secret.name" . }}
             key: {{ include "son.slack.webhook.secret.key" . }}
+          link_names: true
           title: {{ include "son.wrapTemplate" ".CommonAnnotations.title" | quote }}
           # Trick AlertManager to use empty string to remove header links
           title_link: '{{ include "son.wrapTemplate" "define \"son.slack.msg.titleLink\"" }}{{ include "son.wrapTemplate" "\"\"" }}{{ include "son.wrapTemplate" "end" }}'
@@ -69,7 +70,7 @@ spec:
             {{ include "son.slack.msg.jobPrefix" . }} ended in state `{{ include "son.wrapTemplate" "$state" }}` {{ include "son.slack.msg.jobReason" . }}.
             {{ include "son.wrapTemplateTrimL" "end" }}
 
-            {{ include "son.wrapTemplate" "if $user_mail" }} | <{{ include "son.wrapTemplate" "$user_mail" }}>{{ include "son.wrapTemplate" "end" }}
+            {{ include "son.wrapTemplate" "if $user_mail" }} | <@{{ include "son.wrapTemplate" "(reReplaceAll \"^@\" \"\" $user_mail)" }}>{{ include "son.wrapTemplate" "end" }}
 
             {{ include "son.wrapTemplateTrimL" "end" }}
 
