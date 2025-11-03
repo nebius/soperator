@@ -58,7 +58,8 @@
     path: /etc/default/locale
     regexp: "^LANG="
     line: "LANG=en_US.UTF-8"
-    create: yes
+    mode: "0644"
+    create: true
   tags:
     - locale
     - cuda
@@ -91,8 +92,8 @@
       - "libnccl-dev={{ libnccl_version }}+cuda12.9"
       - "libnccl2={{ libnccl_version }}+cuda12.9"
     state: present
-    update_cache: yes
-    hold: yes
+    update_cache: true
+    hold: true
   tags:
     - cuda
 
@@ -126,9 +127,8 @@
   ansible.builtin.unarchive:
     src: "/tmp/nccl-tests-perf-{{ arch_deb }}.tar.gz"
     dest: /usr/bin
-    remote_src: yes
+    remote_src: true
     mode: '0755'
   tags:
     - nccl
     - cuda
-
