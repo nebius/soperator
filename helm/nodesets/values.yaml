@@ -15,8 +15,12 @@ priorityClasses:
     preemptionPolicy: "PreemptLowerPriority"
 # Container images used by NodeSets
 images:
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.22.2-noble-slurm25.05.4"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.22.2-noble-slurm25.05.4"
+  munge:
+    repository: "cr.eu-north1.nebius.cloud/soperator/munge"
+    tag: "1.22.1-noble-slurm25.05.4"
+  slurmd:
+    repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
+    tag: "1.22.1-noble-slurm25.05.4"
 # NodeSets configuration
 # Each NodeSet defines a group of worker nodes with specific characteristics
 # Example GPU NodeSet
@@ -45,10 +49,6 @@ nodesets: {}
 #     prometheus.io/port: "9090"
 #   # Slurmd configuration
 #   slurmd:
-#     image:
-#       repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
-#       tag: "1.22.1-noble-slurm25.05.4"
-#       pullPolicy: "IfNotPresent"
 #     port: 6818
 #     cgroupVersion: "v2"
 #     resources:
@@ -80,11 +80,6 @@ nodesets: {}
 #       limitsConfig: ""
 #   # Munge configuration
 #   munge:
-#     # Override default image from values.images.munge if needed
-#     image:
-#       repository: "cr.eu-north1.nebius.cloud/soperator/munge"
-#       tag: "1.22.1-noble-slurm25.05.4"
-#       pullPolicy: "IfNotPresent"
 #     resources:
 #       cpu: "2000m"
 #       memory: "4Gi"

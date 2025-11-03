@@ -59,7 +59,9 @@ spec:
       pullPolicy: {{ . }}
       {{- end }}
     {{- else }}
-    image: {{ required "slurmd image" $.Values.images.slurmd | quote }}
+    image:
+      repository: {{ required "slurmd image repository" $.Values.images.slurmd.repository | quote }}
+      tag: {{ required "slurmd image tag" $.Values.images.slurmd.tag | quote }}
     {{- end }}
     {{- with .slurmd.port }}
     port: {{ . }}
@@ -106,7 +108,9 @@ spec:
       pullPolicy: {{ . }}
       {{- end }}
     {{- else }}
-    image: {{ required "munge image" $.Values.images.munge | quote }}
+    image:
+      repository: {{ required "munge image repository" $.Values.images.munge.repository | quote }}
+      tag: {{ required "munge image tag" $.Values.images.munge.tag | quote }}
     {{- end }}
     {{- with .munge.resources }}
     resources:
