@@ -26,6 +26,9 @@ mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
 echo "Create directory for slurm job outputs"
 (umask 000; mkdir -p "/mnt/jail/opt/soperator-outputs/slurm_jobs")
 
+echo "Set HOME to soperatorchecks' home directory"
+export HOME=~soperatorchecks
+
 if [[ -n "${RESERVATION_NAME:-}" ]]; then
     echo "Submitting Slurm job on reservation $RESERVATION_NAME..."
     OUT_PATTERN='/opt/soperator-outputs/slurm_jobs/%N.%x.%j.out'
