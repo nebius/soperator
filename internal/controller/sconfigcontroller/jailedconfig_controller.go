@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,12 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -48,6 +45,7 @@ import (
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
@@ -602,22 +600,8 @@ func (r *JailedConfigReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		Named("jailedconfig").
-		WithOptions(controllerOptions(maxConcurrency, cacheSyncTimeout)).
+		WithOptions(controllerconfig.ControllerOptionsWithRateLimit(maxConcurrency, cacheSyncTimeout, 15*time.Second, 1*time.Minute)).
 		Complete(r)
-}
-
-func controllerOptions(maxConcurrency int, cacheSyncTimeout time.Duration) controller.Options {
-	rateLimiters := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](15*time.Second, 1*time.Minute)
-	var optionsInit sync.Once
-	var defaultOptions *controller.Options
-	optionsInit.Do(func() {
-		defaultOptions = &controller.Options{
-			RateLimiter:             rateLimiters,
-			CacheSyncTimeout:        cacheSyncTimeout,
-			MaxConcurrentReconciles: maxConcurrency,
-		}
-	})
-	return *defaultOptions
 }
 
 func (r *JailedConfigReconciler) findObjectsForConfigMap(ctx context.Context, configMapObject client.Object) []reconcile.Request {

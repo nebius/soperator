@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nfs-server.fullname" . }}
+  labels:
+    {{- include "nfs-server.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.service.nfsPort }}
+      targetPort: nfs
+      protocol: TCP
+      name: nfs
+    - port: {{ .Values.service.rpcPort }}
+      targetPort: portmap
+      protocol: TCP
+      name: portmap
+    - port: {{ .Values.service.mountdPort }}
+      targetPort: mountd
+      protocol: TCP
+      name: mountd
+    {{- if and .Values.monitoring.enabled .Values.monitoring.serviceMonitor.enabled }}
+    - port: {{ .Values.monitoring.nodeExporter.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+    {{- end }}
+  selector:
+    {{- include "nfs-server.selectorLabels" . | nindent 4 }}

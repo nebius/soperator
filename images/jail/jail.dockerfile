@@ -18,7 +18,7 @@ RUN ARCH=$(uname -m) && \
 
 FROM cuda AS jail
 
-ARG SLURM_VERSION=24.11.6
+ARG SLURM_VERSION
 ARG GDRCOPY_VERSION=2.5
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -210,9 +210,10 @@ RUN chmod 755 /etc/skel/.ssh && \
 RUN rm -rf -- /root/..?* /root/.[!.]* /root/* && \
     cp -a /etc/skel/. /root/
 
-# Copy createuser utility script
-COPY images/jail/scripts/createuser.py /usr/bin/createuser
-RUN chmod +x /usr/bin/createuser
+# Copy soperator-createuser utility script
+COPY images/jail/scripts/soperator-createuser.py /usr/bin/soperator-createuser
+RUN chmod +x /usr/bin/soperator-createuser && \
+    ln -sf /usr/bin/soperator-createuser /usr/bin/createuser
 
 # Replace SSH "message of the day" scripts
 RUN rm -rf /etc/update-motd.d/*
@@ -230,6 +231,12 @@ RUN apt-get update && \
     apt-get install -y nc-health-checker=${NC_HEALTH_CHECKER} && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Create single folder with slurm plugins for all architectures
+RUN mkdir -p /usr/lib/slurm && \
+    for dir in /usr/lib/*-linux-gnu/slurm; do \
+      [ -d "$dir" ] && ln -sf $dir/* /usr/lib/slurm/ 2>/dev/null || true; \
+    done
 
 # Update linker cache
 RUN ldconfig

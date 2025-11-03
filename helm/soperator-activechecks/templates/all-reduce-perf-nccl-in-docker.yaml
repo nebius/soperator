@@ -1,0 +1,28 @@
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: ActiveCheck
+metadata:
+  name: "all-reduce-perf-nccl-in-docker"
+spec:
+  checkType: "slurmJob"
+  name: "all-reduce-perf-nccl-in-docker"
+  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
+  slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
+  suspend: {{ .Values.checks.allReducePerfNCCLInDocker.suspend }}
+  runAfterCreation: {{ .Values.checks.allReducePerfNCCLInDocker.runAfterCreation }}
+  slurmJobSpec:
+    sbatchScript: |
+{{ tpl (.Files.Get "scripts/all-reduce-perf-nccl-in-docker.sh") . | indent 6 }}
+    eachWorkerJobs: true
+    jobContainer:
+      image: {{ .Values.images.slurmJob | quote }}
+      env:
+{{ toYaml .Values.jobContainer.env | indent 8 }}
+      volumeMounts:
+{{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
+      volumes:
+{{ toYaml .Values.jobContainer.volumes | indent 8 }}
+    mungeContainer:
+      image: {{ .Values.images.munge | quote }}
+  reactions:
+    addReservation:
+      prefix: {{ .Values.reservationPrefix | quote }}

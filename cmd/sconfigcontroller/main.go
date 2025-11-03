@@ -28,6 +28,7 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -136,7 +137,13 @@ func main() {
 	flag.StringVar(&slurmAPIServer, "slurmapiserver", "http://localhost:6820", "Address of the SlurmAPI")
 	flag.Parse()
 	opts := getZapOpts(logFormat, logLevel)
-	ctrl.SetLogger(zap.New(opts...))
+	zapLogger := zap.New(opts...)
+	ctrl.SetLogger(zapLogger)
+
+	// Configure klog to use the same logger as controller-runtime
+	// This ensures that leader election logs are in the same format
+	klog.SetLogger(zapLogger.WithName("klog"))
+
 	setupLog := ctrl.Log.WithName("setup")
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
@@ -166,10 +173,11 @@ func main() {
 			SecureServing: secureMetrics,
 			TLSOpts:       tlsOpts,
 		},
-		WebhookServer:          webhookServer,
-		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "vqeyz6ae.nebius.ai",
+		WebhookServer:                 webhookServer,
+		HealthProbeBindAddress:        probeAddr,
+		LeaderElection:                enableLeaderElection,
+		LeaderElectionID:              "vqeyz6ae.nebius.ai",
+		LeaderElectionReleaseOnCancel: true,
 		Cache: cache.Options{
 			DefaultNamespaces: map[string]cache.Config{
 				clusterNamespace: {},

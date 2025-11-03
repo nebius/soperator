@@ -7,21 +7,67 @@ excludeTemplates:
 tests:
   - it: should render jail logs component when jailLogs.enabled=true
     set:
+      observability.enabled: true
+      observability.opentelemetry.enabled: true
       observability.opentelemetry.logs.values.jailLogs.enabled: true
+    templates:
+      - templates/opentelemetry-collector-jail-logs.yaml
+    asserts:
+      - exists:
+          path: spec.values.config.receivers["filelog/health_checker"]
+  - it: should not render jail logs component when jailLogs.enabled=false
+    set:
+      observability.enabled: true
+      observability.opentelemetry.enabled: true
+      observability.opentelemetry.logs.values.jailLogs.enabled: false
+    templates:
+      - templates/opentelemetry-collector-jail-logs.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: should render tailscale component when tailscale.enabled=true
+    set:
+      tailscale.enabled: true
+    templates:
+      - templates/tailscale.yaml
     asserts:
       - hasDocuments:
           count: 1
-  - it: should render node logs when nodeLogs.enabled=true (default)
-    templates:
-      - templates/opentelemetry-collector-logs.yaml
-    asserts:
-      - exists:
-          path: spec.values.config.receivers["filelog/nodelogs"]
-  - it: should not render node logs when nodeLogs.enabled=false
+  - it: should not render tailscale component when tailscale.enabled=false
     set:
-      observability.opentelemetry.logs.values.nodeLogs.enabled: false
+      tailscale.enabled: false
     templates:
-      - templates/opentelemetry-collector-logs.yaml
+      - templates/tailscale.yaml
     asserts:
-      - notExists:
-          path: spec.values.config.receivers["filelog/nodelogs"]
+      - hasDocuments:
+          count: 0
+  - it: should render nodesets component when nodesets.enabled=true
+    set:
+      nodesets.enabled: true
+    templates:
+      - templates/nodesets.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: HelmRelease
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-nodesets
+      - equal:
+          path: spec.chart.spec.chart
+          value: helm-nodesets
+      - equal:
+          path: spec.releaseName
+          value: soperator-nodesets
+      - equal:
+          path: spec.targetNamespace
+          value: soperator
+  - it: should not render nodesets component when nodesets.enabled=false
+    set:
+      nodesets.enabled: false
+    templates:
+      - templates/nodesets.yaml
+    asserts:
+      - hasDocuments:
+          count: 0

@@ -112,12 +112,12 @@ spec:
   url: {{ .Values.helmRepository.securityProfilesOperator.url }}
   type: {{ .Values.helmRepository.securityProfilesOperator.type }}
 {{- end }}
-{{- if and 
-    .Values.observability.enabled 
-    (or 
-      .Values.observability.vmLogs.enabled 
-      .Values.observability.vmStack.enabled 
-    ) 
+{{- if and
+    .Values.observability.enabled
+    (or
+      .Values.observability.vmLogs.enabled
+      .Values.observability.vmStack.enabled
+    )
 }}
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
@@ -143,4 +143,28 @@ spec:
   interval: {{ .Values.helmRepository.interval }}
   url: {{ .Values.helmRepository.helmReleaseTriggerOperator.url }}
   type: {{ .Values.helmRepository.helmReleaseTriggerOperator.type }}
+{{- end }}
+{{- if .Values.nfsServer.enabled }}
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-csi-driver-nfs
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  interval: {{ .Values.helmRepository.interval }}
+  url: {{ .Values.helmRepository.csiDriverNfs.url }}
+  type: {{ .Values.helmRepository.csiDriverNfs.type }}
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-nfs-server
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  interval: {{ .Values.helmRepository.interval }}
+  url: {{ .Values.helmRepository.nfsServer.url }}
+  type: {{ .Values.helmRepository.nfsServer.type }}
 {{- end }}
