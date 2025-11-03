@@ -15,8 +15,8 @@ priorityClasses:
     preemptionPolicy: "PreemptLowerPriority"
 # Container images used by NodeSets
 images:
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.22.1-noble-slurm25.05.4"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.22.1-noble-slurm25.05.4"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.22.2-noble-slurm25.05.4"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.22.2-noble-slurm25.05.4"
 # NodeSets configuration
 # Each NodeSet defines a group of worker nodes with specific characteristics
 # Example GPU NodeSet
