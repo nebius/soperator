@@ -1,0 +1,41 @@
+---
+
+- name: Ensure /etc/skel/ directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  loop:
+    - /etc/skel/.ssh
+    - /etc/skel/.slurm
+    - /etc/skel/.config/enroot
+    - /root/.ssh
+    - /root/.slurm
+    - /root/.config/enroot
+  tags:
+    - skel
+
+- name: Copy skel files
+  ansible.builtin.copy:
+    src: "../images/jail/skel/{{ item.path }}"
+    dest: "{{ item.dest_folder }}{{ item.path }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { "path": .ssh/config, "dest_folder": "/etc/skel/", mode: "0600" }
+    - { "path": .ssh/config, "dest_folder": "/root/", mode: "0600" }
+    - { "path": .slurm/defaults, "dest_folder": "/etc/skel/", mode: "0644" }
+    - { "path": .slurm/defaults, "dest_folder": "/root/", mode: "0644" }
+    - { "path": .bash_logout, "dest_folder": "/etc/skel/", mode: "0644" }
+    - { "path": .bash_logout, "dest_folder": "/root/", mode: "0644" }
+    - { "path": .bashrc, "dest_folder": "/etc/skel/", mode: "0644" }
+    - { "path": .bashrc, "dest_folder": "/root/", mode: "0644" }
+    - { "path": .profile, "dest_folder": "/etc/skel/", mode: "0644" }
+    - { "path": .profile, "dest_folder": "/root/", mode: "0644" }
+    - { "path": .config/enroot/.credentials, "dest_folder": "/etc/skel/", mode: "0644" }
+    - { "path": .config/enroot/.credentials, "dest_folder": "/root/", mode: "0644" }
+  tags:
+    - skel

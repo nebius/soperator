@@ -4,5 +4,6 @@
   ansible.builtin.apt:
     name:
       - nc-health-checker={{ nc_health_checker_version }}
+    update_cache: true
   tags:
     - nc-health-checker

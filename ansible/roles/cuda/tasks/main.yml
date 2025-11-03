@@ -1,0 +1,134 @@
+---
+
+- name: Collect host facts
+  ansible.builtin.setup:
+  tags:
+    - cuda
+
+- name: Show system info
+  ansible.builtin.debug:
+    msg:
+      - "Architecture from cuda_dpkg_arch_map: {{ cuda_dpkg_arch_map[ansible_architecture] }}"
+      - "Architecture from dpkg_arch_map: {{ dpkg_arch_map[ansible_architecture] }}"
+      - "Distro version: ubuntu{{ ansible_distribution_version }}"
+  tags:
+    - cuda
+
+- name: Ensure required packages is installed
+  ansible.builtin.apt:
+    name:
+      - gnupg2
+      - ca-certificates
+      - locales
+      - tzdata
+      - wget
+      - curl
+  tags:
+    - cuda
+
+- name: Download NVIDIA CUDA keyring package
+  ansible.builtin.get_url:
+    url: >-
+      https://developer.download.nvidia.com/compute/cuda/repos/
+      ubuntu{{ ansible_distribution_version | replace('.', '') }}/
+      {{ cuda_dpkg_arch_map[ansible_architecture] }}/
+      cuda-keyring_1.1-1_all.deb
+    dest: /tmp/cuda-keyring_1.1-1_all.deb
+    mode: "0644"
+  tags:
+    - cuda
+
+- name: Set timezone to UTC
+  community.general.timezone:
+    name: Etc/UTC
+  tags:
+    - timezone
+    - cuda
+
+- name: Ensure a locale exists
+  community.general.locale_gen:
+    name: en_US.UTF-8
+    state: present
+  tags:
+    - locale
+    - cuda
+
+- name: Ensure system default locale is set
+  ansible.builtin.lineinfile:
+    path: /etc/default/locale
+    regexp: "^LANG="
+    line: "LANG=en_US.UTF-8"
+    create: yes
+  tags:
+    - locale
+    - cuda
+
+- name: Install CUDA keyring package
+  ansible.builtin.apt:
+    deb: "/tmp/cuda-keyring_1.1-1_all.deb"
+    state: present
+  tags:
+    - cuda
+
+- name: Add /usr/local/cuda/bin to PATH system-wide
+  ansible.builtin.copy:
+    dest: /etc/profile.d/path_cuda.sh
+    content: "export PATH=/usr/local/cuda/bin:$PATH"
+    owner: root
+    group: root
+    mode: "0644"
+  tags:
+    - cuda
+
+- name: Install CUDA and related libraries
+  ansible.builtin.apt:
+    name:
+      - "cuda=12.9.0-1"
+      - "libcublas-dev-12-9"
+      - "libcudnn9-cuda-12=9.10.1.4-1"
+      - "libcudnn9-dev-cuda-12=9.10.1.4-1"
+      - "libcudnn9-headers-cuda-12=9.10.1.4-1"
+      - "libnccl-dev={{ libnccl_version }}+cuda12.9"
+      - "libnccl2={{ libnccl_version }}+cuda12.9"
+    state: present
+    update_cache: yes
+    hold: yes
+  tags:
+    - cuda
+
+- name: Create APT pin file for CUDA packages
+  ansible.builtin.copy:
+    dest: /etc/apt/preferences.d/cuda-pins
+    content: |
+      Package: cuda-drivers
+      Pin: version 99999999-fake
+      Pin-Priority: 1001
+
+      Package: nvidia-open
+      Pin: version 99999999-fake
+      Pin-Priority: 1001
+    owner: root
+    group: root
+    mode: "0644"
+  tags:
+    - cuda
+
+- name: Download nccl-tests archive
+  ansible.builtin.get_url:
+    url: "{{ packages_repo_url }}/nccl_tests_12.9.0_ubuntu{{ ansible_distribution_version }}/nccl-tests-perf-{{ arch_deb }}.tar.gz"
+    dest: "/tmp/nccl-tests-perf-{{ arch_deb }}.tar.gz"
+    mode: '0644'
+  tags:
+    - nccl
+    - cuda
+
+- name: Extract nccl-tests archive into /usr/bin
+  ansible.builtin.unarchive:
+    src: "/tmp/nccl-tests-perf-{{ arch_deb }}.tar.gz"
+    dest: /usr/bin
+    remote_src: yes
+    mode: '0755'
+  tags:
+    - nccl
+    - cuda
+

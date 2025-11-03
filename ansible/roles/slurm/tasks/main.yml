@@ -17,6 +17,62 @@
     - slurm-packages
     - slurm-client-packages
 
+# /var/spool/slurmd for bind-mounting it from the host. It's needed for sbatch to work
+- name: Create directories
+  ansible.builtin.file:
+    path: /var/spool/slurmd
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  loop:
+    - /var/spool/slurmd
+    - /usr/lib/slurm
+  tags:
+    - slurm
+    - slurm-packages
+    - slurm-client-packages
+
+- name: Find all Slurm plugin files for this architecture
+  ansible.builtin.find:
+    paths: "/usr/lib/{{ ansible_architecture }}-linux-gnu/slurm"
+    file_type: file
+  register: slurm_plugins
+  tags:
+    - slurm
+    - slurm-packages
+    - slurm-client-packages
+
+- name: Define files to exclude
+  ansible.builtin.set_fact:
+    slurm_exclude:
+      - "/usr/lib/{{ ansible_architecture }}-linux-gnu/slurm/spank_pyxis.so"
+      - "/usr/lib/{{ ansible_architecture }}-linux-gnu/slurm/spanknccldebug.so"
+      - "/usr/lib/{{ ansible_architecture }}-linux-gnu/slurm/chroot.so"
+  tags:
+    - slurm
+    - slurm-packages
+    - slurm-client-packages
+
+- name: Symlink all Slurm plugin files into /usr/lib/slurm excluding specific ones
+  ansible.builtin.file:
+    src: "{{ item.path }}"
+    dest: "/usr/lib/slurm/{{ item.path | basename }}"
+    state: link
+    force: true
+    owner: root
+    group: root
+  loop: >-
+    {{
+      slurm_plugins.files
+      | rejectattr('path', 'in', slurm_exclude)
+      | list
+    }}
+  tags:
+    - slurm
+    - slurm-packages
+    - slurm-client-packages
+
 - name: Divert files
   community.general.dpkg_divert:
     path: "{{ item }}"

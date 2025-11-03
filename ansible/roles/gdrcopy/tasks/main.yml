@@ -7,5 +7,6 @@
       - gdrcopy-tests=2.5-1
       - libgdrapi=2.5-1
     state: present
+    update_cache: true
   tags:
     - gdrcopy
