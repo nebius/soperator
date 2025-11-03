@@ -236,7 +236,7 @@ RUN set -eux; \
 
 
 # Install Nebius health-check library
-ARG NC_HEALTH_CHECKER=1.0.0-162.251030
+ARG NC_HEALTH_CHECKER=1.0.0-164.251103
 RUN apt-get update && \
     apt-get install -y nc-health-checker=${NC_HEALTH_CHECKER} && \
     apt-get clean && \
