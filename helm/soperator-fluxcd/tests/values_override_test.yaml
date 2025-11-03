@@ -129,3 +129,50 @@ tests:
           value:
             cpu: 100m
             memory: 128Mi
+---
+suite: test values override default values nodesets
+templates:
+  - templates/nodesets.yaml
+tests:
+  - it: should use custom values when provided
+    set:
+      nodesets.enabled: true
+      nodesets.values:
+        priorityClasses:
+          - name: soperator-worker-high-priority
+            value: 1000
+        nodesets:
+          test-nodeset:
+            nodesetName: "test-nodeset"
+            size: 3
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.priorityClasses[0].name
+          value: soperator-worker-high-priority
+      - equal:
+          path: spec.values.priorityClasses[0].value
+          value: 1000
+      - equal:
+          path: spec.values.nodesets.test-nodeset.size
+          value: 3
+
+  - it: should use override values when provided
+    set:
+      nodesets.enabled: true
+      nodesets.overrideValues:
+        customConfig: true
+        nodesets:
+          gpu-nodeset:
+            nodesetName: "gpu-workers"
+            size: 5
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.customConfig
+          value: true
+      - equal:
+          path: spec.values.nodesets.gpu-nodeset.nodesetName
+          value: "gpu-workers"

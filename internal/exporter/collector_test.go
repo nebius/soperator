@@ -75,7 +75,7 @@ func TestMetricsCollector_Describe(t *testing.T) {
 
 	// Base metrics
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,instance_id,state_base,state_is_drain,state_is_maintenance,state_is_reserved,address,reason}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_job_info", help: "Slurm job detail information", constLabels: {}, variableLabels: {job_id,job_state,job_state_reason,slurm_partition,job_name,user_name,user_id,standard_error,standard_output,array_job_id,array_task_id,submit_time,start_time,end_time,finished_time}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_job_info", help: "Slurm job detail information", constLabels: {}, variableLabels: {job_id,job_state,job_state_reason,slurm_partition,job_name,user_name,user_mail,user_id,standard_error,standard_output,array_job_id,array_task_id,submit_time,start_time,end_time,finished_time}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_job", help: "Slurm job node information", constLabels: {}, variableLabels: {job_id,node_name}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_job_duration_seconds", help: "Slurm job duration in seconds", constLabels: {}, variableLabels: {job_id}}`)
 
@@ -92,7 +92,7 @@ func TestMetricsCollector_Describe(t *testing.T) {
 func TestMetricsCollector_Collect_Success(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	synctest.Run(func() {
+	synctest.Test(t, func(t *testing.T) {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient)
 
@@ -143,6 +143,7 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 				StateReason:    "None",
 				Partition:      "gpu",
 				UserName:       "testuser",
+				UserMail:       "testuser@example.com",
 				UserID:         &userID,
 				StandardError:  "/path/to/stderr",
 				StandardOutput: "/path/to/stdout",
@@ -186,7 +187,7 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 			`GAUGE; slurm_node_info{address="10.0.0.2",instance_id="instance-2",node_name="node-2",reason="",state_base="IDLE",state_is_drain="true",state_is_maintenance="false",state_is_reserved="false"} 1`,
 			`COUNTER; slurm_node_gpu_seconds_total{node_name="node-1",state_base="ALLOCATED",state_is_drain="false",state_is_maintenance="false",state_is_reserved="false"} 20`,
 			`COUNTER; slurm_node_gpu_seconds_total{node_name="node-2",state_base="IDLE",state_is_drain="true",state_is_maintenance="false",state_is_reserved="false"} 10`,
-			`GAUGE; slurm_job_info{array_job_id="",array_task_id="42",end_time="",finished_time="",job_id="12345",job_name="test_job",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr",standard_output="/path/to/stdout",start_time="1722697230",submit_time="1722697200",user_id="1000",user_name="testuser"} 1`,
+			`GAUGE; slurm_job_info{array_job_id="",array_task_id="42",end_time="",finished_time="",job_id="12345",job_name="test_job",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr",standard_output="/path/to/stdout",start_time="1722697230",submit_time="1722697200",user_id="1000",user_mail="testuser@example.com",user_name="testuser"} 1`,
 			`GAUGE; slurm_node_job{job_id="12345",node_name="node-1"} 1`,
 			`GAUGE; slurm_node_job{job_id="12345",node_name="node-2"} 1`,
 			`GAUGE; slurm_controller_server_thread_count 1`,
@@ -233,7 +234,7 @@ func TestMetricsCollector_Collect_APIError(t *testing.T) {
 func TestMetricsCollector_NodeFails(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	synctest.Run(func() {
+	t.Run("NodeFails", func(t *testing.T) {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient)
 
@@ -380,7 +381,7 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	synctest.Run(func() {
+	synctest.Test(t, func(t *testing.T) {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient)
 
@@ -472,7 +473,7 @@ func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	synctest.Run(func() {
+	t.Run("edge cases", func(t *testing.T) {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient)
 
@@ -566,7 +567,7 @@ func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 func TestMetricsCollector_GetDiag_APIError(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	synctest.Run(func() {
+	t.Run("API error handling", func(t *testing.T) {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient)
 
@@ -628,7 +629,7 @@ func TestMetricsCollector_GetDiag_APIError(t *testing.T) {
 func TestMetricsCollector_GetDiag_NilFields(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	synctest.Run(func() {
+	synctest.Test(t, func(t *testing.T) {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient)
 
@@ -675,7 +676,7 @@ func TestMetricsCollector_GetDiag_NilFields(t *testing.T) {
 func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	synctest.Run(func() {
+	synctest.Test(t, func(t *testing.T) {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient)
 
@@ -695,6 +696,7 @@ func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
 				StateReason:    "None",
 				Partition:      "gpu",
 				UserName:       "testuser",
+				UserMail:       "testuser@example.com",
 				UserID:         &userID,
 				StandardError:  "/path/to/stderr1",
 				StandardOutput: "/path/to/stdout1",
@@ -711,6 +713,7 @@ func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
 				StateReason:    "None",
 				Partition:      "cpu",
 				UserName:       "testuser",
+				UserMail:       "testuser@example.com",
 				UserID:         &userID,
 				StandardError:  "/path/to/stderr2",
 				StandardOutput: "/path/to/stdout2",
@@ -727,6 +730,7 @@ func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
 				StateReason:    "OutOfMemory",
 				Partition:      "cpu",
 				UserName:       "testuser",
+				UserMail:       "testuser@example.com",
 				UserID:         &userID,
 				StandardError:  "/path/to/stderr3",
 				StandardOutput: "/path/to/stdout3",
@@ -743,6 +747,7 @@ func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
 				StateReason:    "Resources",
 				Partition:      "cpu",
 				UserName:       "testuser",
+				UserMail:       "testuser@example.com",
 				UserID:         &userID,
 				StandardError:  "/path/to/stderr4",
 				StandardOutput: "/path/to/stdout4",
@@ -785,13 +790,13 @@ func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
 
 		expectedJobMetrics := []string{
 			// Completed job has finished_time
-			fmt.Sprintf(`GAUGE; slurm_job_info{array_job_id="",array_task_id="",end_time="%s",finished_time="%s",job_id="12345",job_name="completed_job",job_state="COMPLETED",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr1",standard_output="/path/to/stdout1",start_time="%s",submit_time="%s",user_id="1000",user_name="testuser"} 1`, endTimeStr, endTimeStr, startTimeStr, submitTimeStr),
+			fmt.Sprintf(`GAUGE; slurm_job_info{array_job_id="",array_task_id="",end_time="%s",finished_time="%s",job_id="12345",job_name="completed_job",job_state="COMPLETED",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr1",standard_output="/path/to/stdout1",start_time="%s",submit_time="%s",user_id="1000",user_mail="testuser@example.com",user_name="testuser"} 1`, endTimeStr, endTimeStr, startTimeStr, submitTimeStr),
 			// Running job has no finished_time
-			fmt.Sprintf(`GAUGE; slurm_job_info{array_job_id="",array_task_id="",end_time="%s",finished_time="",job_id="12346",job_name="running_job",job_state="RUNNING",job_state_reason="None",slurm_partition="cpu",standard_error="/path/to/stderr2",standard_output="/path/to/stdout2",start_time="%s",submit_time="%s",user_id="1000",user_name="testuser"} 1`, endTimeStr, startTimeStr, submitTimeStr),
+			fmt.Sprintf(`GAUGE; slurm_job_info{array_job_id="",array_task_id="",end_time="%s",finished_time="",job_id="12346",job_name="running_job",job_state="RUNNING",job_state_reason="None",slurm_partition="cpu",standard_error="/path/to/stderr2",standard_output="/path/to/stdout2",start_time="%s",submit_time="%s",user_id="1000",user_mail="testuser@example.com",user_name="testuser"} 1`, endTimeStr, startTimeStr, submitTimeStr),
 			// Failed job with zero EndTime has no finished_time and empty end_time
-			fmt.Sprintf(`GAUGE; slurm_job_info{array_job_id="",array_task_id="",end_time="",finished_time="",job_id="12347",job_name="failed_job_no_end",job_state="FAILED",job_state_reason="OutOfMemory",slurm_partition="cpu",standard_error="/path/to/stderr3",standard_output="/path/to/stdout3",start_time="%s",submit_time="%s",user_id="1000",user_name="testuser"} 1`, startTimeStr, submitTimeStr),
+			fmt.Sprintf(`GAUGE; slurm_job_info{array_job_id="",array_task_id="",end_time="",finished_time="",job_id="12347",job_name="failed_job_no_end",job_state="FAILED",job_state_reason="OutOfMemory",slurm_partition="cpu",standard_error="/path/to/stderr3",standard_output="/path/to/stdout3",start_time="%s",submit_time="%s",user_id="1000",user_mail="testuser@example.com",user_name="testuser"} 1`, startTimeStr, submitTimeStr),
 			// Pending job has empty start_time and end_time
-			fmt.Sprintf(`GAUGE; slurm_job_info{array_job_id="",array_task_id="",end_time="",finished_time="",job_id="12348",job_name="pending_job",job_state="PENDING",job_state_reason="Resources",slurm_partition="cpu",standard_error="/path/to/stderr4",standard_output="/path/to/stdout4",start_time="",submit_time="%s",user_id="1000",user_name="testuser"} 1`, submitTimeStr),
+			fmt.Sprintf(`GAUGE; slurm_job_info{array_job_id="",array_task_id="",end_time="",finished_time="",job_id="12348",job_name="pending_job",job_state="PENDING",job_state_reason="Resources",slurm_partition="cpu",standard_error="/path/to/stderr4",standard_output="/path/to/stdout4",start_time="",submit_time="%s",user_id="1000",user_mail="testuser@example.com",user_name="testuser"} 1`, submitTimeStr),
 		}
 
 		for _, expected := range expectedJobMetrics {
@@ -877,7 +882,7 @@ func toPrometheusLikeString(t *testing.T, metric prometheus.Metric) string {
 func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	synctest.Run(func() {
+	synctest.Test(t, func(t *testing.T) {
 		mockClient := &fake.MockClient{}
 		collector := NewMetricsCollector(mockClient)
 
@@ -975,7 +980,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	t.Run("track unavailability state transitions", func(t *testing.T) {
-		synctest.Run(func() {
+		synctest.Test(t, func(t *testing.T) {
 			mockClient := &fake.MockClient{}
 			collector := NewMetricsCollector(mockClient)
 
@@ -1071,7 +1076,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 	})
 
 	t.Run("track draining state transitions", func(t *testing.T) {
-		synctest.Run(func() {
+		synctest.Test(t, func(t *testing.T) {
 			mockClient := &fake.MockClient{}
 			collector := NewMetricsCollector(mockClient)
 
@@ -1168,7 +1173,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 	})
 
 	t.Run("IDLE+DRAIN is considered unavailability", func(t *testing.T) {
-		synctest.Run(func() {
+		synctest.Test(t, func(t *testing.T) {
 			mockClient := &fake.MockClient{}
 			collector := NewMetricsCollector(mockClient)
 
@@ -1217,7 +1222,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 	})
 
 	t.Run("DRAIN+MIXED is considered draining", func(t *testing.T) {
-		synctest.Run(func() {
+		synctest.Test(t, func(t *testing.T) {
 			mockClient := &fake.MockClient{}
 			collector := NewMetricsCollector(mockClient)
 

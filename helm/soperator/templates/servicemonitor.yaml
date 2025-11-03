@@ -1,0 +1,33 @@
+{{ if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "soperator.fullname" . }}-manager-servicemonitor
+  labels:
+  {{- include "soperator.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "soperator.name" . }}-metrics
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace | quote }}
+  jobLabel: {{ .Values.serviceMonitor.jobLabel | quote }}
+  endpoints:
+  - port: https-metrics
+    path: /metrics
+    scheme: https
+    interval: {{ .Values.serviceMonitor.interval }}
+    scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
+    tlsConfig:
+      insecureSkipVerify: true
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    {{- if .Values.serviceMonitor.metricRelabelings }}
+    metricRelabelings:
+      {{- toYaml .Values.serviceMonitor.metricRelabelings | nindent 6 }}
+    {{- end }}
+    {{- if .Values.serviceMonitor.relabelings }}
+    relabelings:
+      {{- toYaml .Values.serviceMonitor.relabelings | nindent 6 }}
+    {{- end }}
+{{ end }}

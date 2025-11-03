@@ -1,0 +1,111 @@
+suite: test nodesets with custom values
+templates:
+  - templates/nodesets.yaml
+tests:
+  - it: should work with custom single nodeset
+    set:
+      nodesets:
+        - name: custom-workers
+          replicas: 10
+          priorityClass: "custom-priority"
+          slurmd:
+            image:
+              repository: "custom/slurm"
+              tag: "v1.0.0"
+            port: 7777
+            resources:
+              cpu: "8"
+              memory: "16Gi"
+            volumes:
+              spool:
+                persistentVolumeClaim:
+                  claimName: "custom-spool"
+              jail:
+                persistentVolumeClaim:
+                  claimName: "custom-jail"
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "custom/munge"
+              tag: "v1.0.0"
+            resources:
+              cpu: "200m"
+              memory: "256Mi"
+          gpu:
+            enabled: false
+          nodeConfig:
+            features:
+              - "custom"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: custom-workers
+      - equal:
+          path: spec.replicas
+          value: 10
+      - equal:
+          path: spec.priorityClass
+          value: "custom-priority"
+      - equal:
+          path: spec.slurmd.image.repository
+          value: "custom/slurm"
+      - equal:
+          path: spec.slurmd.image.tag
+          value: "v1.0.0"
+      - equal:
+          path: spec.slurmd.port
+          value: 7777
+      - equal:
+          path: spec.gpu.enabled
+          value: false
+      - contains:
+          path: spec.nodeConfig.features
+          content: "custom"
+
+  - it: should work with empty nodesets
+    set:
+      nodesets: []
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should handle optional fields correctly
+    set:
+      nodesets:
+        - name: minimal-workers
+          slurmd:
+            image:
+              repository: "minimal/slurm"
+            resources:
+              cpu: "1"
+              memory: "1Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "minimal/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.replicas
+          value: 1  # default value
+      - notExists:
+          path: spec.priorityClass
+      - notExists:
+          path: spec.affinity
+      - notExists:
+          path: spec.tolerations
+      - notExists:
+          path: spec.gpu
+      - notExists:
+          path: spec.nodeConfig

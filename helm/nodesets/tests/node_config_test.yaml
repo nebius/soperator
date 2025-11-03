@@ -1,0 +1,287 @@
+suite: test nodesets node configuration
+templates:
+  - templates/nodesets.yaml
+tests:
+  - it: should configure node features correctly for GPU workers
+    set:
+      nodesets:
+        - name: gpu-workers
+          replicas: 3
+          nodeConfig:
+            features:
+              - "gpu"
+              - "cuda"
+            static: "Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=1"
+            dynamic: "InstanceId={{ .PodName }}"
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "4"
+              memory: "8Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+        - name: cpu-workers
+          replicas: 5
+          nodeConfig:
+            features:
+              - "cpu"
+            static: "Boards=1 SocketsPerBoard=1 CoresPerSocket=4 ThreadsPerCore=1"
+            dynamic: "InstanceId={{ .PodName }}"
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    documentIndex: 0
+    asserts:
+      - exists:
+          path: spec.nodeConfig.features
+      - contains:
+          path: spec.nodeConfig.features
+          content: "gpu"
+      - contains:
+          path: spec.nodeConfig.features
+          content: "cuda"
+      - equal:
+          path: spec.nodeConfig.static
+          value: "Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=1"
+      - equal:
+          path: spec.nodeConfig.dynamic
+          value: "InstanceId={{ .PodName }}"
+
+  - it: should configure node features correctly for CPU workers
+    set:
+      nodesets:
+        - name: gpu-workers
+          replicas: 3
+          nodeConfig:
+            features:
+              - "gpu"
+              - "cuda"
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "4"
+              memory: "8Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+        - name: cpu-workers
+          replicas: 5
+          nodeConfig:
+            features:
+              - "cpu"
+            static: "Boards=1 SocketsPerBoard=1 CoresPerSocket=4 ThreadsPerCore=1"
+            dynamic: "InstanceId={{ .PodName }}"
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    documentIndex: 1
+    asserts:
+      - exists:
+          path: spec.nodeConfig.features
+      - contains:
+          path: spec.nodeConfig.features
+          content: "cpu"
+      - equal:
+          path: spec.nodeConfig.static
+          value: "Boards=1 SocketsPerBoard=1 CoresPerSocket=4 ThreadsPerCore=1"
+      - equal:
+          path: spec.nodeConfig.dynamic
+          value: "InstanceId={{ .PodName }}"
+
+  - it: should configure priority class correctly
+    set:
+      nodesets:
+        - name: gpu-workers
+          replicas: 3
+          priorityClass: "soperator-worker-high-priority"
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "4"
+              memory: "8Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+        - name: cpu-workers
+          replicas: 5
+          priorityClass: "soperator-worker-high-priority"
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    asserts:
+      - equal:
+          path: spec.priorityClass
+          value: "soperator-worker-high-priority"
+        documentIndex: 0
+      - equal:
+          path: spec.priorityClass
+          value: "soperator-worker-high-priority"
+        documentIndex: 1
+
+  - it: should configure maxUnavailable correctly
+    set:
+      nodesets:
+        - name: gpu-workers
+          replicas: 3
+          maxUnavailable: 1
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "4"
+              memory: "8Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+        - name: cpu-workers
+          replicas: 5
+          maxUnavailable: 2
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    asserts:
+      - equal:
+          path: spec.maxUnavailable
+          value: 1
+        documentIndex: 0
+      - equal:
+          path: spec.maxUnavailable
+          value: 2
+        documentIndex: 1
+
+  - it: should configure worker annotations correctly
+    set:
+      nodesets:
+        - name: gpu-workers
+          replicas: 3
+          workerAnnotations:
+            "prometheus.io/scrape": "true"
+            "prometheus.io/port": "9090"
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "4"
+              memory: "8Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+    documentIndex: 0
+    asserts:
+      - exists:
+          path: spec.workerAnnotations
+      - equal:
+          path: spec.workerAnnotations["prometheus.io/scrape"]
+          value: "true"
+      - equal:
+          path: spec.workerAnnotations["prometheus.io/port"]
+          value: "9090"

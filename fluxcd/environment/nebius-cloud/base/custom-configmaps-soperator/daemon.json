@@ -10,6 +10,7 @@
       "runtimeArgs": []
     }
   },
+  "bip": "169.254.0.1/16",
   "default-runtime": "nvidia",
   "default-shm-size": "256gb",
   "default-ulimits": {

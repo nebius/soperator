@@ -6,6 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	"nebius.ai/slurm-operator/internal/consts"
 
@@ -14,6 +15,7 @@ import (
 )
 
 // SlurmClusterSpec defines the desired state of SlurmCluster
+// +kubebuilder:validation:XValidation:rule="!(has(self.partitionConfiguration) && has(self.partitionConfiguration.partitions) && size(self.partitionConfiguration.partitions) > 0 && self.partitionConfiguration.partitions.exists(p, size(p.nodeSetRefs) > 0) && self.slurmNodes.worker.size > 0)",message="Worker size must be zero when NodeSetRefs are used in partition configuration"
 type SlurmClusterSpec struct {
 	// CRVersion defines the version of the Operator the Custom Resource belongs to
 	//
@@ -174,6 +176,11 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="SwitchAsNodeRank"
 	TopologyParam string `json:"topologyParam,omitempty"`
+	// TopologyBlockSize represents a schedulable size of a block for a topology/block plugin.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=18
+	TopologyBlockSize *int `json:"topologyBlockSize,omitempty"`
 }
 
 type MPIConfig struct {
@@ -213,7 +220,7 @@ type PluginConfigPyxis struct {
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=true
-	Required bool `json:"required,omitempty"`
+	Required *bool `json:"required,omitempty"`
 
 	// ContainerImageSave represents an absolute path to the file or directory where SquashFS files will be stored.
 	// If the specified file or directory already exists, it will be reused.
@@ -241,7 +248,7 @@ type PluginConfigNcclDebug struct {
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// LogLevel defines NCCL's log level to be forced.
 	//
@@ -328,20 +335,84 @@ type SConfigController struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="1m"
 	ReconfigureWaitTimeout *string `json:"reconfigureWaitTimeout,omitempty"`
+
+	// HostUsers controls if the pod containers can use the host user namespace
+	//
+	// +kubebuilder:validation:Optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="self.configType != 'structured' || size(self.partitions) > 0",message="Structured partition configuration requires at least one partition"
 type PartitionConfiguration struct {
-	// ConfigType
-	// +kubebuilder:validation:Enum=default;custom
+	// ConfigType defines what behaviour should be used for partition generation.
+	//
+	// PartitionConfigTypeDefault - generates 3 standard partitions:
+	//  - `main` - Default partition for regular jobs (PriorityTier=10)
+	//  - `hidden` - Hidden partition for administrative tasks (Hidden=YES)
+	//  - `background` - Low-priority background partition (PriorityTier=1)
+	//
+	// PartitionConfigTypeCustom - uses raw partition configuration strings from RawConfig.
+	//
+	// PartitionConfigTypeStructured - enables NodeSet references and structured partition definitions.
+	//
+	// +kubebuilder:validation:Enum=default;custom;structured
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="default"
 	ConfigType string `json:"configType,omitempty"`
-	// RawConfig define partition configuration as list of string started with PartitionName
+
+	// RawConfig defines partition configuration as list of string started with PartitionName.
+	// It is used when ConfigType == PartitionConfigTypeCustom.
+	//
 	// Example for custom ConfigType:
-	// - PartitionName=low_priority Nodes=worker-[0-15] Default=YES MaxTime=INFINITE State=UP PriorityTier=1
-	// - PartitionName=high_priority  Nodes=worker-[10-20] Default=NO MaxTime=INFINITE State=UP PriorityTier=2
+	//  - PartitionName=low_priority  Nodes=worker-[0-15]  Default=YES MaxTime=INFINITE State=UP PriorityTier=1
+	//  - PartitionName=high_priority Nodes=worker-[10-20] Default=NO  MaxTime=INFINITE State=UP PriorityTier=2
+	//
 	// +kubebuilder:validation:Optional
 	RawConfig []string `json:"rawConfig,omitempty"`
+
+	// Partitions define partition configuration as a list of structured Partition[s].
+	// It is used when ConfigType == PartitionConfigTypeStructured.
+	//
+	// +kubebuilder:validation:Optional
+	Partitions []Partition `json:"partitions,omitempty"`
+}
+
+const (
+	// PartitionConfigTypeDefault behaves to generate `main`, `hidden`, and `background` partitions automatically.
+	PartitionConfigTypeDefault = "default"
+	// PartitionConfigTypeCustom behaves to use custom raw config.
+	PartitionConfigTypeCustom = "custom"
+	// PartitionConfigTypeStructured behaves to use custom structured partition configuration.
+	PartitionConfigTypeStructured = "structured"
+)
+
+// Partition defines a structured configuration of Partition configuration.
+type Partition struct {
+	// Name defines a name of the Partition.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// IsAll allows to define a Partition including all nodes in the cluster.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	IsAll bool `json:"isAll,omitempty"`
+
+	// NodeSetRefs allows to define a Partition including specific NodeSet[s].
+	// Each value must be unique and correspond to one of the NodeSet.Metadata.Name.
+	//
+	// +kubebuilder:validation:Optional
+	NodeSetRefs []string `json:"nodeSetRefs,omitempty"`
+
+	// Config allows to provide additional configuration for a Partition regarding https://slurm.schedmd.com/slurm.conf.html#SECTION_PARTITION-CONFIGURATION.
+	//
+	// Example:
+	//  Default=NO MaxTime=8:00:00 AllowGroups=ml-team State=UP
+	//
+	// +kubebuilder:validation:Optional
+	Config string `json:"config,omitempty"`
 }
 
 type WorkerFeature struct {
@@ -427,6 +498,11 @@ type PopulateJail struct {
 	//
 	// +kubebuilder:validation:Optional
 	PriorityClass string `json:"priorityClass,omitempty"`
+
+	// HostUsers controls if the pod containers can use the host user namespace
+	//
+	// +kubebuilder:validation:Optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
 }
 
 // K8sNodeFilter defines the k8s node filter used in Slurm node specifications
@@ -489,8 +565,9 @@ type SlurmNodes struct {
 
 	// Worker represents the Slurm worker node configuration
 	//
-	// +kubebuilder:validation:Required
-	Worker SlurmNodeWorker `json:"worker"`
+	// +kubebuilder:deprecation:warning="The Worker field is deprecated and will be removed in a future release"
+	// +kubebuilder:validation:Optional
+	Worker SlurmNodeWorker `json:"worker,omitempty"`
 
 	// Login represents the Slurm login node configuration
 	//
@@ -764,6 +841,11 @@ type SlurmNodeController struct {
 	// +kubebuilder:validation:Required
 	K8sNodeFilterName string `json:"k8sNodeFilterName"`
 
+	// HostUsers controls if the pod containers can use the host user namespace
+	//
+	// +kubebuilder:validation:Optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
+
 	// Slurmctld represents the Slurm control daemon configuration
 	//
 	// +kubebuilder:validation:Required
@@ -806,6 +888,13 @@ type SlurmNodeControllerVolumes struct {
 // SlurmNodeWorker defines the configuration for the Slurm worker node
 type SlurmNodeWorker struct {
 	SlurmNode `json:",inline"`
+
+	// HostUsers controls if the pod containers can use the host user namespace
+	// For workers, defaults to false to allow containers to access host user namespace
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	HostUsers *bool `json:"hostUsers,omitempty"`
 
 	// The maximum number of worker pods that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
@@ -977,7 +1066,7 @@ type SlurmExporter struct {
 	// It has to be set to true if Prometheus Operator is used
 	//
 	// +kubebuilder:default=false
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// It references the PodMonitor configuration
 	//
@@ -1051,6 +1140,11 @@ type SlurmNode struct {
 	//
 	// +kubebuilder:validation:Optional
 	PriorityClass string `json:"priorityClass,omitempty"`
+
+	// HostUsers controls if the pod containers can use the host user namespace
+	//
+	// +kubebuilder:validation:Optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
 }
 
 // NodeContainer defines the configuration for one of node containers
@@ -1254,4 +1348,32 @@ type SlurmClusterList struct {
 
 func init() {
 	SchemeBuilder.Register(&SlurmCluster{}, &SlurmClusterList{})
+}
+
+// SetDefaults sets default values for PluginConfigPyxis
+func (p *PluginConfigPyxis) SetDefaults() {
+	if p.Required == nil {
+		p.Required = ptr.To(true)
+	}
+}
+
+// SetDefaults sets default values for PluginConfigNcclDebug
+func (p *PluginConfigNcclDebug) SetDefaults() {
+	if p.Enabled == nil {
+		p.Enabled = ptr.To(false)
+	}
+}
+
+// SetDefaults sets default values for SlurmExporter
+func (s *SlurmExporter) SetDefaults() {
+	if s.Enabled == nil {
+		s.Enabled = ptr.To(false)
+	}
+}
+
+// SetDefaults sets default values for SlurmNodeWorker
+func (w *SlurmNodeWorker) SetDefaults() {
+	if w.HostUsers == nil {
+		w.HostUsers = ptr.To(false)
+	}
 }

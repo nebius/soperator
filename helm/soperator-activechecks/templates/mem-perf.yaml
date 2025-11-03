@@ -8,8 +8,8 @@ spec:
   dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "20 10-22/12 * * *" # 2 times a day at 10:20 and 22:20 UTC
-  suspend: false
-  runAfterCreation: true
+  suspend: {{ .Values.checks.memPerf.suspend }}
+  runAfterCreation: {{ .Values.checks.memPerf.runAfterCreation }}
   slurmJobSpec:
     sbatchScript: |
 {{ tpl (.Files.Get "scripts/mem-perf.sh") . | indent 6 }}

@@ -33,6 +33,12 @@ helmRepository:
   helmReleaseTriggerOperator:
     url: oci://cr.eu-north1.nebius.cloud/soperator
     type: oci
+  csiDriverNfs:
+    url: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
+    type: default
+  nfsServer:
+    url: oci://cr.eu-north1.nebius.cloud/soperator
+    type: oci
 ns:
   enabled: true
   interval: 5m
@@ -239,6 +245,17 @@ slurmCluster:
     timeout: 5m
     values: null
     overrideValues: null
+nodesets:
+  enabled: false
+  driftDetection:
+    mode: warn
+  interval: 5m
+  timeout: 5m
+  version: 1.22.2
+  namespace: soperator
+  releaseName: soperator-nodesets
+  values: null
+  overrideValues: null
 soperatorActiveChecks:
   enabled: true
   interval: 5m
@@ -321,3 +338,25 @@ notifier:
     slack:
       webhookUrl: null
   overrideValues: null
+csiDriverNfs:
+  interval: 5m
+  timeout: 5m
+  version: 4.11.0
+  namespace: nfs-system
+  releaseName: csi-driver-nfs
+  overrideValues: null
+  values: null
+nfsServer:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: 1.21.12
+  namespace: nfs-system
+  releaseName: nfs-server
+  overrideValues: null
+  values: null
+tailscale:
+  enabled: false
+  interval: 5m
+  timeout: 5m
+  version: 2.0.0

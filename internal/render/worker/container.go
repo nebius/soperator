@@ -75,7 +75,7 @@ func renderContainerSlurmd(
 		return corev1.Container{}, fmt.Errorf("checking resource requests: %w", err)
 	}
 
-	realMemory := renderRealMemorySlurmd(resources)
+	realMemory := common.RenderRealMemorySlurmd(resources)
 
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
@@ -211,12 +211,4 @@ func renderSlurmdEnv(
 		})
 	}
 	return envVar
-}
-
-func renderRealMemorySlurmd(resources corev1.ResourceRequirements) int64 {
-	// Convert the memory quantity to bytes
-	memoryInBytes := resources.Requests.Memory().Value()
-	// Convert bytes to mebibytes (1 MiB = 1,048,576 bytes)
-	memoryInMebibytes := memoryInBytes / 1_048_576 // 1 MiB = 1,048,576 bytes
-	return memoryInMebibytes
 }
