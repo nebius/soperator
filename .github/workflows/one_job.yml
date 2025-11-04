@@ -70,6 +70,20 @@ jobs:
           make get-version UNSTABLE=${UNSTABLE} >> version.txt
           echo "${UNSTABLE}" >> version.txt
 
+      - name: Run make sync-version-from-scratch
+        run: |
+          make kustomize helmify yq
+          make sync-version-from-scratch UNSTABLE=false
+
+      - name: Check for uncommitted changes
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "❌ Uncommitted changes detected after make sync-version-from-scratch"
+            git status --porcelain
+            git diff
+            exit 1
+          fi
+
       - name: Upload version file
         uses: actions/upload-artifact@v5
         with:
@@ -288,20 +302,6 @@ jobs:
           echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION"
           echo "Unstable: $UNSTABLE"
-
-      - name: Run make sync-version-from-scratch
-        run: |
-          make kustomize helmify yq
-          make sync-version-from-scratch UNSTABLE=false
-
-      - name: Check for uncommitted changes
-        run: |
-          if [[ -n "$(git status --porcelain)" ]]; then
-            echo "❌ Uncommitted changes detected after make sync-version-from-scratch"
-            git status --porcelain
-            git diff
-            exit 1
-          fi
 
       - name: Run Helm Tests
         run: make helmtest
