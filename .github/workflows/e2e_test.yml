@@ -49,6 +49,7 @@ jobs:
       O11Y_ACCESS_TOKEN: ${{ secrets.E2E_O11Y_ACCESS_TOKEN }}
       OUTPUT_LOG_FILE: "${{ github.workspace }}/output/output.log"
       OUTPUT_ERR_FILE: "${{ github.workspace }}/output/output.err"
+      ENSURE_SUPPORT_SA: false
 
     steps:
       - name: Checkout repository
