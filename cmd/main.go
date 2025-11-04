@@ -55,6 +55,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
 	"nebius.ai/slurm-operator/internal/feature"
 	webhookcorev1 "nebius.ai/slurm-operator/internal/webhook/v1"
+	webhookv1alpha1 "nebius.ai/slurm-operator/internal/webhook/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -235,6 +236,7 @@ func main() {
 		cli.Fail(setupLog, err, "unable to start manager")
 	}
 
+	// region Reconciler/Cluster
 	if err = clustercontroller.NewSlurmClusterReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
@@ -248,14 +250,18 @@ func main() {
 			cli.Fail(setupLog, err, "unable to create webhook", "webhook", "Secret")
 		}
 	}
+	// endregion Reconciler/Cluster
 
+	// region Reconciler/NodeConfigurator
 	if err = (&nodeconfigurator.NodeConfiguratorReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		cli.Fail(setupLog, err, "unable to create controller", "controller", "NodeConfigurator")
 	}
+	// endregion Reconciler/NodeConfigurator
 
+	// region Reconciler/NodeSet
 	if feature.Gate.Enabled(feature.NodeSetWorkers) {
 		nodeSetName := reflect.TypeOf(slurmv1alpha1.NodeSet{}).Name()
 		nodeSetNameLower := strings.ToLower(nodeSetName)
@@ -268,8 +274,18 @@ func main() {
 			SetupWithManager(mgr, nodeSetNameLower, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create controller", "controller", nodeSetName)
 		}
-	}
 
+		// nolint:goconst
+		if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+			if err := webhookv1alpha1.SetupNodeSetWebhookWithManager(mgr); err != nil {
+				setupLog.Error(err, "unable to create webhook", "webhook", nodeSetName)
+				os.Exit(1)
+			}
+		}
+	}
+	// endregion Reconciler/NodeSet
+
+	// region Reconciler/Topology
 	if topologyControllerEnabled {
 		if err = topologyconfcontroller.NewNodeTopologyReconciler(
 			mgr.GetClient(),
@@ -295,6 +311,8 @@ func main() {
 			)
 		}
 	}
+	// endregion Reconciler/Topology
+
 	//+kubebuilder:scaffold:builder
 
 	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
