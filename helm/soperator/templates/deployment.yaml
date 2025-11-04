@@ -101,3 +101,6 @@ spec:
           defaultMode: 420
           secretName: webhook-server-cert
       {{- end }}
+      {{- if .Values.controllerManager.tolerations }}
+      tolerations: {{- toYaml .Values.controllerManager.tolerations | nindent 6 }}
+      {{- end }}
