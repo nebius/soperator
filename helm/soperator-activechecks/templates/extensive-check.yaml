@@ -18,9 +18,9 @@ spec:
   successReactions:
     removeReservation:
       prefix: {{ .Values.reservationPrefix | quote }}
-  # No failure reactions for now until we implement a meaningful extensive check
-  # failureReactions:
-  #   setHardwareIssuesSuspected: true
+  failureReactions:
+    drainSlurmNode:
+      setHardwareIssueSuspected: {{ .Values.checks.extensiveCheck.setHardwareIssueSuspected }}
   slurmJobSpec:
     sbatchScript: |
 {{ .Files.Get "scripts/extensive-check.sh" | indent 6 }}

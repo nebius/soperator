@@ -107,10 +107,10 @@ type ActiveCheckSpec struct {
 type Reactions struct {
 	// DrainSlurmNode enabling slurm node draining
 	// +kubebuilder:validation:Optional
-	DrainSlurmNode bool `json:"drainSlurmNode,omitempty"`
-	// DrainSlurmNode enabling slurm node commenting if check failed
+	DrainSlurmNode *DrainSlurmNodeSpec `json:"drainSlurmNode,omitempty"`
+	// CommentSlurmNode enabling slurm node commenting
 	// +kubebuilder:validation:Optional
-	CommentSlurmNode bool `json:"commentSlurmNode,omitempty"`
+	CommentSlurmNode *bool `json:"commentSlurmNode,omitempty"`
 
 	// AddReservation adds a slurm reservation with name "<prefix>-<nodeName>"
 	// +kubebuilder:validation:Optional
@@ -118,6 +118,10 @@ type Reactions struct {
 	// RemoveReservation removs slurm reservation with name "<prefix>-<nodeName>"
 	// +kubebuilder:validation:Optional
 	RemoveReservation *ReservationSpec `json:"removeReservation,omitempty"`
+}
+
+type DrainSlurmNodeSpec struct {
+	SetHardwareIssueSuspected bool `json:"setHardwareIssueSuspected,omitempty"`
 }
 
 type ReservationSpec struct {

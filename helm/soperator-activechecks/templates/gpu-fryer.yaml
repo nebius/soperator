@@ -25,5 +25,5 @@ spec:
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
   failureReactions:
-    setCondition: true
-    drainSlurmNode: true
+    drainSlurmNode:
+      setHardwareIssueSuspected: {{ .Values.checks.gpuFryer.setHardwareIssueSuspected }}

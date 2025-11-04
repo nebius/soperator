@@ -1030,12 +1030,14 @@ spec:
                         type: string
                     type: object
                   commentSlurmNode:
-                    description: DrainSlurmNode enabling slurm node commenting if
-                      check failed
+                    description: CommentSlurmNode enabling slurm node commenting
                     type: boolean
                   drainSlurmNode:
                     description: DrainSlurmNode enabling slurm node draining
-                    type: boolean
+                    properties:
+                      setHardwareIssueSuspected:
+                        type: boolean
+                    type: object
                   removeReservation:
                     description: RemoveReservation removs slurm reservation with name
                       "<prefix>-<nodeName>"
@@ -7537,12 +7539,14 @@ spec:
                         type: string
                     type: object
                   commentSlurmNode:
-                    description: DrainSlurmNode enabling slurm node commenting if
-                      check failed
+                    description: CommentSlurmNode enabling slurm node commenting
                     type: boolean
                   drainSlurmNode:
                     description: DrainSlurmNode enabling slurm node draining
-                    type: boolean
+                    properties:
+                      setHardwareIssueSuspected:
+                        type: boolean
+                    type: object
                   removeReservation:
                     description: RemoveReservation removs slurm reservation with name
                       "<prefix>-<nodeName>"
