@@ -916,11 +916,6 @@ func (in *Reactions) DeepCopyInto(out *Reactions) {
 		*out = new(DrainSlurmNodeSpec)
 		**out = **in
 	}
-	if in.CommentSlurmNode != nil {
-		in, out := &in.CommentSlurmNode, &out.CommentSlurmNode
-		*out = new(bool)
-		**out = **in
-	}
 	if in.AddReservation != nil {
 		in, out := &in.AddReservation, &out.AddReservation
 		*out = new(ReservationSpec)

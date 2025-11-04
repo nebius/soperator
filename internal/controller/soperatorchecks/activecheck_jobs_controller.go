@@ -376,7 +376,7 @@ func updateSlurmNodeWithReactions(
 			}
 			updateReq.State = ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateDRAIN})
 		}
-		if reactions.CommentSlurmNode != nil {
+		if reactions.CommentSlurmNode {
 			updateReq.Comment = ptr.To(failureMessage)
 		}
 
@@ -389,7 +389,7 @@ func updateSlurmNodeWithReactions(
 		}
 
 		logger.V(1).Info(fmt.Sprintf("slurm node is updated, drain: %t, comment: %t",
-			reactions.DrainSlurmNode != nil, reactions.CommentSlurmNode != nil))
+			reactions.DrainSlurmNode != nil, reactions.CommentSlurmNode))
 	}
 
 	return nil
@@ -445,7 +445,7 @@ func executeFailureReactions(ctx context.Context, slurmJob slurmapi.Job, activeC
 		return nil
 	}
 
-	if failureReactions.DrainSlurmNode != nil || failureReactions.CommentSlurmNode != nil {
+	if failureReactions.DrainSlurmNode != nil || failureReactions.CommentSlurmNode {
 		err := updateSlurmNodeWithReactions(ctx, logger, slurmJob, activeCheck, *failureReactions, slurmAPIClient)
 		if err != nil {
 			return fmt.Errorf("update slurm node with reaction: %w", err)
