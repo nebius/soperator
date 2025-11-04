@@ -21,6 +21,10 @@ spec:
   slurmConfig:
     {{- toYaml .Values.slurmConfig | nindent 4 }}
   {{- end }}
+  {{- if .Values.customSlurmConfig }}
+  customSlurmConfig: |
+  {{- nindent 4 .Values.customSlurmConfig }}
+  {{- end }}
   {{- if eq .Values.clusterType "gpu" }}
   healthCheckConfig:
     healthCheckInterval: 300

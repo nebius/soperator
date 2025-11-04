@@ -130,6 +130,7 @@ slurmConfig:
   messageTimeout: 60
   topologyPlugin: "topology/tree"
   topologyParam: "SwitchAsNodeRank"
+customSlurmConfig: ""
 mpiConfig:
   pmixEnv: "OMPI_MCA_btl_tcp_if_include=eth0"
 plugStackConfig:
