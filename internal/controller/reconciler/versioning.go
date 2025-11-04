@@ -114,9 +114,9 @@ func setVersionsRecursive(resource metav1.Object, deps ...metav1.Object) error {
 			}
 		case *kruisev1b1.StatefulSet:
 			err = setVersionsAnnotation(&o.Spec.Template, deps...)
-                        if err != nil {
-                                return fmt.Errorf("setting AdvancedStatefulSet pod template versions annotation: %w", err)
-                        }
+			if err != nil {
+				return fmt.Errorf("setting AdvancedStatefulSet pod template versions annotation: %w", err)
+			}
 		case *batchv1.CronJob:
 			err = setVersionsAnnotation(&o.Spec.JobTemplate.Spec.Template, deps...)
 			if err != nil {
