@@ -95,10 +95,6 @@ type ActiveCheckSpec struct {
 	// +kubebuilder:default="k8sJob"
 	CheckType string `json:"checkType,omitempty"`
 
-	// Reactions (deprecated) defines reaction on specific check
-	// +kubebuilder:validation:Optional
-	Reactions Reactions `json:"reactions,omitempty"`
-
 	// SuccessReactions defines reaction on specific check when it succeeds
 	// +kubebuilder:validation:Optional
 	SuccessReactions *Reactions `json:"successReactions,omitempty"`
@@ -109,21 +105,16 @@ type ActiveCheckSpec struct {
 }
 
 type Reactions struct {
-	// SetCondition enabling setting condition to the k8s node
-	// +kubebuilder:validation:Optional
-	SetCondition bool `json:"setCondition,omitempty"`
-
 	// DrainSlurmNode enabling slurm node draining
 	// +kubebuilder:validation:Optional
 	DrainSlurmNode bool `json:"drainSlurmNode,omitempty"`
-
 	// DrainSlurmNode enabling slurm node commenting if check failed
 	// +kubebuilder:validation:Optional
 	CommentSlurmNode bool `json:"commentSlurmNode,omitempty"`
+
 	// AddReservation adds a slurm reservation with name "<prefix>-<nodeName>"
 	// +kubebuilder:validation:Optional
 	AddReservation *ReservationSpec `json:"addReservation,omitempty"`
-
 	// RemoveReservation removs slurm reservation with name "<prefix>-<nodeName>"
 	// +kubebuilder:validation:Optional
 	RemoveReservation *ReservationSpec `json:"removeReservation,omitempty"`

@@ -58,6 +58,7 @@ mem_perf() {
     bash -c "health-checker run -e soperator -p $platform -n mem_bw,mem_lat -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
 
+# TODO: add all_reduce_in_docker and passive checks
 funcs_to_test=(
   all_reduce_with_ib
   all_reduce_without_ib

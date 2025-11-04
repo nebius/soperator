@@ -1043,10 +1043,6 @@ spec:
                       prefix:
                         type: string
                     type: object
-                  setCondition:
-                    description: SetCondition enabling setting condition to the k8s
-                      node
-                    type: boolean
                 type: object
               k8sJobSpec:
                 description: K8sJobSpec defines options for k8s cronjob
@@ -3209,35 +3205,6 @@ spec:
                 description: PodTemplateNameRef points to a PodTemplate that contains
                   the pod configuration.
                 type: string
-              reactions:
-                description: Reactions (deprecated) defines reaction on specific check
-                properties:
-                  addReservation:
-                    description: AddReservation adds a slurm reservation with name
-                      "<prefix>-<nodeName>"
-                    properties:
-                      prefix:
-                        type: string
-                    type: object
-                  commentSlurmNode:
-                    description: DrainSlurmNode enabling slurm node commenting if
-                      check failed
-                    type: boolean
-                  drainSlurmNode:
-                    description: DrainSlurmNode enabling slurm node draining
-                    type: boolean
-                  removeReservation:
-                    description: RemoveReservation removs slurm reservation with name
-                      "<prefix>-<nodeName>"
-                    properties:
-                      prefix:
-                        type: string
-                    type: object
-                  setCondition:
-                    description: SetCondition enabling setting condition to the k8s
-                      node
-                    type: boolean
-                type: object
               runAfterCreation:
                 default: true
                 description: RunAfterCreation specifies whether the job should run
@@ -7583,10 +7550,6 @@ spec:
                       prefix:
                         type: string
                     type: object
-                  setCondition:
-                    description: SetCondition enabling setting condition to the k8s
-                      node
-                    type: boolean
                 type: object
               successfulJobsHistoryLimit:
                 default: 3
