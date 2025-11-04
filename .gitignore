@@ -4,6 +4,7 @@
 bin
 cover.out
 .vscode
+version.txt
 
 # ignoring generated version folder
 /version/
