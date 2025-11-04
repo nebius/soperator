@@ -14,7 +14,6 @@ spec:
   - "dcgmi-diag-r3"
   - "gpu-fryer"
   - "ib-gpu-perf"
-  - "ib-perf"
   - "mem-perf"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   suspend: {{ .Values.checks.ensureHealthyNodes.suspend }}
