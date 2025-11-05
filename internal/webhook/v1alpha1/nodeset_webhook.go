@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,15 +29,35 @@ import (
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 )
 
-// nolint:unused
-// nodesetlog is for logging in this package.
-var _ = logf.Log.WithName("nodeset-resource")
+// nodesetLog is for logging in this package.
+var nodesetLog = logf.Log.WithName("nodeset-resource")
 
 // SetupNodeSetWebhookWithManager registers the webhook for NodeSet in the manager.
 func SetupNodeSetWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&slurmv1alpha1.NodeSet{}).
 		WithValidator(&NodeSetCustomValidator{}).
+		WithDefaulter(&NodeSetCustomDefaulter{}).
 		Complete()
+}
+
+// +kubebuilder:webhook:path=/mutate-slurm-nebius-ai-v1alpha1-nodeset,mutating=true,failurePolicy=fail,sideEffects=None,groups=slurm.nebius.ai,resources=nodesets,verbs=create;update,versions=v1alpha1,name=mnodeset-v1alpha1.kb.io,admissionReviewVersions=v1
+
+// NodeSetCustomDefaulter struct is responsible for setting default values on the custom resource of the
+// Kind NodeSet when those are created or updated.
+type NodeSetCustomDefaulter struct{}
+
+var _ webhook.CustomDefaulter = &NodeSetCustomDefaulter{}
+
+// Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind NodeSet.
+func (d *NodeSetCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
+	nodeset, ok := obj.(*slurmv1alpha1.NodeSet)
+
+	if !ok {
+		return fmt.Errorf("expected an NodeSet object but got %T", obj)
+	}
+	nodesetLog.Info("Defaulting for NodeSet", "name", nodeset.GetName())
+
+	return nil
 }
 
 // +kubebuilder:webhook:path=/validate-slurm-nebius-ai-v1alpha1-nodeset,mutating=false,failurePolicy=fail,sideEffects=None,groups=slurm.nebius.ai,resources=nodesets,verbs=create;update,versions=v1alpha1,name=vnodeset-v1alpha1.kb.io,admissionReviewVersions=v1

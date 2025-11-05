@@ -21,26 +21,42 @@ import (
 	. "github.com/onsi/gomega"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
-	webhookv1alpha1 "nebius.ai/slurm-operator/internal/webhook/v1alpha1"
+	. "nebius.ai/slurm-operator/internal/webhook/v1alpha1"
 )
 
 var _ = Describe("NodeSet Webhook", func() {
 	var (
 		obj       *slurmv1alpha1.NodeSet
 		oldObj    *slurmv1alpha1.NodeSet
-		validator webhookv1alpha1.NodeSetCustomValidator
+		validator NodeSetCustomValidator
+		defaulter NodeSetCustomDefaulter
 	)
 
 	BeforeEach(func() {
 		obj = &slurmv1alpha1.NodeSet{}
 		oldObj = &slurmv1alpha1.NodeSet{}
-		validator = webhookv1alpha1.NodeSetCustomValidator{}
+		validator = NodeSetCustomValidator{}
 		Expect(validator).NotTo(BeNil(), "Expected validator to be initialized")
+		defaulter = NodeSetCustomDefaulter{}
+		Expect(defaulter).NotTo(BeNil(), "Expected defaulter to be initialized")
 		Expect(oldObj).NotTo(BeNil(), "Expected oldObj to be initialized")
 		Expect(obj).NotTo(BeNil(), "Expected obj to be initialized")
 	})
 
 	AfterEach(func() {})
+
+	Context("When creating NodeSet under Defaulting Webhook", func() {
+		// TODO (user): Add logic for defaulting webhooks
+		// Example:
+		// It("Should apply defaults when a required field is empty", func() {
+		//     By("simulating a scenario where defaults should be applied")
+		//     obj.SomeFieldWithDefault = ""
+		//     By("calling the Default method to apply defaults")
+		//     defaulter.Default(ctx, obj)
+		//     By("checking that the default values are set")
+		//     Expect(obj.SomeFieldWithDefault).To(Equal("default_value"))
+		// })
+	})
 
 	Context("When creating or updating NodeSet under Validating Webhook", func() {
 		// TODO (user): Add logic for validating webhooks
