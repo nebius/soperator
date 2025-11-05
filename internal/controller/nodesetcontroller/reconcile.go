@@ -3,7 +3,6 @@ package nodesetcontroller
 import (
 	"context"
 	"fmt"
-	"maps"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -64,34 +63,22 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 	var (
 		cluster *slurmv1.SlurmCluster
 		err     error
-		//
-		clusterName   string
-		hasClusterRef bool
 	)
-	if clusterName, hasClusterRef = nodeSet.GetAnnotations()[consts.AnnotationParentalClusterRefName]; hasClusterRef {
+	{
+		clusterName, hasClusterRef := nodeSet.GetAnnotations()[consts.AnnotationParentalClusterRefName]
+		if !hasClusterRef {
+			err = fmt.Errorf("getting parental cluster ref from annotations")
+			logger.Error(err, "No parent cluster ref found")
+			return ctrl.Result{}, err
+		}
 		cluster, err = resourcegetter.GetCluster(ctx, r.Client,
 			types.NamespacedName{
 				Namespace: nodeSet.Namespace,
 				Name:      clusterName,
 			},
 		)
-	} else {
-		cluster, err = resourcegetter.GetClusterInNamespace(ctx, r.Client, nodeSet.Namespace)
-	}
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("getting parental cluster: %w", err)
-	}
-
-	if !hasClusterRef {
-		nodeSetBase := nodeSet.DeepCopy()
-		maps.Insert(nodeSet.ObjectMeta.Annotations, func(yield func(string, string) bool) {
-			if !yield(consts.AnnotationParentalClusterRefName, cluster.Name) {
-				return
-			}
-		})
-		if err = r.Patch(ctx, nodeSet, client.MergeFrom(nodeSetBase)); err != nil {
-			logger.Error(err, "Failed to patch parental cluster annotation")
-			return ctrl.Result{}, fmt.Errorf("patching parental cluster annotation: %w", err)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("getting parental cluster: %w", err)
 		}
 	}
 	// endregion Get parental cluster
