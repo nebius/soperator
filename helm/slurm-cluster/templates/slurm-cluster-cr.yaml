@@ -23,7 +23,7 @@ spec:
   {{- end }}
   {{- if .Values.customSlurmConfig }}
   customSlurmConfig: |
-  {{- nindent 4 .Values.customSlurmConfig }}
+  {{- indent 4 .Values.customSlurmConfig }}
   {{- end }}
   {{- if eq .Values.clusterType "gpu" }}
   healthCheckConfig:
