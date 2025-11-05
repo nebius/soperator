@@ -17,68 +17,88 @@ limitations under the License.
 package v1alpha1_test
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"context"
+	"testing"
 
+	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/consts"
 	. "nebius.ai/slurm-operator/internal/webhook/v1alpha1"
 )
 
-var _ = Describe("NodeSet Webhook", func() {
-	var (
-		obj       *slurmv1alpha1.NodeSet
-		oldObj    *slurmv1alpha1.NodeSet
-		validator NodeSetCustomValidator
-		defaulter NodeSetCustomDefaulter
+func TestDefaultSlurmClusterRef(t *testing.T) {
+	defaulter := &NodeSetCustomDefaulter{
+		Client: newClientBuilder().Build(),
+	}
+	const (
+		testNamespace   = "default"
+		testNodeSetName = "test-nodeset"
+		testClusterName = "test-cluster"
 	)
 
-	BeforeEach(func() {
-		obj = &slurmv1alpha1.NodeSet{}
-		oldObj = &slurmv1alpha1.NodeSet{}
-		validator = NodeSetCustomValidator{}
-		Expect(validator).NotTo(BeNil(), "Expected validator to be initialized")
-		defaulter = NodeSetCustomDefaulter{}
-		Expect(defaulter).NotTo(BeNil(), "Expected defaulter to be initialized")
-		Expect(oldObj).NotTo(BeNil(), "Expected oldObj to be initialized")
-		Expect(obj).NotTo(BeNil(), "Expected obj to be initialized")
+	t.Run("Parental cluster ref exists", func(t *testing.T) {
+		obj := &slurmv1alpha1.NodeSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testNamespace,
+				Name:      testNodeSetName,
+				Annotations: map[string]string{
+					consts.AnnotationParentalClusterRefName: testClusterName,
+				},
+			},
+		}
+
+		err := defaulter.Default(context.Background(), obj)
+		assert.NoError(t, err)
 	})
 
-	AfterEach(func() {})
+	t.Run("Parental cluster ref is set", func(t *testing.T) {
+		defer func() {
+			defaulter.Client = newClientBuilder().Build()
+		}()
 
-	Context("When creating NodeSet under Defaulting Webhook", func() {
-		// TODO (user): Add logic for defaulting webhooks
-		// Example:
-		// It("Should apply defaults when a required field is empty", func() {
-		//     By("simulating a scenario where defaults should be applied")
-		//     obj.SomeFieldWithDefault = ""
-		//     By("calling the Default method to apply defaults")
-		//     defaulter.Default(ctx, obj)
-		//     By("checking that the default values are set")
-		//     Expect(obj.SomeFieldWithDefault).To(Equal("default_value"))
-		// })
+		defaulter.Client = newClientBuilder().
+			WithObjects(&slurmv1.SlurmCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      testClusterName,
+				},
+			}).
+			Build()
+
+		obj := &slurmv1alpha1.NodeSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testNamespace,
+				Name:      testClusterName,
+			},
+		}
+
+		err := defaulter.Default(context.Background(), obj)
+		assert.NoError(t, err)
+		assert.Equal(t, testClusterName, obj.GetAnnotations()[consts.AnnotationParentalClusterRefName])
 	})
 
-	Context("When creating or updating NodeSet under Validating Webhook", func() {
-		// TODO (user): Add logic for validating webhooks
-		// Example:
-		// It("Should deny creation if a required field is missing", func() {
-		//     By("simulating an invalid creation scenario")
-		//     obj.SomeRequiredField = ""
-		//     Expect(validator.ValidateCreate(ctx, obj)).Error().To(HaveOccurred())
-		// })
-		//
-		// It("Should admit creation if all required fields are present", func() {
-		//     By("simulating an invalid creation scenario")
-		//     obj.SomeRequiredField = "valid_value"
-		//     Expect(validator.ValidateCreate(ctx, obj)).To(BeNil())
-		// })
-		//
-		// It("Should validate updates correctly", func() {
-		//     By("simulating a valid update scenario")
-		//     oldObj.SomeRequiredField = "updated_value"
-		//     obj.SomeRequiredField = "updated_value"
-		//     Expect(validator.ValidateUpdate(ctx, oldObj, obj)).To(BeNil())
-		// })
-	})
+	t.Run("Parental cluster doesn't exist", func(t *testing.T) {
+		obj := &slurmv1alpha1.NodeSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testNamespace,
+				Name:      testClusterName,
+			},
+		}
 
-})
+		err := defaulter.Default(context.Background(), obj)
+		assert.Error(t, err)
+	})
+}
+
+func newClientBuilder() *fake.ClientBuilder {
+	scheme := runtime.NewScheme()
+	_ = slurmv1.AddToScheme(scheme)
+	_ = slurmv1alpha1.AddToScheme(scheme)
+	return fake.NewClientBuilder().
+		WithScheme(scheme)
+}

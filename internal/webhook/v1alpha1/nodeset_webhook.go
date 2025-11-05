@@ -78,6 +78,10 @@ func defaultNodeSetParentalClusterRef(ctx context.Context, client client.Client,
 	if err != nil {
 		return fmt.Errorf("seeking parental cluster: %w", err)
 	}
+
+	if nodeSet.Annotations == nil {
+		nodeSet.Annotations = map[string]string{}
+	}
 	nodeSet.Annotations[consts.AnnotationParentalClusterRefName] = cluster.Name
 
 	return nil
