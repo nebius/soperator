@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"nebius.ai/slurm-operator/internal/cli"
 	"nebius.ai/slurm-operator/internal/exporter"
 	"nebius.ai/slurm-operator/internal/jwt"
 	"nebius.ai/slurm-operator/internal/slurmapi"
@@ -222,14 +223,12 @@ func main() {
 
 	slurmAPIClient, err := slurmapi.NewClient(flags.slurmAPIServer, issuer, slurmapi.DefaultHTTPClient())
 	if err != nil {
-		log.Error(err, "Failed to initialize Slurm API client")
-		os.Exit(1)
+		cli.Fail(log, err, "Failed to initialize Slurm API client")
 	}
 
 	interval, err := time.ParseDuration(flags.collectionInterval)
 	if err != nil {
-		log.Error(err, "Failed to parse collection interval")
-		os.Exit(1)
+		cli.Fail(log, err, "Failed to parse collection interval")
 	}
 
 	clusterExporter := exporter.NewClusterExporter(
@@ -248,13 +247,11 @@ func main() {
 		log.Info("Using standalone token issuer", "scontrol_path", flags.scontrolPath, "rotation_interval", flags.keyRotationInterval)
 	}
 
-	if err := clusterExporter.Start(ctx, flags.metricsAddr); err != nil {
-		log.Error(err, "Failed to start metrics exporter")
-		os.Exit(1)
+	if err = clusterExporter.Start(ctx, flags.metricsAddr); err != nil {
+		cli.Fail(log, err, "Failed to start metrics exporter")
 	}
-	if err := clusterExporter.StartMonitoring(ctx, flags.monitoringAddr); err != nil {
-		log.Error(err, "Failed to start monitoring server")
-		os.Exit(1)
+	if err = clusterExporter.StartMonitoring(ctx, flags.monitoringAddr); err != nil {
+		cli.Fail(log, err, "Failed to start monitoring server")
 	}
 
 	<-ctx.Done()
