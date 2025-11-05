@@ -17,6 +17,9 @@ resources:
   kind: SlurmCluster
   path: nebius.ai/slurm-operator/api/v1
   version: v1
+  webhooks:
+    validation: true
+    webhookVersion: v1
 - core: true
   group: core
   kind: Secret
