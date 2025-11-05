@@ -271,6 +271,7 @@ soperator:
   version: 1.22.2
   namespace: "soperator-system"
   releaseName: soperator-controller
+  featureGates: ""
   values:
     manager:
       resources: {}
