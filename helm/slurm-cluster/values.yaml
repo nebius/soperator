@@ -21,17 +21,16 @@ partitionConfiguration:
   # - custom: uses raw partition configuration strings from rawConfig
   # - structured: enables NodeSet references and structured partition definitions
   configType: "default"
-  
   # RawConfig defines partition configuration as list of string started with PartitionName.
   # It is used when configType == "custom".
   # Example for custom ConfigType:
   rawConfig: []
-#    - PartitionName=low_priority Nodes=low_priority Default=YES MaxTime=INFINITE State=UP PriorityTier=1
-#    - PartitionName=high_priority  Nodes=high_priority Default=NO MaxTime=INFINITE State=UP PriorityTier=2
+  #    - PartitionName=low_priority Nodes=low_priority Default=YES MaxTime=INFINITE State=UP PriorityTier=1
+  #    - PartitionName=high_priority  Nodes=high_priority Default=NO MaxTime=INFINITE State=UP PriorityTier=2
   # If Nodes present, they must not contain node names: use only nodeset values, "ALL" or "".
   # Specifying specific nodes is not supported since Dynamic Nodes are used.
   # For more details, see https://slurm.schedmd.com/dynamic_nodes.html#partitions.
-  
+
   # Partitions define partition configuration as a list of structured Partition[s].
   # It is used when configType == "structured".
   partitions: []
@@ -54,7 +53,6 @@ partitionConfiguration:
   #    nodeSetRefs:
   #      - "cpu-nodesets"
   #    config: "Default=NO MaxTime=INFINITE State=UP PriorityTier=5"
-
 # List of features to be enabled on worker nodes. Each feature object has:
 # - name: (Required) The name of the feature.
 # - hostlist_expr: (Required) A Slurm hostlist expression, e.g. "workers-[0-2,10],workers-[3-5]".
