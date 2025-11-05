@@ -31,8 +31,8 @@ import (
 )
 
 // nolint:unused
-// slurmclusterlog is for logging in this package.
-var slurmclusterlog = logf.Log.WithName("slurmcluster-resource")
+// slurmClusterLog is for logging in this package.
+var slurmClusterLog = logf.Log.WithName("slurmcluster-resource")
 
 // SetupSlurmClusterWebhookWithManager registers the webhook for SlurmCluster in the manager.
 func SetupSlurmClusterWebhookWithManager(mgr ctrl.Manager) error {
@@ -41,7 +41,7 @@ func SetupSlurmClusterWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// +kubebuilder:webhook:path=/validate-slurm-nebius-ai-v1-slurmcluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=slurm.nebius.ai,resources=slurmclusters,verbs=create;update,versions=v1,name=vslurmcluster-v1.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-slurm-nebius-ai-v1-slurmCluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=slurm.nebius.ai,resources=slurmclusters,verbs=create;update,versions=v1,name=vslurmcluster-v1.kb.io,admissionReviewVersions=v1
 
 // SlurmClusterCustomValidator struct is responsible for validating the SlurmCluster resource
 // when it is created, updated, or deleted.
@@ -53,13 +53,13 @@ var _ webhook.CustomValidator = &SlurmClusterCustomValidator{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type SlurmCluster.
 func (v *SlurmClusterCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	slurmcluster, ok := obj.(*slurmv1.SlurmCluster)
+	slurmCluster, ok := obj.(*slurmv1.SlurmCluster)
 	if !ok {
 		return nil, fmt.Errorf("expected a SlurmCluster object but got %T", obj)
 	}
-	slurmclusterlog.Info("Validation for SlurmCluster upon creation", "name", slurmcluster.GetName())
+	slurmClusterLog.Info("Validation for SlurmCluster upon creation", "name", slurmCluster.GetName())
 
-	if err := validateSlurmClusterStructuredPartitionRequireNodeSets(slurmcluster.Spec.PartitionConfiguration.ConfigType); err != nil {
+	if err := validateSlurmClusterStructuredPartitionRequireNodeSets(slurmCluster.Spec.PartitionConfiguration.ConfigType); err != nil {
 		return nil, err
 	}
 
@@ -68,13 +68,13 @@ func (v *SlurmClusterCustomValidator) ValidateCreate(_ context.Context, obj runt
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type SlurmCluster.
 func (v *SlurmClusterCustomValidator) ValidateUpdate(_ context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
-	slurmcluster, ok := newObj.(*slurmv1.SlurmCluster)
+	slurmCluster, ok := newObj.(*slurmv1.SlurmCluster)
 	if !ok {
 		return nil, fmt.Errorf("expected a SlurmCluster object for the newObj but got %T", newObj)
 	}
-	slurmclusterlog.Info("Validation for SlurmCluster upon update", "name", slurmcluster.GetName())
+	slurmClusterLog.Info("Validation for SlurmCluster upon update", "name", slurmCluster.GetName())
 
-	if err := validateSlurmClusterStructuredPartitionRequireNodeSets(slurmcluster.Spec.PartitionConfiguration.ConfigType); err != nil {
+	if err := validateSlurmClusterStructuredPartitionRequireNodeSets(slurmCluster.Spec.PartitionConfiguration.ConfigType); err != nil {
 		return nil, err
 	}
 
