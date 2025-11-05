@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/feature"
 )
 
 // nolint:unused
@@ -58,18 +59,34 @@ func (v *SlurmClusterCustomValidator) ValidateCreate(_ context.Context, obj runt
 	}
 	slurmclusterlog.Info("Validation for SlurmCluster upon creation", "name", slurmcluster.GetName())
 
+	if err := validateSlurmClusterStructuredPartitionRequireNodeSets(slurmcluster.Spec.PartitionConfiguration.ConfigType); err != nil {
+		return nil, err
+	}
+
 	return nil, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type SlurmCluster.
-func (v *SlurmClusterCustomValidator) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+func (v *SlurmClusterCustomValidator) ValidateUpdate(_ context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
 	slurmcluster, ok := newObj.(*slurmv1.SlurmCluster)
 	if !ok {
 		return nil, fmt.Errorf("expected a SlurmCluster object for the newObj but got %T", newObj)
 	}
 	slurmclusterlog.Info("Validation for SlurmCluster upon update", "name", slurmcluster.GetName())
 
+	if err := validateSlurmClusterStructuredPartitionRequireNodeSets(slurmcluster.Spec.PartitionConfiguration.ConfigType); err != nil {
+		return nil, err
+	}
+
 	return nil, nil
+}
+
+func validateSlurmClusterStructuredPartitionRequireNodeSets(configType string) error {
+	if !feature.Gate.Enabled(feature.NodeSetWorkers) && configType == slurmv1.PartitionConfigTypeStructured {
+		return fmt.Errorf("structured partitions are not supported with disabled nodesets")
+	}
+
+	return nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type SlurmCluster.
