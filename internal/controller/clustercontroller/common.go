@@ -75,18 +75,12 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					{
-						nodeSetsEnabled := feature.Gate.Enabled(feature.NodeSetWorkers)
-						if !nodeSetsEnabled && clusterValues.PartitionConfiguration.ConfigType == slurmv1.PartitionConfigTypeStructured {
-							return fmt.Errorf("structured partitions are not supported without nodesets")
+					if feature.Gate.Enabled(feature.NodeSetWorkers) {
+						nodeSets, err := resourcegetter.ListNodeSetsByClusterRef(stepCtx, r.Client, types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name})
+						if err != nil {
+							return err
 						}
-						if nodeSetsEnabled {
-							nodeSets, err := resourcegetter.ListNodeSetsByClusterRef(stepCtx, r.Client, types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name})
-							if err != nil {
-								return err
-							}
-							clusterValues.NodeSets = nodeSets
-						}
+						clusterValues.NodeSets = nodeSets
 					}
 
 					desired := common.RenderConfigMapSlurmConfigs(clusterValues)
