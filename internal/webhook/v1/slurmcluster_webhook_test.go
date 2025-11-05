@@ -17,52 +17,94 @@ limitations under the License.
 package v1_test
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	webhookv1 "nebius.ai/slurm-operator/internal/webhook/v1"
+	"nebius.ai/slurm-operator/internal/feature"
+	. "nebius.ai/slurm-operator/internal/webhook/v1"
 )
 
-var _ = Describe("SlurmCluster Webhook", func() {
-	var (
-		obj       *slurmv1.SlurmCluster
-		oldObj    *slurmv1.SlurmCluster
-		validator webhookv1.SlurmClusterCustomValidator
-	)
+func TestValidateSlurmClusterCreate(t *testing.T) {
+	validator := &SlurmClusterCustomValidator{}
 
-	BeforeEach(func() {
-		obj = &slurmv1.SlurmCluster{}
-		oldObj = &slurmv1.SlurmCluster{}
-		validator = webhookv1.SlurmClusterCustomValidator{}
-		Expect(validator).NotTo(BeNil(), "Expected validator to be initialized")
-		Expect(oldObj).NotTo(BeNil(), "Expected oldObj to be initialized")
-		Expect(obj).NotTo(BeNil(), "Expected obj to be initialized")
+	t.Run("Creation should be denied if NodeSets are disabled but partition configuration is structured", func(t *testing.T) {
+		err := feature.Gate.SetFromMap(map[string]bool{
+			string(feature.NodeSetWorkers): false,
+		})
+		assert.NoError(t, err)
+
+		obj := &slurmv1.SlurmCluster{
+			Spec: slurmv1.SlurmClusterSpec{
+				PartitionConfiguration: slurmv1.PartitionConfiguration{
+					ConfigType: slurmv1.PartitionConfigTypeStructured,
+				},
+			},
+		}
+
+		_, err = validator.ValidateCreate(context.Background(), obj)
+		assert.Error(t, err)
 	})
 
-	AfterEach(func() {})
+	t.Run("Creation should be admit if NodeSets are enabled and partition configuration is structured", func(t *testing.T) {
+		err := feature.Gate.SetFromMap(map[string]bool{
+			string(feature.NodeSetWorkers): true,
+		})
+		assert.NoError(t, err)
 
-	Context("When creating or updating SlurmCluster under Validating Webhook", func() {
-		// TODO (user): Add logic for validating webhooks
-		// Example:
-		// It("Should deny creation if a required field is missing", func() {
-		//     By("simulating an invalid creation scenario")
-		//     obj.SomeRequiredField = ""
-		//     Expect(validator.ValidateCreate(ctx, obj)).Error().To(HaveOccurred())
-		// })
-		//
-		// It("Should admit creation if all required fields are present", func() {
-		//     By("simulating an invalid creation scenario")
-		//     obj.SomeRequiredField = "valid_value"
-		//     Expect(validator.ValidateCreate(ctx, obj)).To(BeNil())
-		// })
-		//
-		// It("Should validate updates correctly", func() {
-		//     By("simulating a valid update scenario")
-		//     oldObj.SomeRequiredField = "updated_value"
-		//     obj.SomeRequiredField = "updated_value"
-		//     Expect(validator.ValidateUpdate(ctx, oldObj, obj)).To(BeNil())
-		// })
+		obj := &slurmv1.SlurmCluster{
+			Spec: slurmv1.SlurmClusterSpec{
+				PartitionConfiguration: slurmv1.PartitionConfiguration{
+					ConfigType: slurmv1.PartitionConfigTypeStructured,
+				},
+			},
+		}
+
+		_, err = validator.ValidateCreate(context.Background(), obj)
+		assert.NoError(t, err)
+	})
+}
+
+func TestValidateSlurmClusterUpdate(t *testing.T) {
+	validator := &SlurmClusterCustomValidator{}
+
+	t.Run("Update should be denied if NodeSets are disabled but partition configuration is structured", func(t *testing.T) {
+		err := feature.Gate.SetFromMap(map[string]bool{
+			string(feature.NodeSetWorkers): false,
+		})
+		assert.NoError(t, err)
+
+		oldObj := &slurmv1.SlurmCluster{}
+		obj := &slurmv1.SlurmCluster{
+			Spec: slurmv1.SlurmClusterSpec{
+				PartitionConfiguration: slurmv1.PartitionConfiguration{
+					ConfigType: slurmv1.PartitionConfigTypeStructured,
+				},
+			},
+		}
+
+		_, err = validator.ValidateUpdate(context.Background(), oldObj, obj)
+		assert.Error(t, err)
 	})
 
-})
+	t.Run("Update should be admit if NodeSets are enabled and partition configuration is structured", func(t *testing.T) {
+		err := feature.Gate.SetFromMap(map[string]bool{
+			string(feature.NodeSetWorkers): true,
+		})
+		assert.NoError(t, err)
+
+		oldObj := &slurmv1.SlurmCluster{}
+		obj := &slurmv1.SlurmCluster{
+			Spec: slurmv1.SlurmClusterSpec{
+				PartitionConfiguration: slurmv1.PartitionConfiguration{
+					ConfigType: slurmv1.PartitionConfigTypeStructured,
+				},
+			},
+		}
+
+		_, err = validator.ValidateUpdate(context.Background(), oldObj, obj)
+		assert.NoError(t, err)
+	})
+}
