@@ -54,7 +54,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/nodesetcontroller"
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
 	"nebius.ai/slurm-operator/internal/feature"
-	webhookcorev1 "nebius.ai/slurm-operator/internal/webhook/v1"
+	webhookv1 "nebius.ai/slurm-operator/internal/webhook/v1"
 	webhookv1alpha1 "nebius.ai/slurm-operator/internal/webhook/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
@@ -237,17 +237,24 @@ func main() {
 	}
 
 	// region Reconciler/Cluster
-	if err = clustercontroller.NewSlurmClusterReconciler(
-		mgr.GetClient(),
-		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(consts.SlurmCluster+"-controller"),
-	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		cli.Fail(setupLog, err, "unable to create controller", "controller", reflect.TypeOf(slurmv1.SlurmCluster{}).Name())
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = webhookcorev1.SetupSecretWebhookWithManager(mgr); err != nil {
-			cli.Fail(setupLog, err, "unable to create webhook", "webhook", "Secret")
+	{
+		slurmClusterName := reflect.TypeOf(slurmv1.SlurmCluster{}).Name()
+
+		if err = clustercontroller.NewSlurmClusterReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(consts.SlurmCluster+"-controller"),
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create controller", "controller", slurmClusterName)
+		}
+		// nolint:goconst
+		if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+			if err = webhookv1.SetupSlurmClusterWebhookWithManager(mgr); err != nil {
+				cli.Fail(setupLog, err, "unable to create webhook", "webhook", slurmClusterName)
+			}
+			if err = webhookv1.SetupSecretWebhookWithManager(mgr); err != nil {
+				cli.Fail(setupLog, err, "unable to create webhook", "webhook", "Secret")
+			}
 		}
 	}
 	// endregion Reconciler/Cluster
