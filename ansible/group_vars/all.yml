@@ -1,48 +1,9 @@
 ---
 
-slurm:
-  version: 25.05.4
-  client_packages:
-    - slurm-smd-client
-    - slurm-smd-dev
-    - slurm-smd-libnss-slurm
-    - slurm-smd
-
-nc_health_checker_version: 1.0.0-162.251030
-
-common_packages:
-  - { name: autoconf, version: "2.71-3" }
-  - { name: build-essential, version: "12.10ubuntu1" }
-  - { name: ca-certificates, version: "20240203" }
-  - { name: flex, version: "2.6.4-8.2build1" }
-  - { name: libevent-dev, version: "2.1.12-stable-9ubuntu2" }
-  - { name: libhwloc-dev, version: "2.10.0-1build1" }
-  - { name: libjansson-dev, version: "2.14-2build2" }
-  - { name: libjson-c-dev, version: "0.17-1build1" }
-  - { name: liblz4-dev, version: "1.9.4-1build1.1" }
-  - { name: libmunge-dev, version: "0.5.15-4build1" }
-  - { name: libpam0g, version: "1.5.3-5ubuntu5.5" }
-  - { name: libpam0g-dev, version: "1.5.3-5ubuntu5.5" }
-  - { name: libssl-dev, version: "3.0.13-0ubuntu3.6" }
-  - { name: libtool, version: "2.4.7-7build1" }
-  - { name: libdrm-dev, version: "2.4.122-1~ubuntu0.24.04.1" }
-  - { name: rdma-core, version: "50.0-2ubuntu0.2" }
-  - { name: ibverbs-utils, version: "50.0-2ubuntu0.2" }
-  - { name: libpmix-dev, version: "5.0.1-4.1build1" }
-  - { name: parallel, version: "20240222+ds-2" } # it's required for enroot operation
-
-openmpi:
-  version: 4.1.7a1-1.2404066
-  version_short: 4.1.7a1
-  ofed_version: 24.04-0.7.0.0
-  ucx_version: 1.17.0-1.2404066
-
 dpkg_arch_map:
   x86_64: amd64
   aarch64: arm64
   armv7l: armhf
-
-nvidia_toolkit_version: 1.17.8-1
 
 cuda_dpkg_arch_map:
   x86_64: x86_64

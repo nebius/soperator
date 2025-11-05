@@ -31,8 +31,8 @@
 - name: Ensure openmpi packages are installed
   ansible.builtin.apt:
     name:
-      - openmpi={{ openmpi.version }}
-      - ucx={{ openmpi.ucx_version }}
+      - openmpi={{ openmpi_version }}
+      - ucx={{ openmpi_ucx_version }}
     state: present
     update_cache: true
   tags:
@@ -41,7 +41,7 @@
 - name: Add OpenMPI to global PATH
   ansible.builtin.copy:
     dest: /etc/profile.d/path_openmpi.sh
-    content: export PATH=/usr/mpi/gcc/openmpi-{{ openmpi.version_short }}/bin:$PATH
+    content: export PATH=/usr/mpi/gcc/openmpi-{{ openmpi_version_short }}/bin:$PATH
     owner: root
     group: root
     mode: '0644'
@@ -55,7 +55,7 @@
       /lib/{{ ansible_architecture }}-linux-gnu
       /usr/lib/{{ ansible_architecture }}-linux-gnu
       /usr/local/cuda/targets/{{ ansible_architecture }}-linux/lib
-      /usr/mpi/gcc/openmpi-{{ openmpi.version_short }}/lib
+      /usr/mpi/gcc/openmpi-{{ openmpi_version_short }}/lib
     owner: root
     group: root
     mode: '0644'

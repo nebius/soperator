@@ -12,7 +12,7 @@
 
 - name: Copy files to the /usr/bin
   ansible.builtin.copy:
-    src: "..images/jail/scripts/{{ item }}"
+    src: "{{ item }}"
     dest: "/usr/bin/{{ item }}"
     owner: root
     group: root
@@ -36,8 +36,8 @@
 
 - name: Copy soperator-scripts files
   ansible.builtin.copy:
-    src: "..images/jail/scripts/{{ item.path }}"
-    dest: "/opt/soperator_utils/{{ item.path }}"
+    src: "{{ item }}"
+    dest: "/opt/soperator_utils/{{ item }}"
     owner: root
     group: root
     mode: "0755"
@@ -46,7 +46,6 @@
     - slurm_task_info.sh
     - worker_nvidia_bug_report.sh
     - fs_usage.sh
-    -
   tags:
     - soperator-scripts
 

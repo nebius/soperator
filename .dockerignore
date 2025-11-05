@@ -1,4 +1,6 @@
-/ansible
+.ansible
+.github
+.gitignore
 /bin
 /config
 /deps

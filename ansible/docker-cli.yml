@@ -1,0 +1,10 @@
+---
+
+- name: Install docker-cli
+  hosts: all, localhost
+  gather_facts: true
+  become: true
+  roles:
+    - docker-cli
+  tags:
+    - docker-cli

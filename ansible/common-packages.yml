@@ -1,0 +1,10 @@
+---
+
+- name: Install common packages
+  hosts: all, localhost
+  gather_facts: true
+  become: true
+  roles:
+    - common-packages
+  tags:
+    - common-packages

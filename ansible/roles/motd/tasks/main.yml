@@ -15,7 +15,7 @@
 
 - name: Copy motd files
   ansible.builtin.copy:
-    src: "../images/jail/motd/{{ item }}"
+    src: "{{ item }}"
     dest: "/etc/update-motd.d/{{ item }}"
     owner: root
     group: root

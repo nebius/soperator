@@ -19,7 +19,7 @@
 
 - name: Copy skel files
   ansible.builtin.copy:
-    src: "../images/jail/skel/{{ item.path }}"
+    src: "{{ item.path }}"
     dest: "{{ item.dest_folder }}{{ item.path }}"
     owner: root
     group: root

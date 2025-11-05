@@ -1,9 +1,0 @@
-Package: *
-Pin: origin "dr.nebius.cloud"
-Pin: release a=stable
-Pin-Priority: 700
-
-Package: *
-Pin: origin "dr.nebius.cloud"
-Pin: release a=testing
-Pin-Priority: 600

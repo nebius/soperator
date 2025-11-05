@@ -1,0 +1,10 @@
+---
+
+- name: Install openmpi
+  hosts: all, localhost
+  become: true
+  gather_facts: true
+  roles:
+    - openmpi
+  tags:
+    - slurm-install

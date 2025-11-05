@@ -1,0 +1,10 @@
+---
+
+- name: Install/Upgrade nc-health-checker
+  hosts: all, localhost
+  become: true
+  gather_facts: true
+  roles:
+    - nc-health-checker
+  tags:
+    - nc-health-checker

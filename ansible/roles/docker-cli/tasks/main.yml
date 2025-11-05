@@ -45,7 +45,7 @@
 
 - name: Install docker wrapper script
   ansible.builtin.copy:
-    src: ../images/jail/scripts/docker.sh
+    src: docker.sh
     dest: /usr/bin/docker
     owner: root
     group: root

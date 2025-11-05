@@ -6,6 +6,7 @@
     curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
     | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
   args:
+    executable: /bin/bash
     creates: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
   tags:
     - nvidia-container-toolkit
@@ -28,12 +29,13 @@
       - libnvidia-container-tools={{ nvidia_toolkit_version }}
       - libnvidia-container1={{ nvidia_toolkit_version }}
     state: present
+    update_cache: true
   tags:
     - nvidia-container-toolkit
 
 - name: Copy NVIDIA nvidia-container-runtime config.toml
   ansible.builtin.copy:
-    src: ../images/common/nvidia-container-runtime/config.toml
+    src: config.toml
     dest: /etc/nvidia-container-runtime/config.toml
     owner: root
     group: root

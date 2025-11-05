@@ -5,5 +5,6 @@
     name:
       - datacenter-gpu-manager-4-cuda12=1:4.4.1-1
     state: present
+    update_cache: true
   tags:
     - dcgmi

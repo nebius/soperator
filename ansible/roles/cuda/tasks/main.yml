@@ -10,6 +10,7 @@
     msg:
       - "Architecture from cuda_dpkg_arch_map: {{ cuda_dpkg_arch_map[ansible_architecture] }}"
       - "Architecture from dpkg_arch_map: {{ dpkg_arch_map[ansible_architecture] }}"
+      - "Architecture: {{ ansible_architecture }}"
       - "Distro version: ubuntu{{ ansible_distribution_version }}"
   tags:
     - cuda
@@ -29,21 +30,32 @@
 - name: Download NVIDIA CUDA keyring package
   ansible.builtin.get_url:
     url: >-
-      https://developer.download.nvidia.com/compute/cuda/repos/
-      ubuntu{{ ansible_distribution_version | replace('.', '') }}/
-      {{ cuda_dpkg_arch_map[ansible_architecture] }}/
-      cuda-keyring_1.1-1_all.deb
+      {{
+        "https://developer.download.nvidia.com/compute/cuda/repos/"
+        ~ "ubuntu"
+        ~ (ansible_distribution_version | replace('.', ''))
+        ~ "/"
+        ~ cuda_dpkg_arch_map[ansible_architecture]
+        ~ "/cuda-keyring_1.1-1_all.deb"
+      }}
     dest: /tmp/cuda-keyring_1.1-1_all.deb
     mode: "0644"
   tags:
     - cuda
 
 - name: Set timezone to UTC
-  community.general.timezone:
-    name: Etc/UTC
-  tags:
-    - timezone
-    - cuda
+  ansible.builtin.file:
+    src: /usr/share/zoneinfo/Etc/UTC
+    dest: /etc/localtime
+    state: link
+
+- name: Ensure /etc/timezone reflects UTC
+  ansible.builtin.copy:
+    dest: /etc/timezone
+    content: "Etc/UTC\n"
+    owner: root
+    group: root
+    mode: "0644"
 
 - name: Ensure a locale exists
   community.general.locale_gen:
@@ -93,11 +105,23 @@
       - "libnccl2={{ libnccl_version }}+cuda12.9"
     state: present
     update_cache: true
-    hold: true
   tags:
     - cuda
 
-- name: Create APT pin file for CUDA packages
+- name: Hold CUDA-related packages (prevent upgrades)
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - cuda
+    - libcublas-dev-12-9
+    - libcudnn9-cuda-12
+    - libcudnn9-dev-cuda-12
+    - libcudnn9-headers-cuda-12
+    - libnccl-dev
+    - libnccl2
+
+- name: Create APT pin file for CUDA and related packages
   ansible.builtin.copy:
     dest: /etc/apt/preferences.d/cuda-pins
     content: |
@@ -108,6 +132,34 @@
       Package: nvidia-open
       Pin: version 99999999-fake
       Pin-Priority: 1001
+
+      Package: cuda
+      Pin: version 12.9.0-1
+      Pin-Priority: 1001
+
+      Package: libcublas-dev-12-9
+      Pin: version 12.9.1.4-1
+      Pin-Priority: 1001
+
+      Package: libcudnn9-cuda-12
+      Pin: version 9.10.1.4-1
+      Pin-Priority: 1001
+
+      Package: libcudnn9-dev-cuda-12
+      Pin: version 9.10.1.4-1
+      Pin-Priority: 1001
+
+      Package: libcudnn9-headers-cuda-12
+      Pin: version 9.10.1.4-1
+      Pin-Priority: 1001
+
+      Package: libnccl-dev
+      Pin: version {{ libnccl_version }}+cuda12.9
+      Pin-Priority: 1001
+
+      Package: libnccl2
+      Pin: version {{ libnccl_version }}+cuda12.9
+      Pin-Priority: 1001
     owner: root
     group: root
     mode: "0644"
@@ -116,19 +168,19 @@
 
 - name: Download nccl-tests archive
   ansible.builtin.get_url:
-    url: "{{ packages_repo_url }}/nccl_tests_12.9.0_ubuntu{{ ansible_distribution_version }}/nccl-tests-perf-{{ arch_deb }}.tar.gz"
-    dest: "/tmp/nccl-tests-perf-{{ arch_deb }}.tar.gz"
-    mode: '0644'
+    url: "{{ packages_repo_url }}/nccl_tests_12.9.0_ubuntu{{ ansible_distribution_version }}/nccl-tests-perf-{{ ansible_architecture }}.tar.gz"
+    dest: "/tmp/nccl-tests-perf-{{ ansible_architecture }}.tar.gz"
+    mode: "0644"
   tags:
     - nccl
     - cuda
 
 - name: Extract nccl-tests archive into /usr/bin
   ansible.builtin.unarchive:
-    src: "/tmp/nccl-tests-perf-{{ arch_deb }}.tar.gz"
+    src: "/tmp/nccl-tests-perf-{{ ansible_architecture }}.tar.gz"
     dest: /usr/bin
     remote_src: true
-    mode: '0755'
+    mode: "0755"
   tags:
     - nccl
     - cuda

@@ -3,9 +3,7 @@
 - name: Collect host facts
   ansible.builtin.setup:
   tags:
-    - slurm
-    - slurm-packages
-    - slurm-client-packages
+    - slurm-divert
 
 - name: Show system info
   ansible.builtin.debug:
@@ -13,25 +11,7 @@
       - "Architecture: {{ ansible_architecture }}"
       - "Distro version: ubuntu{{ ansible_distribution_version }}"
   tags:
-    - slurm
-    - slurm-packages
-    - slurm-client-packages
-
-# /var/spool/slurmd for bind-mounting it from the host. It's needed for sbatch to work
-- name: Create directories
-  ansible.builtin.file:
-    path: /var/spool/slurmd
-    state: directory
-    mode: '0755'
-    owner: root
-    group: root
-  loop:
-    - /var/spool/slurmd
-    - /usr/lib/slurm
-  tags:
-    - slurm
-    - slurm-packages
-    - slurm-client-packages
+    - slurm-divert
 
 - name: Find all Slurm plugin files for this architecture
   ansible.builtin.find:
@@ -39,9 +19,7 @@
     file_type: file
   register: slurm_plugins
   tags:
-    - slurm
-    - slurm-packages
-    - slurm-client-packages
+    - slurm-divert
 
 - name: Define files to exclude
   ansible.builtin.set_fact:
@@ -50,9 +28,7 @@
       - "/usr/lib/{{ ansible_architecture }}-linux-gnu/slurm/spanknccldebug.so"
       - "/usr/lib/{{ ansible_architecture }}-linux-gnu/slurm/chroot.so"
   tags:
-    - slurm
-    - slurm-packages
-    - slurm-client-packages
+    - slurm-divert
 
 - name: Symlink all Slurm plugin files into /usr/lib/slurm excluding specific ones
   ansible.builtin.file:
@@ -69,9 +45,7 @@
       | list
     }}
   tags:
-    - slurm
-    - slurm-packages
-    - slurm-client-packages
+    - slurm-divert
 
 - name: Divert files
   community.general.dpkg_divert:
@@ -83,9 +57,7 @@
     - "/usr/lib/{{ ansible_architecture }}-linux-gnu/libnss_slurm.so.2"
     - /usr/share/bash-completion/completions/slurm_completion.sh
   tags:
-    - slurm
-    - slurm-packages
-    - slurm-client-packages
+    - slurm-divert
 
 - name: Find actual libslurm.so.* shared object (not symlink)
   ansible.builtin.find:
@@ -94,9 +66,7 @@
     file_type: file
   register: slurm_libslurm_so_file
   tags:
-    - slurm
-    - slurm-packages
-    - slurm-client-packages
+    - slurm-divert
 
 - name: Ensure diversion is set for the real libslurm.so.* shared object
   community.general.dpkg_divert:
@@ -107,9 +77,7 @@
   loop: "{{ slurm_libslurm_so_file.files }}"
   when: slurm_libslurm_so_file.matched > 0
   tags:
-    - slurm
-    - slurm-packages
-    - slurm-client-packages
+    - slurm-divert
 
 - name: Divert Slurm client binaries to protect from package overwrites
   community.general.dpkg_divert:
@@ -139,21 +107,4 @@
     - sshare
     - strigger
   tags:
-    - slurm
-    - slurm-packages
-    - slurm-client-packages
-
-- name: Install Slurm client packages
-  ansible.builtin.apt:
-    name: >-
-      {{
-        slurm.client_packages
-        | map('regex_replace', '$', '=' ~ slurm.version ~ '-1')
-        | list
-      }}
-    state: present
-    update_cache: true
-  tags:
-    - slurm
-    - slurm-packages
-    - slurm-client-packages
+    - slurm-divert
