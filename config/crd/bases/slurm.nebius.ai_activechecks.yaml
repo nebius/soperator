@@ -3226,11 +3226,6 @@ spec:
                 description: SlurmJobSpec defines options for k8s cronjob which creates
                   slurm job
                 properties:
-                  eachWorkerJobArray:
-                    default: false
-                    description: Run sbatch script on each worker exactly once using
-                      job array
-                    type: boolean
                   eachWorkerJobs:
                     default: false
                     description: Run sbatch script on each worker exactly once using

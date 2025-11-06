@@ -3225,11 +3225,6 @@ spec:
                 description: SlurmJobSpec defines options for k8s cronjob which creates
                   slurm job
                 properties:
-                  eachWorkerJobArray:
-                    default: false
-                    description: Run sbatch script on each worker exactly once using
-                      job array
-                    type: boolean
                   eachWorkerJobs:
                     default: false
                     description: Run sbatch script on each worker exactly once using
@@ -24784,7 +24779,6 @@ spec:
                       PartitionConfigTypeDefault - generates 3 standard partitions:
                        - `main` - Default partition for regular jobs (PriorityTier=10)
                        - `hidden` - Hidden partition for administrative tasks (Hidden=YES)
-                       - `background` - Low-priority background partition (PriorityTier=1)
 
                       PartitionConfigTypeCustom - uses raw partition configuration strings from RawConfig.
 

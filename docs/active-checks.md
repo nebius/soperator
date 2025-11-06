@@ -96,7 +96,6 @@ CronJobs create Kubernetes Jobs on schedule, which either run the check directly
 **`spec.slurmJobSpec` (Slurm checks)**
 - **`spec.slurmJobSpec.sbatchScriptRefName`** *(string)* — Name of a `ConfigMap` containing an sbatch script at key `sbatch.sh`.
 - **`spec.slurmJobSpec.sbatchScript`** *(string, multiline)* — Inline sbatch script. May contain `#SBATCH` directives and shell logic; can invoke `srun`.
-- **`spec.slurmJobSpec.eachWorkerJobArray`** *(bool)* — Run on **each worker** once using a **Slurm job array**.
 - **`spec.slurmJobSpec.eachWorkerJobs`** *(bool)* — Run on **each worker** using **separate Slurm jobs**.
 - **`spec.slurmJobSpec.maxNumberOfJobs`** *(int64)* — Maximum number of simultaneous jobs. If less than the number of workers, only a subset runs. `0` = no limit.
 
@@ -169,7 +168,6 @@ In both cases, the Active Check Controller creates a CronJob (1:1 with CR) which
 
 #### Slurm job submission modes
 - **Default** — One Slurm batch per run.
-- **eachWorkerJobArray** — Run once per worker using a Slurm job array.
 - **eachWorkerJobs** — Run once per worker using separate Slurm jobs.
 - **maxNumberOfJobs** — Limits concurrent jobs; if less than the number of workers, only a subset executes.
 
@@ -177,16 +175,12 @@ In both cases, the Active Check Controller creates a CronJob (1:1 with CR) which
 There are three partitions by default:
 - **main** — used for clients’ jobs.
 - **hidden** — hidden partition with the same priority as `main`.
-- **background** — hidden partition with lower priority than `main` and `hidden`.
 
 Submission modes use partitions as follows:
 - **Default** (single job) → `hidden` partition.
 - **eachWorkerJobs** (separate job per worker) → `hidden` partition.
-- **eachWorkerJobArray** (job array per worker) → `background` partition.
 
-If neither of `eachWorkerJobs` or `eachWorkerJobArray` is specified the job is running in default submission mode.
-
-Using `background` for job arrays avoids nodes stuck in **PLANNED** and prevents the `main` partition queue from being blocked by large arrays.
+If `eachWorkerJobs` is not specified the job is running in default submission mode.
 
 ## Observability
 

@@ -1149,7 +1149,6 @@ spec:
                       PartitionConfigTypeDefault - generates 3 standard partitions:
                        - `main` - Default partition for regular jobs (PriorityTier=10)
                        - `hidden` - Hidden partition for administrative tasks (Hidden=YES)
-                       - `background` - Low-priority background partition (PriorityTier=1)
 
                       PartitionConfigTypeCustom - uses raw partition configuration strings from RawConfig.
 
