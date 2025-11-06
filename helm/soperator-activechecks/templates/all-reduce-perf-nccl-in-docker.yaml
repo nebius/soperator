@@ -25,4 +25,4 @@ spec:
       image: {{ .Values.images.munge | quote }}
   failureReactions:
     drainSlurmNode:
-      setHardwareIssueSuspected: {{ .Values.checks.allReducePerfNCCLInDocker.setHardwareIssueSuspected }}
+      drainReasonPrefix: {{ .Values.checks.allReducePerfNCCLInDocker.drainReasonPrefix }}

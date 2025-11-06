@@ -26,4 +26,4 @@ spec:
       image: {{ .Values.images.munge | quote }}
   failureReactions:
     drainSlurmNode:
-      setHardwareIssueSuspected: {{ .Values.checks.cudaSamples.setHardwareIssueSuspected }}
+      drainReasonPrefix: {{ .Values.checks.cudaSamples.drainReasonPrefix }}

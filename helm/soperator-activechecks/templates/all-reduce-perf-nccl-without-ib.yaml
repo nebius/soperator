@@ -26,4 +26,4 @@ spec:
       image: {{ .Values.images.munge | quote }}
   failureReactions:
     drainSlurmNode:
-      setHardwareIssueSuspected: {{ .Values.checks.allReducePerfNCCLWithoutIB.setHardwareIssueSuspected }}
+      drainReasonPrefix: {{ .Values.checks.allReducePerfNCCLWithoutIB.drainReasonPrefix }}

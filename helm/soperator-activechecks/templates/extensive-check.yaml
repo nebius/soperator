@@ -15,14 +15,6 @@ spec:
   # *JobsHistoryLimit this sould equal the number of worker nodes in the cluster
   successfulJobsHistoryLimit: 3000
   failedJobsHistoryLimit: 3000
-  successReactions:
-    removeReservation:
-      prefix: {{ .Values.reservationPrefix | quote }}
-  failureReactions:
-    drainSlurmNode:
-      setHardwareIssueSuspected: {{ .Values.checks.extensiveCheck.setHardwareIssueSuspected }}
-    removeReservation:
-      prefix: {{ .Values.reservationPrefix | quote }}
   slurmJobSpec:
     sbatchScript: |
 {{ .Files.Get "scripts/extensive-check.sh" | indent 6 }}
@@ -36,4 +28,11 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
-
+  successReactions:
+    removeReservation:
+      prefix: {{ .Values.checks.extensiveCheck.reservationPrefix | quote }}
+  failureReactions:
+    drainSlurmNode:
+      drainReasonPrefix: {{ .Values.checks.extensiveCheck.drainReasonPrefix }}
+    removeReservation:
+      prefix: {{ .Values.checks.extensiveCheck.reservationPrefix | quote }}

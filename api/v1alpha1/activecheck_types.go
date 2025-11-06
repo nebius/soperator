@@ -121,7 +121,7 @@ type Reactions struct {
 }
 
 type DrainSlurmNodeSpec struct {
-	SetHardwareIssueSuspected bool `json:"setHardwareIssueSuspected,omitempty"`
+	DrainReasonPrefix string `json:"drainReasonPrefix,omitempty"`
 }
 
 type ReservationSpec struct {

@@ -364,16 +364,11 @@ func updateSlurmNodeWithReactions(
 	}
 
 	failureMessage := fmt.Sprintf("Failed %s: job %d [slurm_job]", activeCheckName, slurmJob.ID)
-	defaultFailureReason := fmt.Sprintf("[node_problem] %s", failureMessage)
-	setHardwareIssueSuspectedFailureReason := fmt.Sprintf("[hardware_problem] %s", failureMessage)
 	for _, node := range nodes {
 		updateReq := api.V0041UpdateNodeMsg{}
-		if reactions.DrainSlurmNode != nil {
-			if reactions.DrainSlurmNode.SetHardwareIssueSuspected {
-				updateReq.Reason = ptr.To(setHardwareIssueSuspectedFailureReason)
-			} else {
-				updateReq.Reason = ptr.To(defaultFailureReason)
-			}
+		if reactions.DrainSlurmNode != nil && reactions.DrainSlurmNode.DrainReasonPrefix != "" {
+			drainReason := fmt.Sprintf("%s %s", reactions.DrainSlurmNode.DrainReasonPrefix, failureMessage)
+			updateReq.Reason = ptr.To(drainReason)
 			updateReq.State = ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateDRAIN})
 		}
 		if reactions.CommentSlurmNode {
@@ -452,7 +447,7 @@ func executeReactions(ctx context.Context, slurmJob slurmapi.Job, activeCheckNam
 		return nil
 	}
 
-	if reactions.DrainSlurmNode != nil || reactions.CommentSlurmNode {
+	if (reactions.DrainSlurmNode != nil && reactions.DrainSlurmNode.DrainReasonPrefix != "") || reactions.CommentSlurmNode {
 		err := updateSlurmNodeWithReactions(ctx, logger, slurmJob, activeCheckName, *reactions, slurmAPIClient)
 		if err != nil {
 			return fmt.Errorf("update slurm node with reaction: %w", err)

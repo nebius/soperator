@@ -42,6 +42,16 @@ _run_and_parse_hc() {
   fi
 }
 
+passive_checks() {
+  _run_and_parse_hc srun --cpu-bind=verbose,cores bash -c \
+    "cd /tmp && \
+    HC_DCGMI_DIAG_R1_DEBUGLOGFILE=/dev/null HC_DCGMI_DIAG_R1_DEBUGLEVEL=NONE \
+    health-checker run -e soperator -p $platform \
+    -n module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg,ib_link,dcgmi_diag_r1 \
+    -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout \
+    --log-level info"
+}
+
 all_reduce_in_docker() {
   mkdir -p /tmp/soperatorchecks/a
   mkdir -p /tmp/soperatorchecks/b
@@ -90,17 +100,8 @@ mem_perf() {
     bash -c "health-checker run -e soperator -p $platform -n mem_bw,mem_lat -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
 
-passive_checks() {
-  _run_and_parse_hc srun --cpu-bind=verbose,cores bash -c \
-    "cd /tmp && \
-    HC_DCGMI_DIAG_R1_DEBUGLOGFILE=/dev/null HC_DCGMI_DIAG_R1_DEBUGLEVEL=NONE \
-    health-checker run -e soperator -p $platform \
-    -n module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg,ib_link,dcgmi_diag_r1 \
-    -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout \
-    --log-level info"
-}
-
 funcs_to_test=(
+  passive_checks
   all_reduce_in_docker
   all_reduce_with_ib
   all_reduce_without_ib
@@ -109,7 +110,6 @@ funcs_to_test=(
   gpu_fryer
   ib_gpu_perf
   mem_perf
-  passive_checks
 )
 for test in "${funcs_to_test[@]}"
 do

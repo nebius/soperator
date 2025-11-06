@@ -1036,8 +1036,8 @@ spec:
                   drainSlurmNode:
                     description: DrainSlurmNode enabling slurm node draining
                     properties:
-                      setHardwareIssueSuspected:
-                        type: boolean
+                      drainReasonPrefix:
+                        type: string
                     type: object
                   removeReservation:
                     description: RemoveReservation removs slurm reservation with name
@@ -7540,8 +7540,8 @@ spec:
                   drainSlurmNode:
                     description: DrainSlurmNode enabling slurm node draining
                     properties:
-                      setHardwareIssueSuspected:
-                        type: boolean
+                      drainReasonPrefix:
+                        type: string
                     type: object
                   removeReservation:
                     description: RemoveReservation removs slurm reservation with name
