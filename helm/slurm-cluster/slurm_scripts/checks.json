@@ -210,7 +210,7 @@
   {
     "name": "gpu_health_check",
     "command": "/usr/bin/python3 gpu_health_check.py",
-    "platforms": ["8xH100", "8xH200", "8xB200"],
+    "platforms": ["8xH100", "8xH200", "8xB200", "8xB300"],
     "skip_for_cpu_jobs": true,
     "skip_for_partial_gpu_jobs": false,
     "contexts": ["any"],

@@ -385,6 +385,8 @@ def get_platform_tags() -> list[str]:
         tags.append(f"{count}xH200")
       elif "NVIDIA B200" in first:
         tags.append(f"{count}xB200")
+      elif "NVIDIA B300" in first:
+        tags.append(f"{count}xB300")
 
     tags.append(f"{count}xGPU")
 
