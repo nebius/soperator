@@ -311,4 +311,6 @@ jobs:
           UNSTABLE=${{ steps.read-version.outputs.unstable }}
           OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
 
+          make sync-version UNSTABLE=${UNSTABLE}
+
           make release-helm UNSTABLE="${UNSTABLE}" OPERATOR_IMAGE_TAG="$OPERATOR_IMAGE_TAG"

@@ -104,7 +104,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 			worker:         createWorker(),
 			secrets:        secret,
 			clusterType:    consts.ClusterTypeCPU,
-			expectedEnvVar: consts.CGroupV2Env,
+			expectedEnvVar: consts.EnvCGroupV2,
 			expectedInitCt: 2,
 		},
 	}

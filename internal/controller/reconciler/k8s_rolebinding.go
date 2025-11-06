@@ -10,7 +10,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/logfield"
 )
 
@@ -30,12 +29,12 @@ func NewRoleBindingReconciler(r *Reconciler) *RoleBindingReconciler {
 
 func (r *RoleBindingReconciler) Reconcile(
 	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
+	owner client.Object,
 	desired rbacv1.RoleBinding,
 	deps ...metav1.Object,
 ) error {
 	logger := log.FromContext(ctx)
-	if err := r.reconcile(ctx, cluster, &desired, r.patch, deps...); err != nil {
+	if err := r.reconcile(ctx, owner, &desired, r.patch, deps...); err != nil {
 		logger.V(1).
 			WithValues(logfield.ResourceKV(&desired)...).
 			Error(err, "Failed to reconcile RoleBinding")
@@ -46,14 +45,14 @@ func (r *RoleBindingReconciler) Reconcile(
 
 func (r *RoleBindingReconciler) Cleanup(
 	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
+	owner client.Object,
 	resourceName string,
 ) error {
 	logger := log.FromContext(ctx)
 
 	roleBinding := &rbacv1.RoleBinding{}
 	err := r.Get(ctx, client.ObjectKey{
-		Namespace: cluster.Namespace,
+		Namespace: owner.GetNamespace(),
 		Name:      resourceName,
 	}, roleBinding)
 
@@ -66,7 +65,7 @@ func (r *RoleBindingReconciler) Cleanup(
 		return fmt.Errorf("getting RoleBinding %s: %w", resourceName, err)
 	}
 
-	if !metav1.IsControlledBy(roleBinding, cluster) {
+	if !metav1.IsControlledBy(roleBinding, owner) {
 		logger.V(1).Info("RoleBinding is not owned by controller, skipping deletion", "name", resourceName)
 		return nil
 	}

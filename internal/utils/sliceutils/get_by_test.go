@@ -1,35 +1,22 @@
-package utils_test
+package sliceutils_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"nebius.ai/slurm-operator/internal/utils"
+	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 )
 
-func TestValidateGetBy(t *testing.T) {
-	type S struct {
-		A int
-		B string
-	}
-
-	s := []S{{
-		A: 10,
-		B: "hello",
-	}, {
-		A: 20,
-		B: "bye",
-	}}
-
+func TestGetBy(t *testing.T) {
 	t.Run("Test GetBy found", func(t *testing.T) {
-		f, err := utils.GetBy(s, 10, func(t S) int {
+		f, err := sliceutils.GetBy(testCases, 10, func(t TestCase) int {
 			return t.A
 		})
 		assert.Equal(t, "hello", f.B)
 		assert.NoError(t, err)
 
-		f, err = utils.GetBy(s, "bye", func(t S) string {
+		f, err = sliceutils.GetBy(testCases, "bye", func(t TestCase) string {
 			return t.B
 		})
 		assert.Equal(t, 20, f.A)
@@ -37,19 +24,21 @@ func TestValidateGetBy(t *testing.T) {
 	})
 
 	t.Run("Test GetBy not found", func(t *testing.T) {
-		_, err := utils.GetBy(s, 30, func(t S) int {
+		_, err := sliceutils.GetBy(testCases, 30, func(t TestCase) int {
 			return t.A
 		})
 		assert.Error(t, err)
 	})
+}
 
+func TestMustGetBy(t *testing.T) {
 	t.Run("Test MustGetBy found", func(t *testing.T) {
-		f := utils.MustGetBy(s, 10, func(t S) int {
+		f := sliceutils.MustGetBy(testCases, 10, func(t TestCase) int {
 			return t.A
 		})
 		assert.Equal(t, "hello", f.B)
 
-		f = utils.MustGetBy(s, "bye", func(t S) string {
+		f = sliceutils.MustGetBy(testCases, "bye", func(t TestCase) string {
 			return t.B
 		})
 		assert.Equal(t, 20, f.A)
@@ -57,7 +46,7 @@ func TestValidateGetBy(t *testing.T) {
 
 	t.Run("Test MustGetBy not found", func(t *testing.T) {
 		assert.Panics(t, func() {
-			_ = utils.MustGetBy(s, 30, func(t S) int {
+			_ = sliceutils.MustGetBy(testCases, 30, func(t TestCase) int {
 				return t.A
 			})
 		})

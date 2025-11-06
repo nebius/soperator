@@ -47,6 +47,14 @@ spec:
           repository: gcr.io/kubebuilder/kube-rbac-proxy
           tag: v0.15.0
       manager:
+        {{- if .Values.soperator.featureGates }}
+        args:
+          - --health-probe-bind-address=:8081
+          - --metrics-bind-address=127.0.0.1:8080
+          - --enable-topology-controller=true
+          - --leader-elect
+          - --feature-gates={{ .Values.soperator.featureGates }}
+        {{- end }}
         {{- if and .Values.soperator.values .Values.soperator.values.manager .Values.soperator.values.manager.resources }}
         resources: {{- toYaml .Values.soperator.values.manager.resources | nindent 10 }}
         {{- end }}

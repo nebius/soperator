@@ -21,6 +21,7 @@ import (
 	"flag"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 
 	"go.uber.org/zap/zapcore"
@@ -46,12 +47,15 @@ import (
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/check"
+	"nebius.ai/slurm-operator/internal/cli"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
 	"nebius.ai/slurm-operator/internal/controller/nodeconfigurator"
 	"nebius.ai/slurm-operator/internal/controller/nodesetcontroller"
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
-	webhookcorev1 "nebius.ai/slurm-operator/internal/webhook/v1"
+	"nebius.ai/slurm-operator/internal/feature"
+	webhookv1 "nebius.ai/slurm-operator/internal/webhook/v1"
+	webhookv1alpha1 "nebius.ai/slurm-operator/internal/webhook/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -157,6 +161,7 @@ func main() {
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.BoolVar(&topologyControllerEnabled, "enable-topology-controller", false, "if set, the topology controller will be enabled.")
+	cli.AddFeatureGatesFlag()
 	flag.Parse()
 	opts := getZapOpts(logFormat, logLevel)
 	zapLogger := zap.New(opts...)
@@ -190,10 +195,13 @@ func main() {
 
 	var err error
 
+	if err = cli.ProcessFeatureGates(); err != nil {
+		cli.Fail(setupLog, err, "unable to process feature gates")
+	}
+
 	if soperatorNamespace == "" {
 		if soperatorNamespace, err = getCurrentNamespace(); err != nil {
-			setupLog.Error(err, "unable to get operator namespace")
-			os.Exit(1)
+			cli.Fail(setupLog, err, "unable to get operator namespace")
 		}
 	}
 
@@ -225,41 +233,66 @@ func main() {
 		},
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to start manager")
 	}
 
-	if err = clustercontroller.NewSlurmClusterReconciler(
-		mgr.GetClient(),
-		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(consts.SlurmCluster+"-controller"),
-	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", reflect.TypeOf(slurmv1.SlurmCluster{}).Name())
-		os.Exit(1)
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = webhookcorev1.SetupSecretWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Secret")
-			os.Exit(1)
+	// region Reconciler/Cluster
+	{
+		slurmClusterName := reflect.TypeOf(slurmv1.SlurmCluster{}).Name()
+
+		if err = clustercontroller.NewSlurmClusterReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(consts.SlurmCluster+"-controller"),
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create controller", "controller", slurmClusterName)
+		}
+		// nolint:goconst
+		if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+			if err = webhookv1.SetupSlurmClusterWebhookWithManager(mgr); err != nil {
+				cli.Fail(setupLog, err, "unable to create webhook", "webhook", slurmClusterName)
+			}
+			if err = webhookv1.SetupSecretWebhookWithManager(mgr); err != nil {
+				cli.Fail(setupLog, err, "unable to create webhook", "webhook", "Secret")
+			}
 		}
 	}
+	// endregion Reconciler/Cluster
 
+	// region Reconciler/NodeConfigurator
 	if err = (&nodeconfigurator.NodeConfiguratorReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NodeConfigurator")
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to create controller", "controller", "NodeConfigurator")
 	}
-	if err = (&nodesetcontroller.NodeSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NodeSet")
-		os.Exit(1)
-	}
+	// endregion Reconciler/NodeConfigurator
 
+	// region Reconciler/NodeSet
+	if feature.Gate.Enabled(feature.NodeSetWorkers) {
+		nodeSetName := reflect.TypeOf(slurmv1alpha1.NodeSet{}).Name()
+		nodeSetNameLower := strings.ToLower(nodeSetName)
+
+		if err = nodesetcontroller.NewNodeSetReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(nodeSetNameLower+"-controller"),
+		).
+			SetupWithManager(mgr, nodeSetNameLower, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create controller", "controller", nodeSetName)
+		}
+
+		// nolint:goconst
+		if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+			if err := webhookv1alpha1.SetupNodeSetWebhookWithManager(mgr); err != nil {
+				setupLog.Error(err, "unable to create webhook", "webhook", nodeSetName)
+				os.Exit(1)
+			}
+		}
+	}
+	// endregion Reconciler/NodeSet
+
+	// region Reconciler/Topology
 	if topologyControllerEnabled {
 		if err = topologyconfcontroller.NewNodeTopologyReconciler(
 			mgr.GetClient(),
@@ -268,13 +301,10 @@ func main() {
 			topologyLabelPrefix,
 			mgr.GetAPIReader(),
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-			setupLog.Error(
-				err,
+			cli.Fail(setupLog, err,
 				"unable to create controller",
-				"controller",
-				topologyconfcontroller.NodeTopologyReconcilerName,
+				"controller", topologyconfcontroller.NodeTopologyReconcilerName,
 			)
-			os.Exit(1)
 		}
 
 		if err = topologyconfcontroller.NewWorkerTopologyReconciler(
@@ -282,30 +312,26 @@ func main() {
 			mgr.GetScheme(),
 			soperatorNamespace,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-			setupLog.Error(
-				err,
+			cli.Fail(setupLog, err,
 				"unable to create controller",
-				"controller",
-				topologyconfcontroller.WorkerTopologyReconcilerName,
+				"controller", topologyconfcontroller.WorkerTopologyReconcilerName,
 			)
-			os.Exit(1)
 		}
 	}
+	// endregion Reconciler/Topology
+
 	//+kubebuilder:scaffold:builder
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
-		os.Exit(1)
+	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		cli.Fail(setupLog, err, "unable to set up health check")
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
-		os.Exit(1)
+	if err = mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		cli.Fail(setupLog, err, "unable to set up ready check")
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
-		os.Exit(1)
+	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		cli.Fail(setupLog, err, "problem running manager")
 	}
 }
 

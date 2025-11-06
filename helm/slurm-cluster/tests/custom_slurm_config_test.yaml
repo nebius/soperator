@@ -1,0 +1,26 @@
+suite: test customSlurmConfig rendering
+templates:
+  - slurm-cluster-cr.yaml
+tests:
+  - it: should not render customSlurmConfig when empty
+    set:
+      customSlurmConfig: ""
+    asserts:
+      - isNull:
+          path: spec.customSlurmConfig
+
+  - it: should render customSlurmConfig when provided
+    set:
+      customSlurmConfig: |
+        # Custom configuration
+        MaxJobCount=50000
+        MaxArraySize=10000
+    asserts:
+      - isNotNull:
+          path: spec.customSlurmConfig
+      - matchRegex:
+          path: spec.customSlurmConfig
+          pattern: "MaxJobCount=50000"
+      - matchRegex:
+          path: spec.customSlurmConfig
+          pattern: "MaxArraySize=10000"

@@ -38,7 +38,7 @@ type SlurmCluster struct {
 	MPIConfig         slurmv1.MPIConfig
 	PlugStackConfig   slurmv1.PlugStackConfig
 	SConfigController SConfigController
-	NodeSetList       slurmav1alpha1.NodeSetList
+	NodeSets          []slurmav1alpha1.NodeSet
 }
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD
@@ -65,7 +65,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		PopulateJail:           buildSlurmPopulateJailFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.PopulateJail),
 		NodeFilters:            buildNodeFiltersFrom(cluster.Spec.K8sNodeFilters),
 		VolumeSources:          buildVolumeSourcesFrom(cluster.Spec.VolumeSources),
-		Secrets:                buildSecretsFrom(&cluster.Spec.Secrets),
+		Secrets:                BuildSecretsFrom(&cluster.Spec.Secrets),
 		NodeController:         buildSlurmControllerFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Controller),
 		NodeAccounting:         buildAccountingFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Accounting),
 		NodeRest:               buildRestFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Rest),

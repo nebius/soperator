@@ -7,8 +7,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/naming"
+	"nebius.ai/slurm-operator/internal/utils"
+	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -131,6 +134,133 @@ func renderContainerSlurmd(
 	}, nil
 }
 
+// renderContainerNodeSetSlurmd renders [corev1.Container] for slurmd
+func renderContainerNodeSetSlurmd(
+	nodeSet *values.SlurmNodeSet,
+) (corev1.Container, error) {
+	volumeMounts := []corev1.VolumeMount{
+		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
+		common.RenderVolumeMountJail(),
+		common.RenderVolumeMountMungeSocket(),
+		common.RenderVolumeMountSecurityLimits(),
+		common.RenderVolumeMountSshdKeys(),
+		common.RenderVolumeMountSshdRootKeys(),
+		common.RenderVolumeMountInMemory(),
+		common.RenderVolumeMountTmpDisk(),
+		renderVolumeMountBoot(),
+		renderVolumeMountSharedMemory(),
+		renderVolumeMountSysctl(),
+		renderVolumeMountSupervisordConfigMap(),
+		renderVolumeMountSshdConfigs(),
+	}
+	if nodeSet.GPU.Enabled {
+		volumeMounts = append(volumeMounts, renderVolumeMountNvidia())
+	}
+
+	// region Jail Sub-mounts
+	volumeMounts = append(volumeMounts,
+		common.RenderVolumeMounts(
+			sliceutils.Map(nodeSet.JailSubMounts,
+				func(subMount slurmv1alpha1.NodeVolumeMount) slurmv1.NodeVolumeMount {
+					return slurmv1.NodeVolumeMount{
+						Name:      subMount.Name,
+						MountPath: subMount.MountPath,
+						SubPath:   subMount.SubPath,
+						ReadOnly:  subMount.ReadOnly,
+					}
+				},
+			),
+			consts.VolumeMountPathJailUpper,
+		)...,
+	)
+	// endregion Jail Sub-mounts
+
+	// region Custom mounts
+	volumeMounts = append(volumeMounts,
+		common.RenderVolumeMounts(
+			sliceutils.Map(nodeSet.CustomVolumeMounts,
+				func(mount slurmv1alpha1.NodeVolumeMount) slurmv1.NodeVolumeMount {
+					return slurmv1.NodeVolumeMount{
+						Name:      mount.Name,
+						MountPath: mount.MountPath,
+						SubPath:   mount.SubPath,
+						ReadOnly:  mount.ReadOnly,
+					}
+				},
+			),
+			"",
+		)...,
+	)
+	// endregion Custom mounts
+
+	resources := corev1.ResourceRequirements{
+		Limits:   nodeSet.ContainerSlurmd.Resources,
+		Requests: nodeSet.ContainerSlurmd.Resources,
+	}
+
+	err := check.CheckResourceRequests(resources)
+	if err != nil {
+		return corev1.Container{}, fmt.Errorf("checking resource requests: %w", err)
+	}
+
+	realMemory := common.RenderRealMemorySlurmd(resources)
+
+	return corev1.Container{
+		Name:            consts.ContainerNameSlurmd,
+		Image:           nodeSet.ContainerSlurmd.Image,
+		ImagePullPolicy: nodeSet.ContainerSlurmd.ImagePullPolicy,
+		Command:         nodeSet.ContainerSlurmd.Command,
+		Args:            nodeSet.ContainerSlurmd.Args,
+		Env: renderSlurmdEnv(
+			nodeSet.ParentalCluster.Name,
+			nodeSet.CgroupVersion,
+			utils.Ternary(nodeSet.GPU.Enabled, consts.ClusterTypeGPU, consts.ClusterTypeCPU),
+			realMemory,
+			nodeSet.GPU.Nvidia.GDRCopyEnabled,
+			//
+			// TODO Make it work
+			"",
+			nil,
+		),
+		Ports: []corev1.ContainerPort{{
+			Name:          nodeSet.ContainerSlurmd.Name,
+			ContainerPort: nodeSet.ContainerSlurmd.Port,
+			Protocol:      corev1.ProtocolTCP,
+		}},
+		VolumeMounts: volumeMounts,
+		ReadinessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"scontrol",
+						"show",
+						"slurmd",
+					},
+				},
+			},
+			PeriodSeconds:    1,
+			TimeoutSeconds:   common.DefaultProbeTimeoutSeconds,
+			SuccessThreshold: common.DefaultProbeSuccessThreshold,
+			FailureThreshold: common.DefaultProbeFailureThreshold,
+		},
+		SecurityContext: &corev1.SecurityContext{
+			Privileged: ptr.To(true),
+			Capabilities: &corev1.Capabilities{
+				Add: []corev1.Capability{
+					consts.ContainerSecurityContextCapabilitySysAdmin,
+				},
+			},
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeUnconfined,
+			},
+			ProcMount: ptr.To(corev1.UnmaskedProcMount),
+		},
+		Resources:                resources,
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+	}, nil
+}
+
 func renderVolumeMountSupervisordConfigMap() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      consts.VolumeNameSupervisordConfigMap,
@@ -194,13 +324,13 @@ func renderSlurmdEnv(
 	}
 	if cgroupVersion == consts.CGroupV2 {
 		envVar = append(envVar, corev1.EnvVar{
-			Name:  consts.CGroupV2Env,
+			Name:  consts.EnvCGroupV2,
 			Value: "true",
 		})
 	}
 	if enableGDRCopy {
 		envVar = append(envVar, corev1.EnvVar{
-			Name:  consts.NVIDIAGDRCopy,
+			Name:  consts.EnvNvidiaGDRCopy,
 			Value: "enabled",
 		})
 	}

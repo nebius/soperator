@@ -69,7 +69,8 @@ func JobFromAPI(apiJob api.V0041JobInfo) (Job, error) {
 	}
 
 	// Slurm API returns mail_user = user_name if mail_user wasn't set explicitly
-	if apiJob.MailUser != nil && job.UserName != *apiJob.MailUser {
+	// There are also instances when mail_user = user_name value, but user_name is empty
+	if apiJob.MailUser != nil && job.UserName != "" && job.UserName != *apiJob.MailUser {
 		job.UserMail = *apiJob.MailUser
 	}
 

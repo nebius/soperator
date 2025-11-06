@@ -50,6 +50,7 @@ controllerManager:
   replicas: 1
   serviceAccount:
     annotations: {}
+  tolerations: []
 kubernetesClusterDomain: cluster.local
 webhookService:
   ports:

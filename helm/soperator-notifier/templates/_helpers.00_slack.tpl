@@ -34,7 +34,7 @@ good
 
 {{/* Message prefix for particular job. */}}
 {{- define "son.slack.msg.jobPrefix" -}}
-- Job *{{ include "son.wrapTemplate" "$job" }}* (ID `{{ include "son.wrapTemplate" "$id" }}`){{ include "son.wrapTemplate" "if $user" }}, submitted by *{{ include "son.wrapTemplate" "$user" }}*,{{ include "son.wrapTemplate" "end" }}
+  •  {{ include "son.wrapTemplate" "if $user_mail" }}[<@{{ include "son.wrapTemplate" "(reReplaceAll \"^@\" \"\" $user_mail)" }}>] {{ include "son.wrapTemplate" "end" }}Job *{{ include "son.wrapTemplate" "$job" }}* (ID `{{ include "son.wrapTemplate" "$id" }}`){{ include "son.wrapTemplate" "if $user" }}, submitted by *{{ include "son.wrapTemplate" "$user" }}*,{{ include "son.wrapTemplate" "end" }}
 {{- end }}
 
 {{/* Message text for job state reason. */}}

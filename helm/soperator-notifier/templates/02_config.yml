@@ -69,8 +69,6 @@ spec:
             {{ include "son.slack.msg.jobPrefix" . }} ended in state `{{ include "son.wrapTemplate" "$state" }}` {{ include "son.slack.msg.jobReason" . }}.
             {{ include "son.wrapTemplateTrimL" "end" }}
 
-            {{ include "son.wrapTemplate" "if $user_mail" }} | <{{ include "son.wrapTemplate" "$user_mail" }}>{{ include "son.wrapTemplate" "end" }}
-
             {{ include "son.wrapTemplateTrimL" "end" }}
 
           color: |-

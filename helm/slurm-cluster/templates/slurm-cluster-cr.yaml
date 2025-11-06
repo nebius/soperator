@@ -21,6 +21,10 @@ spec:
   slurmConfig:
     {{- toYaml .Values.slurmConfig | nindent 4 }}
   {{- end }}
+  {{- if .Values.customSlurmConfig }}
+  customSlurmConfig: |
+    {{- indent 4 .Values.customSlurmConfig }}
+  {{- end }}
   {{- if eq .Values.clusterType "gpu" }}
   healthCheckConfig:
     healthCheckInterval: 300
@@ -35,8 +39,28 @@ spec:
   clusterType: {{ .Values.clusterType }}
   partitionConfiguration:
     configType: {{ (default "default" .Values.partitionConfiguration.configType) }}
+    {{- if and .Values.partitionConfiguration.rawConfig (eq .Values.partitionConfiguration.configType "custom") }}
     rawConfig:
-      {{- default list .Values.partitionConfiguration.rawConfig | toYaml | nindent 6 }}
+      {{- .Values.partitionConfiguration.rawConfig | toYaml | nindent 6 }}
+    {{- end }}
+    {{- if and .Values.partitionConfiguration.partitions (eq .Values.partitionConfiguration.configType "structured") }}
+    partitions:
+      {{- range .Values.partitionConfiguration.partitions }}
+      - name: {{ required "Partition name is required" .name | quote }}
+        {{- if hasKey . "isAll" }}
+        isAll: {{ .isAll }}
+        {{- end }}
+        {{- if .nodeSetRefs }}
+        nodeSetRefs:
+          {{- range .nodeSetRefs }}
+          - {{ . | quote }}
+          {{- end }}
+        {{- end }}
+        {{- if .config }}
+        config: {{ .config | quote }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
   workerFeatures:
     {{- range (default list .Values.workerFeatures) }}
     - name: {{ .name | quote }}

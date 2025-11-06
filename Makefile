@@ -525,6 +525,7 @@ $(YQ): $(LOCALBIN)
 ## helm unittest: Run helm unittest with dependency check
 helmtest: check-helm
 	@echo "Running helm unittest"
+	@helm unittest $(CHART_PATH)/soperator
 	@helm unittest $(CHART_PATH)/soperator-fluxcd
 	@helm unittest $(CHART_PATH)/slurm-cluster
 	@helm unittest $(CHART_PATH)/slurm-cluster-storage
