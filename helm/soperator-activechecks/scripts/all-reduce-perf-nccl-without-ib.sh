@@ -22,10 +22,8 @@ echo "Platform found: $platform"
 echo "Running all_reduce_perf_nccl check on $(hostname)..."
 
 HC_OUTPUT=$(srun --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n all_reduce_without_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info")
-HC_EXIT_CODE=$?
 
 echo "Health checker output: $HC_OUTPUT"
-echo "Health checker job step exit code: $HC_EXIT_CODE"
 HC_STATUS=$(echo "$HC_OUTPUT" | awk '/^\s*{/,/^\s*}/' | jq -r '.status')
 
 echo "Health checker status: $HC_STATUS"

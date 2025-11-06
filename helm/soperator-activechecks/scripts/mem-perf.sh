@@ -22,10 +22,8 @@ echo "Running mem_perf check on $(hostname)..."
 HC_OUTPUT=$(srun --container-image={{ include "activecheck.image.pyxis" . }} \
   --container-mounts=$(which health-checker):/usr/local/bin/health-checker --cpu-bind=verbose,cores \
   bash -c "health-checker run -e soperator -p $platform -n mem_bw,mem_lat -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout")
-HC_EXIT_CODE=$?
 
 echo "Health checker output: $HC_OUTPUT"
-echo "Health checker job step exit code: $HC_EXIT_CODE"
 HC_STATUS=$(echo "$HC_OUTPUT" | awk '/^\s*{/,/^\s*}/' | jq -r '.status')
 
 echo "Health checker status: $HC_STATUS"
