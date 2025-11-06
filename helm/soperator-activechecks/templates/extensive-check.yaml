@@ -21,6 +21,8 @@ spec:
   failureReactions:
     drainSlurmNode:
       setHardwareIssueSuspected: {{ .Values.checks.extensiveCheck.setHardwareIssueSuspected }}
+    removeReservation:
+      prefix: {{ .Values.reservationPrefix | quote }}
   slurmJobSpec:
     sbatchScript: |
 {{ .Files.Get "scripts/extensive-check.sh" | indent 6 }}
