@@ -471,14 +471,14 @@ func executeReactions(ctx context.Context, slurmJob slurmapi.Job, activeCheckNam
 
 func processReservationReactions(ctx context.Context, reactions slurmv1alpha1.Reactions, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client, logger logr.Logger) error {
 	if reactions.AddReservation != nil && reactions.AddReservation.Prefix != "" {
-		err := processAddReservation(ctx, *reactions.AddReservation, slurmJob, slurmAPIClient, logger)
+		err := processAddReservation(ctx, reactions.AddReservation.Prefix, slurmJob, slurmAPIClient, logger)
 		if err != nil {
 			return fmt.Errorf("adding reservation: %w", err)
 		}
 	}
 
 	if reactions.RemoveReservation != nil && reactions.RemoveReservation.Prefix != "" {
-		err := processRemoveReservation(ctx, *reactions.RemoveReservation, slurmJob, slurmAPIClient)
+		err := processRemoveReservation(ctx, reactions.RemoveReservation.Prefix, slurmJob, slurmAPIClient)
 		if err != nil {
 			return fmt.Errorf("removing reservation: %w", err)
 		}
@@ -487,13 +487,13 @@ func processReservationReactions(ctx context.Context, reactions slurmv1alpha1.Re
 	return nil
 }
 
-func processAddReservation(ctx context.Context, addReservation slurmv1alpha1.ReservationSpec, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client, logger logr.Logger) error {
+func processAddReservation(ctx context.Context, reservationPrefix string, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client, logger logr.Logger) error {
 	nodes, err := slurmJob.GetNodeList()
 	if err != nil {
 		return fmt.Errorf("get node list: %w", err)
 	}
 	for _, node := range nodes {
-		err := addReservationForNode(ctx, addReservation.Prefix, node, slurmAPIClient, logger)
+		err := addReservationForNode(ctx, reservationPrefix, node, slurmAPIClient, logger)
 		if err != nil {
 			return fmt.Errorf("post reservation: %w", err)
 		}
@@ -501,13 +501,13 @@ func processAddReservation(ctx context.Context, addReservation slurmv1alpha1.Res
 	return nil
 }
 
-func processRemoveReservation(ctx context.Context, removeReservation slurmv1alpha1.ReservationSpec, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client) error {
+func processRemoveReservation(ctx context.Context, reservationPrefix string, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client) error {
 	nodes, err := slurmJob.GetNodeList()
 	if err != nil {
 		return fmt.Errorf("get node list: %w", err)
 	}
 	for _, node := range nodes {
-		reservationName := naming.BuildSlurmReservationNameForNode(removeReservation.Prefix, node)
+		reservationName := naming.BuildSlurmReservationNameForNode(reservationPrefix, node)
 		err := slurmAPIClient.StopReservation(ctx, reservationName)
 		if err != nil {
 			return fmt.Errorf("stop reservation: %w", err)
