@@ -26,7 +26,5 @@ spec:
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
   # Do not add any reactions right now, only monitor
-  reactions:
-    setCondition: false
-    drainSlurmNode: false
+  failureReactions:
     commentSlurmNode: true

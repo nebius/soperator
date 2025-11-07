@@ -349,7 +349,6 @@ type PartitionConfiguration struct {
 	// PartitionConfigTypeDefault - generates 3 standard partitions:
 	//  - `main` - Default partition for regular jobs (PriorityTier=10)
 	//  - `hidden` - Hidden partition for administrative tasks (Hidden=YES)
-	//  - `background` - Low-priority background partition (PriorityTier=1)
 	//
 	// PartitionConfigTypeCustom - uses raw partition configuration strings from RawConfig.
 	//
@@ -378,7 +377,7 @@ type PartitionConfiguration struct {
 }
 
 const (
-	// PartitionConfigTypeDefault behaves to generate `main`, `hidden`, and `background` partitions automatically.
+	// PartitionConfigTypeDefault behaves to generate `main` and `hidden` partitions automatically.
 	PartitionConfigTypeDefault = "default"
 	// PartitionConfigTypeCustom behaves to use custom raw config.
 	PartitionConfigTypeCustom = "custom"

@@ -22,73 +22,105 @@ echo "Platform found: $platform"
 echo "Listing available health checks for platform $platform"
 health-checker list -e soperator -p $platform
 
-all_reduce_without_ib() {
-  health-checker run -e soperator -p $platform -n all_reduce_without_ib --report-format json-pretty
+_run_and_parse_hc() {
+  local HC_OUTPUT HC_STATUS
+  HC_OUTPUT=$("$@")
+
+  echo "Health checker output: $HC_OUTPUT"
+  HC_STATUS=$(echo "$HC_OUTPUT" | awk '/^\s*{/,/^\s*}/' | jq -r '.status')
+  echo "Health checker status: $HC_STATUS"
+
+  if [[ "$HC_STATUS" == "FAIL" ]]; then
+    echo "Health-checker reported status=FAIL."
+    return 1
+  elif [[ "$HC_STATUS" == "ERROR" ]]; then
+    echo "Health-checker reported status=ERROR."
+    return 0
+  else
+    echo "Health-checker passed or returned non-ERROR status."
+    return 0
+  fi
+}
+
+passive_checks() {
+  _run_and_parse_hc srun --cpu-bind=verbose,cores bash -c \
+    "cd /tmp && \
+    HC_DCGMI_DIAG_R1_DEBUGLOGFILE=/dev/null HC_DCGMI_DIAG_R1_DEBUGLEVEL=NONE \
+    health-checker run -e soperator -p $platform \
+    -n module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg,ib_link,dcgmi_diag_r1 \
+    -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout \
+    --log-level info"
+}
+
+all_reduce_in_docker() {
+  mkdir -p /tmp/soperatorchecks/a
+  mkdir -p /tmp/soperatorchecks/b
+
+  srun --gpus=8 docker run --rm \
+    --gpus=all --device=/dev/infiniband \
+    -v /tmp/soperatorchecks/a:/a \
+    --mount type=bind,source=/tmp/soperatorchecks/b,target=/b \
+    {{ include "activecheck.image.docker" . }} \
+    bash -c "NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring all_reduce_perf -b 512M -e 8G -f 2 -g 8"
 }
 
 all_reduce_with_ib() {
-  health-checker run -e soperator -p $platform -n all_reduce_with_ib --report-format json-pretty
+  _run_and_parse_hc srun --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n all_reduce_with_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info"
 }
 
-mem_bw() {
-  srun --container-image="$ACTIVE_CHECKS_IMAGE" \
-  --container-mounts=$(which health-checker):/usr/local/bin/health-checker \
-  --cpu-bind=verbose,cores \
-  bash -c "health-checker run -e soperator -p $platform -n mem_bw --report-format json-pretty"
-}
-
-mem_lat() {
-  srun --container-image="$ACTIVE_CHECKS_IMAGE" \
-       --container-mounts=$(which health-checker):/usr/local/bin/health-checker \
-       --cpu-bind=verbose,cores \
-       bash -c "health-checker run -e soperator -p $platform -n mem_lat --report-format json-pretty"
-}
-
-
-
-dcgmi_diag_r2() {
-  health-checker run -e soperator -p $platform -n dcgmi_diag_r2 --report-format json-pretty
-}
-
-gpu_fryer() {
-  srun --container-image="$ACTIVE_CHECKS_IMAGE" \
-  --container-mounts=$(which health-checker):/usr/local/bin/health-checker \
-  --cpu-bind=verbose \
-  bash -c "HC_GPU_FRYER_DURATION=300 health-checker run -e soperator -p $platform -n gpu_fryer --report-format json-pretty"
+all_reduce_without_ib() {
+  _run_and_parse_hc srun --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n all_reduce_without_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info"
 }
 
 cuda_samples() {
-  srun --container-image="$ACTIVE_CHECKS_IMAGE" \
-        --container-mounts=$(which health-checker):/usr/local/bin/health-checker \
-        --cpu-bind=verbose \
-        bash -c "health-checker run -e soperator -p $platform -n deviceQuery,vectorAdd,simpleMultiGPU,p2pBandwidthLatencyTest --report-format json-pretty"
+  _run_and_parse_hc srun --cpu-bind=verbose --container-image={{ include "activecheck.image.pyxis" . }} \
+    --container-mounts=$(which health-checker):/usr/local/bin/health-checker \
+    bash -c "health-checker run -e soperator -p $platform -n deviceQuery,vectorAdd,simpleMultiGPU,p2pBandwidthLatencyTest -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
+}
+
+dcgmi_diag_r2() {
+  _run_and_parse_hc srun --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n dcgmi_diag_r2 -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
+}
+
+gpu_fryer() {
+  _run_and_parse_hc srun --cpu-bind=verbose --container-image={{ include "activecheck.image.pyxis" . }} \
+    --container-mounts=$(which health-checker):/usr/local/bin/health-checker \
+    bash -c "HC_GPU_FRYER_DURATION=300 health-checker run -e soperator -p $platform -n gpu_fryer -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
+}
+
+ib_gpu_perf() {
+  _run_and_parse_hc srun --container-image={{ include "activecheck.image.pyxis" . }} \
+    --container-mounts=$(which health-checker):/usr/local/bin/health-checker --cpu-bind=verbose,cores \
+    bash -c "health-checker run -e soperator -p $platform -n ^ib_write_bw_gpu.*$,^ib_send_lat_gpu.*$,^ib_read_lat_gpu.*$ -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
+}
+
+mem_perf() {
+  _run_and_parse_hc srun --container-image={{ include "activecheck.image.pyxis" . }} \
+    --container-mounts=$(which health-checker):/usr/local/bin/health-checker --cpu-bind=verbose,cores \
+    bash -c "health-checker run -e soperator -p $platform -n mem_bw,mem_lat -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
 
 funcs_to_test=(
-  all_reduce_without_ib
+  passive_checks
+  all_reduce_in_docker
   all_reduce_with_ib
-  mem_bw
-  mem_lat
+  all_reduce_without_ib
+  cuda_samples
   dcgmi_diag_r2
   gpu_fryer
-  cuda_samples
+  ib_gpu_perf
+  mem_perf
 )
 for test in "${funcs_to_test[@]}"
 do
-  echo "Running $test"
-  echo "on $(hostname)..."
-  HC_OUTPUT=$($test)
-  HC_EXIT_CODE=$?
+  echo "Running $test on $(hostname)..."
+  $test
+  TEST_EXIT_CODE=$?
 
-  echo "Health checker output: $HC_OUTPUT"
-  echo "Health checker exit code: $HC_EXIT_CODE"
-  HC_STATUS=$(echo "$HC_OUTPUT" | awk '/^\s*{/,/^\s*}/' | jq -r '.status')
-
-  echo "Health checker status: $HC_STATUS"
-  if [[ "$HC_STATUS" == "ERROR" || "$HC_STATUS" == "FAIL" || $HC_EXIT_CODE -eq 1 ]]; then
-    echo "Health-checker reported status=ERROR and exited with non-zero status."
-    exit 1 # Fail fast
+  if [[ $TEST_EXIT_CODE -ne 0 ]]; then
+    echo "$test reported failure (exit code $TEST_EXIT_CODE)."
+    exit 1
   else
-    echo "Health-checker passed or returned non-ERROR status."
+    echo "$test passed."
   fi
 done

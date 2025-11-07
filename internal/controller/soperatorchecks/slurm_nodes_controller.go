@@ -187,6 +187,8 @@ func (c *SlurmNodesController) processDegradedNode(
 		return c.processKillTaskFailed(ctx, k8sNode, slurmClusterName, node)
 	case consts.SlurmNodeReasonNodeReplacement:
 		return c.processSlurmNodeMaintenance(ctx, k8sNode, slurmClusterName, node.Name)
+	case consts.SlurmHardwareReasonHC:
+		return nil // TODO: set-unhealthy here
 	case consts.SlurmNodeReasonHC:
 		return c.processHealthCheckFailed(ctx, k8sNode, slurmClusterName, node, node.Reason)
 	default:

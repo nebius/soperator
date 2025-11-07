@@ -49,18 +49,6 @@ if [[ -n "${RESERVATION_NAME:-}" ]]; then
         exit 1
     fi
     SLURM_JOB_ID="$SLURM_OUTPUT"
-
-elif [[ "${EACH_WORKER_JOB_ARRAY:-}" == "true" ]]; then
-    echo "Submitting job using slurm_submit_array_job.sh..."
-    SUBMIT_OUTPUT=$(/opt/bin/slurm/slurm_submit_array_job.sh)
-    SCRIPT_STATUS=$?
-    if [[ $SCRIPT_STATUS -ne 0 ]]; then
-        echo "Job array submission script failed with exit code $SCRIPT_STATUS"
-        echo "$SUBMIT_OUTPUT"
-        exit 1
-    fi
-
-    SLURM_JOB_ID=$(echo "$SUBMIT_OUTPUT" | tail -n 1)
 elif [[ "${EACH_WORKER_JOBS:-}" == "true" ]]; then
     echo "Submitting job using slurm_submit_jobs.sh..."
     SUBMIT_OUTPUT=$(/opt/bin/slurm/slurm_submit_jobs.sh)

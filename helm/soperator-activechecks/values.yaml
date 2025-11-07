@@ -24,17 +24,19 @@ images:
   munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.22.2-noble-slurm25.05.4"
 # Pyxis syntax with '#' separator for registry
 activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-00ce55c"
-reservationPrefix: soperatorchecks.suspicious
 checks:
   allReducePerfNCCLInDocker:
     suspend: true
     runAfterCreation: true
+    drainReasonPrefix: "[node_problem]"
   allReducePerfNCCLWithIB:
     suspend: false
     runAfterCreation: true
+    drainReasonPrefix: "[node_problem]"
   allReducePerfNCCLWithoutIB:
     suspend: false
     runAfterCreation: true
+    drainReasonPrefix: "[node_problem]"
   createUserSoperatorChecks:
     suspend: true
     runAfterCreation: true
@@ -45,12 +47,15 @@ checks:
   cudaSamples:
     suspend: false
     runAfterCreation: true
+    drainReasonPrefix: "[node_problem]"
   dcgmiDiagR2:
     suspend: false
     runAfterCreation: true
+    drainReasonPrefix: "[node_problem]"
   dcgmiDiagR3:
     suspend: true
     runAfterCreation: true
+    drainReasonPrefix: "[node_problem]"
   enrootCleanup:
     suspend: false
     runAfterCreation: false
@@ -61,15 +66,17 @@ checks:
     dir: /opt/soperator-outputs/nccl_logs
     schedule: 15 0 * * *
   ensureHealthyNodes:
-    suspend: false
+    suspend: true
     runAfterCreation: true
-    enabled: true
   extensiveCheck:
     suspend: true
     runAfterCreation: false
+    drainReasonPrefix: "[hardware_problem]"
+    reservationPrefix: "soperatorchecks.suspicious"
   gpuFryer:
     suspend: false
     runAfterCreation: true
+    drainReasonPrefix: "[node_problem]"
   ibGpuPerf:
     suspend: false
     runAfterCreation: true
@@ -79,6 +86,7 @@ checks:
   memPerf:
     suspend: false
     runAfterCreation: true
+    drainReasonPrefix: "[node_problem]"
   prepullContainerImage:
     suspend: true
     runAfterCreation: true
