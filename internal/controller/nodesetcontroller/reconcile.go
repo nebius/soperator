@@ -8,7 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -220,9 +219,15 @@ func (r NodeSetReconciler) ReconcileNodeSetWorkers(
 					return fmt.Errorf("getting %s parental cluster %s/%s: %w", slurmv1alpha1.KindNodeSet, nodeSetValues.ParentalCluster.Namespace, nodeSetValues.ParentalCluster.Name, err)
 				}
 
+				secrets := values.BuildSecretsFrom(&cluster.Spec.Secrets)
+				if cluster.Spec.Secrets.SshdKeysName == "" {
+					logger.V(1).Info("SshdKeysName is empty. Using default name")
+					secrets.SshdKeysName = naming.BuildSecretSSHDKeysName(cluster.Name)
+				}
+
 				desired, err := worker.RenderNodeSetStatefulSet(
 					nodeSetValues,
-					ptr.To(values.BuildSecretsFrom(&cluster.Spec.Secrets)),
+					&secrets,
 				)
 				if err != nil {
 					stepLogger.Error(err, "Failed to render")
