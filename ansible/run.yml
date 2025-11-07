@@ -30,5 +30,6 @@
   roles:
     - common-packages
     - cuda
+    - nccl-tests
   tags:
     - upgrade-cuda

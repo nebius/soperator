@@ -24,8 +24,8 @@ RUN apt-get update && \
 # Install Ansible and base configs
 COPY ansible/ansible.cfg ansible/requirements.txt ansible/run.yml /opt/ansible/
 COPY ansible/inventory/jail/hosts.ini /opt/ansible/inventory/jail/hosts.ini
-RUN cd /opt/ansible && python3 -m venv .venv && \
-    . .venv/bin/activate && pip install -r requirements.txt
+RUN cd /opt/ansible && ln -sf /usr/bin/python3.12 /usr/bin/python3 && \
+    python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
 
 ENV PATH="/opt/ansible/.venv/bin:${PATH}"
 WORKDIR /opt/ansible

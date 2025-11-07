@@ -165,22 +165,3 @@
     mode: "0644"
   tags:
     - cuda
-
-- name: Download nccl-tests archive
-  ansible.builtin.get_url:
-    url: "{{ packages_repo_url }}/nccl_tests_12.9.0_ubuntu{{ ansible_distribution_version }}/nccl-tests-perf-{{ ansible_architecture }}.tar.gz"
-    dest: "/tmp/nccl-tests-perf-{{ ansible_architecture }}.tar.gz"
-    mode: "0644"
-  tags:
-    - nccl
-    - cuda
-
-- name: Extract nccl-tests archive into /usr/bin
-  ansible.builtin.unarchive:
-    src: "/tmp/nccl-tests-perf-{{ ansible_architecture }}.tar.gz"
-    dest: /usr/bin
-    remote_src: true
-    mode: "0755"
-  tags:
-    - nccl
-    - cuda

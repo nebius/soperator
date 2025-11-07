@@ -10,5 +10,3 @@ cuda_dpkg_arch_map:
   aarch64: sbsa
 
 libnccl_version: 2.26.5-1
-
-packages_repo_url: "https://github.com/nebius/slurm-deb-packages/releases/download"
