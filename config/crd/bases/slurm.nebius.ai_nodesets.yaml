@@ -2672,6 +2672,7 @@ spec:
                     - repository
                     type: object
                   port:
+                    default: 6818
                     description: Port defines the port the container exposes
                     format: int32
                     type: integer
