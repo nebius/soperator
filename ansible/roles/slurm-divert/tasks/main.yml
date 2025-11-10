@@ -1,22 +1,9 @@
 ---
 
-- name: Collect host facts
-  ansible.builtin.setup:
-  tags:
-    - slurm-divert
-
-- name: Show system info
-  ansible.builtin.debug:
-    msg:
-      - "Architecture: {{ ansible_architecture }}"
-      - "Distro version: ubuntu{{ ansible_distribution_version }}"
-  tags:
-    - slurm-divert
-
 - name: Find all Slurm plugin files for this architecture
   ansible.builtin.find:
     paths: "/usr/lib/{{ ansible_architecture }}-linux-gnu/slurm"
-    file_type: file
+    file_type: any
   register: slurm_plugins
   tags:
     - slurm-divert
@@ -44,6 +31,8 @@
       | rejectattr('path', 'in', slurm_exclude)
       | list
     }}
+  loop_control:
+      label: "{{ item.path }}"
   tags:
     - slurm-divert
 

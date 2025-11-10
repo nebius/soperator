@@ -1,18 +1,5 @@
 ---
 
-- name: Collect host facts
-  ansible.builtin.setup:
-  tags:
-    - docker-cli
-
-- name: Show system info
-  ansible.builtin.debug:
-    msg:
-      - "Architecture from dpkg_arch_map: {{ dpkg_arch_map[ansible_architecture] }}"
-      - "Distro version: ubuntu{{ ansible_distribution_version }}"
-  tags:
-    - docker-cli
-
 - name: Add docker apt key
   ansible.builtin.get_url:
     url: https://download.docker.com/linux/ubuntu/gpg

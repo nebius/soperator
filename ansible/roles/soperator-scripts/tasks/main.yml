@@ -18,8 +18,8 @@
     group: root
     mode: "0755"
   loop:
-    - nvidia_smi_hostpid.sh
-    - soperator-createuser.py
+    - nvidia-smi-hostpid
+    - soperator-createuser
   tags:
     - soperator-scripts
 

@@ -1,18 +1,5 @@
 ---
 
-- name: Collect host facts
-  ansible.builtin.setup:
-  tags:
-    - openmpi
-
-- name: Show system info
-  ansible.builtin.debug:
-    msg:
-      - "Architecture: {{ ansible_architecture }}"
-      - "Distro version: ubuntu{{ ansible_distribution_version }}"
-  tags:
-    - openmpi
-
 - name: Configure ofed repositories
   ansible.builtin.template:
     src: mellanox_mlnx_ofed.list.j2

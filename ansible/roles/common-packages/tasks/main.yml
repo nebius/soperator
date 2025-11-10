@@ -1,11 +1,5 @@
 ---
 
-- name: Collect host facts
-  ansible.builtin.setup:
-  tags:
-    - packages
-    - common-packages
-
 - name: Download Nebius public GPG key
   ansible.builtin.get_url:
     url: https://dr.nebius.cloud/public.gpg

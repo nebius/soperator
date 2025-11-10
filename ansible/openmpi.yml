@@ -4,6 +4,8 @@
   hosts: all, localhost
   become: true
   gather_facts: true
+  gather_subset:
+    - min
   roles:
     - openmpi
   tags:

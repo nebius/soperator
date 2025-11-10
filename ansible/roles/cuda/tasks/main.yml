@@ -5,16 +5,6 @@
   tags:
     - cuda
 
-- name: Show system info
-  ansible.builtin.debug:
-    msg:
-      - "Architecture from cuda_dpkg_arch_map: {{ cuda_dpkg_arch_map[ansible_architecture] }}"
-      - "Architecture from dpkg_arch_map: {{ dpkg_arch_map[ansible_architecture] }}"
-      - "Architecture: {{ ansible_architecture }}"
-      - "Distro version: ubuntu{{ ansible_distribution_version }}"
-  tags:
-    - cuda
-
 - name: Ensure required packages is installed
   ansible.builtin.apt:
     name:
@@ -105,7 +95,9 @@
   ansible.builtin.dpkg_selections:
     name: "{{ item }}"
     selection: hold
-  loop: "cuda_hold_packages"
+  loop: "{{ cuda_hold_packages }}"
+  tags:
+    - cuda
 
 - name: Create APT pin file for CUDA and related packages
   ansible.builtin.copy:

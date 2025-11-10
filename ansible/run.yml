@@ -5,6 +5,8 @@
   hosts: all
   become: true
   gather_facts: true
+  gather_subset:
+    - min
   roles:
     - python
     - common-packages
@@ -27,6 +29,8 @@
   hosts: all
   become: true
   gather_facts: true
+  gather_subset:
+    - min
   roles:
     - common-packages
     - cuda

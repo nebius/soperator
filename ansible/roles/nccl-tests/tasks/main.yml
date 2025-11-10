@@ -1,18 +1,5 @@
 ---
 
-- name: Collect host facts
-  ansible.builtin.setup:
-  tags:
-    - nccl-tests
-
-- name: Show system info
-  ansible.builtin.debug:
-    msg:
-      - "Architecture: {{ ansible_architecture }}"
-      - "Distro version: ubuntu{{ ansible_distribution_version }}"
-  tags:
-    - nccl-tests
-
 - name: Download nccl-tests archive
 
   ansible.builtin.get_url:
