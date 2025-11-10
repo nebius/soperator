@@ -194,6 +194,7 @@ It includes, among other things:
 - A detailed description of the Soperator [architecture](docs/architecture.md).
 - The [full list of features](docs/features.md) that this solution provides comparing to typical Slurm installations.
 - A more complete description of the existing [limitations](docs/limitations.md).
+- [Local development with Kind](docs/local-development.md) - setting up a local Kubernetes cluster for development and testing.
 - The [release process](docs/release-process.md) for both soperator and nebius-solutions-library repositories.
 - [Metrics collection and processing](docs/metrics-pipeline.md) documentation.
 - [Logs collection and aggregation](docs/logs-pipeline.md) pipeline guide.
