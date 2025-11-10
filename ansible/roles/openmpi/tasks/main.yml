@@ -41,7 +41,7 @@
 - name: Add OpenMPI to global PATH
   ansible.builtin.copy:
     dest: /etc/profile.d/path_openmpi.sh
-    content: export PATH=/usr/mpi/gcc/openmpi-{{ openmpi_version_short }}/bin:$PATH
+    content: export PATH=$PATH:/usr/mpi/gcc/openmpi-{{ openmpi_version_short }}/bin
     owner: root
     group: root
     mode: '0644'

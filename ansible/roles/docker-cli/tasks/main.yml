@@ -32,7 +32,7 @@
 - name: Ensure docker-cli package is installed
   ansible.builtin.apt:
     name:
-      - docker-ce-cli=5:28.5.1-1~ubuntu.24.04~noble
+      - "docker-ce-cli={{ docker_cli_version }}"
   tags:
     - docker-cli
 

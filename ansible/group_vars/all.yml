@@ -8,5 +8,3 @@ dpkg_arch_map:
 cuda_dpkg_arch_map:
   x86_64: x86_64
   aarch64: sbsa
-
-libnccl_version: 2.26.5-1

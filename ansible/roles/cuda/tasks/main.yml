@@ -95,14 +95,7 @@
 
 - name: Install CUDA and related libraries
   ansible.builtin.apt:
-    name:
-      - "cuda=12.9.0-1"
-      - "libcublas-dev-12-9"
-      - "libcudnn9-cuda-12=9.10.1.4-1"
-      - "libcudnn9-dev-cuda-12=9.10.1.4-1"
-      - "libcudnn9-headers-cuda-12=9.10.1.4-1"
-      - "libnccl-dev={{ libnccl_version }}+cuda12.9"
-      - "libnccl2={{ libnccl_version }}+cuda12.9"
+    name: "{{ cuda_packages }}"
     state: present
     update_cache: true
   tags:

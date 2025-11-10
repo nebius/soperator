@@ -14,8 +14,15 @@
     - nccl-tests
 
 - name: Download nccl-tests archive
+
   ansible.builtin.get_url:
-    url: "{{ packages_repo_url }}/nccl_tests_12.9.0_ubuntu{{ ansible_distribution_version }}/nccl-tests-perf-{{ ansible_architecture }}.tar.gz"
+    url: >-
+      {{
+        nccl_tests_deb_repo_url ~
+        '/nccl_tests_' ~ nccl_tests_cuda_version ~
+        '_ubuntu' ~ ansible_distribution_version ~
+        '/nccl-tests-perf-' ~ ansible_architecture ~ '.tar.gz'
+      }}
     dest: "/tmp/nccl-tests-perf-{{ ansible_architecture }}.tar.gz"
     mode: "0644"
   tags:

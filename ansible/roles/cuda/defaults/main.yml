@@ -1,0 +1,12 @@
+---
+
+cuda_packages:
+  - "cuda=12.9.0-1"
+  - "libcublas-dev-12-9"
+  - "libcudnn9-cuda-12=9.10.1.4-1"
+  - "libcudnn9-dev-cuda-12=9.10.1.4-1"
+  - "libcudnn9-headers-cuda-12=9.10.1.4-1"
+  - "libnccl-dev={{ libnccl_version }}+cuda12.9"
+  - "libnccl2={{ libnccl_version }}+cuda12.9"
+
+libnccl_version: 2.26.5-1
