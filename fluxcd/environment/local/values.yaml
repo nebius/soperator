@@ -10,7 +10,7 @@ ns:
 soperator:
   enabled: true
   namespace: soperator-system
-  version: "1.22.2"
+  version: "1.22.3"
   featureGates: ""
   values:
     manager:
@@ -240,10 +240,10 @@ backup:
 # NFS Server - disabled for local dev
 nfsServer:
   enabled: false
-  version: 1.22.2
+  version: 1.22.3
   overrideValues:
     image:
-      tag: 1.22.2
+      tag: 1.22.3
 # Notifier - disabled for local dev
 notifier:
   enabled: false
