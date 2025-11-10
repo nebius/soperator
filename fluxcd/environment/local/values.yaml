@@ -6,7 +6,6 @@ ns:
   enabled: true
   version: "2.0.0"
   interval: 24h
-
 # Soperator configuration
 soperator:
   enabled: true
@@ -26,11 +25,9 @@ soperator:
     enabled: false
   nodeConfigurator:
     enabled: false
-
 # Helm Release Trigger Operator - disabled for local dev
 helmReleaseTriggerOperator:
   enabled: false
-
 # Slurm Cluster configuration - enabled for local dev
 slurmCluster:
   enabled: true
@@ -243,6 +240,10 @@ backup:
 # NFS Server - disabled for local dev
 nfsServer:
   enabled: false
+  version: 1.22.2
+  overrideValues:
+    image:
+      tag: 1.22.2
 # Notifier - disabled for local dev
 notifier:
   enabled: false
