@@ -1,12 +1,58 @@
 ---
 
+cuda_libnccl_version: 2.26.5-1
+
 cuda_packages:
   - "cuda=12.9.0-1"
   - "libcublas-dev-12-9"
   - "libcudnn9-cuda-12=9.10.1.4-1"
   - "libcudnn9-dev-cuda-12=9.10.1.4-1"
   - "libcudnn9-headers-cuda-12=9.10.1.4-1"
-  - "libnccl-dev={{ libnccl_version }}+cuda12.9"
-  - "libnccl2={{ libnccl_version }}+cuda12.9"
+  - "libnccl-dev={{ cuda_libnccl_version }}+cuda12.9"
+  - "libnccl2={{ cuda_libnccl_version }}+cuda12.9"
 
-libnccl_version: 2.26.5-1
+cuda_hold_packages:
+  - cuda
+  - libcublas-dev-12-9
+  - libcudnn9-cuda-12
+  - libcudnn9-dev-cuda-12
+  - libcudnn9-headers-cuda-12
+  - libnccl-dev
+  - libnccl2
+
+cuda_pin_content: |
+  Package: cuda-drivers
+  Pin: version 99999999-fake
+  Pin-Priority: 1001
+
+  Package: nvidia-open
+  Pin: version 99999999-fake
+  Pin-Priority: 1001
+
+  Package: cuda
+  Pin: version 12.9.0-1
+  Pin-Priority: 1001
+
+  Package: libcublas-dev-12-9
+  Pin: version 12.9.1.4-1
+  Pin-Priority: 1001
+
+  Package: libcudnn9-cuda-12
+  Pin: version 9.10.1.4-1
+  Pin-Priority: 1001
+
+  Package: libcudnn9-dev-cuda-12
+  Pin: version 9.10.1.4-1
+  Pin-Priority: 1001
+
+  Package: libcudnn9-headers-cuda-12
+  Pin: version 9.10.1.4-1
+  Pin-Priority: 1001
+
+  Package: libnccl-dev
+  Pin: version {{ cuda_libnccl_version }}+cuda12.9
+  Pin-Priority: 1001
+
+  Package: libnccl2
+  Pin: version {{ cuda_libnccl_version }}+cuda12.9
+  Pin-Priority: 1001

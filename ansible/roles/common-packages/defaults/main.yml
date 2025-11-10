@@ -1,6 +1,7 @@
 ---
 
 common_packages:
+  - { name: acl, version: "2.3.2-1build1.1" }
   - { name: autoconf, version: "2.71-3" }
   - { name: build-essential, version: "12.10ubuntu1" }
   - { name: ca-certificates, version: "20240203" }

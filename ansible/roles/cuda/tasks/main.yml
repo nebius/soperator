@@ -105,54 +105,12 @@
   ansible.builtin.dpkg_selections:
     name: "{{ item }}"
     selection: hold
-  loop:
-    - cuda
-    - libcublas-dev-12-9
-    - libcudnn9-cuda-12
-    - libcudnn9-dev-cuda-12
-    - libcudnn9-headers-cuda-12
-    - libnccl-dev
-    - libnccl2
+  loop: "cuda_hold_packages"
 
 - name: Create APT pin file for CUDA and related packages
   ansible.builtin.copy:
     dest: /etc/apt/preferences.d/cuda-pins
-    content: |
-      Package: cuda-drivers
-      Pin: version 99999999-fake
-      Pin-Priority: 1001
-
-      Package: nvidia-open
-      Pin: version 99999999-fake
-      Pin-Priority: 1001
-
-      Package: cuda
-      Pin: version 12.9.0-1
-      Pin-Priority: 1001
-
-      Package: libcublas-dev-12-9
-      Pin: version 12.9.1.4-1
-      Pin-Priority: 1001
-
-      Package: libcudnn9-cuda-12
-      Pin: version 9.10.1.4-1
-      Pin-Priority: 1001
-
-      Package: libcudnn9-dev-cuda-12
-      Pin: version 9.10.1.4-1
-      Pin-Priority: 1001
-
-      Package: libcudnn9-headers-cuda-12
-      Pin: version 9.10.1.4-1
-      Pin-Priority: 1001
-
-      Package: libnccl-dev
-      Pin: version {{ libnccl_version }}+cuda12.9
-      Pin-Priority: 1001
-
-      Package: libnccl2
-      Pin: version {{ libnccl_version }}+cuda12.9
-      Pin-Priority: 1001
+    content: "{{ cuda_pin_content }}"
     owner: root
     group: root
     mode: "0644"
