@@ -34,11 +34,13 @@ CHART_NODESETS_PATH           = $(CHART_PATH)/nodesets
 
 SLURM_VERSION		  		= 25.05.4
 UBUNTU_VERSION		  		?= noble
-NFS_VERSION               	= $(shell cat NFS_VERSION)
-VERSION               		= $(shell cat VERSION)
+NFS_VERSION_BASE          	= $(shell cat NFS_VERSION)
+VERSION_BASE           		= $(shell cat VERSION)
+
+NFS_VERSION               	= $(NFS_VERSION_BASE)
+VERSION               		= $(VERSION_BASE)
 
 IMAGE_VERSION		  = $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)
-NFS_IMAGE_VERSION	  = $(NFS_VERSION)
 GO_CONST_VERSION_FILE = internal/consts/version.go
 GITHUB_REPO			  = ghcr.io/nebius/soperator
 NEBIUS_REPO			  = cr.eu-north1.nebius.cloud/soperator
@@ -60,9 +62,10 @@ endif
 
 ifeq ($(UNSTABLE), true)
     SHORT_SHA 					= $(shell git rev-parse --short=8 HEAD)
-    OPERATOR_IMAGE_TAG  		= $(VERSION)-$(SHORT_SHA)
-    IMAGE_VERSION		  		= $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
-    NFS_IMAGE_VERSION	  		= $(NFS_VERSION)-$(SHORT_SHA)
+    VERSION		  				= $(VERSION_BASE)-$(SHORT_SHA)
+    OPERATOR_IMAGE_TAG  		= $(VERSION)
+    IMAGE_VERSION		  		= $(VERSION_BASE)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
+    NFS_VERSION	  				= $(NFS_VERSION_BASE)-$(SHORT_SHA)
     IMAGE_REPO			  		= $(NEBIUS_REPO)-unstable
 endif
 
@@ -142,33 +145,33 @@ helm: generate manifests kustomize helmify ## Update soperator Helm chart
 
 .PHONY: get-version
 get-version:
-ifeq ($(UNSTABLE), true)
-	@echo '$(VERSION)-$(SHORT_SHA)'
-else
 	@echo '$(VERSION)'
-endif
+
+.PHONY: get-nfs-version
+get-nfs-version:
+	@echo '$(NFS_VERSION)'
 
 .PHONY: test-version-sync
 test-version-sync: yq
-	@if [ "$(VERSION)" != "$(VALUES_VERSION)" ]; then \
+	@if [ "$(VERSION_BASE)" != "$(VALUES_VERSION)" ]; then \
 		echo "Version in version file and helm/slurm-cluster different!"; \
-		echo "VERSION is - $(VERSION)"; \
+		echo "VERSION_BASE is - $(VERSION_BASE)"; \
 		echo "VALUES_VERSION is - $(VALUES_VERSION)"; \
 		exit 1; \
 	else \
-		echo "Version test passed: versions is: $(VERSION)"; \
+		echo "Version test passed: versions is: $(VERSION_BASE)"; \
 	fi
-	@if [ "$(NFS_VERSION)" != "$(NFS_CHART_VERSION)" ]; then \
+	@if [ "$(NFS_VERSION_BASE)" != "$(NFS_CHART_VERSION)" ]; then \
 		echo "NFS version in NFS_VERSION file and helm/nfs-server/Chart.yaml different!"; \
-		echo "NFS_VERSION is - $(NFS_VERSION)"; \
+		echo "NFS_VERSION_BASE is - $(NFS_VERSION_BASE)"; \
 		echo "NFS_CHART_VERSION is - $(NFS_CHART_VERSION)"; \
 		exit 1; \
 	else \
-		echo "NFS version test passed: version is: $(NFS_VERSION)"; \
+		echo "NFS version test passed: version is: $(NFS_VERSION_BASE)"; \
 	fi
-	@if [ "$(NFS_VERSION)" != "$(NFS_IMAGE_TAG)" ]; then \
+	@if [ "$(NFS_VERSION_BASE)" != "$(NFS_IMAGE_TAG)" ]; then \
 		echo "NFS version in NFS_VERSION file and helm/nfs-server/values.yaml image.tag different!"; \
-		echo "NFS_VERSION is - $(NFS_VERSION)"; \
+		echo "NFS_VERSION_BASE is - $(NFS_VERSION_BASE)"; \
 		echo "NFS_IMAGE_TAG is - $(NFS_IMAGE_TAG)"; \
 		exit 1; \
 	else \
@@ -276,7 +279,7 @@ sync-version: yq ## Sync versions from file
 	@# region helm/nfs-server/values.yaml
 	@echo 'Syncing helm/nfs-server/values.yaml'
 	@$(YQ) -i ".image.repository = \"$(IMAGE_REPO)/nfs-server\"" "helm/nfs-server/values.yaml"
-	@$(YQ) -i ".image.tag = \"$(NFS_IMAGE_VERSION)\"" "helm/nfs-server/values.yaml"
+	@$(YQ) -i ".image.tag = \"$(NFS_VERSION)\"" "helm/nfs-server/values.yaml"
 	@# endregion helm/nfs-server/values.yaml
 
 	@# region helm/slurm-cluster/templates/_registry_helpers.tpl
