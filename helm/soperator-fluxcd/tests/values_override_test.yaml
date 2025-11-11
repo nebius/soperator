@@ -73,6 +73,7 @@ tests:
     set:
       soperator.enabled: true
       soperator.values:
+        serviceMonitor: null
         manager:
           resources:
             requests:
@@ -88,10 +89,13 @@ tests:
       soperator.enabled: true
       soperator.values:
         serviceMonitor:
+          enabled: null
           interval: 30s
     asserts:
       - hasDocuments:
           count: 1
+      - exists:
+          path: spec.values.serviceMonitor.interval
       - notExists:
           path: spec.values.serviceMonitor.enabled
 ---
