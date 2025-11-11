@@ -26,4 +26,4 @@ spec:
       image: {{ .Values.images.munge | quote }}
   failureReactions:
     drainSlurmNode:
-      drainReasonPrefix: {{ .Values.checks.allReducePerfNCCLWithoutIB.drainReasonPrefix }}
+      drainReasonPrefix: {{ .Values.checks.allReducePerfNCCLWithoutIB.drainReasonPrefix | quote }}

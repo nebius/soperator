@@ -33,6 +33,6 @@ spec:
       prefix: {{ .Values.checks.extensiveCheck.reservationPrefix | quote }}
   failureReactions:
     drainSlurmNode:
-      drainReasonPrefix: {{ .Values.checks.extensiveCheck.drainReasonPrefix }}
+      drainReasonPrefix: {{ .Values.checks.extensiveCheck.drainReasonPrefix | quote }}
     removeReservation:
       prefix: {{ .Values.checks.extensiveCheck.reservationPrefix | quote }}

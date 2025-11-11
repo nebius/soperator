@@ -26,4 +26,4 @@ spec:
       image: {{ .Values.images.munge | quote }}
   failureReactions:
     drainSlurmNode:
-      drainReasonPrefix: {{ .Values.checks.dcgmiDiagR2.drainReasonPrefix }}
+      drainReasonPrefix: {{ .Values.checks.dcgmiDiagR2.drainReasonPrefix | quote }}
