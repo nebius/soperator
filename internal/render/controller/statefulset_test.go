@@ -46,7 +46,7 @@ func TestRenderStatefulSet(t *testing.T) {
 							corev1.ResourceCPU:    resource.MustParse("500m"),
 							corev1.ResourceMemory: resource.MustParse("1Gi"),
 						},
-						AppArmorProfile: "unconfined",
+						AppArmorProfile: consts.AppArmorProfileUnconfined,
 					},
 					Name: "slurmctld",
 				},
@@ -58,7 +58,7 @@ func TestRenderStatefulSet(t *testing.T) {
 							corev1.ResourceCPU:    resource.MustParse("100m"),
 							corev1.ResourceMemory: resource.MustParse("256Mi"),
 						},
-						AppArmorProfile: "unconfined",
+						AppArmorProfile: consts.AppArmorProfileUnconfined,
 					},
 				},
 				VolumeSpool: slurmv1.NodeVolume{
@@ -220,7 +220,7 @@ func TestRenderStatefulSetWithMaintenance(t *testing.T) {
 				Image:           "test-image:latest",
 				ImagePullPolicy: corev1.PullAlways,
 				Port:            6817,
-				AppArmorProfile: "unconfined",
+				AppArmorProfile: consts.AppArmorProfileUnconfined,
 			},
 			Name: "slurmctld",
 		},
@@ -228,7 +228,7 @@ func TestRenderStatefulSetWithMaintenance(t *testing.T) {
 			NodeContainer: slurmv1.NodeContainer{
 				Image:           "munge-image:latest",
 				ImagePullPolicy: corev1.PullAlways,
-				AppArmorProfile: "unconfined",
+				AppArmorProfile: consts.AppArmorProfileUnconfined,
 			},
 		},
 		VolumeSpool: slurmv1.NodeVolume{
@@ -312,7 +312,7 @@ func TestRenderStatefulSetHostUsers(t *testing.T) {
 						Image:           "test-image:latest",
 						ImagePullPolicy: corev1.PullAlways,
 						Port:            6817,
-						AppArmorProfile: "unconfined",
+						AppArmorProfile: consts.AppArmorProfileUnconfined,
 					},
 					Name: "slurmctld",
 				},
@@ -320,7 +320,7 @@ func TestRenderStatefulSetHostUsers(t *testing.T) {
 					NodeContainer: slurmv1.NodeContainer{
 						Image:           "munge-image:latest",
 						ImagePullPolicy: corev1.PullAlways,
-						AppArmorProfile: "unconfined",
+						AppArmorProfile: consts.AppArmorProfileUnconfined,
 					},
 				},
 				VolumeSpool: slurmv1.NodeVolume{
