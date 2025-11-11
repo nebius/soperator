@@ -35,7 +35,7 @@ chart() {
   OCI_REPO=$1
   shift 1
 
-  CHART_VERSION=$(grep '^version:' "${HELM_PATH}/${CHART_NAME}/Chart.yaml" | awk '{print $2}')
+  CHART_VERSION=$(grep '^version:' "${HELM_PATH}/${CHART_NAME}/Chart.yaml" | awk '{print $2}' | sed 's/"//g')
 
   if [ -z "${CHART_VERSION}" ]; then
     echo "Error: Could not find version in ${HELM_PATH}/${CHART_NAME}/Chart.yaml"
