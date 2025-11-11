@@ -42,6 +42,58 @@ tests:
           value:
             cpu: 100m
             memory: 128Mi
+
+  - it: should disable serviceMonitor when set to false
+    set:
+      soperator.enabled: true
+      soperator.values:
+        serviceMonitor:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.serviceMonitor.enabled
+          value: false
+
+  - it: should enable serviceMonitor when set to true
+    set:
+      soperator.enabled: true
+      soperator.values:
+        serviceMonitor:
+          enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.serviceMonitor.enabled
+          value: true
+
+  - it: should not render serviceMonitor when not provided
+    set:
+      soperator.enabled: true
+      soperator.values:
+        manager:
+          resources:
+            requests:
+              cpu: 100m
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notExists:
+          path: spec.values.serviceMonitor
+
+  - it: should render serviceMonitor without enabled field when serviceMonitor exists but enabled not set
+    set:
+      soperator.enabled: true
+      soperator.values:
+        serviceMonitor:
+          interval: 30s
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notExists:
+          path: spec.values.serviceMonitor.enabled
 ---
 suite: test values override default values nodeconfigurator
 templates:

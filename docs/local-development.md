@@ -65,12 +65,11 @@ make kind-create KIND_CLUSTER_NAME=my-cluster KIND_NODES=5
 
 | Command | Description |
 |---------|-------------|
-| `make kind` | Install kind CLI to ./bin/ |
-| `make flux` | Install flux CLI to ./bin/ |
+| `make install-kind` | Install kind CLI to ./bin/ |
+| `make install-flux` | Install flux CLI to ./bin/ |
 | `make kind-create` | Create kind cluster with specified nodes (auto-switches kubectl context) |
 | `make kind-delete` | Delete kind cluster |
 | `make kind-list` | List all kind clusters |
-| `make kind-load-images` | Load operator images into kind |
 | `make kind-restart` | Restart cluster (delete + create) |
 | `make kind-status` | Check kind cluster status and deployments |
 | `make deploy-flux` | Deploy soperator via Flux CD |
@@ -80,14 +79,6 @@ make kind-create KIND_CLUSTER_NAME=my-cluster KIND_NODES=5
 > **Note:** The `kind-create` command automatically switches your kubectl context to the newly created cluster, so you can immediately start using `kubectl` commands without manually switching contexts.
 
 ## Working with the Cluster
-
-### Load Local Images
-
-After building operator images locally, load them into kind:
-
-```bash
-make kind-load-images
-```
 
 ### Deploy Operator
 

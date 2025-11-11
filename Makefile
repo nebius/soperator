@@ -592,7 +592,7 @@ yq: $(YQ) ## Download yq locally if necessary.
 $(YQ): $(LOCALBIN)
 	test -s $(LOCALBIN)/yq || GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@v$(YQ_VERSION)
 
-.PHONY: kind
+.PHONY: install-kind
 kind: $(KIND) ## Download kind locally if necessary.
 $(KIND): $(LOCALBIN)
 	@if test -x $(LOCALBIN)/kind && ! $(LOCALBIN)/kind version | grep -q $(KIND_VERSION); then \
@@ -609,7 +609,7 @@ $(KIND): $(LOCALBIN)
 		chmod +x $(LOCALBIN)/kind; \
 	fi
 
-.PHONY: flux
+.PHONY: install-flux
 flux: $(FLUX) ## Download flux CLI locally if necessary.
 $(FLUX): $(LOCALBIN)
 	@if test -x $(LOCALBIN)/flux && ! $(LOCALBIN)/flux version --client | grep -q $(FLUX_VERSION); then \

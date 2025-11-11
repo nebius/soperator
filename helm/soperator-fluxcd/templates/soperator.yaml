@@ -37,9 +37,9 @@ spec:
   {{- if .Values.soperator.overrideValues }}
     {{- toYaml .Values.soperator.overrideValues | nindent 4 }}
   {{- else }}
-    {{- if and .Values.soperator.values.serviceMonitor .Values.soperator.values.serviceMonitor.enabled }}
+    {{- if .Values.soperator.values.serviceMonitor }}
     serviceMonitor:
-      enabled: {{ .Values.soperator.values.serviceMonitor.enabled }}
+      {{- toYaml .Values.soperator.values.serviceMonitor | nindent 6 }}
     {{- end }}
     {{- if .Values.certManager.enabled }}
     certManager:

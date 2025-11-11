@@ -59,9 +59,15 @@ make deploy-flux
 # Create kind cluster
 make kind-create
 
+# For unstable releases, sync version first
+# (This updates the OCI registry URL based on version stability)
+make sync-version
+
 # Deploy with Flux
 make deploy-flux
 ```
+
+**Note**: For unstable/development versions (versions containing `-` like `1.22.3-fed4a485`), run `make sync-version` before `make deploy-flux` to ensure the correct OCI registry URL is used.
 
 ### Manual Deployment
 
@@ -183,13 +189,3 @@ kubectl get configmap soperator-fluxcd-values -n flux-system
 # Reapply if missing
 kustomize build fluxcd/environment/local | kubectl apply -f -
 ```
-
-### Image pull errors
-
-For local development, you may need to load images into kind:
-
-```bash
-make kind-load-images
-```
-
-Or configure to use local registry/unstable images.

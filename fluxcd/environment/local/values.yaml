@@ -14,7 +14,7 @@ soperator:
   featureGates: ""
   values:
     serviceMonitor:
-      enabled: true
+      enabled: false
     manager:
       resources:
         limits:
