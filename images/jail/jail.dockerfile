@@ -15,6 +15,16 @@ FROM cuda AS jail
 
 ARG DEBIAN_FRONTEND=noninteractive
 
+# Create directory for pivoting host's root
+RUN mkdir -m 555 /mnt/host
+
+# Copy initial users
+RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
+COPY images/jail/init-users/* /etc/
+RUN chmod 644 /etc/passwd /etc/group && chown 0:0 /etc/passwd /etc/group && \
+    chmod 640 /etc/shadow /etc/gshadow && chown 0:42 /etc/shadow /etc/gshadow && \
+    chmod 440 /etc/sudoers && chown 0:0 /etc/sudoers
+
 # Install minimal python packages for Ansible
 RUN apt-get update && \
     apt-get install -y \
@@ -44,76 +54,54 @@ RUN ansible-playbook -i localhost -c local common-packages.yml -t common-package
 RUN apt update && \
     apt install -y \
         bc \
-        curl \
         flex \
         gettext-base \
         git \
-        gnupg \
-        jq \
         less \
         lsof \
-        pkg-config \
-        software-properties-common \
-        python3-apt \
-        squashfs-tools \
         iputils-ping \
         dnsutils \
         telnet \
         netcat-openbsd \
         strace \
-        sudo \
         tree \
         vim \
-        wget \
-        zstd \
         pciutils \
-        iproute2 \
-        infiniband-diags \
-        libncurses5-dev \
-        libdrm-dev \
-        zip \
-        unzip \
         rsync \
-        numactl \
         htop \
         hwloc \
         bsdmainutils \
-        kmod \
         tmux \
-        time \
         aptitude && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Create directory for pivoting host's root
-RUN mkdir -m 555 /mnt/host
+# Install AWS CLI
+COPY images/common/scripts/install_awscli.sh /opt/bin/
+RUN chmod +x /opt/bin/install_awscli.sh && \
+    /opt/bin/install_awscli.sh && \
+    rm /opt/bin/install_awscli.sh
 
-# Copy initial users
-RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
-COPY images/jail/init-users/* /etc/
-RUN chmod 644 /etc/passwd /etc/group && chown 0:0 /etc/passwd /etc/group && \
-    chmod 640 /etc/shadow /etc/gshadow && chown 0:42 /etc/shadow /etc/gshadow && \
-    chmod 440 /etc/sudoers && chown 0:0 /etc/sudoers
-
-# Setup the default $HOME directory content
-COPY ansible/skel.yml /opt/ansible/skel.yml
-COPY ansible/roles/skel /opt/ansible/roles/skel
-RUN ansible-playbook -i localhost -c local skel.yml -t skel
-
-# Replace SSH "message of the day" scripts
-COPY ansible/motd.yml /opt/ansible/motd.yml
-COPY ansible/roles/motd /opt/ansible/roles/motd
-RUN ansible-playbook -i localhost -c local motd.yml -t motd
-
-# Install OpenMPI
-COPY ansible/openmpi.yml /opt/ansible/openmpi.yml
-COPY ansible/roles/openmpi /opt/ansible/roles/openmpi
-RUN ansible-playbook -i localhost -c local openmpi.yml -t openmpi
+# Install Rclone
+COPY images/common/scripts/install_rclone.sh /opt/bin/
+RUN chmod +x /opt/bin/install_rclone.sh && \
+    /opt/bin/install_rclone.sh && \
+    rm /opt/bin/install_rclone.sh
 
 # Install nvtop GPU monitoring utility
 COPY ansible/nvtop.yml /opt/ansible/nvtop.yml
 COPY ansible/roles/nvtop /opt/ansible/roles/nvtop
 RUN ansible-playbook -i localhost -c local nvtop.yml -t nvtop
+
+## Install Docker CLI
+COPY ansible/docker-cli.yml /opt/ansible/docker-cli.yml
+COPY ansible/roles/docker-cli /opt/ansible/roles/docker-cli
+RUN ansible-playbook -i localhost -c local docker-cli.yml -t docker-cli
+
+# Install OpenMPI
+COPY ansible/openmpi.yml /opt/ansible/openmpi.yml
+COPY ansible/roles/openmpi /opt/ansible/roles/openmpi
+RUN ansible-playbook -i localhost -c local openmpi.yml -t openmpi
 
 # Install dcgmi tools
 # https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/dcgm-diagnostics.html
@@ -131,22 +119,15 @@ COPY ansible/nvidia-container-toolkit.yml /opt/ansible/nvidia-container-toolkit.
 COPY ansible/roles/nvidia-container-toolkit /opt/ansible/roles/nvidia-container-toolkit
 RUN ansible-playbook -i localhost -c local nvidia-container-toolkit.yml -t nvidia-container-toolkit
 
-# Install AWS CLI
-COPY images/common/scripts/install_awscli.sh /opt/bin/
-RUN chmod +x /opt/bin/install_awscli.sh && \
-    /opt/bin/install_awscli.sh && \
-    rm /opt/bin/install_awscli.sh
+# Setup the default $HOME directory content
+COPY ansible/skel.yml /opt/ansible/skel.yml
+COPY ansible/roles/skel /opt/ansible/roles/skel
+RUN ansible-playbook -i localhost -c local skel.yml -t skel
 
-# Install Rclone
-COPY images/common/scripts/install_rclone.sh /opt/bin/
-RUN chmod +x /opt/bin/install_rclone.sh && \
-    /opt/bin/install_rclone.sh && \
-    rm /opt/bin/install_rclone.sh
-
-## Install Docker CLI
-COPY ansible/docker-cli.yml /opt/ansible/docker-cli.yml
-COPY ansible/roles/docker-cli /opt/ansible/roles/docker-cli
-RUN ansible-playbook -i localhost -c local docker-cli.yml -t docker-cli
+# Replace SSH "message of the day" scripts
+COPY ansible/motd.yml /opt/ansible/motd.yml
+COPY ansible/roles/motd /opt/ansible/roles/motd
+RUN ansible-playbook -i localhost -c local motd.yml -t motd
 
 # Copy wrapper scripts and utilities
 COPY ansible/soperator-scripts.yml /opt/ansible/soperator-scripts.yml

@@ -10,17 +10,17 @@
   roles:
     - python
     - common-packages
-    - skel
-    - motd
-    - openmpi
     - nvtop
+    - docker-cli
+    - openmpi
     - dcgmi
     - gdrcopy
     - nvidia-container-toolkit
-    - docker-cli
     - soperator-scripts
     - slurm-divert
     - slurm-client
+    - skel
+    - motd
     - nc-health-checker
   tags:
     - run-all-upgrade
