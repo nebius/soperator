@@ -22,15 +22,36 @@ echo "Platform found: $platform"
 echo "Listing available health checks for platform $platform"
 health-checker list -e soperator -p $platform
 
+LAST_RUN_ID=""
+LAST_FAIL_TEST=""
+LAST_FAIL_ERROR=""
+
 _run_and_parse_hc() {
-  local HC_OUTPUT HC_STATUS
+  local HC_OUTPUT HC_STATUS JSON_BLOCK FIRST_FAIL
   HC_OUTPUT=$("$@")
 
   echo "Health checker output: $HC_OUTPUT"
-  HC_STATUS=$(echo "$HC_OUTPUT" | awk '/^\s*{/,/^\s*}/' | jq -r '.status')
+  JSON_BLOCK=$(echo "$HC_OUTPUT" | awk '/^\s*{/,/^\s*}/')
+  HC_STATUS=$(echo "$JSON_BLOCK" | jq -r '.status')
   echo "Health checker status: $HC_STATUS"
 
   if [[ "$HC_STATUS" == "FAIL" ]]; then
+    LAST_RUN_ID=$(echo "$JSON_BLOCK" | jq -r '.meta.run_id // "undefined"')
+    FIRST_FAIL=$(echo "$JSON_BLOCK" | jq -r '
+      [ .tests[] as $t
+        | $t.checks[]
+        | select((.state.status // .status) == "FAIL")
+        | {test: $t.name, error: (.state.error // .error // "undefined")}
+      ][0]
+      | if . then "\(.test)|\(.error)" else "" end
+    ')
+    if [[ -n "$FIRST_FAIL" ]]; then
+      IFS='|' read -r LAST_FAIL_TEST LAST_FAIL_ERROR <<< "$FIRST_FAIL"
+    else
+      LAST_FAIL_TEST="undefined"
+      LAST_FAIL_ERROR="undefined"
+    fi
+
     echo "Health-checker reported status=FAIL."
     return 1
   elif [[ "$HC_STATUS" == "ERROR" ]]; then
@@ -62,6 +83,16 @@ all_reduce_in_docker() {
     --mount type=bind,source=/tmp/soperatorchecks/b,target=/b \
     {{ include "activecheck.image.docker" . }} \
     bash -c "NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring all_reduce_perf -b 512M -e 8G -f 2 -g 8"
+  local rc=$?
+
+  if [[ $rc -ne 0 ]]; then
+    LAST_RUN_ID="undefined"
+    LAST_FAIL_TEST="all_reduce_in_docker"
+    LAST_FAIL_ERROR="all_reduce_perf exited with non-zero status"
+    return 1
+  fi
+
+  return 0
 }
 
 all_reduce_with_ib() {
@@ -111,6 +142,7 @@ funcs_to_test=(
   ib_gpu_perf
   mem_perf
 )
+
 for test in "${funcs_to_test[@]}"
 do
   echo "Running $test on $(hostname)..."
@@ -118,6 +150,11 @@ do
   TEST_EXIT_CODE=$?
 
   if [[ $TEST_EXIT_CODE -ne 0 ]]; then
+    COMMENT="Run ID: ${LAST_RUN_ID}, FirstFailedCheck: ${LAST_FAIL_TEST}, Error: ${LAST_FAIL_ERROR}"
+    NODE_NAME=$(hostname)
+    echo "Setting node comment: $COMMENT"
+    scontrol update NodeName=$NODE_NAME Comment="$COMMENT"
+
     echo "$test reported failure (exit code $TEST_EXIT_CODE)."
     exit 1
   else
