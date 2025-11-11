@@ -13,6 +13,8 @@ soperator:
   version: "1.22.3"
   featureGates: ""
   values:
+    serviceMonitor:
+      enabled: true
     manager:
       resources:
         limits:
