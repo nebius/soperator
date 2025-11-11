@@ -290,6 +290,7 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".spec.chart.spec.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/helmrelease.yaml"
 	@echo 'Syncing fluxcd/environment/local/values.yaml'
 	@$(YQ) -i ".soperator.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/values.yaml"
+	@$(YQ) -i ".slurmCluster.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/values.yaml"
 	@$(YQ) -i ".nfsServer.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/values.yaml"
 	@$(YQ) -i ".nfsServer.overrideValues.image.tag = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/values.yaml"
 	@echo 'Syncing fluxcd/environment/local/slurmCluster.yml'
@@ -476,6 +477,12 @@ deploy-flux: flux kustomize ## Deploy soperator via Flux CD to kind cluster (for
 	$(KUSTOMIZE) build fluxcd/environment/local | \
 		sed "s|url: oci://cr.eu-north1.nebius.cloud/soperator.*|url: $$OCI_REPO|g" | \
 		$(KUBECTL_CTX) apply -f -; \
+	echo ""; \
+	echo "Step 4: Patching soperator-fluxcd-values ConfigMap with OCI repository..."; \
+	$(KUBECTL_CTX) get configmap soperator-fluxcd-values -n flux-system -o yaml | \
+		$(YQ) eval ".data.\"values.yaml\" |= (. | from_yaml | .helmRepository.soperator.url = \"$$OCI_REPO\" | to_yaml)" - | \
+		$(KUBECTL_CTX) apply -f -; \
+	echo ""; \
 	ARCH=$$(uname -m); \
 	if [ "$$ARCH" = "arm64" ] || [ "$$ARCH" = "aarch64" ]; then \
 		echo "ARM architecture detected, applying ARM-specific patch..."; \
