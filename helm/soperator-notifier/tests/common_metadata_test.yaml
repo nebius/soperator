@@ -27,7 +27,7 @@ tests:
           value: *chartName
       - matchRegex:
           path: metadata.labels["app.kubernetes.io/version"]
-          pattern: ^\d+\.\d+\.\d+$
+          pattern: ^\d+\.\d+\.\d+(-[a-f0-9]+)?$
       - matchRegex:
           path: metadata.labels["helm.sh/chart"]
-          pattern: ^helm-soperator-notifier-\d+\.\d+\.\d+$
+          pattern: ^helm-soperator-notifier-\d+\.\d+\.\d+(-[a-f0-9]+)?$
