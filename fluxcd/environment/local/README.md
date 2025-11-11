@@ -76,15 +76,6 @@ To deploy an unstable/development version:
 2. Run `make sync-version` to update all configuration files
 3. Run `make deploy-flux` - it will automatically use the correct OCI registry
 
-### Manual Deployment
-
-```bash
-# Install Flux
-flux install
-
-# Apply local configuration
-kustomize build fluxcd/environment/local | kubectl apply -f -
-```
 
 ### Monitoring
 
@@ -185,14 +176,4 @@ kubectl describe helmrepository soperator-fluxcd -n flux-system
 # Force reconciliation
 flux reconcile source helm soperator-fluxcd -n flux-system
 flux reconcile helmrelease soperator-fluxcd -n flux-system
-```
-
-### ConfigMap not found
-
-```bash
-# Verify ConfigMap exists
-kubectl get configmap soperator-fluxcd-values -n flux-system
-
-# Reapply if missing
-kustomize build fluxcd/environment/local | kubectl apply -f -
 ```

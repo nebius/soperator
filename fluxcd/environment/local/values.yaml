@@ -184,6 +184,8 @@ slurmCluster:
             memory: 100Mi
             ephemeralStorage: 100Mi
     sConfigController:
+      serviceMonitor:
+        enabled: false
       node:
         k8sNodeFilterName: kind
         size: 1
