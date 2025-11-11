@@ -30,6 +30,7 @@ var SlurmNodeReasonsList = []string{
 	SlurmNodeReasonNodeReboot,
 	SlurmNodeReasonHC,
 	SlurmUserReasonHC,
+	SlurmHardwareReasonHC,
 }
 
 const (

@@ -17,7 +17,7 @@ spec:
   failedJobsHistoryLimit: 3000
   slurmJobSpec:
     sbatchScript: |
-{{ .Files.Get "scripts/extensive-check.sh" | indent 6 }}
+{{ tpl (.Files.Get "scripts/extensive-check.sh") . | indent 6 }}
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:
