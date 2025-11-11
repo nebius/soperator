@@ -74,6 +74,13 @@ nodesets: {}
 #           readOnly: false
 #           volumeSource:
 #             emptyDir: {}
+#       customVolumeMounts:
+#         - name: "foo"
+#           mountPath: "/tmp/foo"
+#           subPath: "bar"
+#           readOnly: false
+#           volumeSource:
+#             emptyDir: {}
 #       sharedMemorySize: "64Gi"
 #     security:
 #       appArmorProfile: "unconfined"

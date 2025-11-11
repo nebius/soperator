@@ -87,6 +87,10 @@ spec:
       jailSubMounts:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .customVolumeMounts }}
+      customVolumeMounts:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .sharedMemorySize }}
       sharedMemorySize: {{ . }}
       {{- end }}
