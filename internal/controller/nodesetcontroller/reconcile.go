@@ -243,7 +243,7 @@ func (r NodeSetReconciler) ReconcileNodeSetWorkers(
 				}
 				stepLogger.V(1).Info("Retrieved dependencies")
 
-				if err = r.AdvancedStatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
+				if err = r.AdvancedStatefulSet.Reconcile(stepCtx, nodeSet, &desired, deps...); err != nil {
 					stepLogger.Error(err, "Failed to reconcile")
 					return fmt.Errorf("reconciling worker StatefulSet: %w", err)
 				}
