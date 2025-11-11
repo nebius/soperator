@@ -257,3 +257,11 @@ make deploy
 make test
 make kind-delete
 ```
+
+# Known Issues
+
+## Freelens
+
+Fixing invisible local cluster issue:
+
+![alt text](image.png)
