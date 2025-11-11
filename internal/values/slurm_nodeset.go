@@ -24,11 +24,11 @@ type SlurmNodeSet struct {
 	PriorityClass string
 	Annotations   map[string]string
 
-	ContainerSlurmd        Container
-	ContainerMunge         Container
-	CustomInitContainers   []corev1.Container
-	CgroupVersion          string
-	AppArmorProfileDefault bool
+	ContainerSlurmd           Container
+	ContainerMunge            Container
+	CustomInitContainers      []corev1.Container
+	CgroupVersion             string
+	AppArmorProfileUseDefault bool
 
 	SupervisorDConfigMapDefault bool
 	SupervisorDConfigMapName    string
@@ -93,9 +93,9 @@ func BuildSlurmNodeSetFrom(
 			},
 			consts.ContainerNameMunge,
 		),
-		CustomInitContainers:   slices.Clone(nsSpec.CustomInitContainers),
-		CgroupVersion:          nsSpec.Slurmd.CgroupVersion,
-		AppArmorProfileDefault: useDefaultAppArmorProfile,
+		CustomInitContainers:      slices.Clone(nsSpec.CustomInitContainers),
+		CgroupVersion:             nsSpec.Slurmd.CgroupVersion,
+		AppArmorProfileUseDefault: useDefaultAppArmorProfile,
 		//
 		GPU: nsSpec.GPU.DeepCopy(),
 		//
