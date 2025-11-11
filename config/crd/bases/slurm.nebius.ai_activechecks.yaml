@@ -21,11 +21,11 @@ spec:
       type: string
     - description: Whether to run this check after creation
       jsonPath: .spec.runAfterCreation
-      name: Run After Creation
+      name: Init
       type: boolean
     - description: Whether to suspend periodic runs of this check
       jsonPath: .spec.suspend
-      name: Suspend Periodic
+      name: Suspend
       type: boolean
     - description: Schedule
       jsonPath: .spec.schedule
@@ -40,7 +40,7 @@ spec:
       name: Slurm Status
       type: string
     - description: Submission time of the last Slurm job
-      jsonPath: .status.slurmJobStatus.lastJobSubmitTime
+      jsonPath: .status.slurmJobStatus.lastRunSubmitTime
       name: Slurm Submit Time
       type: string
     - description: ID of the last Slurm job
