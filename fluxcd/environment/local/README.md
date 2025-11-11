@@ -139,29 +139,6 @@ spec:
   url: oci://cr.eu-north1.nebius.cloud/soperator-unstable
 ```
 
-## Integration with CI/CD
-
-Example GitHub Actions workflow:
-
-```yaml
-- name: Create kind cluster
-  run: make kind-create
-
-- name: Deploy soperator
-  run: make deploy-flux
-
-- name: Wait for deployment
-  run: |
-    kubectl wait --for=condition=ready helmrelease/soperator-fluxcd \
-      -n flux-system --timeout=5m
-
-- name: Run tests
-  run: make test
-
-- name: Cleanup
-  run: make kind-delete
-```
-
 ## Troubleshooting
 
 ### HelmRelease not reconciling
