@@ -153,7 +153,7 @@ do
     COMMENT="Run ID: ${LAST_RUN_ID}, FirstFailedCheck: ${LAST_FAIL_TEST}, Error: ${LAST_FAIL_ERROR}"
     NODE_NAME=$(hostname)
     echo "Setting node comment: $COMMENT"
-    scontrol update NodeName=$NODE_NAME Comment="$COMMENT"
+    sudo scontrol update NodeName=$NODE_NAME Comment="$COMMENT"
 
     echo "$test reported failure (exit code $TEST_EXIT_CODE)."
     exit 1
