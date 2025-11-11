@@ -63,7 +63,7 @@ endif
 ifeq ($(UNSTABLE), true)
     SHORT_SHA 					= $(shell git rev-parse --short=8 HEAD)
     VERSION		  				= $(VERSION_BASE)-$(SHORT_SHA)
-    OPERATOR_IMAGE_TAG  		= $(VERSION)
+    OPERATOR_IMAGE_TAG  		= $(VERSION_BASE)-$(SHORT_SHA)
     IMAGE_VERSION		  		= $(VERSION_BASE)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
     NFS_VERSION	  				= $(NFS_VERSION_BASE)-$(SHORT_SHA)
     IMAGE_REPO			  		= $(NEBIUS_REPO)-unstable
