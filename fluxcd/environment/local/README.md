@@ -67,7 +67,14 @@ make sync-version
 make deploy-flux
 ```
 
-**Note**: For unstable/development versions (versions containing `-` like `1.22.3-fed4a485`), run `make sync-version` before `make deploy-flux` to ensure the correct OCI registry URL is used.
+**Note**: The `make deploy-flux` command automatically detects whether the version is stable or unstable based on the `VERSION` file:
+- **Stable versions** (e.g., `1.22.3`) use `oci://cr.eu-north1.nebius.cloud/soperator`
+- **Unstable versions** (e.g., `1.22.3-fed4a485`) use `oci://cr.eu-north1.nebius.cloud/soperator-unstable`
+
+To deploy an unstable/development version:
+1. Set the unstable version in the `VERSION` file (e.g., `1.22.3-fed4a485`)
+2. Run `make sync-version` to update all configuration files
+3. Run `make deploy-flux` - it will automatically use the correct OCI registry
 
 ### Manual Deployment
 
