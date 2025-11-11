@@ -41,7 +41,7 @@ kubectl cluster-info
 kubectl get nodes
 ```
 
-You should see 5 nodes (1 control-plane + 4 workers).
+You should see 2 nodes (1 control-plane + 4 workers).
 
 ## Customization
 
