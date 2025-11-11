@@ -20,6 +20,7 @@
     name:
       - openmpi={{ openmpi_version }}
       - ucx={{ openmpi_ucx_version }}
+      - infiniband-diags={{ openmpi_infiniband_diags_version }}
     state: present
     update_cache: true
   tags:
