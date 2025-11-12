@@ -23,6 +23,7 @@ echo "Listing available health checks for platform $platform"
 health-checker list -e soperator -p $platform
 
 LAST_RUN_ID=""
+OUT_TMPL="/opt/soperator-outputs/slurm_jobs/%N.extensive-check:%x.%s.%j.out"
 
 _run_and_parse_hc() {
   local HC_OUTPUT HC_STATUS JSON_BLOCK
@@ -47,7 +48,10 @@ _run_and_parse_hc() {
 }
 
 passive_checks() {
-  _run_and_parse_hc srun --cpu-bind=verbose,cores bash -c \
+  _run_and_parse_hc srun -J "passive-checks" \
+    --output="$OUT_TMPL" \
+    --error="$OUT_TMPL" \
+    --cpu-bind=verbose,cores bash -c \
     "cd /tmp && \
     HC_DCGMI_DIAG_R1_DEBUGLOGFILE=/dev/null HC_DCGMI_DIAG_R1_DEBUGLEVEL=NONE \
     health-checker run -e soperator -p $platform \
@@ -57,37 +61,58 @@ passive_checks() {
 }
 
 all_reduce_with_ib() {
-  _run_and_parse_hc srun --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n all_reduce_with_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info"
+  _run_and_parse_hc srun -J "all-reduce-with-ib" \
+    --output="$OUT_TMPL" \
+    --error="$OUT_TMPL" \
+    --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n all_reduce_with_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info"
 }
 
 all_reduce_without_ib() {
-  _run_and_parse_hc srun --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n all_reduce_without_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info"
+  _run_and_parse_hc srun -J "all-reduce-without-ib" \
+    --output="$OUT_TMPL" \
+    --error="$OUT_TMPL" \
+    --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n all_reduce_without_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info"
 }
 
 cuda_samples() {
-  _run_and_parse_hc srun --cpu-bind=verbose --container-image={{ include "activecheck.image.pyxis" . }} \
+  _run_and_parse_hc srun -J "cuda-samples" \
+    --output="$OUT_TMPL" \
+    --error="$OUT_TMPL" \
+    --cpu-bind=verbose --container-image={{ include "activecheck.image.pyxis" . }} \
     --container-mounts=$(which health-checker):/usr/local/bin/health-checker \
     bash -c "health-checker run -e soperator -p $platform -n deviceQuery,vectorAdd,simpleMultiGPU,p2pBandwidthLatencyTest -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
 
 dcgmi_diag_r2() {
-  _run_and_parse_hc srun --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n dcgmi_diag_r2 -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
+  _run_and_parse_hc srun -J "dcgmi-diag-r2" \
+    --output="$OUT_TMPL" \
+    --error="$OUT_TMPL" \
+    --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n dcgmi_diag_r2 -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
 
 gpu_fryer() {
-  _run_and_parse_hc srun --cpu-bind=verbose --container-image={{ include "activecheck.image.pyxis" . }} \
+  _run_and_parse_hc srun -J "gpu-fryer" \
+    --output="$OUT_TMPL" \
+    --error="$OUT_TMPL" \
+    --cpu-bind=verbose --container-image={{ include "activecheck.image.pyxis" . }} \
     --container-mounts=$(which health-checker):/usr/local/bin/health-checker \
     bash -c "HC_GPU_FRYER_DURATION=300 health-checker run -e soperator -p $platform -n gpu_fryer -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
 
 ib_gpu_perf() {
-  _run_and_parse_hc srun --container-image={{ include "activecheck.image.pyxis" . }} \
+  _run_and_parse_hc srun -J "ib-gpu-perf" \
+    --output="$OUT_TMPL" \
+    --error="$OUT_TMPL" \
+    --container-image={{ include "activecheck.image.pyxis" . }} \
     --container-mounts=$(which health-checker):/usr/local/bin/health-checker --cpu-bind=verbose,cores \
     bash -c "health-checker run -e soperator -p $platform -n ^ib_write_bw_gpu.*$,^ib_send_lat_gpu.*$,^ib_read_lat_gpu.*$ -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
 
 mem_perf() {
-  _run_and_parse_hc srun --container-image={{ include "activecheck.image.pyxis" . }} \
+  _run_and_parse_hc srun -J "mem-perf" \
+    --output="$OUT_TMPL" \
+    --error="$OUT_TMPL" \
+    --container-image={{ include "activecheck.image.pyxis" . }} \
     --container-mounts=$(which health-checker):/usr/local/bin/health-checker --cpu-bind=verbose,cores \
     bash -c "health-checker run -e soperator -p $platform -n mem_bw,mem_lat -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
@@ -102,7 +127,6 @@ funcs_to_test=(
   ib_gpu_perf
   mem_perf
 )
-
 for test in "${funcs_to_test[@]}"
 do
   echo "Running $test on $(hostname)..."

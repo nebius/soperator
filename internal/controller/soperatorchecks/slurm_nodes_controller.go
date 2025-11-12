@@ -210,12 +210,12 @@ func (c *SlurmNodesController) processExtensiveCheckFailed(
 	logger := log.FromContext(ctx).WithName("SlurmNodesController.processExtensiveCheckFailed")
 
 	if !c.enabledNodeReplacement {
-		logger.V(1).Info("skipping extensive check failed processing, node replacement is disabled")
+		logger.V(1).Info("Skipping extensive check failed processing, node replacement is disabled")
 		return nil
 	}
 
 	if slurmNode.Reason != nil && slurmNode.Reason.ChangedAt.Before(k8sNode.CreationTimestamp.Time) {
-		logger.V(1).Info("undraining, slurm node drained before degraded condition changed")
+		logger.V(1).Info("Undraining, slurm node drained before degraded condition changed")
 		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
 	}
 
@@ -228,7 +228,7 @@ func (c *SlurmNodesController) processExtensiveCheckFailed(
 		}
 	}
 	if suspected.Status == corev1.ConditionTrue {
-		logger.V(1).Info("skip, hardware issues already suspected")
+		logger.V(1).Info("Skip, hardware issues already suspected")
 		return nil
 	}
 
@@ -256,12 +256,12 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 	logger := log.FromContext(ctx).WithName("SlurmNodesController.processHealthCheckFailed")
 
 	if !c.enabledNodeReplacement {
-		logger.V(1).Info("skipping health check failed processing, node replacement is disabled")
+		logger.V(1).Info("Skipping health check failed processing, node replacement is disabled")
 		return nil
 	}
 
 	if slurmNode.Reason.ChangedAt.Before(k8sNode.CreationTimestamp.Time) {
-		logger.V(1).Info("undraining, slurm node drained before degraded condition changed")
+		logger.V(1).Info("Undraining, slurm node drained before degraded condition changed")
 		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
 	}
 
@@ -289,11 +289,11 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 	}
 	if hardwareIssuesCondition.Status == corev1.ConditionTrue {
 		// Node is still hardware degraded, skip
-		logger.V(1).Info("skip, still hardware degraded")
+		logger.V(1).Info("Skip, still hardware degraded")
 		return nil
 	}
 
-	logger.V(1).Info("creating a slurm reservation for drained node with [HC] reason")
+	logger.V(1).Info("Creating a slurm reservation for drained node with [HC] reason")
 
 	// Create a maintenance reservation for this slurm node to prevent work from being scheduled on it.
 	err = c.createMaintenanceReservationForSlurmNode(ctx, slurmClusterName, slurmNode.Name)
