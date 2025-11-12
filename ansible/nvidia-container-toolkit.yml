@@ -1,0 +1,9 @@
+---
+
+- name: Install nvidia-container-toolkit (for enroot usage)
+  hosts: all, localhost
+  become: true
+  roles:
+    - nvidia-container-toolkit
+  tags:
+    - nvidia-container-toolkit

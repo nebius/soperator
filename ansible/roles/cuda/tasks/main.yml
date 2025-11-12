@@ -1,0 +1,110 @@
+---
+
+- name: Collect host facts
+  ansible.builtin.setup:
+  tags:
+    - cuda
+
+- name: Ensure required packages is installed
+  ansible.builtin.apt:
+    name:
+      - gnupg2
+      - ca-certificates
+      - locales
+      - tzdata
+      - wget
+      - curl
+  tags:
+    - cuda
+
+- name: Download NVIDIA CUDA keyring package
+  ansible.builtin.get_url:
+    url: >-
+      {{
+        "https://developer.download.nvidia.com/compute/cuda/repos/"
+        ~ "ubuntu"
+        ~ (ansible_distribution_version | replace('.', ''))
+        ~ "/"
+        ~ cuda_dpkg_arch_map[ansible_architecture]
+        ~ "/cuda-keyring_1.1-1_all.deb"
+      }}
+    dest: /tmp/cuda-keyring_1.1-1_all.deb
+    mode: "0644"
+  tags:
+    - cuda
+
+- name: Set timezone to UTC
+  ansible.builtin.file:
+    src: /usr/share/zoneinfo/Etc/UTC
+    dest: /etc/localtime
+    state: link
+
+- name: Ensure /etc/timezone reflects UTC
+  ansible.builtin.copy:
+    dest: /etc/timezone
+    content: "Etc/UTC\n"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Ensure a locale exists
+  community.general.locale_gen:
+    name: en_US.UTF-8
+    state: present
+  tags:
+    - locale
+    - cuda
+
+- name: Ensure system default locale is set
+  ansible.builtin.lineinfile:
+    path: /etc/default/locale
+    regexp: "^LANG="
+    line: "LANG=en_US.UTF-8"
+    mode: "0644"
+    create: true
+  tags:
+    - locale
+    - cuda
+
+- name: Install CUDA keyring package
+  ansible.builtin.apt:
+    deb: "/tmp/cuda-keyring_1.1-1_all.deb"
+    state: present
+  tags:
+    - cuda
+
+- name: Add /usr/local/cuda/bin to PATH system-wide
+  ansible.builtin.copy:
+    dest: /etc/profile.d/path_cuda.sh
+    content: "export PATH=/usr/local/cuda/bin:$PATH"
+    owner: root
+    group: root
+    mode: "0644"
+  tags:
+    - cuda
+
+- name: Install CUDA and related libraries
+  ansible.builtin.apt:
+    name: "{{ cuda_packages }}"
+    state: present
+    update_cache: true
+  tags:
+    - cuda
+
+- name: Hold CUDA-related packages (prevent upgrades)
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ cuda_hold_packages }}"
+  tags:
+    - cuda
+
+- name: Create APT pin file for CUDA and related packages
+  ansible.builtin.copy:
+    dest: /etc/apt/preferences.d/cuda-pins
+    content: "{{ cuda_pin_content }}"
+    owner: root
+    group: root
+    mode: "0644"
+  tags:
+    - cuda
