@@ -145,7 +145,9 @@ func (batch *ReplacedFilesBatch) Finish() error {
 	for _, file := range batch.pendingFiles {
 		err := batch.fs.Remove(file.tempName)
 		if err != nil {
-			errs = append(errs, err)
+			if !os.IsNotExist(err) {
+				errs = append(errs, err)
+			}
 			continue
 		}
 	}

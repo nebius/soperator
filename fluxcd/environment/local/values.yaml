@@ -1,0 +1,253 @@
+# Local development configuration for soperator-fluxcd
+# Minimal setup for kind cluster
+
+# Basic namespaces configuration
+ns:
+  enabled: true
+  version: "2.0.0"
+  interval: 24h
+# Soperator configuration
+soperator:
+  enabled: true
+  namespace: soperator-system
+  version: "1.22.3"
+  featureGates: ""
+  values:
+    serviceMonitor:
+      enabled: false
+    manager:
+      resources:
+        limits:
+          cpu: 500m
+          memory: 512Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi
+  soperatorChecks:
+    enabled: false
+  nodeConfigurator:
+    enabled: false
+# Helm Release Trigger Operator - disabled for local dev
+helmReleaseTriggerOperator:
+  enabled: false
+# Slurm Cluster configuration - enabled for local dev
+slurmCluster:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: 1.22.3
+  namespace: soperator
+  releaseName: soperator
+  overrideValues:
+    clusterName: soperator
+    clusterType: cpu
+    useDefaultAppArmorProfile: false
+    maintenance: none
+    k8sNodeFilters:
+      - name: kind
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: kubernetes.io/hostname
+                      operator: In
+                      values:
+                        - soperator-dev-worker
+    volumeSources:
+      - name: jail
+        persistentVolumeClaim:
+          claimName: jail-pvc
+          readOnly: false
+      - name: controller-spool
+        persistentVolumeClaim:
+          claimName: controller-spool-pvc
+          readOnly: false
+      - name: worker-spool
+        emptyDir:
+          sizeLimit: 250Mi
+      - name: sys-host
+        hostPath:
+          path: /sys
+          type: Directory
+      - name: image-storage
+        configMap:
+          name: image-storage
+          defaultMode: 500
+      - name: hpc-jobs-dir
+        hostPath:
+          path: /var/run/nebius/slurm
+          type: DirectoryOrCreate
+    slurmConfig:
+      topologyPlugin: ""
+    populateJail:
+      k8sNodeFilterName: kind
+    periodicChecks:
+      ncclBenchmark:
+        enabled: false
+    slurmNodes:
+      accounting:
+        enabled: false
+        mariadbOperator:
+          enabled: false
+        slurmdbd:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        munge:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        customInitContainers:
+          - name: ensure-jail-virtiofs
+            image: cr.eu-north1.nebius.cloud/soperator/busybox
+            volumeMounts: [{name: jail, mountPath: /volume-mount}]
+            command: ["grep", " /volume-mount virtiofs ", "/proc/mounts"]
+      controller:
+        size: 1
+        k8sNodeFilterName: kind
+        slurmctld:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        munge:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        volumes:
+          spool:
+            volumeClaimTemplateSpec: null
+            volumeSourceName: controller-spool
+      worker:
+        size: 1
+        k8sNodeFilterName: kind
+        cgroupVersion: v2
+        enableGDRCopy: false
+        sshdConfigMapRefName: ""
+        slurmd:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            gpu: 0
+            ephemeralStorage: 100Mi
+        munge:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        volumes:
+          spool:
+            volumeClaimTemplateSpec: null
+            volumeSourceName: worker-spool
+      login:
+        size: 1
+        k8sNodeFilterName: kind
+        sshdConfigMapRefName: ""
+        sshd:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        munge:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        volumes:
+          customMounts:
+            - name: sys-host
+              mountPath: /mnt/jail.upper/sys-host
+              readOnly: true
+              volumeSourceName: sys-host
+      exporter:
+        enabled: false
+        exporterContainer:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+      rest:
+        enabled: false
+        size: 1
+        rest:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        munge:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+    sConfigController:
+      serviceMonitor:
+        enabled: false
+      node:
+        k8sNodeFilterName: kind
+        size: 1
+      container:
+        imagePullPolicy: IfNotPresent
+        resources:
+          cpu: 5m
+          memory: 100Mi
+          ephemeralStorage: 100Mi
+  slurmClusterStorage:
+    enabled: true
+    overrideValues:
+      storage:
+        jail:
+          matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - soperator-dev-worker
+        controllerSpool:
+          matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - soperator-dev-worker
+nodesets:
+  enabled: false
+# Active Checks - disabled by default
+soperatorActiveChecks:
+  enabled: false
+# MariaDB Operator - disabled for local dev
+mariadbOperator:
+  enabled: false
+# Security Profiles Operator - disabled for local dev
+securityProfilesOperator:
+  enabled: false
+# Observability stack - disabled for local dev
+observability:
+  enabled: false
+  vmStack:
+    enabled: false
+  prometheusOperator:
+    enabled: false
+  vmLogs:
+    enabled: false
+  opentelemetry:
+    enabled: false
+  dcgmExporter:
+    enabled: false
+# Cert Manager - disabled for local dev
+certManager:
+  enabled: false
+# Backup - disabled for local dev
+backup:
+  enabled: false
+# NFS Server - disabled for local dev
+nfsServer:
+  enabled: false
+  version: 1.22.3
+  overrideValues:
+    image:
+      tag: 1.22.3
+# Notifier - disabled for local dev
+notifier:
+  enabled: false

@@ -17,11 +17,9 @@ Both repositories follow the same structure:
 - Development branch: `main`
 - Release branches: `soperator-release-MAJOR.MINOR`
 
-## Release Branch Workflow
+## Automatic Merge-Backs
 
-### Soperator Repository - Automatic Merge-Back
-
-Changes made to release branches are automatically merged back to `main`:
+Changes made to release branches are automatically merged back to `main` in both repositories:
 
 ```
                                   fix-1'     fix-2'           bump'
@@ -37,25 +35,6 @@ soperator-release-1.22   └───────────●─────�
 - GitHub workflow creates merge-back PRs automatically
 - PRs assigned to original commit author
 - Includes original PR descriptions
-
-### Nebius-Solutions-Library Repository - Manual Merge-Back
-
-Changes require manual merge from release branch to `main`:
-
-```
-                                feat-1         feat-2  feat-3  merge
-main                   ──●────────●──────────────●─────────●────●─▶ (features continue)
-                         │                                      ↑
-                         │                                      │ manual merge back
-                         ↓                                      │ (conflicts resolved)
-soperator-release-1.22   └──────●──────●────────●────────●──────●─▶  (stabilization)
-                         │      fix-1  fix-2    fix-3    fix-4  │
-                         └─ branch created                   version bump
-```
-
-- Manual merge from release branch to `main` after version bump
-- Resolve conflicts during merge
-- Can be automated in the future
 
 ## E2E Testing
 
@@ -74,7 +53,7 @@ This ensures quality standards for both development and release branches.
 ### Bug Fixes
 - Bug fixes can go to release branches if fixing them there is needed
 - Make changes in the release branch via PR
-- Wait for automatic merge-back PR to `main` (soperator) or do manual merge (nebius-solutions-library)
+- Wait for automatic merge-back PR to `main`
 - Ensure the back-to-main PR is merged without conflicts, resolve conflicts if needed
 
 ## Release Tracking Issue

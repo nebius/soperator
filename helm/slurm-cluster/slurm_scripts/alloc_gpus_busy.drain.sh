@@ -10,8 +10,15 @@ if [[ -z "${SLURM_JOB_GPUS:-}" ]]; then
     exit 0
 fi
 
+# Check if chroot to driver dir required
+chroot_cmd=""
+driver_dir="/run/nvidia/driver"
+if [[ "$(ls -A $driver_dir)" ]]; then
+    chroot_cmd="chroot $driver_dir"
+fi
+
 # For each allocated GPU, check for running compute apps
-pids=$(chroot /run/nvidia/driver /bin/bash -c "
+pids=$($chroot_cmd /bin/bash -c "
   IFS=',' read -ra ALLOC_GPUS <<< \"\${SLURM_JOB_GPUS}\"
   for gpu in \"\${ALLOC_GPUS[@]}\"; do
       pid=\$(nvidia-smi \

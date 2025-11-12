@@ -12,6 +12,7 @@ import (
 type SlurmController struct {
 	K8sNodeFilterName    string
 	CustomInitContainers []corev1.Container
+	HostUsers            *bool
 
 	ContainerSlurmctld Container
 	ContainerMunge     Container
@@ -42,6 +43,7 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 	res := SlurmController{
 		K8sNodeFilterName:    controller.K8sNodeFilterName,
 		CustomInitContainers: controller.CustomInitContainers,
+		HostUsers:            controller.HostUsers,
 		ContainerSlurmctld: buildContainerFrom(
 			controller.Slurmctld,
 			consts.ContainerNameSlurmctld,

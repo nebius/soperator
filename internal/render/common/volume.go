@@ -272,6 +272,21 @@ func RenderVolumeSecurityLimits(clusterName string, componentType consts.Compone
 	}
 }
 
+// RenderVolumeSecurityLimitsForNodeSet renders [corev1.Volume] containing security limits config contents for NodeSet
+func RenderVolumeSecurityLimitsForNodeSet(clusterName, nodeSetName string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSecurityLimits,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: naming.BuildConfigMapSecurityLimitsForNodeSetName(clusterName, nodeSetName),
+				},
+				DefaultMode: ptr.To(DefaultFileMode),
+			},
+		},
+	}
+}
+
 // RenderVolumeMountSecurityLimits renders [corev1.VolumeMount] defining the mounting path for security limits config
 func RenderVolumeMountSecurityLimits() corev1.VolumeMount {
 	return corev1.VolumeMount{
@@ -482,6 +497,35 @@ func AddVolumeOrSpec(
 	}
 	if pvcTemplateSpec != nil {
 		pvcTemplateSpecs = append(pvcTemplateSpecs, values.PVCTemplateSpec{Name: specName, Spec: pvcTemplateSpec})
+	}
+
+	return volumes, pvcTemplateSpecs, nil
+}
+
+func AddVolumeOrSpecVanilla(
+	name string,
+	volumeSource *corev1.VolumeSource,
+	pvcTemplateSpec *corev1.PersistentVolumeClaimSpec,
+) (volumes []corev1.Volume, pvcTemplateSpecs []values.PVCTemplateSpec, err error) {
+	if (volumeSource != nil && pvcTemplateSpec != nil) || (volumeSource == nil && pvcTemplateSpec == nil) {
+		return nil, nil, errors.New("only one of VolumeSource or VolumeClaimTemplateSpec should be set")
+	}
+
+	if volumeSource != nil {
+		volumes = append(volumes,
+			corev1.Volume{
+				Name:         name,
+				VolumeSource: *volumeSource,
+			},
+		)
+	}
+	if pvcTemplateSpec != nil {
+		pvcTemplateSpecs = append(pvcTemplateSpecs,
+			values.PVCTemplateSpec{
+				Name: name,
+				Spec: pvcTemplateSpec,
+			},
+		)
 	}
 
 	return volumes, pvcTemplateSpecs, nil
