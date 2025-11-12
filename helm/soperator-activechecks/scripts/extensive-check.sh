@@ -25,7 +25,7 @@ health-checker list -e soperator -p $platform
 LAST_RUN_ID=""
 
 _run_and_parse_hc() {
-  local HC_OUTPUT HC_STATUS JSON_BLOCK FIRST_FAIL
+  local HC_OUTPUT HC_STATUS JSON_BLOCK
   HC_OUTPUT=$("$@")
 
   echo "Health checker output: $HC_OUTPUT"
