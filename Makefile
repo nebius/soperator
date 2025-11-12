@@ -34,7 +34,11 @@ CHART_NODESETS_PATH           = $(CHART_PATH)/nodesets
 
 SLURM_VERSION		  		= 25.05.4
 UBUNTU_VERSION		  		?= noble
-VERSION               		= $(shell cat VERSION)
+NFS_VERSION_BASE          	= $(shell cat NFS_VERSION)
+VERSION_BASE           		= $(shell cat VERSION)
+
+NFS_VERSION               	= $(NFS_VERSION_BASE)
+VERSION               		= $(VERSION_BASE)
 
 IMAGE_VERSION		  = $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)
 GO_CONST_VERSION_FILE = internal/consts/version.go
@@ -44,6 +48,8 @@ IMAGE_REPO			  = $(NEBIUS_REPO)
 
 # For version sync test
 VALUES_VERSION 		  = $(shell $(YQ) '.images.slurmctld' helm/slurm-cluster/values.yaml | awk -F':' '{print $$2}' | awk -F'-' '{print $$1}')
+NFS_CHART_VERSION     = $(shell $(YQ) '.version' helm/nfs-server/Chart.yaml)
+NFS_IMAGE_TAG         = $(shell $(YQ) '.image.tag' helm/nfs-server/values.yaml)
 
 
 OPERATOR_IMAGE_TAG  = $(VERSION)
@@ -56,8 +62,10 @@ endif
 
 ifeq ($(UNSTABLE), true)
     SHORT_SHA 					= $(shell git rev-parse --short=8 HEAD)
-    OPERATOR_IMAGE_TAG  		= $(VERSION)-$(SHORT_SHA)
-    IMAGE_VERSION		  		= $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
+    VERSION		  				= $(VERSION_BASE)-$(SHORT_SHA)
+    OPERATOR_IMAGE_TAG  		= $(VERSION_BASE)-$(SHORT_SHA)
+    IMAGE_VERSION		  		= $(VERSION_BASE)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
+    NFS_VERSION	  				= $(NFS_VERSION_BASE)-$(SHORT_SHA)
     IMAGE_REPO			  		= $(NEBIUS_REPO)-unstable
 endif
 
@@ -137,21 +145,37 @@ helm: generate manifests kustomize helmify ## Update soperator Helm chart
 
 .PHONY: get-version
 get-version:
-ifeq ($(UNSTABLE), true)
-	@echo '$(VERSION)-$(SHORT_SHA)'
-else
 	@echo '$(VERSION)'
-endif
+
+.PHONY: get-nfs-version
+get-nfs-version:
+	@echo '$(NFS_VERSION)'
 
 .PHONY: test-version-sync
 test-version-sync: yq
-	@if [ "$(VERSION)" != "$(VALUES_VERSION)" ]; then \
+	@if [ "$(VERSION_BASE)" != "$(VALUES_VERSION)" ]; then \
 		echo "Version in version file and helm/slurm-cluster different!"; \
-		echo "VERSION is - $(VERSION)"; \
+		echo "VERSION_BASE is - $(VERSION_BASE)"; \
 		echo "VALUES_VERSION is - $(VALUES_VERSION)"; \
 		exit 1; \
 	else \
-		echo "Version test passed: versions is: $(VERSION)"; \
+		echo "Version test passed: versions is: $(VERSION_BASE)"; \
+	fi
+	@if [ "$(NFS_VERSION_BASE)" != "$(NFS_CHART_VERSION)" ]; then \
+		echo "NFS version in NFS_VERSION file and helm/nfs-server/Chart.yaml different!"; \
+		echo "NFS_VERSION_BASE is - $(NFS_VERSION_BASE)"; \
+		echo "NFS_CHART_VERSION is - $(NFS_CHART_VERSION)"; \
+		exit 1; \
+	else \
+		echo "NFS version test passed: version is: $(NFS_VERSION_BASE)"; \
+	fi
+	@if [ "$(NFS_VERSION_BASE)" != "$(NFS_IMAGE_TAG)" ]; then \
+		echo "NFS version in NFS_VERSION file and helm/nfs-server/values.yaml image.tag different!"; \
+		echo "NFS_VERSION_BASE is - $(NFS_VERSION_BASE)"; \
+		echo "NFS_IMAGE_TAG is - $(NFS_IMAGE_TAG)"; \
+		exit 1; \
+	else \
+		echo "NFS image tag test passed: tag is: $(NFS_IMAGE_TAG)"; \
 	fi
 
 .PHONY: get-operator-tag-version
@@ -195,7 +219,6 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_ACTIVECHECK_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_DCGM_EXPORTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_NOTIFIER_PATH)/Chart.yaml"
-	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODESETS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_CRDS_PATH)/Chart.yaml"
@@ -207,8 +230,9 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_ACTIVECHECK_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_DCGM_EXPORTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_NOTIFIER_PATH)/Chart.yaml"
-	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODESETS_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(NFS_VERSION)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(NFS_VERSION)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
 	@# endregion helm chart versions
 #
 	@# region helm/slurm-cluster/values.yaml
@@ -251,6 +275,12 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".checks.manager.image.repository = \"$(IMAGE_REPO)/soperatorchecks\"" "helm/soperatorchecks/values.yaml"
 	@$(YQ) -i ".checks.manager.image.tag = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperatorchecks/values.yaml"
 	@# endregion helm/soperatorchecks/values.yaml
+
+	@# region helm/nfs-server/values.yaml
+	@echo 'Syncing helm/nfs-server/values.yaml'
+	@$(YQ) -i ".image.repository = \"$(IMAGE_REPO)/nfs-server\"" "helm/nfs-server/values.yaml"
+	@$(YQ) -i ".image.tag = \"$(NFS_VERSION)\"" "helm/nfs-server/values.yaml"
+	@# endregion helm/nfs-server/values.yaml
 
 	@# region helm/slurm-cluster/templates/_registry_helpers.tpl
 	@echo "Syncing $(CHART_CLUSTER_PATH)/templates/_registry_helpers.tpl"
@@ -421,10 +451,10 @@ endif
 release-helm: ## Build & push helm docker image
 	mkdir -p "helm-releases"
 	@echo "helm release for unstable version"
-	./release_helm.sh  -v "${OPERATOR_IMAGE_TAG}" -u "$(IMAGE_REPO)"
+	./release_helm.sh -u "$(IMAGE_REPO)"
 ifeq ($(UNSTABLE), false)
 	@echo "helm release for stable version"
-	./release_helm.sh -v "${OPERATOR_IMAGE_TAG}" -u "$(NEBIUS_REPO)"
+	./release_helm.sh -u "$(NEBIUS_REPO)"
 endif
 	rm -rf /helm-releases/*
 
