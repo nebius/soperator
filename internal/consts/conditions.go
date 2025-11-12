@@ -30,6 +30,8 @@ const (
 	ReasonSlurmNodeDegraded ReasonConditionType = "SlurmNodeDegraded"
 
 	ReasonNodeNotReady ReasonConditionType = "NodeNotReady"
+
+	ReasonGPUHealthCheckFailed ReasonConditionType = "GPUHealthCheckFailed (Soperator)"
 )
 
 const (
