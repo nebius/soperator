@@ -124,12 +124,10 @@ do
   TEST_EXIT_CODE=$?
 
   if [[ $TEST_EXIT_CODE -ne 0 ]]; then
-    if [[ -z "$LAST_RUN_ID" ]]; then
-      LAST_RUN_ID="undefined"
-    fi
     NODE_NAME=$(hostname)
     COMPUTE_INSTANCE_ID=$(scontrol show node "$NODE_NAME" -o 2>/dev/null | sed -n 's/.*InstanceId=\([^ ]*\).*/\1/p')
-    COMMENT="{health_checker_run_id: ${LAST_RUN_ID}, compute_instance_id: ${COMPUTE_INSTANCE_ID}}"
+    COMMENT=$(jq -cn --arg run "$LAST_RUN_ID" --arg inst "$COMPUTE_INSTANCE_ID" \
+          '{health_checker_run_id: $run, compute_instance_id: $inst}')
     echo "Setting node comment: $COMMENT"
     sudo scontrol update NodeName=$NODE_NAME Comment="$COMMENT"
 
