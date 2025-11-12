@@ -26,14 +26,7 @@
 
 - name: Ensure required packages are installed
   ansible.builtin.apt:
-    name: >-
-      {{
-        common_packages
-        | map(attribute='name')
-        | zip(common_packages | map(attribute='version'))
-        | map('join', '=')
-        | list
-      }}
+    name: "{{ common_packages }}"
     state: present
     update_cache: true
   tags:
