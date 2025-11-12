@@ -119,6 +119,7 @@ funcs_to_test=(
 for test in "${funcs_to_test[@]}"
 do
   echo "Running $test on $(hostname)..."
+  LAST_RUN_ID=""
   $test
   TEST_EXIT_CODE=$?
 
@@ -126,8 +127,9 @@ do
     if [[ -z "$LAST_RUN_ID" ]]; then
       LAST_RUN_ID="undefined"
     fi
-    COMMENT="{health_checker_run_id: ${LAST_RUN_ID}}"
     NODE_NAME=$(hostname)
+    COMPUTE_INSTANCE_ID=$(scontrol show node "$NODE_NAME" -o 2>/dev/null | sed -n 's/.*InstanceId=\([^ ]*\).*/\1/p')
+    COMMENT="{health_checker_run_id: ${LAST_RUN_ID}, compute_instance_id: ${COMPUTE_INSTANCE_ID}}"
     echo "Setting node comment: $COMMENT"
     sudo scontrol update NodeName=$NODE_NAME Comment="$COMMENT"
 

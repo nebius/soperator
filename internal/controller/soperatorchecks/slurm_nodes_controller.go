@@ -188,7 +188,7 @@ func (c *SlurmNodesController) processDegradedNode(
 	case consts.SlurmNodeReasonNodeReplacement:
 		return c.processSlurmNodeMaintenance(ctx, k8sNode, slurmClusterName, node.Name)
 	case consts.SlurmHardwareReasonHC:
-		return nil // TODO: set-unhealthy here
+		return c.processExtensiveCheckFailed(ctx, k8sNode, slurmClusterName, node)
 	case consts.SlurmNodeReasonHC:
 		return c.processHealthCheckFailed(ctx, k8sNode, slurmClusterName, node, node.Reason)
 	default:
@@ -199,6 +199,51 @@ func (c *SlurmNodesController) processDegradedNode(
 			"instanceID", node.InstanceID)
 		return nil
 	}
+}
+
+func (c *SlurmNodesController) processExtensiveCheckFailed(
+	ctx context.Context,
+	k8sNode *corev1.Node,
+	slurmClusterName types.NamespacedName,
+	slurmNode slurmapi.Node,
+) error {
+	logger := log.FromContext(ctx).WithName("SlurmNodesController.processExtensiveCheckFailed")
+
+	if !c.enabledNodeReplacement {
+		logger.V(1).Info("skipping extensive check failed processing, node replacement is disabled")
+		return nil
+	}
+
+	if slurmNode.Reason != nil && slurmNode.Reason.ChangedAt.Before(k8sNode.CreationTimestamp.Time) {
+		logger.V(1).Info("undraining, slurm node drained before degraded condition changed")
+		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
+	}
+
+	// If HardwareIssuesSuspected is already set to True, no-op
+	var suspected corev1.NodeCondition
+	for _, cond := range k8sNode.Status.Conditions {
+		if cond.Type == consts.HardwareIssuesSuspected {
+			suspected = cond
+			break
+		}
+	}
+	if suspected.Status == corev1.ConditionTrue {
+		logger.V(1).Info("skip, hardware issues already suspected")
+		return nil
+	}
+
+	cond := newNodeCondition(
+		consts.HardwareIssuesSuspected,
+		corev1.ConditionTrue,
+		consts.ReasonGPUHealthCheckFailed,
+		consts.MessageConditionType(slurmNode.Comment),
+	)
+
+	if err := setK8SNodeCondition(ctx, c.Client, k8sNode.Name, cond); err != nil {
+		return fmt.Errorf("set k8s node condition: %w", err)
+	}
+
+	return nil
 }
 
 func (c *SlurmNodesController) processHealthCheckFailed(
