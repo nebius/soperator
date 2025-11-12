@@ -56,18 +56,6 @@ passive_checks() {
     --log-level info"
 }
 
-all_reduce_in_docker() {
-  mkdir -p /tmp/soperatorchecks/a
-  mkdir -p /tmp/soperatorchecks/b
-
-  srun --gpus=8 docker run --rm \
-    --gpus=all --device=/dev/infiniband \
-    -v /tmp/soperatorchecks/a:/a \
-    --mount type=bind,source=/tmp/soperatorchecks/b,target=/b \
-    {{ include "activecheck.image.docker" . }} \
-    bash -c "NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring all_reduce_perf -b 512M -e 8G -f 2 -g 8"
-}
-
 all_reduce_with_ib() {
   _run_and_parse_hc srun --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n all_reduce_with_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info"
 }
@@ -106,7 +94,6 @@ mem_perf() {
 
 funcs_to_test=(
   passive_checks
-  all_reduce_in_docker
   all_reduce_with_ib
   all_reduce_without_ib
   cuda_samples
