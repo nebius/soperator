@@ -622,8 +622,9 @@ yq: $(YQ) ## Download yq locally if necessary.
 $(YQ): $(LOCALBIN)
 	test -s $(LOCALBIN)/yq || GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@v$(YQ_VERSION)
 
-.PHONY: install-kind
+.PHONY: kind install-kind
 kind: $(KIND) ## Download kind locally if necessary.
+install-kind: kind ## Alias for kind target.
 $(KIND): $(LOCALBIN)
 	@if test -x $(LOCALBIN)/kind && ! $(LOCALBIN)/kind version | grep -q $(KIND_VERSION); then \
 		echo "$(LOCALBIN)/kind version is not expected $(KIND_VERSION). Removing it before installing."; \
@@ -639,8 +640,9 @@ $(KIND): $(LOCALBIN)
 		chmod +x $(LOCALBIN)/kind; \
 	fi
 
-.PHONY: install-flux
+.PHONY: flux install-flux
 flux: $(FLUX) ## Download flux CLI locally if necessary.
+install-flux: flux ## Alias for flux target.
 $(FLUX): $(LOCALBIN)
 	@if test -x $(LOCALBIN)/flux && ! $(LOCALBIN)/flux version --client | grep -q $(FLUX_VERSION); then \
 		echo "$(LOCALBIN)/flux version is not expected $(FLUX_VERSION). Removing it before installing."; \
