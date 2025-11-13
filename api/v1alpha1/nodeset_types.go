@@ -226,6 +226,7 @@ type ContainerSlurmdSpec struct {
 
 	// Port defines the port the container exposes
 	//
+	// +kubebuilder:default=6818
 	// +kubebuilder:validation:Optional
 	Port int32 `json:"port,omitempty"`
 
