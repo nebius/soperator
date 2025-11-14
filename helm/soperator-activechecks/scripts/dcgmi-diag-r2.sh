@@ -23,10 +23,8 @@ fi
 echo "Platform found: $platform"
 echo "Running dcgmi_diag_r2 check on $(hostname)..."
 HC_OUTPUT=$(srun --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n dcgmi_diag_r2 -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout")
-HC_EXIT_CODE=$?
 
 echo "Health checker output: $HC_OUTPUT"
-echo "Health checker job step exit code: $HC_EXIT_CODE"
 HC_STATUS=$(echo "$HC_OUTPUT" | awk '/^\s*{/,/^\s*}/' | jq -r '.status')
 
 echo "Health checker status: $HC_STATUS"

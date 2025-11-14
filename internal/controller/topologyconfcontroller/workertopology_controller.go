@@ -39,6 +39,10 @@ var (
 	}
 )
 
+const (
+	defBlockSize = 16
+)
+
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;update;create;patch
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;
@@ -115,7 +119,13 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	podsByNode := r.GetPodsByNode(podList.Items)
 	logger.Info("Pods organized by node", "podsByNode", podsByNode)
 
-	desiredTopologyConfig, err := r.BuildTopologyConfig(ctx, nodeTopologyLabelsConfigMap, podsByNode)
+	var desiredTopologyConfig string
+	switch slurmCluster.Spec.SlurmConfig.TopologyPlugin {
+	case consts.SlurmTopologyTree:
+		desiredTopologyConfig, err = r.BuildTopologyConfig(ctx, nodeTopologyLabelsConfigMap, podsByNode)
+	case consts.SlurmTopologyBlock:
+		desiredTopologyConfig, err = r.BuildTopologyBlocks(ctx, slurmCluster.Spec.SlurmConfig.TopologyBlockSize, nodeTopologyLabelsConfigMap, podsByNode)
+	}
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("build topology config: %w", err)
 	}
@@ -137,7 +147,8 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 }
 
 func isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
-	return slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyTree
+	return slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyTree ||
+		slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyBlock
 }
 
 func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
@@ -389,6 +400,25 @@ func (r *WorkerTopologyReconciler) BuildTopologyConfig(
 	}
 	graph := BuildTopologyGraph(ctx, labelsByNode, podsByNode)
 	config := strings.Join(graph.RenderConfigLines(), "\n") + "\n"
+	return config, nil
+}
+
+// BuildTopologyBlocks builds topology config.
+func (r *WorkerTopologyReconciler) BuildTopologyBlocks(
+	ctx context.Context, blockSize *int, nodeTopologyLabelsConf *corev1.ConfigMap, podsByNode map[string][]string,
+) (string, error) {
+	bs := defBlockSize
+	if blockSize != nil {
+		bs = *blockSize
+	}
+
+	labelsByNode, err := r.ParseNodeTopologyLabels(nodeTopologyLabelsConf.Data)
+	if err != nil {
+		return "", fmt.Errorf("deserialize node topology: %w", err)
+	}
+	blocks := BuildTopologyBlocks(ctx, labelsByNode, podsByNode)
+	config := strings.Join(blocks.RenderConfigLines(), "\n") + "\n"
+	config = fmt.Sprintf("%sBlockSizes=%d\n", config, bs)
 	return config, nil
 }
 

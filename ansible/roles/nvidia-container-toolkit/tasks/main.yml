@@ -1,0 +1,44 @@
+---
+
+- name: Download and convert NVIDIA GPG key
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+    | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+  args:
+    executable: /bin/bash
+    creates: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+  tags:
+    - nvidia-container-toolkit
+
+- name: Copy file with owner and permissions
+  ansible.builtin.copy:
+    src: nvidia-container-toolkit.list
+    dest: /etc/apt/sources.list.d/nvidia-container-toolkit.list
+    owner: root
+    group: root
+    mode: '0644'
+  tags:
+    - nvidia-container-toolkit
+
+- name: Ensure nvidia-container-toolkit packages are installed
+  ansible.builtin.apt:
+    name:
+      - nvidia-container-toolkit={{ nvidia_toolkit_version }}
+      - nvidia-container-toolkit-base={{ nvidia_toolkit_version }}
+      - libnvidia-container-tools={{ nvidia_toolkit_version }}
+      - libnvidia-container1={{ nvidia_toolkit_version }}
+    state: present
+    update_cache: true
+  tags:
+    - nvidia-container-toolkit
+
+- name: Copy NVIDIA nvidia-container-runtime config.toml
+  ansible.builtin.copy:
+    src: config.toml
+    dest: /etc/nvidia-container-runtime/config.toml
+    owner: root
+    group: root
+    mode: '0644'
+  tags:
+    - nvidia-container-toolkit

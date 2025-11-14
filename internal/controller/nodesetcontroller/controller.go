@@ -18,10 +18,15 @@ package nodesetcontroller
 
 import (
 	"context"
+	errorsStd "errors"
+	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,43 +35,52 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/logfield"
 )
 
-// NodeSetReconciler reconciles a NodeSet object
-type NodeSetReconciler struct {
-	client.Client
-	Scheme *runtime.Scheme
-}
-
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=nodesets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=nodesets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=nodesets/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;update;patch;delete;create
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=create;delete;get;list;patch;update;watch
+// +kubebuilder:rbac:groups=core,resources=podtemplates,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-func (r *NodeSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx).WithValues(
-		logfield.ClusterNamespace, req.Namespace,
-		logfield.ResourceKind, slurmv1alpha1.KindNodeSet,
-		logfield.ResourceName, req.Name,
-	)
-	log.IntoContext(ctx, logger)
+// NodeSetReconciler reconciles a NodeSet object
+type NodeSetReconciler struct {
+	*reconciler.Reconciler
 
-	logger.V(1).Info("Skipping reconciliation of NodeSet")
+	AdvancedStatefulSet *reconciler.AdvancedStatefulSetReconciler
+	Service             *reconciler.ServiceReconciler
+	Secret              *reconciler.SecretReconciler
+	ConfigMap           *reconciler.ConfigMapReconciler
+}
 
-	return ctrl.Result{}, nil
+func NewNodeSetReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *NodeSetReconciler {
+	r := reconciler.NewReconciler(client, scheme, recorder)
+	return &NodeSetReconciler{
+		Reconciler:          r,
+		AdvancedStatefulSet: reconciler.NewAdvancedStatefulSetReconciler(r),
+		Service:             reconciler.NewServiceReconciler(r),
+		Secret:              reconciler.NewSecretReconciler(r),
+		ConfigMap:           reconciler.NewConfigMapReconciler(r),
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *NodeSetReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency int, cacheSyncTimeout time.Duration) error {
+func (r *NodeSetReconciler) SetupWithManager(mgr ctrl.Manager, name string, maxConcurrency int, cacheSyncTimeout time.Duration) error {
 	if err := r.setupConfigMapIndexer(mgr); err != nil {
 		return err
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		Named("nodeset").
+		Named(name).
 		For(
 			&slurmv1alpha1.NodeSet{},
 			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
@@ -80,4 +94,62 @@ func (r *NodeSetReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency in
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		Complete(r)
+}
+
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of the cluster closer to the desired state.
+func (r *NodeSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := log.FromContext(ctx).WithValues(
+		logfield.ClusterNamespace, req.Namespace,
+		logfield.ResourceKind, slurmv1alpha1.KindNodeSet,
+		logfield.ResourceName, req.Name,
+	)
+	log.IntoContext(ctx, logger)
+
+	nodeSet := &slurmv1alpha1.NodeSet{}
+	err := r.Get(ctx, req.NamespacedName, nodeSet)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.V(1).Info("Resource not found. Ignoring since object must be deleted")
+			return ctrl.Result{}, nil
+		}
+		// Error reading the object - requeue the request.
+		logger.Error(err, "Failed to get resource")
+		return ctrl.Result{Requeue: true}, fmt.Errorf("getting %s: %w", slurmv1alpha1.KindNodeSet, err)
+	}
+
+	// If nodeset is marked for deletion, we have nothing to do
+	if nodeSet.GetDeletionTimestamp() != nil {
+		return ctrl.Result{}, nil
+	}
+
+	result, err := r.reconcile(ctx, nodeSet)
+	if err != nil {
+		logger.Error(err, "Failed to reconcile resource")
+		result = ctrl.Result{}
+		err = fmt.Errorf("reconciling %s: %w", slurmv1alpha1.KindNodeSet, err)
+	}
+
+	statusErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		innerNodeSet := &slurmv1alpha1.NodeSet{}
+		innerErr := r.Get(ctx, req.NamespacedName, innerNodeSet)
+		if innerErr != nil {
+			if apierrors.IsNotFound(innerErr) {
+				logger.V(1).Info("Resource not found. Ignoring since object must be deleted")
+				return nil
+			}
+			// Error reading the object - requeue the request.
+			logger.Error(innerErr, "Failed to get resource")
+			return fmt.Errorf("getting %s: %w", slurmv1alpha1.KindNodeSet, innerErr)
+		}
+
+		return r.Status().Update(ctx, innerNodeSet)
+	})
+	if statusErr != nil {
+		logger.Error(statusErr, "Failed to update resource status")
+		result = ctrl.Result{}
+		err = fmt.Errorf("updating %s status: %w", slurmv1alpha1.KindNodeSet, statusErr)
+	}
+
+	return result, errorsStd.Join(err, statusErr)
 }

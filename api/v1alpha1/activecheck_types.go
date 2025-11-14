@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	"nebius.ai/slurm-operator/internal/consts"
 )
@@ -20,6 +21,8 @@ type ActiveCheckSpec struct {
 	// DependsOn specifies dependency on another active checks that should be completed
 	// before running this one.
 	// Name of another checks in the same namespace.
+	// Note: All checks that the current one depends on must have runAfterCreation: true;
+	// otherwise, the dependency relationship won’t be respected.
 	// +kubebuilder:validation:Optional
 	DependsOn []string `json:"dependsOn"`
 
@@ -92,23 +95,37 @@ type ActiveCheckSpec struct {
 	// +kubebuilder:default="k8sJob"
 	CheckType string `json:"checkType,omitempty"`
 
-	// Reactions defines reaction on specific check
+	// SuccessReactions defines reaction on specific check when it succeeds
 	// +kubebuilder:validation:Optional
-	Reactions Reactions `json:"reactions,omitempty"`
+	SuccessReactions *Reactions `json:"successReactions,omitempty"`
+
+	// FailureReactions defines reaction on specific check when it fails
+	// +kubebuilder:validation:Optional
+	FailureReactions *Reactions `json:"failureReactions,omitempty"`
 }
 
 type Reactions struct {
-	// SetCondition enabling setting condition to the k8s node
+	// DrainSlurmNode enabling slurm node draining
 	// +kubebuilder:validation:Optional
-	SetCondition bool `json:"setCondition,omitempty"`
-
-	// DrainSlurmNode enabling slurm node draining if check failed
-	// +kubebuilder:validation:Optional
-	DrainSlurmNode bool `json:"drainSlurmNode,omitempty"`
-
-	// DrainSlurmNode enabling slurm node commenting if check failed
+	DrainSlurmNode *DrainSlurmNodeSpec `json:"drainSlurmNode,omitempty"`
+	// CommentSlurmNode enabling slurm node commenting
 	// +kubebuilder:validation:Optional
 	CommentSlurmNode bool `json:"commentSlurmNode,omitempty"`
+
+	// AddReservation adds a slurm reservation with name "<prefix>-<nodeName>"
+	// +kubebuilder:validation:Optional
+	AddReservation *ReservationSpec `json:"addReservation,omitempty"`
+	// RemoveReservation removs slurm reservation with name "<prefix>-<nodeName>"
+	// +kubebuilder:validation:Optional
+	RemoveReservation *ReservationSpec `json:"removeReservation,omitempty"`
+}
+
+type DrainSlurmNodeSpec struct {
+	DrainReasonPrefix string `json:"drainReasonPrefix,omitempty"`
+}
+
+type ReservationSpec struct {
+	Prefix string `json:"prefix,omitempty"`
 }
 
 type ContainerSpec struct {
@@ -140,10 +157,6 @@ type SlurmJobSpec struct {
 	// Multiline sbatch script
 	// +kubebuilder:validation:Optional
 	SbatchScript *string `json:"sbatchScript,omitempty"`
-	// Run sbatch script on each worker exactly once using job array
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	EachWorkerJobArray bool `json:"eachWorkerJobArray,omitempty"`
 	// Run sbatch script on each worker exactly once using separate jobs
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
@@ -176,17 +189,17 @@ type ActiveCheckSlurmJobsStatus struct {
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
 
 	// +kubebuilder:validation:Optional
-	LastJobId string `json:"lastJobId"`
+	LastRunId string `json:"lastRunId"`
 	// +kubebuilder:validation:Optional
-	LastJobName string `json:"lastJobName"`
+	LastRunName string `json:"lastRunName"`
 	// +kubebuilder:validation:Optional
-	LastJobState consts.ActiveCheckSlurmJobStatus `json:"lastJobState"`
+	LastRunStatus consts.ActiveCheckSlurmRunStatus `json:"lastRunStatus"`
 	// +kubebuilder:validation:Optional
-	LastJobFailReasons []string `json:"lastJobFailReasons"`
+	LastRunFailJobsAndReasons []JobAndReason `json:"lastRunFailJobsAndReasons"`
 	// +kubebuilder:validation:Optional
-	LastJobSubmitTime *metav1.Time `json:"lastJobSubmitTime"`
+	LastRunErrorJobsAndReasons []JobAndReason `json:"lastRunErrorJobsAndReasons"`
 	// +kubebuilder:validation:Optional
-	LastJobEndTime *metav1.Time `json:"lastJobEndTime"`
+	LastRunSubmitTime *metav1.Time `json:"lastRunSubmitTime"`
 }
 
 // ActiveCheckStatus defines the observed state of ActiveCheck.
@@ -196,14 +209,22 @@ type ActiveCheckStatus struct {
 	SlurmJobsStatus ActiveCheckSlurmJobsStatus `json:"slurmJobsStatus,omitempty"`
 }
 
+type JobAndReason struct {
+	JobID  string `json:"jobID"`
+	Reason string `json:"reason"`
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Type",type=string,JSONPath=`.spec.checkType`,description="The type of the active check"
-// +kubebuilder:printcolumn:name="K8s Job Status",type=string,JSONPath=`.status.k8sJobsStatus.lastJobStatus`,description="Last K8s job status"
-// +kubebuilder:printcolumn:name="Slurm Job Status",type=string,JSONPath=`.status.slurmJobsStatus.lastJobState`,description="Last Slurm job status"
-// +kubebuilder:printcolumn:name="Last Job",type=string,JSONPath=`.status.slurmJobsStatus.lastJobName`,description="Last job name"
-// +kubebuilder:printcolumn:name="Last Job ID",type=string,JSONPath=`.status.slurmJobsStatus.lastJobId`,description="Last job ID"
-// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="Type",type=string,JSONPath=`.spec.checkType`,description="Active check type"
+// +kubebuilder:printcolumn:name="Init",type=boolean,JSONPath=`.spec.runAfterCreation`,description="Whether to run this check after creation"
+// +kubebuilder:printcolumn:name="Suspend",type=boolean,JSONPath=`.spec.suspend`,description="Whether to suspend periodic runs of this check"
+// +kubebuilder:printcolumn:name="Schedule",type=string,JSONPath=`.spec.schedule`,description="Schedule"
+// +kubebuilder:printcolumn:name="K8s Status",type=string,JSONPath=`.status.k8sJobsStatus.lastJobStatus`,description="Status of the last K8s job"
+// +kubebuilder:printcolumn:name="Slurm Status",type=string,JSONPath=`.status.slurmJobsStatus.lastRunStatus`,description="Status of the last Slurm job"
+// +kubebuilder:printcolumn:name="Slurm Submit Time",type=string,JSONPath=`.status.slurmJobStatus.lastRunSubmitTime`,description="Submission time of the last Slurm job"
+// +kubebuilder:printcolumn:name="Slurm ID",type=string,JSONPath=`.status.slurmJobsStatus.lastRunId`,description="ID of the last Slurm job"
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`,description="When the job was created"
 
 // ActiveCheck is the Schema for the activechecks API.
 type ActiveCheck struct {
@@ -225,4 +246,14 @@ type ActiveCheckList struct {
 
 func init() {
 	SchemeBuilder.Register(&ActiveCheck{}, &ActiveCheckList{})
+}
+
+// SetDefaults sets default values for ActiveCheckSpec
+func (s *ActiveCheckSpec) SetDefaults() {
+	if s.Suspend == nil {
+		s.Suspend = ptr.To(true)
+	}
+	if s.RunAfterCreation == nil {
+		s.RunAfterCreation = ptr.To(true)
+	}
 }

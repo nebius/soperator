@@ -1,0 +1,185 @@
+suite: test partition configuration
+templates:
+  - templates/slurm-cluster-cr.yaml
+tests:
+  - it: should render default partition configuration
+    set:
+      partitionConfiguration:
+        configType: "default"
+    asserts:
+      - isKind:
+          of: SlurmCluster
+      - equal:
+          path: spec.partitionConfiguration.configType
+          value: "default"
+      - notExists:
+          path: spec.partitionConfiguration.rawConfig
+      - notExists:
+          path: spec.partitionConfiguration.partitions
+
+  - it: should render custom partition configuration with rawConfig
+    set:
+      partitionConfiguration:
+        configType: "custom"
+        rawConfig:
+          - "PartitionName=low_priority Nodes=low_priority Default=YES State=UP"
+          - "PartitionName=high_priority Nodes=high_priority Default=NO State=UP"
+    asserts:
+      - isKind:
+          of: SlurmCluster
+      - equal:
+          path: spec.partitionConfiguration.configType
+          value: "custom"
+      - equal:
+          path: spec.partitionConfiguration.rawConfig[0]
+          value: "PartitionName=low_priority Nodes=low_priority Default=YES State=UP"
+      - equal:
+          path: spec.partitionConfiguration.rawConfig[1]
+          value: "PartitionName=high_priority Nodes=high_priority Default=NO State=UP"
+      - notExists:
+          path: spec.partitionConfiguration.partitions
+
+  - it: should render structured partition configuration
+    set:
+      partitionConfiguration:
+        configType: "structured"
+        partitions:
+          - name: "gpu-partition"
+            nodeSetRefs:
+              - "gpu-nodesets"
+            config: "Default=YES MaxTime=8:00:00 State=UP"
+          - name: "cpu-partition"
+            nodeSetRefs:
+              - "cpu-nodesets"
+            config: "Default=NO MaxTime=INFINITE State=UP"
+    asserts:
+      - isKind:
+          of: SlurmCluster
+      - equal:
+          path: spec.partitionConfiguration.configType
+          value: "structured"
+      - equal:
+          path: spec.partitionConfiguration.partitions[0].name
+          value: "gpu-partition"
+      - equal:
+          path: spec.partitionConfiguration.partitions[0].nodeSetRefs[0]
+          value: "gpu-nodesets"
+      - equal:
+          path: spec.partitionConfiguration.partitions[0].config
+          value: "Default=YES MaxTime=8:00:00 State=UP"
+      - equal:
+          path: spec.partitionConfiguration.partitions[1].name
+          value: "cpu-partition"
+      - equal:
+          path: spec.partitionConfiguration.partitions[1].nodeSetRefs[0]
+          value: "cpu-nodesets"
+      - equal:
+          path: spec.partitionConfiguration.partitions[1].config
+          value: "Default=NO MaxTime=INFINITE State=UP"
+
+  - it: should render partition with isAll flag
+    set:
+      partitionConfiguration:
+        configType: "structured"
+        partitions:
+          - name: "all-nodes"
+            isAll: true
+            config: "Hidden=YES State=UP"
+    asserts:
+      - equal:
+          path: spec.partitionConfiguration.partitions[0].name
+          value: "all-nodes"
+      - equal:
+          path: spec.partitionConfiguration.partitions[0].isAll
+          value: true
+      - equal:
+          path: spec.partitionConfiguration.partitions[0].config
+          value: "Hidden=YES State=UP"
+      - notExists:
+          path: spec.partitionConfiguration.partitions[0].nodeSetRefs
+
+  - it: should render partition with multiple nodeSetRefs
+    set:
+      partitionConfiguration:
+        configType: "structured"
+        partitions:
+          - name: "mixed-partition"
+            nodeSetRefs:
+              - "gpu-nodesets"
+              - "cpu-nodesets"
+              - "special-nodesets"
+            config: "Default=NO MaxTime=12:00:00 State=UP"
+    asserts:
+      - lengthEqual:
+          path: spec.partitionConfiguration.partitions[0].nodeSetRefs
+          count: 3
+      - equal:
+          path: spec.partitionConfiguration.partitions[0].nodeSetRefs[0]
+          value: "gpu-nodesets"
+      - equal:
+          path: spec.partitionConfiguration.partitions[0].nodeSetRefs[1]
+          value: "cpu-nodesets"
+      - equal:
+          path: spec.partitionConfiguration.partitions[0].nodeSetRefs[2]
+          value: "special-nodesets"
+
+  - it: should render partition without config field
+    set:
+      partitionConfiguration:
+        configType: "structured"
+        partitions:
+          - name: "minimal-partition"
+            nodeSetRefs:
+              - "test-nodesets"
+    asserts:
+      - equal:
+          path: spec.partitionConfiguration.partitions[0].name
+          value: "minimal-partition"
+      - exists:
+          path: spec.partitionConfiguration.partitions[0].nodeSetRefs
+      - notExists:
+          path: spec.partitionConfiguration.partitions[0].config
+      - notExists:
+          path: spec.partitionConfiguration.partitions[0].isAll
+
+  - it: should handle empty partitions list
+    set:
+      partitionConfiguration:
+        configType: "structured"
+        partitions: []
+    asserts:
+      - equal:
+          path: spec.partitionConfiguration.configType
+          value: "structured"
+      - notExists:
+          path: spec.partitionConfiguration.partitions
+
+  - it: should not render partitions when configType is default
+    set:
+      partitionConfiguration:
+        configType: "default"
+        partitions:
+          - name: "should-not-render"
+            isAll: true
+    asserts:
+      - equal:
+          path: spec.partitionConfiguration.configType
+          value: "default"
+      - notExists:
+          path: spec.partitionConfiguration.partitions
+
+  - it: should handle partition with isAll false
+    set:
+      partitionConfiguration:
+        configType: "structured"
+        partitions:
+          - name: "explicit-false"
+            isAll: false
+            nodeSetRefs:
+              - "some-nodesets"
+    asserts:
+      - equal:
+          path: spec.partitionConfiguration.partitions[0].isAll
+          value: false
+      - exists:
+          path: spec.partitionConfiguration.partitions[0].nodeSetRefs

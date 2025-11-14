@@ -1,0 +1,77 @@
+suite: test nodesets priority classes
+templates:
+  - templates/priority-class.yaml
+tests:
+  - it: should render single priority class
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: PriorityClass
+
+  - it: should configure soperator-worker-high-priority class correctly
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "soperator-worker-high-priority"
+      - equal:
+          path: value
+          value: 1e+07
+      - equal:
+          path: globalDefault
+          value: false
+      - equal:
+          path: description
+          value: "High priority class for GPU workers and critical Slurm components"
+      - equal:
+          path: preemptionPolicy
+          value: "PreemptLowerPriority"
+
+  - it: should include common labels
+    asserts:
+      - exists:
+          path: metadata.labels["helm.sh/chart"]
+      - exists:
+          path: metadata.labels["app.kubernetes.io/name"]
+      - exists:
+          path: metadata.labels["app.kubernetes.io/instance"]
+      - exists:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+
+  - it: should work with custom priority classes
+    set:
+      priorityClasses:
+        - name: "custom-priority"
+          value: 500000
+          globalDefault: true
+          description: "Custom priority class"
+          annotations:
+            custom.annotation: "test"
+          labels:
+            custom.label: "test"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: "custom-priority"
+      - equal:
+          path: value
+          value: 500000
+      - equal:
+          path: globalDefault
+          value: true
+      - equal:
+          path: metadata.annotations["custom.annotation"]
+          value: "test"
+      - equal:
+          path: metadata.labels["custom.label"]
+          value: "test"
+
+  - it: should work with empty priority classes
+    set:
+      priorityClasses: []
+    asserts:
+      - hasDocuments:
+          count: 0
