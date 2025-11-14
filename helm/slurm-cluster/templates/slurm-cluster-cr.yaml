@@ -23,11 +23,11 @@ spec:
   {{- end }}
   {{- if .Values.customSlurmConfig }}
   customSlurmConfig: |
-    {{- indent 4 .Values.customSlurmConfig }}
+{{- .Values.customSlurmConfig | nindent 4 }}
   {{- end }}
   {{- if eq .Values.clusterType "gpu" }}
   healthCheckConfig:
-    healthCheckInterval: 300
+    healthCheckInterval: 120
     healthCheckProgram: /opt/slurm_scripts/hc_program.sh
     healthCheckNodeState:
     - state: ANY

@@ -1,0 +1,13 @@
+---
+
+- name: Install slurm client
+  hosts: all, localhost
+  become: true
+  gather_facts: true
+  gather_subset:
+    - min
+  roles:
+    - slurm-client
+    - slurm-divert
+  tags:
+    - slurm-install

@@ -1,4 +1,8 @@
-FROM go-base:${TARGETARCH} AS exporter-builder
+# syntax=docker.io/docker/dockerfile-upstream:1.20.0
+
+ARG TARGETARCH
+
+FROM go-base AS exporter-builder
 
 ARG GO_LDFLAGS=""
 ARG BUILD_TIME

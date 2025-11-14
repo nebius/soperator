@@ -1,0 +1,99 @@
+---
+
+- name: Find all Slurm plugin files for this architecture
+  ansible.builtin.find:
+    paths: "/usr/lib/{{ ansible_architecture }}-linux-gnu/slurm"
+    file_type: any
+  register: slurm_plugins
+  tags:
+    - slurm-divert
+
+- name: Define files to exclude
+  ansible.builtin.set_fact:
+    slurm_exclude:
+      - "/usr/lib/{{ ansible_architecture }}-linux-gnu/slurm/spank_pyxis.so"
+      - "/usr/lib/{{ ansible_architecture }}-linux-gnu/slurm/spanknccldebug.so"
+      - "/usr/lib/{{ ansible_architecture }}-linux-gnu/slurm/chroot.so"
+  tags:
+    - slurm-divert
+
+- name: Symlink all Slurm plugin files into /usr/lib/slurm excluding specific ones
+  ansible.builtin.file:
+    src: "{{ item.path }}"
+    dest: "/usr/lib/slurm/{{ item.path | basename }}"
+    state: link
+    force: true
+    owner: root
+    group: root
+  loop: >-
+    {{
+      slurm_plugins.files
+      | rejectattr('path', 'in', slurm_exclude)
+      | list
+    }}
+  loop_control:
+    label: "{{ item.path }}"
+  tags:
+    - slurm-divert
+
+- name: Divert files
+  community.general.dpkg_divert:
+    path: "{{ item }}"
+    state: present
+    rename: false
+    holder: LOCAL
+  loop:
+    - "/usr/lib/{{ ansible_architecture }}-linux-gnu/libnss_slurm.so.2"
+    - /usr/share/bash-completion/completions/slurm_completion.sh
+  tags:
+    - slurm-divert
+
+- name: Find actual libslurm.so.* shared object (not symlink)
+  ansible.builtin.find:
+    paths: "/usr/lib/{{ ansible_architecture }}-linux-gnu"
+    patterns: "libslurm.so.*.0.0"
+    file_type: file
+  register: slurm_libslurm_so_file
+  tags:
+    - slurm-divert
+
+- name: Ensure diversion is set for the real libslurm.so.* shared object
+  community.general.dpkg_divert:
+    path: "{{ item.path }}"
+    state: present
+    rename: false
+    holder: LOCAL
+  loop: "{{ slurm_libslurm_so_file.files }}"
+  when: slurm_libslurm_so_file.matched > 0
+  tags:
+    - slurm-divert
+
+- name: Divert Slurm client binaries to protect from package overwrites
+  community.general.dpkg_divert:
+    path: "/usr/bin/{{ item }}"
+    state: present
+    rename: false
+    holder: LOCAL
+  loop:
+    - sacct
+    - salloc
+    - sbatch
+    - scancel
+    - scrontab
+    - sdiag
+    - sinfo
+    - squeue
+    - srun
+    - sstat
+    - sacctmgr
+    - sattach
+    - sbcast
+    - scontrol
+    - scrun
+    - sh5util
+    - sprio
+    - sreport
+    - sshare
+    - strigger
+  tags:
+    - slurm-divert

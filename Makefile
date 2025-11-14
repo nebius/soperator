@@ -34,7 +34,11 @@ CHART_NODESETS_PATH           = $(CHART_PATH)/nodesets
 
 SLURM_VERSION		  		= 25.05.4
 UBUNTU_VERSION		  		?= noble
-VERSION               		= $(shell cat VERSION)
+NFS_VERSION_BASE          	= $(shell cat NFS_VERSION)
+VERSION_BASE           		= $(shell cat VERSION)
+
+NFS_VERSION               	= $(NFS_VERSION_BASE)
+VERSION               		= $(VERSION_BASE)
 
 IMAGE_VERSION		  = $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)
 GO_CONST_VERSION_FILE = internal/consts/version.go
@@ -44,6 +48,8 @@ IMAGE_REPO			  = $(NEBIUS_REPO)
 
 # For version sync test
 VALUES_VERSION 		  = $(shell $(YQ) '.images.slurmctld' helm/slurm-cluster/values.yaml | awk -F':' '{print $$2}' | awk -F'-' '{print $$1}')
+NFS_CHART_VERSION     = $(shell $(YQ) '.version' helm/nfs-server/Chart.yaml)
+NFS_IMAGE_TAG         = $(shell $(YQ) '.image.tag' helm/nfs-server/values.yaml)
 
 
 OPERATOR_IMAGE_TAG  = $(VERSION)
@@ -56,8 +62,10 @@ endif
 
 ifeq ($(UNSTABLE), true)
     SHORT_SHA 					= $(shell git rev-parse --short=8 HEAD)
-    OPERATOR_IMAGE_TAG  		= $(VERSION)-$(SHORT_SHA)
-    IMAGE_VERSION		  		= $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
+    VERSION		  				= $(VERSION_BASE)-$(SHORT_SHA)
+    OPERATOR_IMAGE_TAG  		= $(VERSION_BASE)-$(SHORT_SHA)
+    IMAGE_VERSION		  		= $(VERSION_BASE)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
+    NFS_VERSION	  				= $(NFS_VERSION_BASE)-$(SHORT_SHA)
     IMAGE_REPO			  		= $(NEBIUS_REPO)-unstable
 endif
 
@@ -137,21 +145,37 @@ helm: generate manifests kustomize helmify ## Update soperator Helm chart
 
 .PHONY: get-version
 get-version:
-ifeq ($(UNSTABLE), true)
-	@echo '$(VERSION)-$(SHORT_SHA)'
-else
 	@echo '$(VERSION)'
-endif
+
+.PHONY: get-nfs-version
+get-nfs-version:
+	@echo '$(NFS_VERSION)'
 
 .PHONY: test-version-sync
 test-version-sync: yq
-	@if [ "$(VERSION)" != "$(VALUES_VERSION)" ]; then \
+	@if [ "$(VERSION_BASE)" != "$(VALUES_VERSION)" ]; then \
 		echo "Version in version file and helm/slurm-cluster different!"; \
-		echo "VERSION is - $(VERSION)"; \
+		echo "VERSION_BASE is - $(VERSION_BASE)"; \
 		echo "VALUES_VERSION is - $(VALUES_VERSION)"; \
 		exit 1; \
 	else \
-		echo "Version test passed: versions is: $(VERSION)"; \
+		echo "Version test passed: versions is: $(VERSION_BASE)"; \
+	fi
+	@if [ "$(NFS_VERSION_BASE)" != "$(NFS_CHART_VERSION)" ]; then \
+		echo "NFS version in NFS_VERSION file and helm/nfs-server/Chart.yaml different!"; \
+		echo "NFS_VERSION_BASE is - $(NFS_VERSION_BASE)"; \
+		echo "NFS_CHART_VERSION is - $(NFS_CHART_VERSION)"; \
+		exit 1; \
+	else \
+		echo "NFS version test passed: version is: $(NFS_VERSION_BASE)"; \
+	fi
+	@if [ "$(NFS_VERSION_BASE)" != "$(NFS_IMAGE_TAG)" ]; then \
+		echo "NFS version in NFS_VERSION file and helm/nfs-server/values.yaml image.tag different!"; \
+		echo "NFS_VERSION_BASE is - $(NFS_VERSION_BASE)"; \
+		echo "NFS_IMAGE_TAG is - $(NFS_IMAGE_TAG)"; \
+		exit 1; \
+	else \
+		echo "NFS image tag test passed: tag is: $(NFS_IMAGE_TAG)"; \
 	fi
 
 .PHONY: get-operator-tag-version
@@ -195,7 +219,6 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_ACTIVECHECK_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_DCGM_EXPORTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_NOTIFIER_PATH)/Chart.yaml"
-	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODESETS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_CRDS_PATH)/Chart.yaml"
@@ -207,8 +230,9 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_ACTIVECHECK_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_DCGM_EXPORTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_NOTIFIER_PATH)/Chart.yaml"
-	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODESETS_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(NFS_VERSION)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(NFS_VERSION)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
 	@# endregion helm chart versions
 #
 	@# region helm/slurm-cluster/values.yaml
@@ -252,6 +276,12 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".checks.manager.image.tag = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperatorchecks/values.yaml"
 	@# endregion helm/soperatorchecks/values.yaml
 
+	@# region helm/nfs-server/values.yaml
+	@echo 'Syncing helm/nfs-server/values.yaml'
+	@$(YQ) -i ".image.repository = \"$(IMAGE_REPO)/nfs-server\"" "helm/nfs-server/values.yaml"
+	@$(YQ) -i ".image.tag = \"$(NFS_VERSION)\"" "helm/nfs-server/values.yaml"
+	@# endregion helm/nfs-server/values.yaml
+
 	@# region helm/slurm-cluster/templates/_registry_helpers.tpl
 	@echo "Syncing $(CHART_CLUSTER_PATH)/templates/_registry_helpers.tpl"
 	@echo '{{/* This file is generated by make sync-version. */}}' >  $(CHART_CLUSTER_PATH)/templates/_registry_helpers.tpl
@@ -284,6 +314,19 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".notifier.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@# endregion helm/soperator-fluxcd/values.yaml
 
+	@# region fluxcd/environment/local
+	@echo 'Syncing fluxcd/environment/local/helmrelease.yaml'
+	@$(YQ) -i ".spec.chart.spec.chart = \"helm-soperator-fluxcd\"" "fluxcd/environment/local/helmrelease.yaml"
+	@$(YQ) -i ".spec.chart.spec.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/helmrelease.yaml"
+	@echo 'Syncing fluxcd/environment/local/values.yaml'
+	@$(YQ) -i ".soperator.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/values.yaml"
+	@$(YQ) -i ".slurmCluster.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/values.yaml"
+	@$(YQ) -i ".nfsServer.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/values.yaml"
+	@$(YQ) -i ".nfsServer.overrideValues.image.tag = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/values.yaml"
+	@echo 'Syncing fluxcd/environment/local/slurmCluster.yml'
+	@$(YQ) -i ".slurmCluster.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/slurmCluster.yml"
+	@# endregion fluxcd/environment/local
+
 	@# region internal/consts
 	@echo "Syncing $(GO_CONST_VERSION_FILE)"
 	@echo '// This file is generated by make sync-version.' >  $(GO_CONST_VERSION_FILE)
@@ -309,25 +352,18 @@ run: manifests generate fmt vet ## Run a controller from your host with native t
 	 -log-level=debug -leader-elect=true -operator-namespace=soperator-system --enable-topology-controller=true
 
 .PHONY: docker-build-go-base
-docker-build-go-base: ## Build go-base image locally
-# Build amd
-	docker build \
-		--platform linux/amd64 \
+docker-build-go-base: ## Build go-base multiarch manifest locally
+# Build multiarch
+	docker buildx build \
+		--platform linux/amd64,linux/arm64 \
 		--target go-base \
-		-t go-base:amd64 \
+		-t go-base \
 		-f images/common/go-base.dockerfile \
-		.
-
-	# Build arm
-	docker build \
-		--platform linux/arm64 \
-		--target go-base \
-		-t go-base:arm64 \
-		-f images/common/go-base.dockerfile \
+		$(DOCKER_BUILD_ARGS) \
 		.
 
 .PHONY: docker-build-and-push
-docker-build-and-push: ## Build and push docker multi arch image
+docker-build-and-push: ## Build and push docker multi arch manifest
 ifndef IMAGE_NAME
 	$(error IMAGE_NAME is not set)
 endif
@@ -337,34 +373,21 @@ endif
 ifndef UNSTABLE
 	$(error UNSTABLE is not set)
 endif
-# Build amd
-	DOCKER_BUILDKIT=1 docker build \
-		--platform linux/amd64 \
+# Build multiarch
+	docker buildx build \
+		--platform linux/amd64,linux/arm64 \
 		--target ${IMAGE_NAME} \
-		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64" \
+		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" \
 		-f images/${DOCKERFILE} \
 		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
+		--push \
 		$(DOCKER_BUILD_ARGS) \
 		.
-
-	# Build arm
-	DOCKER_BUILDKIT=1 docker build \
-		--platform linux/arm64 \
-		--target ${IMAGE_NAME} \
-		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" \
-		-f images/${DOCKERFILE} \
-		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
-		$(DOCKER_BUILD_ARGS) \
-		.
-	# Push
-	docker push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
-	docker push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64"
 
 ifeq ($(UNSTABLE), false)
-	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
-	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64"
-	docker push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
-	docker push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64"
+	skopeo copy --all \
+		docker://"$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" \
+		docker://"$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 endif
 
 .PHONY: docker-build-jail
@@ -372,8 +395,9 @@ docker-build-jail: ## Build jail
 ifndef IMAGE_VERSION
 	$(error IMAGE_VERSION is not set, docker image cannot be built)
 endif
+# Output type tar doesn't support platform splitting, so we keep single arch build here.
 	# Build amd
-	DOCKER_BUILDKIT=1 docker build \
+	docker buildx build \
 		--platform linux/amd64 \
 		--target jail \
 		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-amd64" \
@@ -383,7 +407,7 @@ endif
 		.
 
 	# Build arm
-	DOCKER_BUILDKIT=1 docker build \
+	docker buildx build \
 		--platform linux/arm64 \
 		--target jail \
 		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-arm64" \
@@ -408,10 +432,10 @@ endif
 release-helm: ## Build & push helm docker image
 	mkdir -p "helm-releases"
 	@echo "helm release for unstable version"
-	./release_helm.sh  -v "${OPERATOR_IMAGE_TAG}" -u "$(IMAGE_REPO)"
+	./release_helm.sh -u "$(IMAGE_REPO)"
 ifeq ($(UNSTABLE), false)
 	@echo "helm release for stable version"
-	./release_helm.sh -v "${OPERATOR_IMAGE_TAG}" -u "$(NEBIUS_REPO)"
+	./release_helm.sh -u "$(NEBIUS_REPO)"
 endif
 	rm -rf /helm-releases/*
 
@@ -434,9 +458,64 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMAGE_REPO)/slurm-operator:$(OPERATOR_IMAGE_TAG)
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 
+.PHONY: deploy-flux
+deploy-flux: flux kustomize ## Deploy soperator via Flux CD to kind cluster (for local development)
+	@echo "Step 1: Installing Flux CD..."
+	@echo "Checking cluster connectivity..."
+	@if ! $(KUBECTL_CTX) cluster-info > /dev/null 2>&1; then \
+		echo "❌ Cannot connect to cluster '$(KIND_CONTEXT)'. Please ensure the cluster is running."; \
+		exit 1; \
+	fi
+	@echo "✅ Cluster is accessible"
+	@if ! $(FLUX) check --context $(KIND_CONTEXT) > /dev/null 2>&1; then \
+		echo "Installing Flux components..."; \
+		$(FLUX) install --context $(KIND_CONTEXT); \
+	else \
+		echo "✅ Flux already installed"; \
+	fi
+	@echo ""
+	@echo "Step 2: Determining OCI registry based on version..."
+	@if echo "$(OPERATOR_IMAGE_TAG)" | grep -q -- "-"; then \
+		echo "Unstable version detected: $(OPERATOR_IMAGE_TAG)"; \
+		OCI_REPO="oci://cr.eu-north1.nebius.cloud/soperator-unstable"; \
+	else \
+		echo "Stable version detected: $(OPERATOR_IMAGE_TAG)"; \
+		OCI_REPO="oci://cr.eu-north1.nebius.cloud/soperator"; \
+	fi; \
+	echo "Using OCI repository: $$OCI_REPO"; \
+	echo ""; \
+	echo "Step 3: Deploying Flux configuration for local environment..."; \
+	$(KUSTOMIZE) build fluxcd/environment/local | \
+		sed "s|url: oci://cr.eu-north1.nebius.cloud/soperator.*|url: $$OCI_REPO|g" | \
+		$(KUBECTL_CTX) apply -f -; \
+	echo ""; \
+	echo "Step 4: Patching soperator-fluxcd-values ConfigMap with OCI repository..."; \
+	$(KUBECTL_CTX) get configmap soperator-fluxcd-values -n flux-system -o yaml | \
+		$(YQ) eval ".data.\"values.yaml\" |= (. | from_yaml | .helmRepository.soperator.url = \"$$OCI_REPO\" | to_yaml)" - | \
+		$(KUBECTL_CTX) apply -f -; \
+	echo ""; \
+	ARCH=$$(uname -m); \
+	if [ "$$ARCH" = "arm64" ] || [ "$$ARCH" = "aarch64" ]; then \
+		echo "ARM architecture detected, applying ARM-specific patch..."; \
+		$(KUBECTL_CTX) apply -f fluxcd/environment/local/arm-patch.yaml; \
+	fi
+	@echo ""
+	@echo "✅ Flux deployment completed!"
+	@echo ""
+	@echo "To check status, run:"
+	@echo "  kubectl --context $(KIND_CONTEXT) get helmreleases -n flux-system"
+	@echo "  kubectl --context $(KIND_CONTEXT) get helmrepositories -n flux-system"
+	@echo "  flux --context $(KIND_CONTEXT) get all -n flux-system"
+
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+
+.PHONY: undeploy-flux
+undeploy-flux: flux kustomize ## Undeploy soperator from Flux CD
+	@echo "Removing Flux configuration..."
+	$(KUSTOMIZE) build fluxcd/environment/local | $(KUBECTL_CTX) delete --ignore-not-found=true -f -
+	@echo "✅ Flux configuration removed"
 
 ##@ Dependencies
 
@@ -454,6 +533,8 @@ GOLANGCI_LINT   = $(LOCALBIN)/golangci-lint
 HELMIFY        ?= $(LOCALBIN)/helmify
 YQ             ?= $(LOCALBIN)/yq
 MOCKERY        ?= $(LOCALBIN)/mockery
+KIND           ?= $(LOCALBIN)/kind
+FLUX           ?= $(LOCALBIN)/flux
 
 ## Tool Versions
 KUSTOMIZE_VERSION        ?= v5.5.0
@@ -465,6 +546,8 @@ HELM_VERSION						 ?= v3.18.3
 HELM_UNITTEST_VERSION    ?= 0.8.2
 YQ_VERSION               ?= 4.44.3
 MOCKERY_VERSION 		 ?= 2.53.5
+KIND_VERSION             ?= v0.30.0
+FLUX_VERSION             ?= 2.7.3
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -520,6 +603,40 @@ yq: $(YQ) ## Download yq locally if necessary.
 $(YQ): $(LOCALBIN)
 	test -s $(LOCALBIN)/yq || GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@v$(YQ_VERSION)
 
+.PHONY: install-kind
+kind: $(KIND) ## Download kind locally if necessary.
+$(KIND): $(LOCALBIN)
+	@if test -x $(LOCALBIN)/kind && ! $(LOCALBIN)/kind version | grep -q $(KIND_VERSION); then \
+		echo "$(LOCALBIN)/kind version is not expected $(KIND_VERSION). Removing it before installing."; \
+		rm -rf $(LOCALBIN)/kind; \
+	fi
+	@if ! test -s $(LOCALBIN)/kind; then \
+		echo "Installing kind $(KIND_VERSION)..."; \
+		OS=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
+		ARCH=$$(uname -m); \
+		if [ "$$ARCH" = "x86_64" ]; then ARCH="amd64"; fi; \
+		if [ "$$ARCH" = "aarch64" ]; then ARCH="arm64"; fi; \
+		curl -Lo $(LOCALBIN)/kind https://kind.sigs.k8s.io/dl/$(KIND_VERSION)/kind-$${OS}-$${ARCH}; \
+		chmod +x $(LOCALBIN)/kind; \
+	fi
+
+.PHONY: install-flux
+flux: $(FLUX) ## Download flux CLI locally if necessary.
+$(FLUX): $(LOCALBIN)
+	@if test -x $(LOCALBIN)/flux && ! $(LOCALBIN)/flux version --client | grep -q $(FLUX_VERSION); then \
+		echo "$(LOCALBIN)/flux version is not expected $(FLUX_VERSION). Removing it before installing."; \
+		rm -rf $(LOCALBIN)/flux; \
+	fi
+	@if ! test -s $(LOCALBIN)/flux; then \
+		echo "Installing flux $(FLUX_VERSION)..."; \
+		OS=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
+		ARCH=$$(uname -m); \
+		if [ "$$ARCH" = "x86_64" ]; then ARCH="amd64"; fi; \
+		if [ "$$ARCH" = "aarch64" ]; then ARCH="arm64"; fi; \
+		curl -sL https://github.com/fluxcd/flux2/releases/download/v$(FLUX_VERSION)/flux_$(FLUX_VERSION)_$${OS}_$${ARCH}.tar.gz | tar xz -C $(LOCALBIN) flux; \
+		chmod +x $(LOCALBIN)/flux; \
+	fi
+
 .PHONY: helmtest check-helm install-helm install-unittest
 
 ## helm unittest: Run helm unittest with dependency check
@@ -555,3 +672,75 @@ install-helm:
 install-unittest:
 	@echo "Installing helm-unittest plugin $(HELM_UNITTEST_VERSION)..."
 	@helm plugin install https://github.com/helm-unittest/helm-unittest --version $(HELM_UNITTEST_VERSION)
+
+##@ Kind Cluster
+
+KIND_CLUSTER_NAME ?= soperator-dev
+KIND_NODES        ?= 2
+KIND_K8S_VERSION  ?= v1.31.0
+KIND_CONTEXT      ?= kind-$(KIND_CLUSTER_NAME)
+KUBECTL_CTX       = $(KUBECTL) --context $(KIND_CONTEXT)
+
+.PHONY: kind-create
+kind-create: kind ## Create kind cluster with specified number of nodes
+	@echo "Creating kind cluster '$(KIND_CLUSTER_NAME)' with $(KIND_NODES) nodes (Kubernetes $(KIND_K8S_VERSION))..."
+	@if $(KIND) get clusters | grep -q "^$(KIND_CLUSTER_NAME)$$"; then \
+		echo "Cluster '$(KIND_CLUSTER_NAME)' already exists"; \
+		exit 1; \
+	fi
+	@echo "kind: Cluster" > /tmp/kind-config.yaml
+	@echo "apiVersion: kind.x-k8s.io/v1alpha4" >> /tmp/kind-config.yaml
+	@echo "nodes:" >> /tmp/kind-config.yaml
+	@echo "- role: control-plane" >> /tmp/kind-config.yaml
+	@for i in $$(seq 1 $$(($(KIND_NODES) - 1))); do \
+		echo "- role: worker" >> /tmp/kind-config.yaml; \
+	done
+	@$(KIND) create cluster --name $(KIND_CLUSTER_NAME) --config /tmp/kind-config.yaml --image kindest/node:$(KIND_K8S_VERSION)
+	@rm /tmp/kind-config.yaml
+	@echo "✅ Kind cluster '$(KIND_CLUSTER_NAME)' created successfully with $(KIND_NODES) nodes"
+	@echo "Switching kubectl context to kind-$(KIND_CLUSTER_NAME)..."
+	@kubectl config use-context kind-$(KIND_CLUSTER_NAME)
+	@echo "✅ kubectl context set to kind-$(KIND_CLUSTER_NAME)"
+
+.PHONY: kind-delete
+kind-delete: kind ## Delete kind cluster
+	@echo "Deleting kind cluster '$(KIND_CLUSTER_NAME)'..."
+	@$(KIND) delete cluster --name $(KIND_CLUSTER_NAME)
+	@echo "✅ Kind cluster '$(KIND_CLUSTER_NAME)' deleted successfully"
+
+.PHONY: kind-list
+kind-list: kind ## List all kind clusters
+	@$(KIND) get clusters
+
+.PHONY: kind-load-images
+kind-load-images: kind ## Load operator images into kind cluster
+	@echo "Loading images into kind cluster '$(KIND_CLUSTER_NAME)'..."
+	@if ! $(KIND) get clusters | grep -q "^$(KIND_CLUSTER_NAME)$$"; then \
+		echo "Cluster '$(KIND_CLUSTER_NAME)' does not exist. Create it first with 'make kind-create'"; \
+		exit 1; \
+	fi
+	@echo "Loading slurm-operator:$(OPERATOR_IMAGE_TAG)..."
+	@$(KIND) load docker-image $(IMAGE_REPO)/slurm-operator:$(OPERATOR_IMAGE_TAG) --name $(KIND_CLUSTER_NAME) || true
+	@echo "✅ Images loaded successfully"
+
+.PHONY: kind-restart
+kind-restart: kind-delete kind-create ## Restart kind cluster (delete and create)
+
+.PHONY: kind-status
+kind-status: ## Check kind cluster status
+	@echo "Cluster: $(KIND_CLUSTER_NAME)"
+	@echo "Context: $(KIND_CONTEXT)"
+	@echo ""
+	@echo "Nodes:"
+	@$(KUBECTL_CTX) get nodes
+	@echo ""
+	@echo "Flux status:"
+	@$(KUBECTL_CTX) get pods -n flux-system 2>/dev/null || echo "Flux not installed"
+	@echo ""
+	@echo "Soperator status:"
+	@$(KUBECTL_CTX) get pods -n soperator-system 2>/dev/null || echo "Soperator not deployed"
+
+.PHONY: jail-shell
+jail-shell: ## Open interactive shell in jail environment via login pod
+	@echo "Opening jail shell in login-0 pod..."
+	@$(KUBECTL_CTX) exec -it -n soperator login-0 -- chroot /mnt/jail bash

@@ -1,0 +1,4 @@
+---
+
+nccl_tests_deb_repo_url: "https://github.com/nebius/slurm-deb-packages/releases/download"
+nccl_tests_cuda_version: 12.9.0

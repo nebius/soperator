@@ -8,3 +8,5 @@ version.txt
 
 # ignoring generated version folder
 /version/
+
+.ansible

@@ -1,13 +1,10 @@
 nameOverride: ""
 fullnameOverride: ""
-
 image:
   repository: cr.eu-north1.nebius.cloud/soperator/nfs-server
   pullPolicy: IfNotPresent
-  tag: ""
-
+  tag: "1.1.0"
 imagePullSecrets: []
-
 # NFS Server Configuration
 nfs:
   # Required: Directory path inside container to export
@@ -22,7 +19,6 @@ nfs:
   graceTime: 10
   leaseTime: 10
   threads: 8
-
 # Storage configuration for the backing volume
 storage:
   # Create a new volume with volumeClaimTemplates
@@ -31,12 +27,10 @@ storage:
   accessMode: ReadWriteOnce
   # Or use existing PVC
   existingClaim: ""
-
 service:
   nfsPort: 2049
   rpcPort: 111
   mountdPort: 20048
-
 # Storage Class for NFS provisioner
 storageClass:
   enabled: true
@@ -52,48 +46,37 @@ storageClass:
     - timeo=150
     - retrans=2
     - noresvport
-
 priorityClass:
   enabled: true
   name: nfs-server-high
   value: 10000
   globalDefault: false
   description: "High priority class for NFS server"
-
 serviceAccount:
   enabled: true
   annotations: {}
   name: ""
-
 podAnnotations: {}
-
 podSecurityContext:
   # NFS server requires privileged access
   fsGroup: 0
-
 securityContext:
   # NFS server requires privileged containers
   privileged: true
   runAsUser: 0
   runAsGroup: 0
-
 resources:
   limits:
     memory: 512Mi
   requests:
     cpu: 250m
     memory: 256Mi
-
 nodeSelector: {}
-
 tolerations: []
-
 affinity: {}
-
 # Update strategy for StatefulSet
 updateStrategy:
   type: RollingUpdate
-
 monitoring:
   enabled: false
   serviceMonitor:

@@ -1,3 +1,5 @@
+# syntax=docker.io/docker/dockerfile-upstream:1.20.0
+
 FROM cr.eu-north1.nebius.cloud/soperator/cuda_base:12.9.0-ubuntu24.04-nccl2.26.5-1-295cb71 AS cuda
 
 # Download NCCL tests executables
@@ -15,67 +17,6 @@ FROM cuda AS jail
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies
-RUN apt update && \
-    apt install -y \
-        autoconf="2.71-3" \
-        bc \
-        build-essential="12.10ubuntu1" \
-        ca-certificates="20240203" \
-        curl \
-        flex \
-        gettext-base \
-        git \
-        gnupg \
-        jq \
-        less \
-        libevent-dev="2.1.12-stable-9ubuntu2" \
-        libhwloc-dev="2.10.0-1build1" \
-        libjansson-dev="2.14-2build2" \
-        libjson-c-dev="0.17-1build1" \
-        liblz4-dev="1.9.4-1build1.1" \
-        libmunge-dev="0.5.15-4build1" \
-        libpam0g-dev="1.5.3-5ubuntu5.5" \
-        libssl-dev="3.0.13-0ubuntu3.6" \
-        libtool="2.4.7-7build1" \
-        lsof \
-        pkg-config \
-        software-properties-common \
-        python3-apt \
-        squashfs-tools \
-        iputils-ping \
-        dnsutils \
-        telnet \
-        netcat-openbsd \
-        strace \
-        sudo \
-        tree \
-        vim \
-        wget \
-        zstd \
-        pciutils \
-        iproute2 \
-        infiniband-diags \
-        libncurses5-dev \
-        libdrm-dev \
-        zip \
-        unzip \
-        rsync \
-        numactl \
-        htop \
-        hwloc \
-        rdma-core="50.0-2ubuntu0.2" \
-        ibverbs-utils="50.0-2ubuntu0.2" \
-        libpmix-dev="5.0.1-4.1build1" \
-        parallel="20240222+ds-2" \
-        bsdmainutils \
-        kmod \
-        tmux \
-        time \
-        aptitude && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host
 
@@ -86,81 +27,56 @@ RUN chmod 644 /etc/passwd /etc/group && chown 0:0 /etc/passwd /etc/group && \
     chmod 640 /etc/shadow /etc/gshadow && chown 0:42 /etc/shadow /etc/gshadow && \
     chmod 440 /etc/sudoers && chown 0:0 /etc/sudoers
 
-# Setup the default $HOME directory content
-RUN rm -rf -- /etc/skel/..?* /etc/skel/.[!.]* /etc/skel/*
-COPY images/jail/skel/ /etc/skel/
-RUN chmod 755 /etc/skel/.ssh && \
-    chmod 600 /etc/skel/.ssh/config && \
-    chmod 755 /etc/skel/.slurm && \
-    chmod 644 /etc/skel/.slurm/defaults && \
-    chmod 644 /etc/skel/.bash_logout && \
-    chmod 644 /etc/skel/.bashrc && \
-    chmod 644 /etc/skel/.profile && \
-    chmod 755 /etc/skel/.config && \
-    chmod 755 /etc/skel/.config/enroot && \
-    chmod 644 /etc/skel/.config/enroot/.credentials
-
-# Use the same /etc/skel content for /root
-RUN rm -rf -- /root/..?* /root/.[!.]* /root/* && \
-    cp -a /etc/skel/. /root/
-
-# Replace SSH "message of the day" scripts
-RUN rm -rf /etc/update-motd.d/*
-COPY images/jail/motd/ /etc/update-motd.d/
-RUN chmod +x /etc/update-motd.d/*
-
-# Install python
+# Install minimal python packages for Ansible
 RUN apt-get update && \
     apt-get install -y \
         python3.12="3.12.3-1ubuntu0.8" \
-        python3.12-dev="3.12.3-1ubuntu0.8" \
-        python3.12-venv="3.12.3-1ubuntu0.8" \
-        python3.12-dbg="3.12.3-1ubuntu0.8" \
-        python3-pip="24.0+dfsg-1ubuntu1.3" \
-        python3-pip-whl="24.0+dfsg-1ubuntu1.3" \
-        python3-debian="0.1.49ubuntu2" && \
+        python3.12-venv="3.12.3-1ubuntu0.8"
+
+# Install Ansible and base configs
+COPY ansible/ansible.cfg ansible/requirements.txt ansible/run.yml /opt/ansible/
+COPY ansible/inventory/jail/hosts.ini /opt/ansible/inventory/jail/hosts.ini
+RUN cd /opt/ansible && ln -sf /usr/bin/python3.12 /usr/bin/python3 && \
+    python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
+
+ENV PATH="/opt/ansible/.venv/bin:${PATH}"
+WORKDIR /opt/ansible
+
+# Install python
+COPY ansible/python.yml /opt/ansible/python.yml
+COPY ansible/roles/python /opt/ansible/roles/python
+RUN ansible-playbook -i localhost -c local python.yml -t python
+
+# Install common packages
+COPY ansible/common-packages.yml /opt/ansible/common-packages.yml
+COPY ansible/roles/common-packages /opt/ansible/roles/common-packages
+RUN ansible-playbook -i localhost -c local common-packages.yml -t common-packages
+
+# Install useful packages
+RUN apt update && \
+    apt install -y \
+        bc \
+        flex \
+        gettext-base \
+        git \
+        less \
+        lsof \
+        iputils-ping \
+        dnsutils \
+        telnet \
+        netcat-openbsd \
+        strace \
+        tree \
+        vim \
+        pciutils \
+        rsync \
+        htop \
+        hwloc \
+        bsdmainutils \
+        tmux \
+        aptitude && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    ln -sf /usr/bin/python3.12 /usr/bin/python && \
-    ln -sf /usr/bin/python3.12 /usr/bin/python3
-
-# Install OpenMPI
-COPY images/common/scripts/install_openmpi.sh /opt/bin/
-RUN chmod +x /opt/bin/install_openmpi.sh && \
-    /opt/bin/install_openmpi.sh && \
-    rm /opt/bin/install_openmpi.sh
-
-# Install nvtop GPU monitoring utility
-RUN add-apt-repository -y ppa:quentiumyt/nvtop && \
-    apt install -y nvtop="3.2.0.2-1+noble" && \
-    apt clean && \
     rm -rf /var/lib/apt/lists/*
-
-# Install dcgmi tools
-# https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/dcgm-diagnostics.html
-RUN apt-get update && \
-    apt install -y datacenter-gpu-manager-4-cuda12="1:4.4.1-1" && \
-    apt clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install GDRCopy libraries & executables
-ARG GDRCOPY_VERSION=2.5
-RUN apt-get update && \
-    apt -y install \
-      gdrcopy=${GDRCOPY_VERSION}-1 \
-      gdrcopy-tests=${GDRCOPY_VERSION}-1 \
-      libgdrapi=${GDRCOPY_VERSION}-1 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install nvidia-container-toolkit (for enroot usage)
-COPY images/common/scripts/install_container_toolkit.sh /opt/bin/
-RUN chmod +x /opt/bin/install_container_toolkit.sh && \
-    /opt/bin/install_container_toolkit.sh && \
-    rm /opt/bin/install_container_toolkit.sh
-
-# Copy NVIDIA Container Toolkit config
-COPY images/common/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
 
 # Install AWS CLI
 COPY images/common/scripts/install_awscli.sh /opt/bin/
@@ -174,73 +90,65 @@ RUN chmod +x /opt/bin/install_rclone.sh && \
     /opt/bin/install_rclone.sh && \
     rm /opt/bin/install_rclone.sh
 
-# Install Docker CLI
-COPY images/common/scripts/install_docker_cli.sh /opt/bin/
-RUN chmod +x /opt/bin/install_docker_cli.sh && \
-    /opt/bin/install_docker_cli.sh && \
-    rm /opt/bin/install_docker_cli.sh
+# Install nvtop GPU monitoring utility
+COPY ansible/nvtop.yml /opt/ansible/nvtop.yml
+COPY ansible/roles/nvtop /opt/ansible/roles/nvtop
+RUN ansible-playbook -i localhost -c local nvtop.yml -t nvtop
 
-# Replace the real Docker CLI with a wrapper script
-RUN mv /usr/bin/docker /usr/bin/docker.real
-COPY images/jail/scripts/docker.sh /usr/bin/docker
-RUN chmod +x /usr/bin/docker
+## Install Docker CLI
+COPY ansible/docker-cli.yml /opt/ansible/docker-cli.yml
+COPY ansible/roles/docker-cli /opt/ansible/roles/docker-cli
+RUN ansible-playbook -i localhost -c local docker-cli.yml -t docker-cli
 
-# Create a wrapper script for nvidia-smi that shows running processes (in the host's PID namespace)
-COPY images/jail/scripts/nvidia_smi_hostpid.sh /usr/bin/nvidia-smi-hostpid
-RUN chmod +x /usr/bin/nvidia-smi-hostpid
+# Install OpenMPI
+COPY ansible/openmpi.yml /opt/ansible/openmpi.yml
+COPY ansible/roles/openmpi /opt/ansible/roles/openmpi
+RUN ansible-playbook -i localhost -c local openmpi.yml -t openmpi
 
-# Copy Soperator utility scripts and add them to $PATH
-COPY images/jail/scripts/soperator_instance_login.sh /opt/soperator_utils/soperator_instance_login.sh
-COPY images/jail/scripts/slurm_task_info.sh /opt/soperator_utils/slurm_task_info.sh
-COPY images/jail/scripts/worker_nvidia_bug_report.sh /opt/soperator_utils/worker_nvidia_bug_report.sh
-COPY images/jail/scripts/fs_usage.sh /opt/soperator_utils/fs_usage.sh
-RUN chmod -R 755 /opt/soperator_utils && \
-    echo 'export PATH="/opt/soperator_utils:$PATH"' > /etc/profile.d/path_soperator_utils.sh && \
-    chmod 755 /etc/profile.d/path_soperator_utils.sh
+# Install dcgmi tools
+# https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/dcgm-diagnostics.html
+COPY ansible/dcgmi.yml /opt/ansible/dcgmi.yml
+COPY ansible/roles/dcgmi /opt/ansible/roles/dcgmi
+RUN ansible-playbook -i localhost -c local dcgmi.yml -t dcgmi
 
-# Copy soperator-createuser utility script
-COPY images/jail/scripts/soperator-createuser.py /usr/bin/soperator-createuser
-RUN chmod +x /usr/bin/soperator-createuser && \
-    ln -sf /usr/bin/soperator-createuser /usr/bin/createuser
+## Install GDRCopy libraries & executables
+COPY ansible/gdrcopy.yml /opt/ansible/gdrcopy.yml
+COPY ansible/roles/gdrcopy /opt/ansible/roles/gdrcopy
+RUN ansible-playbook -i localhost -c local gdrcopy.yml -t gdrcopy
 
-ARG SLURM_VERSION
-RUN apt-get update && \
-    apt -y install \
-      slurm-smd-client=${SLURM_VERSION}-1 \
-      slurm-smd-dev=${SLURM_VERSION}-1 \
-      slurm-smd-libnss-slurm=${SLURM_VERSION}-1 \
-      slurm-smd=${SLURM_VERSION}-1 && \
-    rm -rf /etc/slurm && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+## Install nvidia-container-toolkit (for enroot usage)
+COPY ansible/nvidia-container-toolkit.yml /opt/ansible/nvidia-container-toolkit.yml
+COPY ansible/roles/nvidia-container-toolkit /opt/ansible/roles/nvidia-container-toolkit
+RUN ansible-playbook -i localhost -c local nvidia-container-toolkit.yml -t nvidia-container-toolkit
 
-# Create directory for bind-mounting it from the host. It's needed for sbatch to work
-RUN mkdir -m 755 -p /var/spool/slurmd
+# Setup the default $HOME directory content
+COPY ansible/skel.yml /opt/ansible/skel.yml
+COPY ansible/roles/skel /opt/ansible/roles/skel
+RUN ansible-playbook -i localhost -c local skel.yml -t skel
 
-# Create single folder with slurm plugins for all architectures
-RUN mkdir -p /usr/lib/slurm && \
-    for dir in /usr/lib/*-linux-gnu/slurm; do \
-      [ -d "$dir" ] && ln -sf $dir/* /usr/lib/slurm/ 2>/dev/null || true; \
-    done
+# Replace SSH "message of the day" scripts
+COPY ansible/motd.yml /opt/ansible/motd.yml
+COPY ansible/roles/motd /opt/ansible/roles/motd
+RUN ansible-playbook -i localhost -c local motd.yml -t motd
 
-# Divert files for correct slurm package upgrades and mounting them from container
-RUN set -eux; \
-    libdir="/usr/lib/$(uname -m)-linux-gnu"; \
-    dpkg-divert --add --local --no-rename "$(find "$libdir" -maxdepth 1 -type f -name 'libslurm.so.*.0.0')"; \
-    dpkg-divert --add --local --no-rename "$libdir/libnss_slurm.so.2"; \
-    dpkg-divert --add --local --no-rename /usr/share/bash-completion/completions/slurm_completion.sh; \
-    for b in sacct salloc sbatch scancel scrontab sdiag sinfo squeue srun sstat \
-             sacctmgr sattach sbcast scontrol scrun sh5util sprio sreport sshare strigger; do \
-        dpkg-divert --add --local --no-rename "/usr/bin/$b"; \
-    done
+# Copy wrapper scripts and utilities
+COPY ansible/soperator-scripts.yml /opt/ansible/soperator-scripts.yml
+COPY ansible/roles/soperator-scripts /opt/ansible/roles/soperator-scripts
+RUN ansible-playbook -i localhost -c local soperator-scripts.yml -t wrappers
 
+# Install slurm client and divert files
+COPY ansible/slurm-install.yml /opt/ansible/slurm-install.yml
+COPY ansible/roles/slurm-client /opt/ansible/roles/slurm-client
+COPY ansible/roles/slurm-divert /opt/ansible/roles/slurm-divert
+RUN ansible-playbook -i localhost -c local slurm-install.yml -t slurm-install
 
 # Install Nebius health-check library
-ARG NC_HEALTH_CHECKER=1.0.0-164.251103
-RUN apt-get update && \
-    apt-get install -y nc-health-checker=${NC_HEALTH_CHECKER} && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+COPY ansible/nc-health-checker.yml /opt/ansible/nc-health-checker.yml
+COPY ansible/roles/nc-health-checker /opt/ansible/roles/nc-health-checker
+RUN ansible-playbook -i localhost -c local nc-health-checker.yml -t nc-health-checker
+
+# Remove ansible
+RUN rm -rf /opt/ansible
 
 # Save the initial jail version to a file
 COPY VERSION /etc/soperator-jail-version

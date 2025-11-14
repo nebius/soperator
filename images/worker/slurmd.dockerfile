@@ -1,3 +1,5 @@
+# syntax=docker.io/docker/dockerfile-upstream:1.20.0
+
 FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS worker_slurmd
 
 ARG SLURM_VERSION
@@ -60,7 +62,7 @@ RUN arch=$(uname -m) && \
     elif [ "$arch" = "aarch64" ]; then alt_arch="aarch64"; \
     else echo "Unsupported arch: $arch" && exit 1; fi && \
     echo "LD_LIBRARY_PATH=/lib/${alt_arch}-linux-gnu:/usr/lib/${alt_arch}-linux-gnu:/usr/local/cuda/targets/${alt_arch}-linux/lib:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib" >> /etc/environment
-ENV PATH=$PATH:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
+ENV PATH=${PATH}:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
 # Add Nebius public registry
 RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
@@ -125,7 +127,7 @@ RUN chmod +x /opt/bin/install_container_toolkit.sh && \
     rm /opt/bin/install_container_toolkit.sh
 
 # Copy NVIDIA Container Toolkit config
-COPY images/common/nvidia-container-runtime/config.toml /etc/nvidia-container-runtime/config.toml
+COPY ansible/roles/nvidia-container-toolkit/files/config.toml /etc/nvidia-container-runtime/config.toml
 
 # Install Docker
 COPY images/common/scripts/install_docker.sh /opt/bin/
