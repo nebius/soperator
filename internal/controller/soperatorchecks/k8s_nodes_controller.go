@@ -33,7 +33,8 @@ type K8SNodesController struct {
 	NotReadyTimeout time.Duration
 	// DeleteNotReadyNodes indicates whether NotReady nodes should be deleted after the NotReady timeout is reached.
 	// If false, they will be marked as NotReady but not deleted.
-	DeleteNotReadyNodes bool
+	DeleteNotReadyNodes      bool
+	MaintenanceConditionType corev1.NodeConditionType
 }
 
 func NewK8SNodesController(
@@ -42,13 +43,19 @@ func NewK8SNodesController(
 	recorder record.EventRecorder,
 	notReadyTimeout time.Duration,
 	deleteNotReadyNodes bool,
+	maintenanceConditionType corev1.NodeConditionType,
 ) *K8SNodesController {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
+	if maintenanceConditionType == "" {
+		maintenanceConditionType = consts.DefaultMaintenanceConditionType
+	}
+
 	return &K8SNodesController{
-		Reconciler:          r,
-		NotReadyTimeout:     notReadyTimeout,
-		DeleteNotReadyNodes: deleteNotReadyNodes,
+		Reconciler:               r,
+		NotReadyTimeout:          notReadyTimeout,
+		DeleteNotReadyNodes:      deleteNotReadyNodes,
+		MaintenanceConditionType: maintenanceConditionType,
 	}
 }
 
@@ -70,7 +77,7 @@ func (r *K8SNodesController) SetupWithManager(mgr ctrl.Manager,
 
 					for _, condition := range conditions {
 						switch condition.Type {
-						case consts.SlurmNodeDrain, consts.SlurmNodeReboot, consts.K8SNodeMaintenanceScheduled, consts.HardwareIssuesSuspected,
+						case consts.SlurmNodeDrain, consts.SlurmNodeReboot, r.MaintenanceConditionType, consts.HardwareIssuesSuspected,
 							consts.SoperatorChecksK8SNodeDegraded, consts.SoperatorChecksK8SNodeMaintenance, corev1.NodeReady:
 							condition := condition
 

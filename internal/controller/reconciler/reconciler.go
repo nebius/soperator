@@ -23,7 +23,6 @@ import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
 
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/logfield"
 )
@@ -166,7 +165,7 @@ func (r Reconciler) EnsureUpdated(
 
 func (r Reconciler) reconcile(
 	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
+	owner client.Object,
 	desired client.Object,
 	patcher patchFunc,
 	deps ...metav1.Object,
@@ -218,7 +217,7 @@ func (r Reconciler) reconcile(
 			}
 		}
 
-		err := r.EnsureDeployed(ctx, cluster, existing, desired, deps...)
+		err := r.EnsureDeployed(ctx, owner, existing, desired, deps...)
 		if err != nil {
 			logger.Error(err, "Failed to deploy")
 			return fmt.Errorf("deploying: %w", err)
@@ -230,7 +229,7 @@ func (r Reconciler) reconcile(
 			return fmt.Errorf("patching: %w", err)
 		}
 
-		err = r.EnsureUpdated(ctx, cluster, existing, desired, patch, deps...)
+		err = r.EnsureUpdated(ctx, owner, existing, desired, patch, deps...)
 		if err != nil {
 			logger.Error(err, "Failed to update")
 			return fmt.Errorf("updating: %w", err)

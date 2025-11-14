@@ -1,0 +1,111 @@
+suite: test soperator feature gates
+templates:
+  - templates/soperator.yaml
+
+tests:
+  - it: should not add feature-gates arg when not set
+    asserts:
+      - isKind:
+          of: HelmRelease
+      - notExists:
+          path: spec.values.controllerManager.manager.args
+
+  - it: should not add feature-gates arg when empty string
+    set:
+      soperator:
+        featureGates: ""
+    asserts:
+      - isKind:
+          of: HelmRelease
+      - notExists:
+          path: spec.values.controllerManager.manager.args
+
+  - it: should add feature-gates arg when set
+    set:
+      soperator:
+        featureGates: "NodeSetWorkers=true"
+    asserts:
+      - isKind:
+          of: HelmRelease
+      - exists:
+          path: spec.values.controllerManager.manager.args
+      - contains:
+          path: spec.values.controllerManager.manager.args
+          content: "--feature-gates=NodeSetWorkers=true"
+
+  - it: should include all default args with feature gates
+    set:
+      soperator:
+        featureGates: "NodeSetWorkers=true"
+    asserts:
+      - contains:
+          path: spec.values.controllerManager.manager.args
+          content: "--health-probe-bind-address=:8081"
+      - contains:
+          path: spec.values.controllerManager.manager.args
+          content: "--metrics-bind-address=127.0.0.1:8080"
+      - contains:
+          path: spec.values.controllerManager.manager.args
+          content: "--enable-topology-controller=true"
+      - contains:
+          path: spec.values.controllerManager.manager.args
+          content: "--leader-elect"
+      - contains:
+          path: spec.values.controllerManager.manager.args
+          content: "--feature-gates=NodeSetWorkers=true"
+
+  - it: should support multiple feature gates
+    set:
+      soperator:
+        featureGates: "NodeSetWorkers=true,AnotherFeature=false"
+    asserts:
+      - contains:
+          path: spec.values.controllerManager.manager.args
+          content: "--feature-gates=NodeSetWorkers=true,AnotherFeature=false"
+
+  - it: should preserve resources when feature gates are set
+    set:
+      soperator:
+        featureGates: "NodeSetWorkers=true"
+        values:
+          manager:
+            resources:
+              limits:
+                memory: 256Mi
+              requests:
+                cpu: 200m
+                memory: 128Mi
+    asserts:
+      - exists:
+          path: spec.values.controllerManager.manager.args
+      - equal:
+          path: spec.values.controllerManager.manager.resources.limits.memory
+          value: 256Mi
+      - equal:
+          path: spec.values.controllerManager.manager.resources.requests.cpu
+          value: 200m
+
+  - it: should preserve env vars when feature gates are set
+    set:
+      soperator:
+        featureGates: "NodeSetWorkers=true"
+      mariadbOperator:
+        enabled: true
+      observability:
+        enabled: true
+        prometheusOperator:
+          enabled: true
+      securityProfilesOperator:
+        enabled: true
+    asserts:
+      - exists:
+          path: spec.values.controllerManager.manager.args
+      - equal:
+          path: spec.values.controllerManager.manager.env.isApparmorCrdInstalled
+          value: true
+      - equal:
+          path: spec.values.controllerManager.manager.env.isMariadbCrdInstalled
+          value: true
+      - equal:
+          path: spec.values.controllerManager.manager.env.isPrometheusCrdInstalled
+          value: true

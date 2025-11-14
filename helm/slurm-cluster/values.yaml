@@ -16,17 +16,43 @@ clusterType: gpu
 # partitionConfiguration define partition configuration of slurm worker nodes
 # https://slurm.schedmd.com/slurm.conf.html#SECTION_PARTITION-CONFIGURATION
 partitionConfiguration:
-  # Could be default or custom
+  # ConfigType defines what behaviour should be used for partition generation.
+  # - default: generates 3 standard partitions (main, hidden, background)
+  # - custom: uses raw partition configuration strings from rawConfig
+  # - structured: enables NodeSet references and structured partition definitions
   configType: "default"
-  # configuration as list string started with PartitionName
+  # RawConfig defines partition configuration as list of string started with PartitionName.
+  # It is used when configType == "custom".
   # Example for custom ConfigType:
   rawConfig: []
-#    - PartitionName=low_priority Nodes=low_priority Default=YES MaxTime=INFINITE State=UP PriorityTier=1
-#    - PartitionName=high_priority  Nodes=high_priority Default=NO MaxTime=INFINITE State=UP PriorityTier=2
-# If Nodes present, they must not contain node names: use only nodeset values, "ALL" or "".
-# Specifying specific nodes is not supported since Dynamic Nodes are used.
-# For more details, see https://slurm.schedmd.com/dynamic_nodes.html#partitions.
+  #    - PartitionName=low_priority Nodes=low_priority Default=YES MaxTime=INFINITE State=UP PriorityTier=1
+  #    - PartitionName=high_priority  Nodes=high_priority Default=NO MaxTime=INFINITE State=UP PriorityTier=2
+  # If Nodes present, they must not contain node names: use only nodeset values, "ALL" or "".
+  # Specifying specific nodes is not supported since Dynamic Nodes are used.
+  # For more details, see https://slurm.schedmd.com/dynamic_nodes.html#partitions.
 
+  # Partitions define partition configuration as a list of structured Partition[s].
+  # It is used when configType == "structured".
+  partitions: []
+  # Example partitions (similar to default partitions):
+  #  - name: "main"
+  #    isAll: true
+  #    config: "Default=YES MaxTime=INFINITE State=UP PriorityTier=10"
+  #  - name: "hidden"
+  #    isAll: true
+  #    config: "Hidden=YES MaxTime=INFINITE State=UP PriorityTier=10"
+  #  - name: "background"
+  #    isAll: true
+  #    config: "Hidden=YES MaxTime=INFINITE State=UP PriorityTier=1"
+  # Example with NodeSet references:
+  #  - name: "gpu-partition"
+  #    nodeSetRefs:
+  #      - "gpu-nodesets"
+  #    config: "Default=YES MaxTime=8:00:00 State=UP PriorityTier=10"
+  #  - name: "cpu-partition"
+  #    nodeSetRefs:
+  #      - "cpu-nodesets"
+  #    config: "Default=NO MaxTime=INFINITE State=UP PriorityTier=5"
 # List of features to be enabled on worker nodes. Each feature object has:
 # - name: (Required) The name of the feature.
 # - hostlist_expr: (Required) A Slurm hostlist expression, e.g. "workers-[0-2,10],workers-[3-5]".
@@ -111,6 +137,8 @@ populateJail:
   appArmorProfile: "unconfined"
   # Name of the k8s node filter
   k8sNodeFilterName: "gpu"
+  # Controls if the pod containers can use the host user namespace
+  # hostUsers: false
   # Configuration of the volume containing the custom initial jail content (the default content is used if not set)
   jailSnapshotVolume: null
   #  jailSnapshotVolume:
@@ -128,6 +156,7 @@ slurmConfig:
   messageTimeout: 60
   topologyPlugin: "topology/tree"
   topologyParam: "SwitchAsNodeRank"
+customSlurmConfig: ""
 mpiConfig:
   pmixEnv: "OMPI_MCA_btl_tcp_if_include=eth0"
 plugStackConfig:
@@ -152,6 +181,8 @@ slurmNodes:
   accounting:
     enabled: false
     k8sNodeFilterName: "no-gpu"
+    # Controls if the pod containers can use the host user namespace
+    # hostUsers: false
     slurmConfig:
       accountingStorageTRES: "CPU,Mem,Node,VMem,Gres/gpu"
       jobAcctGatherType: "jobacct_gather/cgroup"
@@ -279,6 +310,8 @@ slurmNodes:
   controller:
     k8sNodeFilterName: "no-gpu"
     priorityClass: ""
+    # Controls if the pod containers can use the host user namespace
+    # hostUsers: false
     slurmctld:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
@@ -315,6 +348,9 @@ slurmNodes:
     size: 2
     maxUnavailable: "20%"
     k8sNodeFilterName: "gpu"
+    # Controls if the pod containers can use the host user namespace
+    # For workers, defaults to true to allow containers to access host user namespace
+    # hostUsers: true
     cgroupVersion: v2
     enableGDRCopy: false
     priorityClass: ""
@@ -370,6 +406,8 @@ slurmNodes:
   login:
     size: 2
     k8sNodeFilterName: "no-gpu"
+    # Controls if the pod containers can use the host user namespace
+    # hostUsers: false
     sshd:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
@@ -419,6 +457,8 @@ slurmNodes:
     enabled: true
     size: 1
     k8sNodeFilterName: "no-gpu"
+    # Controls if the pod containers can use the host user namespace
+    # hostUsers: false
     podMonitorConfig:
       jobLabel: "slurm-exporter"
       interval: "30s"
@@ -450,6 +490,8 @@ slurmNodes:
     enabled: false
     size: 2
     k8sNodeFilterName: "no-gpu"
+    # Controls if the pod containers can use the host user namespace
+    # hostUsers: false
     threadCount: 3
     maxConnections: 10
     rest:
@@ -463,6 +505,8 @@ slurmNodes:
         ephemeralStorage: "500Mi"
     customInitContainers: []
 sConfigController:
+  # Controls if the pod containers can use the host user namespace
+  # hostUsers: false
   node:
     k8sNodeFilterName: "system"
     size: 1
@@ -477,27 +521,20 @@ sConfigController:
   runAsGid: 1001
   reconfigurePollInterval: "20s"
   reconfigureWaitTimeout: "1m"
-telemetry: {}
-# jobsTelemetry:
-#   otelCollectorHttpHost: vmsingle-slurm.monitoring-system.svc.cluster.local
-#   otelCollectorPath: /opentelemetry/api/v1/push
-#   otelCollectorPort: 8429
-#   sendJobsEvents: true
-#   sendOtelMetrics: true
-# openTelemetryCollector:
-#   enabled: true
-#   replicasOtelCollector: 1
-#   otelCollectorPort: 8429
-
+  serviceMonitor:
+    enabled: true
+    jobLabel: "sconfigcontroller"
+    interval: "30s"
+    scrapeTimeout: "28s"
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.22.3-noble-slurm24.11.6"
-  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.22.3-noble-slurm24.11.6"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.22.3-noble-slurm24.11.6"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.22.3-noble-slurm24.11.6"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.22.3-noble-slurm24.11.6"
-  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.22.3-noble-slurm24.11.6"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.22.3-noble-slurm24.11.6"
-  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.22.3-noble-slurm24.11.6"
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.22.3-noble-slurm25.05.4"
+  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.22.3-noble-slurm25.05.4"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.22.3-noble-slurm25.05.4"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.22.3-noble-slurm25.05.4"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.22.3-noble-slurm25.05.4"
+  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.22.3-noble-slurm25.05.4"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.22.3-noble-slurm25.05.4"
+  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.22.3-noble-slurm25.05.4"
   sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.22.3
   mariaDB: docker-registry1.mariadb.com/library/mariadb:11.4.3
 # Configuration for slurm scripts.

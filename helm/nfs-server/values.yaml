@@ -1,0 +1,140 @@
+nameOverride: ""
+fullnameOverride: ""
+image:
+  repository: cr.eu-north1.nebius.cloud/soperator/nfs-server
+  pullPolicy: IfNotPresent
+  tag: "1.1.0"
+imagePullSecrets: []
+# NFS Server Configuration
+nfs:
+  # Required: Directory path inside container to export
+  sharedDirectory: "/export"
+  # Allowed client IPs/networks (e.g., [10.0.0.0/8,192.168.0.0/16] or ["*"] for world)
+  permitted:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+  # NFS export options applied to all permitted networks
+  shareOptions: "rw,fsid=0,async,no_subtree_check,no_auth_nlm,insecure,no_root_squash"
+  graceTime: 10
+  leaseTime: 10
+  threads: 8
+# Storage configuration for the backing volume
+storage:
+  # Create a new volume with volumeClaimTemplates
+  storageClassName: ""
+  size: 100Gi
+  accessMode: ReadWriteOnce
+  # Or use existing PVC
+  existingClaim: ""
+service:
+  nfsPort: 2049
+  rpcPort: 111
+  mountdPort: 20048
+# Storage Class for NFS provisioner
+storageClass:
+  enabled: true
+  name: nfs
+  reclaimPolicy: Delete
+  volumeBindingMode: Immediate
+  allowVolumeExpansion: true
+  mountOptions:
+    - vers=4.1
+    - hard
+    - rsize=1048576
+    - wsize=1048576
+    - timeo=150
+    - retrans=2
+    - noresvport
+priorityClass:
+  enabled: true
+  name: nfs-server-high
+  value: 10000
+  globalDefault: false
+  description: "High priority class for NFS server"
+serviceAccount:
+  enabled: true
+  annotations: {}
+  name: ""
+podAnnotations: {}
+podSecurityContext:
+  # NFS server requires privileged access
+  fsGroup: 0
+securityContext:
+  # NFS server requires privileged containers
+  privileged: true
+  runAsUser: 0
+  runAsGroup: 0
+resources:
+  limits:
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+nodeSelector: {}
+tolerations: []
+affinity: {}
+# Update strategy for StatefulSet
+updateStrategy:
+  type: RollingUpdate
+monitoring:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+    labels: {}
+    interval: 30s
+    scrapeTimeout: 10s
+    path: /metrics
+    port: metrics
+  nodeExporter:
+    image:
+      repository: prom/node-exporter
+      tag: v1.6.1
+      pullPolicy: IfNotPresent
+    # Enable NFS collector
+    args:
+      - --collector.nfsd
+      - --no-collector.nfs
+      - --no-collector.arp
+      - --no-collector.bcache
+      - --no-collector.bonding
+      - --no-collector.conntrack
+      - --no-collector.cpu
+      - --no-collector.cpufreq
+      - --no-collector.diskstats
+      - --no-collector.edac
+      - --no-collector.entropy
+      - --no-collector.filefd
+      - --no-collector.filesystem
+      - --no-collector.hwmon
+      - --no-collector.infiniband
+      - --no-collector.ipvs
+      - --no-collector.loadavg
+      - --no-collector.mdadm
+      - --no-collector.meminfo
+      - --no-collector.netclass
+      - --no-collector.netdev
+      - --no-collector.netstat
+      - --no-collector.pressure
+      - --no-collector.rapl
+      - --no-collector.schedstat
+      - --no-collector.sockstat
+      - --no-collector.softnet
+      - --no-collector.stat
+      - --no-collector.textfile
+      - --no-collector.thermal_zone
+      - --no-collector.time
+      - --no-collector.timex
+      - --no-collector.udp_queues
+      - --no-collector.uname
+      - --no-collector.vmstat
+      - --no-collector.xfs
+      - --no-collector.zfs
+    resources:
+      limits:
+        cpu: 100m
+        memory: 64Mi
+      requests:
+        cpu: 50m
+        memory: 32Mi
+    port: 9100

@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -75,6 +77,93 @@ func RenderJailedConfigSlurmConfigs(cluster *values.SlurmCluster) slurmv1alpha1.
 	}
 }
 
+// AddNodeSetsToSlurmConfig adds nodeset configuration to the slurm config
+// Example output:
+// NodeSet=gb200-0 Nodes=gb200-0-[0-17]
+// Nodeset=h100 Nodes=h100--[0-1]
+func AddNodeSetsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
+	res.AddComment("NodeSet section")
+	if len(cluster.NodeSets) == 0 {
+		res.AddComment("WARNING: No nodesets defined in structured configuration!")
+		return
+	}
+
+	for _, nodeSet := range cluster.NodeSets {
+		switch {
+		case nodeSet.Spec.Replicas == 1:
+			res.AddProperty("NodeSet", fmt.Sprintf("%s Nodes=%s-0", nodeSet.Name, nodeSet.Name))
+		case nodeSet.Spec.Replicas > 1:
+			res.AddProperty("NodeSet", fmt.Sprintf("%s Nodes=%s-[0-%d]", nodeSet.Name, nodeSet.Name, nodeSet.Spec.Replicas-1))
+		default:
+			res.AddComment(fmt.Sprintf("WARNING: NodeSet %s has 0 replicas, skipping", nodeSet.Name))
+		}
+	}
+}
+
+func AddNodeSetFeaturesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
+	res.AddComment("")
+	res.AddComment("Nodesets")
+	for _, feature := range cluster.WorkerFeatures {
+		if feature.NodesetName != "" {
+			res.AddProperty("Nodeset", fmt.Sprintf("%s Feature=%s", feature.NodesetName, feature.Name))
+		}
+	}
+}
+
+// AddNodesToSlurmConfig adds all node names to the slurm config
+//
+// Example output:
+// NodeName=gb200-0-0 NodeHostname=gb200-0-0 NodeAddr=gb200-0-0.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
+// NodeName=gb200-0-1 NodeHostname=gb200-0-1 NodeAddr=gb200-0-1.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
+func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
+	res.AddComment("Nodes section")
+	if len(cluster.NodeSets) == 0 {
+		res.AddComment("WARNING: No nodesets defined in structured configuration!")
+		return
+	}
+	for _, nodeSet := range cluster.NodeSets {
+		if nodeSet.Spec.Replicas == 0 {
+			res.AddComment(fmt.Sprintf("WARNING: NodeSet %s has 0 replicas, skipping", nodeSet.Name))
+			continue
+		}
+		for i := int32(0); i < nodeSet.Spec.Replicas; i++ {
+			nodeName := fmt.Sprintf("%s-%d", nodeSet.Name, i)
+			nodeAddr := fmt.Sprintf("%s.%s.%s.svc", nodeName, nodeSet.Name, nodeSet.Namespace)
+			realMemory := strconv.FormatInt(RenderRealMemorySlurmd(corev1.ResourceRequirements{Requests: nodeSet.Spec.Slurmd.Resources}), 10)
+			res.AddProperty("NodeName", fmt.Sprintf(
+				"%s NodeHostname=%s NodeAddr=%s RealMemory=%s %s",
+				nodeName, nodeName, nodeAddr, realMemory, nodeSet.Spec.NodeConfig.Static,
+			),
+			)
+		}
+	}
+}
+
+// AddPartitionsToSlurmConfig adds structured partition configuration to the slurm config
+//
+// Example output:
+// PartitionName=main Nodes=ALL AllowGroups=mleng CpuBind=verbose Default=YES DefaultTime=1:00:00 MaxTime=4:00:00 DefCpuPerGPU=8 Hidden=NO OverSubscribe=YES PreemptMode=OFF PriorityTier=10 State=UP
+// PartitionName=h100 Nodes=h100 AllowGroups=mleng CpuBind=verbose Default=NO DefaultTime=1:00:00 MaxTime=4:00:00 DefCpuPerGPU=8 Hidden=NO OverSubscribe=YES PreemptMode=OFF PriorityTier=10 State=UP
+func AddPartitionsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
+	res.AddComment("Partitions section")
+	if len(cluster.PartitionConfiguration.Partitions) == 0 {
+		res.AddComment("WARNING: No partitions defined in structured configuration!")
+		return
+	}
+	for _, partition := range cluster.PartitionConfiguration.Partitions {
+		switch {
+		case partition.IsAll:
+			res.AddProperty("PartitionName", fmt.Sprintf("%s Nodes=ALL %s", partition.Name, partition.Config))
+		case len(partition.NodeSetRefs) > 0:
+			nodes := strings.Join(partition.NodeSetRefs, ",")
+			res.AddProperty("PartitionName", fmt.Sprintf("%s Nodes=%s %s", partition.Name, nodes, partition.Config))
+		default:
+			res.AddComment(fmt.Sprintf("WARNING: Partition %s has no nodeset refs and is not 'all', skipping", partition.Name))
+		}
+	}
+
+}
+
 func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
 
@@ -94,7 +183,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	}
 	res.AddProperty("MpiDefault", "pmix")
 	res.AddProperty("MailProg", "/usr/bin/true")
-	res.AddProperty("PluginDir", "/usr/lib/x86_64-linux-gnu/"+consts.Slurm)
+	res.AddProperty("PluginDir", "/usr/lib/"+consts.Slurm)
 	res.AddProperty("ProctrackType", "proctrack/cgroup")
 	res.AddProperty("ReturnToService", 2)
 	res.AddComment("")
@@ -168,7 +257,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("PreemptType", "preempt/partition_prio")
 	res.AddComment("Partition Configuration")
 	switch cluster.PartitionConfiguration.ConfigType {
-	case "custom":
+	case slurmv1.PartitionConfigTypeCustom:
 		for _, l := range cluster.PartitionConfiguration.RawConfig {
 			line := strings.TrimSpace(l)
 			if strings.HasPrefix(line, "PartitionName") {
@@ -176,18 +265,16 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 				res.AddProperty("PartitionName", clearLine)
 			}
 		}
+		AddNodeSetFeaturesToSlurmConfig(res, cluster)
+	case slurmv1.PartitionConfigTypeStructured:
+		AddNodesToSlurmConfig(res, cluster)
+		AddPartitionsToSlurmConfig(res, cluster)
+		AddNodeSetsToSlurmConfig(res, cluster)
+
 	default:
 		res.AddProperty("PartitionName", "main Nodes=ALL Default=YES PriorityTier=10 MaxTime=INFINITE State=UP OverSubscribe=YES")
 		res.AddProperty("PartitionName", "hidden Nodes=ALL Default=NO PriorityTier=10 PreemptMode=OFF Hidden=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
-		res.AddProperty("PartitionName", "background Nodes=ALL Default=NO PriorityTier=1 PreemptMode=OFF Hidden=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
-	}
-
-	res.AddComment("")
-	res.AddComment("Nodesets")
-	for _, feature := range cluster.WorkerFeatures {
-		if feature.NodesetName != "" {
-			res.AddProperty("Nodeset", fmt.Sprintf("%s Feature=%s", feature.NodesetName, feature.Name))
-		}
+		AddNodeSetFeaturesToSlurmConfig(res, cluster)
 	}
 
 	if cluster.NodeAccounting.Enabled {
@@ -298,7 +385,7 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	// TODO(@itechdima): make `expose_enroot_logs` configurable and enable it once #413 is resolved.
 	res.AddLine(strings.Join(
 		[]string{
-			utils.Ternary(cluster.PlugStackConfig.Pyxis.Required, "required", "optional"),
+			utils.Ternary(cluster.PlugStackConfig.Pyxis.Required != nil && *cluster.PlugStackConfig.Pyxis.Required, "required", "optional"),
 			"spank_pyxis.so",
 			"runtime_path=/run/pyxis",
 			"execute_entrypoint=0",
@@ -315,7 +402,7 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 			[]string{
 				utils.Ternary(opts.Required, "required", "optional"),
 				"spanknccldebug.so",
-				fmt.Sprintf("enabled=%d", utils.Ternary(opts.Enabled, 1, 0)),
+				fmt.Sprintf("enabled=%d", utils.Ternary(opts.Enabled != nil && *opts.Enabled, 1, 0)),
 				fmt.Sprintf("log-level=%s", utils.Ternary(opts.LogLevel != "", opts.LogLevel, "INFO")),
 				fmt.Sprintf("out-file=%d", utils.Ternary(opts.OutputToFile, 1, 0)),
 				fmt.Sprintf("out-dir=%s", utils.Ternary(opts.OutputDirectory != "", opts.OutputDirectory, "/opt/soperator-outputs/nccl_logs")),
@@ -402,6 +489,25 @@ func RenderConfigMapSecurityLimits(componentType consts.ComponentType, cluster *
 	}
 }
 
+// RenderConfigMapSecurityLimitsForNodeSet renders new [corev1.ConfigMap] containing security limits config file for particular NodeSet
+func RenderConfigMapSecurityLimitsForNodeSet(nodeSet *values.SlurmNodeSet) corev1.ConfigMap {
+	data := nodeSet.ContainerSlurmd.NodeContainer.SecurityLimitsConfig
+	if data == "" {
+		data = generateUnlimitedSecurityLimitsConfig().Render()
+	}
+
+	return corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      naming.BuildConfigMapSecurityLimitsForNodeSetName(nodeSet.ParentalCluster.Name, nodeSet.Name),
+			Namespace: nodeSet.ParentalCluster.Namespace,
+			Labels:    RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name),
+		},
+		Data: map[string]string{
+			consts.ConfigMapKeySecurityLimits: data,
+		},
+	}
+}
+
 func generateUnlimitedSecurityLimitsConfig() renderutils.ConfigFile {
 	res := &renderutils.MultilineStringConfig{}
 	res.AddLine("# Set core file size to unlimited (-c)")
@@ -459,3 +565,10 @@ func generateEmptySecurityLimitsConfig() renderutils.ConfigFile {
 }
 
 // endregion Security limits
+
+// RenderRealMemorySlurmd converts resource requirements to memory in mebibytes for Slurm
+func RenderRealMemorySlurmd(resources corev1.ResourceRequirements) int64 {
+	memoryInBytes := resources.Requests.Memory().Value()
+	memoryInMebibytes := memoryInBytes / 1_048_576
+	return memoryInMebibytes
+}

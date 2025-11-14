@@ -33,6 +33,7 @@ spec:
             {{ include "son.wrapTemplateTrimL" (printf "$state := .Labels.%s" (include "son.config.label.job.state" . )) }}
             {{ include "son.wrapTemplateTrimL" (printf "$reason := .Labels.%s" (include "son.config.label.job.stateReason" . )) }}
             {{ include "son.wrapTemplateTrimL" (printf "$user := .Labels.%s" (include "son.config.label.job.user" . )) }}
+            {{ include "son.wrapTemplateTrimL" (printf "$user_mail := .Labels.%s" (include "son.config.label.job.user_mail" . )) }}
 
             {{ include "son.wrapTemplateTrimL" (printf "if eq $state \"%s\"" (include "son.config.jobStatus.failed" .)) }}
             {{ include "son.slack.msg.jobPrefix" . }} has *FAILED* {{ include "son.slack.msg.jobReason" . }}.

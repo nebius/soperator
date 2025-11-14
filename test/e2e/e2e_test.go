@@ -116,13 +116,29 @@ func readTFVars(t *testing.T, tfVarsFilename string) map[string]interface{} {
 }
 
 func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[string]interface{} {
+	// active_checks_scope = "prod"
+	tfVars["active_checks_scope"] = "testing"
+
 	// slurm_operator_version = "1.19.0"
 	tfVars["slurm_operator_version"] = cfg.SoperatorVersion
 	// slurm_operator_stable = true
 	tfVars["slurm_operator_stable"] = !cfg.SoperatorUnstable
+	// production = true
+	tfVars["production"] = false
 
 	// company_name = "e2e-test"
 	tfVars["company_name"] = "e2e-test"
+
+	// nfs_in_k8s = {
+	//   enabled        = true
+	//   version        = "1.1.0"
+	//   size_gibibytes = 3720
+	// }
+	tfVars["nfs_in_k8s"] = map[string]interface{}{
+		"enabled":        true,
+		"version":        "1.1.0-6efb732b",
+		"size_gibibytes": 3720,
+	}
 
 	// filestore_jail = {
 	//   spec = {
@@ -156,28 +172,30 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 		},
 	}
 
-	// slurm_nodeset_workers = [{
-	// 	 size                    = 2
-	// 	 nodes_per_nodegroup     = 1
-	// 	 max_unavailable_percent = 50
-	// 	 resource = {
-	// 	   platform = "gpu-h100-sxm"
-	// 	   preset   = "8gpu-128vcpu-1600gb"
-	// 	 }
-	// 	 boot_disk = {
-	// 	   type                 = "NETWORK_SSD"
-	// 	   size_gibibytes       = 2048
-	// 	   block_size_kibibytes = 4
-	// 	 }
-	// 	 gpu_cluster = {
-	// 	   infiniband_fabric = ""
-	// 	 }
-	// }]
+	// slurm_nodeset_workers = [
+	//   {
+	//     name = "worker"
+	//     size = 128
+	//     resource = {
+	//       platform = "gpu-h100-sxm"
+	//       preset   = "8gpu-128vcpu-1600gb"
+	//     }
+	//     boot_disk = {
+	//       type                 = "NETWORK_SSD"
+	//       size_gibibytes       = 512
+	//       block_size_kibibytes = 4
+	//     }
+	//     gpu_cluster = {
+	//       infiniband_fabric = ""
+	//     }
+	//     # Change to preemptible = {} in case you want to use preemptible nodes
+	//     preemptible = null
+	//   },
+	// ]
 	tfVars["slurm_nodeset_workers"] = []interface{}{
 		map[string]interface{}{
-			"size":                    2,
-			"nodes_per_nodegroup":     1,
-			"max_unavailable_percent": 50,
+			"name": "worker",
+			"size": 2,
 			"resource": map[string]interface{}{
 				"platform": cfg.WorkerPlatform,
 				"preset":   cfg.WorkerPreset,

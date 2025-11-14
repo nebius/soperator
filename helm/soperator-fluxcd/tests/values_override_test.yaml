@@ -42,6 +42,62 @@ tests:
           value:
             cpu: 100m
             memory: 128Mi
+
+  - it: should disable serviceMonitor when set to false
+    set:
+      soperator.enabled: true
+      soperator.values:
+        serviceMonitor:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.serviceMonitor.enabled
+          value: false
+
+  - it: should enable serviceMonitor when set to true
+    set:
+      soperator.enabled: true
+      soperator.values:
+        serviceMonitor:
+          enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.serviceMonitor.enabled
+          value: true
+
+  - it: should not render serviceMonitor when not provided
+    set:
+      soperator.enabled: true
+      soperator.values:
+        serviceMonitor: null
+        manager:
+          resources:
+            requests:
+              cpu: 100m
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notExists:
+          path: spec.values.serviceMonitor
+
+  - it: should render serviceMonitor without enabled field when serviceMonitor exists but enabled not set
+    set:
+      soperator.enabled: true
+      soperator.values:
+        serviceMonitor:
+          enabled: null
+          interval: 30s
+    asserts:
+      - hasDocuments:
+          count: 1
+      - exists:
+          path: spec.values.serviceMonitor.interval
+      - notExists:
+          path: spec.values.serviceMonitor.enabled
 ---
 suite: test values override default values nodeconfigurator
 templates:
@@ -129,3 +185,50 @@ tests:
           value:
             cpu: 100m
             memory: 128Mi
+---
+suite: test values override default values nodesets
+templates:
+  - templates/nodesets.yaml
+tests:
+  - it: should use custom values when provided
+    set:
+      nodesets.enabled: true
+      nodesets.values:
+        priorityClasses:
+          - name: soperator-worker-high-priority
+            value: 1000
+        nodesets:
+          test-nodeset:
+            nodesetName: "test-nodeset"
+            size: 3
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.priorityClasses[0].name
+          value: soperator-worker-high-priority
+      - equal:
+          path: spec.values.priorityClasses[0].value
+          value: 1000
+      - equal:
+          path: spec.values.nodesets.test-nodeset.size
+          value: 3
+
+  - it: should use override values when provided
+    set:
+      nodesets.enabled: true
+      nodesets.overrideValues:
+        customConfig: true
+        nodesets:
+          gpu-nodeset:
+            nodesetName: "gpu-workers"
+            size: 5
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.customConfig
+          value: true
+      - equal:
+          path: spec.values.nodesets.gpu-nodeset.nodesetName
+          value: "gpu-workers"

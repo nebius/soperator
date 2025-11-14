@@ -26,7 +26,17 @@ func RenderRole(namespace, clusterName string) rbacv1.Role {
 			{
 				APIGroups: []string{"batch"},
 				Resources: []string{"jobs"},
-				Verbs:     []string{"get", "patch"},
+				Verbs:     []string{"create", "get", "patch"},
+			},
+			{
+				APIGroups: []string{"batch"},
+				Resources: []string{"cronjobs"},
+				Verbs:     []string{"get"},
+			},
+			{
+				APIGroups: []string{"slurm.nebius.ai"},
+				Resources: []string{"activechecks"},
+				Verbs:     []string{"get", "list"},
 			},
 		},
 	}

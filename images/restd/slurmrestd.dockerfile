@@ -4,7 +4,7 @@ ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:noble
 
 FROM $BASE_IMAGE AS slurmrestd
 
-ARG SLURM_VERSION=24.11.6
+ARG SLURM_VERSION
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -48,6 +48,15 @@ RUN apt-get update && \
       slurm-smd=${SLURM_VERSION}-1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Create single folder with slurm plugins for all architectures
+RUN mkdir -p /usr/lib/slurm && \
+    for dir in /usr/lib/*-linux-gnu/slurm; do \
+      [ -d "$dir" ] && ln -sf $dir/* /usr/lib/slurm/ 2>/dev/null || true; \
+    done
+
+# Update linker cache
+RUN ldconfig
 
 # Expose the port used for accessing slurmrestd
 EXPOSE 6820

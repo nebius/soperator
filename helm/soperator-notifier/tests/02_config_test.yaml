@@ -76,39 +76,40 @@ tests:
             {{- $state := .Labels.job_state }}
             {{- $reason := .Labels.job_state_reason }}
             {{- $user := .Labels.job_user }}
+            {{- $user_mail := .Labels.job_user_mail }}
             
             {{- if eq $state "FAILED" }}
-            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} has *FAILED* (reason: `{{ $reason }}`).
+            •  {{ if $user_mail }}[<@{{ (reReplaceAll "^@" "" $user_mail) }}>] {{ end }}Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} has *FAILED* (reason: `{{ $reason }}`).
             
             {{- else if eq $state "NODE_FAIL" }}
-            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was terminated due to a *NODE FAILURE* (reason: `{{ $reason }}`). It should be automatically restarted under the same job ID.
+            •  {{ if $user_mail }}[<@{{ (reReplaceAll "^@" "" $user_mail) }}>] {{ end }}Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was terminated due to a *NODE FAILURE* (reason: `{{ $reason }}`). It should be automatically restarted under the same job ID.
             
             {{- else if eq $state "OUT_OF_MEMORY" }}
-            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was killed for *EXCEEDING ITS MEMORY LIMIT* (reason: `{{ $reason }}`).
+            •  {{ if $user_mail }}[<@{{ (reReplaceAll "^@" "" $user_mail) }}>] {{ end }}Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was killed for *EXCEEDING ITS MEMORY LIMIT* (reason: `{{ $reason }}`).
             
             {{- else if eq $state "CANCELLED" }}
-            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was *CANCELLED* (reason: `{{ $reason }}`). If this was not done manually, it may indicate an error.
+            •  {{ if $user_mail }}[<@{{ (reReplaceAll "^@" "" $user_mail) }}>] {{ end }}Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was *CANCELLED* (reason: `{{ $reason }}`). If this was not done manually, it may indicate an error.
             
             {{- else if eq $state "BOOT_FAIL" }}
-            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was removed from the queue due to an *EPHEMERAL NODE LAUNCH FAILURE* (reason: `{{ $reason }}`).
+            •  {{ if $user_mail }}[<@{{ (reReplaceAll "^@" "" $user_mail) }}>] {{ end }}Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was removed from the queue due to an *EPHEMERAL NODE LAUNCH FAILURE* (reason: `{{ $reason }}`).
             
             {{- else if eq $state "DEADLINE" }}
-            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was removed from the queue because it *DIDN’T START WITHIN ITS DEADLINE* (reason: `{{ $reason }}`).
+            •  {{ if $user_mail }}[<@{{ (reReplaceAll "^@" "" $user_mail) }}>] {{ end }}Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was removed from the queue because it *DIDN’T START WITHIN ITS DEADLINE* (reason: `{{ $reason }}`).
             
             {{- else if eq $state "PREEMPTED" }}
-            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was *PREEMPTED* by a higher-priority job (reason: `{{ $reason }}`).
+            •  {{ if $user_mail }}[<@{{ (reReplaceAll "^@" "" $user_mail) }}>] {{ end }}Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was *PREEMPTED* by a higher-priority job (reason: `{{ $reason }}`).
             
             {{- else if eq $state "SUSPENDED" }}
-            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was *SUSPENDED* (reason: `{{ $reason }}`).
+            •  {{ if $user_mail }}[<@{{ (reReplaceAll "^@" "" $user_mail) }}>] {{ end }}Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was *SUSPENDED* (reason: `{{ $reason }}`).
             
             {{- else if eq $state "TIMEOUT" }}
-            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was killed for *EXCEEDING ITS TIME LIMIT* (reason: `{{ $reason }}`).
+            •  {{ if $user_mail }}[<@{{ (reReplaceAll "^@" "" $user_mail) }}>] {{ end }}Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} was killed for *EXCEEDING ITS TIME LIMIT* (reason: `{{ $reason }}`).
             
             {{- else if eq $state "COMPLETED" }}
-            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} *COMPLETED* successfully.
+            •  {{ if $user_mail }}[<@{{ (reReplaceAll "^@" "" $user_mail) }}>] {{ end }}Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} *COMPLETED* successfully.
             
             {{- else }}
-            - Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} ended in state `{{ $state }}` (reason: `{{ $reason }}`).
+            •  {{ if $user_mail }}[<@{{ (reReplaceAll "^@" "" $user_mail) }}>] {{ end }}Job *{{ $job }}* (ID `{{ $id }}`){{ if $user }}, submitted by *{{ $user }}*,{{ end }} ended in state `{{ $state }}` (reason: `{{ $reason }}`).
             {{- end }}
             
             {{- end }}

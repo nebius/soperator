@@ -1,0 +1,9 @@
+---
+
+- name: Copy wrapper scripts and utilities
+  hosts: all, localhost
+  become: true
+  roles:
+    - soperator-scripts
+  tags:
+    - wrappers

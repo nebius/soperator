@@ -41,6 +41,8 @@ spec:
         - name: SLURM_OPERATOR_WATCH_NAMESPACES
           value: {{ quote .Values.controllerManager.manager.env.slurmOperatorWatchNamespaces
             }}
+        - name: TOPOLOGY_LABEL_PREFIX
+          value: {{ quote .Values.controllerManager.manager.env.topologyLabelPrefix }}
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
@@ -98,4 +100,7 @@ spec:
         secret:
           defaultMode: 420
           secretName: webhook-server-cert
+      {{- end }}
+      {{- if .Values.controllerManager.tolerations }}
+      tolerations: {{- toYaml .Values.controllerManager.tolerations | nindent 8 }}
       {{- end }}

@@ -1,0 +1,242 @@
+slurmCluster:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: 1.22.3
+  namespace: soperator
+  releaseName: soperator
+  overrideValues:
+    clusterName: soperator
+    clusterType: gpu
+    useDefaultAppArmorProfile: true
+    maintenance: none
+    k8sNodeFilters:
+      - name: kind
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: kubernetes.io/hostname
+                      operator: In
+                      values:
+                        - soperator-dev-worker
+    volumeSources:
+      - name: jail
+        persistentVolumeClaim:
+          claimName: jail-pvc
+          readOnly: false
+      - name: controller-spool
+        persistentVolumeClaim:
+          claimName: controller-spool-pvc
+          readOnly: false
+      - name: worker-spool
+        emptyDir:
+          sizeLimit: 2Gi
+      - name: home-dir
+        createPVC: true
+        storageClassName: nfs
+        size: 42 # capacity is not enforced by neither NFS server nor csi-driver-nfs
+        persistentVolumeClaim:
+          claimName: "home-dir"
+      - name: motd-nebius-o11y
+        configMap:
+          name: motd-nebius-o11y
+          defaultMode: 500
+      - name: jail-submount-data
+        persistentVolumeClaim:
+          claimName: jail-submount-data-pvc
+          readOnly: false
+      - name: sys-host
+        hostPath:
+          path: /sys
+          type: Directory
+      - hostPath:
+          path: /
+          type: ""
+        name: nvidia-driver-root
+      - name: image-storage
+        configMap:
+          name: image-storage
+          defaultMode: 500
+      - name: hpc-jobs-dir
+        hostPath:
+          path: /var/run/nebius/slurm
+          type: DirectoryOrCreate
+    populateJail:
+      k8sNodeFilterName: kind
+    periodicChecks:
+      ncclBenchmark:
+        enabled: false
+    slurmNodes:
+      accounting:
+        enabled: false
+        mariadbOperator:
+          enabled: false
+        slurmdbd:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        munge:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        customInitContainers:
+          - name: ensure-jail-virtiofs
+            image: cr.eu-north1.nebius.cloud/soperator/busybox
+            volumeMounts: [{name: jail, mountPath: /volume-mount}]
+            command: ["grep", " /volume-mount virtiofs ", "/proc/mounts"]
+      controller:
+        size: 1
+        k8sNodeFilterName: kind
+        slurmctld:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        munge:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        volumes:
+          spool:
+            volumeClaimTemplateSpec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 50Gi
+              storageClassName: "compute-csi-network-ssd-ext4"
+      worker:
+        size: 1
+        k8sNodeFilterName: kind
+        cgroupVersion: v2
+        enableGDRCopy: false
+        sshdConfigMapRefName: ""
+        slurmd:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        munge:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        volumes:
+          spool:
+            volumeClaimTemplateSpec: null
+            volumeSourceName: worker-spool
+          jailSubMounts:
+            - mountPath: /home
+              name: home-dir
+              volumeSourceName: home-dir
+            - name: data
+              mountPath: /mnt/data
+              volumeSourceName: jail-submount-data
+            - name: local-data
+              mountPath: /mnt/local-data
+              volumeClaimTemplateSpec:
+                accessModes:
+                  - ReadWriteOnce
+                storageClassName: compute-csi-network-ssd-ext4
+                resources:
+                  requests:
+                    storage: 1024Gi
+            - name: image-storage
+              mountPath: /mnt/image-storage
+              volumeClaimTemplateSpec:
+                accessModes:
+                  - ReadWriteOnce
+                storageClassName: compute-csi-network-ssd-io-m3-ext4
+                resources:
+                  requests:
+                    storage: 930Gi
+          customMounts:
+            - name: sys-host
+              mountPath: /mnt/jail.upper/sys-host
+              readOnly: true
+              volumeSourceName: sys-host
+            - name: enroot-on-image-storage
+              mountPath: /etc/enroot/enroot.conf.d/custom-dirs.conf
+              subPath: enroot.conf
+              readOnly: true
+              volumeSourceName: image-storage
+            - name: docker-on-image-storage
+              mountPath: /etc/docker/daemon.json
+              subPath: daemon.json
+              readOnly: true
+              volumeSourceName: image-storage
+            - name: hpc-jobs-dir
+              mountPath: /var/run/nebius/slurm
+              volumeSourceName: hpc-jobs-dir
+            - name: nvidia-driver-root
+              mountPath: /run/nvidia/driver
+              volumeSourceName: nvidia-driver-root
+              readOnly: false
+          sharedMemorySize: 1024Gi
+      login:
+        size: 1
+        k8sNodeFilterName: kind
+        sshdConfigMapRefName: ""
+        sshd:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        munge:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        volumes:
+          jailSubMounts:
+            - mountPath: /home
+              name: home-dir
+              volumeSourceName: home-dir
+            - mountPath: /etc/update-motd.d/95-nebius-o11y
+              subPath: 95-nebius-o11y
+              readOnly: true
+              name: motd-nebius-o11y
+              volumeSourceName: motd-nebius-o11y
+            - name: data
+              mountPath: /mnt/data
+              volumeSourceName: jail-submount-data
+          customMounts:
+            - name: sys-host
+              mountPath: /mnt/jail.upper/sys-host
+              readOnly: true
+              volumeSourceName: sys-host
+      exporter:
+        enabled: false
+        exporterContainer:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+      rest:
+        enabled: false
+        size: 1
+        rest:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+        munge:
+          resources:
+            cpu: 5m
+            memory: 100Mi
+            ephemeralStorage: 100Mi
+    sConfigController:
+      node:
+        k8sNodeFilterName: kind
+        size: 2
+      container:
+        imagePullPolicy: IfNotPresent
+        resources:
+          cpu: 5m
+          memory: 100Mi
+          ephemeralStorage: 100Mi

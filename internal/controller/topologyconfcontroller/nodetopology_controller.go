@@ -33,20 +33,22 @@ var (
 
 type NodeTopologyReconciler struct {
 	BaseReconciler
-	Namespace string
+	Namespace           string
+	topologyLabelPrefix string
 	// https://github.com/kubernetes-sigs/controller-runtime/issues/3044
 	APIReader client.Reader // Direct API reader for pagination
 }
 
 func NewNodeTopologyReconciler(
-	client client.Client, scheme *runtime.Scheme, namespace string, apiReader client.Reader) *NodeTopologyReconciler {
+	client client.Client, scheme *runtime.Scheme, namespace, topologyLabelPrefix string, apiReader client.Reader) *NodeTopologyReconciler {
 	return &NodeTopologyReconciler{
 		BaseReconciler: BaseReconciler{
 			Client: client,
 			Scheme: scheme,
 		},
-		Namespace: namespace,
-		APIReader: apiReader,
+		Namespace:           namespace,
+		topologyLabelPrefix: topologyLabelPrefix,
+		APIReader:           apiReader,
 	}
 }
 
@@ -55,8 +57,11 @@ func NewNodeTopologyReconciler(
 // Upon detecting a node with a `topologyconf.slurm.nebius.ai/tier-1` label,
 // it records the node’s tier information in the `node-topoly-labels` ConfigMap in a
 // `nodeName: [tier-x: switchName, ...]` format.
+// For the Blackwell architecture (GBX00 racks) `topologyconf.slurm.nebius.ai/tier-1` label
+// is considered as NVL domain of the rack. Remaining `tier-*` labels are considered as
+// IB topology.
 //
-// **Example:**
+// **Example (not considered as a real block topology):**
 //
 // Given the following nodes:
 //
@@ -65,6 +70,7 @@ func NewNodeTopologyReconciler(
 // metadata:
 //
 //	labels:
+//	  topologyconf.slurm.nebius.ai/tier-0: nvl0
 //	  topologyconf.slurm.nebius.ai/tier-1: leaf00
 //	  topologyconf.slurm.nebius.ai/tier-2: spine00
 //	name: nodeA
@@ -75,6 +81,7 @@ func NewNodeTopologyReconciler(
 // metadata:
 //
 //	labels:
+//	  topologyconf.slurm.nebius.ai/tier-0: nvl0
 //	  topologyconf.slurm.nebius.ai/tier-1: leaf00
 //	  topologyconf.slurm.nebius.ai/tier-2: spine00
 //	name: nodeB
@@ -85,6 +92,7 @@ func NewNodeTopologyReconciler(
 // metadata:
 //
 //	labels:
+//	  topologyconf.slurm.nebius.ai/tier-0: nvl1
 //	  topologyconf.slurm.nebius.ai/tier-1: leaf01
 //	  topologyconf.slurm.nebius.ai/tier-2: spine01
 //	name: nodeC
@@ -95,16 +103,17 @@ func NewNodeTopologyReconciler(
 // metadata:
 //
 //	labels:
+//	  topologyconf.slurm.nebius.ai/tier-0: nvl2
 //	  topologyconf.slurm.nebius.ai/tier-1: leaf02
 //	  topologyconf.slurm.nebius.ai/tier-2: spine01
 //	name: nodeD
 //
 // The resulting node-topoly-labels ConfigMap would contain:
 //
-// nodeA: [tier-1: leaf00, tier-2: spine00]
-// nodeB: [tier-1: leaf00, tier-2: spine00]
-// nodeC: [tier-1: leaf01, tier-2: spine01]
-// nodeD: [tier-1: leaf02, tier-2: spine01]
+// nodeA: [tier-0: nvl0, tier-1: leaf00, tier-2: spine00]
+// nodeB: [tier-0: nvl0, tier-1: leaf00, tier-2: spine00]
+// nodeC: [tier-0: nvl1, tier-1: leaf01, tier-2: spine01]
+// nodeD: [tier-0: nvl2, tier-1: leaf02, tier-2: spine01]
 func (r *NodeTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithName(NodeTopologyReconcilerName)
 	logger.Info("Starting reconciliation", "node", req.Name)
@@ -151,8 +160,11 @@ func (r *NodeTopologyReconciler) getNode(ctx context.Context, nodeName string) (
 
 // shouldProcessNode checks if the node has the required tier-1 label
 func (r *NodeTopologyReconciler) shouldProcessNode(node *corev1.Node, nodeName string, logger logr.Logger) bool {
-	if _, hasTierLabel := node.Labels[consts.TierOnePrefix]; !hasTierLabel {
-		logger.V(1).Info("Node missing tier-1 label, skipping", "node", nodeName)
+	_, hasTierZero := node.Labels[r.tierZeroLabel()]
+	_, hasTierOne := node.Labels[r.tierOneLabel()]
+
+	if !hasTierZero && !hasTierOne {
+		logger.V(1).Info("Node missing one of tier-0 or tier-1 label, skipping", "node", nodeName)
 		return false
 	}
 	return true
@@ -160,7 +172,7 @@ func (r *NodeTopologyReconciler) shouldProcessNode(node *corev1.Node, nodeName s
 
 // extractTierData extracts tier labels from the node's labels
 func (r *NodeTopologyReconciler) extractTierData(node *corev1.Node, nodeName string, logger logr.Logger) (map[string]string, error) {
-	tierData := ExtractTierLabels(node.Labels, consts.TopologyLabelPrefix)
+	tierData := ExtractTierLabels(node.Labels, r.topologyLabelPrefix)
 
 	if len(tierData) == 0 {
 		logger.V(1).Info("Node has no tier labels", "node", nodeName)
@@ -274,8 +286,8 @@ func (r *NodeTopologyReconciler) initializeConfigMapWithAllNodes(ctx context.Con
 		}
 
 		for _, node := range nodeList.Items {
-			if _, hasTierLabel := node.Labels[consts.TierOnePrefix]; hasTierLabel {
-				tierData := ExtractTierLabels(node.Labels, consts.TopologyLabelPrefix)
+			if _, hasTierLabel := node.Labels[r.tierOneLabel()]; hasTierLabel {
+				tierData := ExtractTierLabels(node.Labels, r.topologyLabelPrefix)
 				if len(tierData) > 0 {
 					tierDataJSON, err := json.Marshal(tierData)
 					if err != nil {
@@ -309,7 +321,7 @@ func (r *NodeTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 				if !ok {
 					return false
 				}
-				_, exists := node.Labels[consts.TierOnePrefix]
+				_, exists := node.Labels[r.tierOneLabel()]
 				return exists
 			},
 			UpdateFunc: func(e event.UpdateEvent) bool {
@@ -322,17 +334,17 @@ func (r *NodeTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 					return false
 				}
 
-				_, newHasLabel := newNode.Labels[consts.TierOnePrefix]
-				_, oldHasLabel := oldNode.Labels[consts.TierOnePrefix]
+				_, newHasLabel := newNode.Labels[r.tierOneLabel()]
+				_, oldHasLabel := oldNode.Labels[r.tierOneLabel()]
 
-				return newHasLabel || (oldHasLabel && oldNode.Labels[consts.TierOnePrefix] != newNode.Labels[consts.TierOnePrefix])
+				return newHasLabel || (oldHasLabel && oldNode.Labels[r.tierOneLabel()] != newNode.Labels[r.tierOneLabel()])
 			},
 			DeleteFunc: func(e event.DeleteEvent) bool {
 				node, ok := e.Object.(*corev1.Node)
 				if !ok {
 					return false
 				}
-				_, exists := node.Labels[consts.TierOnePrefix]
+				_, exists := node.Labels[r.tierOneLabel()]
 				return exists
 			},
 		})).
@@ -387,4 +399,12 @@ func (r *NodeTopologyReconciler) reconcileConfigMapToRequests(ctx context.Contex
 
 	// Return empty slice since we don't need to trigger any node reconciliation
 	return []reconcile.Request{}
+}
+
+func (r *NodeTopologyReconciler) tierZeroLabel() string {
+	return r.topologyLabelPrefix + consts.TierZeroSuffix
+}
+
+func (r *NodeTopologyReconciler) tierOneLabel() string {
+	return r.topologyLabelPrefix + consts.TierOneSuffix
 }

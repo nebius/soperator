@@ -19,14 +19,18 @@ The project structure is based on the [hierarchical repository pattern](https://
   ```
 
 - **`enviroment`**  
-  This directory contains environment-specific and cluster-specific configuration. For the initial implementation, we plan to have two environments and three types of clusters:
+  This directory contains environment-specific and cluster-specific configuration. We support the following environments:
 
   **Environments**:
   - `nebius-cloud` - Environment for the Nebius Cloud provider.
+  - `local` - Local development environment for kind clusters.
 
-  **Clusters** (examples):
-  - `prod` – Deploys `prod` in a stable configuration.
-  - `dev` – Deploys `dev` in a unstable configuration.
+  **Clusters** (for nebius-cloud):
+  - `prod` – Production environment with stable configuration.
+  - `dev` – Development environment with unstable/latest configuration.
+
+  **Local Environment**:
+  - `local` – Minimal configuration for local kind cluster development.
 
 Each subfolder typically has its own `kustomization.yaml`. The structure can be extended as needed to adapt to more complex setups or additional environments.
 
@@ -36,12 +40,20 @@ Below is an example of the project layout under the `fluxcd` directory:
 
 ```
 fluxcd
-├── enviroment
-│   └── nebius-cloud
-│       ├── prod
-│       │   └── kustomization.yaml
-│       └── base
-│           └── kustomization.yaml
+├── environment
+│   ├── nebius-cloud
+│   │   ├── prod
+│   │   │   └── kustomization.yaml
+│   │   ├── dev
+│   │   │   └── kustomization.yaml
+│   │   └── base
+│   │       └── kustomization.yaml
+│   └── local
+│       ├── kustomization.yaml
+│       ├── namespace.yaml
+│       ├── helmrepository.yaml
+│       ├── helmrelease.yaml
+│       └── values.yaml
 │
 └── base
     └── soperator-fluxcd
@@ -57,16 +69,57 @@ fluxcd
 
 ## Deployment
 
+### Production/Dev Deployment (Nebius Cloud)
+
 To deploy a specific cluster configuration, use [Kustomize](https://kustomize.io/) and apply it with `kubectl`. For example, to deploy the `nebius-cloud-dev` configuration:
 
 ```bash
-flux create
-kustomize build --load-restrictor LoadRestrictionsNone fluxcd/enviroment/nebius-cloud/dev/bootstrap | kubectl apply -f -
+flux install
+kustomize build --load-restrictor LoadRestrictionsNone fluxcd/environment/nebius-cloud/dev/bootstrap | kubectl apply -f -
 ```
 
-In this command:
-- `--load-restrictor LoadRestrictionsNone` allows Kustomize load files from outside their root.
-- `fluxcd/enviroment/nebius-cloud/dev` points to the directory containing the `kustomization.yaml` for that specific environment and cluster type.
+### Local Development Deployment (Kind)
+
+For local development with kind clusters, use the simplified Makefile target:
+
+```bash
+# Create kind cluster
+make kind-create
+
+# Deploy soperator via Flux CD
+make deploy-flux
+```
+
+This will:
+1. Install Flux CD to your cluster
+2. Deploy the local environment configuration from `fluxcd/environment/local/`
+3. Create a ConfigMap with minimal values for local development
+4. Deploy soperator-fluxcd HelmRelease
+
+To manually deploy without Makefile:
+
+```bash
+flux install
+kustomize build fluxcd/environment/local | kubectl apply -f -
+```
+
+To check deployment status:
+
+```bash
+kubectl get helmreleases -n flux-system
+kubectl get helmrepositories -n flux-system
+flux get all -n flux-system
+```
+
+To undeploy:
+
+```bash
+make undeploy-flux
+```
+
+In these commands:
+- `--load-restrictor LoadRestrictionsNone` allows Kustomize load files from outside their root (for nebius-cloud deployments).
+- `fluxcd/environment/local` points to the directory containing the local development configuration.
 
 ### Hierarchical Rendering with Kustomize
 
