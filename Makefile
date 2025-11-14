@@ -359,6 +359,7 @@ docker-build-go-base: ## Build go-base multiarch manifest locally
 		--target go-base \
 		-t go-base \
 		-f images/common/go-base.dockerfile \
+		--progress=plain \
 		$(DOCKER_BUILD_ARGS) \
 		.
 
@@ -380,6 +381,7 @@ endif
 		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" \
 		-f images/${DOCKERFILE} \
 		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
+		--progress=plain \
 		--push \
 		$(DOCKER_BUILD_ARGS) \
 		.
@@ -404,6 +406,8 @@ endif
 		-f images/jail/jail.dockerfile \
 		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
 		--output type=tar,dest=images/jail_rootfs_amd64.tar \
+		--progress=plain \
+		$(DOCKER_BUILD_ARGS) \
 		.
 
 	# Build arm
@@ -414,6 +418,8 @@ endif
 		-f images/jail/jail.dockerfile \
 		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
 		--output type=tar,dest=images/jail_rootfs_arm64.tar \
+		--progress=plain \
+		$(DOCKER_BUILD_ARGS) \
 		.
 
 .PHONY: docker-manifest
