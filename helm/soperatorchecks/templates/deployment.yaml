@@ -45,6 +45,8 @@ spec:
           value: {{ quote .Values.checks.manager.env.slurmOperatorWatchNamespaces }}
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
+        - name: IGNORED_NODE_LABELS
+          value: {{ quote .Values.checks.manager.env.ignoredNodeLabels }}
         image: {{ .Values.checks.manager.image.repository }}:{{ .Values.checks.manager.image.tag
           | default .Chart.AppVersion }}
         imagePullPolicy: {{ .Values.checks.manager.imagePullPolicy }}
