@@ -23,17 +23,17 @@ func TestK8SNodesController_ProcessDrainCondition_IgnoredLabels(t *testing.T) {
 	require.NoError(t, corev1.AddToScheme(scheme))
 
 	tests := []struct {
-		name              string
-		ignoredNodeLabels string
-		nodeLabels        map[string]string
-		conditions        []corev1.NodeCondition
-		expectSkip        bool
-		expectCondition   bool
-		expectError       bool
+		name                        string
+		maintenanceIgnoreNodeLabels string
+		nodeLabels                  map[string]string
+		conditions                  []corev1.NodeCondition
+		expectSkip                  bool
+		expectCondition             bool
+		expectError                 bool
 	}{
 		{
-			name:              "no ignored labels - process normally",
-			ignoredNodeLabels: "",
+			name:                        "no ignored labels - process normally",
+			maintenanceIgnoreNodeLabels: "",
 			nodeLabels: map[string]string{
 				"env": "prod",
 			},
@@ -48,8 +48,8 @@ func TestK8SNodesController_ProcessDrainCondition_IgnoredLabels(t *testing.T) {
 			expectError:     false,
 		},
 		{
-			name:              "node has ignored label - skip processing",
-			ignoredNodeLabels: "env=prod",
+			name:                        "ignored label matches - skip processing",
+			maintenanceIgnoreNodeLabels: "env=prod",
 			nodeLabels: map[string]string{
 				"env": "prod",
 			},
@@ -64,8 +64,8 @@ func TestK8SNodesController_ProcessDrainCondition_IgnoredLabels(t *testing.T) {
 			expectError:     false,
 		},
 		{
-			name:              "node has different label value - process normally",
-			ignoredNodeLabels: "env=prod",
+			name:                        "ignored label does not match - process normally",
+			maintenanceIgnoreNodeLabels: "env=prod",
 			nodeLabels: map[string]string{
 				"env": "dev",
 			},
@@ -80,11 +80,26 @@ func TestK8SNodesController_ProcessDrainCondition_IgnoredLabels(t *testing.T) {
 			expectError:     false,
 		},
 		{
-			name:              "multiple ignored labels - node matches one",
-			ignoredNodeLabels: "env=prod,tier=critical",
+			name:                        "multiple ignored labels - none match",
+			maintenanceIgnoreNodeLabels: "env=prod,tier=critical",
 			nodeLabels: map[string]string{
-				"env":  "dev",
-				"tier": "critical",
+				"env": "dev",
+			},
+			conditions: []corev1.NodeCondition{
+				{
+					Type:   consts.SoperatorChecksK8SNodeMaintenance,
+					Status: corev1.ConditionTrue,
+				},
+			},
+			expectSkip:      false,
+			expectCondition: true,
+			expectError:     false,
+		},
+		{
+			name:                        "multiple ignored labels - one matches",
+			maintenanceIgnoreNodeLabels: "env=prod,tier=critical",
+			nodeLabels: map[string]string{
+				"env": "prod",
 			},
 			conditions: []corev1.NodeCondition{
 				{
@@ -97,25 +112,8 @@ func TestK8SNodesController_ProcessDrainCondition_IgnoredLabels(t *testing.T) {
 			expectError:     false,
 		},
 		{
-			name:              "multiple ignored labels - node matches all",
-			ignoredNodeLabels: "env=prod,tier=critical",
-			nodeLabels: map[string]string{
-				"env":  "prod",
-				"tier": "critical",
-			},
-			conditions: []corev1.NodeCondition{
-				{
-					Type:   consts.SoperatorChecksK8SNodeMaintenance,
-					Status: corev1.ConditionTrue,
-				},
-			},
-			expectSkip:      true,
-			expectCondition: false,
-			expectError:     false,
-		},
-		{
-			name:              "multiple ignored labels - node matches none",
-			ignoredNodeLabels: "env=prod,tier=critical",
+			name:                        "multiple ignored labels - node matches none",
+			maintenanceIgnoreNodeLabels: "env=prod,tier=critical",
 			nodeLabels: map[string]string{
 				"env":  "dev",
 				"tier": "standard",
@@ -131,8 +129,8 @@ func TestK8SNodesController_ProcessDrainCondition_IgnoredLabels(t *testing.T) {
 			expectError:     false,
 		},
 		{
-			name:              "complex label keys - matching",
-			ignoredNodeLabels: "topology.kubernetes.io/zone=us-west-1a",
+			name:                        "complex label keys",
+			maintenanceIgnoreNodeLabels: "topology.kubernetes.io/zone=us-west-1a",
 			nodeLabels: map[string]string{
 				"topology.kubernetes.io/zone": "us-west-1a",
 			},
@@ -147,8 +145,8 @@ func TestK8SNodesController_ProcessDrainCondition_IgnoredLabels(t *testing.T) {
 			expectError:     false,
 		},
 		{
-			name:              "node with hardware issues - ignored label",
-			ignoredNodeLabels: "env=prod",
+			name:                        "node with hardware issues - ignored label",
+			maintenanceIgnoreNodeLabels: "env=prod",
 			nodeLabels: map[string]string{
 				"env": "prod",
 			},
@@ -163,8 +161,8 @@ func TestK8SNodesController_ProcessDrainCondition_IgnoredLabels(t *testing.T) {
 			expectError:     false,
 		},
 		{
-			name:              "node already drained - ignored label",
-			ignoredNodeLabels: "env=prod",
+			name:                        "ignored label matches - skip all processing",
+			maintenanceIgnoreNodeLabels: "env=prod",
 			nodeLabels: map[string]string{
 				"env": "prod",
 			},
@@ -210,7 +208,7 @@ func TestK8SNodesController_ProcessDrainCondition_IgnoredLabels(t *testing.T) {
 				15*time.Minute,
 				true,
 				consts.DefaultMaintenanceConditionType,
-				tt.ignoredNodeLabels,
+				tt.maintenanceIgnoreNodeLabels,
 			)
 
 			err := controller.processDrainCondition(context.Background(), node)
@@ -260,29 +258,29 @@ func TestK8SNodesController_InvalidIgnoredLabels(t *testing.T) {
 	require.NoError(t, corev1.AddToScheme(scheme))
 
 	tests := []struct {
-		name              string
-		ignoredNodeLabels string
-		shouldLogError    bool
+		name                        string
+		maintenanceIgnoreNodeLabels string
+		shouldLogError              bool
 	}{
 		{
-			name:              "valid labels",
-			ignoredNodeLabels: "env=prod,tier=critical",
-			shouldLogError:    false,
+			name:                        "valid labels",
+			maintenanceIgnoreNodeLabels: "env=prod,tier=critical",
+			shouldLogError:              false,
 		},
 		{
-			name:              "invalid format - missing value",
-			ignoredNodeLabels: "env=prod,tier",
-			shouldLogError:    true,
+			name:                        "invalid format - missing value",
+			maintenanceIgnoreNodeLabels: "env=prod,tier",
+			shouldLogError:              true,
 		},
 		{
-			name:              "invalid format - missing equals",
-			ignoredNodeLabels: "envprod",
-			shouldLogError:    true,
+			name:                        "invalid format - empty value",
+			maintenanceIgnoreNodeLabels: "env=",
+			shouldLogError:              true,
 		},
 		{
-			name:              "empty string",
-			ignoredNodeLabels: "",
-			shouldLogError:    false,
+			name:                        "empty labels",
+			maintenanceIgnoreNodeLabels: "",
+			shouldLogError:              false,
 		},
 	}
 
@@ -303,7 +301,7 @@ func TestK8SNodesController_InvalidIgnoredLabels(t *testing.T) {
 				15*time.Minute,
 				true,
 				consts.DefaultMaintenanceConditionType,
-				tt.ignoredNodeLabels,
+				tt.maintenanceIgnoreNodeLabels,
 			)
 
 			require.NotNil(t, controller)
@@ -323,15 +321,15 @@ func TestK8SNodesController_Reconcile_WithIgnoredLabels(t *testing.T) {
 	require.NoError(t, corev1.AddToScheme(scheme))
 
 	tests := []struct {
-		name              string
-		ignoredNodeLabels string
-		nodeLabels        map[string]string
-		conditions        []corev1.NodeCondition
-		expectProcessing  bool
+		name                        string
+		maintenanceIgnoreNodeLabels string
+		nodeLabels                  map[string]string
+		conditions                  []corev1.NodeCondition
+		expectProcessing            bool
 	}{
 		{
-			name:              "node with ignored label should not be processed",
-			ignoredNodeLabels: "maintenance-exempt=true",
+			name:                        "node with ignored label should not be processed",
+			maintenanceIgnoreNodeLabels: "maintenance-exempt=true",
 			nodeLabels: map[string]string{
 				"maintenance-exempt": "true",
 			},
@@ -344,8 +342,8 @@ func TestK8SNodesController_Reconcile_WithIgnoredLabels(t *testing.T) {
 			expectProcessing: false,
 		},
 		{
-			name:              "node without ignored label should be processed",
-			ignoredNodeLabels: "maintenance-exempt=true",
+			name:                        "node without ignored label should be processed",
+			maintenanceIgnoreNodeLabels: "maintenance-exempt=true",
 			nodeLabels: map[string]string{
 				"env": "prod",
 			},
@@ -384,7 +382,7 @@ func TestK8SNodesController_Reconcile_WithIgnoredLabels(t *testing.T) {
 				15*time.Minute,
 				true,
 				consts.DefaultMaintenanceConditionType,
-				tt.ignoredNodeLabels,
+				tt.maintenanceIgnoreNodeLabels,
 			)
 
 			ctx := context.Background()
