@@ -115,6 +115,7 @@ func main() {
 		deleteNotReadyNodes      bool
 		notReadyTimeout          time.Duration
 		maintenanceConditionType string
+		ignoredNodeLabels        string
 
 		reconcileTimeout                         time.Duration
 		reconcileTimeoutPodEphemeralStorageCheck time.Duration
@@ -153,6 +154,7 @@ func main() {
 	flag.BoolVar(&deleteNotReadyNodes, "delete-not-ready-nodes", true, "If set, NotReady nodes will be deleted after the not-ready timeout is reached. If false, they will be marked as NotReady but not deleted.")
 	flag.Float64Var(&ephemeralStorageThreshold, "ephemeral-storage-threshold", 85.0, "The threshold percentage for ephemeral storage usage warnings (default 85%)")
 	flag.StringVar(&maintenanceConditionType, "maintenance-condition-type", string(consts.DefaultMaintenanceConditionType), "The condition type for scheduled maintenance")
+	flag.StringVar(&ignoredNodeLabels, "ignored-node-labels", os.Getenv("IGNORED_NODE_LABELS"), "Comma-separated list of node label key=value pairs to ignore during maintenance (e.g., 'env=prod,tier=critical')")
 	flag.Parse()
 
 	opts := getZapOpts(logFormat, logLevel)
@@ -260,6 +262,7 @@ func main() {
 		notReadyTimeout,
 		deleteNotReadyNodes,
 		corev1.NodeConditionType(maintenanceConditionType),
+		ignoredNodeLabels,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 		cli.Fail(setupLog, err, "unable to create k8s nodes controller", "controller", soperatorchecks.K8SNodesControllerName)
 	}

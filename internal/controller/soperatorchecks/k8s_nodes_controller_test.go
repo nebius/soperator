@@ -130,7 +130,7 @@ func TestK8SNodesController_processNotReadyCondition(t *testing.T) {
 				Build()
 
 			recorder := record.NewFakeRecorder(10)
-			controller := NewK8SNodesController(client, scheme, recorder, 15*time.Minute, true, consts.DefaultMaintenanceConditionType)
+			controller := NewK8SNodesController(client, scheme, recorder, 15*time.Minute, true, consts.DefaultMaintenanceConditionType, "")
 
 			ctx := context.Background()
 			err := controller.processNotReadyCondition(ctx, tt.node)
@@ -222,7 +222,7 @@ func TestK8SNodesController_requeueDurationForNotReady(t *testing.T) {
 	require.NoError(t, corev1.AddToScheme(scheme))
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
-	controller := NewK8SNodesController(client, scheme, recorder, 15*time.Minute, true, consts.DefaultMaintenanceConditionType)
+	controller := NewK8SNodesController(client, scheme, recorder, 15*time.Minute, false, consts.DefaultMaintenanceConditionType, "")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -319,7 +319,7 @@ func TestK8SNodesController_Reconcile_NotReadyFlow(t *testing.T) {
 				Build()
 
 			recorder := record.NewFakeRecorder(10)
-			controller := NewK8SNodesController(client, scheme, recorder, 15*time.Minute, true, consts.DefaultMaintenanceConditionType)
+			controller := NewK8SNodesController(client, scheme, recorder, 15*time.Minute, true, consts.DefaultMaintenanceConditionType, "")
 
 			ctx := context.Background()
 			req := ctrl.Request{

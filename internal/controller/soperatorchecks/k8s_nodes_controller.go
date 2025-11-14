@@ -35,6 +35,7 @@ type K8SNodesController struct {
 	// If false, they will be marked as NotReady but not deleted.
 	DeleteNotReadyNodes      bool
 	MaintenanceConditionType corev1.NodeConditionType
+	nodeLabelMatcher         *check.NodeLabelMatcher
 }
 
 func NewK8SNodesController(
@@ -44,6 +45,7 @@ func NewK8SNodesController(
 	notReadyTimeout time.Duration,
 	deleteNotReadyNodes bool,
 	maintenanceConditionType corev1.NodeConditionType,
+	ignoredNodeLabels string,
 ) *K8SNodesController {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
@@ -51,11 +53,18 @@ func NewK8SNodesController(
 		maintenanceConditionType = consts.DefaultMaintenanceConditionType
 	}
 
+	nodeLabelMatcher, err := check.NewNodeLabelMatcher(ignoredNodeLabels)
+	if err != nil {
+		ctrl.Log.WithName("K8SNodesController").Error(err, "failed to parse ignored node labels, continuing without label filtering", "ignoredNodeLabels", ignoredNodeLabels)
+		nodeLabelMatcher, _ = check.NewNodeLabelMatcher("")
+	}
+
 	return &K8SNodesController{
 		Reconciler:               r,
 		NotReadyTimeout:          notReadyTimeout,
 		DeleteNotReadyNodes:      deleteNotReadyNodes,
 		MaintenanceConditionType: maintenanceConditionType,
+		nodeLabelMatcher:         nodeLabelMatcher,
 	}
 }
 
@@ -148,6 +157,14 @@ func (c *K8SNodesController) Reconcile(ctx context.Context, req ctrl.Request) (c
 func (c *K8SNodesController) processDrainCondition(ctx context.Context, k8sNode *corev1.Node) error {
 	logger := log.FromContext(ctx).WithName("K8SNodesController.processDrainCondition")
 	logger.Info("processing drain condition")
+
+	if c.nodeLabelMatcher.ShouldIgnoreNode(k8sNode) {
+		logger.Info("skipping drain condition processing due to ignored labels",
+			"node", k8sNode.Name,
+			"nodeLabels", k8sNode.Labels,
+			"ignoredLabels", c.nodeLabelMatcher.GetIgnoredLabels())
+		return nil
+	}
 
 	var (
 		drainCondition          corev1.NodeCondition
