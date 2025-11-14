@@ -352,25 +352,18 @@ run: manifests generate fmt vet ## Run a controller from your host with native t
 	 -log-level=debug -leader-elect=true -operator-namespace=soperator-system --enable-topology-controller=true
 
 .PHONY: docker-build-go-base
-docker-build-go-base: ## Build go-base image locally
-# Build amd
-	docker build \
-		--platform linux/amd64 \
+docker-build-go-base: ## Build go-base multiarch manifest locally
+# Build multiarch
+	docker buildx build \
+		--platform linux/amd64,linux/arm64 \
 		--target go-base \
-		-t go-base:amd64 \
+		-t go-base \
 		-f images/common/go-base.dockerfile \
-		.
-
-	# Build arm
-	docker build \
-		--platform linux/arm64 \
-		--target go-base \
-		-t go-base:arm64 \
-		-f images/common/go-base.dockerfile \
+		$(DOCKER_BUILD_ARGS) \
 		.
 
 .PHONY: docker-build-and-push
-docker-build-and-push: ## Build and push docker multi arch image
+docker-build-and-push: ## Build and push docker multi arch manifest
 ifndef IMAGE_NAME
 	$(error IMAGE_NAME is not set)
 endif
@@ -380,34 +373,23 @@ endif
 ifndef UNSTABLE
 	$(error UNSTABLE is not set)
 endif
-# Build amd
-	DOCKER_BUILDKIT=1 docker build \
-		--platform linux/amd64 \
+# Build multiarch
+	docker buildx build \
+		--platform linux/amd64,linux/arm64 \
 		--target ${IMAGE_NAME} \
-		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64" \
+		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" \
 		-f images/${DOCKERFILE} \
 		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
+		--push \
 		$(DOCKER_BUILD_ARGS) \
 		.
-
-	# Build arm
-	DOCKER_BUILDKIT=1 docker build \
-		--platform linux/arm64 \
-		--target ${IMAGE_NAME} \
-		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" \
-		-f images/${DOCKERFILE} \
-		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
-		$(DOCKER_BUILD_ARGS) \
-		.
-	# Push
-	docker push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
-	docker push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64"
 
 ifeq ($(UNSTABLE), false)
-	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
-	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64"
-	docker push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
-	docker push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64"
+	docker tag "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+
+	skopeo copy --all \
+  		docker://"$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" \
+  		docker://"$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 endif
 
 .PHONY: docker-build-jail
@@ -415,8 +397,9 @@ docker-build-jail: ## Build jail
 ifndef IMAGE_VERSION
 	$(error IMAGE_VERSION is not set, docker image cannot be built)
 endif
+# Output type tar doesn't support platform splitting, so we keep single arch build here.
 	# Build amd
-	DOCKER_BUILDKIT=1 docker build \
+	docker buildx build \
 		--platform linux/amd64 \
 		--target jail \
 		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-amd64" \
@@ -426,7 +409,7 @@ endif
 		.
 
 	# Build arm
-	DOCKER_BUILDKIT=1 docker build \
+	docker buildx build \
 		--platform linux/arm64 \
 		--target jail \
 		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-arm64" \
