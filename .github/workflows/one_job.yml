@@ -198,11 +198,6 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker
-
       - name: Build all images
         run: |
           UNSTABLE=${{ steps.read-version.outputs.unstable }}
