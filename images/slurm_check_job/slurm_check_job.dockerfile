@@ -1,3 +1,5 @@
+# syntax=docker.io/docker/dockerfile-upstream:1.20.0
+
 ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:noble
 
 FROM $BASE_IMAGE AS slurm_check_job
