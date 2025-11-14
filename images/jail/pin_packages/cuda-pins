@@ -1,7 +1,0 @@
-Package: cuda-drivers
-Pin: version 99999999-fake
-Pin-Priority: 1001
-
-Package: nvidia-open
-Pin: version 99999999-fake
-Pin-Priority: 1001
