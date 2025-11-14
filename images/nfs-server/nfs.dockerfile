@@ -1,3 +1,5 @@
+# syntax=docker.io/docker/dockerfile-upstream:1.20.0
+
 FROM alpine:3.22 AS nfs-server
 
 RUN apk add --no-cache --update \
