@@ -204,7 +204,13 @@ jobs:
           IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
           VERSION=$(make get-version UNSTABLE=${UNSTABLE})
           OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
-          DOCKER_BUILD_ARGS="--cache-from=type=local,src=/mnt/shared-fs/docker/ --cache-to=type=local,dest=/mnt/shared-fs/docker/,mode=max"
+          DOCKER_BUILD_ARGS="\
+            --cache-from=type=local,src=/mnt/shared-fs/docker/soperator-build-0 \
+            --cache-from=type=local,src=/mnt/shared-fs/docker/soperator-build-1 \
+            --cache-from=type=local,src=/mnt/shared-fs/docker/soperator-build-2 \
+            --cache-from=type=local,src=/mnt/shared-fs/docker/soperator-build-3 \
+            --cache-to=type=local,dest=/mnt/shared-fs/docker/${{ runner.name }},mode=max \
+          "
 
           make sync-version UNSTABLE=${UNSTABLE}
 
@@ -263,7 +269,7 @@ jobs:
           rm -f images/jail_rootfs*.tar
 
           echo "Building tarball for jail"
-          make docker-build-jail UNSTABLE="${UNSTABLE}" IMAGE_VERSION=${IMAGE_VERSION}
+          make docker-build-jail DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_VERSION=${IMAGE_VERSION}
 
           echo "Building and pushing image of the populate_jail ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail DOCKERFILE=populate_jail/populate_jail.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
