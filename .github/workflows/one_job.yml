@@ -207,6 +207,7 @@ jobs:
           IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
           VERSION=$(make get-version UNSTABLE=${UNSTABLE})
           OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
+          DOCKER_BUILD_ARGS="--cache-from=type=local,src=/mnt/shared-fs/docker/ --cache-to=type=local,dest=/mnt/shared-fs/docker/,mode=max"
 
           make sync-version UNSTABLE=${UNSTABLE}
 
@@ -218,60 +219,46 @@ jobs:
           
           echo "Building and pushing image of the soperatorchecks ${OPERATOR_IMAGE_TAG}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks DOCKERFILE=soperatorchecks/soperatorchecks.dockerfile IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
-          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
 
           echo "Building and pushing image of the sconfigcontroller ${OPERATOR_IMAGE_TAG}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller DOCKERFILE=sconfigcontroller/sconfigcontroller.dockerfile IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
-          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
 
           echo "Building and pushing image of the soperator ${OPERATOR_IMAGE_TAG}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator DOCKERFILE=soperator/Dockerfile IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
-          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
 
           echo "Building and pushing image of the rebooter ${OPERATOR_IMAGE_TAG}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter DOCKERFILE=rebooter/rebooter.dockerfile IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
-          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
 
           echo "Building and pushing image of the munge ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=munge DOCKERFILE=munge/munge.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=munge IMAGE_VERSION="${IMAGE_VERSION}"
 
           echo "Building and pushing image of the controller_slurmctld ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld DOCKERFILE=controller/slurmctld.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld IMAGE_VERSION="${IMAGE_VERSION}"
 
           echo "Building and pushing image of the controller_slurmdbd ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd DOCKERFILE=accounting/slurmdbd.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd IMAGE_VERSION="${IMAGE_VERSION}"
           
           echo "Building and pushing image of the slurmrestd ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd DOCKERFILE=restd/slurmrestd.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd IMAGE_VERSION="${IMAGE_VERSION}"
           
           # TODO: Remove after soperator-exporter is finished
           echo "Building and pushing image of the exporter ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=exporter DOCKERFILE=exporter/exporter.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=exporter IMAGE_VERSION="${IMAGE_VERSION}"
 
           echo "Building and pushing image of the soperator-exporter ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperator-exporter DOCKERFILE=soperator-exporter/soperator-exporter.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperator-exporter IMAGE_VERSION="${IMAGE_VERSION}"
 
           echo "Building and pushing image of the slurm_check_job ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm_check_job DOCKERFILE=slurm_check_job/slurm_check_job.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm_check_job IMAGE_VERSION="${IMAGE_VERSION}"
-          
+
           echo "Building and pushing image of the k8s_check_job ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_check_job DOCKERFILE=k8s_check_job/k8s_check_job.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_check_job IMAGE_VERSION="${IMAGE_VERSION}"
 
           echo "Building and pushing image of the login_sshd ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd DOCKERFILE=login/sshd.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd IMAGE_VERSION="${IMAGE_VERSION}"
 
           echo "Building and pushing image of the worker_slurmd ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd DOCKERFILE=worker/slurmd.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd IMAGE_VERSION="${IMAGE_VERSION}"
 
           echo "Common images were built"
 
@@ -283,8 +270,7 @@ jobs:
 
           echo "Building and pushing image of the populate_jail ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail DOCKERFILE=populate_jail/populate_jail.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-          make docker-manifest UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail IMAGE_VERSION="${IMAGE_VERSION}"
-          
+
           echo "Removing jail rootfs tar archive to speedup further docker builds."
           rm -f images/jail_rootfs*.tar
 

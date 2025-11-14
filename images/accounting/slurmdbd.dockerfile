@@ -1,3 +1,5 @@
+# syntax=docker.io/docker/dockerfile-upstream:1.20.0
+
 FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS controller_slurmdbd
 
 ARG SLURM_VERSION=24.11.6

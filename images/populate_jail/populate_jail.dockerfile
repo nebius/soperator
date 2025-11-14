@@ -1,3 +1,5 @@
+# syntax=docker.io/docker/dockerfile-upstream:1.20.0
+
 ARG BASE_IMAGE=restic/restic:0.18.0
 ARG TARGETARCH
 
