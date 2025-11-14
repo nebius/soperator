@@ -38,3 +38,9 @@ RUN ansible-playbook -i localhost -c local python.yml -t python
 # Copy role for Nebius health-check library
 COPY ansible/nc-health-checker.yml /opt/ansible/nc-health-checker.yml
 COPY ansible/roles/nc-health-checker /opt/ansible/roles/nc-health-checker
+
+# Copy & run the entrypoint script
+COPY images/k8s_check_job/k8s_check_job_entrypoint.sh /opt/bin/
+RUN chmod +x /opt/bin/k8s_check_job_entrypoint.sh
+
+ENTRYPOINT ["/opt/bin/k8s_check_job_entrypoint.sh"]
