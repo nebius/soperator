@@ -5,13 +5,23 @@
 # Global settings
 nameOverride: ""
 fullnameOverride: ""
+
 # Priority Classes configuration
 # Define priority classes that can be used by NodeSets
 priorityClasses:
-  - name: "soperator-worker-high-priority"
+    # Name of the priority class
+  - name: soperator-worker-high-priority
+    # Optional, defaults to empty string
+    description: "High priority class for Slurm workers"
+    # Optional, defaults to empty dict
+    annotations: {}
+    # Optional, defaults to empty dict
+    labels: {}
+    # Optional, defaults to 10000000
     value: 10000000
+    # Optional, defaults to false
     globalDefault: false
-    description: "High priority class for GPU workers and critical Slurm components"
+    # Optional, defaults to PreemptLowerPriority
     preemptionPolicy: "PreemptLowerPriority"
 # Container images used by NodeSets
 images:
