@@ -28,6 +28,7 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -38,6 +39,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"nebius.ai/slurm-operator/internal/cli"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/rebooter"
 	//+kubebuilder:scaffold:imports
@@ -117,7 +119,13 @@ func main() {
 	flag.Parse()
 
 	opts := getZapOpts(logFormat, logLevel)
-	ctrl.SetLogger(zap.New(opts...))
+	zapLogger := zap.New(opts...)
+	ctrl.SetLogger(zapLogger)
+
+	// Configure klog to use the same logger as controller-runtime
+	// This ensures that leader election logs are in the same format
+	klog.SetLogger(zapLogger.WithName("klog"))
+
 	setupLog := ctrl.Log.WithName("setup")
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
@@ -164,8 +172,7 @@ func main() {
 		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to start manager")
 	}
 
 	rebooterParams := rebooter.RebooterParams{
@@ -176,16 +183,14 @@ func main() {
 	rebooterParams.NodeName = os.Getenv(consts.RebooterNodeNameEnv)
 	if rebooterParams.NodeName == "" {
 		errorStr := fmt.Errorf("%s environment variable is not set", consts.RebooterMethodEnv)
-		setupLog.Error(errorStr, "unable to start manager")
-		os.Exit(1)
+		cli.Fail(setupLog, errorStr, "unable to determine rebooter node name")
 	}
 
 	envEvictionMethod := os.Getenv(consts.RebooterMethodEnv)
 	switch envEvictionMethod {
 	case string(consts.RebooterDrain):
 		// TODO: Implement drain method
-		setupLog.Error(fmt.Errorf("drain method is not supported"), "unable to start manager")
-		os.Exit(1)
+		cli.Fail(setupLog, fmt.Errorf("drain method is not supported"), "unable to start manager")
 	case string(consts.RebooterEvict):
 		fallthrough
 	default:
@@ -197,23 +202,19 @@ func main() {
 		mgr.GetEventRecorderFor(rebooter.ControllerName),
 		rebooterParams,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout, rebooterParams.NodeName); err != nil {
-		setupLog.Error(err, "unable to create controller", rebooter.ControllerName)
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to create controller", rebooter.ControllerName)
 	}
 	//+kubebuilder:scaffold:builder
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
-		os.Exit(1)
+	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		cli.Fail(setupLog, err, "unable to set up health check")
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
-		os.Exit(1)
+	if err = mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		cli.Fail(setupLog, err, "unable to set up ready check")
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
-		os.Exit(1)
+	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		cli.Fail(setupLog, err, "unable to start manager")
 	}
 }

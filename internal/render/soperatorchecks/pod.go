@@ -38,8 +38,8 @@ func renderPodTemplateSpec(check *slurmv1alpha1.ActiveCheck, labels map[string]s
 			fmt.Sprintf(
 				"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
 			): check.Spec.SlurmJobSpec.MungeContainer.AppArmorProfile,
-			consts.DefaultContainerAnnotationName: consts.ContainerNameAccounting,
-			consts.AnnotationActiveCheckKey:       check.Name,
+			consts.AnnotationDefaultContainerName: consts.ContainerNameAccounting,
+			consts.AnnotationActiveCheckName:      check.Name,
 		}
 	}
 
@@ -48,7 +48,7 @@ func renderPodTemplateSpec(check *slurmv1alpha1.ActiveCheck, labels map[string]s
 			fmt.Sprintf(
 				"%s/%s", consts.AnnotationApparmorKey, check.Spec.Name,
 			): check.Spec.K8sJobSpec.JobContainer.AppArmorProfile,
-			consts.AnnotationActiveCheckKey: check.Name,
+			consts.AnnotationActiveCheckName: check.Name,
 		}
 	}
 
@@ -58,6 +58,7 @@ func renderPodTemplateSpec(check *slurmv1alpha1.ActiveCheck, labels map[string]s
 			Annotations: annotations,
 		},
 		Spec: corev1.PodSpec{
+			HostUsers:             ptr.To(false),
 			Affinity:              check.Spec.Affinity,
 			NodeSelector:          check.Spec.NodeSelector,
 			Tolerations:           check.Spec.Tolerations,

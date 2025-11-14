@@ -1,0 +1,29 @@
+---
+
+- name: Remove all files from /etc/update-motd.d
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/update-motd.d/00-header
+    - /etc/update-motd.d/10-help-text
+    - /etc/update-motd.d/50-motd-news
+    - /etc/update-motd.d/60-unminimize
+    - /etc/update-motd.d/92-unattended-upgrades
+  tags:
+    - motd
+
+- name: Copy motd files
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/etc/update-motd.d/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - 00-welcome
+    - 10-system-info
+    - 20-slurm-stats
+    - 30-ssh-users
+  tags:
+    - motd

@@ -11,7 +11,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/logfield"
 )
 
@@ -31,7 +30,7 @@ func NewServiceReconciler(r *Reconciler) *ServiceReconciler {
 
 func (r *ServiceReconciler) Reconcile(
 	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
+	owner client.Object,
 	desired *corev1.Service,
 	name *string,
 	deps ...metav1.Object,
@@ -44,9 +43,9 @@ func (r *ServiceReconciler) Reconcile(
 			return nil
 		}
 		logger.V(1).Info(fmt.Sprintf("Deleting Service %s, because Service is not needed", *name))
-		return r.deleteIfOwnedByController(ctx, cluster, cluster.Namespace, *name)
+		return r.deleteIfOwnedByController(ctx, owner, owner.GetNamespace(), *name)
 	}
-	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
+	if err := r.reconcile(ctx, owner, desired, r.patch, deps...); err != nil {
 		logger.V(1).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile Service")
@@ -57,7 +56,7 @@ func (r *ServiceReconciler) Reconcile(
 
 func (r *ServiceReconciler) deleteIfOwnedByController(
 	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
+	owner client.Object,
 	namespace,
 	name string,
 ) error {
@@ -71,7 +70,7 @@ func (r *ServiceReconciler) deleteIfOwnedByController(
 		return fmt.Errorf("getting Service: %w", err)
 	}
 
-	if !metav1.IsControlledBy(service, cluster) {
+	if !metav1.IsControlledBy(service, owner) {
 		logger.V(1).Info("Service is not owned by controller, skipping deletion")
 		return nil
 	}

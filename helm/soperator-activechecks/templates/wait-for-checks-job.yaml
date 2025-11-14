@@ -59,7 +59,7 @@ spec:
 
                 elif [ "$checkType" = "slurmJob" ]; then
                   while true; do
-                    status=$(kubectl get "$CRD_KIND" "$name" -n "$NAMESPACE" -o jsonpath='{.status.slurmJobsStatus.lastJobState}')
+                    status=$(kubectl get "$CRD_KIND" "$name" -n "$NAMESPACE" -o jsonpath='{.status.slurmJobsStatus.lastRunStatus}')
                     status="${status:-Pending}"
 
                     echo "[slurmJob] $name state: $status"

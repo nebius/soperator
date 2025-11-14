@@ -89,7 +89,7 @@ func RenderStatefulSet(
 						fmt.Sprintf(
 							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
 						): controller.ContainerMunge.AppArmorProfile,
-						consts.DefaultContainerAnnotationName: consts.ContainerNameSlurmctld,
+						consts.AnnotationDefaultContainerName: consts.ContainerNameSlurmctld,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -98,6 +98,7 @@ func RenderStatefulSet(
 							ConditionType: appspub.InPlaceUpdateReady,
 						},
 					},
+					HostUsers:    controller.HostUsers,
 					Affinity:     nodeFilter.Affinity,
 					NodeSelector: nodeFilter.NodeSelector,
 					Tolerations:  nodeFilter.Tolerations,

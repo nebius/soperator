@@ -111,9 +111,10 @@ tests:
       - equal:
           path: spec.partitionConfiguration.configType
           value: default
-      - equal:
+      - notExists:
           path: spec.partitionConfiguration.rawConfig
-          value: []
+      - notExists:
+          path: spec.partitionConfiguration.partitions
 
   # Test populateJail default values
   - it: should set populateJail default values

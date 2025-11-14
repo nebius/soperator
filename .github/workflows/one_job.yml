@@ -4,35 +4,35 @@ on:
   workflow_call:
     inputs:
       unstable:
-        description: 'Build unstable version'
+        description: "Build unstable version"
         type: string
         required: false
-        default: 'true'
+        default: "true"
 
   push:
     branches:
       - main
       - soperator-release-*
     tags:
-      - '**'  # Trigger on any tag
+      - "**" # Trigger on any tag
     paths-ignore:
-      - 'docs/**'
-      - 'CODEOWNERS'
-      - 'LICENSE'
-      - 'PROJECT'
-      - 'README.md'
-      - 'SECURITY.md'
+      - "docs/**"
+      - "CODEOWNERS"
+      - "LICENSE"
+      - "PROJECT"
+      - "README.md"
+      - "SECURITY.md"
 
   # pull_request are defined separately to allow to run CI from forks.
   pull_request:
     types: [opened, synchronize, reopened]
     paths-ignore:
-      - 'docs/**'
-      - 'CODEOWNERS'
-      - 'LICENSE'
-      - 'PROJECT'
-      - 'README.md'
-      - 'SECURITY.md'
+      - "docs/**"
+      - "CODEOWNERS"
+      - "LICENSE"
+      - "PROJECT"
+      - "README.md"
+      - "SECURITY.md"
 
 permissions:
   contents: read
@@ -54,12 +54,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          fetch-depth: 0  # Fetch git history for the VERSION file changes detection
+          fetch-depth: 0 # Fetch git history for the VERSION file changes detection
 
       - name: Install GO
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
           cache: false
 
       - name: Generate version file
@@ -70,108 +70,7 @@ jobs:
           make get-version UNSTABLE=${UNSTABLE} >> version.txt
           echo "${UNSTABLE}" >> version.txt
 
-      - name: Upload version file
-        uses: actions/upload-artifact@v4
-        with:
-          name: version
-          path: version.txt
-
-      - name: Download version artifact
-        uses: actions/download-artifact@v5
-        with:
-          name: version
-          path: ./version
-
-      - name: Read version and unstable
-        id: read-version
-        run: |
-          VERSION=$(sed -n '1p' ./version/version.txt)
-          UNSTABLE=$(sed -n '2p' ./version/version.txt)
-          
-          echo "Version: $VERSION"
-          echo "Unstable: $UNSTABLE"
-
-  lint:
-    runs-on:
-      - self-hosted
-      - build
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-
-      - name: Install GO
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version-file: 'go.mod'
-          cache: false
-
-      # These steps are not a matrix to avoid allocating 3 jobs on runners for something this small
-      - name: golangci-lint on linux/amd64
-        uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
-        with:
-          version: v2.0.2 # version of golangci-lint, should be in sync with Makefile.
-        env:
-          GOEXPERIMENT: synctest
-          GOARCH: amd64
-          GOOS: linux
-      - name: golangci-lint on linux/arm64
-        uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
-        with:
-          version: v2.0.2 # version of golangci-lint, should be in sync with Makefile.
-        env:
-          GOEXPERIMENT: synctest
-          GOARCH: arm64
-          GOOS: linux
-      - name: golangci-lint on darwin/arm64
-        uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
-        with:
-          version: v2.0.2 # version of golangci-lint, should be in sync with Makefile.
-        env:
-          GOEXPERIMENT: synctest
-          GOARCH: arm64
-          GOOS: darwin
-
-  build:
-    runs-on:
-      - self-hosted
-      - X64
-      - build
-    needs: pre-build
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-
-      - name: Install GO
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version-file: 'go.mod'
-          cache: false
-
-      - name: Download version artifact
-        uses: actions/download-artifact@v5
-        with:
-          name: version
-          path: ./version
-
-      - name: Read version and unstable
-        id: read-version
-        run: |
-          VERSION=$(sed -n '1p' ./version/version.txt)
-          UNSTABLE=$(sed -n '2p' ./version/version.txt)
-          
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
-          
-          echo "Version: $VERSION"
-          echo "Unstable: $UNSTABLE"
-
-      - name: Debug VERSION and UNSTABLE vars
-        run: |
-          echo "Building version ${{ steps.read-version.outputs.version }}" 
-          echo "Unstable: ${{ steps.read-version.outputs.unstable }}"
-
-      - name: Run make sync-version-from-scratch # Every time we should have only stable version in our code. So UNSTABLE=false here
+      - name: Run make sync-version-from-scratch
         run: |
           make kustomize helmify yq
           make sync-version-from-scratch UNSTABLE=false
@@ -185,11 +84,98 @@ jobs:
             exit 1
           fi
 
-      - name: Run Helm Tests
-        run: make helmtest
+      - name: Upload version file
+        uses: actions/upload-artifact@v5
+        with:
+          name: version
+          path: version.txt
+
+      - name: Download version artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: version
+          path: ./version
+
+      - name: Read version and unstable
+        id: read-version
+        run: |
+          VERSION=$(sed -n '1p' ./version/version.txt)
+          UNSTABLE=$(sed -n '2p' ./version/version.txt)
+          echo "Version: $VERSION"
+          echo "Unstable: $UNSTABLE"
+
+  lint:
+    runs-on:
+      - self-hosted
+      - build
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Install GO
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: "go.mod"
+          cache: false
+
+      # These steps are not a matrix to avoid allocating 3 jobs on runners for something this small
+      - name: golangci-lint on linux/amd64
+        uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
+        with:
+          version: v2.5.0 # version of golangci-lint, should be in sync with Makefile.
+        env:
+          GOARCH: amd64
+          GOOS: linux
+      - name: golangci-lint on linux/arm64
+        uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
+        with:
+          version: v2.5.0 # version of golangci-lint, should be in sync with Makefile.
+        env:
+          GOARCH: arm64
+          GOOS: linux
+      - name: golangci-lint on darwin/arm64
+        uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
+        with:
+          version: v2.5.0 # version of golangci-lint, should be in sync with Makefile.
+        env:
+          GOARCH: arm64
+          GOOS: darwin
+
+  build-docker-images:
+    runs-on:
+      - self-hosted
+      - X64
+      - build
+    needs: pre-build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Install GO
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: "go.mod"
+          cache: false
+
+      - name: Download version artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: version
+          path: ./version
+
+      - name: Read version and unstable
+        id: read-version
+        run: |
+          VERSION=$(sed -n '1p' ./version/version.txt)
+          UNSTABLE=$(sed -n '2p' ./version/version.txt)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+          echo "Unstable: $UNSTABLE"
 
       - name: Log in to the Github Container registry
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -201,22 +187,23 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build all images
+      - name: Build and push Docker images
         run: |
           UNSTABLE=${{ steps.read-version.outputs.unstable }}
           IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
           VERSION=$(make get-version UNSTABLE=${UNSTABLE})
           OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
           DOCKER_BUILD_ARGS="--cache-from=type=local,src=/mnt/shared-fs/docker/ --cache-to=type=local,dest=/mnt/shared-fs/docker/,mode=max"
+          NFS_VERSION=$(make get-nfs-version UNSTABLE=${UNSTABLE})
 
           make sync-version UNSTABLE=${UNSTABLE}
 
           echo "Updating CRDs & auto-generated code (included in test step) & run tests"
           make test-coverage UNSTABLE="${UNSTABLE}"
-          
+
           echo "Building local go base image"
           make docker-build-go-base
-          
+
           echo "Building and pushing image of the soperatorchecks ${OPERATOR_IMAGE_TAG}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks DOCKERFILE=soperatorchecks/soperatorchecks.dockerfile IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
 
@@ -260,7 +247,8 @@ jobs:
           echo "Building and pushing image of the worker_slurmd ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd DOCKERFILE=worker/slurmd.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
 
-          echo "Common images were built"
+          echo "Building and pushing image of the nfs-server ${NFS_VERSION}"
+          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=nfs-server DOCKERFILE=nfs-server/nfs.dockerfile IMAGE_VERSION=${NFS_VERSION}
 
           echo "Removing previous jail rootfs tar archive"
           rm -f images/jail_rootfs*.tar
@@ -274,5 +262,45 @@ jobs:
           echo "Removing jail rootfs tar archive to speedup further docker builds."
           rm -f images/jail_rootfs*.tar
 
-          echo "Pushing Helm charts"
-          make release-helm UNSTABLE="${UNSTABLE}" OPERATOR_IMAGE_TAG="$OPERATOR_IMAGE_TAG"
+  build-helm-charts:
+    runs-on:
+      - self-hosted
+      - X64
+      - build
+    needs: pre-build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Install GO
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: "go.mod"
+          cache: false
+
+      - name: Download version artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: version
+          path: ./version
+
+      - name: Read version and unstable
+        id: read-version
+        run: |
+          VERSION=$(sed -n '1p' ./version/version.txt)
+          UNSTABLE=$(sed -n '2p' ./version/version.txt)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+          echo "Unstable: $UNSTABLE"
+
+      - name: Run Helm Tests
+        run: make helmtest
+
+      - name: Push Helm charts
+        run: |
+          UNSTABLE=${{ steps.read-version.outputs.unstable }}
+
+          make sync-version UNSTABLE=${UNSTABLE}
+
+          make release-helm UNSTABLE="${UNSTABLE}"

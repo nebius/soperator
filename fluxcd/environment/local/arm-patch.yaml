@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: slurm-cluster
+  namespace: flux-system
+data:
+  values.yaml: |
+    customSlurmConfig: |
+      PluginDir=/usr/lib/aarch64-linux-gnu/slurm

@@ -1,0 +1,10 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: soperator-fluxcd
+  namespace: flux-system
+spec:
+  interval: 5m
+  provider: generic
+  type: oci
+  url: oci://cr.eu-north1.nebius.cloud/soperator

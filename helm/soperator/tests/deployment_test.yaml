@@ -1,0 +1,145 @@
+suite: test deployment tolerations
+release:
+  name: test-soperator
+  namespace: soperator-system
+templates:
+  - templates/deployment.yaml
+
+tests:
+  - it: should not render tolerations when not set
+    asserts:
+      - isKind:
+          of: Deployment
+      - notExists:
+          path: spec.template.spec.tolerations
+
+  - it: should not render tolerations when empty array
+    set:
+      controllerManager:
+        tolerations: []
+    asserts:
+      - isKind:
+          of: Deployment
+      - notExists:
+          path: spec.template.spec.tolerations
+
+  - it: should render tolerations with correct indentation when set
+    set:
+      controllerManager:
+        tolerations:
+          - key: "node-role.kubernetes.io/control-plane"
+            operator: "Exists"
+            effect: "NoSchedule"
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.template.spec.tolerations
+          value:
+            - key: "node-role.kubernetes.io/control-plane"
+              operator: "Exists"
+              effect: "NoSchedule"
+
+  - it: should render multiple tolerations correctly
+    set:
+      controllerManager:
+        tolerations:
+          - key: "node-role.kubernetes.io/control-plane"
+            operator: "Exists"
+            effect: "NoSchedule"
+          - key: "example.com/special"
+            operator: "Equal"
+            value: "true"
+            effect: "NoExecute"
+            tolerationSeconds: 3600
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.template.spec.tolerations[0]
+          value:
+            key: "node-role.kubernetes.io/control-plane"
+            operator: "Exists"
+            effect: "NoSchedule"
+      - equal:
+          path: spec.template.spec.tolerations[1]
+          value:
+            key: "example.com/special"
+            operator: "Equal"
+            value: "true"
+            effect: "NoExecute"
+            tolerationSeconds: 3600
+
+  - it: should render tolerations at the same level as other pod spec fields
+    set:
+      controllerManager:
+        tolerations:
+          - key: "test-key"
+            operator: "Exists"
+            effect: "NoSchedule"
+    asserts:
+      - exists:
+          path: spec.template.spec.tolerations
+      - exists:
+          path: spec.template.spec.securityContext
+      - exists:
+          path: spec.template.spec.serviceAccountName
+      - exists:
+          path: spec.template.spec.terminationGracePeriodSeconds
+
+  - it: should render deployment with correct metadata
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: test-soperator-manager
+      - exists:
+          path: metadata.labels["control-plane"]
+      - equal:
+          path: metadata.labels["control-plane"]
+          value: controller-manager
+
+  - it: should render deployment with correct replicas count
+    set:
+      controllerManager:
+        replicas: 3
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+
+  - it: should handle tolerations with only operator Exists
+    set:
+      controllerManager:
+        tolerations:
+          - operator: "Exists"
+    asserts:
+      - equal:
+          path: spec.template.spec.tolerations[0]
+          value:
+            operator: "Exists"
+
+  - it: should handle tolerations with all possible effects
+    set:
+      controllerManager:
+        tolerations:
+          - key: "test1"
+            effect: "NoSchedule"
+          - key: "test2"
+            effect: "PreferNoSchedule"
+          - key: "test3"
+            effect: "NoExecute"
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.tolerations
+          count: 3
+      - equal:
+          path: spec.template.spec.tolerations[0].effect
+          value: "NoSchedule"
+      - equal:
+          path: spec.template.spec.tolerations[1].effect
+          value: "PreferNoSchedule"
+      - equal:
+          path: spec.template.spec.tolerations[2].effect
+          value: "NoExecute"

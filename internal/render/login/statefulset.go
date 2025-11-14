@@ -85,6 +85,7 @@ func RenderStatefulSet(
 					Annotations: renderAnnotations(login, clusterName, namespace),
 				},
 				Spec: corev1.PodSpec{
+					HostUsers:    login.HostUsers,
 					Affinity:     nodeFilter.Affinity,
 					NodeSelector: nodeFilter.NodeSelector,
 					Tolerations:  nodeFilter.Tolerations,
@@ -129,7 +130,7 @@ func renderAnnotations(login *values.SlurmLogin, clusterName, namespace string) 
 		fmt.Sprintf(
 			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
 		): mungeAppArmorProfile,
-		consts.DefaultContainerAnnotationName: consts.ContainerNameSshd,
+		consts.AnnotationDefaultContainerName: consts.ContainerNameSshd,
 	}
 
 	return annotations

@@ -11,7 +11,6 @@ import (
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/logfield"
 )
 
@@ -31,11 +30,11 @@ func NewAdvancedStatefulSetReconciler(r *Reconciler) *AdvancedStatefulSetReconci
 
 func (r *AdvancedStatefulSetReconciler) Reconcile(
 	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
+	owner client.Object,
 	desired *kruisev1b1.StatefulSet,
 	deps ...metav1.Object,
 ) error {
-	if err := r.reconcile(ctx, cluster, desired, r.patch, deps...); err != nil {
+	if err := r.reconcile(ctx, owner, desired, r.patch, deps...); err != nil {
 		log.FromContext(ctx).
 			WithValues(logfield.ResourceKV(desired)...).
 			Error(err, "Failed to reconcile StatefulSet")
