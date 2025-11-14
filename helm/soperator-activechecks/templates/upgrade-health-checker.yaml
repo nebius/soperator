@@ -11,8 +11,9 @@ spec:
   runAfterCreation: {{ .Values.checks.upgradeHealthChecker.runAfterCreation }}
   k8sJobSpec:
     jobContainer:
-      command: [ "ansible-playbook" ]
+      command: ["/opt/bin/k8s_check_job_entrypoint.sh"]
       args:
+        - ansible-playbook
         - -i
         - "jail,"
         - -e
