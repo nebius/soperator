@@ -45,7 +45,7 @@ func NewK8SNodesController(
 	notReadyTimeout time.Duration,
 	deleteNotReadyNodes bool,
 	maintenanceConditionType corev1.NodeConditionType,
-	ignoredNodeLabels string,
+	maintenanceIgnoreNodeLabels string,
 ) *K8SNodesController {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
@@ -53,9 +53,9 @@ func NewK8SNodesController(
 		maintenanceConditionType = consts.DefaultMaintenanceConditionType
 	}
 
-	nodeLabelMatcher, err := check.NewNodeLabelMatcher(ignoredNodeLabels)
+	nodeLabelMatcher, err := check.NewNodeLabelMatcher(maintenanceIgnoreNodeLabels)
 	if err != nil {
-		ctrl.Log.WithName("K8SNodesController").Error(err, "failed to parse ignored node labels, continuing without label filtering", "ignoredNodeLabels", ignoredNodeLabels)
+		ctrl.Log.WithName("K8SNodesController").Error(err, "failed to parse maintenance ignore node labels, continuing without label filtering", "maintenanceIgnoreNodeLabels", maintenanceIgnoreNodeLabels)
 		nodeLabelMatcher, _ = check.NewNodeLabelMatcher("")
 	}
 

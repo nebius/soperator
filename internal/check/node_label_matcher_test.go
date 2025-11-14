@@ -11,29 +11,29 @@ import (
 
 func TestNewNodeLabelMatcher(t *testing.T) {
 	tests := []struct {
-		name              string
-		ignoredNodeLabels string
-		wantLabels        map[string]string
-		wantErr           bool
-		errContains       string
+		name                        string
+		maintenanceIgnoreNodeLabels string
+		wantLabels                  map[string]string
+		wantErr                     bool
+		errContains                 string
 	}{
 		{
-			name:              "empty string",
-			ignoredNodeLabels: "",
-			wantLabels:        map[string]string{},
-			wantErr:           false,
+			name:                        "empty string",
+			maintenanceIgnoreNodeLabels: "",
+			wantLabels:                  map[string]string{},
+			wantErr:                     false,
 		},
 		{
-			name:              "single label",
-			ignoredNodeLabels: "env=prod",
+			name:                        "single label",
+			maintenanceIgnoreNodeLabels: "env=prod",
 			wantLabels: map[string]string{
 				"env": "prod",
 			},
 			wantErr: false,
 		},
 		{
-			name:              "multiple labels",
-			ignoredNodeLabels: "env=prod,tier=critical,zone=us-west",
+			name:                        "multiple labels",
+			maintenanceIgnoreNodeLabels: "env=prod,tier=critical,zone=us-west",
 			wantLabels: map[string]string{
 				"env":  "prod",
 				"tier": "critical",
@@ -42,8 +42,8 @@ func TestNewNodeLabelMatcher(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:              "labels with spaces",
-			ignoredNodeLabels: " env = prod , tier = critical ",
+			name:                        "labels with spaces",
+			maintenanceIgnoreNodeLabels: " env = prod , tier = critical ",
 			wantLabels: map[string]string{
 				"env":  "prod",
 				"tier": "critical",
@@ -51,8 +51,8 @@ func TestNewNodeLabelMatcher(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:              "labels with extra commas",
-			ignoredNodeLabels: "env=prod,,tier=critical,",
+			name:                        "labels with extra commas",
+			maintenanceIgnoreNodeLabels: "env=prod,,tier=critical,",
 			wantLabels: map[string]string{
 				"env":  "prod",
 				"tier": "critical",
@@ -60,38 +60,38 @@ func TestNewNodeLabelMatcher(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:              "invalid format - missing value",
-			ignoredNodeLabels: "env=prod,tier",
-			wantErr:           true,
-			errContains:       "invalid label format",
+			name:                        "invalid format - missing value",
+			maintenanceIgnoreNodeLabels: "env=prod,tier",
+			wantErr:                     true,
+			errContains:                 "invalid label format",
 		},
 		{
-			name:              "invalid format - missing key",
-			ignoredNodeLabels: "=prod",
-			wantErr:           true,
-			errContains:       "key and value cannot be empty",
+			name:                        "invalid format - missing key",
+			maintenanceIgnoreNodeLabels: "=prod",
+			wantErr:                     true,
+			errContains:                 "key and value cannot be empty",
 		},
 		{
-			name:              "invalid format - missing equals",
-			ignoredNodeLabels: "envprod",
-			wantErr:           true,
-			errContains:       "invalid label format",
+			name:                        "invalid format - missing equals",
+			maintenanceIgnoreNodeLabels: "envprod",
+			wantErr:                     true,
+			errContains:                 "invalid label format",
 		},
 		{
-			name:              "invalid format - empty value",
-			ignoredNodeLabels: "env=",
-			wantErr:           true,
-			errContains:       "key and value cannot be empty",
+			name:                        "invalid format - empty value",
+			maintenanceIgnoreNodeLabels: "env=",
+			wantErr:                     true,
+			errContains:                 "key and value cannot be empty",
 		},
 		{
-			name:              "invalid format - empty key",
-			ignoredNodeLabels: " =value",
-			wantErr:           true,
-			errContains:       "key and value cannot be empty",
+			name:                        "invalid format - empty key",
+			maintenanceIgnoreNodeLabels: " =value",
+			wantErr:                     true,
+			errContains:                 "key and value cannot be empty",
 		},
 		{
-			name:              "complex label keys",
-			ignoredNodeLabels: "topology.kubernetes.io/zone=us-west-1a,node.kubernetes.io/instance-type=m5.large",
+			name:                        "complex label keys",
+			maintenanceIgnoreNodeLabels: "topology.kubernetes.io/zone=us-west-1a,node.kubernetes.io/instance-type=m5.large",
 			wantLabels: map[string]string{
 				"topology.kubernetes.io/zone":      "us-west-1a",
 				"node.kubernetes.io/instance-type": "m5.large",
@@ -99,8 +99,8 @@ func TestNewNodeLabelMatcher(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:              "values with equals sign",
-			ignoredNodeLabels: "annotation=key=value",
+			name:                        "values with equals sign",
+			maintenanceIgnoreNodeLabels: "annotation=key=value",
 			wantLabels: map[string]string{
 				"annotation": "key=value",
 			},
@@ -110,7 +110,7 @@ func TestNewNodeLabelMatcher(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			matcher, err := NewNodeLabelMatcher(tt.ignoredNodeLabels)
+			matcher, err := NewNodeLabelMatcher(tt.maintenanceIgnoreNodeLabels)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -129,46 +129,46 @@ func TestNewNodeLabelMatcher(t *testing.T) {
 
 func TestNodeLabelMatcher_ShouldIgnoreNode(t *testing.T) {
 	tests := []struct {
-		name              string
-		ignoredNodeLabels string
-		nodeLabels        map[string]string
-		want              bool
+		name                        string
+		maintenanceIgnoreNodeLabels string
+		nodeLabels                  map[string]string
+		want                        bool
 	}{
 		{
-			name:              "no ignored labels configured",
-			ignoredNodeLabels: "",
+			name:                        "no ignored labels configured",
+			maintenanceIgnoreNodeLabels: "",
 			nodeLabels: map[string]string{
 				"env": "prod",
 			},
 			want: false,
 		},
 		{
-			name:              "node has matching label",
-			ignoredNodeLabels: "env=prod",
+			name:                        "node has matching label",
+			maintenanceIgnoreNodeLabels: "env=prod",
 			nodeLabels: map[string]string{
 				"env": "prod",
 			},
 			want: true,
 		},
 		{
-			name:              "node has non-matching label value",
-			ignoredNodeLabels: "env=prod",
+			name:                        "node has non-matching label value",
+			maintenanceIgnoreNodeLabels: "env=prod",
 			nodeLabels: map[string]string{
 				"env": "dev",
 			},
 			want: false,
 		},
 		{
-			name:              "node missing ignored label key",
-			ignoredNodeLabels: "env=prod",
+			name:                        "node missing ignored label key",
+			maintenanceIgnoreNodeLabels: "env=prod",
 			nodeLabels: map[string]string{
 				"tier": "critical",
 			},
 			want: false,
 		},
 		{
-			name:              "node has one of multiple ignored labels",
-			ignoredNodeLabels: "env=prod,tier=critical",
+			name:                        "node has one of multiple ignored labels",
+			maintenanceIgnoreNodeLabels: "env=prod,tier=critical",
 			nodeLabels: map[string]string{
 				"env":  "dev",
 				"tier": "critical",
@@ -176,8 +176,8 @@ func TestNodeLabelMatcher_ShouldIgnoreNode(t *testing.T) {
 			want: true,
 		},
 		{
-			name:              "node has all ignored labels",
-			ignoredNodeLabels: "env=prod,tier=critical",
+			name:                        "multiple ignored labels - all match",
+			maintenanceIgnoreNodeLabels: "env=prod,tier=critical",
 			nodeLabels: map[string]string{
 				"env":  "prod",
 				"tier": "critical",
@@ -185,8 +185,8 @@ func TestNodeLabelMatcher_ShouldIgnoreNode(t *testing.T) {
 			want: true,
 		},
 		{
-			name:              "node has extra labels but matches one ignored",
-			ignoredNodeLabels: "env=prod",
+			name:                        "node has extra labels but matches one ignored",
+			maintenanceIgnoreNodeLabels: "env=prod",
 			nodeLabels: map[string]string{
 				"env":  "prod",
 				"tier": "standard",
@@ -196,22 +196,22 @@ func TestNodeLabelMatcher_ShouldIgnoreNode(t *testing.T) {
 			want: true,
 		},
 		{
-			name:              "node has no labels",
-			ignoredNodeLabels: "env=prod",
-			nodeLabels:        map[string]string{},
-			want:              false,
+			name:                        "node has no labels",
+			maintenanceIgnoreNodeLabels: "env=prod",
+			nodeLabels:                  map[string]string{},
+			want:                        false,
 		},
 		{
-			name:              "complex label keys match",
-			ignoredNodeLabels: "topology.kubernetes.io/zone=us-west-1a",
+			name:                        "complex label keys match",
+			maintenanceIgnoreNodeLabels: "topology.kubernetes.io/zone=us-west-1a",
 			nodeLabels: map[string]string{
 				"topology.kubernetes.io/zone": "us-west-1a",
 			},
 			want: true,
 		},
 		{
-			name:              "complex label keys don't match",
-			ignoredNodeLabels: "topology.kubernetes.io/zone=us-west-1a",
+			name:                        "complex label keys don't match",
+			maintenanceIgnoreNodeLabels: "topology.kubernetes.io/zone=us-west-1a",
 			nodeLabels: map[string]string{
 				"topology.kubernetes.io/zone": "us-west-1b",
 			},
@@ -221,7 +221,7 @@ func TestNodeLabelMatcher_ShouldIgnoreNode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			matcher, err := NewNodeLabelMatcher(tt.ignoredNodeLabels)
+			matcher, err := NewNodeLabelMatcher(tt.maintenanceIgnoreNodeLabels)
 			require.NoError(t, err)
 
 			node := &corev1.Node{
@@ -247,30 +247,30 @@ func TestNodeLabelMatcher_ShouldIgnoreNode_NilNode(t *testing.T) {
 
 func TestNodeLabelMatcher_HasIgnoredLabels(t *testing.T) {
 	tests := []struct {
-		name              string
-		ignoredNodeLabels string
-		want              bool
+		name                        string
+		maintenanceIgnoreNodeLabels string
+		want                        bool
 	}{
 		{
-			name:              "no ignored labels",
-			ignoredNodeLabels: "",
-			want:              false,
+			name:                        "no ignored labels",
+			maintenanceIgnoreNodeLabels: "",
+			want:                        false,
 		},
 		{
-			name:              "has ignored labels",
-			ignoredNodeLabels: "env=prod",
-			want:              true,
+			name:                        "has ignored labels",
+			maintenanceIgnoreNodeLabels: "env=prod",
+			want:                        true,
 		},
 		{
-			name:              "multiple ignored labels",
-			ignoredNodeLabels: "env=prod,tier=critical",
-			want:              true,
+			name:                        "multiple ignored labels",
+			maintenanceIgnoreNodeLabels: "env=prod,tier=critical",
+			want:                        true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			matcher, err := NewNodeLabelMatcher(tt.ignoredNodeLabels)
+			matcher, err := NewNodeLabelMatcher(tt.maintenanceIgnoreNodeLabels)
 			require.NoError(t, err)
 
 			got := matcher.HasIgnoredLabels()

@@ -15,16 +15,16 @@ type NodeLabelMatcher struct {
 // NewNodeLabelMatcher creates a new NodeLabelMatcher from a comma-separated string of label pairs.
 // The format is "key1=value1,key2=value2".
 // Returns an error if the format is invalid.
-func NewNodeLabelMatcher(ignoredNodeLabels string) (*NodeLabelMatcher, error) {
+func NewNodeLabelMatcher(maintenanceIgnoreNodeLabels string) (*NodeLabelMatcher, error) {
 	matcher := &NodeLabelMatcher{
 		ignoredLabels: make(map[string]string),
 	}
 
-	if ignoredNodeLabels == "" {
+	if maintenanceIgnoreNodeLabels == "" {
 		return matcher, nil
 	}
 
-	pairs := strings.Split(ignoredNodeLabels, ",")
+	pairs := strings.Split(maintenanceIgnoreNodeLabels, ",")
 	for _, pair := range pairs {
 		pair = strings.TrimSpace(pair)
 		if pair == "" {
