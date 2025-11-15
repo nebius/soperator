@@ -188,7 +188,7 @@ func (c *SlurmNodesController) processDegradedNode(
 	case consts.SlurmNodeReasonNodeReplacement:
 		return c.processSlurmNodeMaintenance(ctx, k8sNode, slurmClusterName, node.Name)
 	case consts.SlurmHardwareReasonHC:
-		return nil // TODO: set-unhealthy here
+		return c.processExtensiveCheckFailed(ctx, k8sNode, slurmClusterName, node)
 	case consts.SlurmNodeReasonHC:
 		return c.processHealthCheckFailed(ctx, k8sNode, slurmClusterName, node, node.Reason)
 	default:
@@ -201,6 +201,51 @@ func (c *SlurmNodesController) processDegradedNode(
 	}
 }
 
+func (c *SlurmNodesController) processExtensiveCheckFailed(
+	ctx context.Context,
+	k8sNode *corev1.Node,
+	slurmClusterName types.NamespacedName,
+	slurmNode slurmapi.Node,
+) error {
+	logger := log.FromContext(ctx).WithName("SlurmNodesController.processExtensiveCheckFailed")
+
+	if !c.enabledNodeReplacement {
+		logger.V(1).Info("Skipping extensive check failed processing, node replacement is disabled")
+		return nil
+	}
+
+	if slurmNode.Reason != nil && slurmNode.Reason.ChangedAt.Before(k8sNode.CreationTimestamp.Time) {
+		logger.V(1).Info("Undraining, slurm node drained before degraded condition changed")
+		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
+	}
+
+	// If HardwareIssuesSuspected is already set to True, no-op
+	var suspected corev1.NodeCondition
+	for _, cond := range k8sNode.Status.Conditions {
+		if cond.Type == consts.HardwareIssuesSuspected {
+			suspected = cond
+			break
+		}
+	}
+	if suspected.Status == corev1.ConditionTrue {
+		logger.V(1).Info("Skip, hardware issues already suspected")
+		return nil
+	}
+
+	cond := newNodeCondition(
+		consts.HardwareIssuesSuspected,
+		corev1.ConditionTrue,
+		consts.ReasonGPUHealthCheckFailed,
+		consts.MessageConditionType(slurmNode.Comment),
+	)
+
+	if err := setK8SNodeCondition(ctx, c.Client, k8sNode.Name, cond); err != nil {
+		return fmt.Errorf("set k8s node condition: %w", err)
+	}
+
+	return nil
+}
+
 func (c *SlurmNodesController) processHealthCheckFailed(
 	ctx context.Context,
 	k8sNode *corev1.Node,
@@ -211,12 +256,12 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 	logger := log.FromContext(ctx).WithName("SlurmNodesController.processHealthCheckFailed")
 
 	if !c.enabledNodeReplacement {
-		logger.V(1).Info("skipping health check failed processing, node replacement is disabled")
+		logger.V(1).Info("Skipping health check failed processing, node replacement is disabled")
 		return nil
 	}
 
 	if slurmNode.Reason.ChangedAt.Before(k8sNode.CreationTimestamp.Time) {
-		logger.V(1).Info("undraining, slurm node drained before degraded condition changed")
+		logger.V(1).Info("Undraining, slurm node drained before degraded condition changed")
 		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
 	}
 
@@ -244,11 +289,11 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 	}
 	if hardwareIssuesCondition.Status == corev1.ConditionTrue {
 		// Node is still hardware degraded, skip
-		logger.V(1).Info("skip, still hardware degraded")
+		logger.V(1).Info("Skip, still hardware degraded")
 		return nil
 	}
 
-	logger.V(1).Info("creating a slurm reservation for drained node with [HC] reason")
+	logger.V(1).Info("Creating a slurm reservation for drained node with [HC] reason")
 
 	// Create a maintenance reservation for this slurm node to prevent work from being scheduled on it.
 	err = c.createMaintenanceReservationForSlurmNode(ctx, slurmClusterName, slurmNode.Name)

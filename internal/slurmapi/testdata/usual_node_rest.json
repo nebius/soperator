@@ -15,7 +15,7 @@
   },
   "burstbuffer_network_address": "",
   "cluster_name": "",
-  "comment": "",
+  "comment": "comment",
   "cores": 8,
   "cpu_binding": 0,
   "cpu_load": 15,

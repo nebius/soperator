@@ -17,6 +17,7 @@ type Node struct {
 	Tres        string    // Trackable Resources (e.g., CPUs, GPUs) assigned to the node.
 	Address     string    // IP Address of the node in the Kubernetes cluster.
 	BootTime    time.Time // The boot time of the node.
+	Comment     string
 }
 
 type NodeReason struct {
@@ -71,6 +72,7 @@ func NodeFromAPI(node api.V0041Node) (Node, error) {
 		Partitions:  *node.Partitions,
 		Tres:        *node.Tres,
 		Address:     *node.Address,
+		Comment:     *node.Comment,
 	}
 
 	if node.BootTime != nil && node.BootTime.Number != nil {
