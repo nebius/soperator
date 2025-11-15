@@ -72,6 +72,7 @@ func TestMaintenanceConditionTypeConfiguration(t *testing.T) {
 				15*time.Minute,
 				true,
 				corev1.NodeConditionType(tt.inputConditionType),
+				"",
 			)
 
 			assert.Equal(t, tt.expectedConditionType, string(k8sController.MaintenanceConditionType),
@@ -102,7 +103,7 @@ func TestDefaultMaintenanceConditionTypeConstant(t *testing.T) {
 	slurmAPIClients := slurmapi.NewClientSet()
 
 	slurmAPIController := NewSlurmAPIClientsController(client, scheme, recorder, slurmAPIClients, "")
-	k8sController := NewK8SNodesController(client, scheme, recorder, 15*time.Minute, true, "")
+	k8sController := NewK8SNodesController(client, scheme, recorder, 15*time.Minute, true, "", "")
 	slurmController := NewSlurmNodesController(client, scheme, recorder, slurmAPIClients, 30*time.Second, true, client, "")
 
 	expectedDefault := string(consts.DefaultMaintenanceConditionType)
