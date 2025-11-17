@@ -9,14 +9,6 @@ on:
         required: false
         default: "true"
 
-  workflow_dispatch:
-    inputs:
-      unstable:
-        description: "Build unstable version"
-        type: string
-        required: false
-        default: "true"
-
   push:
     branches:
       - main
