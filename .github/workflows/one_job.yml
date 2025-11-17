@@ -333,8 +333,9 @@ jobs:
 
           make release-helm UNSTABLE="${UNSTABLE}"
 
-  e2e-local-test:
-    name: Run E2E Local Tests
+  helm-integration-test:
+    name: Helm Chart Integration Test with Built Images
+    if: ${{ inputs.run_e2e_local == true }}
     runs-on: ubuntu-latest
     needs: [build-docker-images, build-helm-charts]
     timeout-minutes: 10
@@ -361,9 +362,7 @@ jobs:
           UNSTABLE=$(sed -n '2p' ./version/version.txt)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
-          echo "Version from artifact: $VERSION"
-          echo "Unstable: $UNSTABLE"
-          echo "VERSION file in repo: $(cat VERSION)"
+          echo "Version: $VERSION, Unstable: $UNSTABLE"
 
       - name: Install dependencies
         run: |
@@ -378,20 +377,14 @@ jobs:
 
       - name: Install yq
         run: make yq
-      - name: Run E2E Local Tests
+
+      - name: Run Helm Integration Tests
         run: |
           UNSTABLE=${{ steps.read-version.outputs.unstable }}
-          IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
-          VERSION=$(make get-version UNSTABLE=${UNSTABLE})
-          OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
-          NFS_VERSION=$(make get-nfs-version UNSTABLE=${UNSTABLE})
-
           make sync-version UNSTABLE=${UNSTABLE}
-
           go test -v -timeout 10m -tags=e2elocal ./test/e2e-local/
         env:
           GO111MODULE: on
-          OPERATOR_VERSION: ${{ steps.read-version.outputs.version }}
           UNSTABLE: ${{ steps.read-version.outputs.unstable }}
 
       - name: Get cluster logs on failure
@@ -411,19 +404,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-local-test-results
+          name: helm-integration-test-results
           path: |
             test/e2e-local/*.log
             test/e2e-local/*.xml
             cluster-logs/
-          retention-days: 1
-
-      - name: Upload test coverage
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-local-coverage
-          path: |
-            coverage.txt
-            coverage.html
           retention-days: 1
