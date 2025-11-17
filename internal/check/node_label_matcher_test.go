@@ -27,7 +27,7 @@ func TestNewNodeLabelMatcher(t *testing.T) {
 			name:                        "single label",
 			maintenanceIgnoreNodeLabels: "env=prod",
 			wantLabels: map[string][]string{
-				"env": []string{"prod"},
+				"env": {"prod"},
 			},
 			wantErr: false,
 		},
