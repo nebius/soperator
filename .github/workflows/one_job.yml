@@ -9,7 +9,7 @@ on:
         required: false
         default: "true"
       run_e2e_local:
-        description: "Run E2E local tests after builds"
+        description: "Run Helm integration tests after builds"
         type: boolean
         required: false
         default: false
@@ -22,7 +22,7 @@ on:
         required: false
         default: "true"
       run_e2e_local:
-        description: "Run E2E local tests after builds"
+        description: "Run Helm integration tests after builds"
         type: boolean
         required: false
         default: false
@@ -381,8 +381,7 @@ jobs:
       - name: Run Helm Integration Tests
         run: |
           UNSTABLE=${{ steps.read-version.outputs.unstable }}
-          make sync-version UNSTABLE=${UNSTABLE}
-          go test -v -timeout 10m -tags=e2elocal ./test/e2e-local/
+          go test -v -timeout 10m -tags=integration ./test/integration/
         env:
           GO111MODULE: on
           UNSTABLE: ${{ steps.read-version.outputs.unstable }}
@@ -406,7 +405,7 @@ jobs:
         with:
           name: helm-integration-test-results
           path: |
-            test/e2e-local/*.log
-            test/e2e-local/*.xml
+            test/integration/*.log
+            test/integration/*.xml
             cluster-logs/
           retention-days: 1

@@ -1,6 +1,6 @@
-//go:build e2elocal
+//go:build integration
 
-// Package e2elocal contains E2E tests for local development with Kind cluster and FluxCD.
+// Package integration contains integration tests for Helm charts deployment with Kind cluster and FluxCD.
 //
 // Environment Variables:
 //   - UNSTABLE: Controls whether to use unstable (development) or stable (release) versions.
@@ -12,11 +12,11 @@
 // Examples:
 //
 //	# Run with unstable version (default)
-//	go test -v -timeout 10m -tags=e2elocal ./test/e2e-local/
+//	go test -v -timeout 10m -tags=integration ./test/integration/
 //
 //	# Run with stable version
-//	UNSTABLE=false go test -v -timeout 10m -tags=e2elocal ./test/e2e-local/
-package e2elocal
+//	UNSTABLE=false go test -v -timeout 10m -tags=integration ./test/integration/
+package integration
 
 import (
 	"fmt"
@@ -28,13 +28,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"nebius.ai/slurm-operator/test/utils"
+	"nebius.ai/slurm-operator/test/testenv"
 )
 
-func TestE2ELocal(t *testing.T) {
+func TestIntegration(t *testing.T) {
 	RegisterFailHandler(Fail)
-	_, _ = fmt.Fprintf(GinkgoWriter, "Starting E2E Soperator Local Suite\n")
-	RunSpecs(t, "E2E Local Suite")
+	_, _ = fmt.Fprintf(GinkgoWriter, "Starting Helm Integration Test Suite\n")
+	RunSpecs(t, "Helm Integration Suite")
 }
 
 var _ = BeforeSuite(func(ctx SpecContext) {
@@ -51,28 +51,28 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 	_, _ = fmt.Fprintf(GinkgoWriter, "Using UNSTABLE=%v\n", unstable)
 
 	By("Installing kind CLI")
-	Expect(utils.InstallKind(ctx)).To(Succeed())
+	Expect(testenv.InstallKind(ctx)).To(Succeed())
 
 	By("Installing flux CLI")
-	Expect(utils.InstallFlux(ctx)).To(Succeed())
+	Expect(testenv.InstallFlux(ctx)).To(Succeed())
 
 	By("Installing yq CLI")
-	Expect(utils.InstallYq(ctx)).To(Succeed())
+	Expect(testenv.InstallYq(ctx)).To(Succeed())
 
 	By("Ensuring clean kind cluster (delete if exists, then create)")
-	_ = utils.DeleteKindCluster(ctx)
+	_ = testenv.DeleteKindCluster(ctx)
 
 	By("Creating kind cluster")
-	Expect(utils.CreateKindCluster(ctx)).To(Succeed())
+	Expect(testenv.CreateKindCluster(ctx)).To(Succeed())
 
 	By(fmt.Sprintf("Syncing version files with UNSTABLE=%v", unstable))
-	Expect(utils.SyncVersion(ctx, unstable)).To(Succeed())
+	Expect(testenv.SyncVersion(ctx, unstable)).To(Succeed())
 
 	By(fmt.Sprintf("Deploying FluxCD with UNSTABLE=%v", unstable))
-	Expect(utils.DeployFlux(ctx, unstable)).To(Succeed())
+	Expect(testenv.DeployFlux(ctx, unstable)).To(Succeed())
 }, NodeTimeout(5*time.Minute))
 
 var _ = AfterSuite(func(ctx SpecContext) {
 	By("Deleting kind cluster")
-	_ = utils.DeleteKindCluster(ctx)
+	_ = testenv.DeleteKindCluster(ctx)
 }, NodeTimeout(5*time.Minute))
