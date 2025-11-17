@@ -13,49 +13,57 @@ func TestNewNodeLabelMatcher(t *testing.T) {
 	tests := []struct {
 		name                        string
 		maintenanceIgnoreNodeLabels string
-		wantLabels                  map[string]string
+		wantLabels                  map[string][]string
 		wantErr                     bool
 		errContains                 string
 	}{
 		{
 			name:                        "empty string",
 			maintenanceIgnoreNodeLabels: "",
-			wantLabels:                  map[string]string{},
+			wantLabels:                  map[string][]string{},
 			wantErr:                     false,
 		},
 		{
 			name:                        "single label",
 			maintenanceIgnoreNodeLabels: "env=prod",
-			wantLabels: map[string]string{
-				"env": "prod",
+			wantLabels: map[string][]string{
+				"env": []string{"prod"},
 			},
 			wantErr: false,
 		},
 		{
 			name:                        "multiple labels",
 			maintenanceIgnoreNodeLabels: "env=prod,tier=critical,zone=us-west",
-			wantLabels: map[string]string{
-				"env":  "prod",
-				"tier": "critical",
-				"zone": "us-west",
+			wantLabels: map[string][]string{
+				"env":  []string{"prod"},
+				"tier": []string{"critical"},
+				"zone": []string{"us-west"},
 			},
 			wantErr: false,
 		},
 		{
 			name:                        "labels with spaces",
 			maintenanceIgnoreNodeLabels: " env = prod , tier = critical ",
-			wantLabels: map[string]string{
-				"env":  "prod",
-				"tier": "critical",
+			wantLabels: map[string][]string{
+				"env":  []string{"prod"},
+				"tier": []string{"critical"},
 			},
 			wantErr: false,
 		},
 		{
 			name:                        "labels with extra commas",
 			maintenanceIgnoreNodeLabels: "env=prod,,tier=critical,",
-			wantLabels: map[string]string{
-				"env":  "prod",
-				"tier": "critical",
+			wantLabels: map[string][]string{
+				"env":  []string{"prod"},
+				"tier": []string{"critical"},
+			},
+			wantErr: false,
+		},
+		{
+			name:                        "duplicate keys keep all values",
+			maintenanceIgnoreNodeLabels: "env=prod,env=staging",
+			wantLabels: map[string][]string{
+				"env": []string{"prod", "staging"},
 			},
 			wantErr: false,
 		},
@@ -92,17 +100,17 @@ func TestNewNodeLabelMatcher(t *testing.T) {
 		{
 			name:                        "complex label keys",
 			maintenanceIgnoreNodeLabels: "topology.kubernetes.io/zone=us-west-1a,node.kubernetes.io/instance-type=m5.large",
-			wantLabels: map[string]string{
-				"topology.kubernetes.io/zone":      "us-west-1a",
-				"node.kubernetes.io/instance-type": "m5.large",
+			wantLabels: map[string][]string{
+				"topology.kubernetes.io/zone":      []string{"us-west-1a"},
+				"node.kubernetes.io/instance-type": []string{"m5.large"},
 			},
 			wantErr: false,
 		},
 		{
 			name:                        "values with equals sign",
 			maintenanceIgnoreNodeLabels: "annotation=key=value",
-			wantLabels: map[string]string{
-				"annotation": "key=value",
+			wantLabels: map[string][]string{
+				"annotation": []string{"key=value"},
 			},
 			wantErr: false,
 		},
@@ -183,6 +191,22 @@ func TestNodeLabelMatcher_ShouldIgnoreNode(t *testing.T) {
 				"tier": "critical",
 			},
 			want: true,
+		},
+		{
+			name:                        "node matches alternate value for same key",
+			maintenanceIgnoreNodeLabels: "env=prod,env=staging",
+			nodeLabels: map[string]string{
+				"env": "staging",
+			},
+			want: true,
+		},
+		{
+			name:                        "node value not in ignored values for key",
+			maintenanceIgnoreNodeLabels: "env=prod,env=staging",
+			nodeLabels: map[string]string{
+				"env": "dev",
+			},
+			want: false,
 		},
 		{
 			name:                        "node has extra labels but matches one ignored",
@@ -291,9 +315,12 @@ func TestNodeLabelMatcher_GetIgnoredLabels(t *testing.T) {
 		assert.Equal(t, labels1, labels2)
 
 		// Should be different instances (copy not reference)
-		labels1["new"] = "label"
+		labels1["new"] = []string{"label"}
 		assert.NotEqual(t, labels1, labels2)
 		assert.NotContains(t, matcher.GetIgnoredLabels(), "new")
+
+		labels1["env"][0] = "modified"
+		assert.Equal(t, "prod", matcher.GetIgnoredLabels()["env"][0])
 	})
 
 	t.Run("empty matcher returns empty map", func(t *testing.T) {
