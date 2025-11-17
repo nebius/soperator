@@ -8,11 +8,6 @@ on:
         type: string
         required: false
         default: "true"
-      run_e2e_local:
-        description: "Run Helm integration tests after builds"
-        type: boolean
-        required: false
-        default: false
 
   workflow_dispatch:
     inputs:
@@ -21,11 +16,6 @@ on:
         type: string
         required: false
         default: "true"
-      run_e2e_local:
-        description: "Run Helm integration tests after builds"
-        type: boolean
-        required: false
-        default: false
 
   push:
     branches:
@@ -335,7 +325,6 @@ jobs:
 
   helm-integration-test:
     name: Helm Chart Integration Test with Built Images
-    if: ${{ inputs.run_e2e_local == true }}
     runs-on: ubuntu-latest
     needs: [build-docker-images, build-helm-charts]
     timeout-minutes: 10
