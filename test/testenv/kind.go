@@ -71,17 +71,6 @@ func GetKindClusterStatus(ctx context.Context) (string, error) {
 	return Run(cmd)
 }
 
-// SyncVersion synchronizes version files with UNSTABLE parameter
-func SyncVersion(ctx context.Context, unstable bool) error {
-	unstableStr := "false"
-	if unstable {
-		unstableStr = "true"
-	}
-	cmd := exec.CommandContext(ctx, "make", "sync-version", fmt.Sprintf("UNSTABLE=%s", unstableStr))
-	_, err := Run(cmd)
-	return err
-}
-
 // GetNonEmptyLines converts given command output string into individual objects
 // according to line breakers, and ignores the empty elements in it.
 func GetNonEmptyLines(output string) []string {

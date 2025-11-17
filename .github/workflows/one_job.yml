@@ -351,7 +351,8 @@ jobs:
           UNSTABLE=$(sed -n '2p' ./version/version.txt)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
-          echo "Version: $VERSION, Unstable: $UNSTABLE"
+          echo "Version: $VERSION"
+          echo "Unstable: $UNSTABLE"
 
       - name: Install dependencies
         run: |
@@ -370,6 +371,7 @@ jobs:
       - name: Run Helm Integration Tests
         run: |
           UNSTABLE=${{ steps.read-version.outputs.unstable }}
+          make sync-version UNSTABLE=${UNSTABLE}
           go test -v -timeout 10m -tags=integration ./test/integration/
         env:
           GO111MODULE: on

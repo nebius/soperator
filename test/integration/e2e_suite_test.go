@@ -65,9 +65,6 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 	By("Creating kind cluster")
 	Expect(testenv.CreateKindCluster(ctx)).To(Succeed())
 
-	By(fmt.Sprintf("Syncing version files with UNSTABLE=%v", unstable))
-	Expect(testenv.SyncVersion(ctx, unstable)).To(Succeed())
-
 	By(fmt.Sprintf("Deploying FluxCD with UNSTABLE=%v", unstable))
 	Expect(testenv.DeployFlux(ctx, unstable)).To(Succeed())
 }, NodeTimeout(5*time.Minute))
