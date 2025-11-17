@@ -4,8 +4,8 @@
 
 ```bash
 # Install tools
-make kind
-make flux
+make install-kind
+make install-flux
 
 # Create 5-node cluster (automatically switches kubectl context)
 make kind-create

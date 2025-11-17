@@ -465,7 +465,7 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 
 .PHONY: deploy-flux
-deploy-flux: flux kustomize ## Deploy soperator via Flux CD to kind cluster (for local development)
+deploy-flux: install-flux kustomize ## Deploy soperator via Flux CD to kind cluster (for local development)
 	@echo "Step 1: Installing Flux CD..."
 	@echo "Checking cluster connectivity..."
 	@if ! $(KUBECTL_CTX) cluster-info > /dev/null 2>&1; then \
@@ -518,7 +518,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: undeploy-flux
-undeploy-flux: flux kustomize ## Undeploy soperator from Flux CD
+undeploy-flux: install-flux kustomize ## Undeploy soperator from Flux CD
 	@echo "Removing Flux configuration..."
 	$(KUSTOMIZE) build fluxcd/environment/local | $(KUBECTL_CTX) delete --ignore-not-found=true -f -
 	@echo "✅ Flux configuration removed"
@@ -610,7 +610,7 @@ $(YQ): $(LOCALBIN)
 	test -s $(LOCALBIN)/yq || GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@v$(YQ_VERSION)
 
 .PHONY: install-kind
-kind: $(KIND) ## Download kind locally if necessary.
+install-kind: $(KIND) ## Download kind locally if necessary.
 $(KIND): $(LOCALBIN)
 	@if test -x $(LOCALBIN)/kind && ! $(LOCALBIN)/kind version | grep -q $(KIND_VERSION); then \
 		echo "$(LOCALBIN)/kind version is not expected $(KIND_VERSION). Removing it before installing."; \
@@ -627,7 +627,7 @@ $(KIND): $(LOCALBIN)
 	fi
 
 .PHONY: install-flux
-flux: $(FLUX) ## Download flux CLI locally if necessary.
+install-flux: $(FLUX) ## Download flux CLI locally if necessary.
 $(FLUX): $(LOCALBIN)
 	@if test -x $(LOCALBIN)/flux && ! $(LOCALBIN)/flux version --client | grep -q $(FLUX_VERSION); then \
 		echo "$(LOCALBIN)/flux version is not expected $(FLUX_VERSION). Removing it before installing."; \
@@ -688,7 +688,7 @@ KIND_CONTEXT      ?= kind-$(KIND_CLUSTER_NAME)
 KUBECTL_CTX       = $(KUBECTL) --context $(KIND_CONTEXT)
 
 .PHONY: kind-create
-kind-create: kind ## Create kind cluster with specified number of nodes
+kind-create: install-kind ## Create kind cluster with specified number of nodes
 	@echo "Creating kind cluster '$(KIND_CLUSTER_NAME)' with $(KIND_NODES) nodes (Kubernetes $(KIND_K8S_VERSION))..."
 	@if $(KIND) get clusters | grep -q "^$(KIND_CLUSTER_NAME)$$"; then \
 		echo "Cluster '$(KIND_CLUSTER_NAME)' already exists"; \
@@ -709,17 +709,17 @@ kind-create: kind ## Create kind cluster with specified number of nodes
 	@echo "✅ kubectl context set to kind-$(KIND_CLUSTER_NAME)"
 
 .PHONY: kind-delete
-kind-delete: kind ## Delete kind cluster
+kind-delete: install-kind ## Delete kind cluster
 	@echo "Deleting kind cluster '$(KIND_CLUSTER_NAME)'..."
 	@$(KIND) delete cluster --name $(KIND_CLUSTER_NAME)
 	@echo "✅ Kind cluster '$(KIND_CLUSTER_NAME)' deleted successfully"
 
 .PHONY: kind-list
-kind-list: kind ## List all kind clusters
+kind-list: install-kind ## List all kind clusters
 	@$(KIND) get clusters
 
 .PHONY: kind-load-images
-kind-load-images: kind ## Load operator images into kind cluster
+kind-load-images: install-kind ## Load operator images into kind cluster
 	@echo "Loading images into kind cluster '$(KIND_CLUSTER_NAME)'..."
 	@if ! $(KIND) get clusters | grep -q "^$(KIND_CLUSTER_NAME)$$"; then \
 		echo "Cluster '$(KIND_CLUSTER_NAME)' does not exist. Create it first with 'make kind-create'"; \

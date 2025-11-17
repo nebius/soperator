@@ -11,22 +11,43 @@ soperator:
   enabled: true
   namespace: soperator-system
   version: "1.22.3"
-  featureGates: ""
-  values:
+  interval: 5m
+  timeout: 5m
+  releaseName: soperator-controller
+  overrideValues:
+    controllerManager:
+      manager:
+        args:
+          - --health-probe-bind-address=:8081
+          - --metrics-bind-address=127.0.0.1:8080
+          - --enable-topology-controller=true
+          - --leader-elect
+        resources:
+          limits:
+            memory: 64Mi
+          requests:
+            cpu: 5m
+            memory: 64Mi
     serviceMonitor:
       enabled: false
-    manager:
-      resources:
-        limits:
-          cpu: 500m
-          memory: 512Mi
-        requests:
-          cpu: 100m
-          memory: 128Mi
+    kruise:
+      installOperator: false
   soperatorChecks:
     enabled: false
   nodeConfigurator:
-    enabled: false
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    releaseName: soperator-node-configurator
+    overrideValues:
+      serviceMonitor:
+        enabled: false
+      rebooter:
+        enabled: true
+        generateRBAC: true
+        logFormat: json
+        tolerations:
+          - operator: Exists
 # Helm Release Trigger Operator - disabled for local dev
 helmReleaseTriggerOperator:
   enabled: false
@@ -42,7 +63,7 @@ slurmCluster:
     clusterName: soperator
     clusterType: cpu
     useDefaultAppArmorProfile: false
-    maintenance: none
+    maintenance: downscale
     k8sNodeFilters:
       - name: kind
         affinity:
@@ -93,12 +114,12 @@ slurmCluster:
         slurmdbd:
           resources:
             cpu: 5m
-            memory: 100Mi
+            memory: 64Mi
             ephemeralStorage: 100Mi
         munge:
           resources:
             cpu: 5m
-            memory: 100Mi
+            memory: 64Mi
             ephemeralStorage: 100Mi
         customInitContainers:
           - name: ensure-jail-virtiofs
@@ -131,13 +152,13 @@ slurmCluster:
         slurmd:
           resources:
             cpu: 5m
-            memory: 100Mi
+            memory: 64Mi
             gpu: 0
             ephemeralStorage: 100Mi
         munge:
           resources:
             cpu: 5m
-            memory: 100Mi
+            memory: 64Mi
             ephemeralStorage: 100Mi
         volumes:
           spool:
@@ -168,7 +189,7 @@ slurmCluster:
         exporterContainer:
           resources:
             cpu: 5m
-            memory: 100Mi
+            memory: 64Mi
             ephemeralStorage: 100Mi
       rest:
         enabled: false
@@ -176,12 +197,12 @@ slurmCluster:
         rest:
           resources:
             cpu: 5m
-            memory: 100Mi
+            memory: 64Mi
             ephemeralStorage: 100Mi
         munge:
           resources:
             cpu: 5m
-            memory: 100Mi
+            memory: 64Mi
             ephemeralStorage: 100Mi
     sConfigController:
       serviceMonitor:

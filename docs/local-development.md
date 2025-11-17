@@ -18,8 +18,8 @@ All tools will be installed to `./bin/` directory automatically when needed.
 Install kind and flux CLI:
 
 ```bash
-make kind
-make flux
+make install-kind
+make install-flux
 ```
 
 ### 2. Create Kind Cluster

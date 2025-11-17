@@ -303,3 +303,81 @@ jobs:
           make sync-version UNSTABLE=${UNSTABLE}
 
           make release-helm UNSTABLE="${UNSTABLE}"
+
+  helm-integration-test:
+    name: Helm Chart Integration Test with Built Images
+    runs-on: ubuntu-latest
+    needs: [build-docker-images, build-helm-charts]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Download version artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: version
+          path: ./version
+
+      - name: Read version and unstable
+        id: read-version
+        run: |
+          VERSION=$(sed -n '1p' ./version/version.txt)
+          UNSTABLE=$(sed -n '2p' ./version/version.txt)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+          echo "Unstable: $UNSTABLE"
+
+      - name: Install dependencies
+        run: |
+          go mod download
+          go mod verify
+
+      - name: Install kind
+        run: make install-kind
+
+      - name: Install flux
+        run: make install-flux
+
+      - name: Install yq
+        run: make yq
+
+      - name: Run Helm Integration Tests
+        run: |
+          UNSTABLE=${{ steps.read-version.outputs.unstable }}
+          make sync-version UNSTABLE=${UNSTABLE}
+          go test -v -timeout 10m -tags=integration ./test/integration/
+        env:
+          GO111MODULE: on
+          UNSTABLE: ${{ steps.read-version.outputs.unstable }}
+
+      - name: Get cluster logs on failure
+        if: failure() || cancelled()
+        run: |
+          kubectl cluster-info dump --output-directory=./cluster-logs || true
+          kubectl get pods -A -o wide || true
+          kubectl get helmreleases -n flux-system || true
+          ./bin/flux get all -n flux-system || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          make kind-delete || true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-integration-test-results
+          path: |
+            test/integration/*.log
+            test/integration/*.xml
+            cluster-logs/
+          retention-days: 1
