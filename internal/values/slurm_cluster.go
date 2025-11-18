@@ -89,6 +89,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 			cluster.Spec.SConfigController.RunAsGid,
 			cluster.Spec.SConfigController.ReconfigurePollInterval,
 			cluster.Spec.SConfigController.ReconfigureWaitTimeout,
+			cluster.Spec.SConfigController.ServiceAccountName,
 		),
 	}
 
