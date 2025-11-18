@@ -67,7 +67,7 @@ serviceMonitor:
   metricRelabelings: []
   relabelings: []
 certManager:
-  enabled: true
+  enabled: false
 kruise:
   installOperator: true
   manager:
