@@ -26866,8 +26866,11 @@ spec:
                   serviceAccountName:
                     description: |-
                       ServiceAccountName is the name of the ServiceAccount to use for sconfigcontroller pods.
-                      If not specified, the default ServiceAccount will be used.
+                      This field is required and must reference an existing ServiceAccount.
+                    minLength: 1
                     type: string
+                required:
+                - serviceAccountName
                 type: object
                 x-kubernetes-validations:
                 - message: ReconfigureWaitTimeout must be greater than ReconfigurePollInterval

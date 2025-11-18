@@ -6,7 +6,6 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
@@ -70,16 +69,8 @@ func BasePodTemplateSpec(
 				),
 			},
 			Volumes:            volumes,
-			ServiceAccountName: getServiceAccountName(clusterName, sConfigController),
+			ServiceAccountName: sConfigController.ServiceAccountName,
 			SecurityContext:    securityContext,
 		},
 	}, nil
-}
-
-// getServiceAccountName returns the service account name to use for sconfigcontroller
-func getServiceAccountName(clusterName string, sConfigController *values.SConfigController) string {
-	if sConfigController.ServiceAccountName != "" {
-		return sConfigController.ServiceAccountName
-	}
-	return naming.BuildServiceAccountSconfigControllerName(clusterName)
 }
