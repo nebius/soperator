@@ -342,7 +342,7 @@ type SConfigController struct {
 	HostUsers *bool `json:"hostUsers,omitempty"`
 
 	// ServiceAccountName is the name of the ServiceAccount to use for sconfigcontroller pods.
-	// If not specified, the default ServiceAccount will be used.
+	// If not specified, a default name based on the cluster name will be generated.
 	// +kubebuilder:validation:Optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
