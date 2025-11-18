@@ -9,6 +9,9 @@ apt -y install enroot=${ENROOT_VERSION}-1 enroot+caps=${ENROOT_VERSION}-1
 apt-get clean
 rm -rf /var/lib/apt/lists/*
 
+# Enable hook that sets env vars for PyTorch
+cp /usr/share/enroot/hooks.d/50-slurm-pytorch.sh /etc/enroot/hooks.d/50-slurm-pytorch.sh
+
 # Prepare env for running enroot
 mkdir -m 777 /usr/share/enroot/enroot-data
 mkdir -m 755 /run/enroot
