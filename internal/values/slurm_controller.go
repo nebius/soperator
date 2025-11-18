@@ -19,6 +19,7 @@ type SlurmController struct {
 
 	Service     Service
 	StatefulSet StatefulSet
+	DaemonSet   DaemonSet
 
 	VolumeSpool        slurmv1.NodeVolume
 	VolumeJail         slurmv1.NodeVolume
@@ -35,6 +36,10 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 		nil,
 	)
 
+	daemonSet := buildDaemonSetFrom(
+		naming.BuildDaemonSetName(consts.ComponentTypeController),
+	)
+
 	res := SlurmController{
 		K8sNodeFilterName:    controller.K8sNodeFilterName,
 		CustomInitContainers: controller.CustomInitContainers,
@@ -49,6 +54,7 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 		),
 		Service:            buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeController, clusterName)),
 		StatefulSet:        statefulSet,
+		DaemonSet:          daemonSet,
 		VolumeSpool:        *controller.Volumes.Spool.DeepCopy(),
 		VolumeJail:         *controller.Volumes.Jail.DeepCopy(),
 		CustomVolumeMounts: controller.Volumes.CustomMounts,
