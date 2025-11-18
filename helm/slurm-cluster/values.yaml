@@ -535,8 +535,8 @@ sConfigController:
     # Specifies whether a ServiceAccount should be created
     create: true
     # The name of the ServiceAccount to use.
-    # If not set and create is true, a name is generated using the fullname template
-    # If not set and create is false, "default" is used
+    # If not set and create is true, a name is generated using the cluster name: <clusterName>-sconfigcontroller
+    # This field is required in the SlurmCluster CR - it will be automatically populated from this value
     name: ""
 images:
   slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.22.3-noble-slurm25.05.4"

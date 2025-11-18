@@ -222,15 +222,16 @@ tests:
           path: spec.sConfigController.serviceAccountName
           value: external-sa
 
-  # Test SlurmCluster CR does not set serviceAccountName when not specified
-  - it: should not set serviceAccountName in SlurmCluster CR when serviceAccount.name is empty
+  # Test SlurmCluster CR uses default ServiceAccount name when name is empty but create is true
+  - it: should use default serviceAccountName in SlurmCluster CR when serviceAccount.name is empty
     template: templates/slurm-cluster-cr.yaml
     set:
       clusterName: test-cluster
       sConfigController:
         serviceAccount:
-          create: false
+          create: true
           name: ""
     asserts:
-      - isNull:
+      - equal:
           path: spec.sConfigController.serviceAccountName
+          value: test-cluster-sconfigcontroller
