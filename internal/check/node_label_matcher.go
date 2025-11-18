@@ -9,7 +9,7 @@ import (
 
 // NodeLabelMatcher handles matching of node labels against configured ignored labels.
 type NodeLabelMatcher struct {
-	ignoredLabels map[string]string
+	ignoredLabels map[string][]string
 }
 
 // NewNodeLabelMatcher creates a new NodeLabelMatcher from a comma-separated string of label pairs.
@@ -17,7 +17,7 @@ type NodeLabelMatcher struct {
 // Returns an error if the format is invalid.
 func NewNodeLabelMatcher(maintenanceIgnoreNodeLabels string) (*NodeLabelMatcher, error) {
 	matcher := &NodeLabelMatcher{
-		ignoredLabels: make(map[string]string),
+		ignoredLabels: make(map[string][]string),
 	}
 
 	if maintenanceIgnoreNodeLabels == "" {
@@ -43,7 +43,17 @@ func NewNodeLabelMatcher(maintenanceIgnoreNodeLabels string) (*NodeLabelMatcher,
 			return nil, fmt.Errorf("invalid label format: %q, key and value cannot be empty", pair)
 		}
 
-		matcher.ignoredLabels[key] = value
+		values := matcher.ignoredLabels[key]
+		shouldAppend := true
+		for _, existingValue := range values {
+			if existingValue == value {
+				shouldAppend = false
+				break
+			}
+		}
+		if shouldAppend {
+			matcher.ignoredLabels[key] = append(values, value)
+		}
 	}
 
 	return matcher, nil
@@ -55,9 +65,16 @@ func (m *NodeLabelMatcher) ShouldIgnoreNode(node *corev1.Node) bool {
 		return false
 	}
 
-	for key, expectedValue := range m.ignoredLabels {
-		if actualValue, exists := node.Labels[key]; exists && actualValue == expectedValue {
-			return true
+	for key, expectedValues := range m.ignoredLabels {
+		actualValue, exists := node.Labels[key]
+		if !exists {
+			continue
+		}
+
+		for _, expectedValue := range expectedValues {
+			if actualValue == expectedValue {
+				return true
+			}
 		}
 	}
 
@@ -65,14 +82,16 @@ func (m *NodeLabelMatcher) ShouldIgnoreNode(node *corev1.Node) bool {
 }
 
 // GetIgnoredLabels returns a copy of the ignored labels map.
-func (m *NodeLabelMatcher) GetIgnoredLabels() map[string]string {
+func (m *NodeLabelMatcher) GetIgnoredLabels() map[string][]string {
 	if m.ignoredLabels == nil {
-		return make(map[string]string)
+		return make(map[string][]string)
 	}
 
-	labels := make(map[string]string, len(m.ignoredLabels))
+	labels := make(map[string][]string, len(m.ignoredLabels))
 	for k, v := range m.ignoredLabels {
-		labels[k] = v
+		copiedValues := make([]string, len(v))
+		copy(copiedValues, v)
+		labels[k] = copiedValues
 	}
 	return labels
 }

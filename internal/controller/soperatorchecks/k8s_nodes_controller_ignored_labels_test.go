@@ -112,6 +112,22 @@ func TestK8SNodesController_ProcessDrainCondition_IgnoredLabels(t *testing.T) {
 			expectError:     false,
 		},
 		{
+			name:                        "ignored label matches alternate value for same key",
+			maintenanceIgnoreNodeLabels: "env=prod,env=staging",
+			nodeLabels: map[string]string{
+				"env": "staging",
+			},
+			conditions: []corev1.NodeCondition{
+				{
+					Type:   consts.SoperatorChecksK8SNodeMaintenance,
+					Status: corev1.ConditionTrue,
+				},
+			},
+			expectSkip:      true,
+			expectCondition: false,
+			expectError:     false,
+		},
+		{
 			name:                        "multiple ignored labels - node matches none",
 			maintenanceIgnoreNodeLabels: "env=prod,tier=critical",
 			nodeLabels: map[string]string{
