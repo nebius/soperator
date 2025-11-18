@@ -70,8 +70,16 @@ func BasePodTemplateSpec(
 				),
 			},
 			Volumes:            volumes,
-			ServiceAccountName: naming.BuildServiceAccountSconfigControllerName(clusterName),
+			ServiceAccountName: getServiceAccountName(clusterName, sConfigController),
 			SecurityContext:    securityContext,
 		},
 	}, nil
+}
+
+// getServiceAccountName returns the service account name to use for sconfigcontroller
+func getServiceAccountName(clusterName string, sConfigController *values.SConfigController) string {
+	if sConfigController.ServiceAccountName != "" {
+		return sConfigController.ServiceAccountName
+	}
+	return naming.BuildServiceAccountSconfigControllerName(clusterName)
 }

@@ -340,6 +340,11 @@ type SConfigController struct {
 	//
 	// +kubebuilder:validation:Optional
 	HostUsers *bool `json:"hostUsers,omitempty"`
+
+	// ServiceAccountName is the name of the ServiceAccount to use for sconfigcontroller pods.
+	// If not specified, the default ServiceAccount will be used.
+	// +kubebuilder:validation:Optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="self.configType != 'structured' || size(self.partitions) > 0",message="Structured partition configuration requires at least one partition"

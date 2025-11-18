@@ -449,6 +449,11 @@ spec:
     {{- if hasKey .Values.sConfigController "hostUsers" }}
     hostUsers: {{ .Values.sConfigController.hostUsers }}
     {{- end }}
+    {{- if .Values.sConfigController.serviceAccount.create }}
+    serviceAccountName: {{ include "slurm-cluster.sconfigcontroller.serviceAccountName" . }}
+    {{- else if .Values.sConfigController.serviceAccount.name }}
+    serviceAccountName: {{ .Values.sConfigController.serviceAccount.name }}
+    {{- end }}
     node:
       size: {{ required ".Values.sConfigController.node.size must be provided." .Values.sConfigController.node.size }}
       k8sNodeFilterName: {{ required ".Values.sConfigController.node.k8sNodeFilterName must be provided." .Values.sConfigController.node.k8sNodeFilterName | quote }}

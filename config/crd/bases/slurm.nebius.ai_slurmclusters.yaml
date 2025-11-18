@@ -3233,6 +3233,11 @@ spec:
                       Defaults to whatever is set in sconfigcontroller image
                     format: int64
                     type: integer
+                  serviceAccountName:
+                    description: |-
+                      ServiceAccountName is the name of the ServiceAccount to use for sconfigcontroller pods.
+                      If not specified, the default ServiceAccount will be used.
+                    type: string
                 type: object
                 x-kubernetes-validations:
                 - message: ReconfigureWaitTimeout must be greater than ReconfigurePollInterval
