@@ -62,6 +62,7 @@ RUN apt update && \
         vim \
         wget \
         zstd \
+        pigz \
         pciutils \
         iproute2 \
         infiniband-diags \
