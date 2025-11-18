@@ -31,6 +31,7 @@ checks:
       - --not-ready-timeout=15m
       - --delete-not-ready-nodes=true
       - --leader-elect
+      - --maintenance-condition-type="NebiusMaintenanceScheduled"
     containerSecurityContext:
       allowPrivilegeEscalation: false
       capabilities:
@@ -38,9 +39,10 @@ checks:
           - ALL
     env:
       slurmOperatorWatchNamespaces: '*'
+      maintenanceIgnoreNodeLabels: "slurm.nebius.ai/nodeset=nfs"
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/soperatorchecks
-      tag: 1.22.3
+      tag: 1.23.0
     imagePullPolicy: Always
     resources:
       limits:
@@ -52,22 +54,11 @@ checks:
   serviceAccount:
     annotations: {}
 kubernetesClusterDomain: cluster.local
-metricsService:
-  enabled: false
-  serviceMonitor:
-    # -- Labels to be added to the controller ServiceMonitor
-    additionalLabels: {}
-    # release: kube-prometheus-stack
-    # --  Interval to scrape metrics
-    interval: 30s
-    # -- Timeout if metrics can't be retrieved in given time interval
-    scrapeTimeout: 25s
-    # MetricRelabelConfigs to apply to samples before ingestion.
-    metricRelabelings: []
-    # RelabelConfigs to apply to samples before scraping.
-  ports:
-    - name: https
-      port: 8443
-      protocol: TCP
-      targetPort: https
-  type: ClusterIP
+serviceMonitor:
+  enabled: true
+  jobLabel: "soperatorchecks"
+  interval: "30s"
+  scrapeTimeout: "28s"
+  additionalLabels: {}
+  metricRelabelings: []
+  relabelings: []

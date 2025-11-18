@@ -1,0 +1,61 @@
+---
+
+- name: Ensure soperator_utils directories exist
+  ansible.builtin.file:
+    path: /opt/soperator_utils
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  tags:
+    - soperator-scripts
+
+- name: Copy files to the /usr/bin
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/usr/bin/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - nvidia-smi-hostpid
+    - soperator-createuser
+  tags:
+    - soperator-scripts
+
+- name: Create symlink for createuser -> soperator-createuser
+  ansible.builtin.file:
+    src: /usr/bin/soperator-createuser
+    dest: /usr/bin/createuser
+    state: link
+    force: true
+    owner: root
+    group: root
+  tags:
+    - soperator-scripts
+
+- name: Copy soperator-scripts files
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/opt/soperator_utils/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - soperator_instance_login.sh
+    - slurm_task_info.sh
+    - worker_nvidia_bug_report.sh
+    - fs_usage.sh
+  tags:
+    - soperator-scripts
+
+- name: Add soperator_utils to PATH for all users
+  ansible.builtin.copy:
+    dest: /etc/profile.d/path_soperator_utils.sh
+    content: |
+      export PATH="/opt/soperator_utils:$PATH"
+    owner: root
+    group: root
+    mode: '0755'
+  tags:
+    - soperator-scripts

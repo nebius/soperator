@@ -90,7 +90,7 @@ use outdated approaches with parsing command outputs.
 If it will be of interest to users, we'll develop a new GUI solution that uses Slurm REST API.
 
 
-### Better metrics exporter
-At the moment, we use [prometheus-slurm-exporter](https://github.com/vpenso/prometheus-slurm-exporter) for gathering
-Slurm metrics. Unfortunately this project is no longer maintained, so we're considering developing a new solution that
-will use Slurm REST API as well.
+### ✅ Better metrics exporter (Completed)
+We have successfully replaced the unmaintained [prometheus-slurm-exporter](https://github.com/vpenso/prometheus-slurm-exporter)
+with our own custom `soperator-exporter`. This new exporter provides comprehensive SLURM metrics collection with improved
+reliability and maintenance. See [slurm-exporter.md](slurm-exporter.md) for detailed documentation.

@@ -1,0 +1,41 @@
+---
+
+- name: Add docker apt key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    checksum: "sha256:1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570"
+    mode: "0644"
+  tags:
+    - docker-cli
+
+- name: Add docker repo
+  ansible.builtin.apt_repository:
+    repo: "deb [arch={{ dpkg_arch_map[ansible_architecture] }} signed-by=/etc/apt/keyrings/docker.asc] \
+          https://download.docker.com/linux/ubuntu   {{ ansible_distribution_release }} stable"
+  tags:
+    - docker-cli
+
+- name: Ensure docker-cli package is installed
+  ansible.builtin.apt:
+    name:
+      - "docker-ce-cli={{ docker_cli_version }}"
+  tags:
+    - docker-cli
+
+- name: Move real docker binary out of the way
+  ansible.builtin.command: mv /usr/bin/docker /usr/bin/docker.real
+  args:
+    creates: /usr/bin/docker.real
+  tags:
+    - docker-cli
+
+- name: Install docker wrapper script
+  ansible.builtin.copy:
+    src: docker.sh
+    dest: /usr/bin/docker
+    owner: root
+    group: root
+    mode: "0755"
+  tags:
+    - docker-cli

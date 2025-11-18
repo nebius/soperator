@@ -14,7 +14,9 @@ const (
 )
 
 var (
+	SlurmUserReasonHC              string = "[user_problem]"
 	SlurmNodeReasonHC              string = "[node_problem]"
+	SlurmHardwareReasonHC          string = "[hardware_problem]"
 	SlurmNodeComputeMaintenance    string = SlurmNodeReasonHC + " compute_maintenance"
 	SlurmNodeReasonKillTaskFailed  string = "Kill task failed"
 	SlurmNodeReasonNodeReplacement string = SlurmNodeComputeMaintenance + ": node replacement process"
@@ -27,10 +29,13 @@ var SlurmNodeReasonsList = []string{
 	SlurmNodeReasonNodeReplacement,
 	SlurmNodeReasonNodeReboot,
 	SlurmNodeReasonHC,
+	SlurmUserReasonHC,
+	SlurmHardwareReasonHC,
 }
 
 const (
 	SlurmConfigRawStrategyPatch    = "patch"
 	SlurmConfigRawStrategyOverride = "override"
 	SlurmTopologyTree              = "topology/tree"
+	SlurmTopologyBlock             = "topology/block"
 )

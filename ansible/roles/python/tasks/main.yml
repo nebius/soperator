@@ -1,0 +1,22 @@
+---
+
+- name: Ensure required packages are installed
+  ansible.builtin.apt:
+    name: "{{ python_packages }}"
+    state: present
+    update_cache: true
+  tags:
+    - python
+
+- name: Create symlink for python
+  ansible.builtin.file:
+    src: /usr/bin/python3.12
+    dest: "{{ item }}"
+    mode: "0755"
+    force: true
+    owner: root
+    group: root
+    state: link
+  loop:
+    - /usr/bin/python
+    - /usr/bin/python3

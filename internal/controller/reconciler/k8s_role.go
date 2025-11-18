@@ -10,7 +10,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/logfield"
 )
 
@@ -30,12 +29,12 @@ func NewRoleReconciler(r *Reconciler) *RoleReconciler {
 
 func (r *RoleReconciler) Reconcile(
 	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
+	owner client.Object,
 	desired rbacv1.Role,
 	deps ...metav1.Object,
 ) error {
 	logger := log.FromContext(ctx)
-	if err := r.reconcile(ctx, cluster, &desired, r.patch, deps...); err != nil {
+	if err := r.reconcile(ctx, owner, &desired, r.patch, deps...); err != nil {
 		logger.V(1).
 			WithValues(logfield.ResourceKV(&desired)...).
 			Error(err, "Failed to reconcile Worker Role")
@@ -46,14 +45,14 @@ func (r *RoleReconciler) Reconcile(
 
 func (r *RoleReconciler) Cleanup(
 	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
+	owner client.Object,
 	roleName string,
 ) error {
 	logger := log.FromContext(ctx)
 
 	role := &rbacv1.Role{}
 	err := r.Get(ctx, client.ObjectKey{
-		Namespace: cluster.Namespace,
+		Namespace: owner.GetNamespace(),
 		Name:      roleName,
 	}, role)
 
@@ -66,7 +65,7 @@ func (r *RoleReconciler) Cleanup(
 		return fmt.Errorf("getting Role %s: %w", roleName, err)
 	}
 
-	if !metav1.IsControlledBy(role, cluster) {
+	if !metav1.IsControlledBy(role, owner) {
 		logger.V(1).Info("Role is not owned by controller, skipping deletion", "name", roleName)
 		return nil
 	}

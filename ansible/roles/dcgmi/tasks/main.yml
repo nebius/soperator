@@ -1,0 +1,9 @@
+---
+
+- name: Ensure dcgmi package is installed
+  ansible.builtin.apt:
+    name: "{{ dcgmi_packages }}"
+    state: present
+    update_cache: true
+  tags:
+    - dcgmi

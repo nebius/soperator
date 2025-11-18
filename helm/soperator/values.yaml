@@ -36,9 +36,10 @@ controllerManager:
       isApparmorCrdInstalled: "false"
       isPrometheusCrdInstalled: "false"
       slurmOperatorWatchNamespaces: '*'
+      topologyLabelPrefix: "topology.nebius.com"
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/slurm-operator
-      tag: 1.22.3
+      tag: 1.23.0
     imagePullPolicy: Always
     resources:
       limits:
@@ -49,33 +50,22 @@ controllerManager:
   replicas: 1
   serviceAccount:
     annotations: {}
+  tolerations: []
 kubernetesClusterDomain: cluster.local
-metricsService:
-  ports:
-    - name: https
-      port: 8443
-      protocol: TCP
-      targetPort: https
-  type: ClusterIP
-  serviceMonitor:
-    # -- Labels to be added to the controller ServiceMonitor
-    enabled: false
-    additionalLabels: {}
-    # release: kube-prometheus-stack
-    # --  Interval to scrape metrics
-    interval: 30s
-    # -- Timeout if metrics can't be retrieved in given time interval
-    scrapeTimeout: 25s
-    # MetricRelabelConfigs to apply to samples before ingestion.
-    metricRelabelings: []
-    # RelabelConfigs to apply to samples before scraping.
-    relabelings: []
 webhookService:
   ports:
     - port: 443
       protocol: TCP
       targetPort: 9443
   type: ClusterIP
+serviceMonitor:
+  enabled: true
+  jobLabel: "soperator"
+  interval: "30s"
+  scrapeTimeout: "28s"
+  additionalLabels: {}
+  metricRelabelings: []
+  relabelings: []
 certManager:
   enabled: false
 kruise:

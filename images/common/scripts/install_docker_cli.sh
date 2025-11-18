@@ -17,6 +17,6 @@ echo \
 apt update -y
 
 # Install Docker daemon and its dependencies
-apt install -y docker-ce-cli
+apt install -y docker-ce-cli="5:28.5.1-1~ubuntu.24.04~noble"
 apt clean
 rm -rf /var/lib/apt/lists/*

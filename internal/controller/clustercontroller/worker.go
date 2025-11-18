@@ -14,12 +14,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/feature"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/render/worker"
 	"nebius.ai/slurm-operator/internal/utils"
+	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -31,102 +34,196 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 ) error {
 	logger := log.FromContext(ctx)
 
-	reconcileWorkersImpl := func() error {
-		return utils.ExecuteMultiStep(ctx,
-			"Reconciliation of Slurm Workers",
-			utils.MultiStepExecutionStrategyCollectErrors,
+	nodeSetsEnabled := feature.Gate.Enabled(feature.NodeSetWorkers)
 
-			utils.MultiStepExecutionStep{
-				Name: "Slurm Worker sysctl ConfigMap",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling")
+	steps := []utils.MultiStepExecutionStep{
+		{
+			Name: "Slurm Worker sysctl ConfigMap",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
 
-					desired := worker.RenderConfigMapSysctl(clusterValues)
-					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				desired := worker.RenderConfigMapSysctl(clusterValues)
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				stepLogger.V(1).Info("Rendered")
+
+				if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling worker Sysctl ConfigMap: %w", err)
+				}
+				stepLogger.V(1).Info("Reconciled")
+
+				return nil
+			},
+		},
+
+		{
+			Name: "Slurm Worker SSHD ConfigMap",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
+
+				var needToReconcile bool
+
+				switch nodeSetsEnabled {
+				case false:
+					needToReconcile = clusterValues.NodeWorker.IsSSHDConfigMapDefault
+				case true:
+					nodeSetsWithCustomSSHDConfigMap := len(
+						sliceutils.Filter(
+							sliceutils.Map(
+								clusterValues.NodeSets,
+								func(nodeSet slurmv1alpha1.NodeSet) string {
+									return nodeSet.Spec.ConfigMapRefSSHD
+								},
+							),
+							func(configMapRef string) bool {
+								return len(configMapRef) > 0
+							},
+						),
+					)
+					needToReconcile = nodeSetsWithCustomSSHDConfigMap < len(clusterValues.NodeSets)
+				}
+
+				if !needToReconcile {
+					stepLogger.V(1).Info("Use custom SSHD ConfigMap from reference")
+					stepLogger.V(1).Info("Reconciled")
+					return nil
+				}
+
+				stepLogger.V(1).Info("Generate default ConfigMap")
+				desired := worker.RenderConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeWorker)
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				stepLogger.V(1).Info("Rendered")
+
+				if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling worker default SSHD ConfigMap: %w", err)
+				}
+				stepLogger.V(1).Info("Reconciled")
+
+				return nil
+			},
+		},
+
+		{
+			Name: "Slurm Worker sshd keys Secret",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
+
+				desired := corev1.Secret{}
+				if getErr := r.Get(
+					stepCtx,
+					types.NamespacedName{
+						Namespace: clusterValues.Namespace,
+						Name:      clusterValues.Secrets.SshdKeysName,
+					},
+					&desired,
+				); getErr != nil {
+					if !apierrors.IsNotFound(getErr) {
+						stepLogger.Error(getErr, "Failed to get")
+						return fmt.Errorf("getting worker SSHDKeys Secrets: %w", getErr)
+					}
+
+					renderedDesired, err := common.RenderSSHDKeysSecret(
+						clusterValues.Name,
+						clusterValues.Namespace,
+						clusterValues.Secrets.SshdKeysName,
+						consts.ComponentTypeWorker,
+					)
+					if err != nil {
+						stepLogger.Error(err, "Failed to render")
+						return fmt.Errorf("rendering worker SSHDKeys Secrets: %w", err)
+					}
+					desired = *renderedDesired.DeepCopy()
 					stepLogger.V(1).Info("Rendered")
+				}
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 
-					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
-						return fmt.Errorf("reconciling worker Sysctl ConfigMap: %w", err)
-					}
-					stepLogger.V(1).Info("Reconciled")
+				if err := r.Secret.Reconcile(stepCtx, cluster, &desired); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling worker SSHDKeys Secrets: %w", err)
+				}
+				stepLogger.V(1).Info("Reconciled")
 
-					return nil
-				},
+				return nil
 			},
+		},
 
-			utils.MultiStepExecutionStep{
-				Name: "Slurm Worker SSHD ConfigMap",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling")
+		{
+			Name: "Slurm Worker Supervisord ConfigMap",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
 
-					if !clusterValues.NodeWorker.IsSSHDConfigMapDefault {
-						stepLogger.V(1).Info("Use custom SSHD ConfigMap from reference")
-						stepLogger.V(1).Info("Reconciled")
-						return nil
-					}
+				var needToReconcile bool
 
-					desired := worker.RenderConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeWorker)
-					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.V(1).Info("Rendered")
+				switch nodeSetsEnabled {
+				case false:
+					needToReconcile = clusterValues.NodeWorker.SupervisordConfigMapDefault
+				case true:
+					nodeSetsWithCustomSupervisorDConfigMap := len(
+						sliceutils.Filter(
+							sliceutils.Map(
+								clusterValues.NodeSets,
+								func(nodeSet slurmv1alpha1.NodeSet) string {
+									return nodeSet.Spec.ConfigMapRefSupervisord
+								},
+							),
+							func(configMapRef string) bool {
+								return len(configMapRef) > 0
+							},
+						),
+					)
+					needToReconcile = nodeSetsWithCustomSupervisorDConfigMap < len(clusterValues.NodeSets)
+				}
 
-					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
-						return fmt.Errorf("reconciling worker default SSHD ConfigMap: %w", err)
-					}
+				if !needToReconcile {
+					stepLogger.V(1).Info("Use custom SupervisorD ConfigMap from reference")
 					stepLogger.V(1).Info("Reconciled")
-
 					return nil
-				},
+				}
+
+				stepLogger.V(1).Info("Generate default ConfigMap")
+				desired := worker.RenderDefaultConfigMapSupervisord(clusterValues)
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				stepLogger.V(1).Info("Rendered")
+
+				if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling worker supervisord configmap: %w", err)
+				}
+
+				stepLogger.V(1).Info("Reconciled")
+
+				return nil
 			},
+		},
 
-			utils.MultiStepExecutionStep{
-				Name: "Slurm Worker sshd keys Secret",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling")
+		{
+			Name: "Slurm Worker ServiceAccount",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
 
-					desired := corev1.Secret{}
-					if getErr := r.Get(
-						stepCtx,
-						types.NamespacedName{
-							Namespace: clusterValues.Namespace,
-							Name:      clusterValues.Secrets.SshdKeysName,
-						},
-						&desired,
-					); getErr != nil {
-						if !apierrors.IsNotFound(getErr) {
-							stepLogger.Error(getErr, "Failed to get")
-							return fmt.Errorf("getting worker SSHDKeys Secrets: %w", getErr)
-						}
+				desired := worker.RenderServiceAccount(clusterValues.Namespace, clusterValues.Name)
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				stepLogger.V(1).Info("Rendered")
 
-						renderedDesired, err := common.RenderSSHDKeysSecret(
-							clusterValues.Name,
-							clusterValues.Namespace,
-							clusterValues.Secrets.SshdKeysName,
-							consts.ComponentTypeWorker,
-						)
-						if err != nil {
-							stepLogger.Error(err, "Failed to render")
-							return fmt.Errorf("rendering worker SSHDKeys Secrets: %w", err)
-						}
-						desired = *renderedDesired.DeepCopy()
-						stepLogger.V(1).Info("Rendered")
-					}
-					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				if err := r.ServiceAccount.Reconcile(stepCtx, cluster, desired); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling worker ServiceAccount: %w", err)
+				}
+				stepLogger.V(1).Info("Reconciled")
 
-					if err := r.Secret.Reconcile(stepCtx, cluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
-						return fmt.Errorf("reconciling worker SSHDKeys Secrets: %w", err)
-					}
-					stepLogger.V(1).Info("Reconciled")
-
-					return nil
-				},
+				return nil
 			},
+		},
+	}
 
+	if !nodeSetsEnabled {
+		steps = append(steps,
 			utils.MultiStepExecutionStep{
 				Name: "Slurm Worker Security limits ConfigMap",
 				Func: func(stepCtx context.Context) error {
@@ -141,33 +238,6 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling worker security limits configmap: %w", err)
 					}
-					stepLogger.V(1).Info("Reconciled")
-
-					return nil
-				},
-			},
-
-			utils.MultiStepExecutionStep{
-				Name: "Slurm Worker Supervisord ConfigMap",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling")
-
-					generateDefault := clusterValues.NodeWorker.SupervisordConfigMapDefault
-					if generateDefault {
-						stepLogger.V(1).Info("Generate default ConfigMap")
-						desired := worker.RenderDefaultConfigMapSupervisord(clusterValues)
-						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-						stepLogger.V(1).Info("Rendered")
-
-						if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
-							stepLogger.Error(err, "Failed to reconcile")
-							return fmt.Errorf("reconciling worker supervisord configmap: %w", err)
-						}
-					} else {
-						stepLogger.V(1).Info("Use custom ConfigMap")
-					}
-
 					stepLogger.V(1).Info("Reconciled")
 
 					return nil
@@ -233,33 +303,18 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					return nil
 				},
 			},
-
-			utils.MultiStepExecutionStep{
-				Name: "Slurm Worker ServiceAccount",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling")
-
-					desired := worker.RenderServiceAccount(clusterValues.Namespace, clusterValues.Name)
-					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.V(1).Info("Rendered")
-
-					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
-						return fmt.Errorf("reconciling worker ServiceAccount: %w", err)
-					}
-					stepLogger.V(1).Info("Reconciled")
-
-					return nil
-				},
-			},
 		)
 	}
 
-	if err := reconcileWorkersImpl(); err != nil {
+	if err := utils.ExecuteMultiStep(ctx,
+		"Reconciliation of Slurm Workers",
+		utils.MultiStepExecutionStrategyCollectErrors,
+		steps...,
+	); err != nil {
 		logger.Error(err, "Failed to reconcile Slurm Workers")
 		return fmt.Errorf("reconciling Slurm Workers: %w", err)
 	}
+
 	logger.Info("Reconciled Slurm Workers")
 	return nil
 }

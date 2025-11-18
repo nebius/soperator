@@ -1,0 +1,54 @@
+---
+
+- name: Configure ofed repositories
+  ansible.builtin.template:
+    src: mellanox_mlnx_ofed.list.j2
+    dest: /etc/apt/sources.list.d/mellanox_mlnx_ofed.list
+    mode: "0644"
+  tags:
+    - openmpi
+
+- name: Add mellanox gpg key
+  ansible.builtin.apt_key:
+    url: https://www.mellanox.com/downloads/ofed/RPM-GPG-KEY-Mellanox
+    keyring: /etc/apt/trusted.gpg
+  tags:
+    - openmpi
+
+- name: Ensure openmpi packages are installed
+  ansible.builtin.apt:
+    name:
+      - openmpi={{ openmpi_version }}
+      - ucx={{ openmpi_ucx_version }}
+      - infiniband-diags={{ openmpi_infiniband_diags_version }}
+    state: present
+    update_cache: true
+  tags:
+    - openmpi
+
+- name: Add OpenMPI to global PATH
+  ansible.builtin.copy:
+    dest: /etc/profile.d/path_openmpi.sh
+    content: export PATH=$PATH:/usr/mpi/gcc/openmpi-{{ openmpi_version_short }}/bin
+    owner: root
+    group: root
+    mode: '0644'
+  tags:
+    - openmpi
+
+- name: Configure OpenMPI library paths
+  ansible.builtin.copy:
+    dest: /etc/ld.so.conf.d/openmpi.conf
+    content: |
+      /lib/{{ ansible_architecture }}-linux-gnu
+      /usr/lib/{{ ansible_architecture }}-linux-gnu
+      /usr/local/cuda/targets/{{ ansible_architecture }}-linux/lib
+      /usr/mpi/gcc/openmpi-{{ openmpi_version_short }}/lib
+    owner: root
+    group: root
+    mode: '0644'
+  register: openmpi_conf
+  notify:
+    - Update linker cache
+  tags:
+    - openmpi
