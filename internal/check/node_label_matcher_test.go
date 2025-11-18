@@ -35,9 +35,9 @@ func TestNewNodeLabelMatcher(t *testing.T) {
 			name:                        "multiple labels",
 			maintenanceIgnoreNodeLabels: "env=prod,tier=critical,zone=us-west",
 			wantLabels: map[string][]string{
-				"env":  []string{"prod"},
-				"tier": []string{"critical"},
-				"zone": []string{"us-west"},
+				"env":  {"prod"},
+				"tier": {"critical"},
+				"zone": {"us-west"},
 			},
 			wantErr: false,
 		},
@@ -45,8 +45,8 @@ func TestNewNodeLabelMatcher(t *testing.T) {
 			name:                        "labels with spaces",
 			maintenanceIgnoreNodeLabels: " env = prod , tier = critical ",
 			wantLabels: map[string][]string{
-				"env":  []string{"prod"},
-				"tier": []string{"critical"},
+				"env":  {"prod"},
+				"tier": {"critical"},
 			},
 			wantErr: false,
 		},
@@ -54,8 +54,8 @@ func TestNewNodeLabelMatcher(t *testing.T) {
 			name:                        "labels with extra commas",
 			maintenanceIgnoreNodeLabels: "env=prod,,tier=critical,",
 			wantLabels: map[string][]string{
-				"env":  []string{"prod"},
-				"tier": []string{"critical"},
+				"env":  {"prod"},
+				"tier": {"critical"},
 			},
 			wantErr: false,
 		},
@@ -63,7 +63,7 @@ func TestNewNodeLabelMatcher(t *testing.T) {
 			name:                        "duplicate keys keep all values",
 			maintenanceIgnoreNodeLabels: "env=prod,env=staging",
 			wantLabels: map[string][]string{
-				"env": []string{"prod", "staging"},
+				"env": {"prod", "staging"},
 			},
 			wantErr: false,
 		},
@@ -101,8 +101,8 @@ func TestNewNodeLabelMatcher(t *testing.T) {
 			name:                        "complex label keys",
 			maintenanceIgnoreNodeLabels: "topology.kubernetes.io/zone=us-west-1a,node.kubernetes.io/instance-type=m5.large",
 			wantLabels: map[string][]string{
-				"topology.kubernetes.io/zone":      []string{"us-west-1a"},
-				"node.kubernetes.io/instance-type": []string{"m5.large"},
+				"topology.kubernetes.io/zone":      {"us-west-1a"},
+				"node.kubernetes.io/instance-type": {"m5.large"},
 			},
 			wantErr: false,
 		},
@@ -110,7 +110,7 @@ func TestNewNodeLabelMatcher(t *testing.T) {
 			name:                        "values with equals sign",
 			maintenanceIgnoreNodeLabels: "annotation=key=value",
 			wantLabels: map[string][]string{
-				"annotation": []string{"key=value"},
+				"annotation": {"key=value"},
 			},
 			wantErr: false,
 		},
