@@ -324,11 +324,11 @@ endif
 		-f images/${DOCKERFILE} \
 		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
 		--progress=plain \
-		--push \
 		$(DOCKER_BUILD_ARGS) \
 		.
-
-ifeq ($(UNSTABLE), false)
+ifeq ($(UNSTABLE), true)
+	docker push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+else
 	skopeo copy --all \
 		docker://"$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" \
 		docker://"$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
