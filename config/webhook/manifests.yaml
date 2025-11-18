@@ -57,7 +57,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-slurm-nebius-ai-v1-slurmCluster
+      path: /validate-slurm-nebius-ai-v1-slurmcluster
   failurePolicy: Fail
   name: vslurmcluster-v1.kb.io
   rules:

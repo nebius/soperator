@@ -39,7 +39,7 @@ webhooks:
     service:
       name: '{{ include "soperator.fullname" . }}-webhook-service'
       namespace: '{{ .Release.Namespace }}'
-      path: /validate-slurm-nebius-ai-v1-slurmCluster
+      path: /validate-slurm-nebius-ai-v1-slurmcluster
   failurePolicy: Fail
   name: vslurmcluster-v1.kb.io
   rules:
