@@ -1,0 +1,33 @@
+name: Ansible Lint
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  lint:
+    name: Lint Ansible Playbooks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install ansible-lint
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ansible/requirements.txt
+
+      - name: Run ansible-lint
+        run: |
+          ansible-lint ansible/*.yml

@@ -19,7 +19,9 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -30,6 +32,7 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,8 +46,12 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/cli"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/soperatorchecks"
 	"nebius.ai/slurm-operator/internal/slurmapi"
+
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -58,6 +65,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(slurmv1.AddToScheme(scheme))
 	utilruntime.Must(slurmv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(kruisev1b1.AddToScheme(scheme))
 }
 
 func getZapOpts(logFormat, logLevel string) []zap.Opts {
@@ -96,20 +104,25 @@ func getZapOpts(logFormat, logLevel string) []zap.Opts {
 
 func main() {
 	var (
-		metricsAddr            string
-		enableLeaderElection   bool
-		probeAddr              string
-		secureMetrics          bool
-		enableHTTP2            bool
-		logFormat              string
-		logLevel               string
-		enabledNodeReplacement bool
-		deleteNotReadyNodes    bool
-		notReadyTimeout        time.Duration
+		metricsAddr                 string
+		enableLeaderElection        bool
+		probeAddr                   string
+		secureMetrics               bool
+		enableHTTP2                 bool
+		logFormat                   string
+		logLevel                    string
+		enabledNodeReplacement      bool
+		deleteNotReadyNodes         bool
+		notReadyTimeout             time.Duration
+		maintenanceConditionType    string
+		maintenanceIgnoreNodeLabels string
 
-		reconcileTimeout time.Duration
-		maxConcurrency   int
-		cacheSyncTimeout time.Duration
+		reconcileTimeout                         time.Duration
+		reconcileTimeoutPodEphemeralStorageCheck time.Duration
+		maxConcurrency                           int
+		maxConcurrencyPodEphemeralStorageCheck   int
+		cacheSyncTimeout                         time.Duration
+		ephemeralStorageThreshold                float64
 	)
 
 	var watchNsCacheByName = make(map[string]cache.Config)
@@ -132,16 +145,32 @@ func main() {
 	flag.StringVar(&logFormat, "log-format", "json", "Log format: plain or json")
 	flag.StringVar(&logLevel, "log-level", "debug", "Log level: debug, info, warn, error, dpanic, panic, fatal")
 	flag.DurationVar(&reconcileTimeout, "reconcile-timeout", 3*time.Minute, "The maximum duration allowed for a single reconcile")
+	flag.DurationVar(&reconcileTimeoutPodEphemeralStorageCheck, "pod-ephemeral-reconcile-timeout", 15*time.Second, "The maximum duration allowed for a single reconcile of Pod Ephemeral Storage Check")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
+	flag.IntVar(&maxConcurrencyPodEphemeralStorageCheck, "pod-ephemeral-max-concurrent-reconciles", 10, "Configures number of concurrent reconciles for Pod Ephemeral Storage Check. It should improve performance for clusters with many pods.")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
 	flag.BoolVar(&enabledNodeReplacement, "enable-node-replacement", true, "Enable node replacement controller")
 	flag.DurationVar(&notReadyTimeout, "not-ready-timeout", 15*time.Minute, "The timeout after which a NotReady node will be deleted. Nodes can be NotReady for more than 10 minutes when GPU operator is starting.")
 	flag.BoolVar(&deleteNotReadyNodes, "delete-not-ready-nodes", true, "If set, NotReady nodes will be deleted after the not-ready timeout is reached. If false, they will be marked as NotReady but not deleted.")
+	flag.Float64Var(&ephemeralStorageThreshold, "ephemeral-storage-threshold", 85.0, "The threshold percentage for ephemeral storage usage warnings (default 85%)")
+	flag.StringVar(&maintenanceConditionType, "maintenance-condition-type", string(consts.DefaultMaintenanceConditionType), "The condition type for scheduled maintenance")
+	flag.StringVar(&maintenanceIgnoreNodeLabels, "maintenance-ignore-node-labels", os.Getenv("MAINTENANCE_IGNORE_NODE_LABELS"), "Comma-separated list of node label key=value pairs to ignore during maintenance (e.g., 'env=prod,tier=critical')")
 	flag.Parse()
 
 	opts := getZapOpts(logFormat, logLevel)
-	ctrl.SetLogger(zap.New(opts...))
+	zapLogger := zap.New(opts...)
+	ctrl.SetLogger(zapLogger)
+
+	// Configure klog to use the same logger as controller-runtime
+	// This ensures that leader election logs are in the same format
+	klog.SetLogger(zapLogger.WithName("klog"))
+
 	setupLog := ctrl.Log.WithName("setup")
+
+	// Validate ephemeral storage threshold
+	if ephemeralStorageThreshold < 0 || ephemeralStorageThreshold > 100 {
+		cli.Fail(setupLog, errors.New("invalid threshold"), fmt.Sprintf("ephemeral-storage-threshold must be between 0 and 100, got: %.2f", ephemeralStorageThreshold))
+	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -190,19 +219,17 @@ func main() {
 		},
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to start manager")
 	}
 
 	ctx := context.Background()
 
 	// Index pods by node name. This is used to list and evict pods from a specific node.
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
+	if err = mgr.GetFieldIndexer().IndexField(ctx, &corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
 		pod := rawObj.(*corev1.Pod)
 		return []string{pod.Spec.NodeName}
 	}); err != nil {
-		setupLog.Error(err, "unable to setup index field")
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to setup index field")
 	}
 
 	slurmAPIClients := slurmapi.NewClientSet()
@@ -212,9 +239,9 @@ func main() {
 		mgr.GetScheme(),
 		mgr.GetEventRecorderFor(soperatorchecks.SlurmAPIClientsControllerName),
 		slurmAPIClients,
+		corev1.NodeConditionType(maintenanceConditionType),
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create slurm api clients controller", "controller", soperatorchecks.SlurmAPIClientsControllerName)
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to create slurm api clients controller", "controller", soperatorchecks.SlurmAPIClientsControllerName)
 	}
 	if err = soperatorchecks.NewSlurmNodesController(
 		mgr.GetClient(),
@@ -224,9 +251,9 @@ func main() {
 		reconcileTimeout,
 		enabledNodeReplacement,
 		mgr.GetAPIReader(),
+		corev1.NodeConditionType(maintenanceConditionType),
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create slurm nodes controller", "controller", soperatorchecks.SlurmNodesControllerName)
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to create slurm nodes controller", "controller", soperatorchecks.SlurmNodesControllerName)
 	}
 	if err = soperatorchecks.NewK8SNodesController(
 		mgr.GetClient(),
@@ -234,9 +261,10 @@ func main() {
 		mgr.GetEventRecorderFor(soperatorchecks.K8SNodesControllerName),
 		notReadyTimeout,
 		deleteNotReadyNodes,
+		corev1.NodeConditionType(maintenanceConditionType),
+		maintenanceIgnoreNodeLabels,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create k8s nodes controller", "controller", soperatorchecks.K8SNodesControllerName)
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to create k8s nodes controller", "controller", soperatorchecks.K8SNodesControllerName)
 	}
 	if err = soperatorchecks.NewActiveCheckController(
 		mgr.GetClient(),
@@ -244,8 +272,7 @@ func main() {
 		mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckControllerName),
 		reconcileTimeout,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create activecheck controller", "controller", "ActiveCheck")
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to create activecheck controller", "controller", "ActiveCheck")
 	}
 	if err = soperatorchecks.NewActiveCheckJobController(
 		mgr.GetClient(),
@@ -254,8 +281,7 @@ func main() {
 		slurmAPIClients,
 		reconcileTimeout,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create activecheckjob controller", "controller", "ActiveCheckJob")
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to create activecheckjob controller", "controller", "ActiveCheckJob")
 	}
 	if err = soperatorchecks.NewServiceAccountController(
 		mgr.GetClient(),
@@ -263,8 +289,7 @@ func main() {
 		mgr.GetEventRecorderFor(soperatorchecks.SlurmChecksServiceAccountControllerName),
 		reconcileTimeout,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create soperatorchecks serviceaccount controller", "controller", "ServiceAccount")
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to create soperatorchecks serviceaccount controller", "controller", "ServiceAccount")
 	}
 	if err = soperatorchecks.NewActiveCheckPrologController(
 		mgr.GetClient(),
@@ -272,23 +297,36 @@ func main() {
 		mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckPrologControllerName),
 		reconcileTimeout,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		setupLog.Error(err, "unable to create soperatorchecks prolog controller", "controller", "Prolog")
-		os.Exit(1)
+		cli.Fail(setupLog, err, "unable to create soperatorchecks prolog controller", "controller", "Prolog")
 	}
+
+	podEphemeralStorageCheck, err := soperatorchecks.NewPodEphemeralStorageCheck(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		mgr.GetEventRecorderFor(soperatorchecks.PodEphemeralStorageCheckName),
+		ctrl.GetConfigOrDie(),
+		reconcileTimeoutPodEphemeralStorageCheck,
+		ephemeralStorageThreshold,
+		slurmAPIClients,
+	)
+	if err != nil {
+		cli.Fail(setupLog, err, "unable to create pod ephemeral storage check", "controller", "PodEphemeralStorageCheck")
+	}
+	if err = podEphemeralStorageCheck.SetupWithManager(mgr, maxConcurrencyPodEphemeralStorageCheck, cacheSyncTimeout); err != nil {
+		cli.Fail(setupLog, err, "unable to setup pod ephemeral storage check", "controller", "PodEphemeralStorageCheck")
+	}
+
 	//+kubebuilder:scaffold:builder
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
-		os.Exit(1)
+	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		cli.Fail(setupLog, err, "unable to set up health check")
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
-		os.Exit(1)
+	if err = mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		cli.Fail(setupLog, err, "unable to set up ready check")
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
-		os.Exit(1)
+	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		cli.Fail(setupLog, err, "unable to start manager")
 	}
 }

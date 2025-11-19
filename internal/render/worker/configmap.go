@@ -44,7 +44,7 @@ func RenderDefaultConfigMapSupervisord(cluster *values.SlurmCluster) corev1.Conf
 	data := generateDefaultSupervisordConfig().Render()
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cluster.NodeWorker.SupervisordConfigMapName,
+			Name:      naming.BuildConfigMapSupervisordName(cluster.Name),
 			Namespace: cluster.Namespace,
 			Labels:    common.RenderLabels(consts.ComponentTypeWorker, cluster.Name),
 		},
@@ -113,14 +113,14 @@ func RenderConfigMapSSHDConfigs(
 			Labels:    common.RenderLabels(componentType, cluster.Name),
 		},
 		Data: map[string]string{
-			consts.ConfigMapKeySshdConfig: generateSshdConfig(cluster).Render(),
+			consts.ConfigMapKeySshdConfig: generateSshdConfig(&cluster.NodeLogin).Render(),
 		},
 	}
 }
 
-func generateSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
+func generateSshdConfig(login *values.SlurmLogin) renderutils.ConfigFile {
 	res := &renderutils.MultilineStringConfig{}
-	res.AddLine(fmt.Sprintf("Port %d", cluster.NodeLogin.ContainerSshd.Port))
+	res.AddLine(fmt.Sprintf("Port %d", login.ContainerSshd.Port))
 	res.AddLine("PermitRootLogin yes")
 	res.AddLine("PasswordAuthentication no")
 	res.AddLine("ChallengeResponseAuthentication no")

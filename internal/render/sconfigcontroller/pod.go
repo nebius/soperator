@@ -6,7 +6,6 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
@@ -46,10 +45,11 @@ func BasePodTemplateSpec(
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: matchLabels,
 			Annotations: map[string]string{
-				consts.DefaultContainerAnnotationName: consts.ContainerNameSConfigController,
+				consts.AnnotationDefaultContainerName: consts.ContainerNameSConfigController,
 			},
 		},
 		Spec: corev1.PodSpec{
+			HostUsers:         sConfigController.HostUsers,
 			Affinity:          nodeFilter.Affinity,
 			Tolerations:       nodeFilter.Tolerations,
 			NodeSelector:      nodeFilter.NodeSelector,
@@ -69,7 +69,7 @@ func BasePodTemplateSpec(
 				),
 			},
 			Volumes:            volumes,
-			ServiceAccountName: naming.BuildServiceAccountSconfigControllerName(clusterName),
+			ServiceAccountName: sConfigController.ServiceAccountName,
 			SecurityContext:    securityContext,
 		},
 	}, nil

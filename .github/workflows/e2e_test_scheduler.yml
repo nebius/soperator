@@ -3,7 +3,7 @@ name: E2E Test Scheduler
 on:
   schedule:
     # Every hour - alternates between main and release branches
-    - cron: '0 */1 * * *'
+    - cron: '0 */3 * * *'
   workflow_dispatch:  # Allow manual trigger for testing
 
 permissions:
@@ -18,9 +18,7 @@ jobs:
       - name: Determine branch and terraform ref
         id: select_params
         run: |
-          # Configuration
-          RELEASE_BRANCH="soperator-release-1.21"
-
+          RELEASE_BRANCH="soperator-release-1.23"
           HOUR=$(date -u +%-H)  # %-H removes leading zeros to avoid octal interpretation
           if [ $((HOUR % 2)) -eq 0 ]; then
             echo "ref=main" >> $GITHUB_OUTPUT

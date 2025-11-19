@@ -1,0 +1,5 @@
+---
+
+- name: Update linker cache
+  ansible.builtin.command: ldconfig
+  changed_when: openmpi_conf.changed

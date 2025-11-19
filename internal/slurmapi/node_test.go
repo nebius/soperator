@@ -32,6 +32,7 @@ func TestNodeFromAPI(t *testing.T) {
 				Tres:       "cpu=16,mem=191356M,billing=16,gres/gpu=1",
 				Address:    "10.0.0.1",
 				BootTime:   time.Unix(1747752894, 0),
+				Comment:    "comment",
 			},
 			wantErr: false,
 		},
@@ -62,6 +63,7 @@ func TestNodeFromAPI(t *testing.T) {
 			assert.Equal(t, tt.want.Tres, got.Tres)
 			assert.Equal(t, tt.want.Address, got.Address)
 			assert.Equal(t, tt.want.BootTime, got.BootTime)
+			assert.Equal(t, tt.want.Comment, got.Comment)
 
 			// Check reason handling
 			if tt.want.Reason == nil {

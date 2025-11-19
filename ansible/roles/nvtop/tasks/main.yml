@@ -1,0 +1,51 @@
+---
+
+- name: Add nvtop repository from PPA
+  ansible.builtin.deb822_repository:
+    name: quentiumyt-ubuntu-nvtop-noble
+    types: deb
+    uris: https://ppa.launchpadcontent.net/quentiumyt/nvtop/ubuntu/
+    suites: noble
+    components:
+      - main
+    signed_by: |-
+      -----BEGIN PGP PUBLIC KEY BLOCK-----
+      .
+      mQINBGK5yqwBEAClPHVgFc99bZ9j0n6/auhvS3AKliPO4ZXD/PS8Y4fO854ijMe2
+      j+HFoeTY25NJ02sdo6XbGPtb6fZhCQRWeech6643W8hEWxlMm9yRarc2akSFNsIN
+      6rslLuuOrZd5RSliHpo4hccfasH/Hi2lnZ0BIQazIb7xZln+R2X6np/tIDAglrSY
+      hGn/hQQ1oTBbrVJMPuSgCUuRqvxM/XwEblBCcxy7ccKjyrzs4/FrqgX9/HF0MFdV
+      MjlMx7k6q7ktK+YpCpYZPoX+B8LMbvTxYqcq3qn8eL9shxFPfIjwX1VoFB9v02Dy
+      mLPt1w8vBR1a8ONaGnccHhz+RSYYL5c3/JGbMyFstixjWELCFyQK5sYnwop1d6pj
+      iU7VC6chIXrcW4vBvfieyEtmAOmjoP8exwRIa/zQoFR0jLwwQ8R5kAM3fSc8DSc2
+      loZGwCSY9Onrx9Kmy6V6O/6y3O8ebG1cME9x/Lk24WBV6kT/r6CO6EvbppuZjXBW
+      0cktlf6ip/Y+WkK08jGD1MJuA7xzfYJ9+a1LCuO7XdiLNYN+JMLsRVum6cyL1+cz
+      nliQCuqdxNYBmPLuzmvBqtA4aDbdJot2FHXjJsQa9dncjoABw6wZVPmvtK2bfFQv
+      NH1cDe0qV3HbcwSFBNWwFS7bUz9dMsMXVwnQJL7Udmyw5g7Tw9G47mPBQQARAQAB
+      tCNMYXVuY2hwYWQgUFBBIGZvciBRdWVudGluIExpZW5oYXJkdIkCTgQTAQoAOBYh
+      BIQdO86rLquQ2fvNmMOcA+lEhUFBBQJiucqsAhsDBQsJCAcCBhUKCQgLAgQWAgMB
+      Ah4BAheAAAoJEMOcA+lEhUFBqyoP/jYyWoTnUary1ZEtrfrM/A1edoPiiuTlopVp
+      OBZpYtnvS8ttf8/wSXj137qYgEgDbArfOHnRneE3bC1dzn1FN+U5nUd+DwIPHiBS
+      tMTg5enqdp79HAYmMKlf2yuEOvxoPpY4VjTrf36/oAUQFQz5lO0/H5FGwA+hdSMh
+      gWi62O0vmTeZC2HmLpR9HUXIP/iwRRHCrduM+yPecf0qqbdWuLKJDWnXt4dH3gN8
+      0unEF+dNVJWWXTfHRl4TBEdxofD0H78QSu0OWAPRZbM5zC4ej7AOnhr4G5ufkz6o
+      uJRGH5OLf3qYJ5x8HfL8q1w37mcPMeEluDFianH3qUj0T4FszlgYQy1ynHVIw44p
+      hLYxFOJ6w2mathChdpkNAI0Ho7tcCKx+L2L4LXJNJ/20q9GuQwa4uTNTfv04rFpg
+      pOHAOVd4AWvlHh+ExHG5DI7w3txLhDROarBHWLcj5Zq7rFIZmXnoPqXcnrXf7NhD
+      li1l0IKn3M0n3RZDrgZZQjYnNm/cF8h20rgiFc6hhe3EfGPZziQ0IiT8cvMgsSxc
+      VxQLGvsYt5ykQ6uwFUPQQgiEAlb2SGpDZiWz0CMrla4bTAHkjsslv6+u7bGB2JYb
+      ju6UN4DG6+bkSPUeLpaDsx4G7nZGCRog6gqNSoI4ttbTSSAL3zeHhRQJGdksB5Dx
+      FNO9BxWo
+      =MVXj
+      -----END PGP PUBLIC KEY BLOCK-----
+  tags:
+    - nvtop
+
+- name: Ensure nvtop package is installed
+  ansible.builtin.apt:
+    name:
+      - nvtop=3.2.0.2-1+noble
+    state: present
+    update_cache: true
+  tags:
+    - nvtop

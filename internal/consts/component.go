@@ -24,6 +24,7 @@ var (
 	ComponentTypeAccounting        ComponentType = baseComponentType{"accounting"}
 	ComponentTypeREST              ComponentType = baseComponentType{"rest"}
 	ComponentTypeWorker            ComponentType = baseComponentType{"worker"}
+	ComponentTypeNodeSet           ComponentType = baseComponentType{"nodeset"}
 	ComponentTypeNodeConfigurator  ComponentType = baseComponentType{"node-configurator"}
 	ComponentTypeLogin             ComponentType = baseComponentType{"login"}
 	ComponentTypePopulateJail      ComponentType = baseComponentType{"populate-jail"}

@@ -8,6 +8,9 @@ slack:
   # Whether to disable sending messages on changes of system job (health checks, etc.) statuses.
   ignoreSystemJobs: true
 
+  # Set true to ignore jobs without `user_mail` label`
+  requireUserMail: true
+
   # Severity group colors.
   severityColor:
     error: danger

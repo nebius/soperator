@@ -22,7 +22,7 @@ rebooter:
   env: []
   image:
     repository: "cr.eu-north1.nebius.cloud/soperator/rebooter"
-    tag: "1.22.4"
+    tag: "1.23.0"
     pullPolicy: IfNotPresent
   nodeSelector: {}
   resources: {}
@@ -33,3 +33,8 @@ rebooter:
   priorityClassName: ""
   serviceAccountName: ""
 initContainers: []
+serviceMonitor:
+  enabled: true
+  jobLabel: "rebooter"
+  interval: "30s"
+  scrapeTimeout: "28s"
