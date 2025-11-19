@@ -378,18 +378,17 @@ endif
 	docker buildx build \
 		--platform linux/amd64,linux/arm64 \
 		--target ${IMAGE_NAME} \
-		-t "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" \
+		-t "$(NEBIUS_REPO)-unstable/${IMAGE_NAME}:${IMAGE_VERSION}" \
 		-f images/${DOCKERFILE} \
 		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
 		--progress=plain \
+		--push \
 		$(DOCKER_BUILD_ARGS) \
 		.
-ifeq ($(UNSTABLE), true)
-	docker push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
-else
+ifeq ($(UNSTABLE), false)
 	skopeo copy --all \
-		docker://"$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" \
-		docker://"$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+		docker://"$(IMAGE_REPO)-unstable/${IMAGE_NAME}:${IMAGE_VERSION}" \
+		docker://"$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 endif
 
 .PHONY: docker-build-jail
