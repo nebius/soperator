@@ -406,22 +406,27 @@ func (r *NodeTopologyReconciler) reconcileConfigMapToRequests(ctx context.Contex
 // It checks if ConfigMap exists and creates it if not
 func (r *NodeTopologyReconciler) Start(ctx context.Context) error {
 	logger := log.FromContext(ctx).WithName(NodeTopologyReconcilerName)
-	logger.Info("Starting NodeTopologyReconciler, checking ConfigMap existence")
+	logger.Info(fmt.Sprintf("Starting %s runnable to ensure ConfigMap existence", NodeTopologyReconcilerName))
 
-	configMapExists := &corev1.ConfigMap{}
+	configMap := &corev1.ConfigMap{}
 	err := r.Client.Get(ctx, client.ObjectKey{
 		Name:      consts.ConfigMapNameTopologyNodeLabels,
 		Namespace: r.Namespace,
-	}, configMapExists)
+	}, configMap)
 
-	if err != nil && errors.IsNotFound(err) {
-		logger.Info("ConfigMap does not exist at startup, creating it with all nodes")
-		_, err := r.GetOrCreateTopologyLabelsConfigMap(ctx)
-		if err != nil {
-			logger.Error(err, "Failed to create topology node labels ConfigMap at startup")
-			return err
-		}
+	if err == nil {
+		return nil
 	}
+
+	if !errors.IsNotFound(err) {
+		return fmt.Errorf("check ConfigMap existence: %w", err)
+	}
+
+	logger.Info("ConfigMap does not exist, creating it")
+	if _, err := r.GetOrCreateTopologyLabelsConfigMap(ctx); err != nil {
+		return fmt.Errorf("create ConfigMap: %w", err)
+	}
+
 	return nil
 }
 
