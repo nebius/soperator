@@ -310,6 +310,11 @@ func (r *NodeTopologyReconciler) initializeConfigMapWithAllNodes(ctx context.Con
 
 func (r *NodeTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 	maxConcurrency int, cacheSyncTimeout time.Duration) error {
+	// Add runnable to check ConfigMap existence after manager starts
+	if err := mgr.Add(r); err != nil {
+		return fmt.Errorf("failed to add runnable: %w", err)
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).Named(NodeTopologyReconcilerName).
 		For(&corev1.Node{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
@@ -395,6 +400,29 @@ func (r *NodeTopologyReconciler) reconcileConfigMapToRequests(ctx context.Contex
 
 	// Return empty slice since we don't need to trigger any node reconciliation
 	return []reconcile.Request{}
+}
+
+// Start is called by the manager when the controller starts
+// It checks if ConfigMap exists and creates it if not
+func (r *NodeTopologyReconciler) Start(ctx context.Context) error {
+	logger := log.FromContext(ctx).WithName(NodeTopologyReconcilerName)
+	logger.Info("Starting NodeTopologyReconciler, checking ConfigMap existence")
+
+	configMapExists := &corev1.ConfigMap{}
+	err := r.Client.Get(ctx, client.ObjectKey{
+		Name:      consts.ConfigMapNameTopologyNodeLabels,
+		Namespace: r.Namespace,
+	}, configMapExists)
+
+	if err != nil && errors.IsNotFound(err) {
+		logger.Info("ConfigMap does not exist at startup, creating it with all nodes")
+		_, err := r.GetOrCreateTopologyLabelsConfigMap(ctx)
+		if err != nil {
+			logger.Error(err, "Failed to create topology node labels ConfigMap at startup")
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *NodeTopologyReconciler) tierZeroLabel() string {
