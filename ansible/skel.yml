@@ -1,0 +1,9 @@
+---
+
+- name: Setup the default $HOME directory content
+  hosts: all, localhost
+  become: true
+  roles:
+    - skel
+  tags:
+    - skel

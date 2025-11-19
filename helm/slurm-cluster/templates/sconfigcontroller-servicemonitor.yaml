@@ -1,0 +1,22 @@
+{{- if .Values.sConfigController.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "slurm-cluster.name" . }}-sconfigcontroller-servicemonitor
+  labels:
+    {{- include "slurm-cluster.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sconfigcontroller-metrics
+  endpoints:
+    - port: http-metrics
+      path: /metrics
+      scheme: http
+      interval: {{ .Values.sConfigController.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.sConfigController.serviceMonitor.scrapeTimeout }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  jobLabel: {{ .Values.sConfigController.serviceMonitor.jobLabel | quote }}
+{{- end }}

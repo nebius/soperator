@@ -4,7 +4,7 @@ ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:noble
 
 FROM $BASE_IMAGE AS slurm_check_job
 
-ARG SLURM_VERSION=24.11.6
+ARG SLURM_VERSION
 ARG PYXIS_VERSION=0.21.0
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -91,15 +91,6 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy script for complementing jail filesystem in runtime
-COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
-
-# Copy script for bind-mounting slurm into the jail
-COPY images/common/scripts/bind_slurm_common.sh /opt/bin/slurm/
-
-RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
-    chmod +x /opt/bin/slurm/bind_slurm_common.sh
-
 # Install kubectl
 RUN ARCH="$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')" && \
     KUBECTL_VERSION="$(curl -Ls https://dl.k8s.io/release/stable.txt)" && \
@@ -107,6 +98,12 @@ RUN ARCH="$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')" && \
     curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" && \
     install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
     rm kubectl
+
+# Create single folder with slurm plugins for all architectures
+RUN mkdir -p /usr/lib/slurm && \
+    for dir in /usr/lib/*-linux-gnu/slurm; do \
+      [ -d "$dir" ] && ln -sf $dir/* /usr/lib/slurm/ 2>/dev/null || true; \
+    done
 
 # Update linker cache
 RUN ldconfig
@@ -117,10 +114,8 @@ RUN rm -rf /home
 
 # Copy & run the entrypoint script
 COPY images/slurm_check_job/slurm_check_job_entrypoint.sh /opt/bin/slurm/
-COPY images/slurm_check_job/slurm_submit_array_job.sh /opt/bin/slurm/
 COPY images/slurm_check_job/slurm_submit_jobs.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/slurm_check_job_entrypoint.sh \
-    && chmod +x /opt/bin/slurm/slurm_submit_array_job.sh \
     && chmod +x /opt/bin/slurm/slurm_submit_jobs.sh
 
 ENTRYPOINT ["/opt/bin/slurm/slurm_check_job_entrypoint.sh"]

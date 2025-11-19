@@ -38,8 +38,11 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controller/state"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
+	"nebius.ai/slurm-operator/internal/feature"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/utils"
+	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
+	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -68,7 +71,6 @@ import (
 //+kubebuilder:rbac:groups=k8s.mariadb.com,resources=grants,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=security-profiles-operator.x-k8s.io,resources=apparmorprofiles,verbs=get;list;watch;update;patch;delete;create
-//+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch;
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/finalizers,verbs=update
@@ -143,6 +145,11 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{Requeue: true}, fmt.Errorf("getting SlurmCluster: %w", err)
 	}
 
+	slurmCluster.Spec.PlugStackConfig.Pyxis.SetDefaults()
+	slurmCluster.Spec.PlugStackConfig.NcclDebug.SetDefaults()
+	slurmCluster.Spec.SlurmNodes.Exporter.SetDefaults()
+	slurmCluster.Spec.SlurmNodes.Worker.SetDefaults()
+
 	// If cluster marked for deletion, we have nothing to do
 	if slurmCluster.GetDeletionTimestamp() != nil {
 		return ctrl.Result{}, nil
@@ -216,6 +223,33 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		return ctrl.Result{}, err
 	}
 
+	if feature.Gate.Enabled(feature.NodeSetWorkers) {
+		nodeSets, err := resourcegetter.ListNodeSetsByClusterRef(ctx, r.Client, client.ObjectKeyFromObject(cluster))
+		if err != nil {
+			logger.Error(err, fmt.Sprintf("Failed to list %s", slurmv1alpha1.KindNodeSet))
+			return ctrl.Result{}, fmt.Errorf("listing node sets: %w", err)
+		}
+
+		// Set cluster type to GPU if at least one NodeSet has GPU enabled
+		if len(
+			sliceutils.Filter(
+				sliceutils.Map(
+					nodeSets,
+					func(nodeSet slurmv1alpha1.NodeSet) bool {
+						return nodeSet.Spec.GPU.Enabled
+					},
+				),
+				func(b bool) bool {
+					return b
+				},
+			),
+		) > 0 {
+			clusterValues.ClusterType = consts.ClusterTypeGPU
+		} else {
+			clusterValues.ClusterType = consts.ClusterTypeCPU
+		}
+	}
+
 	if err = r.setUpConditions(ctx, cluster); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -251,9 +285,6 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 				}
 			}
 			if err = r.ReconcileREST(ctx, cluster, clusterValues); err != nil {
-				return ctrl.Result{}, err
-			}
-			if err = r.ReconcileExporter(ctx, cluster, clusterValues); err != nil {
 				return ctrl.Result{}, err
 			}
 			if err = r.ReconcileSoperatorExporter(ctx, cluster, clusterValues); err != nil {

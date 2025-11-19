@@ -9,10 +9,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	. "nebius.ai/slurm-operator/internal/webhook/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestValidateCreate(t *testing.T) {

@@ -92,3 +92,59 @@ tests:
     asserts:
       - hasDocuments:
           count: 1
+---
+suite: test nodesets dependencies
+templates:
+  - templates/nodesets.yaml
+tests:
+  - it: should not render nodesets when nodesets.enabled=false
+    set:
+      nodesets.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render nodesets when nodesets.enabled=true
+    set:
+      nodesets.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: HelmRelease
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-nodesets
+
+  - it: should have dependencies on namespace and soperator
+    set:
+      nodesets.enabled: true
+    asserts:
+      - contains:
+          path: spec.dependsOn
+          content:
+            name: RELEASE-NAME-ns
+      - contains:
+          path: spec.dependsOn
+          content:
+            name: RELEASE-NAME-soperator
+
+  - it: should have dependency on slurm-cluster when slurm cluster is enabled
+    set:
+      nodesets.enabled: true
+      slurmCluster.enabled: true
+    asserts:
+      - contains:
+          path: spec.dependsOn
+          content:
+            name: RELEASE-NAME-slurm-cluster
+
+  - it: should not have dependency on slurm-cluster when slurm cluster is disabled
+    set:
+      nodesets.enabled: true
+      slurmCluster.enabled: false
+    asserts:
+      - notContains:
+          path: spec.dependsOn
+          content:
+            name: RELEASE-NAME-slurm-cluster

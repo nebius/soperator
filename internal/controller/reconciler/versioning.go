@@ -6,6 +6,7 @@ import (
 	"maps"
 	"strings"
 
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -110,6 +111,11 @@ func setVersionsRecursive(resource metav1.Object, deps ...metav1.Object) error {
 			err = setVersionsAnnotation(&o.Spec.Template, deps...)
 			if err != nil {
 				return fmt.Errorf("setting StatefulSet pod template versions annotation: %w", err)
+			}
+		case *kruisev1b1.StatefulSet:
+			err = setVersionsAnnotation(&o.Spec.Template, deps...)
+			if err != nil {
+				return fmt.Errorf("setting AdvancedStatefulSet pod template versions annotation: %w", err)
 			}
 		case *batchv1.CronJob:
 			err = setVersionsAnnotation(&o.Spec.JobTemplate.Spec.Template, deps...)

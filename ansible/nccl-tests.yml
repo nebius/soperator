@@ -1,0 +1,14 @@
+---
+
+- name: Install nccl-tests
+  hosts:
+    - all
+    - localhost
+  gather_facts: true
+  gather_subset:
+    - min
+  become: true
+  roles:
+    - nccl-tests
+  tags:
+    - nccl-tests

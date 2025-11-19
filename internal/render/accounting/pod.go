@@ -69,10 +69,11 @@ func BasePodTemplateSpec(
 				fmt.Sprintf(
 					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
 				): accounting.ContainerMunge.AppArmorProfile,
-				consts.DefaultContainerAnnotationName: consts.ContainerNameAccounting,
+				consts.AnnotationDefaultContainerName: consts.ContainerNameAccounting,
 			},
 		},
 		Spec: corev1.PodSpec{
+			HostUsers:         accounting.HostUsers,
 			Affinity:          nodeFilter.Affinity,
 			Tolerations:       nodeFilter.Tolerations,
 			NodeSelector:      nodeFilter.NodeSelector,

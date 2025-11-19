@@ -10,7 +10,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/logfield"
 )
 
@@ -30,12 +29,12 @@ func NewServiceAccountReconciler(r *Reconciler) *ServiceAccountReconciler {
 
 func (r *ServiceAccountReconciler) Reconcile(
 	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
+	owner client.Object,
 	desired corev1.ServiceAccount,
 	deps ...metav1.Object,
 ) error {
 	logger := log.FromContext(ctx)
-	if err := r.reconcile(ctx, cluster, &desired, r.patch, deps...); err != nil {
+	if err := r.reconcile(ctx, owner, &desired, r.patch, deps...); err != nil {
 		logger.V(1).
 			WithValues(logfield.ResourceKV(&desired)...).
 			Error(err, "Failed to reconcile ServiceAccount")
@@ -46,14 +45,14 @@ func (r *ServiceAccountReconciler) Reconcile(
 
 func (r *ServiceAccountReconciler) Cleanup(
 	ctx context.Context,
-	cluster *slurmv1.SlurmCluster,
+	owner client.Object,
 	serviceAccountName string,
 ) error {
 	logger := log.FromContext(ctx)
 
 	serviceAccount := &corev1.ServiceAccount{}
 	err := r.Get(ctx, client.ObjectKey{
-		Namespace: cluster.Namespace,
+		Namespace: owner.GetNamespace(),
 		Name:      serviceAccountName,
 	}, serviceAccount)
 
@@ -66,7 +65,7 @@ func (r *ServiceAccountReconciler) Cleanup(
 		return fmt.Errorf("getting ServiceAccount %s: %w", serviceAccountName, err)
 	}
 
-	if !metav1.IsControlledBy(serviceAccount, cluster) {
+	if !metav1.IsControlledBy(serviceAccount, owner) {
 		logger.V(1).Info("ServiceAccount is not owned by controller, skipping deletion", "name", serviceAccountName)
 		return nil
 	}

@@ -9,9 +9,9 @@ const (
 	// SoperatorChecks related conditions to distinguish what happened to the k8s node.
 	SoperatorChecksK8SNodeDegraded    corev1.NodeConditionType = "SoperatorChecksNodeDegraded"
 	SoperatorChecksK8SNodeMaintenance corev1.NodeConditionType = "SoperatorChecksNodeMaintenance"
-	// External condition to react in soperator checks.
-	K8SNodeMaintenanceScheduled corev1.NodeConditionType = "MaintenanceScheduled"
-	HardwareIssuesSuspected     corev1.NodeConditionType = "HardwareIssuesSuspected"
+	HardwareIssuesSuspected           corev1.NodeConditionType = "HardwareIssuesSuspected"
+
+	DefaultMaintenanceConditionType corev1.NodeConditionType = "NebiusMaintenanceScheduled"
 )
 
 type ReasonConditionType string
@@ -30,6 +30,8 @@ const (
 	ReasonSlurmNodeDegraded ReasonConditionType = "SlurmNodeDegraded"
 
 	ReasonNodeNotReady ReasonConditionType = "NodeNotReady"
+
+	ReasonGPUHealthCheckFailed ReasonConditionType = "GPUHealthCheckFailed (Soperator)"
 )
 
 const (
@@ -59,12 +61,12 @@ const (
 	ActiveCheckK8sJobStatusUnknown   ActiveCheckK8sJobStatus = "Unknown"
 )
 
-// ActiveCheckSlurmJobStatus defines status for ActiveCheck slurm job.
-type ActiveCheckSlurmJobStatus string
+// ActiveCheckSlurmRunStatus defines status for ActiveCheck slurm job.
+type ActiveCheckSlurmRunStatus string
 
 const (
-	ActiveCheckSlurmJobStatusInProgress ActiveCheckSlurmJobStatus = "InProgress"
-	ActiveCheckSlurmJobStatusComplete   ActiveCheckSlurmJobStatus = "Complete"
-	ActiveCheckSlurmJobStatusFailed     ActiveCheckSlurmJobStatus = "Failed"
-	ActiveCheckSlurmJobStatusDegraded   ActiveCheckSlurmJobStatus = "Degraded"
+	ActiveCheckSlurmRunStatusInProgress ActiveCheckSlurmRunStatus = "InProgress"
+	ActiveCheckSlurmRunStatusComplete   ActiveCheckSlurmRunStatus = "Complete"
+	ActiveCheckSlurmRunStatusFailed     ActiveCheckSlurmRunStatus = "Failed"
+	ActiveCheckSlurmRunStatusError      ActiveCheckSlurmRunStatus = "Error"
 )

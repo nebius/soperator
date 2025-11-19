@@ -1,0 +1,161 @@
+suite: test nodesets basic functionality
+templates:
+  - templates/nodesets.yaml
+tests:
+  - it: should render both default nodesets
+    set:
+      nodesets:
+        - name: gpu-workers
+          replicas: 3
+          slurmd:
+            image:
+              repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
+              tag: "1.22.1-noble-slurm25.05.4"
+            resources:
+              cpu: "4"
+              memory: "8Gi"
+            volumes:
+              spool:
+                persistentVolumeClaim:
+                  claimName: "spool-pvc"
+              jail:
+                persistentVolumeClaim:
+                  claimName: "jail-pvc"
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "cr.eu-north1.nebius.cloud/soperator/munge"
+              tag: "1.22.1-noble-slurm25.05.4"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+        - name: cpu-workers
+          replicas: 5
+          slurmd:
+            image:
+              repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
+              tag: "1.22.1-noble-slurm25.05.4"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                persistentVolumeClaim:
+                  claimName: "spool-pvc"
+              jail:
+                persistentVolumeClaim:
+                  claimName: "jail-pvc"
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "cr.eu-north1.nebius.cloud/soperator/munge"
+              tag: "1.22.1-noble-slurm25.05.4"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: NodeSet
+      - equal:
+          path: metadata.name
+          value: gpu-workers
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: cpu-workers
+        documentIndex: 1
+
+  - it: should set correct apiVersion and kind
+    set:
+      nodesets:
+        - name: test-workers
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "1"
+              memory: "1Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+    asserts:
+      - equal:
+          path: apiVersion
+          value: slurm.nebius.ai/v1alpha1
+      - equal:
+          path: kind
+          value: NodeSet
+
+  - it: should include common labels
+    set:
+      nodesets:
+        - name: test-workers
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "1"
+              memory: "1Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+    asserts:
+      - exists:
+          path: metadata.labels["helm.sh/chart"]
+      - exists:
+          path: metadata.labels["app.kubernetes.io/name"]
+      - exists:
+          path: metadata.labels["app.kubernetes.io/instance"]
+      - exists:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+
+  - it: should set correct namespace
+    set:
+      nodesets:
+        - name: test-workers
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "1"
+              memory: "1Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+      global:
+        namespace: test-namespace
+    release:
+      namespace: test-namespace
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: test-namespace

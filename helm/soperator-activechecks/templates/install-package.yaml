@@ -7,8 +7,8 @@ spec:
   name: "install-package"
   dependsOn: [ "create-user-soperatorchecks" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  suspend: true
-  runAfterCreation: false
+  suspend: {{ .Values.checks.installPackage.suspend }}
+  runAfterCreation: {{ .Values.checks.installPackage.runAfterCreation }}
   k8sJobSpec:
     jobContainer:
       command:

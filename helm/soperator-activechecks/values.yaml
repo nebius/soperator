@@ -19,20 +19,92 @@ jobContainer:
       persistentVolumeClaim:
         claimName: "jail-pvc"
 images:
-  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.22.4-noble-slurm24.11.6"
-  k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:1.22.4-noble-slurm24.11.6"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.22.4-noble-slurm24.11.6"
+  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.23.0-noble-slurm25.05.4"
+  k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:1.23.0-noble-slurm25.05.4"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.23.0-noble-slurm25.05.4"
 # Pyxis syntax with '#' separator for registry
-activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-4ae0b6d"
-sshCheck:
-  numOfLoginNodes: 2
-createUser:
-  name: "nebius"
-upgradeCuda:
-  cudaVersion: "12.4.1-1"
-upgradeHealthChecker:
-  healthCheckerVersion: "1.0.0-164.251103"
-ensureDirSnccldLogs:
-  enabled: false
-  dir: /opt/soperator-outputs/nccl_logs
-  schedule: 15 0 * * *
+activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-00ce55c"
+checks:
+  allReducePerfNCCLInDocker:
+    suspend: true
+    runAfterCreation: true
+    drainReasonPrefix: "[node_problem]"
+  allReducePerfNCCLWithIB:
+    suspend: false
+    runAfterCreation: true
+    drainReasonPrefix: "[node_problem]"
+  allReducePerfNCCLWithoutIB:
+    suspend: false
+    runAfterCreation: true
+    drainReasonPrefix: "[node_problem]"
+  createUserSoperatorChecks:
+    suspend: true
+    runAfterCreation: true
+  createUser:
+    suspend: true
+    runAfterCreation: true
+    name: "nebius"
+  cudaSamples:
+    suspend: false
+    runAfterCreation: true
+    drainReasonPrefix: "[node_problem]"
+  dcgmiDiagR2:
+    suspend: false
+    runAfterCreation: true
+    drainReasonPrefix: "[node_problem]"
+  dcgmiDiagR3:
+    suspend: true
+    runAfterCreation: true
+    drainReasonPrefix: "[node_problem]"
+  enrootCleanup:
+    suspend: false
+    runAfterCreation: false
+  ensureDirSnccldLogs:
+    suspend: false
+    runAfterCreation: true
+    enabled: false
+    dir: /opt/soperator-outputs/nccl_logs
+    schedule: 15 0 * * *
+  ensureHealthyNodes:
+    suspend: true
+    runAfterCreation: true
+  extensiveCheck:
+    suspend: true
+    runAfterCreation: false
+    drainReasonPrefix: "[hardware_problem]"
+    reservationPrefix: "soperatorchecks.suspicious"
+  gpuFryer:
+    suspend: false
+    runAfterCreation: true
+    drainReasonPrefix: "[node_problem]"
+  ibGpuPerf:
+    suspend: false
+    runAfterCreation: true
+  installPackage:
+    suspend: true
+    runAfterCreation: false
+  memPerf:
+    suspend: false
+    runAfterCreation: true
+    drainReasonPrefix: "[node_problem]"
+  prepullContainerImage:
+    suspend: true
+    runAfterCreation: true
+  soperatorOutputsLogsCleaner:
+    suspend: false
+    runAfterCreation: false
+  sshCheck:
+    suspend: true
+    runAfterCreation: true
+    numOfLoginNodes: 2
+  upgradeCuda:
+    suspend: true
+    runAfterCreation: false
+    cudaVersion: "12.4.1-1"
+  upgradeHealthChecker:
+    suspend: true
+    runAfterCreation: false
+    healthCheckerVersion: "1.0.0-164.251103"
+  waitForTopology:
+    suspend: true
+    runAfterCreation: true

@@ -40,6 +40,29 @@ func TestRenderTopologyConfig(t *testing.T) {
 			},
 		},
 		{
+			name: "With root node and tier-0 label - combined tier1 and higher tiers",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-0": "block0", "tier-1": "switch1", "tier-2": "spine1"},
+				"node2": {"tier-0": "block0", "tier-1": "switch2", "tier-2": "spine2"},
+				"node3": {"tier-0": "block0", "tier-1": "switch1", "tier-2": "spine3"},
+			},
+			podsByNode: map[string][]string{
+				"node1": {"pod1", "pod2"},
+				"node2": {"pod3"},
+				"node3": {"pod4"},
+				"":      {"pod5", "pod6"},
+			},
+			expected: []string{
+				"SwitchName=root Switches=spine1,spine2,spine3,unknown",
+				"SwitchName=spine1 Switches=switch1",
+				"SwitchName=spine2 Switches=switch2",
+				"SwitchName=spine3 Switches=switch1",
+				"SwitchName=switch1 Nodes=pod1,pod2,pod4",
+				"SwitchName=switch2 Nodes=pod3",
+				"SwitchName=unknown Nodes=pod5,pod6",
+			},
+		},
+		{
 			name: "Without root node - combined tier1 and higher tiers",
 			labelsByNode: map[string]tc.NodeTopologyLabels{
 				"node1": {"tier-1": "switch1", "tier-2": "spine1"},

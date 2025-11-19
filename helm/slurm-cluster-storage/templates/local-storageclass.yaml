@@ -4,3 +4,4 @@ metadata:
   name: {{ include "slurm-cluster-storage.class.local.name" . }}
 provisioner: kubernetes.io/no-provisioner
 volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true

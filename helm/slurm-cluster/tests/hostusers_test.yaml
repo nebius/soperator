@@ -1,0 +1,439 @@
+suite: test hostUsers configuration
+templates:
+  - templates/slurm-cluster-cr.yaml
+tests:
+  # Test worker hostUsers default behavior (should default to true via kubebuilder)
+  - it: should not explicitly set hostUsers for worker when not specified in values
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        worker:
+          size: 2
+          k8sNodeFilterName: "gpu"
+    asserts:
+      - notExists:
+          path: spec.slurmNodes.worker.hostUsers
+
+  # Test worker hostUsers can be explicitly set to false
+  - it: should set worker hostUsers to false when explicitly specified
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        worker:
+          size: 2
+          k8sNodeFilterName: "gpu"
+          hostUsers: false
+    asserts:
+      - equal:
+          path: spec.slurmNodes.worker.hostUsers
+          value: false
+
+  # Test worker hostUsers can be explicitly set to true
+  - it: should set worker hostUsers to true when explicitly specified
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        worker:
+          size: 2
+          k8sNodeFilterName: "gpu"
+          hostUsers: true
+    asserts:
+      - equal:
+          path: spec.slurmNodes.worker.hostUsers
+          value: true
+
+  # Test controller hostUsers
+  - it: should not set controller hostUsers when not specified
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        controller:
+          k8sNodeFilterName: "no-gpu"
+    asserts:
+      - notExists:
+          path: spec.slurmNodes.controller.hostUsers
+
+  - it: should set controller hostUsers when explicitly specified
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        controller:
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: false
+    asserts:
+      - equal:
+          path: spec.slurmNodes.controller.hostUsers
+          value: false
+
+  # Test login hostUsers
+  - it: should not set login hostUsers when not specified
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        login:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+    asserts:
+      - notExists:
+          path: spec.slurmNodes.login.hostUsers
+
+  - it: should set login hostUsers when explicitly specified
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        login:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: true
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.hostUsers
+          value: true
+
+  # Test accounting hostUsers
+  - it: should not set accounting hostUsers when not specified
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        accounting:
+          k8sNodeFilterName: "no-gpu"
+    asserts:
+      - notExists:
+          path: spec.slurmNodes.accounting.hostUsers
+
+  - it: should set accounting hostUsers when explicitly specified
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        accounting:
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: false
+    asserts:
+      - equal:
+          path: spec.slurmNodes.accounting.hostUsers
+          value: false
+
+  # Test exporter hostUsers
+  - it: should not set exporter hostUsers when not specified
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        exporter:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+    asserts:
+      - notExists:
+          path: spec.slurmNodes.exporter.hostUsers
+
+  - it: should set exporter hostUsers when explicitly specified
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        exporter:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: true
+    asserts:
+      - equal:
+          path: spec.slurmNodes.exporter.hostUsers
+          value: true
+
+  # Test rest hostUsers
+  - it: should not set rest hostUsers when not specified
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        rest:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+    asserts:
+      - notExists:
+          path: spec.slurmNodes.rest.hostUsers
+
+  - it: should set rest hostUsers when explicitly specified
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        rest:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: false
+    asserts:
+      - equal:
+          path: spec.slurmNodes.rest.hostUsers
+          value: false
+
+  # Test populateJail hostUsers
+  - it: should not set populateJail hostUsers when not specified
+    set:
+      clusterName: test-cluster
+      populateJail:
+        k8sNodeFilterName: "gpu"
+    asserts:
+      - notExists:
+          path: spec.populateJail.hostUsers
+
+  - it: should set populateJail hostUsers when explicitly specified
+    set:
+      clusterName: test-cluster
+      populateJail:
+        k8sNodeFilterName: "gpu"
+        hostUsers: true
+    asserts:
+      - equal:
+          path: spec.populateJail.hostUsers
+          value: true
+
+  # Test sConfigController hostUsers
+  - it: should not set sConfigController hostUsers when not specified
+    set:
+      clusterName: test-cluster
+      sConfigController:
+        node:
+          size: 1
+          k8sNodeFilterName: "system"
+    asserts:
+      - notExists:
+          path: spec.sConfigController.hostUsers
+
+  - it: should set sConfigController hostUsers when explicitly specified
+    set:
+      clusterName: test-cluster
+      sConfigController:
+        node:
+          size: 1
+          k8sNodeFilterName: "system"
+        hostUsers: false
+    asserts:
+      - equal:
+          path: spec.sConfigController.hostUsers
+          value: false
+  # Test that worker defaults to true when not explicitly set (kubebuilder default)
+  - it: should allow worker to use kubebuilder default for hostUsers
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        worker:
+          size: 2
+          k8sNodeFilterName: "gpu"
+        controller:
+          k8sNodeFilterName: "no-gpu"
+        login:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+        accounting:
+          k8sNodeFilterName: "no-gpu"
+        exporter:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+        rest:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+      sConfigController:
+        node:
+          size: 1
+          k8sNodeFilterName: "system"
+      populateJail:
+        k8sNodeFilterName: "gpu"
+    asserts:
+      # Worker should not have hostUsers set (letting kubebuilder default to true)
+      - notExists:
+          path: spec.slurmNodes.worker.hostUsers
+      # Other components should not have hostUsers set
+      - notExists:
+          path: spec.slurmNodes.controller.hostUsers
+      - notExists:
+          path: spec.slurmNodes.login.hostUsers
+      - notExists:
+          path: spec.slurmNodes.accounting.hostUsers
+      - notExists:
+          path: spec.slurmNodes.exporter.hostUsers
+      - notExists:
+          path: spec.slurmNodes.rest.hostUsers
+      - notExists:
+          path: spec.sConfigController.hostUsers
+      - notExists:
+          path: spec.populateJail.hostUsers
+
+  # Test mixed hostUsers configuration
+  - it: should handle mixed hostUsers configuration correctly
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        worker:
+          size: 2
+          k8sNodeFilterName: "gpu"
+          hostUsers: true
+        controller:
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: false
+        login:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: true
+        accounting:
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: false
+        exporter:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: true
+        rest:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: false
+      sConfigController:
+        node:
+          size: 1
+          k8sNodeFilterName: "system"
+        hostUsers: true
+      populateJail:
+        k8sNodeFilterName: "gpu"
+        hostUsers: false
+    asserts:
+      - equal:
+          path: spec.slurmNodes.worker.hostUsers
+          value: true
+      - equal:
+          path: spec.slurmNodes.controller.hostUsers
+          value: false
+      - equal:
+          path: spec.slurmNodes.login.hostUsers
+          value: true
+      - equal:
+          path: spec.slurmNodes.accounting.hostUsers
+          value: false
+      - equal:
+          path: spec.slurmNodes.exporter.hostUsers
+          value: true
+      - equal:
+          path: spec.slurmNodes.rest.hostUsers
+          value: false
+      - equal:
+          path: spec.sConfigController.hostUsers
+          value: true
+      - equal:
+          path: spec.populateJail.hostUsers
+          value: false
+
+  # Test security scenario - all components with restricted hostUsers
+  - it: should support security-hardened configuration with hostUsers false
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        worker:
+          size: 2
+          k8sNodeFilterName: "gpu"
+          hostUsers: false
+        controller:
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: false
+        login:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: false
+        accounting:
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: false
+        exporter:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: false
+        rest:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: false
+      sConfigController:
+        node:
+          size: 1
+          k8sNodeFilterName: "system"
+        hostUsers: false
+      populateJail:
+        k8sNodeFilterName: "gpu"
+        hostUsers: false
+    asserts:
+      - equal:
+          path: spec.slurmNodes.worker.hostUsers
+          value: false
+      - equal:
+          path: spec.slurmNodes.controller.hostUsers
+          value: false
+      - equal:
+          path: spec.slurmNodes.login.hostUsers
+          value: false
+      - equal:
+          path: spec.slurmNodes.accounting.hostUsers
+          value: false
+      - equal:
+          path: spec.slurmNodes.exporter.hostUsers
+          value: false
+      - equal:
+          path: spec.slurmNodes.rest.hostUsers
+          value: false
+      - equal:
+          path: spec.sConfigController.hostUsers
+          value: false
+      - equal:
+          path: spec.populateJail.hostUsers
+          value: false
+
+  # Test permissive scenario - all components with hostUsers true
+  - it: should support permissive configuration with hostUsers true
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        worker:
+          size: 2
+          k8sNodeFilterName: "gpu"
+          hostUsers: true
+        controller:
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: true
+        login:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: true
+        accounting:
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: true
+        exporter:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: true
+        rest:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          hostUsers: true
+      sConfigController:
+        node:
+          size: 1
+          k8sNodeFilterName: "system"
+        hostUsers: true
+      populateJail:
+        k8sNodeFilterName: "gpu"
+        hostUsers: true
+    asserts:
+      - equal:
+          path: spec.slurmNodes.worker.hostUsers
+          value: true
+      - equal:
+          path: spec.slurmNodes.controller.hostUsers
+          value: true
+      - equal:
+          path: spec.slurmNodes.login.hostUsers
+          value: true
+      - equal:
+          path: spec.slurmNodes.accounting.hostUsers
+          value: true
+      - equal:
+          path: spec.slurmNodes.exporter.hostUsers
+          value: true
+      - equal:
+          path: spec.slurmNodes.rest.hostUsers
+          value: true
+      - equal:
+          path: spec.sConfigController.hostUsers
+          value: true
+      - equal:
+          path: spec.populateJail.hostUsers
+          value: true

@@ -7,8 +7,8 @@ spec:
   name: "prepull-container-image"
   dependsOn: [ "create-user-soperatorchecks", "wait-for-topology" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  suspend: true
-  runAfterCreation: true
+  suspend: {{ .Values.checks.prepullContainerImage.suspend }}
+  runAfterCreation: {{ .Values.checks.prepullContainerImage.runAfterCreation }}
   slurmJobSpec:
     sbatchScript: |
 {{ tpl (.Files.Get "scripts/prepull-container-image.sh") . | indent 6 }}
