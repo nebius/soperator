@@ -24,6 +24,7 @@ health-checker list -e soperator -p $platform
 
 LAST_RUN_ID=""
 OUT_TMPL="/opt/soperator-outputs/slurm_jobs/%N.extensive-check:@TEST@.%s.%j.out"
+HC_OUTPUT_DIR="/opt/soperator-outputs/health_checker_cmd_stdout"
 
 _run_and_parse_hc() {
   local HC_OUTPUT HC_STATUS JSON_BLOCK
@@ -91,7 +92,7 @@ cuda_samples() {
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
     --cpu-bind=verbose --container-image={{ include "activecheck.image.pyxis" . }} \
-    --container-mounts=$(which health-checker):/usr/local/bin/health-checker \
+    --container-mounts=$(which health-checker):/usr/local/bin/health-checker,$HC_OUTPUT_DIR:$HC_OUTPUT_DIR \
     bash -c "health-checker run -e soperator -p $platform -n deviceQuery,vectorAdd,simpleMultiGPU,p2pBandwidthLatencyTest -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
 
@@ -113,7 +114,7 @@ gpu_fryer() {
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
     --cpu-bind=verbose --container-image={{ include "activecheck.image.pyxis" . }} \
-    --container-mounts=$(which health-checker):/usr/local/bin/health-checker \
+    --container-mounts=$(which health-checker):/usr/local/bin/health-checker,$HC_OUTPUT_DIR:$HC_OUTPUT_DIR \
     bash -c "HC_GPU_FRYER_DURATION=300 health-checker run -e soperator -p $platform -n gpu_fryer -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
 
@@ -125,7 +126,7 @@ ib_gpu_perf() {
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
     --container-image={{ include "activecheck.image.pyxis" . }} \
-    --container-mounts=$(which health-checker):/usr/local/bin/health-checker --cpu-bind=verbose,cores \
+    --container-mounts=$(which health-checker):/usr/local/bin/health-checker,$HC_OUTPUT_DIR:$HC_OUTPUT_DIR --cpu-bind=verbose,cores \
     bash -c "health-checker run -e soperator -p $platform -n ^ib_write_bw_gpu.*$,^ib_send_lat_gpu.*$,^ib_read_lat_gpu.*$ -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
 
@@ -137,7 +138,7 @@ mem_perf() {
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
     --container-image={{ include "activecheck.image.pyxis" . }} \
-    --container-mounts=$(which health-checker):/usr/local/bin/health-checker --cpu-bind=verbose,cores \
+    --container-mounts=$(which health-checker):/usr/local/bin/health-checker,$HC_OUTPUT_DIR:$HC_OUTPUT_DIR --cpu-bind=verbose,cores \
     bash -c "health-checker run -e soperator -p $platform -n mem_bw,mem_lat -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
 
