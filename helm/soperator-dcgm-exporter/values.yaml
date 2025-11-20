@@ -17,9 +17,8 @@ daemonSet:
 
   nvidiaDcgmExporter:
     image:
-      repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator/image/dcgm-exporter
-      tag: 3.3.9-3.6.1-ubuntu22.04
-
+      repository: nvcr.io/nvidia/k8s/dcgm-exporter
+      tag: 4.4.2-4.7.0-ubuntu22.04
     env:
       dcgmExporterListen: :9400
 
