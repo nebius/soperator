@@ -40,7 +40,7 @@ spec:
       name: Slurm Status
       type: string
     - description: Submission time of the last Slurm job
-      jsonPath: .status.slurmJobStatus.lastRunSubmitTime
+      jsonPath: .status.slurmJobsStatus.lastRunSubmitTime
       name: Slurm Submit Time
       type: string
     - description: ID of the last Slurm job

@@ -52,10 +52,10 @@ passive_checks() {
   local NAME="passive-checks"
   local OUT_FILE="${OUT_TMPL/@TEST@/$NAME}"
 
-  _run_and_parse_hc srun -J "passive-checks" \
+  _run_and_parse_hc srun -J "$NAME" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
-    --cpu-bind=verbose,cores bash -c \
+    --cpu-bind=cores bash -l -c \
     "cd /tmp && \
     HC_DCGMI_DIAG_R1_DEBUGLOGFILE=/dev/null HC_DCGMI_DIAG_R1_DEBUGLEVEL=NONE \
     health-checker run -e soperator -p $platform \
@@ -65,81 +65,81 @@ passive_checks() {
 }
 
 all_reduce_with_ib() {
-  local NAME="all-reduce-with-ib"
+  local NAME="all-reduce-perf-nccl-with-ib"
   local OUT_FILE="${OUT_TMPL/@TEST@/$NAME}"
 
-  _run_and_parse_hc srun -J "all-reduce-with-ib" \
+  _run_and_parse_hc srun -J "$NAME" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
-    --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n all_reduce_with_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info"
+    --cpu-bind=cores bash -l -c "health-checker run -e soperator -p $platform -n all_reduce_with_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info"
 }
 
 all_reduce_without_ib() {
-  local NAME="all-reduce-without-ib"
+  local NAME="all-reduce-perf-nccl-without-ib"
   local OUT_FILE="${OUT_TMPL/@TEST@/$NAME}"
 
-  _run_and_parse_hc srun -J "all-reduce-without-ib" \
+  _run_and_parse_hc srun -J "$NAME" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
-    --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n all_reduce_without_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info"
+    --cpu-bind=cores bash -l -c "health-checker run -e soperator -p $platform -n all_reduce_without_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info"
 }
 
 cuda_samples() {
   local NAME="cuda-samples"
   local OUT_FILE="${OUT_TMPL/@TEST@/$NAME}"
 
-  _run_and_parse_hc srun -J "cuda-samples" \
+  _run_and_parse_hc srun -J "$NAME" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
-    --cpu-bind=verbose --container-image={{ include "activecheck.image.pyxis" . }} \
+    --container-image={{ include "activecheck.image.pyxis" . }} \
     --container-mounts=$(which health-checker):/usr/local/bin/health-checker,$HC_OUTPUT_DIR:$HC_OUTPUT_DIR \
-    bash -c "health-checker run -e soperator -p $platform -n deviceQuery,vectorAdd,simpleMultiGPU,p2pBandwidthLatencyTest -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
+    bash -l -c "health-checker run -e soperator -p $platform -n deviceQuery,vectorAdd,simpleMultiGPU,p2pBandwidthLatencyTest -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
 
 dcgmi_diag_r2() {
   local NAME="dcgmi-diag-r2"
   local OUT_FILE="${OUT_TMPL/@TEST@/$NAME}"
 
-  _run_and_parse_hc srun -J "dcgmi-diag-r2" \
+  _run_and_parse_hc srun -J "$NAME" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
-    --cpu-bind=verbose,cores bash -c "health-checker run -e soperator -p $platform -n dcgmi_diag_r2 -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
+    --cpu-bind=cores bash -l -c "health-checker run -e soperator -p $platform -n dcgmi_diag_r2 -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
 
 gpu_fryer() {
   local NAME="gpu-fryer"
   local OUT_FILE="${OUT_TMPL/@TEST@/$NAME}"
 
-  _run_and_parse_hc srun -J "gpu-fryer" \
+  _run_and_parse_hc srun -J "$NAME" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
-    --cpu-bind=verbose --container-image={{ include "activecheck.image.pyxis" . }} \
+    --container-image={{ include "activecheck.image.pyxis" . }} \
     --container-mounts=$(which health-checker):/usr/local/bin/health-checker,$HC_OUTPUT_DIR:$HC_OUTPUT_DIR \
-    bash -c "HC_GPU_FRYER_DURATION=300 health-checker run -e soperator -p $platform -n gpu_fryer -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
+    bash -l -c "HC_GPU_FRYER_DURATION=300 health-checker run -e soperator -p $platform -n gpu_fryer -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
 
 ib_gpu_perf() {
   local NAME="ib-gpu-perf"
   local OUT_FILE="${OUT_TMPL/@TEST@/$NAME}"
 
-  _run_and_parse_hc srun -J "ib-gpu-perf" \
+  _run_and_parse_hc srun -J "$NAME" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
     --container-image={{ include "activecheck.image.pyxis" . }} \
-    --container-mounts=$(which health-checker):/usr/local/bin/health-checker,$HC_OUTPUT_DIR:$HC_OUTPUT_DIR --cpu-bind=verbose,cores \
-    bash -c "health-checker run -e soperator -p $platform -n ^ib_write_bw_gpu.*$,^ib_send_lat_gpu.*$,^ib_read_lat_gpu.*$ -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
+    --container-mounts=$(which health-checker):/usr/local/bin/health-checker,$HC_OUTPUT_DIR:$HC_OUTPUT_DIR --cpu-bind=cores \
+    bash -l -c "health-checker run -e soperator -p $platform -n ^ib_write_bw_gpu.*$,^ib_send_lat_gpu.*$,^ib_read_lat_gpu.*$ -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
 
 mem_perf() {
   local NAME="mem-perf"
   local OUT_FILE="${OUT_TMPL/@TEST@/$NAME}"
 
-  _run_and_parse_hc srun -J "mem-perf" \
+  _run_and_parse_hc srun -J "$NAME" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
     --container-image={{ include "activecheck.image.pyxis" . }} \
-    --container-mounts=$(which health-checker):/usr/local/bin/health-checker,$HC_OUTPUT_DIR:$HC_OUTPUT_DIR --cpu-bind=verbose,cores \
-    bash -c "health-checker run -e soperator -p $platform -n mem_bw,mem_lat -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
+    --container-mounts=$(which health-checker):/usr/local/bin/health-checker,$HC_OUTPUT_DIR:$HC_OUTPUT_DIR --cpu-bind=cores \
+    bash -l -c "health-checker run -e soperator -p $platform -n mem_bw,mem_lat -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
 
 funcs_to_test=(

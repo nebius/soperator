@@ -23,9 +23,9 @@ fi
 echo "Platform found: $platform"
 echo "Running cuda samples check on $(hostname)..."
 HC_OUTPUT_DIR="/opt/soperator-outputs/health_checker_cmd_stdout"
-HC_OUTPUT=$(srun --cpu-bind=verbose --container-image={{ include "activecheck.image.pyxis" . }} \
+HC_OUTPUT=$(srun --container-image={{ include "activecheck.image.pyxis" . }} \
   --container-mounts=$(which health-checker):/usr/local/bin/health-checker,$HC_OUTPUT_DIR:$HC_OUTPUT_DIR \
-  bash -c "health-checker run -e soperator -p $platform -n deviceQuery,vectorAdd,simpleMultiGPU,p2pBandwidthLatencyTest -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout")
+  bash -l -c "health-checker run -e soperator -p $platform -n deviceQuery,vectorAdd,simpleMultiGPU,p2pBandwidthLatencyTest -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout")
 
 echo "Health checker output: $HC_OUTPUT"
 HC_STATUS=$(echo "$HC_OUTPUT" | awk '/^\s*{/,/^\s*}/' | jq -r '.status')
