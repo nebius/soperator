@@ -52,7 +52,7 @@ passive_checks() {
   local NAME="passive-checks"
   local OUT_FILE="${OUT_TMPL/@TEST@/$NAME}"
 
-  _run_and_parse_hc srun -J "passive-checks" \
+  _run_and_parse_hc srun -J "$NAME" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
     --cpu-bind=cores bash -l -c \
@@ -65,20 +65,20 @@ passive_checks() {
 }
 
 all_reduce_with_ib() {
-  local NAME="all-reduce-with-ib"
+  local NAME="all-reduce-perf-nccl-with-ib"
   local OUT_FILE="${OUT_TMPL/@TEST@/$NAME}"
 
-  _run_and_parse_hc srun -J "all-reduce-with-ib" \
+  _run_and_parse_hc srun -J "$NAME" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
     --cpu-bind=cores bash -l -c "health-checker run -e soperator -p $platform -n all_reduce_with_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info"
 }
 
 all_reduce_without_ib() {
-  local NAME="all-reduce-without-ib"
+  local NAME="all-reduce-perf-nccl-without-ib"
   local OUT_FILE="${OUT_TMPL/@TEST@/$NAME}"
 
-  _run_and_parse_hc srun -J "all-reduce-without-ib" \
+  _run_and_parse_hc srun -J "$NAME" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
     --cpu-bind=cores bash -l -c "health-checker run -e soperator -p $platform -n all_reduce_without_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info"
@@ -88,7 +88,7 @@ cuda_samples() {
   local NAME="cuda-samples"
   local OUT_FILE="${OUT_TMPL/@TEST@/$NAME}"
 
-  _run_and_parse_hc srun -J "cuda-samples" \
+  _run_and_parse_hc srun -J "$NAME" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
     --container-image={{ include "activecheck.image.pyxis" . }} \
@@ -100,7 +100,7 @@ dcgmi_diag_r2() {
   local NAME="dcgmi-diag-r2"
   local OUT_FILE="${OUT_TMPL/@TEST@/$NAME}"
 
-  _run_and_parse_hc srun -J "dcgmi-diag-r2" \
+  _run_and_parse_hc srun -J "$NAME" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
     --cpu-bind=cores bash -l -c "health-checker run -e soperator -p $platform -n dcgmi_diag_r2 -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
@@ -110,7 +110,7 @@ gpu_fryer() {
   local NAME="gpu-fryer"
   local OUT_FILE="${OUT_TMPL/@TEST@/$NAME}"
 
-  _run_and_parse_hc srun -J "gpu-fryer" \
+  _run_and_parse_hc srun -J "$NAME" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
     --container-image={{ include "activecheck.image.pyxis" . }} \
@@ -122,7 +122,7 @@ ib_gpu_perf() {
   local NAME="ib-gpu-perf"
   local OUT_FILE="${OUT_TMPL/@TEST@/$NAME}"
 
-  _run_and_parse_hc srun -J "ib-gpu-perf" \
+  _run_and_parse_hc srun -J "$NAME" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
     --container-image={{ include "activecheck.image.pyxis" . }} \
@@ -134,7 +134,7 @@ mem_perf() {
   local NAME="mem-perf"
   local OUT_FILE="${OUT_TMPL/@TEST@/$NAME}"
 
-  _run_and_parse_hc srun -J "mem-perf" \
+  _run_and_parse_hc srun -J "$NAME" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
     --container-image={{ include "activecheck.image.pyxis" . }} \
