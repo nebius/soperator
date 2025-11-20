@@ -91,7 +91,7 @@ cuda_samples() {
   _run_and_parse_hc srun -J "cuda-samples" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
-    --cpu-bind=cores --container-image={{ include "activecheck.image.pyxis" . }} \
+    --container-image={{ include "activecheck.image.pyxis" . }} \
     --container-mounts=$(which health-checker):/usr/local/bin/health-checker,$HC_OUTPUT_DIR:$HC_OUTPUT_DIR \
     bash -l -c "health-checker run -e soperator -p $platform -n deviceQuery,vectorAdd,simpleMultiGPU,p2pBandwidthLatencyTest -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
@@ -113,7 +113,7 @@ gpu_fryer() {
   _run_and_parse_hc srun -J "gpu-fryer" \
     --output="$OUT_FILE" \
     --error="$OUT_FILE" \
-    --cpu-bind=cores --container-image={{ include "activecheck.image.pyxis" . }} \
+    --container-image={{ include "activecheck.image.pyxis" . }} \
     --container-mounts=$(which health-checker):/usr/local/bin/health-checker,$HC_OUTPUT_DIR:$HC_OUTPUT_DIR \
     bash -l -c "HC_GPU_FRYER_DURATION=300 health-checker run -e soperator -p $platform -n gpu_fryer -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout"
 }
