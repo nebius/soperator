@@ -20,14 +20,13 @@ checks:
         cpu: 50m
         memory: 64Mi
   manager:
+    enableNodeReplacement: false
     args:
-      - --enable-node-replacement=false
       - --log-format=json
       - --log-level=info
       - --reconcile-timeout=3m
       - --max-concurrent-reconciles=1
       - --cache-sync-timeout=2m
-      - --enable-node-replacement=false
       - --not-ready-timeout=15m
       - --delete-not-ready-nodes=true
       - --leader-elect
