@@ -6,7 +6,7 @@ require (
 	github.com/SlinkyProject/slurm-client v0.3.1-20250801102150-043094ce1e4e
 	github.com/go-logr/logr v1.4.3
 	github.com/golang-jwt/jwt/v5 v5.3.0
-	github.com/gruntwork-io/terratest v0.52.0
+	github.com/gruntwork-io/terratest v0.53.0
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/hashicorp/hcl/v2 v2.22.0
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -20,7 +20,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/zclconf/go-cty v1.17.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.44.0
+	golang.org/x/crypto v0.45.0
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
 	istio.io/pkg v0.0.0-20241216214326-d70796207df3
 	k8s.io/api v0.34.2
@@ -120,7 +120,7 @@ require (
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/net v0.46.0 // indirect
+	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sys v0.38.0
 	golang.org/x/term v0.37.0 // indirect

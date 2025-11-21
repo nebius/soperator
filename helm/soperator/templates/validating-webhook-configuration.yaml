@@ -1,44 +1,26 @@
----
-apiVersion: admissionregistration.k8s.io/v1
-kind: MutatingWebhookConfiguration
-metadata:
-  name: mutating-webhook-configuration
-webhooks:
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-slurm-nebius-ai-v1alpha1-nodeset
-  failurePolicy: Fail
-  name: mnodeset-v1alpha1.kb.io
-  rules:
-  - apiGroups:
-    - slurm.nebius.ai
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - nodesets
-  sideEffects: None
----
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: validating-webhook-configuration
+  name: {{ include "soperator.fullname" . }}-validating-webhook-configuration
+  {{- if .Values.certManager.enabled }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "soperator.fullname" . }}-serving-cert
+  {{- end }}
+  labels:
+  {{- include "soperator.labels" . | nindent 4 }}
 webhooks:
 - admissionReviewVersions:
   - v1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: '{{ include "soperator.fullname" . }}-webhook-service'
+      namespace: '{{ .Release.Namespace }}'
       path: /validate--v1-secret
   failurePolicy: Fail
   name: vsecret-v1.kb.io
+  objectSelector:
+    matchLabels:
+      slurm.nebius.ai/webhook: "true"
   rules:
   - apiGroups:
     - ""
@@ -55,8 +37,8 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: '{{ include "soperator.fullname" . }}-webhook-service'
+      namespace: '{{ .Release.Namespace }}'
       path: /validate-slurm-nebius-ai-v1-slurmcluster
   failurePolicy: Fail
   name: vslurmcluster-v1.kb.io
@@ -75,8 +57,8 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: '{{ include "soperator.fullname" . }}-webhook-service'
+      namespace: '{{ .Release.Namespace }}'
       path: /validate-slurm-nebius-ai-v1alpha1-nodeset
   failurePolicy: Fail
   name: vnodeset-v1alpha1.kb.io
