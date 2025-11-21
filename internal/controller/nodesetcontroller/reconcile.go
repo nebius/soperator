@@ -93,7 +93,7 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		cluster.Spec.UseDefaultAppArmorProfile,
 	)
 
-	if err = r.ReconcileNodeSetWorkers(ctx, nodeSet, &nodeSetValues); err != nil {
+	if err = r.executeReconciliation(ctx, nodeSet, &nodeSetValues, cluster); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -131,14 +131,13 @@ func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv
 	return nil
 }
 
-// ReconcileNodeSetWorkers reconciles all resources necessary for deploying Slurm NodeSet workers
-func (r NodeSetReconciler) ReconcileNodeSetWorkers(
+// executeReconciliation reconciles all resources necessary for deploying Slurm NodeSet workers
+func (r NodeSetReconciler) executeReconciliation(
 	ctx context.Context,
 	nodeSet *slurmv1alpha1.NodeSet,
 	nodeSetValues *values.SlurmNodeSet,
+	cluster *slurmv1.SlurmCluster,
 ) error {
-	logger := log.FromContext(ctx)
-
 	steps := []utils.MultiStepExecutionStep{
 		{
 			Name: "Security limits ConfigMap",
@@ -171,13 +170,7 @@ func (r NodeSetReconciler) ReconcileNodeSetWorkers(
 				stepLogger.V(1).Info("Rendered")
 
 				// Cluster has to be the owner of the umbrella service, as it should not be deleted by deleting one of node sets
-				cluster, err := resourcegetter.GetCluster(ctx, r.Client, nodeSetValues.ParentalCluster)
-				if err != nil {
-					stepLogger.Error(err, "Failed to get parental cluster")
-					return fmt.Errorf("getting %s parental cluster %s/%s: %w", slurmv1alpha1.KindNodeSet, nodeSetValues.ParentalCluster.Namespace, nodeSetValues.ParentalCluster.Name, err)
-				}
-
-				if err = r.Service.Reconcile(stepCtx, cluster, &desired, nil); err != nil {
+				if err := r.Service.Reconcile(stepCtx, cluster, &desired, nil); err != nil {
 					stepLogger.Error(err, "Failed to reconcile")
 					return fmt.Errorf("reconciling umbrella worker Service: %w", err)
 				}
@@ -213,15 +206,9 @@ func (r NodeSetReconciler) ReconcileNodeSetWorkers(
 				stepLogger := log.FromContext(stepCtx)
 				stepLogger.V(1).Info("Reconciling")
 
-				cluster, err := resourcegetter.GetCluster(ctx, r.Client, nodeSetValues.ParentalCluster)
-				if err != nil {
-					stepLogger.Error(err, "Failed to get parental cluster")
-					return fmt.Errorf("getting %s parental cluster %s/%s: %w", slurmv1alpha1.KindNodeSet, nodeSetValues.ParentalCluster.Namespace, nodeSetValues.ParentalCluster.Name, err)
-				}
-
 				secrets := values.BuildSecretsFrom(&cluster.Spec.Secrets)
 				if cluster.Spec.Secrets.SshdKeysName == "" {
-					logger.V(1).Info("SshdKeysName is empty. Using default name")
+					stepLogger.V(1).Info("SshdKeysName is empty. Using default name")
 					secrets.SshdKeysName = naming.BuildSecretSSHDKeysName(cluster.Name)
 				}
 
@@ -254,16 +241,17 @@ func (r NodeSetReconciler) ReconcileNodeSetWorkers(
 		},
 	}
 
+	logger := log.FromContext(ctx)
 	if err := utils.ExecuteMultiStep(ctx,
-		"Reconciliation of Slurm NodeSet workers",
+		"Reconciliation of Slurm NodeSet resources",
 		utils.MultiStepExecutionStrategyCollectErrors,
 		steps...,
 	); err != nil {
-		logger.Error(err, "Failed to reconcile Slurm NodeSet workers")
-		return fmt.Errorf("reconciling Slurm NodeSet workers: %w", err)
+		logger.Error(err, "Failed to reconcile resources")
+		return fmt.Errorf("reconciling Slurm NodeSet resources: %w", err)
 	}
 
-	logger.Info("Reconciled Slurm NodeSet workers")
+	logger.Info("Reconciled resources")
 	return nil
 }
 
