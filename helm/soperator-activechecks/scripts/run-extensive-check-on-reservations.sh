@@ -51,16 +51,21 @@ delete() {
 
 echo "Submitting k8s jobs for active check $TARGET_ACTIVE_CHECK_NAME for reserved nodes with prefix $RESERVATION_PREFIX ..."
 
+submitted_jobs=0
 for reservationName in $(scontrol show reservation --json | jq -r --arg RESERVATION_PREFIX "$RESERVATION_PREFIX" '.reservations | .[] | select(.name | startswith($RESERVATION_PREFIX)) | .name' ); do
   jobName="$TARGET_ACTIVE_CHECK_NAME-$reservationName"
 
   action=$(whatToDo)
   if [[ "$action" == "create" ]]; then
     create
+    ((submitted_jobs++))
   elif [[ "$action" == "delete_create" ]]; then
     delete
     create
+    ((submitted_jobs++))
   else
     echo "doing nothing. The job is still running"
   fi
 done
+
+echo "$submitted_jobs jobs were submitted"

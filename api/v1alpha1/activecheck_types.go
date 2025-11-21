@@ -222,7 +222,7 @@ type JobAndReason struct {
 // +kubebuilder:printcolumn:name="Schedule",type=string,JSONPath=`.spec.schedule`,description="Schedule"
 // +kubebuilder:printcolumn:name="K8s Status",type=string,JSONPath=`.status.k8sJobsStatus.lastJobStatus`,description="Status of the last K8s job"
 // +kubebuilder:printcolumn:name="Slurm Status",type=string,JSONPath=`.status.slurmJobsStatus.lastRunStatus`,description="Status of the last Slurm job"
-// +kubebuilder:printcolumn:name="Slurm Submit Time",type=string,JSONPath=`.status.slurmJobStatus.lastRunSubmitTime`,description="Submission time of the last Slurm job"
+// +kubebuilder:printcolumn:name="Slurm Submit Time",type=string,JSONPath=`.status.slurmJobsStatus.lastRunSubmitTime`,description="Submission time of the last Slurm job"
 // +kubebuilder:printcolumn:name="Slurm ID",type=string,JSONPath=`.status.slurmJobsStatus.lastRunId`,description="ID of the last Slurm job"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`,description="When the job was created"
 
