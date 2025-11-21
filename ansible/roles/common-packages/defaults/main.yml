@@ -10,7 +10,7 @@ common_packages:
   - gnupg=2.4.4-2ubuntu17.3
   - jq=1.7.1-3ubuntu0.24.04.1
   - kmod=31+20240202-2ubuntu7.1
-  - libdrm-dev=2.4.122-1~ubuntu0.24.04.1
+  - libdrm-dev=2.4.122-1~ubuntu0.24.04.2
   - libevent-dev=2.1.12-stable-9ubuntu2
   - libjansson-dev=2.14-2build2
   - liblz4-dev=1.9.4-1build1.1
