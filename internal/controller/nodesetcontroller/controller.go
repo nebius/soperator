@@ -153,3 +153,13 @@ func (r *NodeSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	return result, errorsStd.Join(err, statusErr)
 }
+
+func (r *NodeSetReconciler) patchStatus(ctx context.Context, obj *slurmv1alpha1.NodeSet, patcher func(status *slurmv1alpha1.NodeSetStatus)) error {
+	patch := client.MergeFrom(obj.DeepCopy())
+	patcher(&obj.Status)
+	if err := r.Status().Patch(ctx, obj, patch); err != nil {
+		log.FromContext(ctx).Error(err, "Failed to patch status")
+		return fmt.Errorf("patching cluster status: %w", err)
+	}
+	return nil
+}

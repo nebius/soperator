@@ -3,8 +3,11 @@ package nodesetcontroller
 import (
 	"context"
 	"fmt"
+	"time"
 
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -14,6 +17,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/state"
 	"nebius.ai/slurm-operator/internal/logfield"
@@ -96,6 +100,42 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 	if err = r.executeReconciliation(ctx, nodeSet, &nodeSetValues, cluster); err != nil {
 		return ctrl.Result{}, err
 	}
+
+	// region Maintenance condition
+	{
+		var condition metav1.Condition
+		if check.IsMaintenanceActive(nodeSetValues.Maintenance) {
+			condition = metav1.Condition{
+				Type:    slurmv1alpha1.ConditionNodeSetStatefulSetTerminated,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Maintenance",
+				Message: "Workers are disabled",
+			}
+		} else {
+			condition = metav1.Condition{
+				Type:    slurmv1alpha1.ConditionNodeSetStatefulSetTerminated,
+				Status:  metav1.ConditionFalse,
+				Message: "Workers are enabled",
+			}
+		}
+
+		if err = r.patchStatus(ctx, nodeSet, func(status *slurmv1alpha1.NodeSetStatus) {
+			status.SetCondition(condition)
+		}); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+	// endregion Maintenance condition
+
+	// region Validation
+	if res, err := r.validateResources(ctx, nodeSet, &nodeSetValues); err != nil {
+		logger.Error(err, "Failed to validate Slurm workers")
+		return ctrl.Result{}, fmt.Errorf("validating Slurm workers: %w", err)
+	} else if res.RequeueAfter > 0 {
+		logger.Info("Reconciliation requeued")
+		return res, nil
+	}
+	// endregion Validation
 
 	logger.Info("Finished reconciliation")
 
@@ -253,6 +293,72 @@ func (r NodeSetReconciler) executeReconciliation(
 
 	logger.Info("Reconciled resources")
 	return nil
+}
+
+func (r NodeSetReconciler) validateResources(
+	ctx context.Context,
+	nodeSet *slurmv1alpha1.NodeSet,
+	nodeSetValues *values.SlurmNodeSet,
+) (ctrl.Result, error) {
+	const requeueDuration = 10 * time.Second
+	var (
+		res = ctrl.Result{}
+	)
+
+	logger := log.FromContext(ctx)
+
+	existing := &kruisev1b1.StatefulSet{}
+	err := r.Get(
+		ctx,
+		types.NamespacedName{
+			Namespace: nodeSetValues.ParentalCluster.Namespace,
+			Name:      nodeSetValues.StatefulSet.Name,
+		},
+		existing,
+	)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return ctrl.Result{RequeueAfter: requeueDuration}, nil
+		}
+		logger.Error(err, "Failed to get StatefulSet")
+		return res, fmt.Errorf("getting StatefulSet: %w", err)
+	}
+
+	if err = r.patchStatus(ctx, nodeSet, func(status *slurmv1alpha1.NodeSetStatus) {
+		status.Replicas = existing.Status.ReadyReplicas
+	}); err != nil {
+		logger.Error(err, "Failed to update Replicas status")
+		return res, fmt.Errorf("updating .Status.Replicas: %w", err)
+	}
+
+	{
+		var (
+			condition metav1.Condition
+		)
+		if existing.Status.ReadyReplicas == nodeSetValues.StatefulSet.Replicas {
+			condition = metav1.Condition{
+				Type:    slurmv1alpha1.ConditionNodeSetPodsReady,
+				Status:  metav1.ConditionTrue,
+				Message: "NodeSet is ready",
+			}
+		} else {
+			condition = metav1.Condition{
+				Type:    slurmv1alpha1.ConditionNodeSetPodsReady,
+				Status:  metav1.ConditionFalse,
+				Message: "NodeSet is not ready",
+				Reason:  "Not all nodes are ready",
+			}
+			res.RequeueAfter += requeueDuration
+		}
+
+		if err = r.patchStatus(ctx, nodeSet, func(status *slurmv1alpha1.NodeSetStatus) {
+			status.SetCondition(condition)
+		}); err != nil {
+			return res, err
+		}
+	}
+
+	return res, nil
 }
 
 func (r NodeSetReconciler) getWorkersStatefulSetDependencies(
