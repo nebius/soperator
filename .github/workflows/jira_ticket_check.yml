@@ -1,0 +1,46 @@
+name: Jira Ticket Check
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  jira-ticket-check:
+    name: Ensure Jira ticket present
+    runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - name: Verify ticket in title or branch
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          PATTERN='\b([A-Z]+-[0-9]+|NOTIC)\b'
+
+          if echo "${TITLE}" | grep -Eq "${PATTERN}"; then
+            MATCH=$(echo "${TITLE}" | grep -Eo "${PATTERN}" | head -n1)
+            echo "Found ticket '${MATCH}' in PR title."
+            exit 0
+          fi
+
+          if echo "${BRANCH}" | grep -Eq "${PATTERN}"; then
+            MATCH=$(echo "${BRANCH}" | grep -Eo "${PATTERN}" | head -n1)
+            echo "Found ticket '${MATCH}' in branch name."
+            exit 0
+          fi
+
+          echo "No Jira ticket detected in PR title or branch name."
+          echo "Please include a ticket like ABC-123 or NOTIC in the title or branch."
+          exit 1
