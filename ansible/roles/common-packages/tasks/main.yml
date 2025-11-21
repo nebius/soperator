@@ -5,6 +5,7 @@
     url: https://dr.nebius.cloud/public.gpg
     dest: /usr/share/keyrings/nebius.gpg.pub
     mode: "0644"
+    checksum: "sha256:e4ec7915ef64976047b3a65db93cbfa94072a8179e77e29ea78f379d30bf4030"
   tags:
     - nebius-repo
     - packages
