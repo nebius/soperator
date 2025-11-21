@@ -218,8 +218,9 @@ func renderContainerNodeSetSlurmd(
 			realMemory,
 			nodeSet.GPU.Nvidia.GDRCopyEnabled,
 			//
-			// TODO Make it work
+			// TODO (@dstaroff) Make it work
 			"",
+			// workerFeatures is not needed as the SlurmCluster controller renders them into config based on the CR
 			nil,
 		),
 		Ports: []corev1.ContainerPort{{

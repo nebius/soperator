@@ -292,7 +292,7 @@ func renderNodeSetAnnotations(nodeSet *values.SlurmNodeSet) map[string]string {
 	mungeAppArmorProfile := nodeSet.ContainerMunge.AppArmorProfile
 	workerAppArmorProfile := nodeSet.ContainerSlurmd.AppArmorProfile
 
-	// TODO (dstaroff) make use of defaulting webhook for this
+	// TODO (@dstaroff) make use of defaulting webhook for this
 	if mungeAppArmorProfile == "" {
 		mungeAppArmorProfile = consts.AppArmorProfileUnconfined
 	}
