@@ -25,6 +25,7 @@ spec:
         - -e
         - nc_health_checker_version={{ .Values.checks.upgradeHealthChecker.healthCheckerVersion }}
         - nc-health-checker.yml
+        - --diff
       image: {{ .Values.images.k8sJob | quote }}
       volumeMounts:
 {{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}

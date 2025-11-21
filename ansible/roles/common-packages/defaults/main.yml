@@ -6,35 +6,44 @@ common_packages:
   - build-essential=12.10ubuntu1
   - ca-certificates=20240203
   - curl=8.5.0-2ubuntu10.6
+  - flex=2.6.4-8.2build1
   - gnupg=2.4.4-2ubuntu17.3
   - jq=1.7.1-3ubuntu0.24.04.1
-  - flex=2.6.4-8.2build1
   - kmod=31+20240202-2ubuntu7.1
+  - libdrm-dev=2.4.122-1~ubuntu0.24.04.1
   - libevent-dev=2.1.12-stable-9ubuntu2
-  - libhwloc-dev=2.10.0-1build1
   - libjansson-dev=2.14-2build2
-  - libjson-c-dev=0.17-1build1
   - liblz4-dev=1.9.4-1build1.1
-  - libmunge-dev=0.5.15-4build1
-  - libpam0g=1.5.3-5ubuntu5.5
   - libpam0g-dev=1.5.3-5ubuntu5.5
+  - libpam0g=1.5.3-5ubuntu5.5
   - libssl-dev=3.0.13-0ubuntu3.6
   - libtool=2.4.7-7build1
-  - libdrm-dev=2.4.122-1~ubuntu0.24.04.1
   - numactl=2.0.18-1build1
   - pkg-config=1.8.1-2build1
-  - rdma-core=50.0-2ubuntu0.2
   - software-properties-common=0.99.49.3
-  - squashfs-tools=1:4.6.1-1build1 # it's required for enroot
   - sudo=1.9.15p5-3ubuntu5.24.04.1
-  - ibverbs-utils=50.0-2ubuntu0.2
-  - iproute2=6.1.0-1ubuntu6.2 # it's required for Slurm
-  - libncurses-dev=6.4+20240113-1ubuntu2 # it's required for Slurm
+  - unzip=6.0-28ubuntu4.1
+  - zip=3.0-13ubuntu0.2
+
+  # rdma packages
+  - rdma-core=2404mlnx51-1.2404066
+  - ibverbs-utils=2404mlnx51-1.2404066
+
   - libpmix-dev=5.0.1-4.1build1
-  - parallel=20240222+ds-2 # it's required for enroot operation
   - time=1.9-0.2build1
   - wget=1.21.4-1ubuntu4.1
-  - zstd=1.5.5+dfsg2-2build1.1 # it's required for enroot
-  - pigz=2.8-1 # it's recommended for enroot
-  - zip=3.0-13ubuntu0.2
-  - unzip=6.0-28ubuntu4.1
+
+  # required for Slurm
+  - iproute2=6.1.0-1ubuntu6.2
+  - libmunge-dev=0.5.15-4build1
+  - libhwloc-dev=2.10.0-1build1
+  - libjson-c-dev=0.17-1build1
+  - libncurses-dev=6.4+20240113-1ubuntu2
+
+  # required for enroot operation
+  - parallel=20240222+ds-2
+  - squashfs-tools=1:4.6.1-1build1
+  - zstd=1.5.5+dfsg2-2build1.1
+  - pigz=2.8-1
+
+
