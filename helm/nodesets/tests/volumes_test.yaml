@@ -1,6 +1,6 @@
 suite: test nodesets volumes configuration
 templates:
-  - templates/nodesets.yaml
+  - templates/nodeset.yaml
 tests:
   - it: should configure volumes correctly for GPU workers
     set:
@@ -103,6 +103,56 @@ tests:
           value: false
       - exists:
           path: spec.slurmd.volumes.jailSubMounts[0].volumeSource.emptyDir
+
+  - it: should configure custom mounts correctly
+    set:
+      nodesets:
+        - name: gpu-workers
+          replicas: 3
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "4"
+              memory: "8Gi"
+            volumes:
+              spool:
+                emptyDir: { }
+              jail:
+                emptyDir: { }
+              customVolumeMounts:
+                - name: "tmp"
+                  mountPath: "/tmp"
+                  subPath: "tmp"
+                  readOnly: false
+                  volumeSource:
+                    emptyDir: { }
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+    documentIndex: 0
+    asserts:
+      - exists:
+          path: spec.slurmd.volumes.customVolumeMounts
+      - isNotEmpty:
+          path: spec.slurmd.volumes.customVolumeMounts
+      - equal:
+          path: spec.slurmd.volumes.customVolumeMounts[0].name
+          value: "tmp"
+      - equal:
+          path: spec.slurmd.volumes.customVolumeMounts[0].mountPath
+          value: "/tmp"
+      - equal:
+          path: spec.slurmd.volumes.customVolumeMounts[0].subPath
+          value: "tmp"
+      - equal:
+          path: spec.slurmd.volumes.customVolumeMounts[0].readOnly
+          value: false
+      - exists:
+          path: spec.slurmd.volumes.customVolumeMounts[0].volumeSource.emptyDir
 
   - it: should configure security context correctly
     set:

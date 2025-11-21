@@ -285,6 +285,10 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.munge.tag = \"$(IMAGE_VERSION)\"" "helm/nodesets/values.yaml"
 	@$(YQ) -i ".images.slurmd.repository = \"$(IMAGE_REPO)/worker_slurmd\"" "helm/nodesets/values.yaml"
 	@$(YQ) -i ".images.slurmd.tag = \"$(IMAGE_VERSION)\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].slurmd.image.repository = \"$(IMAGE_REPO)/worker_slurmd\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].slurmd.image.tag = \"$(IMAGE_VERSION)+custom\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].munge.image.repository = \"$(IMAGE_REPO)/munge\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].munge.image.tag = \"$(IMAGE_VERSION)+custom\"" "helm/nodesets/values.yaml"
 	@# endregion helm/nodesets/values.yaml
 
 	@# region helm/soperator-activechecks/values.yaml

@@ -51,3 +51,18 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/* Construct container gpu resource from GPU spec ([0]) and GPU resource spec ([1]) */}}
+{{- define "nodesets.resource.gpuFrom" -}}
+  {{- $gpuSpec := (index . 0) | default dict -}}
+  {{- $gpuEnabled := get $gpuSpec "enabled" | default false -}}
+  {{- if not $gpuEnabled -}}
+    {{- "" -}}
+  {{- else -}}
+    {{- $gpuVendorNvidia := hasKey $gpuSpec "nvidia" -}}
+    {{- $gpuVendor := $gpuVendorNvidia | ternary "nvidia.com" "" -}}
+    {{- $gpuResFQID := $gpuVendor | empty | ternary "gpu" (printf "%s/gpu" $gpuVendor)}}
+    {{- $resources := required ".Values.nodesets[*].slurmd.resources.gpu is required as .Values.nodesets[*].gpu.enabled is true" (index . 1)}}
+{{ $gpuResFQID }}: {{ get $resources "gpu" }}
+  {{- end -}}
+{{- end -}}

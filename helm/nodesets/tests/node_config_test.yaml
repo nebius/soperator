@@ -1,6 +1,6 @@
 suite: test nodesets node configuration
 templates:
-  - templates/nodesets.yaml
+  - templates/nodeset.yaml
 tests:
   - it: should configure node features correctly for GPU workers
     set:

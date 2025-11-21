@@ -1,6 +1,6 @@
 suite: test nodesets with custom values
 templates:
-  - templates/nodesets.yaml
+  - templates/nodeset.yaml
 tests:
   - it: should work with custom single nodeset
     set:
