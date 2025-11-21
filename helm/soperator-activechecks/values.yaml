@@ -80,9 +80,6 @@ checks:
   ibGpuPerf:
     suspend: false
     runAfterCreation: true
-  installPackage:
-    suspend: true
-    runAfterCreation: false
   memPerf:
     suspend: false
     runAfterCreation: true
