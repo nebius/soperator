@@ -223,7 +223,7 @@ func (r NodeSetReconciler) executeReconciliation(
 				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 				stepLogger.V(1).Info("Rendered")
 
-				deps, err := r.getWorkersStatefulSetDependencies(stepCtx, nodeSetValues)
+				deps, err := r.getWorkersStatefulSetDependencies(stepCtx, nodeSetValues, cluster)
 				if err != nil {
 					stepLogger.Error(err, "Failed to retrieve dependencies")
 					return fmt.Errorf("retrieving dependencies for worker StatefulSet: %w", err)
@@ -258,7 +258,7 @@ func (r NodeSetReconciler) executeReconciliation(
 func (r NodeSetReconciler) getWorkersStatefulSetDependencies(
 	ctx context.Context,
 	nodeSet *values.SlurmNodeSet,
-	// clusterValues *values.SlurmCluster,
+	cluster *slurmv1.SlurmCluster,
 ) ([]metav1.Object, error) {
 	var res []metav1.Object
 
@@ -275,20 +275,20 @@ func (r NodeSetReconciler) getWorkersStatefulSetDependencies(
 	}
 	res = append(res, mungeKeySecret)
 
-	//if clusterValues.NodeAccounting.Enabled {
-	//	slurmdbdSecret := &corev1.Secret{}
-	//	if err := r.Get(
-	//		ctx,
-	//		types.NamespacedName{
-	//			Namespace: clusterValues.Namespace,
-	//			Name:      naming.BuildSecretSlurmdbdConfigsName(clusterValues.Name),
-	//		},
-	//		slurmdbdSecret,
-	//	); err != nil {
-	//		return []metav1.Object{}, err
-	//	}
-	//	res = append(res, slurmdbdSecret)
-	//}
+	if cluster.Spec.SlurmNodes.Accounting.Enabled {
+		slurmdbdSecret := &corev1.Secret{}
+		if err := r.Get(
+			ctx,
+			types.NamespacedName{
+				Namespace: nodeSet.ParentalCluster.Namespace,
+				Name:      naming.BuildSecretSlurmdbdConfigsName(nodeSet.ParentalCluster.Name),
+			},
+			slurmdbdSecret,
+		); err != nil {
+			return []metav1.Object{}, err
+		}
+		res = append(res, slurmdbdSecret)
+	}
 
 	if nodeSet.SupervisorDConfigMapName != "" {
 		superviserdConfigMap := &corev1.ConfigMap{}
