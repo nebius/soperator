@@ -45,5 +45,3 @@ common_packages:
   - squashfs-tools=1:4.6.1-1build1
   - zstd=1.5.5+dfsg2-2build1.1
   - pigz=2.8-1
-
-
