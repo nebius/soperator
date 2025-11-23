@@ -310,7 +310,7 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 	return nil
 }
 
-const MaintenanceReservationPrefix = "soperatorchecks.suspicious"
+const MaintenanceReservationPrefix = "suspicious-node"
 
 func (c *SlurmNodesController) createMaintenanceReservationForSlurmNode(
 	ctx context.Context,
