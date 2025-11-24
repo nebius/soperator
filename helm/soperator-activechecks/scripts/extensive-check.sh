@@ -206,8 +206,19 @@ do
     NODE_NAME=$(hostname)
     echo "Setting comment on node $NODE_NAME"
     COMPUTE_INSTANCE_ID=$(scontrol show node "$NODE_NAME" --json | jq -r '.nodes[0].instance_id')
-    COMMENT=$(jq -cn --arg run "$HC_RUN_ID" --arg inst "$COMPUTE_INSTANCE_ID" \
-          '{"health_checker_run_id": $run, "compute_instance_id": $inst}')
+    
+    # Build JSON comment
+    # Add extra key-value pair if both are set
+    COMMENT=$(jq -cn \
+      --arg run "$HC_RUN_ID" \
+      --arg inst "$COMPUTE_INSTANCE_ID" \
+      --arg key "$SLURM_EXTRA_COMMENT_KEY" \
+      --arg value "$SLURM_EXTRA_COMMENT_VALUE" \
+      '{
+        health_checker_run_id: $run,
+        compute_instance_id: $inst
+      } + (if $key != "" and $value != "" then {($key): $value} else {} end)')
+    
     sudo scontrol update NodeName="$NODE_NAME" Comment="$COMMENT"
     exit 1
   fi
