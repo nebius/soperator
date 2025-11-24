@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,7 +35,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/check"
+	controllercommon "nebius.ai/slurm-operator/internal/controller/common"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/logfield"
@@ -43,6 +47,8 @@ import (
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=nodesets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=nodesets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=nodesets/finalizers,verbs=update
+// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch
+// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters/status,verbs=get
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;update;patch;delete;create
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
@@ -79,7 +85,7 @@ func (r *NodeSetReconciler) SetupWithManager(mgr ctrl.Manager, name string, maxC
 		return err
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		For(
 			&slurmv1alpha1.NodeSet{},
@@ -87,13 +93,51 @@ func (r *NodeSetReconciler) SetupWithManager(mgr ctrl.Manager, name string, maxC
 		).
 		WithOptions(
 			controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout),
-		).
-		Watches(
-			&corev1.ConfigMap{},
-			handler.EnqueueRequestsFromMapFunc(r.findObjectsForConfigMap),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		Complete(r)
+		)
+
+	controllerBuilder.Watches(
+		&corev1.ConfigMap{},
+		handler.EnqueueRequestsFromMapFunc(r.findObjectsForConfigMap),
+		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+	)
+
+	controllerBuilder.Watches(
+		&slurmv1.SlurmCluster{},
+		handler.EnqueueRequestsFromMapFunc(r.findObjectsForSlurmCluster),
+		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+	)
+
+	resourceChecks := r.createResourceChecks(controllercommon.CreateServiceAccountPredicate())
+	for _, resourceCheck := range resourceChecks {
+		if resourceCheck.Check {
+			for _, obj := range resourceCheck.Objects {
+				controllerBuilder.Owns(obj, builder.WithPredicates(resourceCheck.Predicate))
+			}
+		}
+	}
+
+	return controllerBuilder.Complete(r)
+}
+
+func (r *NodeSetReconciler) createResourceChecks(saPredicate predicate.Funcs) []controllercommon.ResourceCheck {
+	return []controllercommon.ResourceCheck{
+		{
+			Check: check.ForceTrue,
+			Objects: []client.Object{
+				&corev1.ConfigMap{},
+				&corev1.Service{},
+				&kruisev1b1.StatefulSet{},
+			},
+			Predicate: predicate.GenerationChangedPredicate{},
+		},
+		{
+			Check: check.ForceTrue,
+			Objects: []client.Object{
+				&corev1.ServiceAccount{},
+			},
+			Predicate: saPredicate,
+		},
+	}
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
