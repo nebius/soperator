@@ -62,7 +62,7 @@ checks:
   ensureDirSnccldLogs:
     suspend: false
     runAfterCreation: true
-    enabled: false
+    enabled: true
     dir: /opt/soperator-outputs/nccl_logs
     schedule: 15 0 * * *
   ensureHealthyNodes:
