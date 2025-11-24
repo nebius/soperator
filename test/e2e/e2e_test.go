@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gruntwork-io/terratest/modules/terraform"
 	"github.com/hashicorp/hcl/v2"
@@ -33,12 +34,8 @@ type testConfig struct {
 	OutputErrFile      string   `split_words:"true" default:"output.err"`           // OUTPUT_ERR_FILE
 }
 
-func TestTerraform(t *testing.T) {
-	var cfg testConfig
-
-	err := envconfig.Process("", &cfg)
-	require.NoError(t, err)
-
+// setupTerraformOptions creates common terraform options for e2e tests
+func setupTerraformOptions(t *testing.T, cfg testConfig) terraform.Options {
 	tfVars := readTFVars(t, fmt.Sprintf("%s/terraform.tfvars", cfg.PathToInstallation))
 	tfVars = overrideTestValues(tfVars, cfg)
 
@@ -50,7 +47,7 @@ func TestTerraform(t *testing.T) {
 		envVars[pair[0]] = pair[1]
 	}
 
-	commonOptions := terraform.Options{
+	return terraform.Options{
 		TerraformDir: cfg.PathToInstallation,
 		Vars:         tfVars,
 		EnvVars:      envVars,
@@ -63,23 +60,55 @@ func TestTerraform(t *testing.T) {
 		NoColor:    true,
 		MaxRetries: 5,
 	}
+}
+
+// TestTerraformApply runs terraform apply and validates the cluster
+// This test does NOT destroy the cluster on completion to allow for debugging
+func TestTerraformApply(t *testing.T) {
+	var cfg testConfig
+
+	err := envconfig.Process("", &cfg)
+	require.NoError(t, err)
+
+	commonOptions := setupTerraformOptions(t, cfg)
 
 	ensureOutputFiles(t, cfg)
 
 	terraform.Init(t, &commonOptions)
 	terraform.WorkspaceSelectOrNew(t, &commonOptions, "e2e-test")
+
+	// Pre-test cleanup to ensure clean state
 	output, err := terraform.DestroyE(t, &commonOptions)
-	writeOutputs(t, cfg, "destroy", output, err)
+	writeOutputs(t, cfg, "TestTerraformApply", "destroy", output, err)
 	require.NoError(t, err)
 
-	defer func() {
-		output, err := terraform.DestroyE(t, &commonOptions)
-		writeOutputs(t, cfg, "destroy", output, err)
-		require.NoError(t, err)
-	}()
-
+	// Apply terraform configuration
 	output, err = terraform.ApplyE(t, &commonOptions)
-	writeOutputs(t, cfg, "apply", output, err)
+	writeOutputs(t, cfg, "TestTerraformApply", "apply", output, err)
+	require.NoError(t, err)
+
+	// Note: No defer destroy - cleanup is handled by TestTerraformDestroy
+	// This allows cluster state collection on failure in CI
+}
+
+// TestTerraformDestroy cleans up the infrastructure created by TestTerraformApply
+// This is run as a separate test to allow cluster state collection on failure
+func TestTerraformDestroy(t *testing.T) {
+	var cfg testConfig
+
+	err := envconfig.Process("", &cfg)
+	require.NoError(t, err)
+
+	commonOptions := setupTerraformOptions(t, cfg)
+
+	ensureOutputFiles(t, cfg)
+
+	terraform.Init(t, &commonOptions)
+	terraform.WorkspaceSelectOrNew(t, &commonOptions, "e2e-test")
+
+	// Destroy the infrastructure
+	output, err := terraform.DestroyE(t, &commonOptions)
+	writeOutputs(t, cfg, "TestTerraformDestroy", "destroy", output, err)
 	require.NoError(t, err)
 }
 
@@ -235,22 +264,33 @@ func ensureOutputFiles(t *testing.T, cfg testConfig) {
 func ensureFile(t *testing.T, filename string) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(filename), 0755))
 
-	f, err := os.Create(filename)
+	// Use O_CREATE without O_TRUNC to create file if not exists, but don't truncate if exists
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 }
 
-func writeOutputs(t *testing.T, cfg testConfig, command, output string, err error) {
-	writeOutput(t, cfg.OutputLogFile, command, output)
+func writeOutputs(t *testing.T, cfg testConfig, testPhase, command, output string, err error) {
+	writeOutput(t, cfg.OutputLogFile, testPhase, command, output)
 	if err != nil {
-		writeOutput(t, cfg.OutputErrFile, command, err.Error())
+		writeOutput(t, cfg.OutputErrFile, testPhase, command, err.Error())
 	}
 }
 
-func writeOutput(t *testing.T, filename, command, data string) {
+func writeOutput(t *testing.T, filename, testPhase, command, data string) {
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0644)
 	require.NoError(t, err)
 	defer f.Close()
+
+	// Write phase header with timestamp
+	_, err = f.WriteString(fmt.Sprintf("========================================\n"))
+	require.NoError(t, err)
+	_, err = f.WriteString(fmt.Sprintf("Test Phase: %s\n", testPhase))
+	require.NoError(t, err)
+	_, err = f.WriteString(fmt.Sprintf("Timestamp: %s\n", time.Now().Format("2006-01-02 15:04:05 MST")))
+	require.NoError(t, err)
+	_, err = f.WriteString(fmt.Sprintf("========================================\n\n"))
+	require.NoError(t, err)
 
 	_, err = f.WriteString(fmt.Sprintf("Executing %s\n\n", command))
 	require.NoError(t, err)
