@@ -53,7 +53,9 @@ echo "Submitting k8s jobs for active check $TARGET_ACTIVE_CHECK_NAME for reserve
 
 submitted_jobs=0
 for reservationName in $(scontrol show reservation --json | jq -r --arg RESERVATION_PREFIX "$RESERVATION_PREFIX" '.reservations | .[] | select(.name | startswith($RESERVATION_PREFIX)) | .name' ); do
-  jobName="$TARGET_ACTIVE_CHECK_NAME-$reservationName"
+  # Sanitize reservation name for Kubernetes Job name (replace : with - for RFC 1123 compliance)
+  sanitizedReservationName="${reservationName//:/-}"
+  jobName="$TARGET_ACTIVE_CHECK_NAME-$sanitizedReservationName"
 
   action=$(whatToDo)
   if [[ "$action" == "create" ]]; then
