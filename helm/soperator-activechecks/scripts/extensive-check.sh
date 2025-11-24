@@ -207,17 +207,15 @@ do
     echo "Setting comment on node $NODE_NAME"
     COMPUTE_INSTANCE_ID=$(scontrol show node "$NODE_NAME" --json | jq -r '.nodes[0].instance_id')
     
-    # Build JSON comment
-    # Add extra key-value pair if both are set
+    # Build a JSON object with common values and merge it with SLURM_EXTRA_COMMENT_JSON
     COMMENT=$(jq -cn \
-      --arg run "$HC_RUN_ID" \
-      --arg inst "$COMPUTE_INSTANCE_ID" \
-      --arg key "$SLURM_EXTRA_COMMENT_KEY" \
-      --arg value "$SLURM_EXTRA_COMMENT_VALUE" \
-      '{
-        health_checker_run_id: $run,
-        compute_instance_id: $inst
-      } + (if $key != "" and $value != "" then {($key): $value} else {} end)')
+          --arg run "$HC_RUN_ID" \
+          --arg inst "$COMPUTE_INSTANCE_ID" \
+          --arg extra "${SLURM_EXTRA_COMMENT_JSON:-\{\}}" \
+          '{
+            health_checker_run_id: $run,
+            compute_instance_id: $inst
+          } + ($extra | fromjson? // {})')
     
     sudo scontrol update NodeName="$NODE_NAME" Comment="$COMMENT"
     exit 1

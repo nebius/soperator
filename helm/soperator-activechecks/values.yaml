@@ -11,8 +11,8 @@ jobContainer:
           fieldPath: "metadata.namespace"
     - name: "SNCCLD_ENABLED"
       value: "false"
-      # - name: "SLURM_EXTRA_COMMENT_KEY"
-      #   value: "SLURM_EXTRA_COMMENT_VALUE"
+      # - name: "SLURM_EXTRA_COMMENT_JSON"
+      #   value: '{"key1": "value1", "key2": "value2"}'
   volumeMounts:
     - mountPath: "/mnt/jail"
       name: "jail"
