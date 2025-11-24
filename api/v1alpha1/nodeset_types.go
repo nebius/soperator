@@ -132,12 +132,12 @@ type NodeSetSpec struct {
 	// +kubebuilder:validation:Required
 	Slurmd ContainerSlurmdSpec `json:"slurmd"`
 
-	// Slurmd defines the Slurm munge configuration.
+	// Munge defines the Slurm munge configuration.
 	//
 	// +kubebuilder:validation:Required
 	Munge ContainerMungeSpec `json:"munge"`
 
-	// ExtraConfig provides possibility to define extra values set for Node in `slurm.conf`.
+	// NodeConfig provides possibility to define extra values set for Node in `slurm.conf`.
 	NodeConfig NodeConfig `json:"nodeConfig,omitempty"`
 
 	// GPU defines the settings related to GPU support for Slurm workers.
