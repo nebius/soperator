@@ -205,9 +205,9 @@ do
   if [[ $RUN_EXIT_CODE -eq 1 ]]; then
     NODE_NAME=$(hostname)
     echo "Setting comment on node $NODE_NAME"
-    COMPUTE_INSTANCE_ID=$(scontrol show node worker-0 --json | jq -r '.nodes[0].instance_id')
+    COMPUTE_INSTANCE_ID=$(scontrol show node "$NODE_NAME" --json | jq -r '.nodes[0].instance_id')
     COMMENT=$(jq -cn --arg run "$HC_RUN_ID" --arg inst "$COMPUTE_INSTANCE_ID" \
-          '{"health_checker_run_id": "$run", "compute_instance_id": "$inst"}')
+          '{"health_checker_run_id": $run, "compute_instance_id": $inst}')
     sudo scontrol update NodeName="$NODE_NAME" Comment="$COMMENT"
     exit 1
   fi
