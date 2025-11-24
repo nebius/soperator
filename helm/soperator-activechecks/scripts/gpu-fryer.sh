@@ -25,7 +25,7 @@ echo "Running gpu_fryer check on $(hostname)..."
 HC_OUTPUT_DIR="/opt/soperator-outputs/health_checker_cmd_stdout"
 HC_OUTPUT=$(srun --container-image={{ include "activecheck.image.pyxis" . }} \
   --container-mounts=$(which health-checker):/usr/local/bin/health-checker,$HC_OUTPUT_DIR:$HC_OUTPUT_DIR \
-  bash -l -c "health-checker run -e soperator -p $platform -n gpu_fryer -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout")
+  sudo bash -l -c "health-checker run -e soperator -p $platform -n gpu_fryer -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout")
 
 echo "Health checker output: $HC_OUTPUT"
 HC_STATUS=$(echo "$HC_OUTPUT" | awk '/^\s*{/,/^\s*}/' | jq -r '.status')

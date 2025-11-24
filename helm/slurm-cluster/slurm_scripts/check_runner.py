@@ -53,6 +53,10 @@ class Check(typing.NamedTuple):
   # CPU-only jobs are not considered "partial GPU"
   skip_for_partial_gpu_jobs: bool = False
 
+  # Whether to skip this checks for nodes reserved with specific prefixes.
+  # Empty list means don't skip for any reservation.
+  skip_for_reservation_prefixes: list[str] = []
+
   # What contexts this check should run in.
   # Supported values:
   # - "any" - any context
@@ -121,6 +125,7 @@ class NodeInfo(typing.NamedTuple):
   state_flags: list[str] = []
   reason: str = ""
   comment: str = ""
+  reservation: str = ""
   real_memory_bytes: int = 0
 
 class JobInfo(typing.NamedTuple):
@@ -197,8 +202,10 @@ def filter_applicable_checks(checks: list[Check]) -> list[Check]:
   checks = filter_by_platform(checks)
   # Filter by skip_for_partial_gpu_jobs (needs platform tags)
   checks = filter_by_skip_for_partial_gpu_jobs(checks)
-  # Filter by node state
+  # Filter by node_state (needs node info)
   checks = filter_by_node_state(checks)
+  # Filter by skip_for_reservation_prefixes (needs node info)
+  checks = filter_by_skip_for_reservation_prefixes(checks)
   return checks
 
 def filter_by_context(checks: list[Check]) -> list[Check]:
@@ -267,6 +274,19 @@ def filter_by_node_state(checks: list[Check]) -> list[Check]:
     if (
       "any" in check.node_states or
       ("drain" in check.node_states and "DRAIN" in node_info.state_flags)
+    )
+  ]
+
+def filter_by_skip_for_reservation_prefixes(checks: list[Check]) -> list[Check]:
+  # Skip if all checks don't care
+  if all(len(check.skip_for_reservation_prefixes) == 0 for check in checks):
+    return checks
+  node_info = get_node_info()
+  return [
+    check for check in checks
+    if (
+      len(check.skip_for_reservation_prefixes) == 0 or
+      not node_info.reservation.startswith(tuple(check.skip_for_reservation_prefixes))
     )
   ]
 
@@ -421,6 +441,7 @@ def get_node_info() -> NodeInfo:
       state_flags=node.get("state", []),
       reason=node.get("reason", ""),
       comment=node.get("comment", ""),
+      reservation=node.get("reservation", ""),
       real_memory_bytes=(real_memory_mib * 1024 * 1024)
     )
     logging.info(f"Slurm node info: {json.dumps(info._asdict(), indent=2)}")

@@ -72,7 +72,7 @@ checks:
     suspend: true
     runAfterCreation: false
     drainReasonPrefix: "[hardware_problem]"
-    reservationPrefix: "soperatorchecks.suspicious"
+    reservationPrefix: "suspicious-node"
   gpuFryer:
     suspend: false
     runAfterCreation: true
@@ -80,6 +80,7 @@ checks:
   ibGpuPerf:
     suspend: false
     runAfterCreation: true
+    commentPrefix: "[node_problem]"
   installPackage:
     suspend: true
     runAfterCreation: false

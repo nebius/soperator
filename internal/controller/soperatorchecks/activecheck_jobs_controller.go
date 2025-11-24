@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
-	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -363,7 +362,7 @@ func updateSlurmNodeWithReactions(
 		return fmt.Errorf("get node list: %w", err)
 	}
 
-	failureMessage := fmt.Sprintf("Failed %s: job %d [slurm_job]", activeCheckName, slurmJob.ID)
+	failureMessage := fmt.Sprintf("%s: job %d [slurm_job]", activeCheckName, slurmJob.ID)
 	for _, node := range nodes {
 		updateReq := api.V0041UpdateNodeMsg{}
 		if reactions.DrainSlurmNode != nil && reactions.DrainSlurmNode.DrainReasonPrefix != "" {
@@ -371,8 +370,9 @@ func updateSlurmNodeWithReactions(
 			updateReq.Reason = ptr.To(drainReason)
 			updateReq.State = ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateDRAIN})
 		}
-		if reactions.CommentSlurmNode {
-			updateReq.Comment = ptr.To(failureMessage)
+		if reactions.CommentSlurmNode != nil && reactions.CommentSlurmNode.CommentPrefix != "" {
+			comment := fmt.Sprintf("%s %s", reactions.CommentSlurmNode.CommentPrefix, failureMessage)
+			updateReq.Comment = ptr.To(comment)
 		}
 
 		resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, node, updateReq)
@@ -384,7 +384,7 @@ func updateSlurmNodeWithReactions(
 		}
 
 		logger.V(1).Info(fmt.Sprintf("slurm node is updated, drain: %t, comment: %t",
-			reactions.DrainSlurmNode != nil, reactions.CommentSlurmNode))
+			reactions.DrainSlurmNode != nil, reactions.CommentSlurmNode != nil))
 	}
 
 	return nil
@@ -447,7 +447,8 @@ func executeReactions(ctx context.Context, slurmJob slurmapi.Job, activeCheckNam
 		return nil
 	}
 
-	if (reactions.DrainSlurmNode != nil && reactions.DrainSlurmNode.DrainReasonPrefix != "") || reactions.CommentSlurmNode {
+	if (reactions.DrainSlurmNode != nil && reactions.DrainSlurmNode.DrainReasonPrefix != "") ||
+		(reactions.CommentSlurmNode != nil && reactions.CommentSlurmNode.CommentPrefix != "") {
 		err := updateSlurmNodeWithReactions(ctx, logger, slurmJob, activeCheckName, *reactions, slurmAPIClient)
 		if err != nil {
 			return fmt.Errorf("update slurm node with reaction: %w", err)
@@ -496,13 +497,17 @@ func processAddReservation(ctx context.Context, reservationPrefix string, slurmJ
 	return nil
 }
 
+func getExtensiveCheckReservationName(prefix, node string) string {
+	return fmt.Sprintf("%s:%s", prefix, node)
+}
+
 func processRemoveReservation(ctx context.Context, reservationPrefix string, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client) error {
 	nodes, err := slurmJob.GetNodeList()
 	if err != nil {
 		return fmt.Errorf("get node list: %w", err)
 	}
 	for _, node := range nodes {
-		reservationName := naming.BuildSlurmReservationNameForNode(reservationPrefix, node)
+		reservationName := getExtensiveCheckReservationName(reservationPrefix, node)
 		err := slurmAPIClient.StopReservation(ctx, reservationName)
 		if err != nil {
 			return fmt.Errorf("stop reservation: %w", err)
@@ -513,7 +518,7 @@ func processRemoveReservation(ctx context.Context, reservationPrefix string, slu
 }
 
 func addReservationForNode(ctx context.Context, reservationPrefix string, nodeName string, slurmAPIClient slurmapi.Client, logger logr.Logger) error {
-	reservationName := naming.BuildSlurmReservationNameForNode(reservationPrefix, nodeName)
+	reservationName := getExtensiveCheckReservationName(reservationPrefix, nodeName)
 
 	_, err := slurmAPIClient.GetReservation(ctx, reservationName)
 	if err == nil {

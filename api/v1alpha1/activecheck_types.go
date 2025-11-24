@@ -110,7 +110,7 @@ type Reactions struct {
 	DrainSlurmNode *DrainSlurmNodeSpec `json:"drainSlurmNode,omitempty"`
 	// CommentSlurmNode enabling slurm node commenting
 	// +kubebuilder:validation:Optional
-	CommentSlurmNode bool `json:"commentSlurmNode,omitempty"`
+	CommentSlurmNode *CommentSlurmNodeSpec `json:"commentSlurmNode,omitempty"`
 
 	// AddReservation adds a slurm reservation with name "<prefix>-<nodeName>"
 	// +kubebuilder:validation:Optional
@@ -122,6 +122,10 @@ type Reactions struct {
 
 type DrainSlurmNodeSpec struct {
 	DrainReasonPrefix string `json:"drainReasonPrefix,omitempty"`
+}
+
+type CommentSlurmNodeSpec struct {
+	CommentPrefix string `json:"commentPrefix,omitempty"`
 }
 
 type ReservationSpec struct {
