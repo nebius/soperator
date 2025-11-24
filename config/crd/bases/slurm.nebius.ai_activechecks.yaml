@@ -1032,7 +1032,10 @@ spec:
                     type: object
                   commentSlurmNode:
                     description: CommentSlurmNode enabling slurm node commenting
-                    type: boolean
+                    properties:
+                      commentPrefix:
+                        type: string
+                    type: object
                   drainSlurmNode:
                     description: DrainSlurmNode enabling slurm node draining
                     properties:
@@ -7536,7 +7539,10 @@ spec:
                     type: object
                   commentSlurmNode:
                     description: CommentSlurmNode enabling slurm node commenting
-                    type: boolean
+                    properties:
+                      commentPrefix:
+                        type: string
+                    type: object
                   drainSlurmNode:
                     description: DrainSlurmNode enabling slurm node draining
                     properties:

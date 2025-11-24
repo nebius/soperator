@@ -18,20 +18,16 @@ type ReasonConditionType string
 type MessageConditionType string
 
 const (
-	ReasonNodeNeedDrain      ReasonConditionType = "NodeNeedDrain"
-	ReasonNodeDraining       ReasonConditionType = "NodeDraining"
-	ReasonNodeDrained        ReasonConditionType = "NodeDrained"
-	ReasonNodeUndrained      ReasonConditionType = "NodeUndrained"
-	ReasonNodeNeedReboot     ReasonConditionType = "NodeNeedReboot"
-	ReasonNodeRebooting      ReasonConditionType = "NodeRebooting"
-	ReasonNodeRebooted       ReasonConditionType = "NodeRebooted"
-	ReasonNodeNoRebootNeeded ReasonConditionType = "NodeNoRebootNeeded"
+	ReasonNodeNeedDrain ReasonConditionType = "NodeNeedDrain"
+	ReasonNodeDraining  ReasonConditionType = "NodeDraining"
+	ReasonNodeDrained   ReasonConditionType = "NodeDrained"
+	ReasonNodeUndrained ReasonConditionType = "NodeUndrained"
 
-	ReasonSlurmNodeDegraded ReasonConditionType = "SlurmNodeDegraded"
+	ReasonNodeNeedReboot ReasonConditionType = "NodeNeedReboot"
+	ReasonNodeRebooting  ReasonConditionType = "NodeRebooting"
+	ReasonNodeRebooted   ReasonConditionType = "NodeRebooted"
 
-	ReasonNodeNotReady ReasonConditionType = "NodeNotReady"
-
-	ReasonGPUHealthCheckFailed ReasonConditionType = "GPUHealthCheckFailed (Soperator)"
+	ReasonGPUHealthCheckFailed ReasonConditionType = "GPUHealthCheckFailedSoperator"
 )
 
 const (
@@ -45,8 +41,6 @@ const (
 	MessageMaintenanceScheduled    MessageConditionType = "Maintenance is scheduled on k8s node"
 	MessageHardwareIssuesSuspected MessageConditionType = "Hardware issues suspected on k8s node"
 	MessageNodeIsRebooted          MessageConditionType = "Node is rebooted"
-
-	MessageNodeIsNotReady MessageConditionType = "Node is NotReady for more than 5 minutes, undrain before deletion"
 )
 
 // ActiveCheckK8sJobStatus defines status for ActiveCheck k8s job.
