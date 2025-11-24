@@ -137,7 +137,7 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 			nodeName := fmt.Sprintf("%s-%d", nodeSet.Name, i)
 
 			{
-				nodeAddr := fmt.Sprintf("%s.%s.%s.svc", nodeName, nodeSet.Name, nodeSet.Namespace)
+				nodeAddr := fmt.Sprintf("%s.%s.%s.svc.cluster.local", nodeName, naming.BuildNodeSetServiceName(cluster.Name, nodeSet.Name), nodeSet.Namespace)
 				realMemory := strconv.FormatInt(RenderRealMemorySlurmd(corev1.ResourceRequirements{Requests: nodeSet.Spec.Slurmd.Resources}), 10)
 				nodeConfig = fmt.Sprintf("NodeHostname=%s NodeAddr=%s RealMemory=%s",
 					nodeName,
