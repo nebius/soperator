@@ -498,7 +498,7 @@ func processAddReservation(ctx context.Context, reservationPrefix string, slurmJ
 }
 
 func getExtensiveCheckReservationName(prefix, node string) string {
-	return fmt.Sprintf("%s:%s", prefix, node)
+	return fmt.Sprintf("%s-%s", prefix, node)
 }
 
 func processRemoveReservation(ctx context.Context, reservationPrefix string, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client) error {
