@@ -335,8 +335,8 @@ type NodeConfig struct {
 	// +kubebuilder:default=""
 	Static string `json:"static,omitempty"`
 
-	// Dynamic provides a possibility to define extra values per Node (e.g. InstanceId, or Extra fields).
-	// This line supports Go templating, and will be rendered before being passed to the config.
+	// Dynamic provides a possibility to define "Extra" field of the corresponding Slurm node.
+	// It can use any environment variables that are available in the slurmd container when it starts.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=""

@@ -213,8 +213,7 @@ func renderContainerNodeSetSlurmd(
 			nodeSet.CgroupVersion,
 			utils.Ternary(nodeSet.GPU.Enabled, consts.ClusterTypeGPU, consts.ClusterTypeCPU),
 			nodeSet.GPU.Nvidia.GDRCopyEnabled,
-			// TODO (@dstaroff) Make it work
-			"",
+			nodeSet.NodeExtra,
 		),
 		Ports: []corev1.ContainerPort{{
 			Name:          nodeSet.ContainerSlurmd.Name,

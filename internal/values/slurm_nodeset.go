@@ -49,6 +49,7 @@ type SlurmNodeSet struct {
 	SharedMemorySize   *resource.Quantity
 
 	Maintenance             *consts.MaintenanceMode
+	NodeExtra               string
 	EnableHostUserNamespace bool
 }
 
@@ -112,6 +113,7 @@ func BuildSlurmNodeSetFrom(
 		SharedMemorySize: nsSpec.Slurmd.Volumes.SharedMemorySize,
 		//
 		Maintenance:             maintenance,
+		NodeExtra:               nsSpec.NodeConfig.Dynamic,
 		EnableHostUserNamespace: nsSpec.EnableHostUserNamespace,
 	}
 
