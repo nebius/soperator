@@ -18,6 +18,7 @@ func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Containe
 			Name:            check.Spec.Name,
 			Image:           check.Spec.K8sJobSpec.JobContainer.Image,
 			Command:         check.Spec.K8sJobSpec.JobContainer.Command,
+			Args:            check.Spec.K8sJobSpec.JobContainer.Args,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Env:             check.Spec.K8sJobSpec.JobContainer.Env,
 			SecurityContext: &corev1.SecurityContext{

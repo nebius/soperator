@@ -94,3 +94,36 @@ func IsKruiseCRDsInstalled(ctx context.Context) bool {
 
 	return true
 }
+
+// IsCertManagerCRDsInstalled checks if cert-manager CRDs are installed
+func IsCertManagerCRDsInstalled(ctx context.Context) bool {
+	certManagerCRDs := []string{
+		"certificates.cert-manager.io",
+		"issuers.cert-manager.io",
+		"clusterissuers.cert-manager.io",
+		"certificaterequests.cert-manager.io",
+		"orders.acme.cert-manager.io",
+		"challenges.acme.cert-manager.io",
+	}
+
+	cmd := exec.CommandContext(ctx, "kubectl", "get", "crds", "-o", "custom-columns=NAME:.metadata.name")
+	output, err := Run(cmd)
+	if err != nil {
+		return false
+	}
+	crdList := GetNonEmptyLines(output)
+	for _, crd := range certManagerCRDs {
+		found := false
+		for _, line := range crdList {
+			if strings.Contains(line, crd) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	return true
+}

@@ -31,3 +31,28 @@
   {{- end -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Create the name of the service account to use for sconfigcontroller
+*/}}
+{{- define "slurm-cluster.sconfigcontroller.serviceAccountName" -}}
+{{- if .Values.sConfigController.serviceAccount.create -}}
+    {{- default (printf "%s-sconfigcontroller" (include "slurm-cluster.name" .)) .Values.sConfigController.serviceAccount.name }}
+{{- else -}}
+    {{- default "default" .Values.sConfigController.serviceAccount.name }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Create the name of the role for sconfigcontroller
+*/}}
+{{- define "slurm-cluster.sconfigcontroller.roleName" -}}
+{{- printf "%s-sconfigcontroller" (include "slurm-cluster.name" .) }}
+{{- end -}}
+
+{{/*
+Create the name of the role binding for sconfigcontroller
+*/}}
+{{- define "slurm-cluster.sconfigcontroller.roleBindingName" -}}
+{{- printf "%s-sconfigcontroller" (include "slurm-cluster.name" .) }}
+{{- end -}}
