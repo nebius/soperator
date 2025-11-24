@@ -89,7 +89,7 @@ monitoring:
   nodeExporter:
     image:
       repository: prom/node-exporter
-      tag: v1.6.1
+      tag: v1.10.2
       pullPolicy: IfNotPresent
     # Enable NFS collector
     args:
