@@ -203,25 +203,18 @@ func renderContainerNodeSetSlurmd(
 		return corev1.Container{}, fmt.Errorf("checking resource requests: %w", err)
 	}
 
-	realMemory := common.RenderRealMemorySlurmd(resources)
-
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
 		Image:           nodeSet.ContainerSlurmd.Image,
 		ImagePullPolicy: nodeSet.ContainerSlurmd.ImagePullPolicy,
 		Command:         nodeSet.ContainerSlurmd.Command,
 		Args:            nodeSet.ContainerSlurmd.Args,
-		Env: renderSlurmdEnv(
-			nodeSet.ParentalCluster.Name,
+		Env: renderNodeSetSlurmdEnv(
 			nodeSet.CgroupVersion,
 			utils.Ternary(nodeSet.GPU.Enabled, consts.ClusterTypeGPU, consts.ClusterTypeCPU),
-			realMemory,
 			nodeSet.GPU.Nvidia.GDRCopyEnabled,
-			//
 			// TODO (@dstaroff) Make it work
 			"",
-			// workerFeatures is not needed as the SlurmCluster controller renders them into config based on the CR
-			nil,
 		),
 		Ports: []corev1.ContainerPort{{
 			Name:          nodeSet.ContainerSlurmd.Name,
@@ -341,5 +334,52 @@ func renderSlurmdEnv(
 			Value: feature.HostlistExpr,
 		})
 	}
+	return envVar
+}
+
+func renderNodeSetSlurmdEnv(
+	cgroupVersion string,
+	clusterType consts.ClusterType,
+	enableGDRCopy bool,
+	slurmNodeExtra string,
+) []corev1.EnvVar {
+	envVar := []corev1.EnvVar{
+		{
+			Name: "INSTANCE_ID",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "spec.nodeName",
+				},
+			},
+		},
+		{
+			Name:  "SLURM_CLUSTER_TYPE",
+			Value: clusterType.String(),
+		},
+		{
+			Name:  "SOPERATOR_NODE_SETS_ON",
+			Value: "true",
+		},
+	}
+	if len(slurmNodeExtra) > 0 {
+		envVar = append(envVar, corev1.EnvVar{
+			Name:  "SLURM_NODE_EXTRA",
+			Value: slurmNodeExtra,
+		})
+	}
+	if cgroupVersion == consts.CGroupV2 {
+		envVar = append(envVar, corev1.EnvVar{
+			Name:  consts.EnvCGroupV2,
+			Value: "true",
+		})
+	}
+	if enableGDRCopy {
+		envVar = append(envVar, corev1.EnvVar{
+			Name:  consts.EnvNvidiaGDRCopy,
+			Value: "enabled",
+		})
+	}
+
 	return envVar
 }
