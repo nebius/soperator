@@ -353,7 +353,7 @@ nfsServer:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.21.12
+  version: 1.2.0
   namespace: nfs-system
   releaseName: nfs-server
   overrideValues: null
