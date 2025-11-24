@@ -9,6 +9,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/strings/slices"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
@@ -117,23 +118,57 @@ func AddNodeSetFeaturesToSlurmConfig(res *renderutils.PropertiesConfig, cluster 
 // NodeName=gb200-0-1 NodeHostname=gb200-0-1 NodeAddr=gb200-0-1.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
 func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
 	res.AddComment("Nodes section")
+
 	if len(cluster.NodeSets) == 0 {
 		res.AddComment("WARNING: No nodesets defined in structured configuration!")
 		return
 	}
+
+	const nodeFeatureKey = "Feature="
+
 	for _, nodeSet := range cluster.NodeSets {
 		if nodeSet.Spec.Replicas == 0 {
 			res.AddComment(fmt.Sprintf("WARNING: NodeSet %s has 0 replicas, skipping", nodeSet.Name))
 			continue
 		}
+
 		for i := int32(0); i < nodeSet.Spec.Replicas; i++ {
+			var nodeConfig = ""
 			nodeName := fmt.Sprintf("%s-%d", nodeSet.Name, i)
-			nodeAddr := fmt.Sprintf("%s.%s.%s.svc", nodeName, nodeSet.Name, nodeSet.Namespace)
-			realMemory := strconv.FormatInt(RenderRealMemorySlurmd(corev1.ResourceRequirements{Requests: nodeSet.Spec.Slurmd.Resources}), 10)
-			res.AddProperty("NodeName", fmt.Sprintf(
-				"%s NodeHostname=%s NodeAddr=%s RealMemory=%s %s",
-				nodeName, nodeName, nodeAddr, realMemory, nodeSet.Spec.NodeConfig.Static,
-			),
+
+			{
+				nodeAddr := fmt.Sprintf("%s.%s.%s.svc", nodeName, nodeSet.Name, nodeSet.Namespace)
+				realMemory := strconv.FormatInt(RenderRealMemorySlurmd(corev1.ResourceRequirements{Requests: nodeSet.Spec.Slurmd.Resources}), 10)
+				nodeConfig = fmt.Sprintf("NodeHostname=%s NodeAddr=%s RealMemory=%s",
+					nodeName,
+					nodeAddr,
+					realMemory,
+				)
+			}
+
+			if len(nodeSet.Spec.NodeConfig.Features) > 0 {
+				features := strings.Join(nodeSet.Spec.NodeConfig.Features, ",")
+				nodeConfig = fmt.Sprintf("%s %s%s", nodeConfig, nodeFeatureKey, features)
+			}
+
+			// Remove feature overrides
+			staticConfig := strings.Join(
+				slices.Filter(
+					nil,
+					strings.Split(nodeSet.Spec.NodeConfig.Static, " "),
+					func(s string) bool {
+						return !strings.HasPrefix(s, nodeFeatureKey)
+					},
+				),
+				" ",
+			)
+			if len(nodeConfig) > 0 {
+				nodeConfig = fmt.Sprintf("%s %s", nodeConfig, staticConfig)
+			}
+
+			res.AddProperty(
+				"NodeName",
+				fmt.Sprintf("%s %s", nodeName, nodeConfig),
 			)
 		}
 	}
@@ -146,10 +181,12 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 // PartitionName=h100 Nodes=h100 AllowGroups=mleng CpuBind=verbose Default=NO DefaultTime=1:00:00 MaxTime=4:00:00 DefCpuPerGPU=8 Hidden=NO OverSubscribe=YES PreemptMode=OFF PriorityTier=10 State=UP
 func AddPartitionsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
 	res.AddComment("Partitions section")
+
 	if len(cluster.PartitionConfiguration.Partitions) == 0 {
 		res.AddComment("WARNING: No partitions defined in structured configuration!")
 		return
 	}
+
 	for _, partition := range cluster.PartitionConfiguration.Partitions {
 		switch {
 		case partition.IsAll:
@@ -169,8 +206,12 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 
 	res.AddProperty("ClusterName", cluster.Name)
 	res.AddComment("")
-	svcName := cluster.NodeController.Service.Name
-	res.AddProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", "controller-0", svcName))
+
+	{
+		svcName := cluster.NodeController.Service.Name
+		res.AddProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", "controller-0", svcName))
+	}
+
 	res.AddComment("")
 	res.AddProperty("AuthType", "auth/"+consts.Munge)
 	res.AddProperty("CredType", "cred/"+consts.Munge)
@@ -178,9 +219,11 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("SlurmConfig Spec")
 	addSlurmConfigProperties(res, cluster.SlurmConfig)
 	res.AddComment("")
+
 	if cluster.ClusterType == consts.ClusterTypeGPU {
 		res.AddProperty("GresTypes", "gpu")
 	}
+
 	res.AddProperty("MpiDefault", "pmix")
 	res.AddProperty("MailProg", "/usr/bin/true")
 	res.AddProperty("PluginDir", "/usr/lib/"+consts.Slurm)
@@ -213,6 +256,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddComment("HEALTH CHECKS")
 	res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
+
 	if cluster.HealthCheckConfig != nil {
 		res.AddProperty("HealthCheckInterval", cluster.HealthCheckConfig.HealthCheckInterval)
 		res.AddProperty("HealthCheckProgram", cluster.HealthCheckConfig.HealthCheckProgram)
@@ -223,6 +267,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		}
 		res.AddProperty("HealthCheckNodeState", strings.Join(states, ","))
 	}
+
 	res.AddComment("")
 	res.AddProperty("InactiveLimit", 0)
 	res.AddProperty("KillOnBadExit", 1)
@@ -256,6 +301,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("PreemptMode", "REQUEUE")
 	res.AddProperty("PreemptType", "preempt/partition_prio")
 	res.AddComment("Partition Configuration")
+
 	switch cluster.PartitionConfiguration.ConfigType {
 	case slurmv1.PartitionConfigTypeCustom:
 		for _, l := range cluster.PartitionConfiguration.RawConfig {
