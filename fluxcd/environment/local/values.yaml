@@ -258,7 +258,7 @@ observability:
     enabled: false
 # Cert Manager - disabled for local dev
 certManager:
-  enabled: false
+  enabled: true
 # Backup - disabled for local dev
 backup:
   enabled: false

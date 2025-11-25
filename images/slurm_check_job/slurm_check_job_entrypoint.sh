@@ -17,6 +17,12 @@ chown -h 0:42 /etc/{shadow,gshadow}
 echo "Link home from jail to use SSH keys from there"
 ln -s /mnt/jail/home /home
 
+echo "Bind-mount DNS configuration"
+mount --bind /etc/resolv.conf /mnt/jail/etc/resolv.conf
+
+echo "Bind-mount /etc/hosts"
+mount --bind /etc/hosts /mnt/jail/etc/hosts
+
 echo "Symlink slurm configs from jail(sconfigcontroller)"
 rm -rf /etc/slurm && ln -s /mnt/jail/etc/slurm /etc/slurm
 

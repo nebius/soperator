@@ -526,6 +526,18 @@ sConfigController:
     jobLabel: "sconfigcontroller"
     interval: "30s"
     scrapeTimeout: "28s"
+  # RBAC settings for sconfigcontroller
+  rbac:
+    # Specifies whether RBAC resources should be created
+    create: true
+  # ServiceAccount settings for sconfigcontroller
+  serviceAccount:
+    # Specifies whether a ServiceAccount should be created
+    create: true
+    # The name of the ServiceAccount to use.
+    # If not set and create is true, a name is generated using the cluster name: <clusterName>-sconfigcontroller
+    # This field is required in the SlurmCluster CR - it will be automatically populated from this value
+    name: ""
 images:
   slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.23.0-noble-slurm25.05.4"
   slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.23.0-noble-slurm25.05.4"
