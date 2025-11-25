@@ -778,4 +778,4 @@ kind-status: ## Check kind cluster status
 .PHONY: jail-shell
 jail-shell: ## Open interactive shell in jail environment via login pod
 	@echo "Opening jail shell in login-0 pod..."
-	@$(KUBECTL_CTX) exec -it -n soperator login-0 -- chroot /mnt/jail bash
+	@$(KUBECTL_CTX) exec -it -n soperator login-0 -- chroot /mnt/jail bash -l
