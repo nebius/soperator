@@ -82,7 +82,7 @@ checks:
   ibGpuPerf:
     suspend: false
     runAfterCreation: true
-    commentPrefix: "[node_problem]"
+    drainReasonPrefix: "[node_problem]"
   installPackage:
     suspend: true
     runAfterCreation: false

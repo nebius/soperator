@@ -25,7 +25,6 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
-  # Do not add any reactions right now, only monitor
   failureReactions:
-    commentSlurmNode:
-      commentPrefix: {{ .Values.checks.ibGpuPerf.commentPrefix | quote }}
+    drainSlurmNode:
+      drainReasonPrefix: {{ .Values.checks.ibGpuPerf.drainReasonPrefix | quote }}
