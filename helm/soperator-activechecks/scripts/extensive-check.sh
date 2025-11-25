@@ -192,7 +192,7 @@ health_checker_runs=(
   cuda_samples
   dcgmi_diag_r2
   gpu_fryer
-#  ib_gpu_perf - disabled for now because we have to verify the limits for this check
+  ib_gpu_perf
   mem_perf
 )
 for hc_run in "${health_checker_runs[@]}"
