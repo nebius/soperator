@@ -18,6 +18,7 @@ type Node struct {
 	Address     string    // IP Address of the node in the Kubernetes cluster.
 	BootTime    time.Time // The boot time of the node.
 	Comment     string
+	Reservation string
 }
 
 type NodeReason struct {
@@ -84,6 +85,10 @@ func NodeFromAPI(node api.V0041Node) (Node, error) {
 			Reason:    *node.Reason,
 			ChangedAt: time.Unix(*node.ReasonChangedAt.Number, 0),
 		}
+	}
+
+	if node.Reservation != nil {
+		res.Reservation = *node.Reservation
 	}
 
 	return res, nil
