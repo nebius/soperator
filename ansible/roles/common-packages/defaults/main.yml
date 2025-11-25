@@ -20,7 +20,7 @@ common_packages:
   - libpam0g-dev=1.5.3-5ubuntu5.5
   - libssl-dev=3.0.13-0ubuntu3.6
   - libtool=2.4.7-7build1
-  - libdrm-dev=2.4.122-1~ubuntu0.24.04.1
+  - libdrm-dev=2.4.122-1~ubuntu0.24.04.2
   - numactl=2.0.18-1build1
   - pkg-config=1.8.1-2build1
   - rdma-core=50.0-2ubuntu0.2
