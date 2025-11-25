@@ -41,7 +41,7 @@ func SetupSlurmClusterWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// +kubebuilder:webhook:path=/validate-slurm-nebius-ai-v1-slurmCluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=slurm.nebius.ai,resources=slurmclusters,verbs=create;update,versions=v1,name=vslurmcluster-v1.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-slurm-nebius-ai-v1-slurmcluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=slurm.nebius.ai,resources=slurmclusters,verbs=create;update,versions=v1,name=vslurmcluster-v1.kb.io,admissionReviewVersions=v1
 
 // SlurmClusterCustomValidator struct is responsible for validating the SlurmCluster resource
 // when it is created, updated, or deleted.
