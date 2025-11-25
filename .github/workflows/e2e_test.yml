@@ -18,20 +18,24 @@ on:
         required: true
         default: "/soperator/installations/example"
         type: string
-          
+
 
 permissions:
   contents: read
 
 concurrency:
-  group: global-lock
+  # Prevent cancelling already-running jobs (avoids resource waste).
   cancel-in-progress: false
+  # GitHub still cancels older WAITING runs when newer runs arrive.
+  # Per-branch concurrency groups prevent these cancellations between different branches,
+  # e.g. a run on 'feature-branch' will not be cancelled when a new scheduled run at `main` branch arrived.
+  group: e2e-${{ github.ref_name }}
 
 jobs:
   e2e-test:
     runs-on:
       - self-hosted
-      - e2e-tests
+      - e2e-tests # We have a single runner with this label => only 1 job at a time.
 
     environment: e2e
 
@@ -121,7 +125,7 @@ jobs:
           ref: ${{ env.TERRAFORM_REPO_REF }}
           path: "${{ github.workspace }}/terraform-repo"
 
-      - name: Run Terratest
+      - name: Terraform Apply
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
           nebius iam session-management revoke --all-my-active
@@ -136,7 +140,56 @@ jobs:
           aws configure set region $NEBIUS_REGION
           aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
 
-          go test -v -timeout 2h --tags=e2e ./test/e2e/...
+          go test -v -timeout 2h --tags=e2e -run TestTerraformApply ./test/e2e/...
+
+      - name: Basic Kubernetes Cluster State
+        if: always()
+        run: |
+          export PS4='### Running: '
+          set -x
+          kubectl get pods -A -o wide || true
+          kubectl get events -A --sort-by='.lastTimestamp' || true
+          kubectl get helmreleases -n flux-system || true
+          kubectl get slurmclusters -A -o yaml || true
+          kubectl get activechecks -A -o yaml || true
+
+      - name: Slurm Cluster State
+        if: always()
+        run: |
+          export PS4='### Running: '
+          set -x
+          kubectl exec -n soperator controller-0 -- sinfo -N || true
+          kubectl exec -n soperator controller-0 -- squeue || true
+          kubectl exec -n soperator controller-0 -- sacct --allusers || true
+
+      - name: Collect Full Kubernetes Cluster Info
+        if: failure()
+        run: |
+          mkdir -p ./cluster-info
+          kubectl cluster-info dump --namespaces=kruise-system,soperator-system,soperator,flux-system --output-directory=./cluster-info
+
+      - name: Upload Full Kubernetes Cluster Info
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: cluster-info
+          path: ./cluster-info
+          retention-days: 7
+
+      - name: Terraform Destroy
+        if: always()
+        run: |
+          cd ${{ env.PATH_TO_INSTALLATION }}
+          source .envrc
+          cd -
+
+          # Configure AWS CLI (in case env was lost)
+          aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+          aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+          aws configure set region $NEBIUS_REGION
+          aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
+
+          go test -v -timeout 30m --tags=e2e -run TestTerraformDestroy ./test/e2e/...
 
       - name: Add errors output to job summary
         if: ${{ always() }}
