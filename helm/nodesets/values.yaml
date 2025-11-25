@@ -25,12 +25,10 @@ priorityClasses:
 images:
   munge:
     repository: "cr.eu-north1.nebius.cloud/soperator/munge"
-    # Optional
-    tag: "1.23.0-noble-slurm25.05.4"
+    tag: "1.23.0-noble-slurm25.05.5"
   slurmd:
     repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
-    # Optional
-    tag: "1.23.0-noble-slurm25.05.4"
+    tag: "1.23.0-noble-slurm25.05.5"
 # NodeSets configuration
 # Each NodeSet defines a group of worker nodes with specific characteristics
 nodesets:
@@ -81,7 +79,7 @@ nodesets:
       # Optional
       image:
         repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
-        tag: "1.23.0-noble-slurm25.05.4+custom"
+        tag: "1.23.0-noble-slurm25.05.5+custom"
         pullPolicy: "IfNotPresent"
       # Port to serve slurmd service on
       # Optional, defaults to 6818
@@ -163,7 +161,7 @@ nodesets:
       image:
         repository: "cr.eu-north1.nebius.cloud/soperator/munge"
         # Optional
-        tag: "1.23.0-noble-slurm25.05.4+custom"
+        tag: "1.23.0-noble-slurm25.05.5+custom"
         pullPolicy: "IfNotPresent"
       # Munge container resources
       resources:

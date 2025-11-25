@@ -36,7 +36,7 @@ CHART_CUSTOM_CONFIGMAPS_PATH  = $(CHART_PATH)/soperator-custom-configmaps
 CHART_FLUXCD_BOOTSTRAP_PATH   = $(CHART_PATH)/soperator-fluxcd-bootstrap
 CHART_STORAGECLASSES		  = $(CHART_PATH)/storageclasses
 
-SLURM_VERSION		  		= 25.05.4
+SLURM_VERSION		  		= 25.05.5
 UBUNTU_VERSION		  		?= noble
 NFS_VERSION_BASE          	= $(shell cat NFS_VERSION)
 VERSION_BASE           		= $(shell cat VERSION)

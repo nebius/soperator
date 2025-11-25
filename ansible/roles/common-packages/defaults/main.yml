@@ -22,26 +22,28 @@ common_packages:
   - pkg-config=1.8.1-2build1
   - software-properties-common=0.99.49.3
   - sudo=1.9.15p5-3ubuntu5.24.04.1
+  - time=1.9-0.2build1
   - unzip=6.0-28ubuntu4.1
+  - wget=1.21.4-1ubuntu4.1
   - zip=3.0-13ubuntu0.2
 
   # rdma packages
   - rdma-core=2404mlnx51-1.2404066
   - ibverbs-utils=2404mlnx51-1.2404066
 
-  - libpmix-dev=5.0.1-4.1build1
-  - time=1.9-0.2build1
-  - wget=1.21.4-1ubuntu4.1
-
   # required for Slurm
   - iproute2=6.1.0-1ubuntu6.2
-  - libmunge-dev=0.5.15-4build1
   - libhwloc-dev=2.10.0-1build1
   - libjson-c-dev=0.17-1build1
+  - libmunge-dev=0.5.15-4build1
   - libncurses-dev=6.4+20240113-1ubuntu2
+  - libpmix2t64=5.0.1-4.1build1
 
   # required for enroot operation
   - parallel=20240222+ds-2
+  - pigz=2.8-1
   - squashfs-tools=1:4.6.1-1build1
   - zstd=1.5.5+dfsg2-2build1.1
-  - pigz=2.8-1
+
+common_absent_packages:
+  - libpmix-dev=5.0.1-4.1build1
