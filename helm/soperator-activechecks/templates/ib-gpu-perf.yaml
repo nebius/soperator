@@ -27,4 +27,4 @@ spec:
       image: {{ .Values.images.munge | quote }}
   failureReactions:
     drainSlurmNode:
-      drainReasonPrefix: {{ .Values.checks.gpuFryer.drainReasonPrefix | quote }}
+      drainReasonPrefix: {{ .Values.checks.ibGpuPerf.drainReasonPrefix | quote }}
