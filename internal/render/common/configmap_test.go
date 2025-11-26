@@ -52,7 +52,7 @@ ConstrainSwapSpace=yes`
 	t.Run("custom overrides defaults", func(t *testing.T) {
 		customConfig := "ConstrainCores=no\nAllowedKmemSpace=yes"
 		cluster := &values.SlurmCluster{
-			NodeWorker:          values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
 			CustomCgroupConfig: &customConfig,
 		}
 		got := generateCGroupConfig(cluster).Render()
@@ -74,7 +74,7 @@ AllowedKmemSpace=yes`
 	t.Run("custom config with comments", func(t *testing.T) {
 		customConfig := "# This is a comment\nConstrainCores=no"
 		cluster := &values.SlurmCluster{
-			NodeWorker:          values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
 			CustomCgroupConfig: &customConfig,
 		}
 		got := generateCGroupConfig(cluster).Render()
@@ -96,7 +96,7 @@ ConstrainCores=no`
 	t.Run("custom config with empty lines between entries", func(t *testing.T) {
 		customConfig := "ConstrainCores=no\n   \nAllowedKmemSpace=yes"
 		cluster := &values.SlurmCluster{
-			NodeWorker:          values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
 			CustomCgroupConfig: &customConfig,
 		}
 		got := generateCGroupConfig(cluster).Render()
@@ -118,7 +118,7 @@ AllowedKmemSpace=yes`
 	t.Run("custom config with malformed lines", func(t *testing.T) {
 		customConfig := "This line lacks equals"
 		cluster := &values.SlurmCluster{
-			NodeWorker:          values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
 			CustomCgroupConfig: &customConfig,
 		}
 		got := generateCGroupConfig(cluster).Render()
@@ -140,7 +140,7 @@ This line lacks equals`
 	t.Run("empty custom config does not add block", func(t *testing.T) {
 		customConfig := "  \n\t"
 		cluster := &values.SlurmCluster{
-			NodeWorker:          values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
 			CustomCgroupConfig: &customConfig,
 		}
 		got := generateCGroupConfig(cluster).Render()
@@ -158,7 +158,7 @@ IgnoreSystemd=yes`
 	t.Run("custom config adds new keys without overriding defaults", func(t *testing.T) {
 		customConfig := "AllowedKmemSpace=yes"
 		cluster := &values.SlurmCluster{
-			NodeWorker:          values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
 			CustomCgroupConfig: &customConfig,
 		}
 		got := generateCGroupConfig(cluster).Render()
@@ -193,7 +193,6 @@ func Test_parseCGroupKV(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, ok := parseCGroupKV(tt.line)
