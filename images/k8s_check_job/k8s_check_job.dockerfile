@@ -10,8 +10,8 @@ RUN apt-get update && \
         ca-certificates  \
         curl  \
         gnupg \
-        python3.12="3.12.3-1ubuntu0.8" \
-        python3.12-venv="3.12.3-1ubuntu0.8" \
+        python3.12="3.12.3-1ubuntu0.9" \
+        python3.12-venv="3.12.3-1ubuntu0.9" \
         openssh-client \
         retry && \
     apt-get clean && \
