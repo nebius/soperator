@@ -1,0 +1,124 @@
+---
+
+- name: Download Nebius public GPG key
+  ansible.builtin.get_url:
+    url: https://dr.nebius.cloud/public.gpg
+    dest: /usr/share/keyrings/nebius.gpg.pub
+    mode: "0644"
+    checksum: "sha256:e4ec7915ef64976047b3a65db93cbfa94072a8179e77e29ea78f379d30bf4030"
+  tags:
+    - nebius-repo
+    - repos
+
+- name: Add Nebius APT repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/nebius.list
+    content: |
+      deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ {{ ansible_distribution_release }} main
+      deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main
+    owner: root
+    group: root
+    mode: "0644"
+  tags:
+    - nebius-repo
+    - repos
+
+- name: Add docker apt key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    checksum: "sha256:1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570"
+    mode: "0644"
+  tags:
+    - docker-repo
+    - repos
+
+- name: Add docker repo
+  ansible.builtin.apt_repository:
+    repo: "deb [arch={{ repos_docker_dpkg_arch_map[ansible_architecture] }} signed-by=/etc/apt/keyrings/docker.asc] \
+          https://download.docker.com/linux/ubuntu   {{ ansible_distribution_release }} stable"
+  tags:
+    - docker-repo
+    - repos
+
+- name: Download and convert NVIDIA GPG key
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+    | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+  args:
+    executable: /bin/bash
+    creates: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+  tags:
+    - nvidia-container-toolkit-repo
+    - repos
+
+- name: Copy file with owner and permissions
+  ansible.builtin.copy:
+    src: nvidia-container-toolkit.list
+    dest: /etc/apt/sources.list.d/nvidia-container-toolkit.list
+    owner: root
+    group: root
+    mode: '0644'
+  tags:
+    - nvidia-container-toolkit-repo
+    - repos
+
+- name: Add nvtop repository from PPA
+  ansible.builtin.deb822_repository:
+    name: quentiumyt-ubuntu-nvtop-noble
+    types: deb
+    uris: https://ppa.launchpadcontent.net/quentiumyt/nvtop/ubuntu/
+    suites: noble
+    components:
+      - main
+    signed_by: |-
+      -----BEGIN PGP PUBLIC KEY BLOCK-----
+      .
+      mQINBGK5yqwBEAClPHVgFc99bZ9j0n6/auhvS3AKliPO4ZXD/PS8Y4fO854ijMe2
+      j+HFoeTY25NJ02sdo6XbGPtb6fZhCQRWeech6643W8hEWxlMm9yRarc2akSFNsIN
+      6rslLuuOrZd5RSliHpo4hccfasH/Hi2lnZ0BIQazIb7xZln+R2X6np/tIDAglrSY
+      hGn/hQQ1oTBbrVJMPuSgCUuRqvxM/XwEblBCcxy7ccKjyrzs4/FrqgX9/HF0MFdV
+      MjlMx7k6q7ktK+YpCpYZPoX+B8LMbvTxYqcq3qn8eL9shxFPfIjwX1VoFB9v02Dy
+      mLPt1w8vBR1a8ONaGnccHhz+RSYYL5c3/JGbMyFstixjWELCFyQK5sYnwop1d6pj
+      iU7VC6chIXrcW4vBvfieyEtmAOmjoP8exwRIa/zQoFR0jLwwQ8R5kAM3fSc8DSc2
+      loZGwCSY9Onrx9Kmy6V6O/6y3O8ebG1cME9x/Lk24WBV6kT/r6CO6EvbppuZjXBW
+      0cktlf6ip/Y+WkK08jGD1MJuA7xzfYJ9+a1LCuO7XdiLNYN+JMLsRVum6cyL1+cz
+      nliQCuqdxNYBmPLuzmvBqtA4aDbdJot2FHXjJsQa9dncjoABw6wZVPmvtK2bfFQv
+      NH1cDe0qV3HbcwSFBNWwFS7bUz9dMsMXVwnQJL7Udmyw5g7Tw9G47mPBQQARAQAB
+      tCNMYXVuY2hwYWQgUFBBIGZvciBRdWVudGluIExpZW5oYXJkdIkCTgQTAQoAOBYh
+      BIQdO86rLquQ2fvNmMOcA+lEhUFBBQJiucqsAhsDBQsJCAcCBhUKCQgLAgQWAgMB
+      Ah4BAheAAAoJEMOcA+lEhUFBqyoP/jYyWoTnUary1ZEtrfrM/A1edoPiiuTlopVp
+      OBZpYtnvS8ttf8/wSXj137qYgEgDbArfOHnRneE3bC1dzn1FN+U5nUd+DwIPHiBS
+      tMTg5enqdp79HAYmMKlf2yuEOvxoPpY4VjTrf36/oAUQFQz5lO0/H5FGwA+hdSMh
+      gWi62O0vmTeZC2HmLpR9HUXIP/iwRRHCrduM+yPecf0qqbdWuLKJDWnXt4dH3gN8
+      0unEF+dNVJWWXTfHRl4TBEdxofD0H78QSu0OWAPRZbM5zC4ej7AOnhr4G5ufkz6o
+      uJRGH5OLf3qYJ5x8HfL8q1w37mcPMeEluDFianH3qUj0T4FszlgYQy1ynHVIw44p
+      hLYxFOJ6w2mathChdpkNAI0Ho7tcCKx+L2L4LXJNJ/20q9GuQwa4uTNTfv04rFpg
+      pOHAOVd4AWvlHh+ExHG5DI7w3txLhDROarBHWLcj5Zq7rFIZmXnoPqXcnrXf7NhD
+      li1l0IKn3M0n3RZDrgZZQjYnNm/cF8h20rgiFc6hhe3EfGPZziQ0IiT8cvMgsSxc
+      VxQLGvsYt5ykQ6uwFUPQQgiEAlb2SGpDZiWz0CMrla4bTAHkjsslv6+u7bGB2JYb
+      ju6UN4DG6+bkSPUeLpaDsx4G7nZGCRog6gqNSoI4ttbTSSAL3zeHhRQJGdksB5Dx
+      FNO9BxWo
+      =MVXj
+      -----END PGP PUBLIC KEY BLOCK-----
+  tags:
+    - nvtop-repo
+    - repos
+
+- name: Configure ofed repositories
+  ansible.builtin.template:
+    src: mellanox_mlnx_ofed.list.j2
+    dest: /etc/apt/sources.list.d/mellanox_mlnx_ofed.list
+    mode: "0644"
+  tags:
+    - openmpi-repo
+    - repos
+
+- name: Add mellanox gpg key
+  ansible.builtin.apt_key:
+    url: https://www.mellanox.com/downloads/ofed/RPM-GPG-KEY-Mellanox
+    keyring: /etc/apt/trusted.gpg
+  tags:
+    - openmpi-repo
+    - repos

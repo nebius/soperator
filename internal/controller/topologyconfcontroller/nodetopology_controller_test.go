@@ -81,7 +81,11 @@ func TestUpdateTopologyConfigMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := reconciler.UpdateTopologyConfigMap(ctx, tt.nodeName, tt.tierData)
+			// Get or create the ConfigMap first
+			configMap, err := reconciler.GetOrCreateTopologyLabelsConfigMap(ctx)
+			assert.NoError(t, err)
+
+			err = reconciler.UpdateTopologyConfigMap(ctx, tt.nodeName, tt.tierData, configMap)
 			assert.NoError(t, err)
 
 			updatedConfigMap := &corev1.ConfigMap{}
@@ -127,11 +131,19 @@ func TestRemoveTopologyConfigMap(t *testing.T) {
 	for _, tt := range tests {
 
 		tierData := map[string]string{"tier-1": "foo", "tier-2": "bar"}
-		err := reconciler.UpdateTopologyConfigMap(ctx, tt.nodeName, tierData)
+		// Get or create the ConfigMap first
+		configMap, err := reconciler.GetOrCreateTopologyLabelsConfigMap(ctx)
+		assert.NoError(t, err)
+
+		err = reconciler.UpdateTopologyConfigMap(ctx, tt.nodeName, tierData, configMap)
 		logger := log.FromContext(ctx).WithName(tc.NodeTopologyReconcilerName)
 		assert.NoError(t, err)
 		t.Run(tt.name, func(t *testing.T) {
-			err := reconciler.RemoveNodeFromTopologyConfigMap(ctx, tt.nodeName, logger)
+			// Get the ConfigMap again for removal
+			configMap, err := reconciler.GetOrCreateTopologyLabelsConfigMap(ctx)
+			assert.NoError(t, err)
+
+			err = reconciler.RemoveNodeFromTopologyConfigMap(ctx, tt.nodeName, configMap, logger)
 			assert.NoError(t, err)
 
 			updatedConfigMap := &corev1.ConfigMap{}

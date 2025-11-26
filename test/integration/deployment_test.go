@@ -15,6 +15,10 @@ import (
 )
 
 var _ = Describe("Local Kind Cluster with FluxCD", func() {
+	JustBeforeEach(func() {
+		fmt.Printf("\n▶ Running: %s\n", CurrentSpecReport().FullText())
+	})
+
 	Context("Cluster Setup", func() {
 		It("should have kind cluster running", func(ctx SpecContext) {
 			status, err := testenv.GetKindClusterStatus(ctx)
@@ -56,6 +60,12 @@ var _ = Describe("Local Kind Cluster with FluxCD", func() {
 		It("should have SlurmCluster CRDs installed", func(ctx SpecContext) {
 			Eventually(ctx, func() bool {
 				return testenv.IsSlurmClusterCRDsInstalled(ctx)
+			}, 2*time.Minute, 5*time.Second).Should(BeTrue())
+		})
+
+		It("should have cert-manager CRDs installed", func(ctx SpecContext) {
+			Eventually(ctx, func() bool {
+				return testenv.IsCertManagerCRDsInstalled(ctx)
 			}, 2*time.Minute, 5*time.Second).Should(BeTrue())
 		})
 	})
@@ -112,6 +122,40 @@ var _ = Describe("Local Kind Cluster with FluxCD", func() {
 			cmd := exec.Command("kubectl", "get", "namespace", "soperator-system")
 			_, err := testenv.Run(cmd)
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should have cert-manager pods running", func() {
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "pods", "-n", "cert-manager-system",
+					"-o", "jsonpath={.items[*].status.phase}")
+				output, err := testenv.Run(cmd)
+				if err != nil {
+					return false
+				}
+				phases := strings.Fields(output)
+				if len(phases) == 0 {
+					return false
+				}
+				for _, phase := range phases {
+					if phase != "Running" {
+						return false
+					}
+				}
+				return true
+			}, 3*time.Minute, 5*time.Second).Should(BeTrue())
+		})
+
+		It("should have webhook certificate created", func() {
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "certificate", "soperator-controller-serving-cert",
+					"-n", "soperator-system",
+					"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
+				output, err := testenv.Run(cmd)
+				if err != nil {
+					return false
+				}
+				return strings.TrimSpace(output) == "True"
+			}, 2*time.Minute, 5*time.Second).Should(BeTrue())
 		})
 
 		It("should have soperator controller manager pod running", func() {

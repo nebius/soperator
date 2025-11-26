@@ -1,9 +1,8 @@
-{{- if .Values.certManager.enabled }}
 apiVersion: admissionregistration.k8s.io/v1
-kind: ValidatingWebhookConfiguration
+kind: MutatingWebhookConfiguration
 metadata:
-  name: {{ include "soperator.fullname" . }}-validate-secrets
-  {{- if.Values.certManager.enabled }}
+  name: {{ include "soperator.fullname" . }}-mutating-webhook-configuration
+  {{- if .Values.certManager.enabled }}
   annotations:
     cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "soperator.fullname" . }}-serving-cert
   {{- end }}
@@ -12,27 +11,21 @@ metadata:
 webhooks:
 - admissionReviewVersions:
   - v1
-  - v1beta1
   clientConfig:
     service:
       name: '{{ include "soperator.fullname" . }}-webhook-service'
       namespace: '{{ .Release.Namespace }}'
-      path: /validate--v1-secret
+      path: /mutate-slurm-nebius-ai-v1alpha1-nodeset
   failurePolicy: Fail
-  name: validate.secrets.nebius.ai
-  objectSelector:
-    matchLabels:
-      slurm.nebius.ai/webhook: "true"
+  name: mnodeset-v1alpha1.kb.io
   rules:
   - apiGroups:
-    - ""
+    - slurm.nebius.ai
     apiVersions:
-    - v1
+    - v1alpha1
     operations:
     - CREATE
     - UPDATE
-    - DELETE
     resources:
-    - secrets
+    - nodesets
   sideEffects: None
-{{- end }}
