@@ -3,15 +3,26 @@ FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS k8s_check_job
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Install common packages and minimal python packages for Ansible
+# Install common packages and python packages for Ansible
 RUN apt-get update && \
     apt-get install -y \
         apt-transport-https \
         ca-certificates  \
         curl  \
         gnupg \
-        python3.12="3.12.3-1ubuntu0.8" \
-        python3.12-venv="3.12.3-1ubuntu0.8" \
+        python3.12="3.12.3-1" \
+        python3.12-venv="3.12.3-1" \
+        python3.12-dev="3.12.3-1" \
+        libpython3.12-dev="3.12.3-1" \
+        libpython3.12t64="3.12.3-1" \
+        python3.12-dbg="3.12.3-1" \
+        libpython3.12t64-dbg="3.12.3-1" \
+        python3.12-minimal="3.12.3-1" \
+        libpython3.12-minimal="3.12.3-1" \
+        libpython3.12-stdlib="3.12.3-1" \
+        python3-pip="24.0+dfsg-1ubuntu1" \
+        python3-pip-whl="24.0+dfsg-1ubuntu1" \
+        python3-apt="2.7.7ubuntu1" \
         openssh-client \
         retry && \
     apt-get clean && \
@@ -29,11 +40,6 @@ RUN cd /opt/ansible && ln -sf /usr/bin/python3.12 /usr/bin/python3 && \
 
 ENV PATH="/opt/ansible/.venv/bin:${PATH}"
 WORKDIR /opt/ansible
-
-# Install python
-COPY ansible/python.yml /opt/ansible/python.yml
-COPY ansible/roles/python /opt/ansible/roles/python
-RUN ansible-playbook -i localhost -c local python.yml -t python
 
 # Copy role for Nebius health-check library
 COPY ansible/nc-health-checker.yml /opt/ansible/nc-health-checker.yml
