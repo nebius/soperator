@@ -373,7 +373,7 @@ func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 			continue
 		}
 
-		if key, _, ok := parseCGroupKV(line); ok {
+		if key, ok := parseCGroupKV(line); ok {
 			customKeys[key] = struct{}{}
 		}
 		customLines = append(customLines, rawLine)
@@ -381,7 +381,7 @@ func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 
 	filteredDefaults := make([]string, 0, len(defaultLines))
 	for _, line := range defaultLines {
-		if key, _, ok := parseCGroupKV(line); ok {
+		if key, ok := parseCGroupKV(line); ok {
 			if _, exists := customKeys[key]; exists {
 				continue
 			}
@@ -414,23 +414,22 @@ func renderDefaultCGroupConfig(cgroupVersion string) string {
 	return res.Render()
 }
 
-func parseCGroupKV(line string) (string, string, bool) {
+func parseCGroupKV(line string) (string, bool) {
 	trimmed := strings.TrimSpace(line)
 	if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-		return "", "", false
+		return "", false
 	}
 
 	if !strings.Contains(trimmed, "=") {
-		return "", "", false
+		return "", false
 	}
 
 	parts := strings.SplitN(trimmed, "=", 2)
 	key := strings.TrimSpace(parts[0])
-	value := strings.TrimSpace(parts[1])
 	if key == "" {
-		return "", "", false
+		return "", false
 	}
-	return key, value, true
+	return key, true
 }
 
 func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
