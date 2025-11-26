@@ -5,7 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "cuda-samples"
-  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
+  dependsOn: [ "wait-for-soperatorchecks-srun-ready", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "30 0-18/6 * * *" # 4 times a day at 00:30, 06:30, 12:30 and 18:30 UTC
   suspend: {{ .Values.checks.cudaSamples.suspend }}

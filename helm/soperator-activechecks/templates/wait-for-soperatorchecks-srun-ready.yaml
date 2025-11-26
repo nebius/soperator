@@ -1,19 +1,18 @@
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
-  name: "enroot-cleanup"
+  name: "wait-for-soperatorchecks-srun-ready"
 spec:
   checkType: "slurmJob"
-  name: "enroot-cleanup"
-  dependsOn: [ "wait-for-soperatorchecks-srun-ready" ]
+  name: "wait-for-soperatorchecks-srun-ready"
+  dependsOn: [ "create-user-soperatorchecks" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  schedule: "10 8-20/12 * * *" # 2 times a day at 8:10 and 20:10 UTC
-  suspend: {{ .Values.checks.enrootCleanup.suspend }}
-  runAfterCreation: {{ .Values.checks.enrootCleanup.runAfterCreation }}
+  schedule: "0 0 1 1 *" # Never run on schedule, only runAfterCreation
+  suspend: true
+  runAfterCreation: true
   slurmJobSpec:
     sbatchScript: |
-{{ .Files.Get "scripts/enroot-cleanup.sh" | indent 6 }}
-    eachWorkerJobs: true
+{{ .Files.Get "scripts/wait-for-soperatorchecks-srun-ready.sh" | indent 6 }}
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:

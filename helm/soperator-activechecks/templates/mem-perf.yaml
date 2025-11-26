@@ -5,7 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "mem-perf"
-  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
+  dependsOn: [ "wait-for-soperatorchecks-srun-ready", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "20 10-22/12 * * *" # 2 times a day at 10:20 and 22:20 UTC
   suspend: {{ .Values.checks.memPerf.suspend }}
