@@ -157,6 +157,7 @@ slurmConfig:
   topologyPlugin: "topology/tree"
   topologyParam: "SwitchAsNodeRank"
 customSlurmConfig: ""
+customCgroupConfig: ""
 mpiConfig:
   pmixEnv: "OMPI_MCA_btl_tcp_if_include=eth0"
 plugStackConfig:

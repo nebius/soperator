@@ -35,6 +35,7 @@ ConstrainSwapSpace=no
 EnableControllers=yes
 IgnoreSystemd=yes`
 	assert.Equal(t, expectedV2, resV2.Render())
+
 	clusterV1 := &values.SlurmCluster{
 		NodeWorker: values.SlurmWorker{
 			CgroupVersion: consts.CGroupV1,
@@ -49,6 +50,27 @@ ConstrainSwapSpace=yes`
 	resV1 := generateCGroupConfig(clusterV1)
 	assert.Equal(t, expectedV1, resV1.Render())
 
+	customConfig := "ConstrainCores=no\nAllowedKmemSpace=yes"
+	clusterWithCustom := &values.SlurmCluster{
+		NodeWorker: values.SlurmWorker{
+			CgroupVersion: consts.CGroupV2,
+		},
+		CustomCgroupConfig: &customConfig,
+	}
+	expectedCustom := `CgroupMountpoint=/sys/fs/cgroup
+ConstrainDevices=yes
+ConstrainRAMSpace=yes
+CgroupPlugin=cgroup/v2
+ConstrainSwapSpace=no
+EnableControllers=yes
+IgnoreSystemd=yes
+###
+# Custom config
+###
+ConstrainCores=no
+AllowedKmemSpace=yes`
+	resCustom := generateCGroupConfig(clusterWithCustom)
+	assert.Equal(t, expectedCustom, resCustom.Render())
 }
 
 func TestRenderConfigMapSecurityLimits(t *testing.T) {

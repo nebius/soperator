@@ -25,6 +25,10 @@ spec:
   customSlurmConfig: |
 {{- .Values.customSlurmConfig | nindent 4 }}
   {{- end }}
+  {{- if .Values.customCgroupConfig }}
+  customCgroupConfig: |
+{{- .Values.customCgroupConfig | nindent 4 }}
+  {{- end }}
   {{- if eq .Values.clusterType "gpu" }}
   healthCheckConfig:
     healthCheckInterval: 120

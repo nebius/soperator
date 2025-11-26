@@ -85,6 +85,14 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	CustomSlurmConfig *string `json:"customSlurmConfig,omitempty"`
 
+	// CustomCgroupConfig represents the raw cgroup configuration from cgroup.conf.
+	// All options are provided as a raw string.
+	// Soperator does not guarantee the validity of the raw configuration.
+	// Raw config is appended to the generated cgroup.conf content.
+	//
+	// +kubebuilder:validation:Optional
+	CustomCgroupConfig *string `json:"customCgroupConfig,omitempty"`
+
 	// MPIConfig represents the PMIx configuration in mpi.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional

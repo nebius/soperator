@@ -27,18 +27,19 @@ type SlurmCluster struct {
 	VolumeSources []slurmv1.VolumeSource
 	Secrets       slurmv1.Secrets
 
-	NodeController    SlurmController
-	NodeAccounting    SlurmAccounting
-	NodeRest          SlurmREST
-	NodeWorker        SlurmWorker
-	NodeLogin         SlurmLogin
-	SlurmExporter     SlurmExporter
-	SlurmConfig       slurmv1.SlurmConfig
-	CustomSlurmConfig *string
-	MPIConfig         slurmv1.MPIConfig
-	PlugStackConfig   slurmv1.PlugStackConfig
-	SConfigController SConfigController
-	NodeSets          []slurmav1alpha1.NodeSet
+	NodeController     SlurmController
+	NodeAccounting     SlurmAccounting
+	NodeRest           SlurmREST
+	NodeWorker         SlurmWorker
+	NodeLogin          SlurmLogin
+	SlurmExporter      SlurmExporter
+	SlurmConfig        slurmv1.SlurmConfig
+	CustomSlurmConfig  *string
+	CustomCgroupConfig *string
+	MPIConfig          slurmv1.MPIConfig
+	PlugStackConfig    slurmv1.PlugStackConfig
+	SConfigController  SConfigController
+	NodeSets           []slurmav1alpha1.NodeSet
 }
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD
@@ -75,12 +76,13 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 			&cluster.Spec.SlurmNodes.Worker,
 			cluster.Spec.UseDefaultAppArmorProfile,
 		),
-		NodeLogin:         buildSlurmLoginFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
-		SlurmExporter:     buildSlurmExporterFrom(cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Exporter),
-		SlurmConfig:       cluster.Spec.SlurmConfig,
-		CustomSlurmConfig: cluster.Spec.CustomSlurmConfig,
-		MPIConfig:         cluster.Spec.MPIConfig,
-		PlugStackConfig:   cluster.Spec.PlugStackConfig,
+		NodeLogin:          buildSlurmLoginFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
+		SlurmExporter:      buildSlurmExporterFrom(cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Exporter),
+		SlurmConfig:        cluster.Spec.SlurmConfig,
+		CustomSlurmConfig:  cluster.Spec.CustomSlurmConfig,
+		CustomCgroupConfig: cluster.Spec.CustomCgroupConfig,
+		MPIConfig:          cluster.Spec.MPIConfig,
+		PlugStackConfig:    cluster.Spec.PlugStackConfig,
 		SConfigController: buildSConfigControllerFrom(
 			cluster.Spec.SConfigController.Node,
 			cluster.Spec.SConfigController.Container,

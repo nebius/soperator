@@ -359,12 +359,49 @@ func addSlurmConfigProperties(res *renderutils.PropertiesConfig, config interfac
 }
 
 func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
+	defaultLines := strings.Split(renderDefaultCGroupConfig(cluster.NodeWorker.CgroupVersion), "\n")
+
+	if cluster.CustomCgroupConfig == nil || strings.TrimSpace(*cluster.CustomCgroupConfig) == "" {
+		return renderutils.NewAsIsConfig(strings.Join(defaultLines, "\n"))
+	}
+
+	customLines := []string{}
+	customKeys := map[string]struct{}{}
+	for _, rawLine := range strings.Split(strings.TrimRight(*cluster.CustomCgroupConfig, "\n"), "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" {
+			continue
+		}
+
+		if key, _, ok := parseCGroupKV(line); ok {
+			customKeys[key] = struct{}{}
+		}
+		customLines = append(customLines, rawLine)
+	}
+
+	filteredDefaults := make([]string, 0, len(defaultLines))
+	for _, line := range defaultLines {
+		if key, _, ok := parseCGroupKV(line); ok {
+			if _, exists := customKeys[key]; exists {
+				continue
+			}
+		}
+		filteredDefaults = append(filteredDefaults, line)
+	}
+
+	commentBlock := []string{"###", "# Custom config", "###"}
+	allLines := append(filteredDefaults, append(commentBlock, customLines...)...)
+
+	return renderutils.NewAsIsConfig(strings.Join(allLines, "\n"))
+}
+
+func renderDefaultCGroupConfig(cgroupVersion string) string {
 	res := &renderutils.PropertiesConfig{}
 	res.AddProperty("CgroupMountpoint", "/sys/fs/cgroup")
 	res.AddProperty("ConstrainCores", "yes")
 	res.AddProperty("ConstrainDevices", "yes")
 	res.AddProperty("ConstrainRAMSpace", "yes")
-	switch cluster.NodeWorker.CgroupVersion {
+	switch cgroupVersion {
 	case consts.CGroupV1:
 		res.AddProperty("CgroupPlugin", "cgroup/v1")
 		res.AddProperty("ConstrainSwapSpace", "yes")
@@ -374,7 +411,26 @@ func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		res.AddProperty("EnableControllers", "yes")
 		res.AddProperty("IgnoreSystemd", "yes")
 	}
-	return res
+	return res.Render()
+}
+
+func parseCGroupKV(line string) (string, string, bool) {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+		return "", "", false
+	}
+
+	if !strings.Contains(trimmed, "=") {
+		return "", "", false
+	}
+
+	parts := strings.SplitN(trimmed, "=", 2)
+	key := strings.TrimSpace(parts[0])
+	value := strings.TrimSpace(parts[1])
+	if key == "" {
+		return "", "", false
+	}
+	return key, value, true
 }
 
 func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
