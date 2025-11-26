@@ -30,9 +30,6 @@ helmRepository:
   victoriaMetrics:
     url: https://victoriametrics.github.io/helm-charts/
     type: default
-  helmReleaseTriggerOperator:
-    url: oci://cr.eu-north1.nebius.cloud/soperator
-    type: oci
   csiDriverNfs:
     url: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
     type: default
@@ -313,23 +310,6 @@ soperator:
       rebooter:
         resources: {}
     overrideValues: null
-helmReleaseTriggerOperator:
-  enabled: true
-  interval: 5m
-  timeout: 5m
-  version: 0.0.1
-  namespace: flux-system
-  releaseName: helmrelease-trigger
-  values:
-    enableHrAutodiscovery: true
-    repository: "cr.eu-north1.nebius.cloud/soperator/helmrelease-trigger-operator"
-    resources:
-      limits:
-        memory: 128Mi
-      requests:
-        cpu: 100m
-        memory: 128Mi
-  overrideValues: null
 notifier:
   enabled: false
   interval: 5m
