@@ -3,7 +3,7 @@
 FROM cr.eu-north1.nebius.cloud/soperator/cuda_base:13.0.2-ubuntu24.04-nccl2.28.7-1-14542c2 AS cuda
 
 # Download NCCL tests executables
-ARG CUDA_VERSION=12.9.0
+ARG CUDA_VERSION=13.0.2
 ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
 RUN ARCH=$(uname -m) && \
     echo "Using architecture: ${ARCH}" && \
