@@ -13,6 +13,7 @@ spec:
     sbatchScript: |
 {{ tpl (.Files.Get "scripts/all-reduce-perf-nccl-in-docker.sh") . | indent 6 }}
     eachWorkerJobs: true
+    maxNumberOfJobs: 200
     jobContainer:
       image: {{ .Values.images.slurmJob | quote }}
       env:
