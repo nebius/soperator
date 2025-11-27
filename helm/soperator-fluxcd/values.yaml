@@ -310,6 +310,9 @@ soperator:
       rebooter:
         resources: {}
     overrideValues: null
+  monitoringDashboards:
+    enabled: true
+    overrideValues: null
 notifier:
   enabled: false
   interval: 5m
