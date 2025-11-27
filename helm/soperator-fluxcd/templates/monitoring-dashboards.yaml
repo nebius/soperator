@@ -27,7 +27,7 @@ spec:
   interval: {{ .Values.soperator.monitoringDashboards.interval }}
   timeout: {{ .Values.soperator.monitoringDashboards.timeout }}
   releaseName: {{ .Values.soperator.monitoringDashboards.releaseName }}
-  targetNamespace: {{ .Values.soperator.namespace }}
+  targetNamespace: {{ .Values.soperator.monitoringDashboards.namespace }}
   {{- if .Values.soperator.monitoringDashboards.overrideValues }}
   values:
     {{- toYaml .Values.soperator.monitoringDashboards.overrideValues | nindent 4 }}
