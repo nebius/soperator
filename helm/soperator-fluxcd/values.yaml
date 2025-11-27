@@ -366,6 +366,15 @@ storageClasses:
   namespace: storage-system
   releaseName: soperator-storageclasses
   values: null
+customConfigmaps:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: 1.23.0
+  namespace: soperator
+  releaseName: soperator-custom-configmaps
+  overrideValues: null
+  values: null
 tailscale:
   enabled: false
   interval: 5m

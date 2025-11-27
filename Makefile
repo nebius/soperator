@@ -16,7 +16,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 # Limit the scope of generation otherwise it will try to generate configs for non-controller code
-GENPATH = "./api/v1;./api/v1alpha1;"
+GENPATH = "./api/v1;./api/v1alpha1;./internal/webhook/..."
 
 CHART_PATH            		  = helm
 CHART_OPERATOR_PATH   		  = $(CHART_PATH)/soperator
@@ -33,6 +33,8 @@ CHART_NFS_SERVER_PATH         = $(CHART_PATH)/nfs-server
 CHART_NODESETS_PATH           = $(CHART_PATH)/nodesets
 CHART_STORAGECLASSES		  = $(CHART_PATH)/storageclasses
 
+CHART_CUSTOM_CONFIGMAPS_PATH  = $(CHART_PATH)/soperator-custom-configmaps
+CHART_FLUXCD_BOOTSTRAP_PATH   = $(CHART_PATH)/soperator-fluxcd-bootstrap
 
 SLURM_VERSION		  		= 25.05.4
 UBUNTU_VERSION		  		?= noble
@@ -138,12 +140,42 @@ helm: generate manifests kustomize helmify ## Update soperator Helm chart
 	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/rbac/clustercontroller  | $(HELMIFY) $(CHART_OPERATOR_PATH)
 	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/rbac/nodeconfigurator  | $(HELMIFY) $(CHART_NODECONFIGURATOR_PATH)
 	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/rbac/soperatorchecks  | $(HELMIFY) $(CHART_SOPERATORCHECKS_PATH)
+	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/webhook | $(HELMIFY) $(CHART_OPERATOR_PATH)
 	mv $(CHART_OPERATOR_PATH)/values.yaml.bak $(CHART_OPERATOR_PATH)/values.yaml
 	mv $(CHART_NODECONFIGURATOR_PATH)/values.yaml.bak $(CHART_NODECONFIGURATOR_PATH)/values.yaml
 	mv $(CHART_SOPERATORCHECKS_PATH)/values.yaml.bak $(CHART_SOPERATORCHECKS_PATH)/values.yaml
 # Because of helmify rewrite a file we need to add the missing if statement
 	@$(SED_COMMAND) '1s|^|{{- if and .Values.rebooter.generateRBAC .Values.rebooter.enabled }}\n|' $(CHART_NODECONFIGURATOR_PATH)/templates/nodeconfigurator-rbac.yaml
 	@echo -e "\n{{- end }}" >> $(CHART_NODECONFIGURATOR_PATH)/templates/nodeconfigurator-rbac.yaml
+# Add cert-manager annotations to webhook configurations and fix their order
+	@if [ -f "$(CHART_OPERATOR_PATH)/templates/mutating-webhook-configuration.yaml" ]; then \
+		awk 'BEGIN {in_metadata=0; done=0} \
+		/^metadata:$$/ {print; in_metadata=1; next} \
+		in_metadata && /^  name:/ {print; if (!done) {print "  {{- if .Values.certManager.enabled }}"; print "  annotations:"; print "    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include \"soperator.fullname\" . }}-serving-cert"; print "  {{- end }}"; done=1}; next} \
+		in_metadata && /^  annotations:/ {next} \
+		in_metadata && /^    cert-manager/ {next} \
+		in_metadata && /^  labels:/ {in_metadata=0} \
+		{print}' \
+		$(CHART_OPERATOR_PATH)/templates/mutating-webhook-configuration.yaml > $(CHART_OPERATOR_PATH)/templates/mutating-webhook-configuration.yaml.tmp && \
+		mv $(CHART_OPERATOR_PATH)/templates/mutating-webhook-configuration.yaml.tmp $(CHART_OPERATOR_PATH)/templates/mutating-webhook-configuration.yaml; \
+	fi
+	@if [ -f "$(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml" ]; then \
+		awk 'BEGIN {in_metadata=0; done=0} \
+		/^metadata:$$/ {print; in_metadata=1; next} \
+		in_metadata && /^  name:/ {print; if (!done) {print "  {{- if .Values.certManager.enabled }}"; print "  annotations:"; print "    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include \"soperator.fullname\" . }}-serving-cert"; print "  {{- end }}"; done=1}; next} \
+		in_metadata && /^  annotations:/ {next} \
+		in_metadata && /^    cert-manager/ {next} \
+		in_metadata && /^  labels:/ {in_metadata=0} \
+		{print}' \
+		$(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml > $(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml.tmp && \
+		mv $(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml.tmp $(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml; \
+	fi
+# Add objectSelector to Secret webhook
+	@if [ -f "$(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml" ]; then \
+		awk '/name: vsecret-v1.kb.io/ {found=1} found && /^  rules:/ {print "  objectSelector:"; print "    matchLabels:"; print "      slurm.nebius.ai/webhook: \"true\""; found=0} {print}' \
+		$(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml > $(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml.tmp && \
+		mv $(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml.tmp $(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml; \
+	fi
 
 .PHONY: get-version
 get-version:
@@ -223,6 +255,8 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_NOTIFIER_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODESETS_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_STORAGECLASSES)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CUSTOM_CONFIGMAPS_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_FLUXCD_BOOTSTRAP_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_CRDS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
@@ -235,6 +269,8 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_NOTIFIER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODESETS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_STORAGECLASSES)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CUSTOM_CONFIGMAPS_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_FLUXCD_BOOTSTRAP_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(NFS_VERSION)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(NFS_VERSION)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
 	@# endregion helm chart versions
@@ -259,6 +295,10 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.munge.tag = \"$(IMAGE_VERSION)\"" "helm/nodesets/values.yaml"
 	@$(YQ) -i ".images.slurmd.repository = \"$(IMAGE_REPO)/worker_slurmd\"" "helm/nodesets/values.yaml"
 	@$(YQ) -i ".images.slurmd.tag = \"$(IMAGE_VERSION)\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].slurmd.image.repository = \"$(IMAGE_REPO)/worker_slurmd\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].slurmd.image.tag = \"$(IMAGE_VERSION)+custom\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].munge.image.repository = \"$(IMAGE_REPO)/munge\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].munge.image.tag = \"$(IMAGE_VERSION)+custom\"" "helm/nodesets/values.yaml"
 	@# endregion helm/nodesets/values.yaml
 
 	@# region helm/soperator-activechecks/values.yaml
@@ -316,7 +356,13 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".nodesets.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".observability.dcgmExporter.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".notifier.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
+	@$(YQ) -i ".customConfigmaps.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@# endregion helm/soperator-fluxcd/values.yaml
+
+	@# region helm/soperator-fluxcd-bootstrap/values.yaml
+	@echo 'Syncing helm/soperator-fluxcd-bootstrap/values.yaml'
+	@$(YQ) -i ".helmRelease.chart.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd-bootstrap/values.yaml"
+	@# endregion helm/soperator-fluxcd-bootstrap/values.yaml
 
 	@# region fluxcd/environment/local
 	@echo 'Syncing fluxcd/environment/local/helmrelease.yaml'
@@ -755,4 +801,4 @@ kind-status: ## Check kind cluster status
 .PHONY: jail-shell
 jail-shell: ## Open interactive shell in jail environment via login pod
 	@echo "Opening jail shell in login-0 pod..."
-	@$(KUBECTL_CTX) exec -it -n soperator login-0 -- chroot /mnt/jail bash
+	@$(KUBECTL_CTX) exec -it -n soperator login-0 -- chroot /mnt/jail bash -l
