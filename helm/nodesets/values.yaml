@@ -8,159 +8,248 @@ fullnameOverride: ""
 # Priority Classes configuration
 # Define priority classes that can be used by NodeSets
 priorityClasses:
-  - name: "soperator-worker-high-priority"
+  - name: &priorityClassHigh soperator-worker-high-priority
+    # Optional, defaults to empty string
+    description: "High priority class for Slurm workers"
+    # Optional, defaults to empty dict
+    annotations: {}
+    # Optional, defaults to empty dict
+    labels: {}
+    # Optional, defaults to 10000000
     value: 10000000
+    # Optional, defaults to false
     globalDefault: false
-    description: "High priority class for GPU workers and critical Slurm components"
+    # Optional, defaults to PreemptLowerPriority
     preemptionPolicy: "PreemptLowerPriority"
-# Container images used by NodeSets
+# Default container images used by NodeSets
 images:
   munge:
     repository: "cr.eu-north1.nebius.cloud/soperator/munge"
+    # Optional
     tag: "1.23.0-noble-slurm25.05.4"
   slurmd:
     repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
+    # Optional
     tag: "1.23.0-noble-slurm25.05.4"
 # NodeSets configuration
 # Each NodeSet defines a group of worker nodes with specific characteristics
-# Example GPU NodeSet
-nodesets: {}
-# - name: gpu-workers
-#   replicas: 3
-#   affinity:
-#     nodeAffinity:
-#       requiredDuringSchedulingIgnoredDuringExecution:
-#         nodeSelectorTerms:
-#           - matchExpressions:
-#               - key: "nebius.com/node-group-id"
-#                 operator: In
-#                 values:
-#                   - "gpu-node-group-id"
-#   tolerations:
-#     - key: nvidia.com/gpu
-#       operator: Exists
-#       effect: NoSchedule
-#   priorityClass: "soperator-worker-high-priority"
-#   # Maximum number of unavailable replicas during updates
-#   maxUnavailable: 1
-#   enableHostUserNamespace: false
-#   workerAnnotations:
-#     prometheus.io/scrape: "true"
-#     prometheus.io/port: "9090"
-#   # Slurmd configuration
-#   slurmd:
-#     port: 6818
-#     cgroupVersion: "v2"
-#     resources:
-#       cpu: "156000m"
-#       memory: "1220Gi"
-#       ephemeral-storage: "55Gi"
-#       gpu: 8
-#     volumes:
-#       spool:
-#         volumeClaimTemplateSpec:
-#           storageClassName: "nebius-network-ssd"
-#           accessModes: ["ReadWriteOnce"]
-#           resources:
-#             requests:
-#               storage: "128Gi"
-#       jail:
-#         persistentVolumeClaim:
-#           claimName: "jail-pvc"
-#       jailSubMounts:
-#         - name: "tmp"
-#           mountPath: "/tmp"
-#           subPath: "tmp"
-#           readOnly: false
-#           volumeSource:
-#             emptyDir: {}
-#       sharedMemorySize: "64Gi"
-#     security:
-#       appArmorProfile: "unconfined"
-#       limitsConfig: ""
-#   # Munge configuration
-#   munge:
-#     resources:
-#       cpu: "2000m"
-#       memory: "4Gi"
-#       ephemeral-storage: "5Gi"
-#     security:
-#       appArmorProfile: "unconfined"
-#       limitsConfig: ""
-#   # GPU configuration
-#   gpu:
-#     enabled: true
-#     nvidia:
-#       gdrCopyEnabled: false
-#   # Node configuration
-#   nodeConfig:
-#     features:
-#       - "gpu"
-#       - "cuda"
-#     static: "Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=1"
-#     dynamic: "InstanceId={{ .PodName }}"
-#   # Custom ConfigMap references (optional)
-#   # configMapRefSshd: "custom-sshd-config"
-#   # configMapRefSupervisord: "custom-supervisord-config"
-#   # Custom init containers (optional)
-#   customInitContainers: []
-#   #   - name: setup-gpu
-#   #     image: nvidia/cuda:11.8-base-ubuntu20.04
-#   #     command: ["sh", "-c", "nvidia-smi"]
-# - name: cpu-workers
-#   replicas: 5
-#   affinity:
-#     nodeAffinity: 
-#       requiredDuringSchedulingIgnoredDuringExecution:
-#         nodeSelectorTerms:
-#           - matchExpressions:
-#               - key: "nebius.com/node-group-id"
-#                 operator: In
-#                 values:
-#                   - "cpu-node-group-id"
-#   priorityClass: "soperator-worker-high-priority"
-#   maxUnavailable: 2
-#   enableHostUserNamespace: false
-#   slurmd:
-#     port: 6818
-#     cgroupVersion: "v2"
-#     resources:
-#       cpu: "2000m"
-#       memory: "4Gi"
-#       ephemeral-storage: "10Gi"
-#     volumes:
-#       spool:
-#         volumeClaimTemplateSpec:
-#           storageClassName: "nebius-network-ssd"
-#           accessModes: ["ReadWriteOnce"]
-#           resources:
-#             requests:
-#               storage: "64Gi"
-#       jail:
-#         persistentVolumeClaim:
-#           claimName: "jail-pvc"
-#       jailSubMounts:
-#         - name: "tmp"
-#           mountPath: "/tmp"
-#           subPath: "tmp"
-#           readOnly: false
-#           volumeSource:
-#             emptyDir: {}
-#       sharedMemorySize: "32Gi"
-#     security:
-#       appArmorProfile: "unconfined"
-#       limitsConfig: ""
-#     resources:
-#       cpu: "500m"
-#       memory: "500Mi"
-#       ephemeral-storage: "2Gi"
-#     security:
-#       appArmorProfile: "unconfined"
-#       limitsConfig: ""
-#   gpu:
-#     enabled: false
-#   nodeConfig:
-#     features:
-#       - "cpu"
-#     static: "Boards=1 SocketsPerBoard=1 CoresPerSocket=4 ThreadsPerCore=1"
-#     dynamic: "InstanceId={{ .PodName }}"
+nodesets:
+  - name: worker-gpu
+    # Annotations of the NodeSet CR
+    # Optional, defaults to empty dict
+    annotations: {}
+    # Labels of the NodeSet CR
+    # Optional, defaults to empty dict
+    labels: {}
+    # A number of workers in the NodeSet
+    # Optional, defaults to 1
+    replicas: 3
+    # Maximum number of unavailable replicas during updates
+    # Could be a count (number) or percent (string)
+    # Optional, defaults to 20%
+    maxUnavailable: 1
+    # GPU configuration
+    # Optional
+    gpu:
+      # Whether GPU is available on NodeSet's workers
+      # Optional, defaults to false
+      enabled: true
+      # Additional settings for Nvidia vendored GPUs
+      # Optional
+      # Must be assigned to at least empty dict in case of enabled Nvidia GPU
+      nvidia:
+        # Whether GDRCopy should be enabled
+        # Optional, defaults to false
+        gdrCopyEnabled: true
+    # Node configuration values to be set in slurm.conf
+    # Optional
+    nodeConfig:
+      # Slurm Node Features
+      # Optional, defaults to empty list
+      features:
+        - "gpu"
+        - "cuda"
+      # Static string to be added to the Node's configuration
+      # Optional
+      static: "Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=1"
+      # Dynamic string to be added to the Node's configuration
+      # Optional
+      dynamic: "InstanceId={{ .PodName }}"
+    # Slurmd configuration
+    slurmd:
+      # Each particular NodeSet's containers can have images other than default ones
+      # Optional
+      image:
+        repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
+        tag: "1.23.0-noble-slurm25.05.4+custom"
+        pullPolicy: "IfNotPresent"
+      # Port to serve slurmd service on
+      # Optional, defaults to 6818
+      port: 6818
+      # Optional, defaults to "v2"
+      cgroupVersion: "v2"
+      # Slurmd container resources
+      resources:
+        cpu: "156000m"
+        memory: "1220Gi"
+        ephemeralStorage: "55Gi"
+        # Optional, required in case of nodesets[*].gpu.enabled
+        gpu: 8
+      # Slurmd container volumes
+      volumes:
+        # Worker spool volume
+        # Could be any corev1.VolumeSource
+        spool:
+          volumeClaimTemplateSpec:
+            storageClassName: &nebiusNetworkSsdStorageClassName "nebius-network-ssd"
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: "128Gi"
+        # Shared jail volume
+        # Could be any corev1.VolumeSource
+        jail:
+          persistentVolumeClaim:
+            claimName: &jailPvcClaimName "jail-pvc"
+        # Volumes being mounted inside Jail mount
+        # Optional, defaults to empty list
+        jailSubMounts:
+          - name: "tmp1"
+            mountPath: "/tmp/1"
+            # Optional
+            subPath: "1"
+            # Optional
+            readOnly: false
+            # Could be any corev1.VolumeSource
+            volumeSource:
+              emptyDir: {}
+          - name: "tmp2"
+            mountPath: "/tmp/2"
+            # Optional
+            subPath: "2"
+            # Optional
+            readOnly: true
+            # Should be a corev1.PersistentVolumeClaimSpec
+            volumeClaimTemplateSpec: {}
+        # Volumes being mounted into container root FS
+        # Optional, defaults to empty list
+        customVolumeMounts:
+          - name: "foo"
+            mountPath: "/tmp/foo"
+            # Optional
+            subPath: "bar"
+            # Optional
+            readOnly: false
+            # Could be any corev1.VolumeSource
+            volumeSource:
+              emptyDir: {}
+        # Size of the shared memory
+        # Optional
+        sharedMemorySize: "64Gi"
+      # Slurmd container security configuration
+      # Optional
+      security:
+        # AppArmor profile to be used for container
+        # Optional, defaults to "unconfined"
+        appArmorProfile: "unconfined"
+        # limits.conf content
+        # Optional, defaults to empty string
+        # e.g. `* soft nofile 1024`
+        limitsConfig: ""
+    # Munge configuration
+    munge:
+      # Each particular NodeSet's containers can have images other than default ones
+      # Optional
+      image:
+        repository: "cr.eu-north1.nebius.cloud/soperator/munge"
+        # Optional
+        tag: "1.23.0-noble-slurm25.05.4+custom"
+        pullPolicy: "IfNotPresent"
+      # Munge container resources
+      resources:
+        cpu: "2000m"
+        memory: "4Gi"
+        ephemeralStorage: "5Gi"
+      # Munge container security configuration
+      # Optional
+      security:
+        # AppArmor profile to be used for container
+        # Optional, defaults to "unconfined"
+        appArmorProfile: "unconfined"
+        # limits.conf content
+        # Optional, defaults to empty string
+        # e.g. `* soft nofile 1024`
+        limitsConfig: ""
+    # Name of the custom SupervisorD config ConfigMap
+    # Optional, defaults to empty string (use default SupervisorD config)
+    configMapRefSupervisord: ""
+    # Name of the custom SSHD config ConfigMap
+    # Optional, defaults to empty string (use default SSHD config)
+    configMapRefSshd: ""
+    # Whether the worker pod containers can use the host user namespace
+    # Optional, defaults to false
+    enableHostUserNamespace: false
+    # PriorityClass to be used for worker pod
+    # Optional
+    priorityClass: *priorityClassHigh
+    # Must be a corev1.Affinity spec
+    # Affinity could not be set along with nodeSelector
+    # Optional, defaults to empty dict
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: "nebius.com/node-group-id"
+                  operator: In
+                  values:
+                    - "gpu-node-group-id"
+    # A list of corev1.Toleration
+    # Optional, defaults to empty list
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+    # Additional annotations to be added to the worker pods
+    # Optional, defaults to empty dict
+    workerAnnotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "9090"
+    # A list of custom init containers for worker pods
+    # Each item must be a corev1.Container spec
+    # Optional, defaults to empty list
+    customInitContainers:
+      - name: say-hi
+        image: busybox
+        command: ["echo", "Hi!"]
+  - name: worker-cpu
+    replicas: 6
+    nodeConfig:
+      features:
+        - "cpu"
+      static: "Boards=1 SocketsPerBoard=1 CoresPerSocket=4 ThreadsPerCore=1"
+      dynamic: "InstanceId={{ .PodName }}"
+    slurmd:
+      resources:
+        cpu: "500m"
+        memory: "500Mi"
+        ephemeral-storage: "2Gi"
+      volumes:
+        spool:
+          volumeClaimTemplateSpec:
+            storageClassName: *nebiusNetworkSsdStorageClassName
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: "64Gi"
+        jail:
+          persistentVolumeClaim:
+            claimName: *jailPvcClaimName
+    munge:
+      resources:
+        cpu: "2000m"
+        memory: "4Gi"
+        ephemeralStorage: "5Gi"
+    priorityClass: *priorityClassHigh
+    nodeSelector:
+      slurm.nebius.ai/nodeset-name: "worker-cpu"

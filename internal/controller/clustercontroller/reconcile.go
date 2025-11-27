@@ -24,7 +24,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -35,6 +34,7 @@ import (
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
+	controllercommon "nebius.ai/slurm-operator/internal/controller/common"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controller/state"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
@@ -49,6 +49,8 @@ import (
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters/finalizers,verbs=update
+//+kubebuilder:rbac:groups=slurm.nebius.ai,resources=nodesets,verbs=get;list;watch
+//+kubebuilder:rbac:groups=slurm.nebius.ai,resources=nodesets/status,verbs=get
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
@@ -671,11 +673,14 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 		return err
 	}
 
-	saPredicate := r.createServiceAccountPredicate()
+	saPredicate := controllercommon.CreateServiceAccountPredicate()
 
 	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
 		Named("cluster").
-		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.GenerationChangedPredicate{}))
+		For(
+			&slurmv1.SlurmCluster{},
+			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+		)
 
 	controllerBuilder.Watches(
 		&corev1.PodTemplate{},
@@ -692,6 +697,12 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 	controllerBuilder.Watches(
 		&corev1.Secret{},
 		handler.EnqueueRequestsFromMapFunc(r.findObjectsForSecret),
+		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+	)
+
+	controllerBuilder.Watches(
+		&slurmv1alpha1.NodeSet{},
+		handler.EnqueueRequestsFromMapFunc(r.findObjectsForNodeSet),
 		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 	)
 
@@ -766,20 +777,6 @@ func (r *SlurmClusterReconciler) setupSecretIndexer(mgr ctrl.Manager) error {
 		}
 	}
 	return nil
-}
-
-func (r *SlurmClusterReconciler) createServiceAccountPredicate() predicate.Funcs {
-	return predicate.Funcs{
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			if sa, ok := e.Object.(*corev1.ServiceAccount); ok {
-				return sa.GetDeletionTimestamp() != nil
-			}
-			return false
-		},
-		CreateFunc:  func(e event.CreateEvent) bool { return false },
-		UpdateFunc:  func(e event.UpdateEvent) bool { return false },
-		GenericFunc: func(e event.GenericEvent) bool { return false },
-	}
 }
 
 /*
@@ -890,14 +887,38 @@ func (r *SlurmClusterReconciler) findObjectsForSecret(
 	return requests
 }
 
-type ResourceCheck struct {
-	Check     bool
-	Objects   []client.Object
-	Predicate predicate.Predicate
+func (r *SlurmClusterReconciler) findObjectsForNodeSet(
+	ctx context.Context,
+	nodeset client.Object,
+) []reconcile.Request {
+	nodeSet, ok := nodeset.(*slurmv1alpha1.NodeSet)
+	if !ok {
+		return nil
+	}
+
+	attachedSlurmClusters := &slurmv1.SlurmClusterList{}
+	var requests []reconcile.Request
+
+	listOpts := []client.ListOption{
+		client.InNamespace(nodeSet.Namespace),
+	}
+	if err := r.Client.List(ctx, attachedSlurmClusters, listOpts...); err != nil {
+		return requests
+	}
+	for _, slurmCluster := range attachedSlurmClusters.Items {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: slurmCluster.Namespace,
+				Name:      slurmCluster.Name,
+			},
+		})
+	}
+
+	return requests
 }
 
-func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Funcs) []ResourceCheck {
-	return []ResourceCheck{
+func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Funcs) []controllercommon.ResourceCheck {
+	return []controllercommon.ResourceCheck{
 		{
 			Check: check.ForceTrue,
 			Objects: []client.Object{

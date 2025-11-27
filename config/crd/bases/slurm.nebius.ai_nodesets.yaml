@@ -2540,7 +2540,7 @@ spec:
                   Defaults to 20%.
                 x-kubernetes-int-or-string: true
               munge:
-                description: Slurmd defines the Slurm munge configuration.
+                description: Munge defines the Slurm munge configuration.
                 properties:
                   image:
                     description: Image defines the image used for the Slurm munge
@@ -2596,14 +2596,14 @@ spec:
                 - resources
                 type: object
               nodeConfig:
-                description: ExtraConfig provides possibility to define extra values
+                description: NodeConfig provides possibility to define extra values
                   set for Node in `slurm.conf`.
                 properties:
                   dynamic:
                     default: ""
                     description: |-
-                      Dynamic provides a possibility to define extra values per Node (e.g. InstanceId, or Extra fields).
-                      This line supports Go templating, and will be rendered before being passed to the config.
+                      Dynamic provides a possibility to define "Extra" field of the corresponding Slurm node.
+                      It can use any environment variables that are available in the slurmd container when it starts.
                     type: string
                   features:
                     description: Features defines the list of Slurm Node "Features"
@@ -2672,6 +2672,7 @@ spec:
                     - repository
                     type: object
                   port:
+                    default: 6818
                     description: Port defines the port the container exposes
                     format: int32
                     type: integer
