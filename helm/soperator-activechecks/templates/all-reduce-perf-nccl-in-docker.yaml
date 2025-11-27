@@ -5,7 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "all-reduce-perf-nccl-in-docker"
-  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
+  dependsOn: [ "wait-for-soperatorchecks-srun-ready", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   suspend: {{ .Values.checks.allReducePerfNCCLInDocker.suspend }}
   runAfterCreation: {{ .Values.checks.allReducePerfNCCLInDocker.runAfterCreation }}

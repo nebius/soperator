@@ -5,7 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "gpu-fryer"
-  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
+  dependsOn: [ "wait-for-soperatorchecks-srun-ready", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "15 9-21/12 * * *" # 2 times a day at 9:15 and 21:15 UTC
   suspend: {{ .Values.checks.gpuFryer.suspend }}

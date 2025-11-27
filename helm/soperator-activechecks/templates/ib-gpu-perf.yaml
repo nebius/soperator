@@ -5,7 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "ib-gpu-perf"
-  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology", "prepull-container-image" ]
+  dependsOn: [ "wait-for-soperatorchecks-srun-ready", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "55 1-21/4 * * *" # 6 times a day at 01:55, 05:55, 09:55, 13:55, 17:55 and 21:55 UTC
   suspend: {{ .Values.checks.ibGpuPerf.suspend }}
