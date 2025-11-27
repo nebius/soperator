@@ -312,6 +312,9 @@ soperator:
     overrideValues: null
   monitoringDashboards:
     enabled: true
+    interval: 5m
+    timeout: 5m
+    releaseName: soperator-monitoring-dashboards
     overrideValues: null
 notifier:
   enabled: false
