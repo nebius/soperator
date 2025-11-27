@@ -15,7 +15,7 @@ spec:
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.soperator.version }}
   dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   install:
     crds: Skip
     remediation:
