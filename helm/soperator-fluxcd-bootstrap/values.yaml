@@ -1,0 +1,35 @@
+helmRepository:
+  enabled: true
+  name: soperator-fluxcd
+  namespace: flux-system
+  interval: 5m
+  type: oci
+  url: oci://cr.eu-north1.nebius.cloud/soperator
+helmRelease:
+  enabled: true
+  name: soperator-fluxcd
+  namespace: flux-system
+  interval: 5m
+  timeout: 5m
+  chart:
+    name: helm-soperator-fluxcd
+    version: "1.23.0"
+    interval: 5m
+  install:
+    createNamespace: true
+    crds: Skip
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: soperator-fluxcd-values
+      valuesKey: values.yaml
+      optional: false
+    - kind: ConfigMap
+      name: soperator-fluxcd-values-patch
+      valuesKey: values.yaml
+      optional: true
