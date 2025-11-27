@@ -28,6 +28,8 @@ spec:
   timeout: {{ .Values.soperator.monitoringDashboards.timeout }}
   releaseName: {{ .Values.soperator.monitoringDashboards.releaseName }}
   targetNamespace: {{ .Values.soperator.namespace }}
+  {{- if .Values.soperator.monitoringDashboards.overrideValues }}
   values:
     {{- toYaml .Values.soperator.monitoringDashboards.overrideValues | nindent 4 }}
+  {{- end }}
 {{- end }}
