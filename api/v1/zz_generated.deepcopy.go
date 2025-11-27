@@ -713,6 +713,11 @@ func (in *SlurmClusterSpec) DeepCopyInto(out *SlurmClusterSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.CustomCgroupConfig != nil {
+		in, out := &in.CustomCgroupConfig, &out.CustomCgroupConfig
+		*out = new(string)
+		**out = **in
+	}
 	out.MPIConfig = in.MPIConfig
 	in.PlugStackConfig.DeepCopyInto(&out.PlugStackConfig)
 	in.SConfigController.DeepCopyInto(&out.SConfigController)

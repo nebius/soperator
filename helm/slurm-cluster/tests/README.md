@@ -7,6 +7,8 @@ This directory contains Helm unit tests that verify the default values from kube
 - `default-values_test.yaml` - Tests individual default values from kubebuilder annotations
 - `minimal-config_test.yaml` - Tests that minimal configuration with defaults renders correctly
 - `optional-fields_test.yaml` - Tests that optional fields are not included when not provided
+- `custom_slurm_config_test.yaml` - Tests rendering of user provided slurm.conf snippets
+- `custom_cgroup_config_test.yaml` - Tests rendering of user provided cgroup.conf snippets
 
 ## Running Tests
 

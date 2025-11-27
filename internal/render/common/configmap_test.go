@@ -19,14 +19,12 @@ import (
 )
 
 func Test_GenerateCGroupConfig(t *testing.T) {
-	// Test with CgroupVersion set to CGroupV2
-	clusterV2 := &values.SlurmCluster{
-		NodeWorker: values.SlurmWorker{
-			CgroupVersion: consts.CGroupV2,
-		},
-	}
-	resV2 := generateCGroupConfig(clusterV2)
-	expectedV2 := `CgroupMountpoint=/sys/fs/cgroup
+	t.Run("default config v2", func(t *testing.T) {
+		cluster := &values.SlurmCluster{
+			NodeWorker: values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
 ConstrainCores=yes
 ConstrainDevices=yes
 ConstrainRAMSpace=yes
@@ -34,21 +32,174 @@ CgroupPlugin=cgroup/v2
 ConstrainSwapSpace=no
 EnableControllers=yes
 IgnoreSystemd=yes`
-	assert.Equal(t, expectedV2, resV2.Render())
-	clusterV1 := &values.SlurmCluster{
-		NodeWorker: values.SlurmWorker{
-			CgroupVersion: consts.CGroupV1,
-		},
-	}
-	expectedV1 := `CgroupMountpoint=/sys/fs/cgroup
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("default config v1", func(t *testing.T) {
+		cluster := &values.SlurmCluster{
+			NodeWorker: values.SlurmWorker{CgroupVersion: consts.CGroupV1},
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
 ConstrainCores=yes
 ConstrainDevices=yes
 ConstrainRAMSpace=yes
 CgroupPlugin=cgroup/v1
 ConstrainSwapSpace=yes`
-	resV1 := generateCGroupConfig(clusterV1)
-	assert.Equal(t, expectedV1, resV1.Render())
+		assert.Equal(t, want, got)
+	})
 
+	t.Run("custom overrides defaults", func(t *testing.T) {
+		customConfig := "ConstrainCores=no\nAllowedKmemSpace=yes"
+		cluster := &values.SlurmCluster{
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			CustomCgroupConfig: &customConfig,
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
+ConstrainDevices=yes
+ConstrainRAMSpace=yes
+CgroupPlugin=cgroup/v2
+ConstrainSwapSpace=no
+EnableControllers=yes
+IgnoreSystemd=yes
+###
+# Custom config
+###
+ConstrainCores=no
+AllowedKmemSpace=yes`
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("custom config with comments", func(t *testing.T) {
+		customConfig := "# This is a comment\nConstrainCores=no"
+		cluster := &values.SlurmCluster{
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			CustomCgroupConfig: &customConfig,
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
+ConstrainDevices=yes
+ConstrainRAMSpace=yes
+CgroupPlugin=cgroup/v2
+ConstrainSwapSpace=no
+EnableControllers=yes
+IgnoreSystemd=yes
+###
+# Custom config
+###
+# This is a comment
+ConstrainCores=no`
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("custom config with empty lines between entries", func(t *testing.T) {
+		customConfig := "ConstrainCores=no\n   \nAllowedKmemSpace=yes"
+		cluster := &values.SlurmCluster{
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			CustomCgroupConfig: &customConfig,
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
+ConstrainDevices=yes
+ConstrainRAMSpace=yes
+CgroupPlugin=cgroup/v2
+ConstrainSwapSpace=no
+EnableControllers=yes
+IgnoreSystemd=yes
+###
+# Custom config
+###
+ConstrainCores=no
+AllowedKmemSpace=yes`
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("custom config with malformed lines", func(t *testing.T) {
+		customConfig := "This line lacks equals"
+		cluster := &values.SlurmCluster{
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			CustomCgroupConfig: &customConfig,
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
+ConstrainCores=yes
+ConstrainDevices=yes
+ConstrainRAMSpace=yes
+CgroupPlugin=cgroup/v2
+ConstrainSwapSpace=no
+EnableControllers=yes
+IgnoreSystemd=yes
+###
+# Custom config
+###
+This line lacks equals`
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("empty custom config does not add block", func(t *testing.T) {
+		customConfig := "  \n\t"
+		cluster := &values.SlurmCluster{
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			CustomCgroupConfig: &customConfig,
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
+ConstrainCores=yes
+ConstrainDevices=yes
+ConstrainRAMSpace=yes
+CgroupPlugin=cgroup/v2
+ConstrainSwapSpace=no
+EnableControllers=yes
+IgnoreSystemd=yes`
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("custom config adds new keys without overriding defaults", func(t *testing.T) {
+		customConfig := "AllowedKmemSpace=yes"
+		cluster := &values.SlurmCluster{
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			CustomCgroupConfig: &customConfig,
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
+ConstrainCores=yes
+ConstrainDevices=yes
+ConstrainRAMSpace=yes
+CgroupPlugin=cgroup/v2
+ConstrainSwapSpace=no
+EnableControllers=yes
+IgnoreSystemd=yes
+###
+# Custom config
+###
+AllowedKmemSpace=yes`
+		assert.Equal(t, want, got)
+	})
+}
+
+func Test_parseCGroupKV(t *testing.T) {
+	tests := []struct {
+		name   string
+		line   string
+		wantOK bool
+		want   string
+	}{
+		{name: "spaces around equals", line: " key = value ", wantOK: true, want: "key"},
+		{name: "empty value", line: "key=", wantOK: true, want: "key"},
+		{name: "multiple equals", line: "key=value=extra", wantOK: true, want: "key"},
+		{name: "comment line", line: "# comment", wantOK: false, want: ""},
+		{name: "whitespace only", line: "   \t", wantOK: false, want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := parseCGroupKV(tt.line)
+			assert.Equal(t, tt.wantOK, ok)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestRenderConfigMapSecurityLimits(t *testing.T) {
