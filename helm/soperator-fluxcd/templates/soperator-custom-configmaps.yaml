@@ -1,0 +1,40 @@
+{{- if .Values.customConfigmaps.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-custom-configmaps
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: helm-soperator-custom-configmaps
+      interval: {{ .Values.customConfigmaps.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+      version: {{ .Values.customConfigmaps.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+  interval: {{ .Values.customConfigmaps.interval }}
+  timeout: {{ .Values.customConfigmaps.timeout }}
+  releaseName: {{ .Values.customConfigmaps.releaseName }}
+  targetNamespace: {{ .Values.customConfigmaps.namespace }}
+  values:
+  {{- if .Values.customConfigmaps.overrideValues }}
+    {{- toYaml .Values.customConfigmaps.overrideValues | nindent 4 }}
+  {{- end }}
+  valuesFrom:
+  - kind: ConfigMap
+    name: custom-configmaps
+    optional: true
+    valuesKey: values.yaml
+{{- end }}
