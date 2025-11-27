@@ -3,11 +3,12 @@ FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS k8s_check_job
 
 ARG DEBIAN_FRONTEND=noninteractive
 
+# Install certificates (required for using snapshots)
+RUN apt install -y --update ca-certificates=20240203
+
 # Install common packages and minimal python packages for Ansible
-RUN apt-get update && \
-    apt-get install -y \
+RUN apt install --update --snapshot 20251126T093556Z -y \
         apt-transport-https \
-        ca-certificates  \
         curl  \
         gnupg \
         python3.12="3.12.3-1ubuntu0.9" \
@@ -22,8 +23,8 @@ RUN chmod +x /opt/bin/install_kubectl.sh && \
     /opt/bin/install_kubectl.sh && \
     rm /opt/bin/install_kubectl.sh
 
-# Install Ansible and base configs
-COPY ansible/ansible.cfg ansible/requirements.txt /opt/ansible/
+# Install Ansible and copy playbooks
+COPY ansible/ /opt/ansible/
 RUN cd /opt/ansible && ln -sf /usr/bin/python3.12 /usr/bin/python3 && \
     python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
 
@@ -31,15 +32,12 @@ ENV PATH="/opt/ansible/.venv/bin:${PATH}"
 WORKDIR /opt/ansible
 
 # Install python
-COPY ansible/python.yml /opt/ansible/python.yml
-COPY ansible/roles/python /opt/ansible/roles/python
-RUN ansible-playbook -i localhost -c local python.yml -t python
+RUN ansible-playbook -i inventory/ -c local python.yml
 
-# Copy role for Nebius health-check library
-COPY ansible/nc-health-checker.yml /opt/ansible/nc-health-checker.yml
-COPY ansible/roles/nc-health-checker /opt/ansible/roles/nc-health-checker
+# Manage repositories
+RUN ansible-playbook -i inventory/ -c local repos.yml
 
-# Copy & run the entrypoint script
+# Copy the entrypoint script
 COPY images/k8s_check_job/k8s_check_job_entrypoint.sh /opt/bin/
 RUN chmod +x /opt/bin/k8s_check_job_entrypoint.sh
 

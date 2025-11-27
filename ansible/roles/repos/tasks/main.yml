@@ -1,5 +1,17 @@
 ---
 
+- name: Add snapshot time for repositories
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/50snapshot
+    content: |
+      APT::Snapshot "{{ repos_snapshot_timestamp }}";
+    owner: root
+    group: root
+    mode: "0644"
+  tags:
+    - repos-snapshot
+    - repos
+
 - name: Download Nebius public GPG key
   ansible.builtin.get_url:
     url: https://dr.nebius.cloud/public.gpg
