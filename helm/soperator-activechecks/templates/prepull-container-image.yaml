@@ -5,7 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "prepull-container-image"
-  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology" ]
+  dependsOn: [ "wait-for-soperatorchecks-srun-ready", "wait-for-topology" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   suspend: {{ .Values.checks.prepullContainerImage.suspend }}
   runAfterCreation: {{ .Values.checks.prepullContainerImage.runAfterCreation }}

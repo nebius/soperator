@@ -32,6 +32,8 @@ CHART_SOPERATOR_NOTIFIER_PATH = $(CHART_PATH)/soperator-notifier
 CHART_NFS_SERVER_PATH         = $(CHART_PATH)/nfs-server
 CHART_NODESETS_PATH           = $(CHART_PATH)/nodesets
 CHART_SOPERATOR_MONITORING_DASHBOARDS_PATH = $(CHART_PATH)/soperator-monitoring-dashboards
+CHART_CUSTOM_CONFIGMAPS_PATH  = $(CHART_PATH)/soperator-custom-configmaps
+CHART_FLUXCD_BOOTSTRAP_PATH   = $(CHART_PATH)/soperator-fluxcd-bootstrap
 
 SLURM_VERSION		  		= 25.05.4
 UBUNTU_VERSION		  		?= noble
@@ -252,6 +254,8 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_NOTIFIER_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODESETS_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_MONITORING_DASHBOARDS_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CUSTOM_CONFIGMAPS_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_FLUXCD_BOOTSTRAP_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_CRDS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
@@ -264,6 +268,8 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_NOTIFIER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODESETS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_MONITORING_DASHBOARDS_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CUSTOM_CONFIGMAPS_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_FLUXCD_BOOTSTRAP_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(NFS_VERSION)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(NFS_VERSION)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
 	@# endregion helm chart versions
@@ -288,6 +294,10 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.munge.tag = \"$(IMAGE_VERSION)\"" "helm/nodesets/values.yaml"
 	@$(YQ) -i ".images.slurmd.repository = \"$(IMAGE_REPO)/worker_slurmd\"" "helm/nodesets/values.yaml"
 	@$(YQ) -i ".images.slurmd.tag = \"$(IMAGE_VERSION)\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].slurmd.image.repository = \"$(IMAGE_REPO)/worker_slurmd\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].slurmd.image.tag = \"$(IMAGE_VERSION)+custom\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].munge.image.repository = \"$(IMAGE_REPO)/munge\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].munge.image.tag = \"$(IMAGE_VERSION)+custom\"" "helm/nodesets/values.yaml"
 	@# endregion helm/nodesets/values.yaml
 
 	@# region helm/soperator-activechecks/values.yaml
@@ -345,7 +355,13 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".nodesets.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".observability.dcgmExporter.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".notifier.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
+	@$(YQ) -i ".customConfigmaps.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@# endregion helm/soperator-fluxcd/values.yaml
+
+	@# region helm/soperator-fluxcd-bootstrap/values.yaml
+	@echo 'Syncing helm/soperator-fluxcd-bootstrap/values.yaml'
+	@$(YQ) -i ".helmRelease.chart.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd-bootstrap/values.yaml"
+	@# endregion helm/soperator-fluxcd-bootstrap/values.yaml
 
 	@# region fluxcd/environment/local
 	@echo 'Syncing fluxcd/environment/local/helmrelease.yaml'

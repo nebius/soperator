@@ -1,0 +1,35 @@
+{{- if .Values.helmRelease.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ .Values.helmRelease.name }}
+  namespace: {{ .Values.helmRelease.namespace }}
+  labels:
+    {{- include "soperator-fluxcd-bootstrap.labels" . | nindent 4 }}
+spec:
+  interval: {{ .Values.helmRelease.interval }}
+  {{- if .Values.helmRelease.timeout }}
+  timeout: {{ .Values.helmRelease.timeout }}
+  {{- end }}
+  chart:
+    spec:
+      chart: {{ .Values.helmRelease.chart.name }}
+      version: {{ .Values.helmRelease.chart.version }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ .Values.helmRepository.name }}
+        namespace: {{ .Values.helmRepository.namespace }}
+      interval: {{ .Values.helmRelease.chart.interval }}
+  {{- if .Values.helmRelease.install }}
+  install:
+    {{- toYaml .Values.helmRelease.install | nindent 4 }}
+  {{- end }}
+  {{- if .Values.helmRelease.upgrade }}
+  upgrade:
+    {{- toYaml .Values.helmRelease.upgrade | nindent 4 }}
+  {{- end }}
+  {{- if .Values.helmRelease.valuesFrom }}
+  valuesFrom:
+    {{- toYaml .Values.helmRelease.valuesFrom | nindent 4 }}
+  {{- end }}
+{{- end }}

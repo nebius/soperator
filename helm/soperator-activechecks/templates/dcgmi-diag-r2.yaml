@@ -5,7 +5,7 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "dcgmi-diag-r2"
-  dependsOn: [ "create-user-soperatorchecks", "wait-for-topology" ]
+  dependsOn: [ "wait-for-soperatorchecks-srun-ready", "wait-for-topology" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "5 12 * * *" # Once a day at 12:05 UTC
   suspend: {{ .Values.checks.dcgmiDiagR2.suspend }}

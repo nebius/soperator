@@ -1,0 +1,25 @@
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: ActiveCheck
+metadata:
+  name: "wait-for-soperatorchecks-srun-ready"
+spec:
+  checkType: "slurmJob"
+  name: "wait-for-soperatorchecks-srun-ready"
+  dependsOn: [ "create-user-soperatorchecks" ]
+  slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
+  schedule: "0 0 1 1 *" # Never run on schedule, only runAfterCreation
+  suspend: true
+  runAfterCreation: true
+  slurmJobSpec:
+    sbatchScript: |
+{{ .Files.Get "scripts/wait-for-soperatorchecks-srun-ready.sh" | indent 6 }}
+    jobContainer:
+      image: {{ .Values.images.slurmJob | quote }}
+      env:
+{{ toYaml .Values.jobContainer.env | indent 8 }}
+      volumeMounts:
+{{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
+      volumes:
+{{ toYaml .Values.jobContainer.volumes | indent 8 }}
+    mungeContainer:
+      image: {{ .Values.images.munge | quote }}

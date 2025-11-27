@@ -75,6 +75,13 @@ spec:
                 description: CRVersion defines the version of the Operator the Custom
                   Resource belongs to
                 type: string
+              customCgroupConfig:
+                description: |-
+                  CustomCgroupConfig represents the raw cgroup configuration from cgroup.conf.
+                  All options are provided as a raw string.
+                  Soperator does not guarantee the validity of the raw configuration.
+                  Raw config is appended to the generated cgroup.conf content.
+                type: string
               customSlurmConfig:
                 description: |-
                   CustomSlurmConfig represents the raw Slurm configuration from slurm.conf.

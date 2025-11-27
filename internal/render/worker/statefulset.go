@@ -163,6 +163,7 @@ func RenderNodeSetStatefulSet(
 	labels := common.RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	labels[consts.LabelNodeSetKey] = nodeSet.Name
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
+	matchLabels[consts.LabelNodeSetKey] = nodeSet.Name
 
 	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecsForNodeSet(nodeSet, secrets)
 	if err != nil {
@@ -292,8 +293,16 @@ func renderNodeSetAnnotations(nodeSet *values.SlurmNodeSet) map[string]string {
 	mungeAppArmorProfile := nodeSet.ContainerMunge.AppArmorProfile
 	workerAppArmorProfile := nodeSet.ContainerSlurmd.AppArmorProfile
 
-	if nodeSet.AppArmorProfileDefault {
-		workerAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(nodeSet.ParentalCluster.Name, nodeSet.ParentalCluster.Namespace))
+	// TODO (@dstaroff) make use of defaulting webhook for this
+	if mungeAppArmorProfile == "" {
+		mungeAppArmorProfile = consts.AppArmorProfileUnconfined
+	}
+	if workerAppArmorProfile == "" {
+		if nodeSet.AppArmorProfileUseDefault {
+			workerAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(nodeSet.ParentalCluster.Name, nodeSet.ParentalCluster.Namespace))
+		} else {
+			workerAppArmorProfile = consts.AppArmorProfileUnconfined
+		}
 	}
 
 	annotations := map[string]string{
