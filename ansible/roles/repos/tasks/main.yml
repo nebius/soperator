@@ -1,10 +1,48 @@
 ---
 
-- name: Add snapshot time for repositories
+- name: Remove repos (backward compatibility)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/apt/sources.list.d/download_docker_com_linux_ubuntu.list
+  tags:
+    - repos-absent
+    - repos
+
+- name: Add Ubuntu noble APT repository with snapshot
+  vars:
+    is_amd64: "{{ (ansible_facts.architecture | lower) in ['x86_64', 'amd64'] }}"
+    ubuntu_main_uri: >-
+      {{ 'http://archive.ubuntu.com/ubuntu/' if is_amd64
+         else 'http://ports.ubuntu.com/ubuntu-ports/' }}
+    ubuntu_security_uri: >-
+      {{ 'http://security.ubuntu.com/ubuntu/' if is_amd64
+         else 'http://ports.ubuntu.com/ubuntu-ports/' }}
   ansible.builtin.copy:
-    dest: /etc/apt/apt.conf.d/50snapshot
+    dest: /etc/apt/sources.list.d/ubuntu.sources
     content: |
-      APT::Snapshot "{{ repos_snapshot_timestamp }}";
+      ##
+      ## Managed with Ansible
+      ##
+      Types: deb
+      URIs: {{ ubuntu_main_uri }}
+      Suites: noble noble-updates noble-backports
+      Components: main universe restricted multiverse
+      Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+      {% if is_amd64 %}
+      Snapshot: {{ repos_snapshot_timestamp }}
+      {% endif %}
+
+      Types: deb
+      URIs: {{ ubuntu_main_uri }}
+      Suites: noble-security
+      Components: main universe restricted multiverse
+      Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+      {% if is_amd64 %}
+      Snapshot: {{ repos_snapshot_timestamp }}
+      {% endif %}
+
     owner: root
     group: root
     mode: "0644"
@@ -45,10 +83,15 @@
     - docker-repo
     - repos
 
-- name: Add docker repo
-  ansible.builtin.apt_repository:
-    repo: "deb [arch={{ repos_docker_dpkg_arch_map[ansible_architecture] }} signed-by=/etc/apt/keyrings/docker.asc] \
-          https://download.docker.com/linux/ubuntu   {{ ansible_distribution_release }} stable"
+- name: Add Docker APT repository
+  ansible.builtin.deb822_repository:
+    name: docker
+    types: [deb]
+    uris: https://download.docker.com/linux/ubuntu
+    suites: ["{{ ansible_distribution_release }}"]
+    components: [stable]
+    signed_by: /etc/apt/keyrings/docker.asc
+    state: present
   tags:
     - docker-repo
     - repos
