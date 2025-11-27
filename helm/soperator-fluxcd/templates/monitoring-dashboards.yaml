@@ -8,7 +8,7 @@ metadata:
 spec:
   chart:
     spec:
-      chart: helm-monitoring-dashboards
+      chart: helm-soperator-monitoring-dashboards
       interval: {{ .Values.soperator.monitoringDashboards.interval }}
       sourceRef:
         kind: HelmRepository
