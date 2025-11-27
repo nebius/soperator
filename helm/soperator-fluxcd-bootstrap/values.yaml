@@ -26,10 +26,10 @@ helmRelease:
       retries: 3
   valuesFrom:
     - kind: ConfigMap
-      name: soperator-fluxcd-values
+      name: terraform-fluxcd-values
       valuesKey: values.yaml
       optional: false
     - kind: ConfigMap
-      name: soperator-fluxcd-values-patch
+      name: soperator-fluxcd-values
       valuesKey: values.yaml
       optional: true
