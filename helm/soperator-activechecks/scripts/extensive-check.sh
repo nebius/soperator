@@ -26,7 +26,7 @@ echo "Listing available health checks for platform $platform"
 health-checker list -e soperator -p $platform
 
 HC_RUN_ID=""
-OUT_TMPL="/opt/soperator-outputs/slurm_jobs/%N.extensive-check:@TEST@.%j.out"
+OUT_TMPL="/opt/soperator-outputs/slurm_jobs/$SLURMD_NODENAME.extensive-check:@TEST@.$SLURM_JOB_ID.out"
 HC_CMD_OUT_DIR="/opt/soperator-outputs/health_checker_cmd_stdout"
 mkdir -p "$HC_CMD_OUT_DIR"
 
