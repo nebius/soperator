@@ -28734,6 +28734,10 @@ spec:
                             description: Port defines the port the container exposes
                             format: int32
                             type: integer
+                          priorityClassName:
+                            description: PriorityClassName to be used in the MariaDB
+                              Pod.
+                            type: string
                           protectedSecret:
                             default: false
                             description: If enabled, secret cannot be deleted until
