@@ -104,7 +104,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		"ConfigMapNamespace", nodeTopologyLabelsConfigMap.Namespace,
 	)
 
-	labelSelector := client.MatchingLabels{consts.LabelComponentKey: consts.ComponentTypeWorker.String()}
+	labelSelector := client.MatchingLabels{consts.LabelWorkerKey: consts.LabelWorkerValue}
 	fieldSelector := client.MatchingFields{consts.FieldStatusPhase: string(corev1.PodRunning)}
 	podList, err := r.getPodList(ctx, labelSelector, fieldSelector, req.Namespace)
 	if err != nil {
