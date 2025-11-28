@@ -22,6 +22,8 @@ spec:
       image: {{ .Values.images.slurmJob | quote }}
       env:
 {{ toYaml .Values.jobContainer.env | indent 8 }}
+        - name: "SLURM_EXTRA_COMMENT_JSON"
+          value: {{ .Values.checks.extensiveCheck.extraCommentJson | quote }}
       volumeMounts:
 {{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
       volumes:
