@@ -6,6 +6,8 @@ metadata:
   namespace: {{ .Values.helmRelease.namespace }}
   labels:
     {{- include "soperator-fluxcd-bootstrap.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.helmRelease.annotations | nindent 4 }}
 spec:
   interval: {{ .Values.helmRelease.interval }}
   {{- if .Values.helmRelease.timeout }}
