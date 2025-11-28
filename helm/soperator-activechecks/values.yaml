@@ -11,8 +11,6 @@ jobContainer:
           fieldPath: "metadata.namespace"
     - name: "SNCCLD_ENABLED"
       value: "false"
-      # - name: "SLURM_EXTRA_COMMENT_JSON"
-      #   value: '{"key1": "value1", "key2": "value2"}'
   volumeMounts:
     - mountPath: "/mnt/jail"
       name: "jail"
@@ -75,6 +73,7 @@ checks:
     runAfterCreation: false
     drainReasonPrefix: "[hardware_problem]"
     reservationPrefix: "suspicious-node"
+    extraCommentJson: ""
   gpuFryer:
     suspend: false
     runAfterCreation: true
