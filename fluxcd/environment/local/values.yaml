@@ -48,6 +48,8 @@ soperator:
         logFormat: json
         tolerations:
           - operator: Exists
+  monitoringDashboards:
+    enabled: false
 # Slurm Cluster configuration - enabled for local dev
 slurmCluster:
   enabled: true

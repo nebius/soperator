@@ -310,6 +310,13 @@ soperator:
       rebooter:
         resources: {}
     overrideValues: null
+  monitoringDashboards:
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    releaseName: soperator-monitoring-dashboards
+    namespace: monitoring-system
+    overrideValues: null
 notifier:
   enabled: false
   interval: 5m
