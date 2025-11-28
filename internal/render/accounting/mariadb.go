@@ -105,6 +105,7 @@ func RenderMariaDb(
 				Affinity:           affinityConfig,
 				Tolerations:        nodeFilter.Tolerations,
 				PodSecurityContext: mariaDb.PodSecurityContext,
+				PriorityClassName:  ptr.To(mariaDb.PriorityClassName),
 			},
 			Metrics: &mariadbv1alpha1.MariadbMetrics{
 				Enabled: mariaDb.Metrics.Enabled,

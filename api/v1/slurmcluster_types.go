@@ -749,6 +749,10 @@ type MariaDbOperator struct {
 	Metrics            MariadbMetrics                      `json:"metrics,omitempty"`
 	Replication        *mariadbv1alpha1.Replication        `json:"replication,omitempty"`
 	Storage            mariadbv1alpha1.Storage             `json:"storage,omitempty"`
+	// PriorityClassName to be used in the MariaDB Pod.
+	//
+	// +kubebuilder:validation:Optional
+	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 type MariadbMetrics struct {
