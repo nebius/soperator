@@ -52,6 +52,9 @@ data:
   cleanup_enroot.sh: |-
 {{ tpl (.Files.Get "slurm_scripts/cleanup_enroot.sh") . | indent 4 }}
 
+  cleanup_scratch_data.sh: |-
+{{ tpl (.Files.Get "slurm_scripts/cleanup_scratch_data.sh") . | indent 4 }}
+
   drop_page_cache.sh: |-
 {{ tpl (.Files.Get "slurm_scripts/drop_page_cache.sh") . | indent 4 }}
 
