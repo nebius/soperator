@@ -193,6 +193,7 @@ spec:
         securityContext: {{ toYaml .Values.slurmNodes.accounting.mariadbOperator.securityContext | nindent 10 }}
         replication: {{ toYaml .Values.slurmNodes.accounting.mariadbOperator.replication | nindent 10 }}
         storage: {{toYaml .Values.slurmNodes.accounting.mariadbOperator.storage | nindent 10 }}
+        priorityClassName: {{ default (printf "%s-%s" (include "slurm-cluster.name" .) "slurm-mariadb") .Values.slurmNodes.accounting.mariadbOperator.priorityClassName | quote }}
       {{- end }}
       munge:
         image: {{ required "munge image" .Values.images.munge | quote }}

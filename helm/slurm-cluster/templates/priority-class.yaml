@@ -68,3 +68,14 @@ value: 100007
 globalDefault: false
 preemptionPolicy: PreemptLowerPriority
 description: "Priority class for Slurm PopulateJail jobs in the cluster. This is used to ensure that PopulateJail jobs are scheduled with a higher priority than worker pods."
+---
+{{- if .Values.slurmNodes.accounting.mariadbOperator.enabled }}
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "slurm-cluster.name" . }}-slurm-mariadb
+value: 100008
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Priority class for MariaDB pods in the cluster. This is used to ensure that MariaDB pods are scheduled with a higher priority than worker pods."
+{{- end }}

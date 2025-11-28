@@ -283,6 +283,7 @@ slurmNodes:
         # passwordSecretKeyRef: {}
         # name: ""
         # key: ""
+      priorityClassName: ""
       # affinity: {}
       # args: []
       # env: []
