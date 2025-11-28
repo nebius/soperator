@@ -26,7 +26,7 @@ echo "Listing available health checks for platform $platform"
 health-checker list -e soperator -p $platform
 
 HC_RUN_ID=""
-OUT_TMPL="/opt/soperator-outputs/slurm_jobs/%N.extensive-check:@TEST@.%j.out"
+OUT_TMPL="/opt/soperator-outputs/slurm_jobs/$SLURMD_NODENAME.extensive-check:@TEST@.$SLURM_JOB_ID.out"
 HC_CMD_OUT_DIR="/opt/soperator-outputs/health_checker_cmd_stdout"
 mkdir -p "$HC_CMD_OUT_DIR"
 
@@ -54,11 +54,11 @@ parse_hc_output() {
 
   HC_OUTPUT=$(<"$output_file")
 
-  echo "Health-checker output:"
+  echo "Health checker output:"
   echo "$HC_OUTPUT"
   JSON_BLOCK=$(echo "$HC_OUTPUT" | awk '/^\s*{/,/^\s*}/')
   HC_STATUS=$(echo "$JSON_BLOCK" | jq -r '.status // empty')
-  echo "Health-checker finished with status '$HC_STATUS'"
+  echo "Health checker finished with status '$HC_STATUS'"
 
   if [[ "$HC_STATUS" == "FAIL" ]]; then
     HC_RUN_ID=$(echo "$JSON_BLOCK" | jq -r '.meta.run_id // empty')
@@ -68,7 +68,7 @@ parse_hc_output() {
   elif [[ "$HC_STATUS" == "PASS" ]]; then
     return 0
   else
-    echo "Health-checker finished with unknown status."
+    echo "Health checker finished with unknown status."
     return 0
   fi
 }
@@ -122,7 +122,7 @@ cuda_samples() {
 
   srun -J "$NAME" \
     "${SRUN_CONTAINER_ARGS[@]}" \
-    sudo bash -l -c \
+    bash -l -c \
       "health-checker run ${HC_RUN_COMMON_ARGS[*]} \
       -n deviceQuery,vectorAdd,simpleMultiGPU,p2pBandwidthLatencyTest"
 
@@ -149,7 +149,7 @@ gpu_fryer() {
 
   srun -J "$NAME" \
     "${SRUN_CONTAINER_ARGS[@]}" \
-    sudo bash -l -c \
+    bash -l -c \
       "HC_GPU_FRYER_DURATION=300 \
       health-checker run ${HC_RUN_COMMON_ARGS[*]} \
       -n gpu_fryer"
@@ -164,7 +164,7 @@ ib_gpu_perf() {
 
   srun -J "$NAME" \
     "${SRUN_CONTAINER_ARGS[@]}" \
-    sudo bash -l -c \
+    bash -l -c \
       "health-checker run ${HC_RUN_COMMON_ARGS[*]} \
       -n ^ib_write_bw_gpu.*$,^ib_send_lat_gpu.*$,^ib_read_lat_gpu.*$"
 
@@ -178,7 +178,7 @@ mem_perf() {
 
   srun -J "$NAME" \
     "${SRUN_CONTAINER_ARGS[@]}" \
-    sudo bash -l -c \
+    bash -l -c \
       "health-checker run ${HC_RUN_COMMON_ARGS[*]} \
       -n mem_bw,mem_lat"
 
