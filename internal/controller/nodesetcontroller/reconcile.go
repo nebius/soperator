@@ -115,6 +115,7 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 			condition = metav1.Condition{
 				Type:    slurmv1alpha1.ConditionNodeSetStatefulSetTerminated,
 				Status:  metav1.ConditionFalse,
+				Reason:  "WorkersEnabled",
 				Message: "Workers are enabled",
 			}
 		}
@@ -339,6 +340,7 @@ func (r NodeSetReconciler) validateResources(
 			condition = metav1.Condition{
 				Type:    slurmv1alpha1.ConditionNodeSetPodsReady,
 				Status:  metav1.ConditionTrue,
+				Reason:  "NodeSetReady",
 				Message: "NodeSet is ready",
 			}
 		} else {
@@ -346,7 +348,7 @@ func (r NodeSetReconciler) validateResources(
 				Type:    slurmv1alpha1.ConditionNodeSetPodsReady,
 				Status:  metav1.ConditionFalse,
 				Message: "NodeSet is not ready",
-				Reason:  "Not all nodes are ready",
+				Reason:  "NodeSetNotReady",
 			}
 			res.RequeueAfter += requeueDuration
 		}
