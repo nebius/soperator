@@ -160,7 +160,7 @@ func renderContainerNodeSetSlurmd(
 	// region Jail Sub-mounts
 	volumeMounts = append(volumeMounts,
 		common.RenderVolumeMounts(
-			sliceutils.Map(nodeSet.JailSubMounts,
+			sliceutils.MapSlice(nodeSet.JailSubMounts,
 				func(subMount slurmv1alpha1.NodeVolumeMount) slurmv1.NodeVolumeMount {
 					return slurmv1.NodeVolumeMount{
 						Name:      subMount.Name,
@@ -178,7 +178,7 @@ func renderContainerNodeSetSlurmd(
 	// region Custom mounts
 	volumeMounts = append(volumeMounts,
 		common.RenderVolumeMounts(
-			sliceutils.Map(nodeSet.CustomVolumeMounts,
+			sliceutils.MapSlice(nodeSet.CustomVolumeMounts,
 				func(mount slurmv1alpha1.NodeVolumeMount) slurmv1.NodeVolumeMount {
 					return slurmv1.NodeVolumeMount{
 						Name:      mount.Name,

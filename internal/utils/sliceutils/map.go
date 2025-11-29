@@ -4,16 +4,6 @@ import (
 	"iter"
 )
 
-// Map applies f to each element of the slice, and returns new slice containing processed elements.
-// Deprecated: use MapSlice instead.
-func Map[T any, U any](slice []T, f func(T) U) []U {
-	result := make([]U, len(slice))
-	for i := 0; i < len(slice); i++ {
-		result[i] = f(slice[i])
-	}
-	return result
-}
-
 // MapSlice applies f to each element of the slice, and returns new slice containing processed elements.
 func MapSlice[T any, U any](slice []T, f func(T) U) []U {
 	return Collect(MapSeq(SliceSeq(slice), f))
