@@ -3,6 +3,8 @@ package resourcegetter
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,11 +27,16 @@ func ListNodeSetsByClusterRef(ctx context.Context, r client.Reader, clusterRef t
 		return nil, fmt.Errorf("listing %s: %w", slurmv1alpha1.KindNodeSet, err)
 	}
 
-	return sliceutils.Filter(nodeSetList.Items, func(nodeSet slurmv1alpha1.NodeSet) bool {
-		clusterName, found := nodeSet.GetAnnotations()[consts.AnnotationParentalClusterRefName]
-		if found && clusterName == clusterRef.Name {
-			return true
-		}
-		return false
-	}), nil
+	return slices.SortedFunc(
+		sliceutils.FilterSliceSeq(nodeSetList.Items, func(nodeSet slurmv1alpha1.NodeSet) bool {
+			clusterName, found := nodeSet.GetAnnotations()[consts.AnnotationParentalClusterRefName]
+			if found && clusterName == clusterRef.Name {
+				return true
+			}
+			return false
+		}),
+		func(a, b slurmv1alpha1.NodeSet) int {
+			return strings.Compare(a.Name, b.Name)
+		},
+	), nil
 }

@@ -70,8 +70,8 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					needToReconcile = clusterValues.NodeWorker.IsSSHDConfigMapDefault
 				case true:
 					nodeSetsWithCustomSSHDConfigMap := len(
-						sliceutils.Filter(
-							sliceutils.Map(
+						sliceutils.FilterSeqSlice(
+							sliceutils.MapSliceSeq(
 								clusterValues.NodeSets,
 								func(nodeSet slurmv1alpha1.NodeSet) string {
 									return nodeSet.Spec.ConfigMapRefSSHD
@@ -164,8 +164,8 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 					needToReconcile = clusterValues.NodeWorker.SupervisordConfigMapDefault
 				case true:
 					nodeSetsWithCustomSupervisorDConfigMap := len(
-						sliceutils.Filter(
-							sliceutils.Map(
+						sliceutils.FilterSeqSlice(
+							sliceutils.MapSliceSeq(
 								clusterValues.NodeSets,
 								func(nodeSet slurmv1alpha1.NodeSet) string {
 									return nodeSet.Spec.ConfigMapRefSupervisord
