@@ -82,7 +82,7 @@ func TestMapSliceSeq(t *testing.T) {
 		f := sliceutils.MapSliceSeq(emptyTestCases, func(t TestCase) string {
 			return fmt.Sprintf("%d x %s", t.A, t.B)
 		})
-		assert.Empty(t, sliceutils.Collect(f))
+		assert.True(t, sliceutils.IsEmptySeq(f))
 	})
 
 	t.Run("Test MapSliceSeq string", func(t *testing.T) {
@@ -150,7 +150,7 @@ func TestMapSeq(t *testing.T) {
 		f := sliceutils.MapSeq(sliceutils.SliceSeq(emptyTestCases), func(t TestCase) string {
 			return fmt.Sprintf("%d x %s", t.A, t.B)
 		})
-		assert.Empty(t, sliceutils.Collect(f))
+		assert.True(t, sliceutils.IsEmptySeq(f))
 	})
 
 	t.Run("Test MapSeq string", func(t *testing.T) {

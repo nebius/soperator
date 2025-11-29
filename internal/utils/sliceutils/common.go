@@ -24,3 +24,13 @@ func SliceSeq[T any](s []T) iter.Seq[T] {
 		}
 	}
 }
+
+// IsEmptySeq checks if the given seq is empty.
+func IsEmptySeq[T any](seq iter.Seq[T]) bool {
+	empty := true
+	seq(func(_ T) bool {
+		empty = false
+		return false // сразу останавливаемся — нам достаточно одного элемента
+	})
+	return empty
+}

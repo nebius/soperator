@@ -69,7 +69,7 @@ func TestFilterSliceSeq(t *testing.T) {
 		f := sliceutils.FilterSliceSeq(emptyTestCases, func(t TestCase) bool {
 			return t.A == 10
 		})
-		assert.Empty(t, sliceutils.Collect(f))
+		assert.True(t, sliceutils.IsEmptySeq(f))
 	})
 
 	t.Run("Test FilterSliceSeq found", func(t *testing.T) {
@@ -125,7 +125,7 @@ func TestFilterSeq(t *testing.T) {
 		f := sliceutils.FilterSeq(sliceutils.SliceSeq(emptyTestCases), func(t TestCase) bool {
 			return t.A == 10
 		})
-		assert.Empty(t, sliceutils.Collect(f))
+		assert.True(t, sliceutils.IsEmptySeq(f))
 	})
 
 	t.Run("Test FilterSeq found", func(t *testing.T) {
