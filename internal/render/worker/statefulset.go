@@ -33,6 +33,7 @@ func RenderStatefulSet(
 	workerFeatures []slurmv1.WorkerFeature,
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeWorker, clusterName)
+	labels[consts.LabelWorkerKey] = consts.LabelWorkerValue
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeWorker, clusterName)
 
 	nodeFilter := utils.MustGetBy(
@@ -162,6 +163,7 @@ func RenderNodeSetStatefulSet(
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	labels[consts.LabelNodeSetKey] = nodeSet.Name
+	labels[consts.LabelWorkerKey] = consts.LabelWorkerValue
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	matchLabels[consts.LabelNodeSetKey] = nodeSet.Name
 
