@@ -4,19 +4,6 @@ import (
 	"iter"
 )
 
-// Filter returns elements from the slice where the matcher is true.
-// Deprecated: use FilterSlice instead.
-func Filter[T any](slice []T, matcher func(T) bool) []T {
-	res := make([]T, 0, len(slice))
-	for _, v := range slice {
-		if matcher(v) {
-			res = append(res, v)
-		}
-	}
-
-	return res
-}
-
 // FilterSlice returns elements from the slice where the matcher is true.
 func FilterSlice[T any](slice []T, matcher func(T) bool) []T {
 	return Collect(FilterSeq(SliceSeq(slice), matcher))

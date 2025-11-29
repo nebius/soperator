@@ -25,7 +25,7 @@ func ListNodeSetsByClusterRef(ctx context.Context, r client.Reader, clusterRef t
 		return nil, fmt.Errorf("listing %s: %w", slurmv1alpha1.KindNodeSet, err)
 	}
 
-	return sliceutils.Filter(nodeSetList.Items, func(nodeSet slurmv1alpha1.NodeSet) bool {
+	return sliceutils.FilterSlice(nodeSetList.Items, func(nodeSet slurmv1alpha1.NodeSet) bool {
 		clusterName, found := nodeSet.GetAnnotations()[consts.AnnotationParentalClusterRefName]
 		if found && clusterName == clusterRef.Name {
 			return true

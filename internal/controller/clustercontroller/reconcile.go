@@ -233,9 +233,9 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		}
 
 		// Set cluster type to GPU if at least one NodeSet has GPU enabled
-		if len(
-			sliceutils.Filter(
-				sliceutils.Map(
+		if sliceutils.IsEmptySeq(
+			sliceutils.FilterSeq(
+				sliceutils.MapSliceSeq(
 					nodeSets,
 					func(nodeSet slurmv1alpha1.NodeSet) bool {
 						return nodeSet.Spec.GPU.Enabled
@@ -245,10 +245,10 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 					return b
 				},
 			),
-		) > 0 {
-			clusterValues.ClusterType = consts.ClusterTypeGPU
-		} else {
+		) {
 			clusterValues.ClusterType = consts.ClusterTypeCPU
+		} else {
+			clusterValues.ClusterType = consts.ClusterTypeGPU
 		}
 	}
 
