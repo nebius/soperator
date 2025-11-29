@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -216,7 +217,10 @@ func TestWorkerTopologyReconciler_GetStatefulSetsWithFallback(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "worker-group-1",
 						Namespace: namespace,
-						Labels:    common.RenderLabels(consts.ComponentTypeWorker, clusterName),
+						Labels: labels.Merge(
+							common.RenderLabels(consts.ComponentTypeWorker, clusterName),
+							labels.Set{consts.LabelWorkerKey: consts.LabelWorkerValue},
+						),
 					},
 					Spec: kruisev1b1.StatefulSetSpec{
 						Replicas: ptr.To(int32(3)),
@@ -265,7 +269,10 @@ func TestWorkerTopologyReconciler_GetStatefulSetsWithFallback(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "worker-group-1",
 						Namespace: namespace,
-						Labels:    common.RenderLabels(consts.ComponentTypeWorker, clusterName),
+						Labels: labels.Merge(
+							common.RenderLabels(consts.ComponentTypeWorker, clusterName),
+							labels.Set{consts.LabelWorkerKey: consts.LabelWorkerValue},
+						),
 					},
 					Spec: kruisev1b1.StatefulSetSpec{
 						Replicas: ptr.To(int32(2)),
@@ -275,7 +282,10 @@ func TestWorkerTopologyReconciler_GetStatefulSetsWithFallback(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "worker-group-2",
 						Namespace: namespace,
-						Labels:    common.RenderLabels(consts.ComponentTypeWorker, clusterName),
+						Labels: labels.Merge(
+							common.RenderLabels(consts.ComponentTypeWorker, clusterName),
+							labels.Set{consts.LabelWorkerKey: consts.LabelWorkerValue},
+						),
 					},
 					Spec: kruisev1b1.StatefulSetSpec{
 						Replicas: ptr.To(int32(3)),
