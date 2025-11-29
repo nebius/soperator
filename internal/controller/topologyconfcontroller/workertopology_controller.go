@@ -486,19 +486,18 @@ func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, 
 func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 	maxConcurrency int, cacheSyncTimeout time.Duration) error {
 
-	ctx := context.Background()
-
-	// Index pods by their status and worker label.
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Pod{}, consts.FieldStatusPhase,
-		func(o client.Object) []string {
-			if o.(*corev1.Pod).Status.Phase == corev1.PodRunning &&
-				o.(*corev1.Pod).Labels[consts.LabelComponentKey] == consts.ComponentTypeWorker.String() {
-				return []string{string(o.(*corev1.Pod).Status.Phase)}
-			}
-			return []string{}
-		}); err != nil {
+	// Index pod statuses to get client.MatchingFields working.
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&corev1.Pod{},
+		consts.FieldStatusPhase,
+		func(obj client.Object) []string {
+			return []string{string(obj.(*corev1.Pod).Status.Phase)}
+		},
+	); err != nil {
 		return fmt.Errorf("failed to setup %s field indexer: %w", consts.FieldStatusPhase, err)
 	}
+
 	return ctrl.NewControllerManagedBy(mgr).Named(WorkerTopologyReconcilerName).
 		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
