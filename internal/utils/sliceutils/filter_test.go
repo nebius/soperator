@@ -1,6 +1,7 @@
 package sliceutils_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,7 +9,7 @@ import (
 	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 )
 
-func TestFilter(t *testing.T) {
+func TestFilterDeprecated(t *testing.T) {
 	t.Run("Test Filter empty", func(t *testing.T) {
 		f := sliceutils.Filter(emptyTestCases, func(t TestCase) bool {
 			return t.A == 10
@@ -36,114 +37,60 @@ func TestFilter(t *testing.T) {
 	})
 }
 
-func TestFilterSlice(t *testing.T) {
-	t.Run("Test FilterSlice empty", func(t *testing.T) {
-		f := sliceutils.FilterSlice(emptyTestCases, func(t TestCase) bool {
-			return t.A == 10
+func TestFilter(t *testing.T) {
+	for _, suite := range []struct {
+		Name string
+		Impl func([]TestCase, func(testCase TestCase) bool) []TestCase
+	}{
+		{
+			Name: "FilterSlice",
+			Impl: func(xs []TestCase, pred func(TestCase) bool) []TestCase {
+				return sliceutils.FilterSlice(xs, pred)
+			},
+		},
+		{
+			Name: "FilterSliceSeq",
+			Impl: func(xs []TestCase, pred func(TestCase) bool) []TestCase {
+				return sliceutils.Collect(sliceutils.FilterSliceSeq(xs, pred))
+			},
+		},
+		{
+			Name: "FilterSeqSlice",
+			Impl: func(xs []TestCase, pred func(TestCase) bool) []TestCase {
+				return sliceutils.FilterSeqSlice(sliceutils.SliceSeq(xs), pred)
+			},
+		},
+		{
+			Name: "FilterSeq",
+			Impl: func(xs []TestCase, pred func(TestCase) bool) []TestCase {
+				return sliceutils.Collect(sliceutils.FilterSeq(sliceutils.SliceSeq(xs), pred))
+			},
+		},
+	} {
+		t.Run(fmt.Sprintf("Test %s empty", suite.Name), func(t *testing.T) {
+			f := suite.Impl(emptyTestCases, func(t TestCase) bool {
+				return t.A == 10
+			})
+			assert.Empty(t, f)
 		})
-		assert.Empty(t, f)
-	})
 
-	t.Run("Test FilterSlice found", func(t *testing.T) {
-		f := sliceutils.FilterSlice(testCases, func(t TestCase) bool {
-			return t.A == 10
-		})
-		assert.Equal(t, "hello", f[0].B)
+		t.Run(fmt.Sprintf("Test %s found", suite.Name), func(t *testing.T) {
+			f := suite.Impl(testCases, func(t TestCase) bool {
+				return t.A == 10
+			})
+			assert.Equal(t, "hello", f[0].B)
 
-		f = sliceutils.FilterSlice(testCases, func(t TestCase) bool {
-			return t.B == "bye"
+			f = suite.Impl(testCases, func(t TestCase) bool {
+				return t.B == "bye"
+			})
+			assert.Equal(t, 20, f[0].A)
 		})
-		assert.Equal(t, 20, f[0].A)
-	})
 
-	t.Run("Test FilterSlice not found", func(t *testing.T) {
-		f := sliceutils.FilterSlice(testCases, func(t TestCase) bool {
-			return t.A == 0
+		t.Run(fmt.Sprintf("Test %s not found", suite.Name), func(t *testing.T) {
+			f := suite.Impl(testCases, func(t TestCase) bool {
+				return t.A == 0
+			})
+			assert.Empty(t, f)
 		})
-		assert.Empty(t, f)
-	})
-}
-
-func TestFilterSliceSeq(t *testing.T) {
-	t.Run("Test FilterSliceSeq empty", func(t *testing.T) {
-		f := sliceutils.FilterSliceSeq(emptyTestCases, func(t TestCase) bool {
-			return t.A == 10
-		})
-		assert.True(t, sliceutils.IsEmptySeq(f))
-	})
-
-	t.Run("Test FilterSliceSeq found", func(t *testing.T) {
-		f := sliceutils.FilterSliceSeq(testCases, func(t TestCase) bool {
-			return t.A == 10
-		})
-		assert.Equal(t, "hello", sliceutils.Collect(f)[0].B)
-
-		f = sliceutils.FilterSliceSeq(testCases, func(t TestCase) bool {
-			return t.B == "bye"
-		})
-		assert.Equal(t, 20, sliceutils.Collect(f)[0].A)
-	})
-
-	t.Run("Test FilterSliceSeq not found", func(t *testing.T) {
-		f := sliceutils.FilterSliceSeq(testCases, func(t TestCase) bool {
-			return t.A == 0
-		})
-		assert.Empty(t, sliceutils.Collect(f))
-	})
-}
-
-func TestFilterSeqSlice(t *testing.T) {
-	t.Run("Test FilterSeqSlice empty", func(t *testing.T) {
-		f := sliceutils.FilterSeqSlice(sliceutils.SliceSeq(emptyTestCases), func(t TestCase) bool {
-			return t.A == 10
-		})
-		assert.Empty(t, f)
-	})
-
-	t.Run("Test FilterSeqSlice found", func(t *testing.T) {
-		f := sliceutils.FilterSeqSlice(sliceutils.SliceSeq(testCases), func(t TestCase) bool {
-			return t.A == 10
-		})
-		assert.Equal(t, "hello", f[0].B)
-
-		f = sliceutils.FilterSeqSlice(sliceutils.SliceSeq(testCases), func(t TestCase) bool {
-			return t.B == "bye"
-		})
-		assert.Equal(t, 20, f[0].A)
-	})
-
-	t.Run("Test FilterSeqSlice not found", func(t *testing.T) {
-		f := sliceutils.FilterSeqSlice(sliceutils.SliceSeq(testCases), func(t TestCase) bool {
-			return t.A == 0
-		})
-		assert.Empty(t, f)
-	})
-}
-
-func TestFilterSeq(t *testing.T) {
-	t.Run("Test FilterSeq empty", func(t *testing.T) {
-		f := sliceutils.FilterSeq(sliceutils.SliceSeq(emptyTestCases), func(t TestCase) bool {
-			return t.A == 10
-		})
-		assert.True(t, sliceutils.IsEmptySeq(f))
-	})
-
-	t.Run("Test FilterSeq found", func(t *testing.T) {
-		f := sliceutils.FilterSeq(sliceutils.SliceSeq(testCases), func(t TestCase) bool {
-			return t.A == 10
-		})
-		assert.Equal(t, "hello", sliceutils.Collect(f)[0].B)
-
-		f = sliceutils.FilterSeq(sliceutils.SliceSeq(testCases), func(t TestCase) bool {
-			return t.B == "bye"
-		})
-		assert.Equal(t, 20, sliceutils.Collect(f)[0].A)
-	})
-
-	t.Run("Test FilterSeq not found", func(t *testing.T) {
-		f := sliceutils.FilterSeq(sliceutils.SliceSeq(testCases), func(t TestCase) bool {
-			return t.A == 0
-		})
-		assert.Empty(t, sliceutils.Collect(f))
-	})
+	}
 }
