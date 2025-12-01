@@ -145,6 +145,7 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 
 func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv1alpha1.NodeSet) error {
 	patch := client.MergeFrom(nodeSet.DeepCopy())
+	needToUpdate := false
 
 	for _, conditionType := range []string{
 		slurmv1alpha1.ConditionNodeSetConfigUpdated,
@@ -153,15 +154,24 @@ func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv
 		slurmv1alpha1.ConditionNodeSetPodsReady,
 		slurmv1alpha1.ConditionNodeSetStatefulSetTerminated,
 	} {
-		if cond := meta.FindStatusCondition(nodeSet.Status.Conditions, conditionType); cond == nil {
+		if meta.FindStatusCondition(nodeSet.Status.Conditions, conditionType) != nil {
 			continue
 		}
-		nodeSet.Status.SetCondition(metav1.Condition{
+
+		// Don't do
+		//	needToUpdate = needToUpdate || nodeSet.Status.SetCondition
+		// This will skip the SetCondition call if needToUpdate is already true.
+		// Status.SetCondition checks for existing condition and updates only if there is a change.
+		updated := nodeSet.Status.SetCondition(metav1.Condition{
 			Type:    conditionType,
 			Status:  metav1.ConditionUnknown,
 			Reason:  "SetUpCondition",
 			Message: "The object is not ready yet.",
 		})
+		needToUpdate = needToUpdate || updated
+	}
+	if !needToUpdate {
+		return nil
 	}
 
 	if err := r.Status().Patch(ctx, nodeSet, patch); err != nil {
