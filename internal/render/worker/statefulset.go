@@ -205,6 +205,7 @@ func RenderNodeSetStatefulSet(
 			slurmdContainer,
 		},
 		Volumes:   volumes,
+		Subdomain: nodeSet.ServiceUmbrella.Name,
 		DNSPolicy: corev1.DNSClusterFirst,
 		DNSConfig: &corev1.PodDNSConfig{
 			Searches: []string{
@@ -230,7 +231,7 @@ func RenderNodeSetStatefulSet(
 		},
 		Spec: kruisev1b1.StatefulSetSpec{
 			PodManagementPolicy: consts.PodManagementPolicy,
-			ServiceName:         nodeSet.Service.Name,
+			ServiceName:         nodeSet.ServiceUmbrella.Name,
 			Replicas:            replicas,
 			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
