@@ -64,10 +64,10 @@ jobs:
           go-version-file: 'go.mod'
           cache: false
 
-      - name: Install yq
-        uses: frenck/action-setup-yq@v1
-        with:
-          version: v4.44.2
+      - name: Install E2E tools
+        run: |
+          make install-e2e-tools
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Install AWS CLI v2
         run: |
