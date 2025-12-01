@@ -657,6 +657,9 @@ yq: $(YQ) ## Download yq locally if necessary.
 $(YQ): $(LOCALBIN)
 	test -s $(LOCALBIN)/yq || GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@v$(YQ_VERSION)
 
+.PHONY: install-e2e-tools
+install-e2e-tools: yq ## Install tools required for E2E tests
+
 .PHONY: install-kind
 install-kind: $(KIND) ## Download kind locally if necessary.
 $(KIND): $(LOCALBIN)
