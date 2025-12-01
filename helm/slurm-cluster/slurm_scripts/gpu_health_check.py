@@ -12,31 +12,22 @@ def chdir_into_tmp():
   try:
     os.chdir("/tmp")
   except Exception as e:
-    log_json(res_desc=f"Failed to chdir into /tmp: {e}")
+    print(f"Failed to chdir into /tmp: {e}")
     sys.exit(0)
 
-def log_json(
+# TODO: Make it log raw health-checker JSON (multi-line is OK - same as in active checks)
+def print_hc_result(
     res_desc: str,
-    hc_json: typing.Any = None,
     hc_exitcode: int = -1,
     hc_stdout: str = None,
     hc_stderr: str = None,
 ):
-    payload = {"result_description": res_desc}
-    if hc_json:
-        payload["health_checker_json"] = hc_json
-    if hc_exitcode != -1:
-        payload["health_checker_exitcode"] = str(hc_exitcode)
-    if hc_stdout:
-        payload["health_checker_stdout"] = hc_stdout
-    if hc_stderr:
-        payload["health_checker_stderr"] = hc_stderr
-    try:
-        json_oneline = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
-    except Exception:
-        json_oneline = '{"result_description": "Failed to dump JSON log"}'
-    # Print a single-line JSON
-    print(json_oneline)
+    print(res_desc)
+    print(f"Health checker exit code: {hc_exitcode}")
+    print("Health checker stdout:")
+    print(hc_stdout)
+    print("Health checker stderr:")
+    print(hc_stderr)
 
 @dataclasses.dataclass
 class HealthCheckerResult:
@@ -51,6 +42,7 @@ class HealthCheckerResult:
 def get_hc_result(proc: subprocess.CompletedProcess) -> HealthCheckerResult:
     res = HealthCheckerResult()
     res.exitcode = proc.returncode
+    res.stdout = proc.stdout
     res.stderr = proc.stderr
 
     try:
@@ -59,7 +51,6 @@ def get_hc_result(proc: subprocess.CompletedProcess) -> HealthCheckerResult:
             try:
                 obj = json.loads(line)
             except json.decoder.JSONDecodeError:
-                res.stdout += line + "\n"
                 continue
             else:
                 valid_json = obj
@@ -97,7 +88,7 @@ try:
         CHECKS_PLATFORM_TAG = os.environ["CHECKS_PLATFORM_TAG"]
         CHECKS_CONTEXT = os.environ["CHECKS_CONTEXT"]
     except KeyError as ke:
-        log_json(res_desc=f"Failed to get environment variable '{ke.args[0]}'")
+        print(f"Failed to get environment variable '{ke.args[0]}'")
         sys.exit(0)
 
     # Change into /tmp before running health-checker
@@ -112,7 +103,7 @@ try:
     elif CHECKS_CONTEXT == "hc_program":
         tests = "module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg,ib_link"
     else:
-        log_json(res_desc=f"Unknown context '{CHECKS_CONTEXT}'")
+        print(f"Unknown context '{CHECKS_CONTEXT}'")
         sys.exit(0)
 
     # Set custom options for health-checker
@@ -138,10 +129,20 @@ try:
 
     if result.exitcode == 0:
         if result.final_status == "PASS":
-            log_json(res_desc="All checks passed", hc_json=result.json)
+            print_hc_result(
+                res_desc="All checks passed",
+                hc_exitcode=result.exitcode,
+                hc_stdout=result.stdout,
+                hc_stderr=result.stderr,
+            )
             sys.exit(0)
         elif result.final_status == "FAIL" and result.first_failed_check:
-            log_json(res_desc="Some checks failed", hc_json=result.json)
+            print_hc_result(
+                res_desc="Some checks failed",
+                hc_exitcode=result.exitcode,
+                hc_stdout=result.stdout,
+                hc_stderr=result.stderr,
+            )
             # Return details with the first failed check
             details=result.first_failed_check
             if result.first_failed_error:
@@ -149,12 +150,16 @@ try:
             os.write(3, details.encode("utf-8", errors="backslashreplace"))
             sys.exit(1)
         elif result.final_status == "ERROR":
-            log_json(res_desc="Error when running checks", hc_json=result.json, hc_stdout=result.stdout, hc_stderr=result.stderr)
+            print_hc_result(
+                res_desc="Error when running checks",
+                hc_exitcode=result.exitcode,
+                hc_stdout=result.stdout,
+                hc_stderr=result.stderr,
+            )
             sys.exit(0)
 
-    log_json(
+    print_hc_result(
         res_desc="Unexpected result",
-        hc_json=result.json,
         hc_exitcode=result.exitcode,
         hc_stdout=result.stdout,
         hc_stderr=result.stderr,
@@ -162,6 +167,6 @@ try:
     sys.exit(0)
 
 except Exception:
-    log_json(res_desc="Unhandled exception")
-    #traceback.print_exc()
+    print("Unhandled exception")
+    traceback.print_exc()
     sys.exit(0)
