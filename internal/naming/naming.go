@@ -85,6 +85,15 @@ func BuildNodeSetServiceFQDN(
 	return fmt.Sprintf("%s.%s.svc.cluster.local", svcName, namespace)
 }
 
+func BuildNodeSetUmbrellaServiceFQDN(
+	namespace,
+	clusterName string,
+) string {
+	// <svcName>.<namespace>.svc.cluster.local
+	svcName := BuildServiceName(consts.ComponentTypeNodeSet, clusterName)
+	return fmt.Sprintf("%s.%s.svc.cluster.local", svcName, namespace)
+}
+
 func BuildServiceHostFQDN(
 	componentType consts.ComponentType,
 	namespace,

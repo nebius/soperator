@@ -208,7 +208,7 @@ func RenderNodeSetStatefulSet(
 		DNSPolicy: corev1.DNSClusterFirst,
 		DNSConfig: &corev1.PodDNSConfig{
 			Searches: []string{
-				naming.BuildNodeSetServiceFQDN(nodeSet.ParentalCluster.Namespace, nodeSet.ParentalCluster.Name, nodeSet.Name),
+				naming.BuildNodeSetUmbrellaServiceFQDN(nodeSet.ParentalCluster.Namespace, nodeSet.ParentalCluster.Name),
 				naming.BuildLoginHeadlessServiceFQDN(nodeSet.ParentalCluster.Namespace, nodeSet.ParentalCluster.Name),
 			},
 		},
