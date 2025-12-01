@@ -118,33 +118,38 @@ jobs:
           which go
           go version
 
-      - name: Find latest build run on current branch
+      - name: Find latest successful build run on current branch
         id: find_build
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Looking for build run on branch: ${{ github.ref_name }}"
+          echo "Looking for successful build run on branch: ${{ github.ref_name }}"
 
           run_info=$(gh api -X GET \
             "/repos/${{ github.repository }}/actions/workflows/one_job.yml/runs" \
-            -F branch="${{ github.ref_name }}" -F per_page=1 \
-            --jq '.workflow_runs[0] | {id: .id, status: .status, conclusion: .conclusion}')
-          
-          run_id=$(jq -r '.id' <<<"$run_info")
-          status=$(jq -r '.status' <<<"$run_info")
-          conclusion=$(jq -r '.conclusion' <<<"$run_info")
+            -F branch="${{ github.ref_name }}" \
+            -F status=success \
+            -F per_page=1 \
+            --jq '.workflow_runs[0] | {id: .id, head_sha: .head_sha, created_at: .created_at, html_url: .html_url}')
 
-          echo "Latest build workflow:"
-          echo "  run_id: $run_id"
-          echo "  status: $status"
-          echo "  conclusion: $conclusion"
-          
-          if [[ "$conclusion" == "failure" || "$conclusion" == "cancelled" ]]; then
-            echo "❌ Latest build workflow failed or was cancelled"
+          run_id=$(jq -r '.id' <<<"$run_info")
+
+          if [[ "$run_id" == "null" || -z "$run_id" ]]; then
+            echo "::error::No successful build found on branch ${{ github.ref_name }}"
             exit 1
           fi
-          
+
+          head_sha=$(jq -r '.head_sha' <<<"$run_info")
+          created_at=$(jq -r '.created_at' <<<"$run_info")
+          html_url=$(jq -r '.html_url' <<<"$run_info")
+
+          echo "Found build: $run_id"
+
           echo "run_id=$run_id" >> $GITHUB_OUTPUT
+          echo "head_sha=$head_sha" >> $GITHUB_OUTPUT
+          echo "created_at=$created_at" >> $GITHUB_OUTPUT
+          echo "html_url=$html_url" >> $GITHUB_OUTPUT
 
       - name: Download artifact with version
         run: |
@@ -232,6 +237,55 @@ jobs:
           aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
 
           go test -v -timeout 30m --tags=e2e -run TestTerraformDestroy ./test/e2e/...
+
+      - name: Add build info to job summary
+        if: always()
+        shell: bash
+        run: |
+          head_sha="${{ steps.find_build.outputs.head_sha }}"
+          created_at="${{ steps.find_build.outputs.created_at }}"
+          html_url="${{ steps.find_build.outputs.html_url }}"
+          run_id="${{ steps.find_build.outputs.run_id }}"
+          repo_url="https://github.com/${{ github.repository }}"
+          terraform_repo_url="https://github.com/${{ env.TERRAFORM_REPO }}"
+
+          {
+            echo "## Image Build Information"
+
+            if [[ -n "$run_id" && "$run_id" != "null" ]]; then
+              echo "[Run $run_id]($html_url) at $created_at"
+              echo "### Latest commit"
+              short_hash="${head_sha:0:9}"
+              commit_msg=$(git log --oneline -1 "$head_sha" 2>/dev/null | cut -d' ' -f2-)
+              echo "- [$short_hash]($repo_url/commit/$head_sha): $commit_msg"
+
+              # Get commits not covered by the build (first-parent only)
+              not_covered=$(git log --oneline --first-parent "$head_sha"..HEAD 2>/dev/null)
+              if [[ -n "$not_covered" ]]; then
+                echo ""
+                echo "### Not Covered Commits"
+                while IFS= read -r line; do
+                  hash=$(echo "$line" | cut -d' ' -f1)
+                  msg=$(echo "$line" | cut -d' ' -f2-)
+                  echo "- [$hash]($repo_url/commit/$hash): $msg"
+                done <<< "$not_covered"
+              fi
+            else
+              echo "No successful build was found."
+            fi
+
+            # Terraform repo latest commit
+            echo ""
+            echo "### Terraform Repo Latest Commit"
+            tf_head=$(git -C "${{ github.workspace }}/terraform-repo" rev-parse HEAD 2>/dev/null)
+            if [[ -n "$tf_head" ]]; then
+              tf_short="${tf_head:0:9}"
+              tf_msg=$(git -C "${{ github.workspace }}/terraform-repo" log --oneline -1 2>/dev/null | cut -d' ' -f2-)
+              echo "- [$tf_short]($terraform_repo_url/commit/$tf_head): $tf_msg"
+            else
+              echo "- Unable to get terraform repo commit"
+            fi
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Add errors output to job summary
         if: ${{ always() }}
