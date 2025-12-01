@@ -327,8 +327,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		res.AddComment("")
 		res.AddComment("ACCOUNTING")
 		res.AddProperty("AccountingStorageType", "accounting_storage/slurmdbd")
-		res.AddProperty("AccountingStorageHost", fmt.Sprintf(
-			"%s.%s.svc.cluster.local",
+		res.AddProperty("AccountingStorageHost", naming.BuildServiceFQDN(
 			naming.BuildServiceName(consts.ComponentTypeAccounting, cluster.Name),
 			cluster.Namespace,
 		))

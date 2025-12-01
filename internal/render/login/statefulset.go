@@ -104,7 +104,7 @@ func RenderStatefulSet(
 							utils.Ternary(
 								nodeSetsEnabled,
 								naming.BuildNodeSetUmbrellaServiceFQDN(namespace, clusterName),
-								naming.BuildServiceFQDN(consts.ComponentTypeWorker, namespace, clusterName),
+								naming.BuildWorkerServiceFQDN(namespace, clusterName),
 							),
 							naming.BuildLoginHeadlessServiceFQDN(namespace, clusterName),
 						},

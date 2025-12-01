@@ -96,7 +96,7 @@ func RenderStatefulSet(
 		DNSPolicy: corev1.DNSClusterFirst,
 		DNSConfig: &corev1.PodDNSConfig{
 			Searches: []string{
-				naming.BuildServiceFQDN(consts.ComponentTypeWorker, namespace, clusterName),
+				naming.BuildServiceFQDN(worker.Service.Name, namespace),
 				naming.BuildLoginHeadlessServiceFQDN(namespace, clusterName),
 			},
 		},
@@ -208,7 +208,7 @@ func RenderNodeSetStatefulSet(
 		DNSPolicy: corev1.DNSClusterFirst,
 		DNSConfig: &corev1.PodDNSConfig{
 			Searches: []string{
-				naming.BuildNodeSetUmbrellaServiceFQDN(nodeSet.ParentalCluster.Namespace, nodeSet.ParentalCluster.Name),
+				naming.BuildServiceFQDN(nodeSet.ServiceUmbrella.Name, nodeSet.ParentalCluster.Namespace),
 				naming.BuildLoginHeadlessServiceFQDN(nodeSet.ParentalCluster.Namespace, nodeSet.ParentalCluster.Name),
 			},
 		},
