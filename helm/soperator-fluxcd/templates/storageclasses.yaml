@@ -1,0 +1,36 @@
+{{- if .Values.storageClasses.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-storageclasses
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  chart:
+    spec:
+      chart: helm-storageclasses
+      interval: {{ .Values.storageClasses.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+      version: {{ .Values.storageClasses.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  interval: {{ .Values.storageClasses.interval }}
+  timeout: {{ .Values.storageClasses.timeout }}
+  releaseName: {{ .Values.storageClasses.releaseName }}
+  targetNamespace: {{ .Values.storageClasses.namespace }}
+  values:
+  {{- if .Values.storageClasses.values }}
+    {{- toYaml .Values.storageClasses.values | nindent 4 }}
+  {{- end }}
+{{- end }}
