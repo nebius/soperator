@@ -15,7 +15,7 @@ reclaimPolicy: Delete
 
 volumeBindingMode: WaitForFirstConsumer
 
-allowVolumeExpansion: false
+allowVolumeExpansion: true
 
 annotations: {}
 
