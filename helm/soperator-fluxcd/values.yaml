@@ -345,6 +345,23 @@ nfsServer:
   releaseName: nfs-server
   overrideValues: null
   values: null
+storageClasses:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: 1.23.0
+  namespace: storage-system
+  releaseName: soperator-storageclasses
+  values:
+    provisioners:
+      - compute.csi.nebius.com
+    diskTypes:
+      - NETWORK_SSD
+      - NETWORK_SSD_NON_REPLICATED
+      - NETWORK_SSD_IO_M3
+    fsTypes:
+      - ext4
+      - xfs
 customConfigmaps:
   enabled: true
   interval: 5m

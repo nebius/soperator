@@ -1,0 +1,19 @@
+provisioners: []
+
+diskTypes: []
+
+fsTypes: []
+
+reclaimPolicy: Delete
+
+volumeBindingMode: WaitForFirstConsumer
+
+allowVolumeExpansion: false
+
+annotations: {}
+
+labels: {}
+
+mountOptions: []
+
+parameters: {}

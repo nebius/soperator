@@ -1,0 +1,40 @@
+{{- $root := . }}
+{{- if and (gt (len $root.Values.provisioners) 0) (gt (len $root.Values.diskTypes) 0) (gt (len $root.Values.fsTypes) 0) }}
+{{- range $prov := $root.Values.provisioners }}
+{{- range $disk := $root.Values.diskTypes }}
+{{- range $fs := $root.Values.fsTypes }}
+{{- $provName := trimSuffix ".nebius.com" $prov }}
+{{- $rawName := printf "%s-%s-%s" $provName $disk $fs }}
+{{- $scName := (lower $rawName) | replace "_" "-" | replace "." "-" }}
+{{- $params := dict "type" $disk "csi.storage.k8s.io/fstype" $fs }}
+{{- range $k, $v := $root.Values.parameters }}
+{{- $_ := set $params $k $v }}
+{{- end }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ $scName }}
+  labels:
+    {{- include "storageclasses.labels" $root | nindent 4 }}
+    {{- with $root.Values.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with $root.Values.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+provisioner: {{ $prov }}
+parameters:
+  {{- toYaml $params | nindent 2 }}
+reclaimPolicy: {{ $root.Values.reclaimPolicy }}
+volumeBindingMode: {{ $root.Values.volumeBindingMode }}
+allowVolumeExpansion: {{ $root.Values.allowVolumeExpansion }}
+{{- with $root.Values.mountOptions }}
+mountOptions:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
