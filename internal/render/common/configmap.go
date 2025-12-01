@@ -137,9 +137,17 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 			nodeName := fmt.Sprintf("%s-%d", nodeSet.Name, i)
 
 			{
-				nodeAddr := fmt.Sprintf("%s.%s.%s.svc.cluster.local", nodeName, naming.BuildNodeSetServiceName(cluster.Name, nodeSet.Name), nodeSet.Namespace)
-				realMemory := strconv.FormatInt(RenderRealMemorySlurmd(corev1.ResourceRequirements{Requests: nodeSet.Spec.Slurmd.Resources}), 10)
-				nodeConfig = fmt.Sprintf("NodeHostname=%s NodeAddr=%s RealMemory=%s",
+				nodeAddr := fmt.Sprintf(
+					"%s.%s",
+					nodeName,
+					naming.BuildNodeSetUmbrellaServiceFQDN(nodeSet.Namespace, cluster.Name),
+				)
+				realMemory := strconv.FormatInt(
+					RenderRealMemorySlurmd(corev1.ResourceRequirements{Requests: nodeSet.Spec.Slurmd.Resources}),
+					10,
+				)
+				nodeConfig = fmt.Sprintf(
+					"NodeHostname=%s NodeAddr=%s RealMemory=%s",
 					nodeName,
 					nodeAddr,
 					realMemory,
@@ -327,8 +335,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		res.AddComment("")
 		res.AddComment("ACCOUNTING")
 		res.AddProperty("AccountingStorageType", "accounting_storage/slurmdbd")
-		res.AddProperty("AccountingStorageHost", fmt.Sprintf(
-			"%s.%s.svc.cluster.local",
+		res.AddProperty("AccountingStorageHost", naming.BuildServiceFQDN(
 			naming.BuildServiceName(consts.ComponentTypeAccounting, cluster.Name),
 			cluster.Namespace,
 		))

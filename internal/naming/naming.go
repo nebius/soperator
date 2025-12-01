@@ -65,36 +65,19 @@ func BuildNodeSetServiceName(clusterName string, nodeSetName string) string {
 	}.String()
 }
 
-func BuildServiceFQDN(
-	componentType consts.ComponentType,
-	namespace,
-	clusterName string,
-) string {
-	// <svcName>.<namespace>.svc.cluster.local
-	svcName := BuildServiceName(componentType, clusterName)
+func BuildServiceFQDN(svcName, namespace string) string {
 	return fmt.Sprintf("%s.%s.svc.cluster.local", svcName, namespace)
 }
 
-func BuildNodeSetServiceFQDN(
-	namespace,
-	clusterName string,
-	nodeSetName string,
-) string {
-	// <svcName>.<namespace>.svc.cluster.local
-	svcName := BuildNodeSetServiceName(clusterName, nodeSetName)
-	return fmt.Sprintf("%s.%s.svc.cluster.local", svcName, namespace)
+func BuildWorkerServiceFQDN(namespace, clusterName string) string {
+	return BuildServiceFQDN(BuildServiceName(consts.ComponentTypeWorker, clusterName), namespace)
 }
 
-func BuildServiceHostFQDN(
-	componentType consts.ComponentType,
+func BuildNodeSetUmbrellaServiceFQDN(
 	namespace,
 	clusterName string,
-	hostIndex int32,
-) (hostName, hostFQDN string) {
-	// <stsName>-<index>.<svcName>.<namespace>.svc.cluster.local
-	hostName = fmt.Sprintf("%s-%d", BuildStatefulSetName(componentType), hostIndex)
-	hostFQDN = fmt.Sprintf("%s.%s", hostName, BuildServiceFQDN(componentType, namespace, clusterName))
-	return hostName, hostFQDN
+) string {
+	return BuildServiceFQDN(BuildServiceName(consts.ComponentTypeNodeSet, clusterName), namespace)
 }
 
 func BuildAppArmorProfileName(clusterName, namespace string) string {
@@ -198,8 +181,7 @@ func BuildLoginHeadlessServiceName(clusterName string) string {
 }
 
 func BuildLoginHeadlessServiceFQDN(namespace, clusterName string) string {
-	svcName := BuildLoginHeadlessServiceName(clusterName)
-	return fmt.Sprintf("%s.%s.svc.cluster.local", svcName, namespace)
+	return BuildServiceFQDN(BuildLoginHeadlessServiceName(clusterName), namespace)
 }
 
 // endregion Login

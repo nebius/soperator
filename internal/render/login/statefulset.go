@@ -27,6 +27,7 @@ func RenderStatefulSet(
 	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	login *values.SlurmLogin,
+	nodeSetsEnabled bool,
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeLogin, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName)
@@ -100,7 +101,11 @@ func RenderStatefulSet(
 					DNSPolicy: corev1.DNSClusterFirst,
 					DNSConfig: &corev1.PodDNSConfig{
 						Searches: []string{
-							naming.BuildServiceFQDN(consts.ComponentTypeWorker, namespace, clusterName),
+							utils.Ternary(
+								nodeSetsEnabled,
+								naming.BuildNodeSetUmbrellaServiceFQDN(namespace, clusterName),
+								naming.BuildWorkerServiceFQDN(namespace, clusterName),
+							),
 							naming.BuildLoginHeadlessServiceFQDN(namespace, clusterName),
 						},
 					},

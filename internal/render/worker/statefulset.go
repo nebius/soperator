@@ -96,7 +96,7 @@ func RenderStatefulSet(
 		DNSPolicy: corev1.DNSClusterFirst,
 		DNSConfig: &corev1.PodDNSConfig{
 			Searches: []string{
-				naming.BuildServiceFQDN(consts.ComponentTypeWorker, namespace, clusterName),
+				naming.BuildServiceFQDN(worker.Service.Name, namespace),
 				naming.BuildLoginHeadlessServiceFQDN(namespace, clusterName),
 			},
 		},
@@ -205,10 +205,11 @@ func RenderNodeSetStatefulSet(
 			slurmdContainer,
 		},
 		Volumes:   volumes,
+		Subdomain: nodeSet.ServiceUmbrella.Name,
 		DNSPolicy: corev1.DNSClusterFirst,
 		DNSConfig: &corev1.PodDNSConfig{
 			Searches: []string{
-				naming.BuildNodeSetServiceFQDN(nodeSet.ParentalCluster.Namespace, nodeSet.ParentalCluster.Name, nodeSet.Name),
+				naming.BuildServiceFQDN(nodeSet.ServiceUmbrella.Name, nodeSet.ParentalCluster.Namespace),
 				naming.BuildLoginHeadlessServiceFQDN(nodeSet.ParentalCluster.Namespace, nodeSet.ParentalCluster.Name),
 			},
 		},
@@ -230,7 +231,7 @@ func RenderNodeSetStatefulSet(
 		},
 		Spec: kruisev1b1.StatefulSetSpec{
 			PodManagementPolicy: consts.PodManagementPolicy,
-			ServiceName:         nodeSet.Service.Name,
+			ServiceName:         nodeSet.ServiceUmbrella.Name,
 			Replicas:            replicas,
 			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
