@@ -198,9 +198,16 @@ func (r *NodeSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return result, errorsStd.Join(err, statusErr)
 }
 
-func (r *NodeSetReconciler) patchStatus(ctx context.Context, obj *slurmv1alpha1.NodeSet, patcher func(status *slurmv1alpha1.NodeSetStatus)) error {
+// patchStatus patches the status of the NodeSet object using the provided patcher function.
+// The patcher function should return true if a patch is needed, false otherwise.
+func (r *NodeSetReconciler) patchStatus(ctx context.Context, obj *slurmv1alpha1.NodeSet, patcher func(status *slurmv1alpha1.NodeSetStatus) bool) error {
 	patch := client.MergeFrom(obj.DeepCopy())
-	patcher(&obj.Status)
+
+	needToPatch := patcher(&obj.Status)
+	if !needToPatch {
+		return nil
+	}
+
 	if err := r.Status().Patch(ctx, obj, patch); err != nil {
 		log.FromContext(ctx).Error(err, "Failed to patch status")
 		return fmt.Errorf("patching cluster status: %w", err)

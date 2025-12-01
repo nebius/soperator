@@ -65,10 +65,20 @@ type NodeSetStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
+// SetCondition sets the given condition in the NodeSetStatus conditions slice.
+// It initializes the conditions slice if it is nil.
+// Returns true if the condition was added or updated, false otherwise.
 func (s *NodeSetStatus) SetCondition(condition metav1.Condition) bool {
 	if s.Conditions == nil {
 		s.Conditions = make([]metav1.Condition, 0)
 	}
+
+	// We preserve the ObservedGeneration from the existing condition if it exists,
+	// as we don't set it on our own and don't want it to trigger unnecessary updates.
+	if existingCondition := meta.FindStatusCondition(s.Conditions, condition.Type); existingCondition != nil {
+		condition.ObservedGeneration = existingCondition.ObservedGeneration
+	}
+
 	return meta.SetStatusCondition(&s.Conditions, condition)
 }
 
