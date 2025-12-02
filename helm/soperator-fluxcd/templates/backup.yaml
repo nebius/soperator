@@ -37,11 +37,7 @@ spec:
     {{- toYaml .Values.backup.overrideValues | nindent 4 }}
   {{- else }}
     k8up:
-      envVars:
-        - name: BACKUP_SKIP_WITHOUT_ANNOTATION
-          value: "true"
-      env:
-        K8UP_BACKUP_SKIP_WITHOUT_ANNOTATION: "true"
+      skipWithoutAnnotation: true
       image:
         repository: ghcr.io/vshn/k8up
         tag: v4.8.0
