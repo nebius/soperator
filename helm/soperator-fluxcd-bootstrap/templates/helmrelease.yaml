@@ -9,6 +9,7 @@ metadata:
   annotations:
     {{- toYaml .Values.helmRelease.annotations | nindent 4 }}
 spec:
+  targetNamespace: {{ .Values.helmRelease.namespace }}
   interval: {{ .Values.helmRelease.interval }}
   {{- if .Values.helmRelease.timeout }}
   timeout: {{ .Values.helmRelease.timeout }}
