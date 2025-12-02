@@ -48,15 +48,7 @@ spec:
       registry: gcr.io
       repository: k8s-staging-sp-operator/security-profiles-operator
       tag: v0.8.4
-    tolerations:
-      - effect: NoSchedule
-        key: node-role.kubernetes.io/master
-      - key: CriticalAddonsOnly
-        operator: Exists
-      - effect: NoExecute
-        operator: Exists
-      - effect: NoSchedule
-        operator: Exists
+    tolerations: []
     verbosity: 0
     {{- if .Values.securityProfilesOperator.values.resources }}
     resources:
