@@ -9,7 +9,7 @@ helmRepository:
     "helm.sh/resource-policy": keep
 helmRelease:
   enabled: true
-  name: soperator-fluxcd
+  name: flux-system-soperator-fluxcd
   namespace: flux-system
   interval: 5m
   timeout: 5m
