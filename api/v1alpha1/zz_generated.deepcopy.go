@@ -612,6 +612,11 @@ func (in *JobAndReason) DeepCopy() *JobAndReason {
 func (in *K8sJobSpec) DeepCopyInto(out *K8sJobSpec) {
 	*out = *in
 	in.JobContainer.DeepCopyInto(&out.JobContainer)
+	if in.MungeContainer != nil {
+		in, out := &in.MungeContainer, &out.MungeContainer
+		*out = new(ContainerSpec)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.ScriptRefName != nil {
 		in, out := &in.ScriptRefName, &out.ScriptRefName
 		*out = new(string)
