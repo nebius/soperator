@@ -550,7 +550,7 @@ images:
   slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.23.0-noble-slurm25.05.5"
   soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.23.0-noble-slurm25.05.5"
   sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.23.0
-  mariaDB: docker-registry1.mariadb.com/library/mariadb:11.4.3
+  mariaDB: docker-registry1.mariadb.com/library/mariadb:12.1.2
 # Configuration for slurm scripts.
 slurmScripts:
   prolog: null

@@ -19,7 +19,6 @@ on:
         default: "/soperator/installations/example"
         type: string
 
-
 permissions:
   contents: read
 
@@ -61,7 +60,7 @@ jobs:
       - name: Install GO
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
           cache: false
 
       - name: Install E2E tools
@@ -261,8 +260,10 @@ jobs:
         if: always()
         shell: bash
         run: |
-          kubectl exec -n soperator controller-0 -- sinfo -N
-          kubectl exec -n soperator controller-0 -- squeue
+          kubectl exec -n soperator controller-0 -- sinfo -N || true
+          kubectl exec -n soperator controller-0 -- squeue || true
+          kubectl exec -n soperator controller-0 -- sdiag || true
+          kubectl exec -n soperator controller-0 -- sacct --format=JobID,JobName,Partition,Account,AllocCPUS,State,ExitCode -S now-6hours || true
           kubectl exec -n soperator controller-0 -- sacct --parsable2 --allusers --starttime=now-6hours | column -t -s'|'
 
       - name: Collect Full Kubernetes Cluster Info
