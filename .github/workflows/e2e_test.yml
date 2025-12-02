@@ -189,38 +189,110 @@ jobs:
 
           go test -v -timeout 2h --tags=e2e -run TestTerraformApply ./test/e2e/...
 
-      - name: Basic Kubernetes Cluster State
+      - name: K8s Cluster Info and NodeGroups
         if: always()
+        shell: bash
         run: |
-          export PS4='### Running: '
-          set -x
-          kubectl get pods -A -o wide || true
-          kubectl get events -A --sort-by='.lastTimestamp' || true
-          kubectl get helmreleases -n flux-system || true
-          kubectl get slurmclusters -A -o yaml || true
-          kubectl get activechecks -A -o yaml || true
+          echo "=== Listing K8s clusters ==="
+          clusters_json=$(nebius mk8s cluster list --parent-id "$NEBIUS_PROJECT_ID" --format json)
+          echo "$clusters_json"
+
+          echo ""
+          echo "=== Listing node groups for each cluster ==="
+          cluster_ids=$(echo "$clusters_json" | jq -r '.items[].metadata.id // empty')
+
+          for cluster_id in $cluster_ids; do
+            echo ""
+            echo "--- Node groups for cluster: $cluster_id ---"
+            nebius mk8s node-group list --parent-id "$cluster_id" --page-size 1000
+          done
+
+      - name: "K8s Cluster: Pods"
+        if: always()
+        shell: bash
+        run: kubectl get pods -A -o wide
+
+      - name: "K8s Cluster: Events"
+        if: always()
+        shell: bash
+        run: kubectl get events -A --sort-by='.lastTimestamp'
+
+      - name: "K8s Cluster: Nodes"
+        if: always()
+        shell: bash
+        run: |
+          kubectl get nodes
+          echo ""
+          kubectl get nodes -o yaml
+
+      - name: "K8s Cluster: Jobs"
+        if: always()
+        shell: bash
+        run: |
+          kubectl -n soperator get job
+          echo ""
+          kubectl -n soperator get job -o yaml
+
+      - name: "K8s Cluster: Helm Releases"
+        if: always()
+        shell: bash
+        run: |
+          kubectl get helmreleases -n flux-system
+          echo ""
+          kubectl get helmreleases -n flux-system -o yaml
+
+      - name: "K8s Cluster: Slurm Cluster CRs"
+        if: always()
+        shell: bash
+        run: |
+          kubectl get slurmclusters -A
+          echo ""
+          kubectl get slurmclusters -A -o yaml
+
+      - name: "K8s Cluster: Slurm Active Checks CRs"
+        if: always()
+        shell: bash
+        run: |
+          kubectl get activechecks -A
+          echo ""
+          kubectl get activechecks -A -o yaml
 
       - name: Slurm Cluster State
         if: always()
+        shell: bash
         run: |
-          export PS4='### Running: '
-          set -x
-          kubectl exec -n soperator controller-0 -- sinfo -N || true
-          kubectl exec -n soperator controller-0 -- squeue || true
-          kubectl exec -n soperator controller-0 -- sacct --allusers || true
+          kubectl exec -n soperator controller-0 -- sinfo -N
+          kubectl exec -n soperator controller-0 -- squeue
+          kubectl exec -n soperator controller-0 -- sacct --parsable2 --allusers --starttime=now-6hours | column -t -s'|'
 
       - name: Collect Full Kubernetes Cluster Info
-        if: failure()
+        if: always()
+        shell: bash
         run: |
           mkdir -p ./cluster-info
           kubectl cluster-info dump --namespaces=kruise-system,soperator-system,soperator,flux-system --output-directory=./cluster-info
 
       - name: Upload Full Kubernetes Cluster Info
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v5
         with:
           name: cluster-info
           path: ./cluster-info
+          retention-days: 7
+
+      - name: Collect Soperator Outputs
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p ./soperator-outputs
+          kubectl cp soperator/controller-0:/mnt/jail/opt/soperator-outputs ./soperator-outputs
+
+      - name: Upload Soperator Outputs
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: soperator-outputs
+          path: ./soperator-outputs
           retention-days: 7
 
       - name: Terraform Destroy
@@ -250,41 +322,34 @@ jobs:
           terraform_repo_url="https://github.com/${{ env.TERRAFORM_REPO }}"
 
           {
-            echo "## Image Build Information"
+            echo "### Image Build Information"
 
             if [[ -n "$run_id" && "$run_id" != "null" ]]; then
               echo "[Run $run_id]($html_url) at $created_at"
-              echo "### Latest commit"
-              short_hash="${head_sha:0:9}"
-              commit_msg=$(git log --oneline -1 "$head_sha" 2>/dev/null | cut -d' ' -f2-)
-              echo "- [$short_hash]($repo_url/commit/$head_sha): $commit_msg"
+              echo "### Latest Commits on ${{ github.ref_name }}"
+              git log --format='%h|%s|%ar|%an' -3 "$head_sha" 2>/dev/null | while IFS='|' read -r hash msg date author; do
+                echo "- [$hash]($repo_url/commit/$hash): $msg ($date) <$author>"
+              done
 
               # Get commits not covered by the build (first-parent only)
-              not_covered=$(git log --oneline --first-parent "$head_sha"..HEAD 2>/dev/null)
+              not_covered=$(git log --format='%h|%s|%ar|%an' --first-parent "$head_sha"..HEAD 2>/dev/null)
               if [[ -n "$not_covered" ]]; then
                 echo ""
                 echo "### Not Covered Commits"
-                while IFS= read -r line; do
-                  hash=$(echo "$line" | cut -d' ' -f1)
-                  msg=$(echo "$line" | cut -d' ' -f2-)
-                  echo "- [$hash]($repo_url/commit/$hash): $msg"
+                while IFS='|' read -r hash msg date author; do
+                  echo "- [$hash]($repo_url/commit/$hash): $msg ($date) <$author>"
                 done <<< "$not_covered"
               fi
             else
               echo "No successful build was found."
             fi
 
-            # Terraform repo latest commit
+            # Terraform repo latest commits
             echo ""
-            echo "### Terraform Repo Latest Commit"
-            tf_head=$(git -C "${{ github.workspace }}/terraform-repo" rev-parse HEAD 2>/dev/null)
-            if [[ -n "$tf_head" ]]; then
-              tf_short="${tf_head:0:9}"
-              tf_msg=$(git -C "${{ github.workspace }}/terraform-repo" log --oneline -1 2>/dev/null | cut -d' ' -f2-)
-              echo "- [$tf_short]($terraform_repo_url/commit/$tf_head): $tf_msg"
-            else
-              echo "- Unable to get terraform repo commit"
-            fi
+            echo "### Terraform Repo Latest Commits on ${{ env.TERRAFORM_REPO_REF }}"
+            git -C "${{ github.workspace }}/terraform-repo" log --format='%h|%s|%ar|%an' -3 2>/dev/null | while IFS='|' read -r hash msg date author; do
+              echo "- [$hash]($terraform_repo_url/commit/$hash): $msg ($date) <$author>"
+            done
           } >> $GITHUB_STEP_SUMMARY
 
       - name: Add errors output to job summary
