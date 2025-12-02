@@ -17,6 +17,7 @@ spec:
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   - name: {{ include "soperator-fluxcd.fullname" . }}-k8up
+  - name: {{ include "soperator-fluxcd.fullname" . }}-backup-config
   install:
     crds: Skip
     remediation:
@@ -36,7 +37,7 @@ spec:
       spec: {{ toYaml .Values.backup.schedule.values.spec | nindent 8 }}
   valuesFrom:
   - kind: ConfigMap
-    name: backup-schedule
+    name: {{ default "backup-schedule" .Values.backup.config.values.configMapName }}
     optional: true
     valuesKey: values.yaml
 {{- end }}

@@ -64,6 +64,18 @@ backup:
       repository: alpine/k8s
       tag: 1.34.0
   overrideValues: null
+  config:
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    version: 1.23.*
+    releaseName: soperator-backups
+    values:
+      secret:
+        name: jail-backup
+      bucket:
+        endpoint: ""
+        name: ""
   schedule:
     interval: 5m
     timeout: 5m

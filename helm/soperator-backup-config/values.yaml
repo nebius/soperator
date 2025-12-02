@@ -1,0 +1,29 @@
+configMapName: backup-schedule
+
+secret:
+  name: jail-backup
+  keys:
+    accessKeyID: aws-access-key-id
+    secretAccessKey: aws-access-secret-key
+    backupPassword: backup-password
+
+bucket:
+  name: ""
+  endpoint: ""
+
+backup:
+  schedule: "@daily-random"
+  failedJobsHistoryLimit: 2
+  successfulJobsHistoryLimit: 2
+  concurrentRunsAllowed: false
+
+prune:
+  schedule: "@daily-random"
+  retention:
+    keepDaily: 7
+
+tags:
+  - soperator-jail-schedule
+
+podSecurityContext:
+  runAsUser: 0
