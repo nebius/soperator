@@ -1,4 +1,4 @@
-configMapName: backup-schedule
+scheduleName: soperator-jail
 
 secret:
   name: jail-backup

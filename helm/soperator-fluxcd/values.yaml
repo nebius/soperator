@@ -76,15 +76,6 @@ backup:
       bucket:
         endpoint: ""
         name: ""
-  schedule:
-    interval: 5m
-    timeout: 5m
-    version: 4.8.*
-    namespace: k8up-system
-    releaseName: k8up-schedule
-    values:
-      name: soperator-jail
-      spec: {}
 mariadbOperator:
   enabled: true
   interval: 5m
