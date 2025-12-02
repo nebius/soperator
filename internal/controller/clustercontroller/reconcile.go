@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -548,88 +549,43 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 }
 
 func (r *SlurmClusterReconciler) setUpConditions(ctx context.Context, cluster *slurmv1.SlurmCluster) error {
-	return utils.ExecuteMultiStep(ctx,
-		"Setting up conditions",
-		utils.MultiStepExecutionStrategyCollectErrors,
-		utils.MultiStepExecutionStep{
-			Name: "Common resources",
-			Func: func(stepCtx context.Context) error {
-				return r.patchStatus(stepCtx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-					status.SetCondition(metav1.Condition{
-						Type:    slurmv1.ConditionClusterCommonAvailable,
-						Status:  metav1.ConditionUnknown,
-						Reason:  "Reconciling",
-						Message: "Reconciling Slurm common resources",
-					})
-				})
-			},
-		},
-		utils.MultiStepExecutionStep{
-			Name: "Controllers",
-			Func: func(stepCtx context.Context) error {
-				return r.patchStatus(stepCtx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-					status.SetCondition(metav1.Condition{
-						Type:    slurmv1.ConditionClusterControllersAvailable,
-						Status:  metav1.ConditionUnknown,
-						Reason:  "Reconciling",
-						Message: "Reconciling Slurm Controllers",
-					})
-				})
-			},
-		},
-		utils.MultiStepExecutionStep{
-			Name: "Workers",
-			Func: func(stepCtx context.Context) error {
-				return r.patchStatus(stepCtx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-					status.SetCondition(metav1.Condition{
-						Type:    slurmv1.ConditionClusterWorkersAvailable,
-						Status:  metav1.ConditionUnknown,
-						Reason:  "Reconciling",
-						Message: "Reconciling Slurm Workers",
-					})
-				})
-			},
-		},
-		utils.MultiStepExecutionStep{
-			Name: "Login",
-			Func: func(stepCtx context.Context) error {
-				return r.patchStatus(stepCtx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-					status.SetCondition(metav1.Condition{
-						Type:    slurmv1.ConditionClusterLoginAvailable,
-						Status:  metav1.ConditionUnknown,
-						Reason:  "Reconciling",
-						Message: "Reconciling Slurm Login",
-					})
-				})
-			},
-		},
-		utils.MultiStepExecutionStep{
-			Name: "SConfigController",
-			Func: func(stepCtx context.Context) error {
-				return r.patchStatus(stepCtx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-					status.SetCondition(metav1.Condition{
-						Type:    slurmv1.ConditionClusterSConfigControllerAvailable,
-						Status:  metav1.ConditionUnknown,
-						Reason:  "Reconciling",
-						Message: "Reconciling Slurm SConfigController",
-					})
-				})
-			},
-		},
-		utils.MultiStepExecutionStep{
-			Name: "Accounting",
-			Func: func(stepCtx context.Context) error {
-				return r.patchStatus(stepCtx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-					status.SetCondition(metav1.Condition{
-						Type:    slurmv1.ConditionClusterAccountingAvailable,
-						Status:  metav1.ConditionUnknown,
-						Reason:  "Reconciling",
-						Message: "Reconciling Slurm Accounting",
-					})
-				})
-			},
-		},
-	)
+	patch := client.MergeFrom(cluster.DeepCopy())
+	needToUpdate := false
+
+	for _, conditionType := range []string{
+		slurmv1.ConditionClusterCommonAvailable,
+		slurmv1.ConditionClusterControllersAvailable,
+		slurmv1.ConditionClusterWorkersAvailable,
+		slurmv1.ConditionClusterLoginAvailable,
+		slurmv1.ConditionClusterSConfigControllerAvailable,
+		slurmv1.ConditionClusterAccountingAvailable,
+	} {
+		if meta.FindStatusCondition(cluster.Status.Conditions, conditionType) != nil {
+			continue
+		}
+
+		// Don't do
+		//	needToUpdate = needToUpdate || cluster.Status.SetCondition
+		// This will skip the SetCondition call if needToUpdate is already true.
+		// Status.SetCondition checks for existing condition and updates only if there is a change.
+		updated := cluster.Status.SetCondition(metav1.Condition{
+			Type:    conditionType,
+			Status:  metav1.ConditionUnknown,
+			Reason:  "SetUpCondition",
+			Message: "The object is not ready yet.",
+		})
+		needToUpdate = needToUpdate || updated
+	}
+	if !needToUpdate {
+		return nil
+	}
+
+	if err := r.Status().Patch(ctx, cluster, patch); err != nil {
+		log.FromContext(ctx).Error(err, "Failed to patch status")
+		return fmt.Errorf("patching %s status: %w", slurmv1.KindSlurmCluster, err)
+	}
+
+	return nil
 }
 
 func (r *SlurmClusterReconciler) runWithPhase(ctx context.Context, cluster *slurmv1.SlurmCluster, phase *string, do func() (ctrl.Result, error)) (ctrl.Result, error) {
