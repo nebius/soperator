@@ -25,6 +25,7 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
+      appArmorProfile: unconfined
   failureReactions:
     drainSlurmNode:
       drainReasonPrefix: {{ .Values.checks.allReducePerfNCCLWithIB.drainReasonPrefix | quote }}

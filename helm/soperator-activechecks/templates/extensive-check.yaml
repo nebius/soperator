@@ -30,6 +30,7 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
+      appArmorProfile: unconfined
   successReactions:
     removeReservation:
       prefix: {{ .Values.checks.extensiveCheck.reservationPrefix | quote }}

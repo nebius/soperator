@@ -16,6 +16,7 @@ func renderContainerSshd(
 	clusterType consts.ClusterType,
 	container *values.Container,
 	jailSubMounts, customMounts []slurmv1.NodeVolumeMount,
+	appArmorProfile string,
 ) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountJail(),
@@ -67,6 +68,7 @@ func renderContainerSshd(
 					consts.ContainerSecurityContextCapabilitySysAdmin,
 				},
 			},
+			AppArmorProfile: common.ParseAppArmorProfile(appArmorProfile),
 		},
 		Resources: corev1.ResourceRequirements{
 			Limits:   limits,

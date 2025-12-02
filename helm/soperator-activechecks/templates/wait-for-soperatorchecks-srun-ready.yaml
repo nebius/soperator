@@ -23,3 +23,4 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
+      appArmorProfile: unconfined

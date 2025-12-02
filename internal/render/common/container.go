@@ -32,6 +32,15 @@ func RenderContainerMunge(container *values.Container, opts ...RenderOption) cor
 	// Since 1.29 is native sidecar support, we can use the native restart policy
 	restartPolicy := corev1.ContainerRestartPolicy("Always")
 
+	securityContext := &corev1.SecurityContext{
+		Capabilities: &corev1.Capabilities{
+			Add: []corev1.Capability{
+				consts.ContainerSecurityContextCapabilitySysAdmin,
+			},
+		},
+		AppArmorProfile: ParseAppArmorProfile(container.AppArmorProfile),
+	}
+
 	return corev1.Container{
 		Name:            consts.ContainerNameMunge,
 		Image:           container.Image,
@@ -76,11 +85,7 @@ func RenderContainerMunge(container *values.Container, opts ...RenderOption) cor
 			SuccessThreshold: DefaultProbeSuccessThreshold,
 			FailureThreshold: DefaultProbeFailureThreshold,
 		},
-		SecurityContext: &corev1.SecurityContext{
-			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{
-					consts.ContainerSecurityContextCapabilitySysAdmin,
-				}}},
+		SecurityContext: securityContext,
 		Resources: corev1.ResourceRequirements{
 			Limits:   limits,
 			Requests: container.Resources,

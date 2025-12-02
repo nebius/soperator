@@ -48,6 +48,8 @@ func renderContainerSlurmd(
 	enableGDRCopy bool,
 	slurmNodeExtra string,
 	workerFeatures []slurmv1.WorkerFeature,
+	namespace string,
+	useDefaultAppArmorProfile bool,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
@@ -79,6 +81,11 @@ func renderContainerSlurmd(
 	}
 
 	realMemory := common.RenderRealMemorySlurmd(resources)
+
+	appArmorProfile := container.AppArmorProfile
+	if useDefaultAppArmorProfile {
+		appArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
+	}
 
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
@@ -126,7 +133,8 @@ func renderContainerSlurmd(
 			SeccompProfile: &corev1.SeccompProfile{
 				Type: corev1.SeccompProfileTypeUnconfined,
 			},
-			ProcMount: ptr.To(corev1.UnmaskedProcMount),
+			ProcMount:       ptr.To(corev1.UnmaskedProcMount),
+			AppArmorProfile: common.ParseAppArmorProfile(appArmorProfile),
 		},
 		Resources:                resources,
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
@@ -203,6 +211,15 @@ func renderContainerNodeSetSlurmd(
 		return corev1.Container{}, fmt.Errorf("checking resource requests: %w", err)
 	}
 
+	appArmorProfile := nodeSet.ContainerSlurmd.AppArmorProfile
+	if appArmorProfile == "" {
+		if nodeSet.AppArmorProfileUseDefault {
+			appArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(nodeSet.ParentalCluster.Name, nodeSet.ParentalCluster.Namespace))
+		} else {
+			appArmorProfile = consts.AppArmorProfileUnconfined
+		}
+	}
+
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
 		Image:           nodeSet.ContainerSlurmd.Image,
@@ -246,7 +263,8 @@ func renderContainerNodeSetSlurmd(
 			SeccompProfile: &corev1.SeccompProfile{
 				Type: corev1.SeccompProfileTypeUnconfined,
 			},
-			ProcMount: ptr.To(corev1.UnmaskedProcMount),
+			ProcMount:       ptr.To(corev1.UnmaskedProcMount),
+			AppArmorProfile: common.ParseAppArmorProfile(appArmorProfile),
 		},
 		Resources:                resources,
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
