@@ -24,7 +24,6 @@ spec:
         namespace: {{ .Values.helmRepository.namespace }}
       interval: {{ .Values.helmRelease.chart.interval }}
   {{- if .Values.helmRelease.install }}
-  targetNamespace: {{ .Values.helmRelease.namespace }}
   install:
     {{- toYaml .Values.helmRelease.install | nindent 4 }}
   {{- end }}
