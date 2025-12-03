@@ -14,7 +14,8 @@ ln -sf /mnt/jail/etc/gshadow /etc/gshadow
 chown -h 0:42 /etc/{shadow,gshadow} || true
 
 # Symlink slurm configs from jail so srun can find slurm.conf at /etc/slurm/
-ln -sf /mnt/jail/etc/slurm /etc/slurm
+# Must remove directory first - ln -sf won't replace a directory with a symlink
+rm -rf /etc/slurm && ln -s /mnt/jail/etc/slurm /etc/slurm
 
 echo "Waiting for Slurm controller to be ready for soperatorchecks user..."
 
