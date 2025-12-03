@@ -1302,6 +1302,8 @@ const (
 	ConditionClusterSConfigControllerAvailable = "SConfigControllerAvailable"
 	ConditionClusterPopulateJailMode           = "PopulateJailMode"
 
+	// PhaseClusterReconciling
+	// Deprecated
 	PhaseClusterReconciling  = "Reconciling"
 	PhaseClusterNotAvailable = "Not available"
 	PhaseClusterAvailable    = "Available"
