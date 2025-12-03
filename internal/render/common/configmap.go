@@ -46,7 +46,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) corev1.ConfigMap 
 	}
 }
 
-// RenderConfigMapSlurmConfigs renders new [slurmv1alpha1.JailedConfig] for every config in `RenderConfigMapSlurmConfigs` result
+// RenderJailedConfigSlurmConfigs renders new [slurmv1alpha1.JailedConfig] for every config in `RenderConfigMapSlurmConfigs` result
 func RenderJailedConfigSlurmConfigs(cluster *values.SlurmCluster) slurmv1alpha1.JailedConfig {
 	// This must match ConfigMap name in `RenderConfigMapSlurmConfigs`
 	name := naming.BuildConfigMapSlurmConfigsName(cluster.Name)

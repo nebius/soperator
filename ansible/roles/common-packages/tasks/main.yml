@@ -8,3 +8,12 @@
   tags:
     - packages
     - common-packages
+
+- name: Ensure packages are removed
+  ansible.builtin.apt:
+    name: "{{ common_absent_packages }}"
+    state: absent
+  tags:
+    - packages
+    - common-packages
+    - absent-packages
