@@ -294,6 +294,13 @@ func (in *NodeContainer) DeepCopyInto(out *NodeContainer) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.CustomEnv != nil {
+		in, out := &in.CustomEnv, &out.CustomEnv
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources
 		*out = make(corev1.ResourceList, len(*in))

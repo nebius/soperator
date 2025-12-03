@@ -86,14 +86,17 @@ func renderContainerSlurmd(
 		ImagePullPolicy: container.ImagePullPolicy,
 		Command:         container.Command,
 		Args:            container.Args,
-		Env: renderSlurmdEnv(
-			clusterName,
-			cgroupVersion,
-			clusterType,
-			realMemory,
-			enableGDRCopy,
-			slurmNodeExtra,
-			workerFeatures,
+		Env: append(
+			renderSlurmdEnv(
+				clusterName,
+				cgroupVersion,
+				clusterType,
+				realMemory,
+				enableGDRCopy,
+				slurmNodeExtra,
+				workerFeatures,
+			),
+			container.CustomEnv...,
 		),
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,
@@ -211,16 +214,19 @@ func renderContainerNodeSetSlurmd(
 		ImagePullPolicy: nodeSet.ContainerSlurmd.ImagePullPolicy,
 		Command:         nodeSet.ContainerSlurmd.Command,
 		Args:            nodeSet.ContainerSlurmd.Args,
-		Env: renderSlurmdEnv(
-			nodeSet.ParentalCluster.Name,
-			nodeSet.CgroupVersion,
-			utils.Ternary(nodeSet.GPU.Enabled, consts.ClusterTypeGPU, consts.ClusterTypeCPU),
-			realMemory,
-			nodeSet.GPU.Nvidia.GDRCopyEnabled,
-			//
-			// TODO Make it work
-			"",
-			nil,
+		Env: append(
+			renderSlurmdEnv(
+				nodeSet.ParentalCluster.Name,
+				nodeSet.CgroupVersion,
+				utils.Ternary(nodeSet.GPU.Enabled, consts.ClusterTypeGPU, consts.ClusterTypeCPU),
+				realMemory,
+				nodeSet.GPU.Nvidia.GDRCopyEnabled,
+				//
+				// TODO Make it work
+				"",
+				nil,
+			),
+			nodeSet.ContainerSlurmd.CustomEnv...,
 		),
 		Ports: []corev1.ContainerPort{{
 			Name:          nodeSet.ContainerSlurmd.Name,

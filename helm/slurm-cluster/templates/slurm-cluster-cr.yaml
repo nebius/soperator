@@ -286,6 +286,9 @@ spec:
         {{- if .Values.slurmNodes.worker.slurmd.args }}
         args: {{- .Values.slurmNodes.worker.slurmd.args | toYaml | nindent 8 }}
         {{- end }}
+        {{- if .Values.slurmNodes.worker.slurmd.customEnv }}
+        customEnv: {{- .Values.slurmNodes.worker.slurmd.customEnv | toYaml | nindent 8 }}
+        {{-end }}
         resources:
           cpu: {{ required ".Values.slurmNodes.worker.slurmd.resources.cpu must be provided." .Values.slurmNodes.worker.slurmd.resources.cpu | quote}}
           memory: {{ required ".Values.slurmNodes.worker.slurmd.resources.memory must be provided." .Values.slurmNodes.worker.slurmd.resources.memory | quote}}
