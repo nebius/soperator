@@ -64,15 +64,18 @@ backup:
       repository: alpine/k8s
       tag: 1.34.0
   overrideValues: null
-  schedule:
+  config:
+    enabled: true
     interval: 5m
     timeout: 5m
-    version: 4.8.*
-    namespace: k8up-system
-    releaseName: k8up-schedule
+    version: 1.23.0
+    releaseName: soperator-backups
     values:
-      name: soperator-jail
-      spec: {}
+      secret:
+        name: jail-backup
+      bucket:
+        endpoint: ""
+        name: ""
 mariadbOperator:
   enabled: true
   interval: 5m

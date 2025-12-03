@@ -35,6 +35,7 @@ CHART_SOPERATOR_MONITORING_DASHBOARDS_PATH = $(CHART_PATH)/soperator-monitoring-
 CHART_CUSTOM_CONFIGMAPS_PATH  = $(CHART_PATH)/soperator-custom-configmaps
 CHART_FLUXCD_BOOTSTRAP_PATH   = $(CHART_PATH)/soperator-fluxcd-bootstrap
 CHART_STORAGECLASSES		  = $(CHART_PATH)/storageclasses
+CHART_BACKUP_CONFIG		 	  = $(CHART_PATH)/soperator-backup-config
 
 SLURM_VERSION		  		= 25.05.4
 UBUNTU_VERSION		  		?= noble
@@ -258,6 +259,7 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CUSTOM_CONFIGMAPS_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_FLUXCD_BOOTSTRAP_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_STORAGECLASSES)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_BACKUP_CONFIG)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_CRDS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
@@ -273,6 +275,7 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CUSTOM_CONFIGMAPS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_FLUXCD_BOOTSTRAP_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_STORAGECLASSES)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_BACKUP_CONFIG)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(NFS_VERSION)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(NFS_VERSION)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
 	@# endregion helm chart versions
