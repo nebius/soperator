@@ -10,6 +10,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -325,6 +326,11 @@ func (r SlurmClusterReconciler) ValidateWorkers(
 	cluster *slurmv1.SlurmCluster,
 	clusterValues *values.SlurmCluster,
 ) (ctrl.Result, error) {
+	const requeueDuration = 10 * time.Second
+	var (
+		res = ctrl.Result{}
+	)
+
 	logger := log.FromContext(ctx)
 
 	existing := &kruisev1b1.StatefulSet{}
@@ -338,42 +344,54 @@ func (r SlurmClusterReconciler) ValidateWorkers(
 	)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: requeueDuration}, nil
 		}
 		logger.Error(err, "Failed to get worker StatefulSet")
-		return ctrl.Result{}, fmt.Errorf("getting worker StatefulSet: %w", err)
+		return res, fmt.Errorf("getting worker StatefulSet: %w", err)
 	}
 
-	targetReplicas := clusterValues.NodeWorker.StatefulSet.Replicas
-	if existing.Spec.Replicas != nil {
-		targetReplicas = *existing.Spec.Replicas
-	}
-	if existing.Status.AvailableReplicas != targetReplicas {
-		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-			status.SetCondition(metav1.Condition{
-				Type:   slurmv1.ConditionClusterWorkersAvailable,
-				Status: metav1.ConditionFalse, Reason: "NotAvailable",
-				Message: "Slurm workers are not available yet",
-			})
-			status.ReadyWorkers = &existing.Status.AvailableReplicas
-		}); err != nil {
-			return ctrl.Result{}, err
+	if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) bool {
+		var (
+			changesInStatus     = false
+			changesInConditions = false
+		)
+
+		if status.ReadyWorkers == nil {
+			status.ReadyWorkers = ptr.To(int32(0))
 		}
-		return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 10}, nil
-	} else {
-		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-			status.SetCondition(metav1.Condition{
-				Type:   slurmv1.ConditionClusterWorkersAvailable,
-				Status: metav1.ConditionTrue, Reason: "Available",
+		if *status.ReadyWorkers != existing.Status.AvailableReplicas {
+			status.ReadyWorkers = &existing.Status.AvailableReplicas
+			changesInStatus = true
+		}
+
+		var (
+			condition metav1.Condition
+		)
+		if existing.Status.AvailableReplicas == clusterValues.NodeWorker.StatefulSet.Replicas {
+			condition = metav1.Condition{
+				Type:    slurmv1.ConditionClusterWorkersAvailable,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Available",
 				Message: "Slurm workers are available",
-			})
-			status.ReadyWorkers = &existing.Status.AvailableReplicas
-		}); err != nil {
-			return ctrl.Result{}, err
+			}
+		} else {
+			condition = metav1.Condition{
+				Type:    slurmv1.ConditionClusterWorkersAvailable,
+				Status:  metav1.ConditionFalse,
+				Reason:  "NotAvailable",
+				Message: "Slurm workers are not available yet",
+			}
+			res.RequeueAfter += requeueDuration
 		}
+		changesInConditions = status.SetCondition(condition)
+
+		return changesInStatus || changesInConditions
+	}); err != nil {
+		logger.Error(err, "Failed to update status")
+		return res, fmt.Errorf("updating .Status: %w", err)
 	}
 
-	return ctrl.Result{}, nil
+	return res, nil
 }
 
 func (r SlurmClusterReconciler) getWorkersStatefulSetDependencies(

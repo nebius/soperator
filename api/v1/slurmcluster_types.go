@@ -1328,11 +1328,21 @@ type SlurmClusterStatus struct {
 	ReadySConfigController *int32 `json:"readySConfigController,omitempty"`
 }
 
-func (s *SlurmClusterStatus) SetCondition(condition metav1.Condition) {
+// SetCondition sets the given condition in the SlurmClusterStatus conditions slice.
+// It initializes the conditions slice if it is nil.
+// Returns true if the condition was added or updated, false otherwise.
+func (s *SlurmClusterStatus) SetCondition(condition metav1.Condition) bool {
 	if s.Conditions == nil {
 		s.Conditions = make([]metav1.Condition, 0)
 	}
-	meta.SetStatusCondition(&s.Conditions, condition)
+
+	// We preserve the ObservedGeneration from the existing condition if it exists,
+	// as we don't set it on our own and don't want it to trigger unnecessary updates.
+	if existingCondition := meta.FindStatusCondition(s.Conditions, condition.Type); existingCondition != nil {
+		condition.ObservedGeneration = existingCondition.ObservedGeneration
+	}
+
+	return meta.SetStatusCondition(&s.Conditions, condition)
 }
 
 //+kubebuilder:object:root=true
