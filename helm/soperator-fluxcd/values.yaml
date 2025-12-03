@@ -80,7 +80,7 @@ mariadbOperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 0.38.*
+  version: 25.10.2
   namespace: mariadb-operator-system
   releaseName: mariadb-operator
   values: null

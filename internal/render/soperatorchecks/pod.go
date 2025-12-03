@@ -22,8 +22,9 @@ func renderPodTemplateSpec(check *slurmv1alpha1.ActiveCheck, labels map[string]s
 	if check.Spec.CheckType == "slurmJob" {
 		mungeContainerValues := values.Container{
 			NodeContainer: slurmv1.NodeContainer{
-				Image:   check.Spec.SlurmJobSpec.MungeContainer.Image,
-				Command: check.Spec.SlurmJobSpec.MungeContainer.Command,
+				Image:           check.Spec.SlurmJobSpec.MungeContainer.Image,
+				Command:         check.Spec.SlurmJobSpec.MungeContainer.Command,
+				AppArmorProfile: check.Spec.SlurmJobSpec.MungeContainer.AppArmorProfile,
 			},
 			Name: "munge",
 		}
