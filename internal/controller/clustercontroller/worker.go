@@ -355,7 +355,7 @@ func (r SlurmClusterReconciler) ValidateWorkers(
 			changesInConditions = false
 		)
 
-		if *status.ReadyWorkers != existing.Status.AvailableReplicas {
+		if status.ReadyWorkers == nil || *status.ReadyWorkers != existing.Status.AvailableReplicas {
 			status.ReadyWorkers = &existing.Status.AvailableReplicas
 			changesInStatus = true
 		}

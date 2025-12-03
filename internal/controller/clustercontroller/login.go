@@ -274,7 +274,7 @@ func (r SlurmClusterReconciler) ValidateLogin(
 			changesInConditions = false
 		)
 
-		if *status.ReadyLogin != existing.Status.AvailableReplicas {
+		if status.ReadyLogin == nil || *status.ReadyLogin != existing.Status.AvailableReplicas {
 			status.ReadyLogin = &existing.Status.AvailableReplicas
 			changesInStatus = true
 		}

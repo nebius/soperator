@@ -523,10 +523,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 	{
 		phase := utils.Ternary(isClusterAvailable, slurmv1.PhaseClusterAvailable, slurmv1.PhaseClusterNotAvailable)
 		err = errorsStd.Join(err, r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) bool {
-			if status.Phase == nil {
-				status.Phase = ptr.To("")
-			}
-			if *status.Phase == phase {
+			if status.Phase != nil && *status.Phase == phase {
 				return false
 			}
 

@@ -111,7 +111,7 @@ func (r SlurmClusterReconciler) ValidateSConfigController(
 			changesInConditions = false
 		)
 
-		if *status.ReadySConfigController != existing.Status.AvailableReplicas {
+		if status.ReadySConfigController == nil || *status.ReadySConfigController != existing.Status.AvailableReplicas {
 			status.ReadySConfigController = &existing.Status.AvailableReplicas
 			changesInStatus = true
 		}
