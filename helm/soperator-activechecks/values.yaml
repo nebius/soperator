@@ -25,6 +25,7 @@ images:
 # Pyxis syntax with '#' separator for registry
 activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-3935b93"
 checks:
+  # List of checks
   allReducePerfNCCLInDocker:
     suspend: true
     runAfterCreation: true
@@ -37,13 +38,6 @@ checks:
     suspend: false
     runAfterCreation: true
     drainReasonPrefix: "[node_problem]"
-  createUserSoperatorChecks:
-    suspend: true
-    runAfterCreation: true
-  createUser:
-    suspend: true
-    runAfterCreation: true
-    name: "nebius"
   cudaSamples:
     suspend: false
     runAfterCreation: true
@@ -56,15 +50,6 @@ checks:
     suspend: true
     runAfterCreation: true
     drainReasonPrefix: "[node_problem]"
-  enrootCleanup:
-    suspend: false
-    runAfterCreation: false
-  ensureDirSnccldLogs:
-    suspend: false
-    runAfterCreation: true
-    enabled: true
-    dir: /opt/soperator-outputs/nccl_logs
-    schedule: 15 0 * * *
   ensureHealthyNodes:
     suspend: true
     runAfterCreation: true
@@ -86,20 +71,36 @@ checks:
     suspend: false
     runAfterCreation: true
     drainReasonPrefix: "[node_problem]"
+  sshCheck:
+    suspend: true
+    runAfterCreation: true
+    numOfLoginNodes: 2
+  # List of actions
+  createUserSoperatorChecks:
+    suspend: true
+    runAfterCreation: true
+  createUser:
+    suspend: true
+    runAfterCreation: true
+    name: "nebius"
+  enrootCleanup:
+    suspend: false
+    runAfterCreation: false
+  ensureDirSnccldLogs:
+    suspend: false
+    runAfterCreation: true
+    enabled: true
+    dir: /opt/soperator-outputs/nccl_logs
+    schedule: 15 0 * * *
   prepullContainerImage:
     suspend: true
     runAfterCreation: true
   soperatorOutputsLogsCleaner:
     suspend: false
     runAfterCreation: false
-  sshCheck:
-    suspend: true
-    runAfterCreation: true
-    numOfLoginNodes: 2
-  upgradeCuda:
+  manageJailState:
     suspend: true
     runAfterCreation: false
-    cudaVersion: "12.4.1-1"
   upgradeHealthChecker:
     suspend: true
     runAfterCreation: false
