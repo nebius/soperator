@@ -364,6 +364,9 @@ slurmNodes:
       port: 6818
       command: []
       args: []
+      customEnv:
+        - name: "NVIDIA_DRIVER_CAPABILITIES"
+          value: "compute,utility,video"
       resources:
         cpu: "156000m"
         memory: "1220Gi"
