@@ -65,12 +65,7 @@ spec:
         {{- end }}
       {{- end }}
     {{- end }}
-  workerFeatures:
-    {{- range (default list .Values.workerFeatures) }}
-    - name: {{ .name | quote }}
-      hostlistExpr: {{ .hostlistExpr | quote }}
-      nodesetName: {{ .nodesetName | quote }}
-    {{- end }}
+  workerFeatures: {{- default list .Values.workerFeatures | toYaml | nindent 4 }}
   {{- if .Values.healthCheckConfig }}
   healthCheckConfig:
     healthCheckInterval: {{ required "Health check interval must be provided." .Values.healthCheckConfig.healthCheckInterval }}
