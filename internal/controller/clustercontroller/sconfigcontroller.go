@@ -119,7 +119,7 @@ func (r SlurmClusterReconciler) ValidateSConfigController(
 		var (
 			condition metav1.Condition
 		)
-		if existing.Status.AvailableReplicas == clusterValues.NodeLogin.StatefulSet.Replicas {
+		if existing.Status.AvailableReplicas == utils.Ternary(existing.Spec.Replicas == nil, int32(1), *existing.Spec.Replicas) {
 			condition = metav1.Condition{
 				Type:    slurmv1.ConditionClusterSConfigControllerAvailable,
 				Status:  metav1.ConditionTrue,
