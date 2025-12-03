@@ -16,6 +16,7 @@ spec:
     eachWorkerJobs: true
     maxNumberOfJobs: 200
     jobContainer:
+      appArmorProfile: unconfined
       image: {{ .Values.images.slurmJob | quote }}
       env:
 {{ toYaml .Values.jobContainer.env | indent 8 }}

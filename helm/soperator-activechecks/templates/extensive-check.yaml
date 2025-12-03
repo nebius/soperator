@@ -19,6 +19,7 @@ spec:
     sbatchScript: |
 {{ tpl (.Files.Get "scripts/extensive-check.sh") . | indent 6 }}
     jobContainer:
+      appArmorProfile: unconfined
       image: {{ .Values.images.slurmJob | quote }}
       env:
 {{ toYaml .Values.jobContainer.env | indent 8 }}

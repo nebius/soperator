@@ -15,6 +15,7 @@ spec:
 {{ tpl (.Files.Get "scripts/gpu-fryer.sh") . | indent 6 }}
     eachWorkerJobs: true
     jobContainer:
+      appArmorProfile: unconfined
       image: {{ .Values.images.slurmJob | quote }}
       env:
 {{ toYaml .Values.jobContainer.env | indent 8 }}
