@@ -543,7 +543,26 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 
 func (r *SlurmClusterReconciler) setUpStatus(ctx context.Context, cluster *slurmv1.SlurmCluster) error {
 	patch := client.MergeFrom(cluster.DeepCopy())
+	status := &cluster.Status
 	needToUpdate := false
+
+	if status.Phase == nil {
+		status.Phase = ptr.To(slurmv1.PhaseClusterPending)
+		needToUpdate = true
+	}
+
+	if status.ReadyWorkers == nil {
+		status.ReadyWorkers = ptr.To(int32(0))
+		needToUpdate = true
+	}
+	if status.ReadyLogin == nil {
+		status.ReadyLogin = ptr.To(int32(0))
+		needToUpdate = true
+	}
+	if status.ReadySConfigController == nil {
+		status.ReadySConfigController = ptr.To(int32(0))
+		needToUpdate = true
+	}
 
 	for _, conditionType := range []string{
 		slurmv1.ConditionClusterCommonAvailable,
@@ -553,7 +572,7 @@ func (r *SlurmClusterReconciler) setUpStatus(ctx context.Context, cluster *slurm
 		slurmv1.ConditionClusterSConfigControllerAvailable,
 		slurmv1.ConditionClusterAccountingAvailable,
 	} {
-		if meta.FindStatusCondition(cluster.Status.Conditions, conditionType) != nil {
+		if meta.FindStatusCondition(status.Conditions, conditionType) != nil {
 			continue
 		}
 
@@ -561,7 +580,7 @@ func (r *SlurmClusterReconciler) setUpStatus(ctx context.Context, cluster *slurm
 		//	needToUpdate = needToUpdate || cluster.Status.SetCondition
 		// This will skip the SetCondition call if needToUpdate is already true.
 		// Status.SetCondition checks for existing condition and updates only if there is a change.
-		updated := cluster.Status.SetCondition(metav1.Condition{
+		updated := status.SetCondition(metav1.Condition{
 			Type:    conditionType,
 			Status:  metav1.ConditionUnknown,
 			Reason:  "SetUpCondition",

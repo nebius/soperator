@@ -9,7 +9,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -112,9 +111,6 @@ func (r SlurmClusterReconciler) ValidateSConfigController(
 			changesInConditions = false
 		)
 
-		if status.ReadySConfigController == nil {
-			status.ReadySConfigController = ptr.To(int32(0))
-		}
 		if *status.ReadySConfigController != existing.Status.AvailableReplicas {
 			status.ReadySConfigController = &existing.Status.AvailableReplicas
 			changesInStatus = true
