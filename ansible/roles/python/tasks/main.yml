@@ -1,17 +1,5 @@
 ---
 
-- name: Add snapshot time for repositories
-  ansible.builtin.copy:
-    dest: /etc/apt/apt.conf.d/50snapshot
-    content: |
-      APT::Snapshot "{{ repos_snapshot_timestamp }}";
-    owner: root
-    group: root
-    mode: "0644"
-  tags:
-    - repos-snapshot
-    - repos
-
 - name: Ensure required packages are installed
   ansible.builtin.apt:
     name: "{{ python_packages }}"
