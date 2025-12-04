@@ -95,7 +95,7 @@ mariadbOperator:
   overrideValues: null
   crds:
     driftDetection:
-      mode: enabled
+      mode: warn
   driftDetection:
     mode: warn
 observability:
@@ -147,7 +147,7 @@ observability:
       timeout: 5m
       version: 0.0.3
       driftDetection:
-        mode: enabled
+        mode: warn
     interval: 5m
     timeout: 5m
     version: 0.39.*
