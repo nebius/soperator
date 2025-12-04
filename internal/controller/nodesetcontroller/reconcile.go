@@ -120,8 +120,8 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 			}
 		}
 
-		if err = r.patchStatus(ctx, nodeSet, func(status *slurmv1alpha1.NodeSetStatus) {
-			status.SetCondition(condition)
+		if err = r.patchStatus(ctx, nodeSet, func(status *slurmv1alpha1.NodeSetStatus) bool {
+			return status.SetCondition(condition)
 		}); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -145,6 +145,7 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 
 func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv1alpha1.NodeSet) error {
 	patch := client.MergeFrom(nodeSet.DeepCopy())
+	needToUpdate := false
 
 	for _, conditionType := range []string{
 		slurmv1alpha1.ConditionNodeSetConfigUpdated,
@@ -153,15 +154,24 @@ func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv
 		slurmv1alpha1.ConditionNodeSetPodsReady,
 		slurmv1alpha1.ConditionNodeSetStatefulSetTerminated,
 	} {
-		if cond := meta.FindStatusCondition(nodeSet.Status.Conditions, conditionType); cond == nil {
+		if meta.FindStatusCondition(nodeSet.Status.Conditions, conditionType) != nil {
 			continue
 		}
-		nodeSet.Status.SetCondition(metav1.Condition{
+
+		// Don't do
+		//	needToUpdate = needToUpdate || nodeSet.Status.SetCondition
+		// This will skip the SetCondition call if needToUpdate is already true.
+		// Status.SetCondition checks for existing condition and updates only if there is a change.
+		updated := nodeSet.Status.SetCondition(metav1.Condition{
 			Type:    conditionType,
 			Status:  metav1.ConditionUnknown,
 			Reason:  "SetUpCondition",
 			Message: "The object is not ready yet.",
 		})
+		needToUpdate = needToUpdate || updated
+	}
+	if !needToUpdate {
+		return nil
 	}
 
 	if err := r.Status().Patch(ctx, nodeSet, patch); err != nil {
@@ -325,18 +335,21 @@ func (r NodeSetReconciler) validateResources(
 		return res, fmt.Errorf("getting StatefulSet: %w", err)
 	}
 
-	if err = r.patchStatus(ctx, nodeSet, func(status *slurmv1alpha1.NodeSetStatus) {
-		status.Replicas = existing.Status.ReadyReplicas
-	}); err != nil {
-		logger.Error(err, "Failed to update Replicas status")
-		return res, fmt.Errorf("updating .Status.Replicas: %w", err)
-	}
+	if err = r.patchStatus(ctx, nodeSet, func(status *slurmv1alpha1.NodeSetStatus) bool {
+		var (
+			changesInStatus     = false
+			changesInConditions = false
+		)
 
-	{
+		if status.Replicas != existing.Status.AvailableReplicas {
+			status.Replicas = existing.Status.AvailableReplicas
+			changesInStatus = true
+		}
+
 		var (
 			condition metav1.Condition
 		)
-		if existing.Status.ReadyReplicas == nodeSetValues.StatefulSet.Replicas {
+		if existing.Status.AvailableReplicas == nodeSetValues.StatefulSet.Replicas {
 			condition = metav1.Condition{
 				Type:    slurmv1alpha1.ConditionNodeSetPodsReady,
 				Status:  metav1.ConditionTrue,
@@ -352,12 +365,12 @@ func (r NodeSetReconciler) validateResources(
 			}
 			res.RequeueAfter += requeueDuration
 		}
+		changesInConditions = status.SetCondition(condition)
 
-		if err = r.patchStatus(ctx, nodeSet, func(status *slurmv1alpha1.NodeSetStatus) {
-			status.SetCondition(condition)
-		}); err != nil {
-			return res, err
-		}
+		return changesInStatus || changesInConditions
+	}); err != nil {
+		logger.Error(err, "Failed to update status for Replicas")
+		return res, fmt.Errorf("updating .Status: %w", err)
 	}
 
 	return res, nil

@@ -554,8 +554,8 @@ func (r SlurmClusterReconciler) updateAccountingAvailabilityStatus(
 	reason, message string,
 	requeueAfter time.Duration,
 ) (ctrl.Result, error) {
-	if err := r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-		status.SetCondition(metav1.Condition{
+	if err := r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) bool {
+		return status.SetCondition(metav1.Condition{
 			Type:    slurmv1.ConditionClusterAccountingAvailable,
 			Status:  conditionStatus,
 			Reason:  reason,

@@ -81,6 +81,11 @@ func (r SlurmClusterReconciler) ValidateSConfigController(
 	cluster *slurmv1.SlurmCluster,
 	clusterValues *values.SlurmCluster,
 ) (ctrl.Result, error) {
+	const requeueDuration = 10 * time.Second
+	var (
+		res = ctrl.Result{}
+	)
+
 	logger := log.FromContext(ctx)
 
 	existing := &appsv1.Deployment{}
@@ -94,40 +99,49 @@ func (r SlurmClusterReconciler) ValidateSConfigController(
 	)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: requeueDuration}, nil
 		}
 		logger.Error(err, "Failed to get SConfigController Deployment")
-		return ctrl.Result{}, fmt.Errorf("getting SConfigController Deployment: %w", err)
+		return res, fmt.Errorf("getting SConfigController Deployment: %w", err)
 	}
 
-	targetReplicas := int32(1)
-	if existing.Spec.Replicas != nil {
-		targetReplicas = *existing.Spec.Replicas
-	}
-	if existing.Status.AvailableReplicas != targetReplicas {
-		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-			status.SetCondition(metav1.Condition{
-				Type:   slurmv1.ConditionClusterSConfigControllerAvailable,
-				Status: metav1.ConditionFalse, Reason: "NotAvailable",
-				Message: "Slurm SConfigController is not available yet",
-			})
+	if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) bool {
+		var (
+			changesInStatus     = false
+			changesInConditions = false
+		)
+
+		if status.ReadySConfigController == nil || *status.ReadySConfigController != existing.Status.AvailableReplicas {
 			status.ReadySConfigController = &existing.Status.AvailableReplicas
-		}); err != nil {
-			return ctrl.Result{}, err
+			changesInStatus = true
 		}
-		return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 10}, nil
-	} else {
-		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-			status.SetCondition(metav1.Condition{
-				Type:   slurmv1.ConditionClusterSConfigControllerAvailable,
-				Status: metav1.ConditionTrue, Reason: "Available",
+
+		var (
+			condition metav1.Condition
+		)
+		if existing.Status.AvailableReplicas == utils.Ternary(existing.Spec.Replicas == nil, int32(1), *existing.Spec.Replicas) {
+			condition = metav1.Condition{
+				Type:    slurmv1.ConditionClusterSConfigControllerAvailable,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Available",
 				Message: "Slurm SConfigController is available",
-			})
-			status.ReadySConfigController = &existing.Status.AvailableReplicas
-		}); err != nil {
-			return ctrl.Result{}, err
+			}
+		} else {
+			condition = metav1.Condition{
+				Type:    slurmv1.ConditionClusterSConfigControllerAvailable,
+				Status:  metav1.ConditionFalse,
+				Reason:  "NotAvailable",
+				Message: "Slurm SConfigController is not available yet",
+			}
+			res.RequeueAfter += requeueDuration
 		}
+		changesInConditions = status.SetCondition(condition)
+
+		return changesInStatus || changesInConditions
+	}); err != nil {
+		logger.Error(err, "Failed to update status")
+		return res, fmt.Errorf("updating .Status: %w", err)
 	}
 
-	return ctrl.Result{}, nil
+	return res, nil
 }
