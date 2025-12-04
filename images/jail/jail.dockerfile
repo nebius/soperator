@@ -1,6 +1,6 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-FROM cr.eu-north1.nebius.cloud/soperator/cuda_base:12.9.0-ubuntu24.04-nccl2.26.5-1-295cb71 AS cuda
+FROM cr.eu-north1.nebius.cloud/soperator/cuda_base:12.9.0-ubuntu24.04-nccl2.26.5-1-17be0c5 AS cuda
 
 # Download NCCL tests executables
 ARG CUDA_VERSION=12.9.0
@@ -104,12 +104,6 @@ RUN ansible-playbook -i localhost -c local docker-cli.yml -t docker-cli
 COPY ansible/openmpi.yml /opt/ansible/openmpi.yml
 COPY ansible/roles/openmpi /opt/ansible/roles/openmpi
 RUN ansible-playbook -i localhost -c local openmpi.yml -t openmpi
-
-# Install dcgmi tools
-# https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/dcgm-diagnostics.html
-COPY ansible/dcgmi.yml /opt/ansible/dcgmi.yml
-COPY ansible/roles/dcgmi /opt/ansible/roles/dcgmi
-RUN ansible-playbook -i localhost -c local dcgmi.yml -t dcgmi
 
 ## Install GDRCopy libraries & executables
 COPY ansible/gdrcopy.yml /opt/ansible/gdrcopy.yml
