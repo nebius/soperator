@@ -109,7 +109,7 @@ checks:
       - name: "ANSIBLE_STDOUT_CALLBACK"
         value: "ansible.posix.jsonl"
       - name: "ANSIBLE_FORCE_COLOR"
-        value: 0
+        value: "0"
   upgradeHealthChecker:
     suspend: true
     runAfterCreation: false
