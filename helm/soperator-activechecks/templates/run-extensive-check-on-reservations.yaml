@@ -24,9 +24,6 @@ spec:
       parallelism: 1
       template:
         metadata:
-          annotations:
-            container.apparmor.security.beta.kubernetes.io/run-extensive-check-on-reservations: unconfined
-            container.apparmor.security.beta.kubernetes.io/munge: unconfined
           labels:
             app.kubernetes.io/component: soperatorchecks
             app.kubernetes.io/instance: soperator
@@ -42,6 +39,8 @@ spec:
               capabilities:
                 add:
                 - SYS_ADMIN
+              appArmorProfile:
+                type: Unconfined
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
             command:
@@ -82,6 +81,8 @@ spec:
               capabilities:
                 add:
                 - SYS_ADMIN
+              appArmorProfile:
+                type: Unconfined
             readinessProbe:
               exec:
                 command:

@@ -25,6 +25,8 @@ func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Containe
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{consts.ContainerSecurityContextCapabilitySysAdmin},
 				},
+				AppArmorProfile: common.ParseAppArmorProfile(
+					check.Spec.K8sJobSpec.JobContainer.AppArmorProfile),
 			},
 			VolumeMounts: check.Spec.K8sJobSpec.JobContainer.VolumeMounts,
 		}
@@ -86,6 +88,8 @@ func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Containe
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{consts.ContainerSecurityContextCapabilitySysAdmin},
 			},
+			AppArmorProfile: common.ParseAppArmorProfile(
+				check.Spec.K8sJobSpec.JobContainer.AppArmorProfile),
 		},
 		VolumeMounts: slurmVolumeMounts,
 	}

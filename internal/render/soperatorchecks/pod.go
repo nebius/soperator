@@ -1,8 +1,6 @@
 package soperatorchecks
 
 import (
-	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -28,30 +26,12 @@ func renderPodTemplateSpec(check *slurmv1alpha1.ActiveCheck, labels map[string]s
 			},
 			Name: "munge",
 		}
-
 		mungeContainer := common.RenderContainerMunge(&mungeContainerValues)
 		initContainers = append(initContainers, mungeContainer)
-
-		annotations = map[string]string{
-			fmt.Sprintf(
-				"%s/%s", consts.AnnotationApparmorKey, check.Spec.Name,
-			): check.Spec.SlurmJobSpec.JobContainer.AppArmorProfile,
-			fmt.Sprintf(
-				"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-			): check.Spec.SlurmJobSpec.MungeContainer.AppArmorProfile,
-			consts.AnnotationDefaultContainerName: consts.ContainerNameAccounting,
-			consts.AnnotationActiveCheckName:      check.Name,
-		}
 	}
 
-	if check.Spec.CheckType == "k8sJob" {
-		annotations = map[string]string{
-			fmt.Sprintf(
-				"%s/%s", consts.AnnotationApparmorKey, check.Spec.Name,
-			): check.Spec.K8sJobSpec.JobContainer.AppArmorProfile,
-			consts.AnnotationActiveCheckName: check.Name,
-		}
-	}
+	annotations = common.RenderDefaultContainerAnnotation(check.Spec.Name)
+	annotations[consts.AnnotationActiveCheckName] = check.Name
 
 	return corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{

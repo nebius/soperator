@@ -11,6 +11,7 @@ spec:
   runAfterCreation: {{ .Values.checks.upgradeHealthChecker.runAfterCreation }}
   k8sJobSpec:
     jobContainer:
+      appArmorProfile: unconfined
       command: ["/opt/bin/k8s_check_job_entrypoint.sh"]
       args:
         - ansible-playbook

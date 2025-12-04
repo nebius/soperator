@@ -1,8 +1,6 @@
 package accounting
 
 import (
-	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -61,16 +59,8 @@ func BasePodTemplateSpec(
 
 	return &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: matchLabels,
-			Annotations: map[string]string{
-				fmt.Sprintf(
-					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameAccounting,
-				): accounting.ContainerAccounting.AppArmorProfile,
-				fmt.Sprintf(
-					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-				): accounting.ContainerMunge.AppArmorProfile,
-				consts.AnnotationDefaultContainerName: consts.ContainerNameAccounting,
-			},
+			Labels:      matchLabels,
+			Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameAccounting),
 		},
 		Spec: corev1.PodSpec{
 			HostUsers:         accounting.HostUsers,

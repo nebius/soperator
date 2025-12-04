@@ -56,6 +56,7 @@ func renderContainerAccounting(container values.Container, additionalVolumeMount
 					consts.ContainerSecurityContextCapabilitySysAdmin,
 				},
 			},
+			AppArmorProfile: common.ParseAppArmorProfile(container.AppArmorProfile),
 		},
 		Resources: corev1.ResourceRequirements{
 			Limits:   limits,
