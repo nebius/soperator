@@ -101,6 +101,10 @@ checks:
   manageJailState:
     suspend: true
     runAfterCreation: false
+  manageJailStateDryRun:
+    suspend: true
+    runAfterCreation: false
+    schedule: 0 11 * * * # Once a day at 11:00 UTC
   upgradeHealthChecker:
     suspend: true
     runAfterCreation: false
