@@ -21,7 +21,7 @@ echo "Waiting for Slurm controller to be ready for soperatorchecks user..."
 
 for i in $(seq 1 "$MAX_ATTEMPTS"); do
   echo "Attempt $i/$MAX_ATTEMPTS: Testing srun availability..."
-  if runuser -u soperatorchecks -- srun --job-name=test-controller-is-ready -n1 -t1 --partition=hidden hostname 2>&1; then
+  if runuser -u soperatorchecks -- srun --mpi=none --job-name=test-controller-is-ready -n1 -t1 --partition=hidden hostname 2>&1; then
     echo "SUCCESS: Slurm controller is ready for soperatorchecks user"
     exit 0
   fi
