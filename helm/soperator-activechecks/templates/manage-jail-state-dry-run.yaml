@@ -31,6 +31,8 @@ spec:
         - --diff
         - --check
       image: {{ .Values.images.k8sJob | quote }}
+      env:
+{{ toYaml .Values.checks.manageJailStateDryRun.env | indent 8 }}
       volumeMounts:
 {{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
       volumes:
