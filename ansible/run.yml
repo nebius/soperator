@@ -13,7 +13,6 @@
     - nvtop
     - docker-cli
     - openmpi
-    - dcgmi
     - gdrcopy
     - nvidia-container-toolkit
     - soperator-scripts
