@@ -14,6 +14,16 @@ func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Containe
 	var container corev1.Container
 
 	if check.Spec.CheckType == "k8sJob" {
+		volumeMounts := check.Spec.K8sJobSpec.JobContainer.VolumeMounts
+
+		// Add slurm volume mounts if munge is enabled
+		if check.Spec.K8sJobSpec.MungeContainer != nil {
+			volumeMounts = append(volumeMounts,
+				common.RenderVolumeMountSlurmConfigs(),
+				common.RenderVolumeMountMungeSocket(),
+			)
+		}
+
 		container = corev1.Container{
 			Name:            check.Spec.Name,
 			Image:           check.Spec.K8sJobSpec.JobContainer.Image,
@@ -28,7 +38,7 @@ func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Containe
 				AppArmorProfile: common.ParseAppArmorProfile(
 					check.Spec.K8sJobSpec.JobContainer.AppArmorProfile),
 			},
-			VolumeMounts: check.Spec.K8sJobSpec.JobContainer.VolumeMounts,
+			VolumeMounts: volumeMounts,
 		}
 
 		if check.Spec.K8sJobSpec.ScriptRefName != nil {

@@ -3,25 +3,29 @@ kind: ActiveCheck
 metadata:
   name: "wait-for-soperatorchecks-srun-ready"
 spec:
-  checkType: "slurmJob"
+  checkType: "k8sJob"
   name: "wait-for-soperatorchecks-srun-ready"
   dependsOn: [ "create-user-soperatorchecks" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
-  schedule: "0 0 1 1 *" # Never run on schedule, only runAfterCreation
+  schedule: "0 0 1 1 *"
   suspend: true
   runAfterCreation: true
-  slurmJobSpec:
-    sbatchScript: |
-{{ .Files.Get "scripts/wait-for-soperatorchecks-srun-ready.sh" | indent 6 }}
+  k8sJobSpec:
     jobContainer:
       appArmorProfile: unconfined
+      command:
+        - bash
+        - -c
+        - |
+{{ .Files.Get "scripts/wait-for-soperatorchecks-srun-ready.sh" | indent 10 }}
       image: {{ .Values.images.slurmJob | quote }}
-      env:
-{{ toYaml .Values.jobContainer.env | indent 8 }}
       volumeMounts:
-{{ toYaml .Values.jobContainer.volumeMounts | indent 8 }}
+        - mountPath: "/mnt/jail"
+          name: "jail"
       volumes:
-{{ toYaml .Values.jobContainer.volumes | indent 8 }}
+        - name: "jail"
+          persistentVolumeClaim:
+            claimName: "jail-pvc"
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
       appArmorProfile: unconfined
