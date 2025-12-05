@@ -50,6 +50,22 @@ func renderPodTemplateSpec(check *slurmv1alpha1.ActiveCheck, labels map[string]s
 			): check.Spec.K8sJobSpec.JobContainer.AppArmorProfile,
 			consts.AnnotationActiveCheckName: check.Name,
 		}
+
+		if check.Spec.K8sJobSpec.MungeContainer != nil {
+			mungeContainerValues := values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image:   check.Spec.K8sJobSpec.MungeContainer.Image,
+					Command: check.Spec.K8sJobSpec.MungeContainer.Command,
+				},
+				Name: "munge",
+			}
+			mungeContainer := common.RenderContainerMunge(&mungeContainerValues)
+			initContainers = append(initContainers, mungeContainer)
+
+			annotations[fmt.Sprintf(
+				"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
+			)] = check.Spec.K8sJobSpec.MungeContainer.AppArmorProfile
+		}
 	}
 
 	return corev1.PodTemplateSpec{
@@ -84,6 +100,9 @@ func renderVolumes(check *slurmv1alpha1.ActiveCheck) []corev1.Volume {
 	switch check.Spec.CheckType {
 	case "k8sJob":
 		volumes = check.Spec.K8sJobSpec.JobContainer.Volumes
+		if check.Spec.K8sJobSpec.MungeContainer != nil {
+			volumes = append(volumes, slurmVolumes...)
+		}
 	case "slurmJob":
 		volumes = check.Spec.SlurmJobSpec.JobContainer.Volumes
 		volumes = append(volumes, slurmVolumes...)

@@ -147,6 +147,10 @@ type ContainerSpec struct {
 }
 type K8sJobSpec struct {
 	JobContainer ContainerSpec `json:"jobContainer,omitempty"`
+	// MungeContainer defines the munge sidecar container for k8sJob checks that need Slurm authentication.
+	// When specified, a munge init container will be added to the pod along with slurm config volumes.
+	// +kubebuilder:validation:Optional
+	MungeContainer *ContainerSpec `json:"mungeContainer,omitempty"`
 	// ScriptRefName name of configMap with custom script. Data expected in the key script.sh inside ConfigMap.
 	// +kubebuilder:validation:Optional
 	ScriptRefName *string `json:"scriptRefName,omitempty"`

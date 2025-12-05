@@ -57,6 +57,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
 
       - name: Install GO
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -171,6 +173,7 @@ jobs:
           repository: ${{ env.TERRAFORM_REPO }}
           ref: ${{ env.TERRAFORM_REPO_REF }}
           path: "${{ github.workspace }}/terraform-repo"
+          fetch-depth: 0
 
       - name: Terraform Apply
         run: |
@@ -332,13 +335,19 @@ jobs:
               done
 
               # Get commits not covered by the build (first-parent only)
-              not_covered=$(git log --format='%h|%s|%ar|%an' --first-parent "$head_sha"..HEAD 2>/dev/null)
-              if [[ -n "$not_covered" ]]; then
+              if git merge-base --is-ancestor "$head_sha" HEAD 2>/dev/null; then
+                not_covered=$(git log --format='%h|%s|%ar|%an' --first-parent "$head_sha"..HEAD 2>/dev/null || true)
+                if [[ -n "$not_covered" ]]; then
+                  echo ""
+                  echo "### Not Covered Commits"
+                  while IFS='|' read -r hash msg date author; do
+                    echo "- [$hash]($repo_url/commit/$hash): $msg ($date) <$author>"
+                  done <<< "$not_covered"
+                fi
+              else
                 echo ""
-                echo "### Not Covered Commits"
-                while IFS='|' read -r hash msg date author; do
-                  echo "- [$hash]($repo_url/commit/$hash): $msg ($date) <$author>"
-                done <<< "$not_covered"
+                echo "### Warning"
+                echo "Build commit $head_sha is not reachable from current HEAD. Cannot determine uncovered commits."
               fi
             else
               echo "No successful build was found."
