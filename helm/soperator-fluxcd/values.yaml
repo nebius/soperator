@@ -47,7 +47,7 @@ certManager:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: v1.17.*
+  version: v1.19.*
   namespace: cert-manager-system
   releaseName: cert-manager
   values: null
