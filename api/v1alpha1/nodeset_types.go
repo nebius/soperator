@@ -65,10 +65,20 @@ type NodeSetStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
+// SetCondition sets the given condition in the NodeSetStatus conditions slice.
+// It initializes the conditions slice if it is nil.
+// Returns true if the condition was added or updated, false otherwise.
 func (s *NodeSetStatus) SetCondition(condition metav1.Condition) bool {
 	if s.Conditions == nil {
 		s.Conditions = make([]metav1.Condition, 0)
 	}
+
+	// We preserve the ObservedGeneration from the existing condition if it exists,
+	// as we don't set it on our own and don't want it to trigger unnecessary updates.
+	if existingCondition := meta.FindStatusCondition(s.Conditions, condition.Type); existingCondition != nil {
+		condition.ObservedGeneration = existingCondition.ObservedGeneration
+	}
+
 	return meta.SetStatusCondition(&s.Conditions, condition)
 }
 
@@ -132,12 +142,12 @@ type NodeSetSpec struct {
 	// +kubebuilder:validation:Required
 	Slurmd ContainerSlurmdSpec `json:"slurmd"`
 
-	// Slurmd defines the Slurm munge configuration.
+	// Munge defines the Slurm munge configuration.
 	//
 	// +kubebuilder:validation:Required
 	Munge ContainerMungeSpec `json:"munge"`
 
-	// ExtraConfig provides possibility to define extra values set for Node in `slurm.conf`.
+	// NodeConfig provides possibility to define extra values set for Node in `slurm.conf`.
 	NodeConfig NodeConfig `json:"nodeConfig,omitempty"`
 
 	// GPU defines the settings related to GPU support for Slurm workers.
@@ -226,6 +236,7 @@ type ContainerSlurmdSpec struct {
 
 	// Port defines the port the container exposes
 	//
+	// +kubebuilder:default=6818
 	// +kubebuilder:validation:Optional
 	Port int32 `json:"port,omitempty"`
 
@@ -334,8 +345,8 @@ type NodeConfig struct {
 	// +kubebuilder:default=""
 	Static string `json:"static,omitempty"`
 
-	// Dynamic provides a possibility to define extra values per Node (e.g. InstanceId, or Extra fields).
-	// This line supports Go templating, and will be rendered before being passed to the config.
+	// Dynamic provides a possibility to define "Extra" field of the corresponding Slurm node.
+	// It can use any environment variables that are available in the slurmd container when it starts.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=""

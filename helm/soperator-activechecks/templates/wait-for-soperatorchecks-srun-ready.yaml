@@ -12,6 +12,7 @@ spec:
   runAfterCreation: true
   k8sJobSpec:
     jobContainer:
+      appArmorProfile: unconfined
       command:
         - bash
         - -c
@@ -27,3 +28,4 @@ spec:
             claimName: "jail-pvc"
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
+      appArmorProfile: unconfined
