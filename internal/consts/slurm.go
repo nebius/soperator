@@ -17,10 +17,10 @@ var (
 	SlurmUserReasonHC              string = "[user_problem]"
 	SlurmNodeReasonHC              string = "[node_problem]"
 	SlurmHardwareReasonHC          string = "[hardware_problem]"
-	SlurmNodeComputeMaintenance    string = SlurmNodeReasonHC + " compute_maintenance"
+	SlurmNodeComputeMaintenance    string = "[compute_maintenance]"
 	SlurmNodeReasonKillTaskFailed  string = "Kill task failed"
-	SlurmNodeReasonNodeReplacement string = SlurmNodeComputeMaintenance + ": node replacement process"
-	SlurmNodeReasonNodeReboot      string = SlurmNodeComputeMaintenance + ": node reboot process"
+	SlurmNodeReasonNodeReplacement string = SlurmNodeComputeMaintenance + " node replacement process"
+	SlurmNodeReasonNodeReboot      string = SlurmNodeComputeMaintenance + " node reboot process"
 )
 
 // order of reasons is important, because we use it to determine if node is in maintenance
