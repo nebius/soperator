@@ -86,6 +86,9 @@ func renderContainerSlurmd(
 	if useDefaultAppArmorProfile {
 		appArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
 	}
+	if appArmorProfile == "" {
+		appArmorProfile = consts.AppArmorProfileUnconfined
+	}
 
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
@@ -212,12 +215,11 @@ func renderContainerNodeSetSlurmd(
 	}
 
 	appArmorProfile := nodeSet.ContainerSlurmd.AppArmorProfile
+	if nodeSet.AppArmorProfileUseDefault {
+		appArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(nodeSet.ParentalCluster.Name, nodeSet.ParentalCluster.Namespace))
+	}
 	if appArmorProfile == "" {
-		if nodeSet.AppArmorProfileUseDefault {
-			appArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(nodeSet.ParentalCluster.Name, nodeSet.ParentalCluster.Namespace))
-		} else {
-			appArmorProfile = consts.AppArmorProfileUnconfined
-		}
+		appArmorProfile = consts.AppArmorProfileUnconfined
 	}
 
 	return corev1.Container{
