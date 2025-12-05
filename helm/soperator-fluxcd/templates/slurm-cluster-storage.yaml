@@ -16,6 +16,7 @@ spec:
       version: {{ .Values.slurmCluster.version }}
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  - name: {{ include "soperator-fluxcd.fullname" . }}-storageclasses
   {{- if .Values.soperator.enabled }}
   - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
   {{- end }}
