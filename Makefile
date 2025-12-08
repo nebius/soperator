@@ -18,43 +18,43 @@ SHELL = /usr/bin/env bash -o pipefail
 # Limit the scope of generation otherwise it will try to generate configs for non-controller code
 GENPATH = "./api/v1;./api/v1alpha1;./internal/webhook/..."
 
-CHART_PATH            		  = helm
-CHART_OPERATOR_PATH   		  = $(CHART_PATH)/soperator
-CHART_SOPERATORCHECKS_PATH    = $(CHART_PATH)/soperatorchecks
-CHART_NODECONFIGURATOR_PATH   = $(CHART_PATH)/nodeconfigurator
-CHART_OPERATOR_CRDS_PATH   	  = $(CHART_PATH)/soperator-crds
-CHART_CLUSTER_PATH    		  = $(CHART_PATH)/slurm-cluster
-CHART_STORAGE_PATH    		  = $(CHART_PATH)/slurm-cluster-storage
-CHART_FLUXCD_PATH    		  = $(CHART_PATH)/soperator-fluxcd
-CHART_ACTIVECHECK_PATH        = $(CHART_PATH)/soperator-activechecks
-CHART_DCGM_EXPORTER_PATH      = $(CHART_PATH)/soperator-dcgm-exporter
-CHART_SOPERATOR_NOTIFIER_PATH = $(CHART_PATH)/soperator-notifier
-CHART_NFS_SERVER_PATH         = $(CHART_PATH)/nfs-server
-CHART_NODESETS_PATH           = $(CHART_PATH)/nodesets
-CHART_SOPERATOR_MONITORING_DASHBOARDS_PATH = $(CHART_PATH)/soperator-monitoring-dashboards
-CHART_CUSTOM_CONFIGMAPS_PATH  = $(CHART_PATH)/soperator-custom-configmaps
-CHART_FLUXCD_BOOTSTRAP_PATH   = $(CHART_PATH)/soperator-fluxcd-bootstrap
-CHART_STORAGECLASSES		  = $(CHART_PATH)/storageclasses
-CHART_BACKUP_CONFIG		 	  = $(CHART_PATH)/soperator-backup-config
+CHART_PATH									= helm
+CHART_OPERATOR_PATH							= $(CHART_PATH)/soperator
+CHART_SOPERATORCHECKS_PATH					= $(CHART_PATH)/soperatorchecks
+CHART_NODECONFIGURATOR_PATH					= $(CHART_PATH)/nodeconfigurator
+CHART_OPERATOR_CRDS_PATH					= $(CHART_PATH)/soperator-crds
+CHART_CLUSTER_PATH							= $(CHART_PATH)/slurm-cluster
+CHART_STORAGE_PATH							= $(CHART_PATH)/slurm-cluster-storage
+CHART_FLUXCD_PATH							= $(CHART_PATH)/soperator-fluxcd
+CHART_ACTIVECHECK_PATH						= $(CHART_PATH)/soperator-activechecks
+CHART_DCGM_EXPORTER_PATH					= $(CHART_PATH)/soperator-dcgm-exporter
+CHART_SOPERATOR_NOTIFIER_PATH				= $(CHART_PATH)/soperator-notifier
+CHART_NFS_SERVER_PATH						= $(CHART_PATH)/nfs-server
+CHART_NODESETS_PATH							= $(CHART_PATH)/nodesets
+CHART_SOPERATOR_MONITORING_DASHBOARDS_PATH	= $(CHART_PATH)/soperator-monitoring-dashboards
+CHART_CUSTOM_CONFIGMAPS_PATH				= $(CHART_PATH)/soperator-custom-configmaps
+CHART_FLUXCD_BOOTSTRAP_PATH					= $(CHART_PATH)/soperator-fluxcd-bootstrap
+CHART_STORAGECLASSES						= $(CHART_PATH)/storageclasses
+CHART_BACKUP_CONFIG							= $(CHART_PATH)/soperator-backup-config
 
-SLURM_VERSION		  		= 25.05.5
-UBUNTU_VERSION		  		?= noble
-NFS_VERSION_BASE          	= $(shell cat NFS_VERSION)
-VERSION_BASE           		= $(shell cat VERSION)
+SLURM_VERSION		= 25.05.5
+UBUNTU_VERSION		?= noble
+NFS_VERSION_BASE	= $(shell cat VERSION_NFS)
+VERSION_BASE		= $(shell cat VERSION)
 
-NFS_VERSION               	= $(NFS_VERSION_BASE)
-VERSION               		= $(VERSION_BASE)
+NFS_VERSION	= $(NFS_VERSION_BASE)
+VERSION		= $(VERSION_BASE)
 
-IMAGE_VERSION		  = $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)
-GO_CONST_VERSION_FILE = internal/consts/version.go
-GITHUB_REPO			  = ghcr.io/nebius/soperator
-NEBIUS_REPO			  = cr.eu-north1.nebius.cloud/soperator
-IMAGE_REPO			  = $(NEBIUS_REPO)
+IMAGE_VERSION			= $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)
+GO_CONST_VERSION_FILE	= internal/consts/version.go
+GITHUB_REPO				= ghcr.io/nebius/soperator
+NEBIUS_REPO				= cr.eu-north1.nebius.cloud/soperator
+IMAGE_REPO				= $(NEBIUS_REPO)
 
 # For version sync test
-VALUES_VERSION 		  = $(shell $(YQ) '.images.slurmctld' helm/slurm-cluster/values.yaml | awk -F':' '{print $$2}' | awk -F'-' '{print $$1}')
-NFS_CHART_VERSION     = $(shell $(YQ) '.version' helm/nfs-server/Chart.yaml)
-NFS_IMAGE_TAG         = $(shell $(YQ) '.image.tag' helm/nfs-server/values.yaml)
+VALUES_VERSION		= $(shell $(YQ) '.images.slurmctld' helm/slurm-cluster/values.yaml | awk -F':' '{print $$2}' | awk -F'-' '{print $$1}')
+NFS_CHART_VERSION	= $(shell $(YQ) '.version' helm/nfs-server/Chart.yaml)
+NFS_IMAGE_TAG		= $(shell $(YQ) '.image.tag' helm/nfs-server/values.yaml)
 
 
 OPERATOR_IMAGE_TAG  = $(VERSION)
@@ -66,12 +66,12 @@ else
 endif
 
 ifeq ($(UNSTABLE), true)
-    SHORT_SHA 					= $(shell git rev-parse --short=8 HEAD)
-    VERSION		  				= $(VERSION_BASE)-$(SHORT_SHA)
-    OPERATOR_IMAGE_TAG  		= $(VERSION_BASE)-$(SHORT_SHA)
-    IMAGE_VERSION		  		= $(VERSION_BASE)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
-    NFS_VERSION	  				= $(NFS_VERSION_BASE)-$(SHORT_SHA)
-    IMAGE_REPO			  		= $(NEBIUS_REPO)-unstable
+    SHORT_SHA			= $(shell git rev-parse --short=8 HEAD)
+    VERSION				= $(VERSION_BASE)-$(SHORT_SHA)
+    OPERATOR_IMAGE_TAG	= $(VERSION_BASE)-$(SHORT_SHA)
+    IMAGE_VERSION		= $(VERSION_BASE)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
+    NFS_VERSION			= $(NFS_VERSION_BASE)-$(SHORT_SHA)
+    IMAGE_REPO			= $(NEBIUS_REPO)-unstable
 endif
 
 .PHONY: all
@@ -585,29 +585,29 @@ $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
 ## Tool Binaries
-KUBECTL        ?= kubectl
-KUSTOMIZE      ?= $(LOCALBIN)/kustomize
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-ENVTEST        ?= $(LOCALBIN)/setup-envtest
-GOLANGCI_LINT   = $(LOCALBIN)/golangci-lint
-HELMIFY        ?= $(LOCALBIN)/helmify
-YQ             ?= $(LOCALBIN)/yq
-MOCKERY        ?= $(LOCALBIN)/mockery
-KIND           ?= $(LOCALBIN)/kind
-FLUX           ?= $(LOCALBIN)/flux
+KUBECTL			?= kubectl
+KUSTOMIZE		?= $(LOCALBIN)/kustomize
+CONTROLLER_GEN	?= $(LOCALBIN)/controller-gen
+ENVTEST			?= $(LOCALBIN)/setup-envtest
+GOLANGCI_LINT	 = $(LOCALBIN)/golangci-lint
+HELMIFY			?= $(LOCALBIN)/helmify
+YQ				?= $(LOCALBIN)/yq
+MOCKERY			?= $(LOCALBIN)/mockery
+KIND			?= $(LOCALBIN)/kind
+FLUX			?= $(LOCALBIN)/flux
 
 ## Tool Versions
-KUSTOMIZE_VERSION        ?= v5.5.0
-CONTROLLER_TOOLS_VERSION ?= v0.19.0
-ENVTEST_VERSION          ?= release-0.17
-GOLANGCI_LINT_VERSION    ?= v2.5.0  # Should be in sync with the github CI step.
-HELMIFY_VERSION          ?= 0.4.13
-HELM_VERSION						 ?= v3.18.3
-HELM_UNITTEST_VERSION    ?= 0.8.2
-YQ_VERSION               ?= 4.44.3
-MOCKERY_VERSION 		 ?= 2.53.5
-KIND_VERSION             ?= v0.30.0
-FLUX_VERSION             ?= 2.7.3
+KUSTOMIZE_VERSION			?= v5.5.0
+CONTROLLER_TOOLS_VERSION	?= v0.19.0
+ENVTEST_VERSION				?= release-0.17
+GOLANGCI_LINT_VERSION		?= v2.5.0  # Should be in sync with the github CI step.
+HELMIFY_VERSION				?= 0.4.13
+HELM_VERSION				?= v3.18.3
+HELM_UNITTEST_VERSION		?= 0.8.2
+YQ_VERSION					?= 4.44.3
+MOCKERY_VERSION				?= 2.53.5
+KIND_VERSION				?= v0.30.0
+FLUX_VERSION				?= 2.7.3
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -738,11 +738,11 @@ install-unittest:
 
 ##@ Kind Cluster
 
-KIND_CLUSTER_NAME ?= soperator-dev
-KIND_NODES        ?= 2
-KIND_K8S_VERSION  ?= v1.31.0
-KIND_CONTEXT      ?= kind-$(KIND_CLUSTER_NAME)
-KUBECTL_CTX       = $(KUBECTL) --context $(KIND_CONTEXT)
+KIND_CLUSTER_NAME	?= soperator-dev
+KIND_NODES			?= 2
+KIND_K8S_VERSION	?= v1.31.0
+KIND_CONTEXT		?= kind-$(KIND_CLUSTER_NAME)
+KUBECTL_CTX			= $(KUBECTL) --context $(KIND_CONTEXT)
 
 .PHONY: kind-create
 kind-create: install-kind ## Create kind cluster with specified number of nodes

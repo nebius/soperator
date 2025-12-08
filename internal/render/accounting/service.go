@@ -10,7 +10,7 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-// RenderService renders new [corev1.Service] serving Slurm accountings
+// RenderService renders new [corev1.Service] serving Slurm accounting
 func RenderService(namespace, clusterName string, accounting *values.SlurmAccounting) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
