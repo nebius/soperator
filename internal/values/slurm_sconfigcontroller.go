@@ -20,6 +20,7 @@ type SConfigController struct {
 	RunAsGid                *int64
 	ReconfigurePollInterval *string
 	ReconfigureWaitTimeout  *string
+	ServiceAccountName      string
 }
 
 func buildSConfigControllerFrom(
@@ -30,6 +31,7 @@ func buildSConfigControllerFrom(
 	runAsGid *int64,
 	reconfigurePollInterval *string,
 	reconfigureWaitTimeout *string,
+	serviceAccountName string,
 ) SConfigController {
 	containerSConfigController := buildContainerFrom(
 		container,
@@ -47,6 +49,7 @@ func buildSConfigControllerFrom(
 		RunAsGid:                runAsGid,
 		ReconfigurePollInterval: reconfigurePollInterval,
 		ReconfigureWaitTimeout:  reconfigureWaitTimeout,
+		ServiceAccountName:      serviceAccountName,
 	}
 
 	return res

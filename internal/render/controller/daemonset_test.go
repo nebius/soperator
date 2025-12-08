@@ -36,7 +36,7 @@ func TestRenderDaemonSet(t *testing.T) {
 						Image:           "test-image:latest",
 						ImagePullPolicy: corev1.PullAlways,
 						Port:            6817,
-						AppArmorProfile: "unconfined",
+						AppArmorProfile: consts.AppArmorProfileUnconfined,
 					},
 					Name: "slurmctld",
 				},
@@ -44,7 +44,7 @@ func TestRenderDaemonSet(t *testing.T) {
 					NodeContainer: slurmv1.NodeContainer{
 						Image:           "munge-image:latest",
 						ImagePullPolicy: corev1.PullAlways,
-						AppArmorProfile: "unconfined",
+						AppArmorProfile: consts.AppArmorProfileUnconfined,
 					},
 				},
 				PriorityClass: "test-priority",
@@ -210,7 +210,7 @@ func TestRenderDaemonSetNodeAffinity(t *testing.T) {
 			NodeContainer: slurmv1.NodeContainer{
 				Image:           "test-image:latest",
 				ImagePullPolicy: corev1.PullAlways,
-				AppArmorProfile: "unconfined",
+				AppArmorProfile: consts.AppArmorProfileUnconfined,
 			},
 			Name: "slurmctld",
 		},
@@ -218,7 +218,7 @@ func TestRenderDaemonSetNodeAffinity(t *testing.T) {
 			NodeContainer: slurmv1.NodeContainer{
 				Image:           "munge-image:latest",
 				ImagePullPolicy: corev1.PullAlways,
-				AppArmorProfile: "unconfined",
+				AppArmorProfile: consts.AppArmorProfileUnconfined,
 			},
 		},
 	}
@@ -315,7 +315,7 @@ func TestRenderDaemonSetHostUsers(t *testing.T) {
 						Image:           "test-image:latest",
 						ImagePullPolicy: corev1.PullAlways,
 						Port:            6817,
-						AppArmorProfile: "unconfined",
+						AppArmorProfile: consts.AppArmorProfileUnconfined,
 					},
 					Name: "slurmctld",
 				},
@@ -323,7 +323,7 @@ func TestRenderDaemonSetHostUsers(t *testing.T) {
 					NodeContainer: slurmv1.NodeContainer{
 						Image:           "munge-image:latest",
 						ImagePullPolicy: corev1.PullAlways,
-						AppArmorProfile: "unconfined",
+						AppArmorProfile: consts.AppArmorProfileUnconfined,
 					},
 				},
 			}

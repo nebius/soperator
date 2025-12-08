@@ -19,6 +19,7 @@ spec:
     sbatchScript: |
 {{ tpl (.Files.Get "scripts/extensive-check.sh") . | indent 6 }}
     jobContainer:
+      appArmorProfile: unconfined
       image: {{ .Values.images.slurmJob | quote }}
       env:
 {{ toYaml .Values.jobContainer.env | indent 8 }}
@@ -30,6 +31,7 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
+      appArmorProfile: unconfined
   successReactions:
     removeReservation:
       prefix: {{ .Values.checks.extensiveCheck.reservationPrefix | quote }}
