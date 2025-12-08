@@ -6,6 +6,7 @@ spec:
   checkType: "slurmJob"
   name: "ensure-healthy-nodes"
   dependsOn:
+  - "manage-jail-state"
   - "all-reduce-perf-nccl-in-docker"
   - "all-reduce-perf-nccl-with-ib"
   - "all-reduce-perf-nccl-without-ib"

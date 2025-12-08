@@ -9,7 +9,6 @@ metadata:
     app.kubernetes.io/name: slurmcluster
     app.kubernetes.io/part-of: slurm-operator
 spec:
-  name: "run-extensive-check-on-reservations"
   # This schedule defines how often the extensive-check is executed.
   # If extensive-check is already running on a node, we don't stop it.
   schedule: '*/10 * * * *' # every 10 minutes

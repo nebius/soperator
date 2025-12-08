@@ -5,7 +5,9 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "wait-for-soperatorchecks-srun-ready"
-  dependsOn: [ "create-user-soperatorchecks" ]
+  dependsOn:
+  - "manage-jail-state"
+  - "create-user-soperatorchecks"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 0 1 1 *" # Never run on schedule, only runAfterCreation
   suspend: true

@@ -100,9 +100,9 @@ checks:
     runAfterCreation: false
   manageJailState:
     suspend: true
-    runAfterCreation: false
+    runAfterCreation: true
   manageJailStateDryRun:
-    suspend: true
+    suspend: false
     runAfterCreation: false
     schedule: 0 11 * * * # Once a day at 11:00 UTC
     env:
