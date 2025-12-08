@@ -7,80 +7,20 @@ metadata:
     app: {{ .Chart.Name }}
     release: {{ .Release.Name }}
 data:
-  prolog.sh: |-
-{{- if .Values.slurmScripts.prolog }}
-{{ .Values.slurmScripts.prolog | tpl . | indent 4 }}
-{{- else }}
-{{ tpl (.Files.Get "slurm_scripts/prolog.sh") . | indent 4 }}
+  # built-in scripts
+{{- range $name, $conf := .Values.slurmScripts.builtIn }}
+{{- if $conf.enabled }}
+  {{ $name }}: |-
+  {{- if $conf.customContent }}
+{{ tpl ($conf.customContent) $ | indent 4 }}
+  {{- else }}
+{{ tpl (printf "slurm_scripts/%s" $name | $.Files.Get) $ | indent 4 }}
+  {{- end }}
 {{- end }}
-
-  epilog.sh: |-
-{{- if .Values.slurmScripts.epilog }}
-{{ .Values.slurmScripts.epilog | tpl . | indent 4 }}
-{{- else }}
-{{ tpl (.Files.Get "slurm_scripts/epilog.sh") . | indent 4 }}
 {{- end }}
-
-  hc_program.sh: |-
-{{- if .Values.slurmScripts.hcProgram }}
-{{ .Values.slurmScripts.hcProgram | tpl . | indent 4 }}
-{{- else }}
-{{ tpl (.Files.Get "slurm_scripts/hc_program.sh") . | indent 4 }}
-{{- end }}
-
-  alloc_gpus_busy.drain.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/alloc_gpus_busy.drain.sh") . | indent 4 }}
-
-  alloc_gpus_busy.undrain.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/alloc_gpus_busy.undrain.sh") . | indent 4 }}
-
-  alloc_mem_used.drain.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/alloc_mem_used.drain.sh") . | indent 4 }}
-
-  alloc_mem_used.undrain.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/alloc_mem_used.undrain.sh") . | indent 4 }}
-
-  boot_disk_full.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/boot_disk_full.sh") . | indent 4 }}
-
-  check_runner.py: |-
-{{ tpl (.Files.Get "slurm_scripts/check_runner.py") . | indent 4 }}
-
-  checks.json: |-
-{{ tpl (.Files.Get "slurm_scripts/checks.json") . | indent 4 }}
-
-  cleanup_enroot.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/cleanup_enroot.sh") . | indent 4 }}
-
-  cleanup_scratch_data.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/cleanup_scratch_data.sh") . | indent 4 }}
-
-  drop_page_cache.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/drop_page_cache.sh") . | indent 4 }}
-
-  drop_posix_shmem.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/drop_posix_shmem.sh") . | indent 4 }}
-
-  gpu_health_check.py: |-
-{{ tpl (.Files.Get "slurm_scripts/gpu_health_check.py") . | indent 4 }}
-
-  job_tmpfs_delete.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/job_tmpfs_delete.sh") . | indent 4 }}
-
-  job_tmpfs_delete_leftover.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/job_tmpfs_delete_leftover.sh") . | indent 4 }}
-
-  job_tmpfs_recreate.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/job_tmpfs_recreate.sh") . | indent 4 }}
-
-  map_job_dcgm.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/map_job_dcgm.sh") . | indent 4 }}
-
-  unmap_job_dcgm.sh: |-
-{{ tpl (.Files.Get "slurm_scripts/unmap_job_dcgm.sh") . | indent 4 }}
-
-{{- if .Values.slurmScripts.custom }}
-{{- range $name, $content := .Values.slurmScripts.custom }}
+  # extra scripts
+{{- with .Values.slurmScripts.extra }}
+{{- range $name, $content := . }}
   {{ $name }}: |-
 {{ tpl $content $ | indent 4 }}
 {{- end }}
