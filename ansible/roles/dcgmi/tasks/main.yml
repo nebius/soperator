@@ -2,7 +2,7 @@
 
 - name: Detect CUDA toolkit version with nvcc
   ansible.builtin.command: nvcc -V
-  register: nvcc_version
+  register: dcgmi_nvcc_version
   changed_when: false
   failed_when: false
   tags:
@@ -11,7 +11,7 @@
 - name: Ensure nvcc command succeeded
   ansible.builtin.assert:
     that:
-      - nvcc_version.rc == 0
+      - dcgmi_nvcc_version.rc == 0
     fail_msg: >-
       Failed to run 'nvcc -V' to detect CUDA version. Please ensure the CUDA
       toolkit is installed and 'nvcc' is in PATH.
@@ -20,25 +20,25 @@
 
 - name: Extract CUDA major version from nvcc output
   ansible.builtin.set_fact:
-    cuda_major_version: "{{ nvcc_version.stdout | regex_search('release ([0-9]+)', '\\1') }}"
+    dcgmi_cuda_major_version: "{{ dcgmi_nvcc_version.stdout | regex_search('release ([0-9]+)', '\\1') }}"
   tags:
     - dcgmi
 
 - name: Fail if CUDA major version is not supported by dcgmi_cuda_package_map
   ansible.builtin.assert:
     that:
-      - cuda_major_version is defined
-      - cuda_major_version in dcgmi_cuda_package_map
+      - dcgmi_cuda_major_version is defined
+      - dcgmi_cuda_major_version in dcgmi_cuda_package_map
     fail_msg: >-
-      Detected CUDA major version '{{ cuda_major_version | default('UNKNOWN') }}',
+      Detected CUDA major version '{{ dcgmi_cuda_major_version | default('UNKNOWN') }}',
       but dcgmi_cuda_package_map has no entry for it. Please add one in
       roles/dcgmi/defaults/main.yml.
   tags:
     - dcgmi
 
-- name: Ensure dcgmi package is installed for detected CUDA {{ cuda_major_version }}
+- name: Ensure dcgmi package is installed for detected CUDA {{ dcgmi_cuda_major_version }}
   ansible.builtin.apt:
-    name: "{{ dcgmi_cuda_package_map[cuda_major_version] }}"
+    name: "{{ dcgmi_cuda_package_map[dcgmi_cuda_major_version] }}"
     state: present
     update_cache: true
   tags:
