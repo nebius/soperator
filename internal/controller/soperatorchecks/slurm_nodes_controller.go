@@ -40,6 +40,7 @@ type SlurmNodesController struct {
 	slurmAPIClients          *slurmapi.ClientSet
 	reconcileTimeout         time.Duration
 	enabledNodeReplacement   bool
+	disableExtensiveCheck    bool
 	apiReader                client.Reader // Direct API reader for pagination
 	MaintenanceConditionType corev1.NodeConditionType
 }
@@ -51,6 +52,7 @@ func NewSlurmNodesController(
 	slurmAPIClients *slurmapi.ClientSet,
 	reconcileTimeout time.Duration,
 	enabledNodeReplacement bool,
+	disableExtensiveCheck bool,
 	apiReader client.Reader,
 	maintenanceConditionType corev1.NodeConditionType,
 ) *SlurmNodesController {
@@ -65,6 +67,7 @@ func NewSlurmNodesController(
 		slurmAPIClients:          slurmAPIClients,
 		reconcileTimeout:         reconcileTimeout,
 		enabledNodeReplacement:   enabledNodeReplacement,
+		disableExtensiveCheck:    disableExtensiveCheck,
 		apiReader:                apiReader,
 		MaintenanceConditionType: maintenanceConditionType,
 	}
@@ -188,7 +191,7 @@ func (c *SlurmNodesController) processDegradedNode(
 	case consts.SlurmNodeReasonNodeReplacement:
 		return c.processSlurmNodeMaintenance(ctx, k8sNode, slurmClusterName, node.Name)
 	case consts.SlurmHardwareReasonHC:
-		return c.processExtensiveCheckFailed(ctx, k8sNode, slurmClusterName, node)
+		return c.processSetUnhealthy(ctx, k8sNode, slurmClusterName, node)
 	case consts.SlurmNodeReasonHC:
 		return c.processHealthCheckFailed(ctx, k8sNode, slurmClusterName, node, node.Reason)
 	default:
@@ -201,13 +204,13 @@ func (c *SlurmNodesController) processDegradedNode(
 	}
 }
 
-func (c *SlurmNodesController) processExtensiveCheckFailed(
+func (c *SlurmNodesController) processSetUnhealthy(
 	ctx context.Context,
 	k8sNode *corev1.Node,
 	slurmClusterName types.NamespacedName,
 	slurmNode slurmapi.Node,
 ) error {
-	logger := log.FromContext(ctx).WithName("SlurmNodesController.processExtensiveCheckFailed")
+	logger := log.FromContext(ctx).WithName("SlurmNodesController.processSetUnhealthy")
 
 	if !c.enabledNodeReplacement {
 		logger.V(1).Info("Skipping extensive check failed processing, node replacement is disabled")
@@ -258,6 +261,11 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 	if !c.enabledNodeReplacement {
 		logger.V(1).Info("Skipping health check failed processing, node replacement is disabled")
 		return nil
+	}
+
+	if c.disableExtensiveCheck {
+		logger.V(1).Info("Skipping extensive check flow, setting unhealthy right away")
+		return c.processSetUnhealthy(ctx, k8sNode, slurmClusterName, slurmNode)
 	}
 
 	if slurmNode.Reason.ChangedAt.Before(k8sNode.CreationTimestamp.Time) {
