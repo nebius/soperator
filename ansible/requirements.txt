@@ -1,6 +1,6 @@
 ansible==12.2.0
 ansible-compat==25.8.2
-ansible-core==2.19.3
+ansible-core==2.19.4
 ansible-lint==25.9.2
 argcomplete==3.6.3
 attrs==25.4.0
