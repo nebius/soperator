@@ -19,9 +19,7 @@ data:
 {{- end }}
 {{- end }}
   # extra scripts
-{{- with .Values.slurmScripts.extra }}
-{{- range $name, $content := . }}
+{{- range $name, $content := .Values.slurmScripts.extra }}
   {{ $name }}: |-
 {{ tpl $content $ | indent 4 }}
-{{- end }}
 {{- end }}
