@@ -1,0 +1,26 @@
+provisioner: compute.csi.nebius.com
+
+diskTypes:
+  - NETWORK_SSD
+  - NETWORK_SSD_NON_REPLICATED
+  - NETWORK_SSD_IO_M3
+
+fsTypes:
+  - ext4
+  - xfs
+
+storageClassNamePrefix: "compute-csi"
+
+reclaimPolicy: Delete
+
+volumeBindingMode: WaitForFirstConsumer
+
+allowVolumeExpansion: true
+
+annotations: {}
+
+labels: {}
+
+mountOptions: []
+
+parameters: {}

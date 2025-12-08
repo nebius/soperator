@@ -358,6 +358,14 @@ nfsServer:
   releaseName: nfs-server
   overrideValues: null
   values: null
+storageClasses:
+  enabled: true
+  interval: 5m
+  timeout: 5m
+  version: 1.23.0
+  namespace: storage-system
+  releaseName: soperator-storageclasses
+  values: null
 tailscale:
   enabled: false
   interval: 5m
