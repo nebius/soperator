@@ -15,7 +15,7 @@ import (
 	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
-	"nebius.ai/slurm-operator/internal/utils"
+	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -33,7 +33,7 @@ func RenderStatefulSet(
 	labels[consts.LabelControllerType] = consts.LabelControllerTypeMain
 	matchLabels[consts.LabelControllerType] = consts.LabelControllerTypeMain
 
-	nodeFilter := utils.MustGetBy(
+	nodeFilter := sliceutils.MustGetBy(
 		nodeFilters,
 		controller.K8sNodeFilterName,
 		func(f slurmv1.K8sNodeFilter) string { return f.Name },
@@ -97,8 +97,11 @@ func RenderStatefulSet(
 					NodeSelector: nodeFilter.NodeSelector,
 					Tolerations:  nodeFilter.Tolerations,
 					InitContainers: append(
-						controller.CustomInitContainers,
-						common.RenderContainerMunge(&controller.ContainerMunge),
+						[]corev1.Container{
+							common.RenderContainerMunge(&controller.ContainerMunge),
+							renderContainerAccountingWaiter(&controller.ContainerSlurmctld),
+						},
+						controller.CustomInitContainers...,
 					),
 					Containers: []corev1.Container{
 						renderContainerSlurmctld(&controller.ContainerSlurmctld, controller.CustomVolumeMounts),

@@ -14,7 +14,7 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-// RenderDaemonSet renders new [appsv1.DaemonSet] containing additional Slurm controller pods
+// RenderPlaceholderDaemonSet renders new [appsv1.DaemonSet] containing additional Slurm controller pods
 func RenderPlaceholderDaemonSet(
 	namespace,
 	clusterName string,
@@ -64,6 +64,7 @@ func RenderPlaceholderDaemonSet(
 					Containers: append(
 						[]corev1.Container{
 							renderContainerSlurmctldSleep(&controller.ContainerSlurmctld),
+							renderContainerAccountingWaiterSleep(&controller.ContainerSlurmctld),
 						},
 						renderCustomContainersSleep(controller.CustomInitContainers)...,
 					),
@@ -76,6 +77,17 @@ func RenderPlaceholderDaemonSet(
 				},
 			},
 		},
+	}
+}
+
+// renderContainerAccountingWaiterSleep renders accounting waiting init [corev1.Container] in sleep mode for DaemonSet
+func renderContainerAccountingWaiterSleep(container *values.Container) corev1.Container {
+	return corev1.Container{
+		Name:            consts.ContainerNameWaitForAccounting,
+		Image:           container.Image,
+		ImagePullPolicy: container.ImagePullPolicy,
+		Command:         []string{"sleep"},
+		Args:            []string{"infinity"},
 	}
 }
 

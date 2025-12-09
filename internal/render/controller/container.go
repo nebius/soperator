@@ -4,6 +4,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/utils/stringutils"
 
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -82,5 +83,45 @@ func renderContainerSlurmctldSleep(container *values.Container) corev1.Container
 		},
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+	}
+}
+
+// renderContainerAccountingWaiter renders accounting waiting init [corev1.Container]
+func renderContainerAccountingWaiter(container *values.Container) corev1.Container {
+	return corev1.Container{
+		Name:            consts.ContainerNameWaitForAccounting,
+		Image:           container.Image,
+		ImagePullPolicy: container.ImagePullPolicy,
+		Command: []string{
+			"/bin/bash", "-c",
+			// language=bash
+			stringutils.Dedent(`
+			set -eu
+			
+			ln -s /mnt/jail/etc/passwd /etc/passwd
+			ln -s /mnt/jail/etc/group /etc/group
+			ln -s /mnt/jail/etc/shadow /etc/shadow
+			ln -s /mnt/jail/etc/gshadow /etc/gshadow
+			chown -h 0:42 /etc/{shadow,gshadow}
+			
+			rm -rf /etc/slurm && ln -s /mnt/jail/etc/slurm /etc/slurm
+			
+			INTERVAL=5
+			
+			echo "Waiting until munge started"
+			while [ ! -S "/run/munge/munge.socket.2" ]; do sleep ${INTERVAL}; done
+			
+			echo "Waiting for accounting via sacctmgr..."
+			until sacctmgr -n --parsable2 list cluster >/dev/null 2>&1; do
+			  echo "slurmdbd not ready yet, retrying..."
+			  sleep ${INTERVAL}
+			done
+			echo "Accounting is ready."
+			`),
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			common.RenderVolumeMountJail(),
+			common.RenderVolumeMountMungeSocket(),
+		},
 	}
 }
