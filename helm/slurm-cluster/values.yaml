@@ -553,18 +553,15 @@ images:
   mariaDB: docker-registry1.mariadb.com/library/mariadb:12.1.2
 # Configuration for slurm scripts.
 slurmScripts:
+  # Base scripts content can be overridden here
+  checks.json: null
+  check_runner.py: null
+  prolog.sh: null
+  epilog.sh: null
+  hc_program.sh: null
   # Built-in scripts can be overridden or disabled here
   # Keys must match file names in slurm_scripts/
   builtIn:
-    prolog.sh:
-      enabled: true
-      customContent: null
-    epilog.sh:
-      enabled: true
-      customContent: null
-    hc_program.sh:
-      enabled: true
-      customContent: null
     alloc_gpus_busy.drain.sh:
       enabled: true
       customContent: null
@@ -578,12 +575,6 @@ slurmScripts:
       enabled: true
       customContent: null
     boot_disk_full.sh:
-      enabled: true
-      customContent: null
-    check_runner.py:
-      enabled: true
-      customContent: null
-    checks.json:
       enabled: true
       customContent: null
     cleanup_enroot.sh:
