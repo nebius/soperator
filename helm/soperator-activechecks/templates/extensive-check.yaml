@@ -5,7 +5,11 @@ metadata:
 spec:
   name: "extensive-check"
   checkType: "slurmJob"
-  dependsOn: [ "wait-for-soperatorchecks-srun-ready", "wait-for-topology", "prepull-container-image" ]
+  dependsOn:
+  - "manage-jail-state"
+  - "wait-for-soperatorchecks-srun-ready"
+  - "wait-for-topology"
+  - "prepull-container-image"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   # extensive-check is suspended and its schedule is not used.
   # It is being scheduled using `cronjob/run-extensive-check-on-reservations`

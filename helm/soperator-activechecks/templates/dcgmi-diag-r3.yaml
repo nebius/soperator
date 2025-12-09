@@ -5,7 +5,10 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "dcgmi-diag-r3"
-  dependsOn: [ "wait-for-soperatorchecks-srun-ready", "wait-for-topology" ]
+  dependsOn:
+  - "manage-jail-state"
+  - "wait-for-soperatorchecks-srun-ready"
+  - "wait-for-topology"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   suspend: {{ .Values.checks.dcgmiDiagR3.suspend }}
   runAfterCreation: {{ .Values.checks.dcgmiDiagR3.runAfterCreation }}

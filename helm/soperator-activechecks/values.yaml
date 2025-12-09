@@ -100,7 +100,16 @@ checks:
     runAfterCreation: false
   manageJailState:
     suspend: true
+    runAfterCreation: true
+  manageJailStateDryRun:
+    suspend: false
     runAfterCreation: false
+    schedule: 0 11 * * * # Once a day at 11:00 UTC
+    env:
+      - name: "ANSIBLE_STDOUT_CALLBACK"
+        value: "ansible.posix.jsonl"
+      - name: "ANSIBLE_FORCE_COLOR"
+        value: "0"
   upgradeHealthChecker:
     suspend: true
     runAfterCreation: false
