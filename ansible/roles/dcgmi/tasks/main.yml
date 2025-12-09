@@ -1,10 +1,13 @@
 ---
 
 - name: Detect CUDA toolkit version with nvcc
-  ansible.builtin.command: nvcc -V
+  ansible.builtin.shell: "bash -lc 'nvcc -V'"
+  args:
+    executable: /bin/bash
   register: dcgmi_nvcc_version
   changed_when: false
   failed_when: false
+  check_mode: no
   tags:
     - dcgmi
 
