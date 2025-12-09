@@ -21,7 +21,7 @@
 - name: Extract CUDA major version from nvcc output
   ansible.builtin.set_fact:
     dcgmi_cuda_major_version: >-
-      {{ dcgmi_nvcc_version.stdout | regex_search('release ([0-9]+)', '\1') | string }}
+      {{ (dcgmi_nvcc_version.stdout | regex_findall('release ([0-9]+)'))[0] | string }}
   tags:
     - dcgmi
 
