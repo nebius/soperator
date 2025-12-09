@@ -7,7 +7,7 @@
   register: dcgmi_nvcc_version
   changed_when: false
   failed_when: false
-  check_mode: no
+  check_mode: false
   tags:
     - dcgmi
 
