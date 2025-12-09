@@ -7,8 +7,8 @@ metadata:
     app: {{ .Chart.Name }}
     release: {{ .Release.Name }}
 data:
-  # base scripts and config
-{{- range $name := list "checks.json" "check_runner.py" "prolog.sh" "epilog.sh" "hc_program.sh" }}
+  # base scripts
+{{- range $name := list "check_runner.py" "prolog.sh" "epilog.sh" "hc_program.sh" }}
 {{- $content := index $.Values.slurmScripts $name }}
   {{ $name }}: |-
   {{- if $content }}
@@ -29,8 +29,24 @@ data:
 {{- end }}
 {{- end }}
   # extra scripts
-  # make sure to add to checks.json as well
-{{- range $name, $content := .Values.slurmScripts.extra }}
+{{- range $name, $params := .Values.slurmScripts.extra }}
   {{ $name }}: |-
-{{ tpl $content $ | indent 4 }}
+{{ tpl (get $params "content") $ | indent 4 }}
 {{- end }}
+  # checks config
+  checks.json: |-
+    [
+  {{- range $name, $conf := .Values.slurmScripts.builtIn }}
+  {{- if $conf.enabled }}
+    {{- if $conf.customConfig }}
+{{ tpl ($conf.customConfig) $ | indent 6 }},
+    {{- else }}
+{{ tpl (printf "slurm_scripts/%s.json" $name | $.Files.Get) $ | indent 6 }},
+    {{- end -}}
+  {{- end }}
+  {{- end }}
+
+  {{- range $name, $params := .Values.slurmScripts.extra }}
+{{ tpl (get $params "config") $ | indent 6 }},
+  {{- end }}
+    ]
