@@ -31,6 +31,7 @@ func renderContainerREST(containerParams values.Container, threadCount *int32, m
 			Value: strconv.Itoa(int(*maxConnections)),
 		})
 	}
+	env = append(env, containerParams.CustomEnv...)
 
 	return corev1.Container{
 		Name:            consts.ContainerNameREST,

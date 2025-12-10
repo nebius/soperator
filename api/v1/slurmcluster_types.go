@@ -1165,6 +1165,11 @@ type NodeContainer struct {
 	// +kubebuilder:validation:Optional
 	Args []string `json:"args,omitempty"`
 
+	// CustomEnv defines additional environment variables that should be set in the container.
+	//
+	// +kubebuilder:validation:Optional
+	CustomEnv []corev1.EnvVar `json:"customEnv,omitempty"`
+
 	// ImagePullPolicy defines the image pull policy
 	//
 	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent

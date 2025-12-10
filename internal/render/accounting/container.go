@@ -31,6 +31,7 @@ func renderContainerAccounting(container values.Container, additionalVolumeMount
 		Image:           container.Image,
 		Command:         container.Command,
 		Args:            container.Args,
+		Env:             container.CustomEnv,
 		ImagePullPolicy: container.ImagePullPolicy,
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,
