@@ -1,7 +1,7 @@
 ---
 
 - name: Install python
-  hosts: all, localhost
+  hosts: localhost
   become: true
   roles:
     - python

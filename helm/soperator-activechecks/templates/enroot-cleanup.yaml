@@ -5,7 +5,9 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "enroot-cleanup"
-  dependsOn: [ "wait-for-soperatorchecks-srun-ready" ]
+  dependsOn:
+  - "manage-jail-state"
+  - "wait-for-soperatorchecks-srun-ready"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "10 8-20/12 * * *" # 2 times a day at 8:10 and 20:10 UTC
   suspend: {{ .Values.checks.enrootCleanup.suspend }}
@@ -15,6 +17,7 @@ spec:
 {{ .Files.Get "scripts/enroot-cleanup.sh" | indent 6 }}
     eachWorkerJobs: true
     jobContainer:
+      appArmorProfile: unconfined
       image: {{ .Values.images.slurmJob | quote }}
       env:
 {{ toYaml .Values.jobContainer.env | indent 8 }}
@@ -24,3 +27,4 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
+      appArmorProfile: unconfined

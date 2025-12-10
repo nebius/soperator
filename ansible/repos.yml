@@ -1,0 +1,12 @@
+---
+
+- name: Add all required repositories
+  hosts: all, localhost
+  become: true
+  gather_facts: true
+  gather_subset:
+    - min
+  roles:
+    - repos
+  tags:
+    - repos

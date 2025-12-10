@@ -83,12 +83,6 @@ func RenderStatefulSet(
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 					Annotations: map[string]string{
-						fmt.Sprintf(
-							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmctld,
-						): controller.ContainerSlurmctld.AppArmorProfile,
-						fmt.Sprintf(
-							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-						): controller.ContainerMunge.AppArmorProfile,
 						consts.AnnotationDefaultContainerName: consts.ContainerNameSlurmctld,
 					},
 				},

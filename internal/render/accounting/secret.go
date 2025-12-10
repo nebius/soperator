@@ -125,19 +125,24 @@ func generateSlurdbdConfig(
 	if len(passwordName) > 0 {
 		res.AddProperty("StoragePass", string(passwordName))
 	}
+	var port int32
 	if accounting.MariaDb.Enabled {
 		res.AddProperty("StorageUser", consts.MariaDbUsername)
 		res.AddProperty("StorageHost", naming.BuildMariaDbName(clusterName))
-		res.AddProperty("StoragePort", accounting.MariaDb.Port)
+		port = accounting.MariaDb.Port
 	} else {
 		res.AddProperty("StorageUser", accounting.ExternalDB.User)
 		res.AddProperty("StorageHost", accounting.ExternalDB.Host)
-		res.AddProperty("StoragePort", accounting.ExternalDB.Port)
+		port = accounting.ExternalDB.Port
 		storageParameters := generateSlurmdbdConfigStorageParameters(accounting)
 		if storageParameters != "" {
 			res.AddProperty("StorageParameters", storageParameters)
 		}
 	}
+	if port == 0 {
+		port = 3306
+	}
+	res.AddProperty("StoragePort", port)
 	if isRESTenabled {
 		res.AddComment("")
 		res.AddComment("REST API settings")

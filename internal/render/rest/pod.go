@@ -1,8 +1,6 @@
 package rest
 
 import (
-	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -36,12 +34,8 @@ func BasePodTemplateSpec(
 
 	return &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: matchLabels,
-			Annotations: map[string]string{
-				fmt.Sprintf(
-					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameREST,
-				): valuesREST.ContainerREST.AppArmorProfile,
-			},
+			Labels:      matchLabels,
+			Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameREST),
 		},
 		Spec: corev1.PodSpec{
 			HostUsers:         valuesREST.HostUsers,
@@ -50,7 +44,7 @@ func BasePodTemplateSpec(
 			NodeSelector:      nodeFilter.NodeSelector,
 			Hostname:          consts.HostnameREST,
 			InitContainers:    valuesREST.CustomInitContainers,
-			Containers:        []corev1.Container{renderContainerREST(valuesREST.ContainerREST, valuesREST.ThreadCount, valuesREST.MaxConnections)},
+			Containers:        []corev1.Container{renderContainerREST(valuesREST)},
 			Volumes:           volumes,
 			PriorityClassName: valuesREST.PriorityClass,
 		},

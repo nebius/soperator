@@ -87,6 +87,8 @@ func Test_RenderContainerSlurmd(t *testing.T) {
 				false,
 				"{ \"monitoring\": \"https://my-cloud.com/$INSTANCE_ID/monitoring\" }",
 				tt.features,
+				"default",
+				false,
 			)
 			if err != nil && tt.wantLimits != nil {
 				t.Errorf("renderContainerSlurmd() error = %v, want nil", err)
