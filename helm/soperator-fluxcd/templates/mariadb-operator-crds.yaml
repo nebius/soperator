@@ -6,6 +6,10 @@ metadata:
   labels:
   {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
+  {{- with .Values.mariadbOperator.crds.driftDetection }}
+  driftDetection:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   chart:
     spec:
       chart: mariadb-operator-crds
@@ -14,8 +18,6 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-mariadb-operator
       version: {{ .Values.mariadbOperator.version }}
-  driftDetection:
-    mode: enabled
   install:
     crds: CreateReplace
     remediation:

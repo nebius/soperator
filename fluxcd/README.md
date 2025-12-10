@@ -1,5 +1,7 @@
 # Project Structure
 
+> **⚠️ DEPRECATION NOTICE**: The Kustomize-based bootstrap process is no longer supported. Please use the `soperator-fluxcd-bootstrap` Helm chart for deploying FluxCD resources. See the [Bootstrap with Helm Chart](#bootstrap-with-helm-chart) section below.
+
 The project structure is based on the [hierarchical repository pattern](https://cloud.google.com/kubernetes-engine/enterprise/config-sync/docs/concepts/hierarchical-repo) from Anthos. We use [FluxCD](https://fluxcd.io/) to manage configurations, with a division into **`enviroment`** and **`base`** directories:
 
 - **`base`**  
@@ -69,6 +71,13 @@ fluxcd
 
 ## Deployment
 
+### Legacy Deployment (Deprecated)
+
+> **⚠️ DEPRECATED**: The Kustomize-based bootstrap is no longer maintained. Use the Helm chart method above instead.
+
+<details>
+<summary>Click to expand legacy deployment instructions</summary>
+
 ### Production/Dev Deployment (Nebius Cloud)
 
 To deploy a specific cluster configuration, use [Kustomize](https://kustomize.io/) and apply it with `kubectl`. For example, to deploy the `nebius-cloud-dev` configuration:
@@ -128,3 +137,36 @@ Kustomize may require you to “walk up” the directory structure to gather con
 2. Which in turn could reference specific `base` components in `fluxcd/base/...`.
 
 This hierarchical approach allows for maximum flexibility; configurations for local development may not be suitable for production, so each environment can override only what is needed while reusing a common base.
+
+</details>
+
+## Migration from Kustomize to Helm Chart
+
+If you are currently using the Kustomize-based bootstrap, migrate to the Helm chart method:
+
+1. **Remove old Kustomize resources**:
+   ```bash
+   kubectl delete -k fluxcd/environment/<your-env>/bootstrap
+   ```
+
+2. **Create ConfigMap with your values**:
+   ```bash
+   kubectl create configmap soperator-fluxcd-values \
+     -n flux-system \
+     --from-file=values.yaml=<path-to-your-values>
+   ```
+
+3. **Install the bootstrap Helm chart**:
+   ```bash
+   helm install soperator-bootstrap \
+     oci://cr.eu-north1.nebius.cloud/soperator/soperator-fluxcd-bootstrap \
+     --version <version> \
+     --namespace flux-system
+   ```
+
+4. **Verify the deployment**:
+   ```bash
+   kubectl get helmrepository -n flux-system
+   kubectl get helmrelease -n flux-system
+   flux get all -n flux-system
+   ```

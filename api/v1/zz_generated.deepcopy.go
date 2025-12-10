@@ -5,7 +5,7 @@
 package v1
 
 import (
-	"github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
+	"github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -710,6 +710,11 @@ func (in *SlurmClusterSpec) DeepCopyInto(out *SlurmClusterSpec) {
 	in.SlurmConfig.DeepCopyInto(&out.SlurmConfig)
 	if in.CustomSlurmConfig != nil {
 		in, out := &in.CustomSlurmConfig, &out.CustomSlurmConfig
+		*out = new(string)
+		**out = **in
+	}
+	if in.CustomCgroupConfig != nil {
+		in, out := &in.CustomCgroupConfig, &out.CustomCgroupConfig
 		*out = new(string)
 		**out = **in
 	}

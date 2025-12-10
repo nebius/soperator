@@ -39,8 +39,13 @@ echo "Start slurmd daemon"
 slurmd_args=(
   -D
   --instance-id "${INSTANCE_ID}"
-  --extra "${evaluated_extra}"
 )
+
+if [ "${evaluated_extra}" != "" ]; then
+  slurmd_args+=(
+    --extra "${evaluated_extra}"
+  )
+fi
 
 if [ "${SOPERATOR_NODE_SETS_ON}" = "true" ]; then
   echo "Running slurmd with NodeSets configuration from slurm.conf"

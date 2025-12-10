@@ -5,7 +5,11 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "ib-gpu-perf"
-  dependsOn: [ "wait-for-soperatorchecks-srun-ready", "wait-for-topology", "prepull-container-image" ]
+  dependsOn:
+  - "manage-jail-state"
+  - "wait-for-soperatorchecks-srun-ready"
+  - "wait-for-topology"
+  - "prepull-container-image"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "55 1-21/4 * * *" # 6 times a day at 01:55, 05:55, 09:55, 13:55, 17:55 and 21:55 UTC
   suspend: {{ .Values.checks.ibGpuPerf.suspend }}
@@ -16,6 +20,7 @@ spec:
     eachWorkerJobs: true
     maxNumberOfJobs: 200
     jobContainer:
+      appArmorProfile: unconfined
       image: {{ .Values.images.slurmJob | quote }}
       env:
 {{ toYaml .Values.jobContainer.env | indent 8 }}
@@ -25,6 +30,7 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
+      appArmorProfile: unconfined
   failureReactions:
     drainSlurmNode:
       drainReasonPrefix: {{ .Values.checks.ibGpuPerf.drainReasonPrefix | quote }}

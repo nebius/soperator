@@ -39,6 +39,7 @@ func renderContainerSlurmctld(container *values.Container, customMounts []slurmv
 					consts.ContainerSecurityContextCapabilitySysAdmin,
 				},
 			},
+			AppArmorProfile: common.ParseAppArmorProfile(container.AppArmorProfile),
 		},
 		Resources: corev1.ResourceRequirements{
 			Limits:   limits,
