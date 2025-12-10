@@ -112,7 +112,7 @@ func main() {
 		logFormat                   string
 		logLevel                    string
 		enabledNodeReplacement      bool
-		disableExtensiveCheck       bool
+		enableExtensiveCheck        bool
 		deleteNotReadyNodes         bool
 		notReadyTimeout             time.Duration
 		maintenanceConditionType    string
@@ -151,7 +151,7 @@ func main() {
 	flag.IntVar(&maxConcurrencyPodEphemeralStorageCheck, "pod-ephemeral-max-concurrent-reconciles", 10, "Configures number of concurrent reconciles for Pod Ephemeral Storage Check. It should improve performance for clusters with many pods.")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
 	flag.BoolVar(&enabledNodeReplacement, "enable-node-replacement", true, "Enable node replacement controller")
-	flag.BoolVar(&disableExtensiveCheck, "disable-extensive-check", false, "If set, skips extensive check and sets unhealthy flag right after any HC failure")
+	flag.BoolVar(&enableExtensiveCheck, "enable-extensive-check", true, "If set, runs extensive check before setting unhealthy flag for HC failures")
 	flag.DurationVar(&notReadyTimeout, "not-ready-timeout", 15*time.Minute, "The timeout after which a NotReady node will be deleted. Nodes can be NotReady for more than 10 minutes when GPU operator is starting.")
 	flag.BoolVar(&deleteNotReadyNodes, "delete-not-ready-nodes", true, "If set, NotReady nodes will be deleted after the not-ready timeout is reached. If false, they will be marked as NotReady but not deleted.")
 	flag.Float64Var(&ephemeralStorageThreshold, "ephemeral-storage-threshold", 85.0, "The threshold percentage for ephemeral storage usage warnings (default 85%)")
@@ -252,7 +252,7 @@ func main() {
 		slurmAPIClients,
 		reconcileTimeout,
 		enabledNodeReplacement,
-		disableExtensiveCheck,
+		enableExtensiveCheck,
 		mgr.GetAPIReader(),
 		corev1.NodeConditionType(maintenanceConditionType),
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {

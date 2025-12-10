@@ -40,7 +40,7 @@ type SlurmNodesController struct {
 	slurmAPIClients          *slurmapi.ClientSet
 	reconcileTimeout         time.Duration
 	enabledNodeReplacement   bool
-	disableExtensiveCheck    bool
+	enableExtensiveCheck     bool
 	apiReader                client.Reader // Direct API reader for pagination
 	MaintenanceConditionType corev1.NodeConditionType
 }
@@ -52,7 +52,7 @@ func NewSlurmNodesController(
 	slurmAPIClients *slurmapi.ClientSet,
 	reconcileTimeout time.Duration,
 	enabledNodeReplacement bool,
-	disableExtensiveCheck bool,
+	enableExtensiveCheck bool,
 	apiReader client.Reader,
 	maintenanceConditionType corev1.NodeConditionType,
 ) *SlurmNodesController {
@@ -67,7 +67,7 @@ func NewSlurmNodesController(
 		slurmAPIClients:          slurmAPIClients,
 		reconcileTimeout:         reconcileTimeout,
 		enabledNodeReplacement:   enabledNodeReplacement,
-		disableExtensiveCheck:    disableExtensiveCheck,
+		enableExtensiveCheck:     enableExtensiveCheck,
 		apiReader:                apiReader,
 		MaintenanceConditionType: maintenanceConditionType,
 	}
@@ -263,8 +263,8 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 		return nil
 	}
 
-	if c.disableExtensiveCheck {
-		logger.V(1).Info("Skipping extensive check flow, setting unhealthy right away")
+	if !c.enableExtensiveCheck {
+		logger.V(1).Info("Extensive check not enabled, setting unhealthy right away")
 		return c.processSetUnhealthy(ctx, k8sNode, slurmClusterName, slurmNode)
 	}
 

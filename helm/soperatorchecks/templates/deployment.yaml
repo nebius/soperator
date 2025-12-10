@@ -37,7 +37,7 @@ spec:
         resources: {{- toYaml .Values.checks.kubeRbacProxy.resources | nindent 10 }}
         securityContext: {{- toYaml .Values.checks.kubeRbacProxy.containerSecurityContext
           | nindent 10 }}
-      - args: {{- toYaml (append (append .Values.checks.manager.args (printf "--enable-node-replacement=%t" .Values.checks.manager.enableNodeReplacement)) (printf "--disable-extensive-check=%t" .Values.checks.manager.disableExtensiveCheck)) | nindent 8 }}
+      - args: {{- toYaml (append (append .Values.checks.manager.args (printf "--enable-node-replacement=%t" .Values.checks.manager.enableNodeReplacement)) (printf "--enable-extensive-check=%t" .Values.checks.manager.enableExtensiveCheck)) | nindent 8 }}
         command:
         - /usr/bin/soperatorchecks
         env:

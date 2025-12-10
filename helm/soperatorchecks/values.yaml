@@ -21,7 +21,7 @@ checks:
         memory: 64Mi
   manager:
     enableNodeReplacement: false
-    disableExtensiveCheck: true
+    enableExtensiveCheck: false
     args:
       - --log-format=json
       - --log-level=info
