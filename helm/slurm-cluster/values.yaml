@@ -553,12 +553,72 @@ images:
   mariaDB: docker-registry1.mariadb.com/library/mariadb:12.1.2
 # Configuration for slurm scripts.
 slurmScripts:
-  prolog: null
-  epilog: null
-  hcProgram: null
-  # custom:
+  # Built-in scripts can be overridden or disabled here
+  # Keys must match file names in slurm_scripts/
+  builtIn:
+    prolog.sh:
+      enabled: true
+      customContent: null
+    epilog.sh:
+      enabled: true
+      customContent: null
+    hc_program.sh:
+      enabled: true
+      customContent: null
+    alloc_gpus_busy.drain.sh:
+      enabled: true
+      customContent: null
+    alloc_gpus_busy.undrain.sh:
+      enabled: true
+      customContent: null
+    alloc_mem_used.drain.sh:
+      enabled: true
+      customContent: null
+    alloc_mem_used.undrain.sh:
+      enabled: true
+      customContent: null
+    boot_disk_full.sh:
+      enabled: true
+      customContent: null
+    check_runner.py:
+      enabled: true
+      customContent: null
+    checks.json:
+      enabled: true
+      customContent: null
+    cleanup_enroot.sh:
+      enabled: true
+      customContent: null
+    cleanup_scratch_data.sh:
+      enabled: true
+      customContent: null
+    drop_page_cache.sh:
+      enabled: true
+      customContent: null
+    drop_posix_shmem.sh:
+      enabled: true
+      customContent: null
+    gpu_health_check.py:
+      enabled: true
+      customContent: null
+    job_tmpfs_delete.sh:
+      enabled: true
+      customContent: null
+    job_tmpfs_delete_leftover.sh:
+      enabled: true
+      customContent: null
+    job_tmpfs_recreate.sh:
+      enabled: true
+      customContent: null
+    map_job_dcgm.sh:
+      enabled: true
+      customContent: null
+    unmap_job_dcgm.sh:
+      enabled: true
+      customContent: null
+  extra: null
+  # extra:
   #   example.sh: |
   #     #!/bin/bash
   #
-  #     echo "Example"
-  custom: null
+  #     echo "Cluster: {{ $.Values.clusterName }}"
