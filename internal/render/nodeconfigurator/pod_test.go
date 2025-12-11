@@ -23,7 +23,7 @@ func TestRenderPodSpecHostUsers(t *testing.T) {
 						HostUsers: nil,
 					},
 				},
-				SleepContainer: slurmv1alpha1.SleepContainer{
+				CustomContainer: slurmv1alpha1.CustomContainer{
 					Enabled: false,
 				},
 			},
@@ -38,7 +38,7 @@ func TestRenderPodSpecHostUsers(t *testing.T) {
 						HostUsers: ptr.To(false),
 					},
 				},
-				SleepContainer: slurmv1alpha1.SleepContainer{
+				CustomContainer: slurmv1alpha1.CustomContainer{
 					Enabled: false,
 				},
 			},
@@ -53,7 +53,7 @@ func TestRenderPodSpecHostUsers(t *testing.T) {
 						HostUsers: ptr.To(true),
 					},
 				},
-				SleepContainer: slurmv1alpha1.SleepContainer{
+				CustomContainer: slurmv1alpha1.CustomContainer{
 					Enabled: false,
 				},
 			},
@@ -65,7 +65,7 @@ func TestRenderPodSpecHostUsers(t *testing.T) {
 				Rebooter: slurmv1alpha1.Rebooter{
 					Enabled: false,
 				},
-				SleepContainer: slurmv1alpha1.SleepContainer{
+				CustomContainer: slurmv1alpha1.CustomContainer{
 					Enabled: true,
 					PodConfig: slurmv1alpha1.PodConfig{
 						HostUsers: nil,
@@ -80,7 +80,7 @@ func TestRenderPodSpecHostUsers(t *testing.T) {
 				Rebooter: slurmv1alpha1.Rebooter{
 					Enabled: false,
 				},
-				SleepContainer: slurmv1alpha1.SleepContainer{
+				CustomContainer: slurmv1alpha1.CustomContainer{
 					Enabled: true,
 					PodConfig: slurmv1alpha1.PodConfig{
 						HostUsers: ptr.To(false),
@@ -95,7 +95,7 @@ func TestRenderPodSpecHostUsers(t *testing.T) {
 				Rebooter: slurmv1alpha1.Rebooter{
 					Enabled: false,
 				},
-				SleepContainer: slurmv1alpha1.SleepContainer{
+				CustomContainer: slurmv1alpha1.CustomContainer{
 					Enabled: true,
 					PodConfig: slurmv1alpha1.PodConfig{
 						HostUsers: ptr.To(true),
@@ -143,7 +143,7 @@ func TestGetHostUsers(t *testing.T) {
 						HostUsers: ptr.To(true),
 					},
 				},
-				SleepContainer: slurmv1alpha1.SleepContainer{
+				CustomContainer: slurmv1alpha1.CustomContainer{
 					Enabled: false,
 					PodConfig: slurmv1alpha1.PodConfig{
 						HostUsers: ptr.To(false),
@@ -161,7 +161,7 @@ func TestGetHostUsers(t *testing.T) {
 						HostUsers: ptr.To(true),
 					},
 				},
-				SleepContainer: slurmv1alpha1.SleepContainer{
+				CustomContainer: slurmv1alpha1.CustomContainer{
 					Enabled: true,
 					PodConfig: slurmv1alpha1.PodConfig{
 						HostUsers: ptr.To(false),
