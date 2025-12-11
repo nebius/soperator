@@ -162,9 +162,9 @@ func selectTokenIssuer(flags Flags, ctrlClient client.Client, slurmClusterID typ
 
 	switch {
 	case ctrlClient != nil:
-		issuer = jwt.NewToken(ctrlClient).For(slurmClusterID, "root").WithRegistry(jwt.NewTokenRegistry().Build())
+		issuer = jwt.NewToken(ctrlClient).For(slurmClusterID, "ubuntu").WithRegistry(jwt.NewTokenRegistry().Build())
 	case flags.standalone:
-		standaloneIssuer := tokenstandalone.NewStandaloneTokenIssuer(slurmClusterID, "root").
+		standaloneIssuer := tokenstandalone.NewStandaloneTokenIssuer(slurmClusterID, "ubuntu").
 			WithScontrolPath(flags.scontrolPath)
 		// Parse and set rotation interval
 		if rotationInterval, err := time.ParseDuration(flags.keyRotationInterval); err == nil {
