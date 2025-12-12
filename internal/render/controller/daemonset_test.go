@@ -88,6 +88,7 @@ func TestRenderDaemonSet(t *testing.T) {
 				tt.clusterName,
 				nodeFilters,
 				tt.controller,
+				true,
 			)
 
 			// Check basic metadata
@@ -245,6 +246,7 @@ func TestRenderDaemonSetNodeAffinity(t *testing.T) {
 		"test-cluster",
 		nodeFilters,
 		controller,
+		true,
 	)
 
 	// Check node selector
@@ -339,6 +341,7 @@ func TestRenderDaemonSetHostUsers(t *testing.T) {
 				"test-cluster",
 				nodeFilters,
 				controller,
+				true,
 			)
 
 			// Check HostUsers field in PodSpec

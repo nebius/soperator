@@ -119,6 +119,7 @@ func TestRenderStatefulSet(t *testing.T) {
 				nodeFilters,
 				volumeSources,
 				tt.controller,
+				true,
 			)
 
 			if err != nil {
@@ -267,6 +268,7 @@ func TestRenderStatefulSetWithMaintenance(t *testing.T) {
 			},
 		},
 		controller,
+		true,
 	)
 
 	if err != nil {
@@ -360,6 +362,7 @@ func TestRenderStatefulSetHostUsers(t *testing.T) {
 				nodeFilters,
 				volumeSources,
 				controller,
+				true,
 			)
 
 			if err != nil {
