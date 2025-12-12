@@ -27,9 +27,20 @@ const (
 	KindNodeConfigurator = "NodeConfigurator"
 )
 
-// +kubebuilder:validation:XValidation:rule="self.rebooter.enabled != self.nodeConfigurator.enabled",message="Either rebooter or nodeConfigurator must be enabled, but not both simultaneously."
 // NodeConfiguratorSpec defines the desired state of NodeConfigurator.
 type NodeConfiguratorSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
+	HostNetwork bool `json:"hostNetwork"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	HostIPC bool `json:"hostIPC"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	ShareProcessNamespace bool `json:"shareProcessNamespace"`
+
 	// Rebooter controller which will reboot and drain node by some node conditions
 	// in same time can be used rebooter or nodeConfigurator
 	//
@@ -37,11 +48,11 @@ type NodeConfiguratorSpec struct {
 	// +kubebuilder:default:={enabled: true}
 	Rebooter Rebooter `json:"rebooter"`
 
-	// SleepContainer defines container configuration for the node
-	// in same time can be used rebooter or nodeConfigurator
+	// CustomContainer defines container for the node
+	// in same time can be used rebooter or customContainer
 	//
 	// +kubebuilder:validation:Optional
-	SleepContainer SleepContainer `json:"nodeConfigurator"`
+	CustomContainer CustomContainer `json:"customContainer"`
 
 	// InitContainers defines the list of initContainers for the node-configurator
 	// it rewrite the default initContainers
@@ -51,10 +62,19 @@ type NodeConfiguratorSpec struct {
 }
 
 type ContainerConfig struct {
-	// Image defines the node-configurator container image
+	// Name defines the name of container
+	//
+	// +kubebuilder:validation:Optional
+	Name string `json:"name,omitempty"`
+
+	// Image defines the container image
 	//
 	// +kubebuilder:validation:Optional
 	Image Image `json:"image,omitempty"`
+
+	// Command defines the command of container
+	// +kubebuilder:validation:Optional
+	Command []string `json:"command,omitempty"`
 
 	// Resources defines the [corev1.ResourceRequirements] for the container
 	//
@@ -135,7 +155,7 @@ type Rebooter struct {
 	LogFormat string `json:"logFormat,omitempty"`
 }
 
-type SleepContainer struct {
+type CustomContainer struct {
 	Enabled         bool `json:"enabled"`
 	ContainerConfig `json:",inline"`
 	PodConfig       `json:",inline"`

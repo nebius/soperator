@@ -1,8 +1,6 @@
 package nodeconfigurator
 
 import (
-	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
@@ -11,25 +9,19 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 )
 
-// RenderInitContainers renders the initContainers for the DaemonSet
-func renderInitContainers() []corev1.Container {
-	return []corev1.Container{
-		renderContainerNodeSysctl(),
-	}
-}
-
-// RenderContainers renders the containers for the DaemonSet
+// renderContainers renders the containers for the DaemonSet
 func renderContainers(nodeConfigurator slurmv1alpha1.NodeConfiguratorSpec) []corev1.Container {
 	if nodeConfigurator.Rebooter.Enabled {
 		return []corev1.Container{renderContainerRebooter(nodeConfigurator.Rebooter)}
 	}
-	return []corev1.Container{renderContainerNodeSysctlSleep(nodeConfigurator.SleepContainer)}
+	if nodeConfigurator.CustomContainer.Enabled {
+		return []corev1.Container{renderCustomContainer(nodeConfigurator.CustomContainer)}
+	}
+	return []corev1.Container{}
 }
 
-// RenderContainerRebooter renders [corev1.Container] for reconciliation of node rebooter
+// renderContainerRebooter renders [corev1.Container] for reconciliation of node rebooter
 func renderContainerRebooter(rebooter slurmv1alpha1.Rebooter) corev1.Container {
-	image := fmt.Sprintf("%s:%s", rebooter.Image.Repository, rebooter.Image.Tag)
-
 	rebooter.Env = append(
 		rebooter.Env,
 		corev1.EnvVar{
@@ -47,7 +39,7 @@ func renderContainerRebooter(rebooter slurmv1alpha1.Rebooter) corev1.Container {
 
 	return corev1.Container{
 		Name:            consts.ContainerNameRebooter,
-		Image:           image,
+		Image:           rebooter.Image.GetURI(),
 		ImagePullPolicy: rebooter.Image.PullPolicy,
 		SecurityContext: createSecurityContext(true, 0, 0, true, true, nil),
 		Command: []string{
@@ -68,31 +60,24 @@ func renderContainerRebooter(rebooter slurmv1alpha1.Rebooter) corev1.Container {
 	}
 }
 
-// RenderContainerNodeSysctlSleep renders [corev1.Container] for reconciliation of sysctl
-func renderContainerNodeSysctlSleep(sleepContainer slurmv1alpha1.SleepContainer) corev1.Container {
-	if sleepContainer.Image.Repository == "" {
-		sleepContainer.Image.Repository = "busybox"
+func renderCustomContainer(customContainer slurmv1alpha1.CustomContainer) corev1.Container {
+	if customContainer.ContainerConfig.Name == "" {
+		customContainer.ContainerConfig.Name = consts.ContainerNameCustom
 	}
-	if sleepContainer.Image.Tag == "" {
-		sleepContainer.Image.Tag = "latest"
-	}
+
 	return corev1.Container{
-		Name:            consts.ContainerNameNodeSysctlSleep,
-		Image:           fmt.Sprintf("%s:%s", sleepContainer.Image.Repository, sleepContainer.Image.Tag),
+		Name:            customContainer.ContainerConfig.Name,
+		Image:           customContainer.Image.GetURI(),
 		SecurityContext: createSecurityContext(false, 65534, 65534, true, false, []corev1.Capability{"ALL"}),
 		Resources: createResourceRequirements(
-			*sleepContainer.Resources.Limits.Memory(),
-			*sleepContainer.Resources.Requests.Cpu(),
-			*sleepContainer.Resources.Requests.Memory(),
+			*customContainer.Resources.Limits.Memory(),
+			*customContainer.Resources.Requests.Cpu(),
+			*customContainer.Resources.Requests.Memory(),
 		),
-		Command: []string{
-			"/bin/sh",
-			"-c",
-			"sleep infinity",
-		},
-		Env:            sleepContainer.Env,
-		ReadinessProbe: sleepContainer.ReadinessProbe,
-		LivenessProbe:  sleepContainer.LivenessProbe,
+		Command:        customContainer.Command,
+		Env:            customContainer.Env,
+		ReadinessProbe: customContainer.ReadinessProbe,
+		LivenessProbe:  customContainer.LivenessProbe,
 	}
 }
 
@@ -124,20 +109,6 @@ func createResourceRequirements(limitsMemory, requestsCPU, requestsMemory resour
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    requestsCPU,
 			corev1.ResourceMemory: requestsMemory,
-		},
-	}
-}
-
-// RenderContainerNodeSysctl renders [corev1.Container] for modify k8s node sysctl
-func renderContainerNodeSysctl() corev1.Container {
-	return corev1.Container{
-		Name:            consts.ContainerNameNodeSysctl,
-		Image:           "cr.eu-north1.nebius.cloud/soperator/busybox",
-		SecurityContext: createSecurityContext(true, 0, 0, false, true, nil),
-		Command: []string{
-			"/bin/sh",
-			"-c",
-			"sysctl -w kernel.unprivileged_userns_clone=1",
 		},
 	}
 }

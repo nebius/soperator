@@ -51,8 +51,3 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
-{{- define "checkConflicts" -}}
-{{- if and .Values.nodeConfigurator.enabled .Values.rebooter.enabled -}}
-{{- fail "nodeConfigurator.enabled and rebooter.enabled cannot both be true" -}}
-{{- end -}}
-{{- end -}}

@@ -10,9 +10,8 @@ const (
 	ContainerNameWaitForController = "wait-for-controller"
 	ContainerNamePopulateJail      = populateJail
 	ContainerNameExporter          = Exporter
-	ContainerNameNodeSysctl        = "node-sysctl"
 	ContainerNameRebooter          = "rebooter"
-	ContainerNameNodeSysctlSleep   = "node-sysctl-sleep"
+	ContainerNameCustom            = "custom-container"
 	ContainerNameSConfigController = SConfigControllerName
 
 	ContainerSecurityContextCapabilitySysAdmin = "SYS_ADMIN"

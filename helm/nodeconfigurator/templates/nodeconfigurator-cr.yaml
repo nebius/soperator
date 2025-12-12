@@ -1,4 +1,3 @@
-{{- include "checkConflicts" . -}}
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: NodeConfigurator
 metadata:
@@ -9,45 +8,46 @@ metadata:
     {{- . | nindent 4 -}}
   {{- end }}
 spec:
-  nodeConfigurator:
-    enabled: {{ .Values.nodeConfigurator.enabled }}
-    {{- if gt (len .Values.nodeConfigurator.env) 0 }}
+  hostNetwork: {{ .Values.hostNetwork }}
+  customContainer:
+    enabled: {{ .Values.customContainer.enabled }}
+    {{- if gt (len .Values.customContainer.env) 0 }}
     env:
-      {{- toYaml .Values.nodeConfigurator.env | nindent 6 }}
+      {{- toYaml .Values.customContainer.env | nindent 6 }}
     {{- end }}
     image:
-      repository: {{ .Values.nodeConfigurator.image.repository | quote }}
-      tag: {{ .Values.nodeConfigurator.image.tag | quote }}
-      pullPolicy: {{ .Values.nodeConfigurator.image.pullPolicy | quote }}
-    {{- if .Values.nodeConfigurator.nodeSelector }}
+      repository: {{ .Values.customContainer.image.repository | quote }}
+      tag: {{ .Values.customContainer.image.tag | quote }}
+      pullPolicy: {{ .Values.customContainer.image.pullPolicy | quote }}
+    {{- if .Values.customContainer.nodeSelector }}
     nodeSelector:
-      {{- toYaml .Values.nodeConfigurator.nodeSelector | nindent 6 }}
+      {{- toYaml .Values.customContainer.nodeSelector | nindent 6 }}
     {{- end }}
-    {{- if .Values.nodeConfigurator.resources }}
+    {{- if .Values.customContainer.resources }}
     resources:
-      {{- toYaml .Values.nodeConfigurator.resources | nindent 6 }}
+      {{- toYaml .Values.customContainer.resources | nindent 6 }}
     {{- end }}
-    {{- if .Values.nodeConfigurator.livenessProbe }}
+    {{- if .Values.customContainer.livenessProbe }}
     livenessProbe:
-      {{- toYaml .Values.nodeConfigurator.livenessProbe | nindent 6 }}
+      {{- toYaml .Values.customContainer.livenessProbe | nindent 6 }}
     {{- end }}
-    {{- if .Values.nodeConfigurator.readinessProbe }}
+    {{- if .Values.customContainer.readinessProbe }}
     readinessProbe:
-      {{- toYaml .Values.nodeConfigurator.readinessProbe | nindent 6 }}
+      {{- toYaml .Values.customContainer.readinessProbe | nindent 6 }}
     {{- end }}
-    {{- if .Values.nodeConfigurator.tolerations }}
+    {{- if .Values.customContainer.tolerations }}
     tolerations:
-      {{- toYaml .Values.nodeConfigurator.tolerations | nindent 6 }}
+      {{- toYaml .Values.customContainer.tolerations | nindent 6 }}
     {{- end }}
-    {{- if .Values.nodeConfigurator.affinity }}
+    {{- if .Values.customContainer.affinity }}
     affinity:
-      {{- toYaml .Values.nodeConfigurator.affinity | nindent 6 }}
+      {{- toYaml .Values.customContainer.affinity | nindent 6 }}
     {{- end }}
-    {{- if .Values.nodeConfigurator.priorityClassName }}
-    priorityClassName: {{ .Values.nodeConfigurator.priorityClassName | quote }}
+    {{- if .Values.customContainer.priorityClassName }}
+    priorityClassName: {{ .Values.customContainer.priorityClassName | quote }}
     {{- end }}
-    {{- if .Values.nodeConfigurator.serviceAccountName }}
-    serviceAccountName: {{ .Values.nodeConfigurator.serviceAccountName | quote }}
+    {{- if .Values.customContainer.serviceAccountName }}
+    serviceAccountName: {{ .Values.customContainer.serviceAccountName | quote }}
     {{- end }}
   rebooter:
     enabled: {{ .Values.rebooter.enabled }}
