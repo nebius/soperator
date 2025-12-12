@@ -119,6 +119,7 @@ func TestRenderStatefulSet(t *testing.T) {
 				nodeFilters,
 				volumeSources,
 				tt.controller,
+				true,
 			)
 
 			if err != nil {
@@ -188,8 +189,8 @@ func TestRenderStatefulSet(t *testing.T) {
 
 			// Check init containers
 			initContainers := result.Spec.Template.Spec.InitContainers
-			if len(initContainers) != 1 {
-				t.Errorf("Expected 1 init container, got %d", len(initContainers))
+			if len(initContainers) != 2 {
+				t.Errorf("Expected 2 init containers, got %d", len(initContainers))
 			} else {
 				initContainer := initContainers[0]
 				if initContainer.Name != consts.ContainerNameMunge {
@@ -197,6 +198,14 @@ func TestRenderStatefulSet(t *testing.T) {
 				}
 				if initContainer.Image != tt.controller.ContainerMunge.NodeContainer.Image {
 					t.Errorf("Init container image = %v, want %v", initContainer.Image, tt.controller.ContainerMunge.NodeContainer.Image)
+				}
+
+				initContainer = initContainers[1]
+				if initContainer.Name != consts.ContainerNameWaitForAccounting {
+					t.Errorf("Init container name = %v, want %v", initContainer.Name, consts.ContainerNameWaitForAccounting)
+				}
+				if initContainer.Image != tt.controller.ContainerSlurmctld.NodeContainer.Image {
+					t.Errorf("Init container image = %v, want %v", initContainer.Image, tt.controller.ContainerSlurmctld.NodeContainer.Image)
 				}
 			}
 		})
@@ -259,6 +268,7 @@ func TestRenderStatefulSetWithMaintenance(t *testing.T) {
 			},
 		},
 		controller,
+		true,
 	)
 
 	if err != nil {
@@ -352,6 +362,7 @@ func TestRenderStatefulSetHostUsers(t *testing.T) {
 				nodeFilters,
 				volumeSources,
 				controller,
+				true,
 			)
 
 			if err != nil {

@@ -8,6 +8,8 @@ const (
 	ContainerNameREST              = Slurmrestd
 	ContainerNameSshd              = SshdName
 	ContainerNameWaitForController = "wait-for-controller"
+	ContainerNameWaitForDatabase   = "wait-for-database"
+	ContainerNameWaitForAccounting = "wait-for-accounting"
 	ContainerNamePopulateJail      = populateJail
 	ContainerNameExporter          = Exporter
 	ContainerNameNodeSysctl        = "node-sysctl"

@@ -7,7 +7,7 @@ import (
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
-	"nebius.ai/slurm-operator/internal/utils"
+	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -22,7 +22,7 @@ func BasePodTemplateSpec(
 		common.RenderVolumeJailFromSource(volumeSources, *accounting.VolumeJail.VolumeSourceName),
 		common.RenderVolumeProjectedSlurmConfigs(
 			clusterName,
-			RenderVolumeProjecitonSlurmdbdConfigs(clusterName),
+			RenderVolumeProjectionSlurmdbdConfigs(clusterName),
 		),
 		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeRESTJWTKey(clusterName),
@@ -48,7 +48,7 @@ func BasePodTemplateSpec(
 		}
 	}
 
-	nodeFilter, err := utils.GetBy(
+	nodeFilter, err := sliceutils.GetBy(
 		nodeFilters,
 		accounting.K8sNodeFilterName,
 		func(f slurmv1.K8sNodeFilter) string { return f.Name },
@@ -70,8 +70,11 @@ func BasePodTemplateSpec(
 			Hostname:          consts.HostnameAccounting,
 			PriorityClassName: accounting.PriorityClass,
 			InitContainers: append(
-				accounting.CustomInitContainers,
-				common.RenderContainerMunge(&accounting.ContainerMunge),
+				[]corev1.Container{
+					renderContainerDbwaiter(clusterName, accounting),
+					common.RenderContainerMunge(&accounting.ContainerMunge),
+				},
+				accounting.CustomInitContainers...,
 			),
 			Containers: []corev1.Container{
 				renderContainerAccounting(accounting.ContainerAccounting, additionalVolumeMounts),
