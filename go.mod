@@ -24,9 +24,9 @@ require (
 	golang.org/x/crypto v0.46.0
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
 	istio.io/pkg v0.0.0-20241216214326-d70796207df3
-	k8s.io/api v0.34.2
-	k8s.io/apimachinery v0.34.2
-	k8s.io/client-go v0.34.2
+	k8s.io/api v0.34.3
+	k8s.io/apimachinery v0.34.3
+	k8s.io/client-go v0.34.3
 	k8s.io/component-base v0.34.2
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
 	sigs.k8s.io/controller-runtime v0.22.4
