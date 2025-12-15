@@ -20,10 +20,8 @@ const (
 	ContainerPortNameExporter = "metrics"
 	ContainerPortExporter     = 8080
 	ContainerPathExporter     = "/metrics"
-	ContainerSchemeExporter   = "http"
 
 	ContainerPortNameMonitoring = "monitoring"
 	ContainerPortMonitoring     = 8081
 	ContainerPathMonitoring     = "/metrics"
-	ContainerSchemeMonitoring   = "http"
 )
