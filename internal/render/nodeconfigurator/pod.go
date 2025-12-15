@@ -2,6 +2,8 @@ package nodeconfigurator
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
+
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -13,11 +15,6 @@ func renderPodSpec(nodeConfigurator slurmv1alpha1.NodeConfiguratorSpec) corev1.P
 	// rebooter container will use this for rebooting the node
 	hostPID := nodeConfigurator.Rebooter.Enabled
 
-	initContainers := nodeConfigurator.InitContainers
-	if len(nodeConfigurator.InitContainers) == 0 {
-		initContainers = renderInitContainers()
-	}
-
 	containers := renderContainers(nodeConfigurator)
 
 	affinity := getAffinity(nodeConfigurator)
@@ -28,15 +25,18 @@ func renderPodSpec(nodeConfigurator slurmv1alpha1.NodeConfiguratorSpec) corev1.P
 	hostUsers := getHostUsers(nodeConfigurator)
 
 	return corev1.PodSpec{
-		HostUsers:          hostUsers,
-		HostPID:            hostPID,
-		Affinity:           affinity,
-		NodeSelector:       nodeSelector,
-		Tolerations:        tolerations,
-		InitContainers:     initContainers,
-		Containers:         containers,
-		ServiceAccountName: serviceAccountName,
-		PriorityClassName:  priorityClassName,
+		HostNetwork:           nodeConfigurator.HostNetwork,
+		HostIPC:               nodeConfigurator.HostIPC,
+		ShareProcessNamespace: ptr.To(nodeConfigurator.ShareProcessNamespace),
+		HostUsers:             hostUsers,
+		HostPID:               hostPID,
+		Affinity:              affinity,
+		NodeSelector:          nodeSelector,
+		Tolerations:           tolerations,
+		InitContainers:        nodeConfigurator.InitContainers,
+		Containers:            containers,
+		ServiceAccountName:    serviceAccountName,
+		PriorityClassName:     priorityClassName,
 	}
 }
 
@@ -53,40 +53,40 @@ func getAffinity(nodeConfigurator slurmv1alpha1.NodeConfiguratorSpec) *corev1.Af
 	if nodeConfigurator.Rebooter.Enabled {
 		return nodeConfigurator.Rebooter.Affinity
 	}
-	return nodeConfigurator.SleepContainer.Affinity
+	return nodeConfigurator.CustomContainer.Affinity
 }
 
 func getTolerations(nodeConfigurator slurmv1alpha1.NodeConfiguratorSpec) []corev1.Toleration {
 	if nodeConfigurator.Rebooter.Enabled {
 		return nodeConfigurator.Rebooter.Tolerations
 	}
-	return nodeConfigurator.SleepContainer.Tolerations
+	return nodeConfigurator.CustomContainer.Tolerations
 }
 
 func getNodeSelector(nodeConfigurator slurmv1alpha1.NodeConfiguratorSpec) map[string]string {
 	if nodeConfigurator.Rebooter.Enabled {
 		return nodeConfigurator.Rebooter.NodeSelector
 	}
-	return nodeConfigurator.SleepContainer.NodeSelector
+	return nodeConfigurator.CustomContainer.NodeSelector
 }
 
 func getServiceAccountName(nodeConfigurator slurmv1alpha1.NodeConfiguratorSpec) string {
 	if nodeConfigurator.Rebooter.Enabled {
 		return nodeConfigurator.Rebooter.ServiceAccountName
 	}
-	return nodeConfigurator.SleepContainer.ServiceAccountName
+	return nodeConfigurator.CustomContainer.ServiceAccountName
 }
 
 func getPriorityClassName(nodeConfigurator slurmv1alpha1.NodeConfiguratorSpec) string {
 	if nodeConfigurator.Rebooter.Enabled {
 		return nodeConfigurator.Rebooter.PriorityClassName
 	}
-	return nodeConfigurator.SleepContainer.PriorityClassName
+	return nodeConfigurator.CustomContainer.PriorityClassName
 }
 
 func getHostUsers(nodeConfigurator slurmv1alpha1.NodeConfiguratorSpec) *bool {
 	if nodeConfigurator.Rebooter.Enabled {
 		return nodeConfigurator.Rebooter.HostUsers
 	}
-	return nodeConfigurator.SleepContainer.HostUsers
+	return nodeConfigurator.CustomContainer.HostUsers
 }
