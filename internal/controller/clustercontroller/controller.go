@@ -86,6 +86,7 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 						clusterValues.NodeFilters,
 						clusterValues.VolumeSources,
 						&clusterValues.NodeController,
+						clusterValues.NodeAccounting.Enabled,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
@@ -119,6 +120,7 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 						clusterValues.Name,
 						clusterValues.NodeFilters,
 						&clusterValues.NodeController,
+						clusterValues.NodeAccounting.Enabled,
 					)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered DaemonSet")

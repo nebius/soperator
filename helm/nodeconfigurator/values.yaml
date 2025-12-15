@@ -1,10 +1,16 @@
-nodeConfigurator:
+hostNetwork: true
+customContainer:
   enabled: false
   env: []
   image:
-    repository: cr.eu-north1.nebius.cloud/soperator/busybox
+    repository: "cr.eu-north1.nebius.cloud/soperator/busybox"
     tag: "latest"
     pullPolicy: IfNotPresent
+  command:
+    - /bin/sh
+    - -c
+    - sleep
+    - infinity
   nodeSelector: {}
   resources: {}
   livenessProbe: {}
@@ -32,7 +38,24 @@ rebooter:
   affinity: {}
   priorityClassName: ""
   serviceAccountName: ""
-initContainers: []
+initContainers:
+  - name: node-sysctl-params
+    image: "cr.eu-north1.nebius.cloud/soperator/busybox"
+    securityContext:
+      privileged: true
+      runAsUser: 0
+      runAsGroup: 0
+      readOnlyRootFilesystem: false
+      allowPrivilegeEscalation: true
+    command:
+      - /bin/sh
+      - -c
+      - |
+        sysctl -w kernel.unprivileged_userns_clone=1
+        sysctl -w net.core.rmem_max=536870912
+        sysctl -w net.core.wmem_max=536870912
+        sysctl -w net.ipv4.tcp_rmem="4096 131072 536870912"
+        sysctl -w net.ipv4.tcp_wmem="4096 16384 536870912"
 serviceMonitor:
   enabled: true
   jobLabel: "rebooter"

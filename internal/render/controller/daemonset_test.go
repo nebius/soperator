@@ -88,6 +88,7 @@ func TestRenderDaemonSet(t *testing.T) {
 				tt.clusterName,
 				nodeFilters,
 				tt.controller,
+				true,
 			)
 
 			// Check basic metadata
@@ -148,8 +149,8 @@ func TestRenderDaemonSet(t *testing.T) {
 
 			// Check containers - should use sleep versions
 			containers := result.Spec.Template.Spec.Containers
-			if len(containers) != 1 {
-				t.Errorf("Expected 1 container, got %d", len(containers))
+			if len(containers) != 2 {
+				t.Errorf("Expected 2 containers, got %d", len(containers))
 			} else {
 				container := containers[0]
 				if container.Name != consts.ContainerNameSlurmctld {
@@ -245,6 +246,7 @@ func TestRenderDaemonSetNodeAffinity(t *testing.T) {
 		"test-cluster",
 		nodeFilters,
 		controller,
+		true,
 	)
 
 	// Check node selector
@@ -339,6 +341,7 @@ func TestRenderDaemonSetHostUsers(t *testing.T) {
 				"test-cluster",
 				nodeFilters,
 				controller,
+				true,
 			)
 
 			// Check HostUsers field in PodSpec
