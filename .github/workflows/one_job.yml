@@ -85,7 +85,7 @@ jobs:
           fi
 
       - name: Upload version file
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: version
           path: version.txt
@@ -373,7 +373,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: helm-integration-test-results
           path: |
