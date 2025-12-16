@@ -91,7 +91,7 @@ jobs:
           path: version.txt
 
       - name: Download version artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: version
           path: ./version
@@ -159,7 +159,7 @@ jobs:
           cache: false
 
       - name: Download version artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: version
           path: ./version
@@ -278,7 +278,7 @@ jobs:
           cache: false
 
       - name: Download version artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: version
           path: ./version
@@ -320,7 +320,7 @@ jobs:
           cache: true
 
       - name: Download version artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: version
           path: ./version
