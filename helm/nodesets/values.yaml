@@ -24,7 +24,16 @@ images:
 # NodeSets configuration
 # Each NodeSet defines a group of worker nodes with specific characteristics
 # Example GPU NodeSet
-nodesets: {}
+nodesets:
+  0:
+    slurmd:
+      image:
+        repository: cr.eu-north1.nebius.cloud/soperator/worker_slurmd
+        tag: 1.23.0-noble-slurm25.05.4+custom
+    munge:
+      image:
+        repository: cr.eu-north1.nebius.cloud/soperator/munge
+        tag: 1.23.0-noble-slurm25.05.4+custom
 # - name: gpu-workers
 #   replicas: 3
 #   affinity:
