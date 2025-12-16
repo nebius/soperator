@@ -1,0 +1,19 @@
+namespace: soperator
+
+configMaps:
+  supervisord:
+    enabled: true
+    name: custom-supervisord-config
+    files:
+      - supervisord.conf
+  motd:
+    enabled: true
+    name: motd-nebius-o11y
+    files:
+      - 95-nebius-o11y
+  imageStorage:
+    enabled: true
+    name: image-storage
+    files:
+      - daemon.json
+      - enroot.conf

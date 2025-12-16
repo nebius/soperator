@@ -9,6 +9,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 )
 
@@ -46,6 +47,36 @@ func (r *NodeSetReconciler) setupConfigMapIndexer(mgr ctrl.Manager) error {
 		}
 	}
 	return nil
+}
+
+func (r *NodeSetReconciler) findObjectsForSlurmCluster(
+	ctx context.Context,
+	slurmcluster client.Object,
+) []reconcile.Request {
+	slurmCluster, ok := slurmcluster.(*slurmv1.SlurmCluster)
+	if !ok {
+		return nil
+	}
+
+	attachedNodeSets := &slurmv1alpha1.NodeSetList{}
+	var requests []reconcile.Request
+
+	listOpts := []client.ListOption{
+		client.InNamespace(slurmCluster.Namespace),
+	}
+	if err := r.Client.List(ctx, attachedNodeSets, listOpts...); err != nil {
+		return requests
+	}
+	for _, nodeSet := range attachedNodeSets.Items {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: nodeSet.Namespace,
+				Name:      nodeSet.Name,
+			},
+		})
+	}
+
+	return requests
 }
 
 func (r *NodeSetReconciler) findObjectsForConfigMap(

@@ -12,37 +12,37 @@ import (
 )
 
 // renderContainerREST renders [corev1.Container] for slurmrestd
-func renderContainerREST(containerParams values.Container, threadCount *int32, maxConnections *int32) corev1.Container {
-	if containerParams.Port == 0 {
-		containerParams.Port = consts.DefaultRESTPort
+func renderContainerREST(values *values.SlurmREST) corev1.Container {
+	if values.ContainerREST.Port == 0 {
+		values.ContainerREST.Port = consts.DefaultRESTPort
 	}
-	containerParams.NodeContainer.Resources.Storage()
+	values.ContainerREST.NodeContainer.Resources.Storage()
 
 	var env []corev1.EnvVar
-	if threadCount != nil {
+	if values.ThreadCount != nil {
 		env = append(env, corev1.EnvVar{
 			Name:  "SLURMRESTD_THREAD_COUNT",
-			Value: strconv.Itoa(int(*threadCount)),
+			Value: strconv.Itoa(int(*values.ThreadCount)),
 		})
 	}
-	if maxConnections != nil {
+	if values.MaxConnections != nil {
 		env = append(env, corev1.EnvVar{
 			Name:  "SLURMRESTD_MAX_CONNECTIONS",
-			Value: strconv.Itoa(int(*maxConnections)),
+			Value: strconv.Itoa(int(*values.MaxConnections)),
 		})
 	}
 	env = append(env, containerParams.CustomEnv...)
 
 	return corev1.Container{
 		Name:            consts.ContainerNameREST,
-		Image:           containerParams.Image,
-		ImagePullPolicy: containerParams.ImagePullPolicy,
-		Command:         containerParams.Command,
-		Args:            containerParams.Args,
+		Image:           values.ContainerREST.Image,
+		ImagePullPolicy: values.ContainerREST.ImagePullPolicy,
+		Command:         values.ContainerREST.Command,
+		Args:            values.ContainerREST.Args,
 		Env:             env,
 		Ports: []corev1.ContainerPort{{
-			Name:          containerParams.Name,
-			ContainerPort: containerParams.Port,
+			Name:          values.ContainerREST.Name,
+			ContainerPort: values.ContainerREST.Port,
 			Protocol:      corev1.ProtocolTCP,
 		}},
 		VolumeMounts: []corev1.VolumeMount{
@@ -53,7 +53,7 @@ func renderContainerREST(containerParams values.Container, threadCount *int32, m
 		LivenessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{
-					Port: intstr.FromInt32(containerParams.Port),
+					Port: intstr.FromInt32(values.ContainerREST.Port),
 				},
 			},
 			FailureThreshold:    5,
@@ -62,10 +62,12 @@ func renderContainerREST(containerParams values.Container, threadCount *int32, m
 			SuccessThreshold:    1,
 			TimeoutSeconds:      1,
 		},
-		SecurityContext: &corev1.SecurityContext{},
+		SecurityContext: &corev1.SecurityContext{
+			AppArmorProfile: common.ParseAppArmorProfile(values.ContainerREST.AppArmorProfile),
+		},
 		Resources: corev1.ResourceRequirements{
-			Limits:   common.CopyNonCPUResources(containerParams.Resources),
-			Requests: containerParams.Resources,
+			Limits:   common.CopyNonCPUResources(values.ContainerREST.Resources),
+			Requests: values.ContainerREST.Resources,
 		},
 	}
 }

@@ -5,7 +5,10 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "all-reduce-perf-nccl-without-ib"
-  dependsOn: [ "wait-for-soperatorchecks-srun-ready", "wait-for-topology" ]
+  dependsOn:
+  - "manage-jail-state"
+  - "wait-for-soperatorchecks-srun-ready"
+  - "wait-for-topology"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "25 5-23/6 * * *" # 4 times a day at 05:25, 11:25, 17:25 and 23:25 UTC
   suspend: {{ .Values.checks.allReducePerfNCCLWithoutIB.suspend }}
@@ -15,6 +18,7 @@ spec:
 {{ .Files.Get "scripts/all-reduce-perf-nccl-without-ib.sh" | indent 6 }}
     eachWorkerJobs: true
     jobContainer:
+      appArmorProfile: unconfined
       image: {{ .Values.images.slurmJob | quote }}
       env:
 {{ toYaml .Values.jobContainer.env | indent 8 }}
@@ -24,6 +28,7 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
+      appArmorProfile: unconfined
   failureReactions:
     drainSlurmNode:
       drainReasonPrefix: {{ .Values.checks.allReducePerfNCCLWithoutIB.drainReasonPrefix | quote }}

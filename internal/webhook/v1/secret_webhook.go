@@ -46,7 +46,7 @@ func (v *SecretCustomValidator) ValidateCreate(ctx context.Context, obj runtime.
 	secretlog.Info("Validation for Secret upon creation", "name", secret.GetName())
 	_, annotationExists := secret.Annotations[consts.AnnotationClusterName]
 	if !annotationExists {
-		return nil, fmt.Errorf("Secret must have an annotation '%s'", consts.AnnotationClusterName)
+		return nil, fmt.Errorf("secret must have an annotation '%s'", consts.AnnotationClusterName)
 	}
 	return nil, nil
 }

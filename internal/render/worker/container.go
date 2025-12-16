@@ -48,6 +48,8 @@ func renderContainerSlurmd(
 	enableGDRCopy bool,
 	slurmNodeExtra string,
 	workerFeatures []slurmv1.WorkerFeature,
+	namespace string,
+	useDefaultAppArmorProfile bool,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
@@ -79,6 +81,14 @@ func renderContainerSlurmd(
 	}
 
 	realMemory := common.RenderRealMemorySlurmd(resources)
+
+	appArmorProfile := container.AppArmorProfile
+	if useDefaultAppArmorProfile {
+		appArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
+	}
+	if appArmorProfile == "" {
+		appArmorProfile = consts.AppArmorProfileUnconfined
+	}
 
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
@@ -129,7 +139,8 @@ func renderContainerSlurmd(
 			SeccompProfile: &corev1.SeccompProfile{
 				Type: corev1.SeccompProfileTypeUnconfined,
 			},
-			ProcMount: ptr.To(corev1.UnmaskedProcMount),
+			ProcMount:       ptr.To(corev1.UnmaskedProcMount),
+			AppArmorProfile: common.ParseAppArmorProfile(appArmorProfile),
 		},
 		Resources:                resources,
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
@@ -163,7 +174,7 @@ func renderContainerNodeSetSlurmd(
 	// region Jail Sub-mounts
 	volumeMounts = append(volumeMounts,
 		common.RenderVolumeMounts(
-			sliceutils.Map(nodeSet.JailSubMounts,
+			sliceutils.MapSlice(nodeSet.JailSubMounts,
 				func(subMount slurmv1alpha1.NodeVolumeMount) slurmv1.NodeVolumeMount {
 					return slurmv1.NodeVolumeMount{
 						Name:      subMount.Name,
@@ -181,7 +192,7 @@ func renderContainerNodeSetSlurmd(
 	// region Custom mounts
 	volumeMounts = append(volumeMounts,
 		common.RenderVolumeMounts(
-			sliceutils.Map(nodeSet.CustomVolumeMounts,
+			sliceutils.MapSlice(nodeSet.CustomVolumeMounts,
 				func(mount slurmv1alpha1.NodeVolumeMount) slurmv1.NodeVolumeMount {
 					return slurmv1.NodeVolumeMount{
 						Name:      mount.Name,
@@ -206,7 +217,13 @@ func renderContainerNodeSetSlurmd(
 		return corev1.Container{}, fmt.Errorf("checking resource requests: %w", err)
 	}
 
-	realMemory := common.RenderRealMemorySlurmd(resources)
+	appArmorProfile := nodeSet.ContainerSlurmd.AppArmorProfile
+	if nodeSet.AppArmorProfileUseDefault {
+		appArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(nodeSet.ParentalCluster.Name, nodeSet.ParentalCluster.Namespace))
+	}
+	if appArmorProfile == "" {
+		appArmorProfile = consts.AppArmorProfileUnconfined
+	}
 
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
@@ -214,19 +231,11 @@ func renderContainerNodeSetSlurmd(
 		ImagePullPolicy: nodeSet.ContainerSlurmd.ImagePullPolicy,
 		Command:         nodeSet.ContainerSlurmd.Command,
 		Args:            nodeSet.ContainerSlurmd.Args,
-		Env: append(
-			renderSlurmdEnv(
-				nodeSet.ParentalCluster.Name,
-				nodeSet.CgroupVersion,
-				utils.Ternary(nodeSet.GPU.Enabled, consts.ClusterTypeGPU, consts.ClusterTypeCPU),
-				realMemory,
-				nodeSet.GPU.Nvidia.GDRCopyEnabled,
-				//
-				// TODO Make it work
-				"",
-				nil,
-			),
-			nodeSet.ContainerSlurmd.CustomEnv...,
+		Env: renderNodeSetSlurmdEnv(
+			nodeSet.CgroupVersion,
+			utils.Ternary(nodeSet.GPU.Enabled, consts.ClusterTypeGPU, consts.ClusterTypeCPU),
+			nodeSet.GPU.Nvidia.GDRCopyEnabled,
+			nodeSet.NodeExtra,
 		),
 		Ports: []corev1.ContainerPort{{
 			Name:          nodeSet.ContainerSlurmd.Name,
@@ -259,7 +268,8 @@ func renderContainerNodeSetSlurmd(
 			SeccompProfile: &corev1.SeccompProfile{
 				Type: corev1.SeccompProfileTypeUnconfined,
 			},
-			ProcMount: ptr.To(corev1.UnmaskedProcMount),
+			ProcMount:       ptr.To(corev1.UnmaskedProcMount),
+			AppArmorProfile: common.ParseAppArmorProfile(appArmorProfile),
 		},
 		Resources:                resources,
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
@@ -346,5 +356,52 @@ func renderSlurmdEnv(
 			Value: feature.HostlistExpr,
 		})
 	}
+	return envVar
+}
+
+func renderNodeSetSlurmdEnv(
+	cgroupVersion string,
+	clusterType consts.ClusterType,
+	enableGDRCopy bool,
+	slurmNodeExtra string,
+) []corev1.EnvVar {
+	envVar := []corev1.EnvVar{
+		{
+			Name: "INSTANCE_ID",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "spec.nodeName",
+				},
+			},
+		},
+		{
+			Name:  "SLURM_CLUSTER_TYPE",
+			Value: clusterType.String(),
+		},
+		{
+			Name:  "SOPERATOR_NODE_SETS_ON",
+			Value: "true",
+		},
+	}
+	if len(slurmNodeExtra) > 0 {
+		envVar = append(envVar, corev1.EnvVar{
+			Name:  "SLURM_NODE_EXTRA",
+			Value: slurmNodeExtra,
+		})
+	}
+	if cgroupVersion == consts.CGroupV2 {
+		envVar = append(envVar, corev1.EnvVar{
+			Name:  consts.EnvCGroupV2,
+			Value: "true",
+		})
+	}
+	if enableGDRCopy {
+		envVar = append(envVar, corev1.EnvVar{
+			Name:  consts.EnvNvidiaGDRCopy,
+			Value: "enabled",
+		})
+	}
+
 	return envVar
 }

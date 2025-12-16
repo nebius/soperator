@@ -1,8 +1,6 @@
 package soperatorchecks
 
 import (
-	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -22,51 +20,31 @@ func renderPodTemplateSpec(check *slurmv1alpha1.ActiveCheck, labels map[string]s
 	if check.Spec.CheckType == "slurmJob" {
 		mungeContainerValues := values.Container{
 			NodeContainer: slurmv1.NodeContainer{
-				Image:   check.Spec.SlurmJobSpec.MungeContainer.Image,
-				Command: check.Spec.SlurmJobSpec.MungeContainer.Command,
+				Image:           check.Spec.SlurmJobSpec.MungeContainer.Image,
+				Command:         check.Spec.SlurmJobSpec.MungeContainer.Command,
+				AppArmorProfile: check.Spec.SlurmJobSpec.MungeContainer.AppArmorProfile,
 			},
 			Name: "munge",
 		}
-
 		mungeContainer := common.RenderContainerMunge(&mungeContainerValues)
 		initContainers = append(initContainers, mungeContainer)
-
-		annotations = map[string]string{
-			fmt.Sprintf(
-				"%s/%s", consts.AnnotationApparmorKey, check.Spec.Name,
-			): check.Spec.SlurmJobSpec.JobContainer.AppArmorProfile,
-			fmt.Sprintf(
-				"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-			): check.Spec.SlurmJobSpec.MungeContainer.AppArmorProfile,
-			consts.AnnotationDefaultContainerName: consts.ContainerNameAccounting,
-			consts.AnnotationActiveCheckName:      check.Name,
-		}
 	}
 
-	if check.Spec.CheckType == "k8sJob" {
-		annotations = map[string]string{
-			fmt.Sprintf(
-				"%s/%s", consts.AnnotationApparmorKey, check.Spec.Name,
-			): check.Spec.K8sJobSpec.JobContainer.AppArmorProfile,
-			consts.AnnotationActiveCheckName: check.Name,
+	if check.Spec.CheckType == "k8sJob" && check.Spec.K8sJobSpec.MungeContainer != nil {
+		mungeContainerValues := values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image:           check.Spec.K8sJobSpec.MungeContainer.Image,
+				Command:         check.Spec.K8sJobSpec.MungeContainer.Command,
+				AppArmorProfile: check.Spec.K8sJobSpec.MungeContainer.AppArmorProfile,
+			},
+			Name: "munge",
 		}
-
-		if check.Spec.K8sJobSpec.MungeContainer != nil {
-			mungeContainerValues := values.Container{
-				NodeContainer: slurmv1.NodeContainer{
-					Image:   check.Spec.K8sJobSpec.MungeContainer.Image,
-					Command: check.Spec.K8sJobSpec.MungeContainer.Command,
-				},
-				Name: "munge",
-			}
-			mungeContainer := common.RenderContainerMunge(&mungeContainerValues)
-			initContainers = append(initContainers, mungeContainer)
-
-			annotations[fmt.Sprintf(
-				"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-			)] = check.Spec.K8sJobSpec.MungeContainer.AppArmorProfile
-		}
+		mungeContainer := common.RenderContainerMunge(&mungeContainerValues)
+		initContainers = append(initContainers, mungeContainer)
 	}
+
+	annotations = common.RenderDefaultContainerAnnotation(check.Spec.Name)
+	annotations[consts.AnnotationActiveCheckName] = check.Name
 
 	return corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
