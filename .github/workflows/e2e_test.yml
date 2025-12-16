@@ -278,7 +278,7 @@ jobs:
 
       - name: Upload Full Kubernetes Cluster Info
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: cluster-info
           path: ./cluster-info
@@ -293,7 +293,7 @@ jobs:
 
       - name: Upload Soperator Outputs
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: soperator-outputs
           path: ./soperator-outputs
@@ -368,7 +368,7 @@ jobs:
 
       - name: Upload terraform output
         if: ${{ always() }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: terraform-output
           path: "${{ github.workspace }}/output"
