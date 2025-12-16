@@ -37,6 +37,7 @@ func RenderContainerMunge(container *values.Container, opts ...RenderOption) cor
 		Image:           container.Image,
 		Command:         container.Command,
 		Args:            container.Args,
+		Env:             container.CustomEnv,
 		RestartPolicy:   &restartPolicy,
 		ImagePullPolicy: container.ImagePullPolicy,
 		VolumeMounts: []corev1.VolumeMount{
