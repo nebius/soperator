@@ -31,7 +31,7 @@ func renderContainerREST(values *values.SlurmREST) corev1.Container {
 			Value: strconv.Itoa(int(*values.MaxConnections)),
 		})
 	}
-	env = append(env, containerParams.CustomEnv...)
+	env = append(env, values.ContainerREST.CustomEnv...)
 
 	return corev1.Container{
 		Name:            consts.ContainerNameREST,

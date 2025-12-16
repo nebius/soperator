@@ -75,6 +75,10 @@ spec:
       {{- end }}
     {{- end }}
 
+    {{- if .customEnv }}
+    customEnv: {{- .customEnv | toYaml | nindent 8 }}
+    {{- end }}
+
     port: {{ .port | default 6818 }}
     cgroupVersion: {{ .cgroupVersion | default "v2" }}
 
