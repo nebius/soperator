@@ -807,3 +807,15 @@ kind-status: ## Check kind cluster status
 jail-shell: ## Open interactive shell in jail environment via login pod
 	@echo "Opening jail shell in login-0 pod..."
 	@$(KUBECTL_CTX) exec -it -n soperator login-0 -- chroot /mnt/jail bash -l
+
+
+##@ Values generation
+
+.PHONY: generate-values-types
+generate-values-types: ## Generate Go types from Helm values.yaml for slurm-cluster and soperator-fluxcd
+	@echo "Generating Go types from helm/slurm-cluster/values.yaml"
+	@mkdir -p pkg/valuesgen/generated/slurmcluster
+	@go run ./cmd/generate-values -in helm/slurm-cluster/values.yaml -out pkg/valuesgen/generated/slurmcluster/values.go -pkg slurmvalues -type Values
+	@echo "Generating Go types from helm/soperator-fluxcd/values.yaml"
+	@mkdir -p pkg/valuesgen/generated/soperatorfluxcd
+	@go run ./cmd/generate-values -in helm/soperator-fluxcd/values.yaml -out pkg/valuesgen/generated/soperatorfluxcd/values.go -pkg fluxvalues -type Values
