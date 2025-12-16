@@ -160,14 +160,14 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 
 	// nfs_in_k8s = {
 	//    enabled         = true
-	//    version         = "1.2.0"
+	//    version         = "1.2.0-f67979d7"
 	//    size_gibibytes  = 3720
 	//    disk_type       = "NETWORK_SSD_IO_M3"
 	//    filesystem_type = "ext4"
 	// }
 	tfVars["nfs_in_k8s"] = map[string]interface{}{
 		"enabled":         true,
-		"version":         "1.2.0",
+		"version":         "1.2.0-f67979d7",
 		"size_gibibytes":  3720,
 		"disk_type":       "NETWORK_SSD_IO_M3",
 		"filesystem_type": "ext4",
