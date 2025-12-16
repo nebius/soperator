@@ -159,14 +159,18 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 	tfVars["company_name"] = "e2e-test"
 
 	// nfs_in_k8s = {
-	//   enabled        = true
-	//   version        = "1.1.0"
-	//   size_gibibytes = 3720
+	//    enabled         = true
+	//    version         = "1.2.0"
+	//    size_gibibytes  = 3720
+	//    disk_type       = "NETWORK_SSD_IO_M3"
+	//    filesystem_type = "ext4"
 	// }
 	tfVars["nfs_in_k8s"] = map[string]interface{}{
-		"enabled":        true,
-		"version":        "1.1.0-6efb732b",
-		"size_gibibytes": 3720,
+		"enabled":         true,
+		"version":         "1.2.0",
+		"size_gibibytes":  3720,
+		"disk_type":       "NETWORK_SSD_IO_M3",
+		"filesystem_type": "ext4",
 	}
 
 	// filestore_jail = {
