@@ -216,6 +216,11 @@ type ContainerSlurmdSpec struct {
 	// +kubebuilder:validation:Required
 	Image Image `json:"image"`
 
+	// CustomEnv defines additional environment variables that should be set in the container.
+	//
+	// +kubebuilder:validation:Optional
+	CustomEnv []corev1.EnvVar `json:"customEnv,omitempty"`
+
 	// Resources define the [corev1.ResourceList] for the `slurmd` container.
 	// It includes both usual cpu, memory, etc., as well, as 3rd-party resource specifications.
 	//

@@ -37,12 +37,15 @@ func renderContainerSshd(
 		Image:   container.Image,
 		Command: container.Command,
 		Args:    container.Args,
-		Env: []corev1.EnvVar{
-			{
-				Name:  "SLURM_CLUSTER_TYPE",
-				Value: clusterType.String(),
+		Env: append(
+			[]corev1.EnvVar{
+				{
+					Name:  "SLURM_CLUSTER_TYPE",
+					Value: clusterType.String(),
+				},
 			},
-		},
+			container.CustomEnv...,
+		),
 		ImagePullPolicy: container.ImagePullPolicy,
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,

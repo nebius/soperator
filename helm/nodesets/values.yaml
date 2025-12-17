@@ -81,6 +81,9 @@ nodesets:
         repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
         tag: "1.23.0-noble-slurm25.05.5+custom"
         pullPolicy: "IfNotPresent"
+      customEnv:
+        - name: "NVIDIA_DRIVER_CAPABILITIES"
+          value: "compute,utility,video"
       # Port to serve slurmd service on
       # Optional, defaults to 6818
       port: 6818

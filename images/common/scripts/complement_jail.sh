@@ -76,6 +76,11 @@ pushd "${jaildir}"
         # ldconfig is run further in this script under flock.
         readonly FAKE_LDCONFIG=/usr/bin/true
 
+        if [ -z "${NVIDIA_DRIVER_CAPABILITIES}" ]; then
+          NVIDIA_DRIVER_CAPABILITIES="compute,utility"
+        fi
+        export NVIDIA_DRIVER_CAPABILITIES
+
         nvidia-container-cli \
             --user \
             --debug=/dev/stderr \
@@ -84,8 +89,6 @@ pushd "${jaildir}"
             --no-cgroups \
             --ldconfig=$FAKE_LDCONFIG \
             --device=all \
-            --utility \
-            --compute \
             "${jaildir}"
         touch "etc/gpu_libs_installed.flag"
     fi
