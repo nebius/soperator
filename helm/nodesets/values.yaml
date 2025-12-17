@@ -79,7 +79,7 @@ nodesets:
       # Optional
       image:
         repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
-        tag: "1.23.0-noble-slurm25.05.5+custom"
+        tag: "1.23.1-noble-slurm25.05.5+custom"
         pullPolicy: "IfNotPresent"
       customEnv:
         - name: "NVIDIA_DRIVER_CAPABILITIES"
@@ -164,7 +164,7 @@ nodesets:
       image:
         repository: "cr.eu-north1.nebius.cloud/soperator/munge"
         # Optional
-        tag: "1.23.0-noble-slurm25.05.5+custom"
+        tag: "1.23.1-noble-slurm25.05.5+custom"
         pullPolicy: "IfNotPresent"
       # Munge container resources
       resources:
