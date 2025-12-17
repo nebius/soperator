@@ -76,10 +76,25 @@ pushd "${jaildir}"
         # ldconfig is run further in this script under flock.
         readonly FAKE_LDCONFIG=/usr/bin/true
 
-        if [ -z "${NVIDIA_DRIVER_CAPABILITIES}" ]; then
-          NVIDIA_DRIVER_CAPABILITIES="compute,utility"
+        # Propagate the same capabilities as in NVIDIA_DRIVER_CAPABILITIES
+        cap_args=()
+        if [ -z "${NVIDIA_DRIVER_CAPABILITIES-}" ]; then
+            NVIDIA_DRIVER_CAPABILITIES="compute,utility"
         fi
-        export NVIDIA_DRIVER_CAPABILITIES
+        for cap in ${NVIDIA_DRIVER_CAPABILITIES//,/ }; do
+            case "${cap}" in
+            all)
+                cap_args+=("--compute" "--compat32" "--display" "--graphics" "--utility" "--video")
+                break
+                ;;
+            compute|compat32|display|graphics|utility|video)
+                cap_args+=("--${cap}") ;;
+            *)
+                echo "Unknown NVIDIA driver capability: ${cap}"
+                exit 1
+                ;;
+            esac
+        done
 
         nvidia-container-cli \
             --user \
@@ -89,6 +104,7 @@ pushd "${jaildir}"
             --no-cgroups \
             --ldconfig=$FAKE_LDCONFIG \
             --device=all \
+            "${cap_args[@]}" \
             "${jaildir}"
         touch "etc/gpu_libs_installed.flag"
     fi
