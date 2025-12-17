@@ -1,8 +1,10 @@
 package accounting
 
 import (
+	"cmp"
 	"errors"
 	"sort"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -12,6 +14,7 @@ import (
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	renderutils "nebius.ai/slurm-operator/internal/render/utils"
+	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -34,7 +37,7 @@ func RenderSecret(
 	clusterName string,
 	accounting *values.SlurmAccounting,
 	passwordSecret *corev1.Secret,
-	isRESTenabled bool,
+	isRestEnabled bool,
 ) (*corev1.Secret, error) {
 	var err error
 	passwordName := make([]byte, 0)
@@ -51,9 +54,30 @@ func RenderSecret(
 	secretName := naming.BuildSecretSlurmdbdConfigsName(clusterName)
 	labels := common.RenderLabels(consts.ComponentTypeAccounting, clusterName)
 	data := map[string][]byte{
-		consts.ConfigMapKeySlurmdbdConfig: []byte(generateSlurdbdConfig(
-			clusterName, accounting, passwordName, isRESTenabled).Render(),
+		consts.ConfigMapKeySlurmdbdConfig: []byte(generateSlurmdbdConfig(
+			clusterName, accounting, passwordName, isRestEnabled).Render(),
 		),
+		consts.SecretSlurmdbdConfigStorageHost: []byte(utils.Ternary(
+			accounting.MariaDb.Enabled,
+			naming.BuildMariaDbName(clusterName),
+			accounting.ExternalDB.Host,
+		)),
+		consts.SecretSlurmdbdConfigStoragePort: []byte(strconv.Itoa(int(
+			cmp.Or(
+				utils.Ternary(
+					accounting.MariaDb.Enabled,
+					accounting.MariaDb.Port,
+					accounting.ExternalDB.Port,
+				),
+				3306,
+			))),
+		),
+		consts.SecretSlurmdbdConfigStorageUser: []byte(utils.Ternary(
+			accounting.MariaDb.Enabled,
+			consts.MariaDbUsername,
+			accounting.ExternalDB.User,
+		)),
+		consts.SecretSlurmdbdConfigStoragePass: passwordName,
 	}
 
 	return &corev1.Secret{
@@ -105,11 +129,11 @@ func checkPasswordSecret(accounting *values.SlurmAccounting, secret *corev1.Secr
 	return passwordName, nil
 }
 
-func generateSlurdbdConfig(
+func generateSlurmdbdConfig(
 	clusterName string,
 	accounting *values.SlurmAccounting,
 	passwordName []byte,
-	isRESTenabled bool,
+	isRestEnabled bool,
 ) renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
 	// Unmodifiable parameters
@@ -125,20 +149,25 @@ func generateSlurdbdConfig(
 	if len(passwordName) > 0 {
 		res.AddProperty("StoragePass", string(passwordName))
 	}
+	var port int32
 	if accounting.MariaDb.Enabled {
 		res.AddProperty("StorageUser", consts.MariaDbUsername)
 		res.AddProperty("StorageHost", naming.BuildMariaDbName(clusterName))
-		res.AddProperty("StoragePort", accounting.MariaDb.Port)
+		port = accounting.MariaDb.Port
 	} else {
 		res.AddProperty("StorageUser", accounting.ExternalDB.User)
 		res.AddProperty("StorageHost", accounting.ExternalDB.Host)
-		res.AddProperty("StoragePort", accounting.ExternalDB.Port)
+		port = accounting.ExternalDB.Port
 		storageParameters := generateSlurmdbdConfigStorageParameters(accounting)
 		if storageParameters != "" {
 			res.AddProperty("StorageParameters", storageParameters)
 		}
 	}
-	if isRESTenabled {
+	if port == 0 {
+		port = 3306
+	}
+	res.AddProperty("StoragePort", port)
+	if isRestEnabled {
 		res.AddComment("")
 		res.AddComment("REST API settings")
 		res.AddProperty("AuthAltTypes", "auth/jwt")

@@ -9,6 +9,7 @@ spec:
   suspend: {{ .Values.checks.waitForTopology.suspend }}
   runAfterCreation: {{ .Values.checks.waitForTopology.runAfterCreation }}
   k8sJobSpec:
+    appArmorProfile: unconfined
     jobContainer:
       command:
         - bash

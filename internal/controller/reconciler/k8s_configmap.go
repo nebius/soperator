@@ -6,6 +6,7 @@ import (
 	"maps"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -46,7 +47,12 @@ func (r *ConfigMapReconciler) patch(existing, desired client.Object) (client.Pat
 	patchImpl := func(dst, src *corev1.ConfigMap) client.Patch {
 		res := client.MergeFrom(dst.DeepCopy())
 
-		dst.Data = src.Data
+		// Use semantic deep equal to avoid unnecessary updates when ConfigMap data is identical
+		// but Go map iteration order differs (which would cause different serialization)
+		if !equality.Semantic.DeepEqual(dst.Data, src.Data) {
+			dst.Data = src.Data
+		}
+
 		if dst.Labels == nil {
 			dst.Labels = make(map[string]string)
 		}

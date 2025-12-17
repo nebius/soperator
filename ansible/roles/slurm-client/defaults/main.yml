@@ -1,7 +1,7 @@
 ---
 
 slurm:
-  version: 25.05.4
+  version: 25.05.5
   client_packages:
     - slurm-smd-client
     - slurm-smd-dev

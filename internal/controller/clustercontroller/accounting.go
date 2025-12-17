@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -554,8 +554,8 @@ func (r SlurmClusterReconciler) updateAccountingAvailabilityStatus(
 	reason, message string,
 	requeueAfter time.Duration,
 ) (ctrl.Result, error) {
-	if err := r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-		status.SetCondition(metav1.Condition{
+	if err := r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) bool {
+		return status.SetCondition(metav1.Condition{
 			Type:    slurmv1.ConditionClusterAccountingAvailable,
 			Status:  conditionStatus,
 			Reason:  reason,

@@ -5,7 +5,11 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "gpu-fryer"
-  dependsOn: [ "wait-for-soperatorchecks-srun-ready", "wait-for-topology", "prepull-container-image" ]
+  dependsOn:
+  - "manage-jail-state"
+  - "wait-for-soperatorchecks-srun-ready"
+  - "wait-for-topology"
+  - "prepull-container-image"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "15 9-21/12 * * *" # 2 times a day at 9:15 and 21:15 UTC
   suspend: {{ .Values.checks.gpuFryer.suspend }}
@@ -15,6 +19,7 @@ spec:
 {{ tpl (.Files.Get "scripts/gpu-fryer.sh") . | indent 6 }}
     eachWorkerJobs: true
     jobContainer:
+      appArmorProfile: unconfined
       image: {{ .Values.images.slurmJob | quote }}
       env:
 {{ toYaml .Values.jobContainer.env | indent 8 }}
@@ -24,6 +29,7 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
+      appArmorProfile: unconfined
   failureReactions:
     drainSlurmNode:
       drainReasonPrefix: {{ .Values.checks.gpuFryer.drainReasonPrefix | quote }}

@@ -26,6 +26,7 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/types"
 	. "github.com/onsi/gomega"
 
 	"nebius.ai/slurm-operator/test/testenv"
@@ -34,8 +35,14 @@ import (
 func TestIntegration(t *testing.T) {
 	RegisterFailHandler(Fail)
 	_, _ = fmt.Fprintf(GinkgoWriter, "Starting Helm Integration Test Suite\n")
-	RunSpecs(t, "Helm Integration Suite")
+	RunSpecs(t, "Helm Integration Suite", Label("integration"))
 }
+
+var _ = ReportAfterEach(func(report SpecReport) {
+	if report.State.Is(types.SpecStatePassed) {
+		fmt.Printf("✓ %s [%.3fs]\n", report.FullText(), report.RunTime.Seconds())
+	}
+})
 
 var _ = BeforeSuite(func(ctx SpecContext) {
 	// Determine if we should use unstable version (default: true)

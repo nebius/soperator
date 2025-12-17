@@ -23,7 +23,7 @@ tests:
           value: false
       - equal:
           path: description
-          value: "High priority class for GPU workers and critical Slurm components"
+          value: "High priority class for Slurm workers"
       - equal:
           path: preemptionPolicy
           value: "PreemptLowerPriority"
@@ -42,32 +42,35 @@ tests:
   - it: should work with custom priority classes
     set:
       priorityClasses:
-        - name: "custom-priority"
-          value: 500000
-          globalDefault: true
-          description: "Custom priority class"
+        - name: &customPriority "custom-priority"
+          value: &customValue 500000
+          globalDefault: &customGlobalDefault true
+          description: &customDescription "Custom priority class"
           annotations:
-            custom.annotation: "test"
+            custom.annotation: &customAnnLabelValue "test"
           labels:
-            custom.label: "test"
+            custom.label: *customAnnLabelValue
     asserts:
       - hasDocuments:
           count: 1
       - equal:
           path: metadata.name
-          value: "custom-priority"
+          value: *customPriority
       - equal:
           path: value
-          value: 500000
+          value: *customValue
       - equal:
           path: globalDefault
-          value: true
+          value: *customGlobalDefault
       - equal:
           path: metadata.annotations["custom.annotation"]
-          value: "test"
+          value: *customAnnLabelValue
       - equal:
           path: metadata.labels["custom.label"]
-          value: "test"
+          value: *customAnnLabelValue
+      - equal:
+          path: description
+          value: *customDescription
 
   - it: should work with empty priority classes
     set:
@@ -75,3 +78,43 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  - it: should fail if priority class name is not set
+    set:
+      priorityClasses:
+        - name: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: ".Values.priorityClasses[*].name is required."
+
+  - it: should work with just name set
+    set:
+      priorityClasses:
+        - name: &minimalPC "minimal-priority-class"
+    documentIndex: 0
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: *minimalPC
+      - notExists:
+          path: metadata.annotations
+      - exists:
+          path: metadata.labels["helm.sh/chart"]
+      - exists:
+          path: metadata.labels["app.kubernetes.io/name"]
+      - exists:
+          path: metadata.labels["app.kubernetes.io/instance"]
+      - exists:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+      - isNullOrEmpty:
+          path: description
+      - equal:
+          path: value
+          value: 10000000
+      - equal:
+          path: globalDefault
+          value: false
+      - notExists:
+          path: preemptionPolicy
