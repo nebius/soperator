@@ -35,18 +35,17 @@ data:
 {{- end }}
   # checks config
   checks.json: |-
-    [
-  {{- range $name, $conf := .Values.slurmScripts.builtIn }}
+{{- $checks := list }}
+{{- range $name, $conf := .Values.slurmScripts.builtIn }}
   {{- if $conf.enabled }}
     {{- if $conf.customConfig }}
-{{ tpl ($conf.customConfig) $ | indent 6 }},
+      {{- $checks = append $checks (fromJson (tpl ($conf.customConfig) $)) }}
     {{- else }}
-{{ tpl (printf "slurm_scripts/%s.json" $name | $.Files.Get) $ | indent 6 }},
-    {{- end -}}
+      {{- $checks = append $checks (fromJson (tpl (printf "slurm_scripts/%s.json" $name | $.Files.Get) $)) }}
+    {{- end }}
   {{- end }}
-  {{- end }}
-
-  {{- range $name, $params := .Values.slurmScripts.extra }}
-{{ tpl (get $params "config") $ | indent 6 }},
-  {{- end }}
-    ]
+{{- end }}
+{{- range $name, $params := .Values.slurmScripts.extra }}
+  {{- $checks = append $checks (fromJson (tpl (get $params "config") $)) }}
+{{- end }}
+{{ toPrettyJson $checks | indent 4 }}
