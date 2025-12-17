@@ -23,7 +23,9 @@ const (
 	LabelNodeConfiguratorKey   = K8sGroupNameSoperator + "/node-configurator"
 	LabelNodeConfiguratorValue = "true"
 
-	LabelNodeSetKey = K8sGroupNameSoperator + "/nodeset"
+	LabelNodeSetKey  = K8sGroupNameSoperator + "/nodeset"
+	LabelWorkerKey   = K8sGroupNameSoperator + "/worker"
+	LabelWorkerValue = "true"
 
 	LabelSConfigControllerSourceKey   = "sconfigcontroller." + K8sGroupNameSoperator
 	LabelSConfigControllerSourceValue = "true"

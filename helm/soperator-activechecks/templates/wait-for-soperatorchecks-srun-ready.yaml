@@ -5,13 +5,16 @@ metadata:
 spec:
   checkType: "k8sJob"
   name: "wait-for-soperatorchecks-srun-ready"
-  dependsOn: [ "create-user-soperatorchecks" ]
+  dependsOn:
+  - "manage-jail-state"
+  - "create-user-soperatorchecks"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "0 0 1 1 *"
   suspend: true
   runAfterCreation: true
   k8sJobSpec:
     jobContainer:
+      appArmorProfile: unconfined
       command:
         - bash
         - -c
@@ -27,3 +30,4 @@ spec:
             claimName: "jail-pvc"
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
+      appArmorProfile: unconfined

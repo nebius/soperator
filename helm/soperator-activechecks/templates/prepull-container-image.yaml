@@ -5,7 +5,10 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "prepull-container-image"
-  dependsOn: [ "wait-for-soperatorchecks-srun-ready", "wait-for-topology" ]
+  dependsOn:
+  - "manage-jail-state"
+  - "wait-for-soperatorchecks-srun-ready"
+  - "wait-for-topology"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   suspend: {{ .Values.checks.prepullContainerImage.suspend }}
   runAfterCreation: {{ .Values.checks.prepullContainerImage.runAfterCreation }}
@@ -13,6 +16,7 @@ spec:
     sbatchScript: |
 {{ tpl (.Files.Get "scripts/prepull-container-image.sh") . | indent 6 }}
     jobContainer:
+      appArmorProfile: unconfined
       image: {{ .Values.images.slurmJob | quote }}
       env:
 {{ toYaml .Values.jobContainer.env | indent 8 }}
@@ -22,3 +26,4 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
+      appArmorProfile: unconfined

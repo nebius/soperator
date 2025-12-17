@@ -1,0 +1,17 @@
+{
+  "name": "gpu_health_check",
+  "command": "/usr/bin/python3 gpu_health_check.py",
+  "platforms": ["8xH100", "8xH200", "8xB200", "8xB300"],
+  "skip_for_cpu_jobs": true,
+  "skip_for_partial_gpu_jobs": false,
+  "skip_for_reservation_prefixes": ["suspicious-node"],
+  "contexts": ["any"],
+  "node_states": ["any"],
+  "on_fail": "drain",
+  "on_ok": "none",
+  "reason_base": "[node_problem] $name",
+  "reason_append_details": true,
+  "run_in_jail": true,
+  "log": "slurm_scripts/$worker.$name.$context.out",
+  "need_env": ["CHECKS_PLATFORM_TAG"]
+}

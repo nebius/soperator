@@ -157,6 +157,7 @@ slurmConfig:
   topologyPlugin: "topology/tree"
   topologyParam: "SwitchAsNodeRank"
 customSlurmConfig: ""
+customCgroupConfig: ""
 mpiConfig:
   pmixEnv: "OMPI_MCA_btl_tcp_if_include=eth0"
 plugStackConfig:
@@ -282,6 +283,7 @@ slurmNodes:
         # passwordSecretKeyRef: {}
         # name: ""
         # key: ""
+      priorityClassName: ""
       # affinity: {}
       # args: []
       # env: []
@@ -529,25 +531,120 @@ sConfigController:
     jobLabel: "sconfigcontroller"
     interval: "30s"
     scrapeTimeout: "28s"
+  # RBAC settings for sconfigcontroller
+  rbac:
+    # Specifies whether RBAC resources should be created
+    create: true
+  # ServiceAccount settings for sconfigcontroller
+  serviceAccount:
+    # Specifies whether a ServiceAccount should be created
+    create: true
+    # The name of the ServiceAccount to use.
+    # If not set and create is true, a name is generated using the cluster name: <clusterName>-sconfigcontroller
+    # This field is required in the SlurmCluster CR - it will be automatically populated from this value
+    name: ""
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.23.0-noble-slurm25.05.4"
-  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.23.0-noble-slurm25.05.4"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.23.0-noble-slurm25.05.4"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.23.0-noble-slurm25.05.4"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.23.0-noble-slurm25.05.4"
-  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.23.0-noble-slurm25.05.4"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.23.0-noble-slurm25.05.4"
-  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.23.0-noble-slurm25.05.4"
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.23.0-noble-slurm25.05.5"
+  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.23.0-noble-slurm25.05.5"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.23.0-noble-slurm25.05.5"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.23.0-noble-slurm25.05.5"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.23.0-noble-slurm25.05.5"
+  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.23.0-noble-slurm25.05.5"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.23.0-noble-slurm25.05.5"
+  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.23.0-noble-slurm25.05.5"
   sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.23.0
-  mariaDB: docker-registry1.mariadb.com/library/mariadb:11.4.3
+  mariaDB: docker-registry1.mariadb.com/library/mariadb:12.1.2
 # Configuration for slurm scripts.
 slurmScripts:
-  prolog: null
-  epilog: null
-  hcProgram: null
-  # custom:
-  #   example.sh: |
+  # Base scripts content can be overridden here
+  check_runner.py: null
+  prolog.sh: null
+  epilog.sh: null
+  hc_program.sh: null
+  # Built-in scripts can be overridden or disabled here
+  # Keys must match file names in slurm_scripts/
+  builtIn:
+    alloc_gpus_busy.drain.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    alloc_gpus_busy.undrain.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    alloc_mem_used.drain.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    alloc_mem_used.undrain.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    boot_disk_full.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    cleanup_enroot.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    cleanup_scratch_data.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    drop_page_cache.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    drop_posix_shmem.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    gpu_health_check.py:
+      enabled: true
+      customContent: null
+      customConfig: null
+    job_tmpfs_delete.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    job_tmpfs_delete_leftover.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    job_tmpfs_recreate.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    map_job_dcgm.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    unmap_job_dcgm.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+  extra: null
+  # extra:
+  #   example.sh:
+  #     config: |-
+  #     {
+  #       "name": "exmaple",
+  #       "command": "./example.sh",
+  #       "platforms": ["any"],
+  #       "skip_for_cpu_jobs": false,
+  #       "skip_for_partial_gpu_jobs": false,
+  #       "skip_for_reservation_prefixes": [],
+  #       "contexts": ["prolog"],
+  #       "node_states": ["any"],
+  #       "on_fail": "drain",
+  #       "on_ok": "undrain",
+  #       "reason_base": "[some tag] $name",
+  #       "reason_append_details": true,
+  #       "run_in_jail": false,
+  #       "log": "slurm_scripts/$worker.$name.$context.out",
+  #       "need_env": []
+  #     }
+  #     content: |-
   #     #!/bin/bash
-  #
-  #     echo "Example"
-  custom: null
+  #     echo "Cluster: {{ $.Values.clusterName }}"
