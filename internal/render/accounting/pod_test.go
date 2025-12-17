@@ -65,16 +65,16 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 
 	assert.Equal(t, expected.Labels, result.Labels)
 
-	// expected.Spec.InitContainers[0].Name == munge
-	// expected.Spec.Containers[0].Name == accounting
+	// expected.Spec.InitContainers[1].Name == munge
+	// expected.Spec.Containers[1].Name == accounting
 
-	assert.Equal(t, expected.Spec.InitContainers[0].Name, result.Spec.InitContainers[0].Name)
+	assert.Equal(t, expected.Spec.InitContainers[0].Name, result.Spec.InitContainers[1].Name)
 	assert.Equal(t, expected.Spec.Containers[0].Name, result.Spec.Containers[0].Name)
 
-	assert.Equal(t, expected.Spec.InitContainers[0].Image, result.Spec.InitContainers[0].Image)
+	assert.Equal(t, expected.Spec.InitContainers[0].Image, result.Spec.InitContainers[1].Image)
 	assert.Equal(t, expected.Spec.Containers[0].Image, result.Spec.Containers[0].Image)
 
-	assert.Equal(t, expected.Spec.InitContainers[0].Resources, result.Spec.InitContainers[0].Resources)
+	assert.Equal(t, expected.Spec.InitContainers[0].Resources, result.Spec.InitContainers[1].Resources)
 	assert.Equal(t, expected.Spec.Containers[0].Resources, result.Spec.Containers[0].Resources)
 
 	assert.Equal(t, expected.Spec.NodeSelector, result.Spec.NodeSelector)

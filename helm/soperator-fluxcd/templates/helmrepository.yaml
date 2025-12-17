@@ -136,19 +136,6 @@ spec:
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
-  name: {{ include "soperator-fluxcd.fullname" . }}-helmrelease-trigger
-  labels:
-    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
-spec:
-  interval: {{ .Values.helmRepository.interval }}
-  url: {{ .Values.helmRepository.helmReleaseTriggerOperator.url }}
-  type: {{ .Values.helmRepository.helmReleaseTriggerOperator.type }}
-{{- end }}
-{{- if .Values.nfsServer.enabled }}
----
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
   name: {{ include "soperator-fluxcd.fullname" . }}-csi-driver-nfs
   labels:
     {{- include "soperator-fluxcd.labels" . | nindent 4 }}

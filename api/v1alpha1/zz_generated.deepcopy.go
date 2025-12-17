@@ -356,6 +356,13 @@ func (in *ContainerSecuritySpec) DeepCopy() *ContainerSecuritySpec {
 func (in *ContainerSlurmdSpec) DeepCopyInto(out *ContainerSlurmdSpec) {
 	*out = *in
 	out.Image = in.Image
+	if in.CustomEnv != nil {
+		in, out := &in.CustomEnv, &out.CustomEnv
+		*out = make([]v1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources
 		*out = make(v1.ResourceList, len(*in))

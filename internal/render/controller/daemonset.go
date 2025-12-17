@@ -10,16 +10,17 @@ import (
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
-	"nebius.ai/slurm-operator/internal/utils"
+	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-// RenderDaemonSet renders new [appsv1.DaemonSet] containing additional Slurm controller pods
+// RenderPlaceholderDaemonSet renders new [appsv1.DaemonSet] containing additional Slurm controller pods
 func RenderPlaceholderDaemonSet(
 	namespace,
 	clusterName string,
 	nodeFilters []slurmv1.K8sNodeFilter,
 	controller *values.SlurmController,
+	accountingEnabled bool,
 ) appsv1.DaemonSet {
 	labels := common.RenderLabels(consts.ComponentTypeController, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeController, clusterName)
@@ -27,11 +28,19 @@ func RenderPlaceholderDaemonSet(
 	labels[consts.LabelControllerType] = consts.LabelControllerTypePlaceholder
 	matchLabels[consts.LabelControllerType] = consts.LabelControllerTypePlaceholder
 
-	nodeFilter := utils.MustGetBy(
+	nodeFilter := sliceutils.MustGetBy(
 		nodeFilters,
 		controller.K8sNodeFilterName,
 		func(f slurmv1.K8sNodeFilter) string { return f.Name },
 	)
+
+	containers := []corev1.Container{
+		renderContainerSlurmctldSleep(&controller.ContainerSlurmctld),
+	}
+	if accountingEnabled {
+		containers = append(containers, renderContainerAccountingWaiterSleep(&controller.ContainerSlurmctld))
+	}
+	containers = append(containers, renderCustomContainersSleep(controller.CustomInitContainers)...)
 
 	return appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -61,12 +70,7 @@ func RenderPlaceholderDaemonSet(
 					InitContainers: []corev1.Container{
 						common.RenderPlaceholderContainerMunge(&controller.ContainerMunge),
 					},
-					Containers: append(
-						[]corev1.Container{
-							renderContainerSlurmctldSleep(&controller.ContainerSlurmctld),
-						},
-						renderCustomContainersSleep(controller.CustomInitContainers)...,
-					),
+					Containers:                    containers,
 					RestartPolicy:                 corev1.RestartPolicyAlways,
 					TerminationGracePeriodSeconds: ptr.To(common.DefaultPodTerminationGracePeriodSeconds),
 					SecurityContext:               &corev1.PodSecurityContext{},
@@ -76,6 +80,17 @@ func RenderPlaceholderDaemonSet(
 				},
 			},
 		},
+	}
+}
+
+// renderContainerAccountingWaiterSleep renders accounting waiting init [corev1.Container] in sleep mode for DaemonSet
+func renderContainerAccountingWaiterSleep(container *values.Container) corev1.Container {
+	return corev1.Container{
+		Name:            consts.ContainerNameWaitForAccounting,
+		Image:           container.Image,
+		ImagePullPolicy: container.ImagePullPolicy,
+		Command:         []string{"sleep"},
+		Args:            []string{"infinity"},
 	}
 }
 

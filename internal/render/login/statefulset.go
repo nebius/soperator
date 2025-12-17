@@ -27,6 +27,7 @@ func RenderStatefulSet(
 	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	login *values.SlurmLogin,
+	nodeSetsEnabled bool,
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeLogin, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName)
@@ -46,6 +47,11 @@ func RenderStatefulSet(
 	replicas := &login.StatefulSet.Replicas
 	if check.IsMaintenanceActive(login.Maintenance) {
 		replicas = ptr.To(consts.ZeroReplicas)
+	}
+
+	sshAppArmorProfile := login.ContainerSshd.AppArmorProfile
+	if login.UseDefaultAppArmorProfile {
+		sshAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
 	}
 
 	return kruisev1b1.StatefulSet{
@@ -82,7 +88,7 @@ func RenderStatefulSet(
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
-					Annotations: renderAnnotations(login, clusterName, namespace),
+					Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameSshd),
 				},
 				Spec: corev1.PodSpec{
 					HostUsers:    login.HostUsers,
@@ -94,13 +100,23 @@ func RenderStatefulSet(
 						common.RenderContainerMunge(&login.ContainerMunge),
 					),
 					Containers: []corev1.Container{
-						renderContainerSshd(clusterType, &login.ContainerSshd, login.JailSubMounts, login.CustomVolumeMounts),
+						renderContainerSshd(
+							clusterType,
+							&login.ContainerSshd,
+							login.JailSubMounts,
+							login.CustomVolumeMounts,
+							sshAppArmorProfile,
+						),
 					},
 					Volumes:   volumes,
 					DNSPolicy: corev1.DNSClusterFirst,
 					DNSConfig: &corev1.PodDNSConfig{
 						Searches: []string{
-							naming.BuildServiceFQDN(consts.ComponentTypeWorker, namespace, clusterName),
+							utils.Ternary(
+								nodeSetsEnabled,
+								naming.BuildNodeSetUmbrellaServiceFQDN(namespace, clusterName),
+								naming.BuildWorkerServiceFQDN(namespace, clusterName),
+							),
 							naming.BuildLoginHeadlessServiceFQDN(namespace, clusterName),
 						},
 					},
@@ -113,25 +129,4 @@ func RenderStatefulSet(
 			},
 		},
 	}, nil
-}
-
-func renderAnnotations(login *values.SlurmLogin, clusterName, namespace string) map[string]string {
-	mungeAppArmorProfile := login.ContainerMunge.AppArmorProfile
-	sshAppArmorProfile := login.ContainerSshd.AppArmorProfile
-
-	if login.UseDefaultAppArmorProfile {
-		sshAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
-	}
-
-	annotations := map[string]string{
-		fmt.Sprintf(
-			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSshd,
-		): sshAppArmorProfile,
-		fmt.Sprintf(
-			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-		): mungeAppArmorProfile,
-		consts.AnnotationDefaultContainerName: consts.ContainerNameSshd,
-	}
-
-	return annotations
 }

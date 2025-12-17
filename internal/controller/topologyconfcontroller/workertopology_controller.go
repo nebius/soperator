@@ -22,13 +22,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
-	"nebius.ai/slurm-operator/internal/render/common"
-
-	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 )
 
 var (
@@ -104,7 +103,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		"ConfigMapNamespace", nodeTopologyLabelsConfigMap.Namespace,
 	)
 
-	labelSelector := client.MatchingLabels{consts.LabelComponentKey: consts.ComponentTypeWorker.String()}
+	labelSelector := client.MatchingLabels{consts.LabelWorkerKey: consts.LabelWorkerValue}
 	fieldSelector := client.MatchingFields{consts.FieldStatusPhase: string(corev1.PodRunning)}
 	podList, err := r.getPodList(ctx, labelSelector, fieldSelector, req.Namespace)
 	if err != nil {
@@ -298,7 +297,7 @@ func (r *WorkerTopologyReconciler) GetStatefulSetsWithFallback(
 ) (*kruisev1b1.StatefulSetList, error) {
 	listASTS := &kruisev1b1.StatefulSetList{}
 
-	if err := r.getAdvancedSTS(ctx, clusterName, listASTS); err != nil {
+	if err := r.getAdvancedSTS(ctx, listASTS); err != nil {
 		return nil, fmt.Errorf("get advanced stateful sets: %w", err)
 	}
 
@@ -324,8 +323,11 @@ func (r *WorkerTopologyReconciler) GetStatefulSetsWithFallback(
 }
 
 func (r *WorkerTopologyReconciler) getAdvancedSTS(
-	ctx context.Context, clusterName string, asts *kruisev1b1.StatefulSetList) error {
-	labels := common.RenderLabels(consts.ComponentTypeWorker, clusterName)
+	ctx context.Context, asts *kruisev1b1.StatefulSetList,
+) error {
+	labels := map[string]string{
+		consts.LabelWorkerKey: consts.LabelWorkerValue,
+	}
 	return r.Client.List(ctx, asts, client.MatchingLabels(labels))
 }
 
@@ -486,19 +488,18 @@ func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, 
 func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 	maxConcurrency int, cacheSyncTimeout time.Duration) error {
 
-	ctx := context.Background()
-
-	// Index pods by their status and worker label.
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Pod{}, consts.FieldStatusPhase,
-		func(o client.Object) []string {
-			if o.(*corev1.Pod).Status.Phase == corev1.PodRunning &&
-				o.(*corev1.Pod).Labels[consts.LabelComponentKey] == consts.ComponentTypeWorker.String() {
-				return []string{string(o.(*corev1.Pod).Status.Phase)}
-			}
-			return []string{}
-		}); err != nil {
+	// Index pod statuses to get client.MatchingFields working.
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&corev1.Pod{},
+		consts.FieldStatusPhase,
+		func(obj client.Object) []string {
+			return []string{string(obj.(*corev1.Pod).Status.Phase)}
+		},
+	); err != nil {
 		return fmt.Errorf("failed to setup %s field indexer: %w", consts.FieldStatusPhase, err)
 	}
+
 	return ctrl.NewControllerManagedBy(mgr).Named(WorkerTopologyReconcilerName).
 		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
