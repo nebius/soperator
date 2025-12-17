@@ -556,12 +556,95 @@ images:
   mariaDB: docker-registry1.mariadb.com/library/mariadb:12.1.2
 # Configuration for slurm scripts.
 slurmScripts:
-  prolog: null
-  epilog: null
-  hcProgram: null
-  # custom:
-  #   example.sh: |
+  # Base scripts content can be overridden here
+  check_runner.py: null
+  prolog.sh: null
+  epilog.sh: null
+  hc_program.sh: null
+  # Built-in scripts can be overridden or disabled here
+  # Keys must match file names in slurm_scripts/
+  builtIn:
+    alloc_gpus_busy.drain.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    alloc_gpus_busy.undrain.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    alloc_mem_used.drain.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    alloc_mem_used.undrain.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    boot_disk_full.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    cleanup_enroot.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    cleanup_scratch_data.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    drop_page_cache.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    drop_posix_shmem.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    gpu_health_check.py:
+      enabled: true
+      customContent: null
+      customConfig: null
+    job_tmpfs_delete.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    job_tmpfs_delete_leftover.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    job_tmpfs_recreate.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    map_job_dcgm.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    unmap_job_dcgm.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+  extra: null
+  # extra:
+  #   example.sh:
+  #     config: |-
+  #     {
+  #       "name": "exmaple",
+  #       "command": "./example.sh",
+  #       "platforms": ["any"],
+  #       "skip_for_cpu_jobs": false,
+  #       "skip_for_partial_gpu_jobs": false,
+  #       "skip_for_reservation_prefixes": [],
+  #       "contexts": ["prolog"],
+  #       "node_states": ["any"],
+  #       "on_fail": "drain",
+  #       "on_ok": "undrain",
+  #       "reason_base": "[some tag] $name",
+  #       "reason_append_details": true,
+  #       "run_in_jail": false,
+  #       "log": "slurm_scripts/$worker.$name.$context.out",
+  #       "need_env": []
+  #     }
+  #     content: |-
   #     #!/bin/bash
-  #
-  #     echo "Example"
-  custom: null
+  #     echo "Cluster: {{ $.Values.clusterName }}"
