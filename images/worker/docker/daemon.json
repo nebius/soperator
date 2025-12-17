@@ -1,4 +1,5 @@
 {
+  "storage-driver": "vfs",
   "hosts": [
     "unix:///var/run/docker.sock"
   ],
