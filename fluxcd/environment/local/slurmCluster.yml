@@ -2,7 +2,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.23.0
+  version: 1.23.1
   namespace: soperator
   releaseName: soperator
   overrideValues:

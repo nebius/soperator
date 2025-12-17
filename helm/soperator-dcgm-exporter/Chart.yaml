@@ -2,5 +2,5 @@ apiVersion: v2
 name: helm-soperator-dcgm-exporter
 description: A Helm chart for Nvidia DCGM Exporter
 type: application
-version: 1.23.0
-appVersion: "1.23.0"
+version: 1.23.1
+appVersion: "1.23.1"
