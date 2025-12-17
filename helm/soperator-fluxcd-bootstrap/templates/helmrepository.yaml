@@ -1,0 +1,16 @@
+{{- if .Values.helmRepository.enabled }}
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: {{ .Values.helmRepository.name }}
+  namespace: {{ .Values.helmRepository.namespace }}
+  labels:
+    {{- include "soperator-fluxcd-bootstrap.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.helmRepository.annotations | nindent 4 }}
+spec:
+  interval: {{ .Values.helmRepository.interval }}
+  provider: generic
+  type: {{ .Values.helmRepository.type }}
+  url: {{ .Values.helmRepository.url }}
+{{- end }}

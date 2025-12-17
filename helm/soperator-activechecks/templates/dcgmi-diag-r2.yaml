@@ -5,7 +5,10 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "dcgmi-diag-r2"
-  dependsOn: [ "wait-for-soperatorchecks-srun-ready", "wait-for-topology" ]
+  dependsOn:
+  - "manage-jail-state"
+  - "wait-for-soperatorchecks-srun-ready"
+  - "wait-for-topology"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "5 12 * * *" # Once a day at 12:05 UTC
   suspend: {{ .Values.checks.dcgmiDiagR2.suspend }}
@@ -15,6 +18,7 @@ spec:
 {{ .Files.Get "scripts/dcgmi-diag-r2.sh" | indent 6 }}
     eachWorkerJobs: true
     jobContainer:
+      appArmorProfile: unconfined
       image: {{ .Values.images.slurmJob | quote }}
       env:
 {{ toYaml .Values.jobContainer.env | indent 8 }}
@@ -24,6 +28,7 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
+      appArmorProfile: unconfined
   failureReactions:
     drainSlurmNode:
       drainReasonPrefix: {{ .Values.checks.dcgmiDiagR2.drainReasonPrefix | quote }}

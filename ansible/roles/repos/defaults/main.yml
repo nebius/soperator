@@ -1,0 +1,7 @@
+---
+
+repos_openmpi_version: 24.04-0.7.0.0
+
+repos_arch_map:
+  x86_64: amd64
+  aarch64: arm64

@@ -1,0 +1,26 @@
+suite: test customCgroupConfig rendering
+templates:
+  - slurm-cluster-cr.yaml
+tests:
+  - it: should not render customCgroupConfig when empty
+    set:
+      customCgroupConfig: ""
+    asserts:
+      - isNull:
+          path: spec.customCgroupConfig
+
+  - it: should render customCgroupConfig when provided
+    set:
+      customCgroupConfig: |
+        # Custom configuration
+        ConstrainCores=no
+        AllowedKmemSpace=yes
+    asserts:
+      - isNotNull:
+          path: spec.customCgroupConfig
+      - matchRegex:
+          path: spec.customCgroupConfig
+          pattern: "ConstrainCores=no"
+      - matchRegex:
+          path: spec.customCgroupConfig
+          pattern: "AllowedKmemSpace=yes"

@@ -6,6 +6,10 @@ metadata:
   labels:
   {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
+  {{- with .Values.backup.driftDetection }}
+  driftDetection:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   chart:
     spec:
       chart: k8up
@@ -23,11 +27,11 @@ spec:
   - name: {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds
   {{- end }}
   install:
-    crds: Skip
+    crds: CreateReplace
     remediation:
       retries: 3
   upgrade:
-    crds: Skip
+    crds: CreateReplace
   interval: {{ .Values.backup.interval }}
   timeout: {{ .Values.backup.timeout }}
   releaseName: {{ .Values.backup.releaseName }}
@@ -37,11 +41,7 @@ spec:
     {{- toYaml .Values.backup.overrideValues | nindent 4 }}
   {{- else }}
     k8up:
-      envVars:
-        - name: BACKUP_SKIP_WITHOUT_ANNOTATION
-          value: "true"
-      env:
-        K8UP_BACKUP_SKIP_WITHOUT_ANNOTATION: "true"
+      skipWithoutAnnotation: true
       image:
         repository: ghcr.io/vshn/k8up
         tag: v4.8.0
