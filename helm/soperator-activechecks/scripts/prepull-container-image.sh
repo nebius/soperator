@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --deadline="now+8hours"
 #SBATCH --time=30:00
+#SBATCH --gpus-per-node=8
 #SBATCH --exclusive
 #SBATCH --mem=0
 
