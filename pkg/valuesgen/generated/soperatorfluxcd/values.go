@@ -183,12 +183,14 @@ type ValuesSoperatorKruise struct {
 }
 
 type ValuesSoperatorKruiseOverrideValues struct {
-	Crds         ValuesSoperatorKruiseOverrideValuesCrds    `yaml:"crds" json:"crds"`
-	FeatureGates string                                     `yaml:"featureGates" json:"featureGates"`
-	Manager      ValuesSoperatorKruiseOverrideValuesManager `yaml:"manager" json:"manager"`
+	Crds         ValuesSoperatorKruiseOverrideValuesCrds      `yaml:"crds" json:"crds"`
+	FeatureGates string                                       `yaml:"featureGates" json:"featureGates"`
+	HelmHooks    ValuesSoperatorKruiseOverrideValuesHelmHooks `yaml:"helmHooks" json:"helmHooks"`
+	Manager      ValuesSoperatorKruiseOverrideValuesManager   `yaml:"manager" json:"manager"`
 }
 
 type ValuesSoperatorKruiseOverrideValuesManager struct {
+	Image     ValuesSoperatorKruiseOverrideValuesManagerImage     `yaml:"image" json:"image"`
 	Replicas  int                                                 `yaml:"replicas" json:"replicas"`
 	Resources ValuesSoperatorKruiseOverrideValuesManagerResources `yaml:"resources" json:"resources"`
 }
@@ -206,6 +208,18 @@ type ValuesSoperatorKruiseOverrideValuesManagerResourcesRequests struct {
 type ValuesSoperatorKruiseOverrideValuesManagerResourcesLimits struct {
 	Cpu    string `yaml:"cpu" json:"cpu"`
 	Memory string `yaml:"memory" json:"memory"`
+}
+
+type ValuesSoperatorKruiseOverrideValuesManagerImage struct {
+	Repository string `yaml:"repository" json:"repository"`
+}
+
+type ValuesSoperatorKruiseOverrideValuesHelmHooks struct {
+	Image ValuesSoperatorKruiseOverrideValuesHelmHooksImage `yaml:"image" json:"image"`
+}
+
+type ValuesSoperatorKruiseOverrideValuesHelmHooksImage struct {
+	Repository string `yaml:"repository" json:"repository"`
 }
 
 type ValuesSoperatorKruiseOverrideValuesCrds struct {
@@ -1461,7 +1475,15 @@ func NewDefaults() Values {
 						Managed: true,
 					},
 					FeatureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true",
+					HelmHooks: ValuesSoperatorKruiseOverrideValuesHelmHooks{
+						Image: ValuesSoperatorKruiseOverrideValuesHelmHooksImage{
+							Repository: "cr.eu-north1.nebius.cloud/soperator/kruise-helm-hook",
+						},
+					},
 					Manager: ValuesSoperatorKruiseOverrideValuesManager{
+						Image: ValuesSoperatorKruiseOverrideValuesManagerImage{
+							Repository: "cr.eu-north1.nebius.cloud/soperator/kruise-manager",
+						},
 						Replicas: 2,
 						Resources: ValuesSoperatorKruiseOverrideValuesManagerResources{
 							Limits: ValuesSoperatorKruiseOverrideValuesManagerResourcesLimits{

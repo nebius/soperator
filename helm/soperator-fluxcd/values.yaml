@@ -370,6 +370,8 @@ soperator:
         managed: true
       manager:
         replicas: 2
+        image:
+          repository: cr.eu-north1.nebius.cloud/soperator/kruise-manager
         resources:
           limits:
             cpu: 1000m
@@ -377,6 +379,9 @@ soperator:
           requests:
             cpu: 1000m
             memory: 2Gi
+      helmHooks:
+        image:
+          repository: cr.eu-north1.nebius.cloud/soperator/kruise-helm-hook
       featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true"
     driftDetection:
       mode: warn
