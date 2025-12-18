@@ -1018,7 +1018,7 @@ func NewDefaults() Values {
 			ReleaseName:    "soperator-custom-configmaps",
 			Timeout:        "5m",
 			Values:         nil,
-			Version:        "1.23.0",
+			Version:        "1.23.1",
 		},
 		HelmRepository: ValuesHelmRepository{
 			Backup: ValuesHelmRepositoryBackup{
@@ -1113,7 +1113,7 @@ func NewDefaults() Values {
 			ReleaseName:    "soperator-nodesets",
 			Timeout:        "5m",
 			Values:         nil,
-			Version:        "1.23.0",
+			Version:        "1.23.1",
 		},
 		Notifier: ValuesNotifier{
 			DriftDetection: ValuesNotifierDriftDetection{
@@ -1130,7 +1130,7 @@ func NewDefaults() Values {
 					WebhookUrl: nil,
 				},
 			},
-			Version: "1.23.0",
+			Version: "1.23.1",
 		},
 		Ns: ValuesNs{
 			DriftDetection: ValuesNsDriftDetection{
@@ -1153,11 +1153,19 @@ func NewDefaults() Values {
 				ReleaseName: "soperator-dcgm-exporter",
 				Timeout:     "5m",
 				Values: ValuesObservabilityDcgmExporterValues{
-					HpcJobMapDir:    "/var/run/nebius/slurm",
-					Resources:       ValuesObservabilityDcgmExporterValuesResources{},
+					HpcJobMapDir: "/var/run/nebius/slurm",
+					Resources: ValuesObservabilityDcgmExporterValuesResources{
+						Limits: ValuesObservabilityDcgmExporterValuesResourcesLimits{
+							Memory: "128Mi",
+						},
+						Requests: ValuesObservabilityDcgmExporterValuesResourcesRequests{
+							Cpu:    "100m",
+							Memory: "128Mi",
+						},
+					},
 					ValidateToolkit: true,
 				},
-				Version: "1.23.0",
+				Version: "1.23.1",
 			},
 			Enabled:          true,
 			LogsProjectId:    "default-project-id",
@@ -1172,7 +1180,15 @@ func NewDefaults() Values {
 					OverrideValues: nil,
 					Timeout:        "5m",
 					Values: ValuesObservabilityOpentelemetryEventsValues{
-						Resources: ValuesObservabilityOpentelemetryEventsValuesResources{},
+						Resources: ValuesObservabilityOpentelemetryEventsValuesResources{
+							Limits: ValuesObservabilityOpentelemetryEventsValuesResourcesLimits{
+								Memory: "128Mi",
+							},
+							Requests: ValuesObservabilityOpentelemetryEventsValuesResourcesRequests{
+								Cpu:    "100m",
+								Memory: "128Mi",
+							},
+						},
 					},
 					Version: "0.117.*",
 				},
@@ -1187,12 +1203,37 @@ func NewDefaults() Values {
 						JailLogs: ValuesObservabilityOpentelemetryLogsValuesJailLogs{
 							Enabled:      true,
 							PollInterval: "30s",
-							Resources:    ValuesObservabilityOpentelemetryLogsValuesJailLogsResources{},
+							Resources: ValuesObservabilityOpentelemetryLogsValuesJailLogsResources{
+								Limits: ValuesObservabilityOpentelemetryLogsValuesJailLogsResourcesLimits{
+									Memory: "200Mi",
+								},
+								Requests: ValuesObservabilityOpentelemetryLogsValuesJailLogsResourcesRequests{
+									Cpu:    "100m",
+									Memory: "200Mi",
+								},
+							},
 						},
 						NodeLogs: ValuesObservabilityOpentelemetryLogsValuesNodeLogs{
 							Enabled: true,
+							Resources: ValuesObservabilityOpentelemetryLogsValuesNodeLogsResources{
+								Limits: ValuesObservabilityOpentelemetryLogsValuesNodeLogsResourcesLimits{
+									Memory: "200Mi",
+								},
+								Requests: ValuesObservabilityOpentelemetryLogsValuesNodeLogsResourcesRequests{
+									Cpu:    "100m",
+									Memory: "200Mi",
+								},
+							},
 						},
-						Resources: ValuesObservabilityOpentelemetryLogsValuesResources{},
+						Resources: ValuesObservabilityOpentelemetryLogsValuesResources{
+							Limits: ValuesObservabilityOpentelemetryLogsValuesResourcesLimits{
+								Memory: "200Mi",
+							},
+							Requests: ValuesObservabilityOpentelemetryLogsValuesResourcesRequests{
+								Cpu:    "100m",
+								Memory: "200Mi",
+							},
+						},
 					},
 					Version: "0.117.*",
 				},
@@ -1226,7 +1267,15 @@ func NewDefaults() Values {
 						Enabled:    true,
 						Size:       "30Gi",
 					},
-					Resources: ValuesObservabilityVmLogsValuesResources{},
+					Resources: ValuesObservabilityVmLogsValuesResources{
+						Limits: ValuesObservabilityVmLogsValuesResourcesLimits{
+							Memory: "2Gi",
+						},
+						Requests: ValuesObservabilityVmLogsValuesResourcesRequests{
+							Cpu:    "1000m",
+							Memory: "2Gi",
+						},
+					},
 				},
 				Version: "0.9.*",
 			},
@@ -1288,9 +1337,17 @@ func NewDefaults() Values {
 								},
 							},
 							RemoteWriteSettings: ValuesObservabilityVmStackValuesVmagentSpecRemoteWriteSettings{},
-							Resources:           ValuesObservabilityVmStackValuesVmagentSpecResources{},
-							VolumeMounts:        []interface{}{},
-							Volumes:             []interface{}{},
+							Resources: ValuesObservabilityVmStackValuesVmagentSpecResources{
+								Limits: ValuesObservabilityVmStackValuesVmagentSpecResourcesLimits{
+									Memory: "10Gi",
+								},
+								Requests: ValuesObservabilityVmStackValuesVmagentSpecResourcesRequests{
+									Cpu:    "5000m",
+									Memory: "10Gi",
+								},
+							},
+							VolumeMounts: []interface{}{},
+							Volumes:      []interface{}{},
 						},
 					},
 					Vmsingle: ValuesObservabilityVmStackValuesVmsingle{
@@ -1301,7 +1358,15 @@ func NewDefaults() Values {
 								SearchMaxQueryLen:         "18765",
 								SearchMaxUniqueTimeseries: "500000",
 							},
-							Resources:       ValuesObservabilityVmStackValuesVmsingleSpecResources{},
+							Resources: ValuesObservabilityVmStackValuesVmsingleSpecResources{
+								Limits: ValuesObservabilityVmStackValuesVmsingleSpecResourcesLimits{
+									Memory: "2Gi",
+								},
+								Requests: ValuesObservabilityVmStackValuesVmsingleSpecResourcesRequests{
+									Cpu:    "1000m",
+									Memory: "2Gi",
+								},
+							},
 							RetentionPeriod: "30d",
 							Storage: ValuesObservabilityVmStackValuesVmsingleSpecStorage{
 								AccessModes: []string{
@@ -1376,7 +1441,7 @@ func NewDefaults() Values {
 			},
 			Timeout: "5m",
 			Values:  nil,
-			Version: "1.23.0",
+			Version: "1.23.1",
 		},
 		Soperator: ValuesSoperator{
 			DriftDetection: ValuesSoperatorDriftDetection{
@@ -1437,7 +1502,15 @@ func NewDefaults() Values {
 				Timeout:        "5m",
 				Values: ValuesSoperatorNodeConfiguratorValues{
 					Rebooter: ValuesSoperatorNodeConfiguratorValuesRebooter{
-						Resources: ValuesSoperatorNodeConfiguratorValuesRebooterResources{},
+						Resources: ValuesSoperatorNodeConfiguratorValuesRebooterResources{
+							Limits: ValuesSoperatorNodeConfiguratorValuesRebooterResourcesLimits{
+								Memory: "200Mi",
+							},
+							Requests: ValuesSoperatorNodeConfiguratorValuesRebooterResourcesRequests{
+								Cpu:    "100m",
+								Memory: "200Mi",
+							},
+						},
 					},
 				},
 			},
@@ -1457,13 +1530,21 @@ func NewDefaults() Values {
 			Timeout: "5m",
 			Values: ValuesSoperatorValues{
 				Manager: ValuesSoperatorValuesManager{
-					Resources: ValuesSoperatorValuesManagerResources{},
+					Resources: ValuesSoperatorValuesManagerResources{
+						Limits: ValuesSoperatorValuesManagerResourcesLimits{
+							Memory: "1Gi",
+						},
+						Requests: ValuesSoperatorValuesManagerResourcesRequests{
+							Cpu:    "500m",
+							Memory: "1Gi",
+						},
+					},
 				},
 				ServiceMonitor: ValuesSoperatorValuesServiceMonitor{
 					Enabled: true,
 				},
 			},
-			Version: "1.23.0",
+			Version: "1.23.1",
 		},
 		SoperatorActiveChecks: ValuesSoperatorActiveChecks{
 			DriftDetection: ValuesSoperatorActiveChecksDriftDetection{
@@ -1475,7 +1556,7 @@ func NewDefaults() Values {
 			OverrideValues: nil,
 			ReleaseName:    "soperator-activechecks",
 			Timeout:        "120m",
-			Version:        "1.23.0",
+			Version:        "1.23.1",
 		},
 		StorageClasses: ValuesStorageClasses{
 			DriftDetection: ValuesStorageClassesDriftDetection{

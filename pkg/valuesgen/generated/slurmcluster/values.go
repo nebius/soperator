@@ -715,15 +715,15 @@ func NewDefaults() Values {
 		HealthCheckConfig:  nil,
 		Images: ValuesImages{
 			MariaDB:           "docker-registry1.mariadb.com/library/mariadb:12.1.2",
-			Munge:             "cr.eu-north1.nebius.cloud/soperator/munge:1.23.0-noble-slurm25.05.5",
-			PopulateJail:      "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.23.0-noble-slurm25.05.5",
-			SConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.23.0",
-			Slurmctld:         "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.23.0-noble-slurm25.05.5",
-			Slurmd:            "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.23.0-noble-slurm25.05.5",
-			Slurmdbd:          "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.23.0-noble-slurm25.05.5",
-			Slurmrestd:        "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.23.0-noble-slurm25.05.5",
-			SoperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.23.0-noble-slurm25.05.5",
-			Sshd:              "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.23.0-noble-slurm25.05.5",
+			Munge:             "cr.eu-north1.nebius.cloud/soperator/munge:1.23.1-noble-slurm25.05.5",
+			PopulateJail:      "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.23.1-noble-slurm25.05.5",
+			SConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.23.1",
+			Slurmctld:         "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.23.1-noble-slurm25.05.5",
+			Slurmd:            "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.23.1-noble-slurm25.05.5",
+			Slurmdbd:          "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.23.1-noble-slurm25.05.5",
+			Slurmrestd:        "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.23.1-noble-slurm25.05.5",
+			SoperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.23.1-noble-slurm25.05.5",
+			Sshd:              "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.23.1-noble-slurm25.05.5",
 		},
 		K8sNodeFilters: []ValuesK8sNodeFiltersItem{
 			ValuesK8sNodeFiltersItem{
@@ -1144,10 +1144,88 @@ func NewDefaults() Values {
 			},
 		},
 		SlurmScripts: ValuesSlurmScripts{
-			Custom:    nil,
-			Epilog:    nil,
-			HcProgram: nil,
-			Prolog:    nil,
+			BuiltIn: ValuesSlurmScriptsBuiltIn{
+				AllocGpusBusyDrainSh: ValuesSlurmScriptsBuiltInAllocGpusBusyDrainSh{
+					CustomConfig:  nil,
+					CustomContent: nil,
+					Enabled:       true,
+				},
+				AllocGpusBusyUndrainSh: ValuesSlurmScriptsBuiltInAllocGpusBusyUndrainSh{
+					CustomConfig:  nil,
+					CustomContent: nil,
+					Enabled:       true,
+				},
+				AllocMemUsedDrainSh: ValuesSlurmScriptsBuiltInAllocMemUsedDrainSh{
+					CustomConfig:  nil,
+					CustomContent: nil,
+					Enabled:       true,
+				},
+				AllocMemUsedUndrainSh: ValuesSlurmScriptsBuiltInAllocMemUsedUndrainSh{
+					CustomConfig:  nil,
+					CustomContent: nil,
+					Enabled:       true,
+				},
+				BootDiskFullSh: ValuesSlurmScriptsBuiltInBootDiskFullSh{
+					CustomConfig:  nil,
+					CustomContent: nil,
+					Enabled:       true,
+				},
+				CleanupEnrootSh: ValuesSlurmScriptsBuiltInCleanupEnrootSh{
+					CustomConfig:  nil,
+					CustomContent: nil,
+					Enabled:       true,
+				},
+				CleanupScratchDataSh: ValuesSlurmScriptsBuiltInCleanupScratchDataSh{
+					CustomConfig:  nil,
+					CustomContent: nil,
+					Enabled:       true,
+				},
+				DropPageCacheSh: ValuesSlurmScriptsBuiltInDropPageCacheSh{
+					CustomConfig:  nil,
+					CustomContent: nil,
+					Enabled:       true,
+				},
+				DropPosixShmemSh: ValuesSlurmScriptsBuiltInDropPosixShmemSh{
+					CustomConfig:  nil,
+					CustomContent: nil,
+					Enabled:       true,
+				},
+				GpuHealthCheckPy: ValuesSlurmScriptsBuiltInGpuHealthCheckPy{
+					CustomConfig:  nil,
+					CustomContent: nil,
+					Enabled:       true,
+				},
+				JobTmpfsDeleteSh: ValuesSlurmScriptsBuiltInJobTmpfsDeleteSh{
+					CustomConfig:  nil,
+					CustomContent: nil,
+					Enabled:       true,
+				},
+				JobTmpfsDeleteLeftoverSh: ValuesSlurmScriptsBuiltInJobTmpfsDeleteLeftoverSh{
+					CustomConfig:  nil,
+					CustomContent: nil,
+					Enabled:       true,
+				},
+				JobTmpfsRecreateSh: ValuesSlurmScriptsBuiltInJobTmpfsRecreateSh{
+					CustomConfig:  nil,
+					CustomContent: nil,
+					Enabled:       true,
+				},
+				MapJobDcgmSh: ValuesSlurmScriptsBuiltInMapJobDcgmSh{
+					CustomConfig:  nil,
+					CustomContent: nil,
+					Enabled:       true,
+				},
+				UnmapJobDcgmSh: ValuesSlurmScriptsBuiltInUnmapJobDcgmSh{
+					CustomConfig:  nil,
+					CustomContent: nil,
+					Enabled:       true,
+				},
+			},
+			CheckRunnerPy: nil,
+			EpilogSh:      nil,
+			Extra:         nil,
+			HcProgramSh:   nil,
+			PrologSh:      nil,
 		},
 		UseDefaultAppArmorProfile: false,
 		VolumeSources: []ValuesVolumeSourcesItem{
