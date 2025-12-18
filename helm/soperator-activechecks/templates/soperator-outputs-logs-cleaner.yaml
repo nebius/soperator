@@ -11,6 +11,7 @@ spec:
   runAfterCreation: {{ .Values.checks.soperatorOutputsLogsCleaner.runAfterCreation }}
   k8sJobSpec:
     jobContainer:
+      appArmorProfile: unconfined
       command:
         - bash
         - -c

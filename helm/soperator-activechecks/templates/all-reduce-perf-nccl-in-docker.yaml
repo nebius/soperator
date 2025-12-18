@@ -5,7 +5,11 @@ metadata:
 spec:
   checkType: "slurmJob"
   name: "all-reduce-perf-nccl-in-docker"
-  dependsOn: [ "wait-for-soperatorchecks-srun-ready", "wait-for-topology", "prepull-container-image" ]
+  dependsOn:
+  - "manage-jail-state"
+  - "wait-for-soperatorchecks-srun-ready"
+  - "wait-for-topology"
+  - "prepull-container-image"
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   suspend: {{ .Values.checks.allReducePerfNCCLInDocker.suspend }}
   runAfterCreation: {{ .Values.checks.allReducePerfNCCLInDocker.runAfterCreation }}
@@ -15,6 +19,7 @@ spec:
     eachWorkerJobs: true
     maxNumberOfJobs: 200
     jobContainer:
+      appArmorProfile: unconfined
       image: {{ .Values.images.slurmJob | quote }}
       env:
 {{ toYaml .Values.jobContainer.env | indent 8 }}
@@ -24,6 +29,7 @@ spec:
 {{ toYaml .Values.jobContainer.volumes | indent 8 }}
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
+      appArmorProfile: unconfined
   failureReactions:
     drainSlurmNode:
       drainReasonPrefix: {{ .Values.checks.allReducePerfNCCLInDocker.drainReasonPrefix | quote }}

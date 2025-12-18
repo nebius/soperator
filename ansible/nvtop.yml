@@ -1,7 +1,7 @@
 ---
 
 - name: Install nvtop GPU monitoring utility
-  hosts: all, localhost
+  hosts: localhost
   become: true
   roles:
     - nvtop
