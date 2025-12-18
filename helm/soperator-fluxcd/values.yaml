@@ -116,10 +116,26 @@ observability:
         jailLogs:
           enabled: true
           pollInterval: 30s
-          resources: {}
+          resources:
+            requests:
+              memory: 200Mi
+              cpu: 100m
+            limits:
+              memory: 200Mi
         nodeLogs:
           enabled: true
-        resources: {}
+          resources:
+            requests:
+              memory: 200Mi
+              cpu: 100m
+            limits:
+              memory: 200Mi
+        resources:
+          requests:
+            memory: 200Mi
+            cpu: 100m
+          limits:
+            memory: 200Mi
       overrideValues: null
       driftDetection:
         mode: warn
@@ -128,7 +144,12 @@ observability:
       interval: 5m
       timeout: 5m
       values:
-        resources: {}
+        resources:
+          requests:
+            memory: 128Mi
+            cpu: 100m
+          limits:
+            memory: 128Mi
       overrideValues: null
       driftDetection:
         mode: warn
@@ -179,7 +200,12 @@ observability:
           remoteWriteSettings: {}
           remoteWrite:
             - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8429/api/v1/write
-          resources: {}
+          resources:
+            requests:
+              memory: 10Gi
+              cpu: 5000m
+            limits:
+              memory: 10Gi
           extraEnvs: []
           volumeMounts: []
           volumes: []
@@ -197,7 +223,12 @@ observability:
             resources:
               requests:
                 storage: 30Gi
-          resources: {}
+          resources:
+            requests:
+              memory: 2Gi
+              cpu: 1000m
+            limits:
+              memory: 2Gi
       prometheusNodeExporter:
         enabled: true
         extraArgs: null
@@ -216,7 +247,12 @@ observability:
         enabled: true
         size: 30Gi
         accessMode: ReadWriteOnce
-      resources: {}
+      resources:
+        requests:
+          memory: 2Gi
+          cpu: 1000m
+        limits:
+          memory: 2Gi
     overrideValues: null
     driftDetection:
       mode: warn
@@ -230,7 +266,12 @@ observability:
     values:
       hpcJobMapDir: /var/run/nebius/slurm
       validateToolkit: true
-      resources: {}
+      resources:
+        limits:
+          memory: 128Mi
+        requests:
+          memory: 128Mi
+          cpu: 100m
     driftDetection:
       mode: warn
 securityProfilesOperator:
@@ -311,7 +352,12 @@ soperator:
     serviceMonitor:
       enabled: true
     manager:
-      resources: {}
+      resources:
+        limits:
+          memory: 1Gi
+        requests:
+          cpu: 500m
+          memory: 1Gi
   overrideValues: null
   kruise:
     enabled: true
@@ -350,7 +396,12 @@ soperator:
     releaseName: soperator-node-configurator
     values:
       rebooter:
-        resources: {}
+        resources:
+          requests:
+            memory: 200Mi
+            cpu: 100m
+          limits:
+            memory: 200Mi
     overrideValues: null
     driftDetection:
       mode: warn

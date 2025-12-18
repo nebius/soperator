@@ -393,7 +393,7 @@ sync-version: yq ## Sync versions from file
 	@# endregion internal/consts
 
 .PHONY: sync-version-from-scratch
-sync-version-from-scratch: generate manifests helm mock sync-version ## Regenerates all resources and syncs versions to them
+sync-version-from-scratch: generate manifests helm mock sync-version generate-values-types ## Regenerates all resources and syncs versions to them
 
 ##@ Build
 
@@ -815,7 +815,7 @@ jail-shell: ## Open interactive shell in jail environment via login pod
 generate-values-types: ## Generate Go types from Helm values.yaml for slurm-cluster and soperator-fluxcd
 	@echo "Generating Go types from helm/slurm-cluster/values.yaml"
 	@mkdir -p pkg/valuesgen/generated/slurmcluster
-	@go run ./cmd/generate-values -in helm/slurm-cluster/values.yaml -out pkg/valuesgen/generated/slurmcluster/values.go -pkg slurmvalues -type Values
+	@go run ./cmd/generate-values -in helm/slurm-cluster/values.yaml -out pkg/valuesgen/generated/slurmcluster/values.go -pkg slurmcluster -type Values
 	@echo "Generating Go types from helm/soperator-fluxcd/values.yaml"
 	@mkdir -p pkg/valuesgen/generated/soperatorfluxcd
-	@go run ./cmd/generate-values -in helm/soperator-fluxcd/values.yaml -out pkg/valuesgen/generated/soperatorfluxcd/values.go -pkg fluxvalues -type Values
+	@go run ./cmd/generate-values -in helm/soperator-fluxcd/values.yaml -out pkg/valuesgen/generated/soperatorfluxcd/values.go -pkg soperatorfluxcd -type Values
