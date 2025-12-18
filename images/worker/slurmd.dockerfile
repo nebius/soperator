@@ -148,7 +148,8 @@ COPY images/common/scripts/bind_slurm_common.sh /opt/bin/slurm/
 COPY images/common/scripts/reboot.sh /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
-    chmod +x /opt/bin/slurm/bind_slurm_common.sh
+    chmod +x /opt/bin/slurm/bind_slurm_common.sh && \
+    chmod +x /opt/bin/slurm/reboot.sh
 
 # Create single folder with slurm plugins for all architectures
 RUN mkdir -p /usr/lib/slurm && \
