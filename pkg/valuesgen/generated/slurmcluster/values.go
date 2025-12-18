@@ -102,13 +102,14 @@ type ValuesSlurmNodesWorkerVolumesJail struct {
 }
 
 type ValuesSlurmNodesWorkerSlurmd struct {
-	AppArmorProfile      string                                `yaml:"appArmorProfile" json:"appArmorProfile"`
-	Args                 []interface{}                         `yaml:"args" json:"args"`
-	Command              []interface{}                         `yaml:"command" json:"command"`
-	ImagePullPolicy      string                                `yaml:"imagePullPolicy" json:"imagePullPolicy"`
-	Port                 int                                   `yaml:"port" json:"port"`
-	Resources            ValuesSlurmNodesWorkerSlurmdResources `yaml:"resources" json:"resources"`
-	SecurityLimitsConfig string                                `yaml:"securityLimitsConfig" json:"securityLimitsConfig"`
+	AppArmorProfile      string                                      `yaml:"appArmorProfile" json:"appArmorProfile"`
+	Args                 []interface{}                               `yaml:"args" json:"args"`
+	Command              []interface{}                               `yaml:"command" json:"command"`
+	CustomEnv            []ValuesSlurmNodesWorkerSlurmdCustomEnvItem `yaml:"customEnv" json:"customEnv"`
+	ImagePullPolicy      string                                      `yaml:"imagePullPolicy" json:"imagePullPolicy"`
+	Port                 int                                         `yaml:"port" json:"port"`
+	Resources            ValuesSlurmNodesWorkerSlurmdResources       `yaml:"resources" json:"resources"`
+	SecurityLimitsConfig string                                      `yaml:"securityLimitsConfig" json:"securityLimitsConfig"`
 }
 
 type ValuesSlurmNodesWorkerSlurmdResources struct {
@@ -116,6 +117,11 @@ type ValuesSlurmNodesWorkerSlurmdResources struct {
 	EphemeralStorage string `yaml:"ephemeralStorage" json:"ephemeralStorage"`
 	Gpu              int    `yaml:"gpu" json:"gpu"`
 	Memory           string `yaml:"memory" json:"memory"`
+}
+
+type ValuesSlurmNodesWorkerSlurmdCustomEnvItem struct {
+	Name  string `yaml:"name" json:"name"`
+	Value string `yaml:"value" json:"value"`
 }
 
 type ValuesSlurmNodesWorkerMunge struct {
@@ -587,4 +593,475 @@ type ValuesImages struct {
 }
 
 type ValuesAnnotations struct {
+}
+
+func NewDefaults() Values {
+	return Values{
+		Annotations:        ValuesAnnotations{},
+		ClusterName:        "slurm1",
+		ClusterType:        "gpu",
+		CustomCgroupConfig: "",
+		CustomSlurmConfig:  "",
+		HealthCheckConfig:  nil,
+		Images: ValuesImages{
+			MariaDB:           "docker-registry1.mariadb.com/library/mariadb:12.1.2",
+			Munge:             "cr.eu-north1.nebius.cloud/soperator/munge:1.23.0-noble-slurm25.05.5",
+			PopulateJail:      "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.23.0-noble-slurm25.05.5",
+			SConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.23.0",
+			Slurmctld:         "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.23.0-noble-slurm25.05.5",
+			Slurmd:            "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.23.0-noble-slurm25.05.5",
+			Slurmdbd:          "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.23.0-noble-slurm25.05.5",
+			Slurmrestd:        "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.23.0-noble-slurm25.05.5",
+			SoperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.23.0-noble-slurm25.05.5",
+			Sshd:              "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.23.0-noble-slurm25.05.5",
+		},
+		K8sNodeFilters: []ValuesK8sNodeFiltersItem{
+			ValuesK8sNodeFiltersItem{
+				Affinity: ValuesK8sNodeFiltersItemAffinity{
+					NodeAffinity: ValuesK8sNodeFiltersItemAffinityNodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: ValuesK8sNodeFiltersItemAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecution{
+							NodeSelectorTerms: []ValuesK8sNodeFiltersItemAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecutionNodeSelectorTermsItem{
+								ValuesK8sNodeFiltersItemAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecutionNodeSelectorTermsItem{
+									MatchExpressions: []ValuesK8sNodeFiltersItemAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecutionNodeSelectorTermsItemMatchExpressionsItem{
+										ValuesK8sNodeFiltersItemAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecutionNodeSelectorTermsItemMatchExpressionsItem{
+											Key:      "nebius.com/node-group-id",
+											Operator: "In",
+											Values: []string{
+												"node-group-id-here",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Name: "gpu",
+				Tolerations: []ValuesK8sNodeFiltersItemTolerationsItem{
+					ValuesK8sNodeFiltersItemTolerationsItem{
+						Effect:   "NoSchedule",
+						Key:      "nvidia.com/gpu",
+						Operator: "Exists",
+					},
+				},
+			},
+			ValuesK8sNodeFiltersItem{
+				Affinity: ValuesK8sNodeFiltersItemAffinity{
+					NodeAffinity: ValuesK8sNodeFiltersItemAffinityNodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: ValuesK8sNodeFiltersItemAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecution{
+							NodeSelectorTerms: []ValuesK8sNodeFiltersItemAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecutionNodeSelectorTermsItem{
+								ValuesK8sNodeFiltersItemAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecutionNodeSelectorTermsItem{
+									MatchExpressions: []ValuesK8sNodeFiltersItemAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecutionNodeSelectorTermsItemMatchExpressionsItem{
+										ValuesK8sNodeFiltersItemAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecutionNodeSelectorTermsItemMatchExpressionsItem{
+											Key:      "nebius.com/node-group-id",
+											Operator: "In",
+											Values: []string{
+												"node-group-id-here",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Name: "no-gpu",
+			},
+		},
+		Maintenance: "none",
+		MpiConfig: ValuesMpiConfig{
+			PmixEnv: "OMPI_MCA_btl_tcp_if_include=eth0",
+		},
+		PartitionConfiguration: ValuesPartitionConfiguration{
+			ConfigType: "default",
+			Partitions: []interface{}{},
+			RawConfig:  []interface{}{},
+		},
+		PlugStackConfig: ValuesPlugStackConfig{
+			CustomPlugins: []interface{}{},
+			NcclDebug: ValuesPlugStackConfigNcclDebug{
+				Enabled:         true,
+				LogLevel:        "INFO",
+				OutputDirectory: "/opt/soperator-outputs/nccl_logs",
+				OutputToFile:    true,
+				OutputToStdOut:  false,
+				Required:        false,
+			},
+			Pyxis: ValuesPlugStackConfigPyxis{
+				ContainerImageSave: "/var/cache/enroot-container-images/",
+				Required:           true,
+			},
+		},
+		PopulateJail: ValuesPopulateJail{
+			AppArmorProfile:    "unconfined",
+			ImagePullPolicy:    "IfNotPresent",
+			JailSnapshotVolume: nil,
+			K8sNodeFilterName:  "gpu",
+			Overwrite:          false,
+		},
+		SConfigController: ValuesSConfigController{
+			Container: ValuesSConfigControllerContainer{
+				ImagePullPolicy: "IfNotPresent",
+				Resources: ValuesSConfigControllerContainerResources{
+					Cpu:              "250m",
+					EphemeralStorage: "500Mi",
+					Memory:           "256Mi",
+				},
+			},
+			Node: ValuesSConfigControllerNode{
+				K8sNodeFilterName: "system",
+				Size:              1,
+			},
+			Rbac: ValuesSConfigControllerRbac{
+				Create: true,
+			},
+			ReconfigurePollInterval: "20s",
+			ReconfigureWaitTimeout:  "1m",
+			RunAsGid:                1001,
+			RunAsUid:                1001,
+			ServiceAccount: ValuesSConfigControllerServiceAccount{
+				Create: true,
+				Name:   "",
+			},
+			ServiceMonitor: ValuesSConfigControllerServiceMonitor{
+				Enabled:       true,
+				Interval:      "30s",
+				JobLabel:      "sconfigcontroller",
+				ScrapeTimeout: "28s",
+			},
+		},
+		Secrets: ValuesSecrets{},
+		SlurmConfig: ValuesSlurmConfig{
+			CompleteWait:    5,
+			DefCpuPerGPU:    4,
+			DefMemPerNode:   1048576,
+			Epilog:          "/opt/slurm_scripts/epilog.sh",
+			MaxJobCount:     20000,
+			MessageTimeout:  60,
+			MinJobAge:       28800,
+			Prolog:          "/opt/slurm_scripts/prolog.sh",
+			TaskPluginParam: "",
+			TopologyParam:   "SwitchAsNodeRank",
+			TopologyPlugin:  "topology/tree",
+		},
+		SlurmNodes: ValuesSlurmNodes{
+			Accounting: ValuesSlurmNodesAccounting{
+				CustomInitContainers: []interface{}{},
+				Enabled:              false,
+				ExternalDB: ValuesSlurmNodesAccountingExternalDB{
+					Enabled: false,
+					Port:    3306,
+				},
+				K8sNodeFilterName: "no-gpu",
+				MariadbOperator: ValuesSlurmNodesAccountingMariadbOperator{
+					Enabled: false,
+					Metrics: ValuesSlurmNodesAccountingMariadbOperatorMetrics{
+						Enabled: true,
+					},
+					PodSecurityContext: ValuesSlurmNodesAccountingMariadbOperatorPodSecurityContext{},
+					PriorityClassName:  "",
+					ProtectedSecret:    false,
+					Replicas:           1,
+					Replication:        ValuesSlurmNodesAccountingMariadbOperatorReplication{},
+					Resources: ValuesSlurmNodesAccountingMariadbOperatorResources{
+						Cpu:              "1000m",
+						EphemeralStorage: "5Gi",
+						Memory:           "1Gi",
+					},
+					SecurityContext: ValuesSlurmNodesAccountingMariadbOperatorSecurityContext{},
+					Storage:         ValuesSlurmNodesAccountingMariadbOperatorStorage{},
+				},
+				Munge: ValuesSlurmNodesAccountingMunge{
+					AppArmorProfile: "unconfined",
+					ImagePullPolicy: "IfNotPresent",
+					Resources: ValuesSlurmNodesAccountingMungeResources{
+						Cpu:              "1000m",
+						EphemeralStorage: "5Gi",
+						Memory:           "1Gi",
+					},
+				},
+				SlurmConfig: ValuesSlurmNodesAccountingSlurmConfig{
+					AccountingStorageTRES:   "CPU,Mem,Node,VMem,Gres/gpu",
+					JobAcctGatherFrequency:  30,
+					JobAcctGatherType:       "jobacct_gather/cgroup",
+					PriorityWeightAge:       0,
+					PriorityWeightFairshare: 0,
+					PriorityWeightQOS:       0,
+				},
+				Slurmdbd: ValuesSlurmNodesAccountingSlurmdbd{
+					AppArmorProfile: "unconfined",
+					Args:            []interface{}{},
+					Command:         []interface{}{},
+					ImagePullPolicy: "IfNotPresent",
+					Port:            6819,
+					Resources: ValuesSlurmNodesAccountingSlurmdbdResources{
+						Cpu:              "1000m",
+						EphemeralStorage: "10Gi",
+						Memory:           "3Gi",
+					},
+				},
+				SlurmdbdConfig: ValuesSlurmNodesAccountingSlurmdbdConfig{
+					ArchiveEvents:     "yes",
+					ArchiveJobs:       "yes",
+					ArchiveResvs:      "yes",
+					ArchiveSteps:      "no",
+					ArchiveSuspend:    "no",
+					ArchiveTXN:        "no",
+					ArchiveUsage:      "yes",
+					DebugLevel:        "info",
+					PurgeEventAfter:   "1month",
+					PurgeJobAfter:     "12month",
+					PurgeResvAfter:    "1month",
+					PurgeStepAfter:    "1month",
+					PurgeSuspendAfter: "1month",
+					PurgeTXNAfter:     "12month",
+					PurgeUsageAfter:   "24month",
+					TcpTimeout:        2,
+				},
+			},
+			Controller: ValuesSlurmNodesController{
+				CustomInitContainers: []interface{}{},
+				K8sNodeFilterName:    "no-gpu",
+				Munge: ValuesSlurmNodesControllerMunge{
+					AppArmorProfile: "unconfined",
+					Args:            []interface{}{},
+					Command:         []interface{}{},
+					ImagePullPolicy: "IfNotPresent",
+					Resources: ValuesSlurmNodesControllerMungeResources{
+						Cpu:              "1000m",
+						EphemeralStorage: "5Gi",
+						Memory:           "1Gi",
+					},
+				},
+				PriorityClass: "",
+				Slurmctld: ValuesSlurmNodesControllerSlurmctld{
+					AppArmorProfile: "unconfined",
+					Args:            []interface{}{},
+					Command:         []interface{}{},
+					ImagePullPolicy: "IfNotPresent",
+					Port:            6817,
+					Resources: ValuesSlurmNodesControllerSlurmctldResources{
+						Cpu:              "1000m",
+						EphemeralStorage: "20Gi",
+						Memory:           "3Gi",
+					},
+				},
+				Volumes: ValuesSlurmNodesControllerVolumes{
+					CustomMounts: []interface{}{},
+					Jail: ValuesSlurmNodesControllerVolumesJail{
+						VolumeSourceName: "jail",
+					},
+					Spool: ValuesSlurmNodesControllerVolumesSpool{
+						VolumeClaimTemplateSpec: ValuesSlurmNodesControllerVolumesSpoolVolumeClaimTemplateSpec{
+							AccessModes: []string{
+								"ReadWriteOnce",
+							},
+							Resources: ValuesSlurmNodesControllerVolumesSpoolVolumeClaimTemplateSpecResources{
+								Requests: ValuesSlurmNodesControllerVolumesSpoolVolumeClaimTemplateSpecResourcesRequests{
+									Storage: "50Gi",
+								},
+							},
+							StorageClassName: "compute-csi-network-ssd-ext4",
+						},
+					},
+				},
+			},
+			Exporter: ValuesSlurmNodesExporter{
+				CollectionInterval:   "30s",
+				CustomInitContainers: []interface{}{},
+				Enabled:              true,
+				Exporter: ValuesSlurmNodesExporterExporter{
+					AppArmorProfile: "unconfined",
+					Args:            []interface{}{},
+					Command:         []interface{}{},
+					ImagePullPolicy: "IfNotPresent",
+					Resources: ValuesSlurmNodesExporterExporterResources{
+						Cpu:              "250m",
+						EphemeralStorage: "500Mi",
+						Memory:           "256Mi",
+					},
+				},
+				K8sNodeFilterName: "no-gpu",
+				Munge: ValuesSlurmNodesExporterMunge{
+					AppArmorProfile: "unconfined",
+					Args:            []interface{}{},
+					Command:         []interface{}{},
+					ImagePullPolicy: "IfNotPresent",
+					Resources: ValuesSlurmNodesExporterMungeResources{
+						Cpu:              "1000m",
+						EphemeralStorage: "5Gi",
+						Memory:           "1Gi",
+					},
+				},
+				PodMonitorConfig: ValuesSlurmNodesExporterPodMonitorConfig{
+					Interval:      "30s",
+					JobLabel:      "slurm-exporter",
+					ScrapeTimeout: "28s",
+				},
+				Size: 1,
+				Volumes: ValuesSlurmNodesExporterVolumes{
+					Jail: ValuesSlurmNodesExporterVolumesJail{
+						VolumeSourceName: "jail",
+					},
+				},
+			},
+			Login: ValuesSlurmNodesLogin{
+				CustomInitContainers: []interface{}{},
+				K8sNodeFilterName:    "no-gpu",
+				Munge: ValuesSlurmNodesLoginMunge{
+					AppArmorProfile: "unconfined",
+					Args:            []interface{}{},
+					Command:         []interface{}{},
+					ImagePullPolicy: "IfNotPresent",
+					Resources: ValuesSlurmNodesLoginMungeResources{
+						Cpu:              "500m",
+						EphemeralStorage: "5Gi",
+						Memory:           "500Mi",
+					},
+				},
+				Size: 2,
+				SshRootPublicKeys: []string{
+					"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzxkjzPQ4EyZSjan4MLGFSA18idpZicoKW7Hfff username1",
+					"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICL8scMKnwu+Y9S6XDACacZ54+qu+YRo2y4Ieddd username2",
+				},
+				Sshd: ValuesSlurmNodesLoginSshd{
+					AppArmorProfile: "unconfined",
+					Args:            []interface{}{},
+					Command:         []interface{}{},
+					ImagePullPolicy: "IfNotPresent",
+					Port:            22,
+					Resources: ValuesSlurmNodesLoginSshdResources{
+						Cpu:              "3000m",
+						EphemeralStorage: "30Gi",
+						Memory:           "9Gi",
+					},
+				},
+				SshdServiceAnnotations:              ValuesSlurmNodesLoginSshdServiceAnnotations{},
+				SshdServiceLoadBalancerIP:           "",
+				SshdServiceLoadBalancerSourceRanges: []interface{}{},
+				SshdServiceNodePort:                 30022,
+				SshdServiceType:                     "LoadBalancer",
+				Volumes: ValuesSlurmNodesLoginVolumes{
+					CustomMounts: []interface{}{},
+					Jail: ValuesSlurmNodesLoginVolumesJail{
+						VolumeSourceName: "jail",
+					},
+					JailSubMounts: []interface{}{},
+				},
+			},
+			Rest: ValuesSlurmNodesRest{
+				CustomInitContainers: []interface{}{},
+				Enabled:              false,
+				K8sNodeFilterName:    "no-gpu",
+				MaxConnections:       10,
+				Rest: ValuesSlurmNodesRestRest{
+					AppArmorProfile: "unconfined",
+					Args:            []interface{}{},
+					Command:         []interface{}{},
+					ImagePullPolicy: "IfNotPresent",
+					Resources: ValuesSlurmNodesRestRestResources{
+						Cpu:              "2000m",
+						EphemeralStorage: "500Mi",
+						Memory:           "8Gi",
+					},
+				},
+				Size:        2,
+				ThreadCount: 3,
+			},
+			Worker: ValuesSlurmNodesWorker{
+				CgroupVersion:        "v2",
+				CustomInitContainers: []interface{}{},
+				EnableGDRCopy:        false,
+				K8sNodeFilterName:    "gpu",
+				MaxUnavailable:       "20%",
+				Munge: ValuesSlurmNodesWorkerMunge{
+					AppArmorProfile: "unconfined",
+					Args:            []interface{}{},
+					Command:         []interface{}{},
+					ImagePullPolicy: "IfNotPresent",
+					Resources: ValuesSlurmNodesWorkerMungeResources{
+						Cpu:              "2000m",
+						EphemeralStorage: "5Gi",
+						Memory:           "4Gi",
+					},
+				},
+				PriorityClass:  "",
+				Size:           2,
+				SlurmNodeExtra: "",
+				Slurmd: ValuesSlurmNodesWorkerSlurmd{
+					AppArmorProfile: "unconfined",
+					Args:            []interface{}{},
+					Command:         []interface{}{},
+					CustomEnv: []ValuesSlurmNodesWorkerSlurmdCustomEnvItem{
+						ValuesSlurmNodesWorkerSlurmdCustomEnvItem{
+							Name:  "NVIDIA_DRIVER_CAPABILITIES",
+							Value: "compute,utility,video",
+						},
+					},
+					ImagePullPolicy: "IfNotPresent",
+					Port:            6818,
+					Resources: ValuesSlurmNodesWorkerSlurmdResources{
+						Cpu:              "156000m",
+						EphemeralStorage: "55Gi",
+						Gpu:              8,
+						Memory:           "1220Gi",
+					},
+					SecurityLimitsConfig: "",
+				},
+				SshdConfigMapRefName:        "",
+				SupervisordConfigMapRefName: "",
+				Volumes: ValuesSlurmNodesWorkerVolumes{
+					CustomMounts: []interface{}{},
+					Jail: ValuesSlurmNodesWorkerVolumesJail{
+						VolumeSourceName: "jail",
+					},
+					JailSubMounts:    []interface{}{},
+					SharedMemorySize: "64Gi",
+					Spool: ValuesSlurmNodesWorkerVolumesSpool{
+						VolumeClaimTemplateSpec: ValuesSlurmNodesWorkerVolumesSpoolVolumeClaimTemplateSpec{
+							AccessModes: []string{
+								"ReadWriteOnce",
+							},
+							Resources: ValuesSlurmNodesWorkerVolumesSpoolVolumeClaimTemplateSpecResources{
+								Requests: ValuesSlurmNodesWorkerVolumesSpoolVolumeClaimTemplateSpecResourcesRequests{
+									Storage: "128Gi",
+								},
+							},
+							StorageClassName: "nebius-network-ssd",
+						},
+					},
+				},
+			},
+		},
+		SlurmScripts: ValuesSlurmScripts{
+			Custom:    nil,
+			Epilog:    nil,
+			HcProgram: nil,
+			Prolog:    nil,
+		},
+		UseDefaultAppArmorProfile: false,
+		VolumeSources: []ValuesVolumeSourcesItem{
+			ValuesVolumeSourcesItem{
+				CreatePVC: false,
+				Name:      "controller-spool",
+				PersistentVolumeClaim: ValuesVolumeSourcesItemPersistentVolumeClaim{
+					ClaimName: "controller-spool-pvc",
+					ReadOnly:  false,
+				},
+				Size:             "",
+				StorageClassName: "",
+			},
+			ValuesVolumeSourcesItem{
+				CreatePVC: false,
+				Name:      "jail",
+				PersistentVolumeClaim: ValuesVolumeSourcesItemPersistentVolumeClaim{
+					ClaimName: "jail-pvc",
+					ReadOnly:  false,
+				},
+				Size:             "",
+				StorageClassName: "",
+			},
+		},
+		WorkerFeatures: []interface{}{},
+	}
 }

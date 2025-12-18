@@ -826,3 +826,563 @@ type ValuesBackupConfigValuesBucket struct {
 type ValuesBackupConfigDriftDetection struct {
 	Mode string `yaml:"mode" json:"mode"`
 }
+
+func NewDefaults() Values {
+	return Values{
+		Backup: ValuesBackup{
+			Config: ValuesBackupConfig{
+				DriftDetection: ValuesBackupConfigDriftDetection{
+					Mode: "warn",
+				},
+				Enabled:     true,
+				Interval:    "5m",
+				ReleaseName: "soperator-backups",
+				Timeout:     "5m",
+				Values: ValuesBackupConfigValues{
+					Bucket: ValuesBackupConfigValuesBucket{
+						Endpoint: "",
+						Name:     "",
+					},
+					Secret: ValuesBackupConfigValuesSecret{
+						Name: "jail-backup",
+					},
+				},
+				Version: "1.23.0",
+			},
+			DriftDetection: ValuesBackupDriftDetection{
+				Mode: "warn",
+			},
+			Enabled:        true,
+			Interval:       "5m",
+			Namespace:      "k8up-system",
+			OverrideValues: nil,
+			ReleaseName:    "k8up",
+			Timeout:        "5m",
+			Values: ValuesBackupValues{
+				Cleanup: ValuesBackupValuesCleanup{
+					PullPolicy: "IfNotPresent",
+					Registry:   "docker.io",
+					Repository: "alpine/k8s",
+					Tag:        "1.34.0",
+				},
+			},
+			Version: "4.8.*",
+		},
+		CertManager: ValuesCertManager{
+			DriftDetection: ValuesCertManagerDriftDetection{
+				Mode: "warn",
+			},
+			Enabled:        true,
+			Interval:       "5m",
+			Namespace:      "cert-manager-system",
+			OverrideValues: nil,
+			ReleaseName:    "cert-manager",
+			Timeout:        "5m",
+			Values:         nil,
+			Version:        "v1.19.*",
+		},
+		CsiDriverNfs: ValuesCsiDriverNfs{
+			DriftDetection: ValuesCsiDriverNfsDriftDetection{
+				Mode: "warn",
+			},
+			Interval:       "5m",
+			Namespace:      "nfs-system",
+			OverrideValues: nil,
+			ReleaseName:    "csi-driver-nfs",
+			Timeout:        "5m",
+			Values:         nil,
+			Version:        "4.11.0",
+		},
+		CustomConfigmaps: ValuesCustomConfigmaps{
+			DriftDetection: ValuesCustomConfigmapsDriftDetection{
+				Mode: "warn",
+			},
+			Enabled:        true,
+			Interval:       "5m",
+			Namespace:      "soperator",
+			OverrideValues: nil,
+			ReleaseName:    "soperator-custom-configmaps",
+			Timeout:        "5m",
+			Values:         nil,
+			Version:        "1.23.0",
+		},
+		HelmRepository: ValuesHelmRepository{
+			Backup: ValuesHelmRepositoryBackup{
+				Type: "default",
+				Url:  "https://k8up-io.github.io/k8up",
+			},
+			Bedag: ValuesHelmRepositoryBedag{
+				Type: "default",
+				Url:  "https://bedag.github.io/helm-charts",
+			},
+			CertManager: ValuesHelmRepositoryCertManager{
+				Type: "default",
+				Url:  "https://charts.jetstack.io",
+			},
+			CsiDriverNfs: ValuesHelmRepositoryCsiDriverNfs{
+				Type: "default",
+				Url:  "https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts",
+			},
+			Interval: "15m",
+			Kruise: ValuesHelmRepositoryKruise{
+				Type: "default",
+				Url:  "https://openkruise.github.io/charts/",
+			},
+			MariadbOperator: ValuesHelmRepositoryMariadbOperator{
+				Type: "default",
+				Url:  "https://helm.mariadb.com/mariadb-operator",
+			},
+			NfsServer: ValuesHelmRepositoryNfsServer{
+				Type: "oci",
+				Url:  "oci://cr.eu-north1.nebius.cloud/soperator",
+			},
+			Opentelemetry: ValuesHelmRepositoryOpentelemetry{
+				Type: "default",
+				Url:  "https://open-telemetry.github.io/opentelemetry-helm-charts",
+			},
+			PrometheusOperator: ValuesHelmRepositoryPrometheusOperator{
+				Type: "default",
+				Url:  "https://prometheus-community.github.io/helm-charts",
+			},
+			SecurityProfilesOperator: ValuesHelmRepositorySecurityProfilesOperator{
+				Type: "oci",
+				Url:  "oci://cr.eu-north1.nebius.cloud/e00xdc03sb7gpqfd0a",
+			},
+			Soperator: ValuesHelmRepositorySoperator{
+				Type: "oci",
+				Url:  "oci://cr.eu-north1.nebius.cloud/soperator",
+			},
+			VictoriaMetrics: ValuesHelmRepositoryVictoriaMetrics{
+				Type: "default",
+				Url:  "https://victoriametrics.github.io/helm-charts/",
+			},
+		},
+		MariadbOperator: ValuesMariadbOperator{
+			Crds: ValuesMariadbOperatorCrds{
+				DriftDetection: ValuesMariadbOperatorCrdsDriftDetection{
+					Mode: "warn",
+				},
+			},
+			DriftDetection: ValuesMariadbOperatorDriftDetection{
+				Mode: "warn",
+			},
+			Enabled:        true,
+			Interval:       "5m",
+			Namespace:      "mariadb-operator-system",
+			OverrideValues: nil,
+			ReleaseName:    "mariadb-operator",
+			Timeout:        "5m",
+			Values:         nil,
+			Version:        "25.10.2",
+		},
+		NfsServer: ValuesNfsServer{
+			DriftDetection: ValuesNfsServerDriftDetection{
+				Mode: "warn",
+			},
+			Enabled:        true,
+			Interval:       "5m",
+			Namespace:      "nfs-system",
+			OverrideValues: nil,
+			ReleaseName:    "nfs-server",
+			Timeout:        "5m",
+			Values:         nil,
+			Version:        "1.2.0",
+		},
+		Nodesets: ValuesNodesets{
+			DriftDetection: ValuesNodesetsDriftDetection{
+				Mode: "warn",
+			},
+			Enabled:        false,
+			Interval:       "5m",
+			Namespace:      "soperator",
+			OverrideValues: nil,
+			ReleaseName:    "soperator-nodesets",
+			Timeout:        "5m",
+			Values:         nil,
+			Version:        "1.23.0",
+		},
+		Notifier: ValuesNotifier{
+			DriftDetection: ValuesNotifierDriftDetection{
+				Mode: "warn",
+			},
+			Enabled:        false,
+			Interval:       "5m",
+			Namespace:      "monitoring-system",
+			OverrideValues: nil,
+			ReleaseName:    "soperator-notifier",
+			Timeout:        "5m",
+			Values: ValuesNotifierValues{
+				Slack: ValuesNotifierValuesSlack{
+					WebhookUrl: nil,
+				},
+			},
+			Version: "1.23.0",
+		},
+		Ns: ValuesNs{
+			DriftDetection: ValuesNsDriftDetection{
+				Mode: "warn",
+			},
+			Enabled:  true,
+			Interval: "5m",
+			Timeout:  "5m",
+			Version:  "2.0.0",
+		},
+		Observability: ValuesObservability{
+			ClusterName: "soperator",
+			DcgmExporter: ValuesObservabilityDcgmExporter{
+				DriftDetection: ValuesObservabilityDcgmExporterDriftDetection{
+					Mode: "warn",
+				},
+				Enabled:     true,
+				Interval:    "5m",
+				Namespace:   "soperator",
+				ReleaseName: "soperator-dcgm-exporter",
+				Timeout:     "5m",
+				Values: ValuesObservabilityDcgmExporterValues{
+					HpcJobMapDir:    "/var/run/nebius/slurm",
+					Resources:       ValuesObservabilityDcgmExporterValuesResources{},
+					ValidateToolkit: true,
+				},
+				Version: "1.23.0",
+			},
+			Enabled:          true,
+			LogsProjectId:    "default-project-id",
+			MetricsProjectId: "default-project-id",
+			Opentelemetry: ValuesObservabilityOpentelemetry{
+				Enabled: true,
+				Events: ValuesObservabilityOpentelemetryEvents{
+					DriftDetection: ValuesObservabilityOpentelemetryEventsDriftDetection{
+						Mode: "warn",
+					},
+					Interval:       "5m",
+					OverrideValues: nil,
+					Timeout:        "5m",
+					Values: ValuesObservabilityOpentelemetryEventsValues{
+						Resources: ValuesObservabilityOpentelemetryEventsValuesResources{},
+					},
+					Version: "0.117.*",
+				},
+				Logs: ValuesObservabilityOpentelemetryLogs{
+					DriftDetection: ValuesObservabilityOpentelemetryLogsDriftDetection{
+						Mode: "warn",
+					},
+					Interval:       "15m",
+					OverrideValues: nil,
+					Timeout:        "15m",
+					Values: ValuesObservabilityOpentelemetryLogsValues{
+						JailLogs: ValuesObservabilityOpentelemetryLogsValuesJailLogs{
+							Enabled:      true,
+							PollInterval: "30s",
+							Resources:    ValuesObservabilityOpentelemetryLogsValuesJailLogsResources{},
+						},
+						NodeLogs: ValuesObservabilityOpentelemetryLogsValuesNodeLogs{
+							Enabled: true,
+						},
+						Resources: ValuesObservabilityOpentelemetryLogsValuesResources{},
+					},
+					Version: "0.117.*",
+				},
+				Namespace: "logs-system",
+			},
+			PrometheusOperator: ValuesObservabilityPrometheusOperator{
+				DriftDetection: ValuesObservabilityPrometheusOperatorDriftDetection{
+					Mode: "warn",
+				},
+				Enabled:   true,
+				Interval:  "5m",
+				Namespace: "monitoring-system",
+				Timeout:   "5m",
+				Version:   "19.1.*",
+			},
+			PublicEndpointEnabled: true,
+			Region:                "eu-north1",
+			VmLogs: ValuesObservabilityVmLogs{
+				DriftDetection: ValuesObservabilityVmLogsDriftDetection{
+					Mode: "warn",
+				},
+				Enabled:        true,
+				Interval:       "5m",
+				Namespace:      "logs-system",
+				OverrideValues: nil,
+				ReleaseName:    "vm-logs",
+				Timeout:        "5m",
+				Values: ValuesObservabilityVmLogsValues{
+					PersistentVolume: ValuesObservabilityVmLogsValuesPersistentVolume{
+						AccessMode: "ReadWriteOnce",
+						Enabled:    true,
+						Size:       "30Gi",
+					},
+					Resources: ValuesObservabilityVmLogsValuesResources{},
+				},
+				Version: "0.9.*",
+			},
+			VmStack: ValuesObservabilityVmStack{
+				Crds: ValuesObservabilityVmStackCrds{
+					DriftDetection: ValuesObservabilityVmStackCrdsDriftDetection{
+						Mode: "warn",
+					},
+					Interval: "5m",
+					Timeout:  "5m",
+					Version:  "0.0.3",
+				},
+				DriftDetection: ValuesObservabilityVmStackDriftDetection{
+					Mode: "warn",
+				},
+				Enabled:        true,
+				Interval:       "5m",
+				Namespace:      "monitoring-system",
+				OverrideValues: nil,
+				ReleaseName:    "metrics",
+				Timeout:        "5m",
+				Values: ValuesObservabilityVmStackValues{
+					DashboardNamespaces: []string{
+						"soperator",
+						"soperator-system",
+						"gpu-operator",
+						"monitoring-system",
+						"logs-system",
+					},
+					GrafanaIni: ValuesObservabilityVmStackValuesGrafanaIni{
+						Auth: ValuesObservabilityVmStackValuesGrafanaIniAuth{
+							DisableLoginForm: true,
+						},
+						AuthAnonymous: ValuesObservabilityVmStackValuesGrafanaIniAuthAnonymous{
+							Enabled: true,
+							OrgName: "Main Org.",
+							OrgRole: "Admin",
+						},
+						AuthBasic: ValuesObservabilityVmStackValuesGrafanaIniAuthBasic{
+							Enabled: false,
+						},
+					},
+					PrometheusNodeExporter: ValuesObservabilityVmStackValuesPrometheusNodeExporter{
+						Enabled:   true,
+						ExtraArgs: nil,
+					},
+					Vmagent: ValuesObservabilityVmStackValuesVmagent{
+						Spec: ValuesObservabilityVmStackValuesVmagentSpec{
+							ExternalLabels: ValuesObservabilityVmStackValuesVmagentSpecExternalLabels{},
+							ExtraArgs: ValuesObservabilityVmStackValuesVmagentSpecExtraArgs{
+								PromscrapeDropOriginalLabels: "true",
+								PromscrapeMaxScrapeSize:      "33554432",
+								PromscrapeStreamParse:        "true",
+							},
+							ExtraEnvs: []interface{}{},
+							RemoteWrite: []ValuesObservabilityVmStackValuesVmagentSpecRemoteWriteItem{
+								ValuesObservabilityVmStackValuesVmagentSpecRemoteWriteItem{
+									Url: "http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8429/api/v1/write",
+								},
+							},
+							RemoteWriteSettings: ValuesObservabilityVmStackValuesVmagentSpecRemoteWriteSettings{},
+							Resources:           ValuesObservabilityVmStackValuesVmagentSpecResources{},
+							VolumeMounts:        []interface{}{},
+							Volumes:             []interface{}{},
+						},
+					},
+					Vmsingle: ValuesObservabilityVmStackValuesVmsingle{
+						Spec: ValuesObservabilityVmStackValuesVmsingleSpec{
+							ExtraArgs: ValuesObservabilityVmStackValuesVmsingleSpecExtraArgs{
+								DedupMinScrapeInterval:    "30s",
+								MaxLabelsPerTimeseries:    "40",
+								SearchMaxQueryLen:         "18765",
+								SearchMaxUniqueTimeseries: "500000",
+							},
+							Resources:       ValuesObservabilityVmStackValuesVmsingleSpecResources{},
+							RetentionPeriod: "30d",
+							Storage: ValuesObservabilityVmStackValuesVmsingleSpecStorage{
+								AccessModes: []string{
+									"ReadWriteOnce",
+								},
+								Resources: ValuesObservabilityVmStackValuesVmsingleSpecStorageResources{
+									Requests: ValuesObservabilityVmStackValuesVmsingleSpecStorageResourcesRequests{
+										Storage: "30Gi",
+									},
+								},
+							},
+						},
+					},
+				},
+				Version: "0.39.*",
+			},
+		},
+		SecurityProfilesOperator: ValuesSecurityProfilesOperator{
+			DriftDetection: ValuesSecurityProfilesOperatorDriftDetection{
+				Mode: "warn",
+			},
+			Enabled:        true,
+			Interval:       "5m",
+			Namespace:      "security-profiles-operator-system",
+			OverrideValues: nil,
+			ReleaseName:    "security-profiles-operator",
+			Timeout:        "5m",
+			Values: ValuesSecurityProfilesOperatorValues{
+				Daemon: ValuesSecurityProfilesOperatorValuesDaemon{
+					Resources: ValuesSecurityProfilesOperatorValuesDaemonResources{
+						Limits: ValuesSecurityProfilesOperatorValuesDaemonResourcesLimits{
+							Memory: "128Mi",
+						},
+						Requests: ValuesSecurityProfilesOperatorValuesDaemonResourcesRequests{
+							Cpu:    "100m",
+							Memory: "128Mi",
+						},
+					},
+				},
+				Resources: ValuesSecurityProfilesOperatorValuesResources{
+					Limits: ValuesSecurityProfilesOperatorValuesResourcesLimits{
+						Cpu:    "500m",
+						Memory: "3Gi",
+					},
+					Requests: ValuesSecurityProfilesOperatorValuesResourcesRequests{
+						Cpu:    "500m",
+						Memory: "3Gi",
+					},
+				},
+			},
+			Version: "0.8.4-soperator",
+		},
+		SlurmCluster: ValuesSlurmCluster{
+			DriftDetection: ValuesSlurmClusterDriftDetection{
+				Mode: "warn",
+			},
+			Enabled:        true,
+			Interval:       "5m",
+			Namespace:      "soperator",
+			OverrideValues: nil,
+			ReleaseName:    "soperator",
+			SlurmClusterStorage: ValuesSlurmClusterSlurmClusterStorage{
+				DriftDetection: ValuesSlurmClusterSlurmClusterStorageDriftDetection{
+					Mode: "warn",
+				},
+				Enabled:        true,
+				Interval:       "5m",
+				OverrideValues: nil,
+				ReleaseName:    "slurm-cluster-storage",
+				Timeout:        "5m",
+				Values:         nil,
+			},
+			Timeout: "5m",
+			Values:  nil,
+			Version: "1.23.0",
+		},
+		Soperator: ValuesSoperator{
+			DriftDetection: ValuesSoperatorDriftDetection{
+				Mode: "warn",
+			},
+			Enabled:      true,
+			FeatureGates: "",
+			Interval:     "5m",
+			Kruise: ValuesSoperatorKruise{
+				DriftDetection: ValuesSoperatorKruiseDriftDetection{
+					Mode: "warn",
+				},
+				Enabled:  true,
+				Interval: "5m",
+				OverrideValues: ValuesSoperatorKruiseOverrideValues{
+					Crds: ValuesSoperatorKruiseOverrideValuesCrds{
+						Managed: true,
+					},
+					FeatureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true",
+					Manager: ValuesSoperatorKruiseOverrideValuesManager{
+						Replicas: 2,
+						Resources: ValuesSoperatorKruiseOverrideValuesManagerResources{
+							Limits: ValuesSoperatorKruiseOverrideValuesManagerResourcesLimits{
+								Cpu:    "1000m",
+								Memory: "2Gi",
+							},
+							Requests: ValuesSoperatorKruiseOverrideValuesManagerResourcesRequests{
+								Cpu:    "1000m",
+								Memory: "2Gi",
+							},
+						},
+					},
+				},
+				ReleaseName: "soperator-kruise",
+				Timeout:     "5m",
+				Version:     "1.8.0",
+			},
+			MonitoringDashboards: ValuesSoperatorMonitoringDashboards{
+				DriftDetection: ValuesSoperatorMonitoringDashboardsDriftDetection{
+					Mode: "warn",
+				},
+				Enabled:        true,
+				Interval:       "5m",
+				Namespace:      "monitoring-system",
+				OverrideValues: nil,
+				ReleaseName:    "soperator-monitoring-dashboards",
+				Timeout:        "5m",
+			},
+			Namespace: "soperator-system",
+			NodeConfigurator: ValuesSoperatorNodeConfigurator{
+				DriftDetection: ValuesSoperatorNodeConfiguratorDriftDetection{
+					Mode: "warn",
+				},
+				Enabled:        true,
+				Interval:       "5m",
+				OverrideValues: nil,
+				ReleaseName:    "soperator-node-configurator",
+				Timeout:        "5m",
+				Values: ValuesSoperatorNodeConfiguratorValues{
+					Rebooter: ValuesSoperatorNodeConfiguratorValuesRebooter{
+						Resources: ValuesSoperatorNodeConfiguratorValuesRebooterResources{},
+					},
+				},
+			},
+			OverrideValues: nil,
+			ReleaseName:    "soperator-controller",
+			SoperatorChecks: ValuesSoperatorSoperatorChecks{
+				DriftDetection: ValuesSoperatorSoperatorChecksDriftDetection{
+					Mode: "warn",
+				},
+				Enabled:        true,
+				Interval:       "5m",
+				OverrideValues: nil,
+				ReleaseName:    "soperator-checks",
+				Timeout:        "5m",
+				Values:         nil,
+			},
+			Timeout: "5m",
+			Values: ValuesSoperatorValues{
+				Manager: ValuesSoperatorValuesManager{
+					Resources: ValuesSoperatorValuesManagerResources{},
+				},
+				ServiceMonitor: ValuesSoperatorValuesServiceMonitor{
+					Enabled: true,
+				},
+			},
+			Version: "1.23.0",
+		},
+		SoperatorActiveChecks: ValuesSoperatorActiveChecks{
+			DriftDetection: ValuesSoperatorActiveChecksDriftDetection{
+				Mode: "warn",
+			},
+			Enabled:        true,
+			Interval:       "5m",
+			Namespace:      "soperator",
+			OverrideValues: nil,
+			ReleaseName:    "soperator-activechecks",
+			Timeout:        "120m",
+			Version:        "1.23.0",
+		},
+		StorageClasses: ValuesStorageClasses{
+			DriftDetection: ValuesStorageClassesDriftDetection{
+				Mode: "warn",
+			},
+			Enabled:     true,
+			Interval:    "5m",
+			Namespace:   "storage-system",
+			ReleaseName: "soperator-storageclasses",
+			Timeout:     "5m",
+			Values:      nil,
+			Version:     "1.23.0",
+		},
+		Tailscale: ValuesTailscale{
+			DriftDetection: ValuesTailscaleDriftDetection{
+				Mode: "warn",
+			},
+			Enabled:  false,
+			Interval: "5m",
+			Timeout:  "5m",
+			Version:  "2.0.0",
+		},
+	}
+}
