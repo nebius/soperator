@@ -1,14 +1,14 @@
 {{- $root := . -}}
-{{- range $check := .Values.checks }}
-{{- if or (not (hasKey $check "enabled")) $check.enabled }}
+{{- range $name, $check := .Values.checks }}
+{{- if $check.enabled }}
 ---
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
-  name: {{ $check.name | quote }}
+  name: {{ $name | quote }}
 spec:
   checkType: {{ $check.checkType | quote }}
-  name: {{ $check.name | quote }}
+  name: {{ $name | quote }}
   {{- with $check.dependsOn }}
   dependsOn:
 {{ toYaml . | indent 4 }}

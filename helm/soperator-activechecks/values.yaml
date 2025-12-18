@@ -25,7 +25,7 @@ images:
 # Pyxis syntax with '#' separator for registry
 activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-3935b93"
 checks:
-  - name: "all-reduce-perf-nccl-in-docker"
+  all-reduce-perf-nccl-in-docker:
     enabled: true
     checkType: "slurmJob"
     dependsOn:
@@ -43,7 +43,8 @@ checks:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
 
-  - name: "all-reduce-perf-nccl-with-ib"
+  all-reduce-perf-nccl-with-ib:
+    enabled: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -60,7 +61,8 @@ checks:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
 
-  - name: "all-reduce-perf-nccl-without-ib"
+  all-reduce-perf-nccl-without-ib:
+    enabled: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -76,7 +78,8 @@ checks:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
 
-  - name: "cuda-samples"
+  cuda-samples:
+    enabled: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -93,7 +96,8 @@ checks:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
 
-  - name: "dcgmi-diag-r2"
+  dcgmi-diag-r2:
+    enabled: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -109,7 +113,8 @@ checks:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
 
-  - name: "dcgmi-diag-r3"
+  dcgmi-diag-r3:
+    enabled: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -124,7 +129,8 @@ checks:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
 
-  - name: "ensure-healthy-nodes"
+  ensure-healthy-nodes:
+    enabled: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -142,7 +148,8 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/ensure-healthy-nodes.sh"
 
-  - name: "extensive-check"
+  extensive-check:
+    enabled: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -171,7 +178,8 @@ checks:
       removeReservation:
         prefix: "suspicious-node"
 
-  - name: "gpu-fryer"
+  gpu-fryer:
+    enabled: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -188,7 +196,8 @@ checks:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
 
-  - name: "ib-gpu-perf"
+  ib-gpu-perf:
+    enabled: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -206,7 +215,8 @@ checks:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
 
-  - name: "mem-perf"
+  mem-perf:
+    enabled: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -223,7 +233,8 @@ checks:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
 
-  - name: "ssh-check"
+  ssh-check:
+    enabled: true
     checkType: "k8sJob"
     dependsOn:
       - "create-user-soperatorchecks"
@@ -237,14 +248,16 @@ checks:
           - name: "NUM_OF_LOGIN_NODES"
             value: "2"
 
-  - name: "create-user-soperatorchecks"
+  create-user-soperatorchecks:
+    enabled: true
     checkType: "k8sJob"
     suspend: true
     runAfterCreation: true
     k8sJobSpec:
       scriptFile: "scripts/create-user-soperatorchecks.sh"
 
-  - name: "create-user-nebius"
+  create-user-nebius:
+    enabled: true
     checkType: "k8sJob"
     dependsOn:
       - "create-user-soperatorchecks"
@@ -257,7 +270,8 @@ checks:
           - name: "USER_NAME"
             value: "nebius"
 
-  - name: "enroot-cleanup"
+  enroot-cleanup:
+    enabled: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -269,7 +283,7 @@ checks:
       sbatchScriptFile: "scripts/enroot-cleanup.sh"
       eachWorkerJobs: true
 
-  - name: "ensure-dir-snccld-logs"
+  ensure-dir-snccld-logs:
     enabled: true
     checkType: "k8sJob"
     schedule: "15 0 * * *"
@@ -282,7 +296,8 @@ checks:
           - name: "SNCCLD_LOG_DIR_PATH"
             value: "/opt/soperator-outputs/nccl_logs"
 
-  - name: "prepull-container-image"
+  prepull-container-image:
+    enabled: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -293,7 +308,8 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/prepull-container-image.sh"
 
-  - name: "soperator-outputs-logs-cleaner"
+  soperator-outputs-logs-cleaner:
+    enabled: true
     checkType: "k8sJob"
     schedule: "40 */1 * * *"
     suspend: false
@@ -303,7 +319,8 @@ checks:
       jobContainer:
         appArmorProfile: unconfined
 
-  - name: "manage-jail-state"
+  manage-jail-state:
+    enabled: true
     checkType: "k8sJob"
     dependsOn:
       - "create-user-soperatorchecks"
@@ -329,7 +346,8 @@ checks:
           - run-all-upgrade
           - --diff
 
-  - name: "manage-jail-state-dry-run"
+  manage-jail-state-dry-run:
+    enabled: true
     checkType: "k8sJob"
     dependsOn:
       - "create-user-soperatorchecks"
@@ -362,7 +380,8 @@ checks:
           - name: "ANSIBLE_FORCE_COLOR"
             value: "0"
 
-  - name: "upgrade-health-checker"
+  upgrade-health-checker:
+    enabled: true
     checkType: "k8sJob"
     dependsOn:
       - "create-user-soperatorchecks"
@@ -389,7 +408,8 @@ checks:
           - nc-health-checker.yml
           - --diff
 
-  - name: "wait-for-topology"
+  wait-for-topology:
+    enabled: true
     checkType: "k8sJob"
     suspend: true
     runAfterCreation: true
@@ -397,7 +417,8 @@ checks:
       appArmorProfile: unconfined
       scriptFile: "scripts/wait-for-topology.sh"
 
-  - name: "wait-for-soperatorchecks-srun-ready"
+  wait-for-soperatorchecks-srun-ready:
+    enabled: true
     checkType: "k8sJob"
     dependsOn:
       - "manage-jail-state"
@@ -413,7 +434,8 @@ checks:
       mungeContainer:
         enabled: true
 
-  - name: "retrigger-checks"
+  retrigger-checks:
+    enabled: true
     checkType: "k8sJob"
     suspend: true
     runAfterCreation: false

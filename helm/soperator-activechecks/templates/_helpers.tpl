@@ -90,21 +90,6 @@ image: {{ tpl $image $ctx | quote }}
 {{- end -}}
 
 {{/*
-Lookup a check definition by name from the checks list.
-*/}}
-{{- define "soperator-activechecks.getCheck" -}}
-{{- $name := index . 0 -}}
-{{- $ctx := index . 1 -}}
-{{- $found := dict -}}
-{{- range $ctx.Values.checks -}}
-  {{- if eq .name $name -}}
-    {{- $found = . -}}
-  {{- end -}}
-{{- end -}}
-{{- toYaml $found -}}
-{{- end -}}
-
-{{/*
 Render slurmJobSpec for an ActiveCheck.
 */}}
 {{- define "soperator-activechecks.slurmJobSpec" -}}

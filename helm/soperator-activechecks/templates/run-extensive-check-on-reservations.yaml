@@ -49,7 +49,7 @@ spec:
 {{ .Files.Get "scripts/run-extensive-check-on-reservations.sh" | nindent 14 }}
             env:
             - name: RESERVATION_PREFIX
-              value: {{ (include "soperator-activechecks.getCheck" (list "extensive-check" .) | fromYaml).reservationPrefix | quote }}
+              value: {{ (index .Values.checks "extensive-check").reservationPrefix | quote }}
             - name: TARGET_ACTIVE_CHECK_NAME
               value: extensive-check
             volumeMounts:
