@@ -819,3 +819,9 @@ generate-values-types: ## Generate Go types from Helm values.yaml for slurm-clus
 	@echo "Generating Go types from helm/soperator-fluxcd/values.yaml"
 	@mkdir -p pkg/valuesgen/generated/soperatorfluxcd
 	@go run ./cmd/generate-values -in helm/soperator-fluxcd/values.yaml -out pkg/valuesgen/generated/soperatorfluxcd/values.go -pkg soperatorfluxcd -type Values
+	@echo "Generating Go types from helm/soperator/values.yaml"
+	@mkdir -p pkg/valuesgen/generated/soperator
+	@go run ./cmd/generate-values -in helm/soperator/values.yaml -out pkg/valuesgen/generated/soperator/values.go -pkg soperator -type Values
+	@echo "Generating Go types from helm/nodesets/values.yaml"
+	@mkdir -p pkg/valuesgen/generated/nodesets
+	@go run ./cmd/generate-values -in helm/nodesets/values.yaml -out pkg/valuesgen/generated/nodesets/values.go -pkg nodesets -type Values
