@@ -6,6 +6,15 @@ permissions:
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths-ignore:
+      - "docs/**"
+      - "CODEOWNERS"
+      - "LICENSE"
+      - "PROJECT"
+      - "README.md"
+      - "SECURITY.md"
+      - "pkg/valuesgen/**"
+      - "Makefile"
 
 jobs:
   lint:
@@ -21,7 +30,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: "3.13"
 
       - name: Install ansible-lint
         run: |

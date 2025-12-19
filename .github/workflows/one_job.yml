@@ -22,6 +22,8 @@ on:
       - "PROJECT"
       - "README.md"
       - "SECURITY.md"
+      - "pkg/valuesgen/**"
+      - "Makefile"
 
   # pull_request are defined separately to allow to run CI from forks.
   pull_request:
@@ -33,7 +35,8 @@ on:
       - "PROJECT"
       - "README.md"
       - "SECURITY.md"
-
+      - "pkg/valuesgen/**"
+      - "Makefile"
 permissions:
   contents: read
   packages: write
@@ -206,7 +209,7 @@ jobs:
 
           echo "Building local go base image"
           make docker-build-go-base DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}"
-          
+
           echo "Building and pushing image of the soperatorchecks ${OPERATOR_IMAGE_TAG}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks DOCKERFILE=soperatorchecks/soperatorchecks.dockerfile IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
 
@@ -227,10 +230,10 @@ jobs:
 
           echo "Building and pushing image of the controller_slurmdbd ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd DOCKERFILE=accounting/slurmdbd.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-          
+
           echo "Building and pushing image of the slurmrestd ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd DOCKERFILE=restd/slurmrestd.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-          
+
           echo "Building and pushing image of the soperator-exporter ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperator-exporter DOCKERFILE=soperator-exporter/soperator-exporter.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
 
