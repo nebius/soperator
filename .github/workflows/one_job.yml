@@ -23,6 +23,7 @@ on:
       - "README.md"
       - "SECURITY.md"
       - "pkg/valuesgen/**"
+      - "Makefile"
 
   # pull_request are defined separately to allow to run CI from forks.
   pull_request:
@@ -35,7 +36,7 @@ on:
       - "README.md"
       - "SECURITY.md"
       - "pkg/valuesgen/**"
-
+      - "Makefile"
 permissions:
   contents: read
   packages: write
