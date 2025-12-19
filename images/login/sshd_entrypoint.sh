@@ -15,6 +15,9 @@ ln -s /mnt/jail/etc/update-motd.d /etc/update-motd.d
 echo "Link home from jail to use SSH keys from there"
 ln -s /mnt/jail/home /home
 
+echo "Creating symlink to the slurm configs"
+rm -rf /etc/slurm && ln -s /mnt/jail/etc/slurm /etc/slurm
+
 echo "Link soperator home directories from jail to use SSH keys from there"
 mkdir -p /mnt/jail/opt/soperator-home
 ln -s /mnt/jail/opt/soperator-home /opt/soperator-home
