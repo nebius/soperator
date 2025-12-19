@@ -26,5 +26,5 @@ spec:
     mungeContainer:
       image: {{ .Values.images.munge | quote }}
   failureReactions:
-    drainSlurmNode:
-      drainReasonPrefix: {{ .Values.checks.ibGpuPerf.drainReasonPrefix | quote }}
+    commentSlurmNode:
+      commentPrefix: {{ .Values.checks.ibGpuPerf.commentPrefix | quote }}
