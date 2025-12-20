@@ -41,10 +41,10 @@ spec:
     {{- toYaml .Values.backup.overrideValues | nindent 4 }}
   {{- else }}
     k8up:
+      backupImage:
+        repository: k8up-io/k8up
+        tag: v2.13.1
       skipWithoutAnnotation: true
-      image:
-        repository: ghcr.io/vshn/k8up
-        tag: v4.8.0
     {{- if .Values.observability.prometheusOperator.enabled }}
       metrics:
         grafanaDashboard:
