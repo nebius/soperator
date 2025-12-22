@@ -203,8 +203,8 @@ checks:
       eachWorkerJobs: true
       maxNumberOfJobs: 200
     failureReactions:
-      drainSlurmNode:
-        drainReasonPrefix: "[node_problem]"
+      commentSlurmNode:
+        commentPrefix: "[node_problem]"
   mem-perf:
     enabled: true
     checkType: "slurmJob"
