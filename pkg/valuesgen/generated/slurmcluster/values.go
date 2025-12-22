@@ -844,7 +844,7 @@ func NewDefaults() Values {
 		SlurmConfig: ValuesSlurmConfig{
 			CompleteWait:    5,
 			DefCpuPerGPU:    4,
-			DefMemPerNode:   1048576,
+			DefMemPerNode:   0,
 			Epilog:          "/opt/slurm_scripts/epilog.sh",
 			MaxJobCount:     20000,
 			MessageTimeout:  60,
