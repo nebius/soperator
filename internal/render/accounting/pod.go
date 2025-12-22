@@ -1,15 +1,13 @@
 package accounting
 
 import (
-	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
-	"nebius.ai/slurm-operator/internal/utils"
+	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -24,7 +22,7 @@ func BasePodTemplateSpec(
 		common.RenderVolumeJailFromSource(volumeSources, *accounting.VolumeJail.VolumeSourceName),
 		common.RenderVolumeProjectedSlurmConfigs(
 			clusterName,
-			RenderVolumeProjecitonSlurmdbdConfigs(clusterName),
+			RenderVolumeProjectionSlurmdbdConfigs(clusterName),
 		),
 		common.RenderVolumeMungeKey(clusterName),
 		common.RenderVolumeRESTJWTKey(clusterName),
@@ -50,7 +48,7 @@ func BasePodTemplateSpec(
 		}
 	}
 
-	nodeFilter, err := utils.GetBy(
+	nodeFilter, err := sliceutils.GetBy(
 		nodeFilters,
 		accounting.K8sNodeFilterName,
 		func(f slurmv1.K8sNodeFilter) string { return f.Name },
@@ -61,16 +59,8 @@ func BasePodTemplateSpec(
 
 	return &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: matchLabels,
-			Annotations: map[string]string{
-				fmt.Sprintf(
-					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameAccounting,
-				): accounting.ContainerAccounting.AppArmorProfile,
-				fmt.Sprintf(
-					"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-				): accounting.ContainerMunge.AppArmorProfile,
-				consts.AnnotationDefaultContainerName: consts.ContainerNameAccounting,
-			},
+			Labels:      matchLabels,
+			Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameAccounting),
 		},
 		Spec: corev1.PodSpec{
 			HostUsers:         accounting.HostUsers,
@@ -80,8 +70,11 @@ func BasePodTemplateSpec(
 			Hostname:          consts.HostnameAccounting,
 			PriorityClassName: accounting.PriorityClass,
 			InitContainers: append(
-				accounting.CustomInitContainers,
-				common.RenderContainerMunge(&accounting.ContainerMunge),
+				[]corev1.Container{
+					renderContainerDbwaiter(clusterName, accounting),
+					common.RenderContainerMunge(&accounting.ContainerMunge),
+				},
+				accounting.CustomInitContainers...,
 			),
 			Containers: []corev1.Container{
 				renderContainerAccounting(accounting.ContainerAccounting, additionalVolumeMounts),

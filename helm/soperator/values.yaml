@@ -67,9 +67,9 @@ serviceMonitor:
   metricRelabelings: []
   relabelings: []
 certManager:
-  enabled: false
+  enabled: true
 kruise:
-  installOperator: true
+  installOperator: false
   manager:
     replicas: 1
   featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true"

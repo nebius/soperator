@@ -61,7 +61,7 @@ RUN arch=$(uname -m) && \
     if [ "$arch" = "x86_64" ]; then alt_arch="x86_64"; \
     elif [ "$arch" = "aarch64" ]; then alt_arch="aarch64"; \
     else echo "Unsupported arch: $arch" && exit 1; fi && \
-    echo "LD_LIBRARY_PATH=/lib/${alt_arch}-linux-gnu:/usr/lib/${alt_arch}-linux-gnu:/usr/local/cuda/targets/${alt_arch}-linux/lib:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib" >> /etc/environment
+    echo "LD_LIBRARY_PATH=/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib:/lib/${alt_arch}-linux-gnu:/usr/lib/${alt_arch}-linux-gnu:/usr/local/cuda/targets/${alt_arch}-linux/lib" >> /etc/environment
 ENV PATH=${PATH}:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
 # Add Nebius public registry

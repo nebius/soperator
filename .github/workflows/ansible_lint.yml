@@ -6,6 +6,15 @@ permissions:
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths-ignore:
+      - "docs/**"
+      - "CODEOWNERS"
+      - "LICENSE"
+      - "PROJECT"
+      - "README.md"
+      - "SECURITY.md"
+      - "pkg/valuesgen/**"
+      - "Makefile"
 
 jobs:
   lint:
@@ -14,14 +23,14 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: "3.13"
 
       - name: Install ansible-lint
         run: |

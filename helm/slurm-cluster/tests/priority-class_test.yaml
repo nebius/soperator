@@ -118,3 +118,73 @@ tests:
       - equal:
           path: spec.sConfigController.node.priorityClass
           value: "custom-sconfigcontroller"
+
+  - it: should create mariadb priority class when mariadbOperator is enabled
+    template: priority-class.yaml
+    values:
+      - ../tests/minimal-config_test.yaml
+    set:
+      slurmNodes.accounting.mariadbOperator.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 9
+      # Check mariadb priority class (document 8)
+      - equal:
+          path: metadata.name
+          value: slurm1-slurm-mariadb
+        documentIndex: 8
+      - equal:
+          path: kind
+          value: PriorityClass
+        documentIndex: 8
+      - equal:
+          path: value
+          value: 100008
+        documentIndex: 8
+      - equal:
+          path: preemptionPolicy
+          value: PreemptLowerPriority
+        documentIndex: 8
+
+  - it: should not create mariadb priority class when mariadbOperator is disabled
+    template: priority-class.yaml
+    values:
+      - ../tests/minimal-config_test.yaml
+    set:
+      slurmNodes.accounting.mariadbOperator.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 8
+
+  - it: should set mariadb priority class in slurm cluster CR when mariadbOperator is enabled
+    template: slurm-cluster-cr.yaml
+    values:
+      - ../tests/minimal-config_test.yaml
+    set:
+      slurmNodes.accounting.enabled: true
+      slurmNodes.accounting.mariadbOperator.enabled: true
+      images.mariaDB: "mariadb:11.5"
+      slurmNodes.accounting.mariadbOperator.resources.cpu: "1000m"
+      slurmNodes.accounting.mariadbOperator.resources.memory: "1Gi"
+      slurmNodes.accounting.mariadbOperator.resources.ephemeralStorage: "5Gi"
+    asserts:
+      - equal:
+          path: spec.slurmNodes.accounting.mariadbOperator.priorityClassName
+          value: "slurm1-slurm-mariadb"
+
+  - it: should allow custom mariadb priority class to be set
+    template: slurm-cluster-cr.yaml
+    values:
+      - ../tests/minimal-config_test.yaml
+    set:
+      slurmNodes.accounting.enabled: true
+      slurmNodes.accounting.mariadbOperator.enabled: true
+      slurmNodes.accounting.mariadbOperator.priorityClassName: "custom-mariadb"
+      images.mariaDB: "mariadb:11.5"
+      slurmNodes.accounting.mariadbOperator.resources.cpu: "1000m"
+      slurmNodes.accounting.mariadbOperator.resources.memory: "1Gi"
+      slurmNodes.accounting.mariadbOperator.resources.ephemeralStorage: "5Gi"
+    asserts:
+      - equal:
+          path: spec.slurmNodes.accounting.mariadbOperator.priorityClassName
+          value: "custom-mariadb"

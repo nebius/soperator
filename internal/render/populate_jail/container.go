@@ -40,6 +40,7 @@ func renderContainerPopulateJail(clusterType consts.ClusterType, populateJail *v
 					consts.ContainerSecurityContextCapabilitySysAdmin,
 				},
 			},
+			AppArmorProfile: common.ParseAppArmorProfile(populateJail.ContainerPopulateJail.AppArmorProfile),
 		},
 		VolumeMounts: volumeMounts,
 	}

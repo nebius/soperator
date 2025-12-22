@@ -2,8 +2,11 @@ package common
 
 import (
 	"fmt"
+	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/values"
@@ -83,4 +86,28 @@ profile %s flags=(attach_disconnected,mediate_deleted) {
   deny /usr/bin/nvidia-cuda-mps-server w,
   deny /lib/firmware/nvidia/**/gsp_*.bin w,
 }`, naming.BuildAppArmorProfileName(clusterName, namespace))
+}
+
+// ParseAppArmorProfile converts AppArmor profile string to corev1.AppArmorProfile
+// It supports formats like "unconfined", "localhost/profile-name", or just "profile-name"
+func ParseAppArmorProfile(profileStr string) *corev1.AppArmorProfile {
+	if profileStr == "" {
+		return nil
+	}
+	if profileStr == "unconfined" {
+		return &corev1.AppArmorProfile{
+			Type: corev1.AppArmorProfileTypeUnconfined,
+		}
+	}
+	if strings.HasPrefix(profileStr, "localhost/") {
+		profileName := strings.TrimPrefix(profileStr, "localhost/")
+		return &corev1.AppArmorProfile{
+			Type:             corev1.AppArmorProfileTypeLocalhost,
+			LocalhostProfile: ptr.To(profileName),
+		}
+	}
+	return &corev1.AppArmorProfile{
+		Type:             corev1.AppArmorProfileTypeLocalhost,
+		LocalhostProfile: ptr.To(profileStr),
+	}
 }

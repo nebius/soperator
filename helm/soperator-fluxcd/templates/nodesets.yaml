@@ -6,6 +6,10 @@ metadata:
   labels:
   {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
+  {{- with .Values.nodesets.driftDetection }}
+  driftDetection:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   chart:
     spec:
       chart: helm-nodesets
@@ -34,10 +38,6 @@ spec:
     remediation:
       retries: 3
       remediateLastFailure: true
-  {{- if .Values.nodesets.driftDetection }}
-  driftDetection:
-    {{- toYaml .Values.nodesets.driftDetection | nindent 4 -}}
-  {{- end }}
   values:
   {{- if .Values.nodesets.overrideValues }}
     {{- toYaml .Values.nodesets.overrideValues | nindent 4 }}
