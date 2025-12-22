@@ -1,19 +1,7 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-FROM cr.eu-north1.nebius.cloud/soperator/cuda_base:12.9.0-ubuntu24.04-nccl2.26.5-1-17be0c5 AS cuda
-
-# Download NCCL tests executables
-ARG CUDA_VERSION=12.9.0
-ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
-RUN ARCH=$(uname -m) && \
-    echo "Using architecture: ${ARCH}" && \
-    wget -P /tmp "${PACKAGES_REPO_URL}/nccl_tests_${CUDA_VERSION}_ubuntu24.04/nccl-tests-perf-${ARCH}.tar.gz" && \
-    tar -xvzf /tmp/nccl-tests-perf-${ARCH}.tar.gz -C /usr/bin && \
-    rm -rf /tmp/nccl-tests-perf-${ARCH}.tar.gz
-
-#######################################################################################################################
-
-FROM cuda AS jail
+# Base cuda image https://github.com/nebius/ml-containers/tree/main/cuda
+FROM cr.eu-north1.nebius.cloud/soperator/cuda_base:12.9.0-ubuntu24.04-nccl2.26.5-1-4637ddb AS jail
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -83,6 +71,11 @@ RUN apt update && \
         aptitude && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Download NCCL tests executables
+COPY ansible/nccl-tests.yml /opt/ansible/nccl-tests.yml
+COPY ansible/roles/nccl-tests /opt/ansible/roles/nccl-tests
+RUN ansible-playbook -i inventory/ -c local nccl-tests.yml
 
 # Install AWS CLI
 COPY images/common/scripts/install_awscli.sh /opt/bin/
