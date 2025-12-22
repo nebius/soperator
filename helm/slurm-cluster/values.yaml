@@ -145,7 +145,7 @@ populateJail:
   #    volumeSourceName: "jail-snapshot"
   overwrite: false
 slurmConfig:
-  defMemPerNode: 1048576
+  defMemPerNode: 0
   defCpuPerGPU: 4
   completeWait: 5
   prolog: /opt/slurm_scripts/prolog.sh

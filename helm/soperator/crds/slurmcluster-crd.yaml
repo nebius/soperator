@@ -29208,7 +29208,7 @@ spec:
                 default:
                   completeWait: 5
                   defCpuPerGPU: 4
-                  defMemPerNode: 1048576
+                  defMemPerNode: 0
                   epilog: ""
                   maxJobCount: 20000
                   messageTimeout: 60
@@ -29229,7 +29229,7 @@ spec:
                     format: int32
                     type: integer
                   defMemPerNode:
-                    default: 1048576
+                    default: 0
                     description: Default real memory size available per allocated
                       node in mebibytes.
                     format: int32
