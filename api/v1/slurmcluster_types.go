@@ -74,7 +74,7 @@ type SlurmClusterSpec struct {
 	// SlurmConfig represents the Slurm configuration in slurm.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={defMemPerNode: 1048576, defCpuPerGPU: 4, completeWait: 5, epilog: "", prolog: "", maxJobCount: 20000, minJobAge: 28800, messageTimeout: 60}
+	// +kubebuilder:default={defMemPerNode: 0, defCpuPerGPU: 4, completeWait: 5, epilog: "", prolog: "", maxJobCount: 20000, minJobAge: 28800, messageTimeout: 60}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 
 	// CustomSlurmConfig represents the raw Slurm configuration from slurm.conf.
@@ -131,7 +131,7 @@ type SlurmConfig struct {
 	// Default real memory size available per allocated node in mebibytes.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=1048576
+	// +kubebuilder:default=0
 	DefMemPerNode *int32 `json:"defMemPerNode,omitempty"`
 	// Default count of CPUs allocated per allocated GPU
 	//

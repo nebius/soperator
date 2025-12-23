@@ -27,7 +27,7 @@ tests:
     asserts:
       - equal:
           path: spec.slurmConfig.defMemPerNode
-          value: 1048576
+          value: 0
       - equal:
           path: spec.slurmConfig.defCpuPerGPU
           value: 4
