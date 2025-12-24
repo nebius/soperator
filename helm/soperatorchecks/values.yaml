@@ -31,7 +31,7 @@ checks:
       - --not-ready-timeout=15m
       - --delete-not-ready-nodes=true
       - --leader-elect
-      - --maintenance-condition-type="NebiusMaintenanceScheduled"
+      - --maintenance-condition-type=NebiusMaintenanceScheduled
     containerSecurityContext:
       allowPrivilegeEscalation: false
       capabilities:
