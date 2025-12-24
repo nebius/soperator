@@ -9,6 +9,7 @@ import (
 	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/utils/ptr"
 )
 
 func TestNodeFromAPI(t *testing.T) {
@@ -27,12 +28,21 @@ func TestNodeFromAPI(t *testing.T) {
 					api.V0041NodeStateIDLE:        {},
 					api.V0041NodeStateDYNAMICNORM: {},
 				},
-				Reason:     nil,
-				Partitions: []string{"main"},
-				Tres:       "cpu=16,mem=191356M,billing=16,gres/gpu=1",
-				Address:    "10.0.0.1",
-				BootTime:   time.Unix(1747752894, 0),
-				Comment:    "comment",
+				Reason:              nil,
+				Partitions:          []string{"main"},
+				Tres:                "cpu=16,mem=191356M,billing=16,gres/gpu=1",
+				TresUsed:            "",
+				Address:             "10.0.0.1",
+				BootTime:            time.Unix(1747752894, 0),
+				Comment:             "comment",
+				CPUs:                ptr.To(int32(16)),
+				AllocCPUs:           ptr.To(int32(0)),
+				AllocIdleCPUs:       ptr.To(int32(16)),
+				EffectiveCPUs:       ptr.To(int32(16)),
+				AllocMemoryMB:       ptr.To(int64(0)),
+				RealMemoryMB:        ptr.To(int64(191356)),
+				FreeMemoryMB:        ptr.To(int64(168840)),
+				SpecializedMemoryMB: ptr.To(int64(0)),
 			},
 			wantErr: false,
 		},
@@ -61,9 +71,18 @@ func TestNodeFromAPI(t *testing.T) {
 			assert.Equal(t, tt.want.States, got.States)
 			assert.Equal(t, tt.want.Partitions, got.Partitions)
 			assert.Equal(t, tt.want.Tres, got.Tres)
+			assert.Equal(t, tt.want.TresUsed, got.TresUsed)
 			assert.Equal(t, tt.want.Address, got.Address)
 			assert.Equal(t, tt.want.BootTime, got.BootTime)
 			assert.Equal(t, tt.want.Comment, got.Comment)
+			assert.Equal(t, tt.want.CPUs, got.CPUs)
+			assert.Equal(t, tt.want.AllocCPUs, got.AllocCPUs)
+			assert.Equal(t, tt.want.AllocIdleCPUs, got.AllocIdleCPUs)
+			assert.Equal(t, tt.want.EffectiveCPUs, got.EffectiveCPUs)
+			assert.Equal(t, tt.want.AllocMemoryMB, got.AllocMemoryMB)
+			assert.Equal(t, tt.want.RealMemoryMB, got.RealMemoryMB)
+			assert.Equal(t, tt.want.FreeMemoryMB, got.FreeMemoryMB)
+			assert.Equal(t, tt.want.SpecializedMemoryMB, got.SpecializedMemoryMB)
 
 			// Check reason handling
 			if tt.want.Reason == nil {

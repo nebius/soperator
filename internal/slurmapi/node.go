@@ -15,10 +15,21 @@ type Node struct {
 	Reason      *NodeReason
 	Partitions  []string
 	Tres        string    // Trackable Resources (e.g., CPUs, GPUs) assigned to the node.
+	TresUsed    string    // Trackable Resources currently allocated for jobs.
 	Address     string    // IP Address of the node in the Kubernetes cluster.
 	BootTime    time.Time // The boot time of the node.
 	Comment     string
 	Reservation string
+
+	// Resource-related fields (nullable to detect missing data)
+	CPUs                *int32
+	AllocCPUs           *int32
+	AllocIdleCPUs       *int32
+	EffectiveCPUs       *int32
+	AllocMemoryMB       *int64
+	RealMemoryMB        *int64
+	FreeMemoryMB        *int64
+	SpecializedMemoryMB *int64
 }
 
 type NodeReason struct {
@@ -72,9 +83,19 @@ func NodeFromAPI(node api.V0041Node) (Node, error) {
 		States:      nodeStates,
 		Partitions:  *node.Partitions,
 		Tres:        *node.Tres,
+		TresUsed:    valueOrDefault(node.TresUsed),
 		Address:     *node.Address,
 		Comment:     *node.Comment,
 	}
+
+	res.CPUs = node.Cpus
+	res.AllocCPUs = node.AllocCpus
+	res.AllocIdleCPUs = node.AllocIdleCpus
+	res.EffectiveCPUs = node.EffectiveCpus
+	res.AllocMemoryMB = node.AllocMemory
+	res.RealMemoryMB = node.RealMemory
+	res.FreeMemoryMB = convertUint64Struct(node.FreeMem)
+	res.SpecializedMemoryMB = node.SpecializedMemory
 
 	if node.BootTime != nil && node.BootTime.Number != nil {
 		res.BootTime = time.Unix(*node.BootTime.Number, 0)
@@ -106,6 +127,11 @@ func (n *Node) IsDrainState() bool {
 	return exists
 }
 
+func (n *Node) IsCompletingState() bool {
+	_, exists := n.States[api.V0041NodeStateCOMPLETING]
+	return exists
+}
+
 func (n *Node) IsMaintenanceState() bool {
 	_, exists := n.States[api.V0041NodeStateMAINTENANCE]
 	return exists
@@ -113,6 +139,16 @@ func (n *Node) IsMaintenanceState() bool {
 
 func (n *Node) IsReservedState() bool {
 	_, exists := n.States[api.V0041NodeStateRESERVED]
+	return exists
+}
+
+func (n *Node) IsFailState() bool {
+	_, exists := n.States[api.V0041NodeStateFAIL]
+	return exists
+}
+
+func (n *Node) IsPlannedState() bool {
+	_, exists := n.States[api.V0041NodeStatePLANNED]
 	return exists
 }
 
@@ -128,6 +164,7 @@ var baseStates = []api.V0041NodeState{
 	api.V0041NodeStateALLOCATED,
 	api.V0041NodeStateERROR,
 	api.V0041NodeStateMIXED,
+	api.V0041NodeStateCOMPLETING,
 }
 
 // BaseState returns the base state of the node.
@@ -140,4 +177,18 @@ func (n *Node) BaseState() api.V0041NodeState {
 		}
 	}
 	return ""
+}
+
+func valueOrDefault(ptr *string) string {
+	if ptr == nil {
+		return ""
+	}
+	return *ptr
+}
+
+func convertUint64Struct(input *api.V0041Uint64NoValStruct) *int64 {
+	if input == nil || input.Set == nil || !*input.Set || input.Number == nil {
+		return nil
+	}
+	return input.Number
 }

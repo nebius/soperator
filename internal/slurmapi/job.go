@@ -31,6 +31,10 @@ type Job struct {
 	SubmitTime     *metav1.Time
 	StartTime      *metav1.Time
 	EndTime        *metav1.Time
+	TresAllocated  string
+	TresRequested  string
+	CPUs           *int32
+	MemoryPerNode  *int64 // in MB
 }
 
 func JobFromAPI(apiJob api.V0041JobInfo) (Job, error) {
@@ -100,6 +104,15 @@ func JobFromAPI(apiJob api.V0041JobInfo) (Job, error) {
 	job.SubmitTime = convertToMetav1Time(apiJob.SubmitTime)
 	job.StartTime = convertToMetav1Time(apiJob.StartTime)
 	job.EndTime = convertToMetav1Time(apiJob.EndTime)
+
+	if apiJob.TresAllocStr != nil {
+		job.TresAllocated = *apiJob.TresAllocStr
+	}
+	if apiJob.TresReqStr != nil {
+		job.TresRequested = *apiJob.TresReqStr
+	}
+	job.CPUs = convertToInt(apiJob.Cpus)
+	job.MemoryPerNode = convertToInt64(apiJob.MemoryPerNode)
 
 	return job, nil
 }
@@ -290,6 +303,18 @@ func convertToMetav1Time(input *api.V0041Uint64NoValStruct) *metav1.Time {
 }
 
 func convertToInt(input *api.V0041Uint32NoValStruct) *int32 {
+	if input == nil || input.Set == nil || !*input.Set || input.Number == nil {
+		return nil
+	}
+
+	if input.Infinite != nil && *input.Infinite {
+		return nil
+	}
+
+	return input.Number
+}
+
+func convertToInt64(input *api.V0041Uint64NoValStruct) *int64 {
 	if input == nil || input.Set == nil || !*input.Set || input.Number == nil {
 		return nil
 	}
