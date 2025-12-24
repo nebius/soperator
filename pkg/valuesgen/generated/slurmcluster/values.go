@@ -9,7 +9,7 @@ type Values struct {
 	CustomCgroupConfig        string                       `yaml:"customCgroupConfig" json:"customCgroupConfig"`
 	CustomSlurmConfig         string                       `yaml:"customSlurmConfig" json:"customSlurmConfig"`
 	HealthCheckConfig         interface{}                  `yaml:"healthCheckConfig" json:"healthCheckConfig"`
-	Images                    ValuesImages                 `yaml:"images" json:"images"`
+	Images                    *ValuesImages                `yaml:"images,omitempty" json:"images,omitempty"`
 	K8sNodeFilters            []ValuesK8sNodeFiltersItem   `yaml:"k8sNodeFilters" json:"k8sNodeFilters"`
 	Maintenance               string                       `yaml:"maintenance" json:"maintenance"`
 	MpiConfig                 ValuesMpiConfig              `yaml:"mpiConfig" json:"mpiConfig"`
@@ -713,7 +713,7 @@ func NewDefaults() Values {
 		CustomCgroupConfig: "",
 		CustomSlurmConfig:  "",
 		HealthCheckConfig:  nil,
-		Images: ValuesImages{
+		Images: &ValuesImages{
 			MariaDB:           "docker-registry1.mariadb.com/library/mariadb:12.1.2",
 			Munge:             "cr.eu-north1.nebius.cloud/soperator/munge:1.23.1-noble-slurm25.05.5",
 			PopulateJail:      "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.23.1-noble-slurm25.05.5",

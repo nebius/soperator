@@ -190,7 +190,7 @@ type ValuesSoperatorKruiseOverrideValues struct {
 }
 
 type ValuesSoperatorKruiseOverrideValuesManager struct {
-	Image     ValuesSoperatorKruiseOverrideValuesManagerImage     `yaml:"image" json:"image"`
+	Image     *ValuesSoperatorKruiseOverrideValuesManagerImage    `yaml:"image,omitempty" json:"image,omitempty"`
 	Replicas  int                                                 `yaml:"replicas" json:"replicas"`
 	Resources ValuesSoperatorKruiseOverrideValuesManagerResources `yaml:"resources" json:"resources"`
 }
@@ -211,15 +211,15 @@ type ValuesSoperatorKruiseOverrideValuesManagerResourcesLimits struct {
 }
 
 type ValuesSoperatorKruiseOverrideValuesManagerImage struct {
-	Repository string `yaml:"repository" json:"repository"`
+	Repository *string `yaml:"repository" json:"repository"`
 }
 
 type ValuesSoperatorKruiseOverrideValuesHelmHooks struct {
-	Image ValuesSoperatorKruiseOverrideValuesHelmHooksImage `yaml:"image" json:"image"`
+	Image *ValuesSoperatorKruiseOverrideValuesHelmHooksImage `yaml:"image,omitempty" json:"image,omitempty"`
 }
 
 type ValuesSoperatorKruiseOverrideValuesHelmHooksImage struct {
-	Repository string `yaml:"repository" json:"repository"`
+	Repository *string `yaml:"repository" json:"repository"`
 }
 
 type ValuesSoperatorKruiseOverrideValuesCrds struct {
@@ -917,10 +917,10 @@ type ValuesBackupValues struct {
 }
 
 type ValuesBackupValuesCleanup struct {
-	PullPolicy string `yaml:"pullPolicy" json:"pullPolicy"`
-	Registry   string `yaml:"registry" json:"registry"`
-	Repository string `yaml:"repository" json:"repository"`
-	Tag        string `yaml:"tag" json:"tag"`
+	PullPolicy string  `yaml:"pullPolicy" json:"pullPolicy"`
+	Registry   *string `yaml:"registry,omitempty" json:"registry,omitempty"`
+	Repository *string `yaml:"repository" json:"repository"`
+	Tag        *string `yaml:"tag" json:"tag"`
 }
 
 type ValuesBackupDriftDetection struct {
@@ -989,9 +989,9 @@ func NewDefaults() Values {
 			Values: ValuesBackupValues{
 				Cleanup: ValuesBackupValuesCleanup{
 					PullPolicy: "IfNotPresent",
-					Registry:   "docker.io",
-					Repository: "alpine/k8s",
-					Tag:        "1.34.0",
+					Registry:   func() *string { s := "docker.io"; return &s }(),
+					Repository: func() *string { s := "alpine/k8s"; return &s }(),
+					Tag:        func() *string { s := "1.34.0"; return &s }(),
 				},
 			},
 			Version: "4.8.*",
@@ -1476,13 +1476,13 @@ func NewDefaults() Values {
 					},
 					FeatureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true",
 					HelmHooks: ValuesSoperatorKruiseOverrideValuesHelmHooks{
-						Image: ValuesSoperatorKruiseOverrideValuesHelmHooksImage{
-							Repository: "cr.eu-north1.nebius.cloud/soperator/kruise-helm-hook",
+						Image: &ValuesSoperatorKruiseOverrideValuesHelmHooksImage{
+							Repository: func() *string { s := "cr.eu-north1.nebius.cloud/soperator/kruise-helm-hook"; return &s }(),
 						},
 					},
 					Manager: ValuesSoperatorKruiseOverrideValuesManager{
-						Image: ValuesSoperatorKruiseOverrideValuesManagerImage{
-							Repository: "cr.eu-north1.nebius.cloud/soperator/kruise-manager",
+						Image: &ValuesSoperatorKruiseOverrideValuesManagerImage{
+							Repository: func() *string { s := "cr.eu-north1.nebius.cloud/soperator/kruise-manager"; return &s }(),
 						},
 						Replicas: 2,
 						Resources: ValuesSoperatorKruiseOverrideValuesManagerResources{

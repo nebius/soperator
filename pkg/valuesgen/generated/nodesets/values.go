@@ -4,7 +4,7 @@ package nodesets
 
 type Values struct {
 	FullnameOverride string                      `yaml:"fullnameOverride" json:"fullnameOverride"`
-	Images           ValuesImages                `yaml:"images" json:"images"`
+	Images           *ValuesImages               `yaml:"images,omitempty" json:"images,omitempty"`
 	NameOverride     string                      `yaml:"nameOverride" json:"nameOverride"`
 	Nodesets         []ValuesNodesetsItem        `yaml:"nodesets" json:"nodesets"`
 	PriorityClasses  []ValuesPriorityClassesItem `yaml:"priorityClasses" json:"priorityClasses"`
@@ -60,7 +60,7 @@ type ValuesNodesetsItemTolerationsItem struct {
 type ValuesNodesetsItemSlurmd struct {
 	CgroupVersion string                                  `yaml:"cgroupVersion" json:"cgroupVersion"`
 	CustomEnv     []ValuesNodesetsItemSlurmdCustomEnvItem `yaml:"customEnv" json:"customEnv"`
-	Image         ValuesNodesetsItemSlurmdImage           `yaml:"image" json:"image"`
+	Image         *ValuesNodesetsItemSlurmdImage          `yaml:"image,omitempty" json:"image,omitempty"`
 	Port          int                                     `yaml:"port" json:"port"`
 	Resources     ValuesNodesetsItemSlurmdResources       `yaml:"resources" json:"resources"`
 	Security      ValuesNodesetsItemSlurmdSecurity        `yaml:"security" json:"security"`
@@ -144,9 +144,9 @@ type ValuesNodesetsItemSlurmdResources struct {
 }
 
 type ValuesNodesetsItemSlurmdImage struct {
-	PullPolicy string `yaml:"pullPolicy" json:"pullPolicy"`
-	Repository string `yaml:"repository" json:"repository"`
-	Tag        string `yaml:"tag" json:"tag"`
+	PullPolicy string  `yaml:"pullPolicy" json:"pullPolicy"`
+	Repository *string `yaml:"repository" json:"repository"`
+	Tag        *string `yaml:"tag" json:"tag"`
 }
 
 type ValuesNodesetsItemSlurmdCustomEnvItem struct {
@@ -161,7 +161,7 @@ type ValuesNodesetsItemNodeConfig struct {
 }
 
 type ValuesNodesetsItemMunge struct {
-	Image     ValuesNodesetsItemMungeImage     `yaml:"image" json:"image"`
+	Image     *ValuesNodesetsItemMungeImage    `yaml:"image,omitempty" json:"image,omitempty"`
 	Resources ValuesNodesetsItemMungeResources `yaml:"resources" json:"resources"`
 	Security  ValuesNodesetsItemMungeSecurity  `yaml:"security" json:"security"`
 }
@@ -178,9 +178,9 @@ type ValuesNodesetsItemMungeResources struct {
 }
 
 type ValuesNodesetsItemMungeImage struct {
-	PullPolicy string `yaml:"pullPolicy" json:"pullPolicy"`
-	Repository string `yaml:"repository" json:"repository"`
-	Tag        string `yaml:"tag" json:"tag"`
+	PullPolicy string  `yaml:"pullPolicy" json:"pullPolicy"`
+	Repository *string `yaml:"repository" json:"repository"`
+	Tag        *string `yaml:"tag" json:"tag"`
 }
 
 type ValuesNodesetsItemLabels struct {
@@ -197,7 +197,7 @@ type ValuesNodesetsItemGpuNvidia struct {
 
 type ValuesNodesetsItemCustomInitContainersItem struct {
 	Command []string `yaml:"command" json:"command"`
-	Image   string   `yaml:"image" json:"image"`
+	Image   *string  `yaml:"image,omitempty" json:"image,omitempty"`
 	Name    string   `yaml:"name" json:"name"`
 }
 
@@ -232,26 +232,26 @@ type ValuesImages struct {
 }
 
 type ValuesImagesSlurmd struct {
-	Repository string `yaml:"repository" json:"repository"`
-	Tag        string `yaml:"tag" json:"tag"`
+	Repository *string `yaml:"repository" json:"repository"`
+	Tag        *string `yaml:"tag" json:"tag"`
 }
 
 type ValuesImagesMunge struct {
-	Repository string `yaml:"repository" json:"repository"`
-	Tag        string `yaml:"tag" json:"tag"`
+	Repository *string `yaml:"repository" json:"repository"`
+	Tag        *string `yaml:"tag" json:"tag"`
 }
 
 func NewDefaults() Values {
 	return Values{
 		FullnameOverride: "",
-		Images: ValuesImages{
+		Images: &ValuesImages{
 			Munge: ValuesImagesMunge{
-				Repository: "cr.eu-north1.nebius.cloud/soperator/munge",
-				Tag:        "1.23.1-noble-slurm25.05.5",
+				Repository: func() *string { s := "cr.eu-north1.nebius.cloud/soperator/munge"; return &s }(),
+				Tag:        func() *string { s := "1.23.1-noble-slurm25.05.5"; return &s }(),
 			},
 			Slurmd: ValuesImagesSlurmd{
-				Repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd",
-				Tag:        "1.23.1-noble-slurm25.05.5",
+				Repository: func() *string { s := "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"; return &s }(),
+				Tag:        func() *string { s := "1.23.1-noble-slurm25.05.5"; return &s }(),
 			},
 		},
 		NameOverride: "",
@@ -285,7 +285,7 @@ func NewDefaults() Values {
 							"echo",
 							"Hi!",
 						},
-						Image: "busybox",
+						Image: func() *string { s := "busybox"; return &s }(),
 						Name:  "say-hi",
 					},
 				},
@@ -299,10 +299,10 @@ func NewDefaults() Values {
 				Labels:         ValuesNodesetsItemLabels{},
 				MaxUnavailable: 1,
 				Munge: ValuesNodesetsItemMunge{
-					Image: ValuesNodesetsItemMungeImage{
+					Image: &ValuesNodesetsItemMungeImage{
 						PullPolicy: "IfNotPresent",
-						Repository: "cr.eu-north1.nebius.cloud/soperator/munge",
-						Tag:        "1.23.1-noble-slurm25.05.5+custom",
+						Repository: func() *string { s := "cr.eu-north1.nebius.cloud/soperator/munge"; return &s }(),
+						Tag:        func() *string { s := "1.23.1-noble-slurm25.05.5+custom"; return &s }(),
 					},
 					Resources: ValuesNodesetsItemMungeResources{
 						Cpu:              "2000m",
@@ -333,10 +333,10 @@ func NewDefaults() Values {
 							Value: "compute,utility,video",
 						},
 					},
-					Image: ValuesNodesetsItemSlurmdImage{
+					Image: &ValuesNodesetsItemSlurmdImage{
 						PullPolicy: "IfNotPresent",
-						Repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd",
-						Tag:        "1.23.1-noble-slurm25.05.5+custom",
+						Repository: func() *string { s := "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"; return &s }(),
+						Tag:        func() *string { s := "1.23.1-noble-slurm25.05.5+custom"; return &s }(),
 					},
 					Port: 6818,
 					Resources: ValuesNodesetsItemSlurmdResources{

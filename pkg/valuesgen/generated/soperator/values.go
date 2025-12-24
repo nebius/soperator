@@ -64,7 +64,7 @@ type ValuesControllerManagerManager struct {
 	Args                     []string                                               `yaml:"args" json:"args"`
 	ContainerSecurityContext ValuesControllerManagerManagerContainerSecurityContext `yaml:"containerSecurityContext" json:"containerSecurityContext"`
 	Env                      ValuesControllerManagerManagerEnv                      `yaml:"env" json:"env"`
-	Image                    ValuesControllerManagerManagerImage                    `yaml:"image" json:"image"`
+	Image                    *ValuesControllerManagerManagerImage                   `yaml:"image,omitempty" json:"image,omitempty"`
 	ImagePullPolicy          string                                                 `yaml:"imagePullPolicy" json:"imagePullPolicy"`
 	Resources                ValuesControllerManagerManagerResources                `yaml:"resources" json:"resources"`
 }
@@ -84,8 +84,8 @@ type ValuesControllerManagerManagerResourcesLimits struct {
 }
 
 type ValuesControllerManagerManagerImage struct {
-	Repository string `yaml:"repository" json:"repository"`
-	Tag        string `yaml:"tag" json:"tag"`
+	Repository *string `yaml:"repository" json:"repository"`
+	Tag        *string `yaml:"tag" json:"tag"`
 }
 
 type ValuesControllerManagerManagerEnv struct {
@@ -109,7 +109,7 @@ type ValuesControllerManagerManagerContainerSecurityContextCapabilities struct {
 type ValuesControllerManagerKubeRbacProxy struct {
 	Args                     []string                                                     `yaml:"args" json:"args"`
 	ContainerSecurityContext ValuesControllerManagerKubeRbacProxyContainerSecurityContext `yaml:"containerSecurityContext" json:"containerSecurityContext"`
-	Image                    ValuesControllerManagerKubeRbacProxyImage                    `yaml:"image" json:"image"`
+	Image                    *ValuesControllerManagerKubeRbacProxyImage                   `yaml:"image,omitempty" json:"image,omitempty"`
 	Resources                ValuesControllerManagerKubeRbacProxyResources                `yaml:"resources" json:"resources"`
 }
 
@@ -128,8 +128,8 @@ type ValuesControllerManagerKubeRbacProxyResourcesLimits struct {
 }
 
 type ValuesControllerManagerKubeRbacProxyImage struct {
-	Repository string `yaml:"repository" json:"repository"`
-	Tag        string `yaml:"tag" json:"tag"`
+	Repository *string `yaml:"repository" json:"repository"`
+	Tag        *string `yaml:"tag" json:"tag"`
 }
 
 type ValuesControllerManagerKubeRbacProxyContainerSecurityContext struct {
@@ -166,9 +166,9 @@ func NewDefaults() Values {
 						},
 					},
 				},
-				Image: ValuesControllerManagerKubeRbacProxyImage{
-					Repository: "gcr.io/kubebuilder/kube-rbac-proxy",
-					Tag:        "v0.15.0",
+				Image: &ValuesControllerManagerKubeRbacProxyImage{
+					Repository: func() *string { s := "gcr.io/kubebuilder/kube-rbac-proxy"; return &s }(),
+					Tag:        func() *string { s := "v0.15.0"; return &s }(),
 				},
 				Resources: ValuesControllerManagerKubeRbacProxyResources{
 					Limits: ValuesControllerManagerKubeRbacProxyResourcesLimits{
@@ -203,9 +203,9 @@ func NewDefaults() Values {
 					SlurmOperatorWatchNamespaces:         "*",
 					TopologyLabelPrefix:                  "topology.nebius.com",
 				},
-				Image: ValuesControllerManagerManagerImage{
-					Repository: "cr.eu-north1.nebius.cloud/soperator/slurm-operator",
-					Tag:        "1.23.1",
+				Image: &ValuesControllerManagerManagerImage{
+					Repository: func() *string { s := "cr.eu-north1.nebius.cloud/soperator/slurm-operator"; return &s }(),
+					Tag:        func() *string { s := "1.23.1"; return &s }(),
 				},
 				ImagePullPolicy: "Always",
 				Resources: ValuesControllerManagerManagerResources{
