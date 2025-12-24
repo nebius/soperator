@@ -110,7 +110,7 @@ func (g *generator) render(pkg, topType string, defaultVal interface{}) ([]byte,
 	// literal generation later produces pointer literals.
 	for _, td := range g.defs {
 		for i, f := range td.Fields {
-			if f.YAMLName == "image" || f.YAMLName == "images" || f.YAMLName == "registry" {
+			if f.YAMLName == "image" || f.YAMLName == "images" || f.YAMLName == "registry" || f.YAMLName == "repository" || f.YAMLName == "tag" {
 				fType := f.Type
 				if strings.HasPrefix(fType, "[]") {
 					elem := strings.TrimPrefix(fType, "[]")
@@ -119,6 +119,11 @@ func (g *generator) render(pkg, topType string, defaultVal interface{}) ([]byte,
 						continue
 					}
 				} else {
+					// if basic string, promote to *string so omitempty can be used
+					if fType == "string" {
+						td.Fields[i].Type = "*string"
+						continue
+					}
 					if _, ok := g.defs[fType]; ok {
 						td.Fields[i].Type = "*" + fType
 						continue
@@ -177,7 +182,22 @@ func (g *generator) literalFor(v interface{}, goType string, level int) string {
 	// handle pointer types by taking address of the value literal
 	if strings.HasPrefix(goType, "*") {
 		base := strings.TrimPrefix(goType, "*")
-		return "&" + g.literalFor(v, base, level)
+		switch base {
+		case "string":
+			lit := g.literalFor(v, "string", level)
+			return fmt.Sprintf("func() *string { s := %s; return &s }()", lit)
+		case "bool":
+			lit := g.literalFor(v, "bool", level)
+			return fmt.Sprintf("func() *bool { b := %s; return &b }()", lit)
+		case "int":
+			lit := g.literalFor(v, "int", level)
+			return fmt.Sprintf("func() *int { i := %s; return &i }()", lit)
+		case "float64":
+			lit := g.literalFor(v, "float64", level)
+			return fmt.Sprintf("func() *float64 { f := %s; return &f }()", lit)
+		default:
+			return "&" + g.literalFor(v, base, level)
+		}
 	}
 	if goType == "interface{}" {
 		switch vv := v.(type) {

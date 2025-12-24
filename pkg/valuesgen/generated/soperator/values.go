@@ -84,8 +84,8 @@ type ValuesControllerManagerManagerResourcesLimits struct {
 }
 
 type ValuesControllerManagerManagerImage struct {
-	Repository string `yaml:"repository" json:"repository"`
-	Tag        string `yaml:"tag" json:"tag"`
+	Repository *string `yaml:"repository" json:"repository"`
+	Tag        *string `yaml:"tag" json:"tag"`
 }
 
 type ValuesControllerManagerManagerEnv struct {
@@ -128,8 +128,8 @@ type ValuesControllerManagerKubeRbacProxyResourcesLimits struct {
 }
 
 type ValuesControllerManagerKubeRbacProxyImage struct {
-	Repository string `yaml:"repository" json:"repository"`
-	Tag        string `yaml:"tag" json:"tag"`
+	Repository *string `yaml:"repository" json:"repository"`
+	Tag        *string `yaml:"tag" json:"tag"`
 }
 
 type ValuesControllerManagerKubeRbacProxyContainerSecurityContext struct {
@@ -167,8 +167,8 @@ func NewDefaults() Values {
 					},
 				},
 				Image: &ValuesControllerManagerKubeRbacProxyImage{
-					Repository: "gcr.io/kubebuilder/kube-rbac-proxy",
-					Tag:        "v0.15.0",
+					Repository: func() *string { s := "gcr.io/kubebuilder/kube-rbac-proxy"; return &s }(),
+					Tag:        func() *string { s := "v0.15.0"; return &s }(),
 				},
 				Resources: ValuesControllerManagerKubeRbacProxyResources{
 					Limits: ValuesControllerManagerKubeRbacProxyResourcesLimits{
@@ -204,8 +204,8 @@ func NewDefaults() Values {
 					TopologyLabelPrefix:                  "topology.nebius.com",
 				},
 				Image: &ValuesControllerManagerManagerImage{
-					Repository: "cr.eu-north1.nebius.cloud/soperator/slurm-operator",
-					Tag:        "1.23.1",
+					Repository: func() *string { s := "cr.eu-north1.nebius.cloud/soperator/slurm-operator"; return &s }(),
+					Tag:        func() *string { s := "1.23.1"; return &s }(),
 				},
 				ImagePullPolicy: "Always",
 				Resources: ValuesControllerManagerManagerResources{
