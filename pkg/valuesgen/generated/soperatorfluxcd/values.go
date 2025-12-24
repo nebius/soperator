@@ -190,7 +190,7 @@ type ValuesSoperatorKruiseOverrideValues struct {
 }
 
 type ValuesSoperatorKruiseOverrideValuesManager struct {
-	Image     ValuesSoperatorKruiseOverrideValuesManagerImage     `yaml:"image" json:"image"`
+	Image     *ValuesSoperatorKruiseOverrideValuesManagerImage    `yaml:"image,omitempty" json:"image,omitempty"`
 	Replicas  int                                                 `yaml:"replicas" json:"replicas"`
 	Resources ValuesSoperatorKruiseOverrideValuesManagerResources `yaml:"resources" json:"resources"`
 }
@@ -215,7 +215,7 @@ type ValuesSoperatorKruiseOverrideValuesManagerImage struct {
 }
 
 type ValuesSoperatorKruiseOverrideValuesHelmHooks struct {
-	Image ValuesSoperatorKruiseOverrideValuesHelmHooksImage `yaml:"image" json:"image"`
+	Image *ValuesSoperatorKruiseOverrideValuesHelmHooksImage `yaml:"image,omitempty" json:"image,omitempty"`
 }
 
 type ValuesSoperatorKruiseOverrideValuesHelmHooksImage struct {
@@ -918,7 +918,7 @@ type ValuesBackupValues struct {
 
 type ValuesBackupValuesCleanup struct {
 	PullPolicy string `yaml:"pullPolicy" json:"pullPolicy"`
-	Registry   string `yaml:"registry" json:"registry"`
+	Registry   string `yaml:"registry,omitempty" json:"registry,omitempty"`
 	Repository string `yaml:"repository" json:"repository"`
 	Tag        string `yaml:"tag" json:"tag"`
 }
@@ -1476,12 +1476,12 @@ func NewDefaults() Values {
 					},
 					FeatureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true",
 					HelmHooks: ValuesSoperatorKruiseOverrideValuesHelmHooks{
-						Image: ValuesSoperatorKruiseOverrideValuesHelmHooksImage{
+						Image: &ValuesSoperatorKruiseOverrideValuesHelmHooksImage{
 							Repository: "cr.eu-north1.nebius.cloud/soperator/kruise-helm-hook",
 						},
 					},
 					Manager: ValuesSoperatorKruiseOverrideValuesManager{
-						Image: ValuesSoperatorKruiseOverrideValuesManagerImage{
+						Image: &ValuesSoperatorKruiseOverrideValuesManagerImage{
 							Repository: "cr.eu-north1.nebius.cloud/soperator/kruise-manager",
 						},
 						Replicas: 2,

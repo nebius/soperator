@@ -4,7 +4,7 @@ package nodesets
 
 type Values struct {
 	FullnameOverride string                      `yaml:"fullnameOverride" json:"fullnameOverride"`
-	Images           ValuesImages                `yaml:"images" json:"images"`
+	Images           *ValuesImages               `yaml:"images,omitempty" json:"images,omitempty"`
 	NameOverride     string                      `yaml:"nameOverride" json:"nameOverride"`
 	Nodesets         []ValuesNodesetsItem        `yaml:"nodesets" json:"nodesets"`
 	PriorityClasses  []ValuesPriorityClassesItem `yaml:"priorityClasses" json:"priorityClasses"`
@@ -60,7 +60,7 @@ type ValuesNodesetsItemTolerationsItem struct {
 type ValuesNodesetsItemSlurmd struct {
 	CgroupVersion string                                  `yaml:"cgroupVersion" json:"cgroupVersion"`
 	CustomEnv     []ValuesNodesetsItemSlurmdCustomEnvItem `yaml:"customEnv" json:"customEnv"`
-	Image         ValuesNodesetsItemSlurmdImage           `yaml:"image" json:"image"`
+	Image         *ValuesNodesetsItemSlurmdImage          `yaml:"image,omitempty" json:"image,omitempty"`
 	Port          int                                     `yaml:"port" json:"port"`
 	Resources     ValuesNodesetsItemSlurmdResources       `yaml:"resources" json:"resources"`
 	Security      ValuesNodesetsItemSlurmdSecurity        `yaml:"security" json:"security"`
@@ -161,7 +161,7 @@ type ValuesNodesetsItemNodeConfig struct {
 }
 
 type ValuesNodesetsItemMunge struct {
-	Image     ValuesNodesetsItemMungeImage     `yaml:"image" json:"image"`
+	Image     *ValuesNodesetsItemMungeImage    `yaml:"image,omitempty" json:"image,omitempty"`
 	Resources ValuesNodesetsItemMungeResources `yaml:"resources" json:"resources"`
 	Security  ValuesNodesetsItemMungeSecurity  `yaml:"security" json:"security"`
 }
@@ -197,7 +197,7 @@ type ValuesNodesetsItemGpuNvidia struct {
 
 type ValuesNodesetsItemCustomInitContainersItem struct {
 	Command []string `yaml:"command" json:"command"`
-	Image   string   `yaml:"image" json:"image"`
+	Image   string   `yaml:"image,omitempty" json:"image,omitempty"`
 	Name    string   `yaml:"name" json:"name"`
 }
 
@@ -244,7 +244,7 @@ type ValuesImagesMunge struct {
 func NewDefaults() Values {
 	return Values{
 		FullnameOverride: "",
-		Images: ValuesImages{
+		Images: &ValuesImages{
 			Munge: ValuesImagesMunge{
 				Repository: "cr.eu-north1.nebius.cloud/soperator/munge",
 				Tag:        "1.23.1-noble-slurm25.05.5",
@@ -299,7 +299,7 @@ func NewDefaults() Values {
 				Labels:         ValuesNodesetsItemLabels{},
 				MaxUnavailable: 1,
 				Munge: ValuesNodesetsItemMunge{
-					Image: ValuesNodesetsItemMungeImage{
+					Image: &ValuesNodesetsItemMungeImage{
 						PullPolicy: "IfNotPresent",
 						Repository: "cr.eu-north1.nebius.cloud/soperator/munge",
 						Tag:        "1.23.1-noble-slurm25.05.5+custom",
@@ -333,7 +333,7 @@ func NewDefaults() Values {
 							Value: "compute,utility,video",
 						},
 					},
-					Image: ValuesNodesetsItemSlurmdImage{
+					Image: &ValuesNodesetsItemSlurmdImage{
 						PullPolicy: "IfNotPresent",
 						Repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd",
 						Tag:        "1.23.1-noble-slurm25.05.5+custom",

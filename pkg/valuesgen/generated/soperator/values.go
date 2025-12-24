@@ -64,7 +64,7 @@ type ValuesControllerManagerManager struct {
 	Args                     []string                                               `yaml:"args" json:"args"`
 	ContainerSecurityContext ValuesControllerManagerManagerContainerSecurityContext `yaml:"containerSecurityContext" json:"containerSecurityContext"`
 	Env                      ValuesControllerManagerManagerEnv                      `yaml:"env" json:"env"`
-	Image                    ValuesControllerManagerManagerImage                    `yaml:"image" json:"image"`
+	Image                    *ValuesControllerManagerManagerImage                   `yaml:"image,omitempty" json:"image,omitempty"`
 	ImagePullPolicy          string                                                 `yaml:"imagePullPolicy" json:"imagePullPolicy"`
 	Resources                ValuesControllerManagerManagerResources                `yaml:"resources" json:"resources"`
 }
@@ -109,7 +109,7 @@ type ValuesControllerManagerManagerContainerSecurityContextCapabilities struct {
 type ValuesControllerManagerKubeRbacProxy struct {
 	Args                     []string                                                     `yaml:"args" json:"args"`
 	ContainerSecurityContext ValuesControllerManagerKubeRbacProxyContainerSecurityContext `yaml:"containerSecurityContext" json:"containerSecurityContext"`
-	Image                    ValuesControllerManagerKubeRbacProxyImage                    `yaml:"image" json:"image"`
+	Image                    *ValuesControllerManagerKubeRbacProxyImage                   `yaml:"image,omitempty" json:"image,omitempty"`
 	Resources                ValuesControllerManagerKubeRbacProxyResources                `yaml:"resources" json:"resources"`
 }
 
@@ -166,7 +166,7 @@ func NewDefaults() Values {
 						},
 					},
 				},
-				Image: ValuesControllerManagerKubeRbacProxyImage{
+				Image: &ValuesControllerManagerKubeRbacProxyImage{
 					Repository: "gcr.io/kubebuilder/kube-rbac-proxy",
 					Tag:        "v0.15.0",
 				},
@@ -203,7 +203,7 @@ func NewDefaults() Values {
 					SlurmOperatorWatchNamespaces:         "*",
 					TopologyLabelPrefix:                  "topology.nebius.com",
 				},
-				Image: ValuesControllerManagerManagerImage{
+				Image: &ValuesControllerManagerManagerImage{
 					Repository: "cr.eu-north1.nebius.cloud/soperator/slurm-operator",
 					Tag:        "1.23.1",
 				},
