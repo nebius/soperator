@@ -24,4 +24,8 @@ const (
 	SecretSlurmdbdSSLClientKeyCertificateFile = "tls.crt"
 	SecretSlurmdbdSSLClientKeyFileMode        = int32(0400)
 	SecretSlurmdbdSSLServerCAFileMode         = int32(0400)
+	SecretSlurmdbdConfigStorageHost           = "storageHost"
+	SecretSlurmdbdConfigStoragePort           = "storagePort"
+	SecretSlurmdbdConfigStorageUser           = "storageUser"
+	SecretSlurmdbdConfigStoragePass           = "storagePass"
 )

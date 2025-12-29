@@ -48,9 +48,8 @@ soperator:
         logFormat: json
         tolerations:
           - operator: Exists
-# Helm Release Trigger Operator - disabled for local dev
-helmReleaseTriggerOperator:
-  enabled: false
+  monitoringDashboards:
+    enabled: false
 # Slurm Cluster configuration - enabled for local dev
 slurmCluster:
   enabled: true
@@ -258,7 +257,7 @@ observability:
     enabled: false
 # Cert Manager - disabled for local dev
 certManager:
-  enabled: false
+  enabled: true
 # Backup - disabled for local dev
 backup:
   enabled: false
