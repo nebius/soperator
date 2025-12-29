@@ -1,7 +1,7 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-# Base cuda image https://github.com/nebius/ml-containers/tree/main/cuda
-FROM cr.eu-north1.nebius.cloud/soperator/cuda_base:12.9.0-ubuntu24.04-nccl2.26.5-1-4637ddb AS jail
+# https://github.com/nebius/ml-containers/blob/main/.github/workflows/training_diag.yml
+FROM cr.eu-north1.nebius.cloud/ml-containers/training_diag:12.9.0-ubuntu24.04-nccl_tests2.16.4-20251229133835 AS jail
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -15,11 +15,8 @@ RUN chmod 644 /etc/passwd /etc/group && chown 0:0 /etc/passwd /etc/group && \
     chmod 640 /etc/shadow /etc/gshadow && chown 0:42 /etc/shadow /etc/gshadow && \
     chmod 440 /etc/sudoers && chown 0:0 /etc/sudoers
 
-# Install certificates (required for using snapshots)
-RUN apt install -y --update ca-certificates=20240203
-
-# Install minimal python packages for Ansible from repo snapshot
-RUN apt install --update --snapshot 20251126T093556Z -y \
+# Install minimal python packages for Ansible
+RUN apt install --update -y \
         python3.12="3.12.3-1ubuntu0.9" \
         python3.12-venv="3.12.3-1ubuntu0.9"
 

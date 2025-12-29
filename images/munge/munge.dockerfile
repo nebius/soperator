@@ -1,6 +1,7 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS munge
+# https://github.com/nebius/ml-containers/blob/main/.github/workflows/neubuntu.yml
+FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20251224121141 AS munge
 
 ARG DEBIAN_FRONTEND=noninteractive
 
