@@ -459,7 +459,7 @@ storageClasses:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.23.0
+  version: 1.23.1
   namespace: storage-system
   releaseName: soperator-storageclasses
   values: null
