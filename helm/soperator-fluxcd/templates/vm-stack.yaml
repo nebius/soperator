@@ -390,7 +390,7 @@ spec:
           enable_converter_ownership: true
       vmagent:
         spec:
-          {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
+          {{- $hasPublicEndpoint := .Values.observability.publicEndpoint.enabled }}
           {{- $hasVmagentSpec := .Values.observability.vmStack.values.vmagent.spec }}
 
           {{- $hasExternalLabels := and $hasVmagentSpec $hasVmagentSpec.externalLabels }}
