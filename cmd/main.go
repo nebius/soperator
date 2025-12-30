@@ -121,16 +121,15 @@ func getZapOpts(logFormat, logLevel string) []zap.Opts {
 
 func main() {
 	var (
-		metricsAddr               string
-		enableLeaderElection      bool
-		probeAddr                 string
-		secureMetrics             bool
-		enableHTTP2               bool
-		logFormat                 string
-		logLevel                  string
-		soperatorNamespace        string
-		topologyControllerEnabled bool
-		controllersFlag           string
+		metricsAddr          string
+		enableLeaderElection bool
+		probeAddr            string
+		secureMetrics        bool
+		enableHTTP2          bool
+		logFormat            string
+		logLevel             string
+		soperatorNamespace   string
+		controllersFlag      string
 
 		cacheSyncTimeout time.Duration
 		maxConcurrency   int
