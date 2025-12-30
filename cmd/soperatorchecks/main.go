@@ -49,6 +49,7 @@ import (
 	"nebius.ai/slurm-operator/internal/cli"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/soperatorchecks"
+	"nebius.ai/slurm-operator/internal/controllersenabled"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
@@ -117,6 +118,7 @@ func main() {
 		notReadyTimeout             time.Duration
 		maintenanceConditionType    string
 		maintenanceIgnoreNodeLabels string
+		controllersFlag             string
 
 		reconcileTimeout                         time.Duration
 		reconcileTimeoutPodEphemeralStorageCheck time.Duration
@@ -157,6 +159,7 @@ func main() {
 	flag.Float64Var(&ephemeralStorageThreshold, "ephemeral-storage-threshold", 85.0, "The threshold percentage for ephemeral storage usage warnings (default 85%)")
 	flag.StringVar(&maintenanceConditionType, "maintenance-condition-type", string(consts.DefaultMaintenanceConditionType), "The condition type for scheduled maintenance")
 	flag.StringVar(&maintenanceIgnoreNodeLabels, "maintenance-ignore-node-labels", os.Getenv("MAINTENANCE_IGNORE_NODE_LABELS"), "Comma-separated list of node label key=value pairs to ignore during maintenance (e.g., 'env=prod,tier=critical')")
+	flag.StringVar(&controllersFlag, "controllers", "", "A comma-separated list of controllers to enable or disable. Use '*' for all, and '-name' to disable. Overrides SLURM_OPERATOR_CONTROLLERS if set.")
 	flag.Parse()
 
 	opts := getZapOpts(logFormat, logLevel)
@@ -168,6 +171,26 @@ func main() {
 	klog.SetLogger(zapLogger.WithName("klog"))
 
 	setupLog := ctrl.Log.WithName("setup")
+	controllersSpec := os.Getenv("SLURM_OPERATOR_CONTROLLERS")
+	if controllersFlag != "" {
+		controllersSpec = controllersFlag
+	}
+	controllersSet, err := controllersenabled.New(
+		controllersSpec,
+		[]string{
+			"slurmapiclients",
+			"slurmnodes",
+			"k8snodes",
+			"activecheck",
+			"activecheckjob",
+			"serviceaccount",
+			"activecheckprolog",
+			"podephemeralstoragecheck",
+		},
+	)
+	if err != nil {
+		cli.Fail(setupLog, err, "unable to parse SLURM_OPERATOR_CONTROLLERS")
+	}
 
 	// Validate ephemeral storage threshold
 	if ephemeralStorageThreshold < 0 || ephemeralStorageThreshold > 100 {
@@ -236,87 +259,103 @@ func main() {
 
 	slurmAPIClients := slurmapi.NewClientSet()
 
-	if err = soperatorchecks.NewSlurmAPIClientsController(
-		mgr.GetClient(),
-		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(soperatorchecks.SlurmAPIClientsControllerName),
-		slurmAPIClients,
-		corev1.NodeConditionType(maintenanceConditionType),
-	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		cli.Fail(setupLog, err, "unable to create slurm api clients controller", "controller", soperatorchecks.SlurmAPIClientsControllerName)
+	if controllersSet.Enabled("slurmapiclients") {
+		if err = soperatorchecks.NewSlurmAPIClientsController(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(soperatorchecks.SlurmAPIClientsControllerName),
+			slurmAPIClients,
+			corev1.NodeConditionType(maintenanceConditionType),
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create slurm api clients controller", "controller", soperatorchecks.SlurmAPIClientsControllerName)
+		}
 	}
-	if err = soperatorchecks.NewSlurmNodesController(
-		mgr.GetClient(),
-		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(soperatorchecks.SlurmNodesControllerName),
-		slurmAPIClients,
-		reconcileTimeout,
-		enabledNodeReplacement,
-		enableExtensiveCheck,
-		mgr.GetAPIReader(),
-		corev1.NodeConditionType(maintenanceConditionType),
-	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		cli.Fail(setupLog, err, "unable to create slurm nodes controller", "controller", soperatorchecks.SlurmNodesControllerName)
+	if controllersSet.Enabled("slurmnodes") {
+		if err = soperatorchecks.NewSlurmNodesController(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(soperatorchecks.SlurmNodesControllerName),
+			slurmAPIClients,
+			reconcileTimeout,
+			enabledNodeReplacement,
+			enableExtensiveCheck,
+			mgr.GetAPIReader(),
+			corev1.NodeConditionType(maintenanceConditionType),
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create slurm nodes controller", "controller", soperatorchecks.SlurmNodesControllerName)
+		}
 	}
-	if err = soperatorchecks.NewK8SNodesController(
-		mgr.GetClient(),
-		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(soperatorchecks.K8SNodesControllerName),
-		notReadyTimeout,
-		deleteNotReadyNodes,
-		corev1.NodeConditionType(maintenanceConditionType),
-		maintenanceIgnoreNodeLabels,
-	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		cli.Fail(setupLog, err, "unable to create k8s nodes controller", "controller", soperatorchecks.K8SNodesControllerName)
+	if controllersSet.Enabled("k8snodes") {
+		if err = soperatorchecks.NewK8SNodesController(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(soperatorchecks.K8SNodesControllerName),
+			notReadyTimeout,
+			deleteNotReadyNodes,
+			corev1.NodeConditionType(maintenanceConditionType),
+			maintenanceIgnoreNodeLabels,
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create k8s nodes controller", "controller", soperatorchecks.K8SNodesControllerName)
+		}
 	}
-	if err = soperatorchecks.NewActiveCheckController(
-		mgr.GetClient(),
-		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckControllerName),
-		reconcileTimeout,
-	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		cli.Fail(setupLog, err, "unable to create activecheck controller", "controller", "ActiveCheck")
+	if controllersSet.Enabled("activecheck") {
+		if err = soperatorchecks.NewActiveCheckController(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckControllerName),
+			reconcileTimeout,
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create activecheck controller", "controller", "ActiveCheck")
+		}
 	}
-	if err = soperatorchecks.NewActiveCheckJobController(
-		mgr.GetClient(),
-		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckJobControllerName),
-		slurmAPIClients,
-		reconcileTimeout,
-	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		cli.Fail(setupLog, err, "unable to create activecheckjob controller", "controller", "ActiveCheckJob")
+	if controllersSet.Enabled("activecheckjob") {
+		if err = soperatorchecks.NewActiveCheckJobController(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckJobControllerName),
+			slurmAPIClients,
+			reconcileTimeout,
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create activecheckjob controller", "controller", "ActiveCheckJob")
+		}
 	}
-	if err = soperatorchecks.NewServiceAccountController(
-		mgr.GetClient(),
-		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(soperatorchecks.SlurmChecksServiceAccountControllerName),
-		reconcileTimeout,
-	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		cli.Fail(setupLog, err, "unable to create soperatorchecks serviceaccount controller", "controller", "ServiceAccount")
+	if controllersSet.Enabled("serviceaccount") {
+		if err = soperatorchecks.NewServiceAccountController(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(soperatorchecks.SlurmChecksServiceAccountControllerName),
+			reconcileTimeout,
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create soperatorchecks serviceaccount controller", "controller", "ServiceAccount")
+		}
 	}
-	if err = soperatorchecks.NewActiveCheckPrologController(
-		mgr.GetClient(),
-		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckPrologControllerName),
-		reconcileTimeout,
-	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		cli.Fail(setupLog, err, "unable to create soperatorchecks prolog controller", "controller", "Prolog")
+	if controllersSet.Enabled("activecheckprolog") {
+		if err = soperatorchecks.NewActiveCheckPrologController(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckPrologControllerName),
+			reconcileTimeout,
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create soperatorchecks prolog controller", "controller", "Prolog")
+		}
 	}
 
-	podEphemeralStorageCheck, err := soperatorchecks.NewPodEphemeralStorageCheck(
-		mgr.GetClient(),
-		mgr.GetScheme(),
-		mgr.GetEventRecorderFor(soperatorchecks.PodEphemeralStorageCheckName),
-		ctrl.GetConfigOrDie(),
-		reconcileTimeoutPodEphemeralStorageCheck,
-		ephemeralStorageThreshold,
-		slurmAPIClients,
-	)
-	if err != nil {
-		cli.Fail(setupLog, err, "unable to create pod ephemeral storage check", "controller", "PodEphemeralStorageCheck")
-	}
-	if err = podEphemeralStorageCheck.SetupWithManager(mgr, maxConcurrencyPodEphemeralStorageCheck, cacheSyncTimeout); err != nil {
-		cli.Fail(setupLog, err, "unable to setup pod ephemeral storage check", "controller", "PodEphemeralStorageCheck")
+	if controllersSet.Enabled("podephemeralstoragecheck") {
+		podEphemeralStorageCheck, err := soperatorchecks.NewPodEphemeralStorageCheck(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(soperatorchecks.PodEphemeralStorageCheckName),
+			ctrl.GetConfigOrDie(),
+			reconcileTimeoutPodEphemeralStorageCheck,
+			ephemeralStorageThreshold,
+			slurmAPIClients,
+		)
+		if err != nil {
+			cli.Fail(setupLog, err, "unable to create pod ephemeral storage check", "controller", "PodEphemeralStorageCheck")
+		}
+		if err = podEphemeralStorageCheck.SetupWithManager(mgr, maxConcurrencyPodEphemeralStorageCheck, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to setup pod ephemeral storage check", "controller", "PodEphemeralStorageCheck")
+		}
 	}
 
 	//+kubebuilder:scaffold:builder
