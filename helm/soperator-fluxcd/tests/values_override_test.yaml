@@ -132,7 +132,7 @@ tests:
           count: 1
       - equal:
           path: spec.values.extraVolumes[0].name
-          value: o11ytoken
+          value: o11y-writer-sa-token
   - it: should use custom values when provided
     set:
       observability.opentelemetry.events.values.resources:
@@ -146,7 +146,7 @@ tests:
           count: 1
       - equal:
           path: spec.values.extraVolumes[0].name
-          value: o11ytoken
+          value: o11y-writer-sa-token
       - equal:
           path: spec.values.resources.requests
           value:
@@ -165,7 +165,7 @@ tests:
           count: 1
       - equal:
           path: spec.values.extraVolumes[0].name
-          value: o11ytoken
+          value: o11y-writer-sa-token
   - it: should use custom values when provided
     set:
       observability.opentelemetry.logs.values.resources:
@@ -179,7 +179,7 @@ tests:
           count: 1
       - equal:
           path: spec.values.extraVolumes[0].name
-          value: o11ytoken
+          value: o11y-writer-sa-token
       - equal:
           path: spec.values.resources.requests
           value:

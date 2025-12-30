@@ -554,7 +554,6 @@ type ValuesObservabilityPublicEndpointBearertokenauth struct {
 }
 
 type ValuesObservabilityPublicEndpointBearertokenauthSecret struct {
-	Key       string `yaml:"key" json:"key"`
 	MountPath string `yaml:"mountPath" json:"mountPath"`
 	Name      string `yaml:"name" json:"name"`
 }
@@ -1301,7 +1300,6 @@ func NewDefaults() Values {
 				Authenticator: "bearertokenauth",
 				Bearertokenauth: ValuesObservabilityPublicEndpointBearertokenauth{
 					Secret: ValuesObservabilityPublicEndpointBearertokenauthSecret{
-						Key:       "accessToken",
 						MountPath: "/o11ytoken",
 						Name:      "o11y-writer-sa-token",
 					},
