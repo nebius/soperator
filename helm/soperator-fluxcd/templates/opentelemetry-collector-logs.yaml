@@ -33,7 +33,7 @@ spec:
   releaseName: opentelemetry-collector-logs
   targetNamespace: logs-system
   values:
-  {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
+  {{- $hasPublicEndpoint := .Values.observability.publicEndpoint.enabled }}
   {{- if .Values.observability.opentelemetry.logs.overrideValues }}
     {{- toYaml .Values.observability.opentelemetry.logs.overrideValues | nindent 4 }}
   {{- else }}
@@ -69,17 +69,14 @@ spec:
           headers:
             iam-container: {{ .Values.observability.logsProjectId }}
           auth:
-            authenticator: bearertokenauth
+            authenticator: {{ .Values.observability.publicEndpoint.authenticator }}
         {{- end }}
       extensions:
         file_storage:
           directory: /var/lib/otelcol
         health_check:
           endpoint: 0.0.0.0:13133
-        {{- if $hasPublicEndpoint }}
-        bearertokenauth:
-          filename: "/o11ytoken/accessToken"
-        {{- end }}
+        {{- include "o11y.publicEndpoint.authConfig" . | nindent 8 }}
       processors:
         batch:
           send_batch_max_size: 700
@@ -308,9 +305,7 @@ spec:
         extensions:
         - health_check
         - file_storage
-        {{- if $hasPublicEndpoint }}
-        - bearertokenauth
-        {{- end }}
+        {{- include "o11y.publicEndpoint.extension" . | nindent 8 }}
         pipelines:
           logs:
             exporters:
@@ -340,11 +335,7 @@ spec:
     - name: GOMAXPROCS
       value: "1"
     extraVolumeMounts:
-    {{- if $hasPublicEndpoint }}
-    - mountPath: /o11ytoken
-      name: o11ytoken
-      readOnly: true
-    {{- end }}
+    {{- include "o11y.publicEndpoint.volumeMount" . | nindent 4 }}
     - mountPath: /var/log/pods
       name: varlogpods
       readOnly: true
@@ -359,11 +350,7 @@ spec:
       readOnly: true
     {{- end }}
     extraVolumes:
-    {{- if $hasPublicEndpoint }}
-    - name: o11ytoken
-      secret:
-        secretName: o11y-writer-sa-token
-    {{- end }}
+    {{- include "o11y.publicEndpoint.volume" . | nindent 4 }}
     - hostPath:
         path: /var/log/pods
       name: varlogpods
@@ -383,7 +370,7 @@ spec:
     image:
       pullPolicy: IfNotPresent
       repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
-      tag: 0.2.267
+      tag: 0.2.332
     initContainers:
     - command:
       - sh

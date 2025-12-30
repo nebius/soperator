@@ -101,7 +101,25 @@ mariadbOperator:
 observability:
   enabled: true
   clusterName: soperator
-  publicEndpointEnabled: true
+  publicEndpoint:
+    enabled: true
+    authenticator: bearertokenauth # nebiusiamauth | bearertokenauth
+    nebiusiamauth:
+      auth_scheme: iam-key-file
+      iam_endpoint: tokens.iam.api.eu.nebius.cloud:443
+      private_key_dir: /etc/iam-key
+      private_key_file_name: secret.key
+      public_key_id: publickey-e00something
+      service_account_id: serviceaccount-e00something
+      secret:
+        name: iam-key
+        mountPath: /etc/iam-key
+        key: secret.key
+    bearertokenauth:
+      tokenFile: /o11ytoken/accessToken
+      secret:
+        name: o11y-writer-sa-token
+        mountPath: /o11ytoken
   logsProjectId: default-project-id
   metricsProjectId: default-project-id
   region: eu-north1
@@ -109,7 +127,7 @@ observability:
     enabled: true
     namespace: logs-system
     logs:
-      version: 0.117.*
+      version: 0.141.*
       interval: 15m
       timeout: 15m
       values:
@@ -140,7 +158,7 @@ observability:
       driftDetection:
         mode: warn
     events:
-      version: 0.117.*
+      version: 0.141.*
       interval: 5m
       timeout: 5m
       values:

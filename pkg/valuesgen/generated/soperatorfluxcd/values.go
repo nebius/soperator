@@ -320,17 +320,17 @@ type ValuesSecurityProfilesOperatorDriftDetection struct {
 }
 
 type ValuesObservability struct {
-	ClusterName           string                                `yaml:"clusterName" json:"clusterName"`
-	DcgmExporter          ValuesObservabilityDcgmExporter       `yaml:"dcgmExporter" json:"dcgmExporter"`
-	Enabled               bool                                  `yaml:"enabled" json:"enabled"`
-	LogsProjectId         string                                `yaml:"logsProjectId" json:"logsProjectId"`
-	MetricsProjectId      string                                `yaml:"metricsProjectId" json:"metricsProjectId"`
-	Opentelemetry         ValuesObservabilityOpentelemetry      `yaml:"opentelemetry" json:"opentelemetry"`
-	PrometheusOperator    ValuesObservabilityPrometheusOperator `yaml:"prometheusOperator" json:"prometheusOperator"`
-	PublicEndpointEnabled bool                                  `yaml:"publicEndpointEnabled" json:"publicEndpointEnabled"`
-	Region                string                                `yaml:"region" json:"region"`
-	VmLogs                ValuesObservabilityVmLogs             `yaml:"vmLogs" json:"vmLogs"`
-	VmStack               ValuesObservabilityVmStack            `yaml:"vmStack" json:"vmStack"`
+	ClusterName        string                                `yaml:"clusterName" json:"clusterName"`
+	DcgmExporter       ValuesObservabilityDcgmExporter       `yaml:"dcgmExporter" json:"dcgmExporter"`
+	Enabled            bool                                  `yaml:"enabled" json:"enabled"`
+	LogsProjectId      string                                `yaml:"logsProjectId" json:"logsProjectId"`
+	MetricsProjectId   string                                `yaml:"metricsProjectId" json:"metricsProjectId"`
+	Opentelemetry      ValuesObservabilityOpentelemetry      `yaml:"opentelemetry" json:"opentelemetry"`
+	PrometheusOperator ValuesObservabilityPrometheusOperator `yaml:"prometheusOperator" json:"prometheusOperator"`
+	PublicEndpoint     ValuesObservabilityPublicEndpoint     `yaml:"publicEndpoint" json:"publicEndpoint"`
+	Region             string                                `yaml:"region" json:"region"`
+	VmLogs             ValuesObservabilityVmLogs             `yaml:"vmLogs" json:"vmLogs"`
+	VmStack            ValuesObservabilityVmStack            `yaml:"vmStack" json:"vmStack"`
 }
 
 type ValuesObservabilityVmStack struct {
@@ -523,6 +523,40 @@ type ValuesObservabilityVmLogsValuesPersistentVolume struct {
 
 type ValuesObservabilityVmLogsDriftDetection struct {
 	Mode string `yaml:"mode" json:"mode"`
+}
+
+type ValuesObservabilityPublicEndpoint struct {
+	Authenticator   string                                           `yaml:"authenticator" json:"authenticator"`
+	Bearertokenauth ValuesObservabilityPublicEndpointBearertokenauth `yaml:"bearertokenauth" json:"bearertokenauth"`
+	Enabled         bool                                             `yaml:"enabled" json:"enabled"`
+	Nebiusiamauth   ValuesObservabilityPublicEndpointNebiusiamauth   `yaml:"nebiusiamauth" json:"nebiusiamauth"`
+}
+
+type ValuesObservabilityPublicEndpointNebiusiamauth struct {
+	AuthScheme         string                                               `yaml:"auth_scheme" json:"auth_scheme"`
+	IamEndpoint        string                                               `yaml:"iam_endpoint" json:"iam_endpoint"`
+	PrivateKeyDir      string                                               `yaml:"private_key_dir" json:"private_key_dir"`
+	PrivateKeyFileName string                                               `yaml:"private_key_file_name" json:"private_key_file_name"`
+	PublicKeyId        string                                               `yaml:"public_key_id" json:"public_key_id"`
+	Secret             ValuesObservabilityPublicEndpointNebiusiamauthSecret `yaml:"secret" json:"secret"`
+	ServiceAccountId   string                                               `yaml:"service_account_id" json:"service_account_id"`
+}
+
+type ValuesObservabilityPublicEndpointNebiusiamauthSecret struct {
+	Key       string `yaml:"key" json:"key"`
+	MountPath string `yaml:"mountPath" json:"mountPath"`
+	Name      string `yaml:"name" json:"name"`
+}
+
+type ValuesObservabilityPublicEndpointBearertokenauth struct {
+	Secret    ValuesObservabilityPublicEndpointBearertokenauthSecret `yaml:"secret" json:"secret"`
+	TokenFile string                                                 `yaml:"tokenFile" json:"tokenFile"`
+}
+
+type ValuesObservabilityPublicEndpointBearertokenauthSecret struct {
+	Key       string `yaml:"key" json:"key"`
+	MountPath string `yaml:"mountPath" json:"mountPath"`
+	Name      string `yaml:"name" json:"name"`
 }
 
 type ValuesObservabilityPrometheusOperator struct {
@@ -1204,7 +1238,7 @@ func NewDefaults() Values {
 							},
 						},
 					},
-					Version: "0.117.*",
+					Version: "0.141.*",
 				},
 				Logs: ValuesObservabilityOpentelemetryLogs{
 					DriftDetection: ValuesObservabilityOpentelemetryLogsDriftDetection{
@@ -1249,7 +1283,7 @@ func NewDefaults() Values {
 							},
 						},
 					},
-					Version: "0.117.*",
+					Version: "0.141.*",
 				},
 				Namespace: "logs-system",
 			},
@@ -1263,8 +1297,32 @@ func NewDefaults() Values {
 				Timeout:   "5m",
 				Version:   "19.1.*",
 			},
-			PublicEndpointEnabled: true,
-			Region:                "eu-north1",
+			PublicEndpoint: ValuesObservabilityPublicEndpoint{
+				Authenticator: "bearertokenauth",
+				Bearertokenauth: ValuesObservabilityPublicEndpointBearertokenauth{
+					Secret: ValuesObservabilityPublicEndpointBearertokenauthSecret{
+						Key:       "accessToken",
+						MountPath: "/o11ytoken",
+						Name:      "o11y-writer-sa-token",
+					},
+					TokenFile: "/o11ytoken/accessToken",
+				},
+				Enabled: true,
+				Nebiusiamauth: ValuesObservabilityPublicEndpointNebiusiamauth{
+					AuthScheme:         "iam-key-file",
+					IamEndpoint:        "tokens.iam.api.eu.nebius.cloud:443",
+					PrivateKeyDir:      "/etc/iam-key",
+					PrivateKeyFileName: "secret.key",
+					PublicKeyId:        "publickey-e00something",
+					Secret: ValuesObservabilityPublicEndpointNebiusiamauthSecret{
+						Key:       "secret.key",
+						MountPath: "/etc/iam-key",
+						Name:      "iam-key",
+					},
+					ServiceAccountId: "serviceaccount-e00something",
+				},
+			},
+			Region: "eu-north1",
 			VmLogs: ValuesObservabilityVmLogs{
 				DriftDetection: ValuesObservabilityVmLogsDriftDetection{
 					Mode: "warn",
@@ -1590,7 +1648,7 @@ func NewDefaults() Values {
 			ReleaseName: "soperator-storageclasses",
 			Timeout:     "5m",
 			Values:      nil,
-			Version:     "1.23.0",
+			Version:     "1.23.1",
 		},
 		Tailscale: ValuesTailscale{
 			DriftDetection: ValuesTailscaleDriftDetection{
