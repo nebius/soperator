@@ -163,7 +163,6 @@ func main() {
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.StringVar(&controllersFlag, "controllers", "", "A comma-separated list of controllers to enable or disable. Use '*' for all, and '-name' to disable. Overrides SLURM_OPERATOR_CONTROLLERS if set.")
-	flag.BoolVar(&topologyControllerEnabled, "enable-topology-controller", false, "DEPRECATED: topology controller is controlled by --controllers or SLURM_OPERATOR_CONTROLLERS env var")
 	cli.AddFeatureGatesFlag()
 	flag.Parse()
 	opts := getZapOpts(logFormat, logLevel)
