@@ -1,6 +1,7 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS controller_slurmctld
+# https://github.com/nebius/ml-containers/blob/main/.github/workflows/neubuntu.yml
+FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20251224121141 AS controller_slurmctld
 
 ARG SLURM_VERSION
 
@@ -9,8 +10,6 @@ ARG DEBIAN_FRONTEND=noninteractive
 # Install dependencies
 RUN apt-get update && \
     apt -y install \
-        wget \
-        curl \
         libssl-dev \
         libpam0g-dev \
         libtool \
@@ -35,12 +34,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Add Nebius public registry
-RUN curl -fsSL https://dr.nebius.cloud/public.gpg -o /usr/share/keyrings/nebius.gpg.pub && \
-    codename="$(. /etc/os-release && echo $VERSION_CODENAME)" && \
-    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ $codename main" > /etc/apt/sources.list.d/nebius.list && \
-    echo "deb [signed-by=/usr/share/keyrings/nebius.gpg.pub] https://dr.nebius.cloud/ stable main" >> /etc/apt/sources.list.d/nebius.list
-
+# Install slurm packages
 RUN apt-get update && \
     apt -y install \
       slurm-smd-client=${SLURM_VERSION}-1 \

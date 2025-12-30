@@ -6,48 +6,29 @@
     state: absent
   loop:
     - /etc/apt/sources.list.d/download_docker_com_linux_ubuntu.list
+    - /etc/apt/sources.list.d/ubuntu.sources
   tags:
     - repos-absent
     - repos
 
-- name: Add Ubuntu noble APT repository with snapshot
-  vars:
-    is_amd64: "{{ (ansible_facts.architecture | lower) in ['x86_64', 'amd64'] }}"
-    ubuntu_main_uri: >-
-      {{ 'http://archive.ubuntu.com/ubuntu/' if is_amd64
-         else 'http://ports.ubuntu.com/ubuntu-ports/' }}
-    ubuntu_security_uri: >-
-      {{ 'http://security.ubuntu.com/ubuntu/' if is_amd64
-         else 'http://ports.ubuntu.com/ubuntu-ports/' }}
+- name: Add Nebius Ubuntu noble mirror APT repository
   ansible.builtin.copy:
-    dest: /etc/apt/sources.list.d/ubuntu.sources
+    dest: /etc/apt/sources.list.d/nebius-ubuntu.sources
     content: |
       ##
       ## Managed with Ansible
       ##
       Types: deb
-      URIs: {{ ubuntu_main_uri }}
-      Suites: noble noble-updates noble-backports
-      Components: main universe restricted multiverse
+      URIs: https://mirror.storage.eu-north1.nebius.cloud/ubuntu
       Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-      {% if is_amd64 %}
-      Snapshot: {{ repos_snapshot_timestamp }}
-      {% endif %}
-
-      Types: deb
-      URIs: {{ ubuntu_main_uri }}
-      Suites: noble-security
-      Components: main universe restricted multiverse
-      Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-      {% if is_amd64 %}
-      Snapshot: {{ repos_snapshot_timestamp }}
-      {% endif %}
-
+      Components: main restricted universe multiverse
+      Suites: noble noble-updates noble-security noble-backports
+      ## All sources include proposed
+      # Suites: noble noble-updates noble-security noble-backports noble-proposed
     owner: root
     group: root
     mode: "0644"
   tags:
-    - repos-snapshot
     - repos
 
 - name: Download Nebius public GPG key

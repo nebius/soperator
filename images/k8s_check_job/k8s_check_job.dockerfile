@@ -1,16 +1,12 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
-FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS k8s_check_job
+
+# https://github.com/nebius/ml-containers/blob/main/.github/workflows/neubuntu.yml
+FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20251224121141 AS k8s_check_job
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Install certificates (required for using snapshots)
-RUN apt install -y --update ca-certificates=20240203
-
 # Install common packages and minimal python packages for Ansible
-RUN apt install --update --snapshot 20251126T093556Z -y \
-        apt-transport-https \
-        curl  \
-        gnupg \
+RUN apt install --update -y \
         python3.12="3.12.3-1ubuntu0.9" \
         python3.12-venv="3.12.3-1ubuntu0.9" \
         openssh-client \
