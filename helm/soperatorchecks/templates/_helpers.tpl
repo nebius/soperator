@@ -51,3 +51,34 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{- define "soperatorchecks.controllersAvailable" -}}
+slurmapiclients,slurmnodes,k8snodes,activecheck,activecheckjob,serviceaccount,activecheckprolog,podephemeralstoragecheck
+{{- end }}
+
+{{- define "soperatorchecks.controllersSpec" -}}
+{{- $controllers := .Values.checks.manager.controllersEnabled -}}
+{{- $available := include "soperatorchecks.controllersAvailable" . | trim | splitList "," -}}
+{{- if $controllers -}}
+{{- /* validate */}}
+{{- range $name, $_ := $controllers -}}
+{{- if not (has $name $available) -}}
+{{- fail (printf "unknown controller %q in checks.manager.controllersEnabled, available controllers: %q" $name $available) -}}
+{{- end -}}
+{{- end -}}
+{{- /* generate comma spearated list */}}
+{{- $spec := list -}}
+{{- range $available -}}
+{{- if hasKey $controllers . -}}
+{{- if (get $controllers .) -}}
+{{- $spec = append $spec . -}}
+{{- else -}}
+{{- $spec = append $spec (printf "-%s" .) -}}
+{{- end -}}
+{{- else -}}
+{{- $spec = append $spec . -}}
+{{- end -}}
+{{- end -}}
+{{- join "," $spec -}}
+{{- end -}}
+{{- end }}

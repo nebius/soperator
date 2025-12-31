@@ -53,6 +53,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/nodeconfigurator"
 	"nebius.ai/slurm-operator/internal/controller/nodesetcontroller"
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
+	"nebius.ai/slurm-operator/internal/controllersenabled"
 	"nebius.ai/slurm-operator/internal/feature"
 	webhookv1 "nebius.ai/slurm-operator/internal/webhook/v1"
 	webhookv1alpha1 "nebius.ai/slurm-operator/internal/webhook/v1alpha1"
@@ -120,15 +121,15 @@ func getZapOpts(logFormat, logLevel string) []zap.Opts {
 
 func main() {
 	var (
-		metricsAddr               string
-		enableLeaderElection      bool
-		probeAddr                 string
-		secureMetrics             bool
-		enableHTTP2               bool
-		logFormat                 string
-		logLevel                  string
-		soperatorNamespace        string
-		topologyControllerEnabled bool
+		metricsAddr          string
+		enableLeaderElection bool
+		probeAddr            string
+		secureMetrics        bool
+		enableHTTP2          bool
+		logFormat            string
+		logLevel             string
+		soperatorNamespace   string
+		controllersFlag      string
 
 		cacheSyncTimeout time.Duration
 		maxConcurrency   int
@@ -160,7 +161,7 @@ func main() {
 	flag.StringVar(&logLevel, "log-level", "info", "Log level: debug, info, warn, error, dpanic, panic, fatal")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
-	flag.BoolVar(&topologyControllerEnabled, "enable-topology-controller", false, "if set, the topology controller will be enabled.")
+	flag.StringVar(&controllersFlag, "controllers", "", "A comma-separated list of controllers to enable or disable. Use '*' for all, and '-name' to disable. Overrides SLURM_OPERATOR_CONTROLLERS if set.")
 	cli.AddFeatureGatesFlag()
 	flag.Parse()
 	opts := getZapOpts(logFormat, logLevel)
@@ -172,6 +173,28 @@ func main() {
 	klog.SetLogger(zapLogger.WithName("klog"))
 
 	setupLog := ctrl.Log.WithName("setup")
+	var err error
+	controllersSpec := os.Getenv("SLURM_OPERATOR_CONTROLLERS")
+	controllersSource := "env"
+	if controllersFlag != "" {
+		controllersSpec = controllersFlag
+		controllersSource = "flag"
+	}
+	availableControllers := []string{"cluster", "nodeconfigurator", "nodeset", "topology"}
+	controllersSet, err := controllersenabled.New(
+		controllersSpec,
+		availableControllers,
+	)
+	if err != nil {
+		cli.Fail(setupLog, err, "unable to parse SLURM_OPERATOR_CONTROLLERS")
+	}
+	if controllersSpec != "" {
+		for _, name := range availableControllers {
+			if !controllersSet.Enabled(name) {
+				setupLog.Info("controller disabled", "controller", name, "source", controllersSource)
+			}
+		}
+	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -192,8 +215,6 @@ func main() {
 	webhookServer := webhook.NewServer(webhook.Options{
 		TLSOpts: tlsOpts,
 	})
-
-	var err error
 
 	if err = cli.ProcessFeatureGates(); err != nil {
 		cli.Fail(setupLog, err, "unable to process feature gates")
@@ -237,7 +258,7 @@ func main() {
 	}
 
 	// region Reconciler/Cluster
-	{
+	if controllersSet.Enabled("cluster") {
 		slurmClusterName := reflect.TypeOf(slurmv1.SlurmCluster{}).Name()
 
 		if err = clustercontroller.NewSlurmClusterReconciler(
@@ -260,16 +281,18 @@ func main() {
 	// endregion Reconciler/Cluster
 
 	// region Reconciler/NodeConfigurator
-	if err = (&nodeconfigurator.NodeConfiguratorReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-		cli.Fail(setupLog, err, "unable to create controller", "controller", "NodeConfigurator")
+	if controllersSet.Enabled("nodeconfigurator") {
+		if err = (&nodeconfigurator.NodeConfiguratorReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create controller", "controller", "NodeConfigurator")
+		}
 	}
 	// endregion Reconciler/NodeConfigurator
 
 	// region Reconciler/NodeSet
-	if feature.Gate.Enabled(feature.NodeSetWorkers) {
+	if controllersSet.Enabled("nodeset") && feature.Gate.Enabled(feature.NodeSetWorkers) {
 		nodeSetName := reflect.TypeOf(slurmv1alpha1.NodeSet{}).Name()
 		nodeSetNameLower := strings.ToLower(nodeSetName)
 
@@ -293,7 +316,7 @@ func main() {
 	// endregion Reconciler/NodeSet
 
 	// region Reconciler/Topology
-	if topologyControllerEnabled {
+	if controllersSet.Enabled("topology") {
 		if err = topologyconfcontroller.NewNodeTopologyReconciler(
 			mgr.GetClient(),
 			mgr.GetScheme(),

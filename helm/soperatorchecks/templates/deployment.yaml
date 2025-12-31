@@ -43,6 +43,11 @@ spec:
         env:
         - name: SLURM_OPERATOR_WATCH_NAMESPACES
           value: {{ quote .Values.checks.manager.env.slurmOperatorWatchNamespaces }}
+        {{- $controllersSpec := include "soperatorchecks.controllersSpec" . | trim -}}
+        {{- if $controllersSpec }}
+        - name: SLURM_OPERATOR_CONTROLLERS
+          value: {{ quote $controllersSpec }}
+        {{- end }}
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
         - name: MAINTENANCE_IGNORE_NODE_LABELS
