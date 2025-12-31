@@ -172,24 +172,34 @@ func main() {
 
 	setupLog := ctrl.Log.WithName("setup")
 	controllersSpec := os.Getenv("SLURM_OPERATOR_CONTROLLERS")
+	controllersSource := "env"
 	if controllersFlag != "" {
 		controllersSpec = controllersFlag
+		controllersSource = "flag"
+	}
+	availableControllers := []string{
+		"slurmapiclients",
+		"slurmnodes",
+		"k8snodes",
+		"activecheck",
+		"activecheckjob",
+		"serviceaccount",
+		"activecheckprolog",
+		"podephemeralstoragecheck",
 	}
 	controllersSet, err := controllersenabled.New(
 		controllersSpec,
-		[]string{
-			"slurmapiclients",
-			"slurmnodes",
-			"k8snodes",
-			"activecheck",
-			"activecheckjob",
-			"serviceaccount",
-			"activecheckprolog",
-			"podephemeralstoragecheck",
-		},
+		availableControllers,
 	)
 	if err != nil {
 		cli.Fail(setupLog, err, "unable to parse SLURM_OPERATOR_CONTROLLERS")
+	}
+	if controllersSpec != "" {
+		for _, name := range availableControllers {
+			if !controllersSet.Enabled(name) {
+				setupLog.Info("controller disabled", "controller", name, "source", controllersSource)
+			}
+		}
 	}
 
 	// Validate ephemeral storage threshold

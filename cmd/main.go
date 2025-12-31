@@ -175,15 +175,25 @@ func main() {
 	setupLog := ctrl.Log.WithName("setup")
 	var err error
 	controllersSpec := os.Getenv("SLURM_OPERATOR_CONTROLLERS")
+	controllersSource := "env"
 	if controllersFlag != "" {
 		controllersSpec = controllersFlag
+		controllersSource = "flag"
 	}
+	availableControllers := []string{"cluster", "nodeconfigurator", "nodeset", "topology"}
 	controllersSet, err := controllersenabled.New(
 		controllersSpec,
-		[]string{"cluster", "nodeconfigurator", "nodeset", "topology"},
+		availableControllers,
 	)
 	if err != nil {
 		cli.Fail(setupLog, err, "unable to parse SLURM_OPERATOR_CONTROLLERS")
+	}
+	if controllersSpec != "" {
+		for _, name := range availableControllers {
+			if !controllersSet.Enabled(name) {
+				setupLog.Info("controller disabled", "controller", name, "source", controllersSource)
+			}
+		}
 	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
