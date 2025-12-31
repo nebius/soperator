@@ -59,17 +59,16 @@ spec:
         args:
           - --health-probe-bind-address=:8081
           - --metrics-bind-address=127.0.0.1:8080
-          - --enable-topology-controller=true
           - --leader-elect
           - --feature-gates={{ .Values.soperator.featureGates }}
         {{- end }}
         {{- if and .Values.soperator.values .Values.soperator.values.manager .Values.soperator.values.manager.resources }}
         resources: {{- toYaml .Values.soperator.values.manager.resources | nindent 10 }}
         {{- end }}
-        {{- if or 
-          .Values.observability.enabled 
-          .Values.observability.prometheusOperator.enabled 
-          .Values.mariadbOperator.enabled 
+        {{- if or
+          .Values.observability.enabled
+          .Values.observability.prometheusOperator.enabled
+          .Values.mariadbOperator.enabled
         }}
         env:
           {{- if .Values.securityProfilesOperator.enabled }}
@@ -78,10 +77,10 @@ spec:
           {{- if .Values.mariadbOperator.enabled }}
           isMariadbCrdInstalled: true
           {{- end }}
-          {{- if and  
-            .Values.observability.enabled 
-            .Values.observability.prometheusOperator.enabled 
-          }} 
+          {{- if and
+            .Values.observability.enabled
+            .Values.observability.prometheusOperator.enabled
+          }}
           isPrometheusCrdInstalled: true
           {{- end }}
       kruise:
