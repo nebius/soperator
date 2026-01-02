@@ -139,7 +139,7 @@ func renderContainerSlurmd(
 			SeccompProfile: &corev1.SeccompProfile{
 				Type: corev1.SeccompProfileTypeUnconfined,
 			},
-			ProcMount:       ptr.To(corev1.UnmaskedProcMount),
+			ProcMount:       ptr.To(container.ProcMount),
 			AppArmorProfile: common.ParseAppArmorProfile(appArmorProfile),
 		},
 		Resources:                resources,
@@ -271,7 +271,7 @@ func renderContainerNodeSetSlurmd(
 			SeccompProfile: &corev1.SeccompProfile{
 				Type: corev1.SeccompProfileTypeUnconfined,
 			},
-			ProcMount:       ptr.To(corev1.UnmaskedProcMount),
+			ProcMount:       ptr.To(nodeSet.ContainerSlurmd.ProcMount),
 			AppArmorProfile: common.ParseAppArmorProfile(appArmorProfile),
 		},
 		Resources:                resources,

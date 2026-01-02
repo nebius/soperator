@@ -297,6 +297,7 @@ spec:
         {{- if .Values.slurmNodes.worker.slurmd.securityLimitsConfig }}
         securityLimitsConfig: {{ .Values.slurmNodes.worker.slurmd.securityLimitsConfig }}
         {{- end }}
+        procMount: {{ default "Unmasked" .Values.slurmNodes.worker.slurmd.procMount | quote }}
       munge:
         image: {{ required "munge image" .Values.images.munge | quote }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.worker.munge.imagePullPolicy | quote }}

@@ -81,6 +81,7 @@ func BuildSlurmNodeSetFrom(
 				Resources:            nsSpec.Slurmd.Resources.DeepCopy(),
 				SecurityLimitsConfig: nsSpec.Slurmd.Security.LimitsConfig,
 				AppArmorProfile:      nsSpec.Slurmd.Security.AppArmorProfile,
+				ProcMount:            nsSpec.Slurmd.Security.ProcMount,
 			},
 			consts.ContainerNameSlurmd,
 		),
