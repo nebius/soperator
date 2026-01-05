@@ -217,8 +217,8 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 		}
 
 		expectedMetrics := []string{
-			fmt.Sprintf(`GAUGE; slurm_node_info{address="10.0.0.1",instance_id="instance-1",node_name="node-1",reason="",reservation_name="%s",state_base="ALLOCATED",state_is_completing="false",state_is_drain="false",state_is_fail="false",state_is_maintenance="false",state_is_planned="false",state_is_reserved="false"} 1`, longReservation[:maxReservationNameLength]),
-			`GAUGE; slurm_node_info{address="10.0.0.2",instance_id="instance-2",node_name="node-2",reason="",reservation_name="",state_base="IDLE",state_is_completing="false",state_is_drain="true",state_is_fail="false",state_is_maintenance="false",state_is_planned="false",state_is_reserved="false"} 1`,
+			fmt.Sprintf(`GAUGE; slurm_node_info{address="10.0.0.1",instance_id="instance-1",node_name="node-1",reason="",reservation_name="%s",state_base="ALLOCATED",state_is_completing="",state_is_drain="false",state_is_fail="",state_is_maintenance="false",state_is_planned="",state_is_reserved="false"} 1`, longReservation[:maxReservationNameLength]),
+			`GAUGE; slurm_node_info{address="10.0.0.2",instance_id="instance-2",node_name="node-2",reason="",reservation_name="",state_base="IDLE",state_is_completing="",state_is_drain="true",state_is_fail="",state_is_maintenance="false",state_is_planned="",state_is_reserved="false"} 1`,
 			`GAUGE; slurm_node_cpus_total{node_name="node-1"} 16`,
 			`GAUGE; slurm_node_cpus_allocated{node_name="node-1"} 8`,
 			`GAUGE; slurm_node_cpus_idle{node_name="node-1"} 8`,
@@ -338,8 +338,8 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 
 		// Check specific state combinations for node info metrics
 		expectedNodeMetrics := []string{
-			`GAUGE; slurm_node_info{address="10.0.0.3",instance_id="instance-maintenance",node_name="node-maintenance",reason="",reservation_name="",state_base="IDLE",state_is_completing="false",state_is_drain="false",state_is_fail="false",state_is_maintenance="true",state_is_planned="false",state_is_reserved="false"} 1`,
-			`GAUGE; slurm_node_info{address="10.0.0.4",instance_id="instance-reserved",node_name="node-reserved",reason="",reservation_name="",state_base="IDLE",state_is_completing="false",state_is_drain="false",state_is_fail="false",state_is_maintenance="false",state_is_planned="false",state_is_reserved="true"} 1`,
+			`GAUGE; slurm_node_info{address="10.0.0.3",instance_id="instance-maintenance",node_name="node-maintenance",reason="",reservation_name="",state_base="IDLE",state_is_completing="",state_is_drain="false",state_is_fail="",state_is_maintenance="true",state_is_planned="",state_is_reserved="false"} 1`,
+			`GAUGE; slurm_node_info{address="10.0.0.4",instance_id="instance-reserved",node_name="node-reserved",reason="",reservation_name="",state_base="IDLE",state_is_completing="",state_is_drain="false",state_is_fail="",state_is_maintenance="false",state_is_planned="",state_is_reserved="true"} 1`,
 		}
 
 		for _, expected := range expectedNodeMetrics {
@@ -419,7 +419,7 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 		assert.Contains(t, metricsText, expectedNodeFailsMetric)
 
 		// Check that node info metric also includes the reason field for the drained node
-		expectedNodeInfoMetric := `GAUGE; slurm_node_info{address="10.0.0.3",instance_id="instance-maintenance",node_name="node-maintenance",reason="maintenance drain triggered",reservation_name="",state_base="IDLE",state_is_completing="false",state_is_drain="true",state_is_fail="false",state_is_maintenance="true",state_is_planned="false",state_is_reserved="false"} 1`
+		expectedNodeInfoMetric := `GAUGE; slurm_node_info{address="10.0.0.3",instance_id="instance-maintenance",node_name="node-maintenance",reason="maintenance drain triggered",reservation_name="",state_base="IDLE",state_is_completing="",state_is_drain="true",state_is_fail="",state_is_maintenance="true",state_is_planned="",state_is_reserved="false"} 1`
 		assert.Contains(t, metricsText, expectedNodeInfoMetric)
 
 		mockClient.AssertExpectations(t)
@@ -662,7 +662,7 @@ func TestMetricsCollector_GetDiag_APIError(t *testing.T) {
 		}
 
 		// Should still have node metrics (proving other metrics continue to work)
-		assert.Contains(t, metricsText, `GAUGE; slurm_node_info{address="10.0.0.1",instance_id="test-instance",node_name="test-node",reason="",reservation_name="",state_base="IDLE",state_is_completing="false",state_is_drain="false",state_is_fail="false",state_is_maintenance="false",state_is_planned="false",state_is_reserved="false"} 1`)
+		assert.Contains(t, metricsText, `GAUGE; slurm_node_info{address="10.0.0.1",instance_id="test-instance",node_name="test-node",reason="",reservation_name="",state_base="IDLE",state_is_completing="",state_is_drain="false",state_is_fail="",state_is_maintenance="false",state_is_planned="",state_is_reserved="false"} 1`)
 
 		// Should NOT have any RPC metrics due to GetDiag failure
 		for _, metricText := range metricsText {
