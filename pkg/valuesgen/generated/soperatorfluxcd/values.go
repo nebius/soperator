@@ -1590,7 +1590,7 @@ func NewDefaults() Values {
 			ReleaseName: "soperator-storageclasses",
 			Timeout:     "5m",
 			Values:      nil,
-			Version:     "1.23.0",
+			Version:     "1.23.1",
 		},
 		Tailscale: ValuesTailscale{
 			DriftDetection: ValuesTailscaleDriftDetection{
