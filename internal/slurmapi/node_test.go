@@ -31,7 +31,6 @@ func TestNodeFromAPI(t *testing.T) {
 				Reason:              nil,
 				Partitions:          []string{"main"},
 				Tres:                "cpu=16,mem=191356M,billing=16,gres/gpu=1",
-				TresUsed:            "",
 				Address:             "10.0.0.1",
 				BootTime:            time.Unix(1747752894, 0),
 				Comment:             "comment",
@@ -71,7 +70,6 @@ func TestNodeFromAPI(t *testing.T) {
 			assert.Equal(t, tt.want.States, got.States)
 			assert.Equal(t, tt.want.Partitions, got.Partitions)
 			assert.Equal(t, tt.want.Tres, got.Tres)
-			assert.Equal(t, tt.want.TresUsed, got.TresUsed)
 			assert.Equal(t, tt.want.Address, got.Address)
 			assert.Equal(t, tt.want.BootTime, got.BootTime)
 			assert.Equal(t, tt.want.Comment, got.Comment)

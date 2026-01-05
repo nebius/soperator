@@ -370,12 +370,12 @@ func (c *MetricsCollector) slurmNodeMetrics(slurmNodes []slurmapi.Node) iter.Seq
 				node.Name,
 				node.InstanceID,
 				string(node.BaseState()),
-				strconv.FormatBool(node.IsDrainState()),
-				strconv.FormatBool(node.IsMaintenanceState()),
-				strconv.FormatBool(node.IsReservedState()),
-				strconv.FormatBool(node.IsCompletingState()),
-				strconv.FormatBool(node.IsFailState()),
-				strconv.FormatBool(node.IsPlannedState()),
+				strconv.FormatBool(node.IsDrainState()),       // Keep "true"/"false" for backward compatibility
+				strconv.FormatBool(node.IsMaintenanceState()), // Keep "true"/"false" for backward compatibility
+				strconv.FormatBool(node.IsReservedState()),    // Keep "true"/"false" for backward compatibility
+				boolToLabelValue(node.IsCompletingState()),    // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsFailState()),          // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsPlannedState()),       // New flag: use empty string instead of "false"
 				trimReservationName(node.Reservation),
 				node.Address,
 				reason,
@@ -384,43 +384,43 @@ func (c *MetricsCollector) slurmNodeMetrics(slurmNodes []slurmapi.Node) iter.Seq
 				return
 			}
 
-			if cpuTotal, ok := nodeCPU(node); ok {
+			if cpuTotal, ok := node.CPUTotal(); ok {
 				if !yield(prometheus.MustNewConstMetric(c.nodeCPUTotal, prometheus.GaugeValue, cpuTotal, node.Name)) {
 					return
 				}
 			}
-			if cpuAlloc, ok := nodeCPUAllocated(node); ok {
+			if cpuAlloc, ok := node.CPUAllocated(); ok {
 				if !yield(prometheus.MustNewConstMetric(c.nodeCPUAllocated, prometheus.GaugeValue, cpuAlloc, node.Name)) {
 					return
 				}
 			}
-			if cpuIdle, ok := nodeCPUIdle(node); ok {
+			if cpuIdle, ok := node.CPUIdle(); ok {
 				if !yield(prometheus.MustNewConstMetric(c.nodeCPUIdle, prometheus.GaugeValue, cpuIdle, node.Name)) {
 					return
 				}
 			}
-			if cpuEffective, ok := nodeCPUEffective(node); ok {
+			if cpuEffective, ok := node.CPUEffective(); ok {
 				if !yield(prometheus.MustNewConstMetric(c.nodeCPUEffective, prometheus.GaugeValue, cpuEffective, node.Name)) {
 					return
 				}
 			}
 
-			if memTotal, ok := nodeMemoryTotalBytes(node); ok {
+			if memTotal, ok := node.MemoryTotalBytes(); ok {
 				if !yield(prometheus.MustNewConstMetric(c.nodeMemoryTotalBytes, prometheus.GaugeValue, memTotal, node.Name)) {
 					return
 				}
 			}
-			if memAlloc, ok := nodeMemoryAllocatedBytes(node); ok {
+			if memAlloc, ok := node.MemoryAllocatedBytes(); ok {
 				if !yield(prometheus.MustNewConstMetric(c.nodeMemoryAllocatedBytes, prometheus.GaugeValue, memAlloc, node.Name)) {
 					return
 				}
 			}
-			if memFree, ok := nodeMemoryFreeBytes(node); ok {
+			if memFree, ok := node.MemoryFreeBytes(); ok {
 				if !yield(prometheus.MustNewConstMetric(c.nodeMemoryFreeBytes, prometheus.GaugeValue, memFree, node.Name)) {
 					return
 				}
 			}
-			if memEff, ok := nodeMemoryEffectiveBytes(node); ok {
+			if memEff, ok := node.MemoryEffectiveBytes(); ok {
 				if !yield(prometheus.MustNewConstMetric(c.nodeMemoryEffectiveBytes, prometheus.GaugeValue, memEff, node.Name)) {
 					return
 				}
@@ -435,82 +435,19 @@ func (c *MetricsCollector) slurmNodeMetrics(slurmNodes []slurmapi.Node) iter.Seq
 	}
 }
 
-func nodeCPU(node slurmapi.Node) (float64, bool) {
-	if node.CPUs != nil {
-		return float64(*node.CPUs), true
-	}
-	if tres, err := slurmapi.ParseTrackableResources(node.Tres); err == nil && tres.CPUCount > 0 {
-		return float64(tres.CPUCount), true
-	}
-	return 0, false
-}
-
-func nodeCPUAllocated(node slurmapi.Node) (float64, bool) {
-	if node.AllocCPUs == nil {
-		return 0, false
-	}
-	return float64(*node.AllocCPUs), true
-}
-
-func nodeCPUIdle(node slurmapi.Node) (float64, bool) {
-	if node.AllocIdleCPUs == nil {
-		return 0, false
-	}
-	return float64(*node.AllocIdleCPUs), true
-}
-
-func nodeCPUEffective(node slurmapi.Node) (float64, bool) {
-	if node.EffectiveCPUs == nil {
-		return 0, false
-	}
-	return float64(*node.EffectiveCPUs), true
-}
-
-func nodeMemoryTotalBytes(node slurmapi.Node) (float64, bool) {
-	if node.RealMemoryMB != nil {
-		return mbToBytes(*node.RealMemoryMB), true
-	}
-	if tres, err := slurmapi.ParseTrackableResources(node.Tres); err == nil && tres.MemoryBytes > 0 {
-		return float64(tres.MemoryBytes), true
-	}
-	return 0, false
-}
-
-func nodeMemoryAllocatedBytes(node slurmapi.Node) (float64, bool) {
-	if node.AllocMemoryMB == nil {
-		return 0, false
-	}
-	return mbToBytes(*node.AllocMemoryMB), true
-}
-
-func nodeMemoryFreeBytes(node slurmapi.Node) (float64, bool) {
-	if node.FreeMemoryMB == nil {
-		return 0, false
-	}
-	return mbToBytes(*node.FreeMemoryMB), true
-}
-
-func nodeMemoryEffectiveBytes(node slurmapi.Node) (float64, bool) {
-	// Effective memory mirrors Slinky: total memory minus memory reserved for daemons (specialized memory), if available.
-	if node.RealMemoryMB == nil {
-		if tres, err := slurmapi.ParseTrackableResources(node.Tres); err == nil && tres.MemoryBytes > 0 {
-			return float64(tres.MemoryBytes), true
-		}
-		return 0, false
-	}
-
-	effectiveMB := *node.RealMemoryMB
-	if node.SpecializedMemoryMB != nil {
-		effectiveMB -= *node.SpecializedMemoryMB
-		if effectiveMB < 0 {
-			effectiveMB = 0
-		}
-	}
-	return mbToBytes(effectiveMB), true
-}
-
 func mbToBytes(mb int64) float64 {
 	return float64(mb) * 1024 * 1024
+}
+
+// boolToLabelValue converts a boolean to a label value.
+// Returns "true" if true, empty string if false.
+// This is used for new state flags to avoid hitting Victoria Metrics' 30 label limit
+// (empty label value === no label).
+func boolToLabelValue(b bool) string {
+	if b {
+		return "true"
+	}
+	return ""
 }
 
 func (c *MetricsCollector) slurmJobMetrics(ctx context.Context, slurmJobs []slurmapi.Job) iter.Seq[prometheus.Metric] {

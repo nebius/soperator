@@ -15,7 +15,6 @@ type Node struct {
 	Reason      *NodeReason
 	Partitions  []string
 	Tres        string    // Trackable Resources (e.g., CPUs, GPUs) assigned to the node.
-	TresUsed    string    // Trackable Resources currently allocated for jobs.
 	Address     string    // IP Address of the node in the Kubernetes cluster.
 	BootTime    time.Time // The boot time of the node.
 	Comment     string
@@ -83,7 +82,6 @@ func NodeFromAPI(node api.V0041Node) (Node, error) {
 		States:      nodeStates,
 		Partitions:  *node.Partitions,
 		Tres:        *node.Tres,
-		TresUsed:    valueOrDefault(node.TresUsed),
 		Address:     *node.Address,
 		Comment:     *node.Comment,
 	}
@@ -157,6 +155,16 @@ func (n *Node) IsDownState() bool {
 	return exists
 }
 
+// baseStates defines the mutually exclusive base states of a Slurm node.
+// The node state is a 32-bit integer where the lowest 4 bits (0x0000000f) encode
+// exactly 6 mutually exclusive base states: IDLE, DOWN, ALLOCATED, ERROR, MIXED, UNKNOWN.
+// These are the only states that can be used as the "base" state of a node.
+//
+// Additional states like COMPLETING, DRAIN, MAINTENANCE, RESERVED, FAIL, PLANNED are
+// flag bits that can be combined with base states. For example, a node can be
+// IDLE+COMPLETING simultaneously (e.g., State=IDLE+COMPLETING+DYNAMIC_NORM+NOT_RESPONDING).
+//
+// More details: https://github.com/SchedMD/slurm/blob/master/slurm/slurm.h.in
 var baseStates = []api.V0041NodeState{
 	api.V0041NodeStateUNKNOWN,
 	api.V0041NodeStateDOWN,
@@ -164,11 +172,14 @@ var baseStates = []api.V0041NodeState{
 	api.V0041NodeStateALLOCATED,
 	api.V0041NodeStateERROR,
 	api.V0041NodeStateMIXED,
-	api.V0041NodeStateCOMPLETING,
 }
 
 // BaseState returns the base state of the node.
-// Slurm node has one base state and multiple additional states.
+// Slurm node has one base state and multiple additional states (flag bits).
+// The base state is one of: UNKNOWN, DOWN, IDLE, ALLOCATED, ERROR, MIXED.
+// Additional flag bits like COMPLETING, DRAIN, MAINTENANCE, etc. can be combined
+// with the base state to form the complete node state.
+//
 // More details: https://github.com/SchedMD/slurm/blob/1cb50f245f05d851f2383e326db2f20a01820a88/slurm/slurm.h#L961
 func (n *Node) BaseState() api.V0041NodeState {
 	for _, baseState := range baseStates {
@@ -191,4 +202,93 @@ func convertUint64Struct(input *api.V0041Uint64NoValStruct) *int64 {
 		return nil
 	}
 	return input.Number
+}
+
+// CPUTotal returns the total number of CPUs on the node.
+// First tries to use the CPUs field, then falls back to parsing Tres.
+func (n *Node) CPUTotal() (float64, bool) {
+	if n.CPUs != nil {
+		return float64(*n.CPUs), true
+	}
+	if tres, err := ParseTrackableResources(n.Tres); err == nil && tres.CPUCount > 0 {
+		return float64(tres.CPUCount), true
+	}
+	return 0, false
+}
+
+// CPUAllocated returns the number of CPUs currently allocated on the node.
+func (n *Node) CPUAllocated() (float64, bool) {
+	if n.AllocCPUs == nil {
+		return 0, false
+	}
+	return float64(*n.AllocCPUs), true
+}
+
+// CPUIdle returns the number of idle CPUs on the node.
+func (n *Node) CPUIdle() (float64, bool) {
+	if n.AllocIdleCPUs == nil {
+		return 0, false
+	}
+	return float64(*n.AllocIdleCPUs), true
+}
+
+// CPUEffective returns the effective number of CPUs on the node.
+func (n *Node) CPUEffective() (float64, bool) {
+	if n.EffectiveCPUs == nil {
+		return 0, false
+	}
+	return float64(*n.EffectiveCPUs), true
+}
+
+// MemoryTotalBytes returns the total memory on the node in bytes.
+// First tries to use the RealMemoryMB field, then falls back to parsing Tres.
+func (n *Node) MemoryTotalBytes() (float64, bool) {
+	if n.RealMemoryMB != nil {
+		return mbToBytes(*n.RealMemoryMB), true
+	}
+	if tres, err := ParseTrackableResources(n.Tres); err == nil && tres.MemoryBytes > 0 {
+		return float64(tres.MemoryBytes), true
+	}
+	return 0, false
+}
+
+// MemoryAllocatedBytes returns the allocated memory on the node in bytes.
+func (n *Node) MemoryAllocatedBytes() (float64, bool) {
+	if n.AllocMemoryMB == nil {
+		return 0, false
+	}
+	return mbToBytes(*n.AllocMemoryMB), true
+}
+
+// MemoryFreeBytes returns the free memory on the node in bytes.
+func (n *Node) MemoryFreeBytes() (float64, bool) {
+	if n.FreeMemoryMB == nil {
+		return 0, false
+	}
+	return mbToBytes(*n.FreeMemoryMB), true
+}
+
+// MemoryEffectiveBytes returns the effective memory on the node in bytes.
+// Effective memory is total memory minus memory reserved for daemons (specialized memory), if available.
+func (n *Node) MemoryEffectiveBytes() (float64, bool) {
+	if n.RealMemoryMB == nil {
+		if tres, err := ParseTrackableResources(n.Tres); err == nil && tres.MemoryBytes > 0 {
+			return float64(tres.MemoryBytes), true
+		}
+		return 0, false
+	}
+
+	effectiveMB := *n.RealMemoryMB
+	if n.SpecializedMemoryMB != nil {
+		effectiveMB -= *n.SpecializedMemoryMB
+		if effectiveMB < 0 {
+			effectiveMB = 0
+		}
+	}
+	return mbToBytes(effectiveMB), true
+}
+
+// mbToBytes converts megabytes to bytes.
+func mbToBytes(mb int64) float64 {
+	return float64(mb) * 1024 * 1024
 }
