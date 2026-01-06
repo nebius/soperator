@@ -442,9 +442,14 @@ endif
 		$(DOCKER_BUILD_ARGS) \
 		.
 ifeq ($(UNSTABLE), false)
+# Push to the Nebius stable registry
 	skopeo copy --all \
 		docker://"$(IMAGE_REPO)-unstable/${IMAGE_NAME}:${IMAGE_VERSION}" \
 		docker://"$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+# Push to the Github registry
+	skopeo copy --all \
+		docker://"$(IMAGE_REPO)-unstable/${IMAGE_NAME}:${IMAGE_VERSION}" \
+		docker://"$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 endif
 
 .PHONY: docker-build-jail
@@ -476,18 +481,6 @@ endif
 		--progress=plain \
 		$(DOCKER_BUILD_ARGS) \
 		.
-
-.PHONY: docker-manifest
-docker-manifest: ## Create and push docker manifest for multiple image architecture
-ifndef IMAGE_NAME
-	$(error IMAGE_NAME is not set, docker manifest can not be pushed)
-endif
-	docker manifest create --amend "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
-	docker manifest push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
-ifeq ($(UNSTABLE), false)
-	docker manifest create --amend "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
-	docker manifest push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
-endif
 
 .PHONY: release-helm
 release-helm: ## Build & push helm docker image

@@ -1,13 +1,11 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-# https://github.com/nebius/ml-containers/blob/main/.github/workflows/neubuntu.yml
-FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20251224121141 AS worker_slurmd
+# https://github.com/nebius/ml-containers/pull/39
+FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260106134848 AS worker_slurmd
 
 ARG SLURM_VERSION
 ARG OPENMPI_VERSION=4.1.7a1
 ARG PYXIS_VERSION=0.21.0
-
-ARG DEBIAN_FRONTEND=noninteractive
 
 # Install dependencies
 RUN apt-get update && \
