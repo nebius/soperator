@@ -155,6 +155,16 @@ func (n *Node) IsDownState() bool {
 	return exists
 }
 
+func (n *Node) IsNotRespondingState() bool {
+	_, exists := n.States[api.V0041NodeStateNOTRESPONDING]
+	return exists
+}
+
+func (n *Node) IsInvalidState() bool {
+	_, exists := n.States[api.V0041NodeStateINVALID]
+	return exists
+}
+
 // baseStates defines the mutually exclusive base states of a Slurm node.
 // The node state is a 32-bit integer where the lowest 4 bits (0x0000000f) encode
 // exactly 6 mutually exclusive base states: IDLE, DOWN, ALLOCATED, ERROR, MIXED, UNKNOWN.
@@ -164,7 +174,7 @@ func (n *Node) IsDownState() bool {
 // flag bits that can be combined with base states. For example, a node can be
 // IDLE+COMPLETING simultaneously (e.g., State=IDLE+COMPLETING+DYNAMIC_NORM+NOT_RESPONDING).
 //
-// More details: https://github.com/SchedMD/slurm/blob/master/slurm/slurm.h.in
+// More details: https://github.com/SchedMD/slurm/blob/master/slurm/slurm.h#L978-L992
 var baseStates = []api.V0041NodeState{
 	api.V0041NodeStateUNKNOWN,
 	api.V0041NodeStateDOWN,
@@ -172,6 +182,7 @@ var baseStates = []api.V0041NodeState{
 	api.V0041NodeStateALLOCATED,
 	api.V0041NodeStateERROR,
 	api.V0041NodeStateMIXED,
+	api.V0041NodeStateFUTURE,
 }
 
 // BaseState returns the base state of the node.
@@ -188,13 +199,6 @@ func (n *Node) BaseState() api.V0041NodeState {
 		}
 	}
 	return ""
-}
-
-func valueOrDefault(ptr *string) string {
-	if ptr == nil {
-		return ""
-	}
-	return *ptr
 }
 
 func convertUint64Struct(input *api.V0041Uint64NoValStruct) *int64 {
