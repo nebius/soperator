@@ -66,7 +66,9 @@ else
 endif
 
 ifeq ($(UNSTABLE), true)
-    SHORT_SHA			= $(shell git rev-parse --short=8 HEAD)
+    # "r" prefix ensures SHORT_SHA is alphanumeric, not purely numeric.
+    # SemVer forbids leading zeros in numeric pre-release identifiers (e.g., "1.0.0-01234" is invalid).
+    SHORT_SHA			= r$(shell git rev-parse --short=8 HEAD)
     VERSION				= $(VERSION_BASE)-$(SHORT_SHA)
     OPERATOR_IMAGE_TAG	= $(VERSION_BASE)-$(SHORT_SHA)
     IMAGE_VERSION		= $(VERSION_BASE)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
