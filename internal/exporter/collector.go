@@ -128,12 +128,27 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 }
 
 // isNodeUnavailable checks if a node is in unavailable state
-// Unavailable state: DOWN+* or IDLE+DRAIN+*
+// Unavailable state: DOWN+* or IDLE+DRAIN+* or NOTRESPONDING or UNKNOWN or ERROR or FAIL or INVALID
 func isNodeUnavailable(node slurmapi.Node) bool {
 	if node.IsDownState() {
 		return true
 	}
 	if node.BaseState() == api.V0041NodeStateIDLE && node.IsDrainState() {
+		return true
+	}
+	if node.BaseState() == api.V0041NodeStateNOTRESPONDING {
+		return true
+	}
+	if node.BaseState() == api.V0041NodeStateUNKNOWN {
+		return true
+	}
+	if node.BaseState() == api.V0041NodeStateERROR {
+		return true
+	}
+	if node.BaseState() == api.V0041NodeStateFAIL {
+		return true
+	}
+	if node.BaseState() == api.V0041NodeStateINVALID {
 		return true
 	}
 	return false
