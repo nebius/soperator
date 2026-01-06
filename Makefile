@@ -405,7 +405,7 @@ build: manifests generate fmt vet ## Build manager binary with native toolchain.
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host with native toolchain.
 	IS_PROMETHEUS_CRD_INSTALLED=true IS_MARIADB_CRD_INSTALLED=true ENABLE_WEBHOOKS=false IS_APPARMOR_CRD_INSTALLED=true go run cmd/main.go \
-	 -log-level=debug -leader-elect=true -operator-namespace=soperator-system --enable-topology-controller=true
+	 -log-level=debug -leader-elect=true -operator-namespace=soperator-system
 
 .PHONY: docker-build-go-base
 docker-build-go-base: ## Build go-base multiarch manifest locally

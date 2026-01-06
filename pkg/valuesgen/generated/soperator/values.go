@@ -63,6 +63,7 @@ type ValuesControllerManagerServiceAccountAnnotations struct {
 type ValuesControllerManagerManager struct {
 	Args                     []string                                               `yaml:"args" json:"args"`
 	ContainerSecurityContext ValuesControllerManagerManagerContainerSecurityContext `yaml:"containerSecurityContext" json:"containerSecurityContext"`
+	ControllersEnabled       ValuesControllerManagerManagerControllersEnabled       `yaml:"controllersEnabled" json:"controllersEnabled"`
 	Env                      ValuesControllerManagerManagerEnv                      `yaml:"env" json:"env"`
 	Image                    *ValuesControllerManagerManagerImage                   `yaml:"image,omitempty" json:"image,omitempty"`
 	ImagePullPolicy          string                                                 `yaml:"imagePullPolicy" json:"imagePullPolicy"`
@@ -95,6 +96,13 @@ type ValuesControllerManagerManagerEnv struct {
 	IsPrometheusCrdInstalled             string `yaml:"isPrometheusCrdInstalled" json:"isPrometheusCrdInstalled"`
 	SlurmOperatorWatchNamespaces         string `yaml:"slurmOperatorWatchNamespaces" json:"slurmOperatorWatchNamespaces"`
 	TopologyLabelPrefix                  string `yaml:"topologyLabelPrefix" json:"topologyLabelPrefix"`
+}
+
+type ValuesControllerManagerManagerControllersEnabled struct {
+	Cluster          bool `yaml:"cluster" json:"cluster"`
+	Nodeconfigurator bool `yaml:"nodeconfigurator" json:"nodeconfigurator"`
+	Nodeset          bool `yaml:"nodeset" json:"nodeset"`
+	Topology         bool `yaml:"topology" json:"topology"`
 }
 
 type ValuesControllerManagerManagerContainerSecurityContext struct {
@@ -184,7 +192,6 @@ func NewDefaults() Values {
 				Args: []string{
 					"--health-probe-bind-address=:8081",
 					"--metrics-bind-address=127.0.0.1:8080",
-					"--enable-topology-controller=true",
 					"--leader-elect",
 				},
 				ContainerSecurityContext: ValuesControllerManagerManagerContainerSecurityContext{
@@ -194,6 +201,12 @@ func NewDefaults() Values {
 							"ALL",
 						},
 					},
+				},
+				ControllersEnabled: ValuesControllerManagerManagerControllersEnabled{
+					Cluster:          true,
+					Nodeconfigurator: true,
+					Nodeset:          true,
+					Topology:         true,
 				},
 				Env: ValuesControllerManagerManagerEnv{
 					IsApparmorCrdInstalled:               "false",
