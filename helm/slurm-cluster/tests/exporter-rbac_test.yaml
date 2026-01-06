@@ -63,7 +63,7 @@ tests:
           of: Role
       - equal:
           path: metadata.name
-          value: slurm-exporter-role
+          value: test-cluster-exporter-role
       - equal:
           path: metadata.namespace
           value: NAMESPACE
@@ -97,7 +97,7 @@ tests:
           of: RoleBinding
       - equal:
           path: metadata.name
-          value: slurm-exporter-role-binding
+          value: test-cluster-exporter-role-binding
       - equal:
           path: metadata.namespace
           value: NAMESPACE
@@ -106,7 +106,7 @@ tests:
           value: Role
       - equal:
           path: roleRef.name
-          value: slurm-exporter-role
+          value: test-cluster-exporter-role
       - equal:
           path: roleRef.apiGroup
           value: rbac.authorization.k8s.io
