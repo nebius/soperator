@@ -72,12 +72,12 @@ Create the name of the service account to use for exporter
 Create the name of the role for exporter
 */}}
 {{- define "slurm-cluster.exporter.roleName" -}}
-{{- printf "slurm-exporter-role" }}
+{{- printf "%s-exporter-role" (include "slurm-cluster.name" .) }}
 {{- end -}}
 
 {{/*
 Create the name of the role binding for exporter
 */}}
 {{- define "slurm-cluster.exporter.roleBindingName" -}}
-{{- printf "slurm-exporter-role-binding" }}
+{{- printf "%s-exporter-role-binding" (include "slurm-cluster.name" .) }}
 {{- end -}}
