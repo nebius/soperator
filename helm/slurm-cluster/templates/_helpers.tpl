@@ -61,14 +61,10 @@ Create the name of the role binding for sconfigcontroller
 Create the name of the service account to use for exporter
 */}}
 {{- define "slurm-cluster.exporter.serviceAccountName" -}}
-{{- if and (hasKey .Values.slurmNodes "exporter") (hasKey .Values.slurmNodes.exporter "serviceAccount") -}}
-    {{- if .Values.slurmNodes.exporter.serviceAccount.create -}}
-        {{- default "slurm-exporter-sa" .Values.slurmNodes.exporter.serviceAccount.name }}
-    {{- else -}}
-        {{- default "default" .Values.slurmNodes.exporter.serviceAccount.name }}
-    {{- end -}}
+{{- if .Values.slurmNodes.exporter.serviceAccount.create -}}
+    {{- default "slurm-exporter-sa" .Values.slurmNodes.exporter.serviceAccount.name }}
 {{- else -}}
-    slurm-exporter-sa
+    {{- default "default" .Values.slurmNodes.exporter.serviceAccount.name }}
 {{- end -}}
 {{- end -}}
 
