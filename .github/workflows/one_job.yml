@@ -15,28 +15,11 @@ on:
       - soperator-release-*
     tags:
       - "**" # Trigger on any tag
-    paths-ignore:
-      - "docs/**"
-      - "CODEOWNERS"
-      - "LICENSE"
-      - "PROJECT"
-      - "README.md"
-      - "SECURITY.md"
-      - "pkg/valuesgen/**"
-      - "Makefile"
 
   # pull_request are defined separately to allow to run CI from forks.
   pull_request:
     types: [opened, synchronize, reopened]
-    paths-ignore:
-      - "docs/**"
-      - "CODEOWNERS"
-      - "LICENSE"
-      - "PROJECT"
-      - "README.md"
-      - "SECURITY.md"
-      - "pkg/valuesgen/**"
-      - "Makefile"
+
 permissions:
   contents: read
   packages: write
@@ -48,7 +31,30 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      has_code_changes: ${{ steps.filter.outputs.has_code_changes }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          predicate-quantifier: 'every'
+          filters: |
+            has_code_changes:
+              - '**'
+              - '!docs/**'
+              - '!CODEOWNERS'
+              - '!LICENSE'
+              - '!PROJECT'
+              - '!README.md'
+              - '!SECURITY.md'
+
   pre-build:
+    needs: [changes]
+    if: needs.changes.outputs.has_code_changes == 'true'
     runs-on:
       - self-hosted
       - build
@@ -108,6 +114,8 @@ jobs:
           echo "Unstable: $UNSTABLE"
 
   lint:
+    needs: [changes]
+    if: needs.changes.outputs.has_code_changes == 'true'
     runs-on:
       - self-hosted
       - build
@@ -146,11 +154,12 @@ jobs:
           GOOS: darwin
 
   build-docker-images:
+    needs: [changes, pre-build]
+    if: needs.changes.outputs.has_code_changes == 'true'
     runs-on:
       - self-hosted
       - X64
       - build
-    needs: pre-build
     steps:
       - name: Checkout repository
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -265,11 +274,12 @@ jobs:
           rm -f images/jail_rootfs*.tar
 
   build-helm-charts:
+    needs: [changes, pre-build]
+    if: needs.changes.outputs.has_code_changes == 'true'
     runs-on:
       - self-hosted
       - X64
       - build
-    needs: pre-build
     steps:
       - name: Checkout repository
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -309,8 +319,9 @@ jobs:
 
   helm-integration-test:
     name: Helm Chart Integration Test with Built Images
+    needs: [changes, build-docker-images, build-helm-charts]
+    if: needs.changes.outputs.has_code_changes == 'true'
     runs-on: ubuntu-latest
-    needs: [build-docker-images, build-helm-charts]
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -384,3 +395,35 @@ jobs:
             test/integration/*.xml
             cluster-logs/
           retention-days: 1
+
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs:
+      - changes
+      - pre-build
+      - lint
+      - build-docker-images
+      - build-helm-charts
+      - helm-integration-test
+    if: always()
+    steps:
+      - name: Check CI status
+        shell: bash
+        run: |
+          # If no code changes, all jobs should be skipped - that's OK
+          if [[ "${{ needs.changes.outputs.has_code_changes }}" != "true" ]]; then
+            echo "No code changes - CI skipped successfully"
+            exit 0
+          fi
+
+          # Otherwise, check that all jobs passed
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "Some jobs failed"
+            exit 1
+          fi
+          if [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "Some jobs were cancelled"
+            exit 1
+          fi
+          echo "All CI jobs passed!"
