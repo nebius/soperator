@@ -421,6 +421,7 @@ spec:
         image: {{ required "soperator exporter image" .Values.images.soperatorExporter | quote }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.exporter.imagePullPolicy | quote }}
         appArmorProfile: {{ default "unconfined" .Values.slurmNodes.exporter.appArmorProfile | quote }}
+      serviceAccountName: {{ include "slurm-cluster.exporter.serviceAccountName" . }}
     rest:
       enabled: {{ .Values.slurmNodes.rest.enabled }}
       size: {{ required ".Values.slurmNodes.rest.size must be provided." .Values.slurmNodes.rest.size }}

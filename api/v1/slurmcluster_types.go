@@ -1119,6 +1119,10 @@ type SlurmExporter struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="30s"
 	CollectionInterval prometheusv1.Duration `json:"collectionInterval,omitempty"`
+
+	// ServiceAccountName is the name of the ServiceAccount to use for exporter pods.
+	// +kubebuilder:validation:Optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 // ExporterContainer defines the configuration for one of node containers
