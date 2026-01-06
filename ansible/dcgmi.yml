@@ -1,7 +1,7 @@
 ---
 
 - name: Install dcgmi
-  hosts: all, localhost
+  hosts: localhost
   become: true
   roles:
     - dcgmi

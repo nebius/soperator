@@ -3,7 +3,7 @@ package accounting
 import (
 	"errors"
 
-	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -105,6 +105,7 @@ func RenderMariaDb(
 				Affinity:           affinityConfig,
 				Tolerations:        nodeFilter.Tolerations,
 				PodSecurityContext: mariaDb.PodSecurityContext,
+				PriorityClassName:  ptr.To(mariaDb.PriorityClassName),
 			},
 			Metrics: &mariadbv1alpha1.MariadbMetrics{
 				Enabled: mariaDb.Metrics.Enabled,

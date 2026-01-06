@@ -61,7 +61,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           fetch-depth: 0 # Fetch git history for the VERSION file changes detection
 
@@ -94,13 +94,13 @@ jobs:
           fi
 
       - name: Upload version file
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: version
           path: version.txt
 
       - name: Download version artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: version
           path: ./version
@@ -122,7 +122,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
       - name: Install GO
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -162,7 +162,7 @@ jobs:
       - build
     steps:
       - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
       - name: Install GO
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -171,7 +171,7 @@ jobs:
           cache: false
 
       - name: Download version artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: version
           path: ./version
@@ -218,7 +218,7 @@ jobs:
 
           echo "Building local go base image"
           make docker-build-go-base DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}"
-          
+
           echo "Building and pushing image of the soperatorchecks ${OPERATOR_IMAGE_TAG}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks DOCKERFILE=soperatorchecks/soperatorchecks.dockerfile IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
 
@@ -239,10 +239,10 @@ jobs:
 
           echo "Building and pushing image of the controller_slurmdbd ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd DOCKERFILE=accounting/slurmdbd.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-          
+
           echo "Building and pushing image of the slurmrestd ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd DOCKERFILE=restd/slurmrestd.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-          
+
           echo "Building and pushing image of the soperator-exporter ${IMAGE_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperator-exporter DOCKERFILE=soperator-exporter/soperator-exporter.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
 
@@ -282,7 +282,7 @@ jobs:
       - build
     steps:
       - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
       - name: Install GO
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -291,7 +291,7 @@ jobs:
           cache: false
 
       - name: Download version artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: version
           path: ./version
@@ -325,16 +325,16 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: "go.mod"
           cache: true
 
       - name: Download version artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: version
           path: ./version
@@ -387,7 +387,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: helm-integration-test-results
           path: |

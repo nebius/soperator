@@ -27,10 +27,8 @@ spec:
         command:
         - /usr/bin/slurm_operator
         env:
-        {{- if not .Values.certManager.enabled }}
         - name: ENABLE_WEBHOOKS
-          value: "false"
-        {{- end }}
+          value: {{ quote .Values.certManager.enabled }}
         - name: IS_APPARMOR_CRD_INSTALLED
           value: {{ quote .Values.controllerManager.manager.env.isApparmorCrdInstalled }}
         - name: IS_PROMETHEUS_CRD_INSTALLED
@@ -41,6 +39,11 @@ spec:
         - name: SLURM_OPERATOR_WATCH_NAMESPACES
           value: {{ quote .Values.controllerManager.manager.env.slurmOperatorWatchNamespaces
             }}
+        {{- $controllersSpec := include "soperator.controllersSpec" . | trim -}}
+        {{- if $controllersSpec }}
+        - name: SLURM_OPERATOR_CONTROLLERS
+          value: {{ quote $controllersSpec }}
+        {{- end }}
         - name: TOPOLOGY_LABEL_PREFIX
           value: {{ quote .Values.controllerManager.manager.env.topologyLabelPrefix }}
         - name: KUBERNETES_CLUSTER_DOMAIN

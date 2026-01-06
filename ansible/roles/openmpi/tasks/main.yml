@@ -1,20 +1,5 @@
 ---
 
-- name: Configure ofed repositories
-  ansible.builtin.template:
-    src: mellanox_mlnx_ofed.list.j2
-    dest: /etc/apt/sources.list.d/mellanox_mlnx_ofed.list
-    mode: "0644"
-  tags:
-    - openmpi
-
-- name: Add mellanox gpg key
-  ansible.builtin.apt_key:
-    url: https://www.mellanox.com/downloads/ofed/RPM-GPG-KEY-Mellanox
-    keyring: /etc/apt/trusted.gpg
-  tags:
-    - openmpi
-
 - name: Ensure openmpi packages are installed
   ansible.builtin.apt:
     name:
@@ -29,7 +14,7 @@
 - name: Add OpenMPI to global PATH
   ansible.builtin.copy:
     dest: /etc/profile.d/path_openmpi.sh
-    content: export PATH=$PATH:/usr/mpi/gcc/openmpi-{{ openmpi_version_short }}/bin
+    content: export PATH=/usr/mpi/gcc/openmpi-{{ openmpi_version_short }}/bin:$PATH
     owner: root
     group: root
     mode: '0644'

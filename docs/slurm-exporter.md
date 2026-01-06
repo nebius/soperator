@@ -43,18 +43,47 @@ All configuration options can be set via command-line flags or environment varia
 
 ## Exported Metrics
 
+### Node State Model
+
+Slurm represents node state as a 32-bit integer where:
+- The lowest 4 bits encode 6 mutually exclusive base states: `IDLE`, `DOWN`, `ALLOCATED`, `ERROR`, `MIXED`, `UNKNOWN`
+- Additional bits are flag bits that can be combined with base states: `COMPLETING`, `DRAIN`, `MAINTENANCE`, `RESERVED`, `FAIL`, `PLANNED`
+
+For example, a node can be `IDLE+DRAIN` (idle but marked for draining) or `ALLOCATED+COMPLETING` (running jobs but finishing up).
+
+Reference: https://github.com/SchedMD/slurm/blob/master/slurm/slurm.h.in
+
+The exporter represents this as:
+- `state_base` label: The single base state (IDLE, ALLOCATED, etc.)
+- `state_is_*` labels: Boolean flags for additional state flags
+
+Boolean state flag label convention:
+- Legacy flags (`state_is_drain`, `state_is_maintenance`, `state_is_reserved`): Use `"true"`/`"false"` for backward compatibility
+- New flags (`state_is_completing`, `state_is_fail`, `state_is_planned`): Use `"true"` or empty string (`""`) to reduce label cardinality (in Victoria Metrics, empty label value === no label, helping avoid the 30 label limit)
+
 ### Core Metrics (Node and Job)
 
 | Metric Name & Type | Description & Labels |
 |-------------------|---------------------|
-| **slurm_node_info**<br>*Gauge* | Provides detailed information about SLURM nodes<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br>• `instance_id` - Kubernetes instance identifier<br>• `state_base` - Base node state (IDLE, ALLOCATED, DOWN, ERROR, MIXED, UNKNOWN)<br>• `state_is_drain` - Whether node is in drain state ("true"/"false")<br>• `state_is_maintenance` - Whether node is in maintenance state ("true"/"false")<br>• `state_is_reserved` - Whether node is in reserved state ("true"/"false")<br>• `reservation_name` - Reservation that currently includes the node (trimmed to 50 characters)<br>• `address` - IP address of the node<br>• `reason` - Reason for current node state (empty string if node has no reason set) |
+| **slurm_node_info**<br>*Gauge* | Provides detailed information about SLURM nodes<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br>• `instance_id` - Kubernetes instance identifier<br>• `state_base` - Base node state (IDLE, ALLOCATED, DOWN, ERROR, MIXED, UNKNOWN)<br>• `state_is_drain` - Whether node is in drain state ("true"/"false")<br>• `state_is_maintenance` - Whether node is in maintenance state ("true"/"false")<br>• `state_is_reserved` - Whether node is in reserved state ("true"/"false")<br>• `state_is_completing` - Whether node is in completing state ("true" or empty)<br>• `state_is_fail` - Whether node is in fail state ("true" or empty)<br>• `state_is_planned` - Whether node is in planned state ("true" or empty)<br>• `reservation_name` - Reservation that currently includes the node (trimmed to 50 characters)<br>• `address` - IP address of the node<br>• `reason` - Reason for current node state (empty string if node has no reason set) |
 | **slurm_node_gpu_seconds_total**<br>*Counter* | Total GPU seconds accumulated on SLURM nodes<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br>• `state_base` - Base node state<br>• `state_is_drain` - Drain state flag<br>• `state_is_maintenance` - Maintenance state flag<br>• `state_is_reserved` - Reserved state flag |
 | **slurm_node_fails_total**<br>*Counter* | Total number of node state transitions to failed states (DOWN/DRAIN)<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br>• `state_base` - Base node state at time of failure<br>• `state_is_drain` - Drain state flag<br>• `state_is_maintenance` - Maintenance state flag<br>• `state_is_reserved` - Reserved state flag<br>• `reason` - Reason for the node failure |
 | **slurm_node_unavailability_duration_seconds**<br>*Histogram* | Duration of completed node unavailability events (DOWN+* or IDLE+DRAIN+*)<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br><br>**Note:** Observations are recorded when unavailability events complete. Duration tracking is reset on exporter restarts, which may affect accuracy |
 | **slurm_node_draining_duration_seconds**<br>*Histogram* | Duration of completed node draining events (DRAIN+ALLOCATED or DRAIN+MIXED)<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br><br>**Note:** Observations are recorded when draining events complete. Duration tracking is reset on exporter restarts, which may affect accuracy |
+| **slurm_node_cpus_total**<br>*Gauge* | Total number of CPUs on the node<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node |
+| **slurm_node_cpus_allocated**<br>*Gauge* | Number of CPUs currently allocated on the node<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node |
+| **slurm_node_cpus_idle**<br>*Gauge* | Number of idle CPUs on the node<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node |
+| **slurm_node_cpus_effective**<br>*Gauge* | Effective CPUs on the node (excluding specialized CPUs reserved for system daemons)<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node |
+| **slurm_node_memory_total_bytes**<br>*Gauge* | Total memory on the node in bytes<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node |
+| **slurm_node_memory_allocated_bytes**<br>*Gauge* | Allocated memory on the node in bytes<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node |
+| **slurm_node_memory_free_bytes**<br>*Gauge* | Free memory on the node in bytes<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node |
+| **slurm_node_memory_effective_bytes**<br>*Gauge* | Effective memory on the node in bytes (total minus specialized memory reserved for system daemons)<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node |
+| **slurm_node_partition**<br>*Gauge* | Maps nodes to their partitions, enabling partition-level aggregation via PromQL joins<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br>• `partition` - Name of the SLURM partition |
 | **slurm_job_info**<br>*Gauge* | Detailed information about SLURM jobs<br><br>**Labels:**<br>• `job_id` - SLURM job identifier<br>• `job_state` - Current job state (PENDING, RUNNING, COMPLETED, FAILED, etc.)<br>• `job_state_reason` - Reason for current job state<br>• `slurm_partition` - SLURM partition name<br>• `job_name` - User-defined job name<br>• `user_name` - Username who submitted the job<br>• `user_id` - Numeric user ID who submitted the job<br>• `standard_error` - Path to stderr file<br>• `standard_output` - Path to stdout file<br>• `array_job_id` - Array job ID (if applicable)<br>• `array_task_id` - Array task ID (if applicable)<br>• `submit_time` - When the job was submitted (Unix timestamp seconds, empty if not available or zero)<br>• `start_time` - When the job started execution (Unix timestamp seconds, empty if not available or zero)<br>• `end_time` - When the job completed (Unix timestamp seconds, empty if not available or zero). **Warning:** For non-terminal states like RUNNING, this may contain a future timestamp representing the forecasted end time based on the job's time limit<br>• `finished_time` - When the job actually finished for terminal states only (Unix timestamp seconds, empty for non-terminal states or if end_time is zero). Unlike `end_time`, this field only contains actual completion times, never forecasted values |
 | **slurm_node_job**<br>*Gauge* | Mapping between jobs and the nodes they're running on<br><br>**Labels:**<br>• `job_id` - SLURM job identifier<br>• `node_name` - Name of the node running the job |
 | **slurm_job_duration_seconds**<br>*Gauge* | Job duration in seconds. For running jobs, this is the time elapsed since the job started. For completed jobs, this is the total execution time.<br><br>**Labels:**<br>• `job_id` - SLURM job identifier<br><br>**Notes:**<br>• Only exported for jobs with a valid start time<br>• For non-terminal states (RUNNING, etc.): duration = current_time - start_time<br>• For terminal states (COMPLETED, FAILED, etc.): duration = end_time - start_time (only if end_time is valid) |
+| **slurm_job_cpus**<br>*Gauge* | Number of CPUs allocated to the job<br><br>**Labels:**<br>• `job_id` - SLURM job identifier |
+| **slurm_job_memory_bytes**<br>*Gauge* | Memory allocated to the job in bytes<br><br>**Labels:**<br>• `job_id` - SLURM job identifier |
 
 ### Controller RPC Metrics
 

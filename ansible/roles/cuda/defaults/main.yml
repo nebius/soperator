@@ -56,3 +56,7 @@ cuda_pin_content: |
   Package: libnccl2
   Pin: version {{ cuda_libnccl_version }}+cuda12.9
   Pin-Priority: 1001
+
+cuda_dpkg_arch_map:
+  x86_64: x86_64
+  aarch64: sbsa

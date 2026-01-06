@@ -23,8 +23,12 @@ controllerManager:
     args:
       - --health-probe-bind-address=:8081
       - --metrics-bind-address=127.0.0.1:8080
-      - --enable-topology-controller=true
       - --leader-elect
+    controllersEnabled:
+      cluster: true
+      nodeconfigurator: true
+      nodeset: true
+      topology: true
     containerSecurityContext:
       allowPrivilegeEscalation: false
       capabilities:
@@ -67,9 +71,9 @@ serviceMonitor:
   metricRelabelings: []
   relabelings: []
 certManager:
-  enabled: false
+  enabled: true
 kruise:
-  installOperator: true
+  installOperator: false
   manager:
     replicas: 1
   featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true"

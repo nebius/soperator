@@ -1,0 +1,45 @@
+{{- $root := . -}}
+{{- range $name, $check := .Values.checks }}
+{{- if $check.enabled }}
+---
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: ActiveCheck
+metadata:
+  name: {{ $name | quote }}
+spec:
+  checkType: {{ $check.checkType | quote }}
+  name: {{ $name | quote }}
+  {{- with $check.dependsOn }}
+  dependsOn:
+{{ toYaml . | indent 4 }}
+  {{- end }}
+  slurmClusterRefName: {{ $root.Values.slurmClusterRefName | quote }}
+  {{- with $check.schedule }}
+  schedule: {{ . | quote }}
+  {{- end }}
+  {{- with $check.successfulJobsHistoryLimit }}
+  successfulJobsHistoryLimit: {{ . }}
+  {{- end }}
+  {{- with $check.failedJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ . }}
+  {{- end }}
+  suspend: {{ default false $check.suspend }}
+  runAfterCreation: {{ default false $check.runAfterCreation }}
+  {{- if eq $check.checkType "slurmJob" }}
+  slurmJobSpec:
+{{ include "soperator-activechecks.slurmJobSpec" (dict "check" $check "ctx" $root) | indent 4 }}
+  {{- else if eq $check.checkType "k8sJob" }}
+  k8sJobSpec:
+{{ include "soperator-activechecks.k8sJobSpec" (dict "check" $check "ctx" $root) | indent 4 }}
+  {{- end }}
+  {{- with $check.successReactions }}
+  successReactions:
+{{ toYaml . | indent 4 }}
+  {{- end }}
+  {{- with $check.failureReactions }}
+  failureReactions:
+{{ toYaml . | indent 4 }}
+  {{- end }}
+{{- end }}
+{{- println "" }}
+{{- end }}

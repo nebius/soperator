@@ -1,7 +1,7 @@
 ---
 
 - name: Install gdrcopy
-  hosts: all, localhost
+  hosts: localhost
   become: true
   roles:
     - gdrcopy
