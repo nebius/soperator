@@ -38624,6 +38624,10 @@ spec:
                       priorityClass:
                         description: PriorityClass for Slurm node pods
                         type: string
+                      serviceAccountName:
+                        description: ServiceAccountName is the name of the ServiceAccount
+                          to use for exporter pods.
+                        type: string
                       size:
                         description: Size defines the number of node instances
                         format: int32
