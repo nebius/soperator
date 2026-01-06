@@ -122,10 +122,9 @@ RUN chmod +x /opt/bin/install_container_toolkit.sh && \
 COPY ansible/roles/nvidia-container-toolkit/files/config.toml /etc/nvidia-container-runtime/config.toml
 
 # Install Docker
-COPY images/common/scripts/install_docker.sh /opt/bin/
-RUN chmod +x /opt/bin/install_docker.sh && \
-    /opt/bin/install_docker.sh && \
-    rm /opt/bin/install_docker.sh
+RUN apt-get update && \
+    apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin && \
+    apt clean
 
 # Copy Docker daemon config
 COPY images/worker/docker/daemon.json /etc/docker/daemon.json
