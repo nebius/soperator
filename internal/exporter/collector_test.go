@@ -217,8 +217,8 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 		}
 
 		// Assert node info metrics exist (use label substring checks to be robust against label additions/order)
-		assertMetricHasLabels(t, metricsText, "slurm_node_info", []string{`node_name="node-1"`, `instance_id="instance-1"`, `state_base="ALLOCATED"`, `state_is_drain="false"`, fmt.Sprintf(`reservation_name="%s"`, longReservation[:maxReservationNameLength])})
-		assertMetricHasLabels(t, metricsText, "slurm_node_info", []string{`node_name="node-2"`, `instance_id="instance-2"`, `state_base="IDLE"`, `state_is_drain="true"`})
+		assertMetricHasLabels(t, metricsText, []string{`node_name="node-1"`, `instance_id="instance-1"`, `state_base="ALLOCATED"`, `state_is_drain="false"`, fmt.Sprintf(`reservation_name="%s"`, longReservation[:maxReservationNameLength])})
+		assertMetricHasLabels(t, metricsText, []string{`node_name="node-2"`, `instance_id="instance-2"`, `state_base="IDLE"`, `state_is_drain="true"`})
 
 		expectedMetrics := []string{
 			`GAUGE; slurm_node_cpus_total{node_name="node-1"} 16`,
@@ -340,8 +340,8 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 
 		// Check specific state combinations for node info metrics
 		// Assert node info metrics exist for these nodes
-		assertMetricHasLabels(t, metricsText, "slurm_node_info", []string{`node_name="node-maintenance"`, `instance_id="instance-maintenance"`, `state_base="IDLE"`, `state_is_maintenance="true"`})
-		assertMetricHasLabels(t, metricsText, "slurm_node_info", []string{`node_name="node-reserved"`, `instance_id="instance-reserved"`, `state_base="IDLE"`, `state_is_reserved="true"`})
+		assertMetricHasLabels(t, metricsText, []string{`node_name="node-maintenance"`, `instance_id="instance-maintenance"`, `state_base="IDLE"`, `state_is_maintenance="true"`})
+		assertMetricHasLabels(t, metricsText, []string{`node_name="node-reserved"`, `instance_id="instance-reserved"`, `state_base="IDLE"`, `state_is_reserved="true"`})
 
 		// Check that GPU seconds metrics include all the new labels
 		foundMaintenanceGPU := false
@@ -416,7 +416,7 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 		assert.Contains(t, metricsText, expectedNodeFailsMetric)
 
 		// Check that node info metric also includes the reason field for the drained node
-		assertMetricHasLabels(t, metricsText, "slurm_node_info", []string{`node_name="node-maintenance"`, `instance_id="instance-maintenance"`, `reason="maintenance drain triggered"`, `state_is_drain="true"`, `state_is_maintenance="true"`})
+		assertMetricHasLabels(t, metricsText, []string{`node_name="node-maintenance"`, `instance_id="instance-maintenance"`, `reason="maintenance drain triggered"`, `state_is_drain="true"`, `state_is_maintenance="true"`})
 
 		mockClient.AssertExpectations(t)
 	})
@@ -658,7 +658,7 @@ func TestMetricsCollector_GetDiag_APIError(t *testing.T) {
 		}
 
 		// Should still have node metrics (proving other metrics continue to work)
-		assertMetricHasLabels(t, metricsText, "slurm_node_info", []string{`node_name="test-node"`, `instance_id="test-instance"`, `state_base="IDLE"`})
+		assertMetricHasLabels(t, metricsText, []string{`node_name="test-node"`, `instance_id="test-instance"`, `state_base="IDLE"`})
 
 		// Should NOT have any RPC metrics due to GetDiag failure
 		for _, metricText := range metricsText {
@@ -925,7 +925,8 @@ func toPrometheusLikeString(t *testing.T, metric prometheus.Metric) string {
 
 // assertMetricHasLabels asserts that among metricsText there's at least one metric
 // with metricName and all required label substrings present.
-func assertMetricHasLabels(t *testing.T, metricsText []string, metricName string, required []string) {
+func assertMetricHasLabels(t *testing.T, metricsText []string, required []string) {
+	metricName := "slurm_node_info"
 	for _, m := range metricsText {
 		if !strings.Contains(m, metricName) {
 			continue
