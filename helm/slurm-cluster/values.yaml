@@ -468,6 +468,18 @@ slurmNodes:
       jobLabel: "slurm-exporter"
       interval: "30s"
       scrapeTimeout: "28s"
+    # RBAC settings for exporter
+    rbac:
+      # Specifies whether RBAC resources (Role/RoleBinding) should be created
+      create: true
+    # ServiceAccount settings for exporter
+    serviceAccount:
+      # Specifies whether a ServiceAccount should be created
+      create: true
+      # The name of the ServiceAccount to use.
+      # - If empty and create is true, a ServiceAccount named "slurm-exporter-sa" will be created and used.
+      # - If empty and create is false, the "default" ServiceAccount will be used and you must ensure it has the required RBAC.
+      name: ""
     collectionInterval: "30s"
     exporter:
       imagePullPolicy: "IfNotPresent"

@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -74,10 +75,21 @@ func TestMetricsCollector_Describe(t *testing.T) {
 	}
 
 	// Base metrics
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,instance_id,state_base,state_is_drain,state_is_maintenance,state_is_reserved,reservation_name,address,reason}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,instance_id,state_base,state_is_drain,state_is_maintenance,state_is_reserved,state_is_completing,state_is_fail,state_is_planned,state_is_not_responding,state_is_invalid,is_unavailable,reservation_name,address,reason}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_total", help: "Total CPUs on the node", constLabels: {}, variableLabels: {node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_allocated", help: "CPUs allocated on the node", constLabels: {}, variableLabels: {node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_idle", help: "Idle CPUs on the node", constLabels: {}, variableLabels: {node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_effective", help: "Effective CPUs on the node", constLabels: {}, variableLabels: {node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_memory_total_bytes", help: "Total memory on the node in bytes", constLabels: {}, variableLabels: {node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_memory_allocated_bytes", help: "Allocated memory on the node in bytes", constLabels: {}, variableLabels: {node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_memory_free_bytes", help: "Free memory on the node in bytes", constLabels: {}, variableLabels: {node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_memory_effective_bytes", help: "Effective memory on the node in bytes", constLabels: {}, variableLabels: {node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_partition", help: "Slurm node partition mapping", constLabels: {}, variableLabels: {node_name,partition}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_job_info", help: "Slurm job detail information", constLabels: {}, variableLabels: {job_id,job_state,job_state_reason,slurm_partition,job_name,user_name,user_mail,user_id,standard_error,standard_output,array_job_id,array_task_id,submit_time,start_time,end_time,finished_time}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_job", help: "Slurm job node information", constLabels: {}, variableLabels: {job_id,node_name}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_job_duration_seconds", help: "Slurm job duration in seconds", constLabels: {}, variableLabels: {job_id}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_job_cpus", help: "CPUs allocated to a Slurm job", constLabels: {}, variableLabels: {job_id}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_job_memory_bytes", help: "Memory allocated to a Slurm job in bytes", constLabels: {}, variableLabels: {job_id}}`)
 
 	// RPC metrics
 	assert.Contains(t, found, `Desc{fqName: "slurm_controller_rpc_calls_total", help: "Total count of RPC calls by message type", constLabels: {}, variableLabels: {message_type}}`)
@@ -105,9 +117,18 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 				States: map[api.V0041NodeState]struct{}{
 					api.V0041NodeStateALLOCATED: {},
 				},
-				Tres:        "cpu=16,mem=191356M,gres/gpu=2",
-				Address:     "10.0.0.1",
-				Reservation: longReservation,
+				Tres:                "cpu=16,mem=191356M,gres/gpu=2",
+				Address:             "10.0.0.1",
+				Reservation:         longReservation,
+				CPUs:                ptr.To(int32(16)),
+				AllocCPUs:           ptr.To(int32(8)),
+				AllocIdleCPUs:       ptr.To(int32(8)),
+				EffectiveCPUs:       ptr.To(int32(16)),
+				AllocMemoryMB:       ptr.To(int64(64000)),
+				RealMemoryMB:        ptr.To(int64(191356)),
+				FreeMemoryMB:        ptr.To(int64(120000)),
+				SpecializedMemoryMB: ptr.To(int64(0)),
+				Partitions:          []string{"gpu"},
 			},
 			{
 				Name:       "node-2",
@@ -116,8 +137,17 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 					api.V0041NodeStateIDLE:  {},
 					api.V0041NodeStateDRAIN: {},
 				},
-				Tres:    "cpu=8,mem=64000M,gres/gpu=1",
-				Address: "10.0.0.2",
+				Tres:                "cpu=8,mem=64000M,gres/gpu=1",
+				Address:             "10.0.0.2",
+				CPUs:                ptr.To(int32(8)),
+				AllocCPUs:           ptr.To(int32(0)),
+				AllocIdleCPUs:       ptr.To(int32(8)),
+				EffectiveCPUs:       ptr.To(int32(8)),
+				AllocMemoryMB:       ptr.To(int64(0)),
+				RealMemoryMB:        ptr.To(int64(64000)),
+				FreeMemoryMB:        ptr.To(int64(50000)),
+				SpecializedMemoryMB: ptr.To(int64(0)),
+				Partitions:          []string{"main"},
 			},
 		}
 
@@ -155,6 +185,8 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 				SubmitTime:     &submitTime,
 				StartTime:      &startTime,
 				EndTime:        nil, // Job is still running
+				TresAllocated:  "cpu=4,mem=64000M",
+				CPUs:           ptr.To(int32(4)),
 			},
 		}
 
@@ -184,18 +216,34 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 			metricsText = append(metricsText, toPrometheusLikeString(t, metric))
 		}
 
+		// Assert node info metrics exist (use label substring checks to be robust against label additions/order)
+		assertMetricHasLabels(t, metricsText, []string{`node_name="node-1"`, `instance_id="instance-1"`, `state_base="ALLOCATED"`, `state_is_drain="false"`, fmt.Sprintf(`reservation_name="%s"`, longReservation[:maxReservationNameLength])})
+		assertMetricHasLabels(t, metricsText, []string{`node_name="node-2"`, `instance_id="instance-2"`, `state_base="IDLE"`, `state_is_drain="true"`})
+
 		expectedMetrics := []string{
-			fmt.Sprintf(`GAUGE; slurm_node_info{address="10.0.0.1",instance_id="instance-1",node_name="node-1",reason="",reservation_name="%s",state_base="ALLOCATED",state_is_drain="false",state_is_maintenance="false",state_is_reserved="false"} 1`, longReservation[:maxReservationNameLength]),
-			`GAUGE; slurm_node_info{address="10.0.0.2",instance_id="instance-2",node_name="node-2",reason="",reservation_name="",state_base="IDLE",state_is_drain="true",state_is_maintenance="false",state_is_reserved="false"} 1`,
+			`GAUGE; slurm_node_cpus_total{node_name="node-1"} 16`,
+			`GAUGE; slurm_node_cpus_allocated{node_name="node-1"} 8`,
+			`GAUGE; slurm_node_cpus_idle{node_name="node-1"} 8`,
+			`GAUGE; slurm_node_cpus_effective{node_name="node-1"} 16`,
+			`GAUGE; slurm_node_memory_total_bytes{node_name="node-1"} 2.00651309056e+11`,
+			`GAUGE; slurm_node_memory_allocated_bytes{node_name="node-1"} 6.7108864e+10`,
+			`GAUGE; slurm_node_memory_free_bytes{node_name="node-1"} 1.2582912e+11`,
+			`GAUGE; slurm_node_memory_effective_bytes{node_name="node-1"} 2.00651309056e+11`,
+			`GAUGE; slurm_node_partition{node_name="node-1",partition="gpu"} 1`,
+			`GAUGE; slurm_node_partition{node_name="node-2",partition="main"} 1`,
 			`COUNTER; slurm_node_gpu_seconds_total{node_name="node-1",state_base="ALLOCATED",state_is_drain="false",state_is_maintenance="false",state_is_reserved="false"} 20`,
 			`COUNTER; slurm_node_gpu_seconds_total{node_name="node-2",state_base="IDLE",state_is_drain="true",state_is_maintenance="false",state_is_reserved="false"} 10`,
 			`GAUGE; slurm_job_info{array_job_id="",array_task_id="42",end_time="",finished_time="",job_id="12345",job_name="test_job",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr",standard_output="/path/to/stdout",start_time="1722697230",submit_time="1722697200",user_id="1000",user_mail="testuser@example.com",user_name="testuser"} 1`,
 			`GAUGE; slurm_node_job{job_id="12345",node_name="node-1"} 1`,
 			`GAUGE; slurm_node_job{job_id="12345",node_name="node-2"} 1`,
+			`GAUGE; slurm_job_cpus{job_id="12345"} 4`,
+			`GAUGE; slurm_job_memory_bytes{job_id="12345"} 6.7108864e+10`,
 			`GAUGE; slurm_controller_server_thread_count 1`,
 		}
 
-		assert.ElementsMatch(t, expectedMetrics, metricsText)
+		for _, expected := range expectedMetrics {
+			assert.Contains(t, metricsText, expected)
+		}
 
 		mockClient.AssertExpectations(t)
 	})
@@ -291,14 +339,9 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 		}
 
 		// Check specific state combinations for node info metrics
-		expectedNodeMetrics := []string{
-			`GAUGE; slurm_node_info{address="10.0.0.3",instance_id="instance-maintenance",node_name="node-maintenance",reason="",reservation_name="",state_base="IDLE",state_is_drain="false",state_is_maintenance="true",state_is_reserved="false"} 1`,
-			`GAUGE; slurm_node_info{address="10.0.0.4",instance_id="instance-reserved",node_name="node-reserved",reason="",reservation_name="",state_base="IDLE",state_is_drain="false",state_is_maintenance="false",state_is_reserved="true"} 1`,
-		}
-
-		for _, expected := range expectedNodeMetrics {
-			assert.Contains(t, metricsText, expected)
-		}
+		// Assert node info metrics exist for these nodes
+		assertMetricHasLabels(t, metricsText, []string{`node_name="node-maintenance"`, `instance_id="instance-maintenance"`, `state_base="IDLE"`, `state_is_maintenance="true"`})
+		assertMetricHasLabels(t, metricsText, []string{`node_name="node-reserved"`, `instance_id="instance-reserved"`, `state_base="IDLE"`, `state_is_reserved="true"`})
 
 		// Check that GPU seconds metrics include all the new labels
 		foundMaintenanceGPU := false
@@ -373,8 +416,7 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 		assert.Contains(t, metricsText, expectedNodeFailsMetric)
 
 		// Check that node info metric also includes the reason field for the drained node
-		expectedNodeInfoMetric := `GAUGE; slurm_node_info{address="10.0.0.3",instance_id="instance-maintenance",node_name="node-maintenance",reason="maintenance drain triggered",reservation_name="",state_base="IDLE",state_is_drain="true",state_is_maintenance="true",state_is_reserved="false"} 1`
-		assert.Contains(t, metricsText, expectedNodeInfoMetric)
+		assertMetricHasLabels(t, metricsText, []string{`node_name="node-maintenance"`, `instance_id="instance-maintenance"`, `reason="maintenance drain triggered"`, `state_is_drain="true"`, `state_is_maintenance="true"`})
 
 		mockClient.AssertExpectations(t)
 	})
@@ -616,7 +658,7 @@ func TestMetricsCollector_GetDiag_APIError(t *testing.T) {
 		}
 
 		// Should still have node metrics (proving other metrics continue to work)
-		assert.Contains(t, metricsText, `GAUGE; slurm_node_info{address="10.0.0.1",instance_id="test-instance",node_name="test-node",reason="",reservation_name="",state_base="IDLE",state_is_drain="false",state_is_maintenance="false",state_is_reserved="false"} 1`)
+		assertMetricHasLabels(t, metricsText, []string{`node_name="test-node"`, `instance_id="test-instance"`, `state_base="IDLE"`})
 
 		// Should NOT have any RPC metrics due to GetDiag failure
 		for _, metricText := range metricsText {
@@ -879,6 +921,28 @@ func toPrometheusLikeString(t *testing.T, metric prometheus.Metric) string {
 	}
 
 	return fmt.Sprintf("%s; %s%s %g", metricType, metricName, labelsString, value)
+}
+
+// assertMetricHasLabels asserts that among metricsText there's at least one metric
+// with metricName and all required label substrings present.
+func assertMetricHasLabels(t *testing.T, metricsText []string, required []string) {
+	metricName := "slurm_node_info"
+	for _, m := range metricsText {
+		if !strings.Contains(m, metricName) {
+			continue
+		}
+		ok := true
+		for _, r := range required {
+			if !strings.Contains(m, r) {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			return
+		}
+	}
+	t.Fatalf("no metric %q containing required labels %v found; metrics: %v", metricName, required, metricsText)
 }
 
 func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {

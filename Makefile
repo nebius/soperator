@@ -66,7 +66,9 @@ else
 endif
 
 ifeq ($(UNSTABLE), true)
-    SHORT_SHA			= $(shell git rev-parse --short=8 HEAD)
+    # "r" prefix ensures SHORT_SHA is alphanumeric, not purely numeric.
+    # SemVer forbids leading zeros in numeric pre-release identifiers (e.g., "1.0.0-01234" is invalid).
+    SHORT_SHA			= r$(shell git rev-parse --short=8 HEAD)
     VERSION				= $(VERSION_BASE)-$(SHORT_SHA)
     OPERATOR_IMAGE_TAG	= $(VERSION_BASE)-$(SHORT_SHA)
     IMAGE_VERSION		= $(VERSION_BASE)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
@@ -394,7 +396,7 @@ sync-version: yq ## Sync versions from file
 	@# endregion internal/consts
 
 .PHONY: sync-version-from-scratch
-sync-version-from-scratch: generate manifests helm mock sync-version generate-values-types ## Regenerates all resources and syncs versions to them
+sync-version-from-scratch: generate manifests helm mock sync-version ## Regenerates all resources and syncs versions to them
 
 ##@ Build
 
@@ -405,7 +407,7 @@ build: manifests generate fmt vet ## Build manager binary with native toolchain.
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host with native toolchain.
 	IS_PROMETHEUS_CRD_INSTALLED=true IS_MARIADB_CRD_INSTALLED=true ENABLE_WEBHOOKS=false IS_APPARMOR_CRD_INSTALLED=true go run cmd/main.go \
-	 -log-level=debug -leader-elect=true -operator-namespace=soperator-system --enable-topology-controller=true
+	 -log-level=debug -leader-elect=true -operator-namespace=soperator-system
 
 .PHONY: docker-build-go-base
 docker-build-go-base: ## Build go-base multiarch manifest locally
@@ -442,9 +444,14 @@ endif
 		$(DOCKER_BUILD_ARGS) \
 		.
 ifeq ($(UNSTABLE), false)
+# Push to the Nebius stable registry
 	skopeo copy --all \
 		docker://"$(IMAGE_REPO)-unstable/${IMAGE_NAME}:${IMAGE_VERSION}" \
 		docker://"$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+# Push to the Github registry
+	skopeo copy --all \
+		docker://"$(IMAGE_REPO)-unstable/${IMAGE_NAME}:${IMAGE_VERSION}" \
+		docker://"$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 endif
 
 .PHONY: docker-build-jail
@@ -476,18 +483,6 @@ endif
 		--progress=plain \
 		$(DOCKER_BUILD_ARGS) \
 		.
-
-.PHONY: docker-manifest
-docker-manifest: ## Create and push docker manifest for multiple image architecture
-ifndef IMAGE_NAME
-	$(error IMAGE_NAME is not set, docker manifest can not be pushed)
-endif
-	docker manifest create --amend "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
-	docker manifest push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
-ifeq ($(UNSTABLE), false)
-	docker manifest create --amend "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
-	docker manifest push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
-endif
 
 .PHONY: release-helm
 release-helm: ## Build & push helm docker image
@@ -808,21 +803,3 @@ kind-status: ## Check kind cluster status
 jail-shell: ## Open interactive shell in jail environment via login pod
 	@echo "Opening jail shell in login-0 pod..."
 	@$(KUBECTL_CTX) exec -it -n soperator login-0 -- chroot /mnt/jail bash -l
-
-
-##@ Values generation
-
-.PHONY: generate-values-types
-generate-values-types: ## Generate Go types from Helm values.yaml for slurm-cluster and soperator-fluxcd
-	@echo "Generating Go types from helm/slurm-cluster/values.yaml"
-	@mkdir -p pkg/valuesgen/generated/slurmcluster
-	@go run ./cmd/generate-values -in helm/slurm-cluster/values.yaml -out pkg/valuesgen/generated/slurmcluster/values.go -pkg slurmcluster -type Values
-	@echo "Generating Go types from helm/soperator-fluxcd/values.yaml"
-	@mkdir -p pkg/valuesgen/generated/soperatorfluxcd
-	@go run ./cmd/generate-values -in helm/soperator-fluxcd/values.yaml -out pkg/valuesgen/generated/soperatorfluxcd/values.go -pkg soperatorfluxcd -type Values
-	@echo "Generating Go types from helm/soperator/values.yaml"
-	@mkdir -p pkg/valuesgen/generated/soperator
-	@go run ./cmd/generate-values -in helm/soperator/values.yaml -out pkg/valuesgen/generated/soperator/values.go -pkg soperator -type Values
-	@echo "Generating Go types from helm/nodesets/values.yaml"
-	@mkdir -p pkg/valuesgen/generated/nodesets
-	@go run ./cmd/generate-values -in helm/nodesets/values.yaml -out pkg/valuesgen/generated/nodesets/values.go -pkg nodesets -type Values

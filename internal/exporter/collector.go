@@ -10,6 +10,7 @@ import (
 	"time"
 
 	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -22,9 +23,20 @@ type MetricsCollector struct {
 	slurmAPIClient slurmapi.Client
 
 	nodeInfo                   *prometheus.Desc
+	nodeCPUTotal               *prometheus.Desc
+	nodeCPUAllocated           *prometheus.Desc
+	nodeCPUIdle                *prometheus.Desc
+	nodeCPUEffective           *prometheus.Desc
+	nodeMemoryTotalBytes       *prometheus.Desc
+	nodeMemoryAllocatedBytes   *prometheus.Desc
+	nodeMemoryFreeBytes        *prometheus.Desc
+	nodeMemoryEffectiveBytes   *prometheus.Desc
+	nodePartition              *prometheus.Desc
 	jobInfo                    *prometheus.Desc
 	jobNode                    *prometheus.Desc
 	jobDuration                *prometheus.Desc
+	jobCPUs                    *prometheus.Desc
+	jobMemoryBytes             *prometheus.Desc
 	nodeGPUSeconds             *prometheus.CounterVec
 	nodeFails                  *prometheus.CounterVec
 	nodeUnavailabilityDuration *prometheus.HistogramVec
@@ -69,10 +81,28 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 		slurmAPIClient: slurmAPIClient,
 		Monitoring:     NewMonitoringMetrics(),
 
-		nodeInfo:    prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "reservation_name", "address", "reason"}, nil),
-		jobInfo:     prometheus.NewDesc("slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name", "user_name", "user_mail", "user_id", "standard_error", "standard_output", "array_job_id", "array_task_id", "submit_time", "start_time", "end_time", "finished_time"}, nil),
-		jobNode:     prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
-		jobDuration: prometheus.NewDesc("slurm_job_duration_seconds", "Slurm job duration in seconds", []string{"job_id"}, nil),
+		nodeInfo: prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{
+			"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "state_is_completing",
+			"state_is_fail", "state_is_planned", "state_is_not_responding", "state_is_invalid", "is_unavailable", "reservation_name", "address", "reason",
+		}, nil),
+		nodeCPUTotal:             prometheus.NewDesc("slurm_node_cpus_total", "Total CPUs on the node", []string{"node_name"}, nil),
+		nodeCPUAllocated:         prometheus.NewDesc("slurm_node_cpus_allocated", "CPUs allocated on the node", []string{"node_name"}, nil),
+		nodeCPUIdle:              prometheus.NewDesc("slurm_node_cpus_idle", "Idle CPUs on the node", []string{"node_name"}, nil),
+		nodeCPUEffective:         prometheus.NewDesc("slurm_node_cpus_effective", "Effective CPUs on the node", []string{"node_name"}, nil),
+		nodeMemoryTotalBytes:     prometheus.NewDesc("slurm_node_memory_total_bytes", "Total memory on the node in bytes", []string{"node_name"}, nil),
+		nodeMemoryAllocatedBytes: prometheus.NewDesc("slurm_node_memory_allocated_bytes", "Allocated memory on the node in bytes", []string{"node_name"}, nil),
+		nodeMemoryFreeBytes:      prometheus.NewDesc("slurm_node_memory_free_bytes", "Free memory on the node in bytes", []string{"node_name"}, nil),
+		nodeMemoryEffectiveBytes: prometheus.NewDesc("slurm_node_memory_effective_bytes", "Effective memory on the node in bytes", []string{"node_name"}, nil),
+		nodePartition:            prometheus.NewDesc("slurm_node_partition", "Slurm node partition mapping", []string{"node_name", "partition"}, nil),
+		jobInfo: prometheus.NewDesc(
+			"slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name",
+				"user_name", "user_mail", "user_id", "standard_error", "standard_output", "array_job_id", "array_task_id", "submit_time", "start_time",
+				"end_time", "finished_time",
+			}, nil),
+		jobNode:        prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
+		jobDuration:    prometheus.NewDesc("slurm_job_duration_seconds", "Slurm job duration in seconds", []string{"job_id"}, nil),
+		jobCPUs:        prometheus.NewDesc("slurm_job_cpus", "CPUs allocated to a Slurm job", []string{"job_id"}, nil),
+		jobMemoryBytes: prometheus.NewDesc("slurm_job_memory_bytes", "Memory allocated to a Slurm job in bytes", []string{"job_id"}, nil),
 		nodeGPUSeconds: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "slurm_node_gpu_seconds_total",
 			Help: "Total GPU seconds on Slurm nodes",
@@ -105,12 +135,27 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 }
 
 // isNodeUnavailable checks if a node is in unavailable state
-// Unavailable state: DOWN+* or IDLE+DRAIN+*
+// Unavailable state: DOWN+* or IDLE+DRAIN+* or NOTRESPONDING or UNKNOWN or ERROR or FAIL or INVALID
 func isNodeUnavailable(node slurmapi.Node) bool {
 	if node.IsDownState() {
 		return true
 	}
+	if node.IsNotRespondingState() {
+		return true
+	}
 	if node.BaseState() == api.V0041NodeStateIDLE && node.IsDrainState() {
+		return true
+	}
+	if node.BaseState() == api.V0041NodeStateUNKNOWN {
+		return true
+	}
+	if node.BaseState() == api.V0041NodeStateERROR {
+		return true
+	}
+	if node.IsFailState() {
+		return true
+	}
+	if node.IsInvalidState() {
 		return true
 	}
 	return false
@@ -212,9 +257,20 @@ func (c *MetricsCollector) updateNodeFailureMetrics(currentNodes []slurmapi.Node
 // Describe implements the prometheus.Collector interface
 func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.nodeInfo
+	ch <- c.nodeCPUTotal
+	ch <- c.nodeCPUAllocated
+	ch <- c.nodeCPUIdle
+	ch <- c.nodeCPUEffective
+	ch <- c.nodeMemoryTotalBytes
+	ch <- c.nodeMemoryAllocatedBytes
+	ch <- c.nodeMemoryFreeBytes
+	ch <- c.nodeMemoryEffectiveBytes
+	ch <- c.nodePartition
 	ch <- c.jobInfo
 	ch <- c.jobNode
 	ch <- c.jobDuration
+	ch <- c.jobCPUs
+	ch <- c.jobMemoryBytes
 	c.nodeGPUSeconds.Describe(ch)
 	c.nodeFails.Describe(ch)
 	c.nodeUnavailabilityDuration.Describe(ch)
@@ -336,9 +392,15 @@ func (c *MetricsCollector) slurmNodeMetrics(slurmNodes []slurmapi.Node) iter.Seq
 				node.Name,
 				node.InstanceID,
 				string(node.BaseState()),
-				strconv.FormatBool(node.IsDrainState()),
-				strconv.FormatBool(node.IsMaintenanceState()),
-				strconv.FormatBool(node.IsReservedState()),
+				strconv.FormatBool(node.IsDrainState()),       // Keep "true"/"false" for backward compatibility
+				strconv.FormatBool(node.IsMaintenanceState()), // Keep "true"/"false" for backward compatibility
+				strconv.FormatBool(node.IsReservedState()),    // Keep "true"/"false" for backward compatibility
+				boolToLabelValue(node.IsCompletingState()),    // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsFailState()),          // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsPlannedState()),       // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsNotRespondingState()), // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsInvalidState()),       // New flag: use empty string instead of "false"
+				boolToLabelValue(isNodeUnavailable(node)),     // New flag: use empty string instead of "false"
 				trimReservationName(node.Reservation),
 				node.Address,
 				reason,
@@ -346,8 +408,71 @@ func (c *MetricsCollector) slurmNodeMetrics(slurmNodes []slurmapi.Node) iter.Seq
 			if !yield(prometheus.MustNewConstMetric(c.nodeInfo, prometheus.GaugeValue, 1, labels...)) {
 				return
 			}
+
+			if cpuTotal, ok := node.CPUTotal(); ok {
+				if !yield(prometheus.MustNewConstMetric(c.nodeCPUTotal, prometheus.GaugeValue, cpuTotal, node.Name)) {
+					return
+				}
+			}
+			if cpuAlloc, ok := node.CPUAllocated(); ok {
+				if !yield(prometheus.MustNewConstMetric(c.nodeCPUAllocated, prometheus.GaugeValue, cpuAlloc, node.Name)) {
+					return
+				}
+			}
+			if cpuIdle, ok := node.CPUIdle(); ok {
+				if !yield(prometheus.MustNewConstMetric(c.nodeCPUIdle, prometheus.GaugeValue, cpuIdle, node.Name)) {
+					return
+				}
+			}
+			if cpuEffective, ok := node.CPUEffective(); ok {
+				if !yield(prometheus.MustNewConstMetric(c.nodeCPUEffective, prometheus.GaugeValue, cpuEffective, node.Name)) {
+					return
+				}
+			}
+
+			if memTotal, ok := node.MemoryTotalBytes(); ok {
+				if !yield(prometheus.MustNewConstMetric(c.nodeMemoryTotalBytes, prometheus.GaugeValue, memTotal, node.Name)) {
+					return
+				}
+			}
+			if memAlloc, ok := node.MemoryAllocatedBytes(); ok {
+				if !yield(prometheus.MustNewConstMetric(c.nodeMemoryAllocatedBytes, prometheus.GaugeValue, memAlloc, node.Name)) {
+					return
+				}
+			}
+			if memFree, ok := node.MemoryFreeBytes(); ok {
+				if !yield(prometheus.MustNewConstMetric(c.nodeMemoryFreeBytes, prometheus.GaugeValue, memFree, node.Name)) {
+					return
+				}
+			}
+			if memEff, ok := node.MemoryEffectiveBytes(); ok {
+				if !yield(prometheus.MustNewConstMetric(c.nodeMemoryEffectiveBytes, prometheus.GaugeValue, memEff, node.Name)) {
+					return
+				}
+			}
+
+			for _, partition := range node.Partitions {
+				if !yield(prometheus.MustNewConstMetric(c.nodePartition, prometheus.GaugeValue, 1, node.Name, partition)) {
+					return
+				}
+			}
 		}
 	}
+}
+
+func mbToBytes(mb int64) float64 {
+	return float64(mb) * 1024 * 1024
+}
+
+// boolToLabelValue converts a boolean to a label value.
+// Returns "true" if true, empty string if false.
+// This is used for new state flags to avoid hitting Victoria Metrics' 30 label limit
+// (empty label value === no label).
+func boolToLabelValue(b bool) string {
+	if b {
+		return "true"
+	}
+	return ""
 }
 
 func (c *MetricsCollector) slurmJobMetrics(ctx context.Context, slurmJobs []slurmapi.Job) iter.Seq[prometheus.Metric] {
@@ -386,6 +511,18 @@ func (c *MetricsCollector) slurmJobMetrics(ctx context.Context, slurmJobs []slur
 				return
 			}
 
+			cpuValue, cpuOK, memValue, memOK := jobAllocatedResources(logger, job)
+			if cpuOK {
+				if !yield(prometheus.MustNewConstMetric(c.jobCPUs, prometheus.GaugeValue, cpuValue, job.GetIDString())) {
+					return
+				}
+			}
+			if memOK {
+				if !yield(prometheus.MustNewConstMetric(c.jobMemoryBytes, prometheus.GaugeValue, memValue, job.GetIDString())) {
+					return
+				}
+			}
+
 			// Calculate job duration
 			if job.StartTime != nil && job.StartTime.Unix() != 0 {
 				var endTime time.Time
@@ -418,6 +555,40 @@ func (c *MetricsCollector) slurmJobMetrics(ctx context.Context, slurmJobs []slur
 			}
 		}
 	}
+}
+
+func jobAllocatedResources(logger logr.Logger, job slurmapi.Job) (cpu float64, cpuOK bool, mem float64, memOK bool) {
+	if job.TresAllocated != "" {
+		tres, err := slurmapi.ParseTrackableResources(job.TresAllocated)
+		if err != nil {
+			logger.Error(err, "Failed to parse job allocated resources", "job_id", job.GetIDString(), "tres", job.TresAllocated)
+		} else {
+			if tres.CPUCount > 0 {
+				cpu = float64(tres.CPUCount)
+				cpuOK = true
+			}
+			if tres.MemoryBytes > 0 {
+				mem = float64(tres.MemoryBytes)
+				memOK = true
+			}
+		}
+	}
+
+	if !cpuOK && job.CPUs != nil {
+		cpu = float64(*job.CPUs)
+		cpuOK = true
+	}
+
+	if !memOK && job.MemoryPerNode != nil {
+		nodeCount := int32(1)
+		if job.NodeCount != nil {
+			nodeCount = *job.NodeCount
+		}
+		mem = mbToBytes(*job.MemoryPerNode * int64(nodeCount))
+		memOK = true
+	}
+
+	return cpu, cpuOK, mem, memOK
 }
 
 func (c *MetricsCollector) slurmRPCMetrics(diag *api.V0041OpenapiDiagResp) iter.Seq[prometheus.Metric] {
