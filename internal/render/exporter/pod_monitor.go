@@ -16,6 +16,8 @@ func RenderPodMonitor(
 	pmConfig := exporterValues.PodMonitorConfig
 	metricRelabelConfigs := getDefaultMetricRelabelConfigs()
 	metricRelabelConfigs = append(metricRelabelConfigs, pmConfig.MetricRelabelConfigs...)
+	scheme := prometheusv1.SchemeHTTP
+	schemeLower := prometheusv1.Scheme((&scheme).String())
 
 	return prometheusv1.PodMonitor{
 		ObjectMeta: metav1.ObjectMeta{
@@ -38,7 +40,7 @@ func RenderPodMonitor(
 					ScrapeTimeout:        pmConfig.ScrapeTimeout,
 					Path:                 consts.ContainerPathExporter,
 					Port:                 ptr.To(consts.ContainerPortNameExporter),
-					Scheme:               ptr.To(prometheusv1.Scheme("http")),
+					Scheme:               ptr.To(schemeLower),
 					MetricRelabelConfigs: metricRelabelConfigs,
 					RelabelConfigs:       pmConfig.RelabelConfig,
 				},
@@ -47,7 +49,7 @@ func RenderPodMonitor(
 					ScrapeTimeout:        pmConfig.ScrapeTimeout,
 					Path:                 consts.ContainerPathMonitoring,
 					Port:                 ptr.To(consts.ContainerPortNameMonitoring),
-					Scheme:               ptr.To(prometheusv1.Scheme("http")),
+					Scheme:               ptr.To(schemeLower),
 					MetricRelabelConfigs: metricRelabelConfigs,
 					RelabelConfigs:       pmConfig.RelabelConfig,
 				},

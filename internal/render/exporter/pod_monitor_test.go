@@ -19,6 +19,9 @@ func Test_RenderPodMonitor(t *testing.T) {
 	interval := "1m"
 	scrapeTimeout := "30m"
 
+	scheme := prometheusv1.SchemeHTTP
+	schemeLower := prometheusv1.Scheme((&scheme).String())
+
 	slurmExporter := values.SlurmExporter{
 		Enabled: true,
 		PodMonitorConfig: slurmv1.PodMonitorConfig{
@@ -48,14 +51,14 @@ func Test_RenderPodMonitor(t *testing.T) {
 					ScrapeTimeout: prometheusv1.Duration(scrapeTimeout),
 					Path:          consts.ContainerPathExporter,
 					Port:          ptr.To(consts.ContainerPortNameExporter),
-					Scheme:        ptr.To(prometheusv1.Scheme("http")),
+					Scheme:        ptr.To(schemeLower),
 				},
 				{
 					Interval:      prometheusv1.Duration(interval),
 					ScrapeTimeout: prometheusv1.Duration(scrapeTimeout),
 					Path:          consts.ContainerPathMonitoring,
 					Port:          ptr.To(consts.ContainerPortNameMonitoring),
-					Scheme:        ptr.To(prometheusv1.Scheme("http")),
+					Scheme:        ptr.To(schemeLower),
 				},
 			},
 		},
