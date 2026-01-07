@@ -22,7 +22,7 @@ spec:
 {{- if eq (include "slurm-cluster-storage.volume.jail.type" .) "filestore" }}
           image: cr.eu-north1.nebius.cloud/soperator/busybox
 {{- else }}
-          image: cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20251224121141
+          image: cr.eu-north1.nebius.cloud/e00ydq6th0tz1ycxs9/neubuntu:noble-20260109114729
 {{- end }}
           command:
             - /bin/sh
