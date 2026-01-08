@@ -10,6 +10,7 @@ jobs:
     uses: ./.github/workflows/one_job.yml
     with:
       unstable: 'false'
+      multi_arch: 'true'
     secrets: inherit
 
   tag:
