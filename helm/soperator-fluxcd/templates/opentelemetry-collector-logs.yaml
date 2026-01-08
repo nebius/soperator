@@ -1,4 +1,5 @@
 {{- if and .Values.observability.enabled .Values.observability.opentelemetry.enabled }}
+{{- include "soperator-fluxcd.validatePublicEndpointTokenKind" . -}}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -78,7 +79,11 @@ spec:
           endpoint: 0.0.0.0:13133
         {{- if $hasPublicEndpoint }}
         bearertokenauth:
+        {{- if eq .Values.observability.publicEndpointTokenKind "secret" }}
           filename: "/o11ytoken/accessToken"
+        {{- else if eq .Values.observability.publicEndpointTokenKind "hostPath" }}
+          filename: "/o11ytoken/tsa-token"
+        {{- end }}
         {{- end }}
       processors:
         batch:
@@ -361,8 +366,14 @@ spec:
     extraVolumes:
     {{- if $hasPublicEndpoint }}
     - name: o11ytoken
+      {{- if eq .Values.observability.publicEndpointTokenKind "secret" }}
       secret:
         secretName: o11y-writer-sa-token
+      {{- else if eq .Values.observability.publicEndpointTokenKind "hostPath" }}
+      hostPath:
+        path: /mnt/cloud-metadata
+        type: Directory
+      {{- end }}
     {{- end }}
     - hostPath:
         path: /var/log/pods

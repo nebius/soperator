@@ -102,6 +102,7 @@ observability:
   enabled: true
   clusterName: soperator
   publicEndpointEnabled: true
+  publicEndpointTokenKind: secret
   logsProjectId: default-project-id
   metricsProjectId: default-project-id
   region: eu-north1
