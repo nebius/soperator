@@ -1,0 +1,39 @@
+apiVersion: k8up.io/v1
+kind: Schedule
+metadata:
+  name: {{ .Values.scheduleName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "soperator-backups.labels" . | nindent 4 }}
+spec:
+  backend:
+    s3:
+      bucket: {{ .Values.bucket.name | quote }}
+      endpoint: {{ .Values.bucket.endpoint | quote }}
+      accessKeyIDSecretRef:
+        name: {{ .Values.secret.name | quote }}
+        key: {{ .Values.secret.keys.accessKeyID | quote }}
+      secretAccessKeySecretRef:
+        name: {{ .Values.secret.name | quote }}
+        key: {{ .Values.secret.keys.secretAccessKey | quote }}
+    repoPasswordSecretRef:
+      name: {{ .Values.secret.name | quote }}
+      key: {{ .Values.secret.keys.backupPassword | quote }}
+
+  backup:
+    schedule: {{ .Values.backup.schedule | quote }}
+    failedJobsHistoryLimit: {{ .Values.backup.failedJobsHistoryLimit }}
+    successfulJobsHistoryLimit: {{ .Values.backup.successfulJobsHistoryLimit }}
+    concurrentRunsAllowed: {{ .Values.backup.concurrentRunsAllowed }}
+    tags:
+  {{ toYaml .Values.tags | indent 4 }}
+
+  prune:
+    schedule: {{ .Values.prune.schedule | quote }}
+    retention:
+    {{ toYaml .Values.prune.retention | indent 2 }}
+      tags:
+    {{ toYaml .Values.tags | indent 4 }}
+
+  podSecurityContext:
+  {{ toYaml .Values.podSecurityContext | indent 2 }}

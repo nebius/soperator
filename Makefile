@@ -16,42 +16,45 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 # Limit the scope of generation otherwise it will try to generate configs for non-controller code
-GENPATH = "./api/v1;./api/v1alpha1;"
+GENPATH = "./api/v1;./api/v1alpha1;./internal/webhook/..."
 
-CHART_PATH            		  = helm
-CHART_OPERATOR_PATH   		  = $(CHART_PATH)/soperator
-CHART_SOPERATORCHECKS_PATH    = $(CHART_PATH)/soperatorchecks
-CHART_NODECONFIGURATOR_PATH   = $(CHART_PATH)/nodeconfigurator
-CHART_OPERATOR_CRDS_PATH   	  = $(CHART_PATH)/soperator-crds
-CHART_CLUSTER_PATH    		  = $(CHART_PATH)/slurm-cluster
-CHART_STORAGE_PATH    		  = $(CHART_PATH)/slurm-cluster-storage
-CHART_FLUXCD_PATH    		  = $(CHART_PATH)/soperator-fluxcd
-CHART_ACTIVECHECK_PATH        = $(CHART_PATH)/soperator-activechecks
-CHART_DCGM_EXPORTER_PATH      = $(CHART_PATH)/soperator-dcgm-exporter
-CHART_SOPERATOR_NOTIFIER_PATH = $(CHART_PATH)/soperator-notifier
-CHART_NFS_SERVER_PATH         = $(CHART_PATH)/nfs-server
-CHART_NODESETS_PATH           = $(CHART_PATH)/nodesets
-CHART_STORAGECLASSES		  = $(CHART_PATH)/storageclasses
+CHART_PATH									= helm
+CHART_OPERATOR_PATH							= $(CHART_PATH)/soperator
+CHART_SOPERATORCHECKS_PATH					= $(CHART_PATH)/soperatorchecks
+CHART_NODECONFIGURATOR_PATH					= $(CHART_PATH)/nodeconfigurator
+CHART_OPERATOR_CRDS_PATH					= $(CHART_PATH)/soperator-crds
+CHART_CLUSTER_PATH							= $(CHART_PATH)/slurm-cluster
+CHART_STORAGE_PATH							= $(CHART_PATH)/slurm-cluster-storage
+CHART_FLUXCD_PATH							= $(CHART_PATH)/soperator-fluxcd
+CHART_ACTIVECHECK_PATH						= $(CHART_PATH)/soperator-activechecks
+CHART_DCGM_EXPORTER_PATH					= $(CHART_PATH)/soperator-dcgm-exporter
+CHART_SOPERATOR_NOTIFIER_PATH				= $(CHART_PATH)/soperator-notifier
+CHART_NFS_SERVER_PATH						= $(CHART_PATH)/nfs-server
+CHART_NODESETS_PATH							= $(CHART_PATH)/nodesets
+CHART_SOPERATOR_MONITORING_DASHBOARDS_PATH	= $(CHART_PATH)/soperator-monitoring-dashboards
+CHART_CUSTOM_CONFIGMAPS_PATH				= $(CHART_PATH)/soperator-custom-configmaps
+CHART_FLUXCD_BOOTSTRAP_PATH					= $(CHART_PATH)/soperator-fluxcd-bootstrap
+CHART_STORAGECLASSES						= $(CHART_PATH)/storageclasses
+CHART_BACKUP_CONFIG							= $(CHART_PATH)/soperator-backup-config
 
+SLURM_VERSION		= 25.05.5
+UBUNTU_VERSION		?= noble
+NFS_VERSION_BASE	= $(shell cat VERSION_NFS)
+VERSION_BASE		= $(shell cat VERSION)
 
-SLURM_VERSION		  		= 25.05.4
-UBUNTU_VERSION		  		?= noble
-NFS_VERSION_BASE          	= $(shell cat NFS_VERSION)
-VERSION_BASE           		= $(shell cat VERSION)
+NFS_VERSION	= $(NFS_VERSION_BASE)
+VERSION		= $(VERSION_BASE)
 
-NFS_VERSION               	= $(NFS_VERSION_BASE)
-VERSION               		= $(VERSION_BASE)
-
-IMAGE_VERSION		  = $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)
-GO_CONST_VERSION_FILE = internal/consts/version.go
-GITHUB_REPO			  = ghcr.io/nebius/soperator
-NEBIUS_REPO			  = cr.eu-north1.nebius.cloud/soperator
-IMAGE_REPO			  = $(NEBIUS_REPO)
+IMAGE_VERSION			= $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)
+GO_CONST_VERSION_FILE	= internal/consts/version.go
+GITHUB_REPO				= ghcr.io/nebius/soperator
+NEBIUS_REPO				= cr.eu-north1.nebius.cloud/soperator
+IMAGE_REPO				= $(NEBIUS_REPO)
 
 # For version sync test
-VALUES_VERSION 		  = $(shell $(YQ) '.images.slurmctld' helm/slurm-cluster/values.yaml | awk -F':' '{print $$2}' | awk -F'-' '{print $$1}')
-NFS_CHART_VERSION     = $(shell $(YQ) '.version' helm/nfs-server/Chart.yaml)
-NFS_IMAGE_TAG         = $(shell $(YQ) '.image.tag' helm/nfs-server/values.yaml)
+VALUES_VERSION		= $(shell $(YQ) '.images.slurmctld' helm/slurm-cluster/values.yaml | awk -F':' '{print $$2}' | awk -F'-' '{print $$1}')
+NFS_CHART_VERSION	= $(shell $(YQ) '.version' helm/nfs-server/Chart.yaml)
+NFS_IMAGE_TAG		= $(shell $(YQ) '.image.tag' helm/nfs-server/values.yaml)
 
 
 OPERATOR_IMAGE_TAG  = $(VERSION)
@@ -63,12 +66,14 @@ else
 endif
 
 ifeq ($(UNSTABLE), true)
-    SHORT_SHA 					= $(shell git rev-parse --short=8 HEAD)
-    VERSION		  				= $(VERSION_BASE)-$(SHORT_SHA)
-    OPERATOR_IMAGE_TAG  		= $(VERSION_BASE)-$(SHORT_SHA)
-    IMAGE_VERSION		  		= $(VERSION_BASE)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
-    NFS_VERSION	  				= $(NFS_VERSION_BASE)-$(SHORT_SHA)
-    IMAGE_REPO			  		= $(NEBIUS_REPO)-unstable
+    # "r" prefix ensures SHORT_SHA is alphanumeric, not purely numeric.
+    # SemVer forbids leading zeros in numeric pre-release identifiers (e.g., "1.0.0-01234" is invalid).
+    SHORT_SHA			= r$(shell git rev-parse --short=8 HEAD)
+    VERSION				= $(VERSION_BASE)-$(SHORT_SHA)
+    OPERATOR_IMAGE_TAG	= $(VERSION_BASE)-$(SHORT_SHA)
+    IMAGE_VERSION		= $(VERSION_BASE)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
+    NFS_VERSION			= $(NFS_VERSION_BASE)-$(SHORT_SHA)
+    IMAGE_REPO			= $(NEBIUS_REPO)-unstable
 endif
 
 .PHONY: all
@@ -138,12 +143,42 @@ helm: generate manifests kustomize helmify ## Update soperator Helm chart
 	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/rbac/clustercontroller  | $(HELMIFY) $(CHART_OPERATOR_PATH)
 	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/rbac/nodeconfigurator  | $(HELMIFY) $(CHART_NODECONFIGURATOR_PATH)
 	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/rbac/soperatorchecks  | $(HELMIFY) $(CHART_SOPERATORCHECKS_PATH)
+	$(KUSTOMIZE)  build --load-restrictor LoadRestrictionsNone config/webhook | $(HELMIFY) $(CHART_OPERATOR_PATH)
 	mv $(CHART_OPERATOR_PATH)/values.yaml.bak $(CHART_OPERATOR_PATH)/values.yaml
 	mv $(CHART_NODECONFIGURATOR_PATH)/values.yaml.bak $(CHART_NODECONFIGURATOR_PATH)/values.yaml
 	mv $(CHART_SOPERATORCHECKS_PATH)/values.yaml.bak $(CHART_SOPERATORCHECKS_PATH)/values.yaml
 # Because of helmify rewrite a file we need to add the missing if statement
 	@$(SED_COMMAND) '1s|^|{{- if and .Values.rebooter.generateRBAC .Values.rebooter.enabled }}\n|' $(CHART_NODECONFIGURATOR_PATH)/templates/nodeconfigurator-rbac.yaml
 	@echo -e "\n{{- end }}" >> $(CHART_NODECONFIGURATOR_PATH)/templates/nodeconfigurator-rbac.yaml
+# Add cert-manager annotations to webhook configurations and fix their order
+	@if [ -f "$(CHART_OPERATOR_PATH)/templates/mutating-webhook-configuration.yaml" ]; then \
+		awk 'BEGIN {in_metadata=0; done=0} \
+		/^metadata:$$/ {print; in_metadata=1; next} \
+		in_metadata && /^  name:/ {print; if (!done) {print "  {{- if .Values.certManager.enabled }}"; print "  annotations:"; print "    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include \"soperator.fullname\" . }}-serving-cert"; print "  {{- end }}"; done=1}; next} \
+		in_metadata && /^  annotations:/ {next} \
+		in_metadata && /^    cert-manager/ {next} \
+		in_metadata && /^  labels:/ {in_metadata=0} \
+		{print}' \
+		$(CHART_OPERATOR_PATH)/templates/mutating-webhook-configuration.yaml > $(CHART_OPERATOR_PATH)/templates/mutating-webhook-configuration.yaml.tmp && \
+		mv $(CHART_OPERATOR_PATH)/templates/mutating-webhook-configuration.yaml.tmp $(CHART_OPERATOR_PATH)/templates/mutating-webhook-configuration.yaml; \
+	fi
+	@if [ -f "$(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml" ]; then \
+		awk 'BEGIN {in_metadata=0; done=0} \
+		/^metadata:$$/ {print; in_metadata=1; next} \
+		in_metadata && /^  name:/ {print; if (!done) {print "  {{- if .Values.certManager.enabled }}"; print "  annotations:"; print "    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include \"soperator.fullname\" . }}-serving-cert"; print "  {{- end }}"; done=1}; next} \
+		in_metadata && /^  annotations:/ {next} \
+		in_metadata && /^    cert-manager/ {next} \
+		in_metadata && /^  labels:/ {in_metadata=0} \
+		{print}' \
+		$(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml > $(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml.tmp && \
+		mv $(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml.tmp $(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml; \
+	fi
+# Add objectSelector to Secret webhook
+	@if [ -f "$(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml" ]; then \
+		awk '/name: vsecret-v1.kb.io/ {found=1} found && /^  rules:/ {print "  objectSelector:"; print "    matchLabels:"; print "      slurm.nebius.ai/webhook: \"true\""; found=0} {print}' \
+		$(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml > $(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml.tmp && \
+		mv $(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml.tmp $(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml; \
+	fi
 
 .PHONY: get-version
 get-version:
@@ -222,7 +257,11 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_DCGM_EXPORTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_NOTIFIER_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODESETS_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_MONITORING_DASHBOARDS_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CUSTOM_CONFIGMAPS_PATH)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_FLUXCD_BOOTSTRAP_PATH)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_STORAGECLASSES)/Chart.yaml"
+	@$(YQ) -i ".version = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_BACKUP_CONFIG)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_OPERATOR_CRDS_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CLUSTER_PATH)/Chart.yaml"
@@ -234,7 +273,11 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_DCGM_EXPORTER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_NOTIFIER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_NODESETS_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_SOPERATOR_MONITORING_DASHBOARDS_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_CUSTOM_CONFIGMAPS_PATH)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_FLUXCD_BOOTSTRAP_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_STORAGECLASSES)/Chart.yaml"
+	@$(YQ) -i ".appVersion = \"$(OPERATOR_IMAGE_TAG)\"" "$(CHART_BACKUP_CONFIG)/Chart.yaml"
 	@$(YQ) -i ".version = \"$(NFS_VERSION)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
 	@$(YQ) -i ".appVersion = \"$(NFS_VERSION)\"" "$(CHART_NFS_SERVER_PATH)/Chart.yaml"
 	@# endregion helm chart versions
@@ -250,7 +293,7 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.populateJail = \"$(IMAGE_REPO)/populate_jail:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.soperatorExporter = \"$(IMAGE_REPO)/soperator-exporter:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.sConfigController = \"$(IMAGE_REPO)/sconfigcontroller:$(OPERATOR_IMAGE_TAG)\"" "helm/slurm-cluster/values.yaml"
-	@$(YQ) -i ".images.mariaDB = \"docker-registry1.mariadb.com/library/mariadb:11.4.3\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.mariaDB = \"docker-registry1.mariadb.com/library/mariadb:12.1.2\"" "helm/slurm-cluster/values.yaml"
 	@# endregion helm/slurm-cluster/values.yaml
 
 	@# region helm/nodesets/values.yaml
@@ -259,6 +302,10 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.munge.tag = \"$(IMAGE_VERSION)\"" "helm/nodesets/values.yaml"
 	@$(YQ) -i ".images.slurmd.repository = \"$(IMAGE_REPO)/worker_slurmd\"" "helm/nodesets/values.yaml"
 	@$(YQ) -i ".images.slurmd.tag = \"$(IMAGE_VERSION)\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].slurmd.image.repository = \"$(IMAGE_REPO)/worker_slurmd\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].slurmd.image.tag = \"$(IMAGE_VERSION)+custom\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].munge.image.repository = \"$(IMAGE_REPO)/munge\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].munge.image.tag = \"$(IMAGE_VERSION)+custom\"" "helm/nodesets/values.yaml"
 	@# endregion helm/nodesets/values.yaml
 
 	@# region helm/soperator-activechecks/values.yaml
@@ -317,7 +364,13 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".observability.dcgmExporter.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".notifier.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".storageClasses.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
+	@$(YQ) -i ".customConfigmaps.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@# endregion helm/soperator-fluxcd/values.yaml
+
+	@# region helm/soperator-fluxcd-bootstrap/values.yaml
+	@echo 'Syncing helm/soperator-fluxcd-bootstrap/values.yaml'
+	@$(YQ) -i ".helmRelease.chart.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd-bootstrap/values.yaml"
+	@# endregion helm/soperator-fluxcd-bootstrap/values.yaml
 
 	@# region fluxcd/environment/local
 	@echo 'Syncing fluxcd/environment/local/helmrelease.yaml'
@@ -354,7 +407,7 @@ build: manifests generate fmt vet ## Build manager binary with native toolchain.
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host with native toolchain.
 	IS_PROMETHEUS_CRD_INSTALLED=true IS_MARIADB_CRD_INSTALLED=true ENABLE_WEBHOOKS=false IS_APPARMOR_CRD_INSTALLED=true go run cmd/main.go \
-	 -log-level=debug -leader-elect=true -operator-namespace=soperator-system --enable-topology-controller=true
+	 -log-level=debug -leader-elect=true -operator-namespace=soperator-system
 
 .PHONY: docker-build-go-base
 docker-build-go-base: ## Build go-base multiarch manifest locally
@@ -391,9 +444,14 @@ endif
 		$(DOCKER_BUILD_ARGS) \
 		.
 ifeq ($(UNSTABLE), false)
+# Push to the Nebius stable registry
 	skopeo copy --all \
 		docker://"$(IMAGE_REPO)-unstable/${IMAGE_NAME}:${IMAGE_VERSION}" \
 		docker://"$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+# Push to the Github registry
+	skopeo copy --all \
+		docker://"$(IMAGE_REPO)-unstable/${IMAGE_NAME}:${IMAGE_VERSION}" \
+		docker://"$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 endif
 
 .PHONY: docker-build-jail
@@ -425,18 +483,6 @@ endif
 		--progress=plain \
 		$(DOCKER_BUILD_ARGS) \
 		.
-
-.PHONY: docker-manifest
-docker-manifest: ## Create and push docker manifest for multiple image architecture
-ifndef IMAGE_NAME
-	$(error IMAGE_NAME is not set, docker manifest can not be pushed)
-endif
-	docker manifest create --amend "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
-	docker manifest push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
-ifeq ($(UNSTABLE), false)
-	docker manifest create --amend "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
-	docker manifest push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
-endif
 
 .PHONY: release-helm
 release-helm: ## Build & push helm docker image
@@ -535,29 +581,29 @@ $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
 ## Tool Binaries
-KUBECTL        ?= kubectl
-KUSTOMIZE      ?= $(LOCALBIN)/kustomize
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-ENVTEST        ?= $(LOCALBIN)/setup-envtest
-GOLANGCI_LINT   = $(LOCALBIN)/golangci-lint
-HELMIFY        ?= $(LOCALBIN)/helmify
-YQ             ?= $(LOCALBIN)/yq
-MOCKERY        ?= $(LOCALBIN)/mockery
-KIND           ?= $(LOCALBIN)/kind
-FLUX           ?= $(LOCALBIN)/flux
+KUBECTL			?= kubectl
+KUSTOMIZE		?= $(LOCALBIN)/kustomize
+CONTROLLER_GEN	?= $(LOCALBIN)/controller-gen
+ENVTEST			?= $(LOCALBIN)/setup-envtest
+GOLANGCI_LINT	 = $(LOCALBIN)/golangci-lint
+HELMIFY			?= $(LOCALBIN)/helmify
+YQ				?= $(LOCALBIN)/yq
+MOCKERY			?= $(LOCALBIN)/mockery
+KIND			?= $(LOCALBIN)/kind
+FLUX			?= $(LOCALBIN)/flux
 
 ## Tool Versions
-KUSTOMIZE_VERSION        ?= v5.5.0
-CONTROLLER_TOOLS_VERSION ?= v0.19.0
-ENVTEST_VERSION          ?= release-0.17
-GOLANGCI_LINT_VERSION    ?= v2.5.0  # Should be in sync with the github CI step.
-HELMIFY_VERSION          ?= 0.4.13
-HELM_VERSION						 ?= v3.18.3
-HELM_UNITTEST_VERSION    ?= 0.8.2
-YQ_VERSION               ?= 4.44.3
-MOCKERY_VERSION 		 ?= 2.53.5
-KIND_VERSION             ?= v0.30.0
-FLUX_VERSION             ?= 2.7.3
+KUSTOMIZE_VERSION			?= v5.5.0
+CONTROLLER_TOOLS_VERSION	?= v0.19.0
+ENVTEST_VERSION				?= release-0.17
+GOLANGCI_LINT_VERSION		?= v2.5.0  # Should be in sync with the github CI step.
+HELMIFY_VERSION				?= 0.4.13
+HELM_VERSION				?= v3.18.3
+HELM_UNITTEST_VERSION		?= 0.8.2
+YQ_VERSION					?= 4.44.3
+MOCKERY_VERSION				?= 2.53.5
+KIND_VERSION				?= v0.30.0
+FLUX_VERSION				?= 2.7.3
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -688,11 +734,11 @@ install-unittest:
 
 ##@ Kind Cluster
 
-KIND_CLUSTER_NAME ?= soperator-dev
-KIND_NODES        ?= 2
-KIND_K8S_VERSION  ?= v1.31.0
-KIND_CONTEXT      ?= kind-$(KIND_CLUSTER_NAME)
-KUBECTL_CTX       = $(KUBECTL) --context $(KIND_CONTEXT)
+KIND_CLUSTER_NAME	?= soperator-dev
+KIND_NODES			?= 2
+KIND_K8S_VERSION	?= v1.31.0
+KIND_CONTEXT		?= kind-$(KIND_CLUSTER_NAME)
+KUBECTL_CTX			= $(KUBECTL) --context $(KIND_CONTEXT)
 
 .PHONY: kind-create
 kind-create: install-kind ## Create kind cluster with specified number of nodes
@@ -756,4 +802,4 @@ kind-status: ## Check kind cluster status
 .PHONY: jail-shell
 jail-shell: ## Open interactive shell in jail environment via login pod
 	@echo "Opening jail shell in login-0 pod..."
-	@$(KUBECTL_CTX) exec -it -n soperator login-0 -- chroot /mnt/jail bash
+	@$(KUBECTL_CTX) exec -it -n soperator login-0 -- chroot /mnt/jail bash -l

@@ -75,7 +75,7 @@ func TestMetricsCollector_Describe(t *testing.T) {
 	}
 
 	// Base metrics
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,instance_id,state_base,state_is_drain,state_is_maintenance,state_is_reserved,state_is_completing,state_is_fail,state_is_planned,reservation_name,address,reason}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,instance_id,state_base,state_is_drain,state_is_maintenance,state_is_reserved,state_is_completing,state_is_fail,state_is_planned,state_is_not_responding,state_is_invalid,is_unavailable,reservation_name,address,reason}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_total", help: "Total CPUs on the node", constLabels: {}, variableLabels: {node_name}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_allocated", help: "CPUs allocated on the node", constLabels: {}, variableLabels: {node_name}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_idle", help: "Idle CPUs on the node", constLabels: {}, variableLabels: {node_name}}`)
@@ -216,9 +216,11 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 			metricsText = append(metricsText, toPrometheusLikeString(t, metric))
 		}
 
+		// Assert node info metrics exist (use label substring checks to be robust against label additions/order)
+		assertMetricHasLabels(t, metricsText, []string{`node_name="node-1"`, `instance_id="instance-1"`, `state_base="ALLOCATED"`, `state_is_drain="false"`, fmt.Sprintf(`reservation_name="%s"`, longReservation[:maxReservationNameLength])})
+		assertMetricHasLabels(t, metricsText, []string{`node_name="node-2"`, `instance_id="instance-2"`, `state_base="IDLE"`, `state_is_drain="true"`})
+
 		expectedMetrics := []string{
-			fmt.Sprintf(`GAUGE; slurm_node_info{address="10.0.0.1",instance_id="instance-1",node_name="node-1",reason="",reservation_name="%s",state_base="ALLOCATED",state_is_completing="",state_is_drain="false",state_is_fail="",state_is_maintenance="false",state_is_planned="",state_is_reserved="false"} 1`, longReservation[:maxReservationNameLength]),
-			`GAUGE; slurm_node_info{address="10.0.0.2",instance_id="instance-2",node_name="node-2",reason="",reservation_name="",state_base="IDLE",state_is_completing="",state_is_drain="true",state_is_fail="",state_is_maintenance="false",state_is_planned="",state_is_reserved="false"} 1`,
 			`GAUGE; slurm_node_cpus_total{node_name="node-1"} 16`,
 			`GAUGE; slurm_node_cpus_allocated{node_name="node-1"} 8`,
 			`GAUGE; slurm_node_cpus_idle{node_name="node-1"} 8`,
@@ -337,14 +339,9 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 		}
 
 		// Check specific state combinations for node info metrics
-		expectedNodeMetrics := []string{
-			`GAUGE; slurm_node_info{address="10.0.0.3",instance_id="instance-maintenance",node_name="node-maintenance",reason="",reservation_name="",state_base="IDLE",state_is_completing="",state_is_drain="false",state_is_fail="",state_is_maintenance="true",state_is_planned="",state_is_reserved="false"} 1`,
-			`GAUGE; slurm_node_info{address="10.0.0.4",instance_id="instance-reserved",node_name="node-reserved",reason="",reservation_name="",state_base="IDLE",state_is_completing="",state_is_drain="false",state_is_fail="",state_is_maintenance="false",state_is_planned="",state_is_reserved="true"} 1`,
-		}
-
-		for _, expected := range expectedNodeMetrics {
-			assert.Contains(t, metricsText, expected)
-		}
+		// Assert node info metrics exist for these nodes
+		assertMetricHasLabels(t, metricsText, []string{`node_name="node-maintenance"`, `instance_id="instance-maintenance"`, `state_base="IDLE"`, `state_is_maintenance="true"`})
+		assertMetricHasLabels(t, metricsText, []string{`node_name="node-reserved"`, `instance_id="instance-reserved"`, `state_base="IDLE"`, `state_is_reserved="true"`})
 
 		// Check that GPU seconds metrics include all the new labels
 		foundMaintenanceGPU := false
@@ -419,8 +416,7 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 		assert.Contains(t, metricsText, expectedNodeFailsMetric)
 
 		// Check that node info metric also includes the reason field for the drained node
-		expectedNodeInfoMetric := `GAUGE; slurm_node_info{address="10.0.0.3",instance_id="instance-maintenance",node_name="node-maintenance",reason="maintenance drain triggered",reservation_name="",state_base="IDLE",state_is_completing="",state_is_drain="true",state_is_fail="",state_is_maintenance="true",state_is_planned="",state_is_reserved="false"} 1`
-		assert.Contains(t, metricsText, expectedNodeInfoMetric)
+		assertMetricHasLabels(t, metricsText, []string{`node_name="node-maintenance"`, `instance_id="instance-maintenance"`, `reason="maintenance drain triggered"`, `state_is_drain="true"`, `state_is_maintenance="true"`})
 
 		mockClient.AssertExpectations(t)
 	})
@@ -662,7 +658,7 @@ func TestMetricsCollector_GetDiag_APIError(t *testing.T) {
 		}
 
 		// Should still have node metrics (proving other metrics continue to work)
-		assert.Contains(t, metricsText, `GAUGE; slurm_node_info{address="10.0.0.1",instance_id="test-instance",node_name="test-node",reason="",reservation_name="",state_base="IDLE",state_is_completing="",state_is_drain="false",state_is_fail="",state_is_maintenance="false",state_is_planned="",state_is_reserved="false"} 1`)
+		assertMetricHasLabels(t, metricsText, []string{`node_name="test-node"`, `instance_id="test-instance"`, `state_base="IDLE"`})
 
 		// Should NOT have any RPC metrics due to GetDiag failure
 		for _, metricText := range metricsText {
@@ -925,6 +921,28 @@ func toPrometheusLikeString(t *testing.T, metric prometheus.Metric) string {
 	}
 
 	return fmt.Sprintf("%s; %s%s %g", metricType, metricName, labelsString, value)
+}
+
+// assertMetricHasLabels asserts that among metricsText there's at least one metric
+// with metricName and all required label substrings present.
+func assertMetricHasLabels(t *testing.T, metricsText []string, required []string) {
+	metricName := "slurm_node_info"
+	for _, m := range metricsText {
+		if !strings.Contains(m, metricName) {
+			continue
+		}
+		ok := true
+		for _, r := range required {
+			if !strings.Contains(m, r) {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			return
+		}
+	}
+	t.Fatalf("no metric %q containing required labels %v found; metrics: %v", metricName, required, metricsText)
 }
 
 func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {

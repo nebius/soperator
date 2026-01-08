@@ -1,8 +1,7 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS munge
-
-ARG DEBIAN_FRONTEND=noninteractive
+# https://github.com/nebius/ml-containers/pull/39
+FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260106134848 AS munge
 
 # Install munge
 COPY images/common/scripts/install_munge.sh /opt/bin/

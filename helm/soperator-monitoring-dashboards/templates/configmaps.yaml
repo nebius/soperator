@@ -1,0 +1,22 @@
+{{- $namePrefix := include "soperator-monitoring-dashboards.namePrefix" . -}}
+{{- range $path, $file := .Files.Glob "dashboards/*.json" }}
+{{- $dashboardName := include "soperator-monitoring-dashboards.dashboardName" $path -}}
+{{- $cmName := include "soperator-monitoring-dashboards.cmName" (dict "namePrefix" $namePrefix "dashboardName" $dashboardName) -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $cmName }}
+  labels:
+{{- include "soperator-monitoring-dashboards.labels" $ | nindent 4 }}
+{{- with $.Values.extraLabels }}
+{{ toYaml . | nindent 4 }}
+{{- end }}
+{{- with $.Values.annotations }}
+  annotations:
+{{ toYaml . | nindent 4 }}
+{{- end }}
+data:
+  {{ printf "%s.json" $dashboardName }}: |
+    {{- toString $file | nindent 4 }}
+---
+{{- end }}
