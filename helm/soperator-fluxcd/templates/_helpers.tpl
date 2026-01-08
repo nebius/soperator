@@ -51,3 +51,14 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Validate observability.publicEndpointTokenKind is one of: secret, hostPath
+*/}}
+{{- define "soperator-fluxcd.validatePublicEndpointTokenKind" -}}
+{{- $kind := .Values.observability.publicEndpointTokenKind | default "" -}}
+
+{{- if not (or (eq $kind "secret") (eq $kind "hostPath")) -}}
+  {{- fail (printf "observability.publicEndpointTokenKind must be one of: secret, hostPath (got %q)" $kind) -}}
+{{- end -}}
+{{- end -}}
