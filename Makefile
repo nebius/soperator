@@ -76,6 +76,11 @@ ifeq ($(UNSTABLE), true)
     IMAGE_REPO			= $(NEBIUS_REPO)-unstable
 endif
 
+# Docker build platforms (default: amd64 only, override with PLATFORMS=linux/amd64,linux/arm64 for multi-arch)
+PLATFORMS ?= linux/amd64
+HAS_AMD64 = $(findstring linux/amd64,$(PLATFORMS))
+HAS_ARM64 = $(findstring linux/arm64,$(PLATFORMS))
+
 .PHONY: all
 all: build
 
@@ -410,10 +415,9 @@ run: manifests generate fmt vet ## Run a controller from your host with native t
 	 -log-level=debug -leader-elect=true -operator-namespace=soperator-system
 
 .PHONY: docker-build-go-base
-docker-build-go-base: ## Build go-base multiarch manifest locally
-# Build multiarch
+docker-build-go-base: ## Build go-base manifest locally (use PLATFORMS=linux/amd64,linux/arm64 for multi-arch)
 	docker buildx build \
-		--platform linux/amd64,linux/arm64 \
+		--platform $(PLATFORMS) \
 		--target go-base \
 		-t go-base \
 		-f images/common/go-base.dockerfile \
@@ -422,7 +426,7 @@ docker-build-go-base: ## Build go-base multiarch manifest locally
 		.
 
 .PHONY: docker-build-and-push
-docker-build-and-push: ## Build and push docker multi arch manifest
+docker-build-and-push: ## Build and push docker manifest (use PLATFORMS=linux/amd64,linux/arm64 for multi-arch)
 ifndef IMAGE_NAME
 	$(error IMAGE_NAME is not set)
 endif
@@ -432,9 +436,8 @@ endif
 ifndef UNSTABLE
 	$(error UNSTABLE is not set)
 endif
-# Build multiarch
 	docker buildx build \
-		--platform linux/amd64,linux/arm64 \
+		--platform $(PLATFORMS) \
 		--target ${IMAGE_NAME} \
 		-t "$(NEBIUS_REPO)-unstable/${IMAGE_NAME}:${IMAGE_VERSION}" \
 		-f images/${DOCKERFILE} \
@@ -455,12 +458,12 @@ ifeq ($(UNSTABLE), false)
 endif
 
 .PHONY: docker-build-jail
-docker-build-jail: ## Build jail
+docker-build-jail: ## Build jail (use PLATFORMS=linux/amd64,linux/arm64 for multi-arch)
 ifndef IMAGE_VERSION
 	$(error IMAGE_VERSION is not set, docker image cannot be built)
 endif
-# Output type tar doesn't support platform splitting, so we keep single arch build here.
-	# Build amd
+# Output type tar doesn't support multi-platform, so we build each arch separately.
+ifneq ($(HAS_AMD64),)
 	docker buildx build \
 		--platform linux/amd64 \
 		--target jail \
@@ -471,8 +474,8 @@ endif
 		--progress=plain \
 		$(DOCKER_BUILD_ARGS) \
 		.
-
-	# Build arm
+endif
+ifneq ($(HAS_ARM64),)
 	docker buildx build \
 		--platform linux/arm64 \
 		--target jail \
@@ -483,6 +486,7 @@ endif
 		--progress=plain \
 		$(DOCKER_BUILD_ARGS) \
 		.
+endif
 
 .PHONY: release-helm
 release-helm: ## Build & push helm docker image
