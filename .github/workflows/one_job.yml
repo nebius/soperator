@@ -8,6 +8,11 @@ on:
         type: string
         required: false
         default: "true"
+      multi_arch:
+        description: "Build for both amd64 and arm64 platforms"
+        type: string
+        required: false
+        default: "false"
 
   push:
     branches:
@@ -197,8 +202,17 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Build and push Docker images
+        shell: bash
         run: |
           UNSTABLE=${{ steps.read-version.outputs.unstable }}
+          MULTI_ARCH="${{ inputs.multi_arch || 'false' }}"
+          if [[ "$MULTI_ARCH" == "true" ]]; then
+            export PLATFORMS="linux/amd64,linux/arm64"
+          else
+            export PLATFORMS="linux/amd64"
+          fi
+          echo "Building for platforms: ${PLATFORMS}"
+
           IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
           VERSION=$(make get-version UNSTABLE=${UNSTABLE})
           OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
