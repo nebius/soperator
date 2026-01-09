@@ -109,6 +109,7 @@ observability:
   opentelemetry:
     enabled: true
     namespace: logs-system
+    extraHeaders: {}
     logs:
       version: 0.117.*
       interval: 15m

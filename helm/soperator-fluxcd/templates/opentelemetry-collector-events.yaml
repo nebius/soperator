@@ -76,6 +76,10 @@ spec:
           timeout: 5s
           headers:
             iam-container: {{ .Values.observability.logsProjectId }}
+            {{- $extraHeaders := .Values.observability.opentelemetry.extraHeaders }}
+            {{- if and $extraHeaders (gt (len $extraHeaders) 0) }}
+            {{- toYaml $extraHeaders | nindent 12 }}
+            {{- end }}
           auth:
             authenticator: bearertokenauth
         {{- end }}
