@@ -313,6 +313,48 @@ jobs:
 
           go test -v -timeout 30m --tags=e2e -run TestTerraformDestroy ./test/e2e/...
 
+      - name: Force cleanup compute instances on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "=== Node groups state before cleanup ==="
+          clusters_json=$(nebius mk8s cluster list --parent-id "$NEBIUS_PROJECT_ID" --format json 2>/dev/null || true)
+          cluster_ids=$(echo "$clusters_json" | jq -r '.items[].metadata.id // empty' 2>/dev/null || true)
+
+          for cluster_id in $cluster_ids; do
+            echo ""
+            echo "--- Node groups for cluster: $cluster_id ---"
+            nebius mk8s node-group list --parent-id "$cluster_id" --page-size 1000 --format yaml || true
+          done
+
+          echo ""
+          echo "=== Forcing cleanup of remaining compute instances ==="
+
+          # Get nodes from the cluster (ignore errors if cluster is already gone)
+          nodes=$(kubectl get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)
+
+          if [ -z "$nodes" ]; then
+            echo "No nodes found or cluster not accessible"
+            exit 0
+          fi
+
+          echo "Found nodes: $nodes"
+
+          operations=()
+          for node in $nodes; do
+            echo "Deleting compute instance: $node"
+            op=$(nebius compute instance delete --id="$node" --async 2>/dev/null) && operations+=("$op") || echo "Failed to delete instance $node (may already be deleted)"
+          done
+
+          echo ""
+          echo "=== Operation statuses ==="
+          for op in "${operations[@]}"; do
+            echo "--- $op ---"
+            nebius compute instance operation get --id="$op" || true
+          done
+
+          echo "=== Cleanup complete ==="
+
       - name: Add build info to job summary
         if: always()
         shell: bash
