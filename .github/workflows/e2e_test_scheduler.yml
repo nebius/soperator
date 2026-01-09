@@ -15,10 +15,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
       - name: Determine branch and terraform ref
         id: select_params
+        shell: bash
         run: |
-          RELEASE_BRANCH="soperator-release-1.23"
+          RELEASE_BRANCH=$(jq -r .release_branch .github/branch-config.json)
           HOUR=$(date -u +%-H)  # %-H removes leading zeros to avoid octal interpretation
           if [ $((HOUR % 2)) -eq 0 ]; then
             echo "ref=main" >> $GITHUB_OUTPUT
@@ -29,9 +33,6 @@ jobs:
             echo "terraform_ref=$RELEASE_BRANCH" >> $GITHUB_OUTPUT
             echo "Odd hour ($HOUR UTC) - Testing $RELEASE_BRANCH branch with terraform $RELEASE_BRANCH"
           fi
-
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
       - name: Trigger E2E test workflow
         env:
