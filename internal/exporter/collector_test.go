@@ -75,7 +75,7 @@ func TestMetricsCollector_Describe(t *testing.T) {
 	}
 
 	// Base metrics
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,instance_id,state_base,state_is_drain,state_is_maintenance,state_is_reserved,state_is_completing,state_is_fail,state_is_planned,state_is_not_responding,state_is_invalid,is_unavailable,reservation_name,address,reason}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,instance_id,state_base,state_is_drain,state_is_maintenance,state_is_reserved,state_is_completing,state_is_fail,state_is_planned,state_is_not_responding,state_is_invalid,is_unavailable,reservation_name,address,reason,comment}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_total", help: "Total CPUs on the node", constLabels: {}, variableLabels: {node_name}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_allocated", help: "CPUs allocated on the node", constLabels: {}, variableLabels: {node_name}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_idle", help: "Idle CPUs on the node", constLabels: {}, variableLabels: {node_name}}`)
