@@ -14,6 +14,19 @@ on:
         required: false
         default: "false"
 
+  workflow_dispatch:
+    inputs:
+      unstable:
+        description: "Build unstable version"
+        type: string
+        required: false
+        default: "true"
+      multi_arch:
+        description: "Build for both amd64 and arm64 platforms"
+        type: string
+        required: false
+        default: "false"
+
   push:
     branches:
       - main
