@@ -1,7 +1,7 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-# https://github.com/nebius/ml-containers/pull/39
-FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260106134848 AS k8s_check_job
+# https://github.com/nebius/ml-containers/pull/42
+FROM cr.eu-north1.nebius.cloud/e00ydq6th0tz1ycxs9/neubuntu:noble-20260109114729 AS k8s_check_job
 
 # Install common packages
 RUN apt install --update -y \
@@ -10,10 +10,13 @@ RUN apt install --update -y \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY images/common/scripts/install_kubectl.sh /opt/bin/
-RUN chmod +x /opt/bin/install_kubectl.sh && \
-    /opt/bin/install_kubectl.sh && \
-    rm /opt/bin/install_kubectl.sh
+# Install kubectl
+RUN ARCH="$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')" && \
+    KUBECTL_VERSION="$(curl -Ls https://dl.k8s.io/release/stable.txt)" && \
+    echo "Downloading kubectl from https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" && \
+    curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" && \
+    install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
+    rm kubectl
 
 # Copy all Ansible playbooks
 COPY ansible/ /opt/ansible/

@@ -1,9 +1,7 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-# https://github.com/nebius/ml-containers/blob/main/.github/workflows/training_diag.yml
-FROM cr.eu-north1.nebius.cloud/ml-containers/training_diag:12.9.0-ubuntu24.04-nccl_tests2.16.4-20251229133835 AS jail
-
-ARG DEBIAN_FRONTEND=noninteractive
+# https://github.com/nebius/ml-containers/pull/42
+FROM cr.eu-north1.nebius.cloud/e00ydq6th0tz1ycxs9/training_diag:12.9.0-ubuntu24.04-nccl_tests2.16.4-20260109133521 AS jail
 
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host
@@ -15,50 +13,15 @@ RUN chmod 644 /etc/passwd /etc/group && chown 0:0 /etc/passwd /etc/group && \
     chmod 640 /etc/shadow /etc/gshadow && chown 0:42 /etc/shadow /etc/gshadow && \
     chmod 440 /etc/sudoers && chown 0:0 /etc/sudoers
 
-# Install minimal python packages for Ansible
-RUN apt install --update -y \
-        python3.12="3.12.3-1ubuntu0.9" \
-        python3.12-venv="3.12.3-1ubuntu0.9"
-
-# Install Ansible and base configs
-COPY ansible/ansible.cfg ansible/requirements.txt ansible/inventory /opt/ansible/
-RUN cd /opt/ansible && ln -sf /usr/bin/python3.12 /usr/bin/python3 && \
-    python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
-
-ENV PATH="/opt/ansible/.venv/bin:${PATH}"
-WORKDIR /opt/ansible
-
-# Install python
-COPY ansible/python.yml /opt/ansible/python.yml
-COPY ansible/roles/python /opt/ansible/roles/python
-RUN ansible-playbook -i inventory/ -c local python.yml
-
-# Manage repositories
-COPY ansible/repos.yml /opt/ansible/repos.yml
-COPY ansible/roles/repos /opt/ansible/roles/repos
-RUN ansible-playbook -i inventory/ -c local repos.yml
-
-# Install common packages
-COPY ansible/common-packages.yml /opt/ansible/common-packages.yml
-COPY ansible/roles/common-packages /opt/ansible/roles/common-packages
-RUN ansible-playbook -i inventory/ -c local common-packages.yml
-
 # Install useful packages
 RUN apt update && \
     apt install -y \
         bc \
-        flex \
         gettext-base \
         git \
         less \
-        lsof \
-        iputils-ping \
-        dnsutils \
-        telnet \
         netcat-openbsd \
         strace \
-        tree \
-        vim \
         pciutils \
         rsync \
         htop \

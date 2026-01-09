@@ -1,8 +1,9 @@
 ---
 
-# Order of roles here is the same as in jail.dockerfile
 - name: Upgrade all
-  hosts: all, localhost
+  hosts:
+    - all
+    - localhost
   become: true
   gather_facts: true
   gather_subset:
@@ -27,7 +28,9 @@
     - run-all-upgrade
 
 - name: Install Cuda
-  hosts: all, localhost
+  hosts:
+    - all
+    - localhost
   become: true
   gather_facts: true
   gather_subset:
