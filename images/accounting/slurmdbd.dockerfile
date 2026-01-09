@@ -1,55 +1,7 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-# https://github.com/nebius/ml-containers/pull/39
-FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260106134848 AS controller_slurmdbd
-
-ARG SLURM_VERSION
-
-# Install dependencies
-RUN apt-get update && \
-    apt -y install \
-        libssl-dev \
-        libpam0g-dev \
-        libtool \
-        libjansson-dev \
-        libjson-c-dev \
-        libmunge-dev \
-        libhwloc-dev \
-        liblz4-dev \
-        flex \
-        libevent-dev \
-        jq \
-        squashfs-tools \
-        zstd \
-        iputils-ping \
-        dnsutils \
-        telnet \
-        strace \
-        vim \
-        tree \
-        lsof \
-        daemontools && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install slurm packages
-RUN apt-get update && \
-    apt -y install \
-      slurm-smd-client=${SLURM_VERSION}-1 \
-      slurm-smd-dev=${SLURM_VERSION}-1 \
-      slurm-smd-libnss-slurm=${SLURM_VERSION}-1 \
-      slurm-smd=${SLURM_VERSION}-1 \
-      slurm-smd-slurmdbd=${SLURM_VERSION}-1 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Create single folder with slurm plugins for all architectures
-RUN mkdir -p /usr/lib/slurm && \
-    for dir in /usr/lib/*-linux-gnu/slurm; do \
-      [ -d "$dir" ] && ln -sf $dir/* /usr/lib/slurm/ 2>/dev/null || true; \
-    done
-# Update linker cache
-RUN ldconfig
+# https://github.com/nebius/ml-containers/pull/42
+FROM cr.eu-north1.nebius.cloud/e00ydq6th0tz1ycxs9/slurm:25.05.5-20260109162844 AS controller_slurmdbd
 
 # Expose the port used for accessing slurmdbd
 EXPOSE 6819
