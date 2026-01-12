@@ -36,6 +36,7 @@ CHART_STORAGECLASSES		  = $(CHART_PATH)/storageclasses
 
 SLURM_VERSION		  		= 25.05.4
 UBUNTU_VERSION		  		?= noble
+CUDA_VERSION                ?= 12.9.0
 NFS_VERSION_BASE          	= $(shell cat NFS_VERSION)
 VERSION_BASE           		= $(shell cat VERSION)
 
@@ -412,7 +413,8 @@ ifneq ($(HAS_AMD64),)
 		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-amd64" \
 		-f images/jail/jail.dockerfile \
 		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
-		--output type=tar,dest=images/jail_rootfs_amd64.tar \
+		--build-arg CUDA_VERSION="${CUDA_VERSION}" \
+		--output type=tar,dest=images/jail_rootfs_cuda$(CUDA_VERSION)_amd64.tar \
 		--progress=plain \
 		$(DOCKER_BUILD_ARGS) \
 		.
@@ -424,7 +426,8 @@ ifneq ($(HAS_ARM64),)
 		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-arm64" \
 		-f images/jail/jail.dockerfile \
 		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
-		--output type=tar,dest=images/jail_rootfs_arm64.tar \
+		--build-arg CUDA_VERSION="${CUDA_VERSION}" \
+		--output type=tar,dest=images/jail_rootfs_cuda$(CUDA_VERSION)_arm64.tar \
 		--progress=plain \
 		$(DOCKER_BUILD_ARGS) \
 		.

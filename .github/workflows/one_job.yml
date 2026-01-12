@@ -275,14 +275,23 @@ jobs:
           echo "Building and pushing image of the nfs-server ${NFS_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=nfs-server DOCKERFILE=nfs-server/nfs.dockerfile IMAGE_VERSION=${NFS_VERSION}
 
+          CUDA_VERSION_12="12.9.0"
+          CUDA_VERSION_13="13.0.2"
+          CUDA_VERSIONS=("${CUDA_VERSION_12}" "${CUDA_VERSION_13}")
+
           echo "Removing previous jail rootfs tar archive"
           rm -f images/jail_rootfs*.tar
 
-          echo "Building tarball for jail"
-          make docker-build-jail DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_VERSION=${IMAGE_VERSION}
+          for CUDA_VERSION in "${CUDA_VERSIONS[@]}"; do
+            CUDA_TAG="cuda${CUDA_VERSION}"
 
-          echo "Building and pushing image of the populate_jail ${IMAGE_VERSION}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail DOCKERFILE=populate_jail/populate_jail.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
+            echo "Building tarball for jail (${CUDA_TAG})"
+            make docker-build-jail DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_VERSION=${IMAGE_VERSION} CUDA_VERSION="${CUDA_VERSION}"
+
+            echo "Building and pushing image of the populate_jail ${IMAGE_VERSION}-${CUDA_TAG}"
+            DOCKER_BUILD_ARGS_WITH_CUDA="${DOCKER_BUILD_ARGS} --build-arg CUDA_VERSION=${CUDA_VERSION}"
+            make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS_WITH_CUDA}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail DOCKERFILE=populate_jail/populate_jail.dockerfile IMAGE_VERSION="${IMAGE_VERSION}-${CUDA_TAG}"
+          done
 
           echo "Removing jail rootfs tar archive to speedup further docker builds."
           rm -f images/jail_rootfs*.tar

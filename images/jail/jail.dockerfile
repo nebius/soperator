@@ -1,9 +1,10 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-FROM cr.eu-north1.nebius.cloud/soperator/cuda_base:12.9.0-ubuntu24.04-nccl2.26.5-1-17be0c5 AS cuda
+ARG CUDA_VERSION=12.9.0
+FROM cr.eu-north1.nebius.cloud/soperator/cuda_base:${CUDA_VERSION}-ubuntu24.04-nccl2.26.5-1-17be0c5 AS cuda
 
 # Download NCCL tests executables
-ARG CUDA_VERSION=12.9.0
+ARG CUDA_VERSION
 ARG PACKAGES_REPO_URL="https://github.com/nebius/slurm-deb-packages/releases/download"
 RUN ARCH=$(uname -m) && \
     echo "Using architecture: ${ARCH}" && \
