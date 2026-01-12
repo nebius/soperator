@@ -18,5 +18,24 @@ tests:
       checks:
         ibGpuPerf:
           commentPrefix: "[node_problem]"
+          drainReasonPrefix: null
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: should render when only drainReasonPrefix is set
+    set:
+      checks:
+        ibGpuPerf:
+          drainReasonPrefix: "[node_problem]"
+          commentPrefix: null
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: should render when both prefixes are explicitly null
+    set:
+      checks:
+        ibGpuPerf:
+          commentPrefix: null
+          drainReasonPrefix: null
     asserts:
       - notFailedTemplate: {}
