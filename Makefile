@@ -383,7 +383,7 @@ endif
 ifndef UNSTABLE
 	$(error UNSTABLE is not set)
 endif
-	docker buildx build \
+	./scripts/retry.sh -n 3 -d 5 -- docker buildx build \
 		--platform $(PLATFORMS) \
 		--target ${IMAGE_NAME} \
 		-t "$(NEBIUS_REPO)-unstable/${IMAGE_NAME}:${IMAGE_VERSION}" \
@@ -394,7 +394,7 @@ endif
 		$(DOCKER_BUILD_ARGS) \
 		.
 ifeq ($(UNSTABLE), false)
-	skopeo copy --all \
+	skopeo copy --all --retry-times=3 \
 		docker://"$(IMAGE_REPO)-unstable/${IMAGE_NAME}:${IMAGE_VERSION}" \
 		docker://"$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 endif
@@ -436,10 +436,10 @@ ifndef IMAGE_NAME
 	$(error IMAGE_NAME is not set, docker manifest can not be pushed)
 endif
 	docker manifest create --amend "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
-	docker manifest push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+	./scripts/retry.sh -n 3 -d 5 -- docker manifest push "$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 ifeq ($(UNSTABLE), false)
 	docker manifest create --amend "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-arm64" "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}-amd64"
-	docker manifest push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
+	./scripts/retry.sh -n 3 -d 5 -- docker manifest push "$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 endif
 
 .PHONY: release-helm

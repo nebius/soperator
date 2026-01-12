@@ -4,6 +4,8 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 usage() {
   echo "usage: ${0} -u <repo_uri> [-h]"
   echo "  -u <repo_uri> Container registry repo"
@@ -51,7 +53,7 @@ chart() {
   helm package -d "${RELEASE_PATH}" "${HELM_PATH}/${CHART_NAME}"
 
   echo "Pushing helm-${CHART_TARGET} to Container registry - ${OCI_REPO}"
-  helm push "${RELEASE_PATH}/helm-${CHART_TARGET}" "${OCI_REPO}"
+  "${SCRIPT_DIR}/scripts/retry.sh" -n 3 -d 5 -- helm push "${RELEASE_PATH}/helm-${CHART_TARGET}" "${OCI_REPO}"
 
   echo '---'
 }
