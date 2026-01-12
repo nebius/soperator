@@ -1,6 +1,7 @@
 {{- $root := . -}}
 {{- range $name, $check := .Values.checks }}
 {{- if $check.enabled }}
+{{- include "soperator-activechecks.checkReactionsConflict" (dict "name" $name "vals" $root.Values) -}}
 ---
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck

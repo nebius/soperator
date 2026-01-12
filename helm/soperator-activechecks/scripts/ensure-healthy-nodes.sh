@@ -9,10 +9,9 @@ bad_nodes=$(echo "$json" | jq -r '
   .nodes[]
   | select(
       (.reason // "") != "" 
-      or (.comment // "") != "" 
       or ((.state? // "") | tostring | test("DOWN|DRAIN|FAIL"))
     )
-  | {name, reason: (.reason // ""), comment: (.comment // ""), state: .state}
+  | {name, reason: (.reason // ""), state: .state}
 ')
 
 if [[ -n "$bad_nodes" ]]; then
