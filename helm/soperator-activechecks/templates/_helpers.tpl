@@ -195,8 +195,8 @@ jobContainer:
 {{ toYaml $volumeMounts | indent 4 }}
 {{- end }}
 {{- if $volumes }}
-volumes:
-{{ toYaml $volumes | indent 2 }}
+  volumes:
+{{ toYaml $volumes | indent 4 }}
 {{- end }}
 {{- if and $spec.mungeContainer $spec.mungeContainer.enabled }}
 mungeContainer:
