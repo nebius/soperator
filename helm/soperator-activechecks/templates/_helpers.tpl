@@ -205,24 +205,28 @@ mungeContainer:
 {{- end -}}
  
 {{/*
-Validate that a check does not set both commentPrefix and drainReasonPrefix
-in values under a single check. Invoke with (dict "name" "<checkKey>" "vals" .Values)
+Validate that a check does not enable both commentSlurmNode and drainSlurmNode
+under `failureReactions` for a single check. Invoke with (dict "name" "<checkKey>" "vals" .Values)
 */}}
 {{- define "soperator-activechecks.checkReactionsConflict" -}}
 {{- $name := .name -}}
 {{- $vals := .vals -}}
 {{- if $vals }}
-	{{- $checks := index $vals "checks" -}}
-	{{- if $checks }}
-		{{- $check := index $checks $name -}}
-		{{- if $check }}
-			{{- $commentVal := default "" (index $check "commentPrefix") -}}
-			{{- $drainVal := default "" (index $check "drainReasonPrefix") -}}
-			{{- if and (ne $commentVal "") (ne $drainVal "") -}}
-				{{- fail (printf "checks.%s: cannot set both commentPrefix and drainReasonPrefix simultaneously" $name) -}}
-			{{- end -}}
-		{{- end -}}
-	{{- end -}}
+  {{- $checks := index $vals "checks" -}}
+  {{- if $checks }}
+    {{- $check := index $checks $name -}}
+    {{- if $check }}
+      {{- $fr := index $check "failureReactions" -}}
+      {{- if $fr }}
+        {{- $commentVal := default "" (index $fr "commentSlurmNode" "commentPrefix") -}}
+        {{- $drainVal := default "" (index $fr "drainSlurmNode" "drainReasonPrefix") -}}
+        {{- if and (ne $commentVal "") (ne $drainVal "") -}}
+          {{- fail (printf "checks.%s.failureReactions: cannot set both commentSlurmNode and drainSlurmNode simultaneously" $name) -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
 {{- end -}}
 
 {{/*
