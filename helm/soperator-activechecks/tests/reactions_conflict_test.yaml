@@ -1,0 +1,22 @@
+suite: reactions conflict
+templates:
+  - templates/ib-gpu-perf.yaml
+
+tests:
+  - it: should fail if both commentPrefix and drainReasonPrefix are set
+    set:
+      checks:
+        ibGpuPerf:
+          commentPrefix: "[node_problem]"
+          drainReasonPrefix: "[node_problem]"
+    asserts:
+      - failedTemplate:
+          errorMessage: "checks.ibGpuPerf: cannot set both commentPrefix and drainReasonPrefix simultaneously"
+
+  - it: should render when only commentPrefix is set
+    set:
+      checks:
+        ibGpuPerf:
+          commentPrefix: "[node_problem]"
+    asserts:
+      - notFailedTemplate: {}

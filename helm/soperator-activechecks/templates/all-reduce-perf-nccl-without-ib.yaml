@@ -1,3 +1,4 @@
+{{- include "soperator-activechecks.checkReactionsConflict" (dict "comment" .Values.checks.allReducePerfNCCLWithoutIB.commentPrefix "drain" .Values.checks.allReducePerfNCCLWithoutIB.drainReasonPrefix "name" "checks.allReducePerfNCCLWithoutIB") -}}
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
