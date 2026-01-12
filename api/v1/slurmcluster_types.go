@@ -10,7 +10,7 @@ import (
 
 	"nebius.ai/slurm-operator/internal/consts"
 
-	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/api/v1alpha1"
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
 
@@ -84,6 +84,14 @@ type SlurmClusterSpec struct {
 	//
 	// +kubebuilder:validation:Optional
 	CustomSlurmConfig *string `json:"customSlurmConfig,omitempty"`
+
+	// CustomCgroupConfig represents the raw cgroup configuration from cgroup.conf.
+	// All options are provided as a raw string.
+	// Soperator does not guarantee the validity of the raw configuration.
+	// Raw config is appended to the generated cgroup.conf content.
+	//
+	// +kubebuilder:validation:Optional
+	CustomCgroupConfig *string `json:"customCgroupConfig,omitempty"`
 
 	// MPIConfig represents the PMIx configuration in mpi.conf. Not all options are supported.
 	//
@@ -340,6 +348,12 @@ type SConfigController struct {
 	//
 	// +kubebuilder:validation:Optional
 	HostUsers *bool `json:"hostUsers,omitempty"`
+
+	// ServiceAccountName is the name of the ServiceAccount to use for sconfigcontroller pods.
+	// This field is required and must reference an existing ServiceAccount.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	ServiceAccountName string `json:"serviceAccountName"`
 }
 
 // +kubebuilder:validation:XValidation:rule="self.configType != 'structured' || size(self.partitions) > 0",message="Structured partition configuration requires at least one partition"
@@ -735,6 +749,10 @@ type MariaDbOperator struct {
 	Metrics            MariadbMetrics                      `json:"metrics,omitempty"`
 	Replication        *mariadbv1alpha1.Replication        `json:"replication,omitempty"`
 	Storage            mariadbv1alpha1.Storage             `json:"storage,omitempty"`
+	// PriorityClassName to be used in the MariaDB Pod.
+	//
+	// +kubebuilder:validation:Optional
+	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 type MariadbMetrics struct {
@@ -1101,6 +1119,10 @@ type SlurmExporter struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="30s"
 	CollectionInterval prometheusv1.Duration `json:"collectionInterval,omitempty"`
+
+	// ServiceAccountName is the name of the ServiceAccount to use for exporter pods.
+	// +kubebuilder:validation:Optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 // ExporterContainer defines the configuration for one of node containers
@@ -1199,6 +1221,16 @@ type NodeContainer struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="unconfined"
 	AppArmorProfile string `json:"appArmorProfile,omitempty"`
+
+	// procMount denotes the type of proc mount to use for the containers.
+	// The default value is Default which uses the container runtime defaults for
+	// readonly paths and masked paths.
+	// This requires the ProcMountType feature flag to be enabled.
+	// Note that this field cannot be set when spec.os.name is windows.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=Default;Unmasked
+	ProcMount corev1.ProcMountType `json:"procMount,omitempty"`
 }
 
 // NodeVolume defines the configuration for a node volume.
@@ -1289,6 +1321,9 @@ const (
 	ConditionClusterSConfigControllerAvailable = "SConfigControllerAvailable"
 	ConditionClusterPopulateJailMode           = "PopulateJailMode"
 
+	PhaseClusterPending = "Pending"
+	// PhaseClusterReconciling
+	// Deprecated
 	PhaseClusterReconciling  = "Reconciling"
 	PhaseClusterNotAvailable = "Not available"
 	PhaseClusterAvailable    = "Available"
@@ -1315,11 +1350,21 @@ type SlurmClusterStatus struct {
 	ReadySConfigController *int32 `json:"readySConfigController,omitempty"`
 }
 
-func (s *SlurmClusterStatus) SetCondition(condition metav1.Condition) {
+// SetCondition sets the given condition in the SlurmClusterStatus conditions slice.
+// It initializes the conditions slice if it is nil.
+// Returns true if the condition was added or updated, false otherwise.
+func (s *SlurmClusterStatus) SetCondition(condition metav1.Condition) bool {
 	if s.Conditions == nil {
 		s.Conditions = make([]metav1.Condition, 0)
 	}
-	meta.SetStatusCondition(&s.Conditions, condition)
+
+	// We preserve the ObservedGeneration from the existing condition if it exists,
+	// as we don't set it on our own and don't want it to trigger unnecessary updates.
+	if existingCondition := meta.FindStatusCondition(s.Conditions, condition.Type); existingCondition != nil {
+		condition.ObservedGeneration = existingCondition.ObservedGeneration
+	}
+
+	return meta.SetStatusCondition(&s.Conditions, condition)
 }
 
 //+kubebuilder:object:root=true

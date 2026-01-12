@@ -1,7 +1,7 @@
 ---
 
 - name: Install slurm client
-  hosts: all, localhost
+  hosts: localhost
   become: true
   gather_facts: true
   gather_subset:

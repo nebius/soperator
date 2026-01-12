@@ -10,7 +10,7 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-func RenderVolumeProjecitonSlurmdbdConfigs(clusterName string) *corev1.VolumeProjection {
+func RenderVolumeProjectionSlurmdbdConfigs(clusterName string) *corev1.VolumeProjection {
 	return &corev1.VolumeProjection{
 		Secret: &corev1.SecretProjection{
 			LocalObjectReference: corev1.LocalObjectReference{

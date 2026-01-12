@@ -15,6 +15,7 @@ import (
 )
 
 func TestRenderPodTemplateSpec(t *testing.T) {
+	saName := "slurm-exporter-sa"
 	clusterValues := &values.SlurmCluster{
 		NamespacedName: types.NamespacedName{
 			Name:      "test-cluster",
@@ -31,6 +32,7 @@ func TestRenderPodTemplateSpec(t *testing.T) {
 			VolumeJail: slurmv1.NodeVolume{
 				VolumeSourceName: ptr.To(consts.VolumeNameJail),
 			},
+			ServiceAccountName: saName,
 		},
 		NodeFilters: []slurmv1.K8sNodeFilter{
 			{
@@ -58,7 +60,7 @@ func TestRenderPodTemplateSpec(t *testing.T) {
 			Labels: map[string]string{"app": "slurm-exporter"},
 		},
 		Spec: corev1.PodSpec{
-			ServiceAccountName: ServiceAccountName,
+			ServiceAccountName: saName,
 			NodeSelector:       map[string]string{"node": "exporter"},
 			Tolerations:        []corev1.Toleration{{Key: "test", Value: "true"}},
 			InitContainers:     []corev1.Container{},

@@ -33,6 +33,7 @@ func RenderStatefulSet(
 	workerFeatures []slurmv1.WorkerFeature,
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeWorker, clusterName)
+	labels[consts.LabelWorkerKey] = consts.LabelWorkerValue
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeWorker, clusterName)
 
 	nodeFilter := utils.MustGetBy(
@@ -65,6 +66,8 @@ func RenderStatefulSet(
 		worker.EnableGDRCopy,
 		worker.SlurmNodeExtra,
 		workerFeatures,
+		namespace,
+		worker.UseDefaultAppArmorProfile,
 	)
 	if err != nil {
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
@@ -95,7 +98,7 @@ func RenderStatefulSet(
 		DNSPolicy: corev1.DNSClusterFirst,
 		DNSConfig: &corev1.PodDNSConfig{
 			Searches: []string{
-				naming.BuildServiceFQDN(consts.ComponentTypeWorker, namespace, clusterName),
+				naming.BuildServiceFQDN(worker.Service.Name, namespace),
 				naming.BuildLoginHeadlessServiceFQDN(namespace, clusterName),
 			},
 		},
@@ -143,7 +146,7 @@ func RenderStatefulSet(
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
-					Annotations: renderAnnotations(worker, clusterName, namespace),
+					Annotations: renderAnnotations(worker),
 				},
 				Spec: spec,
 			},
@@ -162,7 +165,9 @@ func RenderNodeSetStatefulSet(
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	labels[consts.LabelNodeSetKey] = nodeSet.Name
+	labels[consts.LabelWorkerKey] = consts.LabelWorkerValue
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
+	matchLabels[consts.LabelNodeSetKey] = nodeSet.Name
 
 	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecsForNodeSet(nodeSet, secrets)
 	if err != nil {
@@ -202,10 +207,11 @@ func RenderNodeSetStatefulSet(
 			slurmdContainer,
 		},
 		Volumes:   volumes,
+		Subdomain: nodeSet.ServiceUmbrella.Name,
 		DNSPolicy: corev1.DNSClusterFirst,
 		DNSConfig: &corev1.PodDNSConfig{
 			Searches: []string{
-				naming.BuildNodeSetServiceFQDN(nodeSet.ParentalCluster.Namespace, nodeSet.ParentalCluster.Name, nodeSet.Name),
+				naming.BuildServiceFQDN(nodeSet.ServiceUmbrella.Name, nodeSet.ParentalCluster.Namespace),
 				naming.BuildLoginHeadlessServiceFQDN(nodeSet.ParentalCluster.Namespace, nodeSet.ParentalCluster.Name),
 			},
 		},
@@ -227,7 +233,7 @@ func RenderNodeSetStatefulSet(
 		},
 		Spec: kruisev1b1.StatefulSetSpec{
 			PodManagementPolicy: consts.PodManagementPolicy,
-			ServiceName:         nodeSet.Service.Name,
+			ServiceName:         nodeSet.ServiceUmbrella.Name,
 			Replicas:            replicas,
 			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -265,48 +271,14 @@ func RenderNodeSetStatefulSet(
 	}, nil
 }
 
-func renderAnnotations(worker *values.SlurmWorker, clusterName, namespace string) map[string]string {
-	mungeAppArmorProfile := worker.ContainerMunge.AppArmorProfile
-	workerAppArmorProfile := worker.ContainerSlurmd.AppArmorProfile
-
-	if worker.UseDefaultAppArmorProfile {
-		workerAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
-	}
-
-	annotations := map[string]string{
-		fmt.Sprintf(
-			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmd,
-		): workerAppArmorProfile,
-		fmt.Sprintf(
-			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-		): mungeAppArmorProfile,
-		consts.AnnotationDefaultContainerName: consts.ContainerNameSlurmd,
-	}
-
+func renderAnnotations(worker *values.SlurmWorker) map[string]string {
+	annotations := common.RenderDefaultContainerAnnotation(consts.ContainerNameSlurmd)
 	maps.Copy(annotations, worker.WorkerAnnotations)
-
 	return annotations
 }
 
 func renderNodeSetAnnotations(nodeSet *values.SlurmNodeSet) map[string]string {
-	mungeAppArmorProfile := nodeSet.ContainerMunge.AppArmorProfile
-	workerAppArmorProfile := nodeSet.ContainerSlurmd.AppArmorProfile
-
-	if nodeSet.AppArmorProfileDefault {
-		workerAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(nodeSet.ParentalCluster.Name, nodeSet.ParentalCluster.Namespace))
-	}
-
-	annotations := map[string]string{
-		fmt.Sprintf(
-			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmd,
-		): workerAppArmorProfile,
-		fmt.Sprintf(
-			"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-		): mungeAppArmorProfile,
-		consts.AnnotationDefaultContainerName: consts.ContainerNameSlurmd,
-	}
-
+	annotations := common.RenderDefaultContainerAnnotation(consts.ContainerNameSlurmd)
 	maps.Copy(annotations, nodeSet.Annotations)
-
 	return annotations
 }
