@@ -15,10 +15,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
       - name: Determine branch and terraform ref
         id: select_params
+        shell: bash
         run: |
-          RELEASE_BRANCH="soperator-release-1.23"
+          RELEASE_BRANCH=$(jq -r .release_branch .github/branch-config.json)
           HOUR=$(date -u +%-H)  # %-H removes leading zeros to avoid octal interpretation
           if [ $((HOUR % 2)) -eq 0 ]; then
             echo "ref=main" >> $GITHUB_OUTPUT
