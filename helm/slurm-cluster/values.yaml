@@ -13,6 +13,8 @@ useDefaultAppArmorProfile: false
 maintenance: "none"
 # Slurm cluster type. Can be now gpu or cpu
 clusterType: gpu
+# Select CUDA 13 populate-jail image when true.
+useCuda13: false
 # partitionConfiguration define partition configuration of slurm worker nodes
 # https://slurm.schedmd.com/slurm.conf.html#SECTION_PARTITION-CONFIGURATION
 partitionConfiguration:
@@ -535,7 +537,9 @@ images:
   slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.23.1-noble-slurm25.05.4"
   sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.23.1-noble-slurm25.05.4"
   munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.23.1-noble-slurm25.05.4"
-  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.23.1-noble-slurm25.05.4"
+  populateJail: ""
+  populateJailCuda12: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.23.1-noble-slurm25.05.4-cuda12.9.0"
+  populateJailCuda13: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.23.1-noble-slurm25.05.4-cuda13.0.2"
   slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.23.1-noble-slurm25.05.4"
   soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.23.1-noble-slurm25.05.4"
   sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.23.1
