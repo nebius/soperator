@@ -454,3 +454,37 @@ jobs:
             exit 1
           fi
           echo "All CI jobs passed!"
+
+  notify-failure:
+    name: Notify Slack on failure
+    needs: [ci-success]
+    if: |
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      (needs.ci-success.result == 'failure' || needs.ci-success.result == 'cancelled')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        shell: bash
+        run: |
+          STATUS="${{ needs.ci-success.result }}"
+          if [[ "$STATUS" == "failure" ]]; then
+            EMOJI=":x:"
+            COLOR="danger"
+          else
+            EMOJI=":warning:"
+            COLOR="warning"
+          fi
+
+          curl -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-type: application/json' \
+            --data "{
+              \"attachments\": [{
+                \"color\": \"${COLOR}\",
+                \"title\": \"${EMOJI} Nightly Build ${STATUS}\",
+                \"text\": \"Branch: ${{ github.ref_name }}\nWorkflow: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>\",
+                \"footer\": \"soperator nightly build\"
+              }]
+            }"
