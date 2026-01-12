@@ -1,4 +1,5 @@
 {{- if .Values.checks.ensureDirSnccldLogs.enabled -}}
+{{- include "soperator-activechecks.checkReactionsConflict" (dict "comment" .Values.checks.ensureDirSnccldLogs.commentPrefix "drain" .Values.checks.ensureDirSnccldLogs.drainReasonPrefix "name" "checks.ensureDirSnccldLogs") -}}
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
