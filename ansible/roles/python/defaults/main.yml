@@ -1,9 +1,9 @@
 ---
 
 python_packages:
-  - python3.12=3.12.3-1ubuntu0.9
-  - python3.12-dev=3.12.3-1ubuntu0.9
-  - python3.12-venv=3.12.3-1ubuntu0.9
+  - python3.12=3.12.3-1ubuntu0.10
+  - python3.12-dev=3.12.3-1ubuntu0.10
+  - python3.12-venv=3.12.3-1ubuntu0.10
   - python3-apt=2.7.7ubuntu5.1
   - python3-debian=0.1.49ubuntu2
   - python3-pip=24.0+dfsg-1ubuntu1.3

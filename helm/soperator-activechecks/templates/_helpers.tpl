@@ -70,12 +70,22 @@ Converts from format "reg#repo:tag" to format "reg/repo:tag".
  
 {{/*
 Validate that a check does not set both commentPrefix and drainReasonPrefix
-in values under a single check. This helper should be invoked with a dict
-containing keys: "comment", "drain", "name".
+in values under a single check. Invoke with (dict "name" "<checkKey>" "vals" .Values)
 */}}
 {{- define "soperator-activechecks.checkReactionsConflict" -}}
-{{- $c := . -}}
-{{- if and $c.comment $c.drain -}}
-{{- fail (printf "%s: cannot set both commentPrefix and drainReasonPrefix simultaneously" $c.name) -}}
+{{- $name := .name -}}
+{{- $vals := .vals -}}
+{{- if $vals }}
+	{{- $checks := index $vals "checks" -}}
+	{{- if $checks }}
+		{{- $check := index $checks $name -}}
+		{{- if $check }}
+			{{- $commentVal := default "" (index $check "commentPrefix") -}}
+			{{- $drainVal := default "" (index $check "drainReasonPrefix") -}}
+			{{- if and (ne $commentVal "") (ne $drainVal "") -}}
+				{{- fail (printf "checks.%s: cannot set both commentPrefix and drainReasonPrefix simultaneously" $name) -}}
+			{{- end -}}
+		{{- end -}}
+	{{- end -}}
 {{- end -}}
 {{- end -}}

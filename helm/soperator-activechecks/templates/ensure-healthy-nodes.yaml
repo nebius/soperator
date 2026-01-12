@@ -1,4 +1,4 @@
-{{- include "soperator-activechecks.checkReactionsConflict" (dict "comment" .Values.checks.ensureHealthyNodes.commentPrefix "drain" .Values.checks.ensureHealthyNodes.drainReasonPrefix "name" "checks.ensureHealthyNodes") -}}
+{{- include "soperator-activechecks.checkReactionsConflict" (dict "name" "ensureHealthyNodes" "vals" .Values) -}}
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
