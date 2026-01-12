@@ -77,14 +77,47 @@ var durationBuckets = []float64{
 
 // NewMetricsCollector creates a new MetricsCollector
 func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
+	var nodeInfoLabels = []string{
+		"node_name",
+		"instance_id",
+		"state_base",
+		"state_is_drain",
+		"state_is_maintenance",
+		"state_is_reserved",
+		"state_is_completing",
+		"state_is_fail",
+		"state_is_planned",
+		"state_is_not_responding",
+		"state_is_invalid",
+		"is_unavailable",
+		"reservation_name",
+		"address",
+		"reason",
+		"comment",
+	}
+	var jobInfoLabels = []string{
+		"job_id",
+		"job_state",
+		"job_state_reason",
+		"slurm_partition",
+		"job_name",
+		"user_name",
+		"user_mail",
+		"user_id",
+		"standard_error",
+		"standard_output",
+		"array_job_id",
+		"array_task_id",
+		"submit_time",
+		"start_time",
+		"end_time",
+		"finished_time",
+	}
 	collector := &MetricsCollector{
 		slurmAPIClient: slurmAPIClient,
 		Monitoring:     NewMonitoringMetrics(),
 
-		nodeInfo: prometheus.NewDesc("slurm_node_info", "Slurm node info", []string{
-			"node_name", "instance_id", "state_base", "state_is_drain", "state_is_maintenance", "state_is_reserved", "state_is_completing",
-			"state_is_fail", "state_is_planned", "state_is_not_responding", "state_is_invalid", "is_unavailable", "reservation_name", "address", "reason",
-		}, nil),
+		nodeInfo:                 prometheus.NewDesc("slurm_node_info", "Slurm node info", nodeInfoLabels, nil),
 		nodeCPUTotal:             prometheus.NewDesc("slurm_node_cpus_total", "Total CPUs on the node", []string{"node_name"}, nil),
 		nodeCPUAllocated:         prometheus.NewDesc("slurm_node_cpus_allocated", "CPUs allocated on the node", []string{"node_name"}, nil),
 		nodeCPUIdle:              prometheus.NewDesc("slurm_node_cpus_idle", "Idle CPUs on the node", []string{"node_name"}, nil),
@@ -95,10 +128,7 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 		nodeMemoryEffectiveBytes: prometheus.NewDesc("slurm_node_memory_effective_bytes", "Effective memory on the node in bytes", []string{"node_name"}, nil),
 		nodePartition:            prometheus.NewDesc("slurm_node_partition", "Slurm node partition mapping", []string{"node_name", "partition"}, nil),
 		jobInfo: prometheus.NewDesc(
-			"slurm_job_info", "Slurm job detail information", []string{"job_id", "job_state", "job_state_reason", "slurm_partition", "job_name",
-				"user_name", "user_mail", "user_id", "standard_error", "standard_output", "array_job_id", "array_task_id", "submit_time", "start_time",
-				"end_time", "finished_time",
-			}, nil),
+			"slurm_job_info", "Slurm job detail information", jobInfoLabels, nil),
 		jobNode:        prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
 		jobDuration:    prometheus.NewDesc("slurm_job_duration_seconds", "Slurm job duration in seconds", []string{"job_id"}, nil),
 		jobCPUs:        prometheus.NewDesc("slurm_job_cpus", "CPUs allocated to a Slurm job", []string{"job_id"}, nil),
@@ -161,8 +191,7 @@ func isNodeUnavailable(node slurmapi.Node) bool {
 	return false
 }
 
-// isNodeDraining checks if a node is in draining state
-// Draining state: DRAIN+ALLOC+* or DRAIN+MIXED+*
+// isNodeDraining checks if a node is in draining state which is DRAIN+ALLOC+* or DRAIN+MIXED+*
 func isNodeDraining(node slurmapi.Node) bool {
 	if !node.IsDrainState() {
 		return false
@@ -404,6 +433,7 @@ func (c *MetricsCollector) slurmNodeMetrics(slurmNodes []slurmapi.Node) iter.Seq
 				trimReservationName(node.Reservation),
 				node.Address,
 				reason,
+				node.Comment,
 			}
 			if !yield(prometheus.MustNewConstMetric(c.nodeInfo, prometheus.GaugeValue, 1, labels...)) {
 				return
