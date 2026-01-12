@@ -3,6 +3,7 @@
 # https://github.com/nebius/ml-containers/pull/42
 FROM cr.eu-north1.nebius.cloud/e00ydq6th0tz1ycxs9/slurm:25.05.5-20260109162844 AS worker_slurmd
 
+ARG SLURM_VERSION
 ARG OPENMPI_VERSION=4.1.7a1
 ARG PYXIS_VERSION=0.21.0
 
