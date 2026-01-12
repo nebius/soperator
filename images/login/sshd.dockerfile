@@ -1,43 +1,10 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-# https://github.com/nebius/ml-containers/pull/39
-FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260106134848 AS login_sshd
+# https://github.com/nebius/ml-containers/pull/42
+FROM cr.eu-north1.nebius.cloud/e00ydq6th0tz1ycxs9/slurm:25.05.5-20260109162844 AS login_sshd
 
 ARG SLURM_VERSION
 ARG PYXIS_VERSION=0.21.0
-
-# Install dependencies
-RUN apt-get update && \
-    apt -y install \
-        git \
-        build-essential \
-        bc \
-        python3  \
-        autoconf \
-        pkg-config \
-        libssl-dev \
-        libpam0g-dev \
-        libtool \
-        libjansson-dev \
-        libjson-c-dev \
-        libmunge-dev \
-        libhwloc-dev \
-        liblz4-dev \
-        flex \
-        libevent-dev \
-        jq \
-        squashfs-tools \
-        zstd \
-        software-properties-common \
-        iputils-ping \
-        dnsutils \
-        telnet \
-        strace \
-        vim \
-        tree \
-        lsof && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
 
 # Install OpenSSH server
 # Create root .ssh directory
@@ -58,16 +25,6 @@ RUN ALT_ARCH="$(uname -m)" && \
     mkdir -p "/lib/${ALT_ARCH}-linux-gnu" && \
     cp libdummy.so "/lib/${ALT_ARCH}-linux-gnu/"
 
-# Install slurm packages
-RUN apt-get update && \
-    apt -y install \
-      slurm-smd-client=${SLURM_VERSION}-1 \
-      slurm-smd-dev=${SLURM_VERSION}-1 \
-      slurm-smd-libnss-slurm=${SLURM_VERSION}-1 \
-      slurm-smd=${SLURM_VERSION}-1 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
 # Install slurm сhroot plugin
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
 COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
@@ -81,12 +38,6 @@ COPY images/common/scripts/install_nccld_debug_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
     /opt/bin/install_nccld_debug_plugin.sh && \
     rm /opt/bin/install_nccld_debug_plugin.sh
-
-# Install parallel because it's required for enroot operation
-RUN apt-get update && \
-    apt -y install parallel=20240222+ds-2 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
 
 # Install enroot
 COPY images/common/scripts/install_enroot.sh /opt/bin/
@@ -116,12 +67,6 @@ COPY images/common/scripts/bind_slurm_common.sh /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
     chmod +x /opt/bin/slurm/bind_slurm_common.sh
-
-# Create single folder with slurm plugins for all architectures
-RUN mkdir -p /usr/lib/slurm && \
-    for dir in /usr/lib/*-linux-gnu/slurm; do \
-      [ -d "$dir" ] && ln -sf $dir/* /usr/lib/slurm/ 2>/dev/null || true; \
-    done
 
 # Update linker cache
 RUN ldconfig
