@@ -1,4 +1,5 @@
-{{- include "soperator-activechecks.checkReactionsConflict" (dict "name" "ibGpuPerf" "vals" .Values) -}}
+{{- $check := index .Values.checks "ib-gpu-perf" -}}
+{{- include "soperator-activechecks.checkReactionsConflict" (dict "name" "ib-gpu-perf" "vals" .Values) -}}
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
@@ -9,8 +10,8 @@ spec:
   dependsOn: [ "wait-for-soperatorchecks-srun-ready", "wait-for-topology", "prepull-container-image" ]
   slurmClusterRefName: {{ .Values.slurmClusterRefName | quote }}
   schedule: "55 1-21/4 * * *" # 6 times a day at 01:55, 05:55, 09:55, 13:55, 17:55 and 21:55 UTC
-  suspend: {{ .Values.checks.ibGpuPerf.suspend }}
-  runAfterCreation: {{ .Values.checks.ibGpuPerf.runAfterCreation }}
+  suspend: {{ $check.suspend }}
+  runAfterCreation: {{ $check.runAfterCreation }}
   slurmJobSpec:
     sbatchScript: |
 {{ tpl (.Files.Get "scripts/ib-gpu-perf.sh") . | indent 6 }}
@@ -28,4 +29,4 @@ spec:
       image: {{ .Values.images.munge | quote }}
   failureReactions:
     commentSlurmNode:
-      commentPrefix: {{ .Values.checks.ibGpuPerf.commentPrefix | quote }}
+      commentPrefix: {{ $check.failureReactions.commentSlurmNode.commentPrefix | quote }}

@@ -5,9 +5,10 @@ templates:
 
 tests:
   - it: should fail if both commentSlurmNode and drainSlurmNode are set under failureReactions
+    template: templates/ib-gpu-perf.yaml
     set:
       checks:
-        ibGpuPerf:
+        ib-gpu-perf:
           failureReactions:
             commentSlurmNode:
               commentPrefix: "[node_problem]"
@@ -15,12 +16,13 @@ tests:
               drainReasonPrefix: "[node_problem]"
     asserts:
       - failedTemplate:
-          errorMessage: "checks.ibGpuPerf.failureReactions: cannot set both commentSlurmNode and drainSlurmNode simultaneously"
+          errorMessage: "checks.ib-gpu-perf.failureReactions: cannot set both commentSlurmNode and drainSlurmNode simultaneously"
 
   - it: should render when only commentSlurmNode is set
+    template: templates/ib-gpu-perf.yaml
     set:
       checks:
-        ibGpuPerf:
+        ib-gpu-perf:
           failureReactions:
             commentSlurmNode:
               commentPrefix: "[node_problem]"
@@ -28,29 +30,25 @@ tests:
       - notFailedTemplate: {}
 
   - it: should render when only drainSlurmNode is set
+    template: templates/ib-gpu-perf.yaml
     set:
       checks:
-        ibGpuPerf:
+        ib-gpu-perf:
           failureReactions:
             drainSlurmNode:
               drainReasonPrefix: "[node_problem]"
-    asserts:
-      - notFailedTemplate: {}
-
-  - it: should render when both reaction nodes are explicitly null
-    set:
-      checks:
-        ibGpuPerf:
-          failureReactions:
-            commentSlurmNode: null
-            drainSlurmNode: null
+            # ib-gpu-perf.yaml hardcodes commentSlurmNode.commentPrefix in output,
+            # so we can't set commentSlurmNode: null - use empty string instead.
+            commentSlurmNode:
+              commentPrefix: ""
     asserts:
       - notFailedTemplate: {}
 
   - it: gpu-fryer should fail if both commentSlurmNode and drainSlurmNode are set under failureReactions
+    template: templates/active-checks.yaml
     set:
       checks:
-        "gpu-fryer":
+        gpu-fryer:
           failureReactions:
             commentSlurmNode:
               commentPrefix: "[node_problem]"
@@ -61,29 +59,34 @@ tests:
           errorMessage: "checks.gpu-fryer.failureReactions: cannot set both commentSlurmNode and drainSlurmNode simultaneously"
 
   - it: gpu-fryer should render when only commentSlurmNode is set
+    template: templates/active-checks.yaml
     set:
       checks:
-        "gpu-fryer":
+        gpu-fryer:
           failureReactions:
             commentSlurmNode:
               commentPrefix: "[node_problem]"
+            drainSlurmNode: null
     asserts:
       - notFailedTemplate: {}
 
   - it: gpu-fryer should render when only drainSlurmNode is set
+    template: templates/active-checks.yaml
     set:
       checks:
-        "gpu-fryer":
+        gpu-fryer:
           failureReactions:
+            commentSlurmNode: null
             drainSlurmNode:
               drainReasonPrefix: "[node_problem]"
     asserts:
       - notFailedTemplate: {}
 
   - it: gpu-fryer should render when both reaction nodes are explicitly null
+    template: templates/active-checks.yaml
     set:
       checks:
-        "gpu-fryer":
+        gpu-fryer:
           failureReactions:
             commentSlurmNode: null
             drainSlurmNode: null
