@@ -711,6 +711,7 @@ helmtest: check-helm
 	@helm unittest $(CHART_PATH)/slurm-cluster-storage
 	@helm unittest $(CHART_PATH)/soperator-notifier
 	@helm unittest $(CHART_PATH)/nodesets
+	@helm unittest $(CHART_PATH)/soperator-activechecks
 
 check-helm:
 	@echo "Checking Helm installation..."
