@@ -68,7 +68,7 @@ spec:
           timeout: 5s
         {{- if $hasPublicEndpoint }}
         otlp:
-          endpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
+          endpoint: {{ .Values.observability.opentelemetry.publicEndpoint }}
           balancer_name: round_robin
           compression: snappy
           retry_on_failure:

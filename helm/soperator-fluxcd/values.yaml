@@ -108,6 +108,7 @@ observability:
   region: eu-north1
   opentelemetry:
     enabled: true
+    publicEndpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
     namespace: logs-system
     extraHeaders: {}
     logs:
