@@ -1,0 +1,6 @@
+apiVersion: v2
+name: helm-soperator-fluxcd-bootstrap
+description: Bootstrap Helm chart for installing soperator-fluxcd via FluxCD
+type: application
+version: 1.23.1
+appVersion: "1.23.1"

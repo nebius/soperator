@@ -1,6 +1,7 @@
 {{- if and .Values.observability.enabled
             .Values.observability.opentelemetry.enabled
             .Values.observability.opentelemetry.logs.values.jailLogs.enabled }}
+{{- include "soperator-fluxcd.validatePublicEndpointTokenKind" . -}}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -8,6 +9,10 @@ metadata:
   labels:
   {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
+  {{- with .Values.observability.opentelemetry.logs.driftDetection }}
+  driftDetection:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   chart:
     spec:
       chart: opentelemetry-collector
@@ -226,6 +231,10 @@ spec:
           timeout: 5s
           headers:
             iam-container: {{ .Values.observability.logsProjectId }}
+            {{- $extraHeaders := .Values.observability.opentelemetry.extraHeaders }}
+            {{- if and $extraHeaders (gt (len $extraHeaders) 0) }}
+            {{- toYaml $extraHeaders | nindent 12 }}
+            {{- end }}
           auth:
             authenticator: bearertokenauth
         {{- end }}
@@ -236,7 +245,11 @@ spec:
           endpoint: 0.0.0.0:13133
         {{- if $hasPublicEndpoint }}
         bearertokenauth:
+        {{- if eq .Values.observability.publicEndpointTokenKind "secret" }}
           filename: "/o11ytoken/accessToken"
+        {{- else if eq .Values.observability.publicEndpointTokenKind "hostPath" }}
+          filename: "/o11ytoken/tsa-token"
+        {{- end }}
         {{- end }}
       service:
         extensions:
@@ -279,8 +292,14 @@ spec:
     extraVolumes:
     {{- if $hasPublicEndpoint }}
     - name: o11ytoken
+      {{- if eq .Values.observability.publicEndpointTokenKind "secret" }}
       secret:
         secretName: o11y-writer-sa-token
+      {{- else if eq .Values.observability.publicEndpointTokenKind "hostPath" }}
+      hostPath:
+        path: /mnt/cloud-metadata
+        type: Directory
+      {{- end }}
     {{- end }}
     - name: soperator-outputs
       hostPath:

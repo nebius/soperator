@@ -1,7 +1,7 @@
 ---
 
 - name: Replace SSH "message of the day" scripts
-  hosts: all, localhost
+  hosts: localhost
   become: true
   roles:
     - motd

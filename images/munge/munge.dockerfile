@@ -1,14 +1,19 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-FROM cr.eu-north1.nebius.cloud/soperator/ubuntu:noble AS munge
+# https://github.com/nebius/ml-containers/pull/42
+FROM cr.eu-north1.nebius.cloud/e00ydq6th0tz1ycxs9/neubuntu:noble-20260109114729 AS munge
 
-ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && \
+    apt -y install \
+        munge \
+        libmunge-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install munge
-COPY images/common/scripts/install_munge.sh /opt/bin/
-RUN chmod +x /opt/bin/install_munge.sh && \
-    /opt/bin/install_munge.sh && \
-    rm /opt/bin/install_munge.sh
+# Fix permissions \
+RUN chmod -R 700 /etc/munge /var/log/munge && \
+    chmod -R 711 /var/lib/munge && \
+    chown -R 0:0 /etc/munge /var/log/munge /var/lib/munge
 
 # Update linker cache
 RUN ldconfig

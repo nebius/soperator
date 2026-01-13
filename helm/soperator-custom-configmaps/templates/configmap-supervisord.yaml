@@ -1,0 +1,14 @@
+{{- if .Values.configMaps.supervisord.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.configMaps.supervisord.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "soperator-custom-configmaps.labels" . | nindent 4 }}
+data:
+  {{- range .Values.configMaps.supervisord.files }}
+  {{ . }}: |
+{{ tpl ($.Files.Get (printf "config-files/%s" .)) $ | indent 4 }}
+  {{- end }}
+{{- end }}
