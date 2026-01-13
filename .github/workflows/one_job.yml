@@ -53,7 +53,7 @@ jobs:
     name: Detect Changes
     runs-on: ubuntu-latest
     outputs:
-      has_code_changes: ${{ steps.filter.outputs.has_code_changes }}
+      should_build: ${{ steps.filter.outputs.has_code_changes == 'true' || github.event_name != 'pull_request' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -72,7 +72,7 @@ jobs:
 
   pre-build:
     needs: [changes]
-    if: needs.changes.outputs.has_code_changes == 'true'
+    if: needs.changes.outputs.should_build == 'true'
     runs-on:
       - self-hosted
       - build
@@ -133,7 +133,7 @@ jobs:
 
   lint:
     needs: [changes]
-    if: needs.changes.outputs.has_code_changes == 'true'
+    if: needs.changes.outputs.should_build == 'true'
     runs-on:
       - self-hosted
       - build
@@ -173,7 +173,7 @@ jobs:
 
   build-docker-images:
     needs: [changes, pre-build]
-    if: needs.changes.outputs.has_code_changes == 'true'
+    if: needs.changes.outputs.should_build == 'true'
     runs-on:
       - self-hosted
       - X64
@@ -302,7 +302,7 @@ jobs:
 
   build-helm-charts:
     needs: [changes, pre-build]
-    if: needs.changes.outputs.has_code_changes == 'true'
+    if: needs.changes.outputs.should_build == 'true'
     runs-on:
       - self-hosted
       - X64
@@ -347,7 +347,7 @@ jobs:
   helm-integration-test:
     name: Helm Chart Integration Test with Built Images
     needs: [changes, build-docker-images, build-helm-charts]
-    if: needs.changes.outputs.has_code_changes == 'true'
+    if: needs.changes.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -438,9 +438,9 @@ jobs:
       - name: Check CI status
         shell: bash
         run: |
-          # If no code changes, all jobs should be skipped - that's OK
-          if [[ "${{ needs.changes.outputs.has_code_changes }}" != "true" ]]; then
-            echo "No code changes - CI skipped successfully"
+          # If build was skipped (PR with no code changes), that's OK
+          if [[ "${{ needs.changes.outputs.should_build }}" != "true" ]]; then
+            echo "No code changes in PR - CI skipped successfully"
             exit 0
           fi
 
