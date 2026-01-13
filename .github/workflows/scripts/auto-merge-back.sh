@@ -101,7 +101,7 @@ create_merge_branch() {
 
     # Use original PR branch name if available, otherwise use release branch with SHA
     if [ -n "${PR_HEAD_REF}" ]; then
-        NEW_BRANCH="merge-to-main-from/${PR_HEAD_REF}"
+        NEW_BRANCH="merge-to-main-from/pr-${PR_NUMBER}/${PR_HEAD_REF}"
     else
         NEW_BRANCH="merge-to-main-from/${RELEASE_BRANCH}-${COMMIT_SHORT_SHA}"
     fi
@@ -157,6 +157,12 @@ ${COMMIT_MESSAGE}
 }
 
 main() {
+    # Skip re-runs to avoid duplicate PR creation attempts
+    if [ "${GITHUB_RUN_ATTEMPT:-1}" -gt 1 ]; then
+        echo "Skipping re-run (attempt ${GITHUB_RUN_ATTEMPT}). Merge-back PRs should only be created on first run."
+        exit 0
+    fi
+
     get_commit_info
     get_github_username
     get_pr_info

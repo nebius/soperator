@@ -30,8 +30,8 @@ RUN chmod 644 /etc/passwd /etc/group && chown 0:0 /etc/passwd /etc/group && \
 # Install minimal python packages for Ansible
 RUN apt-get update && \
     apt-get install -y \
-        python3.12="3.12.3-1ubuntu0.9" \
-        python3.12-venv="3.12.3-1ubuntu0.9"
+        python3.12="3.12.3-1ubuntu0.10" \
+        python3.12-venv="3.12.3-1ubuntu0.10"
 
 # Install Ansible and base configs
 COPY ansible/ansible.cfg ansible/requirements.txt ansible/run.yml /opt/ansible/
