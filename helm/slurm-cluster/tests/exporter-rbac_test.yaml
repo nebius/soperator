@@ -1,0 +1,210 @@
+suite: test exporter RBAC resources
+templates:
+  - templates/exporter-serviceaccount.yaml
+  - templates/exporter-role.yaml
+  - templates/exporter-rolebinding.yaml
+  - templates/slurm-cluster-cr.yaml
+tests:
+  # Test ServiceAccount creation with default values
+  - it: should create ServiceAccount with default values
+    template: templates/exporter-serviceaccount.yaml
+    set:
+      clusterName: test-cluster
+    asserts:
+      - isKind:
+          of: ServiceAccount
+      - equal:
+          path: metadata.name
+          value: slurm-exporter-sa
+      - equal:
+          path: metadata.namespace
+          value: NAMESPACE
+      - matchRegex:
+          path: metadata.labels["app.kubernetes.io/component"]
+          pattern: slurm-exporter
+
+  # Test ServiceAccount with custom name
+  - it: should create ServiceAccount with custom name
+    template: templates/exporter-serviceaccount.yaml
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        exporter:
+          serviceAccount:
+            create: true
+            name: custom-sa
+    asserts:
+      - isKind:
+          of: ServiceAccount
+      - equal:
+          path: metadata.name
+          value: custom-sa
+
+  # Test ServiceAccount not created when create=false
+  - it: should not create ServiceAccount when create is false
+    template: templates/exporter-serviceaccount.yaml
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        exporter:
+          serviceAccount:
+            create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Test Role creation with default values
+  - it: should create Role with correct permissions
+    template: templates/exporter-role.yaml
+    set:
+      clusterName: test-cluster
+    asserts:
+      - isKind:
+          of: Role
+      - equal:
+          path: metadata.name
+          value: test-cluster-exporter-role
+      - equal:
+          path: metadata.namespace
+          value: NAMESPACE
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["secrets"]
+            verbs: ["get", "list", "watch"]
+
+  # Test Role not created when rbac.create=false
+  - it: should not create Role when rbac.create is false
+    template: templates/exporter-role.yaml
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        exporter:
+          rbac:
+            create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Test RoleBinding creation with default values
+  - it: should create RoleBinding with correct references
+    template: templates/exporter-rolebinding.yaml
+    set:
+      clusterName: test-cluster
+    asserts:
+      - isKind:
+          of: RoleBinding
+      - equal:
+          path: metadata.name
+          value: test-cluster-exporter-role-binding
+      - equal:
+          path: metadata.namespace
+          value: NAMESPACE
+      - equal:
+          path: roleRef.kind
+          value: Role
+      - equal:
+          path: roleRef.name
+          value: test-cluster-exporter-role
+      - equal:
+          path: roleRef.apiGroup
+          value: rbac.authorization.k8s.io
+      - contains:
+          path: subjects
+          content:
+            kind: ServiceAccount
+            name: slurm-exporter-sa
+            namespace: NAMESPACE
+
+  # Test RoleBinding with custom ServiceAccount name
+  - it: should create RoleBinding with custom ServiceAccount name
+    template: templates/exporter-rolebinding.yaml
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        exporter:
+          serviceAccount:
+            create: true
+            name: custom-sa
+    asserts:
+      - isKind:
+          of: RoleBinding
+      - contains:
+          path: subjects
+          content:
+            kind: ServiceAccount
+            name: custom-sa
+            namespace: NAMESPACE
+
+  # Test RoleBinding not created when rbac.create=false
+  - it: should not create RoleBinding when rbac.create is false
+    template: templates/exporter-rolebinding.yaml
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        exporter:
+          rbac:
+            create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Test SlurmCluster CR uses ServiceAccount when created
+  - it: should set serviceAccountName in SlurmCluster CR when ServiceAccount is created
+    template: templates/slurm-cluster-cr.yaml
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        exporter:
+          serviceAccount:
+            create: true
+    asserts:
+      - equal:
+          path: spec.slurmNodes.exporter.serviceAccountName
+          value: slurm-exporter-sa
+
+  # Test SlurmCluster CR uses custom ServiceAccount name
+  - it: should set custom serviceAccountName in SlurmCluster CR
+    template: templates/slurm-cluster-cr.yaml
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        exporter:
+          serviceAccount:
+            create: true
+            name: my-custom-sa
+    asserts:
+      - equal:
+          path: spec.slurmNodes.exporter.serviceAccountName
+          value: my-custom-sa
+
+  # Test SlurmCluster CR uses external ServiceAccount when create=false
+  - it: should set external serviceAccountName in SlurmCluster CR when create is false
+    template: templates/slurm-cluster-cr.yaml
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        exporter:
+          serviceAccount:
+            create: false
+            name: external-sa
+    asserts:
+      - equal:
+          path: spec.slurmNodes.exporter.serviceAccountName
+          value: external-sa
+
+  # Test SlurmCluster CR uses default ServiceAccount name when name is empty but create is true
+  - it: should use default serviceAccountName in SlurmCluster CR when serviceAccount.name is empty
+    template: templates/slurm-cluster-cr.yaml
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        exporter:
+          serviceAccount:
+            create: true
+            name: ""
+    asserts:
+      - equal:
+          path: spec.slurmNodes.exporter.serviceAccountName
+          value: slurm-exporter-sa

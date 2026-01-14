@@ -24,11 +24,11 @@ type SlurmNodeSet struct {
 	PriorityClass string
 	Annotations   map[string]string
 
-	ContainerSlurmd        Container
-	ContainerMunge         Container
-	CustomInitContainers   []corev1.Container
-	CgroupVersion          string
-	AppArmorProfileDefault bool
+	ContainerSlurmd           Container
+	ContainerMunge            Container
+	CustomInitContainers      []corev1.Container
+	CgroupVersion             string
+	AppArmorProfileUseDefault bool
 
 	SupervisorDConfigMapDefault bool
 	SupervisorDConfigMapName    string
@@ -49,6 +49,7 @@ type SlurmNodeSet struct {
 	SharedMemorySize   *resource.Quantity
 
 	Maintenance             *consts.MaintenanceMode
+	NodeExtra               string
 	EnableHostUserNamespace bool
 }
 
@@ -80,6 +81,7 @@ func BuildSlurmNodeSetFrom(
 				Resources:            nsSpec.Slurmd.Resources.DeepCopy(),
 				SecurityLimitsConfig: nsSpec.Slurmd.Security.LimitsConfig,
 				AppArmorProfile:      nsSpec.Slurmd.Security.AppArmorProfile,
+				ProcMount:            nsSpec.Slurmd.Security.ProcMount,
 			},
 			consts.ContainerNameSlurmd,
 		),
@@ -93,9 +95,9 @@ func BuildSlurmNodeSetFrom(
 			},
 			consts.ContainerNameMunge,
 		),
-		CustomInitContainers:   slices.Clone(nsSpec.CustomInitContainers),
-		CgroupVersion:          nsSpec.Slurmd.CgroupVersion,
-		AppArmorProfileDefault: useDefaultAppArmorProfile,
+		CustomInitContainers:      slices.Clone(nsSpec.CustomInitContainers),
+		CgroupVersion:             nsSpec.Slurmd.CgroupVersion,
+		AppArmorProfileUseDefault: useDefaultAppArmorProfile,
 		//
 		GPU: nsSpec.GPU.DeepCopy(),
 		//
@@ -112,6 +114,7 @@ func BuildSlurmNodeSetFrom(
 		SharedMemorySize: nsSpec.Slurmd.Volumes.SharedMemorySize,
 		//
 		Maintenance:             maintenance,
+		NodeExtra:               nsSpec.NodeConfig.Dynamic,
 		EnableHostUserNamespace: nsSpec.EnableHostUserNamespace,
 	}
 

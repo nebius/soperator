@@ -6,6 +6,10 @@ metadata:
   labels:
   {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
+  {{- with .Values.tailscale.driftDetection }}
+  driftDetection:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   chart:
     spec:
       chart: raw

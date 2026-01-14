@@ -1,0 +1,6 @@
+apiVersion: v2
+name: helm-soperator-backup-config
+description: Render backup schedule configuration for k8up
+type: application
+version: 1.23.1
+appVersion: "1.23.1"

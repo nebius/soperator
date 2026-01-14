@@ -1,8 +1,6 @@
 package populate_jail
 
 import (
-	"fmt"
-
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +33,8 @@ func RenderPopulateJailJob(
 		common.RenderVolumeJailFromSource(volumeSources, *populateJail.VolumeJail.VolumeSourceName),
 	}
 	if populateJail.JailSnapshotVolume != nil {
-		snapshotVolume := common.RenderVolumeJailSnapshotFromSource(volumeSources, *populateJail.JailSnapshotVolume.VolumeSourceName)
+		snapshotVolume := common.RenderVolumeJailSnapshotFromSource(
+			volumeSources, *populateJail.JailSnapshotVolume.VolumeSourceName)
 		volumes = append(volumes, snapshotVolume)
 	}
 
@@ -51,12 +50,8 @@ func RenderPopulateJailJob(
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-					Annotations: map[string]string{
-						fmt.Sprintf(
-							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNamePopulateJail,
-						): populateJail.ContainerPopulateJail.AppArmorProfile,
-					},
+					Labels:      labels,
+					Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNamePopulateJail),
 				},
 				Spec: corev1.PodSpec{
 					HostUsers:         populateJail.HostUsers,
