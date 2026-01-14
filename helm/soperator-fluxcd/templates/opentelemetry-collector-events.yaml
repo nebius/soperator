@@ -143,6 +143,9 @@ spec:
               "^\\{")
             - set(severity_text, "INFO")
             - set(attributes["cluster"], "${env:CLUSTER_NAME}")
+            {{- if .Values.observability.clusterId }}
+            - set(attributes["sp_resource_id"], "${env:CLUSTER_ID}")
+            {{- end }}
       receivers:
         k8sobjects:
           auth_type: serviceAccount
@@ -179,6 +182,10 @@ spec:
           fieldPath: spec.nodeName
     - name: CLUSTER_NAME
       value: {{ .Values.observability.clusterName | quote }}
+    {{- if .Values.observability.clusterId }}
+    - name: CLUSTER_ID
+      value: {{ .Values.observability.clusterId | quote }}
+    {{- end }}
     - name: GOMAXPROCS
       value: "1"
     image:
