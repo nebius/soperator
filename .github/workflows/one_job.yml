@@ -14,6 +14,19 @@ on:
         required: false
         default: "false"
 
+  workflow_dispatch:
+    inputs:
+      unstable:
+        description: "Build unstable version"
+        type: string
+        required: false
+        default: "true"
+      multi_arch:
+        description: "Build for both amd64 and arm64 platforms"
+        type: string
+        required: false
+        default: "false"
+
   push:
     branches:
       - main
@@ -40,7 +53,7 @@ jobs:
     name: Detect Changes
     runs-on: ubuntu-latest
     outputs:
-      has_code_changes: ${{ steps.filter.outputs.has_code_changes }}
+      should_build: ${{ steps.filter.outputs.has_code_changes == 'true' || github.event_name != 'pull_request' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -59,7 +72,7 @@ jobs:
 
   pre-build:
     needs: [changes]
-    if: needs.changes.outputs.has_code_changes == 'true'
+    if: needs.changes.outputs.should_build == 'true'
     runs-on:
       - self-hosted
       - build
@@ -120,7 +133,7 @@ jobs:
 
   lint:
     needs: [changes]
-    if: needs.changes.outputs.has_code_changes == 'true'
+    if: needs.changes.outputs.should_build == 'true'
     runs-on:
       - self-hosted
       - build
@@ -160,7 +173,7 @@ jobs:
 
   build-docker-images:
     needs: [changes, pre-build]
-    if: needs.changes.outputs.has_code_changes == 'true'
+    if: needs.changes.outputs.should_build == 'true'
     runs-on:
       - self-hosted
       - X64
@@ -298,7 +311,7 @@ jobs:
 
   build-helm-charts:
     needs: [changes, pre-build]
-    if: needs.changes.outputs.has_code_changes == 'true'
+    if: needs.changes.outputs.should_build == 'true'
     runs-on:
       - self-hosted
       - X64
@@ -343,7 +356,7 @@ jobs:
   helm-integration-test:
     name: Helm Chart Integration Test with Built Images
     needs: [changes, build-docker-images, build-helm-charts]
-    if: needs.changes.outputs.has_code_changes == 'true'
+    if: needs.changes.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -434,9 +447,9 @@ jobs:
       - name: Check CI status
         shell: bash
         run: |
-          # If no code changes, all jobs should be skipped - that's OK
-          if [[ "${{ needs.changes.outputs.has_code_changes }}" != "true" ]]; then
-            echo "No code changes - CI skipped successfully"
+          # If build was skipped (PR with no code changes), that's OK
+          if [[ "${{ needs.changes.outputs.should_build }}" != "true" ]]; then
+            echo "No code changes in PR - CI skipped successfully"
             exit 0
           fi
 
@@ -450,3 +463,37 @@ jobs:
             exit 1
           fi
           echo "All CI jobs passed!"
+
+  notify-failure:
+    name: Notify Slack on failure
+    needs: [ci-success]
+    if: |
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      (needs.ci-success.result == 'failure' || needs.ci-success.result == 'cancelled')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        shell: bash
+        run: |
+          STATUS="${{ needs.ci-success.result }}"
+          if [[ "$STATUS" == "failure" ]]; then
+            EMOJI=":x:"
+            COLOR="danger"
+          else
+            EMOJI=":warning:"
+            COLOR="warning"
+          fi
+
+          curl -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-type: application/json' \
+            --data "{
+              \"attachments\": [{
+                \"color\": \"${COLOR}\",
+                \"title\": \"${EMOJI} Nightly Build ${STATUS}\",
+                \"text\": \"Branch: ${{ github.ref_name }}\nWorkflow: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>\",
+                \"footer\": \"soperator nightly build\"
+              }]
+            }"

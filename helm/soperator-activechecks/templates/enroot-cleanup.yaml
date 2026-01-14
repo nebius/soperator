@@ -1,3 +1,4 @@
+{{- include "soperator-activechecks.checkReactionsConflict" (dict "name" "enrootCleanup" "vals" .Values) -}}
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:

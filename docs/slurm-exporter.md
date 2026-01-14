@@ -65,7 +65,7 @@ Boolean state flag label convention:
 
 | Metric Name & Type | Description & Labels |
 |-------------------|---------------------|
-| **slurm_node_info**<br>*Gauge* | Provides detailed information about SLURM nodes<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br>• `instance_id` - Kubernetes instance identifier<br>• `state_base` - Base node state (IDLE, ALLOCATED, DOWN, ERROR, MIXED, UNKNOWN)<br>• `state_is_drain` - Whether node is in drain state ("true"/"false")<br>• `state_is_maintenance` - Whether node is in maintenance state ("true"/"false")<br>• `state_is_reserved` - Whether node is in reserved state ("true"/"false")<br>• `state_is_completing` - Whether node is in completing state ("true" or empty)<br>• `state_is_fail` - Whether node is in fail state ("true" or empty)<br>• `state_is_planned` - Whether node is in planned state ("true" or empty)<br>• `state_is_not_responding` - Whether the node is marked as not responding ("true" or empty)<br>• `state_is_invalid` - Whether the node state is considered invalid by SLURM ("true" or empty)<br>• `is_unavailable` - Computed by the exporter: "true" when the node is considered unavailable (DOWN+* or IDLE+DRAIN+*), empty string otherwise<br>• `reservation_name` - Reservation that currently includes the node (trimmed to 50 characters)<br>• `address` - IP address of the node<br>• `reason` - Reason for current node state (empty string if node has no reason set) |
+| **slurm_node_info**<br>*Gauge* | Provides detailed information about SLURM nodes<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br>• `instance_id` - Kubernetes instance identifier<br>• `state_base` - Base node state (IDLE, ALLOCATED, DOWN, ERROR, MIXED, UNKNOWN)<br>• `state_is_drain` - Whether node is in drain state ("true"/"false")<br>• `state_is_maintenance` - Whether node is in maintenance state ("true"/"false")<br>• `state_is_reserved` - Whether node is in reserved state ("true"/"false")<br>• `state_is_completing` - Whether node is in completing state ("true" or empty)<br>• `state_is_fail` - Whether node is in fail state ("true" or empty)<br>• `state_is_planned` - Whether node is in planned state ("true" or empty)<br>• `state_is_not_responding` - Whether the node is marked as not responding ("true" or empty)<br>• `state_is_invalid` - Whether the node state is considered invalid by SLURM ("true" or empty)<br>• `is_unavailable` - Computed by the exporter: "true" when the node is considered unavailable (DOWN+* or IDLE+DRAIN+*), empty string otherwise<br>• `reservation_name` - Reservation that currently includes the node (trimmed to 50 characters)<br>• `address` - IP address of the node<br>• `reason` - Reason for current node state (empty string if node has no reason set)<br>• `comment` - Comment set on the node (e.g., by active checks when GPU health check fails) |
 | **slurm_node_gpu_seconds_total**<br>*Counter* | Total GPU seconds accumulated on SLURM nodes<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br>• `state_base` - Base node state<br>• `state_is_drain` - Drain state flag<br>• `state_is_maintenance` - Maintenance state flag<br>• `state_is_reserved` - Reserved state flag |
 | **slurm_node_fails_total**<br>*Counter* | Total number of node state transitions to failed states (DOWN/DRAIN)<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br>• `state_base` - Base node state at time of failure<br>• `state_is_drain` - Drain state flag<br>• `state_is_maintenance` - Maintenance state flag<br>• `state_is_reserved` - Reserved state flag<br>• `reason` - Reason for the node failure |
 | **slurm_node_unavailability_duration_seconds**<br>*Histogram* | Duration of completed node unavailability events (DOWN+* or IDLE+DRAIN+*)<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br><br>**Note:** Observations are recorded when unavailability events complete. Duration tracking is reset on exporter restarts, which may affect accuracy |
@@ -120,6 +120,25 @@ curl http://localhost:8081/metrics
 # Or with custom monitoring address
 ./soperator-exporter --monitoring-bind-address=:9090
 curl http://localhost:9090/metrics
+```
+
+## Local Development
+
+To run the exporter locally against a cluster for debugging:
+
+1. Port-forward the SLURM REST API service:
+```bash
+kubectl port-forward -n soperator svc/soperator-rest-svc 6820:6820
+```
+
+2. Run the exporter (it finds the JWT secret in the cluster automatically):
+```bash
+go run ./cmd/exporter/main.go --cluster-name=soperator --kubeconfig-path=$HOME/.kube/config
+```
+
+3. View the metrics:
+```bash
+curl localhost:8080/metrics
 ```
 
 ## Grafana Dashboard Example

@@ -1,4 +1,5 @@
 {{- if .Values.checks.ensureDirSnccldLogs.enabled -}}
+{{- include "soperator-activechecks.checkReactionsConflict" (dict "name" "ensureDirSnccldLogs" "vals" .Values) -}}
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
