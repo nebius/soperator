@@ -702,16 +702,10 @@ $(FLUX): $(LOCALBIN)
 
 .PHONY: helmtest check-helm install-helm install-unittest
 
-## helm unittest: Run helm unittest with dependency check
+## helm unittest: Run helm unittest for all charts
 helmtest: check-helm
 	@echo "Running helm unittest"
-	@helm unittest $(CHART_PATH)/soperator
-	@helm unittest $(CHART_PATH)/soperator-fluxcd
-	@helm unittest $(CHART_PATH)/slurm-cluster
-	@helm unittest $(CHART_PATH)/slurm-cluster-storage
-	@helm unittest $(CHART_PATH)/soperator-notifier
-	@helm unittest $(CHART_PATH)/nodesets
-	@helm unittest $(CHART_PATH)/soperator-activechecks
+	@helm unittest $(CHART_PATH)/*/
 
 check-helm:
 	@echo "Checking Helm installation..."
