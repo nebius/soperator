@@ -213,6 +213,9 @@ spec:
             error_mode: ignore
             statements:
             - set(attributes["cluster"], {{ .Values.observability.clusterName | quote }})
+            {{- if .Values.observability.clusterId }}
+            - set(attributes["sp_resource_id"], "${env:CLUSTER_ID}")
+            {{- end }}
       exporters:
         otlphttp/victorialogs:
           compression: gzip
@@ -278,6 +281,10 @@ spec:
     extraEnvs:
     - name: GOMAXPROCS
       value: "1"
+    {{- if .Values.observability.clusterId }}
+    - name: CLUSTER_ID
+      value: {{ .Values.observability.clusterId | quote }}
+    {{- end }}
     extraVolumeMounts:
     {{- if $hasPublicEndpoint }}
     - mountPath: /o11ytoken

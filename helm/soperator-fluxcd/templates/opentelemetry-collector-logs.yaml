@@ -136,6 +136,9 @@ spec:
             statements:
             - set(attributes["cluster"], "${env:CLUSTER_NAME}")
             - set(attributes["k8s.node.name"], "${env:K8S_NODE_NAME}")
+            {{- if .Values.observability.clusterId }}
+            - set(attributes["sp_resource_id"], "${env:CLUSTER_ID}")
+            {{- end }}
       receivers:
         {{- if .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
         filelog/nodelogs:
@@ -346,6 +349,10 @@ spec:
           fieldPath: spec.nodeName
     - name: CLUSTER_NAME
       value: {{ .Values.observability.clusterName | quote }}
+    {{- if .Values.observability.clusterId }}
+    - name: CLUSTER_ID
+      value: {{ .Values.observability.clusterId | quote }}
+    {{- end }}
     - name: GOMAXPROCS
       value: "1"
     extraVolumeMounts:

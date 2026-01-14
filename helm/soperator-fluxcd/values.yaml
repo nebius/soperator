@@ -101,6 +101,7 @@ mariadbOperator:
 observability:
   enabled: true
   clusterName: soperator
+  clusterId: ""
   publicEndpointEnabled: true
   publicEndpointTokenKind: secret
   logsProjectId: default-project-id
