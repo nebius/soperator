@@ -1,11 +1,9 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-# https://github.com/nebius/ml-containers/pull/42
-FROM cr.eu-north1.nebius.cloud/e00ydq6th0tz1ycxs9/slurm:25.05.5-20260109162844 AS worker_slurmd
-
 ARG SLURM_VERSION
-ARG OPENMPI_VERSION=4.1.7a1
-ARG PYXIS_VERSION=0.21.0
+
+# https://github.com/nebius/ml-containers/pull/43
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260114113418 AS worker_slurmd
 
 # Install useful packages
 RUN apt-get update && \
@@ -21,6 +19,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install OpenMPI
+ARG OPENMPI_VERSION=4.1.7a1
 COPY images/common/scripts/install_openmpi.sh /opt/bin/
 RUN chmod +x /opt/bin/install_openmpi.sh && \
     /opt/bin/install_openmpi.sh && \
@@ -62,6 +61,8 @@ RUN chown 0:0 /etc/enroot/enroot.conf && \
     chmod 644 /etc/enroot/enroot.conf.d/custom-dirs.conf
 
 # Install slurm pyxis plugin
+ARG SLURM_VERSION
+ARG PYXIS_VERSION=0.21.0
 RUN apt-get update && \
     apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \
     apt-get clean && \

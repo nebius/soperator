@@ -1,10 +1,9 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-# https://github.com/nebius/ml-containers/pull/42
-FROM cr.eu-north1.nebius.cloud/e00ydq6th0tz1ycxs9/slurm:25.05.5-20260109162844 AS slurm_check_job
-
 ARG SLURM_VERSION
-ARG PYXIS_VERSION=0.21.0
+
+# https://github.com/nebius/ml-containers/pull/43
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260114113418 AS slurm_check_job
 
 # Install slurm сhroot plugin
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
@@ -27,6 +26,8 @@ RUN chown 0:0 /etc/enroot/enroot.conf && \
     chown 0:0 /etc/enroot/enroot.conf.d/custom-dirs.conf && \
     chmod 644 /etc/enroot/enroot.conf.d/custom-dirs.conf
 
+ARG SLURM_VERSION
+ARG PYXIS_VERSION=0.21.0
 # Install slurm pyxis plugin \
 RUN apt-get update && \
     apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \

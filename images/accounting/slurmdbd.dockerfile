@@ -1,7 +1,9 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-# https://github.com/nebius/ml-containers/pull/42
-FROM cr.eu-north1.nebius.cloud/e00ydq6th0tz1ycxs9/slurm:25.05.5-20260109162844 AS controller_slurmdbd
+ARG SLURM_VERSION
+
+# https://github.com/nebius/ml-containers/pull/43
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260114113418 AS controller_slurmdbd
 
 # Expose the port used for accessing slurmdbd
 EXPOSE 6819
