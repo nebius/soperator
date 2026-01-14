@@ -705,7 +705,7 @@ $(FLUX): $(LOCALBIN)
 ## helm unittest: Run helm unittest for all charts
 helmtest: check-helm
 	@echo "Running helm unittest"
-	@helm unittest $(CHART_PATH)/*
+	@helm unittest $(CHART_PATH)/*/
 
 check-helm:
 	@echo "Checking Helm installation..."
