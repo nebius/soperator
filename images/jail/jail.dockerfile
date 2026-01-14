@@ -32,11 +32,6 @@ RUN apt update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Download NCCL tests executables
-COPY ansible/nccl-tests.yml /opt/ansible/nccl-tests.yml
-COPY ansible/roles/nccl-tests /opt/ansible/roles/nccl-tests
-RUN ansible-playbook -i inventory/ -c local nccl-tests.yml
-
 # Install AWS CLI
 COPY images/common/scripts/install_awscli.sh /opt/bin/
 RUN chmod +x /opt/bin/install_awscli.sh && \
@@ -58,17 +53,6 @@ RUN ansible-playbook -i inventory/ -c local nvtop.yml
 COPY ansible/docker-cli.yml /opt/ansible/docker-cli.yml
 COPY ansible/roles/docker-cli /opt/ansible/roles/docker-cli
 RUN ansible-playbook -i inventory/ -c local docker-cli.yml
-
-# Install OpenMPI
-COPY ansible/openmpi.yml /opt/ansible/openmpi.yml
-COPY ansible/roles/openmpi /opt/ansible/roles/openmpi
-RUN ansible-playbook -i inventory/ -c local openmpi.yml
-
-# Install dcgmi tools
-# https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/dcgm-diagnostics.html
-COPY ansible/dcgmi.yml /opt/ansible/dcgmi.yml
-COPY ansible/roles/dcgmi /opt/ansible/roles/dcgmi
-RUN ansible-playbook -i inventory/ -c local dcgmi.yml
 
 ## Install GDRCopy libraries & executables
 COPY ansible/gdrcopy.yml /opt/ansible/gdrcopy.yml
