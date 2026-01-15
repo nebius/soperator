@@ -188,7 +188,7 @@ slurmNodes:
     slurmConfig:
       accountingStorageTRES: "CPU,Mem,Node,VMem,Gres/gpu"
       jobAcctGatherType: "jobacct_gather/cgroup"
-      jobAcctGatherFrequency: 30
+      jobAcctGatherFrequency: 0
       priorityWeightAge: 0
       priorityWeightFairshare: 0
       priorityWeightQOS: 0

@@ -112,7 +112,7 @@ checks:
   upgradeHealthChecker:
     suspend: true
     runAfterCreation: false
-    healthCheckerVersion: "1.0.0-171.251205"
+    healthCheckerVersion: "1.0.0-178.260115"
   waitForTopology:
     suspend: true
     runAfterCreation: true
