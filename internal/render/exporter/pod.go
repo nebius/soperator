@@ -35,7 +35,7 @@ func renderPodTemplateSpec(
 			PriorityClassName:  clusterValues.SlurmExporter.PriorityClass,
 			InitContainers:     initContainers,
 			Containers:         []corev1.Container{renderContainerExporter(clusterValues)},
-			ServiceAccountName: ServiceAccountName,
+			ServiceAccountName: clusterValues.SlurmExporter.ServiceAccountName,
 			Volumes:            []corev1.Volume{},
 		},
 	}

@@ -1,4 +1,5 @@
 {{- if and .Values.observability.enabled .Values.observability.opentelemetry.enabled }}
+{{- include "soperator-fluxcd.validatePublicEndpointTokenKind" . -}}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -6,6 +7,10 @@ metadata:
   labels:
   {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
+  {{- with .Values.observability.opentelemetry.logs.driftDetection }}
+  driftDetection:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   chart:
     spec:
       chart: opentelemetry-collector
@@ -56,7 +61,7 @@ spec:
           timeout: 5s
         {{- if $hasPublicEndpoint }}
         otlp:
-          endpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
+          endpoint: {{ .Values.observability.opentelemetry.publicEndpoint }}
           balancer_name: round_robin
           compression: snappy
           retry_on_failure:
@@ -64,6 +69,10 @@ spec:
           timeout: 5s
           headers:
             iam-container: {{ .Values.observability.logsProjectId }}
+            {{- $extraHeaders := .Values.observability.opentelemetry.extraHeaders }}
+            {{- if and $extraHeaders (gt (len $extraHeaders) 0) }}
+            {{- toYaml $extraHeaders | nindent 12 }}
+            {{- end }}
           auth:
             authenticator: bearertokenauth
         {{- end }}
@@ -74,7 +83,11 @@ spec:
           endpoint: 0.0.0.0:13133
         {{- if $hasPublicEndpoint }}
         bearertokenauth:
+        {{- if eq .Values.observability.publicEndpointTokenKind "secret" }}
           filename: "/o11ytoken/accessToken"
+        {{- else if eq .Values.observability.publicEndpointTokenKind "hostPath" }}
+          filename: "/o11ytoken/tsa-token"
+        {{- end }}
         {{- end }}
       processors:
         batch:
@@ -123,6 +136,9 @@ spec:
             statements:
             - set(attributes["cluster"], "${env:CLUSTER_NAME}")
             - set(attributes["k8s.node.name"], "${env:K8S_NODE_NAME}")
+            {{- if .Values.observability.clusterId }}
+            - set(attributes["sp_resource_id"], "${env:CLUSTER_ID}")
+            {{- end }}
       receivers:
         {{- if .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
         filelog/nodelogs:
@@ -333,6 +349,10 @@ spec:
           fieldPath: spec.nodeName
     - name: CLUSTER_NAME
       value: {{ .Values.observability.clusterName | quote }}
+    {{- if .Values.observability.clusterId }}
+    - name: CLUSTER_ID
+      value: {{ .Values.observability.clusterId | quote }}
+    {{- end }}
     - name: GOMAXPROCS
       value: "1"
     extraVolumeMounts:
@@ -357,8 +377,14 @@ spec:
     extraVolumes:
     {{- if $hasPublicEndpoint }}
     - name: o11ytoken
+      {{- if eq .Values.observability.publicEndpointTokenKind "secret" }}
       secret:
         secretName: o11y-writer-sa-token
+      {{- else if eq .Values.observability.publicEndpointTokenKind "hostPath" }}
+      hostPath:
+        path: /mnt/cloud-metadata
+        type: Directory
+      {{- end }}
     {{- end }}
     - hostPath:
         path: /var/log/pods

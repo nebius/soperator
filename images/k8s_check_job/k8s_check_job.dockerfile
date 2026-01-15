@@ -1,30 +1,28 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-ARG BASE_IMAGE=cr.eu-north1.nebius.cloud/soperator/ubuntu:noble
+# https://github.com/nebius/ml-containers/pull/43
+FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260113164317 AS k8s_check_job
 
-FROM $BASE_IMAGE AS k8s_check_job
-
-RUN apt-get update && \
-    apt-get install -y \
-      openssh-client \
-      retry && \
+# Install common packages
+RUN apt install --update -y \
+        openssh-client \
+        retry && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY images/common/scripts/install_kubectl.sh /opt/bin/
-RUN chmod +x /opt/bin/install_kubectl.sh && \
-    /opt/bin/install_kubectl.sh && \
-    rm /opt/bin/install_kubectl.sh
+# Install kubectl
+RUN ARCH="$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')" && \
+    KUBECTL_VERSION="$(curl -Ls https://dl.k8s.io/release/stable.txt)" && \
+    echo "Downloading kubectl from https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" && \
+    curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" && \
+    install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
+    rm kubectl
 
-# Install python
-RUN apt-get update && \
-    apt-get install -y \
-        python3.12="3.12.3-1ubuntu0.10" \
-        python3.12-dev="3.12.3-1ubuntu0.10" \
-        python3.12-venv="3.12.3-1ubuntu0.10" \
-        python3-pip="24.0+dfsg-1ubuntu1.3" \
-        python3-pip-whl="24.0+dfsg-1ubuntu1.3" && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    ln -sf /usr/bin/python3.12 /usr/bin/python && \
-    ln -sf /usr/bin/python3.12 /usr/bin/python3
+# Copy all Ansible playbooks
+COPY ansible/ /opt/ansible/
+
+# Copy the entrypoint script
+COPY images/k8s_check_job/k8s_check_job_entrypoint.sh /opt/bin/
+RUN chmod +x /opt/bin/k8s_check_job_entrypoint.sh
+
+ENTRYPOINT ["/opt/bin/k8s_check_job_entrypoint.sh"]

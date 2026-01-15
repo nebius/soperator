@@ -19,14 +19,12 @@ import (
 )
 
 func Test_GenerateCGroupConfig(t *testing.T) {
-	// Test with CgroupVersion set to CGroupV2
-	clusterV2 := &values.SlurmCluster{
-		NodeWorker: values.SlurmWorker{
-			CgroupVersion: consts.CGroupV2,
-		},
-	}
-	resV2 := generateCGroupConfig(clusterV2)
-	expectedV2 := `CgroupMountpoint=/sys/fs/cgroup
+	t.Run("default config v2", func(t *testing.T) {
+		cluster := &values.SlurmCluster{
+			NodeWorker: values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
 ConstrainCores=yes
 ConstrainDevices=yes
 ConstrainRAMSpace=yes
@@ -34,21 +32,174 @@ CgroupPlugin=cgroup/v2
 ConstrainSwapSpace=no
 EnableControllers=yes
 IgnoreSystemd=yes`
-	assert.Equal(t, expectedV2, resV2.Render())
-	clusterV1 := &values.SlurmCluster{
-		NodeWorker: values.SlurmWorker{
-			CgroupVersion: consts.CGroupV1,
-		},
-	}
-	expectedV1 := `CgroupMountpoint=/sys/fs/cgroup
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("default config v1", func(t *testing.T) {
+		cluster := &values.SlurmCluster{
+			NodeWorker: values.SlurmWorker{CgroupVersion: consts.CGroupV1},
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
 ConstrainCores=yes
 ConstrainDevices=yes
 ConstrainRAMSpace=yes
 CgroupPlugin=cgroup/v1
 ConstrainSwapSpace=yes`
-	resV1 := generateCGroupConfig(clusterV1)
-	assert.Equal(t, expectedV1, resV1.Render())
+		assert.Equal(t, want, got)
+	})
 
+	t.Run("custom overrides defaults", func(t *testing.T) {
+		customConfig := "ConstrainCores=no\nAllowedKmemSpace=yes"
+		cluster := &values.SlurmCluster{
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			CustomCgroupConfig: &customConfig,
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
+ConstrainDevices=yes
+ConstrainRAMSpace=yes
+CgroupPlugin=cgroup/v2
+ConstrainSwapSpace=no
+EnableControllers=yes
+IgnoreSystemd=yes
+###
+# Custom config
+###
+ConstrainCores=no
+AllowedKmemSpace=yes`
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("custom config with comments", func(t *testing.T) {
+		customConfig := "# This is a comment\nConstrainCores=no"
+		cluster := &values.SlurmCluster{
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			CustomCgroupConfig: &customConfig,
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
+ConstrainDevices=yes
+ConstrainRAMSpace=yes
+CgroupPlugin=cgroup/v2
+ConstrainSwapSpace=no
+EnableControllers=yes
+IgnoreSystemd=yes
+###
+# Custom config
+###
+# This is a comment
+ConstrainCores=no`
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("custom config with empty lines between entries", func(t *testing.T) {
+		customConfig := "ConstrainCores=no\n   \nAllowedKmemSpace=yes"
+		cluster := &values.SlurmCluster{
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			CustomCgroupConfig: &customConfig,
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
+ConstrainDevices=yes
+ConstrainRAMSpace=yes
+CgroupPlugin=cgroup/v2
+ConstrainSwapSpace=no
+EnableControllers=yes
+IgnoreSystemd=yes
+###
+# Custom config
+###
+ConstrainCores=no
+AllowedKmemSpace=yes`
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("custom config with malformed lines", func(t *testing.T) {
+		customConfig := "This line lacks equals"
+		cluster := &values.SlurmCluster{
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			CustomCgroupConfig: &customConfig,
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
+ConstrainCores=yes
+ConstrainDevices=yes
+ConstrainRAMSpace=yes
+CgroupPlugin=cgroup/v2
+ConstrainSwapSpace=no
+EnableControllers=yes
+IgnoreSystemd=yes
+###
+# Custom config
+###
+This line lacks equals`
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("empty custom config does not add block", func(t *testing.T) {
+		customConfig := "  \n\t"
+		cluster := &values.SlurmCluster{
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			CustomCgroupConfig: &customConfig,
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
+ConstrainCores=yes
+ConstrainDevices=yes
+ConstrainRAMSpace=yes
+CgroupPlugin=cgroup/v2
+ConstrainSwapSpace=no
+EnableControllers=yes
+IgnoreSystemd=yes`
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("custom config adds new keys without overriding defaults", func(t *testing.T) {
+		customConfig := "AllowedKmemSpace=yes"
+		cluster := &values.SlurmCluster{
+			NodeWorker:         values.SlurmWorker{CgroupVersion: consts.CGroupV2},
+			CustomCgroupConfig: &customConfig,
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
+ConstrainCores=yes
+ConstrainDevices=yes
+ConstrainRAMSpace=yes
+CgroupPlugin=cgroup/v2
+ConstrainSwapSpace=no
+EnableControllers=yes
+IgnoreSystemd=yes
+###
+# Custom config
+###
+AllowedKmemSpace=yes`
+		assert.Equal(t, want, got)
+	})
+}
+
+func Test_parseCGroupKV(t *testing.T) {
+	tests := []struct {
+		name   string
+		line   string
+		wantOK bool
+		want   string
+	}{
+		{name: "spaces around equals", line: " key = value ", wantOK: true, want: "key"},
+		{name: "empty value", line: "key=", wantOK: true, want: "key"},
+		{name: "multiple equals", line: "key=value=extra", wantOK: true, want: "key"},
+		{name: "comment line", line: "# comment", wantOK: false, want: ""},
+		{name: "whitespace only", line: "   \t", wantOK: false, want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := parseCGroupKV(tt.line)
+			assert.Equal(t, tt.wantOK, ok)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestRenderConfigMapSecurityLimits(t *testing.T) {
@@ -417,13 +568,14 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 								},
 							},
 							NodeConfig: slurmv1alpha1.NodeConfig{
-								Static: "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
+								Features: []string{"a", "b"},
+								Static:   "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1 Feature=c,d",
 							},
 						},
 					},
 				},
 			},
-			expected: "NodeName=nodeA-0 NodeHostname=nodeA-0 NodeAddr=nodeA-0.nodeA.soperator.svc RealMemory=2048 Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeA-0 NodeHostname=nodeA-0 NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 Feature=a,b Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
 		},
 		{
 			name: "Single nodeset with multiple replicas",
@@ -452,9 +604,9 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "NodeName=nodeB-0 NodeHostname=nodeB-0 NodeAddr=nodeB-0.nodeB.soperator.svc RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeB-1 NodeHostname=nodeB-1 NodeAddr=nodeB-1.nodeB.soperator.svc RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeB-2 NodeHostname=nodeB-2 NodeAddr=nodeB-2.nodeB.soperator.svc RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeB-0 NodeHostname=nodeB-0 NodeAddr=nodeB-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
+				"NodeName=nodeB-1 NodeHostname=nodeB-1 NodeAddr=nodeB-1.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
+				"NodeName=nodeB-2 NodeHostname=nodeB-2 NodeAddr=nodeB-2.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
 		},
 		{
 			name: "Multiple nodesets with varying replicas",
@@ -500,9 +652,9 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "NodeName=nodeC-0 NodeHostname=nodeC-0 NodeAddr=nodeC-0.nodeC.soperator.svc RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeC-1 NodeHostname=nodeC-1 NodeAddr=nodeC-1.nodeC.soperator.svc RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeD-0 NodeHostname=nodeD-0 NodeAddr=nodeD-0.nodeD.soperator.svc RealMemory=16384 Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeC-0 NodeHostname=nodeC-0 NodeAddr=nodeC-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
+				"NodeName=nodeC-1 NodeHostname=nodeC-1 NodeAddr=nodeC-1.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
+				"NodeName=nodeD-0 NodeHostname=nodeD-0 NodeAddr=nodeD-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=16384 Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
 		},
 		{
 			name: "Nodeset with zero replicas",

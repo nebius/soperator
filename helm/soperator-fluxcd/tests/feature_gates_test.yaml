@@ -46,9 +46,6 @@ tests:
           content: "--metrics-bind-address=127.0.0.1:8080"
       - contains:
           path: spec.values.controllerManager.manager.args
-          content: "--enable-topology-controller=true"
-      - contains:
-          path: spec.values.controllerManager.manager.args
           content: "--leader-elect"
       - contains:
           path: spec.values.controllerManager.manager.args

@@ -15,7 +15,7 @@ import (
 	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
-	"nebius.ai/slurm-operator/internal/utils"
+	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -26,6 +26,7 @@ func RenderStatefulSet(
 	nodeFilters []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
 	controller *values.SlurmController,
+	accountingEnabled bool,
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeController, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeController, clusterName)
@@ -33,7 +34,7 @@ func RenderStatefulSet(
 	labels[consts.LabelControllerType] = consts.LabelControllerTypeMain
 	matchLabels[consts.LabelControllerType] = consts.LabelControllerTypeMain
 
-	nodeFilter := utils.MustGetBy(
+	nodeFilter := sliceutils.MustGetBy(
 		nodeFilters,
 		controller.K8sNodeFilterName,
 		func(f slurmv1.K8sNodeFilter) string { return f.Name },
@@ -50,6 +51,14 @@ func RenderStatefulSet(
 	if check.IsMaintenanceActive(controller.Maintenance) {
 		replicas = ptr.To(consts.ZeroReplicas)
 	}
+
+	initContainers := []corev1.Container{
+		common.RenderContainerMunge(&controller.ContainerMunge),
+	}
+	if accountingEnabled {
+		initContainers = append(initContainers, renderContainerAccountingWaiter(&controller.ContainerSlurmctld))
+	}
+	initContainers = append(initContainers, controller.CustomInitContainers...)
 
 	return kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -83,12 +92,6 @@ func RenderStatefulSet(
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 					Annotations: map[string]string{
-						fmt.Sprintf(
-							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameSlurmctld,
-						): controller.ContainerSlurmctld.AppArmorProfile,
-						fmt.Sprintf(
-							"%s/%s", consts.AnnotationApparmorKey, consts.ContainerNameMunge,
-						): controller.ContainerMunge.AppArmorProfile,
 						consts.AnnotationDefaultContainerName: consts.ContainerNameSlurmctld,
 					},
 				},
@@ -98,14 +101,11 @@ func RenderStatefulSet(
 							ConditionType: appspub.InPlaceUpdateReady,
 						},
 					},
-					HostUsers:    controller.HostUsers,
-					Affinity:     nodeFilter.Affinity,
-					NodeSelector: nodeFilter.NodeSelector,
-					Tolerations:  nodeFilter.Tolerations,
-					InitContainers: append(
-						controller.CustomInitContainers,
-						common.RenderContainerMunge(&controller.ContainerMunge),
-					),
+					HostUsers:      controller.HostUsers,
+					Affinity:       nodeFilter.Affinity,
+					NodeSelector:   nodeFilter.NodeSelector,
+					Tolerations:    nodeFilter.Tolerations,
+					InitContainers: initContainers,
 					Containers: []corev1.Container{
 						renderContainerSlurmctld(&controller.ContainerSlurmctld, controller.CustomVolumeMounts),
 					},
