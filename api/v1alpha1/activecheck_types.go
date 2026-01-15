@@ -207,6 +207,8 @@ type ActiveCheckSlurmJobsStatus struct {
 	// +kubebuilder:validation:Optional
 	LastRunErrorJobsAndReasons []JobAndReason `json:"lastRunErrorJobsAndReasons"`
 	// +kubebuilder:validation:Optional
+	LastRunCancelledJobs []string `json:"lastRunCancelledJobs"`
+	// +kubebuilder:validation:Optional
 	LastRunSubmitTime *metav1.Time `json:"lastRunSubmitTime"`
 }
 

@@ -62,5 +62,6 @@ const (
 	ActiveCheckSlurmRunStatusInProgress ActiveCheckSlurmRunStatus = "InProgress"
 	ActiveCheckSlurmRunStatusComplete   ActiveCheckSlurmRunStatus = "Complete"
 	ActiveCheckSlurmRunStatusFailed     ActiveCheckSlurmRunStatus = "Failed"
+	ActiveCheckSlurmRunStatusCancelled  ActiveCheckSlurmRunStatus = "Cancelled"
 	ActiveCheckSlurmRunStatusError      ActiveCheckSlurmRunStatus = "Error"
 )
