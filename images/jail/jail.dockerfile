@@ -1,8 +1,8 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
 ARG CUDA_VERSION=12.9.0
-# https://github.com/nebius/ml-containers/pull/43
-FROM cr.eu-north1.nebius.cloud/ml-containers/training_diag:${CUDA_VERSION}-ubuntu24.04-20260114134212 AS jail
+# https://github.com/nebius/ml-containers/pull/45
+FROM cr.eu-north1.nebius.cloud/ml-containers/training_diag:${CUDA_VERSION}-ubuntu24.04-20260115100416 AS jail
 
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host
