@@ -138,8 +138,10 @@ Affected nodes are derived from the Slurm job’s node list (`GetNodeList()`).
     - `Complete` — Run finished successfully (**success reactions may apply**).
     - `Failed` — Check failed (**failure reactions may apply**).
     - `Error` — Error in job submission or check implementation.
+    - `Cancelled` — Check was cancelled.
 - **`lastRunFailJobsAndReasons`** *(array)* — List of `{ jobID, reason }` for failed jobs in the last run.
 - **`lastRunErrorJobsAndReasons`** *(array)* — List of `{ jobID, reason }` for error jobs in the last run.
+- **`LastRunCancelledJobs`** *(array)* — List of job IDs for cancelled jobs in the last run.
 - **`lastRunSubmitTime`** *(time)* — Submission time of the last run.
 
 ## Execution Modes

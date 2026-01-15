@@ -182,6 +182,10 @@ func (j Job) IsCompletedState() bool {
 	return j.State == string(api.V0041JobInfoJobStateCOMPLETED)
 }
 
+func (j Job) IsCancelledState() bool {
+	return j.State == string(api.V0041JobInfoJobStateCANCELLED)
+}
+
 func parseNodeList(nodeString string) ([]string, error) {
 	if nodeString == "" {
 		return nil, nil
