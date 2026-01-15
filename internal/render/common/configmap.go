@@ -404,9 +404,12 @@ func addSlurmConfigProperties(res *renderutils.PropertiesConfig, config interfac
 			continue
 		}
 
-		if field.Kind() == reflect.Int32 || field.Kind() == reflect.Int16 {
+		switch field.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			res.AddProperty(fieldName, field.Int())
 			continue
+		default:
+			// Skip
 		}
 	}
 }
