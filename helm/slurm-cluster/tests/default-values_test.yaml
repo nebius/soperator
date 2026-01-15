@@ -205,7 +205,7 @@ tests:
           value: "jobacct_gather/cgroup"
       - equal:
           path: spec.slurmNodes.accounting.slurmConfig.jobAcctGatherFrequency
-          value: 30
+          value: 0
       - equal:
           path: spec.slurmNodes.accounting.slurmdbdConfig.archiveEvents
           value: "yes"
