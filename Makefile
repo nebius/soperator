@@ -50,7 +50,6 @@ GO_CONST_VERSION_FILE = internal/consts/version.go
 GITHUB_REPO			  = ghcr.io/nebius/soperator
 NEBIUS_REPO			  = cr.eu-north1.nebius.cloud/soperator
 IMAGE_REPO			  = $(NEBIUS_REPO)
-PYXIS_IMAGE_REPO      = $(subst /,\#,$(IMAGE_REPO))
 
 # For version sync test
 VALUES_VERSION 		  = $(shell $(YQ) '.images.slurmctld' helm/slurm-cluster/values.yaml | awk -F':' '{print $$2}' | awk -F'-' '{print $$1}')
@@ -278,7 +277,6 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.munge = \"$(IMAGE_REPO)/munge:$(IMAGE_VERSION)\"" "helm/soperator-activechecks/values.yaml"
 	@$(YQ) -i ".images.k8sJob = \"$(IMAGE_REPO)/k8s_check_job:$(IMAGE_VERSION)\"" "helm/soperator-activechecks/values.yaml"
 	@$(YQ) -i ".images.slurmJob = \"$(IMAGE_REPO)/slurm_check_job:$(IMAGE_VERSION)\"" "helm/soperator-activechecks/values.yaml"
-	@$(YQ) -i ".images.activeCheckImageRepository = \"$(PYXIS_IMAGE_REPO)/active_checks\"" "helm/soperator-activechecks/values.yaml"
 	@# endregion helm/soperator-activechecks/values.yaml
 
 	@# region helm/nodeconfigurator/values.yaml
