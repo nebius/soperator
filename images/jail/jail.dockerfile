@@ -1,6 +1,7 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
 ARG CUDA_VERSION=12.9.0
+# This image was build here: https://github.com/nebius/ml-containers/pull/44
 FROM cr.eu-north1.nebius.cloud/ml-containers/cuda:${CUDA_VERSION}-ubuntu24.04-20260115083111 AS cuda
 
 # Download NCCL tests executables
