@@ -203,9 +203,11 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		var submitTime *metav1.Time
 		var failJobsAndReasons []slurmv1alpha1.JobAndReason
 		var errorJobsAndReasons []slurmv1alpha1.JobAndReason
+		var cancelledJobs []string
 		if activeCheck.Status.SlurmJobsStatus.LastRunId == firstJobId {
 			failJobsAndReasons = activeCheck.Status.SlurmJobsStatus.LastRunFailJobsAndReasons
 			errorJobsAndReasons = activeCheck.Status.SlurmJobsStatus.LastRunErrorJobsAndReasons
+			cancelledJobs = activeCheck.Status.SlurmJobsStatus.LastRunCancelledJobs
 		}
 		requeue := false
 		final := false
@@ -245,6 +247,8 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 					if err != nil {
 						return ctrl.Result{}, fmt.Errorf("executing failure reactions: %w", err)
 					}
+				case slurmJob.IsCancelledState():
+					cancelledJobs = append(cancelledJobs, fmt.Sprint(slurmJob.ID))
 				case slurmJob.IsCompletedState():
 					err = executeSuccessReactions(ctx, slurmJob, activeCheck, slurmAPIClient, logger)
 					if err != nil {
@@ -286,6 +290,8 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			state = consts.ActiveCheckSlurmRunStatusFailed
 		case len(errorJobsAndReasons) != 0:
 			state = consts.ActiveCheckSlurmRunStatusError
+		case len(cancelledJobs) != 0:
+			state = consts.ActiveCheckSlurmRunStatusCancelled
 		default:
 			state = consts.ActiveCheckSlurmRunStatusComplete
 		}
@@ -296,6 +302,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			LastRunStatus:              state,
 			LastRunFailJobsAndReasons:  failJobsAndReasons,
 			LastRunErrorJobsAndReasons: errorJobsAndReasons,
+			LastRunCancelledJobs:       cancelledJobs,
 			LastRunSubmitTime:          submitTime,
 			LastTransitionTime:         metav1.Now(),
 		}

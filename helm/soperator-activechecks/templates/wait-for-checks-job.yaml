@@ -33,14 +33,16 @@ spec:
                 exit 0
               fi
 
-              for name in $active_check_names; do
-                echo "Checking type of ActiveCheck $name..."
+              pending_names="$active_check_names"
+              while [ -n "$pending_names" ]; do
+                pending_next=""
+                for name in $pending_names; do
+                  echo "Checking type of ActiveCheck $name..."
 
-                checkType=$(kubectl get "$CRD_KIND" "$name" -n "$NAMESPACE" -o jsonpath='{.spec.checkType}')
-                echo "ActiveCheck $name has checkType: $checkType"
+                  checkType=$(kubectl get "$CRD_KIND" "$name" -n "$NAMESPACE" -o jsonpath='{.spec.checkType}')
+                  echo "ActiveCheck $name has checkType: $checkType"
 
-                if [ "$checkType" = "k8sJob" ]; then
-                  while true; do
+                  if [ "$checkType" = "k8sJob" ]; then
                     status=$(kubectl get "$CRD_KIND" "$name" -n "$NAMESPACE" -o jsonpath='{.status.k8sJobsStatus.lastJobStatus}')
                     status="${status:-Pending}"
 
@@ -48,17 +50,14 @@ spec:
 
                     if [ "$status" = "Complete" ]; then
                       echo "$name succeeded."
-                      break
                     elif [ "$status" = "Failed" ]; then
                       echo "$name failed. Aborting Helm release."
                       exit 1
+                    else
+                      pending_next="$pending_next $name"
                     fi
 
-                    sleep 5
-                  done
-
-                elif [ "$checkType" = "slurmJob" ]; then
-                  while true; do
+                  elif [ "$checkType" = "slurmJob" ]; then
                     status=$(kubectl get "$CRD_KIND" "$name" -n "$NAMESPACE" -o jsonpath='{.status.slurmJobsStatus.lastRunStatus}')
                     status="${status:-Pending}"
 
@@ -66,18 +65,23 @@ spec:
 
                     if [ "$status" = "Complete" ]; then
                       echo "$name succeeded."
-                      break
+                    elif [ "$status" = "Cancelled" ]; then
+                      echo "$name cancelled."
                     elif [ "$status" = "Failed" ] || [ "$status" = "Degraded" ]; then
                       echo "$name failed or degraded. Aborting Helm release."
                       exit 1
+                    else
+                      pending_next="$pending_next $name"
                     fi
 
-                    sleep 5
-                  done
+                  else
+                    echo "Unknown checkType '$checkType' for $name. Skipping."
+                  fi
 
-                else
-                  echo "Unknown checkType '$checkType' for $name. Skipping."
-                fi
+                  sleep 5
+                done
+
+                pending_names="$pending_next"
               done
 
               echo "All matching CRs completed."
