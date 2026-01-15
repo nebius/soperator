@@ -32,7 +32,10 @@ soperator:
     kruise:
       installOperator: false
   soperatorChecks:
-    enabled: false
+    enabled: true
+    values:
+      serviceMonitor:
+        enabled: false
   nodeConfigurator:
     enabled: true
     interval: 5m
@@ -232,9 +235,9 @@ slurmCluster:
                 - soperator-dev-worker
 nodesets:
   enabled: false
-# Active Checks - disabled by default
+# Active Checks - enabled for integration testing
 soperatorActiveChecks:
-  enabled: false
+  enabled: true
 # MariaDB Operator - disabled for local dev
 mariadbOperator:
   enabled: false
