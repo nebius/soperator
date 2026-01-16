@@ -42,7 +42,7 @@ spec:
   {{- else }}
     k8up:
       backupImage:
-        repository: k8up-io/k8up
+        repository: ghcr.io/k8up-io/k8up
         tag: v2.13.1
       skipWithoutAnnotation: true
     {{- if .Values.observability.prometheusOperator.enabled }}
