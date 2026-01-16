@@ -77,6 +77,11 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:default={defMemPerNode: 0, defCpuPerGPU: 4, completeWait: 5, epilog: "", prolog: "", maxJobCount: 20000, minJobAge: 28800, messageTimeout: 60}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 
+	// Topology contains topology-related parameters for Slurm.
+	//
+	// +kubebuilder:validation:Optional
+	Topology *Topology `json:"topology,omitempty"`
+
 	// CustomSlurmConfig represents the raw Slurm configuration from slurm.conf.
 	// All options are provided as a raw string.
 	// Soperator does not guarantee the validity of the raw configuration.
@@ -176,11 +181,16 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="SwitchAsNodeRank"
 	TopologyParam string `json:"topologyParam,omitempty"`
-	// TopologyBlockSize represents a schedulable size of a block for a topology/block plugin.
+}
+
+// Topology contains topology-related parameters for Slurm.
+type Topology struct {
+	// BlockSize represents a schedulable size of a block for topology/block plugin.
+	// Maps to BlockSizes parameter in topology.conf.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=18
-	TopologyBlockSize *int `json:"topologyBlockSize,omitempty"`
+	BlockSize *int `json:"blockSize,omitempty"`
 }
 
 type MPIConfig struct {

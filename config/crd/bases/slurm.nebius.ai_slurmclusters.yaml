@@ -3468,11 +3468,6 @@ spec:
                     default: ""
                     description: Additional parameters for the task plugin
                     type: string
-                  topologyBlockSize:
-                    default: 18
-                    description: TopologyBlockSize represents a schedulable size of
-                      a block for a topology/block plugin.
-                    type: integer
                   topologyParam:
                     default: SwitchAsNodeRank
                     description: TopologyParam is list of comma-separated options
@@ -19057,6 +19052,16 @@ spec:
                 - exporter
                 - login
                 - rest
+                type: object
+              topology:
+                description: Topology contains topology-related parameters for Slurm.
+                properties:
+                  blockSize:
+                    default: 18
+                    description: |-
+                      BlockSize represents a schedulable size of a block for topology/block plugin.
+                      Maps to BlockSizes parameter in topology.conf.
+                    type: integer
                 type: object
               useDefaultAppArmorProfile:
                 default: false

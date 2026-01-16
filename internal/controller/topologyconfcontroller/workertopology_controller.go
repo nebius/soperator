@@ -124,7 +124,11 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	case consts.SlurmTopologyTree:
 		desiredTopologyConfig, err = r.BuildTopologyConfig(ctx, nodeTopologyLabelsConfigMap, podsByNode)
 	case consts.SlurmTopologyBlock:
-		desiredTopologyConfig, err = r.BuildTopologyBlocks(ctx, slurmCluster.Spec.SlurmConfig.TopologyBlockSize, nodeTopologyLabelsConfigMap, podsByNode)
+		var blockSize *int
+		if slurmCluster.Spec.Topology != nil {
+			blockSize = slurmCluster.Spec.Topology.BlockSize
+		}
+		desiredTopologyConfig, err = r.BuildTopologyBlocks(ctx, blockSize, nodeTopologyLabelsConfigMap, podsByNode)
 	}
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("build topology config: %w", err)
