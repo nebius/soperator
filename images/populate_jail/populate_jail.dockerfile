@@ -2,13 +2,15 @@
 
 ARG BASE_IMAGE=restic/restic:0.18.0
 ARG TARGETARCH
+ARG CUDA_VERSION=12.9.0
 
 # First stage: untap jail_rootfs.tar
 FROM $BASE_IMAGE AS untaped
 
 ARG TARGETARCH
+ARG CUDA_VERSION
 
-COPY images/jail_rootfs_${TARGETARCH}.tar /jail_rootfs.tar
+COPY images/jail_rootfs_cuda${CUDA_VERSION}_${TARGETARCH}.tar /jail_rootfs.tar
 RUN mkdir /jail && tar -xvf /jail_rootfs.tar -C /jail && \
     restic init --insecure-no-password --repo /jail_restic && \
     cd /jail && \
