@@ -97,7 +97,7 @@ Render slurmJobSpec for an ActiveCheck.
 {{- $spec := default dict .check.slurmJobSpec -}}
 {{- $jobContainerRaw := default dict $spec.jobContainer -}}
 {{- $baseContainer := dict "appArmorProfile" "unconfined" "image" $ctx.Values.images.slurmJob "env" $ctx.Values.jobContainer.env "volumeMounts" $ctx.Values.jobContainer.volumeMounts "volumes" $ctx.Values.jobContainer.volumes -}}
-{{- $jobContainer := mustMerge $baseContainer (omit $jobContainerRaw "extraEnv" "extraVolumeMounts" "extraVolumes") -}}
+{{- $jobContainer := mustMerge (omit $jobContainerRaw "extraEnv" "extraVolumeMounts" "extraVolumes") $baseContainer -}}
 {{- $env := default (list) $jobContainer.env -}}
 {{- with $jobContainerRaw.extraEnv }}{{- $env = concat $env . -}}{{- end }}
 {{- $volumeMounts := default (list) $jobContainer.volumeMounts -}}
@@ -152,7 +152,7 @@ Render k8sJobSpec for an ActiveCheck.
 {{- $baseContainer := dict "image" $ctx.Values.images.k8sJob -}}
 {{- if $useCommonVolumeMounts }}{{- $_ := set $baseContainer "volumeMounts" $ctx.Values.jobContainer.volumeMounts -}}{{- end }}
 {{- if $includeCommonEnv }}{{- $_ := set $baseContainer "env" $ctx.Values.jobContainer.env -}}{{- end }}
-{{- $jobContainer := mustMerge $baseContainer (omit $jobContainerRaw "extraEnv" "extraVolumeMounts" "extraVolumes") -}}
+{{- $jobContainer := mustMerge (omit $jobContainerRaw "extraEnv" "extraVolumeMounts" "extraVolumes") $baseContainer -}}
 {{- $env := default (list) $jobContainer.env -}}
 {{- with $jobContainerRaw.extraEnv }}{{- $env = concat $env . -}}{{- end }}
 {{- $volumeMounts := default (list) $jobContainer.volumeMounts -}}

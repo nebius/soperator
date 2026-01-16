@@ -43,3 +43,31 @@ tests:
           path: spec.k8sJobSpec.mungeContainer
       - exists:
           path: spec.k8sJobSpec.mungeContainer.image
+
+  - it: should allow overriding k8sJob container image
+    documentSelector:
+      path: metadata.name
+      value: test-k8sjob-image-override
+    set:
+      slurmClusterRefName: test-cluster
+      images:
+        k8sJob: "default-k8s-image:latest"
+        slurmJob: "slurm-job-image:latest"
+        munge: "munge-image:latest"
+      jobContainer:
+        volumeMounts: []
+        volumes: []
+      checks:
+        test-k8sjob-image-override:
+          enabled: true
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              image: "{{ .Values.images.slurmJob }}"
+              command: ["echo", "test"]
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - equal:
+          path: spec.k8sJobSpec.jobContainer.image
+          value: "slurm-job-image:latest"
