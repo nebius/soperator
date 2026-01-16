@@ -23,7 +23,8 @@ images:
   k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:1.23.1-noble-slurm25.05.5"
   munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.23.1-noble-slurm25.05.5"
 # Pyxis syntax with '#' separator for registry
-activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-3935b93"
+# Image from PR https://github.com/nebius/ml-containers/pull/46
+activeCheckImage: "cr.eu-north1.nebius.cloud/ml-containers/training_diag:12.9.0-ubuntu24.04-20260116120703"
 checks:
   all-reduce-perf-nccl-in-docker:
     enabled: true
