@@ -338,6 +338,11 @@ jobs:
             test_plugin "${image}" "spanknccldebug.so" || ((++failed))
           done
 
+          # Test spank_pyxis.so in all slurm images
+          for image in slurm_check_job login_sshd worker_slurmd; do
+            test_plugin "${image}" "spank_pyxis.so" || ((++failed))
+          done
+
           echo ""
           if [[ $failed -gt 0 ]]; then
             echo "FAILED: $failed plugin check(s) failed"
