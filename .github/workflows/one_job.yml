@@ -300,6 +300,51 @@ jobs:
           echo "Removing jail rootfs tar archive to speedup further docker builds."
           rm -f images/jail_rootfs*.tar
 
+      - name: Test SPANK plugins are accessible
+        shell: bash
+        run: |
+          UNSTABLE=${{ steps.read-version.outputs.unstable }}
+          IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
+          IMAGE_REPO="$(make get-image-repo UNSTABLE=${UNSTABLE})"
+
+          failed=0
+
+          test_plugin() {
+            local image=$1
+            local plugin=$2
+            local full_image="${IMAGE_REPO}/${image}:${IMAGE_VERSION}"
+
+            if ! docker run --rm --entrypoint test "${full_image}" -e "/usr/lib/slurm/${plugin}"; then
+              echo "FAIL: ${image} missing /usr/lib/slurm/${plugin}"
+              return 1
+            fi
+
+            # Verify the shared library is loadable (valid ELF, dependencies satisfied)
+            if ! docker run --rm --entrypoint ldd "${full_image}" "/usr/lib/slurm/${plugin}" > /dev/null 2>&1; then
+              echo "FAIL: ${image} has broken /usr/lib/slurm/${plugin}"
+              docker run --rm --entrypoint ldd "${full_image}" "/usr/lib/slurm/${plugin}" 2>&1 || true
+              return 1
+            fi
+            echo "  OK: ${image} has /usr/lib/slurm/${plugin}"
+          }
+
+          # Test chroot.so in all slurm images
+          for image in slurm_check_job login_sshd worker_slurmd; do
+            test_plugin "${image}" "chroot.so" || ((++failed))
+          done
+
+          # Test spanknccldebug.so (only in login_sshd and worker_slurmd)
+          for image in login_sshd worker_slurmd; do
+            test_plugin "${image}" "spanknccldebug.so" || ((++failed))
+          done
+
+          echo ""
+          if [[ $failed -gt 0 ]]; then
+            echo "FAILED: $failed plugin check(s) failed"
+            exit 1
+          fi
+          echo "All SPANK plugin tests passed!"
+
   build-helm-charts:
     needs: [changes, pre-build]
     if: needs.changes.outputs.should_build == 'true'

@@ -228,6 +228,10 @@ get-operator-tag-version:
 get-image-version:
 	@echo '$(IMAGE_VERSION)'
 
+.PHONY: get-image-repo
+get-image-repo:
+	@echo '$(IMAGE_REPO)'
+
 .PHONY: sync-version
 sync-version: yq ## Sync versions from file
 	@echo 'Version is - $(VERSION)'
