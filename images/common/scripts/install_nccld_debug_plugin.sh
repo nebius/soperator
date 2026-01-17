@@ -23,3 +23,7 @@ gcc \
   -shared \
   -o /usr/lib/"${ALT_ARCH}"-linux-gnu/slurm/spanknccldebug.so \
   ${SNCCLD_SRC_DIR}/*.c
+
+# Create symlink in /usr/lib/slurm/ for plugin discovery
+mkdir -p /usr/lib/slurm
+ln -sf /usr/lib/"${ALT_ARCH}"-linux-gnu/slurm/spanknccldebug.so /usr/lib/slurm/spanknccldebug.so

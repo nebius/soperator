@@ -9,3 +9,7 @@ ALT_ARCH="$(uname -m)"
 # Compile and install chroot SPANK plugin
 gcc -fPIC -shared -o /usr/src/chroot-plugin/chroot.so /usr/src/chroot-plugin/chroot.c -I/usr/local/include/slurm -L/usr/local/lib -lslurm && \
     cp /usr/src/chroot-plugin/chroot.so /usr/lib/"${ALT_ARCH}"-linux-gnu/slurm/
+
+# Create symlink in /usr/lib/slurm/ for plugin discovery
+mkdir -p /usr/lib/slurm
+ln -sf /usr/lib/"${ALT_ARCH}"-linux-gnu/slurm/chroot.so /usr/lib/slurm/chroot.so
