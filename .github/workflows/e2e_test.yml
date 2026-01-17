@@ -269,6 +269,28 @@ jobs:
           kubectl exec -n soperator controller-0 -- sacct --format=JobID,JobName,Partition,Account,AllocCPUS,State,ExitCode -S now-6hours || true
           kubectl exec -n soperator controller-0 -- sacct --parsable2 --allusers --starttime=now-6hours | column -t -s'|'
 
+      - name: Dump Slurm configuration files
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          echo "=== /etc/slurm directory listing ==="
+          kubectl exec -n soperator controller-0 -- ls -la /etc/slurm/ || true
+
+          echo ""
+          kubectl exec -n soperator controller-0 -- bash -c '
+            for f in /etc/slurm/*.conf; do
+              echo ""
+              echo "=== $f ==="
+              cat "$f"
+              echo ""
+            done
+          ' || true
+
+          echo ""
+          echo "=== Running scontrol show config ==="
+          kubectl exec -n soperator controller-0 -- scontrol show config || true
+
       - name: Collect Full Kubernetes Cluster Info
         if: always()
         shell: bash
