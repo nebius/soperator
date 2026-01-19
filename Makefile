@@ -36,6 +36,9 @@ CHART_STORAGECLASSES		  = $(CHART_PATH)/storageclasses
 
 SLURM_VERSION		  		= 25.05.4
 UBUNTU_VERSION		  		?= noble
+CUDA12_VERSION              ?= 12.9.0
+CUDA13_VERSION              ?= 13.0.2
+CUDA_VERSION                ?= 12.9.0
 NFS_VERSION_BASE          	= $(shell cat NFS_VERSION)
 VERSION_BASE           		= $(shell cat VERSION)
 
@@ -252,7 +255,10 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.slurmd = \"$(IMAGE_REPO)/worker_slurmd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.sshd = \"$(IMAGE_REPO)/login_sshd:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.munge = \"$(IMAGE_REPO)/munge:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
-	@$(YQ) -i ".images.populateJail = \"$(IMAGE_REPO)/populate_jail:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.populateJailRepository = \"$(IMAGE_REPO)/populate_jail\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.populateJailTag = \"$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.populateJailCudaVersions.\"12\" = \"$(CUDA12_VERSION)\"" "helm/slurm-cluster/values.yaml"
+	@$(YQ) -i ".images.populateJailCudaVersions.\"13\" = \"$(CUDA13_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.soperatorExporter = \"$(IMAGE_REPO)/soperator-exporter:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.sConfigController = \"$(IMAGE_REPO)/sconfigcontroller:$(OPERATOR_IMAGE_TAG)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.mariaDB = \"docker-registry1.mariadb.com/library/mariadb:11.4.3\"" "helm/slurm-cluster/values.yaml"
@@ -412,7 +418,8 @@ ifneq ($(HAS_AMD64),)
 		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-amd64" \
 		-f images/jail/jail.dockerfile \
 		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
-		--output type=tar,dest=images/jail_rootfs_amd64.tar \
+		--build-arg CUDA_VERSION="${CUDA_VERSION}" \
+		--output type=tar,dest=images/jail_rootfs_cuda$(CUDA_VERSION)_amd64.tar \
 		--progress=plain \
 		$(DOCKER_BUILD_ARGS) \
 		.
@@ -424,7 +431,8 @@ ifneq ($(HAS_ARM64),)
 		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-arm64" \
 		-f images/jail/jail.dockerfile \
 		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
-		--output type=tar,dest=images/jail_rootfs_arm64.tar \
+		--build-arg CUDA_VERSION="${CUDA_VERSION}" \
+		--output type=tar,dest=images/jail_rootfs_cuda$(CUDA_VERSION)_arm64.tar \
 		--progress=plain \
 		$(DOCKER_BUILD_ARGS) \
 		.
