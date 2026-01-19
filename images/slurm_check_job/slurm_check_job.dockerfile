@@ -34,6 +34,13 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Install NCCL debug plugin
+COPY images/common/spank-nccl-debug/src /usr/src/soperator/spank/nccld-debug
+COPY images/common/scripts/install_nccld_debug_plugin.sh /opt/bin/
+RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
+    /opt/bin/install_nccld_debug_plugin.sh && \
+    rm /opt/bin/install_nccld_debug_plugin.sh
+
 # Install kubectl
 RUN ARCH="$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')" && \
     KUBECTL_VERSION="$(curl -Ls https://dl.k8s.io/release/stable.txt)" && \
