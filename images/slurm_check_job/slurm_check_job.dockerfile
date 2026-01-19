@@ -52,6 +52,14 @@ RUN ARCH="$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')" && \
 # Update linker cache
 RUN ldconfig
 
+# Create symlinks for SPANK plugins so Slurm can find them at /usr/lib/slurm/
+# Plugins are installed at /usr/lib/${ARCH}-linux-gnu/slurm/ but Slurm looks at /usr/lib/slurm/
+RUN ARCH="$(uname -m)" && \
+    mkdir -p /usr/lib/slurm && \
+    ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/chroot.so" /usr/lib/slurm/chroot.so && \
+    ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/spank_pyxis.so" /usr/lib/slurm/spank_pyxis.so && \
+    ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/spanknccldebug.so" /usr/lib/slurm/spanknccldebug.so
+
 # Delete users & home because they will be linked from jail
 RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
 RUN rm -rf /home
