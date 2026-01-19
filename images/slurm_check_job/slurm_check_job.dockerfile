@@ -60,6 +60,9 @@ RUN ARCH="$(uname -m)" && \
     ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/spank_pyxis.so" /usr/lib/slurm/spank_pyxis.so && \
     ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/spanknccldebug.so" /usr/lib/slurm/spanknccldebug.so
 
+# Disable NCCL debug plugin by default for slurm jobs
+ENV SNCCLD_ENABLED="false"
+
 # Delete users & home because they will be linked from jail
 RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
 RUN rm -rf /home
