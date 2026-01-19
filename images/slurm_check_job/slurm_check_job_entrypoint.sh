@@ -26,6 +26,16 @@ mount --bind /etc/hosts /mnt/jail/etc/hosts
 echo "Symlink slurm configs from jail(sconfigcontroller)"
 rm -rf /etc/slurm && ln -s /mnt/jail/etc/slurm /etc/slurm
 
+echo "Bind-mount SPANK plugins to /usr/lib/slurm/"
+ARCH="$(uname -m)"
+mkdir -p /usr/lib/slurm
+touch /usr/lib/slurm/chroot.so
+mount --bind "/usr/lib/${ARCH}-linux-gnu/slurm/chroot.so" "/usr/lib/slurm/chroot.so"
+touch /usr/lib/slurm/spank_pyxis.so
+mount --bind "/usr/lib/${ARCH}-linux-gnu/slurm/spank_pyxis.so" "/usr/lib/slurm/spank_pyxis.so"
+touch /usr/lib/slurm/spanknccldebug.so
+mount --bind "/usr/lib/${ARCH}-linux-gnu/slurm/spanknccldebug.so" "/usr/lib/slurm/spanknccldebug.so"
+
 echo "Bind-mount /opt/bin/sbatch.sh script"
 mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
 
