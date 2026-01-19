@@ -33,8 +33,14 @@ touch /usr/lib/slurm/chroot.so
 mount --bind "/usr/lib/${ARCH}-linux-gnu/slurm/chroot.so" "/usr/lib/slurm/chroot.so"
 touch /usr/lib/slurm/spank_pyxis.so
 mount --bind "/usr/lib/${ARCH}-linux-gnu/slurm/spank_pyxis.so" "/usr/lib/slurm/spank_pyxis.so"
+
+# Bind-mount spanknccldebug to stop slurm errors like below:
+# srun: error: plugin_load_from_file: dlopen(spanknccldebug.so): spanknccldebug.so: cannot open shared object file: No such file or directory
+# srun: error: spank: spanknccldebug.so: Dlopen of plugin file failed
 touch /usr/lib/slurm/spanknccldebug.so
 mount --bind "/usr/lib/${ARCH}-linux-gnu/slurm/spanknccldebug.so" "/usr/lib/slurm/spanknccldebug.so"
+# And disable spanknccldebug because slurm jobs don't need this plugin.
+export SNCCLD_ENABLED="false"
 
 echo "Bind-mount /opt/bin/sbatch.sh script"
 mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
