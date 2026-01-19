@@ -6,4 +6,9 @@ const (
 	DefaultAccountingPort  = 6819
 	SlurmdbdPidFile        = "/var/run/slurmdbd.pid"
 	SlurmdbdRESTJWTKeyPath = "/var/spool/slurmdbd/jwt_hs256.key"
+
+	AccountingStorageHostEnv = "STORAGE_HOST"
+	AccountingStoragePortEnv = "STORAGE_PORT"
+	AccountingStorageUserEnv = "STORAGE_USER"
+	AccountingStoragePassEnv = "STORAGE_PASS"
 )

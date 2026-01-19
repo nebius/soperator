@@ -1,0 +1,17 @@
+{
+  "name": "cleanup_scratch_data",
+  "command": "./cleanup_scratch_data.sh",
+  "platforms": ["any"],
+  "skip_for_cpu_jobs": false,
+  "skip_for_partial_gpu_jobs": false,
+  "skip_for_reservation_prefixes": [],
+  "contexts": ["none"],
+  "node_states": ["any"],
+  "on_fail": "none",
+  "on_ok": "none",
+  "reason_base": "",
+  "reason_append_details": false,
+  "run_in_jail": false,
+  "log": "slurm_scripts/$worker.$name.$context.out",
+  "need_env": []
+}

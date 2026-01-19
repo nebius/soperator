@@ -1,7 +1,0 @@
----
-
-openmpi_version: 4.1.7a1-1.2404066
-openmpi_version_short: 4.1.7a1
-openmpi_ofed_version: 24.04-0.7.0.0
-openmpi_ucx_version: 1.17.0-1.2404066
-openmpi_infiniband_diags_version: 2404mlnx51-1.2404066

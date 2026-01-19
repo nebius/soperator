@@ -1,0 +1,39 @@
+{{- if and .Values.soperator.enabled .Values.soperator.monitoringDashboards.enabled }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-monitoring-dashboards
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  {{- with .Values.soperator.monitoringDashboards.driftDetection }}
+  driftDetection:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  chart:
+    spec:
+      chart: helm-soperator-monitoring-dashboards
+      interval: {{ .Values.soperator.monitoringDashboards.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+      version: {{ .Values.soperator.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+  interval: {{ .Values.soperator.monitoringDashboards.interval }}
+  timeout: {{ .Values.soperator.monitoringDashboards.timeout }}
+  releaseName: {{ .Values.soperator.monitoringDashboards.releaseName }}
+  targetNamespace: {{ .Values.soperator.monitoringDashboards.namespace }}
+  {{- if .Values.soperator.monitoringDashboards.overrideValues }}
+  values:
+    {{- toYaml .Values.soperator.monitoringDashboards.overrideValues | nindent 4 }}
+  {{- end }}
+{{- end }}

@@ -19,94 +19,407 @@ jobContainer:
       persistentVolumeClaim:
         claimName: "jail-pvc"
 images:
-  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.23.1-noble-slurm25.05.4"
-  k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:1.23.1-noble-slurm25.05.4"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.23.1-noble-slurm25.05.4"
+  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:1.23.1-noble-slurm25.05.5"
+  k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:1.23.1-noble-slurm25.05.5"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.23.1-noble-slurm25.05.5"
 # Pyxis syntax with '#' separator for registry
-activeCheckImage: "cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-3935b93"
+# Image from PR https://github.com/nebius/ml-containers/pull/46
+activeCheckImage: "cr.eu-north1.nebius.cloud/ml-containers/training_diag:12.9.0-ubuntu24.04-20260116120703"
 checks:
-  allReducePerfNCCLInDocker:
-    suspend: true
-    runAfterCreation: true
-    drainReasonPrefix: "[node_problem]"
-  allReducePerfNCCLWithIB:
-    suspend: false
-    runAfterCreation: true
-    drainReasonPrefix: "[node_problem]"
-  allReducePerfNCCLWithoutIB:
-    suspend: false
-    runAfterCreation: true
-    drainReasonPrefix: "[node_problem]"
-  createUserSoperatorChecks:
-    suspend: true
-    runAfterCreation: true
-  createUser:
-    suspend: true
-    runAfterCreation: true
-    name: "nebius"
-  cudaSamples:
-    suspend: false
-    runAfterCreation: true
-    drainReasonPrefix: "[node_problem]"
-  dcgmiDiagR2:
-    suspend: false
-    runAfterCreation: true
-    drainReasonPrefix: "[node_problem]"
-  dcgmiDiagR3:
-    suspend: true
-    runAfterCreation: true
-    drainReasonPrefix: "[node_problem]"
-  enrootCleanup:
-    suspend: false
-    runAfterCreation: false
-  ensureDirSnccldLogs:
-    suspend: false
-    runAfterCreation: true
+  all-reduce-perf-nccl-in-docker:
     enabled: true
-    dir: /opt/soperator-outputs/nccl_logs
-    schedule: 15 0 * * *
-  ensureHealthyNodes:
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+      - "wait-for-topology"
+      - "prepull-container-image"
     suspend: true
     runAfterCreation: true
-  extensiveCheck:
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/all-reduce-perf-nccl-in-docker.sh"
+      eachWorkerJobs: true
+      maxNumberOfJobs: 200
+    failureReactions:
+      drainSlurmNode:
+        drainReasonPrefix: "[node_problem]"
+  all-reduce-perf-nccl-with-ib:
+    enabled: true
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+      - "wait-for-topology"
+    schedule: "45 0-18/6 * * *"
+    suspend: false
+    runAfterCreation: true
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/all-reduce-perf-nccl-with-ib.sh"
+      eachWorkerJobs: true
+      maxNumberOfJobs: 200
+    failureReactions:
+      drainSlurmNode:
+        drainReasonPrefix: "[node_problem]"
+  all-reduce-perf-nccl-without-ib:
+    enabled: true
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+      - "wait-for-topology"
+    schedule: "25 5-23/6 * * *"
+    suspend: false
+    runAfterCreation: true
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/all-reduce-perf-nccl-without-ib.sh"
+      eachWorkerJobs: true
+    failureReactions:
+      drainSlurmNode:
+        drainReasonPrefix: "[node_problem]"
+  cuda-samples:
+    enabled: true
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+      - "wait-for-topology"
+      - "prepull-container-image"
+    schedule: "30 0-18/6 * * *"
+    suspend: false
+    runAfterCreation: true
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/cuda-samples.sh"
+      eachWorkerJobs: true
+    failureReactions:
+      drainSlurmNode:
+        drainReasonPrefix: "[node_problem]"
+  dcgmi-diag-r2:
+    enabled: true
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+      - "wait-for-topology"
+    schedule: "5 12 * * *"
+    suspend: false
+    runAfterCreation: true
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/dcgmi-diag-r2.sh"
+      eachWorkerJobs: true
+    failureReactions:
+      drainSlurmNode:
+        drainReasonPrefix: "[node_problem]"
+  dcgmi-diag-r3:
+    enabled: true
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+      - "wait-for-topology"
+    suspend: true
+    runAfterCreation: true
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/dcgmi-diag-r3.sh"
+      eachWorkerJobs: true
+    failureReactions:
+      drainSlurmNode:
+        drainReasonPrefix: "[node_problem]"
+  ensure-healthy-nodes:
+    enabled: true
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "all-reduce-perf-nccl-in-docker"
+      - "all-reduce-perf-nccl-with-ib"
+      - "all-reduce-perf-nccl-without-ib"
+      - "cuda-samples"
+      - "dcgmi-diag-r2"
+      - "dcgmi-diag-r3"
+      - "gpu-fryer"
+      - "ib-gpu-perf"
+      - "mem-perf"
+    suspend: true
+    runAfterCreation: true
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/ensure-healthy-nodes.sh"
+  extensive-check:
+    enabled: true
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+      - "wait-for-topology"
+      - "prepull-container-image"
+    schedule: "0 0 1 1 *"
     suspend: true
     runAfterCreation: false
-    drainReasonPrefix: "[hardware_problem]"
+    successfulJobsHistoryLimit: 3000
+    failedJobsHistoryLimit: 3000
     reservationPrefix: "suspicious-node"
-    extraCommentJson: ""
-  gpuFryer:
+    drainReasonPrefix: "[hardware_problem]"
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/extensive-check.sh"
+      jobContainer:
+        extraEnv:
+          - name: "SLURM_EXTRA_COMMENT_JSON"
+            value: ""
+    successReactions:
+      removeReservation:
+        prefix: "suspicious-node"
+    failureReactions:
+      drainSlurmNode:
+        drainReasonPrefix: "[hardware_problem]"
+      removeReservation:
+        prefix: "suspicious-node"
+  gpu-fryer:
+    enabled: true
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+      - "wait-for-topology"
+      - "prepull-container-image"
+    schedule: "15 9-21/12 * * *"
     suspend: false
     runAfterCreation: true
-    drainReasonPrefix: "[node_problem]"
-  ibGpuPerf:
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/gpu-fryer.sh"
+      eachWorkerJobs: true
+    failureReactions:
+      drainSlurmNode:
+        drainReasonPrefix: "[node_problem]"
+  ib-gpu-perf:
+    enabled: true
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+      - "wait-for-topology"
+      - "prepull-container-image"
+    schedule: "55 1-21/4 * * *"
     suspend: false
     runAfterCreation: true
-    commentPrefix: "[node_problem]"
-  installPackage:
-    suspend: true
-    runAfterCreation: false
-  memPerf:
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/ib-gpu-perf.sh"
+      eachWorkerJobs: true
+      maxNumberOfJobs: 200
+    failureReactions:
+      commentSlurmNode:
+        commentPrefix: "[node_problem]"
+  mem-perf:
+    enabled: true
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+      - "wait-for-topology"
+      - "prepull-container-image"
+    schedule: "20 10-22/12 * * *"
     suspend: false
     runAfterCreation: true
-    drainReasonPrefix: "[node_problem]"
-  prepullContainerImage:
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/mem-perf.sh"
+      eachWorkerJobs: true
+    failureReactions:
+      drainSlurmNode:
+        drainReasonPrefix: "[node_problem]"
+  ssh-check:
+    enabled: true
+    checkType: "k8sJob"
+    dependsOn:
+      - "create-user-soperatorchecks"
     suspend: true
     runAfterCreation: true
-  soperatorOutputsLogsCleaner:
+    k8sJobSpec:
+      scriptFile: "scripts/ssh-check.sh"
+      jobContainer:
+        appArmorProfile: unconfined
+        env:
+          - name: "NUM_OF_LOGIN_NODES"
+            value: "2"
+  create-user-soperatorchecks:
+    enabled: true
+    checkType: "k8sJob"
+    suspend: true
+    runAfterCreation: true
+    k8sJobSpec:
+      scriptFile: "scripts/create-user-soperatorchecks.sh"
+  create-user-nebius:
+    enabled: true
+    checkType: "k8sJob"
+    dependsOn:
+      - "create-user-soperatorchecks"
+    suspend: true
+    runAfterCreation: true
+    k8sJobSpec:
+      scriptFile: "scripts/create-user.sh"
+      jobContainer:
+        env:
+          - name: "USER_NAME"
+            value: "nebius"
+  enroot-cleanup:
+    enabled: true
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+    schedule: "10 8-20/12 * * *"
     suspend: false
     runAfterCreation: false
-  sshCheck:
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/enroot-cleanup.sh"
+      eachWorkerJobs: true
+  ensure-dir-snccld-logs:
+    enabled: true
+    checkType: "k8sJob"
+    schedule: "15 0 * * *"
+    suspend: false
+    runAfterCreation: true
+    k8sJobSpec:
+      scriptFile: "scripts/ensure-dir-snccld-logs.sh"
+      jobContainer:
+        env:
+          - name: "SNCCLD_LOG_DIR_PATH"
+            value: "/opt/soperator-outputs/nccl_logs"
+  prepull-container-image:
+    enabled: true
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+      - "wait-for-topology"
     suspend: true
     runAfterCreation: true
-    numOfLoginNodes: 2
-  upgradeCuda:
-    suspend: true
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/prepull-container-image.sh"
+  soperator-outputs-logs-cleaner:
+    enabled: true
+    checkType: "k8sJob"
+    schedule: "40 */1 * * *"
+    suspend: false
     runAfterCreation: false
-    cudaVersion: "12.4.1-1"
-  upgradeHealthChecker:
-    suspend: true
-    runAfterCreation: false
-    healthCheckerVersion: "1.0.0-178.260115"
-  waitForTopology:
+    k8sJobSpec:
+      scriptFile: "scripts/soperator-outputs-logs-cleaner.sh"
+      jobContainer:
+        appArmorProfile: unconfined
+  manage-jail-state:
+    enabled: true
+    checkType: "k8sJob"
+    dependsOn:
+      - "create-user-soperatorchecks"
     suspend: true
     runAfterCreation: true
+    k8sJobSpec:
+      jobContainer:
+        command: ["/opt/bin/k8s_check_job_entrypoint.sh"]
+        args:
+          - ansible-playbook
+          - -i
+          - inventory/
+          - -c
+          - local
+          - -e
+          - ansible_connection=community.general.chroot
+          - -e
+          - ansible_host=/mnt/jail
+          - -e
+          - ansible_python_interpreter=/usr/bin/python3
+          - run.yml
+          - -t
+          - run-all-upgrade
+          - --diff
+  manage-jail-state-dry-run:
+    enabled: true
+    checkType: "k8sJob"
+    dependsOn:
+      - "create-user-soperatorchecks"
+    schedule: "0 11 * * *"
+    suspend: false
+    runAfterCreation: false
+    k8sJobSpec:
+      jobContainer:
+        command: ["/opt/bin/k8s_check_job_entrypoint.sh"]
+        args:
+          - ansible-playbook
+          - -i
+          - inventory/
+          - -c
+          - local
+          - -e
+          - ansible_connection=community.general.chroot
+          - -e
+          - ansible_host=/mnt/jail
+          - -e
+          - ansible_python_interpreter=/usr/bin/python3
+          - run.yml
+          - -t
+          - run-all-upgrade
+          - --diff
+          - --check
+        env:
+          - name: "ANSIBLE_STDOUT_CALLBACK"
+            value: "ansible.posix.jsonl"
+          - name: "ANSIBLE_FORCE_COLOR"
+            value: "0"
+  upgrade-health-checker:
+    enabled: true
+    checkType: "k8sJob"
+    dependsOn:
+      - "create-user-soperatorchecks"
+    suspend: true
+    runAfterCreation: false
+    k8sJobSpec:
+      jobContainer:
+        appArmorProfile: unconfined
+        command: ["/opt/bin/k8s_check_job_entrypoint.sh"]
+        args:
+          - ansible-playbook
+          - -i
+          - inventory/
+          - -c
+          - local
+          - -e
+          - ansible_connection=community.general.chroot
+          - -e
+          - ansible_host=/mnt/jail
+          - -e
+          - ansible_python_interpreter=/usr/bin/python3
+          - -e
+          - "nc_health_checker_version=1.0.0-178.260115"
+          - nc-health-checker.yml
+          - --diff
+  wait-for-topology:
+    enabled: true
+    checkType: "k8sJob"
+    suspend: true
+    runAfterCreation: true
+    k8sJobSpec:
+      appArmorProfile: unconfined
+      scriptFile: "scripts/wait-for-topology.sh"
+  wait-for-soperatorchecks-srun-ready:
+    enabled: true
+    checkType: "k8sJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "create-user-soperatorchecks"
+    schedule: "0 0 1 1 *"
+    suspend: true
+    runAfterCreation: true
+    k8sJobSpec:
+      scriptFile: "scripts/wait-for-soperatorchecks-srun-ready.sh"
+      jobContainer:
+        appArmorProfile: unconfined
+        image: "{{ .Values.images.slurmJob }}"
+      mungeContainer:
+        enabled: true
+  retrigger-checks:
+    enabled: true
+    checkType: "k8sJob"
+    suspend: true
+    runAfterCreation: false
+    k8sJobSpec:
+      pythonScriptFile: "scripts/retrigger-checks.py"
+      jobContainer:
+        env:
+          - name: "NAMESPACE"
+            value: "{{ .Release.Namespace }}"

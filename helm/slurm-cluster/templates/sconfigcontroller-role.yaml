@@ -1,0 +1,32 @@
+{{- if .Values.sConfigController.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "slurm-cluster.sconfigcontroller.roleName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "slurm-cluster.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sconfigcontroller
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: ["slurm.nebius.ai"]
+    resources: ["jailedconfigs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["slurm.nebius.ai"]
+    resources: ["jailedconfigs/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["slurm.nebius.ai"]
+    resources: ["jailedconfigs/finalizers"]
+    verbs: ["update"]
+{{- end }}

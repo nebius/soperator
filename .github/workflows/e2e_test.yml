@@ -19,7 +19,6 @@ on:
         default: "/soperator/installations/example"
         type: string
 
-
 permissions:
   contents: read
 
@@ -56,14 +55,14 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           fetch-depth: 0
 
       - name: Install GO
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
           cache: false
 
       - name: Install E2E tools
@@ -168,7 +167,7 @@ jobs:
           echo "SOPERATOR_UNSTABLE=$SOPERATOR_UNSTABLE" >> $GITHUB_ENV
 
       - name: Checkout Terraform repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           repository: ${{ env.TERRAFORM_REPO }}
           ref: ${{ env.TERRAFORM_REPO_REF }}
@@ -264,8 +263,10 @@ jobs:
         if: always()
         shell: bash
         run: |
-          kubectl exec -n soperator controller-0 -- sinfo -N
-          kubectl exec -n soperator controller-0 -- squeue
+          kubectl exec -n soperator controller-0 -- sinfo -N || true
+          kubectl exec -n soperator controller-0 -- squeue || true
+          kubectl exec -n soperator controller-0 -- sdiag || true
+          kubectl exec -n soperator controller-0 -- sacct --format=JobID,JobName,Partition,Account,AllocCPUS,State,ExitCode -S now-6hours || true
           kubectl exec -n soperator controller-0 -- sacct --parsable2 --allusers --starttime=now-6hours | column -t -s'|'
 
       - name: Collect Full Kubernetes Cluster Info
@@ -277,7 +278,7 @@ jobs:
 
       - name: Upload Full Kubernetes Cluster Info
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: cluster-info
           path: ./cluster-info
@@ -292,7 +293,7 @@ jobs:
 
       - name: Upload Soperator Outputs
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: soperator-outputs
           path: ./soperator-outputs
@@ -409,7 +410,7 @@ jobs:
 
       - name: Upload terraform output
         if: ${{ always() }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: terraform-output
           path: "${{ github.workspace }}/output"

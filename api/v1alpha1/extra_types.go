@@ -123,4 +123,14 @@ type ContainerSecuritySpec struct {
 	// +kubebuilder:default="unconfined"
 	// +kubebuilder:validation:Optional
 	AppArmorProfile string `json:"appArmorProfile,omitempty"`
+
+	// procMount denotes the type of proc mount to use for the containers.
+	// The default value is Default which uses the container runtime defaults for
+	// readonly paths and masked paths.
+	// This requires the ProcMountType feature flag to be enabled.
+	// Note that this field cannot be set when spec.os.name is windows.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=Default;Unmasked
+	ProcMount corev1.ProcMountType `json:"procMount,omitempty"`
 }

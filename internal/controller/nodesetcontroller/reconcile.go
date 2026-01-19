@@ -3,18 +3,21 @@ package nodesetcontroller
 import (
 	"context"
 	"fmt"
+	"time"
 
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/state"
 	"nebius.ai/slurm-operator/internal/logfield"
@@ -94,9 +97,46 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		cluster.Spec.UseDefaultAppArmorProfile,
 	)
 
-	if err = r.ReconcileNodeSetWorkers(ctx, nodeSet, &nodeSetValues); err != nil {
+	if err = r.executeReconciliation(ctx, nodeSet, &nodeSetValues, cluster); err != nil {
 		return ctrl.Result{}, err
 	}
+
+	// region Maintenance condition
+	{
+		var condition metav1.Condition
+		if check.IsMaintenanceActive(nodeSetValues.Maintenance) {
+			condition = metav1.Condition{
+				Type:    slurmv1alpha1.ConditionNodeSetStatefulSetTerminated,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Maintenance",
+				Message: "Workers are disabled",
+			}
+		} else {
+			condition = metav1.Condition{
+				Type:    slurmv1alpha1.ConditionNodeSetStatefulSetTerminated,
+				Status:  metav1.ConditionFalse,
+				Reason:  "WorkersEnabled",
+				Message: "Workers are enabled",
+			}
+		}
+
+		if err = r.patchStatus(ctx, nodeSet, func(status *slurmv1alpha1.NodeSetStatus) bool {
+			return status.SetCondition(condition)
+		}); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+	// endregion Maintenance condition
+
+	// region Validation
+	if res, err := r.validateResources(ctx, nodeSet, &nodeSetValues); err != nil {
+		logger.Error(err, "Failed to validate Slurm workers")
+		return ctrl.Result{}, fmt.Errorf("validating Slurm workers: %w", err)
+	} else if res.RequeueAfter > 0 {
+		logger.Info("Reconciliation requeued")
+		return res, nil
+	}
+	// endregion Validation
 
 	logger.Info("Finished reconciliation")
 
@@ -105,6 +145,7 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 
 func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv1alpha1.NodeSet) error {
 	patch := client.MergeFrom(nodeSet.DeepCopy())
+	needToUpdate := false
 
 	for _, conditionType := range []string{
 		slurmv1alpha1.ConditionNodeSetConfigUpdated,
@@ -113,15 +154,24 @@ func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv
 		slurmv1alpha1.ConditionNodeSetPodsReady,
 		slurmv1alpha1.ConditionNodeSetStatefulSetTerminated,
 	} {
-		if cond := meta.FindStatusCondition(nodeSet.Status.Conditions, conditionType); cond == nil {
+		if meta.FindStatusCondition(nodeSet.Status.Conditions, conditionType) != nil {
 			continue
 		}
-		nodeSet.Status.SetCondition(metav1.Condition{
+
+		// Don't do
+		//	needToUpdate = needToUpdate || nodeSet.Status.SetCondition
+		// This will skip the SetCondition call if needToUpdate is already true.
+		// Status.SetCondition checks for existing condition and updates only if there is a change.
+		updated := nodeSet.Status.SetCondition(metav1.Condition{
 			Type:    conditionType,
 			Status:  metav1.ConditionUnknown,
 			Reason:  "SetUpCondition",
 			Message: "The object is not ready yet.",
 		})
+		needToUpdate = needToUpdate || updated
+	}
+	if !needToUpdate {
+		return nil
 	}
 
 	if err := r.Status().Patch(ctx, nodeSet, patch); err != nil {
@@ -132,14 +182,13 @@ func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv
 	return nil
 }
 
-// ReconcileNodeSetWorkers reconciles all resources necessary for deploying Slurm NodeSet workers
-func (r NodeSetReconciler) ReconcileNodeSetWorkers(
+// executeReconciliation reconciles all resources necessary for deploying Slurm NodeSet workers
+func (r NodeSetReconciler) executeReconciliation(
 	ctx context.Context,
 	nodeSet *slurmv1alpha1.NodeSet,
 	nodeSetValues *values.SlurmNodeSet,
+	cluster *slurmv1.SlurmCluster,
 ) error {
-	logger := log.FromContext(ctx)
-
 	steps := []utils.MultiStepExecutionStep{
 		{
 			Name: "Security limits ConfigMap",
@@ -172,13 +221,7 @@ func (r NodeSetReconciler) ReconcileNodeSetWorkers(
 				stepLogger.V(1).Info("Rendered")
 
 				// Cluster has to be the owner of the umbrella service, as it should not be deleted by deleting one of node sets
-				cluster, err := resourcegetter.GetCluster(ctx, r.Client, nodeSetValues.ParentalCluster)
-				if err != nil {
-					stepLogger.Error(err, "Failed to get parental cluster")
-					return fmt.Errorf("getting %s parental cluster %s/%s: %w", slurmv1alpha1.KindNodeSet, nodeSetValues.ParentalCluster.Namespace, nodeSetValues.ParentalCluster.Name, err)
-				}
-
-				if err = r.Service.Reconcile(stepCtx, cluster, &desired, nil); err != nil {
+				if err := r.Service.Reconcile(stepCtx, cluster, &desired, nil); err != nil {
 					stepLogger.Error(err, "Failed to reconcile")
 					return fmt.Errorf("reconciling umbrella worker Service: %w", err)
 				}
@@ -214,15 +257,15 @@ func (r NodeSetReconciler) ReconcileNodeSetWorkers(
 				stepLogger := log.FromContext(stepCtx)
 				stepLogger.V(1).Info("Reconciling")
 
-				cluster, err := resourcegetter.GetCluster(ctx, r.Client, nodeSetValues.ParentalCluster)
-				if err != nil {
-					stepLogger.Error(err, "Failed to get parental cluster")
-					return fmt.Errorf("getting %s parental cluster %s/%s: %w", slurmv1alpha1.KindNodeSet, nodeSetValues.ParentalCluster.Namespace, nodeSetValues.ParentalCluster.Name, err)
+				secrets := values.BuildSecretsFrom(&cluster.Spec.Secrets)
+				if cluster.Spec.Secrets.SshdKeysName == "" {
+					stepLogger.V(1).Info("SshdKeysName is empty. Using default name")
+					secrets.SshdKeysName = naming.BuildSecretSSHDKeysName(cluster.Name)
 				}
 
 				desired, err := worker.RenderNodeSetStatefulSet(
 					nodeSetValues,
-					ptr.To(values.BuildSecretsFrom(&cluster.Spec.Secrets)),
+					&secrets,
 				)
 				if err != nil {
 					stepLogger.Error(err, "Failed to render")
@@ -231,14 +274,14 @@ func (r NodeSetReconciler) ReconcileNodeSetWorkers(
 				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 				stepLogger.V(1).Info("Rendered")
 
-				deps, err := r.getWorkersStatefulSetDependencies(stepCtx, nodeSetValues)
+				deps, err := r.getWorkersStatefulSetDependencies(stepCtx, nodeSetValues, cluster)
 				if err != nil {
 					stepLogger.Error(err, "Failed to retrieve dependencies")
 					return fmt.Errorf("retrieving dependencies for worker StatefulSet: %w", err)
 				}
 				stepLogger.V(1).Info("Retrieved dependencies")
 
-				if err = r.AdvancedStatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
+				if err = r.AdvancedStatefulSet.Reconcile(stepCtx, nodeSet, &desired, deps...); err != nil {
 					stepLogger.Error(err, "Failed to reconcile")
 					return fmt.Errorf("reconciling worker StatefulSet: %w", err)
 				}
@@ -249,23 +292,94 @@ func (r NodeSetReconciler) ReconcileNodeSetWorkers(
 		},
 	}
 
+	logger := log.FromContext(ctx)
 	if err := utils.ExecuteMultiStep(ctx,
-		"Reconciliation of Slurm NodeSet workers",
+		"Reconciliation of Slurm NodeSet resources",
 		utils.MultiStepExecutionStrategyCollectErrors,
 		steps...,
 	); err != nil {
-		logger.Error(err, "Failed to reconcile Slurm NodeSet workers")
-		return fmt.Errorf("reconciling Slurm NodeSet workers: %w", err)
+		logger.Error(err, "Failed to reconcile resources")
+		return fmt.Errorf("reconciling Slurm NodeSet resources: %w", err)
 	}
 
-	logger.Info("Reconciled Slurm NodeSet workers")
+	logger.Info("Reconciled resources")
 	return nil
+}
+
+func (r NodeSetReconciler) validateResources(
+	ctx context.Context,
+	nodeSet *slurmv1alpha1.NodeSet,
+	nodeSetValues *values.SlurmNodeSet,
+) (ctrl.Result, error) {
+	const requeueDuration = 10 * time.Second
+	var (
+		res = ctrl.Result{}
+	)
+
+	logger := log.FromContext(ctx)
+
+	existing := &kruisev1b1.StatefulSet{}
+	err := r.Get(
+		ctx,
+		types.NamespacedName{
+			Namespace: nodeSetValues.ParentalCluster.Namespace,
+			Name:      nodeSetValues.StatefulSet.Name,
+		},
+		existing,
+	)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return ctrl.Result{RequeueAfter: requeueDuration}, nil
+		}
+		logger.Error(err, "Failed to get StatefulSet")
+		return res, fmt.Errorf("getting StatefulSet: %w", err)
+	}
+
+	if err = r.patchStatus(ctx, nodeSet, func(status *slurmv1alpha1.NodeSetStatus) bool {
+		var (
+			changesInStatus     = false
+			changesInConditions = false
+		)
+
+		if status.Replicas != existing.Status.AvailableReplicas {
+			status.Replicas = existing.Status.AvailableReplicas
+			changesInStatus = true
+		}
+
+		var (
+			condition metav1.Condition
+		)
+		if existing.Status.AvailableReplicas == nodeSetValues.StatefulSet.Replicas {
+			condition = metav1.Condition{
+				Type:    slurmv1alpha1.ConditionNodeSetPodsReady,
+				Status:  metav1.ConditionTrue,
+				Reason:  "NodeSetReady",
+				Message: "NodeSet is ready",
+			}
+		} else {
+			condition = metav1.Condition{
+				Type:    slurmv1alpha1.ConditionNodeSetPodsReady,
+				Status:  metav1.ConditionFalse,
+				Message: "NodeSet is not ready",
+				Reason:  "NodeSetNotReady",
+			}
+			res.RequeueAfter += requeueDuration
+		}
+		changesInConditions = status.SetCondition(condition)
+
+		return changesInStatus || changesInConditions
+	}); err != nil {
+		logger.Error(err, "Failed to update status for Replicas")
+		return res, fmt.Errorf("updating .Status: %w", err)
+	}
+
+	return res, nil
 }
 
 func (r NodeSetReconciler) getWorkersStatefulSetDependencies(
 	ctx context.Context,
 	nodeSet *values.SlurmNodeSet,
-	// clusterValues *values.SlurmCluster,
+	cluster *slurmv1.SlurmCluster,
 ) ([]metav1.Object, error) {
 	var res []metav1.Object
 
@@ -282,20 +396,20 @@ func (r NodeSetReconciler) getWorkersStatefulSetDependencies(
 	}
 	res = append(res, mungeKeySecret)
 
-	//if clusterValues.NodeAccounting.Enabled {
-	//	slurmdbdSecret := &corev1.Secret{}
-	//	if err := r.Get(
-	//		ctx,
-	//		types.NamespacedName{
-	//			Namespace: clusterValues.Namespace,
-	//			Name:      naming.BuildSecretSlurmdbdConfigsName(clusterValues.Name),
-	//		},
-	//		slurmdbdSecret,
-	//	); err != nil {
-	//		return []metav1.Object{}, err
-	//	}
-	//	res = append(res, slurmdbdSecret)
-	//}
+	if cluster.Spec.SlurmNodes.Accounting.Enabled {
+		slurmdbdSecret := &corev1.Secret{}
+		if err := r.Get(
+			ctx,
+			types.NamespacedName{
+				Namespace: nodeSet.ParentalCluster.Namespace,
+				Name:      naming.BuildSecretSlurmdbdConfigsName(nodeSet.ParentalCluster.Name),
+			},
+			slurmdbdSecret,
+		); err != nil {
+			return []metav1.Object{}, err
+		}
+		res = append(res, slurmdbdSecret)
+	}
 
 	if nodeSet.SupervisorDConfigMapName != "" {
 		superviserdConfigMap := &corev1.ConfigMap{}

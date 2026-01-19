@@ -1,0 +1,237 @@
+suite: test sconfigcontroller RBAC resources
+templates:
+  - templates/sconfigcontroller-serviceaccount.yaml
+  - templates/sconfigcontroller-role.yaml
+  - templates/sconfigcontroller-rolebinding.yaml
+  - templates/slurm-cluster-cr.yaml
+tests:
+  # Test ServiceAccount creation with default values
+  - it: should create ServiceAccount with default values
+    template: templates/sconfigcontroller-serviceaccount.yaml
+    set:
+      clusterName: test-cluster
+    asserts:
+      - isKind:
+          of: ServiceAccount
+      - equal:
+          path: metadata.name
+          value: test-cluster-sconfigcontroller
+      - equal:
+          path: metadata.namespace
+          value: NAMESPACE
+      - matchRegex:
+          path: metadata.labels["app.kubernetes.io/component"]
+          pattern: sconfigcontroller
+
+  # Test ServiceAccount with custom name
+  - it: should create ServiceAccount with custom name
+    template: templates/sconfigcontroller-serviceaccount.yaml
+    set:
+      clusterName: test-cluster
+      sConfigController:
+        serviceAccount:
+          create: true
+          name: custom-sa
+    asserts:
+      - isKind:
+          of: ServiceAccount
+      - equal:
+          path: metadata.name
+          value: custom-sa
+
+  # Test ServiceAccount not created when create=false
+  - it: should not create ServiceAccount when create is false
+    template: templates/sconfigcontroller-serviceaccount.yaml
+    set:
+      clusterName: test-cluster
+      sConfigController:
+        serviceAccount:
+          create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Test Role creation with default values
+  - it: should create Role with correct permissions
+    template: templates/sconfigcontroller-role.yaml
+    set:
+      clusterName: test-cluster
+    asserts:
+      - isKind:
+          of: Role
+      - equal:
+          path: metadata.name
+          value: test-cluster-sconfigcontroller
+      - equal:
+          path: metadata.namespace
+          value: NAMESPACE
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["configmaps"]
+            verbs: ["get", "list", "watch"]
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["secrets"]
+            verbs: ["get", "list", "watch"]
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["coordination.k8s.io"]
+            resources: ["leases"]
+            verbs: ["get", "list", "watch", "create", "update", "patch"]
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["events"]
+            verbs: ["create", "patch"]
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["slurm.nebius.ai"]
+            resources: ["jailedconfigs"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["slurm.nebius.ai"]
+            resources: ["jailedconfigs/status"]
+            verbs: ["get", "update", "patch"]
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["slurm.nebius.ai"]
+            resources: ["jailedconfigs/finalizers"]
+            verbs: ["update"]
+
+  # Test Role not created when rbac.create=false
+  - it: should not create Role when rbac.create is false
+    template: templates/sconfigcontroller-role.yaml
+    set:
+      clusterName: test-cluster
+      sConfigController:
+        rbac:
+          create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Test RoleBinding creation with default values
+  - it: should create RoleBinding with correct references
+    template: templates/sconfigcontroller-rolebinding.yaml
+    set:
+      clusterName: test-cluster
+    asserts:
+      - isKind:
+          of: RoleBinding
+      - equal:
+          path: metadata.name
+          value: test-cluster-sconfigcontroller
+      - equal:
+          path: metadata.namespace
+          value: NAMESPACE
+      - equal:
+          path: roleRef.kind
+          value: Role
+      - equal:
+          path: roleRef.name
+          value: test-cluster-sconfigcontroller
+      - equal:
+          path: roleRef.apiGroup
+          value: rbac.authorization.k8s.io
+      - contains:
+          path: subjects
+          content:
+            kind: ServiceAccount
+            name: test-cluster-sconfigcontroller
+            namespace: NAMESPACE
+
+  # Test RoleBinding with custom ServiceAccount name
+  - it: should create RoleBinding with custom ServiceAccount name
+    template: templates/sconfigcontroller-rolebinding.yaml
+    set:
+      clusterName: test-cluster
+      sConfigController:
+        serviceAccount:
+          create: true
+          name: custom-sa
+    asserts:
+      - isKind:
+          of: RoleBinding
+      - contains:
+          path: subjects
+          content:
+            kind: ServiceAccount
+            name: custom-sa
+            namespace: NAMESPACE
+
+  # Test RoleBinding not created when rbac.create=false
+  - it: should not create RoleBinding when rbac.create is false
+    template: templates/sconfigcontroller-rolebinding.yaml
+    set:
+      clusterName: test-cluster
+      sConfigController:
+        rbac:
+          create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Test SlurmCluster CR uses ServiceAccount when created
+  - it: should set serviceAccountName in SlurmCluster CR when ServiceAccount is created
+    template: templates/slurm-cluster-cr.yaml
+    set:
+      clusterName: test-cluster
+      sConfigController:
+        serviceAccount:
+          create: true
+    asserts:
+      - equal:
+          path: spec.sConfigController.serviceAccountName
+          value: test-cluster-sconfigcontroller
+
+  # Test SlurmCluster CR uses custom ServiceAccount name
+  - it: should set custom serviceAccountName in SlurmCluster CR
+    template: templates/slurm-cluster-cr.yaml
+    set:
+      clusterName: test-cluster
+      sConfigController:
+        serviceAccount:
+          create: true
+          name: my-custom-sa
+    asserts:
+      - equal:
+          path: spec.sConfigController.serviceAccountName
+          value: my-custom-sa
+
+  # Test SlurmCluster CR uses external ServiceAccount when create=false
+  - it: should set external serviceAccountName in SlurmCluster CR when create is false
+    template: templates/slurm-cluster-cr.yaml
+    set:
+      clusterName: test-cluster
+      sConfigController:
+        serviceAccount:
+          create: false
+          name: external-sa
+    asserts:
+      - equal:
+          path: spec.sConfigController.serviceAccountName
+          value: external-sa
+
+  # Test SlurmCluster CR uses default ServiceAccount name when name is empty but create is true
+  - it: should use default serviceAccountName in SlurmCluster CR when serviceAccount.name is empty
+    template: templates/slurm-cluster-cr.yaml
+    set:
+      clusterName: test-cluster
+      sConfigController:
+        serviceAccount:
+          create: true
+          name: ""
+    asserts:
+      - equal:
+          path: spec.sConfigController.serviceAccountName
+          value: test-cluster-sconfigcontroller

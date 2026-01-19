@@ -1,0 +1,73 @@
+suite: test k8sJobSpec structure
+templates:
+  - templates/active-checks.yaml
+tests:
+  - it: should render k8sJobSpec with correct structure
+    documentSelector:
+      path: metadata.name
+      value: test-k8sjob
+    set:
+      slurmClusterRefName: test-cluster
+      images:
+        k8sJob: "test-image:latest"
+        munge: "munge-image:latest"
+      jobContainer:
+        volumeMounts:
+          - mountPath: /mnt/jail
+            name: jail
+        volumes:
+          - name: jail
+            persistentVolumeClaim:
+              claimName: jail-pvc
+      checks:
+        test-k8sjob:
+          enabled: true
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              command: ["echo", "test"]
+            mungeContainer:
+              enabled: true
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - exists:
+          path: spec.k8sJobSpec.jobContainer.image
+      - exists:
+          path: spec.k8sJobSpec.jobContainer.command
+      - exists:
+          path: spec.k8sJobSpec.jobContainer.volumeMounts
+      - exists:
+          path: spec.k8sJobSpec.jobContainer.volumes
+      - exists:
+          path: spec.k8sJobSpec.mungeContainer
+      - exists:
+          path: spec.k8sJobSpec.mungeContainer.image
+
+  - it: should allow overriding k8sJob container image
+    documentSelector:
+      path: metadata.name
+      value: test-k8sjob-image-override
+    set:
+      slurmClusterRefName: test-cluster
+      images:
+        k8sJob: "default-k8s-image:latest"
+        slurmJob: "slurm-job-image:latest"
+        munge: "munge-image:latest"
+      jobContainer:
+        volumeMounts: []
+        volumes: []
+      checks:
+        test-k8sjob-image-override:
+          enabled: true
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              image: "{{ .Values.images.slurmJob }}"
+              command: ["echo", "test"]
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - equal:
+          path: spec.k8sJobSpec.jobContainer.image
+          value: "slurm-job-image:latest"

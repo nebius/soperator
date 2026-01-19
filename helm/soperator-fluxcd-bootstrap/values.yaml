@@ -1,0 +1,43 @@
+helmRepository:
+  enabled: true
+  name: soperator-fluxcd
+  namespace: flux-system
+  interval: 5m
+  type: oci
+  url: oci://cr.eu-north1.nebius.cloud/soperator
+  annotations:
+    "helm.sh/resource-policy": keep
+helmRelease:
+  enabled: true
+  name: soperator-fluxcd
+  namespace: flux-system
+  interval: 5m
+  timeout: 5m
+  chart:
+    name: helm-soperator-fluxcd
+    version: "1.23.1"
+    interval: 5m
+  install:
+    createNamespace: true
+    crds: Skip
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-fluxcd-values
+      valuesKey: values.yaml
+      optional: false
+    - kind: ConfigMap
+      name: soperator-fluxcd-values
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
+      name: terraform-opentelemetry-collector
+      valuesKey: values.yaml
+      optional: true
+  annotations:
+    "helm.sh/resource-policy": keep
