@@ -361,8 +361,8 @@ func addSlurmConfigProperties(res *renderutils.PropertiesConfig, config interfac
 func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
 	res.AddProperty("CgroupMountpoint", "/sys/fs/cgroup")
-	res.AddProperty("ConstrainCores", "yes")
-	res.AddProperty("ConstrainDevices", "yes")
+	res.AddProperty("ConstrainCores", "no")
+	res.AddProperty("ConstrainDevices", "no")
 	res.AddProperty("ConstrainRAMSpace", "yes")
 	switch cluster.NodeWorker.CgroupVersion {
 	case consts.CGroupV1:
