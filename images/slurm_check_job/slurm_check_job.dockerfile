@@ -34,6 +34,13 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Install NCCL debug plugin
+COPY images/common/spank-nccl-debug/src /usr/src/soperator/spank/nccld-debug
+COPY images/common/scripts/install_nccld_debug_plugin.sh /opt/bin/
+RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
+    /opt/bin/install_nccld_debug_plugin.sh && \
+    rm /opt/bin/install_nccld_debug_plugin.sh
+
 # Install kubectl
 RUN ARCH="$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')" && \
     KUBECTL_VERSION="$(curl -Ls https://dl.k8s.io/release/stable.txt)" && \
@@ -44,6 +51,17 @@ RUN ARCH="$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')" && \
 
 # Update linker cache
 RUN ldconfig
+
+# Create symlinks for SPANK plugins so Slurm can find them at /usr/lib/slurm/
+# Plugins are installed at /usr/lib/${ARCH}-linux-gnu/slurm/ but Slurm looks at /usr/lib/slurm/
+RUN ARCH="$(uname -m)" && \
+    mkdir -p /usr/lib/slurm && \
+    ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/chroot.so" /usr/lib/slurm/chroot.so && \
+    ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/spank_pyxis.so" /usr/lib/slurm/spank_pyxis.so && \
+    ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/spanknccldebug.so" /usr/lib/slurm/spanknccldebug.so
+
+# Disable NCCL debug plugin by default for slurm jobs
+ENV SNCCLD_ENABLED="false"
 
 # Delete users & home because they will be linked from jail
 RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
