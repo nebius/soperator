@@ -27,7 +27,9 @@ echo "Symlink slurm configs from jail(sconfigcontroller)"
 rm -rf /etc/slurm && ln -s /mnt/jail/etc/slurm /etc/slurm
 
 echo "Bind-mount /opt/bin/sbatch.sh script"
-mount --bind /opt/bin/sbatch.sh opt/bin/sbatch.sh
+mkdir -p /mnt/jail/opt/bin
+touch /mnt/jail/opt/bin/sbatch.sh
+mount --bind /opt/bin/sbatch.sh /mnt/jail/opt/bin/sbatch.sh
 
 echo "Create directory for slurm job outputs"
 (umask 000; mkdir -p "/mnt/jail/opt/soperator-outputs/slurm_jobs")
