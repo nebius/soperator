@@ -4,7 +4,10 @@ package e2e_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/hcl/v2"
@@ -46,7 +49,7 @@ func readTFVars(t *testing.T, tfVarsFilename string) map[string]interface{} {
 	return varsMap
 }
 
-func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[string]interface{} {
+func overrideTestValues(t *testing.T, tfVars map[string]interface{}, cfg testConfig) map[string]interface{} {
 	// active_checks_scope = "prod"
 	tfVars["active_checks_scope"] = "testing"
 
@@ -107,6 +110,9 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 		},
 	}
 
+	// slurm_nodesets_enabled = false
+	tfVars["slurm_nodesets_enabled"] = true
+
 	// slurm_nodeset_workers = [
 	//   {
 	//     name = "worker"
@@ -125,6 +131,10 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 	//     }
 	//     # Change to preemptible = {} in case you want to use preemptible nodes
 	//     preemptible = null
+	//     # Provide a list of strings to set Slurm Node features
+	//     features = null
+	//     # Set to `true` to create partition for the NodeSet by default
+	//     create_partition = null
 	//   },
 	// ]
 	tfVars["slurm_nodeset_workers"] = []interface{}{
@@ -145,6 +155,33 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 			},
 			// User regular nodes for now
 			// "preemptible": struct{}{},
+			"preemptible":      nil,
+			"features":         nil,
+			"create_partition": nil,
+		},
+	}
+
+	// slurm_nodesets_partitions = [
+	//   {
+	//     name   = "workers"
+	//     is_all = false
+	//     config = "Default=NO PriorityTier=10 MaxTime=INFINITE State=UP OverSubscribe=YES"
+	//     nodeset_refs = [
+	//       "worker",
+	//     ]
+	//   },
+	// ]
+	tfVars["slurm_nodesets_partitions"] = []any{
+		map[string]any{
+			"name":   "workers",
+			"is_all": false,
+			"config": strings.TrimSpace(fmt.Sprintf(
+				"Default=YES PriorityTier=10 MaxTime=INFINITE State=UP OverSubscribe=YES %s",
+				renderDefCpuPerGpu(t, cfg),
+			)),
+			"nodeset_refs": []string{
+				"worker",
+			},
 		},
 	}
 
@@ -160,4 +197,45 @@ func overrideTestValues(tfVars map[string]interface{}, cfg testConfig) map[strin
 	tfVars["cleanup_bucket_on_destroy"] = true
 
 	return tfVars
+}
+
+func renderDefCpuPerGpu(t *testing.T, cfg testConfig) string {
+	if !strings.HasPrefix(cfg.WorkerPlatform, "gpu") {
+		return ""
+	}
+
+	presetComponents := strings.Split(cfg.WorkerPreset, "-")
+	require.GreaterOrEqual(t, len(presetComponents), 3)
+
+	var (
+		gpusString, cpusString string
+	)
+	for _, component := range presetComponents {
+		if strings.HasSuffix(component, "gpu") {
+			gpusString = strings.TrimSuffix(component, "gpu")
+			continue
+		}
+		if strings.HasSuffix(component, "cpu") {
+			cpusString = strings.TrimSuffix(component, "cpu")
+			continue
+		}
+	}
+	require.NotEmpty(t, gpusString)
+	require.NotEmpty(t, cpusString)
+
+	var (
+		gpus, cpus int
+		err        error
+	)
+	gpus, err = strconv.Atoi(gpusString)
+	require.NoError(t, err)
+	require.Greater(t, gpus, 0)
+	cpus, err = strconv.Atoi(cpusString)
+	require.NoError(t, err)
+	require.Greater(t, cpus, 0)
+
+	var cpuPerGpu int = cpus / gpus
+	require.Greater(t, cpuPerGpu, 0)
+
+	return fmt.Sprintf("DefCpuPerGPU=%d", cpuPerGpu)
 }

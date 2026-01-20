@@ -17,7 +17,7 @@ import (
 // setupTerraformOptions creates common terraform options for e2e tests
 func setupTerraformOptions(t *testing.T, cfg testConfig) terraform.Options {
 	tfVars := readTFVars(t, fmt.Sprintf("%s/terraform.tfvars", cfg.PathToInstallation))
-	tfVars = overrideTestValues(tfVars, cfg)
+	tfVars = overrideTestValues(t, tfVars, cfg)
 
 	envVarsList := os.Environ()
 	envVars := make(map[string]string)
