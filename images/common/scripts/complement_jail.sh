@@ -113,7 +113,7 @@ pushd "${jaildir}"
     /opt/bin/slurm/bind_slurm_common.sh -j ${jaildir}
 
     echo "Bind-mount slurm chroot plugin from container to the jail"
-    mkdir -p "${SLURM_LIB_PATH}"
+    mkdir -p usr/lib/slurm
     touch usr/lib/slurm/chroot.so
     mount --bind "/${SLURM_LIB_PATH}/chroot.so" "usr/lib/slurm/chroot.so"
 
