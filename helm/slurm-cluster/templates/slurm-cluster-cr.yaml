@@ -100,9 +100,20 @@ spec:
     - name: {{ .name | quote }}
       {{- omit . "name" "createPVC" "storageClassName" "size" | toYaml | nindent 6 }}
     {{- end }}
-  secrets: {{ toYaml .Values.secrets | nindent 4 }}
+  secrets:
+    {{- toYaml .Values.secrets | nindent 4 }}
+  {{ $populateJail := "" -}}
+  {{- if and .Values.images.populateJail (ne .Values.images.populateJail "") -}}
+  {{- $populateJail = .Values.images.populateJail -}}
+  {{- else -}}
+  {{- $cudaMajorVersion := default 12 .Values.cudaMajorVersion -}}
+  {{- $cudaVersion := required "populateJail cuda version for the selected major version must be provided." (index .Values.images.populateJailCudaVersions (printf "%v" $cudaMajorVersion)) -}}
+  {{- $populateJailRepo := required "populateJail repository must be provided." .Values.images.populateJailRepository -}}
+  {{- $populateJailTag := required "populateJail tag must be provided." .Values.images.populateJailTag -}}
+  {{- $populateJail = printf "%s:%s-cuda%s" $populateJailRepo $populateJailTag $cudaVersion -}}
+  {{- end -}}
   populateJail:
-    image: {{ required "populateJail image" .Values.images.populateJail | quote }}
+    image: {{ required "populateJail image" $populateJail | quote }}
     imagePullPolicy: {{ default "IfNotPresent" .Values.populateJail.imagePullPolicy | quote }}
     appArmorProfile: {{ default "unconfined" .Values.populateJail.appArmorProfile | quote }}
     k8sNodeFilterName: {{ required "Populate Jail job k8s node filter name must be provided." .Values.populateJail.k8sNodeFilterName | quote }}

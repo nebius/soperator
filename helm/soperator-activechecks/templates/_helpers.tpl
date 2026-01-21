@@ -56,7 +56,20 @@ Create the name of the service account to use
 Pyxis format for active check image.
 */}}
 {{- define "activecheck.image.pyxis" -}}
+{{- include "activecheck.image.resolve" . -}}
 {{- .Values.activeCheckImage -}}
+{{- end -}}
+
+{{/*
+Resolve active check image when not explicitly set.
+*/}}
+{{- define "activecheck.image.resolve" -}}
+{{- if not .Values.activeCheckImage -}}
+{{- $cudaMajorVersion := default 12 .Values.cudaMajorVersion -}}
+{{- $tag := required "activeCheck image tag for the selected CUDA major version must be provided." (index .Values.images.activeCheckImageTags (printf "%v" $cudaMajorVersion)) -}}
+{{- $repo := required "activeCheck image repository must be provided." .Values.images.activeCheckImageRepository -}}
+{{- $_ := set .Values "activeCheckImage" (printf "%s:%s" $repo $tag) -}}
+{{- end -}}
 {{- end -}}
 
 
@@ -65,7 +78,7 @@ Docker format for active check image.
 Converts from format "reg#repo:tag" to format "reg/repo:tag".
 */}}
 {{- define "activecheck.image.docker" -}}
-{{- .Values.activeCheckImage | replace "#" "/" -}}
+{{- include "activecheck.image.pyxis" . | replace "#" "/" -}}
 {{- end -}}
 
 {{/*

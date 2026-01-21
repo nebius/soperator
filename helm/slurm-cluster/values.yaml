@@ -13,6 +13,8 @@ useDefaultAppArmorProfile: false
 maintenance: "none"
 # Slurm cluster type. Can be now gpu or cpu
 clusterType: gpu
+# CUDA major version used for populate-jail image selection.
+cudaMajorVersion: 12
 # partitionConfiguration define partition configuration of slurm worker nodes
 # https://slurm.schedmd.com/slurm.conf.html#SECTION_PARTITION-CONFIGURATION
 partitionConfiguration:
@@ -561,11 +563,16 @@ images:
   slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.23.1-noble-slurm25.05.5"
   sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.23.1-noble-slurm25.05.5"
   munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.23.1-noble-slurm25.05.5"
-  populateJail: "cr.eu-north1.nebius.cloud/soperator/populate_jail:1.23.1-noble-slurm25.05.5"
+  populateJail: ""
+  populateJailRepository: "cr.eu-north1.nebius.cloud/soperator/populate_jail"
+  populateJailTag: "1.23.1-noble-slurm25.05.5"
+  populateJailCudaVersions:
+    "12": "12.9.0"
+    "13": "13.0.2"
   slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.23.1-noble-slurm25.05.5"
   soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.23.1-noble-slurm25.05.5"
-  sConfigController: cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.23.1
-  mariaDB: docker-registry1.mariadb.com/library/mariadb:12.1.2
+  sConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.23.1"
+  mariaDB: "docker-registry1.mariadb.com/library/mariadb:12.1.2"
 # Configuration for slurm scripts.
 slurmScripts:
   # Base scripts content can be overridden here
