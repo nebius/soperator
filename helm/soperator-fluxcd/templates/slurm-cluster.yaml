@@ -5,6 +5,10 @@ metadata:
   labels:
   {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
+  {{- with .Values.slurmCluster.driftDetection }}
+  driftDetection:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   chart:
     spec:
       chart: helm-slurm-cluster

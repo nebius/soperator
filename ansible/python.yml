@@ -1,9 +1,0 @@
----
-
-- name: Install python
-  hosts: all, localhost
-  become: true
-  roles:
-    - python
-  tags:
-    - python

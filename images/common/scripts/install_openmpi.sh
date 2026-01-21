@@ -8,12 +8,8 @@ OFED_VERSION=24.04-0.7.0.0
 
 UCX_VERSION=1.17.0-1.2404066
 
-DISTRO=$(. /etc/os-release; echo "${ID}${VERSION_ID}")
 ALT_ARCH="$(uname -m)"
 
-cd /etc/apt/sources.list.d || exit
-wget https://linux.mellanox.com/public/repo/mlnx_ofed/$OFED_VERSION/"$DISTRO"/mellanox_mlnx_ofed.list
-wget -qO - https://www.mellanox.com/downloads/ofed/RPM-GPG-KEY-Mellanox | apt-key add -
 apt update
 apt install openmpi="$OPENMPI_VERSION" ucx="$UCX_VERSION"
 apt clean
