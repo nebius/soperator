@@ -573,7 +573,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg(\n  (\n    count(\n      slurm_node_job{\n        \n      }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{\n      \n      user_name!=\"soperatorchecks\"\n    }\n  )\n    >\n  1\n) by ()",
+          "expr": "avg(\n  (\n    count(\n      slurm_node_job{\n        \n      }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{\n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  1\n) by ()",
           "hide": false,
           "instant": false,
           "legendFormat": "__auto",
@@ -981,7 +981,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg(\n  sum_over_time(\n    (\n      slurm_job_info{\n        \n        user_name!=\"soperatorchecks\",\n        job_state=\"RUNNING\"\n      }\n    )[1d:1m]\n  )\n    *\n  60\n) by ()",
+          "expr": "avg(\n  sum_over_time(\n    (\n      slurm_job_info{\n        \n        slurm_partition${partition_match_exp},\n        job_state=\"RUNNING\"\n      }\n    )[1d:1m]\n  )\n    *\n  60\n) by ()",
           "hide": false,
           "instant": false,
           "legendFormat": "__auto",
@@ -1797,8 +1797,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "count(\n    count(\n        slurm_job_info{\n            \n            user_name!=\"soperatorchecks\"\n        }\n    ) by (user_name)\n) by ()",
-          "legendFormat": "__auto",
+          "expr": "count(\n    count(\n        slurm_job_info{\n            \n            slurm_partition${partition_match_exp}\n        }\n    ) by (user_name)\n) by ()",
+          "legendFormat": "count",
           "range": true,
           "refId": "A",
           "useCustomValues": true,
@@ -2074,7 +2074,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(\n  slurm_job_info{\n    user_name!=\"soperatorchecks\",\n    job_state=\"PENDING\"\n  }\n) by(job_state_reason)",
+          "expr": "sum(\n  slurm_job_info{\n    slurm_partition${partition_match_exp},\n    job_state=\"PENDING\"\n  }\n) by(job_state_reason)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A",
@@ -2086,7 +2086,7 @@
       "type": "timeseries"
     },
     {
-      "collapsed": true,
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -3336,7 +3336,7 @@
                 "uid": "VictoriaMetrics"
               },
               "editorMode": "code",
-              "expr": "(\n  sum(\n    slurm_job_info{\n      \n      user_name!=\"soperatorchecks\",\n      job_state=~\"COMPLETED\"\n    }\n      and on(job_id)\n    (\n      count(\n        slurm_node_job{ }\n      ) by(job_id)\n        >=\n      4\n    )\n  ) by ()\n    /\n  sum(\n    slurm_job_info{\n      user_name!=\"soperatorchecks\",\n      job_state=~\"COMPLETED|FAILED|CANCELLED|TIMEOUT|DEADLINE\",\n    }\n      and on(job_id)\n    (\n      count(\n        slurm_node_job{ }\n      ) by(job_id)\n        >=\n      4\n    )\n  ) by ()\n) \n  *\n100",
+              "expr": "(\n  sum(\n    slurm_job_info{\n      \n      slurm_partition${partition_match_exp},\n      job_state=~\"COMPLETED\"\n    }\n      and on(job_id)\n    (\n      count(\n        slurm_node_job{ }\n      ) by(job_id)\n        >=\n      4\n    )\n  ) by ()\n    /\n  sum(\n    slurm_job_info{\n      slurm_partition${partition_match_exp},\n      job_state=~\"COMPLETED|FAILED|CANCELLED|TIMEOUT|DEADLINE\",\n    }\n      and on(job_id)\n    (\n      count(\n        slurm_node_job{ }\n      ) by(job_id)\n        >=\n      4\n    )\n  ) by ()\n) \n  *\n100",
               "hide": false,
               "legendFormat": "__auto",
               "range": true,
@@ -3487,7 +3487,7 @@
                 "uid": "VictoriaMetrics"
               },
               "editorMode": "code",
-              "expr": "max(\n  (\n    count(\n      slurm_node_job{\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{\n      \n      user_name!=\"soperatorchecks\"\n    }\n  )\n    >\n  1\n) by()",
+              "expr": "max(\n  (\n    count(\n      slurm_node_job{\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{\n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  1\n) by()",
               "hide": false,
               "legendFormat": "max",
               "range": true,
@@ -3501,7 +3501,7 @@
                 "uid": "VictoriaMetrics"
               },
               "editorMode": "code",
-              "expr": "avg(\n  (\n    count(\n      slurm_node_job{\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{\n      \n      user_name!=\"soperatorchecks\"\n    }\n  )\n    >\n  1\n) by()",
+              "expr": "avg(\n  (\n    count(\n      slurm_node_job{\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{\n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  1\n) by()",
               "hide": false,
               "legendFormat": "avg",
               "range": true,
@@ -3515,7 +3515,7 @@
                 "uid": "VictoriaMetrics"
               },
               "editorMode": "code",
-              "expr": "min(\n  (\n    count(\n      slurm_node_job{\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{\n      \n      user_name!=\"soperatorchecks\"\n    }\n  )\n    >\n  1\n) by()",
+              "expr": "min(\n  (\n    count(\n      slurm_node_job{\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{\n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  1\n) by()",
               "hide": false,
               "legendFormat": "min",
               "range": true,
@@ -3766,7 +3766,7 @@
                 "uid": "VictoriaMetrics"
               },
               "editorMode": "code",
-              "expr": "max(\n  slurm_job_duration_seconds\n  and on(job_id)\n  slurm_job_info{user_name!=\"soperatorchecks\" }\n)",
+              "expr": "max(\n  slurm_job_duration_seconds\n  and on(job_id)\n  slurm_job_info{slurm_partition${partition_match_exp} }\n)",
               "hide": false,
               "legendFormat": "max",
               "range": true,
@@ -3780,7 +3780,7 @@
                 "uid": "VictoriaMetrics"
               },
               "editorMode": "code",
-              "expr": "avg(\n  slurm_job_duration_seconds{ }\n    and on(job_id)\n  slurm_job_info{user_name!=\"soperatorchecks\" }\n)",
+              "expr": "avg(\n  slurm_job_duration_seconds{ }\n    and on(job_id)\n  slurm_job_info{slurm_partition${partition_match_exp} }\n)",
               "hide": false,
               "legendFormat": "avg",
               "range": true,
@@ -3794,7 +3794,7 @@
                 "uid": "VictoriaMetrics"
               },
               "editorMode": "code",
-              "expr": "min(\n  slurm_job_duration_seconds{ }\n    and on(job_id)\n  slurm_job_info{user_name!=\"soperatorchecks\" }\n)",
+              "expr": "min(\n  slurm_job_duration_seconds{ }\n    and on(job_id)\n  slurm_job_info{slurm_partition${partition_match_exp} }\n)",
               "hide": false,
               "legendFormat": "min",
               "range": true,
@@ -3978,7 +3978,7 @@
             {
               "editorMode": "code",
               "exemplar": false,
-              "expr": "histogram(\n    count(slurm_node_job) by (job_id)\n    and on(job_id)\n    slurm_job_info{\n      user_name!=\"soperatorchecks\"\n    }\n)",
+              "expr": "histogram(\n    count(slurm_node_job) by (job_id)\n    and on(job_id)\n    slurm_job_info{\n      slurm_partition${partition_match_exp}\n    }\n)",
               "format": "time_series",
               "hide": false,
               "instant": false,
