@@ -1,41 +1,91 @@
 suite: reactions conflict
 templates:
-  - templates/ib-gpu-perf.yaml
+  - templates/active-checks.yaml
 
 tests:
-  - it: should fail if both commentPrefix and drainReasonPrefix are set
+  - it: ib-gpu-perf should fail if both commentSlurmNode and drainSlurmNode are set under failureReactions
+    template: templates/active-checks.yaml
     set:
       checks:
-        ibGpuPerf:
-          commentPrefix: "[node_problem]"
-          drainReasonPrefix: "[node_problem]"
+        ib-gpu-perf:
+          failureReactions:
+            commentSlurmNode:
+              commentPrefix: "[node_problem]"
+            drainSlurmNode:
+              drainReasonPrefix: "[node_problem]"
     asserts:
       - failedTemplate:
-          errorMessage: "checks.ibGpuPerf: cannot set both commentPrefix and drainReasonPrefix simultaneously"
+          errorMessage: "checks.ib-gpu-perf.failureReactions: cannot set both commentSlurmNode and drainSlurmNode simultaneously"
 
-  - it: should render when only commentPrefix is set
+  - it: ib-gpu-perf should render when only commentSlurmNode is set
+    template: templates/active-checks.yaml
     set:
       checks:
-        ibGpuPerf:
-          commentPrefix: "[node_problem]"
-          drainReasonPrefix: null
+        ib-gpu-perf:
+          failureReactions:
+            commentSlurmNode:
+              commentPrefix: "[node_problem]"
+            drainSlurmNode: null
     asserts:
       - notFailedTemplate: {}
 
-  - it: should render when only drainReasonPrefix is set
+  - it: ib-gpu-perf should render when only drainSlurmNode is set
+    template: templates/active-checks.yaml
     set:
       checks:
-        ibGpuPerf:
-          drainReasonPrefix: "[node_problem]"
-          commentPrefix: null
+        ib-gpu-perf:
+          failureReactions:
+            drainSlurmNode:
+              drainReasonPrefix: "[node_problem]"
+            commentSlurmNode: null
     asserts:
       - notFailedTemplate: {}
 
-  - it: should render when both prefixes are explicitly null
+  - it: gpu-fryer should fail if both commentSlurmNode and drainSlurmNode are set under failureReactions
+    template: templates/active-checks.yaml
     set:
       checks:
-        ibGpuPerf:
-          commentPrefix: null
-          drainReasonPrefix: null
+        gpu-fryer:
+          failureReactions:
+            commentSlurmNode:
+              commentPrefix: "[node_problem]"
+            drainSlurmNode:
+              drainReasonPrefix: "[node_problem]"
+    asserts:
+      - failedTemplate:
+          errorMessage: "checks.gpu-fryer.failureReactions: cannot set both commentSlurmNode and drainSlurmNode simultaneously"
+
+  - it: gpu-fryer should render when only commentSlurmNode is set
+    template: templates/active-checks.yaml
+    set:
+      checks:
+        gpu-fryer:
+          failureReactions:
+            commentSlurmNode:
+              commentPrefix: "[node_problem]"
+            drainSlurmNode: null
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: gpu-fryer should render when only drainSlurmNode is set
+    template: templates/active-checks.yaml
+    set:
+      checks:
+        gpu-fryer:
+          failureReactions:
+            commentSlurmNode: null
+            drainSlurmNode:
+              drainReasonPrefix: "[node_problem]"
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: gpu-fryer should render when both reaction nodes are explicitly null
+    template: templates/active-checks.yaml
+    set:
+      checks:
+        gpu-fryer:
+          failureReactions:
+            commentSlurmNode: null
+            drainSlurmNode: null
     asserts:
       - notFailedTemplate: {}

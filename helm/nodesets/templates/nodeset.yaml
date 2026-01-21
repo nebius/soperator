@@ -1,0 +1,204 @@
+{{- range $i, $ns := .Values.nodesets }}
+{{- with $ns }}
+---
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: NodeSet
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Release.Namespace }}
+
+  {{- with (.annotations | default dict) }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  labels:
+    {{- include "nodesets.labels" $ | nindent 4 }}
+    {{- with (.labels | default dict) }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+
+spec:
+  {{- with (.replicas | default 1) }}
+  replicas: {{ . }}
+  {{- end }}
+
+  {{- with (.maxUnavailable | default "20%") }}
+  maxUnavailable: {{ . }}
+  {{- end }}
+
+  {{- with .gpu }}
+  gpu:
+    enabled: {{ .enabled | default false }}
+
+    {{- with .nvidia }}
+    nvidia:
+      gdrCopyEnabled: {{ .gdrCopyEnabled | default false }}
+    {{- end }}
+  {{- end }}
+
+  {{- with .nodeConfig }}
+  nodeConfig:
+    {{- with .features }}
+    features:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+
+    {{- with .static }}
+    static: {{ . | quote }}
+    {{- end }}
+
+    {{- with .dynamic }}
+    dynamic: {{ . | quote }}
+    {{- end }}
+  {{- end }}
+
+  {{- with (required ".Values.nodesets[*].slurmd is required." .slurmd) }}
+  slurmd:
+    image:
+    {{- if .image }}
+    {{- with .image }}
+      repository: {{ (required ".Values.nodesets[*].slurmd.image.repository is required as the custom image is used." .repository) | quote }}
+
+      {{- with .tag }}
+      tag: {{ . | quote }}
+      {{- end }}
+
+      {{- with .pullPolicy }}
+      pullPolicy: {{ . }}
+      {{- end }}
+    {{- end }}
+    {{- else }}
+      repository: {{ (required ".Values.images.slurmd.repository is required as the default image is used." $.Values.images.slurmd.repository) | quote }}
+      {{- with $.Values.images.slurmd.tag }}
+      tag: {{ . | quote }}
+      {{- end }}
+    {{- end }}
+
+    {{- if .customEnv }}
+    customEnv: {{- .customEnv | toYaml | nindent 8 }}
+    {{- end }}
+
+    port: {{ .port | default 6818 }}
+    cgroupVersion: {{ .cgroupVersion | default "v2" }}
+
+    {{- with (required ".Values.nodesets[*].slurmd.resources is required" .resources) }}
+    resources:
+      cpu: {{ required ".Values.nodesets[*].slurmd.resources.cpu is required" .cpu | quote }}
+      memory: {{ required ".Values.nodesets[*].slurmd.resources.memory is required" .memory | quote }}
+      {{- with .ephemeralStorage }}
+      ephemeral-storage: {{ . | quote }}
+      {{- end }}
+      {{- include "nodesets.resource.gpuFrom" (list $ns.gpu $ns.slurmd.resources) | nindent 6 }}
+    {{- end }}
+
+    {{- with (required ".Values.nodesets[*].slurmd.volumes is required" .volumes) }}
+    volumes:
+      {{- with (required ".Values.nodesets[*].slurmd.volumes.spool is required" .spool) }}
+      spool:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (required ".Values.nodesets[*].slurmd.volumes.jail is required" .jail) }}
+      jail:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (.jailSubMounts | default list) }}
+      jailSubMounts:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (.customVolumeMounts | default list) }}
+      customVolumeMounts:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (.sharedMemorySize | default "") }}
+      sharedMemorySize: {{ . | quote }}
+      {{- end }}
+    {{- end }}
+
+    security:
+      limitsConfig: {{ get (.security | default dict) "limitsConfig" | quote }}
+      appArmorProfile: {{ get (.security | default dict) "appArmorProfile" | default "unconfined" | quote }}
+  {{- end }}
+
+  {{- with (required ".Values.nodesets[*].munge is required." .munge) }}
+  munge:
+    image:
+    {{- if .image }}
+    {{- with .image }}
+      repository: {{ (required ".Values.nodesets[*].munge.image.repository is required as the custom image is used." .repository) | quote }}
+
+      {{- with .tag }}
+      tag: {{ . | quote }}
+      {{- end }}
+
+      {{- with .pullPolicy }}
+      pullPolicy: {{ . }}
+      {{- end }}
+    {{- end }}
+    {{- else }}
+      repository: {{ (required ".Values.images.munge.repository is required as the default image is used." $.Values.images.munge.repository) | quote }}
+      {{- with $.Values.images.munge.tag }}
+      tag: {{ . | quote }}
+      {{- end }}
+    {{- end }}
+
+    {{- with (required ".Values.nodesets[*].munge.resources is required" .resources) }}
+    resources:
+      cpu: {{ required ".Values.nodesets[*].munge.resources.cpu is required" .cpu | quote }}
+      memory: {{ required ".Values.nodesets[*].munge.resources.memory is required" .memory | quote }}
+      {{- with .ephemeralStorage }}
+      ephemeral-storage: {{ . | quote }}
+      {{- end }}
+    {{- end }}
+
+    security:
+      limitsConfig: {{ get (.security | default dict) "limitsConfig" | quote }}
+      appArmorProfile: {{ get (.security | default dict) "appArmorProfile" | default "unconfined" | quote }}
+  {{- end }}
+
+  {{- with (.configMapRefSupervisord | default "") }}
+  configMapRefSupervisord: {{ . | quote }}
+  {{- end }}
+
+  {{- with (.configMapRefSshd | default "") }}
+  configMapRefSshd: {{ . | quote }}
+  {{- end }}
+
+  {{- with (.enableHostUserNamespace | default false) }}
+  enableHostUserNamespace: {{ . }}
+  {{- end }}
+
+  {{- with (.priorityClass | default "") }}
+  priorityClass: {{ . | quote }}
+  {{- end }}
+
+  {{- with .nodeSelector }}
+  nodeSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- with (.affinity | default dict) }}
+  affinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- with (.tolerations | default list) }}
+  tolerations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- with (.workerAnnotations | default dict) }}
+  workerAnnotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- with (.customInitContainers | default list) }}
+  customInitContainers:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}

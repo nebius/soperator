@@ -25,6 +25,10 @@ spec:
   customSlurmConfig: |
 {{- .Values.customSlurmConfig | nindent 4 }}
   {{- end }}
+  {{- if .Values.customCgroupConfig }}
+  customCgroupConfig: |
+{{- .Values.customCgroupConfig | nindent 4 }}
+  {{- end }}
   {{- if eq .Values.clusterType "gpu" }}
   healthCheckConfig:
     healthCheckInterval: 120
@@ -61,12 +65,7 @@ spec:
         {{- end }}
       {{- end }}
     {{- end }}
-  workerFeatures:
-    {{- range (default list .Values.workerFeatures) }}
-    - name: {{ .name | quote }}
-      hostlistExpr: {{ .hostlistExpr | quote }}
-      nodesetName: {{ .nodesetName | quote }}
-    {{- end }}
+  workerFeatures: {{- default list .Values.workerFeatures | toYaml | nindent 4 }}
   {{- if .Values.healthCheckConfig }}
   healthCheckConfig:
     healthCheckInterval: {{ required "Health check interval must be provided." .Values.healthCheckConfig.healthCheckInterval }}
@@ -200,6 +199,7 @@ spec:
         securityContext: {{ toYaml .Values.slurmNodes.accounting.mariadbOperator.securityContext | nindent 10 }}
         replication: {{ toYaml .Values.slurmNodes.accounting.mariadbOperator.replication | nindent 10 }}
         storage: {{toYaml .Values.slurmNodes.accounting.mariadbOperator.storage | nindent 10 }}
+        priorityClassName: {{ default (printf "%s-%s" (include "slurm-cluster.name" .) "slurm-mariadb") .Values.slurmNodes.accounting.mariadbOperator.priorityClassName | quote }}
       {{- end }}
       munge:
         image: {{ required "munge image" .Values.images.munge | quote }}
@@ -308,6 +308,7 @@ spec:
         {{- if .Values.slurmNodes.worker.slurmd.securityLimitsConfig }}
         securityLimitsConfig: {{ .Values.slurmNodes.worker.slurmd.securityLimitsConfig }}
         {{- end }}
+        procMount: {{ default "Unmasked" .Values.slurmNodes.worker.slurmd.procMount | quote }}
       munge:
         image: {{ required "munge image" .Values.images.munge | quote }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.worker.munge.imagePullPolicy | quote }}
@@ -432,6 +433,7 @@ spec:
         image: {{ required "soperator exporter image" .Values.images.soperatorExporter | quote }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.exporter.imagePullPolicy | quote }}
         appArmorProfile: {{ default "unconfined" .Values.slurmNodes.exporter.appArmorProfile | quote }}
+      serviceAccountName: {{ include "slurm-cluster.exporter.serviceAccountName" . }}
     rest:
       enabled: {{ .Values.slurmNodes.rest.enabled }}
       size: {{ required ".Values.slurmNodes.rest.size must be provided." .Values.slurmNodes.rest.size }}
@@ -463,6 +465,7 @@ spec:
     {{- if hasKey .Values.sConfigController "hostUsers" }}
     hostUsers: {{ .Values.sConfigController.hostUsers }}
     {{- end }}
+    serviceAccountName: {{ include "slurm-cluster.sconfigcontroller.serviceAccountName" . }}
     node:
       size: {{ required ".Values.sConfigController.node.size must be provided." .Values.sConfigController.node.size }}
       k8sNodeFilterName: {{ required ".Values.sConfigController.node.k8sNodeFilterName must be provided." .Values.sConfigController.node.k8sNodeFilterName | quote }}

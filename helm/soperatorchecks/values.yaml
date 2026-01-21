@@ -32,6 +32,15 @@ checks:
       - --delete-not-ready-nodes=true
       - --leader-elect
       - --maintenance-condition-type=NebiusMaintenanceScheduled
+    controllersEnabled:
+      slurmapiclients: true
+      slurmnodes: true
+      k8snodes: true
+      activecheck: true
+      activecheckjob: true
+      serviceaccount: true
+      activecheckprolog: true
+      podephemeralstoragecheck: true
     containerSecurityContext:
       allowPrivilegeEscalation: false
       capabilities:

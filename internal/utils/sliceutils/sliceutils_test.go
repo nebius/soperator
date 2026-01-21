@@ -6,6 +6,8 @@ type TestCase struct {
 }
 
 var (
+	emptyTestCases []TestCase
+
 	testCases = []TestCase{{
 		A: 10,
 		B: "hello",

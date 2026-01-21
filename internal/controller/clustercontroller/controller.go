@@ -86,6 +86,7 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 						clusterValues.NodeFilters,
 						clusterValues.VolumeSources,
 						&clusterValues.NodeController,
+						clusterValues.NodeAccounting.Enabled,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
@@ -119,6 +120,7 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 						clusterValues.Name,
 						clusterValues.NodeFilters,
 						&clusterValues.NodeController,
+						clusterValues.NodeAccounting.Enabled,
 					)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 					stepLogger.V(1).Info("Rendered DaemonSet")
@@ -153,6 +155,12 @@ func (r SlurmClusterReconciler) ValidateControllers(
 	cluster *slurmv1.SlurmCluster,
 	clusterValues *values.SlurmCluster,
 ) (ctrl.Result, error) {
+	const requeueDuration = 10 * time.Second
+	var (
+		res = ctrl.Result{}
+	)
+
+	logger := log.FromContext(ctx)
 
 	existing := &kruisev1b1.StatefulSet{}
 	err := r.Get(
@@ -165,39 +173,39 @@ func (r SlurmClusterReconciler) ValidateControllers(
 	)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: requeueDuration}, nil
 		}
-		return ctrl.Result{}, fmt.Errorf("getting controller StatefulSet: %w", err)
+		logger.Error(err, "Failed to get controller StatefulSet")
+		return res, fmt.Errorf("getting controller StatefulSet: %w", err)
 	}
 
-	targetReplicas := clusterValues.NodeController.StatefulSet.Replicas
-	if existing.Spec.Replicas != nil {
-		targetReplicas = *existing.Spec.Replicas
-	}
-	if existing.Status.AvailableReplicas != targetReplicas {
-		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-			status.SetCondition(metav1.Condition{
-				Type:   slurmv1.ConditionClusterControllersAvailable,
-				Status: metav1.ConditionFalse, Reason: "NotAvailable",
-				Message: "Slurm controllers are not available yet",
-			})
-		}); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 10}, nil
-	} else {
-		if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) {
-			status.SetCondition(metav1.Condition{
-				Type:   slurmv1.ConditionClusterControllersAvailable,
-				Status: metav1.ConditionTrue, Reason: "Available",
+	if err = r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) bool {
+		var (
+			condition metav1.Condition
+		)
+		if existing.Status.ReadyReplicas == clusterValues.NodeController.StatefulSet.Replicas {
+			condition = metav1.Condition{
+				Type:    slurmv1.ConditionClusterControllersAvailable,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Available",
 				Message: "Slurm controllers are available",
-			})
-		}); err != nil {
-			return ctrl.Result{}, err
+			}
+		} else {
+			condition = metav1.Condition{
+				Type:    slurmv1.ConditionClusterControllersAvailable,
+				Status:  metav1.ConditionFalse,
+				Reason:  "NotAvailable",
+				Message: "Slurm controllers are not available yet",
+			}
+			res.RequeueAfter += requeueDuration
 		}
+		return status.SetCondition(condition)
+	}); err != nil {
+		logger.Error(err, "Failed to update status")
+		return res, fmt.Errorf("updating .Status: %w", err)
 	}
 
-	return ctrl.Result{}, nil
+	return res, nil
 }
 
 func (r SlurmClusterReconciler) getControllersStatefulSetDependencies(

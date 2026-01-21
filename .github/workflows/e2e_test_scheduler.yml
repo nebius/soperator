@@ -34,9 +34,6 @@ jobs:
             echo "Odd hour ($HOUR UTC) - Testing $RELEASE_BRANCH branch with terraform $RELEASE_BRANCH"
           fi
 
-      - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-
       - name: Trigger E2E test workflow
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

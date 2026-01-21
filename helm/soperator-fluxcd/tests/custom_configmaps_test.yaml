@@ -1,0 +1,161 @@
+suite: test custom configmaps
+templates:
+  - templates/soperator-custom-configmaps.yaml
+
+tests:
+  - it: should render custom configmaps component when customConfigmaps.enabled=true
+    set:
+      customConfigmaps:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: HelmRelease
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-custom-configmaps
+      - equal:
+          path: spec.chart.spec.chart
+          value: helm-soperator-custom-configmaps
+      - equal:
+          path: spec.releaseName
+          value: soperator-custom-configmaps
+      - equal:
+          path: spec.targetNamespace
+          value: soperator
+
+  - it: should not render custom configmaps component when customConfigmaps.enabled=false
+    set:
+      customConfigmaps:
+        enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should use correct version from values
+    set:
+      customConfigmaps:
+        enabled: true
+        version: "1.23.0"
+    asserts:
+      - equal:
+          path: spec.chart.spec.version
+          value: "1.23.0"
+
+  - it: should use correct namespace from values
+    set:
+      customConfigmaps:
+        enabled: true
+        namespace: custom-namespace
+    asserts:
+      - equal:
+          path: spec.targetNamespace
+          value: custom-namespace
+
+  - it: should use correct interval and timeout from values
+    set:
+      customConfigmaps:
+        enabled: true
+        interval: 10m
+        timeout: 10m
+    asserts:
+      - equal:
+          path: spec.interval
+          value: 10m
+      - equal:
+          path: spec.timeout
+          value: 10m
+      - equal:
+          path: spec.chart.spec.interval
+          value: 10m
+
+  - it: should use correct release name from values
+    set:
+      customConfigmaps:
+        enabled: true
+        releaseName: my-custom-release
+    asserts:
+      - equal:
+          path: spec.releaseName
+          value: my-custom-release
+
+  - it: should have correct dependencies
+    set:
+      customConfigmaps:
+        enabled: true
+    asserts:
+      - contains:
+          path: spec.dependsOn
+          content:
+            name: RELEASE-NAME-ns
+
+  - it: should reference correct HelmRepository
+    set:
+      customConfigmaps:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.chart.spec.sourceRef.kind
+          value: HelmRepository
+      - equal:
+          path: spec.chart.spec.sourceRef.name
+          value: RELEASE-NAME-soperator
+
+  - it: should include valuesFrom ConfigMap reference
+    set:
+      customConfigmaps:
+        enabled: true
+    asserts:
+      - contains:
+          path: spec.valuesFrom
+          content:
+            kind: ConfigMap
+            name: custom-configmaps
+            optional: true
+            valuesKey: values.yaml
+
+  - it: should merge overrideValues when provided
+    set:
+      customConfigmaps:
+        enabled: true
+        overrideValues:
+          namespace: override-namespace
+          configMaps:
+            supervisord:
+              enabled: false
+    asserts:
+      - equal:
+          path: spec.values.namespace
+          value: override-namespace
+      - equal:
+          path: spec.values.configMaps.supervisord.enabled
+          value: false
+
+  - it: should have correct install and upgrade settings
+    set:
+      customConfigmaps:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.install.crds
+          value: Skip
+      - equal:
+          path: spec.install.remediation.retries
+          value: 3
+      - equal:
+          path: spec.upgrade.crds
+          value: Skip
+      - equal:
+          path: spec.upgrade.remediation.retries
+          value: 3
+
+  - it: should have correct labels
+    set:
+      customConfigmaps:
+        enabled: true
+    asserts:
+      - isNotEmpty:
+          path: metadata.labels
+      - exists:
+          path: metadata.labels["helm.sh/chart"]
