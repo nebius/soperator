@@ -79,6 +79,7 @@ spec:
       kube-state-metrics:
         extraArgs:
           - '--metric-allowlist=kube_pod_info'
+          - '--metric-allowlist=kube_pod_created'
           - '--metric-allowlist=kube_pod_status_phase'
           - '--metric-allowlist=kube_pod_container_status_running'
           - '--metric-allowlist=kube_pod_container_status_waiting'
