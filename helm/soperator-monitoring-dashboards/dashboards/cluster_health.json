@@ -2911,7 +2911,7 @@
                       {
                         "targetBlank": true,
                         "title": "Worker Overview Dashboard",
-                        "url": "https://grafana.nebius.dev/d/soperator_ext_workers_overview/workers-overview?${__url_time_range}&${region:queryparam}&${cluster:queryparam}&var-worker=${__data.fields.Name}"
+                        "url": "/d/soperator_workers_overview/workers-overview?${__url_time_range}&var-worker=${__data.fields.Name}"
                       }
                     ]
                   }
@@ -3000,7 +3000,7 @@
                       {
                         "targetBlank": true,
                         "title": "Job Overview Dashboard",
-                        "url": "https://grafana.nebius.dev/d/soperator_ext_jobs_overview/jobs-overview?orgId=1&${__url_time_range}&${region:queryparam}&${cluster:queryparam}&var-slurm_job=${__data.fields.job_ids}\n"
+                        "url": "/d/soperator_jobs_overview/jobs-overview?${__url_time_range}&var-slurm_job=${__data.fields.job_ids}"
                       }
                     ]
                   },
@@ -4580,7 +4580,7 @@
                       {
                         "targetBlank": true,
                         "title": "",
-                        "url": "/d/eeuyulcyrlekgb/jobs-overview?${__url_time_range}&var-slurm_job=${__data.fields[\"Job ID\"]}"
+                        "url": "/d/soperator_jobs_overview/jobs-overview?${__url_time_range}&var-slurm_job=${__data.fields[\"Job ID\"]}"
                       }
                     ]
                   }
