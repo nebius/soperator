@@ -205,7 +205,9 @@ func renderDefCpuPerGpu(t *testing.T, cfg testConfig) string {
 	}
 
 	presetComponents := strings.Split(cfg.WorkerPreset, "-")
-	require.GreaterOrEqual(t, len(presetComponents), 3)
+	require.GreaterOrEqual(t, len(presetComponents), 3,
+		"gpu worker preset must contain at least gpu, cpu, and memory specifiers",
+	)
 
 	var (
 		gpusString, cpusString string
@@ -220,22 +222,22 @@ func renderDefCpuPerGpu(t *testing.T, cfg testConfig) string {
 			continue
 		}
 	}
-	require.NotEmpty(t, gpusString)
-	require.NotEmpty(t, cpusString)
+	require.NotEmpty(t, gpusString, "worker preset must have gpu specifier")
+	require.NotEmpty(t, cpusString, "worker preset must have vcpu specifier")
 
 	var (
 		gpus, cpus int
 		err        error
 	)
 	gpus, err = strconv.Atoi(gpusString)
-	require.NoError(t, err)
-	require.Greater(t, gpus, 0)
+	require.NoError(t, err, "failed to parse gpu count from preset specifier: %q", gpusString)
+	require.Greater(t, gpus, 0, "gpu count must be greater than zero")
 	cpus, err = strconv.Atoi(cpusString)
-	require.NoError(t, err)
-	require.Greater(t, cpus, 0)
+	require.NoError(t, err, "failed to parse cpu count from preset specifier: %q", cpusString)
+	require.Greater(t, cpus, 0, "cpu count must be greater than zero")
 
 	var cpuPerGpu int = cpus / gpus
-	require.Greater(t, cpuPerGpu, 0)
+	require.Greater(t, cpuPerGpu, 0, "cpu per gpu must be greater than zero")
 
 	return fmt.Sprintf("DefCpuPerGPU=%d", cpuPerGpu)
 }
