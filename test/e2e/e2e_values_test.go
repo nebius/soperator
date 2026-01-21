@@ -215,8 +215,8 @@ func renderDefCpuPerGpu(t *testing.T, cfg testConfig) string {
 			gpusString = strings.TrimSuffix(component, "gpu")
 			continue
 		}
-		if strings.HasSuffix(component, "cpu") {
-			cpusString = strings.TrimSuffix(component, "cpu")
+		if strings.HasSuffix(component, "vcpu") {
+			cpusString = strings.TrimSuffix(component, "vcpu")
 			continue
 		}
 	}
