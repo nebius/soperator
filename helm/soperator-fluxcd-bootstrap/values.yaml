@@ -15,7 +15,7 @@ helmRelease:
   timeout: 5m
   chart:
     name: helm-soperator-fluxcd
-    version: "1.23.1"
+    version: "1.23.2"
     interval: 5m
   install:
     createNamespace: true
