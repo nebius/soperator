@@ -179,7 +179,7 @@ func (r *PodEphemeralStorageCheck) Reconcile(ctx context.Context, req ctrl.Reque
 }
 
 func (r *PodEphemeralStorageCheck) isPodRelevant(pod *corev1.Pod) bool {
-	componentType := pod.Labels[consts.LabelComponentKey]
+	componentType := pod.Labels[consts.LabelWorkerKey]
 	managedBy := pod.Labels[consts.LabelManagedByKey]
 
 	if componentType != consts.ComponentTypeWorker.String() ||
@@ -231,7 +231,7 @@ func (r *PodEphemeralStorageCheck) mapKruiseStatefulSetToPods(ctx context.Contex
 func (r *PodEphemeralStorageCheck) getPodsForStatefulSet(ctx context.Context, namespace, statefulSetName string) []reconcile.Request {
 	var podList corev1.PodList
 	err := r.List(ctx, &podList, client.InNamespace(namespace), client.MatchingLabels{
-		consts.LabelComponentKey: consts.ComponentTypeWorker.String(),
+		consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
 	})
 	if err != nil {
 		return nil
@@ -348,7 +348,7 @@ func (r *PodEphemeralStorageCheck) createEphemeralStorageEvent(ctx context.Conte
 			Namespace:    pod.Namespace,
 			GenerateName: fmt.Sprintf("%s-ephemeral-storage-", pod.Name),
 			Labels: map[string]string{
-				consts.LabelComponentKey: consts.ComponentTypeWorker.String(),
+				consts.LabelWorkerKey:    consts.ComponentTypeWorker.String(),
 				consts.LabelManagedByKey: consts.LabelManagedByValue,
 			},
 		},
@@ -422,7 +422,7 @@ func (r *PodEphemeralStorageCheck) checkSlurmNodeDrainStatus(ctx context.Context
 func (r *PodEphemeralStorageCheck) findWorkerPods(ctx context.Context, namespace string) ([]corev1.Pod, error) {
 	var podList corev1.PodList
 	err := r.List(ctx, &podList, client.InNamespace(namespace), client.MatchingLabels{
-		consts.LabelComponentKey: consts.ComponentTypeWorker.String(),
+		consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("listing worker pods: %w", err)
