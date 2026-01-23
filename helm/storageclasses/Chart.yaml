@@ -2,5 +2,5 @@ apiVersion: v2
 name: helm-storageclasses
 description: Generate StorageClasses for provisioner/disk/fs combinations
 type: application
-appVersion: "1.23.2"
-version: 1.23.2
+appVersion: "2.0.0"
+version: 2.0.0

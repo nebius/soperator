@@ -558,20 +558,20 @@ sConfigController:
     # This field is required in the SlurmCluster CR - it will be automatically populated from this value
     name: ""
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:1.23.2-noble-slurm25.05.5"
-  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:1.23.2-noble-slurm25.05.5"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:1.23.2-noble-slurm25.05.5"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:1.23.2-noble-slurm25.05.5"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:1.23.2-noble-slurm25.05.5"
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:2.0.0-noble-slurm25.05.5"
+  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:2.0.0-noble-slurm25.05.5"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:2.0.0-noble-slurm25.05.5"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:2.0.0-noble-slurm25.05.5"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:2.0.0-noble-slurm25.05.5"
   populateJail: ""
   populateJailRepository: "cr.eu-north1.nebius.cloud/soperator/populate_jail"
-  populateJailTag: "1.23.2-noble-slurm25.05.5"
+  populateJailTag: "2.0.0-noble-slurm25.05.5"
   populateJailCudaVersions:
     "12": "12.9.0"
     "13": "13.0.2"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:1.23.2-noble-slurm25.05.5"
-  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:1.23.2-noble-slurm25.05.5"
-  sConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:1.23.2"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:2.0.0-noble-slurm25.05.5"
+  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:2.0.0-noble-slurm25.05.5"
+  sConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:2.0.0"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:12.1.2"
 # Configuration for slurm scripts.
 slurmScripts:
