@@ -70,7 +70,7 @@ func TestIsPodRelevant(t *testing.T) {
 					Name:      "worker-pod",
 					Namespace: "test-ns",
 					Labels: map[string]string{
-						consts.LabelWorkerKey:    consts.ComponentTypeWorker.String(),
+						consts.LabelWorkerKey:    consts.LabelWorkerValue,
 						consts.LabelManagedByKey: consts.LabelManagedByValue,
 					},
 					OwnerReferences: []metav1.OwnerReference{
@@ -92,7 +92,7 @@ func TestIsPodRelevant(t *testing.T) {
 					Name:      "worker-pod-no-owner",
 					Namespace: "test-ns",
 					Labels: map[string]string{
-						consts.LabelWorkerKey:    consts.ComponentTypeWorker.String(),
+						consts.LabelWorkerKey:    consts.LabelWorkerValue,
 						consts.LabelManagedByKey: consts.LabelManagedByValue,
 					},
 				},
@@ -106,7 +106,7 @@ func TestIsPodRelevant(t *testing.T) {
 					Name:      "worker-pod-wrong-owner",
 					Namespace: "test-ns",
 					Labels: map[string]string{
-						consts.LabelWorkerKey:    consts.ComponentTypeWorker.String(),
+						consts.LabelWorkerKey:    consts.LabelWorkerValue,
 						consts.LabelManagedByKey: consts.LabelManagedByValue,
 					},
 					OwnerReferences: []metav1.OwnerReference{
@@ -128,7 +128,7 @@ func TestIsPodRelevant(t *testing.T) {
 					Name:      "worker-pod-wrong-api",
 					Namespace: "test-ns",
 					Labels: map[string]string{
-						consts.LabelWorkerKey:    consts.ComponentTypeWorker.String(),
+						consts.LabelWorkerKey:    consts.LabelWorkerValue,
 						consts.LabelManagedByKey: consts.LabelManagedByValue,
 					},
 					OwnerReferences: []metav1.OwnerReference{
@@ -150,7 +150,7 @@ func TestIsPodRelevant(t *testing.T) {
 					Name:      "worker-pod",
 					Namespace: "test-ns",
 					Labels: map[string]string{
-						consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+						consts.LabelWorkerKey: consts.LabelWorkerValue,
 					},
 				},
 			},
@@ -177,7 +177,7 @@ func TestIsPodRelevant(t *testing.T) {
 					Name:      "worker-pod",
 					Namespace: "test-ns",
 					Labels: map[string]string{
-						consts.LabelWorkerKey:    consts.ComponentTypeWorker.String(),
+						consts.LabelWorkerKey:    consts.LabelWorkerValue,
 						consts.LabelManagedByKey: "other-operator",
 					},
 				},
@@ -708,7 +708,7 @@ func TestFindWorkerPods(t *testing.T) {
 						Name:      "worker-1",
 						Namespace: "other-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -731,7 +731,7 @@ func TestFindWorkerPods(t *testing.T) {
 						Name:      "worker-1",
 						Namespace: "test-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -746,7 +746,7 @@ func TestFindWorkerPods(t *testing.T) {
 						Name:      "worker-2",
 						Namespace: "test-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -769,7 +769,7 @@ func TestFindWorkerPods(t *testing.T) {
 						Name:      "worker-1",
 						Namespace: "test-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -807,7 +807,7 @@ func TestFindWorkerPods(t *testing.T) {
 						Name:      "worker-running",
 						Namespace: "test-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -822,7 +822,7 @@ func TestFindWorkerPods(t *testing.T) {
 						Name:      "worker-pending",
 						Namespace: "test-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -837,7 +837,7 @@ func TestFindWorkerPods(t *testing.T) {
 						Name:      "worker-failed",
 						Namespace: "test-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -860,7 +860,7 @@ func TestFindWorkerPods(t *testing.T) {
 						Name:      "worker-assigned",
 						Namespace: "test-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -875,7 +875,7 @@ func TestFindWorkerPods(t *testing.T) {
 						Name:      "worker-unassigned",
 						Namespace: "test-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -898,7 +898,7 @@ func TestFindWorkerPods(t *testing.T) {
 						Name:      "worker-good-1",
 						Namespace: "test-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -913,7 +913,7 @@ func TestFindWorkerPods(t *testing.T) {
 						Name:      "worker-good-2",
 						Namespace: "test-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -928,7 +928,7 @@ func TestFindWorkerPods(t *testing.T) {
 						Name:      "worker-pending",
 						Namespace: "test-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 					},
 					Status: corev1.PodStatus{
@@ -975,7 +975,7 @@ func TestFindWorkerPods(t *testing.T) {
 				for _, pod := range result {
 					assert.Equal(t, corev1.PodRunning, pod.Status.Phase)
 					assert.NotEmpty(t, pod.Spec.NodeName)
-					assert.Equal(t, consts.ComponentTypeWorker.String(), pod.Labels[consts.LabelWorkerKey])
+					assert.Equal(t, consts.LabelWorkerValue, pod.Labels[consts.LabelWorkerKey])
 				}
 			}
 		})
@@ -1115,7 +1115,7 @@ func TestGetPodsForStatefulSet(t *testing.T) {
 						Name:      "worker-sts-0",
 						Namespace: "test-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -1132,7 +1132,7 @@ func TestGetPodsForStatefulSet(t *testing.T) {
 						Name:      "worker-sts-1",
 						Namespace: "test-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -1158,7 +1158,7 @@ func TestGetPodsForStatefulSet(t *testing.T) {
 						Name:      "worker-sts-0",
 						Namespace: "test-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -1175,7 +1175,7 @@ func TestGetPodsForStatefulSet(t *testing.T) {
 						Name:      "other-pod",
 						Namespace: "test-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -1201,7 +1201,7 @@ func TestGetPodsForStatefulSet(t *testing.T) {
 						Name:      "worker-sts-0",
 						Namespace: "test-ns",
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -1244,7 +1244,7 @@ func TestGetPodsForStatefulSet(t *testing.T) {
 						Name:      "worker-sts-0",
 						Namespace: "other-ns", // Different namespace
 						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.ComponentTypeWorker.String(),
+							consts.LabelWorkerKey: consts.LabelWorkerValue,
 						},
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -1376,10 +1376,10 @@ func TestCreateEphemeralStorageEventStructure(t *testing.T) {
 			// Test that the event would have correct metadata structure
 			// (this tests the logic without the actual client call)
 			eventLabels := map[string]string{
-				consts.LabelWorkerKey:    consts.ComponentTypeWorker.String(),
+				consts.LabelWorkerKey:    consts.LabelWorkerValue,
 				consts.LabelManagedByKey: consts.LabelManagedByValue,
 			}
-			assert.Equal(t, consts.ComponentTypeWorker.String(), eventLabels[consts.LabelWorkerKey])
+			assert.Equal(t, consts.LabelWorkerValue, eventLabels[consts.LabelWorkerKey])
 			assert.Equal(t, consts.LabelManagedByValue, eventLabels[consts.LabelManagedByKey])
 
 			// Test involved object reference structure
