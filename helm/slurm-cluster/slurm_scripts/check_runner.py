@@ -310,7 +310,7 @@ def run_check(check: Check, in_jail=False):
   os.makedirs(os.path.dirname(log_abs_path), mode=0o777, exist_ok=True)
 
   # Execute the check command
-  cmd = ["bash", "-c", f"{check.command} 3>&1 1>\"{log_abs_path}\" 2>&1"]
+  cmd = ["bash", "-l", "-c", f"{check.command} 3>&1 1>\"{log_abs_path}\" 2>&1"]
   result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
   # Build the reason message
