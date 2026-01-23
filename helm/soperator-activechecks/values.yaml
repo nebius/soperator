@@ -400,8 +400,9 @@ checks:
     suspend: true
     runAfterCreation: true
     k8sJobSpec:
-      appArmorProfile: unconfined
       scriptFile: "scripts/wait-for-topology.sh"
+      jobContainer:
+        appArmorProfile: unconfined
   wait-for-soperatorchecks-srun-ready:
     enabled: true
     checkType: "k8sJob"
