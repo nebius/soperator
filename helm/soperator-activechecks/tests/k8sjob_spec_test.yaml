@@ -71,3 +71,31 @@ tests:
       - equal:
           path: spec.k8sJobSpec.jobContainer.image
           value: "slurm-job-image:latest"
+
+  - it: should not render appArmorProfile at k8sJobSpec level (regression test)
+    documentSelector:
+      path: metadata.name
+      value: test-apparmorprofile-placement
+    set:
+      slurmClusterRefName: test-cluster
+      images:
+        k8sJob: "test-image:latest"
+      jobContainer:
+        volumeMounts: []
+        volumes: []
+      checks:
+        test-apparmorprofile-placement:
+          enabled: true
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              appArmorProfile: unconfined
+              command: ["echo", "test"]
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - notExists:
+          path: spec.k8sJobSpec.appArmorProfile
+      - equal:
+          path: spec.k8sJobSpec.jobContainer.appArmorProfile
+          value: unconfined

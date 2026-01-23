@@ -183,9 +183,6 @@ Render k8sJobSpec for an ActiveCheck.
 {{- end }}
 {{- $args := $jobContainer.args -}}
 {{- $image := tpl (default $ctx.Values.images.k8sJob $jobContainer.image) $ctx }}
-{{- if $spec.appArmorProfile }}
-appArmorProfile: {{ $spec.appArmorProfile }}
-{{- end }}
 jobContainer:
   image: {{ $image | quote }}
 {{- with $jobContainer.appArmorProfile }}
