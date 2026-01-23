@@ -60,6 +60,7 @@ podAnnotations: {}
 podSecurityContext:
   # NFS server requires privileged access
   fsGroup: 0
+  fsGroupChangePolicy: "OnRootMismatch"
 securityContext:
   # NFS server requires privileged containers
   privileged: true
