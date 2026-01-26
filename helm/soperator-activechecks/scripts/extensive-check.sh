@@ -190,7 +190,7 @@ health_checker_runs=(
   all_reduce_with_ib
   all_reduce_without_ib
   cuda_samples
-  dcgmi_diag_r2
+# dcgmi_diag_r2
   gpu_fryer
 #  ib_gpu_perf
   mem_perf

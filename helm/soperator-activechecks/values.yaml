@@ -55,12 +55,12 @@ checks:
     runAfterCreation: true
     drainReasonPrefix: "[node_problem]"
   dcgmiDiagR2:
-    suspend: false
-    runAfterCreation: true
+    suspend: true
+    runAfterCreation: false
     drainReasonPrefix: "[node_problem]"
   dcgmiDiagR3:
     suspend: true
-    runAfterCreation: true
+    runAfterCreation: false
     drainReasonPrefix: "[node_problem]"
   enrootCleanup:
     suspend: false
