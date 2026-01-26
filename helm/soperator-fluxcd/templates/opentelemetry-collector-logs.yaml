@@ -317,6 +317,11 @@ spec:
           storage: file_storage
         zipkin: null
       service:
+        {{- if .Values.observability.opentelemetry.metrics.enabled }}
+        telemetry:
+          metrics:
+            address: 0.0.0.0:8888
+        {{- end }}
         extensions:
         - health_check
         - file_storage
