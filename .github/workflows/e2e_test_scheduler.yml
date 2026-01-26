@@ -2,8 +2,8 @@ name: E2E Test Scheduler
 
 on:
   schedule:
-    # Every hour - alternates between main and release branches
-    - cron: '0 */3 * * *'
+    # Periodically - uses persistent counter to rotate through main and release branches
+    - cron: '0 */2 * * *'
   workflow_dispatch:  # Allow manual trigger for testing
 
 permissions:
@@ -18,25 +18,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Install yq
+        uses: frenck/action-setup-yq@v1
+
       - name: Determine branch and terraform ref
         id: select_params
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          RELEASE_BRANCH=$(jq -r .release_branch .github/branch-config.json)
-          HOUR=$(date -u +%-H)  # %-H removes leading zeros to avoid octal interpretation
-          if [ $((HOUR % 2)) -eq 0 ]; then
-            echo "ref=main" >> $GITHUB_OUTPUT
-            echo "terraform_ref=main" >> $GITHUB_OUTPUT
-            echo "Even hour ($HOUR UTC) - Testing main branch with terraform main"
-          else
-            echo "ref=$RELEASE_BRANCH" >> $GITHUB_OUTPUT
-            echo "terraform_ref=$RELEASE_BRANCH" >> $GITHUB_OUTPUT
-            echo "Odd hour ($HOUR UTC) - Testing $RELEASE_BRANCH branch with terraform $RELEASE_BRANCH"
-          fi
+          readarray -t RELEASE_BRANCHES < <(yq -r '.release_branches[]' .github/branch-config.yaml)
+          BRANCHES=("main" "${RELEASE_BRANCHES[@]}")
+          BRANCH_COUNT=${#BRANCHES[@]}
+
+          COUNTER=$(gh variable get E2E_TRIGGER_COUNTER 2>/dev/null || echo "0")
+          RUN_INDEX=$(( COUNTER % BRANCH_COUNT ))
+          REF="${BRANCHES[$RUN_INDEX]}"
+          TERRAFORM_REF="$REF"
+
+          NEXT_COUNTER=$(( COUNTER + 1 ))
+          gh variable set E2E_TRIGGER_COUNTER --body "$NEXT_COUNTER"
+
+          echo "ref=$REF" >> $GITHUB_OUTPUT
+          echo "terraform_ref=$TERRAFORM_REF" >> $GITHUB_OUTPUT
+          echo "Testing branch $REF (counter=$COUNTER, index $RUN_INDEX of $BRANCH_COUNT branches)"
 
       - name: Trigger E2E test workflow
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
           REF="${{ steps.select_params.outputs.ref }}"
           TERRAFORM_REF="${{ steps.select_params.outputs.terraform_ref }}"
