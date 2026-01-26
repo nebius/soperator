@@ -525,7 +525,7 @@ sConfigController:
   runAsUid: 1001
   runAsGid: 1001
   reconfigurePollInterval: "20s"
-  reconfigureWaitTimeout: "1m"
+  reconfigureWaitTimeout: "5m"
   serviceMonitor:
     enabled: true
     jobLabel: "sconfigcontroller"
