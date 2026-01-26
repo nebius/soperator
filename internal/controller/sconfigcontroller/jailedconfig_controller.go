@@ -53,7 +53,7 @@ import (
 const (
 	configMapField = ".spec.configMap.name"
 
-	defaultReconfigureWaitTimeout  = 1 * time.Minute
+	defaultReconfigureWaitTimeout  = 5 * time.Minute
 	defaultReconfigurePollInterval = 20 * time.Second
 )
 
