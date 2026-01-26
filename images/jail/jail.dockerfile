@@ -49,42 +49,50 @@ RUN chmod +x /opt/bin/install_rclone.sh && \
 # Install nvtop GPU monitoring utility
 COPY ansible/nvtop.yml /opt/ansible/nvtop.yml
 COPY ansible/roles/nvtop /opt/ansible/roles/nvtop
-RUN ansible-playbook -i inventory/ -c local nvtop.yml
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local nvtop.yml
 
 ## Install Docker CLI
 COPY ansible/docker-cli.yml /opt/ansible/docker-cli.yml
 COPY ansible/roles/docker-cli /opt/ansible/roles/docker-cli
-RUN ansible-playbook -i inventory/ -c local docker-cli.yml
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local docker-cli.yml
 
 ## Install GDRCopy libraries & executables
 COPY ansible/gdrcopy.yml /opt/ansible/gdrcopy.yml
 COPY ansible/roles/gdrcopy /opt/ansible/roles/gdrcopy
-RUN ansible-playbook -i inventory/ -c local gdrcopy.yml
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local gdrcopy.yml
 
 ## Install nvidia-container-toolkit (for enroot usage)
 COPY ansible/nvidia-container-toolkit.yml /opt/ansible/nvidia-container-toolkit.yml
 COPY ansible/roles/nvidia-container-toolkit /opt/ansible/roles/nvidia-container-toolkit
-RUN ansible-playbook -i inventory/ -c local nvidia-container-toolkit.yml -t nvidia-container-toolkit
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local nvidia-container-toolkit.yml -t nvidia-container-toolkit
 
 # Setup the default $HOME directory content
 COPY ansible/skel.yml /opt/ansible/skel.yml
 COPY ansible/roles/skel /opt/ansible/roles/skel
-RUN ansible-playbook -i inventory/ -c local skel.yml
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local skel.yml
 
 # Replace SSH "message of the day" scripts
 COPY ansible/motd.yml /opt/ansible/motd.yml
 COPY ansible/roles/motd /opt/ansible/roles/motd
-RUN ansible-playbook -i inventory/ -c local motd.yml
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local motd.yml
 
 # Copy wrapper scripts and utilities
 COPY ansible/soperator-scripts.yml /opt/ansible/soperator-scripts.yml
 COPY ansible/roles/soperator-scripts /opt/ansible/roles/soperator-scripts
-RUN ansible-playbook -i inventory/ -c local soperator-scripts.yml
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local soperator-scripts.yml
 
 # Install Nebius health-check library
 COPY ansible/nc-health-checker.yml /opt/ansible/nc-health-checker.yml
 COPY ansible/roles/nc-health-checker /opt/ansible/roles/nc-health-checker
-RUN ansible-playbook -i inventory/ -c local nc-health-checker.yml
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local nc-health-checker.yml
 
 # Remove ansible
 RUN rm -rf /opt/ansible
