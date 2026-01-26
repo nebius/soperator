@@ -107,8 +107,8 @@ checks:
       - "wait-for-soperatorchecks-srun-ready"
       - "wait-for-topology"
     schedule: "5 12 * * *"
-    suspend: false
-    runAfterCreation: true
+    suspend: true
+    runAfterCreation: false
     slurmJobSpec:
       sbatchScriptFile: "scripts/dcgmi-diag-r2.sh"
       eachWorkerJobs: true
@@ -123,7 +123,7 @@ checks:
       - "wait-for-soperatorchecks-srun-ready"
       - "wait-for-topology"
     suspend: true
-    runAfterCreation: true
+    runAfterCreation: false
     slurmJobSpec:
       sbatchScriptFile: "scripts/dcgmi-diag-r3.sh"
       eachWorkerJobs: true
