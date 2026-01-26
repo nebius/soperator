@@ -231,6 +231,9 @@ spec:
         readOnly: true
     {{- end }}
     {{- if .Values.observability.opentelemetry.metrics.enabled }}
+    command:
+      extraArgs:
+        - --feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress
     ports:
       metrics:
         enabled: true

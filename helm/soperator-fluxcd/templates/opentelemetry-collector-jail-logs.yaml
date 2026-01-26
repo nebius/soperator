@@ -377,6 +377,9 @@ spec:
     resources: {{- toYaml .Values.observability.opentelemetry.logs.values.jailLogs.resources | nindent 6 }}
     {{- end }}
     {{- if .Values.observability.opentelemetry.metrics.enabled }}
+    command:
+      extraArgs:
+        - --feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress
     podMonitor:
       enabled: true
       metricsEndpoints:
