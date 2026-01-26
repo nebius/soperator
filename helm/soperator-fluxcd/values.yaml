@@ -112,6 +112,10 @@ observability:
     publicEndpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
     namespace: logs-system
     extraHeaders: {}
+    metrics:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
     logs:
       version: 0.117.*
       interval: 15m

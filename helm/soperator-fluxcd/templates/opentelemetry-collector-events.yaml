@@ -225,6 +225,22 @@ spec:
         name: o11ytoken
         readOnly: true
     {{- end }}
+    {{- if .Values.observability.opentelemetry.metrics.enabled }}
+    ports:
+      metrics:
+        enabled: true
+    podMonitor:
+      enabled: true
+      metricsEndpoints:
+        - port: metrics
+          interval: {{ .Values.observability.opentelemetry.metrics.interval | default "30s" }}
+          scrapeTimeout: {{ .Values.observability.opentelemetry.metrics.scrapeTimeout | default "10s" }}
+          relabelings:
+            - sourceLabels: [__meta_kubernetes_pod_name]
+              targetLabel: pod
+            - replacement: otel-collector-events
+              targetLabel: collector
+    {{- end }}
   {{- end }}
   valuesFrom:
   - kind: ConfigMap

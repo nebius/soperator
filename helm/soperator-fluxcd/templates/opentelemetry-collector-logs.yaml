@@ -467,6 +467,24 @@ spec:
     {{- if and .Values.observability.opentelemetry.logs.values .Values.observability.opentelemetry.logs.values.resources }}
     resources: {{- toYaml .Values.observability.opentelemetry.logs.values.resources | nindent 6 }}
     {{- end }}
+    {{- if .Values.observability.opentelemetry.metrics.enabled }}
+    ports:
+      metrics:
+        enabled: true
+    podMonitor:
+      enabled: true
+      metricsEndpoints:
+        - port: metrics
+          interval: {{ .Values.observability.opentelemetry.metrics.interval | default "30s" }}
+          scrapeTimeout: {{ .Values.observability.opentelemetry.metrics.scrapeTimeout | default "10s" }}
+          relabelings:
+            - sourceLabels: [__meta_kubernetes_pod_name]
+              targetLabel: pod
+            - sourceLabels: [__meta_kubernetes_node_name]
+              targetLabel: node
+            - replacement: otel-collector-logs
+              targetLabel: collector
+    {{- end }}
   {{- end }}
   valuesFrom:
   - kind: ConfigMap
