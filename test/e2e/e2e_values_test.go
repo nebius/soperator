@@ -69,6 +69,7 @@ func overrideTestValues(t *testing.T, tfVars map[string]interface{}, cfg testCon
 	//    size_gibibytes  = 3720
 	//    disk_type       = "NETWORK_SSD_IO_M3"
 	//    filesystem_type = "ext4"
+	//    threads         = 32
 	// }
 	tfVars["nfs_in_k8s"] = map[string]interface{}{
 		"enabled":         true,
@@ -76,6 +77,7 @@ func overrideTestValues(t *testing.T, tfVars map[string]interface{}, cfg testCon
 		"size_gibibytes":  3720,
 		"disk_type":       "NETWORK_SSD_IO_M3",
 		"filesystem_type": "ext4",
+		"threads":         32,
 	}
 
 	// filestore_jail = {
