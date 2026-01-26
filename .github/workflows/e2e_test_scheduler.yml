@@ -2,7 +2,6 @@ name: E2E Test Scheduler
 
 on:
   schedule:
-    # Periodically - uses persistent counter to rotate through main and release branches
     - cron: '0 */2 * * *'
   workflow_dispatch:  # Allow manual trigger for testing
 
@@ -23,25 +22,20 @@ jobs:
 
       - name: Determine branch and terraform ref
         id: select_params
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           readarray -t RELEASE_BRANCHES < <(yq -r '.release_branches[]' .github/branch-config.yaml)
           BRANCHES=("main" "${RELEASE_BRANCHES[@]}")
           BRANCH_COUNT=${#BRANCHES[@]}
 
-          COUNTER=$(gh variable get E2E_TRIGGER_COUNTER 2>/dev/null || echo "0")
-          RUN_INDEX=$(( COUNTER % BRANCH_COUNT ))
+          RUN_NUMBER=${{ github.run_number }}
+          RUN_INDEX=$(( RUN_NUMBER % BRANCH_COUNT ))
           REF="${BRANCHES[$RUN_INDEX]}"
           TERRAFORM_REF="$REF"
 
-          NEXT_COUNTER=$(( COUNTER + 1 ))
-          gh variable set E2E_TRIGGER_COUNTER --body "$NEXT_COUNTER"
-
           echo "ref=$REF" >> $GITHUB_OUTPUT
           echo "terraform_ref=$TERRAFORM_REF" >> $GITHUB_OUTPUT
-          echo "Testing branch $REF (counter=$COUNTER, index $RUN_INDEX of $BRANCH_COUNT branches)"
+          echo "Testing branch $REF (run #$RUN_NUMBER, index $RUN_INDEX of $BRANCH_COUNT branches)"
 
       - name: Trigger E2E test workflow
         env:
