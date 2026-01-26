@@ -3391,7 +3391,7 @@ spec:
                       Defaults to 20s
                     type: string
                   reconfigureWaitTimeout:
-                    default: 1m
+                    default: 5m
                     description: |-
                       ReconfigureWaitTimeout defines the maximum time to wait for all nodes to restart during reconfiguration.
                       Must be greater than ReconfigurePollInterval. Defaults to 1m
