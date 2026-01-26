@@ -15,9 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
-	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/controller/reconciler"
-	"nebius.ai/slurm-operator/internal/controllerconfig"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,13 +23,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/controller/reconciler"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
 
-var (
+const (
 	SlurmNodesControllerName = "soperatorchecks.slurmnodes"
-
-	workerPodNameRegex = regexp.MustCompile(`^worker-\d+$`)
 )
 
 type SlurmNodesController struct {
@@ -647,24 +645,21 @@ func (c *SlurmNodesController) drainSlurmNodes(
 	k8sNodeName string,
 	reason string,
 ) error {
-
-	podList := &corev1.PodList{}
-	if err := c.List(ctx, podList, client.MatchingFields{"spec.nodeName": k8sNodeName}); err != nil {
-		return fmt.Errorf("list pods on node %s: %w", k8sNodeName, err)
+	workerPodList, err := c.listWorkerPods(ctx, k8sNodeName)
+	if err != nil {
+		return err
 	}
 
 	var errs []error
-	for _, pod := range podList.Items {
-		if workerPodNameRegex.MatchString(pod.Name) {
-			slurmClusterName := types.NamespacedName{
-				Namespace: pod.Namespace,
-				Name:      pod.Labels[consts.LabelInstanceKey],
-			}
+	for _, pod := range workerPodList.Items {
+		slurmClusterName := types.NamespacedName{
+			Namespace: pod.Namespace,
+			Name:      pod.Labels[consts.LabelInstanceKey],
+		}
 
-			err := c.drainSlurmNode(ctx, slurmClusterName, pod.Name, reason)
-			if err != nil {
-				errs = append(errs, err)
-			}
+		err := c.drainSlurmNode(ctx, slurmClusterName, pod.Name, reason)
+		if err != nil {
+			errs = append(errs, err)
 		}
 	}
 
@@ -713,40 +708,53 @@ func (c *SlurmNodesController) slurmNodesFullyDrained(
 	logger := log.FromContext(ctx).WithName("SlurmNodesController.slurmNodesFullyDrained")
 
 	logger.Info("checking that slurm nodes are fully drained")
-	podList := &corev1.PodList{}
-	if err := c.List(ctx, podList, client.MatchingFields{"spec.nodeName": k8sNodeName}); err != nil {
-		return false, fmt.Errorf("list pods on node %s: %w", k8sNodeName, err)
+	workerPodList, err := c.listWorkerPods(ctx, k8sNodeName)
+	if err != nil {
+		return false, err
 	}
 
-	for _, pod := range podList.Items {
-		if workerPodNameRegex.MatchString(pod.Name) {
-			logger = logger.WithValues("slurmNode", pod.Name, "instanceKey", pod.Labels[consts.LabelInstanceKey])
-			logger.Info("found slurm node")
+	for _, pod := range workerPodList.Items {
+		logger = logger.WithValues("slurmNode", pod.Name, "instanceKey", pod.Labels[consts.LabelInstanceKey])
+		logger.Info("found slurm node")
 
-			slurmClusterName := types.NamespacedName{
-				Namespace: pod.Namespace,
-				Name:      pod.Labels[consts.LabelInstanceKey],
-			}
-
-			node, err := c.getSlurmNode(ctx, slurmClusterName, pod.Name)
-			if err != nil {
-				return false, err
-			}
-			_, isCompleting := node.States[api.V0041NodeStateCOMPLETING]
-			logger.Info("slurm node", "nodeStates", node.States)
-			// When epilog is running, node is in COMPLETING state and both IDLE and DRAIN states are set.
-			// Example: State=IDLE+COMPLETING+DRAIN+DYNAMIC_NORM
-			// We consider node fully drained when it is in IDLE+DRAIN+DYNAMIC_NORM states.
-			if !node.IsIdleDrained() || isCompleting {
-				logger.Info("slurm node is not fully drained", "nodeStates", node.States)
-				return false, nil
-			}
-			logger.V(1).Info("slurm node is fully drained", "nodeStates", node.States)
+		slurmClusterName := types.NamespacedName{
+			Namespace: pod.Namespace,
+			Name:      pod.Labels[consts.LabelInstanceKey],
 		}
+
+		node, err := c.getSlurmNode(ctx, slurmClusterName, pod.Name)
+		if err != nil {
+			return false, err
+		}
+		_, isCompleting := node.States[api.V0041NodeStateCOMPLETING]
+		logger.Info("slurm node", "nodeStates", node.States)
+		// When epilog is running, node is in COMPLETING state and both IDLE and DRAIN states are set.
+		// Example: State=IDLE+COMPLETING+DRAIN+DYNAMIC_NORM
+		// We consider node fully drained when it is in IDLE+DRAIN+DYNAMIC_NORM states.
+		if !node.IsIdleDrained() || isCompleting {
+			logger.Info("slurm node is not fully drained", "nodeStates", node.States)
+			return false, nil
+		}
+		logger.V(1).Info("slurm node is fully drained", "nodeStates", node.States)
 	}
 
 	logger.Info("all slurm nodes are fully drained")
 	return true, nil
+}
+
+func (c *SlurmNodesController) listWorkerPods(
+	ctx context.Context,
+	k8sNodeName string,
+) (*corev1.PodList, error) {
+
+	podList := &corev1.PodList{}
+	if err := c.List(ctx, podList,
+		client.MatchingFields{"spec.nodeName": k8sNodeName},
+		client.MatchingLabels{consts.LabelWorkerKey: consts.LabelWorkerValue}); err != nil {
+		return nil, fmt.Errorf("list pods on node %s: %w", k8sNodeName, err)
+	}
+
+	return podList, nil
 }
 
 func (c *SlurmNodesController) undrainSlurmNode(
