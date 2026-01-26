@@ -343,7 +343,7 @@ type SConfigController struct {
 	// ReconfigureWaitTimeout defines the maximum time to wait for all nodes to restart during reconfiguration.
 	// Must be greater than ReconfigurePollInterval. Defaults to 1m
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="1m"
+	// +kubebuilder:default="5m"
 	ReconfigureWaitTimeout *string `json:"reconfigureWaitTimeout,omitempty"`
 
 	// HostUsers controls if the pod containers can use the host user namespace
