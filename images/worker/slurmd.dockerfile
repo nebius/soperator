@@ -122,6 +122,9 @@ RUN mkdir -p /var/log/slurm/multilog && \
 # Copy slurmd entrypoint script
 COPY images/worker/slurmd_entrypoint.sh /opt/bin/slurm/
 
+# Copy wait_for_topology script for ephemeral nodes
+COPY images/worker/wait_for_topology.py /opt/bin/slurm/
+
 # Copy supervisord entrypoint script
 COPY images/worker/supervisord_entrypoint.sh /opt/bin/slurm/
 
@@ -130,7 +133,8 @@ COPY images/worker/wait-for-controller.sh /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh && \
     chmod +x /opt/bin/slurm/supervisord_entrypoint.sh && \
-    chmod +x /opt/bin/slurm/wait-for-controller.sh
+    chmod +x /opt/bin/slurm/wait-for-controller.sh && \
+    chmod +x /opt/bin/slurm/wait_for_topology.py
 
 # Start supervisord that manages both slurmd and sshd as child processes
 ENTRYPOINT ["/opt/bin/slurm/supervisord_entrypoint.sh"]

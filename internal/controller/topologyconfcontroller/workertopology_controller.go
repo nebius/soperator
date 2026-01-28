@@ -115,7 +115,22 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return DefaultRequeueResult, nil
 	}
 
-	podsByNode := r.GetPodsByNode(podList.Items)
+	// Get ephemeral NodeSets and filter out their pods from topology
+	ephemeralNodeSets, err := r.GetEphemeralNodeSets(ctx, req.Namespace)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("get ephemeral NodeSets: %w", err)
+	}
+	if len(ephemeralNodeSets) > 0 {
+		logger.Info("Found ephemeral NodeSets, filtering pods", "ephemeralNodeSets", ephemeralNodeSets)
+	}
+
+	filteredPods := r.FilterPodsExcludingEphemeralNodeSets(podList.Items, ephemeralNodeSets)
+	if len(filteredPods) == 0 {
+		logger.Info("No non-ephemeral pods found after filtering")
+		return DefaultRequeueResult, nil
+	}
+
+	podsByNode := r.GetPodsByNode(filteredPods)
 	logger.Info("Pods organized by node", "podsByNode", podsByNode)
 
 	var desiredTopologyConfig string
@@ -301,8 +316,17 @@ func (r *WorkerTopologyReconciler) GetStatefulSetsWithFallback(
 ) (*kruisev1b1.StatefulSetList, error) {
 	listASTS := &kruisev1b1.StatefulSetList{}
 
-	if err := r.getAdvancedSTS(ctx, listASTS); err != nil {
+	if err := r.getAdvancedSTS(ctx, namespace, listASTS); err != nil {
 		return nil, fmt.Errorf("get advanced stateful sets: %w", err)
+	}
+
+	ephemeralNodeSets, err := r.GetEphemeralNodeSets(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("get ephemeral NodeSets: %w", err)
+	}
+
+	if len(ephemeralNodeSets) > 0 {
+		listASTS.Items = r.FilterStatefulSetsExcludingEphemeralNodeSets(listASTS.Items, ephemeralNodeSets)
 	}
 
 	if len(listASTS.Items) == 0 {
@@ -325,36 +349,42 @@ func (r *WorkerTopologyReconciler) GetStatefulSetsWithFallback(
 			},
 		}
 
-		listASTS.Items = []kruisev1b1.StatefulSet{fallbackSTS}
+			listASTS.Items = []kruisev1b1.StatefulSet{fallbackSTS}
+		}
+
 	}
 
 	return listASTS, nil
 }
 
 func (r *WorkerTopologyReconciler) getAdvancedSTS(
-	ctx context.Context, asts *kruisev1b1.StatefulSetList,
+	ctx context.Context, namespace string, asts *kruisev1b1.StatefulSetList,
 ) error {
 	labels := map[string]string{
 		consts.LabelWorkerKey: consts.LabelWorkerValue,
 	}
-	return r.Client.List(ctx, asts, client.MatchingLabels(labels))
+	return r.Client.List(ctx, asts, client.InNamespace(namespace), client.MatchingLabels(labels))
 }
 
 func InitializeTopologyConf(asts *kruisev1b1.StatefulSetList) string {
-	if asts == nil || len(asts.Items) == 0 {
+	if asts == nil {
 		return ""
 	}
 
-	switchName := "SwitchName=unknown"
 	var nodes []string
+	switchName := "SwitchName=unknown"
+	dummyNodeName := "dummy"
+	nodes = append(nodes, dummyNodeName)
 
-	for _, sts := range asts.Items {
-		if sts.Spec.Replicas == nil || *sts.Spec.Replicas <= 0 {
-			continue
-		}
+	if len(asts.Items) > 0 {
+		for _, sts := range asts.Items {
+			if sts.Spec.Replicas == nil || *sts.Spec.Replicas <= 0 {
+				continue
+			}
 
-		for i := 0; i < int(*sts.Spec.Replicas); i++ {
-			nodes = append(nodes, sts.Name+"-"+strconv.Itoa(i))
+			for i := 0; i < int(*sts.Spec.Replicas); i++ {
+				nodes = append(nodes, sts.Name+"-"+strconv.Itoa(i))
+			}
 		}
 	}
 
@@ -381,6 +411,73 @@ func (r *WorkerTopologyReconciler) getPodList(
 	}
 
 	return podList, nil
+}
+
+// GetEphemeralNodeSets returns a set of NodeSet names that have EphemeralNodes=true
+func (r *WorkerTopologyReconciler) GetEphemeralNodeSets(ctx context.Context, namespace string) (map[string]struct{}, error) {
+	nodeSetList := &v1alpha1.NodeSetList{}
+	if err := r.Client.List(ctx, nodeSetList, client.InNamespace(namespace)); err != nil {
+		return nil, fmt.Errorf("list NodeSets in namespace %s: %w", namespace, err)
+	}
+
+	ephemeralNodeSets := make(map[string]struct{})
+	for _, nodeSet := range nodeSetList.Items {
+		if nodeSet.Spec.EphemeralNodes != nil && *nodeSet.Spec.EphemeralNodes {
+			ephemeralNodeSets[nodeSet.Name] = struct{}{}
+		}
+	}
+
+	return ephemeralNodeSets, nil
+}
+
+// FilterPodsExcludingEphemeralNodeSets filters out pods that belong to NodeSets with EphemeralNodes=true
+func (r *WorkerTopologyReconciler) FilterPodsExcludingEphemeralNodeSets(
+	pods []corev1.Pod, ephemeralNodeSets map[string]struct{},
+) []corev1.Pod {
+	if len(ephemeralNodeSets) == 0 {
+		return pods
+	}
+
+	filtered := make([]corev1.Pod, 0, len(pods))
+	for _, pod := range pods {
+		nodeSetName, exists := pod.Labels[consts.LabelNodeSetKey]
+		if !exists {
+			// If pod doesn't have NodeSet label, include it
+			filtered = append(filtered, pod)
+			continue
+		}
+
+		if _, isEphemeral := ephemeralNodeSets[nodeSetName]; !isEphemeral {
+			// Only include pods from non-ephemeral NodeSets
+			filtered = append(filtered, pod)
+		}
+	}
+
+	return filtered
+}
+
+// FilterStatefulSetsExcludingEphemeralNodeSets filters out StatefulSets that belong to NodeSets with EphemeralNodes=true
+func (r *WorkerTopologyReconciler) FilterStatefulSetsExcludingEphemeralNodeSets(
+	statefulSets []kruisev1b1.StatefulSet, ephemeralNodeSets map[string]struct{},
+) []kruisev1b1.StatefulSet {
+	if len(ephemeralNodeSets) == 0 {
+		return statefulSets
+	}
+
+	filtered := make([]kruisev1b1.StatefulSet, 0, len(statefulSets))
+	for _, sts := range statefulSets {
+		nodeSetName, exists := sts.Labels[consts.LabelNodeSetKey]
+		if !exists {
+			filtered = append(filtered, sts)
+			continue
+		}
+
+		if _, isEphemeral := ephemeralNodeSets[nodeSetName]; !isEphemeral {
+			filtered = append(filtered, sts)
+		}
+	}
+
+	return filtered
 }
 
 // GetPodsByNode organizes pods by their node name.

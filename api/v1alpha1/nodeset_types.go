@@ -130,6 +130,27 @@ type NodeSetSpec struct {
 	// +kubebuilder:default="20%"
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
+	// EphemeralNodes enables ephemeral node behavior for this NodeSet.
+	// When true, nodes will use dynamic topology injection instead of legacy topology.conf.
+	// Topology data is read from the topology-node-labels ConfigMap at runtime
+	// and passed to slurmd via --conf "Topology=..." parameter.
+	// This mode is designed for cloud/ephemeral worker nodes that may be dynamically
+	// added or removed from the cluster.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	EphemeralNodes *bool `json:"ephemeralNodes,omitempty"`
+
+	// EphemeralTopologyWaitTimeout specifies the maximum time (in seconds) to wait
+	// for topology data to become available before starting slurmd.
+	// Only used when EphemeralNodes is true.
+	// Defaults to 180 seconds (3 minutes).
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=60
+	// +kubebuilder:default=180
+	EphemeralTopologyWaitTimeout int32 `json:"ephemeralTopologyWaitTimeout,omitempty"`
+
 	// EnableHostUserNamespace controls if the pod containers can use the host user namespace.
 	// Defaults to false.
 	//

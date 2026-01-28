@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
+	kruisev1alpha1 "github.com/openkruise/kruise-api/apps/v1alpha1"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
@@ -77,6 +78,7 @@ func init() {
 	if check.IsAppArmorCRDInstalled() {
 		utilruntime.Must(apparmor.AddToScheme(scheme))
 	}
+	utilruntime.Must(kruisev1alpha1.AddToScheme(scheme))
 	utilruntime.Must(kruisev1b1.AddToScheme(scheme))
 
 	utilruntime.Must(slurmv1.AddToScheme(scheme))
