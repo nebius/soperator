@@ -38,6 +38,60 @@ func RenderContainerWaitForController(container *values.Container) corev1.Contai
 	}
 }
 
+// RenderContainerWaitForTopology renders init [corev1.Container] that waits for topology data
+// to become available for ephemeral nodes
+func RenderContainerWaitForTopology(container *values.Container, waitTimeoutSeconds int32) corev1.Container {
+	return corev1.Container{
+		Name:            consts.ContainerNameWaitForTopology,
+		Image:           container.Image,
+		ImagePullPolicy: container.ImagePullPolicy,
+		Command: []string{
+			"python3",
+			"/opt/bin/slurm/wait_for_topology.py",
+		},
+		Env: []corev1.EnvVar{
+			{
+				Name: "K8S_NODE_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: corev1.SchemeGroupVersion.Version,
+						FieldPath:  "spec.nodeName",
+					},
+				},
+			},
+			{
+				Name:  "TOPOLOGY_CONFIGMAP_PATH",
+				Value: consts.VolumeMountPathTopologyNodeLabels,
+			},
+			{
+				Name:  "TOPOLOGY_ENV_FILE",
+				Value: consts.TopologyEnvFilePath,
+			},
+			{
+				Name:  "TOPOLOGY_WAIT_TIMEOUT",
+				Value: strconv.Itoa(int(waitTimeoutSeconds)),
+			},
+			{
+				Name:  "TOPOLOGY_POLL_INTERVAL",
+				Value: "5",
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      consts.VolumeNameTopologyNodeLabels,
+				MountPath: consts.VolumeMountPathTopologyNodeLabels,
+				ReadOnly:  true,
+			},
+			{
+				Name:      consts.VolumeNameTopologyEnv,
+				MountPath: consts.VolumeMountPathTopologyEnv,
+			},
+		},
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+	}
+}
+
 // renderContainerSlurmd renders [corev1.Container] for slurmd
 func renderContainerSlurmd(
 	container *values.Container,
@@ -225,6 +279,15 @@ func renderContainerNodeSetSlurmd(
 		appArmorProfile = consts.AppArmorProfileUnconfined
 	}
 
+	// Add topology env volume mount for ephemeral nodes
+	if nodeSet.EphemeralNodes != nil && *nodeSet.EphemeralNodes {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      consts.VolumeNameTopologyEnv,
+			MountPath: consts.VolumeMountPathTopologyEnv,
+			ReadOnly:  true,
+		})
+	}
+
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
 		Image:           nodeSet.ContainerSlurmd.Image,
@@ -237,6 +300,7 @@ func renderContainerNodeSetSlurmd(
 				utils.Ternary(nodeSet.GPU.Enabled, consts.ClusterTypeGPU, consts.ClusterTypeCPU),
 				nodeSet.GPU.Nvidia.GDRCopyEnabled,
 				nodeSet.NodeExtra,
+				nodeSet.EphemeralNodes != nil && *nodeSet.EphemeralNodes,
 			),
 			nodeSet.ContainerSlurmd.CustomEnv...,
 		),
@@ -367,6 +431,7 @@ func renderNodeSetSlurmdEnv(
 	clusterType consts.ClusterType,
 	enableGDRCopy bool,
 	slurmNodeExtra string,
+	ephemeralNodes bool,
 ) []corev1.EnvVar {
 	envVar := []corev1.EnvVar{
 		{
@@ -382,11 +447,36 @@ func renderNodeSetSlurmdEnv(
 			Name:  "SLURM_CLUSTER_TYPE",
 			Value: clusterType.String(),
 		},
-		{
+	}
+
+	// Set node mode based on ephemeral or static configuration
+	if ephemeralNodes {
+		envVar = append(envVar,
+			corev1.EnvVar{
+				Name:  "SOPERATOR_EPHEMERAL_NODES",
+				Value: "true",
+			},
+			corev1.EnvVar{
+				Name:  "TOPOLOGY_ENV_FILE",
+				Value: consts.TopologyEnvFilePath,
+			},
+			corev1.EnvVar{
+				Name: "K8S_NODE_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: corev1.SchemeGroupVersion.Version,
+						FieldPath:  "spec.nodeName",
+					},
+				},
+			},
+		)
+	} else {
+		envVar = append(envVar, corev1.EnvVar{
 			Name:  "SOPERATOR_NODE_SETS_ON",
 			Value: "true",
-		},
+		})
 	}
+
 	if len(slurmNodeExtra) > 0 {
 		envVar = append(envVar, corev1.EnvVar{
 			Name:  "SLURM_NODE_EXTRA",

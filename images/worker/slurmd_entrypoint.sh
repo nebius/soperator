@@ -47,14 +47,55 @@ if [ "${evaluated_extra}" != "" ]; then
   )
 fi
 
-if [ "${SOPERATOR_NODE_SETS_ON}" = "true" ]; then
+build_dynamic_conf() {
+  local conf_parts=(
+    "NodeHostname=${K8S_POD_NAME}"
+    "NodeAddr=${K8S_POD_NAME}.${K8S_SERVICE_NAME}.${K8S_POD_NAMESPACE}.svc"
+    "RealMemory=${SLURM_REAL_MEMORY}"
+    "Gres=${GRES}"
+  )
+
+  # Add topology if available (for ephemeral nodes)
+  if [ -n "${SLURM_NODE_TOPOLOGY}" ]; then
+    echo "Adding topology: ${SLURM_NODE_TOPOLOGY}" >&2
+    conf_parts+=("${SLURM_NODE_TOPOLOGY}")
+  fi
+
+  local features
+  features=$(feature_conf)
+  if [ -n "${features}" ]; then
+    conf_parts+=("${features}")
+  fi
+
+  echo "${conf_parts[*]}"
+}
+
+if [ "${SOPERATOR_EPHEMERAL_NODES}" = "true" ]; then
+  echo "Running slurmd as ephemeral node with dynamic topology"
+  
+  # Default path should match consts.TopologyEnvFilePath used by the operator
+  TOPOLOGY_ENV_FILE="${TOPOLOGY_ENV_FILE:-/tmp/topology/slurm_topology.env}"
+  
+  if [ -f "${TOPOLOGY_ENV_FILE}" ]; then
+    echo "Loading topology from ${TOPOLOGY_ENV_FILE}"
+    . "${TOPOLOGY_ENV_FILE}"
+  else
+    echo "WARNING: Topology env file not found at ${TOPOLOGY_ENV_FILE}"
+  fi
+  
+  slurmd_args+=(
+    -Z
+    --conf
+    "$(build_dynamic_conf)"
+  )
+elif [ "${SOPERATOR_NODE_SETS_ON}" = "true" ]; then
   echo "Running slurmd with NodeSets configuration from slurm.conf"
 else
   echo "Running slurmd with dynamic node configuration"
   slurmd_args+=(
     -Z
     --conf
-    "NodeHostname=${K8S_POD_NAME} NodeAddr=${K8S_POD_NAME}.${K8S_SERVICE_NAME}.${K8S_POD_NAMESPACE}.svc RealMemory=${SLURM_REAL_MEMORY} Gres=${GRES} $(feature_conf)"
+    "$(build_dynamic_conf)"
   )
 fi
 
