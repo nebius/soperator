@@ -27,8 +27,8 @@ func Test_GenerateCGroupConfig(t *testing.T) {
 	}
 	resV2 := generateCGroupConfig(clusterV2)
 	expectedV2 := `CgroupMountpoint=/sys/fs/cgroup
-ConstrainCores=yes
-ConstrainDevices=yes
+ConstrainCores=no
+ConstrainDevices=no
 ConstrainRAMSpace=yes
 CgroupPlugin=cgroup/v2
 ConstrainSwapSpace=no
@@ -41,8 +41,8 @@ IgnoreSystemd=yes`
 		},
 	}
 	expectedV1 := `CgroupMountpoint=/sys/fs/cgroup
-ConstrainCores=yes
-ConstrainDevices=yes
+ConstrainCores=no
+ConstrainDevices=no
 ConstrainRAMSpace=yes
 CgroupPlugin=cgroup/v1
 ConstrainSwapSpace=yes`
