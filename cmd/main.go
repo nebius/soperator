@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
+	kruisev1alpha1 "github.com/openkruise/kruise-api/apps/v1alpha1"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
@@ -78,6 +79,7 @@ func init() {
 		utilruntime.Must(apparmor.AddToScheme(scheme))
 	}
 	utilruntime.Must(kruisev1b1.AddToScheme(scheme))
+	utilruntime.Must(kruisev1alpha1.AddToScheme(scheme))
 
 	utilruntime.Must(slurmv1.AddToScheme(scheme))
 
@@ -338,6 +340,17 @@ func main() {
 			cli.Fail(setupLog, err,
 				"unable to create controller",
 				"controller", topologyconfcontroller.WorkerTopologyReconcilerName,
+			)
+		}
+
+		if err = topologyconfcontroller.NewTopologyDistributionReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			soperatorNamespace,
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err,
+				"unable to create controller",
+				"controller", topologyconfcontroller.TopologyDistributionReconcilerName,
 			)
 		}
 	}
