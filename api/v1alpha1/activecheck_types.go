@@ -136,6 +136,7 @@ type ContainerSpec struct {
 	Image        string               `json:"image,omitempty"`
 	Command      []string             `json:"command,omitempty"`
 	Args         []string             `json:"args,omitempty"`
+	WorkingDir   string               `json:"workingDir,omitempty"`
 	Env          []corev1.EnvVar      `json:"env,omitempty"`
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 	Volumes      []corev1.Volume      `json:"volumes,omitempty"`
