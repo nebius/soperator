@@ -177,11 +177,40 @@ func RenderNodeSetStatefulSet(
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
-	initContainers := slices.Clone(nodeSet.CustomInitContainers)
-	initContainers = append(initContainers,
+	if nodeSet.EphemeralNodes != nil && *nodeSet.EphemeralNodes {
+		volumes = append(volumes,
+			corev1.Volume{
+				Name: consts.VolumeNameTopologyNodeLabels,
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: consts.ConfigMapNameTopologyNodeLabels,
+						},
+						Optional: ptr.To(true),
+					},
+				},
+			},
+			corev1.Volume{
+				Name: consts.VolumeNameTopologyEnv,
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			},
+		)
+	}
+
+	initContainers := []corev1.Container{
 		common.RenderContainerMunge(&nodeSet.ContainerMunge),
 		RenderContainerWaitForController(&nodeSet.ContainerSlurmd),
-	)
+	}
+
+	if nodeSet.EphemeralNodes != nil && *nodeSet.EphemeralNodes {
+		initContainers = append(initContainers,
+			RenderContainerWaitForTopology(&nodeSet.ContainerSlurmd, nodeSet.EphemeralTopologyWaitTimeout),
+		)
+	}
+
+	initContainers = append(initContainers, nodeSet.CustomInitContainers...)
 
 	slurmdContainer, err := renderContainerNodeSetSlurmd(nodeSet, cgroupVersion)
 	if err != nil {

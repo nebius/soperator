@@ -7,8 +7,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/worker"
 	"nebius.ai/slurm-operator/internal/values"
@@ -274,6 +276,133 @@ func TestRenderStatefulSet_HostUsers(t *testing.T) {
 					t.Errorf("expected HostUsers to be %v, got %v", *tc.expectedHostUsers, *statefulSet.Spec.Template.Spec.HostUsers)
 				}
 			}
+		})
+	}
+}
+
+func TestRenderStatefulSet_EphemeralNodes(t *testing.T) {
+	createNodeSet := func(ephemeralNodes *bool, waitTimeout int32) *values.SlurmNodeSet {
+		return &values.SlurmNodeSet{
+			Name: "test-nodeset",
+			ParentalCluster: client.ObjectKey{
+				Namespace: "test-namespace",
+				Name:      "test-cluster",
+			},
+			ContainerSlurmd: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image:           "test-image",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Resources: corev1.ResourceList{
+						corev1.ResourceMemory:           resource.MustParse("1Gi"),
+						corev1.ResourceCPU:              resource.MustParse("100m"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+					},
+				},
+			},
+			ContainerMunge: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image: "munge-image",
+				},
+			},
+			VolumeSpool: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+			},
+			VolumeJail: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+			},
+			StatefulSet: values.StatefulSet{
+				Replicas: 1,
+			},
+			SupervisorDConfigMapName:     "supervisord-config",
+			SSHDConfigMapName:            "sshd-config",
+			GPU:                          &slurmv1alpha1.GPUSpec{Enabled: false},
+			EphemeralNodes:               ephemeralNodes,
+			EphemeralTopologyWaitTimeout: waitTimeout,
+		}
+	}
+
+	tests := []struct {
+		name                       string
+		ephemeralNodes             *bool
+		waitTimeout                int32
+		expectedInitContainerCount int
+		expectTopologyVolumes      bool
+		expectWaitForTopology      bool
+	}{
+		{
+			name:                       "ephemeral nodes disabled (nil)",
+			ephemeralNodes:             nil,
+			waitTimeout:                300,
+			expectedInitContainerCount: 2, // munge + wait-for-controller
+			expectTopologyVolumes:      false,
+			expectWaitForTopology:      false,
+		},
+		{
+			name:                       "ephemeral nodes disabled (false)",
+			ephemeralNodes:             ptr.To(false),
+			waitTimeout:                300,
+			expectedInitContainerCount: 2, // munge + wait-for-controller
+			expectTopologyVolumes:      false,
+			expectWaitForTopology:      false,
+		},
+		{
+			name:                       "ephemeral nodes enabled",
+			ephemeralNodes:             ptr.To(true),
+			waitTimeout:                300,
+			expectedInitContainerCount: 3, // munge + wait-for-controller + wait-for-topology
+			expectTopologyVolumes:      true,
+			expectWaitForTopology:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodeSet := createNodeSet(tt.ephemeralNodes, tt.waitTimeout)
+
+			result, err := worker.RenderNodeSetStatefulSet(
+				nodeSet,
+				&slurmv1.Secrets{},
+			)
+			assert.NoError(t, err)
+
+			// Verify init container count
+			assert.Len(t, result.Spec.Template.Spec.InitContainers, tt.expectedInitContainerCount,
+				"expected %d init containers", tt.expectedInitContainerCount)
+
+			// Verify wait-for-topology init container presence
+			var hasWaitForTopology bool
+			for _, container := range result.Spec.Template.Spec.InitContainers {
+				if container.Name == consts.ContainerNameWaitForTopology {
+					hasWaitForTopology = true
+					break
+				}
+			}
+			assert.Equal(t, tt.expectWaitForTopology, hasWaitForTopology,
+				"wait-for-topology container presence mismatch")
+
+			// Verify topology-related volumes
+			var hasTopologyNodeLabelsVolume, hasTopologyEnvVolume bool
+			for _, volume := range result.Spec.Template.Spec.Volumes {
+				switch volume.Name {
+				case consts.VolumeNameTopologyNodeLabels:
+					hasTopologyNodeLabelsVolume = true
+					if tt.expectTopologyVolumes {
+						assert.NotNil(t, volume.ConfigMap, "topology-node-labels volume should be ConfigMap")
+						assert.Equal(t, consts.ConfigMapNameTopologyNodeLabels, volume.ConfigMap.Name)
+						assert.NotNil(t, volume.ConfigMap.Optional)
+						assert.True(t, *volume.ConfigMap.Optional, "topology-node-labels ConfigMap should be optional")
+					}
+				case consts.VolumeNameTopologyEnv:
+					hasTopologyEnvVolume = true
+					if tt.expectTopologyVolumes {
+						assert.NotNil(t, volume.EmptyDir, "topology-env volume should be EmptyDir")
+					}
+				}
+			}
+			assert.Equal(t, tt.expectTopologyVolumes, hasTopologyNodeLabelsVolume,
+				"topology-node-labels volume presence mismatch")
+			assert.Equal(t, tt.expectTopologyVolumes, hasTopologyEnvVolume,
+				"topology-env volume presence mismatch")
 		})
 	}
 }

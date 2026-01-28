@@ -851,6 +851,11 @@ func (in *NodeSetSpec) DeepCopyInto(out *NodeSetSpec) {
 		*out = new(intstr.IntOrString)
 		**out = **in
 	}
+	if in.EphemeralNodes != nil {
+		in, out := &in.EphemeralNodes, &out.EphemeralNodes
+		*out = new(bool)
+		**out = **in
+	}
 	in.Slurmd.DeepCopyInto(&out.Slurmd)
 	in.Munge.DeepCopyInto(&out.Munge)
 	in.NodeConfig.DeepCopyInto(&out.NodeConfig)
