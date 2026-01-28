@@ -126,6 +126,7 @@ eachWorkerJobs: {{ $spec.eachWorkerJobs }}
 maxNumberOfJobs: {{ . }}
 {{- end }}
 jobContainer:
+  workingDir: {{ $jobContainer.workingDir | quote }}
   appArmorProfile: {{ $jobContainer.appArmorProfile }}
   image: {{ tpl $jobContainer.image $ctx | quote }}
 {{- with $jobContainer.command }}
@@ -181,9 +182,11 @@ Render k8sJobSpec for an ActiveCheck.
 {{- if and (not $command) $spec.pythonScriptFile }}
 {{- $command = list "bash" "-c" (printf "python3 - <<'PY'\n%s\nPY" (include "soperator-activechecks.renderScript" (dict "path" $spec.pythonScriptFile "ctx" $ctx))) -}}
 {{- end }}
+{{- $workingDir := $jobContainer.workingDir -}}
 {{- $args := $jobContainer.args -}}
 {{- $image := tpl (default $ctx.Values.images.k8sJob $jobContainer.image) $ctx }}
 jobContainer:
+  workingDir: {{ $workingDir | quote }}
   image: {{ $image | quote }}
 {{- with $jobContainer.appArmorProfile }}
   appArmorProfile: {{ . }}
