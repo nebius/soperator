@@ -18,6 +18,11 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 )
 
+// rdNameForNamespace returns ResourceDistribution name for a given namespace
+func rdNameForNamespace(namespace string) string {
+	return ResourceDistributionName + "-" + namespace
+}
+
 func TestTopologyDistributionReconciler_HasNamespaceWithEphemeralNodeSets(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, slurmv1alpha1.AddToScheme(scheme))
@@ -156,7 +161,7 @@ func TestTopologyDistributionReconciler_EnsureResourceDistribution(t *testing.T)
 			targetNamespace: "slurm-cluster-2",
 			existingRD: &kruisev1alpha1.ResourceDistribution{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: ResourceDistributionName,
+					Name: rdNameForNamespace("slurm-cluster-2"),
 				},
 				Spec: kruisev1alpha1.ResourceDistributionSpec{
 					Targets: kruisev1alpha1.ResourceDistributionTargets{
@@ -175,7 +180,7 @@ func TestTopologyDistributionReconciler_EnsureResourceDistribution(t *testing.T)
 			targetNamespace: "slurm-cluster",
 			existingRD: &kruisev1alpha1.ResourceDistribution{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: ResourceDistributionName,
+					Name: rdNameForNamespace("slurm-cluster"),
 				},
 				Spec: kruisev1alpha1.ResourceDistributionSpec{
 					Targets: kruisev1alpha1.ResourceDistributionTargets{
@@ -211,7 +216,7 @@ func TestTopologyDistributionReconciler_EnsureResourceDistribution(t *testing.T)
 
 			// Verify ResourceDistribution exists
 			rd := &kruisev1alpha1.ResourceDistribution{}
-			err = fakeClient.Get(ctx, types.NamespacedName{Name: ResourceDistributionName}, rd)
+			err = fakeClient.Get(ctx, types.NamespacedName{Name: rdNameForNamespace(tt.targetNamespace)}, rd)
 			require.NoError(t, err)
 
 			// Verify target namespace
@@ -242,8 +247,7 @@ func TestTopologyDistributionReconciler_DeleteResourceDistributionIfExists(t *te
 			namespace: "slurm-cluster",
 			existingRD: &kruisev1alpha1.ResourceDistribution{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      ResourceDistributionName,
-					Namespace: "slurm-cluster",
+					Name: rdNameForNamespace("slurm-cluster"),
 				},
 			},
 			wantDelete: true,
@@ -271,7 +275,7 @@ func TestTopologyDistributionReconciler_DeleteResourceDistributionIfExists(t *te
 
 			// Verify ResourceDistribution was deleted
 			rd := &kruisev1alpha1.ResourceDistribution{}
-			err = fakeClient.Get(ctx, types.NamespacedName{Name: ResourceDistributionName, Namespace: tt.namespace}, rd)
+			err = fakeClient.Get(ctx, types.NamespacedName{Name: rdNameForNamespace(tt.namespace)}, rd)
 			if tt.wantDelete {
 				assert.Error(t, err)
 			}
@@ -363,7 +367,7 @@ func TestTopologyDistributionReconciler_Reconcile(t *testing.T) {
 
 			// Verify ResourceDistribution state
 			rd := &kruisev1alpha1.ResourceDistribution{}
-			err = fakeClient.Get(ctx, types.NamespacedName{Name: ResourceDistributionName}, rd)
+			err = fakeClient.Get(ctx, types.NamespacedName{Name: rdNameForNamespace(tt.namespace)}, rd)
 			if tt.wantRDExists {
 				require.NoError(t, err)
 				assert.Len(t, rd.Spec.Targets.IncludedNamespaces.List, len(tt.wantTargetNamespaces))

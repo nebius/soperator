@@ -73,7 +73,9 @@ build_dynamic_conf() {
 if [ "${SOPERATOR_EPHEMERAL_NODES}" = "true" ]; then
   echo "Running slurmd as ephemeral node with dynamic topology"
   
-  TOPOLOGY_ENV_FILE="${TOPOLOGY_ENV_FILE:-/tmp/slurm_topology.env}"
+  # Default path should match consts.TopologyEnvFilePath used by the operator
+  TOPOLOGY_ENV_FILE="${TOPOLOGY_ENV_FILE:-/tmp/topology/slurm_topology.env}"
+  
   if [ -f "${TOPOLOGY_ENV_FILE}" ]; then
     echo "Loading topology from ${TOPOLOGY_ENV_FILE}"
     . "${TOPOLOGY_ENV_FILE}"

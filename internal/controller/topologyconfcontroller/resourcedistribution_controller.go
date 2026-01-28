@@ -91,19 +91,6 @@ func (r *TopologyDistributionReconciler) hasNamespaceWithEphemeralNodeSets(ctx c
 	return false, nil
 }
 
-// getSourceConfigMap retrieves the topology-node-labels ConfigMap from operator namespace
-func (r *TopologyDistributionReconciler) getSourceConfigMap(ctx context.Context) (*corev1.ConfigMap, error) {
-	configMap := &corev1.ConfigMap{}
-	key := client.ObjectKey{
-		Name:      consts.ConfigMapNameTopologyNodeLabels,
-		Namespace: r.Namespace,
-	}
-	if err := r.Client.Get(ctx, key, configMap); err != nil {
-		return nil, err
-	}
-	return configMap, nil
-}
-
 // ensureResourceDistribution creates or updates the ResourceDistribution
 func (r *TopologyDistributionReconciler) ensureResourceDistribution(
 	ctx context.Context,
@@ -111,11 +98,13 @@ func (r *TopologyDistributionReconciler) ensureResourceDistribution(
 ) error {
 	logger := log.FromContext(ctx).WithName(TopologyDistributionReconcilerName)
 
+	rdName := ResourceDistributionName + "-" + targetNamespace
+
 	targetNamespacesList := []kruisev1alpha1.ResourceDistributionNamespace{{Name: targetNamespace}}
 
 	desired := &kruisev1alpha1.ResourceDistribution{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: ResourceDistributionName,
+			Name: rdName,
 		},
 		Spec: kruisev1alpha1.ResourceDistributionSpec{
 			Resource: runtime.RawExtension{
@@ -135,22 +124,22 @@ func (r *TopologyDistributionReconciler) ensureResourceDistribution(
 	}
 
 	existing := &kruisev1alpha1.ResourceDistribution{}
-	err := r.Client.Get(ctx, client.ObjectKey{Name: ResourceDistributionName}, existing)
+	err := r.Client.Get(ctx, client.ObjectKey{Name: rdName}, existing)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			logger.Info("Creating ResourceDistribution", "name", ResourceDistributionName)
+			logger.Info("Creating ResourceDistribution", "name", rdName)
 			return r.Client.Create(ctx, desired)
 		}
 		return fmt.Errorf("get existing resource distribution: %w", err)
 	}
 
 	if equalResourceDistributions(existing, desired) {
-		logger.Info("ResourceDistribution is up-to-date", "name", ResourceDistributionName)
+		logger.Info("ResourceDistribution is up-to-date", "name", rdName)
 		return nil
 	}
 
 	existing.Spec = desired.Spec
-	logger.Info("Updating ResourceDistribution", "name", ResourceDistributionName)
+	logger.Info("Updating ResourceDistribution", "name", rdName)
 	return r.Client.Update(ctx, existing)
 }
 
@@ -162,8 +151,9 @@ func (r *TopologyDistributionReconciler) deleteResourceDistributionIfExists(
 		Info(msg string, keysAndValues ...any)
 	},
 ) (ctrl.Result, error) {
+	rdName := ResourceDistributionName + "-" + namespace
 	rd := &kruisev1alpha1.ResourceDistribution{}
-	err := r.Client.Get(ctx, client.ObjectKey{Name: ResourceDistributionName, Namespace: namespace}, rd)
+	err := r.Client.Get(ctx, client.ObjectKey{Name: rdName}, rd)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -171,7 +161,7 @@ func (r *TopologyDistributionReconciler) deleteResourceDistributionIfExists(
 		return ctrl.Result{}, fmt.Errorf("get resource distribution: %w", err)
 	}
 
-	logger.Info("No ephemeral NodeSets found, deleting ResourceDistribution", "name", ResourceDistributionName)
+	logger.Info("No ephemeral NodeSets found, deleting ResourceDistribution", "name", rdName)
 	if err := r.Client.Delete(ctx, rd); err != nil {
 		return ctrl.Result{}, fmt.Errorf("delete resource distribution: %w", err)
 	}

@@ -7,10 +7,9 @@ Or without pytest: python3 wait_for_topology_test.py
 """
 
 import os
-import sys
 import tempfile
 import unittest
-from unittest import mock
+import unittest.mock as mock
 
 # Import the module under test
 import wait_for_topology
@@ -320,12 +319,12 @@ class TestGetEnvironmentVariables(unittest.TestCase):
         self.assertEqual(result, "test-node-001")
 
     def test_get_node_name_not_set(self):
-        """Get node name when environment variable is not set returns None."""
+        """Get node name when environment variable is not set raises KeyError."""
         env = os.environ.copy()
         env.pop("K8S_NODE_NAME", None)
         with mock.patch.dict(os.environ, env, clear=True):
-            result = wait_for_topology.get_node_name()
-        self.assertIsNone(result)
+            with self.assertRaises(KeyError):
+                wait_for_topology.get_node_name()
 
     def test_get_topology_path_default(self):
         """Get topology path returns default when not set."""
