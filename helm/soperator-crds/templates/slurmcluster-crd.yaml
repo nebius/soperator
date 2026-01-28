@@ -3189,6 +3189,8 @@ spec:
                           - name
                           type: object
                         type: array
+                      workingDir:
+                        type: string
                     type: object
                   mungeContainer:
                     description: |-
@@ -5330,6 +5332,8 @@ spec:
                           - name
                           type: object
                         type: array
+                      workingDir:
+                        type: string
                     type: object
                   scriptRefName:
                     description: ScriptRefName name of configMap with custom script.
@@ -7511,6 +7515,8 @@ spec:
                           - name
                           type: object
                         type: array
+                      workingDir:
+                        type: string
                     type: object
                   maxNumberOfJobs:
                     default: 0
@@ -9657,6 +9663,8 @@ spec:
                           - name
                           type: object
                         type: array
+                      workingDir:
+                        type: string
                     type: object
                   sbatchScript:
                     description: Multiline sbatch script

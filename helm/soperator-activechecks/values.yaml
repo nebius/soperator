@@ -317,6 +317,8 @@ checks:
     runAfterCreation: true
     k8sJobSpec:
       jobContainer:
+        appArmorProfile: unconfined
+        workingDir: /opt/ansible
         command: ["/opt/bin/k8s_check_job_entrypoint.sh"]
         args:
           - ansible-playbook
@@ -344,6 +346,8 @@ checks:
     runAfterCreation: false
     k8sJobSpec:
       jobContainer:
+        appArmorProfile: unconfined
+        workingDir: /opt/ansible
         command: ["/opt/bin/k8s_check_job_entrypoint.sh"]
         args:
           - ansible-playbook
@@ -377,6 +381,7 @@ checks:
     k8sJobSpec:
       jobContainer:
         appArmorProfile: unconfined
+        workingDir: /opt/ansible
         command: ["/opt/bin/k8s_check_job_entrypoint.sh"]
         args:
           - ansible-playbook
