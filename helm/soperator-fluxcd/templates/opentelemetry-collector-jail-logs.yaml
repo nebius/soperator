@@ -255,6 +255,11 @@ spec:
         {{- end }}
         {{- end }}
       service:
+        {{- if .Values.observability.opentelemetry.metrics.enabled }}
+        telemetry:
+          metrics:
+            address: 0.0.0.0:8888
+        {{- end }}
         extensions:
         - health_check
         - file_storage
@@ -358,6 +363,8 @@ spec:
         enabled: false
       zipkin:
         enabled: false
+      metrics:
+        enabled: {{ .Values.observability.opentelemetry.metrics.enabled | default true }}
     securityContext:
       runAsGroup: 0
       runAsUser: 10001
@@ -368,6 +375,22 @@ spec:
     useGOMEMLIMIT: {{ .Values.observability.opentelemetry.logs.values.useGOMEMLIMIT | default true }}
     {{- if .Values.observability.opentelemetry.logs.values.jailLogs.resources }}
     resources: {{- toYaml .Values.observability.opentelemetry.logs.values.jailLogs.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.observability.opentelemetry.metrics.enabled }}
+    command:
+      extraArgs:
+        - --feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress
+    podMonitor:
+      enabled: true
+      metricsEndpoints:
+        - port: metrics
+          interval: {{ .Values.observability.opentelemetry.metrics.interval | default "30s" }}
+          scrapeTimeout: {{ .Values.observability.opentelemetry.metrics.scrapeTimeout | default "10s" }}
+          relabelings:
+            - sourceLabels: [__meta_kubernetes_pod_name]
+              targetLabel: pod
+            - replacement: otel-collector-jail-logs
+              targetLabel: collector
     {{- end }}
   {{- end }}
   valuesFrom:
