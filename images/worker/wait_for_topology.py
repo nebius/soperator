@@ -225,8 +225,12 @@ def main():
                 files = os.listdir(topology_path)
                 node_files = [f for f in files if not f.startswith(".")]
                 logger.error("Available nodes in ConfigMap: %s", node_files)
-            except OSError:
-                pass
+            except OSError as e:
+                logger.debug(
+                    "Failed to list topology directory %s when reporting available nodes: %s",
+                    topology_path,
+                    e,
+                )
             sys.exit(1)
         
         logger.info("Node %s not found in topology ConfigMap, retrying... (%ds elapsed)", node_name, int(elapsed))
