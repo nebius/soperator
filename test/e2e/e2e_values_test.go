@@ -155,7 +155,7 @@ func overrideTestValues(t *testing.T, tfVars map[string]interface{}, cfg testCon
 			"gpu_cluster": map[string]interface{}{
 				"infiniband_fabric": cfg.InfinibandFabric,
 			},
-			"preemptible":      preemptibleValue(cfg.PreemptiveNodes),
+			"preemptible":      preemptibleValue(cfg.PreemptibleNodes),
 			"features":         nil,
 			"create_partition": nil,
 		},
