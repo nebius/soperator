@@ -155,9 +155,7 @@ func overrideTestValues(t *testing.T, tfVars map[string]interface{}, cfg testCon
 			"gpu_cluster": map[string]interface{}{
 				"infiniband_fabric": cfg.InfinibandFabric,
 			},
-			// User regular nodes for now
-			// "preemptible": struct{}{},
-			"preemptible":      nil,
+			"preemptible":      preemptibleValue(cfg.PreemptiveNodes),
 			"features":         nil,
 			"create_partition": nil,
 		},
@@ -242,4 +240,11 @@ func renderDefCpuPerGpu(t *testing.T, cfg testConfig) string {
 	require.Greater(t, cpuPerGpu, 0, "cpu per gpu must be greater than zero")
 
 	return fmt.Sprintf("DefCpuPerGPU=%d", cpuPerGpu)
+}
+
+func preemptibleValue(enabled bool) interface{} {
+	if enabled {
+		return struct{}{}
+	}
+	return nil
 }

@@ -16,4 +16,5 @@ type testConfig struct {
 	O11yNamespace      string   `split_words:"true" default:"logs-system"`          // O11Y_NAMESPACE
 	OutputLogFile      string   `split_words:"true" default:"output.log"`           // OUTPUT_LOG_FILE
 	OutputErrFile      string   `split_words:"true" default:"output.err"`           // OUTPUT_ERR_FILE
+	PreemptiveNodes    bool     `split_words:"true" default:"false"`                // PREEMPTIVE_NODES
 }
