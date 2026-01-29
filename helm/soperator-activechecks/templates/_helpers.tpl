@@ -112,6 +112,7 @@ Render slurmJobSpec for an ActiveCheck.
 {{- $baseContainer := dict "appArmorProfile" "unconfined" "image" $ctx.Values.images.slurmJob "env" $ctx.Values.jobContainer.env "volumeMounts" $ctx.Values.jobContainer.volumeMounts "volumes" $ctx.Values.jobContainer.volumes -}}
 {{- $jobContainer := mustMerge (omit $jobContainerRaw "extraEnv" "extraVolumeMounts" "extraVolumes") $baseContainer -}}
 {{- $env := default (list) $jobContainer.env -}}
+{{- $workingDir := $jobContainer.workingDir -}}
 {{- with $jobContainerRaw.extraEnv }}{{- $env = concat $env . -}}{{- end }}
 {{- $volumeMounts := default (list) $jobContainer.volumeMounts -}}
 {{- with $jobContainerRaw.extraVolumeMounts }}{{- $volumeMounts = concat $volumeMounts . -}}{{- end }}
@@ -126,7 +127,9 @@ eachWorkerJobs: {{ $spec.eachWorkerJobs }}
 maxNumberOfJobs: {{ . }}
 {{- end }}
 jobContainer:
-  workingDir: {{ $jobContainer.workingDir | quote }}
+{{- if $workingDir }}
+  workingDir: {{ $workingDir | quote }}
+{{- end }}
   appArmorProfile: {{ $jobContainer.appArmorProfile }}
   image: {{ tpl $jobContainer.image $ctx | quote }}
 {{- with $jobContainer.command }}
@@ -186,7 +189,9 @@ Render k8sJobSpec for an ActiveCheck.
 {{- $args := $jobContainer.args -}}
 {{- $image := tpl (default $ctx.Values.images.k8sJob $jobContainer.image) $ctx }}
 jobContainer:
+{{- if $workingDir }}
   workingDir: {{ $workingDir | quote }}
+{{- end }}
   image: {{ $image | quote }}
 {{- with $jobContainer.appArmorProfile }}
   appArmorProfile: {{ . }}
