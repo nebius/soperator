@@ -127,7 +127,7 @@ eachWorkerJobs: {{ $spec.eachWorkerJobs }}
 maxNumberOfJobs: {{ . }}
 {{- end }}
 jobContainer:
-{{- if $env }}
+{{- if $workingDir }}
   workingDir: {{ $workingDir | quote }}
 {{- end }}
   appArmorProfile: {{ $jobContainer.appArmorProfile }}
