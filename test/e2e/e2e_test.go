@@ -3,9 +3,11 @@
 package e2e_test
 
 import (
+	"context"
+	"os/signal"
+	"syscall"
 	"testing"
 
-	"github.com/gruntwork-io/terratest/modules/terraform"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/stretchr/testify/require"
 )
@@ -18,21 +20,30 @@ func TestTerraformApply(t *testing.T) {
 	err := envconfig.Process("", &cfg)
 	require.NoError(t, err)
 
-	commonOptions := setupTerraformOptions(t, cfg)
+	runner := setupRunner(t, cfg)
 
 	ensureOutputFiles(t, cfg)
 
-	terraform.Init(t, &commonOptions)
-	terraform.WorkspaceSelectOrNew(t, &commonOptions, "e2e-test")
+	// Create context with signal handling for graceful shutdown
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	result, err := runner.Init(ctx)
+	writeOutputs(t, cfg, "TestTerraformApply", "init", result.Combined(), err)
+	require.NoError(t, err)
+
+	result, err = runner.WorkspaceSelectOrNew(ctx, "e2e-test")
+	writeOutputs(t, cfg, "TestTerraformApply", "workspace", result.Combined(), err)
+	require.NoError(t, err)
 
 	// Pre-test cleanup to ensure clean state
-	output, err := terraform.DestroyE(t, &commonOptions)
-	writeOutputs(t, cfg, "TestTerraformApply", "destroy", output, err)
+	result, err = runner.Destroy(ctx)
+	writeOutputs(t, cfg, "TestTerraformApply", "destroy", result.Combined(), err)
 	require.NoError(t, err)
 
 	// Apply terraform configuration
-	output, err = terraform.ApplyE(t, &commonOptions)
-	writeOutputs(t, cfg, "TestTerraformApply", "apply", output, err)
+	result, err = runner.Apply(ctx)
+	writeOutputs(t, cfg, "TestTerraformApply", "apply", result.Combined(), err)
 	require.NoError(t, err)
 
 	// Note: No defer destroy - cleanup is handled by TestTerraformDestroy
@@ -47,15 +58,24 @@ func TestTerraformDestroy(t *testing.T) {
 	err := envconfig.Process("", &cfg)
 	require.NoError(t, err)
 
-	commonOptions := setupTerraformOptions(t, cfg)
+	runner := setupRunner(t, cfg)
 
 	ensureOutputFiles(t, cfg)
 
-	terraform.Init(t, &commonOptions)
-	terraform.WorkspaceSelectOrNew(t, &commonOptions, "e2e-test")
+	// Create context with signal handling for graceful shutdown
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	result, err := runner.Init(ctx)
+	writeOutputs(t, cfg, "TestTerraformDestroy", "init", result.Combined(), err)
+	require.NoError(t, err)
+
+	result, err = runner.WorkspaceSelectOrNew(ctx, "e2e-test")
+	writeOutputs(t, cfg, "TestTerraformDestroy", "workspace", result.Combined(), err)
+	require.NoError(t, err)
 
 	// Destroy the infrastructure
-	output, err := terraform.DestroyE(t, &commonOptions)
-	writeOutputs(t, cfg, "TestTerraformDestroy", "destroy", output, err)
+	result, err = runner.Destroy(ctx)
+	writeOutputs(t, cfg, "TestTerraformDestroy", "destroy", result.Combined(), err)
 	require.NoError(t, err)
 }
