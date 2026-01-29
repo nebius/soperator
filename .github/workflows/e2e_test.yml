@@ -48,6 +48,7 @@ jobs:
       WORKER_PLATFORM: ${{ vars.E2E_TEST_WORKER_PLATFORM }}
       WORKER_PRESET: ${{ vars.E2E_TEST_WORKER_PRESET }}
       INFINIBAND_FABRIC: ${{ vars.E2E_TEST_INFINIBAND_FABRIC }}
+      PREEMPTIVE_NODES: ${{ vars.E2E_TEST_PREEMPTIVE_NODES }}
       SSH_KEYS: ${{ vars.E2E_TEST_SSH_KEYS }}
       O11Y_ACCESS_TOKEN: ${{ secrets.E2E_O11Y_ACCESS_TOKEN }}
       OUTPUT_LOG_FILE: "${{ github.workspace }}/output/output.log"
