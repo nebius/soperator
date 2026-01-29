@@ -1,9 +1,10 @@
 name: "Auto merge back to main"
 
-on:
-  push:
-    branches:
-      - 'soperator-release-*'
+# Disabled for this branch - merge-back not needed for 1.23
+# on: {}
+#   push:
+#     branches:
+#       - 'soperator-release-*'
 
 jobs:
   create-merge-back-pr:
