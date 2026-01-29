@@ -1,7 +1,9 @@
 ---
 
 - name: Install/Upgrade nc-health-checker
-  hosts: localhost
+  hosts:
+    - all
+    - localhost
   become: true
   gather_facts: true
   gather_subset:
