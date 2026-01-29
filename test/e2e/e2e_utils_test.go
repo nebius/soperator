@@ -10,12 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gruntwork-io/terratest/modules/terraform"
 	"github.com/stretchr/testify/require"
+
+	"nebius.ai/slurm-operator/test/e2e/tfrunner"
 )
 
-// setupTerraformOptions creates common terraform options for e2e tests
-func setupTerraformOptions(t *testing.T, cfg testConfig) terraform.Options {
+// setupRunner creates a terraform runner configured for e2e tests.
+func setupRunner(t *testing.T, cfg testConfig) *tfrunner.Runner {
 	tfVars := readTFVars(t, fmt.Sprintf("%s/terraform.tfvars", cfg.PathToInstallation))
 	tfVars = overrideTestValues(t, tfVars, cfg)
 
@@ -27,19 +28,26 @@ func setupTerraformOptions(t *testing.T, cfg testConfig) terraform.Options {
 		envVars[pair[0]] = pair[1]
 	}
 
-	return terraform.Options{
+	opts := &tfrunner.Options{
 		TerraformDir: cfg.PathToInstallation,
 		Vars:         tfVars,
 		EnvVars:      envVars,
-		RetryableTerraformErrors: map[string]string{
+		RetryableErrors: map[string]string{
 			"(?m)^.*context deadline exceeded.*$":  "retry on context deadline exceeded",
-			"(?m)^.*connection reset by peer.*$":   "retry on conn reset by peer",
+			"(?m)^.*connection reset by peer.*$":   "retry on connection reset by peer",
 			"(?m)^.*etcdserver: leader changed.*$": "retry on leader changed",
 			"(?m)^.*resource deletion failed.*$":   "retry on allocation delete",
 		},
-		NoColor:    true,
-		MaxRetries: 5,
+		NoColor:                 true,
+		MaxRetries:              5,
+		TimeBetweenRetries:      10 * time.Second,
+		GracefulShutdownTimeout: 120 * time.Second,
 	}
+
+	runner, err := tfrunner.NewRunner(opts, t)
+	require.NoError(t, err)
+
+	return runner
 }
 
 func ensureOutputFiles(t *testing.T, cfg testConfig) {
@@ -69,13 +77,13 @@ func writeOutput(t *testing.T, filename, testPhase, command, data string) {
 	defer f.Close()
 
 	// Write phase header with timestamp
-	_, err = f.WriteString(fmt.Sprintf("========================================\n"))
+	_, err = f.WriteString("========================================\n")
 	require.NoError(t, err)
 	_, err = f.WriteString(fmt.Sprintf("Test Phase: %s\n", testPhase))
 	require.NoError(t, err)
 	_, err = f.WriteString(fmt.Sprintf("Timestamp: %s\n", time.Now().Format("2006-01-02 15:04:05 MST")))
 	require.NoError(t, err)
-	_, err = f.WriteString(fmt.Sprintf("========================================\n\n"))
+	_, err = f.WriteString("========================================\n\n")
 	require.NoError(t, err)
 
 	_, err = f.WriteString(fmt.Sprintf("Executing %s\n\n", command))
