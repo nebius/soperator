@@ -71,6 +71,15 @@ jobs:
           make install-e2e-tools
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
+      - name: Install Nebius CLI
+        shell: bash
+        env:
+          NEBIUS_CLI_VERSION: "0.12.164"
+          NEBIUS_INSTALL_FOLDER: "${{ github.workspace }}/bin"
+        run: |
+          echo "Installing Nebius CLI ${NEBIUS_CLI_VERSION}..."
+          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+
       - name: Install AWS CLI v2
         run: |
           if command -v aws >/dev/null 2>&1; then
