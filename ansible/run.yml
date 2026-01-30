@@ -4,6 +4,16 @@
   hosts:
     - all
     - localhost
+  vars:
+    cuda_version: "{{ lookup('env','CUDA_VERSION') }}"
+    cuda_samples_cuda_version: "{{ cuda_version }}"
+    nccl_tests_cuda_version: "{{ cuda_version }}"
+    nccl_tests_version: "{{ lookup('env','NCCL_TESTS_VERSION') }}" # https://github.com/nebius/ml-containers/blob/main/ansible/roles/nccl-tests/defaults/main.yml#L3
+    perftest_cuda_version: "{{ cuda_version }}"
+
+    ansible_connection: community.general.chroot
+    ansible_host: /mnt/jail
+    ansible_python_interpreter: /usr/bin/python3
   become: true
   gather_facts: true
   gather_subset:
@@ -12,6 +22,11 @@
     - repos
     - python
     - common-packages
+    - cuda
+    - cuda-samples
+    - nccl-tests
+    - dcgmi
+    - perftest
     - nvtop
     - docker-cli
     - openmpi
@@ -26,18 +41,3 @@
     - nc-health-checker
   tags:
     - run-all-upgrade
-
-- name: Install Cuda
-  hosts:
-    - all
-    - localhost
-  become: true
-  gather_facts: true
-  gather_subset:
-    - min
-  roles:
-    - common-packages
-    - cuda
-    - nccl-tests
-  tags:
-    - upgrade-cuda

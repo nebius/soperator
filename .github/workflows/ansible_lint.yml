@@ -39,4 +39,4 @@ jobs:
 
       - name: Run ansible-lint
         run: |
-          ansible-lint ansible/*.yml
+          ansible-lint ansible

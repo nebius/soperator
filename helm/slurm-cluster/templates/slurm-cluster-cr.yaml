@@ -106,8 +106,7 @@ spec:
   {{- if and .Values.images.populateJail (ne .Values.images.populateJail "") -}}
   {{- $populateJail = .Values.images.populateJail -}}
   {{- else -}}
-  {{- $cudaMajorVersion := default 12 .Values.cudaMajorVersion -}}
-  {{- $cudaVersion := required "populateJail cuda version for the selected major version must be provided." (index .Values.images.populateJailCudaVersions (printf "%v" $cudaMajorVersion)) -}}
+  {{- $cudaVersion := default "12.9.0" .Values.cudaVersion -}}
   {{- $populateJailRepo := required "populateJail repository must be provided." .Values.images.populateJailRepository -}}
   {{- $populateJailTag := required "populateJail tag must be provided." .Values.images.populateJailTag -}}
   {{- $populateJail = printf "%s:%s-cuda%s" $populateJailRepo $populateJailTag $cudaVersion -}}

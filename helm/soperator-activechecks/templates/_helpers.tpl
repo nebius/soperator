@@ -65,8 +65,8 @@ Resolve active check image when not explicitly set.
 */}}
 {{- define "activecheck.image.resolve" -}}
 {{- if not .Values.activeCheckImage -}}
-{{- $cudaMajorVersion := default 12 .Values.cudaMajorVersion -}}
-{{- $tag := required "activeCheck image tag for the selected CUDA major version must be provided." (index .Values.images.activeCheckImageTags (printf "%v" $cudaMajorVersion)) -}}
+{{- $cudaVersion := default "12.9.0" .Values.cudaVersion -}}
+{{- $tag := required "activeCheck image tag for the selected CUDA version must be provided." (index .Values.images.activeCheckImageTags (printf "%v" $cudaVersion)) -}}
 {{- $repo := required "activeCheck image repository must be provided." .Values.images.activeCheckImageRepository -}}
 {{- $_ := set .Values "activeCheckImage" (printf "%s:%s" $repo $tag) -}}
 {{- end -}}
@@ -112,7 +112,7 @@ Render slurmJobSpec for an ActiveCheck.
 {{- $baseContainer := dict "appArmorProfile" "unconfined" "image" $ctx.Values.images.slurmJob "env" $ctx.Values.jobContainer.env "volumeMounts" $ctx.Values.jobContainer.volumeMounts "volumes" $ctx.Values.jobContainer.volumes -}}
 {{- $jobContainer := mustMerge (omit $jobContainerRaw "extraEnv" "extraVolumeMounts" "extraVolumes") $baseContainer -}}
 {{- $env := default (list) $jobContainer.env -}}
-{{- $workingDir := $jobContainer.workingDir -}}
+{{- $workingDir := default "" $jobContainer.workingDir -}}
 {{- with $jobContainerRaw.extraEnv }}{{- $env = concat $env . -}}{{- end }}
 {{- $volumeMounts := default (list) $jobContainer.volumeMounts -}}
 {{- with $jobContainerRaw.extraVolumeMounts }}{{- $volumeMounts = concat $volumeMounts . -}}{{- end }}
@@ -171,7 +171,12 @@ Render k8sJobSpec for an ActiveCheck.
 {{- if $includeCommonEnv }}{{- $_ := set $baseContainer "env" $ctx.Values.jobContainer.env -}}{{- end }}
 {{- $jobContainer := mustMerge (omit $jobContainerRaw "extraEnv" "extraVolumeMounts" "extraVolumes") $baseContainer -}}
 {{- $env := default (list) $jobContainer.env -}}
+{{- $workingDir := default "" $jobContainer.workingDir -}}
 {{- with $jobContainerRaw.extraEnv }}{{- $env = concat $env . -}}{{- end }}
+{{- if eq $workingDir "/opt/ansible" -}}
+  {{- with $ctx.Values.cudaVersion }}{{ $env = concat $env (list (dict "name" "CUDA_VERSION" "value" (printf "%v" .))) -}}{{- end }}
+  {{- with $ctx.Values.ncclTestsVersion }}{{ $env = concat $env (list (dict "name" "NCCL_TESTS_VERSION" "value" (printf "%v" .))) -}}{{- end }}
+{{- end -}}
 {{- $volumeMounts := default (list) $jobContainer.volumeMounts -}}
 {{- with $jobContainerRaw.extraVolumeMounts }}{{- $volumeMounts = concat $volumeMounts . -}}{{- end }}
 {{- $volumes := list -}}
@@ -185,7 +190,6 @@ Render k8sJobSpec for an ActiveCheck.
 {{- if and (not $command) $spec.pythonScriptFile }}
 {{- $command = list "bash" "-c" (printf "python3 - <<'PY'\n%s\nPY" (include "soperator-activechecks.renderScript" (dict "path" $spec.pythonScriptFile "ctx" $ctx))) -}}
 {{- end }}
-{{- $workingDir := $jobContainer.workingDir -}}
 {{- $args := $jobContainer.args -}}
 {{- $image := tpl (default $ctx.Values.images.k8sJob $jobContainer.image) $ctx }}
 jobContainer:
