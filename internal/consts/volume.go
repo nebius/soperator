@@ -81,3 +81,12 @@ const (
 	VolumeMountPathSlurmdbdSSLCACertificate = "/mnt/" + slurmdbdSSLCACertificate
 	VolumeMountPathSlurmdbdSSLClientKey     = "/mnt/" + slurmdbdSSLClientKey
 )
+
+// Ephemeral topology volumes
+const (
+	VolumeNameTopologyNodeLabels      = "topology-node-labels"
+	VolumeNameTopologyEnv             = "topology-env"
+	VolumeMountPathTopologyNodeLabels = "/etc/slurm/topology-node-labels"
+	VolumeMountPathTopologyEnv        = "/tmp/topology"
+	TopologyEnvFilePath               = "/tmp/topology/slurm_topology.env"
+)

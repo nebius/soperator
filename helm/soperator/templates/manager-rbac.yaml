@@ -55,6 +55,7 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - resourcedistributions
   - statefulsets
   verbs:
   - create
