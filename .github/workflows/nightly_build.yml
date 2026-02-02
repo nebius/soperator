@@ -25,8 +25,8 @@ jobs:
           echo "Triggering nightly multi-arch build on main"
           gh workflow run one_job.yml --ref main -f multi_arch=true
 
-          # Build all release branches from config
-          for branch in $(yq -r '.release_branches[]' .github/branch-config.yaml); do
+          # Build all nightly release branches from config
+          for branch in $(yq -r '.nightly_release_branches[]' .github/branch-config.yaml); do
             echo "Triggering nightly multi-arch build on ${branch}"
             gh workflow run one_job.yml --ref "${branch}" -f multi_arch=true
           done
