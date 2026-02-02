@@ -285,3 +285,71 @@ tests:
       - equal:
           path: spec.workerAnnotations["prometheus.io/port"]
           value: "9090"
+
+  - it: should configure gresConfig correctly for GPU workers
+    set:
+      nodesets:
+        - name: gpu-workers
+          replicas: 3
+          nodeConfig:
+            features:
+              - "gpu"
+              - "cuda"
+            static: "Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=1"
+            dynamic: "InstanceId={{ .PodName }}"
+            gresConfig:
+              - "AutoDetect=off Name=gpu Type=nvidia_h200 File=/dev/nvidia[0-3] Cores=32-63"
+              - "AutoDetect=off Name=gpu Type=nvidia_h200 File=/dev/nvidia[4-7] Cores=0-31"
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "4"
+              memory: "8Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+        - name: cpu-workers
+          replicas: 5
+          nodeConfig:
+            features:
+              - "cpu"
+            static: "Boards=1 SocketsPerBoard=1 CoresPerSocket=4 ThreadsPerCore=1"
+            dynamic: "InstanceId={{ .PodName }}"
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    documentIndex: 0
+    asserts:
+      - exists:
+          path: spec.nodeConfig.gresConfig
+      - contains:
+          path: spec.nodeConfig.gresConfig
+          content: "AutoDetect=off Name=gpu Type=nvidia_h200 File=/dev/nvidia[0-3] Cores=32-63"
+      - contains:
+          path: spec.nodeConfig.gresConfig
+          content: "AutoDetect=off Name=gpu Type=nvidia_h200 File=/dev/nvidia[4-7] Cores=0-31"

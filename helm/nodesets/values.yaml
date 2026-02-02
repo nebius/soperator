@@ -73,6 +73,10 @@ nodesets:
       # Dynamic string to be added to the Node's configuration
       # Optional
       dynamic: "InstanceId={{ .PodName }}"
+      # GRESConfig strings to be added to the Node's configuration
+      # Optional, defaults to empty list
+      gresConfig:
+        - "AutoDetect=nvidia"
     # Slurmd configuration
     slurmd:
       # Each particular NodeSet's containers can have images other than default ones
