@@ -10,16 +10,17 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
-	check "nebius.ai/slurm-operator/internal/check"
-	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/controller/reconciler"
-	"nebius.ai/slurm-operator/internal/controllerconfig"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	check "nebius.ai/slurm-operator/internal/check"
+	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/controller/reconciler"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
 )
 
 var (
@@ -248,20 +249,15 @@ func (c *K8SNodesController) processRebootCondition(ctx context.Context, k8sNode
 			return nil
 		}
 
-		if rebootCondition.Status == corev1.ConditionTrue && degradedCondition.Status == corev1.ConditionTrue &&
-			rebootCondition.LastTransitionTime.Time.After(degradedCondition.LastTransitionTime.Time) {
-
-			logger.Info("no action needed: k8s node already was rebooted")
-			return nil
+		if rebootCondition.LastTransitionTime.Time.Before(degradedCondition.LastTransitionTime.Time) {
+			logger.Info("setting SlurmNodeReboot: true")
+			return setK8SNodeCondition(ctx, c.Client, k8sNode.Name, newNodeCondition(
+				consts.SlurmNodeReboot,
+				corev1.ConditionTrue,
+				consts.ReasonNodeNeedReboot,
+				consts.MessageSlurmNodeDegraded,
+			))
 		}
-
-		logger.Info("setting SlurmNodeReboot: true")
-		return setK8SNodeCondition(ctx, c.Client, k8sNode.Name, newNodeCondition(
-			consts.SlurmNodeReboot,
-			corev1.ConditionTrue,
-			consts.ReasonNodeNeedReboot,
-			consts.MessageSlurmNodeDegraded,
-		))
 	}
 	if rebootCondition.Reason != string(consts.ReasonNodeRebooted) {
 		logger.Info("no action needed: still rebooting")
