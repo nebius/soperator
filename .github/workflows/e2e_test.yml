@@ -51,8 +51,6 @@ jobs:
       PREEMPTIBLE_NODES: ${{ vars.E2E_TEST_PREEMPTIBLE_NODES }}
       SSH_KEYS: ${{ vars.E2E_TEST_SSH_KEYS }}
       O11Y_ACCESS_TOKEN: ${{ secrets.E2E_O11Y_ACCESS_TOKEN }}
-      OUTPUT_LOG_FILE: "${{ github.workspace }}/output/output.log"
-      OUTPUT_ERR_FILE: "${{ github.workspace }}/output/output.err"
 
     steps:
       - name: Checkout repository
@@ -70,6 +68,15 @@ jobs:
         run: |
           make install-e2e-tools
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+
+      - name: Install Nebius CLI
+        shell: bash
+        env:
+          NEBIUS_CLI_VERSION: "0.12.164"
+          NEBIUS_INSTALL_FOLDER: "${{ github.workspace }}/bin"
+        run: |
+          echo "Installing Nebius CLI ${NEBIUS_CLI_VERSION}..."
+          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
 
       - name: Install AWS CLI v2
         run: |
@@ -404,14 +411,3 @@ jobs:
               echo "- [$hash]($terraform_repo_url/commit/$hash): $msg ($date) <$author>"
             done
           } >> $GITHUB_STEP_SUMMARY
-
-      - name: Add errors output to job summary
-        if: ${{ always() }}
-        run: cat $OUTPUT_ERR_FILE >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload terraform output
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v6
-        with:
-          name: terraform-output
-          path: "${{ github.workspace }}/output"
