@@ -72,9 +72,8 @@ func (e *PodNotEvictableError) Error() string {
 }
 
 type NodeActions struct {
-	Reboot  bool
-	Drain   bool
-	Undrain bool
+	Reboot bool
+	Drain  bool
 }
 
 func (r *RebooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -100,11 +99,6 @@ func (r *RebooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	logger.V(1).Info("Starting handling node reboot")
 	if err := r.handleNodeReboot(ctx, node, nodeActions); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	logger.V(1).Info("Starting handling node undrain")
-	if err := r.handleNodeUnDrain(ctx, node, nodeActions); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -138,12 +132,20 @@ func (r *RebooterReconciler) GetActions(ctx context.Context, node *corev1.Node) 
 	if nodeRebootCondition != nil {
 		if !r.IsUptimeGreaterThanLastTransition(ctx, nodeRebootCondition.LastTransitionTime) {
 			logger.Info("Node does not need to be rebooted")
+
+			// If node just has been rebooted, it's still has NoExecute taint, so we should undrain it.
+			logger.Info("Checking if node needs to be undrained")
+			if r.checkIfNodeNeedsReboot(ctx, nodeRebootCondition) {
+				if err := r.handleNodeUnDrain(ctx, node); err != nil {
+					return NodeActions{}, err
+				}
+			}
+
 			err := r.setNodeCondition(ctx, node, consts.SlurmNodeReboot, corev1.ConditionTrue, consts.ReasonNodeRebooted, consts.MessageRebooted)
 			if err != nil {
 				return NodeActions{}, fmt.Errorf("set node condition: %w", err)
 			}
-		}
-		if r.checkIfNodeNeedsReboot(ctx, nodeRebootCondition) {
+		} else if r.checkIfNodeNeedsReboot(ctx, nodeRebootCondition) {
 			logger.V(1).Info("Node needs reboot")
 			// If the node needs to be rebooted, it also needs to be drained.
 			actions.Drain = true
@@ -151,10 +153,6 @@ func (r *RebooterReconciler) GetActions(ctx context.Context, node *corev1.Node) 
 		}
 	}
 
-	logger.Info("Checking if node needs to be undrained")
-	if !actions.Drain && !actions.Reboot {
-		actions.Undrain = true
-	}
 	return actions, nil
 }
 
@@ -186,15 +184,13 @@ func (r *RebooterReconciler) handleDrainError(ctx context.Context, err error) (c
 }
 
 // handleNodeUnDrain undrains the node with the given name if needed.
-func (r *RebooterReconciler) handleNodeUnDrain(ctx context.Context, node *corev1.Node, nodeActions NodeActions) error {
-	if nodeActions.Undrain {
-		if err := r.UndrainNodeIfNeeded(ctx, node); err != nil {
-			log.FromContext(ctx).V(1).Info("Failed to undrain node", "error", err)
-			return err
-		}
-		if err := r.setNodeCondition(ctx, node, consts.SlurmNodeDrain, corev1.ConditionFalse, consts.ReasonNodeUndrained, consts.MessageUndrained); err != nil {
-			return err
-		}
+func (r *RebooterReconciler) handleNodeUnDrain(ctx context.Context, node *corev1.Node) error {
+	if err := r.UndrainNodeIfNeeded(ctx, node); err != nil {
+		log.FromContext(ctx).V(1).Info("Failed to undrain node", "error", err)
+		return err
+	}
+	if err := r.setNodeCondition(ctx, node, consts.SlurmNodeDrain, corev1.ConditionFalse, consts.ReasonNodeUndrained, consts.MessageUndrained); err != nil {
+		return err
 	}
 	return nil
 }
