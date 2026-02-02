@@ -14,7 +14,5 @@ type testConfig struct {
 	O11yAccessToken    string   `split_words:"true" required:"true"`                // O11Y_ACCESS_TOKEN
 	O11ySecretName     string   `split_words:"true" default:"o11y-writer-sa-token"` // O11Y_SECRET_NAME
 	O11yNamespace      string   `split_words:"true" default:"logs-system"`          // O11Y_NAMESPACE
-	OutputLogFile      string   `split_words:"true" default:"output.log"`           // OUTPUT_LOG_FILE
-	OutputErrFile      string   `split_words:"true" default:"output.err"`           // OUTPUT_ERR_FILE
 	PreemptibleNodes   bool     `split_words:"true" default:"false"`                // PREEMPTIBLE_NODES
 }
