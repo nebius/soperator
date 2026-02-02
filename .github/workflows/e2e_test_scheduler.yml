@@ -24,7 +24,7 @@ jobs:
         id: select_params
         shell: bash
         run: |
-          readarray -t RELEASE_BRANCHES < <(yq -r '.release_branches[]' .github/branch-config.yaml)
+          readarray -t RELEASE_BRANCHES < <(yq -r '.e2e_release_branches[]' .github/branch-config.yaml)
           BRANCHES=("main" "${RELEASE_BRANCHES[@]}")
           BRANCH_COUNT=${#BRANCHES[@]}
 

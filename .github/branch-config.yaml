@@ -1,5 +1,11 @@
 # Branch configuration for E2E tests and nightly builds.
 # "main" is always included automatically (not listed here)
-release_branches:
+
+# Release branches for nightly multi-arch builds
+nightly_release_branches:
+  - soperator-release-2.0
+
+# Release branches for E2E tests
+e2e_release_branches:
   - soperator-release-2.0
   - soperator-release-1.23
