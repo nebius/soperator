@@ -52,7 +52,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 							return fmt.Errorf("getting REST JWT Key Secret: %w", getErr)
 						}
 
-						renderedDesired, err := rest.RenderSecret(clusterValues.Name, clusterValues.Namespace)
+						renderedDesired, err := rest.RenderSecret(clusterValues.Namespace, clusterValues.Name)
 						if err != nil {
 							return fmt.Errorf("rendering REST JWT secret key: %w", err)
 						}
