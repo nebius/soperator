@@ -356,6 +356,10 @@ type NodeConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=""
 	Dynamic string `json:"dynamic,omitempty"`
+
+	// GRESConfig provides a possibility to define node-scoped settings in gres.conf.
+	// Multiple lines can be passed. Each line will be prefixed with NodeName=<node-names-from-the-nodeset>.
+	GRESConfig []string `json:"gresConfig,omitempty"`
 }
 
 // GPUSpec defines the settings related to GPU support

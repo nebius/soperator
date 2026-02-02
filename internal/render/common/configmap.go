@@ -40,7 +40,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) corev1.ConfigMap 
 			consts.ConfigMapKeyCustomSlurmConfig: generateCustomSlurmConfig(cluster).Render(),
 			consts.ConfigMapKeyCGroupConfig:      generateCGroupConfig(cluster).Render(),
 			consts.ConfigMapKeySpankConfig:       generateSpankConfig(cluster).Render(),
-			consts.ConfigMapKeyGresConfig:        generateGresConfig(cluster.ClusterType).Render(),
+			consts.ConfigMapKeyGresConfig:        generateGresConfig(cluster).Render(),
 			consts.ConfigMapKeyMPIConfig:         generateMPIConfig(cluster).Render(),
 		},
 	}
@@ -114,8 +114,8 @@ func AddNodeSetFeaturesToSlurmConfig(res *renderutils.PropertiesConfig, cluster 
 // AddNodesToSlurmConfig adds all node names to the slurm config
 //
 // Example output:
-// NodeName=gb200-0-0 NodeHostname=gb200-0-0 NodeAddr=gb200-0-0.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
-// NodeName=gb200-0-1 NodeHostname=gb200-0-1 NodeAddr=gb200-0-1.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
+// NodeName=gb200-0-0 State=CLOUD NodeHostname=gb200-0-0 NodeAddr=gb200-0-0.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
+// NodeName=gb200-0-1 State=CLOUD NodeHostname=gb200-0-1 NodeAddr=gb200-0-1.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
 func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
 	res.AddComment("Nodes section")
 
@@ -125,6 +125,7 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 	}
 
 	const nodeFeatureKey = "Feature="
+	const stateKey = "State="
 
 	for _, nodeSet := range cluster.NodeSets {
 		if nodeSet.Spec.Replicas == 0 {
@@ -159,24 +160,28 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 				nodeConfig = fmt.Sprintf("%s %s%s", nodeConfig, nodeFeatureKey, features)
 			}
 
-			// Remove feature overrides
+			// Remove feature and state overrides
 			staticConfig := strings.Join(
 				slices.Filter(
 					nil,
 					strings.Split(nodeSet.Spec.NodeConfig.Static, " "),
 					func(s string) bool {
-						return !strings.HasPrefix(s, nodeFeatureKey)
+						return !strings.HasPrefix(s, nodeFeatureKey) &&
+							!strings.HasPrefix(s, stateKey)
 					},
 				),
 				" ",
 			)
+
 			if len(nodeConfig) > 0 {
 				nodeConfig = fmt.Sprintf("%s %s", nodeConfig, staticConfig)
 			}
 
+			// Create static nodes with state CLOUD.
+			// Otherwise, nodes will disappear from the Slurm state every time the corresponding K8s pods don't run.
 			res.AddProperty(
 				"NodeName",
-				fmt.Sprintf("%s %s", nodeName, nodeConfig),
+				fmt.Sprintf("%s State=CLOUD %s", nodeName, nodeConfig),
 			)
 		}
 	}
@@ -207,6 +212,41 @@ func AddPartitionsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *valu
 		}
 	}
 
+}
+
+// AddNodesToGresConfig adds node-scoped settings to the slurm config
+// Only relevant when nodesets are used (structured partition configuration).
+//
+// Example output:
+// NodeName=worker-h200-[0-7] <cluster.NodeSets[0].Spec.NodeConfig.GRESConfig[0]>
+// NodeName=worker-h200-[0-7] <cluster.NodeSets[0].Spec.NodeConfig.GRESConfig[1]>
+// NodeName=worker-b300-[0-4] <cluster.NodeSets[1].Spec.NodeConfig.GRESConfig[0]>
+func AddNodesToGresConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
+	res.AddComment("Nodes section")
+
+	if len(cluster.NodeSets) == 0 {
+		res.AddComment("WARNING: No nodesets defined in structured configuration!")
+		return
+	}
+
+	for _, nodeSet := range cluster.NodeSets {
+		if nodeSet.Spec.Replicas == 0 {
+			res.AddComment(fmt.Sprintf("WARNING: NodeSet %s has 0 replicas, skipping", nodeSet.Name))
+			continue
+		}
+
+		res.AddComment(fmt.Sprintf("NodeSet %s:", nodeSet.Name))
+		nodePrefix := nodeSet.Name
+		nodeMaxIdx := nodeSet.Spec.Replicas - 1
+		gresLines := nodeSet.Spec.NodeConfig.GRESConfig
+		if len(gresLines) == 0 {
+			res.AddComment("No custom configuration provided")
+			continue
+		}
+		for _, gresLine := range gresLines {
+			res.AddProperty("NodeName", fmt.Sprintf("%s-[0-%d] %s", nodePrefix, nodeMaxIdx, gresLine))
+		}
+	}
 }
 
 func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
@@ -260,7 +300,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddProperty("PropagateResourceLimits", "NONE") // Don't propagate ulimits from the login node by default
 	res.AddComment("")
-	res.AddProperty("SchedulerParameters", "nohold_on_prolog_fail,extra_constraints")
+	res.AddProperty("SchedulerParameters", "nohold_on_prolog_fail,extra_constraints,pack_serial_at_end")
 	res.AddComment("")
 	res.AddComment("HEALTH CHECKS")
 	res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
@@ -541,11 +581,14 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	return res
 }
 
-func generateGresConfig(clusterType consts.ClusterType) renderutils.ConfigFile {
+func generateGresConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
 	res.AddComment("Gres config")
-	if clusterType == consts.ClusterTypeGPU {
-		res.AddProperty("AutoDetect", "nvml")
+	if cluster.ClusterType == consts.ClusterTypeGPU {
+		res.AddProperty("AutoDetect", "nvidia")
+	}
+	if cluster.PartitionConfiguration.ConfigType == slurmv1.PartitionConfigTypeStructured {
+		AddNodesToGresConfig(res, cluster)
 	}
 	return res
 }

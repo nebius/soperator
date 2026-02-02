@@ -51,6 +51,11 @@ spec:
     {{- with .dynamic }}
     dynamic: {{ . | quote }}
     {{- end }}
+
+    {{- with .gresConfig }}
+    gresConfig:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
   {{- end }}
 
   {{- with (required ".Values.nodesets[*].slurmd is required." .slurmd) }}

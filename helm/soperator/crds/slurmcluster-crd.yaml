@@ -17508,6 +17508,13 @@ spec:
                     items:
                       type: string
                     type: array
+                  gresConfig:
+                    description: |-
+                      GRESConfig provides a possibility to define node-scoped settings in gres.conf.
+                      Multiple lines can be passed. Each line will be prefixed with NodeName=<node-names-from-the-nodeset>.
+                    items:
+                      type: string
+                    type: array
                   static:
                     default: ""
                     description: |-
