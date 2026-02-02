@@ -114,8 +114,8 @@ func AddNodeSetFeaturesToSlurmConfig(res *renderutils.PropertiesConfig, cluster 
 // AddNodesToSlurmConfig adds all node names to the slurm config
 //
 // Example output:
-// NodeName=gb200-0-0 NodeHostname=gb200-0-0 NodeAddr=gb200-0-0.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
-// NodeName=gb200-0-1 NodeHostname=gb200-0-1 NodeAddr=gb200-0-1.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
+// NodeName=gb200-0-0 State=CLOUD NodeHostname=gb200-0-0 NodeAddr=gb200-0-0.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
+// NodeName=gb200-0-1 State=CLOUD NodeHostname=gb200-0-1 NodeAddr=gb200-0-1.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
 func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
 	res.AddComment("Nodes section")
 
@@ -125,6 +125,7 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 	}
 
 	const nodeFeatureKey = "Feature="
+	const stateKey = "State="
 
 	for _, nodeSet := range cluster.NodeSets {
 		if nodeSet.Spec.Replicas == 0 {
@@ -159,24 +160,28 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 				nodeConfig = fmt.Sprintf("%s %s%s", nodeConfig, nodeFeatureKey, features)
 			}
 
-			// Remove feature overrides
+			// Remove feature and state overrides
 			staticConfig := strings.Join(
 				slices.Filter(
 					nil,
 					strings.Split(nodeSet.Spec.NodeConfig.Static, " "),
 					func(s string) bool {
-						return !strings.HasPrefix(s, nodeFeatureKey)
+						return !strings.HasPrefix(s, nodeFeatureKey) &&
+							!strings.HasPrefix(s, stateKey)
 					},
 				),
 				" ",
 			)
+
 			if len(nodeConfig) > 0 {
 				nodeConfig = fmt.Sprintf("%s %s", nodeConfig, staticConfig)
 			}
 
+			// Create static nodes with state CLOUD.
+			// Otherwise, nodes will disappear from the Slurm state every time the corresponding K8s pods don't run.
 			res.AddProperty(
 				"NodeName",
-				fmt.Sprintf("%s %s", nodeName, nodeConfig),
+				fmt.Sprintf("%s State=CLOUD %s", nodeName, nodeConfig),
 			)
 		}
 	}
