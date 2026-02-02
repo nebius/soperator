@@ -31,14 +31,7 @@ func setupTerraformOptions(t *testing.T, cfg testConfig) terraform.Options {
 		TerraformDir: cfg.PathToInstallation,
 		Vars:         tfVars,
 		EnvVars:      envVars,
-		RetryableTerraformErrors: map[string]string{
-			"(?m)^.*context deadline exceeded.*$":  "retry on context deadline exceeded",
-			"(?m)^.*connection reset by peer.*$":   "retry on conn reset by peer",
-			"(?m)^.*etcdserver: leader changed.*$": "retry on leader changed",
-			"(?m)^.*resource deletion failed.*$":   "retry on allocation delete",
-		},
-		NoColor:    true,
-		MaxRetries: 5,
+		NoColor:      true,
 	}
 }
 
