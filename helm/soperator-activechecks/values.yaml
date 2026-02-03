@@ -1,5 +1,5 @@
 slurmClusterRefName: "soperator"
-# CUDA version used for active check image selection and f or managing jail state
+# CUDA version used for active check image selection and for managing jail state
 cudaVersion: 12.9.0
 ncclTestsVersion: 2.16.4
 jobContainer:
