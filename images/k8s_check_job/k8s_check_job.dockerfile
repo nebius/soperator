@@ -1,10 +1,11 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-# https://github.com/nebius/ml-containers/pull/43
-FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260123155209 AS k8s_check_job
+# https://github.com/nebius/ml-containers/pull/53
+FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260202145316 AS k8s_check_job
 
 # Install common packages
-RUN apt install --update -y \
+RUN apt update && \
+    apt install -y \
         openssh-client \
         retry && \
     apt-get clean && \
@@ -17,9 +18,6 @@ RUN ARCH="$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')" && \
     curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" && \
     install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
     rm kubectl
-
-# Copy all Ansible playbooks
-COPY ansible/ /opt/ansible/
 
 # Copy the entrypoint script
 COPY images/k8s_check_job/k8s_check_job_entrypoint.sh /opt/bin/

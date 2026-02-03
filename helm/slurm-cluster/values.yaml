@@ -13,8 +13,8 @@ useDefaultAppArmorProfile: false
 maintenance: "none"
 # Slurm cluster type. Can be now gpu or cpu
 clusterType: gpu
-# CUDA major version used for populate-jail image selection.
-cudaMajorVersion: 12
+# CUDA version used for populate-jail image selection.
+cudaVersion: 12.9.0
 # partitionConfiguration define partition configuration of slurm worker nodes
 # https://slurm.schedmd.com/slurm.conf.html#SECTION_PARTITION-CONFIGURATION
 partitionConfiguration:
@@ -566,9 +566,6 @@ images:
   populateJail: ""
   populateJailRepository: "cr.eu-north1.nebius.cloud/soperator/populate_jail"
   populateJailTag: "2.0.0-noble-slurm25.05.5"
-  populateJailCudaVersions:
-    "12": "12.9.0"
-    "13": "13.0.2"
   slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:2.0.0-noble-slurm25.05.5"
   soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:2.0.0-noble-slurm25.05.5"
   sConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:2.0.0"

@@ -45,8 +45,6 @@ VERSION_BASE		= $(shell cat VERSION)
 NFS_VERSION	= $(NFS_VERSION_BASE)
 VERSION		= $(VERSION_BASE)
 
-CUDA12_VERSION              ?= 12.9.0
-CUDA13_VERSION              ?= 13.0.2
 CUDA_VERSION                ?= 12.9.0
 
 IMAGE_VERSION			= $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)
@@ -301,8 +299,6 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.munge = \"$(IMAGE_REPO)/munge:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.populateJailRepository = \"$(IMAGE_REPO)/populate_jail\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.populateJailTag = \"$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
-	@$(YQ) -i ".images.populateJailCudaVersions.\"12\" = \"$(CUDA12_VERSION)\"" "helm/slurm-cluster/values.yaml"
-	@$(YQ) -i ".images.populateJailCudaVersions.\"13\" = \"$(CUDA13_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.soperatorExporter = \"$(IMAGE_REPO)/soperator-exporter:$(IMAGE_VERSION)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.sConfigController = \"$(IMAGE_REPO)/sconfigcontroller:$(OPERATOR_IMAGE_TAG)\"" "helm/slurm-cluster/values.yaml"
 	@$(YQ) -i ".images.mariaDB = \"docker-registry1.mariadb.com/library/mariadb:12.1.2\"" "helm/slurm-cluster/values.yaml"
@@ -324,6 +320,7 @@ sync-version: yq ## Sync versions from file
 	@echo 'Syncing helm/soperator-activechecks/values.yaml'
 	@$(YQ) -i ".images.munge = \"$(IMAGE_REPO)/munge:$(IMAGE_VERSION)\"" "helm/soperator-activechecks/values.yaml"
 	@$(YQ) -i ".images.k8sJob = \"$(IMAGE_REPO)/k8s_check_job:$(IMAGE_VERSION)\"" "helm/soperator-activechecks/values.yaml"
+	@$(YQ) -i ".images.sansible = \"$(IMAGE_REPO)/sansible:$(IMAGE_VERSION)\"" "helm/soperator-activechecks/values.yaml"
 	@$(YQ) -i ".images.slurmJob = \"$(IMAGE_REPO)/slurm_check_job:$(IMAGE_VERSION)\"" "helm/soperator-activechecks/values.yaml"
 	@# endregion helm/soperator-activechecks/values.yaml
 
