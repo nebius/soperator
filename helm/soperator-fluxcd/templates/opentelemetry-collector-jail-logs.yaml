@@ -77,6 +77,9 @@ spec:
             - type: add
               field: resource["k8s.namespace.name"]
               value: {{ .Values.slurmCluster.namespace | default "soperator" | quote }}
+            - type: add
+              field: resource["region"]
+              value: {{ .Values.observability.region | quote }}
             - id: extract_directory
               type: regex_parser
               parse_from: attributes["log.file.path"]
@@ -173,6 +176,9 @@ spec:
             - type: add
               field: resource["k8s.namespace.name"]
               value: {{ .Values.slurmCluster.namespace | default "soperator" | quote }}
+            - type: add
+              field: resource["region"]
+              value: {{ .Values.observability.region | quote }}
 
             # Add log_type
             - type: add
