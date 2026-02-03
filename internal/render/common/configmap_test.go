@@ -575,7 +575,7 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "NodeName=nodeA-0 NodeHostname=nodeA-0 NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 Feature=a,b Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeA-0 State=CLOUD NodeHostname=nodeA-0 NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 Feature=a,b Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
 		},
 		{
 			name: "Single nodeset with multiple replicas",
@@ -604,9 +604,9 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "NodeName=nodeB-0 NodeHostname=nodeB-0 NodeAddr=nodeB-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeB-1 NodeHostname=nodeB-1 NodeAddr=nodeB-1.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeB-2 NodeHostname=nodeB-2 NodeAddr=nodeB-2.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeB-0 State=CLOUD NodeHostname=nodeB-0 NodeAddr=nodeB-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
+				"NodeName=nodeB-1 State=CLOUD NodeHostname=nodeB-1 NodeAddr=nodeB-1.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
+				"NodeName=nodeB-2 State=CLOUD NodeHostname=nodeB-2 NodeAddr=nodeB-2.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
 		},
 		{
 			name: "Multiple nodesets with varying replicas",
@@ -652,9 +652,9 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "NodeName=nodeC-0 NodeHostname=nodeC-0 NodeAddr=nodeC-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeC-1 NodeHostname=nodeC-1 NodeAddr=nodeC-1.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeD-0 NodeHostname=nodeD-0 NodeAddr=nodeD-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=16384 Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeC-0 State=CLOUD NodeHostname=nodeC-0 NodeAddr=nodeC-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
+				"NodeName=nodeC-1 State=CLOUD NodeHostname=nodeC-1 NodeAddr=nodeC-1.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
+				"NodeName=nodeD-0 State=CLOUD NodeHostname=nodeD-0 NodeAddr=nodeD-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=16384 Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
 		},
 		{
 			name: "Nodeset with zero replicas",
@@ -983,6 +983,177 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 			// Check if the expected string is present in the result
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected string not found in result.\nExpected to contain:\n%s\n\nGot:\n%s", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestAddNodesToGresConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		cluster  *values.SlurmCluster
+		expected string
+	}{
+		{
+			name: "Empty NodeSets",
+			cluster: &values.SlurmCluster{
+				NodeSets: []slurmv1alpha1.NodeSet{},
+			},
+			expected: `
+#Nodes section
+#WARNING: No nodesets defined in structured configuration!`,
+		},
+		{
+			name: "NodeSets without replicas",
+			cluster: &values.SlurmCluster{
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "a",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 0,
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								GRESConfig: []string{"lol"},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "b",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 0,
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								GRESConfig: []string{"kek"},
+							},
+						},
+					},
+				},
+			},
+			expected: `
+#Nodes section
+#WARNING: NodeSet a has 0 replicas, skipping
+#WARNING: NodeSet b has 0 replicas, skipping
+`,
+		},
+		{
+			name: "One NodeSet with custom config",
+			cluster: &values.SlurmCluster{
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "worker",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 4,
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								GRESConfig: []string{
+									"AutoDetect=off Name=gpu Type=nvidia_h200 File=/dev/nvidia[0-7] Cores=0-63 Flags=nvidia_gpu_env",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: `
+#Nodes section
+#NodeSet worker:
+NodeName=worker-[0-3] AutoDetect=off Name=gpu Type=nvidia_h200 File=/dev/nvidia[0-7] Cores=0-63 Flags=nvidia_gpu_env
+`,
+		},
+		{
+			name: "Multi-line custom configs",
+			cluster: &values.SlurmCluster{
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "worker-h100",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 4,
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								GRESConfig: []string{
+									"AutoDetect=off Name=gpu Type=nvidia_h100 File=/dev/nvidia[0-3] Cores=32-63 Flags=nvidia_gpu_env",
+									"AutoDetect=off Name=gpu Type=nvidia_h100 File=/dev/nvidia[4-7] Cores=0-31 Flags=nvidia_gpu_env",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "worker-h200",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 8,
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								GRESConfig: []string{
+									"AutoDetect=off Name=gpu Type=nvidia_h200 File=/dev/nvidia[0-7] Cores=0-63 Flags=nvidia_gpu_env",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: `
+#Nodes section
+#NodeSet worker-h100:
+NodeName=worker-h100-[0-3] AutoDetect=off Name=gpu Type=nvidia_h100 File=/dev/nvidia[0-3] Cores=32-63 Flags=nvidia_gpu_env
+NodeName=worker-h100-[0-3] AutoDetect=off Name=gpu Type=nvidia_h100 File=/dev/nvidia[4-7] Cores=0-31 Flags=nvidia_gpu_env
+#NodeSet worker-h200:
+NodeName=worker-h200-[0-7] AutoDetect=off Name=gpu Type=nvidia_h200 File=/dev/nvidia[0-7] Cores=0-63 Flags=nvidia_gpu_env
+`,
+		},
+		{
+			name: "NodeSets without custom configs",
+			cluster: &values.SlurmCluster{
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "worker-h100",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 4,
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								GRESConfig: []string{
+									"AutoDetect=off Name=gpu Type=nvidia_h100 File=/dev/nvidia[0-3] Cores=32-63 Flags=nvidia_gpu_env",
+									"AutoDetect=off Name=gpu Type=nvidia_h100 File=/dev/nvidia[4-7] Cores=0-31 Flags=nvidia_gpu_env",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "worker-h200",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 8,
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								GRESConfig: nil,
+							},
+						},
+					},
+				},
+			},
+			expected: `
+#Nodes section
+#NodeSet worker-h100:
+NodeName=worker-h100-[0-3] AutoDetect=off Name=gpu Type=nvidia_h100 File=/dev/nvidia[0-3] Cores=32-63 Flags=nvidia_gpu_env
+NodeName=worker-h100-[0-3] AutoDetect=off Name=gpu Type=nvidia_h100 File=/dev/nvidia[4-7] Cores=0-31 Flags=nvidia_gpu_env
+#NodeSet worker-h200:
+#No custom configuration provided
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := &renderutils.PropertiesConfig{}
+			AddNodesToGresConfig(res, tt.cluster)
+			result := res.Render()
+
+			if strings.TrimSpace(result) != strings.TrimSpace(tt.expected) {
+				t.Errorf("Unexpected gres.conf\n wanted:\n %s\n got:\n%s", tt.expected, result)
 			}
 		})
 	}
