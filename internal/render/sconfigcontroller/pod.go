@@ -1,6 +1,8 @@
 package sconfigcontroller
 
 import (
+	"sort"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -41,6 +43,18 @@ func BasePodTemplateSpec(
 		}
 	}
 
+	initContainers := []corev1.Container{
+		renderInitContainerSConfigController(
+			sConfigController.RunAsUid,
+			sConfigController.RunAsGid,
+		),
+	}
+
+	// Lexicographic sorting init containers by their names to have implicit ordering functionality
+	sort.Slice(initContainers, func(i, j int) bool {
+		return initContainers[i].Name < initContainers[j].Name
+	})
+
 	return &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: matchLabels,
@@ -62,12 +76,7 @@ func BasePodTemplateSpec(
 					sConfigController,
 				),
 			},
-			InitContainers: []corev1.Container{
-				renderInitContainerSConfigController(
-					sConfigController.RunAsUid,
-					sConfigController.RunAsGid,
-				),
-			},
+			InitContainers:     initContainers,
 			Volumes:            volumes,
 			ServiceAccountName: sConfigController.ServiceAccountName,
 			SecurityContext:    securityContext,

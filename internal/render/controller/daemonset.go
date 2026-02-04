@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"sort"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +44,14 @@ func RenderPlaceholderDaemonSet(
 	}
 	containers = append(containers, renderCustomContainersSleep(controller.CustomInitContainers)...)
 
+	initContainers := []corev1.Container{
+		common.RenderPlaceholderContainerMunge(&controller.ContainerMunge),
+	}
+	// Lexicographic sorting init containers by their names to have implicit ordering functionality
+	sort.Slice(initContainers, func(i, j int) bool {
+		return initContainers[i].Name < initContainers[j].Name
+	})
+
 	return appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      controller.DaemonSet.Name + "-placeholder",
@@ -63,13 +73,11 @@ func RenderPlaceholderDaemonSet(
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
-					HostUsers:    controller.HostUsers,
-					Affinity:     nodeFilter.Affinity,
-					NodeSelector: nodeFilter.NodeSelector,
-					Tolerations:  nodeFilter.Tolerations,
-					InitContainers: []corev1.Container{
-						common.RenderPlaceholderContainerMunge(&controller.ContainerMunge),
-					},
+					HostUsers:                     controller.HostUsers,
+					Affinity:                      nodeFilter.Affinity,
+					NodeSelector:                  nodeFilter.NodeSelector,
+					Tolerations:                   nodeFilter.Tolerations,
+					InitContainers:                initContainers,
 					Containers:                    containers,
 					RestartPolicy:                 corev1.RestartPolicyAlways,
 					TerminationGracePeriodSeconds: ptr.To(common.DefaultPodTerminationGracePeriodSeconds),

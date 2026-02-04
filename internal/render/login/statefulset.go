@@ -2,6 +2,7 @@ package login
 
 import (
 	"fmt"
+	"sort"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -54,6 +55,16 @@ func RenderStatefulSet(
 		sshAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
 	}
 
+	initContainers := append(
+		login.CustomInitContainers,
+		common.RenderContainerMunge(&login.ContainerMunge),
+	)
+
+	// Lexicographic sorting init containers by their names to have implicit ordering functionality
+	sort.Slice(initContainers, func(i, j int) bool {
+		return initContainers[i].Name < initContainers[j].Name
+	})
+
 	return kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      login.StatefulSet.Name,
@@ -91,14 +102,11 @@ func RenderStatefulSet(
 					Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameSshd),
 				},
 				Spec: corev1.PodSpec{
-					HostUsers:    login.HostUsers,
-					Affinity:     nodeFilter.Affinity,
-					NodeSelector: nodeFilter.NodeSelector,
-					Tolerations:  nodeFilter.Tolerations,
-					InitContainers: append(
-						login.CustomInitContainers,
-						common.RenderContainerMunge(&login.ContainerMunge),
-					),
+					HostUsers:      login.HostUsers,
+					Affinity:       nodeFilter.Affinity,
+					NodeSelector:   nodeFilter.NodeSelector,
+					Tolerations:    nodeFilter.Tolerations,
+					InitContainers: initContainers,
 					Containers: []corev1.Container{
 						renderContainerSshd(
 							clusterType,

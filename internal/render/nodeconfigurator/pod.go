@@ -1,6 +1,9 @@
 package nodeconfigurator
 
 import (
+	"slices"
+	"sort"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
@@ -23,6 +26,13 @@ func renderPodSpec(nodeConfigurator slurmv1alpha1.NodeConfiguratorSpec) corev1.P
 	serviceAccountName := getServiceAccountName(nodeConfigurator)
 	priorityClassName := getPriorityClassName(nodeConfigurator)
 	hostUsers := getHostUsers(nodeConfigurator)
+
+	initContainers := slices.Clone(nodeConfigurator.InitContainers)
+
+	// Lexicographic sorting init containers by their names to have implicit ordering functionality
+	sort.Slice(initContainers, func(i, j int) bool {
+		return initContainers[i].Name < initContainers[j].Name
+	})
 
 	return corev1.PodSpec{
 		HostNetwork:           nodeConfigurator.HostNetwork,

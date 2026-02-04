@@ -1,6 +1,8 @@
 package soperatorchecks
 
 import (
+	"sort"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -45,6 +47,11 @@ func renderPodTemplateSpec(check *slurmv1alpha1.ActiveCheck, labels map[string]s
 
 	annotations = common.RenderDefaultContainerAnnotation(check.Spec.Name)
 	annotations[consts.AnnotationActiveCheckName] = check.Name
+
+	// Lexicographic sorting init containers by their names to have implicit ordering functionality
+	sort.Slice(initContainers, func(i, j int) bool {
+		return initContainers[i].Name < initContainers[j].Name
+	})
 
 	return corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{

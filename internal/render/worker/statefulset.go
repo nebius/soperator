@@ -3,6 +3,7 @@ package worker
 import (
 	"fmt"
 	"maps"
+	"sort"
 
 	appspub "github.com/openkruise/kruise-api/apps/pub"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
@@ -55,6 +56,11 @@ func RenderStatefulSet(
 	}
 
 	initContainers = append(initContainers, worker.CustomInitContainers...)
+
+	// Lexicographic sorting init containers by their names to have implicit ordering functionality
+	sort.Slice(initContainers, func(i, j int) bool {
+		return initContainers[i].Name < initContainers[j].Name
+	})
 
 	slurmdContainer, err := renderContainerSlurmd(
 		&worker.ContainerSlurmd,
@@ -179,6 +185,11 @@ func RenderNodeSetStatefulSet(
 		RenderContainerWaitForController(&nodeSet.ContainerSlurmd),
 	}
 	initContainers = append(initContainers, nodeSet.CustomInitContainers...)
+
+	// Lexicographic sorting init containers by their names to have implicit ordering functionality
+	sort.Slice(initContainers, func(i, j int) bool {
+		return initContainers[i].Name < initContainers[j].Name
+	})
 
 	slurmdContainer, err := renderContainerNodeSetSlurmd(nodeSet)
 	if err != nil {

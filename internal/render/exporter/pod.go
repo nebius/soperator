@@ -1,6 +1,8 @@
 package exporter
 
 import (
+	"sort"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -23,6 +25,12 @@ func renderPodTemplateSpec(
 		_ = err // Ignore not found error, use "empty" node filter.
 		nodeFilter = slurmv1.K8sNodeFilter{}
 	}
+
+	// Lexicographic sorting init containers by their names to have implicit ordering functionality
+	sort.Slice(initContainers, func(i, j int) bool {
+		return initContainers[i].Name < initContainers[j].Name
+	})
+
 	result := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: matchLabels,

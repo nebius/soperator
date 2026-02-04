@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"sort"
 
 	appspub "github.com/openkruise/kruise-api/apps/pub"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
@@ -59,6 +60,11 @@ func RenderStatefulSet(
 		initContainers = append(initContainers, renderContainerAccountingWaiter(&controller.ContainerSlurmctld))
 	}
 	initContainers = append(initContainers, controller.CustomInitContainers...)
+
+	// Lexicographic sorting init containers by their names to have implicit ordering functionality
+	sort.Slice(initContainers, func(i, j int) bool {
+		return initContainers[i].Name < initContainers[j].Name
+	})
 
 	return kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{

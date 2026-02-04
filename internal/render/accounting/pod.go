@@ -1,6 +1,8 @@
 package accounting
 
 import (
+	"sort"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -57,6 +59,19 @@ func BasePodTemplateSpec(
 		return nil, err
 	}
 
+	initContainers := append(
+		[]corev1.Container{
+			renderContainerDbwaiter(clusterName, accounting),
+			common.RenderContainerMunge(&accounting.ContainerMunge),
+		},
+		accounting.CustomInitContainers...,
+	)
+
+	// Lexicographic sorting init containers by their names to have implicit ordering functionality
+	sort.Slice(initContainers, func(i, j int) bool {
+		return initContainers[i].Name < initContainers[j].Name
+	})
+
 	return &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      matchLabels,
@@ -69,13 +84,7 @@ func BasePodTemplateSpec(
 			NodeSelector:      nodeFilter.NodeSelector,
 			Hostname:          consts.HostnameAccounting,
 			PriorityClassName: accounting.PriorityClass,
-			InitContainers: append(
-				[]corev1.Container{
-					renderContainerDbwaiter(clusterName, accounting),
-					common.RenderContainerMunge(&accounting.ContainerMunge),
-				},
-				accounting.CustomInitContainers...,
-			),
+			InitContainers:    initContainers,
 			Containers: []corev1.Container{
 				renderContainerAccounting(accounting.ContainerAccounting, additionalVolumeMounts),
 			},
