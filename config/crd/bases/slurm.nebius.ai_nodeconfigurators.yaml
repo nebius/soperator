@@ -1600,6 +1600,7 @@ spec:
                 description: |-
                   InitContainers defines the list of initContainers for the node-configurator
                   it rewrite the default initContainers
+                  All applied init containers will be lexicographically ordered by their names
                 items:
                   description: A single application container that you want to run
                     within a pod.

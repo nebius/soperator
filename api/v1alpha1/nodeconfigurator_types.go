@@ -56,6 +56,7 @@ type NodeConfiguratorSpec struct {
 
 	// InitContainers defines the list of initContainers for the node-configurator
 	// it rewrite the default initContainers
+	// All applied init containers will be lexicographically ordered by their names
 	//
 	// +kubebuilder:validation:Optional
 	InitContainers []corev1.Container `json:"initContainers,omitempty"`

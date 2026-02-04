@@ -11718,6 +11718,7 @@ spec:
                 description: |-
                   InitContainers defines the list of initContainers for the node-configurator
                   it rewrite the default initContainers
+                  All applied init containers will be lexicographically ordered by their names
                 items:
                   description: A single application container that you want to run
                     within a pod.
@@ -15867,8 +15868,9 @@ spec:
                   If omitted, the default name and values of config will be used.
                 type: string
               customInitContainers:
-                description: CustomInitContainers represent additional init containers
-                  which will be added to worker pods.
+                description: |-
+                  CustomInitContainers represent additional init containers which will be added to worker pods.
+                  All init containers, including default ones, will be lexicographically ordered by their names
                 items:
                   description: A single application container that you want to run
                     within a pod.
@@ -27828,8 +27830,9 @@ spec:
                       a Slurm node.
                     properties:
                       customInitContainers:
-                        description: CustomInitContainers represent additional init
-                          containers that should be added to created Pods
+                        description: |-
+                          CustomInitContainers represent additional init containers that should be added to created Pods.
+                          All init containers, including default ones, will be lexicographically ordered by their names
                         items:
                           description: A single application container that you want
                             to run within a pod.
@@ -29512,8 +29515,9 @@ spec:
                       Accounting represents the Slurm accounting node and database configuration
                     properties:
                       customInitContainers:
-                        description: CustomInitContainers represent additional init
-                          containers that should be added to created Pods
+                        description: |-
+                          CustomInitContainers represent additional init containers that should be added to created Pods.
+                          All init containers, including default ones, will be lexicographically ordered by their names
                         items:
                           description: A single application container that you want
                             to run within a pod.
@@ -33637,8 +33641,9 @@ spec:
                     description: Controller represents the Slurm controller node configuration
                     properties:
                       customInitContainers:
-                        description: CustomInitContainers represent additional init
-                          containers that should be added to created Pods
+                        description: |-
+                          CustomInitContainers represent additional init containers that should be added to created Pods.
+                          All init containers, including default ones, will be lexicographically ordered by their names
                         items:
                           description: A single application container that you want
                             to run within a pod.
@@ -36322,8 +36327,9 @@ spec:
                         pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
                         type: string
                       customInitContainers:
-                        description: CustomInitContainers represent additional init
-                          containers that should be added to created Pods
+                        description: |-
+                          CustomInitContainers represent additional init containers that should be added to created Pods.
+                          All init containers, including default ones, will be lexicographically ordered by their names
                         items:
                           description: A single application container that you want
                             to run within a pod.
@@ -38991,8 +38997,9 @@ spec:
                     description: Login represents the Slurm login node configuration
                     properties:
                       customInitContainers:
-                        description: CustomInitContainers represent additional init
-                          containers that should be added to created Pods
+                        description: |-
+                          CustomInitContainers represent additional init containers that should be added to created Pods.
+                          All init containers, including default ones, will be lexicographically ordered by their names
                         items:
                           description: A single application container that you want
                             to run within a pod.
@@ -41737,8 +41744,9 @@ spec:
                     description: Rest represents the Slurm REST API node configuration
                     properties:
                       customInitContainers:
-                        description: CustomInitContainers represent additional init
-                          containers that should be added to created Pods
+                        description: |-
+                          CustomInitContainers represent additional init containers that should be added to created Pods.
+                          All init containers, including default ones, will be lexicographically ordered by their names
                         items:
                           description: A single application container that you want
                             to run within a pod.
@@ -43550,8 +43558,9 @@ spec:
                         - v2
                         type: string
                       customInitContainers:
-                        description: CustomInitContainers represent additional init
-                          containers that should be added to created Pods
+                        description: |-
+                          CustomInitContainers represent additional init containers that should be added to created Pods.
+                          All init containers, including default ones, will be lexicographically ordered by their names
                         items:
                           description: A single application container that you want
                             to run within a pod.

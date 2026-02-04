@@ -857,7 +857,8 @@ type AccountingSlurmConf struct {
 
 // SlurmNodeController defines the configuration for the Slurm controller node
 type SlurmNodeController struct {
-	// CustomInitContainers represent additional init containers that should be added to created Pods
+	// CustomInitContainers represent additional init containers that should be added to created Pods.
+	// All init containers, including default ones, will be lexicographically ordered by their names
 	//
 	// +kubebuilder:validation:Optional
 	CustomInitContainers []corev1.Container `json:"customInitContainers,omitempty"`
@@ -1158,7 +1159,8 @@ type SlurmNode struct {
 	// Size defines the number of node instances
 	Size int32 `json:"size,omitempty"`
 
-	// CustomInitContainers represent additional init containers that should be added to created Pods
+	// CustomInitContainers represent additional init containers that should be added to created Pods.
+	// All init containers, including default ones, will be lexicographically ordered by their names
 	CustomInitContainers []corev1.Container `json:"customInitContainers,omitempty"`
 
 	// K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.

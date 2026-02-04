@@ -981,8 +981,9 @@ spec:
                   If omitted, the default name and values of config will be used.
                 type: string
               customInitContainers:
-                description: CustomInitContainers represent additional init containers
-                  which will be added to worker pods.
+                description: |-
+                  CustomInitContainers represent additional init containers which will be added to worker pods.
+                  All init containers, including default ones, will be lexicographically ordered by their names
                 items:
                   description: A single application container that you want to run
                     within a pod.

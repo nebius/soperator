@@ -202,6 +202,7 @@ type NodeSetSpec struct {
 	WorkerAnnotations map[string]string `json:"workerAnnotations,omitempty"`
 
 	// CustomInitContainers represent additional init containers which will be added to worker pods.
+	// All init containers, including default ones, will be lexicographically ordered by their names
 	//
 	// +kubebuilder:validation:Optional
 	CustomInitContainers []corev1.Container `json:"customInitContainers,omitempty"`
