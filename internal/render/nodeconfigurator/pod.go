@@ -43,7 +43,7 @@ func renderPodSpec(nodeConfigurator slurmv1alpha1.NodeConfiguratorSpec) corev1.P
 		Affinity:              affinity,
 		NodeSelector:          nodeSelector,
 		Tolerations:           tolerations,
-		InitContainers:        nodeConfigurator.InitContainers,
+		InitContainers:        initContainers,
 		Containers:            containers,
 		ServiceAccountName:    serviceAccountName,
 		PriorityClassName:     priorityClassName,
