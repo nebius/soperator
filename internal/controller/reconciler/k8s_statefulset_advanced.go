@@ -58,6 +58,7 @@ func (r *AdvancedStatefulSetReconciler) patch(existing, desired client.Object) (
 		dst.Spec.Replicas = src.Spec.Replicas
 		dst.Spec.UpdateStrategy = src.Spec.UpdateStrategy
 		dst.Spec.Template.Spec = src.Spec.Template.Spec
+		dst.Spec.ReserveOrdinals = src.Spec.ReserveOrdinals
 
 		if len(src.Spec.VolumeClaimTemplates) > 0 {
 			dst.Spec.VolumeClaimTemplates = append([]corev1.PersistentVolumeClaim{}, src.Spec.VolumeClaimTemplates...)

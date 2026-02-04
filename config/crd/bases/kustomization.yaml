@@ -1,6 +1,7 @@
 resources:
 - slurm.nebius.ai_activechecks.yaml
 - slurm.nebius.ai_nodeconfigurators.yaml
+- slurm.nebius.ai_nodesetpowerstates.yaml
 - slurm.nebius.ai_nodesets.yaml
 - slurm.nebius.ai_slurmclusters.yaml
 - slurm.nebius.ai_jailedconfigs.yaml

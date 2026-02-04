@@ -280,7 +280,7 @@ func renderContainerNodeSetSlurmd(
 	}
 
 	// Add topology env volume mount for ephemeral nodes
-	if nodeSet.EphemeralNodes != nil && *nodeSet.EphemeralNodes {
+	if isEphemeralNodesEnabled(nodeSet) {
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name:      consts.VolumeNameTopologyEnv,
 			MountPath: consts.VolumeMountPathTopologyEnv,

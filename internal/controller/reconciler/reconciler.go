@@ -212,6 +212,8 @@ func (r Reconciler) reconcile(
 				existing = &apparmor.AppArmorProfile{}
 			case *slurmv1alpha1.JailedConfig:
 				existing = &slurmv1alpha1.JailedConfig{}
+			case *slurmv1alpha1.NodeSetPowerState:
+				existing = &slurmv1alpha1.NodeSetPowerState{}
 			default:
 				return errors.New(fmt.Sprintf("unimplemented resolver for resource type %T", desired))
 			}

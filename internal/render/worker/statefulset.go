@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"sort"
 
 	appspub "github.com/openkruise/kruise-api/apps/pub"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
@@ -11,6 +12,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -175,7 +177,13 @@ func RenderNodeSetStatefulSet(
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
-	if nodeSet.EphemeralNodes != nil && *nodeSet.EphemeralNodes {
+	initContainers := slices.Clone(nodeSet.CustomInitContainers)
+	initContainers = append(initContainers,
+		common.RenderContainerMunge(&nodeSet.ContainerMunge),
+		RenderContainerWaitForController(&nodeSet.ContainerSlurmd),
+	)
+
+	if isEphemeralNodesEnabled(nodeSet) {
 		volumes = append(volumes,
 			corev1.Volume{
 				Name: consts.VolumeNameTopologyNodeLabels,
@@ -197,18 +205,11 @@ func RenderNodeSetStatefulSet(
 		)
 	}
 
-	initContainers := []corev1.Container{
-		common.RenderContainerMunge(&nodeSet.ContainerMunge),
-		RenderContainerWaitForController(&nodeSet.ContainerSlurmd),
-	}
-
-	if nodeSet.EphemeralNodes != nil && *nodeSet.EphemeralNodes {
+	if isEphemeralNodesEnabled(nodeSet) {
 		initContainers = append(initContainers,
 			RenderContainerWaitForTopology(&nodeSet.ContainerSlurmd, nodeSet.EphemeralTopologyWaitTimeout),
 		)
 	}
-
-	initContainers = append(initContainers, nodeSet.CustomInitContainers...)
 
 	slurmdContainer, err := renderContainerNodeSetSlurmd(nodeSet)
 	if err != nil {
@@ -216,8 +217,15 @@ func RenderNodeSetStatefulSet(
 	}
 
 	replicas := &nodeSet.StatefulSet.Replicas
+	var reserveOrdinals []intstr.IntOrString
+
 	if check.IsMaintenanceActive(nodeSet.Maintenance) {
 		replicas = ptr.To(consts.ZeroReplicas)
+	} else if isEphemeralNodesEnabled(nodeSet) {
+		// For ephemeral nodes, replicas and reserveOrdinals are calculated based on activeNodes.
+		// If activeNodes is empty, no pods will be created (replicas = 0).
+		// Pods are only created when NodeSetPowerState.spec.activeNodes is populated by the power-manager.
+		replicas, reserveOrdinals = calculateReplicasAndReserveOrdinals(nodeSet.ActiveNodes)
 	}
 
 	spec := corev1.PodSpec{
@@ -265,6 +273,7 @@ func RenderNodeSetStatefulSet(
 			PodManagementPolicy: consts.PodManagementPolicy,
 			ServiceName:         nodeSet.ServiceUmbrella.Name,
 			Replicas:            replicas,
+			ReserveOrdinals:     reserveOrdinals,
 			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
@@ -311,4 +320,47 @@ func renderNodeSetAnnotations(nodeSet *values.SlurmNodeSet) map[string]string {
 	annotations := common.RenderDefaultContainerAnnotation(consts.ContainerNameSlurmd)
 	maps.Copy(annotations, nodeSet.Annotations)
 	return annotations
+}
+
+// calculateReplicasAndReserveOrdinals calculates the replicas and reserveOrdinals for ephemeral nodes.
+// For activeNodes = [0, 3, 5, 7, 12]:
+//   - replicas = 5 (number of active nodes)
+//   - reserveOrdinals = [1, 2, 4, 6, 8, 9, 10, 11] (all ordinals from 0 to maxOrdinal that are NOT in activeNodes)
+//
+// This way, OpenKruise will create pods at ordinals 0, 3, 5, 7, 12 only.
+func calculateReplicasAndReserveOrdinals(activeNodes []int32) (*int32, []intstr.IntOrString) {
+	if len(activeNodes) == 0 {
+		return ptr.To(int32(0)), nil
+	}
+
+	// Sort activeNodes to find the max ordinal
+	sortedActive := make([]int32, len(activeNodes))
+	copy(sortedActive, activeNodes)
+	sort.Slice(sortedActive, func(i, j int) bool { return sortedActive[i] < sortedActive[j] })
+
+	maxOrdinal := sortedActive[len(sortedActive)-1]
+
+	// Create a set of active ordinals for O(1) lookup
+	activeSet := make(map[int32]bool, len(activeNodes))
+	for _, ordinal := range activeNodes {
+		activeSet[ordinal] = true
+	}
+
+	// Calculate reserveOrdinals: all ordinals from 0 to maxOrdinal that are NOT in activeNodes
+	var reserveOrdinals []intstr.IntOrString
+	for i := int32(0); i <= maxOrdinal; i++ {
+		if !activeSet[i] {
+			reserveOrdinals = append(reserveOrdinals, intstr.FromInt32(i))
+		}
+	}
+
+	// Replicas = number of active nodes
+	replicas := int32(len(activeNodes))
+
+	return &replicas, reserveOrdinals
+}
+
+// isEphemeralNodesEnabled checks if ephemeral nodes mode is enabled for the NodeSet
+func isEphemeralNodesEnabled(nodeSet *values.SlurmNodeSet) bool {
+	return nodeSet.EphemeralNodes != nil && *nodeSet.EphemeralNodes
 }

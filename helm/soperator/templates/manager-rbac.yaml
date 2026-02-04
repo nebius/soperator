@@ -140,6 +140,7 @@ rules:
   resources:
   - jailedconfigs
   - nodeconfigurators
+  - nodesetpowerstates
   - nodesets
   - slurmclusters
   verbs:
@@ -164,6 +165,7 @@ rules:
   resources:
   - jailedconfigs/status
   - nodeconfigurators/status
+  - nodesetpowerstates/status
   - nodesets/status
   - slurmclusters/status
   verbs:
