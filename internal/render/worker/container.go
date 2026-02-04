@@ -19,74 +19,111 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-// RenderContainerWaitForController renders init [corev1.Container] that waits for controller readiness
-func RenderContainerWaitForController(container *values.Container) corev1.Container {
-	return corev1.Container{
-		Name:            consts.ContainerNameWaitForController,
-		Image:           container.Image,
-		ImagePullPolicy: container.ImagePullPolicy,
-		Command: []string{
-			"/opt/bin/slurm/wait-for-controller.sh",
-		},
-		Env: []corev1.EnvVar{},
-		VolumeMounts: []corev1.VolumeMount{
-			common.RenderVolumeMountJail(),
-			common.RenderVolumeMountMungeSocket(),
-		},
-		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
-		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+// RenderContainerWorkerInit renders init [corev1.Container] for worker nodes.
+// It runs a script that waits for the controller to be ready before allowing the main slurmd container to start.
+// If topology is enabled, it also waits for the topology configuration to be ready before allowing slurmd to start.
+func RenderContainerWorkerInit(
+	clusterName string,
+	container *values.Container,
+	topologyEnabled, isNodeSet bool,
+	waitTimeoutSeconds int32,
+) corev1.Container {
+	command := []string{
+		"python3",
+		"/opt/bin/slurm/worker_init.py",
+		"wait-controller",
 	}
-}
+	if topologyEnabled {
+		command = append(command, "wait-topology")
+	}
 
-// RenderContainerWaitForTopology renders init [corev1.Container] that waits for topology data
-// to become available for ephemeral nodes
-func RenderContainerWaitForTopology(container *values.Container, waitTimeoutSeconds int32) corev1.Container {
-	return corev1.Container{
-		Name:            consts.ContainerNameWaitForTopology,
-		Image:           container.Image,
-		ImagePullPolicy: container.ImagePullPolicy,
-		Command: []string{
-			"python3",
-			"/opt/bin/slurm/wait_for_topology.py",
-		},
-		Env: []corev1.EnvVar{
-			{
-				Name: "K8S_NODE_NAME",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: corev1.SchemeGroupVersion.Version,
-						FieldPath:  "spec.nodeName",
-					},
+	volumeMounts := []corev1.VolumeMount{
+		common.RenderVolumeMountJail(),
+		common.RenderVolumeMountMungeSocket(),
+	}
+	if topologyEnabled {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      consts.VolumeNameTopologyNodeLabels,
+			MountPath: consts.VolumeMountPathTopologyNodeLabels,
+			ReadOnly:  true,
+		})
+	}
+
+	env := []corev1.EnvVar{
+		{
+			Name: "K8S_NODE_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "spec.nodeName",
 				},
 			},
-			{
+		},
+		{
+			Name: "K8S_POD_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "metadata.name",
+				},
+			},
+		},
+		{
+			Name: "K8S_POD_NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name:  "CONTROLLER_MAX_ATTEMPTS",
+			Value: "60",
+		},
+		{
+			Name:  "CONTROLLER_POLL_INTERVAL",
+			Value: "5",
+		},
+	}
+
+	if isNodeSet {
+		env = append(env, corev1.EnvVar{
+			Name:  "K8S_SERVICE_NAME",
+			Value: naming.BuildServiceName(consts.ComponentTypeNodeSet, clusterName),
+		})
+	} else {
+		// For "legacy" workers without NodeSet, we use the default worker service for backward compatibility.
+		env = append(env, corev1.EnvVar{
+			Name:  "K8S_SERVICE_NAME",
+			Value: naming.BuildServiceName(consts.ComponentTypeWorker, clusterName),
+		})
+	}
+
+	if topologyEnabled {
+		env = append(env,
+			corev1.EnvVar{
 				Name:  "TOPOLOGY_CONFIGMAP_PATH",
 				Value: consts.VolumeMountPathTopologyNodeLabels,
 			},
-			{
-				Name:  "TOPOLOGY_ENV_FILE",
-				Value: consts.TopologyEnvFilePath,
-			},
-			{
+			corev1.EnvVar{
 				Name:  "TOPOLOGY_WAIT_TIMEOUT",
 				Value: strconv.Itoa(int(waitTimeoutSeconds)),
 			},
-			{
+			corev1.EnvVar{
 				Name:  "TOPOLOGY_POLL_INTERVAL",
 				Value: "5",
 			},
-		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      consts.VolumeNameTopologyNodeLabels,
-				MountPath: consts.VolumeMountPathTopologyNodeLabels,
-				ReadOnly:  true,
-			},
-			{
-				Name:      consts.VolumeNameTopologyEnv,
-				MountPath: consts.VolumeMountPathTopologyEnv,
-			},
-		},
+		)
+	}
+
+	return corev1.Container{
+		Name:                     consts.ContainerNameWorkerInit,
+		Image:                    container.Image,
+		ImagePullPolicy:          container.ImagePullPolicy,
+		Command:                  command,
+		VolumeMounts:             volumeMounts,
+		Env:                      env,
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}
@@ -280,15 +317,6 @@ func renderContainerNodeSetSlurmd(
 		appArmorProfile = consts.AppArmorProfileUnconfined
 	}
 
-	// Add topology env volume mount for ephemeral nodes
-	if nodeSet.EphemeralNodes != nil && *nodeSet.EphemeralNodes {
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      consts.VolumeNameTopologyEnv,
-			MountPath: consts.VolumeMountPathTopologyEnv,
-			ReadOnly:  true,
-		})
-	}
-
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
 		Image:           nodeSet.ContainerSlurmd.Image,
@@ -427,12 +455,11 @@ func renderSlurmdEnv(
 }
 
 func renderNodeSetSlurmdEnv(
-	nodeSet *values.SlurmNodeSet,
-	realMemory int64,
+	cgroupVersion string,
+	clusterType consts.ClusterType,
+	enableGDRCopy bool,
+	slurmNodeExtra string,
 ) []corev1.EnvVar {
-	clusterType := utils.Ternary(nodeSet.GPU.Enabled, consts.ClusterTypeGPU, consts.ClusterTypeCPU)
-	ephemeralNodes := nodeSet.EphemeralNodes != nil && *nodeSet.EphemeralNodes
-
 	envVar := []corev1.EnvVar{
 		{
 			Name: "INSTANCE_ID",
@@ -447,76 +474,25 @@ func renderNodeSetSlurmdEnv(
 			Name:  "SLURM_CLUSTER_TYPE",
 			Value: clusterType.String(),
 		},
-	}
-
-	// Set node mode based on ephemeral or static configuration
-	if ephemeralNodes {
-		envVar = append(envVar,
-			corev1.EnvVar{
-				Name:  "SOPERATOR_NODE_SETS_ON",
-				Value: "true",
-			},
-			corev1.EnvVar{
-				Name:  "TOPOLOGY_ENV_FILE",
-				Value: consts.TopologyEnvFilePath,
-			},
-			corev1.EnvVar{
-				Name: "K8S_NODE_NAME",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: corev1.SchemeGroupVersion.Version,
-						FieldPath:  "spec.nodeName",
-					},
-				},
-			},
-			// Required for build_dynamic_conf in slurmd_entrypoint.sh
-			corev1.EnvVar{
-				Name: "K8S_POD_NAME",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: corev1.SchemeGroupVersion.Version,
-						FieldPath:  "metadata.name",
-					},
-				},
-			},
-			corev1.EnvVar{
-				Name: "K8S_POD_NAMESPACE",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: corev1.SchemeGroupVersion.Version,
-						FieldPath:  "metadata.namespace",
-					},
-				},
-			},
-			corev1.EnvVar{
-				Name:  "K8S_SERVICE_NAME",
-				Value: naming.BuildNodeSetServiceName(nodeSet.ParentalCluster.Name, nodeSet.Name),
-			},
-			corev1.EnvVar{
-				Name:  "SLURM_REAL_MEMORY",
-				Value: strconv.FormatInt(realMemory, 10),
-			},
-		)
-	} else {
-		envVar = append(envVar, corev1.EnvVar{
+		{
 			Name:  "SOPERATOR_NODE_SETS_ON",
 			Value: "true",
-		})
+		},
 	}
 
-	if len(nodeSet.NodeExtra) > 0 {
+	if len(slurmNodeExtra) > 0 {
 		envVar = append(envVar, corev1.EnvVar{
 			Name:  "SLURM_NODE_EXTRA",
-			Value: nodeSet.NodeExtra,
+			Value: slurmNodeExtra,
 		})
 	}
-	if nodeSet.CgroupVersion == consts.CGroupV2 {
+	if cgroupVersion == consts.CGroupV2 {
 		envVar = append(envVar, corev1.EnvVar{
 			Name:  consts.EnvCGroupV2,
 			Value: "true",
 		})
 	}
-	if nodeSet.GPU.Nvidia.GDRCopyEnabled {
+	if enableGDRCopy {
 		envVar = append(envVar, corev1.EnvVar{
 			Name:  consts.EnvNvidiaGDRCopy,
 			Value: "enabled",

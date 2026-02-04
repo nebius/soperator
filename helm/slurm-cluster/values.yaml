@@ -316,6 +316,18 @@ slurmNodes:
     priorityClass: ""
     # Controls if the pod containers can use the host user namespace
     # hostUsers: false
+    # RBAC settings for slurm-controller (ephemeral node power state management)
+    # The power-manager binary runs inside slurmctld pod and is called by Slurm's ResumeProgram/SuspendProgram
+    rbac:
+      # Specifies whether RBAC resources should be created
+      create: true
+    # ServiceAccount settings for slurm-controller (mounted in slurmctld pod)
+    serviceAccount:
+      # Specifies whether a ServiceAccount should be created
+      create: true
+      # The name of the ServiceAccount to use.
+      # If not set and create is true, a name is generated using the cluster name: <clusterName>-slurm-controller
+      name: ""
     slurmctld:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"

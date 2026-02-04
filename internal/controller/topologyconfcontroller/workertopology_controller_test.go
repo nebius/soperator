@@ -116,6 +116,11 @@ func TestParseNodeTopologyLabels(t *testing.T) {
 }
 
 func TestInitializeTopologyConf(t *testing.T) {
+	t.Run("Nil StatefulSetList", func(t *testing.T) {
+		result := tc.InitializeTopologyConf(nil)
+		assert.Equal(t, "SwitchName=root", result)
+	})
+
 	tests := []struct {
 		name         string
 		statefulSets []kruisev1b1.StatefulSet
@@ -124,7 +129,7 @@ func TestInitializeTopologyConf(t *testing.T) {
 		{
 			name:         "No StatefulSets",
 			statefulSets: []kruisev1b1.StatefulSet{},
-			expected:     "SwitchName=unknown Nodes=dummy",
+			expected:     "SwitchName=unknown",
 		},
 		{
 			name: "Single StatefulSet with replicas",
@@ -138,7 +143,7 @@ func TestInitializeTopologyConf(t *testing.T) {
 					},
 				},
 			},
-			expected: "SwitchName=unknown Nodes=dummy,worker-sts-0,worker-sts-1,worker-sts-2",
+			expected: "SwitchName=unknown Nodes=worker-sts-0,worker-sts-1,worker-sts-2",
 		},
 		{
 			name: "Multiple StatefulSets with replicas",
@@ -160,7 +165,7 @@ func TestInitializeTopologyConf(t *testing.T) {
 					},
 				},
 			},
-			expected: "SwitchName=unknown Nodes=dummy,worker-sts1-0,worker-sts1-1,worker-sts2-0",
+			expected: "SwitchName=unknown Nodes=worker-sts1-0,worker-sts1-1,worker-sts2-0",
 		},
 		{
 			name: "StatefulSet with zero replicas",
@@ -174,7 +179,7 @@ func TestInitializeTopologyConf(t *testing.T) {
 					},
 				},
 			},
-			expected: "SwitchName=unknown Nodes=dummy",
+			expected: "SwitchName=unknown",
 		},
 	}
 
@@ -186,6 +191,179 @@ func TestInitializeTopologyConf(t *testing.T) {
 
 			result := tc.InitializeTopologyConf(aSTS)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestWorkerTopologyReconciler_IsNodeSets(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, slurmv1.AddToScheme(scheme))
+	require.NoError(t, v1alpha1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kruisev1b1.AddToScheme(scheme))
+
+	ctx := context.Background()
+	namespace := "test-namespace"
+
+	tests := []struct {
+		name         string
+		existingObjs []client.Object
+		cluster      *slurmv1.SlurmCluster
+		expected     bool
+	}{
+		{
+			name: "NodeSets exist in namespace - returns true",
+			existingObjs: []client.Object{
+				&v1alpha1.NodeSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "nodeset-1",
+						Namespace: namespace,
+					},
+				},
+			},
+			cluster: &slurmv1.SlurmCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: namespace,
+				},
+			},
+			expected: true,
+		},
+		{
+			name:         "No NodeSets and worker size > 0 - returns false",
+			existingObjs: []client.Object{},
+			cluster: &slurmv1.SlurmCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: namespace,
+				},
+				Spec: slurmv1.SlurmClusterSpec{
+					SlurmNodes: slurmv1.SlurmNodes{
+						Worker: &slurmv1.SlurmNodeWorker{
+							SlurmNode: slurmv1.SlurmNode{
+								Size: 5,
+							},
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name:         "No NodeSets and worker size == 0 - returns true",
+			existingObjs: []client.Object{},
+			cluster: &slurmv1.SlurmCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: namespace,
+				},
+				Spec: slurmv1.SlurmClusterSpec{
+					SlurmNodes: slurmv1.SlurmNodes{
+						Worker: &slurmv1.SlurmNodeWorker{
+							SlurmNode: slurmv1.SlurmNode{
+								Size: 0,
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:         "No NodeSets and nil worker - returns true",
+			existingObjs: []client.Object{},
+			cluster: &slurmv1.SlurmCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: namespace,
+				},
+				Spec: slurmv1.SlurmClusterSpec{
+					SlurmNodes: slurmv1.SlurmNodes{
+						Worker: nil,
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Multiple NodeSets exist - returns true",
+			existingObjs: []client.Object{
+				&v1alpha1.NodeSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "nodeset-1",
+						Namespace: namespace,
+					},
+				},
+				&v1alpha1.NodeSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "nodeset-2",
+						Namespace: namespace,
+					},
+				},
+			},
+			cluster: &slurmv1.SlurmCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: namespace,
+				},
+				Spec: slurmv1.SlurmClusterSpec{
+					SlurmNodes: slurmv1.SlurmNodes{
+						Worker: &slurmv1.SlurmNodeWorker{
+							SlurmNode: slurmv1.SlurmNode{
+								Size: 5,
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "NodeSets in different namespace - returns false",
+			existingObjs: []client.Object{
+				&v1alpha1.NodeSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "nodeset-1",
+						Namespace: "other-namespace",
+					},
+				},
+			},
+			cluster: &slurmv1.SlurmCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: namespace,
+				},
+				Spec: slurmv1.SlurmClusterSpec{
+					SlurmNodes: slurmv1.SlurmNodes{
+						Worker: &slurmv1.SlurmNodeWorker{
+							SlurmNode: slurmv1.SlurmNode{
+								Size: 5,
+							},
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(tt.existingObjs...).
+				Build()
+
+			reconciler := &tc.WorkerTopologyReconciler{
+				BaseReconciler: tc.BaseReconciler{
+					Client: fakeClient,
+					Scheme: scheme,
+				},
+			}
+
+			result, err := reconciler.IsNodeSets(ctx, tt.cluster)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result, "IsNodeSets result mismatch")
 		})
 	}
 }
@@ -462,7 +640,7 @@ func TestEnsureWorkerTopologyConfigMap(t *testing.T) {
 			}
 
 			logger := log.Log.WithName("test")
-			result, err := reconciler.EnsureWorkerTopologyConfigMap(ctx, namespace, clusterName, logger)
+			result, err := reconciler.EnsureWorkerTopologyConfigMap(ctx, namespace, clusterName, false, logger)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -493,110 +671,6 @@ func TestEnsureWorkerTopologyConfigMap(t *testing.T) {
 			}, jailedConfig)
 			require.NoError(t, err)
 			assert.Equal(t, consts.ConfigMapNameTopologyConfig, jailedConfig.Spec.ConfigMap.Name)
-		})
-	}
-}
-
-func TestGetEphemeralNodeSets(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, v1alpha1.AddToScheme(scheme))
-
-	tests := []struct {
-		name     string
-		nodeSets []v1alpha1.NodeSet
-		expected map[string]struct{}
-	}{
-		{
-			name:     "No NodeSets",
-			nodeSets: []v1alpha1.NodeSet{},
-			expected: map[string]struct{}{},
-		},
-		{
-			name: "No ephemeral NodeSets",
-			nodeSets: []v1alpha1.NodeSet{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-1", Namespace: "test-ns"},
-					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: ptr.To(false)},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-2", Namespace: "test-ns"},
-					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: nil},
-				},
-			},
-			expected: map[string]struct{}{},
-		},
-		{
-			name: "Some ephemeral NodeSets",
-			nodeSets: []v1alpha1.NodeSet{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-static", Namespace: "test-ns"},
-					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: ptr.To(false)},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-ephemeral", Namespace: "test-ns"},
-					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: ptr.To(true)},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-nil", Namespace: "test-ns"},
-					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: nil},
-				},
-			},
-			expected: map[string]struct{}{
-				"nodeset-ephemeral": {},
-			},
-		},
-		{
-			name: "All ephemeral NodeSets",
-			nodeSets: []v1alpha1.NodeSet{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-1", Namespace: "test-ns"},
-					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: ptr.To(true)},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-2", Namespace: "test-ns"},
-					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: ptr.To(true)},
-				},
-			},
-			expected: map[string]struct{}{
-				"nodeset-1": {},
-				"nodeset-2": {},
-			},
-		},
-		{
-			name: "NodeSets in different namespaces",
-			nodeSets: []v1alpha1.NodeSet{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-ephemeral", Namespace: "test-ns"},
-					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: ptr.To(true)},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-other", Namespace: "other-ns"},
-					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: ptr.To(true)},
-				},
-			},
-			expected: map[string]struct{}{
-				"nodeset-ephemeral": {},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			objects := make([]client.Object, 0, len(tt.nodeSets))
-			for i := range tt.nodeSets {
-				objects = append(objects, &tt.nodeSets[i])
-			}
-
-			fakeClient := fake.NewClientBuilder().
-				WithScheme(scheme).
-				WithObjects(objects...).
-				Build()
-
-			reconciler := tc.NewWorkerTopologyReconciler(fakeClient, scheme, "operator-ns")
-
-			result, err := reconciler.GetEphemeralNodeSets(context.Background(), "test-ns")
-			require.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -689,6 +763,81 @@ func TestFilterPodsExcludingEphemeralNodeSets(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.expectedPodNames, resultNames)
+		})
+	}
+}
+
+func TestFilterStatefulSetsExcludingEphemeralNodeSets(t *testing.T) {
+	reconciler := &tc.WorkerTopologyReconciler{}
+
+	tests := []struct {
+		name              string
+		statefulSets      []kruisev1b1.StatefulSet
+		ephemeralNodeSets map[string]struct{}
+		expectedNames     []string
+	}{
+		{
+			name: "No ephemeral NodeSets - all StatefulSets included",
+			statefulSets: []kruisev1b1.StatefulSet{
+				{ObjectMeta: metav1.ObjectMeta{Name: "sts-1", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "sts-2", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-2"}}},
+			},
+			ephemeralNodeSets: map[string]struct{}{},
+			expectedNames:     []string{"sts-1", "sts-2"},
+		},
+		{
+			name: "Filter out StatefulSets from ephemeral NodeSets",
+			statefulSets: []kruisev1b1.StatefulSet{
+				{ObjectMeta: metav1.ObjectMeta{Name: "sts-static", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-static"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "sts-ephemeral", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-ephemeral"}}},
+			},
+			ephemeralNodeSets: map[string]struct{}{
+				"nodeset-ephemeral": {},
+			},
+			expectedNames: []string{"sts-static"},
+		},
+		{
+			name: "StatefulSets without NodeSet label are included",
+			statefulSets: []kruisev1b1.StatefulSet{
+				{ObjectMeta: metav1.ObjectMeta{Name: "sts-with-label", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-ephemeral"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "sts-without-label", Labels: map[string]string{}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "sts-nil-labels"}},
+			},
+			ephemeralNodeSets: map[string]struct{}{
+				"nodeset-ephemeral": {},
+			},
+			expectedNames: []string{"sts-without-label", "sts-nil-labels"},
+		},
+		{
+			name: "All StatefulSets from ephemeral NodeSets filtered out",
+			statefulSets: []kruisev1b1.StatefulSet{
+				{ObjectMeta: metav1.ObjectMeta{Name: "sts-1", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-eph-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "sts-2", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-eph-2"}}},
+			},
+			ephemeralNodeSets: map[string]struct{}{
+				"nodeset-eph-1": {},
+				"nodeset-eph-2": {},
+			},
+			expectedNames: []string{},
+		},
+		{
+			name:              "Empty StatefulSets list",
+			statefulSets:      []kruisev1b1.StatefulSet{},
+			ephemeralNodeSets: map[string]struct{}{"nodeset-ephemeral": {}},
+			expectedNames:     []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := reconciler.FilterStatefulSetsExcludingEphemeralNodeSets(tt.statefulSets, tt.ephemeralNodeSets)
+
+			resultNames := make([]string, 0, len(result))
+			for _, sts := range result {
+				resultNames = append(resultNames, sts.Name)
+			}
+
+			assert.Equal(t, tt.expectedNames, resultNames)
 		})
 	}
 }

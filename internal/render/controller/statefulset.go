@@ -115,6 +115,7 @@ func RenderStatefulSet(
 					SchedulerName:                 corev1.DefaultSchedulerName,
 					DNSPolicy:                     corev1.DNSClusterFirst,
 					PriorityClassName:             controller.PriorityClass,
+					ServiceAccountName:            controller.ServiceAccountName,
 				},
 			},
 		},
