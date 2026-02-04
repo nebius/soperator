@@ -52,13 +52,16 @@ func RenderStatefulSet(
 		replicas = ptr.To(consts.ZeroReplicas)
 	}
 
-	initContainers := []corev1.Container{
+	systemInitContainers := []corev1.Container{
 		common.RenderContainerMunge(&controller.ContainerMunge),
 	}
 	if accountingEnabled {
-		initContainers = append(initContainers, renderContainerAccountingWaiter(&controller.ContainerSlurmctld))
+		systemInitContainers = append(systemInitContainers, renderContainerAccountingWaiter(&controller.ContainerSlurmctld))
 	}
-	initContainers = append(initContainers, controller.CustomInitContainers...)
+	initContainers, err := common.OrderInitContainers(systemInitContainers, controller.CustomInitContainers)
+	if err != nil {
+		return kruisev1b1.StatefulSet{}, fmt.Errorf("ordering init containers: %w", err)
+	}
 
 	return kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{

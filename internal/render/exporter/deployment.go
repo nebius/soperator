@@ -38,7 +38,11 @@ func RenderDeploymentExporter(clusterValues *values.SlurmCluster) (*appsv1.Deplo
 	if err != nil {
 		return nil, err
 	}
-	initContainers := append(clusterValues.SlurmExporter.CustomInitContainers, minNoopContainer)
+	systemInitContainers := []corev1.Container{minNoopContainer}
+	initContainers, err := common.OrderInitContainers(systemInitContainers, clusterValues.SlurmExporter.CustomInitContainers)
+	if err != nil {
+		return nil, err
+	}
 
 	podTemplateSpec := renderPodTemplateSpec(
 		clusterValues,

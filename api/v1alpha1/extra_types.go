@@ -106,6 +106,19 @@ const (
 	UpdateStatusSucceeded UpdateStatus = "succeeded"
 )
 
+// InitContainer wraps corev1.Container with ordering metadata for init containers.
+// It allows specifying dependencies between init containers to control execution order.
+type InitContainer struct {
+	corev1.Container `json:",inline"`
+
+	// RunsBefore specifies names of system init containers that must run after this one.
+	// Can only reference system init containers (e.g., "munge", "wait-for-controller").
+	// Custom containers maintain their relative order from the array.
+	//
+	// +kubebuilder:validation:Optional
+	RunsBefore []string `json:"runsBefore,omitempty"`
+}
+
 // ContainerSecuritySpec defines the security configuration for a container
 type ContainerSecuritySpec struct {
 	// SecurityLimitsConfig defines the multiline content of "limits.conf".

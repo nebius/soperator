@@ -1829,11 +1829,13 @@ spec:
                       a Slurm node.
                     properties:
                       customInitContainers:
-                        description: CustomInitContainers represent additional init
-                          containers that should be added to created Pods
+                        description: |-
+                          CustomInitContainers represent additional init containers that should be added to created Pods.
+                          Use RunsBefore to control the order relative to system init containers.
                         items:
-                          description: A single application container that you want
-                            to run within a pod.
+                          description: |-
+                            InitContainer wraps corev1.Container with ordering metadata for init containers.
+                            It allows specifying dependencies between init containers to control execution order.
                           properties:
                             args:
                               description: |-
@@ -2864,6 +2866,14 @@ spec:
                                 type: object
                               type: array
                               x-kubernetes-list-type: atomic
+                            runsBefore:
+                              description: |-
+                                RunsBefore specifies names of system init containers that must run after this one.
+                                Can only reference system init containers (e.g., "munge", "wait-for-accounting").
+                                Custom containers maintain their relative order from the array.
+                              items:
+                                type: string
+                              type: array
                             securityContext:
                               description: |-
                                 SecurityContext defines the security options the container should be run with.
@@ -3513,11 +3523,13 @@ spec:
                       Accounting represents the Slurm accounting node and database configuration
                     properties:
                       customInitContainers:
-                        description: CustomInitContainers represent additional init
-                          containers that should be added to created Pods
+                        description: |-
+                          CustomInitContainers represent additional init containers that should be added to created Pods.
+                          Use RunsBefore to control the order relative to system init containers.
                         items:
-                          description: A single application container that you want
-                            to run within a pod.
+                          description: |-
+                            InitContainer wraps corev1.Container with ordering metadata for init containers.
+                            It allows specifying dependencies between init containers to control execution order.
                           properties:
                             args:
                               description: |-
@@ -4548,6 +4560,14 @@ spec:
                                 type: object
                               type: array
                               x-kubernetes-list-type: atomic
+                            runsBefore:
+                              description: |-
+                                RunsBefore specifies names of system init containers that must run after this one.
+                                Can only reference system init containers (e.g., "munge", "wait-for-accounting").
+                                Custom containers maintain their relative order from the array.
+                              items:
+                                type: string
+                              type: array
                             securityContext:
                               description: |-
                                 SecurityContext defines the security options the container should be run with.
@@ -7638,11 +7658,13 @@ spec:
                     description: Controller represents the Slurm controller node configuration
                     properties:
                       customInitContainers:
-                        description: CustomInitContainers represent additional init
-                          containers that should be added to created Pods
+                        description: |-
+                          CustomInitContainers represent additional init containers that should be added to created Pods.
+                          Use RunsBefore to control the order relative to system init containers.
                         items:
-                          description: A single application container that you want
-                            to run within a pod.
+                          description: |-
+                            InitContainer wraps corev1.Container with ordering metadata for init containers.
+                            It allows specifying dependencies between init containers to control execution order.
                           properties:
                             args:
                               description: |-
@@ -8673,6 +8695,14 @@ spec:
                                 type: object
                               type: array
                               x-kubernetes-list-type: atomic
+                            runsBefore:
+                              description: |-
+                                RunsBefore specifies names of system init containers that must run after this one.
+                                Can only reference system init containers (e.g., "munge", "wait-for-accounting").
+                                Custom containers maintain their relative order from the array.
+                              items:
+                                type: string
+                              type: array
                             securityContext:
                               description: |-
                                 SecurityContext defines the security options the container should be run with.
@@ -10323,11 +10353,13 @@ spec:
                         pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
                         type: string
                       customInitContainers:
-                        description: CustomInitContainers represent additional init
-                          containers that should be added to created Pods
+                        description: |-
+                          CustomInitContainers represent additional init containers that should be added to created Pods.
+                          Use RunsBefore to control the order relative to system init containers.
                         items:
-                          description: A single application container that you want
-                            to run within a pod.
+                          description: |-
+                            InitContainer wraps corev1.Container with ordering metadata for init containers.
+                            It allows specifying dependencies between init containers to control execution order.
                           properties:
                             args:
                               description: |-
@@ -11358,6 +11390,14 @@ spec:
                                 type: object
                               type: array
                               x-kubernetes-list-type: atomic
+                            runsBefore:
+                              description: |-
+                                RunsBefore specifies names of system init containers that must run after this one.
+                                Can only reference system init containers (e.g., "munge", "wait-for-accounting").
+                                Custom containers maintain their relative order from the array.
+                              items:
+                                type: string
+                              type: array
                             securityContext:
                               description: |-
                                 SecurityContext defines the security options the container should be run with.
@@ -12992,11 +13032,13 @@ spec:
                     description: Login represents the Slurm login node configuration
                     properties:
                       customInitContainers:
-                        description: CustomInitContainers represent additional init
-                          containers that should be added to created Pods
+                        description: |-
+                          CustomInitContainers represent additional init containers that should be added to created Pods.
+                          Use RunsBefore to control the order relative to system init containers.
                         items:
-                          description: A single application container that you want
-                            to run within a pod.
+                          description: |-
+                            InitContainer wraps corev1.Container with ordering metadata for init containers.
+                            It allows specifying dependencies between init containers to control execution order.
                           properties:
                             args:
                               description: |-
@@ -14027,6 +14069,14 @@ spec:
                                 type: object
                               type: array
                               x-kubernetes-list-type: atomic
+                            runsBefore:
+                              description: |-
+                                RunsBefore specifies names of system init containers that must run after this one.
+                                Can only reference system init containers (e.g., "munge", "wait-for-accounting").
+                                Custom containers maintain their relative order from the array.
+                              items:
+                                type: string
+                              type: array
                             securityContext:
                               description: |-
                                 SecurityContext defines the security options the container should be run with.
@@ -15738,11 +15788,13 @@ spec:
                     description: Rest represents the Slurm REST API node configuration
                     properties:
                       customInitContainers:
-                        description: CustomInitContainers represent additional init
-                          containers that should be added to created Pods
+                        description: |-
+                          CustomInitContainers represent additional init containers that should be added to created Pods.
+                          Use RunsBefore to control the order relative to system init containers.
                         items:
-                          description: A single application container that you want
-                            to run within a pod.
+                          description: |-
+                            InitContainer wraps corev1.Container with ordering metadata for init containers.
+                            It allows specifying dependencies between init containers to control execution order.
                           properties:
                             args:
                               description: |-
@@ -16773,6 +16825,14 @@ spec:
                                 type: object
                               type: array
                               x-kubernetes-list-type: atomic
+                            runsBefore:
+                              description: |-
+                                RunsBefore specifies names of system init containers that must run after this one.
+                                Can only reference system init containers (e.g., "munge", "wait-for-accounting").
+                                Custom containers maintain their relative order from the array.
+                              items:
+                                type: string
+                              type: array
                             securityContext:
                               description: |-
                                 SecurityContext defines the security options the container should be run with.
@@ -17551,11 +17611,13 @@ spec:
                         - v2
                         type: string
                       customInitContainers:
-                        description: CustomInitContainers represent additional init
-                          containers that should be added to created Pods
+                        description: |-
+                          CustomInitContainers represent additional init containers that should be added to created Pods.
+                          Use RunsBefore to control the order relative to system init containers.
                         items:
-                          description: A single application container that you want
-                            to run within a pod.
+                          description: |-
+                            InitContainer wraps corev1.Container with ordering metadata for init containers.
+                            It allows specifying dependencies between init containers to control execution order.
                           properties:
                             args:
                               description: |-
@@ -18586,6 +18648,14 @@ spec:
                                 type: object
                               type: array
                               x-kubernetes-list-type: atomic
+                            runsBefore:
+                              description: |-
+                                RunsBefore specifies names of system init containers that must run after this one.
+                                Can only reference system init containers (e.g., "munge", "wait-for-accounting").
+                                Custom containers maintain their relative order from the array.
+                              items:
+                                type: string
+                              type: array
                             securityContext:
                               description: |-
                                 SecurityContext defines the security options the container should be run with.

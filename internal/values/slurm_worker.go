@@ -1,7 +1,6 @@
 package values
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -15,7 +14,7 @@ type SlurmWorker struct {
 
 	ContainerSlurmd      Container
 	ContainerMunge       Container
-	CustomInitContainers []corev1.Container
+	CustomInitContainers []slurmv1.InitContainer
 
 	SupervisordConfigMapDefault bool
 	SupervisordConfigMapName    string

@@ -95,14 +95,14 @@ func renderContainerAccountingWaiterSleep(container *values.Container) corev1.Co
 }
 
 // renderCustomContainersSleep converts custom init containers to sleep containers
-func renderCustomContainersSleep(customInitContainers []corev1.Container) []corev1.Container {
+func renderCustomContainersSleep(customInitContainers []slurmv1.InitContainer) []corev1.Container {
 	if len(customInitContainers) == 0 {
 		return nil
 	}
 
 	result := make([]corev1.Container, len(customInitContainers))
-	for i, container := range customInitContainers {
-		sleepContainer := container.DeepCopy()
+	for i, initContainer := range customInitContainers {
+		sleepContainer := initContainer.Container.DeepCopy()
 		sleepContainer.Command = []string{"sleep"}
 		sleepContainer.Args = []string{"infinity"}
 		sleepContainer.Resources = corev1.ResourceRequirements{}

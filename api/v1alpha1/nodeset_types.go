@@ -202,9 +202,10 @@ type NodeSetSpec struct {
 	WorkerAnnotations map[string]string `json:"workerAnnotations,omitempty"`
 
 	// CustomInitContainers represent additional init containers which will be added to worker pods.
+	// Use RunsBefore to control the order relative to system init containers.
 	//
 	// +kubebuilder:validation:Optional
-	CustomInitContainers []corev1.Container `json:"customInitContainers,omitempty"`
+	CustomInitContainers []InitContainer `json:"customInitContainers,omitempty"`
 
 	// endregion Scheduling
 }

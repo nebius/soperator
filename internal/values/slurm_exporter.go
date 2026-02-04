@@ -2,7 +2,6 @@ package values
 
 import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -24,7 +23,7 @@ type SlurmExporter struct {
 	// Deprecated: will be removed when Slurm Exporter will be replaced with Soperator Exporter.
 	ContainerMunge Container
 
-	CustomInitContainers []corev1.Container
+	CustomInitContainers []slurmv1.InitContainer
 
 	// VolumeJail is a volume that is used to mount the jail directory for the Soperator Exporter.
 	//

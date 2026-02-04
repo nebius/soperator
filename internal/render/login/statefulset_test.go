@@ -90,7 +90,7 @@ func TestRenderStatefulSet_PriorityClass(t *testing.T) {
 					Name: "test-headless",
 				},
 				SSHDConfigMapName:    "test-sshd-config",
-				CustomInitContainers: []corev1.Container{},
+				CustomInitContainers: []slurmv1.InitContainer{},
 				JailSubMounts:        []slurmv1.NodeVolumeMount{},
 				CustomVolumeMounts:   []slurmv1.NodeVolumeMount{},
 			}

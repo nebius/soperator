@@ -566,6 +566,19 @@ type VolumeSource struct {
 	Name string `json:"name"`
 }
 
+// InitContainer wraps corev1.Container with ordering metadata for init containers.
+// It allows specifying dependencies between init containers to control execution order.
+type InitContainer struct {
+	corev1.Container `json:",inline"`
+
+	// RunsBefore specifies names of system init containers that must run after this one.
+	// Can only reference system init containers (e.g., "munge", "wait-for-accounting").
+	// Custom containers maintain their relative order from the array.
+	//
+	// +kubebuilder:validation:Optional
+	RunsBefore []string `json:"runsBefore,omitempty"`
+}
+
 // Secrets define the [corev1.Secret] references needed for Slurm cluster operation
 type Secrets struct {
 	// SshdKeysName defines name of the [corev1.Secret] with ssh keys for SSHD server
@@ -857,10 +870,11 @@ type AccountingSlurmConf struct {
 
 // SlurmNodeController defines the configuration for the Slurm controller node
 type SlurmNodeController struct {
-	// CustomInitContainers represent additional init containers that should be added to created Pods
+	// CustomInitContainers represent additional init containers that should be added to created Pods.
+	// Use RunsBefore to control the order relative to system init containers.
 	//
 	// +kubebuilder:validation:Optional
-	CustomInitContainers []corev1.Container `json:"customInitContainers,omitempty"`
+	CustomInitContainers []InitContainer `json:"customInitContainers,omitempty"`
 
 	// K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
 	// Must correspond to the name of one of [K8sNodeFilter]
@@ -1158,8 +1172,9 @@ type SlurmNode struct {
 	// Size defines the number of node instances
 	Size int32 `json:"size,omitempty"`
 
-	// CustomInitContainers represent additional init containers that should be added to created Pods
-	CustomInitContainers []corev1.Container `json:"customInitContainers,omitempty"`
+	// CustomInitContainers represent additional init containers that should be added to created Pods.
+	// Use RunsBefore to control the order relative to system init containers.
+	CustomInitContainers []InitContainer `json:"customInitContainers,omitempty"`
 
 	// K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
 	// Must correspond to the name of one of [K8sNodeFilter]

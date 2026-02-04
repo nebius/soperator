@@ -1,6 +1,8 @@
 package accounting
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -57,6 +59,15 @@ func BasePodTemplateSpec(
 		return nil, err
 	}
 
+	systemInitContainers := []corev1.Container{
+		renderContainerDbwaiter(clusterName, accounting),
+		common.RenderContainerMunge(&accounting.ContainerMunge),
+	}
+	initContainers, err := common.OrderInitContainers(systemInitContainers, accounting.CustomInitContainers)
+	if err != nil {
+		return nil, fmt.Errorf("ordering init containers: %w", err)
+	}
+
 	return &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      matchLabels,
@@ -69,13 +80,7 @@ func BasePodTemplateSpec(
 			NodeSelector:      nodeFilter.NodeSelector,
 			Hostname:          consts.HostnameAccounting,
 			PriorityClassName: accounting.PriorityClass,
-			InitContainers: append(
-				[]corev1.Container{
-					renderContainerDbwaiter(clusterName, accounting),
-					common.RenderContainerMunge(&accounting.ContainerMunge),
-				},
-				accounting.CustomInitContainers...,
-			),
+			InitContainers:    initContainers,
 			Containers: []corev1.Container{
 				renderContainerAccounting(accounting.ContainerAccounting, additionalVolumeMounts),
 			},

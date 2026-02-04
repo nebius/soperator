@@ -26,7 +26,7 @@ type SlurmNodeSet struct {
 
 	ContainerSlurmd           Container
 	ContainerMunge            Container
-	CustomInitContainers      []corev1.Container
+	CustomInitContainers      []slurmv1alpha1.InitContainer
 	CgroupVersion             string
 	AppArmorProfileUseDefault bool
 

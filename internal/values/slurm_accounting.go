@@ -1,7 +1,6 @@
 package values
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -17,7 +16,7 @@ type SlurmAccounting struct {
 
 	ContainerAccounting  Container
 	ContainerMunge       Container
-	CustomInitContainers []corev1.Container
+	CustomInitContainers []slurmv1.InitContainer
 
 	Service        Service
 	Deployment     Deployment

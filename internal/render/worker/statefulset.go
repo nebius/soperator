@@ -50,11 +50,15 @@ func RenderStatefulSet(
 	}
 
 	// Since 1.29 is native sidecar support, we can use the native restart policy
-	initContainers := []corev1.Container{
-		common.RenderContainerMunge(&worker.ContainerMunge), RenderContainerWaitForController(&worker.ContainerSlurmd),
+	systemInitContainers := []corev1.Container{
+		common.RenderContainerMunge(&worker.ContainerMunge),
+		RenderContainerWaitForController(&worker.ContainerSlurmd),
 	}
 
-	initContainers = append(initContainers, worker.CustomInitContainers...)
+	initContainers, err := common.OrderInitContainers(systemInitContainers, worker.CustomInitContainers)
+	if err != nil {
+		return kruisev1b1.StatefulSet{}, fmt.Errorf("ordering init containers: %w", err)
+	}
 
 	slurmdContainer, err := renderContainerSlurmd(
 		&worker.ContainerSlurmd,
@@ -174,11 +178,14 @@ func RenderNodeSetStatefulSet(
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
-	initContainers := []corev1.Container{
+	systemInitContainers := []corev1.Container{
 		common.RenderContainerMunge(&nodeSet.ContainerMunge),
 		RenderContainerWaitForController(&nodeSet.ContainerSlurmd),
 	}
-	initContainers = append(initContainers, nodeSet.CustomInitContainers...)
+	initContainers, err := common.OrderInitContainersAlpha(systemInitContainers, nodeSet.CustomInitContainers)
+	if err != nil {
+		return kruisev1b1.StatefulSet{}, fmt.Errorf("ordering init containers: %w", err)
+	}
 
 	slurmdContainer, err := renderContainerNodeSetSlurmd(nodeSet)
 	if err != nil {

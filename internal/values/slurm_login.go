@@ -14,7 +14,7 @@ type SlurmLogin struct {
 
 	ContainerSshd        Container
 	ContainerMunge       Container
-	CustomInitContainers []corev1.Container
+	CustomInitContainers []slurmv1.InitContainer
 
 	Service         Service
 	HeadlessService Service
