@@ -77,6 +77,9 @@ spec:
             - type: add
               field: resource["k8s.namespace.name"]
               value: {{ .Values.slurmCluster.namespace | default "soperator" | quote }}
+            - type: add
+              field: resource["region"]
+              value: {{ .Values.observability.region | quote }}
             - id: extract_directory
               type: regex_parser
               parse_from: attributes["log.file.path"]
@@ -129,6 +132,22 @@ spec:
               if: resource["log_type"] == "slurm_scripts" and attributes["script_context"] != nil
             - type: remove
               field: attributes.base_name
+            - id: parse_json_body # parse json body to extract fields
+              type: json_parser
+              parse_from: body
+              parse_to: attributes.hc_json
+              if: body matches "^\\s*\\{"
+            - type: move
+              from: attributes.hc_json.status
+              to: resource["slurm_run_status"]
+              if: attributes.hc_json != nil && attributes.hc_json["status"] != nil
+            - type: move
+              from: attributes.hc_json.resolution
+              to: resource["slurm_run_resolution"]
+              if: attributes.hc_json != nil && attributes.hc_json["resolution"] != nil
+            - type: remove # drop the parsed json body
+              field: attributes.hc_json
+              if: attributes.hc_json != nil
           retry_on_failure:
             enabled: true
           start_at: end  # Start reading from the end of the file on startup.
@@ -157,6 +176,9 @@ spec:
             - type: add
               field: resource["k8s.namespace.name"]
               value: {{ .Values.slurmCluster.namespace | default "soperator" | quote }}
+            - type: add
+              field: resource["region"]
+              value: {{ .Values.observability.region | quote }}
 
             # Add log_type
             - type: add
