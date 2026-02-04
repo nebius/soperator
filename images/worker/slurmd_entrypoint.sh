@@ -48,29 +48,7 @@ if [ "${evaluated_extra}" != "" ]; then
 fi
 
 if [ "${SOPERATOR_NODE_SETS_ON}" = "true" ]; then
-  echo "Running slurmd with NodeSets configuration from slurm.conf"
-
-  # Default path should match consts.TopologyEnvFilePath used by the operator
-  TOPOLOGY_ENV_FILE="${TOPOLOGY_ENV_FILE:-/tmp/topology/slurm_topology.env}"
-
-  if [ -f "${TOPOLOGY_ENV_FILE}" ]; then
-    echo "Loading topology from ${TOPOLOGY_ENV_FILE}"
-    . "${TOPOLOGY_ENV_FILE}"
-  else
-    echo "WARNING: Topology env file not found at ${TOPOLOGY_ENV_FILE}"
-    exit 2
-  fi
-
-  if [ -z "${SLURM_NODE_TOPOLOGY}" ]; then
-    echo "ERROR: SLURM_NODE_TOPOLOGY is not set in ${TOPOLOGY_ENV_FILE}"
-    exit 3
-  fi
-
-  slurmd_args+=(
-    --conf
-    "${SLURM_NODE_TOPOLOGY}"
-  )
-  
+  echo "Running slurmd with NodeSets configuration"
 else
   echo "Running slurmd with dynamic node configuration"
   slurmd_args+=(

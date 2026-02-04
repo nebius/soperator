@@ -899,6 +899,14 @@ type SlurmNodeController struct {
 	//
 	// +kubebuilder:validation:Optional
 	PriorityClass string `json:"priorityClass,omitempty"`
+
+	// ServiceAccountName is the name of the ServiceAccount to use for power-manager.
+	// The power-manager binary runs inside slurmctld pod and is called by Slurm's ResumeProgram/SuspendProgram
+	// to manage ephemeral node power states by updating NodeSetPowerState CRs.
+	// If empty, power management for ephemeral nodes will not be available.
+	//
+	// +kubebuilder:validation:Optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 // SlurmNodeControllerVolumes define the volumes for the Slurm controller node

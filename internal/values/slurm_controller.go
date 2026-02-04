@@ -26,6 +26,8 @@ type SlurmController struct {
 	CustomVolumeMounts []slurmv1.NodeVolumeMount
 	Maintenance        *consts.MaintenanceMode
 	PriorityClass      string
+
+	ServiceAccountName string
 }
 
 func buildSlurmControllerFrom(clusterName string, maintenance *consts.MaintenanceMode, controller *slurmv1.SlurmNodeController) SlurmController {
@@ -52,13 +54,14 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 			controller.Munge,
 			consts.ContainerNameMunge,
 		),
-		Service:       buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeController, clusterName)),
-		StatefulSet:   statefulSet,
-		DaemonSet:     daemonSet,
-		VolumeSpool:   *controller.Volumes.Spool.DeepCopy(),
-		VolumeJail:    *controller.Volumes.Jail.DeepCopy(),
-		Maintenance:   maintenance,
-		PriorityClass: controller.PriorityClass,
+		Service:            buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeController, clusterName)),
+		StatefulSet:        statefulSet,
+		DaemonSet:          daemonSet,
+		VolumeSpool:        *controller.Volumes.Spool.DeepCopy(),
+		VolumeJail:         *controller.Volumes.Jail.DeepCopy(),
+		Maintenance:        maintenance,
+		PriorityClass:      controller.PriorityClass,
+		ServiceAccountName: controller.ServiceAccountName,
 	}
 
 	for _, customVolumeMount := range controller.Volumes.CustomMounts {

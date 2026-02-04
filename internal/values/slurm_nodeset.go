@@ -53,6 +53,8 @@ type SlurmNodeSet struct {
 
 	EphemeralNodes               *bool
 	EphemeralTopologyWaitTimeout int32
+
+	ActiveNodes []int32
 }
 
 func BuildSlurmNodeSetFrom(

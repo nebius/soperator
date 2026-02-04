@@ -1,0 +1,23 @@
+{{- if .Values.slurmNodes.controller.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "slurm-cluster.controller.roleName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "slurm-cluster.labels" . | nindent 4 }}
+    app.kubernetes.io/component: slurm-controller
+rules:
+  # Read NodeSets to check ephemeralNodes flag
+  - apiGroups: ["slurm.nebius.ai"]
+    resources: ["nodesets"]
+    verbs: ["get", "list", "watch"]
+  # Full access to NodeSetPowerState (the only write permission needed)
+  - apiGroups: ["slurm.nebius.ai"]
+    resources: ["nodesetpowerstates"]
+    verbs: ["get", "list", "watch", "create", "update"]
+  # Read NodeSetPowerState status
+  - apiGroups: ["slurm.nebius.ai"]
+    resources: ["nodesetpowerstates/status"]
+    verbs: ["get"]
+{{- end }}

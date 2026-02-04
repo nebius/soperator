@@ -107,3 +107,13 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 
 	return res, nil
 }
+
+// HasEphemeralNodes returns true if any NodeSet in the cluster has ephemeral nodes enabled
+func (c *SlurmCluster) HasEphemeralNodes() bool {
+	for _, ns := range c.NodeSets {
+		if ns.Spec.EphemeralNodes != nil && *ns.Spec.EphemeralNodes {
+			return true
+		}
+	}
+	return false
+}
