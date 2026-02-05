@@ -311,12 +311,17 @@ func (r *WorkerTopologyReconciler) GetStatefulSetsWithFallback(
 			return nil, fmt.Errorf("get SlurmCluster for fallback topology: %w", err)
 		}
 
+		var replicas int32 = 0
+		if slurmCluster.Spec.SlurmNodes.Worker != nil {
+			replicas = slurmCluster.Spec.SlurmNodes.Worker.Size
+		}
+
 		fallbackSTS := kruisev1b1.StatefulSet{
 			ObjectMeta: ctrl.ObjectMeta{
 				Name: "worker",
 			},
 			Spec: kruisev1b1.StatefulSetSpec{
-				Replicas: &slurmCluster.Spec.SlurmNodes.Worker.Size,
+				Replicas: &replicas,
 			},
 		}
 

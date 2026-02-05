@@ -101,9 +101,13 @@ func (c *SlurmCluster) Validate(ctx context.Context) error {
 			// controller
 			c.NodeController.VolumeSpool.VolumeSourceName,
 			c.NodeController.VolumeJail.VolumeSourceName,
-			// worker
-			c.NodeWorker.VolumeSpool.VolumeSourceName,
-			c.NodeWorker.VolumeJail.VolumeSourceName,
+		}
+		// worker volumes (only if worker is defined)
+		if c.NodeWorker.VolumeSpool.VolumeSourceName != nil {
+			volumeSourceNamesRaw = append(volumeSourceNamesRaw, c.NodeWorker.VolumeSpool.VolumeSourceName)
+		}
+		if c.NodeWorker.VolumeJail.VolumeSourceName != nil {
+			volumeSourceNamesRaw = append(volumeSourceNamesRaw, c.NodeWorker.VolumeJail.VolumeSourceName)
 		}
 		// worker jail sub-mounts
 		for _, subMount := range c.NodeWorker.JailSubMounts {

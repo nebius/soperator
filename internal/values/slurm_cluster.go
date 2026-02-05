@@ -73,7 +73,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		NodeWorker: buildSlurmWorkerFrom(
 			cluster.Name,
 			cluster.Spec.Maintenance,
-			&cluster.Spec.SlurmNodes.Worker,
+			cluster.Spec.SlurmNodes.Worker,
 			cluster.Spec.UseDefaultAppArmorProfile,
 		),
 		NodeLogin:          buildSlurmLoginFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),

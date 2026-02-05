@@ -48449,7 +48449,8 @@ spec:
                 configuration
               rule: '!(has(self.partitionConfiguration) && has(self.partitionConfiguration.partitions)
                 && size(self.partitionConfiguration.partitions) > 0 && self.partitionConfiguration.partitions.exists(p,
-                size(p.nodeSetRefs) > 0) && self.slurmNodes.worker.size > 0)'
+                size(p.nodeSetRefs) > 0) && has(self.slurmNodes.worker) && self.slurmNodes.worker.size
+                > 0)'
           status:
             description: SlurmClusterStatus defines the observed state of SlurmCluster
             properties:

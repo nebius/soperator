@@ -242,7 +242,7 @@ func TestWorkerTopologyReconciler_GetStatefulSetsWithFallback(t *testing.T) {
 					},
 					Spec: slurmv1.SlurmClusterSpec{
 						SlurmNodes: slurmv1.SlurmNodes{
-							Worker: slurmv1.SlurmNodeWorker{
+							Worker: &slurmv1.SlurmNodeWorker{
 								SlurmNode: slurmv1.SlurmNode{
 									Size: 5,
 								},
@@ -439,7 +439,7 @@ func TestEnsureWorkerTopologyConfigMap(t *testing.T) {
 				},
 				Spec: slurmv1.SlurmClusterSpec{
 					SlurmNodes: slurmv1.SlurmNodes{
-						Worker: slurmv1.SlurmNodeWorker{
+						Worker: &slurmv1.SlurmNodeWorker{
 							SlurmNode: slurmv1.SlurmNode{Size: 2},
 						},
 					},

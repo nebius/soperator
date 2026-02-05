@@ -48,6 +48,10 @@ func buildSlurmWorkerFrom(
 	worker *slurmv1.SlurmNodeWorker,
 	useDefaultAppArmorProfile bool,
 ) SlurmWorker {
+	if worker == nil {
+		return SlurmWorker{}
+	}
+
 	supervisordConfigName := worker.SupervisordConfigMapRefName
 	supervisordConfigDefault := supervisordConfigName == ""
 	if supervisordConfigDefault {
