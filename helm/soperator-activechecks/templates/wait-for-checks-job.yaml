@@ -25,8 +25,9 @@ spec:
               CRD_KIND="activechecks.slurm.nebius.ai"
 
               echo "Fetching ActiveCheck list..."
+              # Only wait for checks that run on creation and have drainSlurmNode configured.
               active_check_names=$(kubectl get "$CRD_KIND" -n "$NAMESPACE" -o json \
-                | jq -r '.items[] | select(.spec.runAfterCreation == true) | .metadata.name')
+                | jq -r '.items[] | select(.spec.runAfterCreation == true and .spec.failureReactions.drainSlurmNode != null) | .metadata.name')
 
               if [ -z "$active_check_names" ]; then
                 echo "No CRs with runAfterCreation=true found. Exiting."
