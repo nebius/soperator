@@ -210,7 +210,7 @@ jobContainer:
 {{- end }}
 {{- if $env }}
   env:
-{{ toYaml $env | indent 4 }}
+{{ tpl (toYaml $env) .ctx | indent 4 }}
 {{- end }}
 {{- if $volumeMounts }}
   volumeMounts:
