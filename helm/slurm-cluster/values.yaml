@@ -603,6 +603,10 @@ slurmScripts:
       enabled: true
       customContent: null
       customConfig: null
+    chmod_enroot_layers.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
     cleanup_enroot.sh:
       enabled: true
       customContent: null
