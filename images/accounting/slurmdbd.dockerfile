@@ -2,8 +2,8 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/53
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260204141127 AS controller_slurmdbd
+# https://github.com/nebius/ml-containers/pull/55
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260205130055 AS controller_slurmdbd
 
 # Expose the port used for accessing slurmdbd
 EXPOSE 6819

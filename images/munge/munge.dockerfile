@@ -1,7 +1,7 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-# https://github.com/nebius/ml-containers/pull/53
-FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260202145316 AS munge
+# https://github.com/nebius/ml-containers/pull/55
+FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260205123821 AS munge
 
 RUN apt-get update && \
     apt -y install \
