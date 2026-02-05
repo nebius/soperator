@@ -1,6 +1,8 @@
 package accounting
 
 import (
+	"slices"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -57,6 +59,12 @@ func BasePodTemplateSpec(
 		return nil, err
 	}
 
+	initContainers := slices.Clone(accounting.CustomInitContainers)
+	initContainers = append(initContainers,
+		renderContainerDbwaiter(clusterName, accounting),
+		common.RenderContainerMunge(&accounting.ContainerMunge),
+	)
+
 	return &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      matchLabels,
@@ -69,13 +77,7 @@ func BasePodTemplateSpec(
 			NodeSelector:      nodeFilter.NodeSelector,
 			Hostname:          consts.HostnameAccounting,
 			PriorityClassName: accounting.PriorityClass,
-			InitContainers: append(
-				[]corev1.Container{
-					renderContainerDbwaiter(clusterName, accounting),
-					common.RenderContainerMunge(&accounting.ContainerMunge),
-				},
-				accounting.CustomInitContainers...,
-			),
+			InitContainers:    initContainers,
 			Containers: []corev1.Container{
 				renderContainerAccounting(accounting.ContainerAccounting, additionalVolumeMounts),
 			},
