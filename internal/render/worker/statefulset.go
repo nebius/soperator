@@ -3,6 +3,7 @@ package worker
 import (
 	"fmt"
 	"maps"
+	"slices"
 
 	appspub "github.com/openkruise/kruise-api/apps/pub"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
@@ -49,12 +50,12 @@ func RenderStatefulSet(
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
+	initContainers := slices.Clone(worker.CustomInitContainers)
 	// Since 1.29 is native sidecar support, we can use the native restart policy
-	initContainers := []corev1.Container{
-		common.RenderContainerMunge(&worker.ContainerMunge), RenderContainerWaitForController(&worker.ContainerSlurmd),
-	}
-
-	initContainers = append(initContainers, worker.CustomInitContainers...)
+	initContainers = append(initContainers,
+		common.RenderContainerMunge(&worker.ContainerMunge),
+		RenderContainerWaitForController(&worker.ContainerSlurmd),
+	)
 
 	slurmdContainer, err := renderContainerSlurmd(
 		&worker.ContainerSlurmd,
@@ -174,11 +175,11 @@ func RenderNodeSetStatefulSet(
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
-	initContainers := []corev1.Container{
+	initContainers := slices.Clone(nodeSet.CustomInitContainers)
+	initContainers = append(initContainers,
 		common.RenderContainerMunge(&nodeSet.ContainerMunge),
 		RenderContainerWaitForController(&nodeSet.ContainerSlurmd),
-	}
-	initContainers = append(initContainers, nodeSet.CustomInitContainers...)
+	)
 
 	slurmdContainer, err := renderContainerNodeSetSlurmd(nodeSet)
 	if err != nil {

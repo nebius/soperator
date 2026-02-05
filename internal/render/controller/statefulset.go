@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"slices"
 
 	appspub "github.com/openkruise/kruise-api/apps/pub"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
@@ -52,13 +53,11 @@ func RenderStatefulSet(
 		replicas = ptr.To(consts.ZeroReplicas)
 	}
 
-	initContainers := []corev1.Container{
-		common.RenderContainerMunge(&controller.ContainerMunge),
-	}
+	initContainers := slices.Clone(controller.CustomInitContainers)
+	initContainers = append(initContainers, common.RenderContainerMunge(&controller.ContainerMunge))
 	if accountingEnabled {
 		initContainers = append(initContainers, renderContainerAccountingWaiter(&controller.ContainerSlurmctld))
 	}
-	initContainers = append(initContainers, controller.CustomInitContainers...)
 
 	return kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
