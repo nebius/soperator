@@ -227,13 +227,6 @@ type ContainerSlurmdSpec struct {
 	// +kubebuilder:validation:Required
 	Resources corev1.ResourceList `json:"resources"`
 
-	// CgroupVersion defines the version of the cgroup
-	//
-	// +kubebuilder:default="v2"
-	// +kubebuilder:validation:Enum="v1";"v2"
-	// +kubebuilder:validation:Optional
-	CgroupVersion string `json:"cgroupVersion,omitempty"`
-
 	// Volumes define the volume configurations for the Slurm worker container
 	//
 	// +kubebuilder:validation:Required

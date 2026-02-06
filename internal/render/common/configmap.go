@@ -1,6 +1,7 @@
 package common
 
 import (
+	"cmp"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -465,12 +466,7 @@ func addSlurmConfigProperties(res *renderutils.PropertiesConfig, config interfac
 }
 
 func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
-	cgroupVersion := cluster.NodeWorker.CgroupVersion
-	if cgroupVersion == "" {
-		// TODO: it's better to use "autodetect", but right now we have some checks in the entrypoint
-		// that rely on "v2" value.
-		cgroupVersion = consts.CGroupV2
-	}
+	cgroupVersion := cmp.Or(cluster.CgroupVersion, consts.CGroupV2)
 	defaultLines := strings.Split(renderDefaultCGroupConfig(cgroupVersion), "\n")
 
 	if cluster.CustomCgroupConfig == nil || strings.TrimSpace(*cluster.CustomCgroupConfig) == "" {

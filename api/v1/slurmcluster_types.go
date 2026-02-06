@@ -98,6 +98,13 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	CustomCgroupConfig *string `json:"customCgroupConfig,omitempty"`
 
+	// CgroupVersion defines the version of the cgroup used by Slurm workers.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="v2"
+	// +kubebuilder:validation:Enum="v1";"v2"
+	CgroupVersion string `json:"cgroupVersion,omitempty"`
+
 	// MPIConfig represents the PMIx configuration in mpi.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
@@ -962,7 +969,9 @@ type SlurmNodeWorker struct {
 	//
 	// +kubebuilder:validation:Required
 	Volumes SlurmNodeWorkerVolumes `json:"volumes"`
+
 	// CgroupVersion defines the version of the cgroup
+	// Deprecated: Use spec.cgroupVersion instead. This field is kept for backward compatibility.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="v2"

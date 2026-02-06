@@ -36,6 +36,7 @@ type SlurmCluster struct {
 	SlurmConfig        slurmv1.SlurmConfig
 	CustomSlurmConfig  *string
 	CustomCgroupConfig *string
+	CgroupVersion      string
 	MPIConfig          slurmv1.MPIConfig
 	PlugStackConfig    slurmv1.PlugStackConfig
 	SConfigController  SConfigController
@@ -83,6 +84,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		SlurmConfig:        cluster.Spec.SlurmConfig,
 		CustomSlurmConfig:  cluster.Spec.CustomSlurmConfig,
 		CustomCgroupConfig: cluster.Spec.CustomCgroupConfig,
+		CgroupVersion:      cluster.Spec.CgroupVersion,
 		MPIConfig:          cluster.Spec.MPIConfig,
 		PlugStackConfig:    cluster.Spec.PlugStackConfig,
 		SConfigController: buildSConfigControllerFrom(

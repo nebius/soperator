@@ -17545,13 +17545,6 @@ spec:
               slurmd:
                 description: Slurmd defines the Slurm worker daemon configuration.
                 properties:
-                  cgroupVersion:
-                    default: v2
-                    description: CgroupVersion defines the version of the cgroup
-                    enum:
-                    - v1
-                    - v2
-                    type: string
                   customEnv:
                     description: CustomEnv defines additional environment variables
                       that should be set in the container.
@@ -26063,6 +26056,14 @@ spec:
           spec:
             description: SlurmClusterSpec defines the desired state of SlurmCluster
             properties:
+              cgroupVersion:
+                default: v2
+                description: CgroupVersion defines the version of the cgroup used
+                  by Slurm workers.
+                enum:
+                - v1
+                - v2
+                type: string
               clusterType:
                 default: gpu
                 description: ClusterType define type of slurm worker nodes
@@ -43544,7 +43545,9 @@ spec:
                     properties:
                       cgroupVersion:
                         default: v2
-                        description: CgroupVersion defines the version of the cgroup
+                        description: |-
+                          CgroupVersion defines the version of the cgroup
+                          Deprecated: Use spec.cgroupVersion instead. This field is kept for backward compatibility.
                         enum:
                         - v1
                         - v2

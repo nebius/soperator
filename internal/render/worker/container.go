@@ -151,6 +151,7 @@ func renderContainerSlurmd(
 // renderContainerNodeSetSlurmd renders [corev1.Container] for slurmd
 func renderContainerNodeSetSlurmd(
 	nodeSet *values.SlurmNodeSet,
+	cgroupVersion string,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
@@ -233,7 +234,7 @@ func renderContainerNodeSetSlurmd(
 		Args:            nodeSet.ContainerSlurmd.Args,
 		Env: append(
 			renderNodeSetSlurmdEnv(
-				nodeSet.CgroupVersion,
+				cgroupVersion,
 				utils.Ternary(nodeSet.GPU.Enabled, consts.ClusterTypeGPU, consts.ClusterTypeCPU),
 				nodeSet.GPU.Nvidia.GDRCopyEnabled,
 				nodeSet.NodeExtra,
