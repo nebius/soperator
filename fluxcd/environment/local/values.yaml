@@ -21,6 +21,7 @@ soperator:
           - --health-probe-bind-address=:8081
           - --metrics-bind-address=127.0.0.1:8080
           - --leader-elect
+          - --feature-gates=NodeSetWorkers=true
         resources:
           limits:
             memory: 64Mi
@@ -144,27 +145,7 @@ slurmCluster:
           spool:
             volumeClaimTemplateSpec: null
             volumeSourceName: controller-spool
-      worker:
-        size: 1
-        k8sNodeFilterName: kind
-        cgroupVersion: v2
-        enableGDRCopy: false
-        sshdConfigMapRefName: ""
-        slurmd:
-          resources:
-            cpu: 5m
-            memory: 64Mi
-            gpu: 0
-            ephemeralStorage: 100Mi
-        munge:
-          resources:
-            cpu: 5m
-            memory: 64Mi
-            ephemeralStorage: 100Mi
-        volumes:
-          spool:
-            volumeClaimTemplateSpec: null
-            volumeSourceName: worker-spool
+      worker: null
       login:
         size: 1
         k8sNodeFilterName: kind
@@ -234,7 +215,38 @@ slurmCluster:
               values:
                 - soperator-dev-worker
 nodesets:
-  enabled: false
+  enabled: true
+  overrideValues:
+    priorityClasses: []
+    nodesets:
+      - name: worker
+        replicas: 1
+        slurmd:
+          resources:
+            cpu: "5m"
+            memory: "64Mi"
+            ephemeralStorage: "100Mi"
+          volumes:
+            spool:
+              emptyDir:
+                sizeLimit: "250Mi"
+            jail:
+              persistentVolumeClaim:
+                claimName: "jail-pvc"
+        munge:
+          resources:
+            cpu: "5m"
+            memory: "64Mi"
+            ephemeralStorage: "100Mi"
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: kubernetes.io/hostname
+                      operator: In
+                      values:
+                        - soperator-dev-worker
 # Active Checks - enabled for integration testing
 soperatorActiveChecks:
   enabled: true
