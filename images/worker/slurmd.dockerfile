@@ -68,14 +68,11 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install nvidia-container-toolkit
-COPY images/common/scripts/install_container_toolkit.sh /opt/bin/
-RUN chmod +x /opt/bin/install_container_toolkit.sh && \
-    /opt/bin/install_container_toolkit.sh && \
-    rm /opt/bin/install_container_toolkit.sh
-
-# Copy NVIDIA Container Toolkit config
-COPY ansible/roles/nvidia-container-toolkit/files/config.toml /etc/nvidia-container-runtime/config.toml
+## Install nvidia-container-toolkit (for enroot usage)
+COPY ansible/nvidia-container-toolkit.yml /opt/ansible/nvidia-container-toolkit.yml
+COPY ansible/roles/nvidia-container-toolkit /opt/ansible/roles/nvidia-container-toolkit
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local nvidia-container-toolkit.yml -t nvidia-container-toolkit
 
 # Install Docker
 RUN apt-get update && \
