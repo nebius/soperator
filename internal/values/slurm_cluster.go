@@ -40,6 +40,8 @@ type SlurmCluster struct {
 	PlugStackConfig    slurmv1.PlugStackConfig
 	SConfigController  SConfigController
 	NodeSets           []slurmav1alpha1.NodeSet
+
+	UseDefaultAppArmorProfile bool
 }
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD
@@ -93,6 +95,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 			cluster.Spec.SConfigController.ReconfigureWaitTimeout,
 			cluster.Spec.SConfigController.ServiceAccountName,
 		),
+		UseDefaultAppArmorProfile: cluster.Spec.UseDefaultAppArmorProfile,
 	}
 
 	if err := res.Validate(ctx); err != nil {
