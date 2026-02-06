@@ -23,7 +23,7 @@ if [ -z "$jaildir" ] || [ -z "$upperdir" ]; then
 fi
 
 ALT_ARCH="$(uname -m)"
-echo "🔧 Using ALT_ARCH = ${ALT_ARCH}"
+echo "Using ALT_ARCH = ${ALT_ARCH}"
 
 SLURM_LIB_PATH="usr/lib/${ALT_ARCH}-linux-gnu/slurm"
 
