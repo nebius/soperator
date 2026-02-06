@@ -109,3 +109,97 @@ func Test_RenderContainerSlurmd(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderContainerWaitForTopology(t *testing.T) {
+	imageName := "test-image"
+
+	tests := []struct {
+		name               string
+		container          *values.Container
+		waitTimeoutSeconds int32
+		expectedEnvVars    map[string]string
+	}{
+		{
+			name: "default timeout",
+			container: &values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image:           imageName,
+					ImagePullPolicy: corev1.PullIfNotPresent,
+				},
+			},
+			waitTimeoutSeconds: 300,
+			expectedEnvVars: map[string]string{
+				"TOPOLOGY_CONFIGMAP_PATH": consts.VolumeMountPathTopologyNodeLabels,
+				"TOPOLOGY_ENV_FILE":       consts.TopologyEnvFilePath,
+				"TOPOLOGY_WAIT_TIMEOUT":   "300",
+				"TOPOLOGY_POLL_INTERVAL":  "5",
+			},
+		},
+		{
+			name: "custom timeout",
+			container: &values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image:           imageName,
+					ImagePullPolicy: corev1.PullAlways,
+				},
+			},
+			waitTimeoutSeconds: 600,
+			expectedEnvVars: map[string]string{
+				"TOPOLOGY_WAIT_TIMEOUT": "600",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := RenderContainerWaitForTopology(tt.container, tt.waitTimeoutSeconds)
+
+			// Verify container basics
+			assert.Equal(t, consts.ContainerNameWaitForTopology, got.Name)
+			assert.Equal(t, tt.container.Image, got.Image)
+			assert.Equal(t, tt.container.ImagePullPolicy, got.ImagePullPolicy)
+			assert.Equal(t, []string{"python3", "/opt/bin/slurm/wait_for_topology.py"}, got.Command)
+
+			// Verify volume mounts
+			assert.Len(t, got.VolumeMounts, 2)
+			expectedMounts := map[string]struct {
+				path     string
+				readOnly bool
+			}{
+				consts.VolumeNameTopologyNodeLabels: {consts.VolumeMountPathTopologyNodeLabels, true},
+				consts.VolumeNameTopologyEnv:        {consts.VolumeMountPathTopologyEnv, false},
+			}
+			for _, mount := range got.VolumeMounts {
+				expected, exists := expectedMounts[mount.Name]
+				assert.True(t, exists, "unexpected volume mount: %s", mount.Name)
+				assert.Equal(t, expected.path, mount.MountPath, "wrong mount path for %s", mount.Name)
+				assert.Equal(t, expected.readOnly, mount.ReadOnly, "wrong readOnly for %s", mount.Name)
+			}
+
+			// Verify env vars
+			gotEnvVars := make(map[string]string, len(got.Env))
+			for _, env := range got.Env {
+				if env.ValueFrom != nil {
+					// Skip env vars with ValueFrom (like K8S_NODE_NAME)
+					continue
+				}
+				gotEnvVars[env.Name] = env.Value
+			}
+			for key, value := range tt.expectedEnvVars {
+				assert.Equal(t, value, gotEnvVars[key], "env var for key %q mismatch", key)
+			}
+
+			// Verify K8S_NODE_NAME env var with FieldRef
+			var foundNodeName bool
+			for _, env := range got.Env {
+				if env.Name == "K8S_NODE_NAME" {
+					foundNodeName = true
+					assert.NotNil(t, env.ValueFrom)
+					assert.NotNil(t, env.ValueFrom.FieldRef)
+					assert.Equal(t, "spec.nodeName", env.ValueFrom.FieldRef.FieldPath)
+				}
+			}
+			assert.True(t, foundNodeName, "K8S_NODE_NAME env var not found")
+		})
+	}
+}

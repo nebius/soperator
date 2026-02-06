@@ -124,7 +124,7 @@ func TestInitializeTopologyConf(t *testing.T) {
 		{
 			name:         "No StatefulSets",
 			statefulSets: []kruisev1b1.StatefulSet{},
-			expected:     "",
+			expected:     "SwitchName=unknown Nodes=dummy",
 		},
 		{
 			name: "Single StatefulSet with replicas",
@@ -138,7 +138,7 @@ func TestInitializeTopologyConf(t *testing.T) {
 					},
 				},
 			},
-			expected: "SwitchName=unknown Nodes=worker-sts-0,worker-sts-1,worker-sts-2",
+			expected: "SwitchName=unknown Nodes=dummy,worker-sts-0,worker-sts-1,worker-sts-2",
 		},
 		{
 			name: "Multiple StatefulSets with replicas",
@@ -160,7 +160,7 @@ func TestInitializeTopologyConf(t *testing.T) {
 					},
 				},
 			},
-			expected: "SwitchName=unknown Nodes=worker-sts1-0,worker-sts1-1,worker-sts2-0",
+			expected: "SwitchName=unknown Nodes=dummy,worker-sts1-0,worker-sts1-1,worker-sts2-0",
 		},
 		{
 			name: "StatefulSet with zero replicas",
@@ -174,7 +174,7 @@ func TestInitializeTopologyConf(t *testing.T) {
 					},
 				},
 			},
-			expected: "SwitchName=unknown",
+			expected: "SwitchName=unknown Nodes=dummy",
 		},
 	}
 
@@ -194,6 +194,7 @@ func TestInitializeTopologyConf(t *testing.T) {
 func TestWorkerTopologyReconciler_GetStatefulSetsWithFallback(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, slurmv1.AddToScheme(scheme))
+	require.NoError(t, v1alpha1.AddToScheme(scheme))
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, kruisev1b1.AddToScheme(scheme))
 
@@ -492,6 +493,202 @@ func TestEnsureWorkerTopologyConfigMap(t *testing.T) {
 			}, jailedConfig)
 			require.NoError(t, err)
 			assert.Equal(t, consts.ConfigMapNameTopologyConfig, jailedConfig.Spec.ConfigMap.Name)
+		})
+	}
+}
+
+func TestGetEphemeralNodeSets(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, v1alpha1.AddToScheme(scheme))
+
+	tests := []struct {
+		name     string
+		nodeSets []v1alpha1.NodeSet
+		expected map[string]struct{}
+	}{
+		{
+			name:     "No NodeSets",
+			nodeSets: []v1alpha1.NodeSet{},
+			expected: map[string]struct{}{},
+		},
+		{
+			name: "No ephemeral NodeSets",
+			nodeSets: []v1alpha1.NodeSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-1", Namespace: "test-ns"},
+					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: ptr.To(false)},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-2", Namespace: "test-ns"},
+					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: nil},
+				},
+			},
+			expected: map[string]struct{}{},
+		},
+		{
+			name: "Some ephemeral NodeSets",
+			nodeSets: []v1alpha1.NodeSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-static", Namespace: "test-ns"},
+					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: ptr.To(false)},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-ephemeral", Namespace: "test-ns"},
+					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: ptr.To(true)},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-nil", Namespace: "test-ns"},
+					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: nil},
+				},
+			},
+			expected: map[string]struct{}{
+				"nodeset-ephemeral": {},
+			},
+		},
+		{
+			name: "All ephemeral NodeSets",
+			nodeSets: []v1alpha1.NodeSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-1", Namespace: "test-ns"},
+					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: ptr.To(true)},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-2", Namespace: "test-ns"},
+					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: ptr.To(true)},
+				},
+			},
+			expected: map[string]struct{}{
+				"nodeset-1": {},
+				"nodeset-2": {},
+			},
+		},
+		{
+			name: "NodeSets in different namespaces",
+			nodeSets: []v1alpha1.NodeSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-ephemeral", Namespace: "test-ns"},
+					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: ptr.To(true)},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "nodeset-other", Namespace: "other-ns"},
+					Spec:       v1alpha1.NodeSetSpec{EphemeralNodes: ptr.To(true)},
+				},
+			},
+			expected: map[string]struct{}{
+				"nodeset-ephemeral": {},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			objects := make([]client.Object, 0, len(tt.nodeSets))
+			for i := range tt.nodeSets {
+				objects = append(objects, &tt.nodeSets[i])
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(objects...).
+				Build()
+
+			reconciler := tc.NewWorkerTopologyReconciler(fakeClient, scheme, "operator-ns")
+
+			result, err := reconciler.GetEphemeralNodeSets(context.Background(), "test-ns")
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestFilterPodsExcludingEphemeralNodeSets(t *testing.T) {
+	reconciler := &tc.WorkerTopologyReconciler{}
+
+	tests := []struct {
+		name              string
+		pods              []corev1.Pod
+		ephemeralNodeSets map[string]struct{}
+		expectedPodNames  []string
+	}{
+		{
+			name: "No ephemeral NodeSets - all pods included",
+			pods: []corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-2", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-2"}}},
+			},
+			ephemeralNodeSets: map[string]struct{}{},
+			expectedPodNames:  []string{"pod-1", "pod-2"},
+		},
+		{
+			name: "Filter out pods from ephemeral NodeSets",
+			pods: []corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-static-1", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-static"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-ephemeral-1", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-ephemeral"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-static-2", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-static"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-ephemeral-2", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-ephemeral"}}},
+			},
+			ephemeralNodeSets: map[string]struct{}{
+				"nodeset-ephemeral": {},
+			},
+			expectedPodNames: []string{"pod-static-1", "pod-static-2"},
+		},
+		{
+			name: "Pods without NodeSet label are included",
+			pods: []corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-with-label", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-ephemeral"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-without-label", Labels: map[string]string{}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-nil-labels"}},
+			},
+			ephemeralNodeSets: map[string]struct{}{
+				"nodeset-ephemeral": {},
+			},
+			expectedPodNames: []string{"pod-without-label", "pod-nil-labels"},
+		},
+		{
+			name: "All pods from ephemeral NodeSets filtered out",
+			pods: []corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-ephemeral-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-2", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-ephemeral-2"}}},
+			},
+			ephemeralNodeSets: map[string]struct{}{
+				"nodeset-ephemeral-1": {},
+				"nodeset-ephemeral-2": {},
+			},
+			expectedPodNames: []string{},
+		},
+		{
+			name:              "Empty pods list",
+			pods:              []corev1.Pod{},
+			ephemeralNodeSets: map[string]struct{}{"nodeset-ephemeral": {}},
+			expectedPodNames:  []string{},
+		},
+		{
+			name: "Multiple ephemeral NodeSets",
+			pods: []corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-static", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-static"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-eph-1", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-eph-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-eph-2", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-eph-2"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-eph-3", Labels: map[string]string{consts.LabelNodeSetKey: "nodeset-eph-3"}}},
+			},
+			ephemeralNodeSets: map[string]struct{}{
+				"nodeset-eph-1": {},
+				"nodeset-eph-2": {},
+				"nodeset-eph-3": {},
+			},
+			expectedPodNames: []string{"pod-static"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := reconciler.FilterPodsExcludingEphemeralNodeSets(tt.pods, tt.ephemeralNodeSets)
+
+			resultNames := make([]string, 0, len(result))
+			for _, pod := range result {
+				resultNames = append(resultNames, pod.Name)
+			}
+
+			assert.Equal(t, tt.expectedPodNames, resultNames)
 		})
 	}
 }

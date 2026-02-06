@@ -54,6 +54,7 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - resourcedistributions
   - statefulsets
   verbs:
   - create
@@ -138,6 +139,7 @@ rules:
   resources:
   - jailedconfigs
   - nodeconfigurators
+  - nodesetpowerstates
   - nodesets
   - slurmclusters
   verbs:
@@ -162,6 +164,7 @@ rules:
   resources:
   - jailedconfigs/status
   - nodeconfigurators/status
+  - nodesetpowerstates/status
   - nodesets/status
   - slurmclusters/status
   verbs:

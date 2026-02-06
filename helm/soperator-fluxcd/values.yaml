@@ -390,7 +390,7 @@ soperator:
       helmHooks:
         image:
           repository: cr.eu-north1.nebius.cloud/soperator/kruise-helm-hook
-      featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true"
+      featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true,ResourceDistributionGate=true"
     driftDetection:
       mode: warn
   soperatorChecks:
