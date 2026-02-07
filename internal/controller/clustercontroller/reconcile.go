@@ -151,7 +151,9 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	slurmCluster.Spec.PlugStackConfig.Pyxis.SetDefaults()
 	slurmCluster.Spec.PlugStackConfig.NcclDebug.SetDefaults()
 	slurmCluster.Spec.SlurmNodes.Exporter.SetDefaults()
-	slurmCluster.Spec.SlurmNodes.Worker.SetDefaults()
+	if slurmCluster.Spec.SlurmNodes.Worker != nil {
+		slurmCluster.Spec.SlurmNodes.Worker.SetDefaults()
+	}
 
 	// If cluster marked for deletion, we have nothing to do
 	if slurmCluster.GetDeletionTimestamp() != nil {
@@ -686,12 +688,18 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 func (r *SlurmClusterReconciler) setupConfigMapIndexer(mgr ctrl.Manager) error {
 	indexers := map[string]func(*slurmv1.SlurmCluster) string{
 		supervisordConfigMapField: func(sc *slurmv1.SlurmCluster) string {
+			if sc.Spec.SlurmNodes.Worker == nil {
+				return "" // NodeSets mode: NodeSetReconciler handles this
+			}
 			return sc.Spec.SlurmNodes.Worker.SupervisordConfigMapRefName
 		},
 		sshdLoginConfigMapField: func(sc *slurmv1.SlurmCluster) string {
 			return sc.Spec.SlurmNodes.Login.SSHDConfigMapRefName
 		},
 		sshdWorkerConfigMapField: func(sc *slurmv1.SlurmCluster) string {
+			if sc.Spec.SlurmNodes.Worker == nil {
+				return "" // NodeSets mode: NodeSetReconciler handles this
+			}
 			return sc.Spec.SlurmNodes.Worker.SSHDConfigMapRefName
 		},
 	}

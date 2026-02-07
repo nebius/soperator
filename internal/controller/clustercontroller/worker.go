@@ -279,6 +279,7 @@ func (r SlurmClusterReconciler) ReconcileWorkers(
 						clusterValues.VolumeSources,
 						&clusterValues.NodeWorker,
 						clusterValues.WorkerFeatures,
+						clusterValues.CgroupVersion,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")

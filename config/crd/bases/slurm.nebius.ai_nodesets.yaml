@@ -2659,13 +2659,6 @@ spec:
               slurmd:
                 description: Slurmd defines the Slurm worker daemon configuration.
                 properties:
-                  cgroupVersion:
-                    default: v2
-                    description: CgroupVersion defines the version of the cgroup
-                    enum:
-                    - v1
-                    - v2
-                    type: string
                   customEnv:
                     description: CustomEnv defines additional environment variables
                       that should be set in the container.

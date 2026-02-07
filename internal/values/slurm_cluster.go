@@ -36,10 +36,13 @@ type SlurmCluster struct {
 	SlurmConfig        slurmv1.SlurmConfig
 	CustomSlurmConfig  *string
 	CustomCgroupConfig *string
+	CgroupVersion      string
 	MPIConfig          slurmv1.MPIConfig
 	PlugStackConfig    slurmv1.PlugStackConfig
 	SConfigController  SConfigController
 	NodeSets           []slurmav1alpha1.NodeSet
+
+	UseDefaultAppArmorProfile bool
 }
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD
@@ -73,7 +76,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		NodeWorker: buildSlurmWorkerFrom(
 			cluster.Name,
 			cluster.Spec.Maintenance,
-			&cluster.Spec.SlurmNodes.Worker,
+			cluster.Spec.SlurmNodes.Worker,
 			cluster.Spec.UseDefaultAppArmorProfile,
 		),
 		NodeLogin:          buildSlurmLoginFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
@@ -81,6 +84,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		SlurmConfig:        cluster.Spec.SlurmConfig,
 		CustomSlurmConfig:  cluster.Spec.CustomSlurmConfig,
 		CustomCgroupConfig: cluster.Spec.CustomCgroupConfig,
+		CgroupVersion:      cluster.Spec.CgroupVersion,
 		MPIConfig:          cluster.Spec.MPIConfig,
 		PlugStackConfig:    cluster.Spec.PlugStackConfig,
 		SConfigController: buildSConfigControllerFrom(
@@ -93,6 +97,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 			cluster.Spec.SConfigController.ReconfigureWaitTimeout,
 			cluster.Spec.SConfigController.ServiceAccountName,
 		),
+		UseDefaultAppArmorProfile: cluster.Spec.UseDefaultAppArmorProfile,
 	}
 
 	if err := res.Validate(ctx); err != nil {

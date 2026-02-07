@@ -359,7 +359,6 @@ jobs:
     needs: [changes, build-docker-images, build-helm-charts]
     if: needs.changes.outputs.should_build == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -409,12 +408,17 @@ jobs:
           GO111MODULE: on
           UNSTABLE: ${{ steps.read-version.outputs.unstable }}
 
-      - name: Get cluster logs on failure
-        if: failure() || cancelled()
+      - name: Get cluster info
+        if: always()
+        shell: bash
         run: |
-          kubectl cluster-info dump --output-directory=./cluster-logs || true
+          mkdir -p ./cluster-info
+          kubectl cluster-info dump --output-directory=./cluster-info || true
+          echo "=== Pods ==="
           kubectl get pods -A -o wide || true
+          echo "=== HelmReleases ==="
           kubectl get helmreleases -n flux-system || true
+          echo "=== Flux Resources ==="
           ./bin/flux get all -n flux-system || true
 
       - name: Cleanup
@@ -430,7 +434,7 @@ jobs:
           path: |
             test/integration/*.log
             test/integration/*.xml
-            cluster-logs/
+            cluster-info/
           retention-days: 1
 
   ci-success:

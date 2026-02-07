@@ -170,13 +170,19 @@ var _ = Describe("Local Kind Cluster with FluxCD", func() {
 				if release == "soperator-fluxcd-soperator-activechecks" {
 					continue
 				}
-				cmd := exec.Command("kubectl", "get", "helmrelease", release,
+				statusCmd := exec.Command("kubectl", "get", "helmrelease", release,
 					"-n", "flux-system",
 					"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
-				output, err := testenv.Run(cmd)
-				Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get status for HelmRelease %s", release))
-				Expect(strings.TrimSpace(output)).To(Equal("True"),
-					fmt.Sprintf("HelmRelease %s should be in Ready status", release))
+				status, err := testenv.Run(statusCmd)
+				Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("get status for HelmRelease %s", release))
+
+				if strings.TrimSpace(status) != "True" {
+					msgCmd := exec.Command("kubectl", "get", "helmrelease", release,
+						"-n", "flux-system",
+						"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].message}")
+					msg, _ := testenv.Run(msgCmd)
+					Fail(fmt.Sprintf("HelmRelease %s is not Ready: %s", release, strings.TrimSpace(msg)))
+				}
 			}
 		})
 	})
@@ -274,17 +280,21 @@ var _ = Describe("Local Kind Cluster with FluxCD", func() {
 				if release == "soperator-fluxcd-soperator-activechecks" {
 					continue
 				}
-				cmd := exec.Command("kubectl", "get", "helmrelease", release,
+				statusCmd := exec.Command("kubectl", "get", "helmrelease", release,
 					"-n", "flux-system",
 					"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
-				status, err := testenv.Run(cmd)
+				status, err := testenv.Run(statusCmd)
 				if err == nil && strings.TrimSpace(status) == "False" {
-					failedReleases = append(failedReleases, release)
+					msgCmd := exec.Command("kubectl", "get", "helmrelease", release,
+						"-n", "flux-system",
+						"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].message}")
+					msg, _ := testenv.Run(msgCmd)
+					failedReleases = append(failedReleases, fmt.Sprintf("%s: %s", release, strings.TrimSpace(msg)))
 				}
 			}
 
 			Expect(failedReleases).To(BeEmpty(),
-				fmt.Sprintf("The following HelmReleases are not Ready: %v", failedReleases))
+				fmt.Sprintf("The following HelmReleases are not Ready:\n%s", strings.Join(failedReleases, "\n")))
 		})
 	})
 })

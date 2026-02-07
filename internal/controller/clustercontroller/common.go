@@ -158,7 +158,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 						stepLogger.V(1).Info("AppArmor CRD is not installed, skipping AppArmor profile reconciliation")
 						return nil
 					}
-					if !clusterValues.NodeLogin.UseDefaultAppArmorProfile || !clusterValues.NodeWorker.UseDefaultAppArmorProfile {
+					if !clusterValues.UseDefaultAppArmorProfile {
 						stepLogger.V(1).Info("Default AppArmor profile is not set, skipping AppArmor profile reconciliation")
 						return nil
 					}

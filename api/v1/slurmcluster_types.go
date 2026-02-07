@@ -15,7 +15,7 @@ import (
 )
 
 // SlurmClusterSpec defines the desired state of SlurmCluster
-// +kubebuilder:validation:XValidation:rule="!(has(self.partitionConfiguration) && has(self.partitionConfiguration.partitions) && size(self.partitionConfiguration.partitions) > 0 && self.partitionConfiguration.partitions.exists(p, size(p.nodeSetRefs) > 0) && self.slurmNodes.worker.size > 0)",message="Worker size must be zero when NodeSetRefs are used in partition configuration"
+// +kubebuilder:validation:XValidation:rule="!(has(self.partitionConfiguration) && has(self.partitionConfiguration.partitions) && size(self.partitionConfiguration.partitions) > 0 && self.partitionConfiguration.partitions.exists(p, size(p.nodeSetRefs) > 0) && has(self.slurmNodes.worker) && self.slurmNodes.worker.size > 0)",message="Worker size must be zero when NodeSetRefs are used in partition configuration"
 type SlurmClusterSpec struct {
 	// CRVersion defines the version of the Operator the Custom Resource belongs to
 	//
@@ -97,6 +97,13 @@ type SlurmClusterSpec struct {
 	//
 	// +kubebuilder:validation:Optional
 	CustomCgroupConfig *string `json:"customCgroupConfig,omitempty"`
+
+	// CgroupVersion defines the version of the cgroup used by Slurm workers.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="v2"
+	// +kubebuilder:validation:Enum="v1";"v2"
+	CgroupVersion string `json:"cgroupVersion,omitempty"`
 
 	// MPIConfig represents the PMIx configuration in mpi.conf. Not all options are supported.
 	//
@@ -590,7 +597,7 @@ type SlurmNodes struct {
 	//
 	// +kubebuilder:deprecation:warning="The Worker field is deprecated and will be removed in a future release"
 	// +kubebuilder:validation:Optional
-	Worker SlurmNodeWorker `json:"worker,omitempty"`
+	Worker *SlurmNodeWorker `json:"worker,omitempty"`
 
 	// Login represents the Slurm login node configuration
 	//
@@ -962,7 +969,9 @@ type SlurmNodeWorker struct {
 	//
 	// +kubebuilder:validation:Required
 	Volumes SlurmNodeWorkerVolumes `json:"volumes"`
+
 	// CgroupVersion defines the version of the cgroup
+	// Deprecated: Use spec.cgroupVersion instead. This field is kept for backward compatibility.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="v2"
@@ -998,7 +1007,7 @@ type SlurmNodeWorkerVolumes struct {
 	// JailSubMounts represents the sub-mount configurations within the jail volume
 	//
 	// +kubebuilder:validation:Optional
-	JailSubMounts []NodeVolumeMount `json:"jailSubMounts"`
+	JailSubMounts []NodeVolumeMount `json:"jailSubMounts,omitempty"`
 
 	// CustomMounts represents the custom mount configurations
 	//
@@ -1078,7 +1087,7 @@ type SlurmNodeLoginVolumes struct {
 	// JailSubMounts represents the sub-mount configurations within the jail volume
 	//
 	// +kubebuilder:validation:Optional
-	JailSubMounts []NodeVolumeMount `json:"jailSubMounts"`
+	JailSubMounts []NodeVolumeMount `json:"jailSubMounts,omitempty"`
 
 	// CustomMounts represents the custom mount configurations
 	//

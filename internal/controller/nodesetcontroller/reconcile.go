@@ -266,6 +266,7 @@ func (r NodeSetReconciler) executeReconciliation(
 				desired, err := worker.RenderNodeSetStatefulSet(
 					nodeSetValues,
 					&secrets,
+					cluster.Spec.CgroupVersion,
 				)
 				if err != nil {
 					stepLogger.Error(err, "Failed to render")

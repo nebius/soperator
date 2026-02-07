@@ -1,6 +1,7 @@
 package common
 
 import (
+	"cmp"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -134,26 +135,28 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 		}
 
 		for i := int32(0); i < nodeSet.Spec.Replicas; i++ {
-			var nodeConfig = ""
 			nodeName := fmt.Sprintf("%s-%d", nodeSet.Name, i)
 
-			{
-				nodeAddr := fmt.Sprintf(
-					"%s.%s",
-					nodeName,
-					naming.BuildNodeSetUmbrellaServiceFQDN(nodeSet.Namespace, cluster.Name),
-				)
-				realMemory := strconv.FormatInt(
-					RenderRealMemorySlurmd(corev1.ResourceRequirements{Requests: nodeSet.Spec.Slurmd.Resources}),
-					10,
-				)
-				nodeConfig = fmt.Sprintf(
-					"NodeHostname=%s NodeAddr=%s RealMemory=%s",
-					nodeName,
-					nodeAddr,
-					realMemory,
-				)
+			nodeAddr := fmt.Sprintf(
+				"%s.%s",
+				nodeName,
+				naming.BuildNodeSetUmbrellaServiceFQDN(nodeSet.Namespace, cluster.Name),
+			)
+			realMemory := strconv.FormatInt(
+				RenderRealMemorySlurmd(corev1.ResourceRequirements{Requests: nodeSet.Spec.Slurmd.Resources}),
+				10,
+			)
+
+			var nodeConfigParts []string
+			nodeConfigParts = append(nodeConfigParts,
+				fmt.Sprintf("NodeHostname=%s", nodeName),
+				fmt.Sprintf("NodeAddr=%s", nodeAddr),
+				fmt.Sprintf("RealMemory=%s", realMemory),
+			)
+			if nodeSet.Spec.Slurmd.Port != 0 {
+				nodeConfigParts = append(nodeConfigParts, fmt.Sprintf("Port=%d", nodeSet.Spec.Slurmd.Port))
 			}
+			nodeConfig := strings.Join(nodeConfigParts, " ")
 
 			if len(nodeSet.Spec.NodeConfig.Features) > 0 {
 				features := strings.Join(nodeSet.Spec.NodeConfig.Features, ",")
@@ -282,7 +285,15 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("SlurmctldPort", cluster.NodeController.ContainerSlurmctld.Port)
 	res.AddComment("")
 	res.AddProperty("SlurmdPidFile", "/var/run/"+consts.SlurmdName+".pid")
-	res.AddProperty("SlurmdPort", cluster.NodeWorker.ContainerSlurmd.Port)
+	// Note: In NodeSets mode, each NodeName line has its own Port= setting.
+	if cluster.PartitionConfiguration.ConfigType != slurmv1.PartitionConfigTypeStructured {
+		slurmdPort := cluster.NodeWorker.ContainerSlurmd.Port
+		// It is not necessary to specify default port since Slurm already does that implicitly:
+		// "If none is explicitly specified, its value will be 6818"
+		if slurmdPort != 0 {
+			res.AddProperty("SlurmdPort", slurmdPort)
+		}
+	}
 	res.AddComment("")
 	res.AddProperty("SlurmdSpoolDir", naming.BuildVolumeMountSpoolPath(consts.SlurmdName))
 	res.AddComment("")
@@ -455,7 +466,8 @@ func addSlurmConfigProperties(res *renderutils.PropertiesConfig, config interfac
 }
 
 func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
-	defaultLines := strings.Split(renderDefaultCGroupConfig(cluster.NodeWorker.CgroupVersion), "\n")
+	cgroupVersion := cmp.Or(cluster.CgroupVersion, consts.CGroupV2)
+	defaultLines := strings.Split(renderDefaultCGroupConfig(cgroupVersion), "\n")
 
 	if cluster.CustomCgroupConfig == nil || strings.TrimSpace(*cluster.CustomCgroupConfig) == "" {
 		return renderutils.NewAsIsConfig(strings.Join(defaultLines, "\n"))

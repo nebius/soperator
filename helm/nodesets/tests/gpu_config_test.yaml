@@ -183,7 +183,6 @@ tests:
               repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
               tag: "1.22.1-noble-slurm25.05.4"
             port: 6818
-            cgroupVersion: "v2"
             resources:
               cpu: "4"
               memory: "8Gi"
@@ -214,9 +213,6 @@ tests:
       - equal:
           path: spec.slurmd.port
           value: 6818
-      - equal:
-          path: spec.slurmd.cgroupVersion
-          value: "v2"
       - exists:
           path: spec.slurmd.resources
       - exists:

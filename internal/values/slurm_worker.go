@@ -25,7 +25,6 @@ type SlurmWorker struct {
 
 	WorkerAnnotations map[string]string
 
-	CgroupVersion  string
 	EnableGDRCopy  bool
 	SlurmNodeExtra string
 	PriorityClass  string
@@ -48,6 +47,10 @@ func buildSlurmWorkerFrom(
 	worker *slurmv1.SlurmNodeWorker,
 	useDefaultAppArmorProfile bool,
 ) SlurmWorker {
+	if worker == nil {
+		return SlurmWorker{}
+	}
+
 	supervisordConfigName := worker.SupervisordConfigMapRefName
 	supervisordConfigDefault := supervisordConfigName == ""
 	if supervisordConfigDefault {
@@ -83,7 +86,6 @@ func buildSlurmWorkerFrom(
 		VolumeSpool:               *worker.Volumes.Spool.DeepCopy(),
 		VolumeJail:                *worker.Volumes.Jail.DeepCopy(),
 		SharedMemorySize:          worker.Volumes.SharedMemorySize,
-		CgroupVersion:             worker.CgroupVersion,
 		EnableGDRCopy:             worker.EnableGDRCopy,
 		PriorityClass:             worker.PriorityClass,
 		UseDefaultAppArmorProfile: useDefaultAppArmorProfile,
