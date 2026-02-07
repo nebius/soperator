@@ -277,12 +277,12 @@ type WorkerVolumesSpec struct {
 	// JailSubMounts define the configuration of volume mounts within the jail volume
 	//
 	// +kubebuilder:validation:Optional
-	JailSubMounts []NodeVolumeMount `json:"jailSubMounts"`
+	JailSubMounts []NodeVolumeMount `json:"jailSubMounts,omitempty"`
 
 	// CustomVolumeMounts define the configuration of volume mounts within the worker container
 	//
 	// +kubebuilder:validation:Optional
-	CustomVolumeMounts []NodeVolumeMount `json:"customVolumeMounts"`
+	CustomVolumeMounts []NodeVolumeMount `json:"customVolumeMounts,omitempty"`
 
 	// SharedMemorySize defines the size of the shared memory (/dev/shm)
 	//
