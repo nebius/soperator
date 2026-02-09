@@ -32,6 +32,7 @@ func RenderStatefulSet(
 	volumeSources []slurmv1.VolumeSource,
 	worker *values.SlurmWorker,
 	workerFeatures []slurmv1.WorkerFeature,
+	cgroupVersion string,
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeWorker, clusterName)
 	labels[consts.LabelWorkerKey] = consts.LabelWorkerValue
@@ -63,7 +64,7 @@ func RenderStatefulSet(
 		worker.CustomVolumeMounts,
 		clusterName,
 		clusterType,
-		worker.CgroupVersion,
+		cgroupVersion,
 		worker.EnableGDRCopy,
 		worker.SlurmNodeExtra,
 		workerFeatures,
@@ -163,6 +164,7 @@ func RenderStatefulSet(
 func RenderNodeSetStatefulSet(
 	nodeSet *values.SlurmNodeSet,
 	secrets *slurmv1.Secrets,
+	cgroupVersion string,
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	labels[consts.LabelNodeSetKey] = nodeSet.Name
@@ -181,7 +183,7 @@ func RenderNodeSetStatefulSet(
 		RenderContainerWaitForController(&nodeSet.ContainerSlurmd),
 	)
 
-	slurmdContainer, err := renderContainerNodeSetSlurmd(nodeSet)
+	slurmdContainer, err := renderContainerNodeSetSlurmd(nodeSet, cgroupVersion)
 	if err != nil {
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
 	}

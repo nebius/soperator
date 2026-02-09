@@ -260,6 +260,7 @@ spec:
         customMounts:
           {{- .Values.slurmNodes.controller.volumes.customMounts | toYaml | nindent 10 }}
         {{- end }}
+    {{- if .Values.slurmNodes.worker }}
     worker:
       {{- if .Values.slurmNodes.worker.maxUnavailable }}
       maxUnavailable: {{ .Values.slurmNodes.worker.maxUnavailable | quote }}
@@ -345,6 +346,7 @@ spec:
         {{- if .Values.slurmNodes.worker.volumes.sharedMemorySize }}
         sharedMemorySize: {{ .Values.slurmNodes.worker.volumes.sharedMemorySize | quote }}
         {{- end }}
+    {{- end }}
     login:
       size: {{ required ".Values.slurmNodes.login.size must be provided." .Values.slurmNodes.login.size }}
       k8sNodeFilterName: {{ required ".Values.slurmNodes.login.k8sNodeFilterName must be provided." .Values.slurmNodes.login.k8sNodeFilterName | quote }}

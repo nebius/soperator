@@ -2,6 +2,7 @@ package testenv
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"strings"
 )
@@ -126,4 +127,29 @@ func IsCertManagerCRDsInstalled(ctx context.Context) bool {
 	}
 
 	return true
+}
+
+// DumpAllHelmReleases returns detailed info for all HelmReleases in a namespace for debugging
+func DumpAllHelmReleases(ctx context.Context, namespace string) string {
+	listCmd := exec.CommandContext(ctx, "kubectl", "get", "helmreleases",
+		"-n", namespace, "-o", "jsonpath={.items[*].metadata.name}")
+	output, err := Run(listCmd)
+	if err != nil {
+		return fmt.Sprintf("Error listing HelmReleases: %v", err)
+	}
+
+	var result strings.Builder
+	result.WriteString("\n=== HelmRelease Status Dump ===\n")
+
+	releases := strings.Fields(output)
+	for _, release := range releases {
+		statusCmd := exec.CommandContext(ctx, "kubectl", "get", "helmrelease", release,
+			"-n", namespace,
+			"-o", "jsonpath={.status.conditions[?(@.type=='Ready')]}")
+		statusOutput, _ := Run(statusCmd)
+		result.WriteString(fmt.Sprintf("\n%s:\n  %s\n", release, statusOutput))
+	}
+	result.WriteString("=== End HelmRelease Dump ===\n")
+
+	return result.String()
 }

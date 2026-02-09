@@ -85,7 +85,6 @@ spec:
     {{- end }}
 
     port: {{ .port | default 6818 }}
-    cgroupVersion: {{ .cgroupVersion | default "v2" }}
 
     {{- with (required ".Values.nodesets[*].slurmd.resources is required" .resources) }}
     resources:

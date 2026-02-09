@@ -227,13 +227,6 @@ type ContainerSlurmdSpec struct {
 	// +kubebuilder:validation:Required
 	Resources corev1.ResourceList `json:"resources"`
 
-	// CgroupVersion defines the version of the cgroup
-	//
-	// +kubebuilder:default="v2"
-	// +kubebuilder:validation:Enum="v1";"v2"
-	// +kubebuilder:validation:Optional
-	CgroupVersion string `json:"cgroupVersion,omitempty"`
-
 	// Volumes define the volume configurations for the Slurm worker container
 	//
 	// +kubebuilder:validation:Required
@@ -284,12 +277,12 @@ type WorkerVolumesSpec struct {
 	// JailSubMounts define the configuration of volume mounts within the jail volume
 	//
 	// +kubebuilder:validation:Optional
-	JailSubMounts []NodeVolumeMount `json:"jailSubMounts"`
+	JailSubMounts []NodeVolumeMount `json:"jailSubMounts,omitempty"`
 
 	// CustomVolumeMounts define the configuration of volume mounts within the worker container
 	//
 	// +kubebuilder:validation:Optional
-	CustomVolumeMounts []NodeVolumeMount `json:"customVolumeMounts"`
+	CustomVolumeMounts []NodeVolumeMount `json:"customVolumeMounts,omitempty"`
 
 	// SharedMemorySize defines the size of the shared memory (/dev/shm)
 	//

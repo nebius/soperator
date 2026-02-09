@@ -16,7 +16,7 @@ func TestCELValidationLogic(t *testing.T) {
 			name: "no partitions - should pass",
 			spec: v1.SlurmClusterSpec{
 				SlurmNodes: v1.SlurmNodes{
-					Worker: v1.SlurmNodeWorker{
+					Worker: &v1.SlurmNodeWorker{
 						SlurmNode: v1.SlurmNode{
 							Size: 5, // Non-zero size is OK without NodeSetRefs
 						},
@@ -29,7 +29,7 @@ func TestCELValidationLogic(t *testing.T) {
 			name: "partitions without nodeSetRefs - should pass",
 			spec: v1.SlurmClusterSpec{
 				SlurmNodes: v1.SlurmNodes{
-					Worker: v1.SlurmNodeWorker{
+					Worker: &v1.SlurmNodeWorker{
 						SlurmNode: v1.SlurmNode{
 							Size: 5, // Non-zero size is OK without NodeSetRefs
 						},
@@ -45,7 +45,7 @@ func TestCELValidationLogic(t *testing.T) {
 			name: "nodeSetRefs with zero worker size - should pass",
 			spec: v1.SlurmClusterSpec{
 				SlurmNodes: v1.SlurmNodes{
-					Worker: v1.SlurmNodeWorker{
+					Worker: &v1.SlurmNodeWorker{
 						SlurmNode: v1.SlurmNode{
 							Size: 0, // Zero size with NodeSetRefs is OK
 						},
@@ -64,7 +64,7 @@ func TestCELValidationLogic(t *testing.T) {
 			name: "nodeSetRefs with non-zero worker size - should fail",
 			spec: v1.SlurmClusterSpec{
 				SlurmNodes: v1.SlurmNodes{
-					Worker: v1.SlurmNodeWorker{
+					Worker: &v1.SlurmNodeWorker{
 						SlurmNode: v1.SlurmNode{
 							Size: 5, // Non-zero size with NodeSetRefs should fail
 						},
@@ -83,7 +83,7 @@ func TestCELValidationLogic(t *testing.T) {
 			name: "empty nodeSetRefs with non-zero worker - should pass",
 			spec: v1.SlurmClusterSpec{
 				SlurmNodes: v1.SlurmNodes{
-					Worker: v1.SlurmNodeWorker{
+					Worker: &v1.SlurmNodeWorker{
 						SlurmNode: v1.SlurmNode{
 							Size: 5,
 						},
@@ -93,6 +93,21 @@ func TestCELValidationLogic(t *testing.T) {
 					Partitions: []v1.Partition{{
 						Name:        "test",
 						NodeSetRefs: []string{}, // Empty NodeSetRefs
+					}},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "nodeSetRefs with nil worker - should pass",
+			spec: v1.SlurmClusterSpec{
+				SlurmNodes: v1.SlurmNodes{
+					Worker: nil, // No worker defined
+				},
+				PartitionConfiguration: v1.PartitionConfiguration{
+					Partitions: []v1.Partition{{
+						Name:        "test",
+						NodeSetRefs: []string{"nodeset1"},
 					}},
 				},
 			},
@@ -118,7 +133,7 @@ func evaluateCELLogic(spec v1.SlurmClusterSpec) bool {
 	// CEL: !(has(self.partitionConfiguration) && has(self.partitionConfiguration.partitions) &&
 	//       size(self.partitionConfiguration.partitions) > 0 &&
 	//       self.partitionConfiguration.partitions.exists(p, size(p.nodeSetRefs) > 0) &&
-	//       self.slurmNodes.worker.size > 0)
+	//       has(self.slurmNodes.worker) && self.slurmNodes.worker.size > 0)
 
 	// Check if there are partitions
 	if len(spec.PartitionConfiguration.Partitions) == 0 {
@@ -137,9 +152,8 @@ func evaluateCELLogic(spec v1.SlurmClusterSpec) bool {
 		return true
 	}
 
-	// Check if worker size is greater than zero
-	// Since Worker is not a pointer, we just check if Size > 0
-	if spec.SlurmNodes.Worker.Size == 0 {
+	// Check if worker exists and has size greater than zero
+	if spec.SlurmNodes.Worker == nil || spec.SlurmNodes.Worker.Size == 0 {
 		return true
 	}
 

@@ -1145,7 +1145,11 @@ func (in *SlurmNodes) DeepCopyInto(out *SlurmNodes) {
 	*out = *in
 	in.Accounting.DeepCopyInto(&out.Accounting)
 	in.Controller.DeepCopyInto(&out.Controller)
-	in.Worker.DeepCopyInto(&out.Worker)
+	if in.Worker != nil {
+		in, out := &in.Worker, &out.Worker
+		*out = new(SlurmNodeWorker)
+		(*in).DeepCopyInto(*out)
+	}
 	in.Login.DeepCopyInto(&out.Login)
 	in.Exporter.DeepCopyInto(&out.Exporter)
 	in.Rest.DeepCopyInto(&out.Rest)

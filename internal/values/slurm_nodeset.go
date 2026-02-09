@@ -27,7 +27,6 @@ type SlurmNodeSet struct {
 	ContainerSlurmd           Container
 	ContainerMunge            Container
 	CustomInitContainers      []corev1.Container
-	CgroupVersion             string
 	AppArmorProfileUseDefault bool
 
 	SupervisorDConfigMapDefault bool
@@ -96,7 +95,6 @@ func BuildSlurmNodeSetFrom(
 			consts.ContainerNameMunge,
 		),
 		CustomInitContainers:      slices.Clone(nsSpec.CustomInitContainers),
-		CgroupVersion:             nsSpec.Slurmd.CgroupVersion,
 		AppArmorProfileUseDefault: useDefaultAppArmorProfile,
 		//
 		GPU: nsSpec.GPU.DeepCopy(),

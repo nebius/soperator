@@ -15,7 +15,7 @@ import (
 )
 
 func RenderAppArmorProfile(cluster *values.SlurmCluster) *apparmor.AppArmorProfile {
-	if !cluster.NodeLogin.UseDefaultAppArmorProfile || !cluster.NodeWorker.UseDefaultAppArmorProfile {
+	if !cluster.UseDefaultAppArmorProfile {
 		return nil
 	}
 	return &apparmor.AppArmorProfile{
