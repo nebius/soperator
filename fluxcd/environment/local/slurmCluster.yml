@@ -110,74 +110,7 @@ slurmCluster:
                 requests:
                   storage: 50Gi
               storageClassName: "compute-csi-network-ssd-ext4"
-      worker:
-        size: 1
-        k8sNodeFilterName: kind
-        cgroupVersion: v2
-        enableGDRCopy: false
-        sshdConfigMapRefName: ""
-        slurmd:
-          resources:
-            cpu: 5m
-            memory: 100Mi
-            ephemeralStorage: 100Mi
-        munge:
-          resources:
-            cpu: 5m
-            memory: 100Mi
-            ephemeralStorage: 100Mi
-        volumes:
-          spool:
-            volumeClaimTemplateSpec: null
-            volumeSourceName: worker-spool
-          jailSubMounts:
-            - mountPath: /home
-              name: home-dir
-              volumeSourceName: home-dir
-            - name: data
-              mountPath: /mnt/data
-              volumeSourceName: jail-submount-data
-            - name: local-data
-              mountPath: /mnt/local-data
-              volumeClaimTemplateSpec:
-                accessModes:
-                  - ReadWriteOnce
-                storageClassName: compute-csi-network-ssd-ext4
-                resources:
-                  requests:
-                    storage: 1024Gi
-            - name: image-storage
-              mountPath: /mnt/image-storage
-              volumeClaimTemplateSpec:
-                accessModes:
-                  - ReadWriteOnce
-                storageClassName: compute-csi-network-ssd-io-m3-ext4
-                resources:
-                  requests:
-                    storage: 930Gi
-          customMounts:
-            - name: sys-host
-              mountPath: /mnt/jail.upper/sys-host
-              readOnly: true
-              volumeSourceName: sys-host
-            - name: enroot-on-image-storage
-              mountPath: /etc/enroot/enroot.conf.d/custom-dirs.conf
-              subPath: enroot.conf
-              readOnly: true
-              volumeSourceName: image-storage
-            - name: docker-on-image-storage
-              mountPath: /etc/docker/daemon.json
-              subPath: daemon.json
-              readOnly: true
-              volumeSourceName: image-storage
-            - name: hpc-jobs-dir
-              mountPath: /var/run/nebius/slurm
-              volumeSourceName: hpc-jobs-dir
-            - name: nvidia-driver-root
-              mountPath: /run/nvidia/driver
-              volumeSourceName: nvidia-driver-root
-              readOnly: false
-          sharedMemorySize: 1024Gi
+      worker: null
       login:
         size: 1
         k8sNodeFilterName: kind

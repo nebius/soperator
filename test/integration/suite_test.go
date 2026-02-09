@@ -19,6 +19,7 @@
 package integration
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -41,6 +42,9 @@ func TestIntegration(t *testing.T) {
 var _ = ReportAfterEach(func(report SpecReport) {
 	if report.State.Is(types.SpecStatePassed) {
 		fmt.Printf("✓ %s [%.3fs]\n", report.FullText(), report.RunTime.Seconds())
+	} else if report.State.Is(types.SpecStateFailed) {
+		fmt.Printf("✗ %s [%.3fs]\n", report.FullText(), report.RunTime.Seconds())
+		fmt.Print(testenv.DumpAllHelmReleases(context.Background(), "flux-system"))
 	}
 })
 

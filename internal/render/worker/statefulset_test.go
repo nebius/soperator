@@ -54,7 +54,6 @@ func Test_RenderStatefulSet(t *testing.T) {
 
 	createWorker := func() *values.SlurmWorker {
 		return &values.SlurmWorker{
-			CgroupVersion: consts.CGroupV1,
 			SlurmNode: slurmv1.SlurmNode{
 				K8sNodeFilterName: "cpu",
 			},
@@ -88,6 +87,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 		worker         *values.SlurmWorker
 		secrets        *slurmv1.Secrets
 		clusterType    consts.ClusterType
+		cgroupVersion  string
 		expectedEnvVar string
 		expectedInitCt int
 	}{
@@ -96,6 +96,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 			worker:         createWorker(),
 			secrets:        secret,
 			clusterType:    consts.ClusterTypeCPU,
+			cgroupVersion:  consts.CGroupV1,
 			expectedEnvVar: "",
 			expectedInitCt: 2,
 		},
@@ -104,6 +105,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 			worker:         createWorker(),
 			secrets:        secret,
 			clusterType:    consts.ClusterTypeCPU,
+			cgroupVersion:  consts.CGroupV2,
 			expectedEnvVar: consts.EnvCGroupV2,
 			expectedInitCt: 2,
 		},
@@ -112,7 +114,7 @@ func Test_RenderStatefulSet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := worker.RenderStatefulSet(
-				testNamespace, testCluster, tt.clusterType, nodeFilter, tt.secrets, volumeSource, tt.worker, nil,
+				testNamespace, testCluster, tt.clusterType, nodeFilter, tt.secrets, volumeSource, tt.worker, nil, tt.cgroupVersion,
 			)
 			assert.NoError(t, err)
 
@@ -253,6 +255,7 @@ func TestRenderStatefulSet_HostUsers(t *testing.T) {
 				volumeSources,
 				workerValue,
 				[]slurmv1.WorkerFeature{},
+				consts.CGroupV2,
 			)
 
 			if err != nil {

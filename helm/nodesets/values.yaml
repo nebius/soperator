@@ -91,8 +91,6 @@ nodesets:
       # Port to serve slurmd service on
       # Optional, defaults to 6818
       port: 6818
-      # Optional, defaults to "v2"
-      cgroupVersion: "v2"
       # Slurmd container resources
       resources:
         cpu: "156000m"
