@@ -17,4 +17,7 @@ WORKDIR /opt/ansible/
 COPY images/sansible/sansible_entrypoint.sh /opt/bin/
 RUN chmod +x /opt/bin/sansible_entrypoint.sh
 
+ARG SLURM_VERSION
+ENV SLURM_VERSION=$SLURM_VERSION
+
 ENTRYPOINT ["/opt/bin/sansible_entrypoint.sh"]
