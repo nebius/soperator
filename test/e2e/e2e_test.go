@@ -3,6 +3,7 @@
 package e2e_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -57,6 +58,19 @@ func setupTerraformOptions(t *testing.T, cfg testConfig) terraform.Options {
 	tfVars := readTFVars(t, fmt.Sprintf("%s/terraform.tfvars", cfg.PathToInstallation))
 	tfVars = overrideTestValues(t, tfVars, cfg)
 
+	varsJSON, err := json.MarshalIndent(tfVars, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal terraform variables to JSON: %v", err)
+	}
+	t.Logf("Terraform variables:\n%s", varsJSON)
+
+	varFilePath := fmt.Sprintf("%s/e2e-override.tfvars.json", cfg.PathToInstallation)
+	err = os.WriteFile(varFilePath, varsJSON, 0o644)
+	if err != nil {
+		t.Fatalf("write terraform var file %s: %v", varFilePath, err)
+	}
+	t.Cleanup(func() { os.Remove(varFilePath) })
+
 	envVarsList := os.Environ()
 	envVars := make(map[string]string)
 	for _, envVar := range envVarsList {
@@ -67,7 +81,7 @@ func setupTerraformOptions(t *testing.T, cfg testConfig) terraform.Options {
 
 	return terraform.Options{
 		TerraformDir: cfg.PathToInstallation,
-		Vars:         tfVars,
+		VarFiles:     []string{varFilePath},
 		EnvVars:      envVars,
 		NoColor:      true,
 	}
