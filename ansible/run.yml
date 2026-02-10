@@ -10,6 +10,7 @@
     nccl_tests_cuda_version: "{{ cuda_version }}"
     nccl_tests_version: "{{ lookup('env','NCCL_TESTS_VERSION') }}" # https://github.com/nebius/ml-containers/blob/main/ansible/roles/nccl-tests/defaults/main.yml#L3
     perftest_cuda_version: "{{ cuda_version }}"
+    slurm_version: "{{ lookup('env','SLURM_VERSION') }}"
 
     ansible_connection: community.general.chroot
     ansible_host: /mnt/jail
