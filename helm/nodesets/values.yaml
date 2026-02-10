@@ -25,10 +25,10 @@ priorityClasses:
 images:
   munge:
     repository: "cr.eu-north1.nebius.cloud/soperator/munge"
-    tag: "2.0.0-noble-slurm25.05.5"
+    tag: "2.0.0-noble-slurm25.11.2"
   slurmd:
     repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
-    tag: "2.0.0-noble-slurm25.05.5"
+    tag: "2.0.0-noble-slurm25.11.2"
 # NodeSets configuration
 # Each NodeSet defines a group of worker nodes with specific characteristics
 nodesets:
@@ -83,7 +83,7 @@ nodesets:
       # Optional
       image:
         repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
-        tag: "2.0.0-noble-slurm25.05.5+custom"
+        tag: "2.0.0-noble-slurm25.11.2+custom"
         pullPolicy: "IfNotPresent"
       customEnv:
         - name: "NVIDIA_DRIVER_CAPABILITIES"
@@ -166,7 +166,7 @@ nodesets:
       image:
         repository: "cr.eu-north1.nebius.cloud/soperator/munge"
         # Optional
-        tag: "2.0.0-noble-slurm25.05.5+custom"
+        tag: "2.0.0-noble-slurm25.11.2+custom"
         pullPolicy: "IfNotPresent"
       # Munge container resources
       resources:

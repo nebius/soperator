@@ -16,21 +16,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Trigger nightly build on main
+      - name: Trigger nightly builds on all branches
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
+          # Always build main
           echo "Triggering nightly multi-arch build on main"
           gh workflow run one_job.yml --ref main -f multi_arch=true
-          echo "Build triggered on main"
 
-      - name: Trigger nightly build on release branch
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          RELEASE_BRANCH=$(jq -r .release_branch .github/branch-config.json)
-          echo "Triggering nightly multi-arch build on ${RELEASE_BRANCH}"
-          gh workflow run one_job.yml --ref "${RELEASE_BRANCH}" -f multi_arch=true
-          echo "Build triggered on ${RELEASE_BRANCH}"
+          # Build all nightly release branches from config
+          for branch in $(yq -r '.nightly_release_branches[]' .github/branch-config.yaml); do
+            echo "Triggering nightly multi-arch build on ${branch}"
+            gh workflow run one_job.yml --ref "${branch}" -f multi_arch=true
+          done
+          echo "All builds triggered"
