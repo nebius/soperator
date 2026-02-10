@@ -147,6 +147,21 @@ func setupTerraformOptions(t *testing.T, cfg testConfig) terraform.Options {
 	tfVars := readTFVars(t, fmt.Sprintf("%s/terraform.tfvars", cfg.PathToInstallation))
 	tfVars = overrideTestValues(t, tfVars, cfg)
 
+	// "options nvidia NVreg_RegistryDwords=\"PeerMappingOverride=1;\""" line is not
+	// properly passed to the tfVars, so we need to additionally escape it
+	if v, ok := tfVars["nvidia_admin_conf_lines"]; ok {
+		if lines, ok := v.([]interface{}); ok {
+			for i := range lines {
+				if line, ok := lines[i].(string); ok {
+					lines[i] = escapeForTerraformVarString(line)
+				}
+			}
+			tfVars["nvidia_admin_conf_lines"] = lines
+		} else {
+			fmt.Println("KLELKEKEKKE")
+		}
+	}
+
 	envVarsList := os.Environ()
 	envVars := make(map[string]string)
 	for _, envVar := range envVarsList {
@@ -161,4 +176,10 @@ func setupTerraformOptions(t *testing.T, cfg testConfig) terraform.Options {
 		EnvVars:      envVars,
 		NoColor:      true,
 	}
+}
+
+func escapeForTerraformVarString(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `"`, `\"`)
+	return s
 }
