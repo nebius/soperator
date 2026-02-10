@@ -28,9 +28,9 @@ images:
   sansible: "cr.eu-north1.nebius.cloud/soperator/sansible:2.0.0-noble-slurm25.11.2"
   activeCheckImageRepository: "cr.eu-north1.nebius.cloud#ml-containers/training_diag"
   activeCheckImageTags:
-    # Image training_diag from PR https://github.com/nebius/ml-containers/pull/55
-    "12.9.0": "12.9.0-ubuntu24.04-20260205130135"
-    "13.0.2": "13.0.2-ubuntu24.04-20260205130135"
+    # Image training_diag from PR https://github.com/nebius/ml-containers/pull/61
+    "12.9.0": "12.9.0-ubuntu24.04-20260206170007"
+    "13.0.2": "13.0.2-ubuntu24.04-20260206170007"
 # Optional override in Pyxis ("reg#repo:tag") format.
 activeCheckImage: ""
 checks:
