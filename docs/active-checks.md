@@ -1,6 +1,6 @@
 # Active Checks – Health and system checks framework
 
-This doc is prepared based on the `1.22` soperator version and includes description of all the features available in `1.22`.
+This doc is prepared based on the `2.0` soperator version and includes description of all the features available in `2.0`.
 
 ## Overview
 
@@ -15,6 +15,8 @@ The framework helps to:
 Active Checks supports two execution modes:
 - **Kubernetes Jobs** – checks running as scheduled or one-time jobs inside Kubernetes.
 - **Slurm Jobs** – checks running on some or all Slurm nodes to validate compute hardware and environment.
+
+In addition, there is an **extensive check pipeline** that runs follow-up checks on suspicious Slurm nodes after a failed Active Check.
 
 Deployment follows a **GitOps model**: Flux deploys ActiveCheck CRs to clusters. Starting from a specific version of soperator, all clusters include Active Checks automatically through Helm charts managed by Flux.
 
@@ -33,9 +35,9 @@ This section explains the main building blocks of the Active Checks framework, f
   Through this chart, Flux ensures that ActiveCheck CRs and controllers are consistently deployed across clusters.
 
 - **Active Check CRs**  
-  The core custom resource used to define a check.
+  The core custom resources used to define checks.
     - A single CR with a `checkType` field that can be either `k8sJob` or `slurmJob`.
-    - Defines parameters such as commands, schedules, resources, and slurm job submit options.  
+    - The extensive check pipeline uses the same ActiveCheck CRD, configured as a Slurm check that targets suspicious nodes.
       (See [ActiveCheck CRD](#activecheck-crd) for details.)
 
 - **Active Check Controller**  
@@ -48,7 +50,7 @@ This section explains the main building blocks of the Active Checks framework, f
     - Slurm Active Check Jobs: submit one Slurm Job batch per Active Check Job.
 
 - **Active Check Jobs Controller**  
-  Watches Active Check Jobs (both K8s and Slurm-based).
+  Watches Active Check Jobs (K8s and Slurm).
     - Collects job results (for Slurm-based jobs via the [Slurm API client](https://github.com/nebius/soperator/blob/main/internal/slurmapi/client.go)).
     - Updates statuses of the parent Active Check CRs (see [Status fields](#status-fields)).
     - Executes reactions based on the outcome of the checks (see [Reactions fields (spec)](#reactions-fields-spec)).
@@ -61,6 +63,11 @@ This section explains the main building blocks of the Active Checks framework, f
 - **Slurm Workers**  
   Compute nodes in the Slurm cluster where Slurm jobs execute.  
   These are the targets for most hardware acceptance and performance tests.
+
+- **Slurm Nodes Controller**
+  Watches Slurm nodes and drained workers.
+    - Sets `suspicious` reservation for the nodes drained with `[node_problem]` reason prefix.
+    - Sets the unhealthy flag for the nodes drained with `[hardware_problem]` reason prefix.
 
 - **Image Storage**
   Stores container images that provide the environments needed for running checks.
@@ -77,6 +84,7 @@ CronJobs create Kubernetes Jobs on schedule, which either run the check directly
 ### Top-level `spec` fields
 
 - **`spec.name`** *(string)* — Logical name used for generated CronJob/Jobs.
+- **`spec.slurmClusterRefName`** *(string)* — Name of the SlurmCluster to target.
 - **`spec.checkType`** *(enum: `k8sJob`|`slurmJob`)* — Selects execution mode.
 - **`spec.schedule`** *(string)* — Cron schedule in standard Kubernetes Cron format.
 - **`spec.suspend`** *(bool)* — If `true`, pauses scheduling without deleting resources.
@@ -90,10 +98,13 @@ CronJobs create Kubernetes Jobs on schedule, which either run the check directly
 #### Mode-specific options
 
 **`spec.k8sJobSpec` (Kubernetes checks)**
-- **`spec.k8sJobSpec.jobContainer.command`** *(string[])* — Entrypoint/command for the check container.
+- **`spec.k8sJobSpec.jobContainer`** *(ContainerSpec)* — Container image and command/args for the check.
+- **`spec.k8sJobSpec.mungeContainer`** *(ContainerSpec)* — Optional Munge sidecar for Slurm auth.
 - **`spec.k8sJobSpec.scriptRefName`** *(string)* — Name of a `ConfigMap` containing a custom script at key `script.sh`.
 
 **`spec.slurmJobSpec` (Slurm checks)**
+- **`spec.slurmJobSpec.jobContainer`** *(ContainerSpec)* — Container image and command/args for Slurm submission.
+- **`spec.slurmJobSpec.mungeContainer`** *(ContainerSpec)* — Munge sidecar for Slurm auth.
 - **`spec.slurmJobSpec.sbatchScriptRefName`** *(string)* — Name of a `ConfigMap` containing an sbatch script at key `sbatch.sh`.
 - **`spec.slurmJobSpec.sbatchScript`** *(string, multiline)* — Inline sbatch script. May contain `#SBATCH` directives and shell logic; can invoke `srun`.
 - **`spec.slurmJobSpec.eachWorkerJobs`** *(bool)* — Run on **each worker** using **separate Slurm jobs**.
@@ -101,7 +112,6 @@ CronJobs create Kubernetes Jobs on schedule, which either run the check directly
 
 ### Reactions fields (spec)
 
-- **`spec.reactions`** *(deprecated)* — Legacy reactions block.
 - **`spec.successReactions`** *(Reactions)* — Actions to take when a Slurm run **succeeds**.
 - **`spec.failureReactions`** *(Reactions)* — Actions to take when a Slurm run **fails**.
 
@@ -113,6 +123,8 @@ CronJobs create Kubernetes Jobs on schedule, which either run the check directly
 
 Reactions are evaluated by the **Active Check Jobs Controller** after Slurm runs.  
 Affected nodes are derived from the Slurm job’s node list (`GetNodeList()`).
+
+Reservations are used to mark **suspicious** nodes after a failed Active Check and to drive the extensive-check pipeline.
 
 ### `status` fields
 
@@ -141,7 +153,7 @@ Affected nodes are derived from the Slurm job’s node list (`GetNodeList()`).
     - `Cancelled` — Check was cancelled.
 - **`lastRunFailJobsAndReasons`** *(array)* — List of `{ jobID, reason }` for failed jobs in the last run.
 - **`lastRunErrorJobsAndReasons`** *(array)* — List of `{ jobID, reason }` for error jobs in the last run.
-- **`LastRunCancelledJobs`** *(array)* — List of job IDs for cancelled jobs in the last run.
+- **`lastRunCancelledJobs`** *(array)* — List of job IDs for cancelled jobs in the last run.
 - **`lastRunSubmitTime`** *(time)* — Submission time of the last run.
 
 ## Execution Modes
@@ -170,19 +182,29 @@ In both cases, the Active Check Controller creates a CronJob (1:1 with CR) which
 
 #### Slurm job submission modes
 - **Default** — One Slurm batch per run.
-- **eachWorkerJobs** — Run once per worker using separate Slurm jobs.
-- **maxNumberOfJobs** — Limits concurrent jobs; if less than the number of workers, only a subset executes.
+- **eachWorkerJobs** — Run once per worker using separate Slurm jobs. `maxNumberOfJobs` param may be used together with it to limit the number of jobs (if less than the number of workers, only a subset executes).
 
 #### Slurm partitions (defaults)
-There are three partitions by default:
+There are two partitions by default:
 - **main** — used for clients’ jobs.
 - **hidden** — hidden partition with the same priority as `main`.
 
-Submission modes use partitions as follows:
-- **Default** (single job) → `hidden` partition.
-- **eachWorkerJobs** (separate job per worker) → `hidden` partition.
+Active checks always use hidden partition for job submission.
 
-If `eachWorkerJobs` is not specified the job is running in default submission mode.
+If `eachWorkerJobs` is not specified the job is running in the default submission mode.
+
+## Extensive check pipeline
+
+The extensive check pipeline is a follow-up flow for suspicious Slurm nodes, implemented using the same ActiveCheck CRD with `checkType: slurmJob`.
+
+**Flow**
+1. **Active Check fails** → affected nodes are drained with the `[node_problem]` prefix.
+2. **Reservation added** → nodes move into the **suspicious** pool (reservation name uses the configured prefix).
+3. **Extensive check runs** → an ActiveCheck CronJob submits a Slurm batch that targets suspicious nodes only.
+    - Each suspicious worker gets its own Slurm job in the batch.
+    - If there are no suspicious nodes, no extensive-check jobs are created.
+4. **Success** → reservations are removed and nodes return to the **healthy** pool.
+5. **Failure** → nodes are drained with the `[hardware_problem]` prefix and marked for replacement by the Slurm Nodes Controller.
 
 ## Observability
 
@@ -201,7 +223,7 @@ Results and metrics are visualized in Grafana. Operators can quickly see:
 
 ## Controllers
 
-Active Checks are managed by two controllers. Together they implement a GitOps-friendly flow:
+Active Checks are managed by three controllers. Together they implement a GitOps-friendly flow:
 **ActiveCheck CR → CronJob (1:1) → Jobs → Status & (if Slurm) Reactions**.
 
 ### 1. Active Check Controller
@@ -224,8 +246,8 @@ Active Checks are managed by two controllers. Together they implement a GitOps-f
 ### 2. Active Check Jobs Controller
 
 **Purpose**
-- Observes **Jobs** created by CronJobs (both k8s and slurm modes).
-- Aggregates results and **updates `ActiveCheck.status`** (see [Status fields](#status-fields)).
+- Observes **Jobs** created by CronJobs (K8s and Slurm).
+- Aggregates results and **updates status on the owning CRs** (see [Status fields](#status-fields)).
 - Applies **reactions** for Slurm runs according to `successReactions` / `failureReactions` (see [Reactions fields (spec)](#reactions-fields-spec)).
 
 **High-level flow**
@@ -246,6 +268,20 @@ Active Checks are managed by two controllers. Together they implement a GitOps-f
 **Error handling & GC (high level)**
 - Requeues on transient errors (API reads/patches).
 - Job history is pruned by CronJob’s `successfulJobsHistoryLimit` / `failedJobsHistoryLimit`.
+
+### 3. Slurm Nodes Controller
+
+**Purpose**
+- Watches Slurm nodes, focusing on drained workers.
+- Sets `suspicious` reservations for workers drained with the `[node_problem]` prefix.
+- Sets the unhealthy flag on the corresponding Kubernetes nodes for workers drained with the `[hardware_problem]` prefix to mark them for replacement.
+
+**High-level flow (Active Check + extensive check pipeline)**
+1. Periodically list Slurm nodes and filter **drained** nodes with well-known health check reasons.
+2. For `[node_problem]` health check failures:
+    - If extensive checks are enabled, create a `suspicious-node` reservation and **undrain** the node so extensive checks can run.
+    - If extensive checks are disabled, mark the node unhealthy immediately **when node replacement is enabled**; otherwise no-op.
+3. For `[hardware_problem]` failures, set the unhealthy flag on the Kubernetes node to trigger replacement.
 
 ## Roadmap & Limitations
 
