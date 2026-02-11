@@ -1,9 +1,7 @@
-//go:build e2e
-
-package e2e_test
+package e2e
 
 // nolint:tagalign
-type testConfig struct {
+type Config struct {
 	SoperatorVersion   string   `split_words:"true" required:"true"`                // SOPERATOR_VERSION
 	SoperatorUnstable  bool     `split_words:"true" required:"true"`                // SOPERATOR_UNSTABLE
 	PathToInstallation string   `split_words:"true" required:"true"`                // PATH_TO_INSTALLATION
