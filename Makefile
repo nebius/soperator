@@ -195,6 +195,10 @@ get-version:
 get-nfs-version:
 	@echo '$(NFS_VERSION)'
 
+.PHONY: get-slurm-version
+get-slurm-version:
+	@echo '$(SLURM_VERSION)'
+
 .PHONY: test-version-sync
 test-version-sync: yq
 	@if [ "$(VERSION_BASE)" != "$(VALUES_VERSION)" ]; then \
@@ -430,7 +434,7 @@ docker-build-go-base: ## Build go-base manifest locally (use PLATFORMS=linux/amd
 		.
 
 .PHONY: docker-build-and-push
-docker-build-and-push: ## Build and push docker manifest (use PLATFORMS=linux/amd64,linux/arm64 for multi-arch)
+docker-build-and-push: ## Build and push docker images
 ifndef IMAGE_NAME
 	$(error IMAGE_NAME is not set)
 endif
@@ -460,6 +464,36 @@ ifeq ($(UNSTABLE), false)
 		docker://"$(IMAGE_REPO)-unstable/${IMAGE_NAME}:${IMAGE_VERSION}" \
 		docker://"$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
 endif
+
+.PHONY: docker-create-manifest
+docker-create-manifest: ## Create and push multi-arch manifest from per-arch tags
+ifndef IMAGE_NAME
+	$(error IMAGE_NAME is not set)
+endif
+ifndef IMAGE_VERSION
+	$(error IMAGE_VERSION is not set)
+endif
+ifndef UNSTABLE
+	$(error UNSTABLE is not set)
+endif
+ifeq ($(UNSTABLE),false)
+	$(eval REPO_PREFIX := $(NEBIUS_REPO))
+else
+	$(eval REPO_PREFIX := $(NEBIUS_REPO)-unstable)
+endif
+	@set -euo pipefail; \
+	REPO="$(REPO_PREFIX)/$(IMAGE_NAME)"; \
+	MANIFEST_TAG="$$REPO:$(IMAGE_VERSION)"; \
+	ARCHES="$${ARCHES:-amd64 arm64}"; \
+	echo "Creating manifest: $$MANIFEST_TAG"; \
+	echo "Using arches: $$ARCHES"; \
+	IMAGES=""; \
+	for arch in $$ARCHES; do \
+	  IMAGES="$$IMAGES $$REPO:$(IMAGE_VERSION)-$$arch"; \
+	done; \
+	echo "Sources:$$IMAGES"; \
+	docker buildx imagetools create -t "$$MANIFEST_TAG" $$IMAGES; \
+	docker buildx imagetools inspect "$$MANIFEST_TAG"
 
 .PHONY: docker-build-jail
 docker-build-jail: ## Build jail (use PLATFORMS=linux/amd64,linux/arm64 for multi-arch)
