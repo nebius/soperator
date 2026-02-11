@@ -24,7 +24,7 @@ Slurm cluster customers may apply custom Active Check CRs to the cluster (indepe
 
 ## Architecture diagram
 
-<img src="images/activecheck_diagram.svg" width="100%" height="auto"/>
+<img src="images/activecheck_diagram.png" width="100%" height="auto"/>
 
 ## Components
 
