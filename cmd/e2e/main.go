@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/kelseyhightower/envconfig"
 
@@ -21,12 +24,15 @@ func main() {
 		log.Fatalf("parse config: %v", err)
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	var err error
 	switch os.Args[1] {
 	case "apply":
-		err = e2e.Apply(cfg)
+		err = e2e.Apply(ctx, cfg)
 	case "destroy":
-		err = e2e.Destroy(cfg)
+		err = e2e.Destroy(ctx, cfg)
 	default:
 		_, _ = fmt.Fprintf(os.Stderr, "Unknown command: %s\nUsage: e2e <apply|destroy>\n", os.Args[1])
 		os.Exit(2)

@@ -8,68 +8,67 @@ import (
 	"os/exec"
 	"strings"
 
-	"nebius.ai/slurm-operator/internal/e2e/tfrunner"
+	"github.com/hashicorp/terraform-exec/tfexec"
 )
 
 const k8sClusterName = "soperator-e2e-test"
 
-func Destroy(cfg Config) error {
-	runner, cleanup, err := Init(cfg)
+func Destroy(ctx context.Context, cfg Config) error {
+	tf, varFilePath, cleanup, err := Init(ctx, cfg)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
 
-	return destroyWithK8sRecovery(runner)
+	return destroyWithK8sRecovery(ctx, tf, varFilePath)
 }
 
-func destroyWithK8sRecovery(runner *tfrunner.Runner) error {
-	err := runner.Destroy()
+func destroyWithK8sRecovery(ctx context.Context, tf *tfexec.Terraform, varFilePath string) error {
+	err := tf.Destroy(ctx, tfexec.VarFile(varFilePath))
 	if err == nil {
 		return nil
 	}
 	if !strings.Contains(err.Error(), "Kubernetes cluster unreachable") {
 		return err
 	}
-	if !isMK8SClusterGone() {
+	if !isMK8SClusterGone(ctx) {
 		return err
 	}
 	log.Print("K8s cluster is confirmed gone, removing helm releases from state and retrying destroy")
-	removeHelmReleasesFromState(runner)
-	logState(runner)
-	if retryErr := runner.Destroy(); retryErr != nil {
+	removeHelmReleasesFromState(ctx, tf)
+	logState(ctx, tf)
+	if retryErr := tf.Destroy(ctx, tfexec.VarFile(varFilePath)); retryErr != nil {
 		return fmt.Errorf("destroy after helm release state cleanup: %w", retryErr)
 	}
 	log.Printf("Destroy recovered: K8s cluster %s was already gone, removed helm releases from state to unblock cleanup", k8sClusterName)
 	return nil
 }
 
-func removeHelmReleasesFromState(runner *tfrunner.Runner) {
-	out, err := runner.Run("state", "list")
+func removeHelmReleasesFromState(ctx context.Context, tf *tfexec.Terraform) {
+	state, err := tf.Show(ctx)
 	if err != nil {
-		log.Printf("terraform state list failed during helm release removal: %v", err)
+		log.Printf("terraform show failed during helm release removal: %v", err)
 		return
 	}
-	for _, resource := range strings.Split(out, "\n") {
-		resource = strings.TrimSpace(resource)
-		if resource == "" || !strings.Contains(resource, "helm_release") {
+	for _, addr := range collectResourceAddresses(state) {
+		if !strings.Contains(addr, "helm_release") {
 			continue
 		}
-		log.Printf("Removing %s from terraform state", resource)
-		if _, rmErr := runner.Run("state", "rm", resource); rmErr != nil {
-			log.Printf("terraform state rm %s failed: %v", resource, rmErr)
+		log.Printf("Removing %s from terraform state", addr)
+		if err := tf.StateRm(ctx, addr); err != nil {
+			log.Printf("terraform state rm %s failed: %v", addr, err)
 		}
 	}
 }
 
-func isMK8SClusterGone() bool {
+func isMK8SClusterGone(ctx context.Context) bool {
 	projectID := os.Getenv("NEBIUS_PROJECT_ID")
 	if projectID == "" {
 		log.Print("NEBIUS_PROJECT_ID not set, cannot verify cluster existence")
 		return false
 	}
 
-	out, err := exec.CommandContext(context.Background(),
+	out, err := exec.CommandContext(ctx,
 		"nebius", "mk8s", "cluster", "get-by-name",
 		"--parent-id", projectID,
 		"--name", k8sClusterName,
