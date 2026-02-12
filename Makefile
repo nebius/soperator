@@ -78,11 +78,6 @@ ifeq ($(UNSTABLE), true)
     IMAGE_REPO			= $(NEBIUS_REPO)-unstable
 endif
 
-# Docker build platforms (default: amd64 only, override with PLATFORMS=linux/amd64,linux/arm64 for multi-arch)
-PLATFORMS ?= linux/amd64
-HAS_AMD64 = $(findstring linux/amd64,$(PLATFORMS))
-HAS_ARM64 = $(findstring linux/arm64,$(PLATFORMS))
-
 .PHONY: all
 all: build
 
@@ -198,33 +193,6 @@ get-nfs-version:
 .PHONY: get-slurm-version
 get-slurm-version:
 	@echo '$(SLURM_VERSION)'
-
-.PHONY: test-version-sync
-test-version-sync: yq
-	@if [ "$(VERSION_BASE)" != "$(VALUES_VERSION)" ]; then \
-		echo "Version in version file and helm/slurm-cluster different!"; \
-		echo "VERSION_BASE is - $(VERSION_BASE)"; \
-		echo "VALUES_VERSION is - $(VALUES_VERSION)"; \
-		exit 1; \
-	else \
-		echo "Version test passed: versions is: $(VERSION_BASE)"; \
-	fi
-	@if [ "$(NFS_VERSION_BASE)" != "$(NFS_CHART_VERSION)" ]; then \
-		echo "NFS version in NFS_VERSION file and helm/nfs-server/Chart.yaml different!"; \
-		echo "NFS_VERSION_BASE is - $(NFS_VERSION_BASE)"; \
-		echo "NFS_CHART_VERSION is - $(NFS_CHART_VERSION)"; \
-		exit 1; \
-	else \
-		echo "NFS version test passed: version is: $(NFS_VERSION_BASE)"; \
-	fi
-	@if [ "$(NFS_VERSION_BASE)" != "$(NFS_IMAGE_TAG)" ]; then \
-		echo "NFS version in NFS_VERSION file and helm/nfs-server/values.yaml image.tag different!"; \
-		echo "NFS_VERSION_BASE is - $(NFS_VERSION_BASE)"; \
-		echo "NFS_IMAGE_TAG is - $(NFS_IMAGE_TAG)"; \
-		exit 1; \
-	else \
-		echo "NFS image tag test passed: tag is: $(NFS_IMAGE_TAG)"; \
-	fi
 
 .PHONY: get-operator-tag-version
 get-operator-tag-version:
@@ -422,17 +390,6 @@ run: manifests generate fmt vet ## Run a controller from your host with native t
 	IS_PROMETHEUS_CRD_INSTALLED=true IS_MARIADB_CRD_INSTALLED=true ENABLE_WEBHOOKS=false IS_APPARMOR_CRD_INSTALLED=true go run cmd/main.go \
 	 -log-level=debug -leader-elect=true -operator-namespace=soperator-system
 
-.PHONY: docker-build-go-base
-docker-build-go-base: ## Build go-base manifest locally (use PLATFORMS=linux/amd64,linux/arm64 for multi-arch)
-	docker buildx build \
-		--platform $(PLATFORMS) \
-		--target go-base \
-		-t go-base \
-		-f images/common/go-base.dockerfile \
-		--progress=plain \
-		$(DOCKER_BUILD_ARGS) \
-		.
-
 .PHONY: docker-build-and-push
 docker-build-and-push: ## Build and push docker images
 ifndef IMAGE_NAME
@@ -445,25 +402,15 @@ ifndef UNSTABLE
 	$(error UNSTABLE is not set)
 endif
 	docker buildx build \
-		--platform $(PLATFORMS) \
-		--target ${IMAGE_NAME} \
-		-t "$(NEBIUS_REPO)-unstable/${IMAGE_NAME}:${IMAGE_VERSION}" \
-		-f images/${DOCKERFILE} \
-		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
+		--platform $(PLATFORM) \
+		--target $(IMAGE_NAME) \
+		-t "$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_VERSION)-$(ARCH)" \
+		-f images/$(DOCKERFILE) \
+		--build-arg SLURM_VERSION="$(SLURM_VERSION)" \
 		--progress=plain \
 		--push \
 		$(DOCKER_BUILD_ARGS) \
 		.
-ifeq ($(UNSTABLE), false)
-# Push to the Nebius stable registry
-	skopeo copy --all \
-		docker://"$(IMAGE_REPO)-unstable/${IMAGE_NAME}:${IMAGE_VERSION}" \
-		docker://"$(IMAGE_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
-# Push to the Github registry
-	skopeo copy --all \
-		docker://"$(IMAGE_REPO)-unstable/${IMAGE_NAME}:${IMAGE_VERSION}" \
-		docker://"$(GITHUB_REPO)/${IMAGE_NAME}:${IMAGE_VERSION}"
-endif
 
 .PHONY: docker-create-manifest
 docker-create-manifest: ## Create and push multi-arch manifest from per-arch tags
@@ -476,57 +423,32 @@ endif
 ifndef UNSTABLE
 	$(error UNSTABLE is not set)
 endif
-ifeq ($(UNSTABLE),false)
-	$(eval REPO_PREFIX := $(NEBIUS_REPO))
-else
-	$(eval REPO_PREFIX := $(NEBIUS_REPO)-unstable)
-endif
 	@set -euo pipefail; \
-	REPO="$(REPO_PREFIX)/$(IMAGE_NAME)"; \
-	MANIFEST_TAG="$$REPO:$(IMAGE_VERSION)"; \
 	ARCHES="$${ARCHES:-amd64 arm64}"; \
-	echo "Creating manifest: $$MANIFEST_TAG"; \
+	NEBIUS_REPO="$(IMAGE_REPO)/$(IMAGE_NAME)"; \
+	NEBIUS_MANIFEST="$$NEBIUS_REPO:$(IMAGE_VERSION)"; \
+	\
+	echo "Creating Nebius manifest: $$NEBIUS_MANIFEST"; \
 	echo "Using arches: $$ARCHES"; \
 	IMAGES=""; \
 	for arch in $$ARCHES; do \
-	  IMAGES="$$IMAGES $$REPO:$(IMAGE_VERSION)-$$arch"; \
+	  IMAGES="$$IMAGES $$NEBIUS_REPO:$(IMAGE_VERSION)-$$arch"; \
 	done; \
 	echo "Sources:$$IMAGES"; \
-	docker buildx imagetools create -t "$$MANIFEST_TAG" $$IMAGES; \
-	docker buildx imagetools inspect "$$MANIFEST_TAG"
-
-.PHONY: docker-build-jail
-docker-build-jail: ## Build jail (use PLATFORMS=linux/amd64,linux/arm64 for multi-arch)
-ifndef IMAGE_VERSION
-	$(error IMAGE_VERSION is not set, docker image cannot be built)
-endif
-# Output type tar doesn't support multi-platform, so we build each arch separately.
-ifneq ($(HAS_AMD64),)
-	docker buildx build \
-		--platform linux/amd64 \
-		--target jail \
-		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-amd64" \
-		-f images/jail/jail.dockerfile \
-		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
-		--build-arg CUDA_VERSION="${CUDA_VERSION}" \
-		--output type=tar,dest=images/jail_rootfs_cuda$(CUDA_VERSION)_amd64.tar \
-		--progress=plain \
-		$(DOCKER_BUILD_ARGS) \
-		.
-endif
-ifneq ($(HAS_ARM64),)
-	docker buildx build \
-		--platform linux/arm64 \
-		--target jail \
-		-t "$(IMAGE_REPO)/jail:${IMAGE_VERSION}-arm64" \
-		-f images/jail/jail.dockerfile \
-		--build-arg SLURM_VERSION="${SLURM_VERSION}" \
-		--build-arg CUDA_VERSION="${CUDA_VERSION}" \
-		--output type=tar,dest=images/jail_rootfs_cuda$(CUDA_VERSION)_arm64.tar \
-		--progress=plain \
-		$(DOCKER_BUILD_ARGS) \
-		.
-endif
+	docker buildx imagetools create -t "$$NEBIUS_MANIFEST" $$IMAGES; \
+	docker buildx imagetools inspect "$$NEBIUS_MANIFEST"; \
+	\
+	if [ "$(UNSTABLE)" = "false" ]; then \
+	  if [ -z "$(GITHUB_REPO)" ]; then \
+	    echo "WARN: GITHUB_REPO is empty, skipping GitHub manifest"; \
+	  else \
+	    GITHUB_REPO="$(GITHUB_REPO)/$(IMAGE_NAME)"; \
+	    GITHUB_MANIFEST="$$GITHUB_REPO:$(IMAGE_VERSION)"; \
+	    echo "Creating GitHub manifest: $$GITHUB_MANIFEST"; \
+	    docker buildx imagetools create -t "$$GITHUB_MANIFEST" $$IMAGES; \
+	    docker buildx imagetools inspect "$$GITHUB_MANIFEST"; \
+	  fi; \
+	fi
 
 .PHONY: release-helm
 release-helm: ## Build & push helm docker image
