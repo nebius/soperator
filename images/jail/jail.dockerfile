@@ -102,3 +102,25 @@ COPY VERSION /etc/soperator-jail-version
 
 # Update linker cache
 RUN ldconfig
+
+#######################################################################################################################
+FROM restic/restic:0.18.0 AS untaped
+
+COPY --from=jail / /jail
+
+RUN restic init --insecure-no-password --repo /jail_restic && \
+    cd /jail && \
+    restic --insecure-no-password --repo /jail_restic backup ./ \
+        --no-scan --no-cache --read-concurrency 16 \
+        --compression max --pack-size 8 \
+        --host soperator
+
+#######################################################################################################################
+FROM restic/restic:0.18.0 AS populate_jail
+
+COPY --from=untaped /jail_restic /jail_restic
+
+COPY images/jail/populate_jail_entrypoint.sh /opt/bin/
+RUN chmod +x /opt/bin/populate_jail_entrypoint.sh
+ENTRYPOINT ["/opt/bin/populate_jail_entrypoint.sh"]
+

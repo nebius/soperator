@@ -291,24 +291,167 @@ jobs:
           echo "Building and pushing image of the nfs-server ${NFS_VERSION}"
           make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=nfs-server DOCKERFILE=nfs-server/nfs.dockerfile IMAGE_VERSION=${NFS_VERSION}
 
-          echo "Removing previous jail rootfs tar archive"
-          rm -f images/jail_rootfs*.tar
 
-          CUDA_VERSIONS=("12.9.0" "13.0.2")
+  build-jail-images:
+    needs: [ changes, pre-build ]
+    if: needs.changes.outputs.should_build == 'true'
+    runs-on: ${{ matrix.runner }}
 
-          for CUDA_VERSION in "${CUDA_VERSIONS[@]}"; do
-            CUDA_TAG="cuda${CUDA_VERSION}"
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ linux/amd64, linux/arm64 ]
+        cuda_version: [ "12.9.0", "13.0.2" ]
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+            arch: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            arch: arm64
 
-            echo "Building tarball for jail (${CUDA_TAG})"
-            make docker-build-jail DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_VERSION=${IMAGE_VERSION} CUDA_VERSION="${CUDA_VERSION}"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
-            echo "Building and pushing image of the populate_jail ${IMAGE_VERSION}-${CUDA_TAG}"
-            DOCKER_BUILD_ARGS_WITH_CUDA="${DOCKER_BUILD_ARGS} --build-arg CUDA_VERSION=${CUDA_VERSION}"
-            make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS_WITH_CUDA}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail DOCKERFILE=populate_jail/populate_jail.dockerfile IMAGE_VERSION="${IMAGE_VERSION}-${CUDA_TAG}"
-          done
+      - name: Install GO
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: "go.mod"
+          cache: false
 
-          echo "Removing jail rootfs tar archive to speedup further docker builds."
-          rm -f images/jail_rootfs*.tar
+      - name: Download version artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: version
+          path: ./version
+
+      - name: Read version and unstable
+        id: read-version
+        run: |
+          VERSION=$(sed -n '1p' ./version/version.txt)
+          UNSTABLE=$(sed -n '2p' ./version/version.txt)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+          echo "Unstable: $UNSTABLE"
+
+      - name: Log in to the Github Container registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Install Nebius CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+          echo "$HOME/.nebius/bin" >> "$GITHUB_PATH"
+          mkdir -p "$HOME/.nebius"
+          echo "${{ secrets.NEBIUS_CONFIG_YAML_B64 }}" | base64 -d > "$HOME/.nebius/config.yaml"
+          chmod 600 "$HOME/.nebius/config.yaml"
+
+      - name: Configure Nebius docker credential-helper for auth
+        shell: bash
+        run: nebius registry configure-helper
+
+      - name: Free Disk Space on runner
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Build and push populate_jail for ${{ matrix.arch }} CUDA ${{ matrix.cuda_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          UNSTABLE='${{ steps.read-version.outputs.unstable }}'
+          IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
+
+          CUDA_TAG="cuda${{ matrix.cuda_version }}"
+          echo "Building and pushing populate_jail ${IMAGE_VERSION}-${CUDA_TAG} for ${{ matrix.platform }}"
+
+          ARGS="--build-arg CUDA_VERSION=${{ matrix.cuda_version }}"
+
+          make docker-build-and-push \
+            UNSTABLE="${UNSTABLE}" \
+            IMAGE_NAME=populate_jail \
+            DOCKERFILE=jail/jail.dockerfile \
+            IMAGE_VERSION="${IMAGE_VERSION}-${CUDA_TAG}-${{ matrix.arch }}" \
+            PLATFORMS='${{ matrix.platform }}' \
+            DOCKER_BUILD_ARGS="--build-arg CUDA_VERSION=${{ matrix.cuda_version }}"
+
+  manifest-populate-jail:
+    name: Create multi-arch manifest (populate_jail)
+    needs: [build-jail-images]
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        cuda_version: ["12.9.0", "13.0.2"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Download version artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: version
+          path: ./version
+
+      - name: Read version and unstable
+        id: read-version
+        run: |
+          VERSION=$(sed -n '1p' ./version/version.txt)
+          UNSTABLE=$(sed -n '2p' ./version/version.txt)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+          echo "Unstable: $UNSTABLE"
+
+      - name: Install Nebius CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+          echo "$HOME/.nebius/bin" >> "$GITHUB_PATH"
+          mkdir -p "$HOME/.nebius"
+          echo "${{ secrets.NEBIUS_CONFIG_YAML_B64 }}" | base64 -d > "$HOME/.nebius/config.yaml"
+          chmod 600 "$HOME/.nebius/config.yaml"
+
+      - name: Configure Nebius docker credential-helper for auth
+        shell: bash
+        run: nebius registry configure-helper
+
+      - name: Set up Docker Buildx (for imagetools)
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Create and push manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          UNSTABLE='${{ steps.read-version.outputs.unstable }}'
+          IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
+          CUDA_TAG="cuda${{ matrix.cuda_version }}"
+  
+          echo "Calling: make docker-create-manifest UNSTABLE=${UNSTABLE} IMAGE_NAME=populate_jail IMAGE_VERSION=${IMAGE_VERSION}-${CUDA_TAG}"
+          make docker-create-manifest \
+            UNSTABLE="${UNSTABLE}" \
+            IMAGE_NAME=populate_jail \
+            IMAGE_VERSION="${IMAGE_VERSION}-${CUDA_TAG}"
+
 
   build-helm-charts:
     needs: [changes, pre-build]
@@ -356,7 +499,11 @@ jobs:
 
   helm-integration-test:
     name: Helm Chart Integration Test with Built Images
-    needs: [changes, build-docker-images, build-helm-charts]
+    needs:
+      - changes
+      - build-docker-images
+      - manifest-populate-jail
+      - build-helm-charts
     if: needs.changes.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -445,6 +592,7 @@ jobs:
       - pre-build
       - lint
       - build-docker-images
+      - manifest-populate-jail
       - build-helm-charts
       - helm-integration-test
     if: always()
