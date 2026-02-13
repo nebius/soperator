@@ -173,6 +173,7 @@ jobs:
           fetch-depth: 0
 
       - name: Terraform Apply
+        timeout-minutes: 120
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
           nebius iam session-management revoke --all-my-active
@@ -187,7 +188,7 @@ jobs:
           aws configure set region $NEBIUS_REGION
           aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
 
-          go test -v -timeout 2h --tags=e2e -run TestTerraformApply ./test/e2e/...
+          go run ./cmd/e2e apply
 
       - name: K8s Cluster Info and NodeGroups
         if: always()
@@ -299,6 +300,7 @@ jobs:
 
       - name: Terraform Destroy
         if: always()
+        timeout-minutes: 30
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
           source .envrc
@@ -310,7 +312,7 @@ jobs:
           aws configure set region $NEBIUS_REGION
           aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
 
-          go test -v -timeout 30m --tags=e2e -run TestTerraformDestroy ./test/e2e/...
+          go run ./cmd/e2e destroy
 
       - name: Force cleanup compute instances on failure
         if: failure()
