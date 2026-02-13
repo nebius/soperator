@@ -63,9 +63,7 @@ jobs:
   pre-build:
     needs: [changes]
     if: needs.changes.outputs.should_build == 'true'
-    runs-on:
-      - self-hosted
-      - build
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
@@ -124,9 +122,7 @@ jobs:
   lint:
     needs: [changes]
     if: needs.changes.outputs.should_build == 'true'
-    runs-on:
-      - self-hosted
-      - build
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
@@ -618,10 +614,7 @@ jobs:
   build-helm-charts:
     needs: [changes, pre-build]
     if: needs.changes.outputs.should_build == 'true'
-    runs-on:
-      - self-hosted
-      - X64
-      - build
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -647,6 +640,20 @@ jobs:
           echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION"
           echo "Unstable: $UNSTABLE"
+
+      - name: Install Nebius CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+          echo "$HOME/.nebius/bin" >> "$GITHUB_PATH"
+          mkdir -p "$HOME/.nebius"
+          echo "${{ secrets.NEBIUS_CONFIG_YAML_B64 }}" | base64 -d > "$HOME/.nebius/config.yaml"
+          chmod 600 "$HOME/.nebius/config.yaml"
+
+      - name: Configure Nebius docker credential-helper for auth
+        shell: bash
+        run: nebius registry configure-helper
 
       - name: Run Helm Tests
         run: make helmtest
