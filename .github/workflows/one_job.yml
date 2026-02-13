@@ -8,11 +8,6 @@ on:
         type: string
         required: false
         default: "true"
-      multi_arch:
-        description: "Build for both amd64 and arm64 platforms"
-        type: string
-        required: false
-        default: "false"
 
   workflow_dispatch:
     inputs:
@@ -21,11 +16,6 @@ on:
         type: string
         required: false
         default: "true"
-      multi_arch:
-        description: "Build for both amd64 and arm64 platforms"
-        type: string
-        required: false
-        default: "false"
 
   push:
     branches:
@@ -174,10 +164,19 @@ jobs:
   build-docker-images:
     needs: [changes, pre-build]
     if: needs.changes.outputs.should_build == 'true'
-    runs-on:
-      - self-hosted
-      - X64
-      - build
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ linux/amd64, linux/arm64 ]
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+            arch: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            arch: arm64
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -211,85 +210,128 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Install Nebius CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+          echo "$HOME/.nebius/bin" >> "$GITHUB_PATH"
+          mkdir -p "$HOME/.nebius"
+          echo "${{ secrets.NEBIUS_CONFIG_YAML_B64 }}" | base64 -d > "$HOME/.nebius/config.yaml"
+          chmod 600 "$HOME/.nebius/config.yaml"
+
+      - name: Configure Nebius docker credential-helper for auth
+        shell: bash
+        run: nebius registry configure-helper
 
       - name: Build and push Docker images
         shell: bash
         run: |
           UNSTABLE=${{ steps.read-version.outputs.unstable }}
-          MULTI_ARCH="${{ inputs.multi_arch || 'false' }}"
-          if [[ "$MULTI_ARCH" == "true" ]]; then
-            export PLATFORMS="linux/amd64,linux/arm64"
-          else
-            export PLATFORMS="linux/amd64"
-          fi
-          echo "Building for platforms: ${PLATFORMS}"
+          
+          echo "Building for platform: ${{ matrix.platform }}"
 
           IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
           VERSION=$(make get-version UNSTABLE=${UNSTABLE})
           OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
-          DOCKER_BUILD_ARGS="\
-            --cache-from=type=local,src=/mnt/shared-fs/docker/soperator-build-0 \
-            --cache-from=type=local,src=/mnt/shared-fs/docker/soperator-build-1 \
-            --cache-from=type=local,src=/mnt/shared-fs/docker/soperator-build-2 \
-            --cache-from=type=local,src=/mnt/shared-fs/docker/soperator-build-3 \
-            --cache-to=type=local,dest=/mnt/shared-fs/docker/${{ runner.name }},mode=max \
-          "
           NFS_VERSION=$(make get-nfs-version UNSTABLE=${UNSTABLE})
 
           make sync-version UNSTABLE=${UNSTABLE}
 
           echo "Updating CRDs & auto-generated code (included in test step) & run tests"
           make test-coverage UNSTABLE="${UNSTABLE}"
+          
+          echo "soperator controller - ${OPERATOR_IMAGE_TAG}"
+          make docker-build-and-push \
+            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator DOCKERFILE=soperator-controllers/Dockerfile \
+            IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
+          
+          echo "sconfigcontroller - ${OPERATOR_IMAGE_TAG}"
+          make docker-build-and-push \
+            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller DOCKERFILE=soperator-controllers/Dockerfile \
+            IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
+          
+          echo "rebooter - ${OPERATOR_IMAGE_TAG}"
+          make docker-build-and-push \
+            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter DOCKERFILE=soperator-controllers/Dockerfile \
+            IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
+          
+          echo "soperatorchecks - ${OPERATOR_IMAGE_TAG}"
+          make docker-build-and-push \
+            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks DOCKERFILE=soperator-controllers/Dockerfile \
+            IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
 
-          echo "Building local go base image"
-          make docker-build-go-base DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}"
+          echo "soperator-exporter - ${IMAGE_VERSION}"
+          make docker-build-and-push \
+            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperator-exporter DOCKERFILE=soperator-controllers/Dockerfile \
+            IMAGE_VERSION=${IMAGE_VERSION}
 
-          echo "Building and pushing image of the soperatorchecks ${OPERATOR_IMAGE_TAG}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks DOCKERFILE=soperatorchecks/soperatorchecks.dockerfile IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
+          echo "munge - ${IMAGE_VERSION}"
+          make docker-build-and-push \
+            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=munge DOCKERFILE=munge/munge.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
 
-          echo "Building and pushing image of the sconfigcontroller ${OPERATOR_IMAGE_TAG}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller DOCKERFILE=sconfigcontroller/sconfigcontroller.dockerfile IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
+          echo "controller_slurmctld - ${IMAGE_VERSION}"
+          make docker-build-and-push \
+            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld DOCKERFILE=controller/slurmctld.dockerfile \
+            IMAGE_VERSION=${IMAGE_VERSION}
 
-          echo "Building and pushing image of the soperator ${OPERATOR_IMAGE_TAG}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator DOCKERFILE=soperator/Dockerfile IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
+          echo "controller_slurmdbd - ${IMAGE_VERSION}"
+          make docker-build-and-push \
+            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd DOCKERFILE=accounting/slurmdbd.dockerfile \
+            IMAGE_VERSION=${IMAGE_VERSION}
 
-          echo "Building and pushing image of the rebooter ${OPERATOR_IMAGE_TAG}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter DOCKERFILE=rebooter/rebooter.dockerfile IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
+          echo "slurmrestd - ${IMAGE_VERSION}"
+          make docker-build-and-push \
+            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd DOCKERFILE=restd/slurmrestd.dockerfile \
+            IMAGE_VERSION=${IMAGE_VERSION}
 
-          echo "Building and pushing image of the munge ${IMAGE_VERSION}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=munge DOCKERFILE=munge/munge.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
+          echo "slurm_check_job - ${IMAGE_VERSION}"
+          make docker-build-and-push \
+            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm_check_job \
+            DOCKERFILE=slurm_check_job/slurm_check_job.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
 
-          echo "Building and pushing image of the controller_slurmctld ${IMAGE_VERSION}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld DOCKERFILE=controller/slurmctld.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
+          echo "k8s_check_job - ${IMAGE_VERSION}"
+          make docker-build-and-push \
+            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_check_job DOCKERFILE=k8s_check_job/k8s_check_job.dockerfile \
+            IMAGE_VERSION=${IMAGE_VERSION}
 
-          echo "Building and pushing image of the controller_slurmdbd ${IMAGE_VERSION}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd DOCKERFILE=accounting/slurmdbd.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
+          echo "sansible - ${IMAGE_VERSION}"
+          make docker-build-and-push \
+            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=sansible DOCKERFILE=sansible/sansible.dockerfile \
+            IMAGE_VERSION=${IMAGE_VERSION}
 
-          echo "Building and pushing image of the slurmrestd ${IMAGE_VERSION}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd DOCKERFILE=restd/slurmrestd.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
+          echo "login_sshd - ${IMAGE_VERSION}"
+          make docker-build-and-push \
+            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd DOCKERFILE=login/sshd.dockerfile \
+            IMAGE_VERSION=${IMAGE_VERSION}
 
-          echo "Building and pushing image of the soperator-exporter ${IMAGE_VERSION}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperator-exporter DOCKERFILE=soperator-exporter/soperator-exporter.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
+          echo "worker_slurmd - ${IMAGE_VERSION}"
+          make docker-build-and-push \
+            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd DOCKERFILE=worker/slurmd.dockerfile \
+            IMAGE_VERSION=${IMAGE_VERSION}
 
-          echo "Building and pushing image of the slurm_check_job ${IMAGE_VERSION}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm_check_job DOCKERFILE=slurm_check_job/slurm_check_job.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-
-          echo "Building and pushing image of the k8s_check_job ${IMAGE_VERSION}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_check_job DOCKERFILE=k8s_check_job/k8s_check_job.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-
-          echo "Building and pushing image of the sansible ${IMAGE_VERSION}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=sansible DOCKERFILE=sansible/sansible.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-
-          echo "Building and pushing image of the login_sshd ${IMAGE_VERSION}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd DOCKERFILE=login/sshd.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-
-          echo "Building and pushing image of the worker_slurmd ${IMAGE_VERSION}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd DOCKERFILE=worker/slurmd.dockerfile IMAGE_VERSION=${IMAGE_VERSION}
-
-          echo "Building and pushing image of the nfs-server ${NFS_VERSION}"
-          make docker-build-and-push DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" UNSTABLE="${UNSTABLE}" IMAGE_NAME=nfs-server DOCKERFILE=nfs-server/nfs.dockerfile IMAGE_VERSION=${NFS_VERSION}
+          echo "nfs-server - ${NFS_VERSION}"
+          make docker-build-and-push \
+            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=nfs-server DOCKERFILE=nfs-server/nfs.dockerfile \
+            IMAGE_VERSION=${NFS_VERSION}
 
 
   build-jail-images:
@@ -381,18 +423,133 @@ jobs:
           CUDA_TAG="cuda${{ matrix.cuda_version }}"
           echo "Building and pushing populate_jail ${IMAGE_VERSION}-${CUDA_TAG} for ${{ matrix.platform }}"
 
-          ARGS="--build-arg CUDA_VERSION=${{ matrix.cuda_version }}"
-
           make docker-build-and-push \
-            UNSTABLE="${UNSTABLE}" \
-            IMAGE_NAME=populate_jail \
-            DOCKERFILE=jail/jail.dockerfile \
-            IMAGE_VERSION="${IMAGE_VERSION}-${CUDA_TAG}-${{ matrix.arch }}" \
-            PLATFORMS='${{ matrix.platform }}' \
-            DOCKER_BUILD_ARGS="--build-arg CUDA_VERSION=${{ matrix.cuda_version }}"
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail DOCKERFILE=jail/jail.dockerfile \
+            IMAGE_VERSION="${IMAGE_VERSION}-${CUDA_TAG}" ARCH="${{ matrix.arch }}" \
+            PLATFORM="${{ matrix.platform }}" DOCKER_BUILD_ARGS="--build-arg CUDA_VERSION=${{ matrix.cuda_version }}"
+          
+          df -h
+
+  manifest-docker-images:
+    name: Create docker-images manifests
+    needs: [build-docker-images]
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Download version artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: version
+          path: ./version
+
+      - name: Read version and unstable
+        id: read-version
+        run: |
+          VERSION=$(sed -n '1p' ./version/version.txt)
+          UNSTABLE=$(sed -n '2p' ./version/version.txt)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+          echo "Unstable: $UNSTABLE"
+
+      - name: Install Nebius CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+          echo "$HOME/.nebius/bin" >> "$GITHUB_PATH"
+          mkdir -p "$HOME/.nebius"
+          echo "${{ secrets.NEBIUS_CONFIG_YAML_B64 }}" | base64 -d > "$HOME/.nebius/config.yaml"
+          chmod 600 "$HOME/.nebius/config.yaml"
+
+      - name: Configure Nebius docker credential-helper for auth
+        shell: bash
+        run: nebius registry configure-helper
+
+      - name: Set up Docker Buildx (for imagetools)
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Log in to the Github Container registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          UNSTABLE='${{ steps.read-version.outputs.unstable }}'
+          IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
+          OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
+          NFS_VERSION=$(make get-nfs-version UNSTABLE=${UNSTABLE})
+
+          echo "Creating manifest for slurm-operator"
+          make docker-create-manifest \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
+          
+          echo "Creating manifest for sconfigcontroller"
+          make docker-create-manifest \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
+          
+          echo "Creating manifest for rebooter"
+          make docker-create-manifest \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
+          
+          echo "Creating manifest for soperatorchecks"
+          make docker-create-manifest \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
+          
+          echo "Creating manifest for soperator-exporter"
+          make docker-create-manifest \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperator-exporter IMAGE_VERSION="${IMAGE_VERSION}"
+          
+          echo "Creating manifest for munge"
+          make docker-create-manifest \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=munge IMAGE_VERSION="${IMAGE_VERSION}"
+          
+          echo "Creating manifest for controller_slurmctld"
+          make docker-create-manifest \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld IMAGE_VERSION="${IMAGE_VERSION}"
+          
+          echo "Creating manifest for controller_slurmdbd"
+          make docker-create-manifest \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd IMAGE_VERSION="${IMAGE_VERSION}"
+
+          echo "Creating manifest for slurmrestd"
+          make docker-create-manifest \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd IMAGE_VERSION="${IMAGE_VERSION}"
+          
+          echo "Creating manifest for slurm_check_job"
+          make docker-create-manifest \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm_check_job IMAGE_VERSION="${IMAGE_VERSION}"
+          
+          echo "Creating manifest for k8s_check_job"
+          make docker-create-manifest \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_check_job IMAGE_VERSION="${IMAGE_VERSION}"
+          
+          echo "Creating manifest for sansible"
+          make docker-create-manifest \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=sansible IMAGE_VERSION="${IMAGE_VERSION}"
+          
+          echo "Creating manifest for login_sshd"
+          make docker-create-manifest \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd IMAGE_VERSION="${IMAGE_VERSION}"
+          
+          echo "Creating manifest for worker_slurmd"
+          make docker-create-manifest \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd IMAGE_VERSION="${IMAGE_VERSION}"
+          
+          echo "Creating manifest for nfs-server"
+          make docker-create-manifest \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=nfs-server IMAGE_VERSION="${NFS_VERSION}"
 
   manifest-populate-jail:
-    name: Create multi-arch manifest (populate_jail)
+    name: Create populate_jail manifests
     needs: [build-jail-images]
     runs-on: ubuntu-24.04
 
@@ -438,6 +595,13 @@ jobs:
       - name: Set up Docker Buildx (for imagetools)
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
+      - name: Log in to the Github Container registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create and push manifest
         shell: bash
         run: |
@@ -446,11 +610,9 @@ jobs:
           IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
           CUDA_TAG="cuda${{ matrix.cuda_version }}"
   
-          echo "Calling: make docker-create-manifest UNSTABLE=${UNSTABLE} IMAGE_NAME=populate_jail IMAGE_VERSION=${IMAGE_VERSION}-${CUDA_TAG}"
+          echo "Create manifest for populate_jail - ${IMAGE_VERSION}-${CUDA_TAG}"
           make docker-create-manifest \
-            UNSTABLE="${UNSTABLE}" \
-            IMAGE_NAME=populate_jail \
-            IMAGE_VERSION="${IMAGE_VERSION}-${CUDA_TAG}"
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail IMAGE_VERSION="${IMAGE_VERSION}-${CUDA_TAG}"
 
 
   build-helm-charts:
@@ -501,7 +663,7 @@ jobs:
     name: Helm Chart Integration Test with Built Images
     needs:
       - changes
-      - build-docker-images
+      - manifest-docker-images
       - manifest-populate-jail
       - build-helm-charts
     if: needs.changes.outputs.should_build == 'true'
