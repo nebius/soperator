@@ -9,4 +9,4 @@ echo "Set permissions for shared /run/munge"
 chmod 755 /run/munge # It changes permissions of this shared directory in other containers as well
 
 echo "Start munge daemon"
-munged -F --num-threads="$MUNGE_NUM_THREADS" --key-file="$MUNGE_KEY_FILE" --pid-file="$MUNGE_PID_FILE" -S "$MUNGE_SOCKET_FILE"
+exec munged -F --num-threads="$MUNGE_NUM_THREADS" --key-file="$MUNGE_KEY_FILE" --pid-file="$MUNGE_PID_FILE" -S "$MUNGE_SOCKET_FILE"
