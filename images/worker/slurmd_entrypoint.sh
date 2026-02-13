@@ -49,6 +49,9 @@ fi
 
 if [ "${SOPERATOR_NODE_SETS_ON}" = "true" ]; then
   echo "Running slurmd with NodeSets configuration"
+    slurmd_args+=(
+    -b
+  )
 else
   echo "Running slurmd with dynamic node configuration"
   slurmd_args+=(
