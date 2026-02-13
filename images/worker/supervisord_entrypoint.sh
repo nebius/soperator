@@ -97,4 +97,4 @@ fi
 
 # Hack with logs: multilog will write log in stdout and in log file, and rotate log file
 echo "Start supervisord daemon"
-/usr/bin/supervisord
+exec /usr/bin/supervisord

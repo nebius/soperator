@@ -33,4 +33,4 @@ echo "Waiting until munge started"
 while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done
 
 echo "Start sshd daemon"
-/usr/sbin/sshd -D -e -f /mnt/ssh-configs/sshd_config
+exec /usr/sbin/sshd -D -e -f /mnt/ssh-configs/sshd_config
