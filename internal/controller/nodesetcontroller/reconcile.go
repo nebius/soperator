@@ -97,6 +97,17 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		cluster.Spec.UseDefaultAppArmorProfile,
 	)
 
+	// region Ephemeral nodes power state
+	if nodeSetValues.EphemeralNodes != nil && *nodeSetValues.EphemeralNodes {
+		activeNodes, err := r.reconcileNodeSetPowerState(ctx, nodeSet)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("reconciling NodeSetPowerState: %w", err)
+		}
+		nodeSetValues.ActiveNodes = activeNodes
+		logger.V(1).Info("Ephemeral nodes power state reconciled", "activeNodes", activeNodes)
+	}
+	// endregion Ephemeral nodes power state
+
 	if err = r.executeReconciliation(ctx, nodeSet, &nodeSetValues, cluster); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -263,10 +274,14 @@ func (r NodeSetReconciler) executeReconciliation(
 					secrets.SshdKeysName = naming.BuildSecretSSHDKeysName(cluster.Name)
 				}
 
+				topologyPluginEnabled := cluster.Spec.SlurmConfig.TopologyPlugin != ""
+
 				desired, err := worker.RenderNodeSetStatefulSet(
+					cluster.Name,
 					nodeSetValues,
 					&secrets,
 					cluster.Spec.CgroupVersion,
+					topologyPluginEnabled,
 				)
 				if err != nil {
 					stepLogger.Error(err, "Failed to render")
@@ -445,4 +460,56 @@ func (r NodeSetReconciler) getWorkersStatefulSetDependencies(
 	}
 
 	return res, nil
+}
+
+// reconcileNodeSetPowerState ensures the NodeSetPowerState CR exists for this NodeSet
+// and returns the list of active node ordinals from it.
+func (r *NodeSetReconciler) reconcileNodeSetPowerState(
+	ctx context.Context,
+	nodeSet *slurmv1alpha1.NodeSet,
+) ([]int32, error) {
+	logger := log.FromContext(ctx)
+
+	powerStateName := nodeSet.Name
+
+	existing := &slurmv1alpha1.NodeSetPowerState{}
+	err := r.Get(ctx, types.NamespacedName{
+		Namespace: nodeSet.Namespace,
+		Name:      powerStateName,
+	}, existing)
+
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, fmt.Errorf("getting NodeSetPowerState: %w", err)
+	}
+
+	desired := &slurmv1alpha1.NodeSetPowerState{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      powerStateName,
+			Namespace: nodeSet.Namespace,
+			Labels: map[string]string{
+				consts.LabelNodeSetKey: nodeSet.Name,
+			},
+		},
+		Spec: slurmv1alpha1.NodeSetPowerStateSpec{
+			NodeSetRef: nodeSet.Name,
+		},
+	}
+
+	if err := r.NodeSetPowerState.Reconcile(ctx, nodeSet, desired); err != nil {
+		return nil, fmt.Errorf("reconciling NodeSetPowerState: %w", err)
+	}
+
+	if err := r.Get(ctx, types.NamespacedName{
+		Namespace: nodeSet.Namespace,
+		Name:      powerStateName,
+	}, existing); err != nil {
+		return nil, fmt.Errorf("getting NodeSetPowerState after reconcile: %w", err)
+	}
+
+	logger.V(1).Info("NodeSetPowerState reconciled",
+		"name", powerStateName,
+		"activeNodes", existing.Spec.ActiveNodes,
+	)
+
+	return existing.Spec.ActiveNodes, nil
 }

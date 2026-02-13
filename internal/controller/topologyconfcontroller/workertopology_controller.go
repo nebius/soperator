@@ -87,9 +87,21 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return DefaultRequeueResult, nil
 	}
 
-	existingTopologyConfigMap, err := r.EnsureWorkerTopologyConfigMap(ctx, req.Namespace, slurmCluster.Name, logger)
+	isNodeset, err := r.IsNodeSets(ctx, slurmCluster)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("check for NodeSets in namespace %q: %w", req.Namespace, err)
+	}
+
+	existingTopologyConfigMap, err := r.EnsureWorkerTopologyConfigMap(ctx, req.Namespace, slurmCluster.Name, isNodeset, logger)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("ensure worker topology ConfigMap: %w", err)
+	}
+
+	if isNodeset {
+		logger.Info("NodeSets detected in namespace, skipping topology config generation",
+			"Namespace", req.Namespace,
+		)
+		return DefaultRequeueResult, nil
 	}
 
 	nodeTopologyLabelsConfigMap, err := r.getNodeTopologyLabelsConfigMap(ctx, req, logger)
@@ -155,7 +167,7 @@ func isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
 }
 
 func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
-	ctx context.Context, namespace string, clusterName string, logger logr.Logger,
+	ctx context.Context, namespace string, clusterName string, isNodeset bool, logger logr.Logger,
 ) (*corev1.ConfigMap, error) {
 	configMapKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
 	jailedConfigKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
@@ -189,7 +201,7 @@ func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
 			"configMapExists", configMapExists,
 			"jailedConfigExists", jailedConfigExists)
 
-		if err = r.createDefaultTopologyResources(ctx, namespace, clusterName); err != nil {
+		if err = r.createDefaultTopologyResources(ctx, namespace, clusterName, isNodeset); err != nil {
 			return nil, fmt.Errorf("create default topology resources in namespace %q: %w", namespace, err)
 		}
 
@@ -268,18 +280,22 @@ func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace string) 
 
 // createDefaultTopologyResources creates both ConfigMap and JailedConfig resources for topology configuration with default values.
 func (r *WorkerTopologyReconciler) createDefaultTopologyResources(
-	ctx context.Context, namespace, clusterName string,
+	ctx context.Context, namespace, clusterName string, isNodeSet bool,
 ) error {
-	listASTS, err := r.GetStatefulSetsWithFallback(ctx, namespace, clusterName)
-	if err != nil {
-		return fmt.Errorf("get StatefulSets with fallback: %w", err)
+	var config string
+	if isNodeSet {
+		config = InitializeTopologyConf(nil)
+	} else {
+		listASTS, err := r.GetStatefulSetsWithFallback(ctx, namespace, clusterName)
+		if err != nil {
+			return fmt.Errorf("get StatefulSets with fallback: %w", err)
+		}
+		config = InitializeTopologyConf(listASTS)
 	}
-
-	config := InitializeTopologyConf(listASTS)
 
 	// Create ConfigMap
 	configMap := r.renderTopologyConfigMap(namespace, config)
-	err = r.Client.Create(ctx, configMap)
+	err := r.Client.Create(ctx, configMap)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("create ConfigMap %s: %w", configMap.Name, err)
 	}
@@ -301,7 +317,7 @@ func (r *WorkerTopologyReconciler) GetStatefulSetsWithFallback(
 ) (*kruisev1b1.StatefulSetList, error) {
 	listASTS := &kruisev1b1.StatefulSetList{}
 
-	if err := r.getAdvancedSTS(ctx, listASTS); err != nil {
+	if err := r.getAdvancedSTS(ctx, namespace, listASTS); err != nil {
 		return nil, fmt.Errorf("get advanced stateful sets: %w", err)
 	}
 
@@ -332,17 +348,17 @@ func (r *WorkerTopologyReconciler) GetStatefulSetsWithFallback(
 }
 
 func (r *WorkerTopologyReconciler) getAdvancedSTS(
-	ctx context.Context, asts *kruisev1b1.StatefulSetList,
+	ctx context.Context, namespace string, asts *kruisev1b1.StatefulSetList,
 ) error {
 	labels := map[string]string{
 		consts.LabelWorkerKey: consts.LabelWorkerValue,
 	}
-	return r.Client.List(ctx, asts, client.MatchingLabels(labels))
+	return r.Client.List(ctx, asts, client.InNamespace(namespace), client.MatchingLabels(labels))
 }
 
 func InitializeTopologyConf(asts *kruisev1b1.StatefulSetList) string {
-	if asts == nil || len(asts.Items) == 0 {
-		return ""
+	if asts == nil {
+		return "SwitchName=root"
 	}
 
 	switchName := "SwitchName=unknown"
@@ -381,6 +397,76 @@ func (r *WorkerTopologyReconciler) getPodList(
 	}
 
 	return podList, nil
+}
+
+// IsNodeSets returns true if there are any NodeSets in the namespace, false otherwise.
+func (r *WorkerTopologyReconciler) IsNodeSets(ctx context.Context, slurmCluster *slurmv1.SlurmCluster) (bool, error) {
+
+	nodeSetList := &v1alpha1.NodeSetList{}
+	err := r.Client.List(ctx, nodeSetList, client.InNamespace(slurmCluster.Namespace))
+	if err != nil && !apierrors.IsNotFound(err) {
+		return false, fmt.Errorf("list NodeSets in namespace %s: %w", slurmCluster.Namespace, err)
+	}
+
+	if len(nodeSetList.Items) > 0 {
+		return true, nil
+	}
+
+	if slurmCluster.Spec.SlurmNodes.Worker == nil || slurmCluster.Spec.SlurmNodes.Worker.Size == 0 {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// FilterPodsExcludingEphemeralNodeSets filters out pods that belong to NodeSets with EphemeralNodes=true
+func (r *WorkerTopologyReconciler) FilterPodsExcludingEphemeralNodeSets(
+	pods []corev1.Pod, ephemeralNodeSets map[string]struct{},
+) []corev1.Pod {
+	if len(ephemeralNodeSets) == 0 {
+		return pods
+	}
+
+	filtered := make([]corev1.Pod, 0, len(pods))
+	for _, pod := range pods {
+		nodeSetName, exists := pod.Labels[consts.LabelNodeSetKey]
+		if !exists {
+			// If pod doesn't have NodeSet label, include it
+			filtered = append(filtered, pod)
+			continue
+		}
+
+		if _, isEphemeral := ephemeralNodeSets[nodeSetName]; !isEphemeral {
+			// Only include pods from non-ephemeral NodeSets
+			filtered = append(filtered, pod)
+		}
+	}
+
+	return filtered
+}
+
+// FilterStatefulSetsExcludingEphemeralNodeSets filters out StatefulSets that belong to NodeSets with EphemeralNodes=true
+func (r *WorkerTopologyReconciler) FilterStatefulSetsExcludingEphemeralNodeSets(
+	statefulSets []kruisev1b1.StatefulSet, ephemeralNodeSets map[string]struct{},
+) []kruisev1b1.StatefulSet {
+	if len(ephemeralNodeSets) == 0 {
+		return statefulSets
+	}
+
+	filtered := make([]kruisev1b1.StatefulSet, 0, len(statefulSets))
+	for _, sts := range statefulSets {
+		nodeSetName, exists := sts.Labels[consts.LabelNodeSetKey]
+		if !exists {
+			filtered = append(filtered, sts)
+			continue
+		}
+
+		if _, isEphemeral := ephemeralNodeSets[nodeSetName]; !isEphemeral {
+			filtered = append(filtered, sts)
+		}
+	}
+
+	return filtered
 }
 
 // GetPodsByNode organizes pods by their node name.

@@ -8,9 +8,13 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	kruisev1alpha1 "github.com/openkruise/kruise-api/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -20,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 )
@@ -30,6 +35,8 @@ var (
 
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;update;create
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=resourcedistributions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch
 
 type NodeTopologyReconciler struct {
 	BaseReconciler
@@ -108,7 +115,7 @@ func NewNodeTopologyReconciler(
 //	  topologyconf.slurm.nebius.ai/tier-2: spine01
 //	name: nodeD
 //
-// The resulting node-topoly-labels ConfigMap would contain:
+// The resulting ResourceDistribution would distribute a ConfigMap containing:
 //
 // nodeA: [tier-0: nvl0, tier-1: leaf00, tier-2: spine00]
 // nodeB: [tier-0: nvl0, tier-1: leaf00, tier-2: spine00]
@@ -118,7 +125,7 @@ func (r *NodeTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	logger := log.FromContext(ctx).WithName(NodeTopologyReconcilerName)
 	logger.Info("Starting reconciliation", "node", req.Name)
 
-	configMap, err := r.GetOrCreateTopologyLabelsConfigMap(ctx)
+	resourceDistribution, err := r.GetOrCreateTopologyResourceDistribution(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -126,7 +133,7 @@ func (r *NodeTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	node, err := r.getNode(ctx, req.Name)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			if err := r.RemoveNodeFromTopologyConfigMap(ctx, req.Name, configMap, logger); err != nil {
+			if err := r.RemoveNodeFromResourceDistribution(ctx, req.Name, resourceDistribution, logger); err != nil {
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{}, nil
@@ -143,7 +150,7 @@ func (r *NodeTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	if err := r.UpdateTopologyConfigMap(ctx, req.Name, tierData, configMap); err != nil {
+	if err := r.UpdateResourceDistribution(ctx, req.Name, tierData, resourceDistribution); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -199,70 +206,173 @@ func ExtractTierLabels(k8sNodeLabels map[string]string, topologyLabelPrefix stri
 	return tierLabels
 }
 
-// RemoveNodeFromTopologyConfigMap removes the node's tier data from the ConfigMap
-func (r *NodeTopologyReconciler) RemoveNodeFromTopologyConfigMap(ctx context.Context, nodeName string, configMap *corev1.ConfigMap, logger logr.Logger) error {
+// getConfigMapDataFromResourceDistribution extracts the ConfigMap data from the ResourceDistribution
+func (r *NodeTopologyReconciler) getConfigMapDataFromResourceDistribution(rd *kruisev1alpha1.ResourceDistribution) (map[string]string, error) {
+	if rd.Spec.Resource.Raw == nil {
+		return make(map[string]string), nil
+	}
+
+	var configMap corev1.ConfigMap
+	if err := json.Unmarshal(rd.Spec.Resource.Raw, &configMap); err != nil {
+		return nil, fmt.Errorf("unmarshal ConfigMap from ResourceDistribution: %w", err)
+	}
+
 	if configMap.Data == nil {
-		return nil // Nothing to remove if Data is nil
+		return make(map[string]string), nil
 	}
-	if _, exists := configMap.Data[nodeName]; exists {
-		delete(configMap.Data, nodeName)
-		if err := r.Client.Update(ctx, configMap); err != nil {
-			return fmt.Errorf("update ConfigMap %s/%s: %w", r.Namespace, configMap.ObjectMeta.Name, err)
-		}
-		return nil
-	}
-	logger.V(1).Info("Node not found in ConfigMap, nothing to remove", "node", nodeName)
-	return nil
+
+	return configMap.Data, nil
 }
 
-// updateTopologyConfigMap updates the ConfigMap with the node's tier data
-func (r *NodeTopologyReconciler) UpdateTopologyConfigMap(
-	ctx context.Context, nodeName string, tierData map[string]string, configMap *corev1.ConfigMap) error {
+// RemoveNodeFromResourceDistribution removes the node's tier data from the ResourceDistribution
+func (r *NodeTopologyReconciler) RemoveNodeFromResourceDistribution(
+	ctx context.Context, nodeName string, rd *kruisev1alpha1.ResourceDistribution, logger logr.Logger) error {
+
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Get the latest version of ResourceDistribution
+		latestRd := &kruisev1alpha1.ResourceDistribution{}
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: rd.Name}, latestRd); err != nil {
+			return fmt.Errorf("get latest ResourceDistribution: %w", err)
+		}
+
+		configMapData, err := r.getConfigMapDataFromResourceDistribution(latestRd)
+		if err != nil {
+			return err
+		}
+
+		if _, exists := configMapData[nodeName]; !exists {
+			logger.V(1).Info("Node not found in ResourceDistribution, nothing to remove", "node", nodeName)
+			return nil
+		}
+
+		delete(configMapData, nodeName)
+
+		return r.updateResourceDistributionWithData(ctx, latestRd, configMapData)
+	})
+}
+
+// UpdateResourceDistribution updates the ResourceDistribution with the node's tier data
+func (r *NodeTopologyReconciler) UpdateResourceDistribution(
+	ctx context.Context, nodeName string, tierData map[string]string, rd *kruisev1alpha1.ResourceDistribution) error {
+
 	tierDataJSON, err := json.Marshal(tierData)
 	if err != nil {
 		return fmt.Errorf("serialize tier data for node %s: %w", nodeName, err)
 	}
 
-	if configMap.Data == nil {
-		configMap.Data = make(map[string]string)
-	}
-	configMap.Data[nodeName] = string(tierDataJSON)
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Get the latest version of ResourceDistribution
+		latestRd := &kruisev1alpha1.ResourceDistribution{}
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: rd.Name}, latestRd); err != nil {
+			return fmt.Errorf("get latest ResourceDistribution: %w", err)
+		}
 
-	if err := r.Client.Update(ctx, configMap); err != nil {
-		return fmt.Errorf("update ConfigMap %s/%s: %w", r.Namespace, configMap.ObjectMeta.Name, err)
+		configMapData, err := r.getConfigMapDataFromResourceDistribution(latestRd)
+		if err != nil {
+			return err
+		}
+
+		configMapData[nodeName] = string(tierDataJSON)
+
+		return r.updateResourceDistributionWithData(ctx, latestRd, configMapData)
+	})
+}
+
+// updateResourceDistributionWithData updates the ResourceDistribution with new ConfigMap data
+func (r *NodeTopologyReconciler) updateResourceDistributionWithData(
+	ctx context.Context, rd *kruisev1alpha1.ResourceDistribution, configMapData map[string]string) error {
+
+	// Get target namespaces from SlurmClusters
+	targetNamespaces, err := r.getTargetNamespaces(ctx)
+	if err != nil {
+		return fmt.Errorf("get target namespaces: %w", err)
+	}
+
+	// Build the embedded ConfigMap
+	configMap := corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: consts.ConfigMapNameTopologyNodeLabels,
+		},
+		Data: configMapData,
+	}
+
+	configMapBytes, err := json.Marshal(configMap)
+	if err != nil {
+		return fmt.Errorf("marshal ConfigMap: %w", err)
+	}
+
+	rd.Spec.Resource = runtime.RawExtension{Raw: configMapBytes}
+	rd.Spec.Targets = kruisev1alpha1.ResourceDistributionTargets{
+		ExcludedNamespaces:     kruisev1alpha1.ResourceDistributionTargetNamespaces{},
+		IncludedNamespaces:     targetNamespaces,
+		NamespaceLabelSelector: metav1.LabelSelector{},
+	}
+
+	if err := r.Client.Update(ctx, rd); err != nil {
+		return fmt.Errorf("update ResourceDistribution %s: %w", rd.Name, err)
 	}
 
 	return nil
 }
 
-// GetOrCreateTopologyLabelsConfigMap retrieves or creates the ConfigMap used to store node topology information.
-func (r *NodeTopologyReconciler) GetOrCreateTopologyLabelsConfigMap(ctx context.Context) (*corev1.ConfigMap, error) {
-	configMap := &corev1.ConfigMap{
-		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.ConfigMapNameTopologyNodeLabels,
-			Namespace: r.Namespace,
-		},
+// getTargetNamespaces returns the list of namespaces to distribute the ConfigMap to
+func (r *NodeTopologyReconciler) getTargetNamespaces(ctx context.Context) (kruisev1alpha1.ResourceDistributionTargetNamespaces, error) {
+	namespaceSet := make(map[string]struct{})
+
+	// Always include the operator namespace
+	namespaceSet[r.Namespace] = struct{}{}
+
+	// Get all SlurmCluster resources and add their namespaces
+	slurmClusters := &slurmv1.SlurmClusterList{}
+	if err := r.Client.List(ctx, slurmClusters); err != nil {
+		return kruisev1alpha1.ResourceDistributionTargetNamespaces{}, fmt.Errorf("list SlurmClusters: %w", err)
 	}
 
-	err := r.Client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return nil, fmt.Errorf("get ConfigMap: %w", err)
-		}
-
-		if err := r.initializeConfigMapWithAllNodes(ctx, configMap); err != nil {
-			return nil, fmt.Errorf("initialize ConfigMap with all nodes: %w", err)
-		}
+	for _, cluster := range slurmClusters.Items {
+		namespaceSet[cluster.Namespace] = struct{}{}
 	}
 
-	return configMap, nil
+	// Convert to list
+	namespaceList := make([]kruisev1alpha1.ResourceDistributionNamespace, 0, len(namespaceSet))
+	for ns := range namespaceSet {
+		namespaceList = append(namespaceList, kruisev1alpha1.ResourceDistributionNamespace{
+			Name: ns,
+		})
+	}
+
+	return kruisev1alpha1.ResourceDistributionTargetNamespaces{
+		List: namespaceList,
+	}, nil
 }
 
-// initializeConfigMapWithAllNodes creates ConfigMap and populates it with all nodes that have tier labels
-func (r *NodeTopologyReconciler) initializeConfigMapWithAllNodes(ctx context.Context, configMap *corev1.ConfigMap) error {
+// GetOrCreateTopologyResourceDistribution retrieves or creates the ResourceDistribution
+func (r *NodeTopologyReconciler) GetOrCreateTopologyResourceDistribution(ctx context.Context) (*kruisev1alpha1.ResourceDistribution, error) {
+	rd := &kruisev1alpha1.ResourceDistribution{}
+	rdKey := client.ObjectKey{Name: consts.ResourceDistributionNameTopology}
+
+	err := r.Client.Get(ctx, rdKey, rd)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return nil, fmt.Errorf("get ResourceDistribution: %w", err)
+		}
+
+		if err := r.initializeResourceDistributionWithAllNodes(ctx, rd); err != nil {
+			return nil, fmt.Errorf("initialize ResourceDistribution with all nodes: %w", err)
+		}
+	}
+
+	return rd, nil
+}
+
+// initializeResourceDistributionWithAllNodes creates ResourceDistribution and populates it with all nodes that have tier labels
+func (r *NodeTopologyReconciler) initializeResourceDistributionWithAllNodes(ctx context.Context, rd *kruisev1alpha1.ResourceDistribution) error {
 	logger := log.FromContext(ctx).WithName(NodeTopologyReconcilerName)
 
-	configMap.Data = make(map[string]string)
+	configMapData := make(map[string]string)
 
 	nodeList := &corev1.NodeList{}
 	continueToken := ""
@@ -290,7 +400,7 @@ func (r *NodeTopologyReconciler) initializeConfigMapWithAllNodes(ctx context.Con
 						logger.Error(err, "Failed to serialize tier data for node", "node", node.Name)
 						continue
 					}
-					configMap.Data[node.Name] = string(tierDataJSON)
+					configMapData[node.Name] = string(tierDataJSON)
 				}
 			}
 		}
@@ -300,17 +410,53 @@ func (r *NodeTopologyReconciler) initializeConfigMapWithAllNodes(ctx context.Con
 			break
 		}
 	}
-	if err := r.Client.Create(ctx, configMap); err != nil {
-		return fmt.Errorf("create ConfigMap: %w", err)
+
+	// Get target namespaces from SlurmClusters
+	targetNamespaces, err := r.getTargetNamespaces(ctx)
+	if err != nil {
+		return fmt.Errorf("get target namespaces: %w", err)
 	}
 
-	logger.Info("Initialized ConfigMap with all nodes", "nodesCount", len(configMap.Data))
+	// Build the embedded ConfigMap
+	configMap := corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: consts.ConfigMapNameTopologyNodeLabels,
+		},
+		Data: configMapData,
+	}
+
+	configMapBytes, err := json.Marshal(configMap)
+	if err != nil {
+		return fmt.Errorf("marshal ConfigMap: %w", err)
+	}
+
+	rd.ObjectMeta = metav1.ObjectMeta{
+		Name: consts.ResourceDistributionNameTopology,
+	}
+	rd.Spec = kruisev1alpha1.ResourceDistributionSpec{
+		Resource: runtime.RawExtension{Raw: configMapBytes},
+		Targets: kruisev1alpha1.ResourceDistributionTargets{
+			ExcludedNamespaces:     kruisev1alpha1.ResourceDistributionTargetNamespaces{},
+			IncludedNamespaces:     targetNamespaces,
+			NamespaceLabelSelector: metav1.LabelSelector{},
+		},
+	}
+
+	if err := r.Client.Create(ctx, rd); err != nil {
+		return fmt.Errorf("create ResourceDistribution: %w", err)
+	}
+
+	logger.Info("Initialized ResourceDistribution with all nodes", "nodesCount", len(configMapData))
 	return nil
 }
 
 func (r *NodeTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 	maxConcurrency int, cacheSyncTimeout time.Duration) error {
-	// Add runnable to check ConfigMap existence after manager starts
+	// Add runnable to check ResourceDistribution existence after manager starts
 	if err := mgr.Add(r); err != nil {
 		return fmt.Errorf("failed to add runnable: %w", err)
 	}
@@ -349,8 +495,8 @@ func (r *NodeTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 				return exists
 			},
 		})).
-		Watches(&corev1.ConfigMap{},
-			handler.EnqueueRequestsFromMapFunc(r.reconcileConfigMapToRequests),
+		Watches(&kruisev1alpha1.ResourceDistribution{},
+			handler.EnqueueRequestsFromMapFunc(r.reconcileResourceDistributionToRequests),
 			builder.WithPredicates(predicate.Funcs{
 				CreateFunc: func(e event.CreateEvent) bool {
 					return false
@@ -359,11 +505,27 @@ func (r *NodeTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 					return false
 				},
 				DeleteFunc: func(e event.DeleteEvent) bool {
-					cm, ok := e.Object.(*corev1.ConfigMap)
+					rd, ok := e.Object.(*kruisev1alpha1.ResourceDistribution)
 					if !ok {
 						return false
 					}
-					return cm.Name == consts.ConfigMapNameTopologyNodeLabels && cm.Namespace == r.Namespace
+					return rd.Name == consts.ResourceDistributionNameTopology
+				},
+				GenericFunc: func(e event.GenericEvent) bool {
+					return false
+				},
+			})).
+		Watches(&slurmv1.SlurmCluster{},
+			handler.EnqueueRequestsFromMapFunc(r.reconcileSlurmClusterToRequests),
+			builder.WithPredicates(predicate.Funcs{
+				CreateFunc: func(e event.CreateEvent) bool {
+					return true
+				},
+				UpdateFunc: func(e event.UpdateEvent) bool {
+					return false
+				},
+				DeleteFunc: func(e event.DeleteEvent) bool {
+					return true
 				},
 				GenericFunc: func(e event.GenericEvent) bool {
 					return false
@@ -373,28 +535,23 @@ func (r *NodeTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 		Complete(r)
 }
 
-// reconcileConfigMapToRequests handles ConfigMap deletion and recreates it
-func (r *NodeTopologyReconciler) reconcileConfigMapToRequests(ctx context.Context, obj client.Object) []reconcile.Request {
-	cm, ok := obj.(*corev1.ConfigMap)
+// reconcileResourceDistributionToRequests handles ResourceDistribution deletion and recreates it
+func (r *NodeTopologyReconciler) reconcileResourceDistributionToRequests(ctx context.Context, obj client.Object) []reconcile.Request {
+	rd, ok := obj.(*kruisev1alpha1.ResourceDistribution)
 	if !ok {
 		return nil
 	}
 
-	if cm.Name == consts.ConfigMapNameTopologyNodeLabels && cm.Namespace == r.Namespace {
+	if rd.Name == consts.ResourceDistributionNameTopology {
 		logger := log.FromContext(ctx).WithName(NodeTopologyReconcilerName)
-		logger.Info("Topology node labels ConfigMap was deleted, recreating it", "configMap", cm.Name)
+		logger.Info("Topology ResourceDistribution was deleted, recreating it", "resourceDistribution", rd.Name)
 
-		configMap := &corev1.ConfigMap{
-			ObjectMeta: ctrl.ObjectMeta{
-				Name:      consts.ConfigMapNameTopologyNodeLabels,
-				Namespace: r.Namespace,
-			},
-		}
+		newRd := &kruisev1alpha1.ResourceDistribution{}
 
-		if err := r.initializeConfigMapWithAllNodes(ctx, configMap); err != nil {
-			logger.Error(err, "Failed to recreate topology node labels ConfigMap")
+		if err := r.initializeResourceDistributionWithAllNodes(ctx, newRd); err != nil {
+			logger.Error(err, "Failed to recreate topology ResourceDistribution")
 		} else {
-			logger.Info("Successfully recreated topology node labels ConfigMap")
+			logger.Info("Successfully recreated topology ResourceDistribution")
 		}
 	}
 
@@ -402,29 +559,64 @@ func (r *NodeTopologyReconciler) reconcileConfigMapToRequests(ctx context.Contex
 	return []reconcile.Request{}
 }
 
+// reconcileSlurmClusterToRequests handles SlurmCluster create/delete to update target namespaces
+func (r *NodeTopologyReconciler) reconcileSlurmClusterToRequests(ctx context.Context, obj client.Object) []reconcile.Request {
+	logger := log.FromContext(ctx).WithName(NodeTopologyReconcilerName)
+	logger.Info("SlurmCluster changed, updating ResourceDistribution target namespaces", "cluster", obj.GetName(), "namespace", obj.GetNamespace())
+
+	// Get the ResourceDistribution
+	rd := &kruisev1alpha1.ResourceDistribution{}
+	rdKey := client.ObjectKey{Name: consts.ResourceDistributionNameTopology}
+
+	if err := r.Client.Get(ctx, rdKey, rd); err != nil {
+		if errors.IsNotFound(err) {
+			logger.V(1).Info("ResourceDistribution not found, will be created on next reconciliation")
+			return []reconcile.Request{}
+		}
+		logger.Error(err, "Failed to get ResourceDistribution")
+		return []reconcile.Request{}
+	}
+
+	// Get current ConfigMap data
+	configMapData, err := r.getConfigMapDataFromResourceDistribution(rd)
+	if err != nil {
+		logger.Error(err, "Failed to get ConfigMap data from ResourceDistribution")
+		return []reconcile.Request{}
+	}
+
+	// Update target namespaces
+	if err := r.updateResourceDistributionWithData(ctx, rd, configMapData); err != nil {
+		logger.Error(err, "Failed to update ResourceDistribution target namespaces")
+	} else {
+		logger.Info("Successfully updated ResourceDistribution target namespaces")
+	}
+
+	// Return empty slice since we don't need to trigger any node reconciliation
+	return []reconcile.Request{}
+}
+
 // Start is called by the manager when the controller starts
-// It checks if ConfigMap exists and creates it if not
+// It checks if ResourceDistribution exists and creates it if not
 func (r *NodeTopologyReconciler) Start(ctx context.Context) error {
 	logger := log.FromContext(ctx).WithName(NodeTopologyReconcilerName)
-	logger.Info(fmt.Sprintf("Starting %s runnable to ensure ConfigMap existence", NodeTopologyReconcilerName))
+	logger.Info(fmt.Sprintf("Starting %s runnable to ensure ResourceDistribution existence", NodeTopologyReconcilerName))
 
-	configMap := &corev1.ConfigMap{}
+	rd := &kruisev1alpha1.ResourceDistribution{}
 	err := r.Client.Get(ctx, client.ObjectKey{
-		Name:      consts.ConfigMapNameTopologyNodeLabels,
-		Namespace: r.Namespace,
-	}, configMap)
+		Name: consts.ResourceDistributionNameTopology,
+	}, rd)
 
 	if err == nil {
 		return nil
 	}
 
 	if !errors.IsNotFound(err) {
-		return fmt.Errorf("check ConfigMap existence: %w", err)
+		return fmt.Errorf("check ResourceDistribution existence: %w", err)
 	}
 
-	logger.Info("ConfigMap does not exist, creating it")
-	if _, err := r.GetOrCreateTopologyLabelsConfigMap(ctx); err != nil {
-		return fmt.Errorf("create ConfigMap: %w", err)
+	logger.Info("ResourceDistribution does not exist, creating it")
+	if _, err := r.GetOrCreateTopologyResourceDistribution(ctx); err != nil {
+		return fmt.Errorf("create ResourceDistribution: %w", err)
 	}
 
 	return nil
@@ -436,4 +628,51 @@ func (r *NodeTopologyReconciler) tierZeroLabel() string {
 
 func (r *NodeTopologyReconciler) tierOneLabel() string {
 	return r.topologyLabelPrefix + consts.TierOneSuffix
+}
+
+// Legacy methods for backward compatibility with tests
+
+// GetOrCreateTopologyLabelsConfigMap is deprecated, use GetOrCreateTopologyResourceDistribution
+func (r *NodeTopologyReconciler) GetOrCreateTopologyLabelsConfigMap(ctx context.Context) (*corev1.ConfigMap, error) {
+	rd, err := r.GetOrCreateTopologyResourceDistribution(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	configMapData, err := r.getConfigMapDataFromResourceDistribution(rd)
+	if err != nil {
+		return nil, err
+	}
+
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      consts.ConfigMapNameTopologyNodeLabels,
+			Namespace: r.Namespace,
+		},
+		Data: configMapData,
+	}, nil
+}
+
+// UpdateTopologyConfigMap is deprecated, use UpdateResourceDistribution
+func (r *NodeTopologyReconciler) UpdateTopologyConfigMap(
+	ctx context.Context, nodeName string, tierData map[string]string) error {
+
+	rd, err := r.GetOrCreateTopologyResourceDistribution(ctx)
+	if err != nil {
+		return err
+	}
+
+	return r.UpdateResourceDistribution(ctx, nodeName, tierData, rd)
+}
+
+// RemoveNodeFromTopologyConfigMap is deprecated, use RemoveNodeFromResourceDistribution
+func (r *NodeTopologyReconciler) RemoveNodeFromTopologyConfigMap(
+	ctx context.Context, nodeName string, logger logr.Logger) error {
+
+	rd, err := r.GetOrCreateTopologyResourceDistribution(ctx)
+	if err != nil {
+		return err
+	}
+
+	return r.RemoveNodeFromResourceDistribution(ctx, nodeName, rd, logger)
 }

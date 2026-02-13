@@ -251,6 +251,11 @@ spec:
           memory: {{ required ".Values.slurmNodes.controller.munge.resources.memory must be provided." .Values.slurmNodes.controller.munge.resources.memory | quote}}
           ephemeral-storage: {{ required ".Values.slurmNodes.controller.munge.resources.ephemeralStorage must be provided." .Values.slurmNodes.controller.munge.resources.ephemeralStorage | quote}}
       customInitContainers: {{- default list .Values.slurmNodes.controller.customInitContainers | toYaml | nindent 10 }}
+      {{- if .Values.slurmNodes.controller.serviceAccount.create }}
+      serviceAccountName: {{ include "slurm-cluster.controller.serviceAccountName" . | quote }}
+      {{- else if .Values.slurmNodes.controller.serviceAccount.name }}
+      serviceAccountName: {{ .Values.slurmNodes.controller.serviceAccount.name | quote }}
+      {{- end }}
       volumes:
         spool:
           {{- required ".Values.slurmNodes.controller.volumes.spool must be provided." .Values.slurmNodes.controller.volumes.spool | toYaml | nindent 10 }}

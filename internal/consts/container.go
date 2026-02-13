@@ -7,7 +7,7 @@ const (
 	ContainerNameSlurmd            = SlurmdName
 	ContainerNameREST              = Slurmrestd
 	ContainerNameSshd              = SshdName
-	ContainerNameWaitForController = "wait-for-controller"
+	ContainerNameWorkerInit        = "worker-init"
 	ContainerNameWaitForDatabase   = "wait-for-database"
 	ContainerNameWaitForAccounting = "wait-for-accounting"
 	ContainerNamePopulateJail      = populateJail

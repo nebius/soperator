@@ -19,20 +19,111 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-// RenderContainerWaitForController renders init [corev1.Container] that waits for controller readiness
-func RenderContainerWaitForController(container *values.Container) corev1.Container {
+// RenderContainerWorkerInit renders init [corev1.Container] for worker nodes.
+// It runs a script that waits for the controller to be ready before allowing the main slurmd container to start.
+// If topology is enabled, it also waits for the topology configuration to be ready before allowing slurmd to start.
+func RenderContainerWorkerInit(
+	clusterName string,
+	container *values.Container,
+	topologyEnabled, isNodeSet bool,
+	waitTimeoutSeconds int32,
+) corev1.Container {
+	command := []string{
+		"python3",
+		"/opt/bin/slurm/worker_init.py",
+		"wait-controller",
+	}
+	if topologyEnabled {
+		command = append(command, "wait-topology")
+	}
+
+	volumeMounts := []corev1.VolumeMount{
+		common.RenderVolumeMountJail(),
+		common.RenderVolumeMountMungeSocket(),
+	}
+	if topologyEnabled {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      consts.VolumeNameTopologyNodeLabels,
+			MountPath: consts.VolumeMountPathTopologyNodeLabels,
+			ReadOnly:  true,
+		})
+	}
+
+	env := []corev1.EnvVar{
+		{
+			Name: "K8S_NODE_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "spec.nodeName",
+				},
+			},
+		},
+		{
+			Name: "K8S_POD_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "metadata.name",
+				},
+			},
+		},
+		{
+			Name: "K8S_POD_NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name:  "CONTROLLER_MAX_ATTEMPTS",
+			Value: "60",
+		},
+		{
+			Name:  "CONTROLLER_POLL_INTERVAL",
+			Value: "5",
+		},
+	}
+
+	if isNodeSet {
+		env = append(env, corev1.EnvVar{
+			Name:  "K8S_SERVICE_NAME",
+			Value: naming.BuildServiceName(consts.ComponentTypeNodeSet, clusterName),
+		})
+	} else {
+		// For "legacy" workers without NodeSet, we use the default worker service for backward compatibility.
+		env = append(env, corev1.EnvVar{
+			Name:  "K8S_SERVICE_NAME",
+			Value: naming.BuildServiceName(consts.ComponentTypeWorker, clusterName),
+		})
+	}
+
+	if topologyEnabled {
+		env = append(env,
+			corev1.EnvVar{
+				Name:  "TOPOLOGY_CONFIGMAP_PATH",
+				Value: consts.VolumeMountPathTopologyNodeLabels,
+			},
+			corev1.EnvVar{
+				Name:  "TOPOLOGY_WAIT_TIMEOUT",
+				Value: strconv.Itoa(int(waitTimeoutSeconds)),
+			},
+			corev1.EnvVar{
+				Name:  "TOPOLOGY_POLL_INTERVAL",
+				Value: "5",
+			},
+		)
+	}
+
 	return corev1.Container{
-		Name:            consts.ContainerNameWaitForController,
-		Image:           container.Image,
-		ImagePullPolicy: container.ImagePullPolicy,
-		Command: []string{
-			"/opt/bin/slurm/wait-for-controller.sh",
-		},
-		Env: []corev1.EnvVar{},
-		VolumeMounts: []corev1.VolumeMount{
-			common.RenderVolumeMountJail(),
-			common.RenderVolumeMountMungeSocket(),
-		},
+		Name:                     consts.ContainerNameWorkerInit,
+		Image:                    container.Image,
+		ImagePullPolicy:          container.ImagePullPolicy,
+		Command:                  command,
+		VolumeMounts:             volumeMounts,
+		Env:                      env,
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}
@@ -247,21 +338,6 @@ func renderContainerNodeSetSlurmd(
 			Protocol:      corev1.ProtocolTCP,
 		}},
 		VolumeMounts: volumeMounts,
-		ReadinessProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{
-						"scontrol",
-						"show",
-						"slurmd",
-					},
-				},
-			},
-			PeriodSeconds:    1,
-			TimeoutSeconds:   common.DefaultProbeTimeoutSeconds,
-			SuccessThreshold: common.DefaultProbeSuccessThreshold,
-			FailureThreshold: common.DefaultProbeFailureThreshold,
-		},
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: ptr.To(true),
 			Capabilities: &corev1.Capabilities{
@@ -388,6 +464,7 @@ func renderNodeSetSlurmdEnv(
 			Value: "true",
 		},
 	}
+
 	if len(slurmNodeExtra) > 0 {
 		envVar = append(envVar, corev1.EnvVar{
 			Name:  "SLURM_NODE_EXTRA",

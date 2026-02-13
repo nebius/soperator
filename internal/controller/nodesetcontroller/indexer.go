@@ -117,3 +117,29 @@ func (r *NodeSetReconciler) findObjectsForConfigMap(
 
 	return requests
 }
+
+// findNodeSetForPowerState maps a NodeSetPowerState change to its corresponding NodeSet.
+// The NodeSetPowerState's spec.nodeSetRef field contains the name of the NodeSet.
+func (r *NodeSetReconciler) findNodeSetForPowerState(
+	ctx context.Context,
+	powerState client.Object,
+) []reconcile.Request {
+	nodeSetPowerState, ok := powerState.(*slurmv1alpha1.NodeSetPowerState)
+	if !ok {
+		return nil
+	}
+
+	nodeSetName := nodeSetPowerState.Spec.NodeSetRef
+	if nodeSetName == "" {
+		return nil
+	}
+
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: nodeSetPowerState.Namespace,
+				Name:      nodeSetName,
+			},
+		},
+	}
+}

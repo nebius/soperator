@@ -165,7 +165,7 @@ func TestWorkerTopologyReconciler_createDefaultTopologyResources(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			err := reconciler.createDefaultTopologyResources(ctx, namespace, clusterName)
+			err := reconciler.createDefaultTopologyResources(ctx, namespace, clusterName, false)
 
 			if tt.expectedError {
 				assert.Error(t, err)
