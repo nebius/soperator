@@ -370,7 +370,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("SlurmctldLogFile", consts.SlurmLogFile)
 	res.AddProperty("SlurmdDebug", consts.SlurmDefaultDebugLevel)
 	res.AddProperty("SlurmdLogFile", consts.SlurmLogFile)
-	res.AddProperty("DebugFlags", "Script")
+	res.AddProperty("DebugFlags", "Script,Power")
 	res.AddComment("")
 	res.AddComment("COMPUTE NODES")
 	res.AddComment("We're using the \"dynamic nodes\" feature: https://slurm.schedmd.com/dynamic_nodes.html")
