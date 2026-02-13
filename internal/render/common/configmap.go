@@ -351,11 +351,9 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		res.AddComment("POWER MANAGEMENT (ephemeral nodes)")
 		res.AddProperty("ResumeProgram", "/opt/soperator/bin/power_resume.sh")
 		res.AddProperty("SuspendProgram", "/opt/soperator/bin/power_suspend.sh")
-		res.AddProperty("SuspendTime", 1000)
 		res.AddProperty("SuspendTimeout", 90)
 		res.AddProperty("ResumeRate", 100)
 		res.AddProperty("SuspendRate", 100)
-		res.AddProperty("ReconfigFlags", "KeepPowerSaveSettings")
 		if suspendExcNodes := buildSuspendExcNodes(cluster); suspendExcNodes != "" {
 			res.AddProperty("SuspendExcNodes", suspendExcNodes)
 		}
