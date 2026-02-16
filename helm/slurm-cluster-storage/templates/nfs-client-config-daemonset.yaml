@@ -1,0 +1,52 @@
+{{- if .Values.nfsClientConfig.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: "nfs-client-config"
+spec:
+  selector:
+    matchLabels:
+      slurm: "nfs-client-config"
+  template:
+    metadata:
+      labels:
+        slurm: "nfs-client-config"
+    spec:
+      containers:
+        - name: nfs-client-config
+          image: {{ .Values.nfsClientConfig.image | quote }}
+          imagePullPolicy: {{ .Values.nfsClientConfig.imagePullPolicy }}
+          env:
+            - name: NFS_CLIENT_CONFIG_PATH
+              value: {{ .Values.nfsClientConfig.configPath | quote }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              python3 - <<'PY'
+{{ tpl (.Files.Get "files/ensure_nfs_client_config.py") . | indent 14 }}
+              PY
+              exec sleep infinity
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+      volumes:
+        - name: host-root
+          hostPath:
+            path: /
+            type: Directory
+{{- with .Values.nfsClientConfig.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+{{- end }}
+{{- with .Values.nfsClientConfig.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+{{- end }}
+{{- with .Values.nfsClientConfig.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+{{- end }}
+{{- end }}
