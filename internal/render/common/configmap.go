@@ -311,7 +311,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddProperty("PropagateResourceLimits", "NONE") // Don't propagate ulimits from the login node by default
 	res.AddComment("")
-	res.AddProperty("SchedulerParameters", "nohold_on_prolog_fail,extra_constraints,pack_serial_at_end")
+	res.AddProperty("SchedulerParameters", "nohold_on_prolog_fail,extra_constraints,pack_serial_at_end,salloc_wait_nodes,sbatch_wait_nodes")
 	res.AddComment("")
 	res.AddComment("HEALTH CHECKS")
 	res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
@@ -346,17 +346,17 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("ResumeTimeout", 1800)
 
 	// Power management for ephemeral nodes
-	if cluster.HasEphemeralNodes() {
-		res.AddComment("")
-		res.AddComment("POWER MANAGEMENT (ephemeral nodes)")
-		res.AddProperty("ResumeProgram", "/opt/soperator/bin/power_resume.sh")
-		res.AddProperty("SuspendProgram", "/opt/soperator/bin/power_suspend.sh")
-		res.AddProperty("SuspendTimeout", 90)
-		res.AddProperty("ResumeRate", 100)
-		res.AddProperty("SuspendRate", 100)
-		if suspendExcNodes := buildSuspendExcNodes(cluster); suspendExcNodes != "" {
-			res.AddProperty("SuspendExcNodes", suspendExcNodes)
-		}
+	res.AddComment("")
+	res.AddComment("POWER MANAGEMENT (ephemeral nodes)")
+	res.AddProperty("ResumeProgram", "/opt/soperator/bin/power_resume.sh")
+	res.AddProperty("SuspendProgram", "/opt/soperator/bin/power_suspend.sh")
+	res.AddProperty("SuspendExcStates", "CLOUD")
+	res.AddProperty("SuspendTimeout", 90)
+	res.AddProperty("SuspendTime", 0)
+	res.AddProperty("ResumeRate", 100)
+	res.AddProperty("SuspendRate", 100)
+	if suspendExcNodes := buildSuspendExcNodes(cluster); suspendExcNodes != "" {
+		res.AddProperty("SuspendExcNodes", suspendExcNodes)
 	}
 
 	res.AddComment("")

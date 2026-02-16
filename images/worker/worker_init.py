@@ -297,6 +297,19 @@ def _format_tier_topology(parts: dict) -> str:
 def apply_node_topology(hostname: str, topology: str) -> None:
     """Apply topology to a node via scontrol update."""
     try:
+        cmd = ["scontrol", "update", f"nodename={hostname}", "State=UNDRAIN Reason='' Comment=''"]
+        logger.info("Setting node state to UNDRAIN before applying topology: %s", " ".join(cmd))
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            output = (result.stdout + result.stderr).strip()
+            logger.error("scontrol update to UNDRAIN failed (rc=%d): %s", result.returncode, output)
+            sys.exit(1)
+
         node_addr = get_node_addr()
         cmd = ["scontrol", "update", f"nodename={hostname}", f"{node_addr}", f"{topology}" ]
         logger.info("Running: %s", " ".join(cmd))
