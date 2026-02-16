@@ -67,18 +67,3 @@ storage:
     #   - key: nvidia.com/gpu
     #     operator: Exists
     #     effect: NoSchedule
-
-nfsClientConfig:
-  enabled: true
-  image: "cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260206131521"
-  imagePullPolicy: IfNotPresent
-  configPath: "/host/etc/nfsmount.conf"
-  nodeSelector: {}
-  affinity: {}
-  tolerations:
-    - effect: NoSchedule
-      key: slurm.nebius.ai/nodeset
-      operator: Exists
-    - effect: NoSchedule
-      key: nvidia.com/gpu
-      operator: Exists
