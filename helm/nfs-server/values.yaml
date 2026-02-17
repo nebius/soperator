@@ -46,13 +46,13 @@ storageClass:
     - wsize=1048576
     - timeo=150
     - retrans=2
-    - noresvport
-    - local_lock=none
-    - proto=tcp
     - actimeo=30
-    - atime=False
-    - diratime=False
-    - acl=False
+    - local_lock=all
+    - proto=tcp
+    - noresvport
+    - noatime
+    - nodiratime
+    - noacl
 priorityClass:
   enabled: true
   name: nfs-server-high
