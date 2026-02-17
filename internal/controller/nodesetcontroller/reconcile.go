@@ -140,18 +140,64 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 	// endregion Maintenance condition
 
 	// region Validation
-	if res, err := r.validateResources(ctx, nodeSet, &nodeSetValues); err != nil {
+	var res ctrl.Result
+	if res, err = r.validateResources(ctx, nodeSet, &nodeSetValues); err != nil {
 		logger.Error(err, "Failed to validate Slurm workers")
 		return ctrl.Result{}, fmt.Errorf("validating Slurm workers: %w", err)
-	} else if res.RequeueAfter > 0 {
+	}
+	// endregion Validation
+
+	// region Phase computation
+	// Always update phase after validation so it reflects current conditions,
+	// even when we are about to requeue.
+	if err = r.updatePhase(ctx, nodeSet); err != nil {
+		return ctrl.Result{}, err
+	}
+	// endregion Phase computation
+
+	if res.RequeueAfter > 0 {
 		logger.Info("Reconciliation requeued")
 		return res, nil
 	}
-	// endregion Validation
 
 	logger.Info("Finished reconciliation")
 
 	return ctrl.Result{}, nil
+}
+
+func (r *NodeSetReconciler) updatePhase(ctx context.Context, nodeSet *slurmv1alpha1.NodeSet) error {
+	phase := computePhase(nodeSet)
+	if nodeSet.Status.Phase == phase {
+		return nil
+	}
+
+	return r.patchStatus(ctx, nodeSet, func(status *slurmv1alpha1.NodeSetStatus) bool {
+		if status.Phase == phase {
+			return false
+		}
+		status.Phase = phase
+		return true
+	})
+}
+
+// computePhase determines the NodeSet phase based on current conditions.
+func computePhase(nodeSet *slurmv1alpha1.NodeSet) string {
+	terminated := meta.FindStatusCondition(nodeSet.Status.Conditions, slurmv1alpha1.ConditionNodeSetStatefulSetTerminated)
+	if terminated != nil && terminated.Status == metav1.ConditionTrue {
+		return slurmv1alpha1.PhaseNodeSetTerminating
+	}
+
+	podsReady := meta.FindStatusCondition(nodeSet.Status.Conditions, slurmv1alpha1.ConditionNodeSetPodsReady)
+	if podsReady != nil && podsReady.Status == metav1.ConditionTrue {
+		return slurmv1alpha1.PhaseNodeSetReady
+	}
+
+	// If pods condition exists but is not True, we're actively provisioning
+	if podsReady != nil && podsReady.Status == metav1.ConditionFalse {
+		return slurmv1alpha1.PhaseNodeSetProvisioning
+	}
+
+	return slurmv1alpha1.PhaseNodeSetPending
 }
 
 func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv1alpha1.NodeSet) error {
