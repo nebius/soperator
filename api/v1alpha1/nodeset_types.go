@@ -14,6 +14,7 @@ import (
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="The phase of NodeSet lifecycle."
 // +kubebuilder:printcolumn:name="Desired",type="integer",JSONPath=".spec.replicas",description="The desired number of workers."
 // +kubebuilder:printcolumn:name="Ready",type="integer",JSONPath=".status.replicas",description="The current number of workers being ready for some time."
+// +kubebuilder:printcolumn:name="Ephemeral",type="boolean",JSONPath=".spec.ephemeralNodes",description="Whether the NodeSet uses ephemeral nodes."
 
 // NodeSet is the Schema for the nodesets API
 type NodeSet struct {

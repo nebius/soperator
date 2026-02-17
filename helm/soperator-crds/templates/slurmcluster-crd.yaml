@@ -15113,6 +15113,10 @@ spec:
       jsonPath: .status.replicas
       name: Ready
       type: integer
+    - description: Whether the NodeSet uses ephemeral nodes.
+      jsonPath: .spec.ephemeralNodes
+      name: Ephemeral
+      type: boolean
     name: v1alpha1
     schema:
       openAPIV3Schema:
