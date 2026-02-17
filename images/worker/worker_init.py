@@ -297,7 +297,7 @@ def _format_tier_topology(parts: dict) -> str:
 def apply_node_topology(hostname: str, topology: str) -> None:
     """Apply topology to a node via scontrol update."""
     try:
-        cmd = ["scontrol", "update", f"nodename={hostname}", "State=UNDRAIN Reason='' Comment=''"]
+        cmd = ["scontrol", "update", f"nodename={hostname}", "State=UNDRAIN", "Reason=", "Comment="]
         logger.info("Setting node state to UNDRAIN before applying topology: %s", " ".join(cmd))
         result = subprocess.run(
             cmd,
