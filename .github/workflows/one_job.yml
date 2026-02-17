@@ -231,7 +231,6 @@ jobs:
           echo "Building for platform: ${{ matrix.platform }}"
 
           IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
-          VERSION=$(make get-version UNSTABLE=${UNSTABLE})
           OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
           NFS_VERSION=$(make get-nfs-version UNSTABLE=${UNSTABLE})
 
@@ -415,14 +414,16 @@ jobs:
           set -euo pipefail
           UNSTABLE='${{ steps.read-version.outputs.unstable }}'
           IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
-
           CUDA_TAG="cuda${{ matrix.cuda_version }}"
+          CACHE_VERSION="$(make get-image-version UNSTABLE=false)-${CUDA_TAG}-cache-${{ matrix.arch }}"
+          
           echo "Building and pushing populate_jail ${IMAGE_VERSION}-${CUDA_TAG} for ${{ matrix.platform }}"
 
           make docker-build-and-push \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail DOCKERFILE=jail/jail.dockerfile \
             IMAGE_VERSION="${IMAGE_VERSION}-${CUDA_TAG}" ARCH="${{ matrix.arch }}" \
-            PLATFORM="${{ matrix.platform }}" DOCKER_BUILD_ARGS="--build-arg CUDA_VERSION=${{ matrix.cuda_version }}"
+            PLATFORM="${{ matrix.platform }}" CACHE_VERSION="${CACHE_VERSION}" \
+            DOCKER_BUILD_ARGS="--build-arg CUDA_VERSION=${{ matrix.cuda_version }}"
           
           df -h
 
