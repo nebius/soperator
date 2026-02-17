@@ -541,6 +541,15 @@ func (r *NodeSetReconciler) reconcileNodeSetPowerState(
 		},
 	}
 
+	if apierrors.IsNotFound(err) {
+		logger.V(1).Info("NodeSetPowerState not found, it will be created")
+		activeNodes := make([]int32, nodeSet.Spec.Replicas)
+		for i := int32(0); i < nodeSet.Spec.Replicas; i++ {
+			activeNodes[i] = i
+		}
+		desired.Spec.ActiveNodes = activeNodes
+	}
+
 	if err := r.NodeSetPowerState.Reconcile(ctx, nodeSet, desired); err != nil {
 		return nil, fmt.Errorf("reconciling NodeSetPowerState: %w", err)
 	}
