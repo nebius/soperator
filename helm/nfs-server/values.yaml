@@ -47,7 +47,6 @@ storageClass:
     - timeo=150
     - retrans=2
     - actimeo=30
-    - local_lock=all
     - proto=tcp
     - noresvport
     - noatime
