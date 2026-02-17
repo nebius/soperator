@@ -38,16 +38,13 @@ CHART_STORAGECLASSES						= $(CHART_PATH)/storageclasses
 CHART_BACKUP_CONFIG							= $(CHART_PATH)/soperator-backup-config
 
 SLURM_VERSION		= 25.11.2
-UBUNTU_VERSION		?= noble
 NFS_VERSION_BASE	= $(shell cat VERSION_NFS)
 VERSION_BASE		= $(shell cat VERSION)
 
 NFS_VERSION	= $(NFS_VERSION_BASE)
 VERSION		= $(VERSION_BASE)
 
-CUDA_VERSION                ?= 12.9.0
-
-IMAGE_VERSION			= $(VERSION)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)
+IMAGE_VERSION			= $(VERSION)-slurm$(SLURM_VERSION)
 GO_CONST_VERSION_FILE	= internal/consts/version.go
 GITHUB_REPO				= ghcr.io/nebius/soperator
 NEBIUS_REPO				= cr.eu-north1.nebius.cloud/soperator
@@ -73,7 +70,7 @@ ifeq ($(UNSTABLE), true)
     SHORT_SHA			= r$(shell git rev-parse --short=8 HEAD)
     VERSION				= $(VERSION_BASE)-$(SHORT_SHA)
     OPERATOR_IMAGE_TAG	= $(VERSION_BASE)-$(SHORT_SHA)
-    IMAGE_VERSION		= $(VERSION_BASE)-$(UBUNTU_VERSION)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
+    IMAGE_VERSION		= $(VERSION_BASE)-slurm$(SLURM_VERSION)-$(SHORT_SHA)
     NFS_VERSION			= $(NFS_VERSION_BASE)-$(SHORT_SHA)
     IMAGE_REPO			= $(NEBIUS_REPO)-unstable
 endif
@@ -401,6 +398,19 @@ endif
 ifndef UNSTABLE
 	$(error UNSTABLE is not set)
 endif
+ifndef PLATFORM
+	$(error PLATFORM is not set)
+endif
+ifndef ARCH
+	$(error ARCH is not set)
+endif
+
+	@set -euo pipefail; \
+	if [ -n "$${CACHE_VERSION:-}" ]; then \
+		CACHE_REF="$(IMAGE_REPO)/$(IMAGE_NAME):$${CACHE_VERSION}"; \
+	else \
+		CACHE_REF="$(IMAGE_REPO)/$(IMAGE_NAME):$(shell cat VERSION)-slurm$(SLURM_VERSION)-cache-$(ARCH)"; \
+	fi; \
 	docker buildx build \
 		--platform $(PLATFORM) \
 		--target $(IMAGE_NAME) \
@@ -409,6 +419,8 @@ endif
 		--build-arg SLURM_VERSION="$(SLURM_VERSION)" \
 		--progress=plain \
 		--push \
+		--cache-from=type=registry,ref=$${CACHE_REF} \
+		--cache-to=type=registry,ref=$${CACHE_REF},mode=max \
 		$(DOCKER_BUILD_ARGS) \
 		.
 
