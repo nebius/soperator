@@ -561,6 +561,36 @@ func (r *NodeSetReconciler) reconcileNodeSetPowerState(
 		return nil, fmt.Errorf("getting NodeSetPowerState after reconcile: %w", err)
 	}
 
+	// Update status subresource so printer columns (ACTIVE, READY) are populated.
+	{
+		patch := client.MergeFrom(existing.DeepCopy())
+		activeCount := int32(len(existing.Spec.ActiveNodes))
+		needsPatch := false
+
+		if existing.Status.ActiveCount != activeCount {
+			existing.Status.ActiveCount = activeCount
+			needsPatch = true
+		}
+
+		readyCondition := metav1.Condition{
+			Type:    slurmv1alpha1.ConditionNodeSetPowerStateReady,
+			Status:  metav1.ConditionTrue,
+			Reason:  "ActiveNodesReconciled",
+			Message: fmt.Sprintf("%d active nodes reconciled", activeCount),
+		}
+		if meta.FindStatusCondition(existing.Status.Conditions, slurmv1alpha1.ConditionNodeSetPowerStateReady) == nil ||
+			meta.FindStatusCondition(existing.Status.Conditions, slurmv1alpha1.ConditionNodeSetPowerStateReady).Status != readyCondition.Status {
+			meta.SetStatusCondition(&existing.Status.Conditions, readyCondition)
+			needsPatch = true
+		}
+
+		if needsPatch {
+			if err := r.Status().Patch(ctx, existing, patch); err != nil {
+				return nil, fmt.Errorf("patching NodeSetPowerState status: %w", err)
+			}
+		}
+	}
+
 	logger.V(1).Info("NodeSetPowerState reconciled",
 		"name", powerStateName,
 		"activeNodes", existing.Spec.ActiveNodes,
