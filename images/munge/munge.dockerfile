@@ -1,12 +1,12 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
 # https://github.com/nebius/ml-containers/pull/56
-FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260206131521 AS munge
+FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260218112629 AS munge
 
 RUN apt-get update && \
     apt -y install \
-        munge \
-        libmunge-dev && \
+        munge=0.5.15-4ubuntu0.1 \
+        libmunge-dev=0.5.15-4ubuntu0.1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
