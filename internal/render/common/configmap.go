@@ -355,6 +355,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("SuspendTime", 0)
 	res.AddProperty("ResumeRate", 100)
 	res.AddProperty("SuspendRate", 100)
+	res.AddProperty("ReconfigFlags", "KeepPowerSaveSettings")
 	if suspendExcNodes := buildSuspendExcNodes(cluster); suspendExcNodes != "" {
 		res.AddProperty("SuspendExcNodes", suspendExcNodes)
 	}
