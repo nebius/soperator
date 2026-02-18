@@ -32,13 +32,12 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 		errorContains   string
 	}{
 		{
-			name:            "ConfigMap and JailedConfig do not exist - should fail",
+			name:            "ConfigMap and JailedConfig do not exist - should create both",
 			existingObjects: []client.Object{},
-			expectedError:   true,
-			errorContains:   "get ConfigMap",
+			expectedError:   false,
 		},
 		{
-			name: "ConfigMap exists, JailedConfig does not exist - should fail on JailedConfig get",
+			name: "ConfigMap exists, JailedConfig does not exist - should create JailedConfig",
 			existingObjects: []client.Object{
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
@@ -51,11 +50,10 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 					},
 				},
 			},
-			expectedError: true,
-			errorContains: "get JailedConfig",
+			expectedError: false,
 		},
 		{
-			name: "ConfigMap does not exist, JailedConfig exists - should fail on ConfigMap get",
+			name: "ConfigMap does not exist, JailedConfig exists - should create ConfigMap and update JailedConfig",
 			existingObjects: []client.Object{
 				&v1alpha1.JailedConfig{
 					ObjectMeta: metav1.ObjectMeta{
@@ -76,8 +74,7 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 					},
 				},
 			},
-			expectedError: true,
-			errorContains: "get ConfigMap",
+			expectedError: false,
 		},
 		{
 			name: "Both ConfigMap and JailedConfig exist - should update successfully",
