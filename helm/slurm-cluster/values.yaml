@@ -565,7 +565,7 @@ images:
   munge: "cr.eu-north1.nebius.cloud/soperator/munge:2.0.1-slurm25.11.2"
   populateJail: ""
   populateJailRepository: "cr.eu-north1.nebius.cloud/soperator/populate_jail"
-  populateJailTag: "2.0.0-slurm25.11.2"
+  populateJailTag: "2.0.1-slurm25.11.2"
   slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:2.0.1-slurm25.11.2"
   soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:2.0.1-slurm25.11.2"
   sConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:2.0.1"
