@@ -39,13 +39,19 @@ storageClass:
   volumeBindingMode: Immediate
   allowVolumeExpansion: true
   mountOptions:
-    - vers=4.1
+    - nconnect=16
+    - vers=4.2
     - hard
     - rsize=1048576
     - wsize=1048576
     - timeo=150
     - retrans=2
+    - actimeo=30
+    - proto=tcp
     - noresvport
+    - noatime
+    - nodiratime
+    - noacl
 priorityClass:
   enabled: true
   name: nfs-server-high
