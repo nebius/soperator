@@ -34,4 +34,7 @@ const (
 	ConfigMapNameTopologyNodeLabels      = "topology-node-labels"
 	ConfigMapNameTopologyConfig          = "topology-config"
 	ConfigMapNameActiveCheckPrologScript = "activecheck-prolog"
+
+	// ResourceDistribution names
+	ResourceDistributionNameTopology = "topology-soperator"
 )

@@ -729,6 +729,17 @@ func (r *JailedConfigReconciler) pollSlurmNodesRestart(ctx context.Context, node
 			}
 		}
 
+		// Remove nodes that are no longer among active (responding) nodes.
+		// This can happen if the node became NOT_RESPONDING after reconfigure
+		// (e.g. slurmd is not running) or was removed from Slurm entirely.
+		// In either case we cannot track their start time, so stop waiting.
+		for name := range nodeToStartBefore {
+			if _, stillPresent := nodeToStartAfter[name]; !stillPresent {
+				logger.V(1).Info("Node is no longer among active nodes, skipping", "node", name)
+				delete(nodeToStartBefore, name)
+			}
+		}
+
 		if len(nodeToStartBefore) == 0 {
 			break
 		}

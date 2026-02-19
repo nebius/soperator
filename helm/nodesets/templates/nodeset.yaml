@@ -27,6 +27,14 @@ spec:
   maxUnavailable: {{ . }}
   {{- end }}
 
+  {{- if .ephemeralNodes }}
+  ephemeralNodes: {{ .ephemeralNodes }}
+  {{- end }}
+
+  {{- with .ephemeralTopologyWaitTimeout }}
+  ephemeralTopologyWaitTimeout: {{ . }}
+  {{- end }}
+
   {{- with .gpu }}
   gpu:
     enabled: {{ .enabled | default false }}

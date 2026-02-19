@@ -81,3 +81,29 @@ Create the name of the role binding for exporter
 {{- define "slurm-cluster.exporter.roleBindingName" -}}
 {{- printf "%s-exporter-role-binding" (include "slurm-cluster.name" .) }}
 {{- end -}}
+
+{{/*
+Create the name of the service account to use for slurm-controller
+*/}}
+{{- define "slurm-cluster.controller.serviceAccountName" -}}
+{{- if .Values.slurmNodes.controller.serviceAccount.create -}}
+    {{- default (printf "%s-slurm-controller" (include "slurm-cluster.name" .)) .Values.slurmNodes.controller.serviceAccount.name }}
+{{- else -}}
+    {{- default "default" .Values.slurmNodes.controller.serviceAccount.name }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Create the name of the role for slurm-controller
+*/}}
+{{- define "slurm-cluster.controller.roleName" -}}
+{{- printf "%s-slurm-controller" (include "slurm-cluster.name" .) }}
+{{- end -}}
+
+{{/*
+Create the name of the role binding for slurm-controller
+*/}}
+{{- define "slurm-cluster.controller.roleBindingName" -}}
+{{- printf "%s-slurm-controller" (include "slurm-cluster.name" .) }}
+{{- end -}}
+

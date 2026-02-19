@@ -46,6 +46,15 @@ nodesets:
     # Could be a count (number) or percent (string)
     # Optional, defaults to 20%
     maxUnavailable: 1
+    # Enable ephemeral node behavior for this NodeSet.
+    # When true, nodes will use dynamic topology injection instead of legacy topology.conf.
+    # Topology data is read from the topology-node-labels ConfigMap at runtime.
+    # Optional, defaults to false
+    ephemeralNodes: false
+    # Maximum time (in seconds) to wait for topology data before starting slurmd.
+    # Only used when ephemeralNodes is true.
+    # Optional, defaults to 180
+    ephemeralTopologyWaitTimeout: 180
     # GPU configuration
     # Optional
     gpu:

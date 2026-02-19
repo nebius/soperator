@@ -311,7 +311,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddProperty("PropagateResourceLimits", "NONE") // Don't propagate ulimits from the login node by default
 	res.AddComment("")
-	res.AddProperty("SchedulerParameters", "nohold_on_prolog_fail,extra_constraints,pack_serial_at_end")
+	res.AddProperty("SchedulerParameters", "nohold_on_prolog_fail,extra_constraints,pack_serial_at_end,salloc_wait_nodes,sbatch_wait_nodes")
 	res.AddComment("")
 	res.AddComment("HEALTH CHECKS")
 	res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
@@ -336,9 +336,30 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("SlurmdTimeout", 180)
 	res.AddProperty("TCPTimeout", 15)
 	res.AddProperty("WaitTime", 0)
-	res.AddProperty("SlurmctldParameters", "conmgr_max_connections=512,conmgr_threads=16")
+	if cluster.HasEphemeralNodes() {
+		res.AddProperty("SlurmctldParameters", "conmgr_max_connections=512,conmgr_threads=16,cloud_dns,idle_on_node_suspend")
+	} else {
+		res.AddProperty("SlurmctldParameters", "conmgr_max_connections=512,conmgr_threads=16")
+	}
+
 	res.AddProperty("RebootProgram", "/opt/bin/slurm/reboot.sh")
 	res.AddProperty("ResumeTimeout", 1800)
+
+	// Power management for ephemeral nodes
+	res.AddComment("")
+	res.AddComment("POWER MANAGEMENT (ephemeral nodes)")
+	res.AddProperty("ResumeProgram", "/opt/soperator/bin/power_resume.sh")
+	res.AddProperty("SuspendProgram", "/opt/soperator/bin/power_suspend.sh")
+	res.AddProperty("SuspendExcStates", "CLOUD")
+	res.AddProperty("SuspendTimeout", 90)
+	res.AddProperty("SuspendTime", 0)
+	res.AddProperty("ResumeRate", 100)
+	res.AddProperty("SuspendRate", 100)
+	res.AddProperty("ReconfigFlags", "KeepPowerSaveSettings")
+	if suspendExcNodes := buildSuspendExcNodes(cluster); suspendExcNodes != "" {
+		res.AddProperty("SuspendExcNodes", suspendExcNodes)
+	}
+
 	res.AddComment("")
 	res.AddComment("SCHEDULING")
 	res.AddProperty("SchedulerType", "sched/backfill")
@@ -350,7 +371,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("SlurmctldLogFile", consts.SlurmLogFile)
 	res.AddProperty("SlurmdDebug", consts.SlurmDefaultDebugLevel)
 	res.AddProperty("SlurmdLogFile", consts.SlurmLogFile)
-	res.AddProperty("DebugFlags", "Script")
+	res.AddProperty("DebugFlags", "Script,Power")
 	res.AddComment("")
 	res.AddComment("COMPUTE NODES")
 	res.AddComment("We're using the \"dynamic nodes\" feature: https://slurm.schedmd.com/dynamic_nodes.html")
@@ -420,6 +441,31 @@ func generateCustomSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigF
 		multilineCfg.AddLine(*cluster.CustomSlurmConfig)
 	}
 	return multilineCfg
+}
+
+// buildSuspendExcNodes builds the list of nodes that should never be suspended.
+// This includes all nodes from NodeSets that do NOT have ephemeralNodes=true.
+// Example output: "static-workers-[0-9],gpu-static-[0-5]"
+func buildSuspendExcNodes(cluster *values.SlurmCluster) string {
+	var staticNodeSets []string
+
+	for _, nodeSet := range cluster.NodeSets {
+		if nodeSet.Spec.EphemeralNodes != nil && *nodeSet.Spec.EphemeralNodes {
+			continue
+		}
+
+		if nodeSet.Spec.Replicas == 0 {
+			continue
+		}
+
+		if nodeSet.Spec.Replicas == 1 {
+			staticNodeSets = append(staticNodeSets, fmt.Sprintf("%s-0", nodeSet.Name))
+		} else {
+			staticNodeSets = append(staticNodeSets, fmt.Sprintf("%s-[0-%d]", nodeSet.Name, nodeSet.Spec.Replicas-1))
+		}
+	}
+
+	return strings.Join(staticNodeSets, ",")
 }
 
 // addSlurmConfigProperties adds properties from the given struct to the config file

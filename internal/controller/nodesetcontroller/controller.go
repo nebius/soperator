@@ -47,6 +47,8 @@ import (
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=nodesets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=nodesets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=nodesets/finalizers,verbs=update
+// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=nodesetpowerstates,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=nodesetpowerstates/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters/status,verbs=get
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;update;patch;delete;create
@@ -66,6 +68,7 @@ type NodeSetReconciler struct {
 	Service             *reconciler.ServiceReconciler
 	Secret              *reconciler.SecretReconciler
 	ConfigMap           *reconciler.ConfigMapReconciler
+	NodeSetPowerState   *reconciler.NodeSetPowerStateReconciler
 }
 
 func NewNodeSetReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *NodeSetReconciler {
@@ -76,6 +79,7 @@ func NewNodeSetReconciler(client client.Client, scheme *runtime.Scheme, recorder
 		Service:             reconciler.NewServiceReconciler(r),
 		Secret:              reconciler.NewSecretReconciler(r),
 		ConfigMap:           reconciler.NewConfigMapReconciler(r),
+		NodeSetPowerState:   reconciler.NewNodeSetPowerStateReconciler(r),
 	}
 }
 
@@ -104,6 +108,12 @@ func (r *NodeSetReconciler) SetupWithManager(mgr ctrl.Manager, name string, maxC
 	controllerBuilder.Watches(
 		&slurmv1.SlurmCluster{},
 		handler.EnqueueRequestsFromMapFunc(r.findObjectsForSlurmCluster),
+		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+	)
+
+	controllerBuilder.Watches(
+		&slurmv1alpha1.NodeSetPowerState{},
+		handler.EnqueueRequestsFromMapFunc(r.findNodeSetForPowerState),
 		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 	)
 

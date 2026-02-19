@@ -9421,6 +9421,13 @@ spec:
                       priorityClass:
                         description: PriorityClass for Slurm controller pods
                         type: string
+                      serviceAccountName:
+                        description: |-
+                          ServiceAccountName is the name of the ServiceAccount to use for power-manager.
+                          The power-manager binary runs inside slurmctld pod and is called by Slurm's ResumeProgram/SuspendProgram
+                          to manage ephemeral node power states by updating NodeSetPowerState CRs.
+                          If empty, power management for ephemeral nodes will not be available.
+                        type: string
                       slurmctld:
                         description: Slurmctld represents the Slurm control daemon
                           configuration

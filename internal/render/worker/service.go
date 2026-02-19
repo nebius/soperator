@@ -40,9 +40,10 @@ func RenderNodeSetUmbrellaService(nodeSet *values.SlurmNodeSet) corev1.Service {
 			Labels:    common.RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name),
 		},
 		Spec: corev1.ServiceSpec{
-			Type:      nodeSet.ServiceUmbrella.Type,
-			Selector:  common.RenderMatchLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name),
-			ClusterIP: corev1.ClusterIPNone,
+			PublishNotReadyAddresses: true,
+			Type:                     nodeSet.ServiceUmbrella.Type,
+			Selector:                 common.RenderMatchLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name),
+			ClusterIP:                corev1.ClusterIPNone,
 			Ports: []corev1.ServicePort{{
 				Protocol:   nodeSet.ServiceUmbrella.Protocol,
 				Port:       nodeSet.ContainerSlurmd.Port,

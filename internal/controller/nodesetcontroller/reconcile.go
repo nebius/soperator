@@ -97,6 +97,17 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		cluster.Spec.UseDefaultAppArmorProfile,
 	)
 
+	// region Ephemeral nodes power state
+	if nodeSetValues.EphemeralNodes != nil && *nodeSetValues.EphemeralNodes {
+		activeNodes, err := r.reconcileNodeSetPowerState(ctx, nodeSet)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("reconciling NodeSetPowerState: %w", err)
+		}
+		nodeSetValues.ActiveNodes = activeNodes
+		logger.V(1).Info("Ephemeral nodes power state reconciled", "activeNodes", activeNodes)
+	}
+	// endregion Ephemeral nodes power state
+
 	if err = r.executeReconciliation(ctx, nodeSet, &nodeSetValues, cluster); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -129,18 +140,64 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 	// endregion Maintenance condition
 
 	// region Validation
-	if res, err := r.validateResources(ctx, nodeSet, &nodeSetValues); err != nil {
+	var res ctrl.Result
+	if res, err = r.validateResources(ctx, nodeSet, &nodeSetValues); err != nil {
 		logger.Error(err, "Failed to validate Slurm workers")
 		return ctrl.Result{}, fmt.Errorf("validating Slurm workers: %w", err)
-	} else if res.RequeueAfter > 0 {
+	}
+	// endregion Validation
+
+	// region Phase computation
+	// Always update phase after validation so it reflects current conditions,
+	// even when we are about to requeue.
+	if err = r.updatePhase(ctx, nodeSet); err != nil {
+		return ctrl.Result{}, err
+	}
+	// endregion Phase computation
+
+	if res.RequeueAfter > 0 {
 		logger.Info("Reconciliation requeued")
 		return res, nil
 	}
-	// endregion Validation
 
 	logger.Info("Finished reconciliation")
 
 	return ctrl.Result{}, nil
+}
+
+func (r *NodeSetReconciler) updatePhase(ctx context.Context, nodeSet *slurmv1alpha1.NodeSet) error {
+	phase := computePhase(nodeSet)
+	if nodeSet.Status.Phase == phase {
+		return nil
+	}
+
+	return r.patchStatus(ctx, nodeSet, func(status *slurmv1alpha1.NodeSetStatus) bool {
+		if status.Phase == phase {
+			return false
+		}
+		status.Phase = phase
+		return true
+	})
+}
+
+// computePhase determines the NodeSet phase based on current conditions.
+func computePhase(nodeSet *slurmv1alpha1.NodeSet) string {
+	terminated := meta.FindStatusCondition(nodeSet.Status.Conditions, slurmv1alpha1.ConditionNodeSetStatefulSetTerminated)
+	if terminated != nil && terminated.Status == metav1.ConditionTrue {
+		return slurmv1alpha1.PhaseNodeSetTerminating
+	}
+
+	podsReady := meta.FindStatusCondition(nodeSet.Status.Conditions, slurmv1alpha1.ConditionNodeSetPodsReady)
+	if podsReady != nil && podsReady.Status == metav1.ConditionTrue {
+		return slurmv1alpha1.PhaseNodeSetReady
+	}
+
+	// If pods condition exists but is not True, we're actively provisioning
+	if podsReady != nil && podsReady.Status == metav1.ConditionFalse {
+		return slurmv1alpha1.PhaseNodeSetProvisioning
+	}
+
+	return slurmv1alpha1.PhaseNodeSetPending
 }
 
 func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv1alpha1.NodeSet) error {
@@ -263,10 +320,14 @@ func (r NodeSetReconciler) executeReconciliation(
 					secrets.SshdKeysName = naming.BuildSecretSSHDKeysName(cluster.Name)
 				}
 
+				topologyPluginEnabled := cluster.Spec.SlurmConfig.TopologyPlugin != ""
+
 				desired, err := worker.RenderNodeSetStatefulSet(
+					cluster.Name,
 					nodeSetValues,
 					&secrets,
 					cluster.Spec.CgroupVersion,
+					topologyPluginEnabled,
 				)
 				if err != nil {
 					stepLogger.Error(err, "Failed to render")
@@ -445,4 +506,95 @@ func (r NodeSetReconciler) getWorkersStatefulSetDependencies(
 	}
 
 	return res, nil
+}
+
+// reconcileNodeSetPowerState ensures the NodeSetPowerState CR exists for this NodeSet
+// and returns the list of active node ordinals from it.
+func (r *NodeSetReconciler) reconcileNodeSetPowerState(
+	ctx context.Context,
+	nodeSet *slurmv1alpha1.NodeSet,
+) ([]int32, error) {
+	logger := log.FromContext(ctx)
+
+	powerStateName := nodeSet.Name
+
+	existing := &slurmv1alpha1.NodeSetPowerState{}
+	err := r.Get(ctx, types.NamespacedName{
+		Namespace: nodeSet.Namespace,
+		Name:      powerStateName,
+	}, existing)
+
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, fmt.Errorf("getting NodeSetPowerState: %w", err)
+	}
+
+	desired := &slurmv1alpha1.NodeSetPowerState{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      powerStateName,
+			Namespace: nodeSet.Namespace,
+			Labels: map[string]string{
+				consts.LabelNodeSetKey: nodeSet.Name,
+			},
+		},
+		Spec: slurmv1alpha1.NodeSetPowerStateSpec{
+			NodeSetRef: nodeSet.Name,
+		},
+	}
+
+	if apierrors.IsNotFound(err) {
+		logger.V(1).Info("NodeSetPowerState not found, it will be created")
+		activeNodes := make([]int32, nodeSet.Spec.Replicas)
+		for i := int32(0); i < nodeSet.Spec.Replicas; i++ {
+			activeNodes[i] = i
+		}
+		desired.Spec.ActiveNodes = activeNodes
+	}
+
+	if err := r.NodeSetPowerState.Reconcile(ctx, nodeSet, desired); err != nil {
+		return nil, fmt.Errorf("reconciling NodeSetPowerState: %w", err)
+	}
+
+	if err := r.Get(ctx, types.NamespacedName{
+		Namespace: nodeSet.Namespace,
+		Name:      powerStateName,
+	}, existing); err != nil {
+		return nil, fmt.Errorf("getting NodeSetPowerState after reconcile: %w", err)
+	}
+
+	// Update status subresource so printer columns (ACTIVE, READY) are populated.
+	{
+		patch := client.MergeFrom(existing.DeepCopy())
+		activeCount := int32(len(existing.Spec.ActiveNodes))
+		needsPatch := false
+
+		if existing.Status.ActiveCount != activeCount {
+			existing.Status.ActiveCount = activeCount
+			needsPatch = true
+		}
+
+		readyCondition := metav1.Condition{
+			Type:    slurmv1alpha1.ConditionNodeSetPowerStateReady,
+			Status:  metav1.ConditionTrue,
+			Reason:  "ActiveNodesReconciled",
+			Message: fmt.Sprintf("%d active nodes reconciled", activeCount),
+		}
+		if meta.FindStatusCondition(existing.Status.Conditions, slurmv1alpha1.ConditionNodeSetPowerStateReady) == nil ||
+			meta.FindStatusCondition(existing.Status.Conditions, slurmv1alpha1.ConditionNodeSetPowerStateReady).Status != readyCondition.Status {
+			meta.SetStatusCondition(&existing.Status.Conditions, readyCondition)
+			needsPatch = true
+		}
+
+		if needsPatch {
+			if err := r.Status().Patch(ctx, existing, patch); err != nil {
+				return nil, fmt.Errorf("patching NodeSetPowerState status: %w", err)
+			}
+		}
+	}
+
+	logger.V(1).Info("NodeSetPowerState reconciled",
+		"name", powerStateName,
+		"activeNodes", existing.Spec.ActiveNodes,
+	)
+
+	return existing.Spec.ActiveNodes, nil
 }
