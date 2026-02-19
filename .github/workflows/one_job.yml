@@ -65,6 +65,13 @@ jobs:
     if: needs.changes.outputs.should_build == 'true'
     runs-on: ubuntu-24.04
 
+    outputs:
+      unstable: ${{ steps.set_vars.outputs.unstable }}
+      version: ${{ steps.set_vars.outputs.version }}
+      image_version: ${{ steps.set_vars.outputs.image_version }}
+      operator_image_tag: ${{ steps.set_vars.outputs.operator_image_tag }}
+      nfs_version: ${{ steps.set_vars.outputs.nfs_version }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -77,13 +84,16 @@ jobs:
           go-version-file: "go.mod"
           cache: false
 
-      - name: Generate version file
+      - id: set_vars
+        name: Setting variables
         run: |
           UNSTABLE="${{ inputs.unstable || 'true' }}"
-          echo "Building with unstable=${UNSTABLE}"
 
-          make get-version UNSTABLE=${UNSTABLE} >> version.txt
-          echo "${UNSTABLE}" >> version.txt
+          echo "unstable=${UNSTABLE}" >> "$GITHUB_OUTPUT"
+          echo "version=`make get-version UNSTABLE=${UNSTABLE}`" >> "$GITHUB_OUTPUT"
+          echo "image_version=`make get-image-version UNSTABLE=${UNSTABLE}`" >> "$GITHUB_OUTPUT"
+          echo "operator_image_tag=`make get-operator-tag-version UNSTABLE=${UNSTABLE}`" >> "$GITHUB_OUTPUT"
+          echo "nfs_version=`make get-nfs-version UNSTABLE=${UNSTABLE}`" >> "$GITHUB_OUTPUT"
 
       - name: Run make sync-version-from-scratch
         run: |
@@ -98,26 +108,6 @@ jobs:
             git diff
             exit 1
           fi
-
-      - name: Upload version file
-        uses: actions/upload-artifact@v6
-        with:
-          name: version
-          path: version.txt
-
-      - name: Download version artifact
-        uses: actions/download-artifact@v7
-        with:
-          name: version
-          path: ./version
-
-      - name: Read version and unstable
-        id: read-version
-        run: |
-          VERSION=$(sed -n '1p' ./version/version.txt)
-          UNSTABLE=$(sed -n '2p' ./version/version.txt)
-          echo "Version: $VERSION"
-          echo "Unstable: $UNSTABLE"
 
   lint:
     needs: [changes]
@@ -158,7 +148,9 @@ jobs:
           GOOS: darwin
 
   build-docker-images:
-    needs: [changes, pre-build]
+    needs:
+      - changes
+      - pre-build
     if: needs.changes.outputs.should_build == 'true'
     runs-on: ${{ matrix.runner }}
 
@@ -173,6 +165,14 @@ jobs:
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
             arch: arm64
+
+    env:
+      UNSTABLE: ${{ needs.pre-build.outputs.unstable }}
+      VERSION: ${{ needs.pre-build.outputs.version }}
+      IMAGE_VERSION: ${{ needs.pre-build.outputs.image_version }}
+      OPERATOR_IMAGE_TAG: ${{ needs.pre-build.outputs.operator_image_tag }}
+      NFS_VERSION: ${{ needs.pre-build.outputs.nfs_version }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -183,21 +183,14 @@ jobs:
           go-version-file: "go.mod"
           cache: false
 
-      - name: Download version artifact
-        uses: actions/download-artifact@v7
-        with:
-          name: version
-          path: ./version
-
       - name: Read version and unstable
         id: read-version
         run: |
-          VERSION=$(sed -n '1p' ./version/version.txt)
-          UNSTABLE=$(sed -n '2p' ./version/version.txt)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION"
           echo "Unstable: $UNSTABLE"
+          echo "Image version: $IMAGE_VERSION"
+          echo "Operator image tag: $OPERATOR_IMAGE_TAG"
+          echo "Nfs version: $NFS_VERSION"
 
       - name: Log in to the Github Container registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
@@ -226,37 +219,31 @@ jobs:
       - name: Build and push Docker images
         shell: bash
         run: |
-          UNSTABLE=${{ steps.read-version.outputs.unstable }}
-          
           echo "Building for platform: ${{ matrix.platform }}"
-
-          IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
-          OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
-          NFS_VERSION=$(make get-nfs-version UNSTABLE=${UNSTABLE})
 
           make sync-version UNSTABLE=${UNSTABLE}
 
           echo "Updating CRDs & auto-generated code (included in test step) & run tests"
           make test-coverage UNSTABLE="${UNSTABLE}"
-          
+
           echo "soperator controller - ${OPERATOR_IMAGE_TAG}"
           make docker-build-and-push \
             PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator DOCKERFILE=soperator-controllers/Dockerfile \
             IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
-          
+
           echo "sconfigcontroller - ${OPERATOR_IMAGE_TAG}"
           make docker-build-and-push \
             PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller DOCKERFILE=soperator-controllers/Dockerfile \
             IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
-          
+
           echo "rebooter - ${OPERATOR_IMAGE_TAG}"
           make docker-build-and-push \
             PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter DOCKERFILE=soperator-controllers/Dockerfile \
             IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
-          
+
           echo "soperatorchecks - ${OPERATOR_IMAGE_TAG}"
           make docker-build-and-push \
             PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
@@ -330,7 +317,9 @@ jobs:
 
 
   build-jail-images:
-    needs: [ changes, pre-build ]
+    needs:
+      - changes
+      - pre-build
     if: needs.changes.outputs.should_build == 'true'
     runs-on: ${{ matrix.runner }}
 
@@ -347,6 +336,13 @@ jobs:
             runner: ubuntu-24.04-arm
             arch: arm64
 
+    env:
+      UNSTABLE: ${{ needs.pre-build.outputs.unstable }}
+      VERSION: ${{ needs.pre-build.outputs.version }}
+      IMAGE_VERSION: ${{ needs.pre-build.outputs.image_version }}
+      OPERATOR_IMAGE_TAG: ${{ needs.pre-build.outputs.operator_image_tag }}
+      NFS_VERSION: ${{ needs.pre-build.outputs.nfs_version }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -356,22 +352,6 @@ jobs:
         with:
           go-version-file: "go.mod"
           cache: false
-
-      - name: Download version artifact
-        uses: actions/download-artifact@v7
-        with:
-          name: version
-          path: ./version
-
-      - name: Read version and unstable
-        id: read-version
-        run: |
-          VERSION=$(sed -n '1p' ./version/version.txt)
-          UNSTABLE=$(sed -n '2p' ./version/version.txt)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
-          echo "Version: $VERSION"
-          echo "Unstable: $UNSTABLE"
 
       - name: Log in to the Github Container registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
@@ -412,11 +392,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          UNSTABLE='${{ steps.read-version.outputs.unstable }}'
-          IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
           CUDA_TAG="cuda${{ matrix.cuda_version }}"
           CACHE_VERSION="$(make get-image-version UNSTABLE=false)-${CUDA_TAG}-cache-${{ matrix.arch }}"
-          
+
           echo "Building and pushing populate_jail ${IMAGE_VERSION}-${CUDA_TAG} for ${{ matrix.platform }}"
 
           make docker-build-and-push \
@@ -424,33 +402,26 @@ jobs:
             IMAGE_VERSION="${IMAGE_VERSION}-${CUDA_TAG}" ARCH="${{ matrix.arch }}" \
             PLATFORM="${{ matrix.platform }}" CACHE_VERSION="${CACHE_VERSION}" \
             DOCKER_BUILD_ARGS="--build-arg CUDA_VERSION=${{ matrix.cuda_version }}"
-          
+
           df -h
 
   manifest-docker-images:
     name: Create docker-images manifests
-    needs: [build-docker-images]
+    needs:
+      - pre-build
+      - build-docker-images
     runs-on: ubuntu-24.04
+
+    env:
+      UNSTABLE: ${{ needs.pre-build.outputs.unstable }}
+      VERSION: ${{ needs.pre-build.outputs.version }}
+      IMAGE_VERSION: ${{ needs.pre-build.outputs.image_version }}
+      OPERATOR_IMAGE_TAG: ${{ needs.pre-build.outputs.operator_image_tag }}
+      NFS_VERSION: ${{ needs.pre-build.outputs.nfs_version }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - name: Download version artifact
-        uses: actions/download-artifact@v7
-        with:
-          name: version
-          path: ./version
-
-      - name: Read version and unstable
-        id: read-version
-        run: |
-          VERSION=$(sed -n '1p' ./version/version.txt)
-          UNSTABLE=$(sed -n '2p' ./version/version.txt)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
-          echo "Version: $VERSION"
-          echo "Unstable: $UNSTABLE"
 
       - name: Install Nebius CLI
         shell: bash
@@ -480,39 +451,35 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          UNSTABLE='${{ steps.read-version.outputs.unstable }}'
-          IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
-          OPERATOR_IMAGE_TAG=$(make get-operator-tag-version UNSTABLE=${UNSTABLE})
-          NFS_VERSION=$(make get-nfs-version UNSTABLE=${UNSTABLE})
 
           echo "Creating manifest for slurm-operator"
           make docker-create-manifest \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm-operator IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
-          
+
           echo "Creating manifest for sconfigcontroller"
           make docker-create-manifest \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=sconfigcontroller IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
-          
+
           echo "Creating manifest for rebooter"
           make docker-create-manifest \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=rebooter IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
-          
+
           echo "Creating manifest for soperatorchecks"
           make docker-create-manifest \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperatorchecks IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
-          
+
           echo "Creating manifest for soperator-exporter"
           make docker-create-manifest \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperator-exporter IMAGE_VERSION="${IMAGE_VERSION}"
-          
+
           echo "Creating manifest for munge"
           make docker-create-manifest \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=munge IMAGE_VERSION="${IMAGE_VERSION}"
-          
+
           echo "Creating manifest for controller_slurmctld"
           make docker-create-manifest \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmctld IMAGE_VERSION="${IMAGE_VERSION}"
-          
+
           echo "Creating manifest for controller_slurmdbd"
           make docker-create-manifest \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=controller_slurmdbd IMAGE_VERSION="${IMAGE_VERSION}"
@@ -520,34 +487,36 @@ jobs:
           echo "Creating manifest for slurmrestd"
           make docker-create-manifest \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurmrestd IMAGE_VERSION="${IMAGE_VERSION}"
-          
+
           echo "Creating manifest for slurm_check_job"
           make docker-create-manifest \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=slurm_check_job IMAGE_VERSION="${IMAGE_VERSION}"
-          
+
           echo "Creating manifest for k8s_check_job"
           make docker-create-manifest \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=k8s_check_job IMAGE_VERSION="${IMAGE_VERSION}"
-          
+
           echo "Creating manifest for sansible"
           make docker-create-manifest \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=sansible IMAGE_VERSION="${IMAGE_VERSION}"
-          
+
           echo "Creating manifest for login_sshd"
           make docker-create-manifest \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd IMAGE_VERSION="${IMAGE_VERSION}"
-          
+
           echo "Creating manifest for worker_slurmd"
           make docker-create-manifest \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=worker_slurmd IMAGE_VERSION="${IMAGE_VERSION}"
-          
+
           echo "Creating manifest for nfs-server"
           make docker-create-manifest \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=nfs-server IMAGE_VERSION="${NFS_VERSION}"
 
   manifest-populate-jail:
     name: Create populate_jail manifests
-    needs: [build-jail-images]
+    needs:
+      - pre-build
+      - build-jail-images
     runs-on: ubuntu-24.04
 
     strategy:
@@ -555,25 +524,16 @@ jobs:
       matrix:
         cuda_version: ["12.9.0", "13.0.2"]
 
+    env:
+      UNSTABLE: ${{ needs.pre-build.outputs.unstable }}
+      VERSION: ${{ needs.pre-build.outputs.version }}
+      IMAGE_VERSION: ${{ needs.pre-build.outputs.image_version }}
+      OPERATOR_IMAGE_TAG: ${{ needs.pre-build.outputs.operator_image_tag }}
+      NFS_VERSION: ${{ needs.pre-build.outputs.nfs_version }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - name: Download version artifact
-        uses: actions/download-artifact@v7
-        with:
-          name: version
-          path: ./version
-
-      - name: Read version and unstable
-        id: read-version
-        run: |
-          VERSION=$(sed -n '1p' ./version/version.txt)
-          UNSTABLE=$(sed -n '2p' ./version/version.txt)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
-          echo "Version: $VERSION"
-          echo "Unstable: $UNSTABLE"
 
       - name: Install Nebius CLI
         shell: bash
@@ -603,19 +563,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          UNSTABLE='${{ steps.read-version.outputs.unstable }}'
-          IMAGE_VERSION="$(make get-image-version UNSTABLE=${UNSTABLE})"
+
           CUDA_TAG="cuda${{ matrix.cuda_version }}"
-  
+
           echo "Create manifest for populate_jail - ${IMAGE_VERSION}-${CUDA_TAG}"
           make docker-create-manifest \
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=populate_jail IMAGE_VERSION="${IMAGE_VERSION}-${CUDA_TAG}"
 
-
   build-helm-charts:
-    needs: [changes, pre-build]
+    needs:
+      - changes
+      - pre-build
     if: needs.changes.outputs.should_build == 'true'
     runs-on: ubuntu-24.04
+
+    env:
+      UNSTABLE: ${{ needs.pre-build.outputs.unstable }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -625,22 +589,6 @@ jobs:
         with:
           go-version-file: "go.mod"
           cache: false
-
-      - name: Download version artifact
-        uses: actions/download-artifact@v7
-        with:
-          name: version
-          path: ./version
-
-      - name: Read version and unstable
-        id: read-version
-        run: |
-          VERSION=$(sed -n '1p' ./version/version.txt)
-          UNSTABLE=$(sed -n '2p' ./version/version.txt)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
-          echo "Version: $VERSION"
-          echo "Unstable: $UNSTABLE"
 
       - name: Install Nebius CLI
         shell: bash
@@ -661,21 +609,20 @@ jobs:
 
       - name: Push Helm charts
         run: |
-          UNSTABLE=${{ steps.read-version.outputs.unstable }}
-
           make sync-version UNSTABLE=${UNSTABLE}
-
           make release-helm UNSTABLE="${UNSTABLE}"
 
   helm-integration-test:
     name: Helm Chart Integration Test with Built Images
     needs:
       - changes
+      - pre-build
       - manifest-docker-images
       - manifest-populate-jail
       - build-helm-charts
     if: needs.changes.outputs.should_build == 'true'
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -685,22 +632,6 @@ jobs:
         with:
           go-version-file: "go.mod"
           cache: true
-
-      - name: Download version artifact
-        uses: actions/download-artifact@v7
-        with:
-          name: version
-          path: ./version
-
-      - name: Read version and unstable
-        id: read-version
-        run: |
-          VERSION=$(sed -n '1p' ./version/version.txt)
-          UNSTABLE=$(sed -n '2p' ./version/version.txt)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "unstable=$UNSTABLE" >> "$GITHUB_OUTPUT"
-          echo "Version: $VERSION"
-          echo "Unstable: $UNSTABLE"
 
       - name: Install dependencies
         run: |
@@ -718,12 +649,11 @@ jobs:
 
       - name: Run Helm Integration Tests
         run: |
-          UNSTABLE=${{ steps.read-version.outputs.unstable }}
           make sync-version UNSTABLE=${UNSTABLE}
           go test -v -timeout 10m -tags=integration ./test/integration/
         env:
           GO111MODULE: on
-          UNSTABLE: ${{ steps.read-version.outputs.unstable }}
+          UNSTABLE: ${{ needs.pre-build.outputs.unstable }}
 
       - name: Get cluster info
         if: always()
