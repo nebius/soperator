@@ -22,13 +22,16 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
+const populateJailRequeueDuration = 10 * time.Second
+
 // ReconcilePopulateJail reconciles and wait all resources necessary for deploying Populate Jail Job
 func (r SlurmClusterReconciler) ReconcilePopulateJail(
 	ctx context.Context,
 	clusterValues *values.SlurmCluster,
 	cluster *slurmv1.SlurmCluster,
-) error {
+) (bool, error) {
 	logger := log.FromContext(ctx)
+	populateJailRequeue := false
 
 	reconcilePopulateJailImpl := func() error {
 		return utils.ExecuteMultiStep(ctx,
@@ -54,6 +57,9 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 							return fmt.Errorf("checking running login/worker pods: %w", err)
 						}
 						if hasActivePods {
+							if check.IsModeDownscaleAndOverwritePopulate(clusterValues.PopulateJail.Maintenance) {
+								populateJailRequeue = true
+							}
 							stepLogger.Info("Skipping Populate jail Job: login or worker pods are not fully terminated")
 							return nil
 						}
@@ -160,11 +166,15 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 
 	if err := reconcilePopulateJailImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile Populate jail Job")
-		return fmt.Errorf("reconciling Populate jail Job: %w", err)
+		return false, fmt.Errorf("reconciling Populate jail Job: %w", err)
+	}
+	if populateJailRequeue {
+		logger.Info("Populate jail reconciliation requeue requested: waiting for login/worker pods termination")
+		return true, nil
 	}
 	logger.Info("Reconciled Populate jail Job")
 
-	return nil
+	return false, nil
 }
 
 func isConditionNonOverwrite(conditions []metav1.Condition) bool {
