@@ -25,7 +25,7 @@ populate_jail_rootfs() {
 
 remove_empty_lib_mount_targets() {
     echo "Removing the flag file that shows that GPU library bind-mount targets exist"
-    rm "/mnt/jail/etc/gpu_libs_installed.flag"
+    rm -f "/mnt/jail/etc/gpu_libs_installed.flag"
 
     echo "Removing empty library files that were used as bind-mount targets on the previous cluster"
     ARCH_LIST="x86_64 aarch64"
