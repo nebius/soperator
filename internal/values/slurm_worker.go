@@ -79,7 +79,7 @@ func buildSlurmWorkerFrom(
 		WorkerAnnotations:           worker.WorkerAnnotations,
 		Service:                     buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeWorker, clusterName)),
 		StatefulSet: buildStatefulSetWithMaxUnavailableFrom(
-			naming.BuildStatefulSetName(consts.ComponentTypeWorker),
+			naming.BuildStatefulSetName(consts.ComponentTypeWorker, clusterName),
 			worker.SlurmNode.Size,
 			worker.MaxUnavailable,
 		),

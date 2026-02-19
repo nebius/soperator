@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   namespace: {{ .Release.Namespace }}
-  name: slurm-scripts
+  name: {{ include "slurm-cluster.slurmScripts.configMapName" . }}
   labels:
     app: {{ .Chart.Name }}
     release: {{ .Release.Name }}

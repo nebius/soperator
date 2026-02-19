@@ -30,6 +30,7 @@ func TestWorkerTopologyReconciler_createDefaultTopologyResources(t *testing.T) {
 
 	namespace := "test-namespace"
 	clusterName := "test-cluster"
+	expectedCMName := topologyConfigMapName(clusterName)
 
 	// Create a test SlurmCluster
 	workerSize := int32(3)
@@ -68,7 +69,7 @@ func TestWorkerTopologyReconciler_createDefaultTopologyResources(t *testing.T) {
 				slurmCluster,
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:            consts.ConfigMapNameTopologyConfig,
+						Name:            expectedCMName,
 						Namespace:       namespace,
 						ResourceVersion: "1000",
 					},
@@ -85,13 +86,13 @@ func TestWorkerTopologyReconciler_createDefaultTopologyResources(t *testing.T) {
 				slurmCluster,
 				&v1alpha1.JailedConfig{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:            consts.ConfigMapNameTopologyConfig,
+						Name:            expectedCMName,
 						Namespace:       namespace,
 						ResourceVersion: "1000",
 					},
 					Spec: v1alpha1.JailedConfigSpec{
 						ConfigMap: v1alpha1.ConfigMapReference{
-							Name: consts.ConfigMapNameTopologyConfig,
+							Name: expectedCMName,
 						},
 						Items: []corev1.KeyToPath{
 							{
@@ -110,7 +111,7 @@ func TestWorkerTopologyReconciler_createDefaultTopologyResources(t *testing.T) {
 				slurmCluster,
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:            consts.ConfigMapNameTopologyConfig,
+						Name:            expectedCMName,
 						Namespace:       namespace,
 						ResourceVersion: "1000",
 					},
@@ -120,13 +121,13 @@ func TestWorkerTopologyReconciler_createDefaultTopologyResources(t *testing.T) {
 				},
 				&v1alpha1.JailedConfig{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:            consts.ConfigMapNameTopologyConfig,
+						Name:            expectedCMName,
 						Namespace:       namespace,
 						ResourceVersion: "1000",
 					},
 					Spec: v1alpha1.JailedConfigSpec{
 						ConfigMap: v1alpha1.ConfigMapReference{
-							Name: consts.ConfigMapNameTopologyConfig,
+							Name: expectedCMName,
 						},
 						Items: []corev1.KeyToPath{
 							{
@@ -176,7 +177,7 @@ func TestWorkerTopologyReconciler_createDefaultTopologyResources(t *testing.T) {
 				// Verify ConfigMap exists
 				var configMap corev1.ConfigMap
 				err = fakeClient.Get(ctx, types.NamespacedName{
-					Name:      consts.ConfigMapNameTopologyConfig,
+					Name:      expectedCMName,
 					Namespace: namespace,
 				}, &configMap)
 				assert.NoError(t, err)
@@ -185,11 +186,11 @@ func TestWorkerTopologyReconciler_createDefaultTopologyResources(t *testing.T) {
 				// Verify JailedConfig exists
 				var jailedConfig v1alpha1.JailedConfig
 				err = fakeClient.Get(ctx, types.NamespacedName{
-					Name:      consts.ConfigMapNameTopologyConfig,
+					Name:      expectedCMName,
 					Namespace: namespace,
 				}, &jailedConfig)
 				assert.NoError(t, err)
-				assert.Equal(t, consts.ConfigMapNameTopologyConfig, jailedConfig.Spec.ConfigMap.Name)
+				assert.Equal(t, expectedCMName, jailedConfig.Spec.ConfigMap.Name)
 				assert.Len(t, jailedConfig.Spec.Items, 1)
 				assert.Equal(t, consts.ConfigMapKeyTopologyConfig, jailedConfig.Spec.Items[0].Key)
 				assert.Equal(t, filepath.Join("/etc/slurm/", consts.ConfigMapKeyTopologyConfig), jailedConfig.Spec.Items[0].Path)

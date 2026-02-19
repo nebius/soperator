@@ -103,7 +103,10 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		"ConfigMapNamespace", nodeTopologyLabelsConfigMap.Namespace,
 	)
 
-	labelSelector := client.MatchingLabels{consts.LabelWorkerKey: consts.LabelWorkerValue}
+	labelSelector := client.MatchingLabels{
+		consts.LabelWorkerKey:   consts.LabelWorkerValue,
+		consts.LabelInstanceKey: slurmCluster.Name,
+	}
 	fieldSelector := client.MatchingFields{consts.FieldStatusPhase: string(corev1.PodRunning)}
 	podList, err := r.getPodList(ctx, labelSelector, fieldSelector, req.Namespace)
 	if err != nil {
@@ -140,7 +143,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return DefaultRequeueResult, nil
 	}
 
-	if err := r.updateTopologyConfigMap(ctx, req.Namespace, desiredTopologyConfig); err != nil {
+	if err := r.updateTopologyConfigMap(ctx, req.Namespace, slurmCluster.Name, desiredTopologyConfig); err != nil {
 		logger.Error(err, "Update ConfigMap with topology config")
 		return ctrl.Result{}, fmt.Errorf("update ConfigMap with topology config: %w", err)
 	}
@@ -154,11 +157,16 @@ func isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
 		slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyBlock
 }
 
+func topologyConfigMapName(clusterName string) string {
+	return clusterName + "-" + consts.ConfigMapNameTopologyConfig
+}
+
 func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
 	ctx context.Context, namespace string, clusterName string, logger logr.Logger,
 ) (*corev1.ConfigMap, error) {
-	configMapKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
-	jailedConfigKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
+	cmName := topologyConfigMapName(clusterName)
+	configMapKey := client.ObjectKey{Name: cmName, Namespace: namespace}
+	jailedConfigKey := client.ObjectKey{Name: cmName, Namespace: namespace}
 
 	configMap := &corev1.ConfigMap{}
 	configMapExists := true
@@ -168,7 +176,7 @@ func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
 			configMapExists = false
 			logger.Info("Worker topology ConfigMap not found")
 		} else {
-			return nil, fmt.Errorf("get ConfigMap %s: %w", consts.ConfigMapNameTopologyConfig, err)
+			return nil, fmt.Errorf("get ConfigMap %s: %w", cmName, err)
 		}
 	}
 
@@ -180,7 +188,7 @@ func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
 			jailedConfigExists = false
 			logger.Info("Worker topology JailedConfig not found")
 		} else {
-			return nil, fmt.Errorf("get JailedConfig %s: %w", consts.ConfigMapNameTopologyConfig, err)
+			return nil, fmt.Errorf("get JailedConfig %s: %w", cmName, err)
 		}
 	}
 
@@ -222,15 +230,20 @@ func (r *WorkerTopologyReconciler) getNodeTopologyLabelsConfigMap(
 	return configMap, nil
 }
 
-func (r *WorkerTopologyReconciler) renderTopologyConfigMap(namespace string, config string) *corev1.ConfigMap {
+func (r *WorkerTopologyReconciler) renderTopologyConfigMap(namespace string, config string, clusterName string) *corev1.ConfigMap {
+	cmName := topologyConfigMapName(clusterName)
 	return &corev1.ConfigMap{
 		TypeMeta: ctrl.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.String(),
 			Kind:       "ConfigMap",
 		},
 		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.ConfigMapNameTopologyConfig,
+			Name:      cmName,
 			Namespace: namespace,
+			Labels: map[string]string{
+				consts.LabelInstanceKey:          clusterName,
+				consts.LabelJailedAggregationKey: consts.LabelJailedAggregationCommonValue,
+			},
 		},
 		Data: map[string]string{
 			consts.ConfigMapKeyTopologyConfig: config,
@@ -238,22 +251,24 @@ func (r *WorkerTopologyReconciler) renderTopologyConfigMap(namespace string, con
 	}
 }
 
-func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace string) *v1alpha1.JailedConfig {
+func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace string, clusterName string) *v1alpha1.JailedConfig {
+	cmName := topologyConfigMapName(clusterName)
 	return &v1alpha1.JailedConfig{
 		TypeMeta: ctrl.TypeMeta{
 			APIVersion: v1alpha1.GroupVersion.String(),
 			Kind:       "JailedConfig",
 		},
 		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.ConfigMapNameTopologyConfig,
+			Name:      cmName,
 			Namespace: namespace,
 			Labels: map[string]string{
+				consts.LabelInstanceKey:          clusterName,
 				consts.LabelJailedAggregationKey: consts.LabelJailedAggregationCommonValue,
 			},
 		},
 		Spec: v1alpha1.JailedConfigSpec{
 			ConfigMap: v1alpha1.ConfigMapReference{
-				Name: consts.ConfigMapNameTopologyConfig,
+				Name: cmName,
 			},
 			Items: []corev1.KeyToPath{
 				{
@@ -278,14 +293,14 @@ func (r *WorkerTopologyReconciler) createDefaultTopologyResources(
 	config := InitializeTopologyConf(listASTS)
 
 	// Create ConfigMap
-	configMap := r.renderTopologyConfigMap(namespace, config)
+	configMap := r.renderTopologyConfigMap(namespace, config, clusterName)
 	err = r.Client.Create(ctx, configMap)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("create ConfigMap %s: %w", configMap.Name, err)
 	}
 
 	// Create JailedConfig
-	jailedConfig := r.renderTopologyJailedConfig(namespace)
+	jailedConfig := r.renderTopologyJailedConfig(namespace, clusterName)
 	err = r.Client.Create(ctx, jailedConfig)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("create JailedConfig %s: %w", jailedConfig.Name, err)
@@ -301,7 +316,7 @@ func (r *WorkerTopologyReconciler) GetStatefulSetsWithFallback(
 ) (*kruisev1b1.StatefulSetList, error) {
 	listASTS := &kruisev1b1.StatefulSetList{}
 
-	if err := r.getAdvancedSTS(ctx, listASTS); err != nil {
+	if err := r.getAdvancedSTS(ctx, namespace, clusterName, listASTS); err != nil {
 		return nil, fmt.Errorf("get advanced stateful sets: %w", err)
 	}
 
@@ -319,6 +334,9 @@ func (r *WorkerTopologyReconciler) GetStatefulSetsWithFallback(
 		fallbackSTS := kruisev1b1.StatefulSet{
 			ObjectMeta: ctrl.ObjectMeta{
 				Name: "worker",
+				Labels: map[string]string{
+					consts.LabelInstanceKey: clusterName,
+				},
 			},
 			Spec: kruisev1b1.StatefulSetSpec{
 				Replicas: &replicas,
@@ -332,12 +350,13 @@ func (r *WorkerTopologyReconciler) GetStatefulSetsWithFallback(
 }
 
 func (r *WorkerTopologyReconciler) getAdvancedSTS(
-	ctx context.Context, asts *kruisev1b1.StatefulSetList,
+	ctx context.Context, namespace, clusterName string, asts *kruisev1b1.StatefulSetList,
 ) error {
 	labels := map[string]string{
-		consts.LabelWorkerKey: consts.LabelWorkerValue,
+		consts.LabelWorkerKey:   consts.LabelWorkerValue,
+		consts.LabelInstanceKey: clusterName,
 	}
-	return r.Client.List(ctx, asts, client.MatchingLabels(labels))
+	return r.Client.List(ctx, asts, client.InNamespace(namespace), client.MatchingLabels(labels))
 }
 
 func InitializeTopologyConf(asts *kruisev1b1.StatefulSetList) string {
@@ -452,12 +471,13 @@ func (r *WorkerTopologyReconciler) calculateConfigHash(config string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, namespace string, config string) error {
-	configMapKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
+func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, namespace, clusterName, config string) error {
+	cmName := topologyConfigMapName(clusterName)
+	configMapKey := client.ObjectKey{Name: cmName, Namespace: namespace}
 	existingConfigMap := &corev1.ConfigMap{}
 	err := r.Client.Get(ctx, configMapKey, existingConfigMap)
 	if err != nil {
-		return fmt.Errorf("get ConfigMap %s: %w", consts.ConfigMapNameTopologyConfig, err)
+		return fmt.Errorf("get ConfigMap %s: %w", cmName, err)
 	}
 
 	existingConfigMap.Data[consts.ConfigMapKeyTopologyConfig] = config
@@ -466,16 +486,16 @@ func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, 
 		return fmt.Errorf("update ConfigMap %s: %w", existingConfigMap.Name, err)
 	}
 
-	jailedConfigKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
+	jailedConfigKey := client.ObjectKey{Name: cmName, Namespace: namespace}
 	existingJailedConfig := &v1alpha1.JailedConfig{}
 	err = r.Client.Get(ctx, jailedConfigKey, existingJailedConfig)
 	if err != nil {
-		return fmt.Errorf("get JailedConfig %s: %w", consts.ConfigMapNameTopologyConfig, err)
+		return fmt.Errorf("get JailedConfig %s: %w", cmName, err)
 	}
 
 	desiredSpec := v1alpha1.JailedConfigSpec{
 		ConfigMap: v1alpha1.ConfigMapReference{
-			Name: consts.ConfigMapNameTopologyConfig,
+			Name: cmName,
 		},
 		Items: []corev1.KeyToPath{
 			{

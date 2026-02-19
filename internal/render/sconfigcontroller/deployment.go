@@ -45,7 +45,7 @@ func RenderDeployment(
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      naming.BuildDeploymentName(consts.ComponentTypeSConfigController),
+			Name:      naming.BuildDeploymentName(consts.ComponentTypeSConfigController, clusterName),
 			Namespace: clusterNamespace,
 			Labels:    labels,
 		},

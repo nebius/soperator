@@ -19,6 +19,8 @@ metadata:
     {{- end }}
 
 spec:
+  slurmClusterRefName: {{ $.Values.slurmClusterRefName | quote }}
+
   {{- with (.replicas | default 1) }}
   replicas: {{ . }}
   {{- end }}
@@ -96,6 +98,8 @@ spec:
       {{- include "nodesets.resource.gpuFrom" (list $ns.gpu $ns.slurmd.resources) | nindent 6 }}
     {{- end }}
 
+    securityContext:
+      procMount: Default
     {{- with (required ".Values.nodesets[*].slurmd.volumes is required" .volumes) }}
     volumes:
       {{- with (required ".Values.nodesets[*].slurmd.volumes.spool is required" .spool) }}

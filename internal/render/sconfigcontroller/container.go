@@ -23,7 +23,7 @@ func renderContainerSConfigController(
 		fmt.Sprintf("--cluster-name=%s", clusterName),
 		fmt.Sprintf("--jail-path=%s", jailMount.MountPath),
 		fmt.Sprintf("--slurmapiserver=%s", slurmAPIServer),
-		"--leader-elect",
+		// "--leader-elect",
 	}
 
 	// Add optional parameters if they are specified

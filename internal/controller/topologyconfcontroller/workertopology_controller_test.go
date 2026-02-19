@@ -347,6 +347,7 @@ func TestEnsureWorkerTopologyConfigMap(t *testing.T) {
 	ctx := context.Background()
 	namespace := "test-namespace"
 	clusterName := "test-cluster"
+	expectedCMName := clusterName + "-" + consts.ConfigMapNameTopologyConfig
 
 	tests := []struct {
 		name                  string
@@ -368,7 +369,7 @@ func TestEnsureWorkerTopologyConfigMap(t *testing.T) {
 			existingObjs: []client.Object{
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      consts.ConfigMapNameTopologyConfig,
+						Name:      expectedCMName,
 						Namespace: namespace,
 					},
 					Data: map[string]string{
@@ -385,12 +386,12 @@ func TestEnsureWorkerTopologyConfigMap(t *testing.T) {
 			existingObjs: []client.Object{
 				&v1alpha1.JailedConfig{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      consts.ConfigMapNameTopologyConfig,
+						Name:      expectedCMName,
 						Namespace: namespace,
 					},
 					Spec: v1alpha1.JailedConfigSpec{
 						ConfigMap: v1alpha1.ConfigMapReference{
-							Name: consts.ConfigMapNameTopologyConfig,
+							Name: expectedCMName,
 						},
 					},
 				},
@@ -404,7 +405,7 @@ func TestEnsureWorkerTopologyConfigMap(t *testing.T) {
 			existingObjs: []client.Object{
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      consts.ConfigMapNameTopologyConfig,
+						Name:      expectedCMName,
 						Namespace: namespace,
 					},
 					Data: map[string]string{
@@ -413,12 +414,12 @@ func TestEnsureWorkerTopologyConfigMap(t *testing.T) {
 				},
 				&v1alpha1.JailedConfig{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      consts.ConfigMapNameTopologyConfig,
+						Name:      expectedCMName,
 						Namespace: namespace,
 					},
 					Spec: v1alpha1.JailedConfigSpec{
 						ConfigMap: v1alpha1.ConfigMapReference{
-							Name: consts.ConfigMapNameTopologyConfig,
+							Name: expectedCMName,
 						},
 					},
 				},
@@ -478,7 +479,7 @@ func TestEnsureWorkerTopologyConfigMap(t *testing.T) {
 			// Verify ConfigMap exists
 			configMap := &corev1.ConfigMap{}
 			err = fakeClient.Get(ctx, client.ObjectKey{
-				Name:      consts.ConfigMapNameTopologyConfig,
+				Name:      expectedCMName,
 				Namespace: namespace,
 			}, configMap)
 			require.NoError(t, err)
@@ -487,11 +488,11 @@ func TestEnsureWorkerTopologyConfigMap(t *testing.T) {
 			// Verify JailedConfig exists
 			jailedConfig := &v1alpha1.JailedConfig{}
 			err = fakeClient.Get(ctx, client.ObjectKey{
-				Name:      consts.ConfigMapNameTopologyConfig,
+				Name:      expectedCMName,
 				Namespace: namespace,
 			}, jailedConfig)
 			require.NoError(t, err)
-			assert.Equal(t, consts.ConfigMapNameTopologyConfig, jailedConfig.Spec.ConfigMap.Name)
+			assert.Equal(t, expectedCMName, jailedConfig.Spec.ConfigMap.Name)
 		})
 	}
 }

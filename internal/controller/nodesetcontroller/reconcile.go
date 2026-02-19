@@ -18,7 +18,6 @@ import (
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/check"
-	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/state"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -68,9 +67,9 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		err     error
 	)
 	{
-		clusterName, hasClusterRef := nodeSet.GetAnnotations()[consts.AnnotationParentalClusterRefName]
-		if !hasClusterRef {
-			err = fmt.Errorf("getting parental cluster ref from annotations")
+		clusterName := nodeSet.Spec.SlurmClusterRefName
+		if clusterName == "" {
+			err = fmt.Errorf("NodeSet %q has empty spec.slurmClusterRefName", nodeSet.Name)
 			logger.Error(err, "No parent cluster ref found")
 			return ctrl.Result{}, err
 		}
