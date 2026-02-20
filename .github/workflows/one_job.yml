@@ -95,6 +95,16 @@ jobs:
           echo "operator_image_tag=`make get-operator-tag-version UNSTABLE=${UNSTABLE}`" >> "$GITHUB_OUTPUT"
           echo "nfs_version=`make get-nfs-version UNSTABLE=${UNSTABLE}`" >> "$GITHUB_OUTPUT"
 
+          make get-version UNSTABLE=${UNSTABLE} >> version.txt
+          echo "${UNSTABLE}" >> version.txt
+
+      # This artifact is consumed by e2e_test.yml to determine which version to test.
+      - name: Upload version artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: version
+          path: version.txt
+
       - name: Run make sync-version-from-scratch
         run: |
           make kustomize helmify yq

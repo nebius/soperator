@@ -159,12 +159,14 @@ jobs:
           echo "html_url=$html_url" >> $GITHUB_OUTPUT
 
       - name: Download artifact with version
+        shell: bash
         run: |
           gh run download ${{ steps.find_build.outputs.run_id }} -n version
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Read version
+        shell: bash
         run: |
           SOPERATOR_VERSION=$(sed -n '1p' version.txt)
           SOPERATOR_UNSTABLE=$(sed -n '2p' version.txt)
