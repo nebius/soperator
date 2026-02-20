@@ -151,9 +151,6 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	slurmCluster.Spec.PlugStackConfig.Pyxis.SetDefaults()
 	slurmCluster.Spec.PlugStackConfig.NcclDebug.SetDefaults()
 	slurmCluster.Spec.SlurmNodes.Exporter.SetDefaults()
-	if slurmCluster.Spec.SlurmNodes.Worker != nil {
-		slurmCluster.Spec.SlurmNodes.Worker.SetDefaults()
-	}
 
 	// If cluster marked for deletion, we have nothing to do
 	if slurmCluster.GetDeletionTimestamp() != nil {
@@ -276,10 +273,6 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 	}
 
 	if err := r.ReconcileAccounting(ctx, cluster, clusterValues); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if err := r.ReconcileWorkers(ctx, cluster, clusterValues); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -413,42 +406,6 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		}
 		// endregion Controllers
 
-		// region Workers
-		switch {
-		case nodeSetsEnabled, clusterValues.NodeWorker.Size == 0:
-			if err := r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) bool {
-				return status.SetCondition(metav1.Condition{
-					Type:    slurmv1.ConditionClusterWorkersAvailable,
-					Status:  metav1.ConditionFalse,
-					Reason:  "NotAvailable",
-					Message: "Slurm workers are disabled",
-				})
-			}); err != nil {
-				return ctrl.Result{}, err
-			}
-
-		case check.IsMaintenanceActive(clusterValues.NodeWorker.Maintenance):
-			if err := r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) bool {
-				return status.SetCondition(metav1.Condition{
-					Type:    slurmv1.ConditionClusterWorkersAvailable,
-					Status:  metav1.ConditionFalse,
-					Reason:  "Maintenance",
-					Message: "Slurm workers are in maintenance",
-				})
-			}); err != nil {
-				return ctrl.Result{}, err
-			}
-
-		default:
-			if res, err := r.ValidateWorkers(ctx, cluster, clusterValues); err != nil {
-				logger.Error(err, "Failed to validate Slurm workers")
-				return ctrl.Result{}, fmt.Errorf("validating Slurm workers: %w", err)
-			} else if res.RequeueAfter > 0 {
-				return res, nil
-			}
-		}
-		// endregion Workers
-
 		// region Login
 		if check.IsMaintenanceActive(clusterValues.NodeLogin.Maintenance) {
 			if err := r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) bool {
@@ -550,10 +507,6 @@ func (r *SlurmClusterReconciler) setUpStatus(ctx context.Context, cluster *slurm
 		needToUpdate = true
 	}
 
-	if status.ReadyWorkers == nil {
-		status.ReadyWorkers = ptr.To(int32(0))
-		needToUpdate = true
-	}
 	if status.ReadyLogin == nil {
 		status.ReadyLogin = ptr.To(int32(0))
 		needToUpdate = true
@@ -566,7 +519,6 @@ func (r *SlurmClusterReconciler) setUpStatus(ctx context.Context, cluster *slurm
 	for _, conditionType := range []string{
 		slurmv1.ConditionClusterCommonAvailable,
 		slurmv1.ConditionClusterControllersAvailable,
-		slurmv1.ConditionClusterWorkersAvailable,
 		slurmv1.ConditionClusterLoginAvailable,
 		slurmv1.ConditionClusterSConfigControllerAvailable,
 		slurmv1.ConditionClusterAccountingAvailable,
@@ -687,20 +639,8 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 
 func (r *SlurmClusterReconciler) setupConfigMapIndexer(mgr ctrl.Manager) error {
 	indexers := map[string]func(*slurmv1.SlurmCluster) string{
-		supervisordConfigMapField: func(sc *slurmv1.SlurmCluster) string {
-			if sc.Spec.SlurmNodes.Worker == nil {
-				return "" // NodeSets mode: NodeSetReconciler handles this
-			}
-			return sc.Spec.SlurmNodes.Worker.SupervisordConfigMapRefName
-		},
 		sshdLoginConfigMapField: func(sc *slurmv1.SlurmCluster) string {
 			return sc.Spec.SlurmNodes.Login.SSHDConfigMapRefName
-		},
-		sshdWorkerConfigMapField: func(sc *slurmv1.SlurmCluster) string {
-			if sc.Spec.SlurmNodes.Worker == nil {
-				return "" // NodeSets mode: NodeSetReconciler handles this
-			}
-			return sc.Spec.SlurmNodes.Worker.SSHDConfigMapRefName
 		},
 	}
 
