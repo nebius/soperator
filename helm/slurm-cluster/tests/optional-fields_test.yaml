@@ -151,8 +151,8 @@ tests:
       - exists:
           path: spec.slurmNodes.exporter.podMonitorConfig
 
-  # Test that worker maxUnavailable is included when provided in values
-  - it: should include worker maxUnavailable when provided in values
+  # Worker options are managed by NodeSet resources, not SlurmCluster CR
+  - it: should not render worker maxUnavailable in slurm cluster CR
     set:
       clusterName: test-cluster
       k8sNodeFilters:
@@ -221,7 +221,7 @@ tests:
         sConfigController: "test-image"
         mariaDB: "test-image"
     asserts:
-      - exists:
+      - notExists:
           path: spec.slurmNodes.worker.maxUnavailable
 
   # Test that sConfigController optional fields are included when provided in values

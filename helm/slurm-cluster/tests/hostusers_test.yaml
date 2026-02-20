@@ -193,10 +193,7 @@ tests:
       populateJail:
         k8sNodeFilterName: "gpu"
     asserts:
-      # Worker should not have hostUsers set (letting kubebuilder default to true)
-      - notExists:
-          path: spec.slurmNodes.worker.hostUsers
-      # Other components should not have hostUsers set
+      # Components should not have hostUsers set when omitted
       - notExists:
           path: spec.slurmNodes.controller.hostUsers
       - notExists:
@@ -244,9 +241,6 @@ tests:
         k8sNodeFilterName: "gpu"
         hostUsers: false
     asserts:
-      - equal:
-          path: spec.slurmNodes.worker.hostUsers
-          value: true
       - equal:
           path: spec.slurmNodes.controller.hostUsers
           value: false
@@ -302,9 +296,6 @@ tests:
         hostUsers: false
     asserts:
       - equal:
-          path: spec.slurmNodes.worker.hostUsers
-          value: false
-      - equal:
           path: spec.slurmNodes.controller.hostUsers
           value: false
       - equal:
@@ -358,9 +349,6 @@ tests:
         k8sNodeFilterName: "gpu"
         hostUsers: true
     asserts:
-      - equal:
-          path: spec.slurmNodes.worker.hostUsers
-          value: true
       - equal:
           path: spec.slurmNodes.controller.hostUsers
           value: true

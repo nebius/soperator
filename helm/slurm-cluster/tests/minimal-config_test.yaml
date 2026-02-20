@@ -167,12 +167,6 @@ tests:
           path: spec.populateJail.overwrite
           value: false
       - equal:
-          path: spec.slurmNodes.worker.cgroupVersion
-          value: "v2"
-      - equal:
-          path: spec.slurmNodes.worker.enableGDRCopy
-          value: false
-      - equal:
           path: spec.slurmNodes.accounting.enabled
           value: false
       - equal:
@@ -265,8 +259,8 @@ tests:
           path: spec.mpiConfig.pmixEnv
           value: "OMPI_MCA_btl_tcp_if_include=eth0"
 
-  # Test that maxUnavailable is set when provided
-  - it: should include maxUnavailable when provided
+  # Worker options are managed by NodeSet resources, not SlurmCluster CR
+  - it: should not render worker maxUnavailable in slurm cluster CR
     set:
       clusterName: test-cluster
       slurmNodes:
@@ -335,6 +329,5 @@ tests:
         sConfigController: "test-image"
         mariaDB: "test-image"
     asserts:
-      - equal:
+      - notExists:
           path: spec.slurmNodes.worker.maxUnavailable
-          value: "20%"
