@@ -38,12 +38,6 @@ tests:
                     storage: 50Gi
             jail:
               volumeSourceName: "jail"
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          volumes:
-            jail:
-              volumeSourceName: "jail"
         login:
           size: 2
           k8sNodeFilterName: "no-gpu"
@@ -115,12 +109,6 @@ tests:
                 resources:
                   requests:
                     storage: 50Gi
-            jail:
-              volumeSourceName: "jail"
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          volumes:
             jail:
               volumeSourceName: "jail"
         login:
@@ -199,12 +187,6 @@ tests:
                     storage: 50Gi
             jail:
               volumeSourceName: "jail"
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          volumes:
-            jail:
-              volumeSourceName: "jail"
         login:
           size: 2
           k8sNodeFilterName: "no-gpu"
@@ -276,12 +258,6 @@ tests:
                 resources:
                   requests:
                     storage: 50Gi
-            jail:
-              volumeSourceName: "jail"
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          volumes:
             jail:
               volumeSourceName: "jail"
         login:

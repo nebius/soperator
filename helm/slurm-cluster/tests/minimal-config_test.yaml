@@ -80,30 +80,6 @@ tests:
                     storage: 50Gi
             jail:
               volumeSourceName: "jail"
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          slurmd:
-            resources:
-              cpu: "156000m"
-              memory: "1220Gi"
-              ephemeralStorage: "55Gi"
-              gpu: 8
-          munge:
-            resources:
-              cpu: "2000m"
-              memory: "4Gi"
-              ephemeralStorage: "5Gi"
-          volumes:
-            spool:
-              volumeClaimTemplateSpec:
-                storageClassName: "nebius-network-ssd"
-                accessModes: ["ReadWriteOnce"]
-                resources:
-                  requests:
-                    storage: "128Gi"
-            jail:
-              volumeSourceName: "jail"
         login:
           size: 2
           k8sNodeFilterName: "no-gpu"
@@ -251,12 +227,6 @@ tests:
                     storage: 50Gi
             jail:
               volumeSourceName: "jail"
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          volumes:
-            jail:
-              volumeSourceName: "jail"
         login:
           size: 2
           k8sNodeFilterName: "no-gpu"
@@ -300,14 +270,6 @@ tests:
     set:
       clusterName: test-cluster
       slurmNodes:
-        worker:
-          maxUnavailable: "20%"
-          size: 2
-          k8sNodeFilterName: "gpu"
-          volumes:
-            jail:
-              volumeSourceName: "jail"
-        # ... other minimal required config ...
         accounting:
           k8sNodeFilterName: "no-gpu"
         controller:

@@ -2,46 +2,6 @@ suite: test hostUsers configuration
 templates:
   - templates/slurm-cluster-cr.yaml
 tests:
-  # Test worker hostUsers default behavior (should default to true via kubebuilder)
-  - it: should not explicitly set hostUsers for worker when not specified in values
-    set:
-      clusterName: test-cluster
-      slurmNodes:
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-    asserts:
-      - notExists:
-          path: spec.slurmNodes.worker.hostUsers
-
-  # Test worker hostUsers can be explicitly set to false
-  - it: should set worker hostUsers to false when explicitly specified
-    set:
-      clusterName: test-cluster
-      slurmNodes:
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          hostUsers: false
-    asserts:
-      - equal:
-          path: spec.slurmNodes.worker.hostUsers
-          value: false
-
-  # Test worker hostUsers can be explicitly set to true
-  - it: should set worker hostUsers to true when explicitly specified
-    set:
-      clusterName: test-cluster
-      slurmNodes:
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          hostUsers: true
-    asserts:
-      - equal:
-          path: spec.slurmNodes.worker.hostUsers
-          value: true
-
   # Test controller hostUsers
   - it: should not set controller hostUsers when not specified
     set:
@@ -213,9 +173,6 @@ tests:
     set:
       clusterName: test-cluster
       slurmNodes:
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
         controller:
           k8sNodeFilterName: "no-gpu"
         login:
@@ -260,10 +217,6 @@ tests:
     set:
       clusterName: test-cluster
       slurmNodes:
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          hostUsers: true
         controller:
           k8sNodeFilterName: "no-gpu"
           hostUsers: false
@@ -321,10 +274,6 @@ tests:
     set:
       clusterName: test-cluster
       slurmNodes:
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          hostUsers: false
         controller:
           k8sNodeFilterName: "no-gpu"
           hostUsers: false
@@ -382,10 +331,6 @@ tests:
     set:
       clusterName: test-cluster
       slurmNodes:
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          hostUsers: true
         controller:
           k8sNodeFilterName: "no-gpu"
           hostUsers: true
