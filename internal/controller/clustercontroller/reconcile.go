@@ -39,7 +39,6 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controller/state"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
-	"nebius.ai/slurm-operator/internal/feature"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
@@ -231,32 +230,29 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		}
 	}
 
-	nodeSetsEnabled := feature.Gate.Enabled(feature.NodeSetWorkers)
-	if nodeSetsEnabled {
-		nodeSets, err := resourcegetter.ListNodeSetsByClusterRef(ctx, r.Client, client.ObjectKeyFromObject(cluster))
-		if err != nil {
-			logger.Error(err, fmt.Sprintf("Failed to list %s", slurmv1alpha1.KindNodeSet))
-			return ctrl.Result{}, fmt.Errorf("listing node sets: %w", err)
-		}
+	nodeSets, err := resourcegetter.ListNodeSetsByClusterRef(ctx, r.Client, client.ObjectKeyFromObject(cluster))
+	if err != nil {
+		logger.Error(err, fmt.Sprintf("Failed to list %s", slurmv1alpha1.KindNodeSet))
+		return ctrl.Result{}, fmt.Errorf("listing node sets: %w", err)
+	}
 
-		// Set cluster type to GPU if at least one NodeSet has GPU enabled
-		if sliceutils.IsEmptySeq(
-			sliceutils.FilterSeq(
-				sliceutils.MapSliceSeq(
-					nodeSets,
-					func(nodeSet slurmv1alpha1.NodeSet) bool {
-						return nodeSet.Spec.GPU.Enabled
-					},
-				),
-				func(b bool) bool {
-					return b
+	// Set cluster type to GPU if at least one NodeSet has GPU enabled
+	if sliceutils.IsEmptySeq(
+		sliceutils.FilterSeq(
+			sliceutils.MapSliceSeq(
+				nodeSets,
+				func(nodeSet slurmv1alpha1.NodeSet) bool {
+					return nodeSet.Spec.GPU.Enabled
 				},
 			),
-		) {
-			clusterValues.ClusterType = consts.ClusterTypeCPU
-		} else {
-			clusterValues.ClusterType = consts.ClusterTypeGPU
-		}
+			func(b bool) bool {
+				return b
+			},
+		),
+	) {
+		clusterValues.ClusterType = consts.ClusterTypeCPU
+	} else {
+		clusterValues.ClusterType = consts.ClusterTypeGPU
 	}
 
 	// region Reconciliation

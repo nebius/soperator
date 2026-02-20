@@ -23,7 +23,7 @@ tests:
   - it: should add feature-gates arg when set
     set:
       soperator:
-        featureGates: "NodeSetWorkers=true"
+        featureGates: "StableFeature=true"
     asserts:
       - isKind:
           of: HelmRelease
@@ -31,12 +31,12 @@ tests:
           path: spec.values.controllerManager.manager.args
       - contains:
           path: spec.values.controllerManager.manager.args
-          content: "--feature-gates=NodeSetWorkers=true"
+          content: "--feature-gates=StableFeature=true"
 
   - it: should include all default args with feature gates
     set:
       soperator:
-        featureGates: "NodeSetWorkers=true"
+        featureGates: "StableFeature=true"
     asserts:
       - contains:
           path: spec.values.controllerManager.manager.args
@@ -49,21 +49,21 @@ tests:
           content: "--leader-elect"
       - contains:
           path: spec.values.controllerManager.manager.args
-          content: "--feature-gates=NodeSetWorkers=true"
+          content: "--feature-gates=StableFeature=true"
 
   - it: should support multiple feature gates
     set:
       soperator:
-        featureGates: "NodeSetWorkers=true,AnotherFeature=false"
+        featureGates: "StableFeature=true,AnotherFeature=false"
     asserts:
       - contains:
           path: spec.values.controllerManager.manager.args
-          content: "--feature-gates=NodeSetWorkers=true,AnotherFeature=false"
+          content: "--feature-gates=StableFeature=true,AnotherFeature=false"
 
   - it: should preserve resources when feature gates are set
     set:
       soperator:
-        featureGates: "NodeSetWorkers=true"
+        featureGates: "StableFeature=true"
         values:
           manager:
             resources:
@@ -85,7 +85,7 @@ tests:
   - it: should preserve env vars when feature gates are set
     set:
       soperator:
-        featureGates: "NodeSetWorkers=true"
+        featureGates: "StableFeature=true"
       mariadbOperator:
         enabled: true
       observability:

@@ -11,7 +11,6 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/check"
-	"nebius.ai/slurm-operator/internal/feature"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -75,13 +74,15 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
-					if feature.Gate.Enabled(feature.NodeSetWorkers) {
-						nodeSets, err := resourcegetter.ListNodeSetsByClusterRef(stepCtx, r.Client, types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name})
-						if err != nil {
-							return err
-						}
-						clusterValues.NodeSets = nodeSets
+					nodeSets, err := resourcegetter.ListNodeSetsByClusterRef(
+						stepCtx,
+						r.Client,
+						types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name},
+					)
+					if err != nil {
+						return err
 					}
+					clusterValues.NodeSets = nodeSets
 
 					desired := common.RenderConfigMapSlurmConfigs(clusterValues)
 					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)

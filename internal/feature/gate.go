@@ -5,15 +5,3 @@ import (
 )
 
 var Gate = featuregate.NewFeatureGate()
-
-func init() {
-	_ = Gate.Add(map[featuregate.Feature]featuregate.FeatureSpec{
-		NodeSetWorkers: {
-			Default:    false,
-			PreRelease: featuregate.Alpha,
-			//
-			// TODO: Lock when PreRelease is GA.
-			//LockToDefault: true,
-		},
-	})
-}

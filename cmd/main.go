@@ -55,7 +55,6 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/nodesetcontroller"
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
 	"nebius.ai/slurm-operator/internal/controllersenabled"
-	"nebius.ai/slurm-operator/internal/feature"
 	webhookv1 "nebius.ai/slurm-operator/internal/webhook/v1"
 	webhookv1alpha1 "nebius.ai/slurm-operator/internal/webhook/v1alpha1"
 	//+kubebuilder:scaffold:imports
@@ -294,7 +293,7 @@ func main() {
 	// endregion Reconciler/NodeConfigurator
 
 	// region Reconciler/NodeSet
-	if controllersSet.Enabled("nodeset") && feature.Gate.Enabled(feature.NodeSetWorkers) {
+	if controllersSet.Enabled("nodeset") {
 		nodeSetName := reflect.TypeOf(slurmv1alpha1.NodeSet{}).Name()
 		nodeSetNameLower := strings.ToLower(nodeSetName)
 
