@@ -40,10 +40,7 @@ func setupTerraform(cfg Config) (tf *tfexec.Terraform, varFilePath string, clean
 		return nil, "", nil, fmt.Errorf("read terraform variables: %w", err)
 	}
 
-	tfVars, err = overrideTestValues(tfVars, cfg)
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("override test values: %w", err)
-	}
+	tfVars = overrideTestValues(tfVars, cfg)
 
 	varsJSON, err := json.MarshalIndent(tfVars, "", "  ")
 	if err != nil {

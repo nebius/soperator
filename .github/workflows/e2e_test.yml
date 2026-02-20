@@ -32,15 +32,9 @@ jobs:
       PATH_TO_INSTALLATION: "${{ github.workspace }}/terraform-repo/soperator/installations/example"
       TERRAFORM_REPO: "nebius/nebius-solution-library"
       TERRAFORM_REPO_REF: "${{ github.event.inputs.terraform_repo_ref || github.ref_name }}"
-      NEBIUS_TENANT_ID: ${{ vars.E2E_TEST_NEBIUS_TENANT_ID }}
-      NEBIUS_PROJECT_ID: ${{ vars.E2E_TEST_NEBIUS_PROJECT_ID }}
-      NEBIUS_REGION: ${{ vars.E2E_TEST_NEBIUS_REGION }}
-      WORKER_PLATFORM: ${{ vars.E2E_TEST_WORKER_PLATFORM }}
-      WORKER_PRESET: ${{ vars.E2E_TEST_WORKER_PRESET }}
-      INFINIBAND_FABRIC: ${{ vars.E2E_TEST_INFINIBAND_FABRIC }}
-      PREEMPTIBLE_NODES: ${{ vars.E2E_TEST_PREEMPTIBLE_NODES }}
-      SSH_KEYS: ${{ vars.E2E_TEST_SSH_KEYS }}
       O11Y_ACCESS_TOKEN: ${{ secrets.E2E_O11Y_ACCESS_TOKEN }}
+      PROFILE_ENV_VAR: ${{ vars.PROFILE_ENV_VAR }}
+      E2E_PROFILE: ${{ vars[vars.PROFILE_ENV_VAR] }}
 
     steps:
       - name: Checkout repository
@@ -58,6 +52,20 @@ jobs:
         run: |
           make install-e2e-tools
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+
+      - name: Resolve profile
+        shell: bash
+        run: |
+          echo "Resolving profile from variable $PROFILE_ENV_VAR"
+
+          if [[ -z "$E2E_PROFILE" ]]; then
+            echo "::error::Variable $PROFILE_ENV_VAR is empty or not set"
+            exit 1
+          fi
+
+          echo "NEBIUS_PROJECT_ID=$(echo "$E2E_PROFILE" | yq -r '.nebius_project_id')" >> "$GITHUB_ENV"
+          echo "NEBIUS_REGION=$(echo "$E2E_PROFILE" | yq -r '.nebius_region')" >> "$GITHUB_ENV"
+          echo "NEBIUS_TENANT_ID=$(echo "$E2E_PROFILE" | yq -r '.nebius_tenant_id')" >> "$GITHUB_ENV"
 
       - name: Install Nebius CLI
         shell: bash
@@ -151,12 +159,14 @@ jobs:
           echo "html_url=$html_url" >> $GITHUB_OUTPUT
 
       - name: Download artifact with version
+        shell: bash
         run: |
           gh run download ${{ steps.find_build.outputs.run_id }} -n version
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Read version
+        shell: bash
         run: |
           SOPERATOR_VERSION=$(sed -n '1p' version.txt)
           SOPERATOR_UNSTABLE=$(sed -n '2p' version.txt)
