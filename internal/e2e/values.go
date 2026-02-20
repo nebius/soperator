@@ -84,8 +84,8 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 			"name": "worker",
 			"size": 2,
 			"resource": map[string]interface{}{
-				"platform": cfg.WorkerPlatform,
-				"preset":   cfg.WorkerPreset,
+				"platform": cfg.Profile.WorkerPlatform,
+				"preset":   cfg.Profile.WorkerPreset,
 			},
 			"boot_disk": map[string]interface{}{
 				"type":                 "NETWORK_SSD",
@@ -93,15 +93,15 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 				"block_size_kibibytes": 4,
 			},
 			"gpu_cluster": map[string]interface{}{
-				"infiniband_fabric": cfg.InfinibandFabric,
+				"infiniband_fabric": cfg.Profile.InfinibandFabric,
 			},
-			"preemptible":      preemptibleValue(cfg.PreemptibleNodes),
+			"preemptible":      preemptibleValue(cfg.Profile.PreemptibleNodes),
 			"features":         nil,
 			"create_partition": nil,
 		},
 	}
 
-	tfVars["slurm_login_ssh_root_public_keys"] = cfg.SSHKeys
+	tfVars["slurm_login_ssh_root_public_keys"] = []string{cfg.SSHPublicKey}
 	tfVars["etcd_cluster_size"] = 1
 	tfVars["cleanup_bucket_on_destroy"] = true
 
