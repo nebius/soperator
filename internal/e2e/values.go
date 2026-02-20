@@ -88,8 +88,8 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) (map[string]i
 			"name": "worker",
 			"size": 2,
 			"resource": map[string]interface{}{
-				"platform": cfg.WorkerPlatform,
-				"preset":   cfg.WorkerPreset,
+				"platform": cfg.Profile.WorkerPlatform,
+				"preset":   cfg.Profile.WorkerPreset,
 			},
 			"boot_disk": map[string]interface{}{
 				"type":                 "NETWORK_SSD",
@@ -97,15 +97,15 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) (map[string]i
 				"block_size_kibibytes": 4,
 			},
 			"gpu_cluster": map[string]interface{}{
-				"infiniband_fabric": cfg.InfinibandFabric,
+				"infiniband_fabric": cfg.Profile.InfinibandFabric,
 			},
-			"preemptible":      preemptibleValue(cfg.PreemptibleNodes),
+			"preemptible":      preemptibleValue(cfg.Profile.PreemptibleNodes),
 			"features":         nil,
 			"create_partition": nil,
 		},
 	}
 
-	defCpuPerGpu, err := renderDefCpuPerGpu(cfg)
+	defCpuPerGpu, err := renderDefCpuPerGpu(cfg.Profile)
 	if err != nil {
 		return nil, fmt.Errorf("render DefCpuPerGpu: %w", err)
 	}
@@ -124,21 +124,21 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) (map[string]i
 		},
 	}
 
-	tfVars["slurm_login_ssh_root_public_keys"] = cfg.SSHKeys
+	tfVars["slurm_login_ssh_root_public_keys"] = []string{cfg.SSHPublicKey}
 	tfVars["etcd_cluster_size"] = 1
 	tfVars["cleanup_bucket_on_destroy"] = true
 
 	return tfVars, nil
 }
 
-func renderDefCpuPerGpu(cfg Config) (string, error) {
-	if !strings.HasPrefix(cfg.WorkerPlatform, "gpu") {
+func renderDefCpuPerGpu(p Profile) (string, error) {
+	if !strings.HasPrefix(p.WorkerPlatform, "gpu") {
 		return "", nil
 	}
 
-	presetComponents := strings.Split(cfg.WorkerPreset, "-")
+	presetComponents := strings.Split(p.WorkerPreset, "-")
 	if len(presetComponents) < 3 {
-		return "", fmt.Errorf("gpu worker preset must contain at least gpu, cpu, and memory specifiers, got %q", cfg.WorkerPreset)
+		return "", fmt.Errorf("gpu worker preset must contain at least gpu, cpu, and memory specifiers, got %q", p.WorkerPreset)
 	}
 
 	var gpusString, cpusString string
@@ -153,10 +153,10 @@ func renderDefCpuPerGpu(cfg Config) (string, error) {
 		}
 	}
 	if gpusString == "" {
-		return "", fmt.Errorf("worker preset %q must have gpu specifier", cfg.WorkerPreset)
+		return "", fmt.Errorf("worker preset %q must have gpu specifier", p.WorkerPreset)
 	}
 	if cpusString == "" {
-		return "", fmt.Errorf("worker preset %q must have vcpu specifier", cfg.WorkerPreset)
+		return "", fmt.Errorf("worker preset %q must have vcpu specifier", p.WorkerPreset)
 	}
 
 	gpus, err := strconv.Atoi(gpusString)
