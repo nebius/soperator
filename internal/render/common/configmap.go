@@ -102,16 +102,6 @@ func AddNodeSetsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values
 	}
 }
 
-func AddNodeSetFeaturesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
-	res.AddComment("")
-	res.AddComment("Nodesets")
-	for _, feature := range cluster.WorkerFeatures {
-		if feature.NodesetName != "" {
-			res.AddProperty("Nodeset", fmt.Sprintf("%s Feature=%s", feature.NodesetName, feature.Name))
-		}
-	}
-}
-
 // AddNodesToSlurmConfig adds all node names to the slurm config
 //
 // Example output:
@@ -285,15 +275,6 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("SlurmctldPort", cluster.NodeController.ContainerSlurmctld.Port)
 	res.AddComment("")
 	res.AddProperty("SlurmdPidFile", "/var/run/"+consts.SlurmdName+".pid")
-	// Note: In NodeSets mode, each NodeName line has its own Port= setting.
-	if cluster.PartitionConfiguration.ConfigType != slurmv1.PartitionConfigTypeStructured {
-		slurmdPort := cluster.NodeWorker.ContainerSlurmd.Port
-		// It is not necessary to specify default port since Slurm already does that implicitly:
-		// "If none is explicitly specified, its value will be 6818"
-		if slurmdPort != 0 {
-			res.AddProperty("SlurmdPort", slurmdPort)
-		}
-	}
 	res.AddComment("")
 	res.AddProperty("SlurmdSpoolDir", naming.BuildVolumeMountSpoolPath(consts.SlurmdName))
 	res.AddComment("")
@@ -391,7 +372,6 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 				res.AddProperty("PartitionName", clearLine)
 			}
 		}
-		AddNodeSetFeaturesToSlurmConfig(res, cluster)
 	case slurmv1.PartitionConfigTypeStructured:
 		AddNodesToSlurmConfig(res, cluster)
 		AddPartitionsToSlurmConfig(res, cluster)
@@ -400,7 +380,6 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	default:
 		res.AddProperty("PartitionName", "main Nodes=ALL Default=YES PriorityTier=10 MaxTime=INFINITE State=UP OverSubscribe=YES")
 		res.AddProperty("PartitionName", "hidden Nodes=ALL Default=NO PriorityTier=10 PreemptMode=OFF Hidden=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
-		AddNodeSetFeaturesToSlurmConfig(res, cluster)
 	}
 
 	if cluster.NodeAccounting.Enabled {
@@ -676,11 +655,6 @@ func RenderConfigMapSecurityLimits(componentType consts.ComponentType, cluster *
 	switch componentType {
 	case consts.ComponentTypeLogin:
 		data = cluster.NodeLogin.ContainerSshd.NodeContainer.SecurityLimitsConfig
-	case consts.ComponentTypeWorker:
-		data = cluster.NodeWorker.ContainerSlurmd.NodeContainer.SecurityLimitsConfig
-		if data == "" {
-			data = generateUnlimitedSecurityLimitsConfig().Render()
-		}
 	case consts.ComponentTypeController:
 		data = cluster.NodeController.ContainerSlurmctld.NodeContainer.SecurityLimitsConfig
 	}

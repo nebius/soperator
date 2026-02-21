@@ -80,30 +80,6 @@ tests:
                     storage: 50Gi
             jail:
               volumeSourceName: "jail"
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          slurmd:
-            resources:
-              cpu: "156000m"
-              memory: "1220Gi"
-              ephemeralStorage: "55Gi"
-              gpu: 8
-          munge:
-            resources:
-              cpu: "2000m"
-              memory: "4Gi"
-              ephemeralStorage: "5Gi"
-          volumes:
-            spool:
-              volumeClaimTemplateSpec:
-                storageClassName: "nebius-network-ssd"
-                accessModes: ["ReadWriteOnce"]
-                resources:
-                  requests:
-                    storage: "128Gi"
-            jail:
-              volumeSourceName: "jail"
         login:
           size: 2
           k8sNodeFilterName: "no-gpu"
@@ -191,12 +167,6 @@ tests:
           path: spec.populateJail.overwrite
           value: false
       - equal:
-          path: spec.slurmNodes.worker.cgroupVersion
-          value: "v2"
-      - equal:
-          path: spec.slurmNodes.worker.enableGDRCopy
-          value: false
-      - equal:
           path: spec.slurmNodes.accounting.enabled
           value: false
       - equal:
@@ -251,12 +221,6 @@ tests:
                     storage: 50Gi
             jail:
               volumeSourceName: "jail"
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          volumes:
-            jail:
-              volumeSourceName: "jail"
         login:
           size: 2
           k8sNodeFilterName: "no-gpu"
@@ -295,19 +259,11 @@ tests:
           path: spec.mpiConfig.pmixEnv
           value: "OMPI_MCA_btl_tcp_if_include=eth0"
 
-  # Test that maxUnavailable is set when provided
-  - it: should include maxUnavailable when provided
+  # Worker options are managed by NodeSet resources, not SlurmCluster CR
+  - it: should not render worker maxUnavailable in slurm cluster CR
     set:
       clusterName: test-cluster
       slurmNodes:
-        worker:
-          maxUnavailable: "20%"
-          size: 2
-          k8sNodeFilterName: "gpu"
-          volumes:
-            jail:
-              volumeSourceName: "jail"
-        # ... other minimal required config ...
         accounting:
           k8sNodeFilterName: "no-gpu"
         controller:
@@ -373,6 +329,5 @@ tests:
         sConfigController: "test-image"
         mariaDB: "test-image"
     asserts:
-      - equal:
+      - notExists:
           path: spec.slurmNodes.worker.maxUnavailable
-          value: "20%"

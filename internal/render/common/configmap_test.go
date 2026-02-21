@@ -242,37 +242,6 @@ func TestRenderConfigMapSecurityLimits(t *testing.T) {
 			expectedLabel: consts.ComponentTypeLogin.String(),
 		},
 		{
-			name: "Worker default security limits",
-			cluster: values.SlurmCluster{
-				NamespacedName: types.NamespacedName{
-					Namespace: "slurm",
-					Name:      "test",
-				},
-			},
-			componentType: consts.ComponentTypeWorker,
-			expectedData:  generateUnlimitedSecurityLimitsConfig().Render(),
-			expectedLabel: consts.ComponentTypeWorker.String(),
-		},
-		{
-			name: "Worker custom security limits",
-			cluster: values.SlurmCluster{
-				NamespacedName: types.NamespacedName{
-					Namespace: "slurm",
-					Name:      "test",
-				},
-				NodeWorker: values.SlurmWorker{
-					ContainerSlurmd: values.Container{
-						NodeContainer: slurmv1.NodeContainer{
-							SecurityLimitsConfig: "* soft memlock 300000\n* hard memlock 300000",
-						},
-					},
-				},
-			},
-			componentType: consts.ComponentTypeWorker,
-			expectedData:  "* soft memlock 300000\n* hard memlock 300000",
-			expectedLabel: consts.ComponentTypeWorker.String(),
-		},
-		{
 			name: "Controller default security limits",
 			cluster: values.SlurmCluster{
 				NamespacedName: types.NamespacedName{

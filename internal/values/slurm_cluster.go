@@ -18,7 +18,6 @@ type SlurmCluster struct {
 	CRVersion              string
 	ClusterType            consts.ClusterType
 	PartitionConfiguration PartitionConfiguration
-	WorkerFeatures         []slurmv1.WorkerFeature
 	HealthCheckConfig      *HealthCheckConfig
 
 	PopulateJail PopulateJail
@@ -30,7 +29,6 @@ type SlurmCluster struct {
 	NodeController     SlurmController
 	NodeAccounting     SlurmAccounting
 	NodeRest           SlurmREST
-	NodeWorker         SlurmWorker
 	NodeLogin          SlurmLogin
 	SlurmExporter      SlurmExporter
 	SlurmConfig        slurmv1.SlurmConfig
@@ -64,7 +62,6 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		CRVersion:              buildCRVersionFrom(ctx, cluster.Spec.CRVersion),
 		ClusterType:            clusterType,
 		PartitionConfiguration: buildPartitionConfiguration(&cluster.Spec.PartitionConfiguration),
-		WorkerFeatures:         cluster.Spec.WorkerFeatures,
 		HealthCheckConfig:      buildHealthCheckConfig(cluster.Spec.HealthCheckConfig),
 		PopulateJail:           buildSlurmPopulateJailFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.PopulateJail),
 		NodeFilters:            buildNodeFiltersFrom(cluster.Spec.K8sNodeFilters),
@@ -73,20 +70,14 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		NodeController:         buildSlurmControllerFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Controller),
 		NodeAccounting:         buildAccountingFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Accounting),
 		NodeRest:               buildRestFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Rest),
-		NodeWorker: buildSlurmWorkerFrom(
-			cluster.Name,
-			cluster.Spec.Maintenance,
-			cluster.Spec.SlurmNodes.Worker,
-			cluster.Spec.UseDefaultAppArmorProfile,
-		),
-		NodeLogin:          buildSlurmLoginFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
-		SlurmExporter:      buildSlurmExporterFrom(cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Exporter),
-		SlurmConfig:        cluster.Spec.SlurmConfig,
-		CustomSlurmConfig:  cluster.Spec.CustomSlurmConfig,
-		CustomCgroupConfig: cluster.Spec.CustomCgroupConfig,
-		CgroupVersion:      cluster.Spec.CgroupVersion,
-		MPIConfig:          cluster.Spec.MPIConfig,
-		PlugStackConfig:    cluster.Spec.PlugStackConfig,
+		NodeLogin:              buildSlurmLoginFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
+		SlurmExporter:          buildSlurmExporterFrom(cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Exporter),
+		SlurmConfig:            cluster.Spec.SlurmConfig,
+		CustomSlurmConfig:      cluster.Spec.CustomSlurmConfig,
+		CustomCgroupConfig:     cluster.Spec.CustomCgroupConfig,
+		CgroupVersion:          cluster.Spec.CgroupVersion,
+		MPIConfig:              cluster.Spec.MPIConfig,
+		PlugStackConfig:        cluster.Spec.PlugStackConfig,
 		SConfigController: buildSConfigControllerFrom(
 			cluster.Spec.SConfigController.Node,
 			cluster.Spec.SConfigController.Container,

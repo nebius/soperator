@@ -110,7 +110,6 @@ slurmCluster:
                 requests:
                   storage: 50Gi
               storageClassName: "compute-csi-network-ssd-ext4"
-      worker: null
       login:
         size: 1
         k8sNodeFilterName: kind

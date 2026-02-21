@@ -61,13 +61,6 @@ partitionConfiguration:
 #   Soperator will run these workers with the feature name.
 # - nodeset_name: (Optional) The Slurm nodeset name to be provisioned using this feature.
 #   This nodeset may be used in conjunction with partitions.
-workerFeatures: []
-#  - name: "low_priority"
-#    hostlistExpr: "worker-[0-9]"
-#    nodesetName: "low_priority"
-#  - name: "high_priority"
-#    hostlistExpr: "worker-[10-12]"
-#    nodesetName: "high_priority"
 
 # HealthCheckConfig defines Slurm health check configuration.
 healthCheckConfig: null
@@ -360,68 +353,6 @@ slurmNodes:
       jail:
         volumeSourceName: "jail"
       customMounts: []
-  worker:
-    size: 2
-    maxUnavailable: "20%"
-    k8sNodeFilterName: "gpu"
-    # Controls if the pod containers can use the host user namespace
-    # For workers, defaults to true to allow containers to access host user namespace
-    # hostUsers: true
-    cgroupVersion: v2
-    enableGDRCopy: false
-    priorityClass: ""
-    slurmNodeExtra: ""
-    supervisordConfigMapRefName: ""
-    sshdConfigMapRefName: ""
-    # workerAnnotations: []
-    slurmd:
-      imagePullPolicy: "IfNotPresent"
-      appArmorProfile: "unconfined"
-      port: 6818
-      command: []
-      args: []
-      customEnv:
-        - name: "NVIDIA_DRIVER_CAPABILITIES"
-          value: "compute,utility,video"
-      resources:
-        cpu: "156000m"
-        memory: "1220Gi"
-        ephemeralStorage: "55Gi"
-        gpu: 8
-      securityLimitsConfig: ""
-    munge:
-      imagePullPolicy: "IfNotPresent"
-      appArmorProfile: "unconfined"
-      command: []
-      args: []
-      resources:
-        cpu: "2000m"
-        memory: "4Gi"
-        ephemeralStorage: "5Gi"
-    customInitContainers: []
-    volumes:
-      spool:
-        volumeClaimTemplateSpec:
-          storageClassName: "nebius-network-ssd"
-          accessModes: ["ReadWriteOnce"]
-          resources:
-            requests:
-              storage: "128Gi"
-      jail:
-        volumeSourceName: "jail"
-      jailSubMounts: []
-      # jailSubMounts:
-      #   - name: "mlcommons-sd-bench-data"
-      #     mountPath: "/mlperf-sd"
-      #     volumeSourceName: "mlperf-sd"
-      customMounts: []
-      # customMounts:
-      #   - name: "slurm-prolog"
-      #     mountPath: "/etc/slurm-scripts/prolog.sh"
-      #     subPath: "prolog.sh"
-      #     readOnly: true
-      #     volumeSourceName: "slurm-prolog"
-      sharedMemorySize: "64Gi"
   login:
     size: 2
     k8sNodeFilterName: "no-gpu"

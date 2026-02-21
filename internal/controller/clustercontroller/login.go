@@ -15,7 +15,6 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/feature"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -31,8 +30,6 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 	clusterValues *values.SlurmCluster,
 ) error {
 	logger := log.FromContext(ctx)
-
-	nodeSetsEnabled := feature.Gate.Enabled(feature.NodeSetWorkers)
 
 	reconcileLoginImpl := func() error {
 		return utils.ExecuteMultiStep(ctx,
@@ -202,7 +199,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 						&clusterValues.Secrets,
 						clusterValues.VolumeSources,
 						&clusterValues.NodeLogin,
-						nodeSetsEnabled,
+						true,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
