@@ -30,8 +30,8 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
     go build -v -o power-manager ./cmd/powermanager
 
-# https://github.com/nebius/ml-containers/pull/55
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260205130055 AS controller_slurmctld
+# https://github.com/nebius/ml-containers/pull/69
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260220131744 AS controller_slurmctld
 
 # Delete users & home because they will be linked from jail
 RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
