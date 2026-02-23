@@ -569,9 +569,7 @@ type statusPatcher func(status *slurmv1.SlurmClusterStatus) bool
 
 const (
 	podTemplateField                             = ".spec.slurmNodes.exporter.exporter.podTemplateNameRef"
-	supervisordConfigMapField                    = ".spec.slurmNodes.worker.supervisordConfigMapRefName"
 	sshdLoginConfigMapField                      = ".spec.slurmNodes.login.sshdConfigMapRefName"
-	sshdWorkerConfigMapField                     = ".spec.slurmNodes.worker.sshdConfigMapRefName"
 	accountingExternalDBPasswordSecretKeyField   = ".spec.slurmNodes.accounting.externalDB.passwordSecretKeyRef.Name"
 	accountingExternalDBTLSServerCASecretField   = ".spec.slurmNodes.accounting.externalDB.tls.serverCASecretRef"
 	accountingExternalDBTLSClientCertSecretField = ".spec.slurmNodes.accounting.externalDB.tls.clientCertSecretRef"
@@ -727,9 +725,7 @@ func (r *SlurmClusterReconciler) findObjectsForConfigMap(
 	}
 	attachedSlurmClusters := &slurmv1.SlurmClusterList{}
 	matchingFields := []string{
-		supervisordConfigMapField,
 		sshdLoginConfigMapField,
-		sshdWorkerConfigMapField,
 	}
 
 	var requests []reconcile.Request
