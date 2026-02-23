@@ -8,6 +8,11 @@ on:
         required: false
         default: ""
         type: string
+      profile_env_var:
+        description: "Name of the GitHub variable containing the profile YAML (defaults to env setting)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -33,8 +38,8 @@ jobs:
       TERRAFORM_REPO: "nebius/nebius-solution-library"
       TERRAFORM_REPO_REF: "${{ github.event.inputs.terraform_repo_ref || github.ref_name }}"
       O11Y_ACCESS_TOKEN: ${{ secrets.E2E_O11Y_ACCESS_TOKEN }}
-      PROFILE_ENV_VAR: ${{ vars.PROFILE_ENV_VAR }}
-      E2E_PROFILE: ${{ vars[vars.PROFILE_ENV_VAR] }}
+      PROFILE_ENV_VAR: ${{ inputs.profile_env_var || vars.PROFILE_ENV_VAR }}
+      E2E_PROFILE: ${{ vars[inputs.profile_env_var || vars.PROFILE_ENV_VAR] }}
 
     steps:
       - name: Checkout repository
