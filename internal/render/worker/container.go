@@ -275,10 +275,6 @@ func renderNodeSetSlurmdEnv(
 			Name:  "SLURM_CLUSTER_TYPE",
 			Value: clusterType.String(),
 		},
-		{
-			Name:  "SOPERATOR_NODE_SETS_ON",
-			Value: "true",
-		},
 	}
 
 	if len(slurmNodeExtra) > 0 {
