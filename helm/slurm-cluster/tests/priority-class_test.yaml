@@ -65,9 +65,6 @@ tests:
           path: spec.slurmNodes.controller.priorityClass
           value: "slurm1-slurm-controller"
       - equal:
-          path: spec.slurmNodes.worker.priorityClass
-          value: "slurm1-slurm-worker"
-      - equal:
           path: spec.slurmNodes.login.priorityClass
           value: "slurm1-slurm-login"
       - equal:
@@ -88,7 +85,6 @@ tests:
       populateJail.priorityClass: "custom-populate-jail"
       slurmNodes.accounting.priorityClass: "custom-accounting"
       slurmNodes.controller.priorityClass: "custom-controller"
-      slurmNodes.worker.priorityClass: "custom-worker"
       slurmNodes.login.priorityClass: "custom-login"
       slurmNodes.exporter.priorityClass: "custom-exporter"
       slurmNodes.rest.priorityClass: "custom-rest"
@@ -103,9 +99,6 @@ tests:
       - equal:
           path: spec.slurmNodes.controller.priorityClass
           value: "custom-controller"
-      - equal:
-          path: spec.slurmNodes.worker.priorityClass
-          value: "custom-worker"
       - equal:
           path: spec.slurmNodes.login.priorityClass
           value: "custom-login"

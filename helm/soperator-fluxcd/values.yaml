@@ -355,7 +355,6 @@ soperator:
   version: 3.0.0
   namespace: "soperator-system"
   releaseName: soperator-controller
-  featureGates: ""
   values:
     serviceMonitor:
       enabled: true

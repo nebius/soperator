@@ -3,9 +3,7 @@ package v1
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
 	"nebius.ai/slurm-operator/internal/consts"
@@ -15,7 +13,6 @@ import (
 )
 
 // SlurmClusterSpec defines the desired state of SlurmCluster
-// +kubebuilder:validation:XValidation:rule="!(has(self.partitionConfiguration) && has(self.partitionConfiguration.partitions) && size(self.partitionConfiguration.partitions) > 0 && self.partitionConfiguration.partitions.exists(p, size(p.nodeSetRefs) > 0) && has(self.slurmNodes.worker) && self.slurmNodes.worker.size > 0)",message="Worker size must be zero when NodeSetRefs are used in partition configuration"
 type SlurmClusterSpec struct {
 	// CRVersion defines the version of the Operator the Custom Resource belongs to
 	//
@@ -122,15 +119,10 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	SConfigController SConfigController `json:"sConfigController,omitempty"`
 
-	// Generate and set default AppArmor profile for the Slurm worker and login nodes. The Security Profiles Operator must be installed.
+	// Generate and set default AppArmor profile for the login nodes. The Security Profiles Operator must be installed.
 	//
 	// +kubebuilder:default=false
 	UseDefaultAppArmorProfile bool `json:"useDefaultAppArmorProfile,omitempty"`
-
-	// WorkerFeatures defines Slurm node features to be used in the workers and Slurm nodesets to create using these features.
-	//
-	// +kubebuilder:validation:Optional
-	WorkerFeatures []WorkerFeature `json:"workerFeatures,omitempty"`
 
 	// HealthCheckConfig defines Slurm health check configuration.
 	//
@@ -445,22 +437,6 @@ type Partition struct {
 	Config string `json:"config,omitempty"`
 }
 
-type WorkerFeature struct {
-	// Name defines the name of the feature.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name"`
-	// HostlistExpr defines a Slurm hostlist expression, e.g. "workers-[0-2,10],workers-[3-5]".
-	// Soperator will run these workers with the feature name.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength=1
-	HostlistExpr string `json:"hostlistExpr,omitempty"`
-	// NodesetName optionally defines the Slurm nodeset name to be provisioned using this feature.
-	// This nodeset maybe be used in conjunction with partitions.
-	// +kubebuilder:validation:Optional
-	NodesetName string `json:"nodesetName,omitempty"`
-}
-
 type HealthCheckConfig struct {
 	// HealthCheckInterval defines interval for health check run in seconds.
 	//
@@ -592,12 +568,6 @@ type SlurmNodes struct {
 	//
 	// +kubebuilder:validation:Required
 	Controller SlurmNodeController `json:"controller"`
-
-	// Worker represents the Slurm worker node configuration
-	//
-	// +kubebuilder:deprecation:warning="The Worker field is deprecated and will be removed in a future release"
-	// +kubebuilder:validation:Optional
-	Worker *SlurmNodeWorker `json:"worker,omitempty"`
 
 	// Login represents the Slurm login node configuration
 	//
@@ -927,107 +897,6 @@ type SlurmNodeControllerVolumes struct {
 	CustomMounts []NodeVolumeMount `json:"customMounts,omitempty"`
 }
 
-// SlurmNodeWorker defines the configuration for the Slurm worker node
-type SlurmNodeWorker struct {
-	SlurmNode `json:",inline"`
-
-	// HostUsers controls if the pod containers can use the host user namespace
-	// For workers, defaults to false to allow containers to access host user namespace
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	HostUsers *bool `json:"hostUsers,omitempty"`
-
-	// The maximum number of worker pods that can be unavailable during the update.
-	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
-	// Absolute number is calculated from percentage by rounding down.
-	// Also, maxUnavailable can just be allowed to work with Parallel podManagementPolicy.
-	// Defaults to 20%.
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="20%"
-	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
-
-	// Slurmd represents the Slurm daemon service configuration
-	//
-	// +kubebuilder:validation:Required
-	Slurmd NodeContainer `json:"slurmd"`
-
-	// Munge represents the Slurm munge configuration
-	//
-	// +kubebuilder:validation:Required
-	Munge NodeContainer `json:"munge"`
-
-	// SupervisordConfigMapRefName is the name of the supervisord config, which runs in slurmd container
-	//
-	// +kubebuilder:validation:Optional
-	SupervisordConfigMapRefName string `json:"supervisordConfigMapRefName,omitempty"`
-
-	// SSHDConfigMapRefName is the name of the SSHD config, which runs in slurmd container
-	//
-	// +kubebuilder:validation:Optional
-	SSHDConfigMapRefName string `json:"sshdConfigMapRefName,omitempty"`
-
-	// WorkerAnnotations represent K8S annotations that should be added to the workers
-	//
-	// +kubebuilder:validation:Optional
-	WorkerAnnotations map[string]string `json:"workerAnnotations,omitempty"`
-
-	// Volumes represents the volume configurations for the worker node
-	//
-	// +kubebuilder:validation:Required
-	Volumes SlurmNodeWorkerVolumes `json:"volumes"`
-
-	// CgroupVersion defines the version of the cgroup
-	// Deprecated: Use spec.cgroupVersion instead. This field is kept for backward compatibility.
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="v2"
-	// +kubebuilder:validation:Enum="v1";"v2"
-	CgroupVersion string `json:"cgroupVersion,omitempty"`
-
-	// EnableGDRCopy driver propagation into containers (this feature must also be enabled in NVIDIA GPU operator)
-	// https://developer.nvidia.com/gdrcopy
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	EnableGDRCopy bool `json:"enableGDRCopy,omitempty"`
-
-	// SlurmNodeExtra defines the string that will be set to the "Extra" field of the corresponding Slurm node. It can
-	// use any environment variables that are available in the slurmd container when it starts.
-	//
-	// +kubebuilder:validation:Optional
-	SlurmNodeExtra string `json:"slurmNodeExtra,omitempty"`
-}
-
-// SlurmNodeWorkerVolumes defines the volumes for the Slurm worker node
-type SlurmNodeWorkerVolumes struct {
-	// Spool represents the spool data volume configuration
-	//
-	// +kubebuilder:validation:Required
-	Spool NodeVolume `json:"spool"`
-
-	// Jail represents the jail data volume configuration
-	//
-	// +kubebuilder:validation:Required
-	Jail NodeVolume `json:"jail"`
-
-	// JailSubMounts represents the sub-mount configurations within the jail volume
-	//
-	// +kubebuilder:validation:Optional
-	JailSubMounts []NodeVolumeMount `json:"jailSubMounts,omitempty"`
-
-	// CustomMounts represents the custom mount configurations
-	//
-	// +kubebuilder:validation:Optional
-	CustomMounts []NodeVolumeMount `json:"customMounts,omitempty"`
-
-	// Size of the shared memory for NCCL
-	//
-	// +kubebuilder:default="64Gi"
-	SharedMemorySize *resource.Quantity `json:"sharedMemorySize,omitempty"`
-}
-
 // SlurmNodeLogin defines the configuration for the Slurm login node
 type SlurmNodeLogin struct {
 	SlurmNode `json:",inline"`
@@ -1342,7 +1211,6 @@ const (
 
 	ConditionClusterCommonAvailable            = "CommonAvailable"
 	ConditionClusterControllersAvailable       = "ControllersAvailable"
-	ConditionClusterWorkersAvailable           = "WorkersAvailable"
 	ConditionClusterLoginAvailable             = "LoginAvailable"
 	ConditionClusterAccountingAvailable        = "AccountingAvailable"
 	ConditionClusterSConfigControllerAvailable = "SConfigControllerAvailable"
@@ -1363,10 +1231,6 @@ type SlurmClusterStatus struct {
 
 	// +kubebuilder:validation:Optional
 	Phase *string `json:"phase,omitempty"`
-
-	// ReadyWorkers represents the number of ready worker pods
-	// +kubebuilder:validation:Optional
-	ReadyWorkers *int32 `json:"readyWorkers,omitempty"`
 
 	// ReadyLogin represents the number of ready login pods
 	// +kubebuilder:validation:Optional
@@ -1401,7 +1265,6 @@ func (s *SlurmClusterStatus) SetCondition(condition metav1.Condition) bool {
 //
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.phase`,description="The phase of Slurm cluster creation."
 // +kubebuilder:printcolumn:name="Controllers",type=string,JSONPath=`.status.conditions[?(@.type=="ControllersAvailable")].status`,description="Whether controllers are ready"
-// +kubebuilder:printcolumn:name="Workers",type=integer,JSONPath=`.status.readyWorkers`,description="The number of ready worker pods"
 // +kubebuilder:printcolumn:name="Login",type=integer,JSONPath=`.status.readyLogin`,description="The number of ready login pods"
 // +kubebuilder:printcolumn:name="SConfigCtrl",type=string,JSONPath=`.status.conditions[?(@.type=="SConfigControllerAvailable")].status`,description="Whether SConfigController is ready"
 // +kubebuilder:printcolumn:name="Accounting",type=string,JSONPath=`.status.conditions[?(@.type=="AccountingAvailable")].status`,description="Whether accounting is ready"
@@ -1444,12 +1307,5 @@ func (p *PluginConfigNcclDebug) SetDefaults() {
 func (s *SlurmExporter) SetDefaults() {
 	if s.Enabled == nil {
 		s.Enabled = ptr.To(false)
-	}
-}
-
-// SetDefaults sets default values for SlurmNodeWorker
-func (w *SlurmNodeWorker) SetDefaults() {
-	if w.HostUsers == nil {
-		w.HostUsers = ptr.To(false)
 	}
 }
