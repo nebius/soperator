@@ -15,6 +15,7 @@ import (
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/render/rest"
+	"nebius.ai/slurm-operator/internal/render/worker"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
 	"nebius.ai/slurm-operator/internal/values"
@@ -174,6 +175,25 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 						return fmt.Errorf("reconciling AppArmor profiles: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Worker ServiceAccount",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling")
+
+					desired := worker.RenderServiceAccount(clusterValues.Namespace, clusterValues.Name)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("Rendered")
+
+					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return fmt.Errorf("reconciling worker ServiceAccount: %w", err)
+					}
+					stepLogger.V(1).Info("Reconciled")
+
 					return nil
 				},
 			},
