@@ -24,10 +24,21 @@ func main() {
 		log.Fatalf("parse config: %v", err)
 	}
 
+	profile, err := e2e.LoadProfile()
+	if err != nil {
+		log.Fatalf("load profile: %v", err)
+	}
+	cfg.Profile = profile
+
+	sshPubKey, err := e2e.GenerateSSHPublicKey()
+	if err != nil {
+		log.Fatalf("generate SSH public key: %v", err)
+	}
+	cfg.SSHPublicKey = sshPubKey
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	var err error
 	switch os.Args[1] {
 	case "apply":
 		err = e2e.Apply(ctx, cfg)
