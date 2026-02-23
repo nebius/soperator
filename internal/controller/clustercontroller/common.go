@@ -11,6 +11,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/check"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -191,6 +192,69 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling worker ServiceAccount: %w", err)
+					}
+					stepLogger.V(1).Info("Reconciled")
+
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Worker sysctl ConfigMap",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling")
+
+					desired := worker.RenderConfigMapSysctl(clusterValues)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("Rendered")
+
+					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return fmt.Errorf("reconciling worker Sysctl ConfigMap: %w", err)
+					}
+					stepLogger.V(1).Info("Reconciled")
+
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Worker sshd keys Secret",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling")
+
+					desired := corev1.Secret{}
+					if getErr := r.Get(
+						stepCtx,
+						types.NamespacedName{
+							Namespace: clusterValues.Namespace,
+							Name:      clusterValues.Secrets.SshdKeysName,
+						},
+						&desired,
+					); getErr != nil {
+						if !apierrors.IsNotFound(getErr) {
+							stepLogger.Error(getErr, "Failed to get")
+							return fmt.Errorf("getting worker SSHDKeys Secrets: %w", getErr)
+						}
+
+						renderedDesired, err := common.RenderSSHDKeysSecret(
+							clusterValues.Name,
+							clusterValues.Namespace,
+							clusterValues.Secrets.SshdKeysName,
+							consts.ComponentTypeWorker,
+						)
+						if err != nil {
+							stepLogger.Error(err, "Failed to render")
+							return fmt.Errorf("rendering worker SSHDKeys Secrets: %w", err)
+						}
+						desired = *renderedDesired.DeepCopy()
+						stepLogger.V(1).Info("Rendered")
+					}
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+
+					if err := r.Secret.Reconcile(stepCtx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return fmt.Errorf("reconciling worker SSHDKeys Secrets: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
