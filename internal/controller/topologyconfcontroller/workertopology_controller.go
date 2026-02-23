@@ -27,10 +27,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
-	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
-
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/api/v1alpha1"
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
@@ -190,63 +189,15 @@ func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace string) 
 	}
 }
 
-// GetStatefulSetsWithFallback builds a StatefulSetList representing the worker topology.
-// If NodeSets exist and worker.Size == 0, the list is built from NodeSet replicas.
-// Otherwise, a single fallback entry is created from worker.Size.
-func (r *WorkerTopologyReconciler) GetStatefulSetsWithFallback(
-	ctx context.Context, namespace string, slurmCluster *slurmv1.SlurmCluster,
-) (*kruisev1b1.StatefulSetList, error) {
-	listASTS := &kruisev1b1.StatefulSetList{}
-
-	var workerSize int32
-	if slurmCluster.Spec.SlurmNodes.Worker != nil {
-		workerSize = slurmCluster.Spec.SlurmNodes.Worker.Size
-	}
-
-	nodeSets, err := resourcegetter.ListNodeSetsByClusterRef(
-		ctx, r.Client, types.NamespacedName{Namespace: namespace, Name: slurmCluster.Name},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("list NodeSets: %w", err)
-	}
-
-	if len(nodeSets) > 0 && workerSize == 0 {
-		// Build from NodeSet replicas
-		for _, ns := range nodeSets {
-			replicas := ns.Spec.Replicas
-			listASTS.Items = append(listASTS.Items, kruisev1b1.StatefulSet{
-				ObjectMeta: ctrl.ObjectMeta{
-					Name: ns.Name,
-				},
-				Spec: kruisev1b1.StatefulSetSpec{
-					Replicas: &replicas,
-				},
-			})
-		}
-	} else {
-		// Fallback to worker.Size
-		listASTS.Items = []kruisev1b1.StatefulSet{{
-			ObjectMeta: ctrl.ObjectMeta{
-				Name: "worker",
-			},
-			Spec: kruisev1b1.StatefulSetSpec{
-				Replicas: &workerSize,
-			},
-		}}
-	}
-
-	return listASTS, nil
-}
-
 // BuildNodeSetTopologyConf builds a topology config for the NodeSet mode.
 // All workers are placed under a single "unknown" switch with "root" as the parent.
-func BuildNodeSetTopologyConf(statefulSets []kruisev1b1.StatefulSet) string {
+func BuildNodeSetTopologyConf(nodeSetsList []slurmv1alpha1.NodeSet) string {
 	var nodes []string
-	for _, sts := range statefulSets {
-		if sts.Spec.Replicas == nil || *sts.Spec.Replicas <= 0 {
+	for _, ns := range nodeSetsList {
+		if ns.Spec.Replicas <= 0 {
 			continue
 		}
-		nodes = append(nodes, formatNodeRange(sts.Name, int(*sts.Spec.Replicas)))
+		nodes = append(nodes, formatNodeRange(ns.Name, int(ns.Spec.Replicas)))
 	}
 
 	if len(nodes) == 0 {
@@ -269,12 +220,14 @@ func formatNodeRange(name string, replicas int) string {
 func (r *WorkerTopologyReconciler) buildNodeSetTopologyConfig(
 	ctx context.Context, namespace string, slurmCluster *slurmv1.SlurmCluster,
 ) (string, error) {
-	listASTS, err := r.GetStatefulSetsWithFallback(ctx, namespace, slurmCluster)
+	nodeSetsList, err := resourcegetter.ListNodeSetsByClusterRef(
+		ctx, r.Client, types.NamespacedName{Namespace: namespace, Name: slurmCluster.Name},
+	)
 	if err != nil {
-		return "", fmt.Errorf("get StatefulSets: %w", err)
+		return "", fmt.Errorf("list NodeSets: %w", err)
 	}
 
-	return BuildNodeSetTopologyConf(listASTS.Items), nil
+	return BuildNodeSetTopologyConf(nodeSetsList), nil
 }
 
 // GetPodsByNode organizes pods by their node name.

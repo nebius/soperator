@@ -133,59 +133,6 @@ tests:
           path: spec.populateJail.overwrite
           value: false
 
-  # Test worker maxUnavailable default value
-  - it: should set worker maxUnavailable default value
-    set:
-      clusterName: test-cluster
-      slurmNodes:
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          maxUnavailable: "20%"
-    asserts:
-      - equal:
-          path: spec.slurmNodes.worker.maxUnavailable
-          value: "20%"
-
-  # Test worker cgroupVersion default value
-  - it: should set worker cgroupVersion default value
-    set:
-      clusterName: test-cluster
-      slurmNodes:
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-    asserts:
-      - equal:
-          path: spec.slurmNodes.worker.cgroupVersion
-          value: "v2"
-
-  # Test worker enableGDRCopy default value
-  - it: should set worker enableGDRCopy default value
-    set:
-      clusterName: test-cluster
-      slurmNodes:
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-    asserts:
-      - equal:
-          path: spec.slurmNodes.worker.enableGDRCopy
-          value: false
-
-  # Test worker sharedMemorySize default value
-  - it: should set worker sharedMemorySize default value
-    set:
-      clusterName: test-cluster
-      slurmNodes:
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-    asserts:
-      - equal:
-          path: spec.slurmNodes.worker.volumes.sharedMemorySize
-          value: "64Gi"
-
   # Test accounting defaults
   - it: should set accounting default values
     set:
