@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 concurrency:
   # Prevent cancelling already-running jobs (avoids resource waste).
@@ -57,6 +58,9 @@ jobs:
         run: |
           make install-e2e-tools
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+
+      - name: Build e2e binary
+        run: go build -o bin/e2e ./cmd/e2e
 
       - name: Resolve profile
         shell: bash
@@ -187,6 +191,17 @@ jobs:
           path: "${{ github.workspace }}/terraform-repo"
           fetch-depth: 0
 
+      - name: Check capacity
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          cd ${{ env.PATH_TO_INSTALLATION }}
+          source .envrc
+          cd -
+          bin/e2e check-capacity
+
       - name: Terraform Apply
         timeout-minutes: 120
         run: |
@@ -203,7 +218,7 @@ jobs:
           aws configure set region $NEBIUS_REGION
           aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
 
-          go run ./cmd/e2e apply
+          bin/e2e apply
 
       - name: K8s Cluster Info and NodeGroups
         if: always()
@@ -327,7 +342,7 @@ jobs:
           aws configure set region $NEBIUS_REGION
           aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
 
-          go run ./cmd/e2e destroy
+          bin/e2e destroy
 
       - name: Force cleanup compute instances on failure
         if: failure()
