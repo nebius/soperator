@@ -55,68 +55,69 @@ class TestFormatSlurmTopology(unittest.TestCase):
         self.assertEqual(result, "topology=default:root:switch1")
 
     def test_tier_format_two_tiers(self):
-        """Two tier format uses lowest tier as leaf switch."""
-        result = worker_init.format_slurm_topology("tier-0=leaf,tier-1=root")
-        # tier-0 (leaf) is the lowest, used for dynamic topology
-        self.assertEqual(result, "topology=default:root:leaf")
+        """Two tier format builds full hierarchy: spine first, leaf last."""
+        result = worker_init.format_slurm_topology("tier-1=leaf01,tier-2=spine01")
+        # tier-2 (spine, closer to root) first, tier-1 (leaf) last
+        self.assertEqual(result, "topology=default:root:spine01:leaf01")
 
     def test_tier_format_three_tiers(self):
-        """Three tier format uses lowest tier as leaf switch."""
+        """Three tier format builds full hierarchy from top switch to leaf."""
         result = worker_init.format_slurm_topology(
-            "tier-0=leaf,tier-1=mid,tier-2=root"
+            "tier-1=leaf01,tier-2=spine01,tier-3=fabric01"
         )
-        # tier-0 (leaf) is the lowest
-        self.assertEqual(result, "topology=default:root:leaf")
+        # tier-3 first, tier-2 second, tier-1 (leaf) last
+        self.assertEqual(result, "topology=default:root:fabric01:spine01:leaf01")
 
     def test_tier_format_with_spaces(self):
         """Tier format with spaces is handled correctly."""
         result = worker_init.format_slurm_topology(
-            "tier-0 = switch1 , tier-1 = rack1"
+            "tier-1 = leaf01 , tier-2 = spine01"
         )
-        self.assertEqual(result, "topology=default:root:switch1")
+        self.assertEqual(result, "topology=default:root:spine01:leaf01")
 
     def test_tier_format_unordered(self):
-        """Tier format with unordered tiers uses lowest tier."""
+        """Tier format with unordered tiers builds correct hierarchy."""
         result = worker_init.format_slurm_topology(
-            "tier-2=top,tier-0=bottom,tier-1=middle"
+            "tier-2=spine01,tier-1=leaf01,tier-3=fabric01"
         )
-        self.assertEqual(result, "topology=default:root:bottom")
+        # Must be sorted: tier-3, tier-2, tier-1 regardless of input order
+        self.assertEqual(result, "topology=default:root:fabric01:spine01:leaf01")
 
     def test_json_format_two_tiers(self):
-        """JSON format with two tiers uses lowest tier as leaf."""
+        """JSON format with two tiers builds full hierarchy: spine first, leaf last."""
         result = worker_init.format_slurm_topology(
             '{"tier-1":"4dcbe855beb5ce19f484ba1a8960929d","tier-2":"5df641bb92d51e0dd5d97037fc7e2971"}'
         )
-        # tier-1 is the lowest tier here, used as leaf switch
-        self.assertEqual(result, "topology=default:root:4dcbe855beb5ce19f484ba1a8960929d")
+        # tier-2 (spine) first, tier-1 (leaf) last
+        self.assertEqual(result, "topology=default:root:5df641bb92d51e0dd5d97037fc7e2971:4dcbe855beb5ce19f484ba1a8960929d")
 
     def test_json_format_single_tier(self):
         """JSON format with single tier is parsed correctly."""
-        result = worker_init.format_slurm_topology('{"tier-1":"switch1"}')
-        self.assertEqual(result, "topology=default:root:switch1")
+        result = worker_init.format_slurm_topology('{"tier-1":"leaf01"}')
+        self.assertEqual(result, "topology=default:root:leaf01")
 
     def test_json_format_three_tiers(self):
-        """JSON format with three tiers uses lowest tier."""
+        """JSON format with three tiers builds full hierarchy."""
         result = worker_init.format_slurm_topology(
-            '{"tier-1":"leaf","tier-2":"mid","tier-3":"root"}'
+            '{"tier-1":"leaf01","tier-2":"spine01","tier-3":"fabric01"}'
         )
-        # tier-1 is the lowest
-        self.assertEqual(result, "topology=default:root:leaf")
+        # tier-3 first, tier-2 second, tier-1 (leaf) last
+        self.assertEqual(result, "topology=default:root:fabric01:spine01:leaf01")
 
     def test_json_format_with_whitespace(self):
         """JSON format with whitespace is handled correctly."""
         result = worker_init.format_slurm_topology(
-            '  {"tier-1": "switch1", "tier-2": "rack1"}  '
+            '  {"tier-1": "leaf01", "tier-2": "spine01"}  '
         )
-        self.assertEqual(result, "topology=default:root:switch1")
+        self.assertEqual(result, "topology=default:root:spine01:leaf01")
 
     def test_json_format_with_tier_zero(self):
-        """JSON format with tier-0 uses it as leaf (block topology)."""
+        """JSON format with tier-0 builds full hierarchy including tier-0 as leaf."""
         result = worker_init.format_slurm_topology(
-            '{"tier-0":"block1","tier-1":"rack1"}'
+            '{"tier-0":"nvl0","tier-1":"leaf01"}'
         )
-        # tier-0 is the lowest, used for block topology
-        self.assertEqual(result, "topology=default:root:block1")
+        # tier-1 (rack/leaf-switch) first, tier-0 (NVL domain) last
+        self.assertEqual(result, "topology=default:root:leaf01:nvl0")
 
 
 class TestFormatTierTopology(unittest.TestCase):
@@ -137,49 +138,49 @@ class TestFormatTierTopology(unittest.TestCase):
         result = worker_init._format_tier_topology({"tier-1": "switch1"})
         self.assertEqual(result, "topology=default:root:switch1")
 
-    def test_two_tiers_uses_lowest(self):
-        """Two tiers uses the lowest tier number."""
+    def test_two_tiers_builds_hierarchy(self):
+        """Two tiers builds full hierarchy: spine first, leaf last."""
         result = worker_init._format_tier_topology({
-            "tier-1": "leaf",
-            "tier-2": "spine"
+            "tier-1": "leaf01",
+            "tier-2": "spine01"
         })
-        self.assertEqual(result, "topology=default:root:leaf")
+        self.assertEqual(result, "topology=default:root:spine01:leaf01")
 
-    def test_tier_zero_is_lowest(self):
-        """tier-0 is considered lowest (block topology)."""
+    def test_tier_zero_included_as_leaf(self):
+        """tier-0 is included as the innermost switch (leaf/block domain)."""
         result = worker_init._format_tier_topology({
-            "tier-0": "block1",
-            "tier-1": "rack1",
-            "tier-2": "spine1"
+            "tier-0": "nvl0",
+            "tier-1": "leaf01",
+            "tier-2": "spine01"
         })
-        self.assertEqual(result, "topology=default:root:block1")
+        self.assertEqual(result, "topology=default:root:spine01:leaf01:nvl0")
 
-    def test_three_tiers_uses_lowest(self):
-        """Three tiers with tier-1 as lowest."""
+    def test_three_tiers_builds_hierarchy(self):
+        """Three tiers builds full path from fabric to leaf."""
         result = worker_init._format_tier_topology({
-            "tier-1": "leaf00",
-            "tier-2": "spine00",
-            "tier-3": "superspine"
+            "tier-1": "leaf01",
+            "tier-2": "spine01",
+            "tier-3": "fabric01"
         })
-        self.assertEqual(result, "topology=default:root:leaf00")
+        self.assertEqual(result, "topology=default:root:fabric01:spine01:leaf01")
 
     def test_unordered_tier_keys(self):
-        """Tier keys in any order still finds lowest."""
+        """Tier keys in any order produce the same sorted hierarchy."""
         result = worker_init._format_tier_topology({
-            "tier-3": "top",
-            "tier-1": "bottom",
-            "tier-2": "middle"
+            "tier-3": "fabric01",
+            "tier-1": "leaf01",
+            "tier-2": "spine01"
         })
-        self.assertEqual(result, "topology=default:root:bottom")
+        self.assertEqual(result, "topology=default:root:fabric01:spine01:leaf01")
 
     def test_non_tier_keys_ignored(self):
         """Non-tier keys are ignored, tier keys used."""
         result = worker_init._format_tier_topology({
             "other": "value",
-            "tier-1": "switch1",
+            "tier-1": "leaf01",
             "name": "test"
         })
-        self.assertEqual(result, "topology=default:root:switch1")
+        self.assertEqual(result, "topology=default:root:leaf01")
 
     def test_only_non_tier_keys_uses_first_value(self):
         """Only non-tier keys uses first value as fallback."""
@@ -193,17 +194,18 @@ class TestFormatTierTopology(unittest.TestCase):
         """Invalid tier format keys are ignored."""
         result = worker_init._format_tier_topology({
             "tier-abc": "invalid",
-            "tier-1": "valid"
+            "tier-1": "leaf01"
         })
-        self.assertEqual(result, "topology=default:root:valid")
+        self.assertEqual(result, "topology=default:root:leaf01")
 
     def test_tier_with_hash_value(self):
-        """Tier with hash value (real ConfigMap data)."""
+        """Tier with hash value (real ConfigMap data) builds full hierarchy."""
         result = worker_init._format_tier_topology({
             "tier-1": "4dcbe855beb5ce19f484ba1a8960929d",
             "tier-2": "5df641bb92d51e0dd5d97037fc7e2971"
         })
-        self.assertEqual(result, "topology=default:root:4dcbe855beb5ce19f484ba1a8960929d")
+        # tier-2 (spine) first, tier-1 (leaf) last
+        self.assertEqual(result, "topology=default:root:5df641bb92d51e0dd5d97037fc7e2971:4dcbe855beb5ce19f484ba1a8960929d")
 
 
 class TestReadTopologyForNode(unittest.TestCase):
@@ -569,9 +571,9 @@ class TestTopologyIntegration(unittest.TestCase):
         shutil.rmtree(self.temp_dir)
 
     def test_full_flow_read_and_format(self):
-        """Test read topology then format."""
+        """Test read topology then format builds full hierarchy."""
         node_name = "gpu-node-001"
-        topology = "tier-0=switch-rack1,tier-1=spine1"
+        topology = "tier-1=leaf01,tier-2=spine01"
 
         # Create node topology file
         node_file = os.path.join(self.configmap_dir, node_name)
@@ -582,12 +584,12 @@ class TestTopologyIntegration(unittest.TestCase):
         result = worker_init.read_topology_for_node(self.configmap_dir, node_name)
         self.assertEqual(result, topology)
 
-        # Format topology - uses lowest tier (tier-0) as leaf switch with root
+        # Format topology - spine first, leaf last
         formatted = worker_init.format_slurm_topology(result)
-        self.assertEqual(formatted, "topology=default:root:switch-rack1")
+        self.assertEqual(formatted, "topology=default:root:spine01:leaf01")
 
     def test_full_flow_json_input(self):
-        """Test read JSON topology then format."""
+        """Test read JSON topology then format builds full hierarchy."""
         node_name = "gpu-node-002"
         topology = '{"tier-1": "leaf01", "tier-2": "spine01"}'
 
@@ -599,7 +601,7 @@ class TestTopologyIntegration(unittest.TestCase):
         self.assertEqual(result, topology)
 
         formatted = worker_init.format_slurm_topology(result)
-        self.assertEqual(formatted, "topology=default:root:leaf01")
+        self.assertEqual(formatted, "topology=default:root:spine01:leaf01")
 
 
 class TestEdgeCases(unittest.TestCase):
@@ -616,19 +618,19 @@ class TestEdgeCases(unittest.TestCase):
         self.assertEqual(result, "topology=default:sw001:rack42")
 
     def test_tier_with_high_numbers(self):
-        """Tier format with high tier numbers uses lowest tier."""
+        """Tier format with high tier numbers builds full hierarchy sorted correctly."""
         result = worker_init.format_slurm_topology(
-            "tier-0=l0,tier-5=l5,tier-10=l10"
+            "tier-1=leaf01,tier-5=fabric01,tier-10=supernet01"
         )
-        # Should use tier-0 as the lowest tier
-        self.assertEqual(result, "topology=default:root:l0")
+        # tier-10 first, tier-5 second, tier-1 (leaf) last
+        self.assertEqual(result, "topology=default:root:supernet01:fabric01:leaf01")
 
     def test_mixed_tier_and_non_tier_keys(self):
-        """Mixed tier and non-tier keys uses lowest tier key."""
+        """Mixed tier and non-tier keys: non-tier keys are ignored."""
         result = worker_init.format_slurm_topology(
-            "tier-0=switch1,other=value,tier-1=rack1"
+            "tier-1=leaf01,other=value,tier-2=spine01"
         )
-        self.assertEqual(result, "topology=default:root:switch1")
+        self.assertEqual(result, "topology=default:root:spine01:leaf01")
 
     def test_only_non_tier_keys(self):
         """Only non-tier keys uses first value."""
