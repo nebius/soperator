@@ -5,6 +5,9 @@
 # Global settings
 nameOverride: ""
 fullnameOverride: ""
+# Name of the SlurmCluster this NodeSets release belongs to.
+# Must be in the same namespace as the NodeSets.
+slurmClusterRefName: "soperator"
 # Priority Classes configuration
 # Define priority classes that can be used by NodeSets
 priorityClasses:
@@ -122,7 +125,7 @@ nodesets:
         # Could be any corev1.VolumeSource
         jail:
           persistentVolumeClaim:
-            claimName: &jailPvcClaimName "jail-pvc"
+            claimName: &jailPvcClaimName "soperator-jail-pvc"
         # Volumes being mounted inside Jail mount
         # Optional, defaults to empty list
         jailSubMounts:

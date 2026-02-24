@@ -24,6 +24,8 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 
 	namespace := "test-namespace"
+	clusterName := "test-cluster"
+	expectedCMName := topologyConfigMapName(clusterName)
 
 	tests := []struct {
 		name            string
@@ -41,7 +43,7 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 			existingObjects: []client.Object{
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:            consts.ConfigMapNameTopologyConfig,
+						Name:            expectedCMName,
 						Namespace:       namespace,
 						ResourceVersion: "1000",
 					},
@@ -57,13 +59,13 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 			existingObjects: []client.Object{
 				&v1alpha1.JailedConfig{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:            consts.ConfigMapNameTopologyConfig,
+						Name:            expectedCMName,
 						Namespace:       namespace,
 						ResourceVersion: "1000",
 					},
 					Spec: v1alpha1.JailedConfigSpec{
 						ConfigMap: v1alpha1.ConfigMapReference{
-							Name: consts.ConfigMapNameTopologyConfig,
+							Name: expectedCMName,
 						},
 						Items: []corev1.KeyToPath{
 							{
@@ -81,7 +83,7 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 			existingObjects: []client.Object{
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:            consts.ConfigMapNameTopologyConfig,
+						Name:            expectedCMName,
 						Namespace:       namespace,
 						ResourceVersion: "1000",
 					},
@@ -91,13 +93,13 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 				},
 				&v1alpha1.JailedConfig{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:            consts.ConfigMapNameTopologyConfig,
+						Name:            expectedCMName,
 						Namespace:       namespace,
 						ResourceVersion: "1000",
 					},
 					Spec: v1alpha1.JailedConfigSpec{
 						ConfigMap: v1alpha1.ConfigMapReference{
-							Name: consts.ConfigMapNameTopologyConfig,
+							Name: expectedCMName,
 						},
 						Items: []corev1.KeyToPath{
 							{
@@ -115,7 +117,7 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 			existingObjects: []client.Object{
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:            consts.ConfigMapNameTopologyConfig,
+						Name:            expectedCMName,
 						Namespace:       namespace,
 						ResourceVersion: "1000",
 					},
@@ -125,13 +127,13 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 				},
 				&v1alpha1.JailedConfig{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:            consts.ConfigMapNameTopologyConfig,
+						Name:            expectedCMName,
 						Namespace:       namespace,
 						ResourceVersion: "1000",
 					},
 					Spec: v1alpha1.JailedConfigSpec{
 						ConfigMap: v1alpha1.ConfigMapReference{
-							Name: consts.ConfigMapNameTopologyConfig,
+							Name: expectedCMName,
 						},
 						Items: []corev1.KeyToPath{
 							{
@@ -162,7 +164,7 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			err := reconciler.updateTopologyConfigMap(ctx, namespace, "new-topology-config")
+			err := reconciler.updateTopologyConfigMap(ctx, namespace, clusterName, "new-topology-config")
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -173,7 +175,7 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 				// Verify ConfigMap was updated
 				var updatedConfigMap corev1.ConfigMap
 				err = fakeClient.Get(ctx, types.NamespacedName{
-					Name:      consts.ConfigMapNameTopologyConfig,
+					Name:      expectedCMName,
 					Namespace: namespace,
 				}, &updatedConfigMap)
 				assert.NoError(t, err)
@@ -182,11 +184,11 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 				// Verify JailedConfig exists and has correct spec
 				var updatedJailedConfig v1alpha1.JailedConfig
 				err = fakeClient.Get(ctx, types.NamespacedName{
-					Name:      consts.ConfigMapNameTopologyConfig,
+					Name:      expectedCMName,
 					Namespace: namespace,
 				}, &updatedJailedConfig)
 				assert.NoError(t, err)
-				assert.Equal(t, consts.ConfigMapNameTopologyConfig, updatedJailedConfig.Spec.ConfigMap.Name)
+				assert.Equal(t, expectedCMName, updatedJailedConfig.Spec.ConfigMap.Name)
 				assert.Len(t, updatedJailedConfig.Spec.Items, 1)
 				assert.Equal(t, consts.ConfigMapKeyTopologyConfig, updatedJailedConfig.Spec.Items[0].Key)
 				assert.Equal(t, filepath.Join("/etc/slurm/", consts.ConfigMapKeyTopologyConfig), updatedJailedConfig.Spec.Items[0].Path)
