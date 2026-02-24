@@ -501,17 +501,17 @@ sConfigController:
     # This field is required in the SlurmCluster CR - it will be automatically populated from this value
     name: ""
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:3.0.0-slurm25.11.2"
-  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:3.0.0-slurm25.11.2"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:3.0.0-slurm25.11.2"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:3.0.0-slurm25.11.2"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:3.0.0-slurm25.11.2"
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:3.0.1-slurm25.11.2"
+  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:3.0.1-slurm25.11.2"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:3.0.1-slurm25.11.2"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:3.0.1-slurm25.11.2"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:3.0.1-slurm25.11.2"
   populateJail: ""
   populateJailRepository: "cr.eu-north1.nebius.cloud/soperator/populate_jail"
-  populateJailTag: "3.0.0-slurm25.11.2"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:3.0.0-slurm25.11.2"
-  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:3.0.0-slurm25.11.2"
-  sConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:3.0.0"
+  populateJailTag: "3.0.1-slurm25.11.2"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:3.0.1-slurm25.11.2"
+  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:3.0.1-slurm25.11.2"
+  sConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:3.0.1"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:12.1.2"
 # Configuration for slurm scripts.
 slurmScripts:
