@@ -204,15 +204,19 @@ def format_slurm_topology(topology: str) -> str:
     Format topology string for Slurm --conf option.
 
     Input formats:
-      - JSON: '{"tier-1":"switch1","tier-2":"rack1"}' -> "topology=default:root:switch1"
-        (uses lowest tier number as the leaf switch/block)
+      - JSON: '{"tier-1":"switch1","tier-2":"rack1"}' -> "topology=default:root:rack1:switch1"
+        (builds full switch hierarchy: highest tier first, leaf last)
       - "default:switch1" -> "topology=default:root:switch1"
       - "default:sw_root:s1:s2" -> "topology=default:sw_root:s1:s2" (intermediate switches already present)
-      - "tier-0=block1,tier-1=rack1" -> "topology=default:root:block1"
+      - "tier-0=block1,tier-1=rack1" -> "topology=default:root:rack1:block1"
       - "switch1" -> "topology=default:root:switch1"
 
-    For tree topology: the lowest tier (tier-0 or tier-1) is the leaf switch.
-    For block topology: tier-0 is the block name.
+    Slurm dynamic topology format: topology=<name>:<switch_near_root>:...<leaf_switch>
+    Tiers are sorted descending so that the highest tier (closest to root/spine) comes
+    first in the path and the lowest tier (leaf) comes last.
+
+    Example with K8s labels tier-1=leaf, tier-2=spine:
+      topology=default:root:spine:leaf
 
     Returns the formatted Slurm Topology string.
 
@@ -260,14 +264,17 @@ def _format_tier_topology(parts: dict) -> str:
         parts: Dictionary with tier keys like {"tier-1": "switch1", "tier-2": "rack1"}
 
     Returns:
-        Formatted Slurm Topology string using the lowest tier as the leaf switch/block.
+        Formatted Slurm Topology string with the full switch hierarchy.
+        Tiers are ordered from highest number (spine/root-side) down to lowest (leaf),
+        so that slurmctld can build the correct switch tree dynamically.
 
-    For dynamic topology in Slurm, we only need to specify the leaf switch (lowest tier).
-    The slurmctld already knows the topology structure from topology.conf.
+    See: https://slurm.schedmd.com/topology.html#dynamic_topo
+         Format: Topology=<name>:<switch_near_root>:...:<leaf_switch>
 
     Example:
-      - {"tier-0": "block1", "tier-1": "rack1"} -> "topology=default:root:block1"
-      - {"tier-1": "leaf00", "tier-2": "spine00"} -> "topology=default:root:leaf00"
+      - {"tier-1": "leaf00"} -> "topology=default:root:leaf00"
+      - {"tier-1": "leaf00", "tier-2": "spine00"} -> "topology=default:root:spine00:leaf00"
+      - {"tier-0": "block1", "tier-1": "rack1"} -> "topology=default:root:rack1:block1"
     """
     if not parts:
         return ""
@@ -283,10 +290,10 @@ def _format_tier_topology(parts: dict) -> str:
                 continue
 
     if tier_keys:
-        tier_keys.sort(key=lambda x: x[0])
-        lowest_tier_key = tier_keys[0][1]
-        leaf_switch = parts[lowest_tier_key]
-        return f"topology=default:root:{leaf_switch}"
+        # Sort descending: highest tier first (spine/root-side), lowest last (leaf)
+        tier_keys.sort(key=lambda x: x[0], reverse=True)
+        switches = [parts[k] for _, k in tier_keys]
+        return f"topology=default:root:{':'.join(switches)}"
 
     if parts:
         first_value = next(iter(parts.values()))
