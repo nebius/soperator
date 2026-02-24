@@ -117,7 +117,7 @@ tests:
       # Verify correct names are preserved (slurm-scripts is always first)
       - equal:
           path: spec.volumeSources[0].name
-          value: "slurm-scripts"
+          value: "test-cluster-slurm-scripts"
       - equal:
           path: spec.volumeSources[1].name
           value: "jail"
@@ -206,7 +206,7 @@ tests:
       # Verify correct values
       - equal:
           path: spec.volumeSources[0].name
-          value: "slurm-scripts"
+          value: "test-cluster-slurm-scripts"
       - equal:
           path: spec.volumeSources[1].name
           value: "simple-pvc"

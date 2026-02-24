@@ -33,13 +33,13 @@ type SlurmController struct {
 func buildSlurmControllerFrom(clusterName string, maintenance *consts.MaintenanceMode, controller *slurmv1.SlurmNodeController) SlurmController {
 	// Controller always has 1 replica
 	statefulSet := buildStatefulSetWithMaxUnavailableFrom(
-		naming.BuildStatefulSetName(consts.ComponentTypeController),
+		naming.BuildStatefulSetName(consts.ComponentTypeController, clusterName),
 		consts.SingleReplicas,
 		nil,
 	)
 
 	daemonSet := buildDaemonSetFrom(
-		naming.BuildDaemonSetName(consts.ComponentTypeController),
+		naming.BuildDaemonSetName(consts.ComponentTypeController, clusterName),
 	)
 
 	res := SlurmController{
