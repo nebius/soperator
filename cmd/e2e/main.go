@@ -16,6 +16,8 @@ import (
 )
 
 func main() {
+	log.SetFlags(0)
+
 	if len(os.Args) < 2 {
 		_, _ = fmt.Fprintf(os.Stderr, "Usage: e2e <apply|destroy|check-capacity>\n")
 		os.Exit(2)

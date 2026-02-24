@@ -76,6 +76,21 @@ jobs:
           echo "NEBIUS_REGION=$(echo "$E2E_PROFILE" | yq -r '.nebius_region')" >> "$GITHUB_ENV"
           echo "NEBIUS_TENANT_ID=$(echo "$E2E_PROFILE" | yq -r '.nebius_tenant_id')" >> "$GITHUB_ENV"
 
+      - name: Print run parameters
+        shell: bash
+        run: |
+          {
+            echo "### Run Parameters"
+            echo ""
+            echo "- Branch: \`${{ github.ref_name }}\`"
+            echo "- Terraform branch: \`${{ env.TERRAFORM_REPO_REF }}\`"
+            echo "- Profile variable: \`$PROFILE_ENV_VAR\`"
+            echo ""
+            echo '```yaml'
+            echo "$E2E_PROFILE" | yq .
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Install Nebius CLI
         shell: bash
         env:
@@ -200,7 +215,11 @@ jobs:
           cd ${{ env.PATH_TO_INSTALLATION }}
           source .envrc
           cd -
-          bin/e2e check-capacity
+
+          echo "### Capacity Check" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          bin/e2e check-capacity 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Terraform Apply
         timeout-minutes: 120
@@ -221,7 +240,7 @@ jobs:
           bin/e2e apply
 
       - name: K8s Cluster Info and NodeGroups
-        if: always()
+        if: '!cancelled()'
         shell: bash
         run: |
           echo "=== Listing K8s clusters ==="
@@ -239,17 +258,17 @@ jobs:
           done
 
       - name: "K8s Cluster: Pods"
-        if: always()
+        if: '!cancelled()'
         shell: bash
         run: kubectl get pods -A -o wide
 
       - name: "K8s Cluster: Events"
-        if: always()
+        if: '!cancelled()'
         shell: bash
         run: kubectl get events -A --sort-by='.lastTimestamp'
 
       - name: "K8s Cluster: Nodes"
-        if: always()
+        if: '!cancelled()'
         shell: bash
         run: |
           kubectl get nodes
@@ -257,7 +276,7 @@ jobs:
           kubectl get nodes -o yaml
 
       - name: "K8s Cluster: Jobs"
-        if: always()
+        if: '!cancelled()'
         shell: bash
         run: |
           kubectl -n soperator get job
@@ -265,7 +284,7 @@ jobs:
           kubectl -n soperator get job -o yaml
 
       - name: "K8s Cluster: Helm Releases"
-        if: always()
+        if: '!cancelled()'
         shell: bash
         run: |
           kubectl get helmreleases -n flux-system
@@ -273,7 +292,7 @@ jobs:
           kubectl get helmreleases -n flux-system -o yaml
 
       - name: "K8s Cluster: Slurm Cluster CRs"
-        if: always()
+        if: '!cancelled()'
         shell: bash
         run: |
           kubectl get slurmclusters -A
@@ -281,7 +300,7 @@ jobs:
           kubectl get slurmclusters -A -o yaml
 
       - name: "K8s Cluster: Slurm Active Checks CRs"
-        if: always()
+        if: '!cancelled()'
         shell: bash
         run: |
           kubectl get activechecks -A
@@ -289,7 +308,7 @@ jobs:
           kubectl get activechecks -A -o yaml
 
       - name: Slurm Cluster State
-        if: always()
+        if: '!cancelled()'
         shell: bash
         run: |
           kubectl exec -n soperator controller-0 -- sinfo -N || true
@@ -299,14 +318,14 @@ jobs:
           kubectl exec -n soperator controller-0 -- sacct --parsable2 --allusers --starttime=now-6hours | column -t -s'|'
 
       - name: Collect Full Kubernetes Cluster Info
-        if: always()
+        if: '!cancelled()'
         shell: bash
         run: |
           mkdir -p ./cluster-info
           kubectl cluster-info dump --namespaces=kruise-system,soperator-system,soperator,flux-system --output-directory=./cluster-info
 
       - name: Upload Full Kubernetes Cluster Info
-        if: always()
+        if: '!cancelled()'
         uses: actions/upload-artifact@v6
         with:
           name: cluster-info
@@ -314,14 +333,14 @@ jobs:
           retention-days: 7
 
       - name: Collect Soperator Outputs
-        if: always()
+        if: '!cancelled()'
         shell: bash
         run: |
           mkdir -p ./soperator-outputs
           kubectl cp soperator/controller-0:/mnt/jail/opt/soperator-outputs ./soperator-outputs
 
       - name: Upload Soperator Outputs
-        if: always()
+        if: '!cancelled()'
         uses: actions/upload-artifact@v6
         with:
           name: soperator-outputs
@@ -329,7 +348,7 @@ jobs:
           retention-days: 7
 
       - name: Terraform Destroy
-        if: always()
+        if: '!cancelled()'
         timeout-minutes: 30
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
@@ -429,7 +448,11 @@ jobs:
             # Terraform repo latest commits
             echo ""
             echo "### Terraform Repo Latest Commits on ${{ env.TERRAFORM_REPO_REF }}"
-            git -C "${{ github.workspace }}/terraform-repo" log --format='%h|%s|%ar|%an' -3 2>/dev/null | while IFS='|' read -r hash msg date author; do
-              echo "- [$hash]($terraform_repo_url/commit/$hash): $msg ($date) <$author>"
-            done
+            if [[ -d "${{ github.workspace }}/terraform-repo/.git" ]]; then
+              git -C "${{ github.workspace }}/terraform-repo" log --format='%h|%s|%ar|%an' -3 2>/dev/null | while IFS='|' read -r hash msg date author; do
+                echo "- [$hash]($terraform_repo_url/commit/$hash): $msg ($date) <$author>"
+              done
+            else
+              echo "Terraform repo not checked out."
+            fi
           } >> $GITHUB_STEP_SUMMARY

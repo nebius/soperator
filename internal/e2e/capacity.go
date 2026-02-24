@@ -120,15 +120,12 @@ func CheckCapacity(ctx context.Context, profile Profile) error {
 		log.Printf("CBG platform=%s fabric=%s: nodesets=%v required=%d available=%d (limit=%d usage=%d)",
 			key.Platform, key.Fabric, d.nodesets, d.required, available, currentLimit, usage)
 
-		if available >= d.required {
-			continue
+		if available < d.required {
+			log.Printf("CBG platform=%s fabric=%s: INSUFFICIENT CAPACITY — need %d GPUs but only %d available",
+				key.Platform, key.Fabric, d.required, available)
+			insufficient = true
+			printResourceDetails(ctx, sdk, cbg)
 		}
-
-		log.Printf("CBG platform=%s fabric=%s: INSUFFICIENT CAPACITY — need %d GPUs but only %d available",
-			key.Platform, key.Fabric, d.required, available)
-		insufficient = true
-
-		printResourceDetails(ctx, sdk, cbg)
 	}
 
 	if !insufficient {
