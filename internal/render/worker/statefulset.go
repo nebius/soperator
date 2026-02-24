@@ -71,7 +71,7 @@ func RenderNodeSetStatefulSet(
 		)
 	}
 
-	slurmdContainer, err := renderContainerNodeSetSlurmd(nodeSet, cgroupVersion)
+	slurmdContainer, err := renderContainerNodeSetSlurmd(nodeSet, topologyPluginEnabled, cgroupVersion)
 	if err != nil {
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
 	}
