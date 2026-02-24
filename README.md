@@ -96,14 +96,12 @@ Slurm cluster itself by accident. This defines a clear boundary between operator
 
 ### Tailscale support
 
-You can optionally enable [Tailscale](https://github.com/tailscale/tailscale) on login pods (`login-0`, `login-1`) and access Slurm securely over your Tailnet.
+You can optionally enable [Tailscale](https://github.com/tailscale/tailscale) on Slurm login pods to SSH to login nodes securely over your Tailnet.
 
-- Enable via Terraform: `tailscale_enabled = true`
-- Soperator automatically adds the Tailscale sidecar/init-container to login pods and installs the required RBAC.
-- A Tailnet admin must authenticate/approve the devices (auth URL is printed in the Tailscale container logs).
+- Enabling Tailscale requires applying Kubernetes RBAC and adding a Tailscale container to login pods.
+- A Tailnet admin must authenticate/approve each login pod device (auth URL is printed in the Tailscale container logs).
 
 See [docs/tailscale.md](docs/tailscale.md) for details.
-
 
 ### Accounting
 Slurm's accounting system records detailed job information such as:
