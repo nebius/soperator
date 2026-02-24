@@ -31,7 +31,7 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 		assert.Equal(t, container.Image, result.Image)
 		assert.Equal(t, container.ImagePullPolicy, result.ImagePullPolicy)
 		assert.Equal(t, []string{"python3", "/opt/bin/slurm/worker_init.py", "wait-controller", "wait-topology"}, result.Command)
-		assert.Equal(t, 9, len(result.Env))
+		assert.Equal(t, 10, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 3 topology
 		assert.Equal(t, 3, len(result.VolumeMounts))
 
 		expectedMounts := map[string]string{
@@ -97,44 +97,44 @@ func Test_RenderContainerWorkerInit_K8SServiceName(t *testing.T) {
 	tests := []struct {
 		name            string
 		clusterName     string
-		isNodeSet       bool
+		gpuEnabled      bool
 		expectedService string
 	}{
 		{
-			name:            "isNodeSet=true uses nodeset service name",
+			name:            "uses nodeset service name with gpu enabled",
 			clusterName:     "my-cluster",
-			isNodeSet:       true,
+			gpuEnabled:      true,
 			expectedService: "my-cluster-nodeset-svc",
 		},
 		{
-			name:            "isNodeSet=false uses worker service name",
+			name:            "uses nodeset service name without gpu",
 			clusterName:     "my-cluster",
-			isNodeSet:       false,
-			expectedService: "my-cluster-worker-svc",
+			gpuEnabled:      false,
+			expectedService: "my-cluster-nodeset-svc",
 		},
 		{
-			name:            "different cluster name with isNodeSet=true",
+			name:            "different cluster name with gpu enabled",
 			clusterName:     "prod",
-			isNodeSet:       true,
+			gpuEnabled:      true,
 			expectedService: "prod-nodeset-svc",
 		},
 		{
-			name:            "different cluster name with isNodeSet=false",
+			name:            "different cluster name without gpu",
 			clusterName:     "prod",
-			isNodeSet:       false,
-			expectedService: "prod-worker-svc",
+			gpuEnabled:      false,
+			expectedService: "prod-nodeset-svc",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := worker.RenderContainerWorkerInit(tt.clusterName, container, false, tt.isNodeSet, 0)
+			result := worker.RenderContainerWorkerInit(tt.clusterName, container, false, tt.gpuEnabled, 0)
 
 			env, found := findEnv(result.Env, "K8S_SERVICE_NAME")
 			assert.True(t, found, "K8S_SERVICE_NAME env var must be present")
 			assert.Equal(t, tt.expectedService, env.Value,
-				"K8S_SERVICE_NAME should be %q for isNodeSet=%v, got %q",
-				tt.expectedService, tt.isNodeSet, env.Value)
+				"K8S_SERVICE_NAME should be %q for gpuEnabled=%v, got %q",
+				tt.expectedService, tt.gpuEnabled, env.Value)
 		})
 	}
 }

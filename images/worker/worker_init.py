@@ -339,8 +339,30 @@ def apply_node_topology(hostname: str, topology: str) -> None:
         logger.error("scontrol command not found")
         sys.exit(1)
 
+def is_gpu_enabled() -> bool:
+    """Return True if NODESET_GPU_ENABLED is set to 'true'."""
+    return os.environ.get("NODESET_GPU_ENABLED", "") == "true"
+
+
 def wait_for_topology() -> None:
-    """Wait for topology data to become available for this node, then apply it via scontrol."""
+    """Wait for topology data to become available for this node, then apply it via scontrol.
+
+    For non-GPU nodes (NODESET_GPU_ENABLED != 'true'), skips ConfigMap lookup and
+    immediately assigns the node to the generic 'unknown' switch defined in topology.conf.
+    """
+    hostname = get_hostname()
+    if not hostname:
+        logger.error("HOSTNAME environment variable is not set")
+        sys.exit(1)
+
+    if not is_gpu_enabled():
+        logger.info(
+            "NODESET_GPU_ENABLED is not set to 'true', "
+            "assigning node %s to default:root:unknown topology", hostname
+        )
+        apply_node_topology(hostname, "topology=default:root:unknown")
+        return
+
     node_name = get_node_name()
     topology_path = get_topology_path()
     wait_timeout = get_topology_wait_timeout()
@@ -398,11 +420,6 @@ def wait_for_topology() -> None:
     topology = format_slurm_topology(raw_topology)
     if not topology:
         logger.error("Failed to format topology from raw data: %s", raw_topology)
-        sys.exit(1)
-
-    hostname = get_hostname()
-    if not hostname:
-        logger.error("HOSTNAME environment variable is not set")
         sys.exit(1)
 
     apply_node_topology(hostname, topology)
