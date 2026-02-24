@@ -132,6 +132,7 @@ func RenderContainerWorkerInit(
 // renderContainerNodeSetSlurmd renders [corev1.Container] for slurmd
 func renderContainerNodeSetSlurmd(
 	nodeSet *values.SlurmNodeSet,
+	topologyEnabled bool,
 	cgroupVersion string,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
@@ -151,6 +152,13 @@ func renderContainerNodeSetSlurmd(
 	}
 	if nodeSet.GPU.Enabled {
 		volumeMounts = append(volumeMounts, renderVolumeMountNvidia())
+	}
+	if topologyEnabled {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      consts.VolumeNameTopologyNodeLabels,
+			MountPath: consts.VolumeMountPathTopologyNodeLabels,
+			ReadOnly:  true,
+		})
 	}
 
 	// region Jail Sub-mounts

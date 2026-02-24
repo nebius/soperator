@@ -31,6 +31,14 @@ feature_conf() {
     fi
 }
 
+TOPO_LABELS_FILE="/tmp/slurm/topology-node-labels"
+if [[ -f $TOPO_LABELS_FILE ]]; then
+    switch_tier2=$(jq -r '."tier-2" // empty' "$TOPO_LABELS_FILE" 2>/dev/null || echo "")
+    export TOPO_SWITCH_TIER2="${switch_tier2:-unknown}"
+else
+    export TOPO_SWITCH_TIER2="unknown"
+fi
+
 echo "Evaluate variables in the Slurm node 'Extra' field"
 evaluated_extra=$(eval echo "$SLURM_NODE_EXTRA")
 
