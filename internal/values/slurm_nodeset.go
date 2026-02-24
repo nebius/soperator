@@ -105,7 +105,7 @@ func BuildSlurmNodeSetFrom(
 		GPU: nsSpec.GPU.DeepCopy(),
 		//
 		StatefulSet: buildStatefulSetWithMaxUnavailableFrom(
-			naming.BuildNodeSetStatefulSetName(nodeSet.Name),
+			naming.BuildNodeSetStatefulSetName(clusterName, nodeSet.Name),
 			nsSpec.Replicas,
 			nsSpec.MaxUnavailable,
 		),

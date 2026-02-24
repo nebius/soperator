@@ -91,9 +91,9 @@ spec:
     {{- end }}
     {{- end }}
   volumeSources:
-    - name: slurm-scripts
+    - name: {{ include "slurm-cluster.slurmScripts.configMapName" . }}
       configMap:
-        name: slurm-scripts
+        name: {{ include "slurm-cluster.slurmScripts.configMapName" . }}
         defaultMode: 500
     {{- range .Values.volumeSources }}
     - name: {{ .name | quote }}
@@ -325,10 +325,10 @@ spec:
         customMounts:
           - name: slurm-scripts
             mountPath: /opt/slurm_scripts/
-            volumeSourceName: slurm-scripts
+            volumeSourceName: {{ include "slurm-cluster.slurmScripts.configMapName" . }}
           - name: slurm-scripts-jail
             mountPath: /mnt/jail.upper/opt/slurm_scripts/
-            volumeSourceName: slurm-scripts
+            volumeSourceName: {{ include "slurm-cluster.slurmScripts.configMapName" . }}
           {{- if .Values.slurmNodes.login.volumes.customMounts }}
           {{- .Values.slurmNodes.login.volumes.customMounts | toYaml | nindent 10 }}
           {{- end }}

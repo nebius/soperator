@@ -28,8 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
-	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
 )
 
 // nodesetLog is for logging in this package.
@@ -54,35 +52,13 @@ type NodeSetCustomDefaulter struct {
 var _ webhook.CustomDefaulter = &NodeSetCustomDefaulter{}
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind NodeSet.
-func (d *NodeSetCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
+func (d *NodeSetCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
 	nodeSet, ok := obj.(*slurmv1alpha1.NodeSet)
 
 	if !ok {
 		return fmt.Errorf("expected an NodeSet object but got %T", obj)
 	}
 	nodesetLog.Info("Defaulting for NodeSet", "name", nodeSet.GetName())
-
-	if err := defaultNodeSetParentalClusterRef(ctx, d.Client, nodeSet); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func defaultNodeSetParentalClusterRef(ctx context.Context, client client.Client, nodeSet *slurmv1alpha1.NodeSet) error {
-	if _, hasClusterRef := nodeSet.GetAnnotations()[consts.AnnotationParentalClusterRefName]; hasClusterRef {
-		return nil
-	}
-
-	cluster, err := resourcegetter.GetClusterInNamespace(ctx, client, nodeSet.Namespace)
-	if err != nil {
-		return fmt.Errorf("seeking parental cluster: %w", err)
-	}
-
-	if nodeSet.Annotations == nil {
-		nodeSet.Annotations = map[string]string{}
-	}
-	nodeSet.Annotations[consts.AnnotationParentalClusterRefName] = cluster.Name
 
 	return nil
 }
