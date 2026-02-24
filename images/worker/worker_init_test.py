@@ -556,6 +556,66 @@ class TestWaitForController(unittest.TestCase):
         self.assertEqual(mock_run.call_count, 2)
 
 
+class TestIsGpuEnabled(unittest.TestCase):
+    """Tests for is_gpu_enabled function."""
+
+    def test_gpu_enabled_true(self):
+        """Returns True when NODESET_GPU_ENABLED=true."""
+        with mock.patch.dict(os.environ, {"NODESET_GPU_ENABLED": "true"}):
+            self.assertTrue(worker_init.is_gpu_enabled())
+
+    def test_gpu_enabled_false(self):
+        """Returns False when NODESET_GPU_ENABLED=false."""
+        with mock.patch.dict(os.environ, {"NODESET_GPU_ENABLED": "false"}):
+            self.assertFalse(worker_init.is_gpu_enabled())
+
+    def test_gpu_enabled_not_set(self):
+        """Returns False when NODESET_GPU_ENABLED is not set."""
+        env = os.environ.copy()
+        env.pop("NODESET_GPU_ENABLED", None)
+        with mock.patch.dict(os.environ, env, clear=True):
+            self.assertFalse(worker_init.is_gpu_enabled())
+
+    def test_gpu_enabled_case_sensitive(self):
+        """Returns False for 'True' (uppercase) - must be exactly 'true'."""
+        with mock.patch.dict(os.environ, {"NODESET_GPU_ENABLED": "True"}):
+            self.assertFalse(worker_init.is_gpu_enabled())
+
+
+class TestWaitForTopologyNonGpu(unittest.TestCase):
+    """Tests for wait_for_topology non-GPU fast path."""
+
+    @mock.patch("worker_init.apply_node_topology")
+    @mock.patch("worker_init.is_gpu_enabled", return_value=False)
+    @mock.patch.dict(os.environ, {"HOSTNAME": "worker-0"})
+    def test_non_gpu_applies_unknown_topology(self, mock_gpu, mock_apply):
+        """Non-GPU node immediately applies topology=default:root:unknown."""
+        worker_init.wait_for_topology()
+
+        mock_apply.assert_called_once_with("worker-0", "topology=default:root:unknown")
+
+    @mock.patch("worker_init.apply_node_topology")
+    @mock.patch("worker_init.is_gpu_enabled", return_value=False)
+    @mock.patch.dict(os.environ, {"HOSTNAME": "worker-0"})
+    def test_non_gpu_does_not_read_configmap(self, mock_gpu, mock_apply):
+        """Non-GPU node does not wait for ConfigMap at all."""
+        with mock.patch("worker_init.read_topology_for_node") as mock_read:
+            worker_init.wait_for_topology()
+            mock_read.assert_not_called()
+
+    @mock.patch("worker_init.apply_node_topology")
+    @mock.patch("worker_init.is_gpu_enabled", return_value=False)
+    def test_non_gpu_exits_if_hostname_not_set(self, mock_gpu, mock_apply):
+        """Non-GPU node exits if HOSTNAME is not set."""
+        env = os.environ.copy()
+        env.pop("HOSTNAME", None)
+        with mock.patch.dict(os.environ, env, clear=True):
+            with self.assertRaises(SystemExit) as ctx:
+                worker_init.wait_for_topology()
+            self.assertEqual(ctx.exception.code, 1)
+        mock_apply.assert_not_called()
+
+
 class TestTopologyIntegration(unittest.TestCase):
     """Integration tests for the topology flow."""
 

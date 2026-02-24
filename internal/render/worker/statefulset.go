@@ -47,12 +47,13 @@ func RenderNodeSetStatefulSet(
 		topologyTimeOut = consts.DefaultEphemeralTopologyWaitTimeout
 	}
 
-	isNodeSet := true
-
 	initContainers := slices.Clone(nodeSet.CustomInitContainers)
 	initContainers = append(initContainers,
 		common.RenderContainerMunge(&nodeSet.ContainerMunge),
-		RenderContainerWorkerInit(clusterName, &nodeSet.ContainerSlurmd, topologyPluginEnabled, isNodeSet, topologyTimeOut),
+		RenderContainerWorkerInit(
+			clusterName, &nodeSet.ContainerSlurmd, topologyPluginEnabled,
+			nodeSet.GPU.Enabled, topologyTimeOut,
+		),
 	)
 
 	if topologyPluginEnabled {

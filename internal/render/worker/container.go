@@ -25,7 +25,7 @@ import (
 func RenderContainerWorkerInit(
 	clusterName string,
 	container *values.Container,
-	topologyEnabled, isNodeSet bool,
+	topologyEnabled, gpuEnabled bool,
 	waitTimeoutSeconds int32,
 ) corev1.Container {
 	command := []string{
@@ -85,19 +85,19 @@ func RenderContainerWorkerInit(
 			Name:  "CONTROLLER_POLL_INTERVAL",
 			Value: "5",
 		},
-	}
-
-	if isNodeSet {
-		env = append(env, corev1.EnvVar{
+		{
 			Name:  "K8S_SERVICE_NAME",
 			Value: naming.BuildServiceName(consts.ComponentTypeNodeSet, clusterName),
-		})
-	} else {
-		// For "legacy" workers without NodeSet, we use the default worker service for backward compatibility.
-		env = append(env, corev1.EnvVar{
-			Name:  "K8S_SERVICE_NAME",
-			Value: naming.BuildServiceName(consts.ComponentTypeWorker, clusterName),
-		})
+		},
+	}
+
+	if gpuEnabled {
+		env = append(env,
+			corev1.EnvVar{
+				Name:  "NODESET_GPU_ENABLED",
+				Value: "true",
+			},
+		)
 	}
 
 	if topologyEnabled {
