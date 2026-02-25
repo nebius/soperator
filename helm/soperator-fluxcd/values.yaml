@@ -52,6 +52,15 @@ certManager:
   releaseName: cert-manager
   values: null
   overrideValues: null
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   driftDetection:
     mode: warn
 backup:
@@ -70,6 +79,15 @@ backup:
       repository: alpine/k8s
       tag: 1.34.0
   overrideValues: null
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   config:
     driftDetection:
       mode: warn
@@ -78,6 +96,13 @@ backup:
     timeout: 5m
     version: 1.23.0
     releaseName: soperator-backups
+    install:
+      remediation:
+        retries: 3
+    upgrade:
+      remediation:
+        retries: 3
+        remediateLastFailure: true
     values:
       secret:
         name: jail-backup
@@ -93,7 +118,25 @@ mariadbOperator:
   releaseName: mariadb-operator
   values: null
   overrideValues: null
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   crds:
+    install:
+      crds: CreateReplace
+      remediation:
+        retries: 3
+    upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
     driftDetection:
       mode: warn
   driftDetection:
@@ -120,6 +163,13 @@ observability:
       version: 0.117.*
       interval: 15m
       timeout: 15m
+      install:
+        remediation:
+          retries: 3
+      upgrade:
+        remediation:
+          retries: 3
+          remediateLastFailure: true
       values:
         jailLogs:
           enabled: true
@@ -151,6 +201,13 @@ observability:
       version: 0.117.*
       interval: 5m
       timeout: 5m
+      install:
+        remediation:
+          retries: 3
+      upgrade:
+        remediation:
+          retries: 3
+          remediateLastFailure: true
       values:
         resources:
           requests:
@@ -175,6 +232,15 @@ observability:
       interval: 5m
       timeout: 5m
       version: 0.0.3
+      install:
+        crds: CreateReplace
+        remediation:
+          retries: 3
+      upgrade:
+        crds: CreateReplace
+        remediation:
+          retries: 3
+          remediateLastFailure: true
       driftDetection:
         mode: warn
     interval: 5m
@@ -182,6 +248,15 @@ observability:
     version: 0.39.*
     namespace: monitoring-system
     releaseName: metrics
+    install:
+      crds: Skip
+      remediation:
+        retries: 3
+    upgrade:
+      crds: Skip
+      remediation:
+        retries: 3
+        remediateLastFailure: true
     values:
       dashboardNamespaces:
         - soperator
@@ -250,6 +325,15 @@ observability:
     version: 0.9.*
     namespace: logs-system
     releaseName: vm-logs
+    install:
+      crds: CreateReplace
+      remediation:
+        retries: 3
+    upgrade:
+      crds: CreateReplace
+      remediation:
+        retries: 3
+        remediateLastFailure: true
     values:
       persistentVolume:
         enabled: true
@@ -271,6 +355,15 @@ observability:
     version: 2.0.1
     namespace: soperator
     releaseName: soperator-dcgm-exporter
+    install:
+      crds: CreateReplace
+      remediation:
+        retries: 3
+    upgrade:
+      crds: CreateReplace
+      remediation:
+        retries: 3
+        remediateLastFailure: true
     values:
       hpcJobMapDir: /var/run/nebius/slurm
       validateToolkit: true
@@ -289,6 +382,15 @@ securityProfilesOperator:
   version: 0.8.4-soperator
   releaseName: security-profiles-operator
   namespace: security-profiles-operator-system
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   values:
     daemon:
       resources:
@@ -316,6 +418,15 @@ slurmCluster:
   releaseName: soperator
   values: null
   overrideValues: null
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   slurmClusterStorage:
     enabled: true
     releaseName: slurm-cluster-storage
@@ -323,6 +434,13 @@ slurmCluster:
     timeout: 5m
     values: null
     overrideValues: null
+    install:
+      remediation:
+        retries: 3
+    upgrade:
+      remediation:
+        retries: 3
+        remediateLastFailure: true
     driftDetection:
       mode: warn
   driftDetection:
@@ -338,6 +456,15 @@ nodesets:
   releaseName: soperator-nodesets
   values: null
   overrideValues: null
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
 soperatorActiveChecks:
   enabled: true
   interval: 5m
@@ -346,6 +473,15 @@ soperatorActiveChecks:
   releaseName: soperator-activechecks
   namespace: soperator
   overrideValues: null
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   driftDetection:
     mode: warn
 soperator:
@@ -356,6 +492,15 @@ soperator:
   namespace: "soperator-system"
   releaseName: soperator-controller
   featureGates: ""
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   values:
     serviceMonitor:
       enabled: true
@@ -373,6 +518,15 @@ soperator:
     timeout: 5m
     version: 1.8.0
     releaseName: soperator-kruise
+    install:
+      crds: CreateReplace
+      remediation:
+        retries: 3
+    upgrade:
+      crds: CreateReplace
+      remediation:
+        retries: 3
+        remediateLastFailure: true
     overrideValues:
       crds:
         managed: true
@@ -398,6 +552,13 @@ soperator:
     interval: 5m
     timeout: 5m
     releaseName: soperator-checks
+    install:
+      remediation:
+        retries: 3
+    upgrade:
+      remediation:
+        retries: 3
+        remediateLastFailure: true
     values: null
     overrideValues: null
     driftDetection:
@@ -407,6 +568,15 @@ soperator:
     interval: 5m
     timeout: 5m
     releaseName: soperator-node-configurator
+    install:
+      crds: Skip
+      remediation:
+        retries: 3
+    upgrade:
+      crds: Skip
+      remediation:
+        retries: 3
+        remediateLastFailure: true
     values:
       rebooter:
         resources:
@@ -424,6 +594,14 @@ soperator:
     timeout: 5m
     releaseName: soperator-monitoring-dashboards
     namespace: monitoring-system
+    install:
+      crds: Skip
+      remediation:
+        retries: 3
+    upgrade:
+      crds: Skip
+      remediation:
+        retries: 3
     overrideValues: null
     driftDetection:
       mode: warn
@@ -436,6 +614,13 @@ notifier:
   version: 2.0.1
   namespace: monitoring-system
   releaseName: soperator-notifier
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   values:
     slack:
       webhookUrl: null
@@ -450,6 +635,15 @@ csiDriverNfs:
   releaseName: csi-driver-nfs
   overrideValues: null
   values: null
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   driftDetection:
     mode: warn
 nfsServer:
@@ -461,6 +655,15 @@ nfsServer:
   releaseName: nfs-server
   overrideValues: null
   values: null
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   driftDetection:
     mode: warn
 storageClasses:
@@ -471,6 +674,15 @@ storageClasses:
   namespace: storage-system
   releaseName: soperator-storageclasses
   values: null
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   driftDetection:
     mode: warn
 customConfigmaps:
@@ -482,6 +694,15 @@ customConfigmaps:
   releaseName: soperator-custom-configmaps
   overrideValues: null
   values: null
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   driftDetection:
     mode: warn
 tailscale:
@@ -489,5 +710,14 @@ tailscale:
   interval: 5m
   timeout: 5m
   version: 2.0.0
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   driftDetection:
     mode: warn
