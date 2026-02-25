@@ -157,7 +157,7 @@ jobs:
           GOARCH: arm64
           GOOS: darwin
 
-  build-docker-images:
+  build-soperator-images:
     needs:
       - changes
       - pre-build
@@ -235,6 +235,12 @@ jobs:
 
           echo "Updating CRDs & auto-generated code (included in test step) & run tests"
           make test-coverage UNSTABLE="${UNSTABLE}"
+          
+          echo "go base for cache - ${OPERATOR_IMAGE_TAG}"
+          make docker-build-and-push \
+            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
+            UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperator-go-base DOCKERFILE=soperator-controllers/Dockerfile \
+            IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
 
           echo "soperator controller - ${OPERATOR_IMAGE_TAG}"
           make docker-build-and-push \
@@ -266,6 +272,82 @@ jobs:
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperator-exporter DOCKERFILE=soperator-controllers/Dockerfile \
             IMAGE_VERSION=${IMAGE_VERSION}
 
+  build-slurm-images:
+    needs:
+      - changes
+      - pre-build
+    if: needs.changes.outputs.should_build == 'true'
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ linux/amd64, linux/arm64 ]
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+            arch: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            arch: arm64
+
+    env:
+      UNSTABLE: ${{ needs.pre-build.outputs.unstable }}
+      VERSION: ${{ needs.pre-build.outputs.version }}
+      IMAGE_VERSION: ${{ needs.pre-build.outputs.image_version }}
+      OPERATOR_IMAGE_TAG: ${{ needs.pre-build.outputs.operator_image_tag }}
+      NFS_VERSION: ${{ needs.pre-build.outputs.nfs_version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Install GO
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: "go.mod"
+          cache: false
+
+      - name: Read version and unstable
+        id: read-version
+        run: |
+          echo "Version: $VERSION"
+          echo "Unstable: $UNSTABLE"
+          echo "Image version: $IMAGE_VERSION"
+          echo "Operator image tag: $OPERATOR_IMAGE_TAG"
+          echo "Nfs version: $NFS_VERSION"
+
+      - name: Log in to the Github Container registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Install Nebius CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+          echo "$HOME/.nebius/bin" >> "$GITHUB_PATH"
+          mkdir -p "$HOME/.nebius"
+          echo "${{ secrets.NEBIUS_CONFIG_YAML_B64 }}" | base64 -d > "$HOME/.nebius/config.yaml"
+          chmod 600 "$HOME/.nebius/config.yaml"
+
+      - name: Configure Nebius docker credential-helper for auth
+        shell: bash
+        run: nebius registry configure-helper
+
+      - name: Build and push Docker images
+        shell: bash
+        run: |
+          echo "Building for platform: ${{ matrix.platform }}"
+
+          make sync-version UNSTABLE=${UNSTABLE}
+          
           echo "munge - ${IMAGE_VERSION}"
           make docker-build-and-push \
             PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
@@ -419,7 +501,8 @@ jobs:
     name: Create docker-images manifests
     needs:
       - pre-build
-      - build-docker-images
+      - build-soperator-images
+      - build-slurm-images
     runs-on: ubuntu-24.04
 
     env:
@@ -701,7 +784,8 @@ jobs:
       - changes
       - pre-build
       - lint
-      - build-docker-images
+      - build-slurm-images
+      - build-soperator-images
       - manifest-populate-jail
       - build-helm-charts
       - helm-integration-test

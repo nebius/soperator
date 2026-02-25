@@ -491,7 +491,6 @@ soperator:
   version: 3.0.1
   namespace: "soperator-system"
   releaseName: soperator-controller
-  featureGates: ""
   install:
     crds: CreateReplace
     remediation:
