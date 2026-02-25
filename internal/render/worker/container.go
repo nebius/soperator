@@ -19,138 +19,120 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-// RenderContainerWaitForController renders init [corev1.Container] that waits for controller readiness
-func RenderContainerWaitForController(container *values.Container) corev1.Container {
-	return corev1.Container{
-		Name:            consts.ContainerNameWaitForController,
-		Image:           container.Image,
-		ImagePullPolicy: container.ImagePullPolicy,
-		Command: []string{
-			"/opt/bin/slurm/wait-for-controller.sh",
-		},
-		Env: []corev1.EnvVar{},
-		VolumeMounts: []corev1.VolumeMount{
-			common.RenderVolumeMountJail(),
-			common.RenderVolumeMountMungeSocket(),
-		},
-		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
-		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-	}
-}
-
-// renderContainerSlurmd renders [corev1.Container] for slurmd
-func renderContainerSlurmd(
-	container *values.Container,
-	jailSubMounts, customMounts []slurmv1.NodeVolumeMount,
+// RenderContainerWorkerInit renders init [corev1.Container] for worker nodes.
+// It runs a script that waits for the controller to be ready before allowing the main slurmd container to start.
+// If topology is enabled, it also waits for the topology configuration to be ready before allowing slurmd to start.
+func RenderContainerWorkerInit(
 	clusterName string,
-	clusterType consts.ClusterType,
-	cgroupVersion string,
-	enableGDRCopy bool,
-	slurmNodeExtra string,
-	workerFeatures []slurmv1.WorkerFeature,
-	namespace string,
-	useDefaultAppArmorProfile bool,
-) (corev1.Container, error) {
+	container *values.Container,
+	topologyEnabled, gpuEnabled bool,
+	waitTimeoutSeconds int32,
+) corev1.Container {
+	command := []string{
+		"python3",
+		"/opt/bin/slurm/worker_init.py",
+		"wait-controller",
+	}
+	if topologyEnabled {
+		command = append(command, "wait-topology")
+	}
+
 	volumeMounts := []corev1.VolumeMount{
-		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
 		common.RenderVolumeMountJail(),
 		common.RenderVolumeMountMungeSocket(),
-		common.RenderVolumeMountSecurityLimits(),
-		common.RenderVolumeMountSshdKeys(),
-		common.RenderVolumeMountSshdRootKeys(),
-		common.RenderVolumeMountInMemory(),
-		common.RenderVolumeMountTmpDisk(),
-		renderVolumeMountSshdConfigs(),
-		renderVolumeMountNvidia(),
-		renderVolumeMountBoot(),
-		renderVolumeMountSharedMemory(),
-		renderVolumeMountSysctl(),
-		renderVolumeMountSupervisordConfigMap(),
 	}
-	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(jailSubMounts, consts.VolumeMountPathJailUpper)...)
-	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(customMounts, "")...)
-
-	resources := corev1.ResourceRequirements{
-		Limits:   container.Resources,
-		Requests: container.Resources,
+	if topologyEnabled {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      consts.VolumeNameTopologyNodeLabels,
+			MountPath: consts.VolumeMountPathTopologyNodeLabels,
+			ReadOnly:  true,
+		})
 	}
 
-	err := check.CheckResourceRequests(resources)
-	if err != nil {
-		return corev1.Container{}, fmt.Errorf("checking resource requests: %w", err)
+	env := []corev1.EnvVar{
+		{
+			Name: "K8S_NODE_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "spec.nodeName",
+				},
+			},
+		},
+		{
+			Name: "K8S_POD_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "metadata.name",
+				},
+			},
+		},
+		{
+			Name: "K8S_POD_NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name:  "CONTROLLER_MAX_ATTEMPTS",
+			Value: "60",
+		},
+		{
+			Name:  "CONTROLLER_POLL_INTERVAL",
+			Value: "5",
+		},
+		{
+			Name:  "K8S_SERVICE_NAME",
+			Value: naming.BuildServiceName(consts.ComponentTypeNodeSet, clusterName),
+		},
 	}
 
-	realMemory := common.RenderRealMemorySlurmd(resources)
-
-	appArmorProfile := container.AppArmorProfile
-	if useDefaultAppArmorProfile {
-		appArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
+	if gpuEnabled {
+		env = append(env,
+			corev1.EnvVar{
+				Name:  "NODESET_GPU_ENABLED",
+				Value: "true",
+			},
+		)
 	}
-	if appArmorProfile == "" {
-		appArmorProfile = consts.AppArmorProfileUnconfined
+
+	if topologyEnabled {
+		env = append(env,
+			corev1.EnvVar{
+				Name:  "TOPOLOGY_CONFIGMAP_PATH",
+				Value: consts.VolumeMountPathTopologyNodeLabels,
+			},
+			corev1.EnvVar{
+				Name:  "TOPOLOGY_WAIT_TIMEOUT",
+				Value: strconv.Itoa(int(waitTimeoutSeconds)),
+			},
+			corev1.EnvVar{
+				Name:  "TOPOLOGY_POLL_INTERVAL",
+				Value: "5",
+			},
+		)
 	}
 
 	return corev1.Container{
-		Name:            consts.ContainerNameSlurmd,
-		Image:           container.Image,
-		ImagePullPolicy: container.ImagePullPolicy,
-		Command:         container.Command,
-		Args:            container.Args,
-		Env: append(
-			renderSlurmdEnv(
-				clusterName,
-				cgroupVersion,
-				clusterType,
-				realMemory,
-				enableGDRCopy,
-				slurmNodeExtra,
-				workerFeatures,
-			),
-			container.CustomEnv...,
-		),
-		Ports: []corev1.ContainerPort{{
-			Name:          container.Name,
-			ContainerPort: container.Port,
-			Protocol:      corev1.ProtocolTCP,
-		}},
-		VolumeMounts: volumeMounts,
-		ReadinessProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{
-						"scontrol",
-						"show",
-						"slurmd",
-					},
-				},
-			},
-			PeriodSeconds:    1,
-			TimeoutSeconds:   common.DefaultProbeTimeoutSeconds,
-			SuccessThreshold: common.DefaultProbeSuccessThreshold,
-			FailureThreshold: common.DefaultProbeFailureThreshold,
-		},
-		SecurityContext: &corev1.SecurityContext{
-			Privileged: ptr.To(true),
-			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{
-					consts.ContainerSecurityContextCapabilitySysAdmin,
-				},
-			},
-			SeccompProfile: &corev1.SeccompProfile{
-				Type: corev1.SeccompProfileTypeUnconfined,
-			},
-			ProcMount:       ptr.To(container.ProcMount),
-			AppArmorProfile: common.ParseAppArmorProfile(appArmorProfile),
-		},
-		Resources:                resources,
+		Name:                     consts.ContainerNameWorkerInit,
+		Image:                    container.Image,
+		ImagePullPolicy:          container.ImagePullPolicy,
+		Command:                  command,
+		VolumeMounts:             volumeMounts,
+		Env:                      env,
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-	}, nil
+	}
 }
 
 // renderContainerNodeSetSlurmd renders [corev1.Container] for slurmd
 func renderContainerNodeSetSlurmd(
 	nodeSet *values.SlurmNodeSet,
+	topologyEnabled bool,
 	cgroupVersion string,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
@@ -170,6 +152,13 @@ func renderContainerNodeSetSlurmd(
 	}
 	if nodeSet.GPU.Enabled {
 		volumeMounts = append(volumeMounts, renderVolumeMountNvidia())
+	}
+	if topologyEnabled {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      consts.VolumeNameTopologyNodeLabels,
+			MountPath: consts.VolumeMountPathTopologyNodeLabels,
+			ReadOnly:  true,
+		})
 	}
 
 	// region Jail Sub-mounts
@@ -247,21 +236,6 @@ func renderContainerNodeSetSlurmd(
 			Protocol:      corev1.ProtocolTCP,
 		}},
 		VolumeMounts: volumeMounts,
-		ReadinessProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{
-						"scontrol",
-						"show",
-						"slurmd",
-					},
-				},
-			},
-			PeriodSeconds:    1,
-			TimeoutSeconds:   common.DefaultProbeTimeoutSeconds,
-			SuccessThreshold: common.DefaultProbeSuccessThreshold,
-			FailureThreshold: common.DefaultProbeFailureThreshold,
-		},
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: ptr.To(true),
 			Capabilities: &corev1.Capabilities{
@@ -289,80 +263,6 @@ func renderVolumeMountSupervisordConfigMap() corev1.VolumeMount {
 	}
 }
 
-func renderSlurmdEnv(
-	clusterName, cgroupVersion string,
-	clusterType consts.ClusterType,
-	realMemory int64,
-	enableGDRCopy bool,
-	slurmNodeExtra string,
-	workerFeatures []slurmv1.WorkerFeature,
-) []corev1.EnvVar {
-	envVar := []corev1.EnvVar{
-		{
-			Name: "K8S_POD_NAME",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					APIVersion: corev1.SchemeGroupVersion.Version,
-					FieldPath:  "metadata.name",
-				},
-			},
-		},
-		{
-			Name: "K8S_POD_NAMESPACE",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					APIVersion: corev1.SchemeGroupVersion.Version,
-					FieldPath:  "metadata.namespace",
-				},
-			},
-		},
-		{
-			Name: "INSTANCE_ID",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					APIVersion: corev1.SchemeGroupVersion.Version,
-					FieldPath:  "spec.nodeName",
-				},
-			},
-		},
-		{
-			Name:  "K8S_SERVICE_NAME",
-			Value: naming.BuildServiceName(consts.ComponentTypeWorker, clusterName),
-		},
-		{
-			Name:  "SLURM_CLUSTER_TYPE",
-			Value: clusterType.String(),
-		},
-		{
-			Name:  "SLURM_REAL_MEMORY",
-			Value: strconv.FormatInt(realMemory, 10),
-		},
-		{
-			Name:  "SLURM_NODE_EXTRA",
-			Value: slurmNodeExtra,
-		},
-	}
-	if cgroupVersion == consts.CGroupV2 {
-		envVar = append(envVar, corev1.EnvVar{
-			Name:  consts.EnvCGroupV2,
-			Value: "true",
-		})
-	}
-	if enableGDRCopy {
-		envVar = append(envVar, corev1.EnvVar{
-			Name:  consts.EnvNvidiaGDRCopy,
-			Value: "enabled",
-		})
-	}
-	for _, feature := range workerFeatures {
-		envVar = append(envVar, corev1.EnvVar{
-			Name:  "SLURM_FEATURE_" + feature.Name,
-			Value: feature.HostlistExpr,
-		})
-	}
-	return envVar
-}
-
 func renderNodeSetSlurmdEnv(
 	cgroupVersion string,
 	clusterType consts.ClusterType,
@@ -383,11 +283,8 @@ func renderNodeSetSlurmdEnv(
 			Name:  "SLURM_CLUSTER_TYPE",
 			Value: clusterType.String(),
 		},
-		{
-			Name:  "SOPERATOR_NODE_SETS_ON",
-			Value: "true",
-		},
 	}
+
 	if len(slurmNodeExtra) > 0 {
 		envVar = append(envVar, corev1.EnvVar{
 			Name:  "SLURM_NODE_EXTRA",

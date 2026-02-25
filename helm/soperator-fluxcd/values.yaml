@@ -352,7 +352,7 @@ observability:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 2.0.1
+    version: 3.0.1
     namespace: soperator
     releaseName: soperator-dcgm-exporter
     install:
@@ -413,7 +413,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 2.0.1
+  version: 3.0.1
   namespace: soperator
   releaseName: soperator
   values: null
@@ -451,7 +451,7 @@ nodesets:
     mode: warn
   interval: 5m
   timeout: 5m
-  version: 2.0.1
+  version: 3.0.1
   namespace: soperator
   releaseName: soperator-nodesets
   values: null
@@ -469,7 +469,7 @@ soperatorActiveChecks:
   enabled: true
   interval: 5m
   timeout: 120m
-  version: 2.0.1
+  version: 3.0.1
   releaseName: soperator-activechecks
   namespace: soperator
   overrideValues: null
@@ -488,10 +488,9 @@ soperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 2.0.1
+  version: 3.0.1
   namespace: "soperator-system"
   releaseName: soperator-controller
-  featureGates: ""
   install:
     crds: CreateReplace
     remediation:
@@ -544,7 +543,7 @@ soperator:
       helmHooks:
         image:
           repository: cr.eu-north1.nebius.cloud/soperator/kruise-helm-hook
-      featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true"
+      featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true,ResourceDistributionGate=true"
     driftDetection:
       mode: warn
   soperatorChecks:
@@ -611,7 +610,7 @@ notifier:
   enabled: false
   interval: 5m
   timeout: 5m
-  version: 2.0.1
+  version: 3.0.1
   namespace: monitoring-system
   releaseName: soperator-notifier
   install:
@@ -670,7 +669,7 @@ storageClasses:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 2.0.1
+  version: 3.0.1
   namespace: storage-system
   releaseName: soperator-storageclasses
   values: null
@@ -689,7 +688,7 @@ customConfigmaps:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 2.0.1
+  version: 3.0.1
   namespace: soperator
   releaseName: soperator-custom-configmaps
   overrideValues: null

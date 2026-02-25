@@ -107,3 +107,9 @@ spec:
       {{- if .Values.controllerManager.tolerations }}
       tolerations: {{- toYaml .Values.controllerManager.tolerations | nindent 8 }}
       {{- end }}
+      {{- if .Values.controllerManager.affinity }}
+      affinity: {{- toYaml .Values.controllerManager.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.controllerManager.nodeSelector }}
+      nodeSelector: {{- toYaml .Values.controllerManager.nodeSelector | nindent 8 }}
+      {{- end }}

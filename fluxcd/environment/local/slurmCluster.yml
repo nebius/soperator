@@ -2,7 +2,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 2.0.1
+  version: 3.0.1
   namespace: soperator
   releaseName: soperator
   overrideValues:
@@ -110,7 +110,6 @@ slurmCluster:
                 requests:
                   storage: 50Gi
               storageClassName: "compute-csi-network-ssd-ext4"
-      worker: null
       login:
         size: 1
         k8sNodeFilterName: kind

@@ -50,6 +50,11 @@ type SlurmNodeSet struct {
 	Maintenance             *consts.MaintenanceMode
 	NodeExtra               string
 	EnableHostUserNamespace bool
+
+	EphemeralNodes               *bool
+	EphemeralTopologyWaitTimeout int32
+
+	ActiveNodes []int32
 }
 
 func BuildSlurmNodeSetFrom(
@@ -114,6 +119,9 @@ func BuildSlurmNodeSetFrom(
 		Maintenance:             maintenance,
 		NodeExtra:               nsSpec.NodeConfig.Dynamic,
 		EnableHostUserNamespace: nsSpec.EnableHostUserNamespace,
+		//
+		EphemeralNodes:               nsSpec.EphemeralNodes,
+		EphemeralTopologyWaitTimeout: nsSpec.EphemeralTopologyWaitTimeout,
 	}
 
 	// region Submounts

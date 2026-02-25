@@ -78,23 +78,6 @@ mkdir -p /var/run/sshd
 echo "Waiting until munge is started"
 while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done
 
-GRES=""
-if [ "$SLURM_CLUSTER_TYPE" = "gpu" ]; then
-    echo "Slurm cluster type is - $SLURM_CLUSTER_TYPE Detect available GPUs"
-    # The following command converts the nvidia-smi output into the Gres GPU string expected by Slurm.
-    # For example, if "nvidia-smi --list-gpus" shows this:
-    #   GPU 0: NVIDIA A100-SXM4-80GB (UUID: <...>)
-    #   GPU 1: NVIDIA A100-SXM4-80GB (UUID: <...>)
-    #   GPU 2: NVIDIA V100-SXM4-16GB (UUID: <...>)
-    # the GRES variable will be equal to "gpu:nvidia_a100-sxm4-80gb:2,gpu:nvidia_v100-sxm2-16gb:1".
-    # See Slurm docs: https://slurm.schedmd.com/gres.html#AutoDetect
-    export GRES="$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -e 's/ /_/g' -e 's/.*/\L&/' | sort | uniq -c | awk '{print "gpu:" $2 ":" $1}' | paste -sd ',' -)"
-
-    echo "Detected GRES is $GRES"
-else
-    echo "Skipping GPU detection"
-fi
-
 # Hack with logs: multilog will write log in stdout and in log file, and rotate log file
 echo "Start supervisord daemon"
 exec /usr/bin/supervisord

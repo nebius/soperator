@@ -2,8 +2,8 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/53
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260202145952 AS worker_slurmd
+# https://github.com/nebius/ml-containers/pull/69
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260220131744 AS worker_slurmd
 
 # Install useful packages
 RUN apt-get update && \
@@ -122,15 +122,15 @@ RUN mkdir -p /var/log/slurm/multilog && \
 # Copy slurmd entrypoint script
 COPY images/worker/slurmd_entrypoint.sh /opt/bin/slurm/
 
+# Copy worker init script (controller readiness + topology for ephemeral nodes)
+COPY images/worker/worker_init.py /opt/bin/slurm/
+
 # Copy supervisord entrypoint script
 COPY images/worker/supervisord_entrypoint.sh /opt/bin/slurm/
 
-# Copy wait-for-controller script
-COPY images/worker/wait-for-controller.sh /opt/bin/slurm/
-
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh && \
     chmod +x /opt/bin/slurm/supervisord_entrypoint.sh && \
-    chmod +x /opt/bin/slurm/wait-for-controller.sh
+    chmod +x /opt/bin/slurm/worker_init.py
 
 # Start supervisord that manages both slurmd and sshd as child processes
 ENTRYPOINT ["/opt/bin/slurm/supervisord_entrypoint.sh"]

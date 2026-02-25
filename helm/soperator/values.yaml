@@ -43,7 +43,7 @@ controllerManager:
       topologyLabelPrefix: "topology.nebius.com"
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/slurm-operator
-      tag: 2.0.1
+      tag: 3.0.1
     imagePullPolicy: Always
     resources:
       limits:
@@ -54,6 +54,8 @@ controllerManager:
   replicas: 1
   serviceAccount:
     annotations: {}
+  affinity: {}
+  nodeSelector: {}
   tolerations: []
 kubernetesClusterDomain: cluster.local
 webhookService:
@@ -76,4 +78,4 @@ kruise:
   installOperator: false
   manager:
     replicas: 1
-  featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true"
+  featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true,ResourceDistributionGate=true"

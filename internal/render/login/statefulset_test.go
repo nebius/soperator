@@ -104,7 +104,6 @@ func TestRenderStatefulSet_PriorityClass(t *testing.T) {
 				secrets,
 				volumeSources,
 				login,
-				false,
 			)
 
 			if err != nil {

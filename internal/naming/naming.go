@@ -69,10 +69,6 @@ func BuildServiceFQDN(svcName, namespace string) string {
 	return fmt.Sprintf("%s.%s.svc.cluster.local", svcName, namespace)
 }
 
-func BuildWorkerServiceFQDN(namespace, clusterName string) string {
-	return BuildServiceFQDN(BuildServiceName(consts.ComponentTypeWorker, clusterName), namespace)
-}
-
 func BuildNodeSetUmbrellaServiceFQDN(
 	namespace,
 	clusterName string,

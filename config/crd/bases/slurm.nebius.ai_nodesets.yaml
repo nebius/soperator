@@ -27,6 +27,10 @@ spec:
       jsonPath: .status.replicas
       name: Ready
       type: integer
+    - description: Whether the NodeSet uses ephemeral nodes.
+      jsonPath: .spec.ephemeralNodes
+      name: Ephemeral
+      type: boolean
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -2508,6 +2512,26 @@ spec:
                   EnableHostUserNamespace controls if the pod containers can use the host user namespace.
                   Defaults to false.
                 type: boolean
+              ephemeralNodes:
+                default: false
+                description: |-
+                  EphemeralNodes enables ephemeral node behavior for this NodeSet.
+                  When true, nodes will use dynamic topology injection instead of legacy topology.conf.
+                  Topology data is read from the topology-node-labels ConfigMap at runtime
+                  and passed to slurmd via --conf "Topology=..." parameter.
+                  This mode is designed for cloud/ephemeral worker nodes that may be dynamically
+                  added or removed from the cluster.
+                type: boolean
+              ephemeralTopologyWaitTimeout:
+                default: 180
+                description: |-
+                  EphemeralTopologyWaitTimeout specifies the maximum time (in seconds) to wait
+                  for topology data to become available before starting slurmd.
+                  Only used when EphemeralNodes is true.
+                  Defaults to 180 seconds (3 minutes).
+                format: int32
+                minimum: 60
+                type: integer
               gpu:
                 description: GPU defines the settings related to GPU support for Slurm
                   workers.

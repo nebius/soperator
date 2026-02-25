@@ -2,8 +2,8 @@
 
 ARG CUDA_VERSION
 ARG SLURM_VERSION
-# https://github.com/nebius/ml-containers/pull/53
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm_training_diag:slurm${SLURM_VERSION}-cuda${CUDA_VERSION}-ubuntu24.04-20260202154154 AS jail
+# https://github.com/nebius/ml-containers/pull/72
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm_training_diag:slurm${SLURM_VERSION}-cuda${CUDA_VERSION}-ubuntu24.04-20260223104221 AS jail
 
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host
@@ -102,3 +102,25 @@ COPY VERSION /etc/soperator-jail-version
 
 # Update linker cache
 RUN ldconfig
+
+#######################################################################################################################
+FROM restic/restic:0.18.0 AS untaped
+
+COPY --from=jail / /jail
+
+RUN restic init --insecure-no-password --repo /jail_restic && \
+    cd /jail && \
+    restic --insecure-no-password --repo /jail_restic backup ./ \
+        --no-scan --no-cache --read-concurrency 16 \
+        --compression max --pack-size 8 \
+        --host soperator
+
+#######################################################################################################################
+FROM restic/restic:0.18.0 AS populate_jail
+
+COPY --from=untaped /jail_restic /jail_restic
+
+COPY images/jail/populate_jail_entrypoint.sh /opt/bin/
+RUN chmod +x /opt/bin/populate_jail_entrypoint.sh
+ENTRYPOINT ["/opt/bin/populate_jail_entrypoint.sh"]
+

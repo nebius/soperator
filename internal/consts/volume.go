@@ -81,3 +81,9 @@ const (
 	VolumeMountPathSlurmdbdSSLCACertificate = "/mnt/" + slurmdbdSSLCACertificate
 	VolumeMountPathSlurmdbdSSLClientKey     = "/mnt/" + slurmdbdSSLClientKey
 )
+
+// Ephemeral topology volumes
+const (
+	VolumeNameTopologyNodeLabels      = "topology-node-labels"
+	VolumeMountPathTopologyNodeLabels = "/tmp/slurm/topology-node-labels"
+)
