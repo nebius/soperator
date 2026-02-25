@@ -51,7 +51,7 @@ checks:
       maintenanceIgnoreNodeLabels: "slurm.nebius.ai/nodeset=nfs"
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/soperatorchecks
-      tag: 2.0.2
+      tag: 2.0.1
     imagePullPolicy: Always
     resources:
       limits:
