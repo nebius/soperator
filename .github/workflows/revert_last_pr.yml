@@ -1,0 +1,29 @@
+name: "Revert last PR in merge-to-main"
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  revert:
+    name: Revert last PR
+    if: |
+      github.event.issue.pull_request
+      && startsWith(github.event.issue.title, 'Merge to ')
+      && github.event.comment.body == '/revert-last-pr'
+    runs-on: self-hosted
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Revert last PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: .github/workflows/scripts/revert-latest-pr.sh "${{ github.event.issue.number }}"
