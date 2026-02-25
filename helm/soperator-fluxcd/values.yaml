@@ -133,7 +133,7 @@ mariadbOperator:
       remediation:
         retries: 3
     upgrade:
-    crds: CreateReplace
+      crds: CreateReplace
     remediation:
       retries: 3
       remediateLastFailure: true
