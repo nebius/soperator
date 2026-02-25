@@ -21,13 +21,9 @@ spec:
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   install:
-    crds: Skip
-    remediation:
-      retries: 3
+    {{- toYaml .Values.customConfigmaps.install | nindent 4 }}
   upgrade:
-    crds: Skip
-    remediation:
-      retries: 3
+    {{- toYaml .Values.customConfigmaps.upgrade | nindent 4 }}
   interval: {{ .Values.customConfigmaps.interval }}
   timeout: {{ .Values.customConfigmaps.timeout }}
   releaseName: {{ .Values.customConfigmaps.releaseName }}
