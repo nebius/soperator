@@ -21,11 +21,9 @@ spec:
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   install:
-    crds: Skip
-    remediation:
-      retries: 3
+    {{- toYaml .Values.csiDriverNfs.install | nindent 4 }}
   upgrade:
-    crds: Skip
+    {{- toYaml .Values.csiDriverNfs.upgrade | nindent 4 }}
   interval: {{ .Values.csiDriverNfs.interval }}
   timeout: {{ .Values.csiDriverNfs.timeout }}
   releaseName: {{ .Values.csiDriverNfs.releaseName }}

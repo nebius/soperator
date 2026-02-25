@@ -23,18 +23,13 @@ spec:
   - name: {{ include "soperator-fluxcd.fullname" . }}-mariadb-operator-crds
   - name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
   install:
-    crds: Skip
-    remediation:
-      retries: 3
+    {{- toYaml .Values.mariadbOperator.install | nindent 4 }}
   interval: {{ .Values.mariadbOperator.interval }}
   timeout: {{ .Values.mariadbOperator.timeout }}
   releaseName: {{ .Values.mariadbOperator.releaseName }}
   targetNamespace: {{ .Values.mariadbOperator.namespace }}
   upgrade:
-    crds: Skip
-    remediation:
-      retries: 3
-      remediateLastFailure: true
+    {{- toYaml .Values.mariadbOperator.upgrade | nindent 4 }}
   values:
   {{- if .Values.mariadbOperator.overrideValues }}
     {{- toYaml .Values.mariadbOperator.overrideValues | nindent 4 }}

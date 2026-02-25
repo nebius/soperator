@@ -21,12 +21,9 @@ spec:
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
   install:
-    remediation:
-      retries: 3
+    {{- toYaml .Values.soperator.soperatorChecks.install | nindent 4 }}
   upgrade:
-    remediation:
-      retries: 3
-      remediateLastFailure: true
+    {{- toYaml .Values.soperator.soperatorChecks.upgrade | nindent 4 }}
   interval: {{ .Values.soperator.soperatorChecks.interval }}
   timeout: {{ .Values.soperator.soperatorChecks.timeout }}
   releaseName: {{ .Values.soperator.soperatorChecks.releaseName }}

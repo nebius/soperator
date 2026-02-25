@@ -21,14 +21,9 @@ spec:
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   install:
-    crds: Skip
-    remediation:
-      retries: 3
+    {{- toYaml .Values.storageClasses.install | nindent 4 }}
   upgrade:
-    crds: Skip
-    remediation:
-      retries: 3
-      remediateLastFailure: true
+    {{- toYaml .Values.storageClasses.upgrade | nindent 4 }}
   interval: {{ .Values.storageClasses.interval }}
   timeout: {{ .Values.storageClasses.timeout }}
   releaseName: {{ .Values.storageClasses.releaseName }}
