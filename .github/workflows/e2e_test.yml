@@ -93,10 +93,8 @@ jobs:
           go-version-file: "go.mod"
           cache: false
 
-      - name: Install E2E tools
-        run: |
-          make install-e2e-tools
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+      - name: Add local bin to PATH
+        run: echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
