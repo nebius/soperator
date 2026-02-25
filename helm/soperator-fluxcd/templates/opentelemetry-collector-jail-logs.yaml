@@ -25,12 +25,9 @@ spec:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   - name: {{ include "soperator-fluxcd.fullname" . }}-vm-logs
   install:
-    remediation:
-      retries: 3
+    {{- toYaml .Values.observability.opentelemetry.logs.install | nindent 4 }}
   upgrade:
-    remediation:
-      retries: 3
-      remediateLastFailure: true
+    {{- toYaml .Values.observability.opentelemetry.logs.upgrade | nindent 4 }}
   interval: {{ .Values.observability.opentelemetry.logs.interval }}
   timeout: {{ .Values.observability.opentelemetry.logs.timeout }}
   releaseName: opentelemetry-collector-jail-logs
