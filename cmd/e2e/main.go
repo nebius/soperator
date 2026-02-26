@@ -19,7 +19,7 @@ func main() {
 	log.SetFlags(0)
 
 	if len(os.Args) < 2 {
-		_, _ = fmt.Fprintf(os.Stderr, "Usage: e2e <apply|destroy|check-capacity>\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: e2e <init|apply|destroy|check-capacity>\n")
 		os.Exit(2)
 	}
 
@@ -34,6 +34,9 @@ func main() {
 	switch os.Args[1] {
 	case "check-capacity":
 		err = runCheckCapacity(ctx, profile)
+	case "init":
+		cfg := loadFullConfig(profile)
+		err = e2e.RunInit(ctx, cfg)
 	case "apply":
 		cfg := loadFullConfig(profile)
 		err = e2e.Apply(ctx, cfg)
@@ -41,7 +44,7 @@ func main() {
 		cfg := loadFullConfig(profile)
 		err = e2e.Destroy(ctx, cfg)
 	default:
-		_, _ = fmt.Fprintf(os.Stderr, "Unknown command: %s\nUsage: e2e <apply|destroy|check-capacity>\n", os.Args[1])
+		_, _ = fmt.Fprintf(os.Stderr, "Unknown command: %s\nUsage: e2e <init|apply|destroy|check-capacity>\n", os.Args[1])
 		os.Exit(2)
 	}
 	if err != nil {
