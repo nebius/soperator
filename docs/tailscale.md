@@ -90,6 +90,10 @@ Wait for login pods to restart:
 ```bash
 kubectl -n soperator get pods -l app.kubernetes.io/component=login -w
 ```
+
+> Note: The Kubernetes Secret referenced by `TS_KUBE_SECRET` is created/updated automatically by the Tailscale container to persist its state.
+> In this setup `TS_KUBE_SECRET` is set to the pod name (`metadata.name`), so each login pod typically uses a Secret with the same name as the pod.
+> Deleting that Secret forces the pod to re-authenticate (a new auth URL will appear in logs).
 ---
 
 ## 3) Authenticate login pods
