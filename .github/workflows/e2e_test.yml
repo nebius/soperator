@@ -382,7 +382,7 @@ jobs:
           retention-days: 7
 
       - name: Terraform Destroy
-        if: '!cancelled()'
+        if: always()
         timeout-minutes: 30
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
