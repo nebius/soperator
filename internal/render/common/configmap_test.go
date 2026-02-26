@@ -352,20 +352,20 @@ func TestRenderPlugstack(t *testing.T) {
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Contains(t, result, "optional spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 container_image_save=")
+		assert.Contains(t, result, "optional spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 importer=")
 	})
 
 	t.Run("Pyxis options", func(t *testing.T) {
 		result := generateSpankConfig(&values.SlurmCluster{
 			PlugStackConfig: slurmv1.PlugStackConfig{
 				Pyxis: slurmv1.PluginConfigPyxis{
-					Required:           ptr.To(true),
-					ContainerImageSave: "/tmp/",
+					Required:     ptr.To(true),
+					ImporterPath: "/opt/importer.sh",
 				},
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Contains(t, result, "required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 container_image_save=/tmp/")
+		assert.Contains(t, result, "required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 importer=/opt/importer.sh")
 	})
 
 	t.Run("NCCL no options", func(t *testing.T) {

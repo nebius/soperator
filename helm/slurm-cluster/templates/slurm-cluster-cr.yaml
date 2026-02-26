@@ -94,7 +94,7 @@ spec:
     - name: slurm-scripts
       configMap:
         name: slurm-scripts
-        defaultMode: 500
+        defaultMode: 0755
     {{- range .Values.volumeSources }}
     - name: {{ .name | quote }}
       {{- omit . "name" "createPVC" "storageClassName" "size" | toYaml | nindent 6 }}

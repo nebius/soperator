@@ -27447,7 +27447,7 @@ spec:
                     outputToStdOut: false
                     required: false
                   pyxis:
-                    containerImageSave: /var/cache/enroot-container-images/
+                    importerPath: /opt/slurm_scripts/pyxis_caching_importer.sh
                     required: true
                 description: PlugStackConfig represents the Plugin stack configurations
                   in `plugstack.conf`.
@@ -27538,12 +27538,11 @@ spec:
                     type: object
                   pyxis:
                     default:
-                      containerImageSave: /var/cache/enroot-container-images/
+                      importerPath: /opt/slurm_scripts/pyxis_caching_importer.sh
                       required: true
                     description: Pyxis represents the 'Pyxis' SPANK plugin configuration.
                     properties:
                       containerImageSave:
-                        default: /var/cache/enroot-container-images/
                         description: |-
                           ContainerImageSave represents an absolute path to the file or directory where SquashFS files will be stored.
                           If the specified file or directory already exists, it will be reused.
@@ -27552,6 +27551,13 @@ spec:
                           A directory path must end with '/' (e.g., /path/to/directory/ vs. /path/to/file).
                           If the image name contains '/', a nested directory will be created under the specified path (if it is a directory).
                           If the option argument is empty (""), SquashFS files will not be stored.
+                        type: string
+                      importerPath:
+                        default: /opt/slurm_scripts/pyxis_caching_importer.sh
+                        description: |-
+                          Path to the executable for pyxis importer extension.
+                          File should be available to execute for every user in Slurm.
+                          More docs: https://github.com/NVIDIA/pyxis/tree/v0.23.0/importers.
                         type: string
                       required:
                         default: true
