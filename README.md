@@ -95,7 +95,13 @@ All user actions are isolated within a dedicated container-like environment, so 
 Slurm cluster itself by accident. This defines a clear boundary between operator and user responsibility.
 
 ### Tailscale support
-You can optionally enable [Tailscale](https://github.com/tailscale/tailscale) as a sidecar on login pods and access the cluster securely from your own network.
+
+You can optionally enable [Tailscale](https://github.com/tailscale/tailscale) on Slurm login pods to SSH to login nodes securely over your Tailnet.
+
+- Enabling Tailscale requires applying Kubernetes RBAC and adding a Tailscale container to login pods.
+- A Tailnet admin must authenticate/approve each login pod device (auth URL is printed in the Tailscale container logs).
+
+See [docs/tailscale.md](docs/tailscale.md) for details.
 
 ### Accounting
 Slurm's accounting system records detailed job information such as:
