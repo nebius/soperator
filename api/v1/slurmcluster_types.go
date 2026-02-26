@@ -111,7 +111,7 @@ type SlurmClusterSpec struct {
 	// PlugStackConfig represents the Plugin stack configurations in `plugstack.conf`.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ pyxis: { required: true, containerImageSave: "/var/cache/enroot-container-images/" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" } }
+	// +kubebuilder:default={ pyxis: { required: true, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" } }
 	PlugStackConfig PlugStackConfig `json:"plugStackConfig,omitempty"`
 
 	// SConfigController defines the desired state of controller that watches after configs
@@ -214,7 +214,7 @@ type PlugStackConfig struct {
 	// Pyxis represents the 'Pyxis' SPANK plugin configuration.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ required: true, containerImageSave: "/var/cache/enroot-container-images/" }
+	// +kubebuilder:default={ required: true, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }
 	Pyxis PluginConfigPyxis `json:"pyxis,omitempty"`
 
 	// NcclDebug represents the 'NCCL Debug' SPANK plugin configuration.
@@ -239,6 +239,14 @@ type PluginConfigPyxis struct {
 	// +kubebuilder:default=true
 	Required *bool `json:"required,omitempty"`
 
+	// Path to the executable for pyxis importer extension.
+	// File should be available to execute for every user in Slurm.
+	// More docs: https://github.com/NVIDIA/pyxis/tree/v0.23.0/importers.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="/opt/slurm_scripts/pyxis_caching_importer.sh"
+	ImporterPath string `json:"importerPath,omitempty"`
+
 	// ContainerImageSave represents an absolute path to the file or directory where SquashFS files will be stored.
 	// If the specified file or directory already exists, it will be reused.
 	// If the path does not exist, it will be created.
@@ -248,7 +256,7 @@ type PluginConfigPyxis struct {
 	// If the option argument is empty (""), SquashFS files will not be stored.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="/var/cache/enroot-container-images/"
+	// +kubebuilder:deprecation:warning="The ContainerImageSave field is deprecated and will be removed in a future release"
 	ContainerImageSave string `json:"containerImageSave,omitempty"`
 }
 

@@ -570,7 +570,6 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 
 	res.AddLine(fmt.Sprintf("required chroot.so %s", consts.VolumeMountPathJail))
 
-	// TODO(@itechdima): make `expose_enroot_logs` configurable and enable it once #413 is resolved.
 	res.AddLine(strings.Join(
 		[]string{
 			utils.Ternary(cluster.PlugStackConfig.Pyxis.Required != nil && *cluster.PlugStackConfig.Pyxis.Required, "required", "optional"),
@@ -579,7 +578,7 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 			"execute_entrypoint=0",
 			"container_scope=global",
 			"sbatch_support=1",
-			fmt.Sprintf("container_image_save=%s", cluster.PlugStackConfig.Pyxis.ContainerImageSave),
+			fmt.Sprintf("importer=%s", cluster.PlugStackConfig.Pyxis.ImporterPath),
 		},
 		" ",
 	))
