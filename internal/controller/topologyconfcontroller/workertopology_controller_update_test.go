@@ -209,11 +209,12 @@ func TestWorkerTopologyReconciler_renderTopologyConfigMap(t *testing.T) {
 	}
 
 	namespace := "test-namespace"
+	clusterName := "test-cluster"
 	config := "SwitchName=root"
 
-	cm := r.renderTopologyConfigMap(namespace, config)
+	cm := r.renderTopologyConfigMap(namespace, config, clusterName)
 
-	assert.Equal(t, consts.ConfigMapNameTopologyConfig, cm.Name)
+	assert.Equal(t, topologyConfigMapName(clusterName), cm.Name)
 	assert.Equal(t, namespace, cm.Namespace)
 	assert.Equal(t, corev1.SchemeGroupVersion.String(), cm.APIVersion)
 	assert.Equal(t, "ConfigMap", cm.Kind)

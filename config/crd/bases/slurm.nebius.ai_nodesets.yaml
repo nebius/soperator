@@ -11033,7 +11033,6 @@ spec:
                 type: object
             required:
             - munge
-            - slurmClusterRefName
             - slurmd
             type: object
           status:

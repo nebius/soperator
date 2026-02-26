@@ -114,7 +114,7 @@ tests:
           path: subjects
           content:
             kind: ServiceAccount
-            name: test-cluster-exporter-sa
+            name: test-cluster-slurm-exporter-sa
             namespace: NAMESPACE
 
   # Test RoleBinding with custom ServiceAccount name
@@ -162,7 +162,7 @@ tests:
     asserts:
       - equal:
           path: spec.slurmNodes.exporter.serviceAccountName
-          value: test-cluster-exporter-sa
+          value: test-cluster-slurm-exporter-sa
 
   # Test SlurmCluster CR uses custom ServiceAccount name
   - it: should set custom serviceAccountName in SlurmCluster CR
@@ -207,4 +207,4 @@ tests:
     asserts:
       - equal:
           path: spec.slurmNodes.exporter.serviceAccountName
-          value: test-cluster-exporter-sa
+          value: test-cluster-slurm-exporter-sa

@@ -108,9 +108,11 @@ func BuildDaemonSetName(componentType consts.ComponentType, clusterName string) 
 }
 
 func BuildDeploymentName(componentType consts.ComponentType, clusterName string) string {
+	// NOTE: Intentionally do NOT include clusterName in Deployment names to avoid
+	// changing the naming scheme and orphaning existing Deployments created by
+	// earlier versions of the operator.
 	return namedEntity{
 		componentType: &componentType,
-		clusterName:   clusterName,
 		entity:        "",
 	}.String()
 }

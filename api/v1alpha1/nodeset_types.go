@@ -116,7 +116,7 @@ type NodeSetSpec struct {
 	// SlurmClusterRefName is the name of the parent SlurmCluster this NodeSet belongs to.
 	// Must be in the same namespace as the NodeSet.
 	//
-	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Optional
 	SlurmClusterRefName string `json:"slurmClusterRefName"`
 
 	// Replicas specifies the number of worker nodes in the NodeSet.
