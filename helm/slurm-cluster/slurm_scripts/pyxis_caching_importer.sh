@@ -31,6 +31,7 @@ case "${cmd}" in
 
         if [ ! -e "${squashfs_path}" ]; then
             # TODO: use `digest` approach once 406 Not Acceptable is tolerated in enroot
+            # https://github.com/NVIDIA/enroot/pull/263
             # if [[ "${image_uri}" == *"@${digest}" ]]; then
             #     # URI already has the digest in it.
             #     enroot import --output "${squashfs_temp_path}" "${image_uri}" >&2
