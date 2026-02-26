@@ -18,19 +18,58 @@ permissions:
   contents: read
   actions: write
 
-concurrency:
-  # Prevent cancelling already-running jobs (avoids resource waste).
-  cancel-in-progress: false
-  # GitHub still cancels older WAITING runs when newer runs arrive.
-  # Per-branch concurrency groups prevent these cancellations between different branches,
-  # e.g. a run on 'feature-branch' will not be cancelled when a new scheduled run at `main` branch arrived.
-  group: e2e-${{ github.ref_name }}
-
 jobs:
+  resolve-profile:
+    runs-on: ubuntu-latest
+    environment: e2e
+    outputs:
+      nebius_project_id: ${{ steps.resolve.outputs.nebius_project_id }}
+      nebius_region: ${{ steps.resolve.outputs.nebius_region }}
+      nebius_tenant_id: ${{ steps.resolve.outputs.nebius_tenant_id }}
+    env:
+      E2E_PROFILE: ${{ vars[inputs.profile_env_var || vars.PROFILE_ENV_VAR] }}
+    steps:
+      - name: Install yq
+        uses: frenck/action-setup-yq@v1
+
+      - name: Resolve profile
+        id: resolve
+        shell: bash
+        run: |
+          if [[ -z "$E2E_PROFILE" ]]; then
+            echo "::error::E2E_PROFILE is empty or not set"
+            exit 1
+          fi
+          echo "nebius_project_id=$(echo "$E2E_PROFILE" | yq -r '.nebius_project_id')" >> "$GITHUB_OUTPUT"
+          echo "nebius_region=$(echo "$E2E_PROFILE" | yq -r '.nebius_region')" >> "$GITHUB_OUTPUT"
+          echo "nebius_tenant_id=$(echo "$E2E_PROFILE" | yq -r '.nebius_tenant_id')" >> "$GITHUB_OUTPUT"
+
+      - name: Print run parameters
+        shell: bash
+        env:
+          PROFILE_ENV_VAR: ${{ inputs.profile_env_var || vars.PROFILE_ENV_VAR }}
+          TERRAFORM_REPO_REF: ${{ github.event.inputs.terraform_repo_ref || github.ref_name }}
+        run: |
+          {
+            echo "### Run Parameters"
+            echo ""
+            echo "- Branch: \`${{ github.ref_name }}\`"
+            echo "- Terraform branch: \`$TERRAFORM_REPO_REF\`"
+            echo "- Profile variable: \`$PROFILE_ENV_VAR\`"
+            echo ""
+            echo '```yaml'
+            echo "$E2E_PROFILE" | yq .
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   e2e-test:
-    runs-on:
-      - self-hosted
-      - e2e-tests # We have a single runner with this label => only 1 job at a time.
+    needs: resolve-profile
+    concurrency:
+      # Per-project mutex: runs targeting the same Nebius project are serialized,
+      # different projects can run concurrently. Queued runs wait, never cancel in-progress ones.
+      cancel-in-progress: false
+      group: e2e-${{ needs.resolve-profile.outputs.nebius_project_id }}
+    runs-on: ubuntu-latest
 
     environment: e2e
 
@@ -54,42 +93,24 @@ jobs:
           go-version-file: "go.mod"
           cache: false
 
-      - name: Install E2E tools
-        run: |
-          make install-e2e-tools
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+      - name: Add local bin to PATH
+        run: echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.12.2"
+          terraform_wrapper: false
 
       - name: Build e2e binary
         run: go build -o bin/e2e ./cmd/e2e
 
-      - name: Resolve profile
+      - name: Export profile outputs
         shell: bash
         run: |
-          echo "Resolving profile from variable $PROFILE_ENV_VAR"
-
-          if [[ -z "$E2E_PROFILE" ]]; then
-            echo "::error::Variable $PROFILE_ENV_VAR is empty or not set"
-            exit 1
-          fi
-
-          echo "NEBIUS_PROJECT_ID=$(echo "$E2E_PROFILE" | yq -r '.nebius_project_id')" >> "$GITHUB_ENV"
-          echo "NEBIUS_REGION=$(echo "$E2E_PROFILE" | yq -r '.nebius_region')" >> "$GITHUB_ENV"
-          echo "NEBIUS_TENANT_ID=$(echo "$E2E_PROFILE" | yq -r '.nebius_tenant_id')" >> "$GITHUB_ENV"
-
-      - name: Print run parameters
-        shell: bash
-        run: |
-          {
-            echo "### Run Parameters"
-            echo ""
-            echo "- Branch: \`${{ github.ref_name }}\`"
-            echo "- Terraform branch: \`${{ env.TERRAFORM_REPO_REF }}\`"
-            echo "- Profile variable: \`$PROFILE_ENV_VAR\`"
-            echo ""
-            echo '```yaml'
-            echo "$E2E_PROFILE" | yq .
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          echo "NEBIUS_PROJECT_ID=${{ needs.resolve-profile.outputs.nebius_project_id }}" >> "$GITHUB_ENV"
+          echo "NEBIUS_REGION=${{ needs.resolve-profile.outputs.nebius_region }}" >> "$GITHUB_ENV"
+          echo "NEBIUS_TENANT_ID=${{ needs.resolve-profile.outputs.nebius_tenant_id }}" >> "$GITHUB_ENV"
 
       - name: Install Nebius CLI
         shell: bash
@@ -99,6 +120,19 @@ jobs:
         run: |
           echo "Installing Nebius CLI ${NEBIUS_CLI_VERSION}..."
           curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+
+      - name: Configure Nebius CLI
+        shell: bash
+        env:
+          NEBIUS_CLI_CONFIG: ${{ vars.NEBIUS_CLI_CONFIG }}
+          NEBIUS_PRIVATE_KEY: ${{ secrets.NEBIUS_PRIVATE_KEY }}
+          NEBIUS_TELEMETRY_PRIVATE_KEY: ${{ secrets.NEBIUS_TELEMETRY_PRIVATE_KEY }}
+        run: |
+          mkdir -p "$HOME/.nebius"
+          echo "$NEBIUS_CLI_CONFIG" > "$HOME/.nebius/config.yaml"
+          yq -i '.profiles.default.private-key = strenv(NEBIUS_PRIVATE_KEY)' "$HOME/.nebius/config.yaml"
+          yq -i '.profiles.soperator-telemetry.private-key = strenv(NEBIUS_TELEMETRY_PRIVATE_KEY)' "$HOME/.nebius/config.yaml"
+          chmod 600 "$HOME/.nebius/config.yaml"
 
       - name: Install AWS CLI v2
         run: |
@@ -212,6 +246,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
+          # Remove credentials, so .envrc would create a fresh access token with long TTL.
+          rm -f "$HOME/.nebius/credentials.yaml"
+
           cd ${{ env.PATH_TO_INSTALLATION }}
           source .envrc
           cd -
@@ -225,9 +262,6 @@ jobs:
         timeout-minutes: 120
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
-          nebius iam session-management revoke --all-my-active
-          # revoke is async operation and in different region token from source .envrc could be revoked right after it's created
-          sleep 5
           source .envrc
           cd -
 
