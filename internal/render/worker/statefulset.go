@@ -69,6 +69,10 @@ func RenderNodeSetStatefulSet(
 					},
 				},
 			},
+			corev1.Volume{
+				Name:         consts.VolumeNameDynamicTopology,
+				VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+			},
 		)
 	}
 
