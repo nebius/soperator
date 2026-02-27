@@ -86,4 +86,7 @@ const (
 const (
 	VolumeNameTopologyNodeLabels      = "topology-node-labels"
 	VolumeMountPathTopologyNodeLabels = "/tmp/slurm/topology-node-labels"
+
+	VolumeNameDynamicTopology      = "dynamic-slurm-topology"
+	VolumeMountPathDynamicTopology = "/mnt/dynamic-topology"
 )

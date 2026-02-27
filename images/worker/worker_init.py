@@ -301,6 +301,59 @@ def _format_tier_topology(parts: dict) -> str:
 
     return ""
 
+def generate_node_topology_conf(hostname: str, tier_data: dict) -> str:
+    """
+    Generate a minimal per-pod topology.conf for slurmd.
+
+    Tier keys are sorted descending so the highest-numbered tier (closest to root/spine)
+    appears first in the switch hierarchy and the lowest-numbered tier (leaf) appears last.
+
+    Examples:
+      tier-0=nvl0, tier-1=leaf00 ->
+        SwitchName=root Switches=leaf00
+        SwitchName=leaf00 Switches=nvl0
+        SwitchName=nvl0 Nodes=worker-1
+
+      no tier labels ->
+        SwitchName=root Switches=unknown
+        SwitchName=unknown Nodes=worker-1
+    """
+    tier_keys = []
+    for k in tier_data:
+        if k.startswith("tier-"):
+            try:
+                tier_keys.append((int(k.split("-")[1]), k))
+            except (ValueError, IndexError):
+                continue
+
+    if not tier_keys:
+        return (
+            f"SwitchName=root Switches=unknown\n"
+            f"SwitchName=unknown Nodes={hostname}\n"
+        )
+
+    # Sort descending: highest tier (spine/root-side) first, lowest (leaf) last
+    tier_keys.sort(key=lambda x: x[0], reverse=True)
+    switches = [tier_data[k] for _, k in tier_keys]
+
+    lines = [f"SwitchName=root Switches={switches[0]}"]
+    for i in range(len(switches) - 1):
+        lines.append(f"SwitchName={switches[i]} Switches={switches[i + 1]}")
+    lines.append(f"SwitchName={switches[-1]} Nodes={hostname}")
+    return "\n".join(lines) + "\n"
+
+
+def write_dynamic_topology_conf(hostname: str, tier_data: dict) -> None:
+    """Write a per-pod topology.conf to the dynamic topology volume."""
+    content = generate_node_topology_conf(hostname, tier_data)
+    dest_dir = os.environ.get("DYNAMIC_TOPOLOGY_PATH", "/mnt/dynamic-topology")
+    dest_file = os.path.join(dest_dir, "topology.conf")
+    os.makedirs(dest_dir, exist_ok=True)
+    with open(dest_file, "w") as f:
+        f.write(content)
+    logger.info("Written per-pod topology.conf to %s:\n%s", dest_file, content)
+
+
 def apply_node_topology(hostname: str, topology: str) -> None:
     """Apply topology to a node via scontrol update."""
     try:
@@ -351,6 +404,7 @@ def wait_for_topology() -> None:
             "NODESET_GPU_ENABLED is not set to 'true', "
             "assigning node %s to default:root:unknown topology", hostname
         )
+        write_dynamic_topology_conf(hostname, {})
         apply_node_topology(hostname, "topology=default:root:unknown")
         return
 
@@ -412,6 +466,14 @@ def wait_for_topology() -> None:
     if not topology:
         logger.error("Failed to format topology from raw data: %s", raw_topology)
         sys.exit(1)
+
+    tier_data = {}
+    if raw_topology.strip().startswith("{"):
+        try:
+            tier_data = json.loads(raw_topology)
+        except json.JSONDecodeError:
+            logger.warning("Could not parse raw topology as JSON for topology.conf generation: %s", raw_topology)
+    write_dynamic_topology_conf(hostname, tier_data)
 
     apply_node_topology(hostname, topology)
 

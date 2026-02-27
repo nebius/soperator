@@ -31,13 +31,14 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 		assert.Equal(t, container.Image, result.Image)
 		assert.Equal(t, container.ImagePullPolicy, result.ImagePullPolicy)
 		assert.Equal(t, []string{"python3", "/opt/bin/slurm/worker_init.py", "wait-controller", "wait-topology"}, result.Command)
-		assert.Equal(t, 10, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 3 topology
-		assert.Equal(t, 3, len(result.VolumeMounts))
+		assert.Equal(t, 11, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 3 topology + 1 DYNAMIC_TOPOLOGY_PATH
+		assert.Equal(t, 4, len(result.VolumeMounts))
 
 		expectedMounts := map[string]string{
 			consts.VolumeNameJail:               consts.VolumeMountPathJail,
 			consts.VolumeNameMungeSocket:        consts.VolumeMountPathMungeSocket,
 			consts.VolumeNameTopologyNodeLabels: consts.VolumeMountPathTopologyNodeLabels,
+			consts.VolumeNameDynamicTopology:    consts.VolumeMountPathDynamicTopology,
 		}
 		assert.Equal(t, len(expectedMounts), len(result.VolumeMounts))
 		for _, mount := range result.VolumeMounts {

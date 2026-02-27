@@ -42,11 +42,17 @@ func RenderContainerWorkerInit(
 		common.RenderVolumeMountMungeSocket(),
 	}
 	if topologyEnabled {
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      consts.VolumeNameTopologyNodeLabels,
-			MountPath: consts.VolumeMountPathTopologyNodeLabels,
-			ReadOnly:  true,
-		})
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{
+				Name:      consts.VolumeNameTopologyNodeLabels,
+				MountPath: consts.VolumeMountPathTopologyNodeLabels,
+				ReadOnly:  true,
+			},
+			corev1.VolumeMount{
+				Name:      consts.VolumeNameDynamicTopology,
+				MountPath: consts.VolumeMountPathDynamicTopology,
+			},
+		)
 	}
 
 	env := []corev1.EnvVar{
@@ -114,6 +120,10 @@ func RenderContainerWorkerInit(
 				Name:  "TOPOLOGY_POLL_INTERVAL",
 				Value: "5",
 			},
+			corev1.EnvVar{
+				Name:  "DYNAMIC_TOPOLOGY_PATH",
+				Value: consts.VolumeMountPathDynamicTopology,
+			},
 		)
 	}
 
@@ -154,11 +164,17 @@ func renderContainerNodeSetSlurmd(
 		volumeMounts = append(volumeMounts, renderVolumeMountNvidia())
 	}
 	if topologyEnabled {
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      consts.VolumeNameTopologyNodeLabels,
-			MountPath: consts.VolumeMountPathTopologyNodeLabels,
-			ReadOnly:  true,
-		})
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{
+				Name:      consts.VolumeNameTopologyNodeLabels,
+				MountPath: consts.VolumeMountPathTopologyNodeLabels,
+				ReadOnly:  true,
+			},
+			corev1.VolumeMount{
+				Name:      consts.VolumeNameDynamicTopology,
+				MountPath: consts.VolumeMountPathDynamicTopology,
+			},
+		)
 	}
 
 	// region Jail Sub-mounts
