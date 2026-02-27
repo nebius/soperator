@@ -79,8 +79,8 @@ tests:
           path: spec.plugStackConfig.pyxis.required
           value: true
       - equal:
-          path: spec.plugStackConfig.pyxis.containerImageSave
-          value: "/var/cache/enroot-container-images/"
+          path: spec.plugStackConfig.pyxis.importerPath
+          value: "/opt/slurm_scripts/pyxis_caching_importer.sh"
       - equal:
           path: spec.plugStackConfig.ncclDebug.required
           value: false

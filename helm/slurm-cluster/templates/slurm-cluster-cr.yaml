@@ -93,8 +93,8 @@ spec:
   volumeSources:
     - name: {{ include "slurm-cluster.slurmScripts.configMapName" . }}
       configMap:
-        name: {{ include "slurm-cluster.slurmScripts.configMapName" . }}
-        defaultMode: 500
+        name: slurm-scripts
+        defaultMode: 0755
     {{- range .Values.volumeSources }}
     - name: {{ .name | quote }}
       {{- omit . "name" "createPVC" "storageClassName" "size" | toYaml | nindent 6 }}

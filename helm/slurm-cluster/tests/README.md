@@ -52,7 +52,7 @@ These tests verify the following kubebuilder default values:
 
 ### PlugStackConfig
 - `pyxis.required: true`
-- `pyxis.containerImageSave: "/var/cache/enroot-container-images/"`
+- `pyxis.importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh"`
 - `ncclDebug.required: false`
 - `ncclDebug.enabled: false`
 - `ncclDebug.logLevel: "INFO"`

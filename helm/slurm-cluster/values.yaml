@@ -158,7 +158,7 @@ mpiConfig:
 plugStackConfig:
   pyxis:
     required: true
-    containerImageSave: "/var/cache/enroot-container-images/"
+    importerPath: /opt/slurm_scripts/pyxis_caching_importer.sh
   ncclDebug:
     required: false
     enabled: true
@@ -520,6 +520,7 @@ slurmScripts:
   prolog.sh: null
   epilog.sh: null
   hc_program.sh: null
+  pyxis_caching_importer.sh: null
   # Built-in scripts can be overridden or disabled here
   # Keys must match file names in slurm_scripts/
   builtIn:
