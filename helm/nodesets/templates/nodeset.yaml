@@ -19,6 +19,8 @@ metadata:
     {{- end }}
 
 spec:
+  slurmClusterRefName: {{ $.Values.slurmClusterRefName | quote }}
+
   {{- with (.replicas | default 1) }}
   replicas: {{ . }}
   {{- end }}
