@@ -71,6 +71,15 @@ ldconfig
 echo "Complement jail rootfs"
 /opt/bin/slurm/complement_jail.sh -j /mnt/jail -u /mnt/jail.upper -w
 
+echo "Override topology.conf with per-pod dynamic version if available"
+DYNAMIC_TOPOLOGY="/mnt/dynamic-topology/topology.conf"
+if [ -f "${DYNAMIC_TOPOLOGY}" ]; then
+    mount --bind "${DYNAMIC_TOPOLOGY}" /mnt/jail/etc/slurm/topology.conf
+    echo "Per-pod topology.conf mounted into jail"
+else
+    echo "No per-pod topology.conf found at ${DYNAMIC_TOPOLOGY}, using shared ConfigMap version"
+fi
+
 echo "Create privilege separation directory /var/run/sshd"
 mkdir -p /var/run/sshd
 
