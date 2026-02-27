@@ -97,7 +97,7 @@ jobs:
         run: echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Install Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "1.12.2"
           terraform_wrapper: false
