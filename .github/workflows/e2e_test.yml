@@ -258,6 +258,20 @@ jobs:
           bin/e2e check-capacity 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Terraform Init
+        timeout-minutes: 30
+        run: |
+          cd ${{ env.PATH_TO_INSTALLATION }}
+          source .envrc
+          cd -
+
+          aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+          aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+          aws configure set region $NEBIUS_REGION
+          aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
+
+          bin/e2e init
+
       - name: Terraform Apply
         timeout-minutes: 120
         run: |
@@ -277,18 +291,53 @@ jobs:
         if: '!cancelled()'
         shell: bash
         run: |
-          echo "=== Listing K8s clusters ==="
-          clusters_json=$(nebius mk8s cluster list --parent-id "$NEBIUS_PROJECT_ID" --format json)
-          echo "$clusters_json"
+          echo "=== K8s Clusters ==="
+          clusters_table=$(nebius mk8s cluster list --parent-id "$NEBIUS_PROJECT_ID" --format table)
+          echo "$clusters_table"
 
-          echo ""
-          echo "=== Listing node groups for each cluster ==="
+          clusters_json=$(nebius mk8s cluster list --parent-id "$NEBIUS_PROJECT_ID" --format json)
           cluster_ids=$(echo "$clusters_json" | jq -r '.items[].metadata.id // empty')
+
+          {
+            echo "### K8s Clusters"
+            echo '```'
+            echo "$clusters_table"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
           for cluster_id in $cluster_ids; do
             echo ""
             echo "--- Node groups for cluster: $cluster_id ---"
-            nebius mk8s node-group list --parent-id "$cluster_id" --page-size 1000
+            ng_json=$(nebius mk8s node-group list --parent-id "$cluster_id" --page-size 1000 --format json)
+
+            # Summary table
+            summary=$(echo "$ng_json" | jq -r '
+              ["ID", "NAME", "STATE", "READY/TARGET"],
+              ["--", "----", "-----", "------------"],
+              (.items[] |
+                [
+                  .metadata.id,
+                  .metadata.name,
+                  .status.state,
+                  "\(.status.ready_node_count // "?")/\(.status.target_node_count // "?")"
+                ]
+              ) | @tsv')
+            echo "$summary" | column -t
+
+            {
+              echo "### Node Groups: $cluster_id"
+              echo '```'
+              echo "$summary" | column -t
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            # Full JSON for non-RUNNING node groups
+            not_running=$(echo "$ng_json" | jq '[.items[] | select(.status.state != "RUNNING")]')
+            if [ "$(echo "$not_running" | jq 'length')" -gt 0 ]; then
+              echo ""
+              echo "=== Non-RUNNING node groups (full details) ==="
+              echo "$not_running" | jq .
+            fi
           done
 
       - name: "K8s Cluster: Pods"
@@ -382,7 +431,7 @@ jobs:
           retention-days: 7
 
       - name: Terraform Destroy
-        if: '!cancelled()'
+        if: always()
         timeout-minutes: 30
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
