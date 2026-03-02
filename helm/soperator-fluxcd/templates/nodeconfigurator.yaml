@@ -21,13 +21,18 @@ spec:
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
   install:
-    {{- toYaml .Values.soperator.nodeConfigurator.install | nindent 4 }}
+    crds: Skip
+    remediation:
+      retries: 3
   interval: {{ .Values.soperator.nodeConfigurator.interval }}
   timeout: {{ .Values.soperator.nodeConfigurator.timeout }}
   releaseName: {{ .Values.soperator.nodeConfigurator.releaseName }}
   targetNamespace: {{ .Values.soperator.namespace }}
   upgrade:
-    {{- toYaml .Values.soperator.nodeConfigurator.upgrade | nindent 4 }}
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   values:
   {{- if .Values.soperator.nodeConfigurator.overrideValues }}
     {{- toYaml .Values.soperator.nodeConfigurator.overrideValues | nindent 4 }}

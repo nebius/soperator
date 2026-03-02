@@ -25,9 +25,12 @@ spec:
   - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
   {{- end }}
   install:
-    {{- toYaml .Values.slurmCluster.slurmClusterStorage.install | nindent 4 }}
+    remediation:
+      retries: 3
   upgrade:
-    {{- toYaml .Values.slurmCluster.slurmClusterStorage.upgrade | nindent 4 }}
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   interval: {{ .Values.slurmCluster.slurmClusterStorage.interval }}
   timeout: {{ .Values.slurmCluster.slurmClusterStorage.timeout }}
   releaseName: {{ .Values.slurmCluster.slurmClusterStorage.releaseName }}

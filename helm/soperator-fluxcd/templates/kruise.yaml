@@ -24,9 +24,14 @@ spec:
   - name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
   {{- end }}
   install:
-    {{- toYaml .Values.soperator.kruise.install | nindent 4 }}
+    crds: CreateReplace
+    remediation:
+      retries: 3
   upgrade:
-    {{- toYaml .Values.soperator.kruise.upgrade | nindent 4 }}
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   interval: {{ .Values.soperator.kruise.interval }}
   timeout: {{ .Values.soperator.kruise.timeout }}
   releaseName: {{ .Values.soperator.kruise.releaseName }}

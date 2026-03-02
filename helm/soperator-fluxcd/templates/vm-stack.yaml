@@ -25,9 +25,14 @@ spec:
   {{- end }}
   - name: {{ include "soperator-fluxcd.fullname" . }}-victoria-metrics-operator-crds
   install:
-    {{- toYaml .Values.observability.vmStack.install | nindent 4 }}
+    crds: Skip
+    remediation:
+      retries: 3
   upgrade:
-    {{- toYaml .Values.observability.vmStack.upgrade | nindent 4 }}
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   interval: {{ .Values.observability.vmStack.interval }}
   timeout: {{ .Values.observability.vmStack.timeout }}
   releaseName: {{ .Values.observability.vmStack.releaseName }}

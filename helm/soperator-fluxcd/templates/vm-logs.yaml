@@ -19,13 +19,18 @@ spec:
         name: {{ include "soperator-fluxcd.fullname" . }}-victoriametrics
       version: 0.9.*
   install:
-    {{- toYaml .Values.observability.vmLogs.install | nindent 4 }}
+    crds: CreateReplace
+    remediation:
+      retries: 3
   interval: {{ .Values.observability.vmLogs.interval }}
   timeout: {{ .Values.observability.vmLogs.timeout }}
   releaseName: {{ .Values.observability.vmLogs.releaseName }}
   targetNamespace: {{ .Values.observability.vmLogs.namespace }}
   upgrade:
-    {{- toYaml .Values.observability.vmLogs.upgrade | nindent 4 }}
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   values:
   {{- if .Values.observability.vmStack.overrideValues }}
     {{- toYaml .Values.observability.vmStack.overrideValues | nindent 4 }}

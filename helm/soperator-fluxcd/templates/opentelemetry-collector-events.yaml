@@ -23,9 +23,12 @@ spec:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   - name: {{ include "soperator-fluxcd.fullname" . }}-vm-logs
   install:
-    {{- toYaml .Values.observability.opentelemetry.events.install | nindent 4 }}
+    remediation:
+      retries: 3
   upgrade:
-    {{- toYaml .Values.observability.opentelemetry.events.upgrade | nindent 4 }}
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   interval: {{ .Values.observability.opentelemetry.events.interval }}
   timeout: {{ .Values.observability.opentelemetry.events.timeout }}
   releaseName: opentelemetry-collector-events

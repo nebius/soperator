@@ -22,13 +22,18 @@ spec:
   - name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster
   - name: {{ include "soperator-fluxcd.fullname" . }}-soperatorchecks  
   install:
-    {{- toYaml .Values.soperatorActiveChecks.install | nindent 4 }}
+    crds: Skip
+    remediation:
+      retries: 3
   interval: {{ .Values.soperatorActiveChecks.interval }}
   timeout: {{ .Values.soperatorActiveChecks.timeout }}
   releaseName: {{ .Values.soperatorActiveChecks.releaseName }}
   targetNamespace: {{ .Values.soperatorActiveChecks.namespace }}
   upgrade:
-    {{- toYaml .Values.soperatorActiveChecks.upgrade | nindent 4 }}
+    crds: Skip
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   values:
   {{- if .Values.soperatorActiveChecks.overrideValues }}
     {{- toYaml .Values.soperatorActiveChecks.overrideValues | nindent 4 }}

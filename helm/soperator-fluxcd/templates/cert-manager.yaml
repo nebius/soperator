@@ -24,9 +24,14 @@ spec:
   - name: {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds
   {{- end }}
   install:
-    {{- toYaml .Values.certManager.install | nindent 4 }}
+    crds: CreateReplace
+    remediation:
+      retries: 3
   upgrade:
-    {{- toYaml .Values.certManager.upgrade | nindent 4 }}
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   interval: {{ .Values.certManager.interval }}
   targetNamespace: {{ .Values.certManager.namespace }}
   releaseName: {{ .Values.certManager.releaseName }}

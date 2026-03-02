@@ -21,9 +21,13 @@ spec:
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   install:
-    {{- toYaml .Values.soperator.monitoringDashboards.install | nindent 4 }}
+    crds: Skip
+    remediation:
+      retries: 3
   upgrade:
-    {{- toYaml .Values.soperator.monitoringDashboards.upgrade | nindent 4 }}
+    crds: Skip
+    remediation:
+      retries: 3
   interval: {{ .Values.soperator.monitoringDashboards.interval }}
   timeout: {{ .Values.soperator.monitoringDashboards.timeout }}
   releaseName: {{ .Values.soperator.monitoringDashboards.releaseName }}

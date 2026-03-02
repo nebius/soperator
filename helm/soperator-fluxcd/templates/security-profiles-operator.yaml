@@ -19,9 +19,14 @@ spec:
         name: {{ include "soperator-fluxcd.fullname" . }}-security-profiles-operator
       version: {{ .Values.securityProfilesOperator.version }}
   install:
-    {{- toYaml .Values.securityProfilesOperator.install | nindent 4 }}
+    crds: CreateReplace
+    remediation:
+      retries: 3
   upgrade:
-    {{- toYaml .Values.securityProfilesOperator.upgrade | nindent 4 }}
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
   interval: {{ .Values.securityProfilesOperator.interval }}
   timeout: {{ .Values.securityProfilesOperator.timeout }}
   releaseName: {{ .Values.securityProfilesOperator.releaseName }}
