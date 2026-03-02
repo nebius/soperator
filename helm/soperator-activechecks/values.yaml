@@ -1,7 +1,14 @@
 slurmClusterRefName: "soperator"
 # CUDA version used for active check image selection and for managing jail state
 cudaVersion: 12.9.0
-ncclTestsVersion: 2.16.4
+# Flat override: if non-empty, takes precedence over ncclTestsVersions map.
+ncclTestsVersion: ""
+# Per-CUDA default NCCL tests versions.
+# Source of truth: https://github.com/nebius/ml-containers/blob/main/ansible/roles/nccl-tests/defaults/main.yml
+# Update this map together with activeCheckImageTags when adding new CUDA versions.
+ncclTestsVersions:
+  "12.9.0": "2.16.4"
+  "13.0.2": "2.17.6"
 jobContainer:
   env:
     - name: "K8S_POD_NAME"

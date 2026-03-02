@@ -82,6 +82,19 @@ Converts from format "reg#repo:tag" to format "reg/repo:tag".
 {{- end -}}
 
 {{/*
+Resolve NCCL tests version from cudaVersion.
+If .Values.ncclTestsVersion is non-empty, use it (flat override).
+Otherwise, look up from .Values.ncclTestsVersions map.
+*/}}
+{{- define "soperator-activechecks.ncclTestsVersion" -}}
+{{- if .Values.ncclTestsVersion -}}
+  {{- .Values.ncclTestsVersion -}}
+{{- else -}}
+  {{- required (printf "ncclTestsVersions must contain an entry for CUDA %s, or set ncclTestsVersion explicitly" .Values.cudaVersion) (index .Values.ncclTestsVersions (printf "%v" .Values.cudaVersion)) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Render script content from a file with optional tpl evaluation.
 */}}
 {{- define "soperator-activechecks.renderScript" -}}
@@ -175,7 +188,7 @@ Render k8sJobSpec for an ActiveCheck.
 {{- with $jobContainerRaw.extraEnv }}{{- $env = concat $env . -}}{{- end }}
 {{- if eq $workingDir "/opt/ansible" -}}
   {{- with $ctx.Values.cudaVersion }}{{ $env = concat $env (list (dict "name" "CUDA_VERSION" "value" (printf "%v" .))) -}}{{- end }}
-  {{- with $ctx.Values.ncclTestsVersion }}{{ $env = concat $env (list (dict "name" "NCCL_TESTS_VERSION" "value" (printf "%v" .))) -}}{{- end }}
+  {{- $env = concat $env (list (dict "name" "NCCL_TESTS_VERSION" "value" (include "soperator-activechecks.ncclTestsVersion" $ctx))) -}}
 {{- end -}}
 {{- $volumeMounts := default (list) $jobContainer.volumeMounts -}}
 {{- with $jobContainerRaw.extraVolumeMounts }}{{- $volumeMounts = concat $volumeMounts . -}}{{- end }}
