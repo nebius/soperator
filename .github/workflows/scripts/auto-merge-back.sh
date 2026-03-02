@@ -5,7 +5,11 @@ set -u          # Exit on undefined variable
 set -o pipefail # Exit on pipe failure
 
 # Auto Merge-Back Workflow Script
-# Creates pull requests to merge changes from release branches back to main
+# Creates pull requests to merge changes from release branches to the next
+# release branch in version order, or to main if there is no newer release branch.
+#
+# For example, with branches soperator-release-2.0 and soperator-release-3.0:
+#   soperator-release-2.0 -> soperator-release-3.0 -> main
 #
 # GitHub provides these environment variables automatically:
 # - GITHUB_SHA: The commit SHA that triggered the workflow
@@ -20,6 +24,7 @@ declare COMMIT_MESSAGE
 declare COMMIT_AUTHOR_NAME
 declare COMMIT_AUTHOR_EMAIL
 declare RELEASE_BRANCH
+declare MERGE_TARGET
 declare USERNAME
 declare PR_NUMBER
 declare PR_TITLE
@@ -43,6 +48,43 @@ get_commit_info() {
     echo "Commit Message: ${COMMIT_MESSAGE}"
     echo "Author: ${COMMIT_AUTHOR_NAME} <${COMMIT_AUTHOR_EMAIL}>"
     echo "Release Branch: ${RELEASE_BRANCH}"
+}
+
+get_merge_target() {
+    echo "=== Determining merge target ==="
+
+    # Fetch release branch refs
+    git fetch origin --no-tags --filter=blob:none \
+        'refs/heads/soperator-release-*:refs/remotes/origin/soperator-release-*'
+
+    # List all release branches, filter to proper naming, sort by version.
+    # grep may return exit code 1 when no branches match, so we suppress it
+    # to let the fallback to "main" work under set -e -o pipefail.
+    local branches
+    branches=$(git branch -r --list 'origin/soperator-release-*' \
+        | sed 's|origin/||; s/^[[:space:]]*//' \
+        | grep -E '^soperator-release-[0-9]+\.[0-9]+$' \
+        || true)
+    branches=$(echo "${branches}" | sort -V)
+
+    echo "Found release branches:"
+    echo "${branches}"
+
+    # Find the next branch after the current one
+    MERGE_TARGET="main"
+    local found_current=false
+    while IFS= read -r branch; do
+        [ -z "${branch}" ] && continue
+        if [ "${found_current}" = true ]; then
+            MERGE_TARGET="${branch}"
+            break
+        fi
+        if [ "${branch}" = "${RELEASE_BRANCH}" ]; then
+            found_current=true
+        fi
+    done <<< "${branches}"
+
+    echo "Merge target: ${MERGE_TARGET}"
 }
 
 get_github_username() {
@@ -101,9 +143,9 @@ create_merge_branch() {
 
     # Use original PR branch name if available, otherwise use release branch with SHA
     if [ -n "${PR_HEAD_REF}" ]; then
-        NEW_BRANCH="merge-to-main-from/pr-${PR_NUMBER}/${PR_HEAD_REF}"
+        NEW_BRANCH="merge-to-${MERGE_TARGET}-from/pr-${PR_NUMBER}/${PR_HEAD_REF}"
     else
-        NEW_BRANCH="merge-to-main-from/${RELEASE_BRANCH}-${COMMIT_SHORT_SHA}"
+        NEW_BRANCH="merge-to-${MERGE_TARGET}-from/${RELEASE_BRANCH}-${COMMIT_SHORT_SHA}"
     fi
 
     # Create and push the branch
@@ -119,9 +161,9 @@ create_pull_request() {
     # Determine PR title
     local pr_title
     if [ -n "${PR_TITLE}" ]; then
-        pr_title="Merge to main: ${PR_TITLE}"
+        pr_title="Merge to ${MERGE_TARGET}: ${PR_TITLE}"
     else
-        pr_title="Merge to main: ${COMMIT_MESSAGE}"
+        pr_title="Merge to ${MERGE_TARGET}: ${COMMIT_MESSAGE}"
     fi
     echo "PR Title: ${pr_title}"
 
@@ -129,14 +171,14 @@ create_pull_request() {
     local pr_body
     if [ -n "${PR_NUMBER}" ]; then
         # If we have a PR, use its description
-        pr_body="This is merge back of the [Pull Request #${PR_NUMBER}](https://github.com/${GITHUB_REPOSITORY}/pull/${PR_NUMBER}) by @${USERNAME}
+        pr_body="Merge back to \`${MERGE_TARGET}\` of the [Pull Request #${PR_NUMBER}](https://github.com/${GITHUB_REPOSITORY}/pull/${PR_NUMBER}) by @${USERNAME}
 
 # Original PR Description
 
 ${PR_BODY}"
     else
         # Fallback for commits without PRs
-        pr_body="This is merge back of commit ${COMMIT_SHORT_SHA} by @${USERNAME}
+        pr_body="Merge back to \`${MERGE_TARGET}\` of commit ${COMMIT_SHORT_SHA} by @${USERNAME}
 
 Commit message:
 \`\`\`
@@ -146,7 +188,7 @@ ${COMMIT_MESSAGE}
 
     # Create the PR
     gh pr create \
-        --base "main" \
+        --base "${MERGE_TARGET}" \
         --head "${NEW_BRANCH}" \
         --title "${pr_title}" \
         --body "${pr_body}" \
@@ -164,6 +206,7 @@ main() {
     fi
 
     get_commit_info
+    get_merge_target
     get_github_username
     get_pr_info
     create_merge_branch
