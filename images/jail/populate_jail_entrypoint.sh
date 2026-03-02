@@ -31,7 +31,7 @@ remove_empty_lib_mount_targets() {
     ARCH_LIST="x86_64 aarch64"
     for arch in $ARCH_LIST; do
         find "/mnt/jail/lib/${arch}-linux-gnu" \
-            -maxdepth 1 -type f ! -type l -empty -print |
+            -maxdepth 1 -type f -empty -name '*.so*' -print |
         while IFS= read -r file; do
             echo "Removing $file"
             rm -- "$file" || true
