@@ -10,6 +10,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -29,7 +30,7 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 	ctx context.Context,
 	clusterValues *values.SlurmCluster,
 	cluster *slurmv1.SlurmCluster,
-) (bool, error) {
+) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	populateJailRequeue := false
 
@@ -166,15 +167,15 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 
 	if err := reconcilePopulateJailImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile Populate jail Job")
-		return false, fmt.Errorf("reconciling Populate jail Job: %w", err)
+		return ctrl.Result{}, fmt.Errorf("reconciling Populate jail Job: %w", err)
 	}
 	if populateJailRequeue {
 		logger.Info("Populate jail reconciliation requeue requested: waiting for login/worker pods termination")
-		return true, nil
+		return ctrl.Result{RequeueAfter: populateJailRequeueDuration}, nil
 	}
 	logger.Info("Reconciled Populate jail Job")
 
-	return false, nil
+	return ctrl.Result{}, nil
 }
 
 func isConditionNonOverwrite(conditions []metav1.Condition) bool {

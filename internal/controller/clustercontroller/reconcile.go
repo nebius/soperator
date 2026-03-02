@@ -257,14 +257,13 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 
 	// region Reconciliation
 	logger.Info("Starting reconciliation of Slurm Cluster")
-	populateJailRequeue := false
+	populateJailRes := ctrl.Result{}
 
 	if !check.IsModeSkipPopulateJail(clusterValues.PopulateJail.Maintenance) {
-		requeue, err := r.ReconcilePopulateJail(ctx, clusterValues, cluster)
+		populateJailRes, err = r.ReconcilePopulateJail(ctx, clusterValues, cluster)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		populateJailRequeue = requeue
 	}
 
 	if err := r.ReconcileCommon(ctx, cluster, clusterValues); err != nil {
@@ -493,8 +492,8 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 
 	logger.Info("Finished reconciliation of Slurm Cluster")
 
-	if populateJailRequeue && res.RequeueAfter == 0 && !res.Requeue {
-		res.RequeueAfter = populateJailRequeueDuration
+	if populateJailRes.RequeueAfter > 0 && res.RequeueAfter == 0 && !res.Requeue {
+		res.RequeueAfter = populateJailRes.RequeueAfter
 	}
 
 	return res, err
