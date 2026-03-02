@@ -46,25 +46,8 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 
 					isMaintenanceStopMode := check.IsModeDownscaleAndDeletePopulate(
 						clusterValues.PopulateJail.Maintenance)
-					if !isMaintenanceStopMode {
-						hasActivePods, err := hasNonTerminalLoginOrWorkerPods(
-							stepCtx,
-							r.Client,
-							clusterValues.Namespace,
-							clusterValues.Name,
-						)
-						if err != nil {
-							stepLogger.Error(err, "Failed to check running login/worker pods")
-							return fmt.Errorf("checking running login/worker pods: %w", err)
-						}
-						if hasActivePods {
-							if check.IsModeDownscaleAndOverwritePopulate(clusterValues.PopulateJail.Maintenance) {
-								populateJailRequeue = true
-							}
-							stepLogger.Info("Skipping Populate jail Job: login or worker pods are not fully terminated")
-							return nil
-						}
-					}
+					isMaintenanceOverwriteMode := check.IsModeDownscaleAndOverwritePopulate(
+						clusterValues.PopulateJail.Maintenance)
 
 					desired := batchv1.Job{}
 					getErr := r.Get(stepCtx,
@@ -85,7 +68,7 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 							stepLogger.V(1).Info("Deleted")
 							return nil
 						}
-						if check.IsModeDownscaleAndOverwritePopulate(clusterValues.PopulateJail.Maintenance) {
+						if isMaintenanceOverwriteMode {
 							if isConditionNonOverwrite(cluster.Status.Conditions) {
 								if err := r.Delete(stepCtx, &desired); err != nil {
 									stepLogger.Error(err, "Failed to delete")
@@ -104,6 +87,24 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 
 					if isMaintenanceStopMode {
 						stepLogger.V(1).Info("Skipping creation due to MaintenanceStopMode")
+						return nil
+					}
+
+					hasActivePods, err := hasNonTerminalLoginOrWorkerPods(
+						stepCtx,
+						r.Client,
+						clusterValues.Namespace,
+						clusterValues.Name,
+					)
+					if err != nil {
+						stepLogger.Error(err, "Failed to check running login/worker pods")
+						return fmt.Errorf("checking running login/worker pods: %w", err)
+					}
+					if hasActivePods {
+						if isMaintenanceOverwriteMode {
+							populateJailRequeue = true
+						}
+						stepLogger.Info("Skipping Populate jail Job creation: login or worker pods are not fully terminated")
 						return nil
 					}
 
