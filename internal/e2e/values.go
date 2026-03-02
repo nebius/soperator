@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
@@ -54,7 +56,7 @@ func readTFVars(filename string) (map[string]interface{}, error) {
 	return varsMap, nil
 }
 
-func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]interface{} {
+func overrideTestValues(tfVars map[string]interface{}, cfg Config) (map[string]interface{}, error) {
 	tfVars["active_checks_scope"] = "testing"
 	tfVars["slurm_operator_version"] = cfg.SoperatorVersion
 	tfVars["slurm_operator_stable"] = !cfg.SoperatorUnstable
@@ -79,6 +81,8 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 		},
 	}
 
+	tfVars["slurm_nodesets_enabled"] = true
+
 	tfVars["slurm_nodeset_workers"] = []interface{}{
 		map[string]interface{}{
 			"name": "worker",
@@ -101,11 +105,82 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 		},
 	}
 
+	defCpuPerGpu, err := renderDefCpuPerGpu(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("render DefCpuPerGpu: %w", err)
+	}
+
+	tfVars["slurm_nodesets_partitions"] = []any{
+		map[string]any{
+			"name":   "workers",
+			"is_all": false,
+			"config": strings.TrimSpace(fmt.Sprintf(
+				"Default=YES PriorityTier=10 MaxTime=INFINITE State=UP OverSubscribe=YES %s",
+				defCpuPerGpu,
+			)),
+			"nodeset_refs": []string{
+				"worker",
+			},
+		},
+	}
+
 	tfVars["slurm_login_ssh_root_public_keys"] = cfg.SSHKeys
 	tfVars["etcd_cluster_size"] = 1
 	tfVars["cleanup_bucket_on_destroy"] = true
 
-	return tfVars
+	return tfVars, nil
+}
+
+func renderDefCpuPerGpu(cfg Config) (string, error) {
+	if !strings.HasPrefix(cfg.WorkerPlatform, "gpu") {
+		return "", nil
+	}
+
+	presetComponents := strings.Split(cfg.WorkerPreset, "-")
+	if len(presetComponents) < 3 {
+		return "", fmt.Errorf("gpu worker preset must contain at least gpu, cpu, and memory specifiers, got %q", cfg.WorkerPreset)
+	}
+
+	var gpusString, cpusString string
+	for _, component := range presetComponents {
+		if strings.HasSuffix(component, "gpu") {
+			gpusString = strings.TrimSuffix(component, "gpu")
+			continue
+		}
+		if strings.HasSuffix(component, "vcpu") {
+			cpusString = strings.TrimSuffix(component, "vcpu")
+			continue
+		}
+	}
+	if gpusString == "" {
+		return "", fmt.Errorf("worker preset %q must have gpu specifier", cfg.WorkerPreset)
+	}
+	if cpusString == "" {
+		return "", fmt.Errorf("worker preset %q must have vcpu specifier", cfg.WorkerPreset)
+	}
+
+	gpus, err := strconv.Atoi(gpusString)
+	if err != nil {
+		return "", fmt.Errorf("parse gpu count from preset specifier %q: %w", gpusString, err)
+	}
+	if gpus <= 0 {
+		return "", fmt.Errorf("gpu count must be greater than zero, got %d", gpus)
+	}
+
+	cpus, err := strconv.Atoi(cpusString)
+	if err != nil {
+		return "", fmt.Errorf("parse cpu count from preset specifier %q: %w", cpusString, err)
+	}
+	if cpus <= 0 {
+		return "", fmt.Errorf("cpu count must be greater than zero, got %d", cpus)
+	}
+
+	cpuPerGpu := cpus / gpus
+	if cpuPerGpu <= 0 {
+		return "", fmt.Errorf("cpu per gpu must be greater than zero, got %d", cpuPerGpu)
+	}
+
+	return fmt.Sprintf("DefCpuPerGPU=%d", cpuPerGpu), nil
 }
 
 func preemptibleValue(enabled bool) interface{} {
