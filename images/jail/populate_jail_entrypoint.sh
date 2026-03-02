@@ -30,7 +30,9 @@ remove_empty_lib_mount_targets() {
     echo "Removing empty library files that were used as bind-mount targets on the previous cluster"
     ARCH_LIST="x86_64 aarch64"
     for arch in $ARCH_LIST; do
-        find "/mnt/jail/lib/${arch}-linux-gnu" \
+        dir="/mnt/jail/lib/${arch}-linux-gnu"
+        [ -d "$dir" ] || continue
+        find "$dir" \
             -maxdepth 1 -type f -empty -name '*.so*' -print |
         while IFS= read -r file; do
             echo "Removing $file"

@@ -78,6 +78,8 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 							}
 							return nil
 						}
+						stepLogger.V(1).Info("Skipping creation: Populate jail Job already exists")
+						return nil
 					}
 
 					if getErr != nil && !apierrors.IsNotFound(getErr) && !isMaintenanceStopMode {
