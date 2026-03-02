@@ -21,15 +21,13 @@ spec:
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   install:
-    remediation:
-      retries: 3
+    {{- toYaml .Values.backup.config.install | nindent 4 }}
   interval: {{ default .Values.backup.interval .Values.backup.config.interval }}
   timeout: {{ default .Values.backup.timeout .Values.backup.config.timeout }}
   releaseName: {{ .Values.backup.config.releaseName }}
   targetNamespace: {{ .Values.slurmCluster.namespace }}
   upgrade:
-    remediation:
-      retries: 3
+    {{- toYaml .Values.backup.config.upgrade | nindent 4 }}
   values:
   {{- if .Values.backup.config.values }}
   {{- toYaml .Values.backup.config.values | nindent 4 }}

@@ -95,7 +95,13 @@ All user actions are isolated within a dedicated container-like environment, so 
 Slurm cluster itself by accident. This defines a clear boundary between operator and user responsibility.
 
 ### Tailscale support
-You can optionally enable [Tailscale](https://github.com/tailscale/tailscale) as a sidecar on login pods and access the cluster securely from your own network.
+
+You can optionally enable [Tailscale](https://github.com/tailscale/tailscale) on Slurm login pods to SSH to login nodes securely over your Tailnet.
+
+- Enabling Tailscale requires applying Kubernetes RBAC and adding a Tailscale container to login pods.
+- A Tailnet admin must authenticate/approve each login pod device (auth URL is printed in the Tailscale container logs).
+
+See [docs/tailscale.md](docs/tailscale.md) for details.
 
 ### Accounting
 Slurm's accounting system records detailed job information such as:
@@ -115,7 +121,7 @@ This helps cluster administrators and users monitor resource utilization, enforc
 - **Single-partition clusters**. Slurm's ability to split clusters into several partitions isn't supported now.
 - **Software versions**. The list of software versions we currently support is quite short.
     - Linux: Ubuntu [24.04](https://releases.ubuntu.com/noble/).
-    - Slurm: versions `25.11.2`.
+    - Slurm: versions `25.11.3`.
     - CUDA: version [12.9](https://docs.nvidia.com/cuda/archive/12.9.0/cuda-toolkit-release-notes/contents.html).
     - Kubernetes: >= [1.31](https://kubernetes.io/blog/2024/08/13/kubernetes-v1-31-release/).
     - Versions of some preinstalled software packages can't be changed.

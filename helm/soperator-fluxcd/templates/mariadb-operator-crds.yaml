@@ -19,11 +19,9 @@ spec:
         name: {{ include "soperator-fluxcd.fullname" . }}-mariadb-operator
       version: {{ .Values.mariadbOperator.version }}
   install:
-    crds: CreateReplace
-    remediation:
-      retries: 3
+    {{- toYaml .Values.mariadbOperator.crds.install | nindent 4 }}
   interval: {{ .Values.mariadbOperator.interval }}
   timeout: {{ .Values.mariadbOperator.timeout }}
   upgrade:
-    crds: CreateReplace
+    {{- toYaml .Values.mariadbOperator.crds.upgrade | nindent 4 }}
 {{- end }}

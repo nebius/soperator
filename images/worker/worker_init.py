@@ -204,15 +204,19 @@ def format_slurm_topology(topology: str) -> str:
     Format topology string for Slurm --conf option.
 
     Input formats:
-      - JSON: '{"tier-1":"switch1","tier-2":"rack1"}' -> "topology=default:root:switch1"
-        (uses lowest tier number as the leaf switch/block)
+      - JSON: '{"tier-1":"switch1","tier-2":"rack1"}' -> "topology=default:root:rack1:switch1"
+        (builds full switch hierarchy: highest tier first, leaf last)
       - "default:switch1" -> "topology=default:root:switch1"
       - "default:sw_root:s1:s2" -> "topology=default:sw_root:s1:s2" (intermediate switches already present)
-      - "tier-0=block1,tier-1=rack1" -> "topology=default:root:block1"
+      - "tier-0=block1,tier-1=rack1" -> "topology=default:root:rack1:block1"
       - "switch1" -> "topology=default:root:switch1"
 
-    For tree topology: the lowest tier (tier-0 or tier-1) is the leaf switch.
-    For block topology: tier-0 is the block name.
+    Slurm dynamic topology format: topology=<name>:<switch_near_root>:...<leaf_switch>
+    Tiers are sorted descending so that the highest tier (closest to root/spine) comes
+    first in the path and the lowest tier (leaf) comes last.
+
+    Example with K8s labels tier-1=leaf, tier-2=spine:
+      topology=default:root:spine:leaf
 
     Returns the formatted Slurm Topology string.
 
@@ -260,14 +264,17 @@ def _format_tier_topology(parts: dict) -> str:
         parts: Dictionary with tier keys like {"tier-1": "switch1", "tier-2": "rack1"}
 
     Returns:
-        Formatted Slurm Topology string using the lowest tier as the leaf switch/block.
+        Formatted Slurm Topology string with the full switch hierarchy.
+        Tiers are ordered from highest number (spine/root-side) down to lowest (leaf),
+        so that slurmctld can build the correct switch tree dynamically.
 
-    For dynamic topology in Slurm, we only need to specify the leaf switch (lowest tier).
-    The slurmctld already knows the topology structure from topology.conf.
+    See: https://slurm.schedmd.com/topology.html#dynamic_topo
+         Format: Topology=<name>:<switch_near_root>:...:<leaf_switch>
 
     Example:
-      - {"tier-0": "block1", "tier-1": "rack1"} -> "topology=default:root:block1"
-      - {"tier-1": "leaf00", "tier-2": "spine00"} -> "topology=default:root:leaf00"
+      - {"tier-1": "leaf00"} -> "topology=default:root:leaf00"
+      - {"tier-1": "leaf00", "tier-2": "spine00"} -> "topology=default:root:spine00:leaf00"
+      - {"tier-0": "block1", "tier-1": "rack1"} -> "topology=default:root:rack1:block1"
     """
     if not parts:
         return ""
@@ -283,10 +290,10 @@ def _format_tier_topology(parts: dict) -> str:
                 continue
 
     if tier_keys:
-        tier_keys.sort(key=lambda x: x[0])
-        lowest_tier_key = tier_keys[0][1]
-        leaf_switch = parts[lowest_tier_key]
-        return f"topology=default:root:{leaf_switch}"
+        # Sort descending: highest tier first (spine/root-side), lowest last (leaf)
+        tier_keys.sort(key=lambda x: x[0], reverse=True)
+        switches = [parts[k] for _, k in tier_keys]
+        return f"topology=default:root:{':'.join(switches)}"
 
     if parts:
         first_value = next(iter(parts.values()))
@@ -297,21 +304,12 @@ def _format_tier_topology(parts: dict) -> str:
 def apply_node_topology(hostname: str, topology: str) -> None:
     """Apply topology to a node via scontrol update."""
     try:
-        cmd = ["scontrol", "update", f"nodename={hostname}", "State=UNDRAIN", "Reason=", "Comment="]
-        logger.info("Setting node state to UNDRAIN before applying topology: %s", " ".join(cmd))
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        if result.returncode != 0:
-            output = (result.stdout + result.stderr).strip()
-            logger.error("scontrol update to UNDRAIN failed (rc=%d): %s", result.returncode, output)
-            sys.exit(1)
-
         node_addr = get_node_addr()
-        cmd = ["scontrol", "update", f"nodename={hostname}", f"{node_addr}", f"{topology}" ]
+        cmd = [
+            "scontrol", "update",
+            f"nodename={hostname}", f"{node_addr}", f"{topology}",
+            "state=UNDRAIN", "reason=", "comment=",
+        ]
         logger.info("Running: %s", " ".join(cmd))
         result = subprocess.run(
             cmd,
@@ -332,8 +330,30 @@ def apply_node_topology(hostname: str, topology: str) -> None:
         logger.error("scontrol command not found")
         sys.exit(1)
 
+def is_gpu_enabled() -> bool:
+    """Return True if NODESET_GPU_ENABLED is set to 'true'."""
+    return os.environ.get("NODESET_GPU_ENABLED", "") == "true"
+
+
 def wait_for_topology() -> None:
-    """Wait for topology data to become available for this node, then apply it via scontrol."""
+    """Wait for topology data to become available for this node, then apply it via scontrol.
+
+    For non-GPU nodes (NODESET_GPU_ENABLED != 'true'), skips ConfigMap lookup and
+    immediately assigns the node to the generic 'unknown' switch defined in topology.conf.
+    """
+    hostname = get_hostname()
+    if not hostname:
+        logger.error("HOSTNAME environment variable is not set")
+        sys.exit(1)
+
+    if not is_gpu_enabled():
+        logger.info(
+            "NODESET_GPU_ENABLED is not set to 'true', "
+            "assigning node %s to default:root:unknown topology", hostname
+        )
+        apply_node_topology(hostname, "topology=default:root:unknown")
+        return
+
     node_name = get_node_name()
     topology_path = get_topology_path()
     wait_timeout = get_topology_wait_timeout()
@@ -391,11 +411,6 @@ def wait_for_topology() -> None:
     topology = format_slurm_topology(raw_topology)
     if not topology:
         logger.error("Failed to format topology from raw data: %s", raw_topology)
-        sys.exit(1)
-
-    hostname = get_hostname()
-    if not hostname:
-        logger.error("HOSTNAME environment variable is not set")
         sys.exit(1)
 
     apply_node_topology(hostname, topology)

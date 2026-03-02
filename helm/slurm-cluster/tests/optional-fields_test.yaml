@@ -38,12 +38,6 @@ tests:
                     storage: 50Gi
             jail:
               volumeSourceName: "jail"
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          volumes:
-            jail:
-              volumeSourceName: "jail"
         login:
           size: 2
           k8sNodeFilterName: "no-gpu"
@@ -117,12 +111,6 @@ tests:
                     storage: 50Gi
             jail:
               volumeSourceName: "jail"
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          volumes:
-            jail:
-              volumeSourceName: "jail"
         login:
           size: 2
           k8sNodeFilterName: "no-gpu"
@@ -163,8 +151,8 @@ tests:
       - exists:
           path: spec.slurmNodes.exporter.podMonitorConfig
 
-  # Test that worker maxUnavailable is included when provided in values
-  - it: should include worker maxUnavailable when provided in values
+  # Worker options are managed by NodeSet resources, not SlurmCluster CR
+  - it: should not render worker maxUnavailable in slurm cluster CR
     set:
       clusterName: test-cluster
       k8sNodeFilters:
@@ -197,12 +185,6 @@ tests:
                 resources:
                   requests:
                     storage: 50Gi
-            jail:
-              volumeSourceName: "jail"
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          volumes:
             jail:
               volumeSourceName: "jail"
         login:
@@ -239,7 +221,7 @@ tests:
         sConfigController: "test-image"
         mariaDB: "test-image"
     asserts:
-      - exists:
+      - notExists:
           path: spec.slurmNodes.worker.maxUnavailable
 
   # Test that sConfigController optional fields are included when provided in values
@@ -276,12 +258,6 @@ tests:
                 resources:
                   requests:
                     storage: 50Gi
-            jail:
-              volumeSourceName: "jail"
-        worker:
-          size: 2
-          k8sNodeFilterName: "gpu"
-          volumes:
             jail:
               volumeSourceName: "jail"
         login:

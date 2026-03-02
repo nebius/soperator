@@ -19,13 +19,11 @@ spec:
         name: {{ include "soperator-fluxcd.fullname" . }}-bedag
       version: {{ .Values.tailscale.version }}
   install:
-    crds: Skip
-    remediation:
-      retries: 3
+    {{- toYaml .Values.tailscale.install | nindent 4 }}
   interval: {{ .Values.tailscale.interval }}
   timeout: {{ .Values.tailscale.timeout }}
   upgrade:
-    crds: Skip
+    {{- toYaml .Values.tailscale.upgrade | nindent 4 }}
   values:
     resources:
     - apiVersion: rbac.authorization.k8s.io/v1

@@ -133,7 +133,11 @@ create_pull_request() {
 
 # Original PR Description
 
-${PR_BODY}"
+${PR_BODY}
+
+---
+
+> You cannot skip this merge, but if you really don't want these changes (conflicts or doesn't make sense), just comment \`/revert-last-pr\`, and wait for the revert to come, then merge this PR (even if 0 changes)."
     else
         # Fallback for commits without PRs
         pr_body="This is merge back of commit ${COMMIT_SHORT_SHA} by @${USERNAME}
@@ -141,7 +145,11 @@ ${PR_BODY}"
 Commit message:
 \`\`\`
 ${COMMIT_MESSAGE}
-\`\`\`"
+\`\`\`
+
+---
+
+> You cannot skip this merge, but if you really don't want these changes (conflicts or doesn't make sense), just comment \`/revert-last-pr\`, and wait for the revert to come, then merge this PR (even if 0 changes)."
     fi
 
     # Create the PR

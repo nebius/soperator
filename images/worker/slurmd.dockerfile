@@ -2,8 +2,8 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/55
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260205130055 AS worker_slurmd
+# https://github.com/nebius/ml-containers/pull/73
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260225115852 AS worker_slurmd
 
 # Install useful packages
 RUN apt-get update && \
@@ -62,7 +62,7 @@ RUN chown 0:0 /etc/enroot/enroot.conf && \
 
 # Install slurm pyxis plugin
 ARG SLURM_VERSION
-ARG PYXIS_VERSION=0.21.0
+ARG PYXIS_VERSION=0.23.0
 RUN apt-get update && \
     apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \
     apt-get clean && \

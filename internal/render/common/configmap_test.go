@@ -242,37 +242,6 @@ func TestRenderConfigMapSecurityLimits(t *testing.T) {
 			expectedLabel: consts.ComponentTypeLogin.String(),
 		},
 		{
-			name: "Worker default security limits",
-			cluster: values.SlurmCluster{
-				NamespacedName: types.NamespacedName{
-					Namespace: "slurm",
-					Name:      "test",
-				},
-			},
-			componentType: consts.ComponentTypeWorker,
-			expectedData:  generateUnlimitedSecurityLimitsConfig().Render(),
-			expectedLabel: consts.ComponentTypeWorker.String(),
-		},
-		{
-			name: "Worker custom security limits",
-			cluster: values.SlurmCluster{
-				NamespacedName: types.NamespacedName{
-					Namespace: "slurm",
-					Name:      "test",
-				},
-				NodeWorker: values.SlurmWorker{
-					ContainerSlurmd: values.Container{
-						NodeContainer: slurmv1.NodeContainer{
-							SecurityLimitsConfig: "* soft memlock 300000\n* hard memlock 300000",
-						},
-					},
-				},
-			},
-			componentType: consts.ComponentTypeWorker,
-			expectedData:  "* soft memlock 300000\n* hard memlock 300000",
-			expectedLabel: consts.ComponentTypeWorker.String(),
-		},
-		{
 			name: "Controller default security limits",
 			cluster: values.SlurmCluster{
 				NamespacedName: types.NamespacedName{
@@ -383,20 +352,20 @@ func TestRenderPlugstack(t *testing.T) {
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Contains(t, result, "optional spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 container_image_save=")
+		assert.Contains(t, result, "optional spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 importer=")
 	})
 
 	t.Run("Pyxis options", func(t *testing.T) {
 		result := generateSpankConfig(&values.SlurmCluster{
 			PlugStackConfig: slurmv1.PlugStackConfig{
 				Pyxis: slurmv1.PluginConfigPyxis{
-					Required:           ptr.To(true),
-					ContainerImageSave: "/tmp/",
+					Required:     ptr.To(true),
+					ImporterPath: "/opt/importer.sh",
 				},
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Contains(t, result, "required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 container_image_save=/tmp/")
+		assert.Contains(t, result, "required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 importer=/opt/importer.sh")
 	})
 
 	t.Run("NCCL no options", func(t *testing.T) {

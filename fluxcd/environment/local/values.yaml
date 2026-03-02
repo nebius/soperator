@@ -10,7 +10,7 @@ ns:
 soperator:
   enabled: true
   namespace: soperator-system
-  version: "2.0.1"
+  version: "3.0.1"
   interval: 5m
   timeout: 5m
   releaseName: soperator-controller
@@ -21,7 +21,6 @@ soperator:
           - --health-probe-bind-address=:8081
           - --metrics-bind-address=127.0.0.1:8080
           - --leader-elect
-          - --feature-gates=NodeSetWorkers=true
         resources:
           limits:
             memory: 64Mi
@@ -58,7 +57,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 2.0.1
+  version: 3.0.1
   namespace: soperator
   releaseName: soperator
   overrideValues:
@@ -278,10 +277,10 @@ backup:
 # NFS Server - disabled for local dev
 nfsServer:
   enabled: false
-  version: 2.0.1
+  version: 3.0.1
   overrideValues:
     image:
-      tag: 2.0.1
+      tag: 3.0.1
 # Notifier - disabled for local dev
 notifier:
   enabled: false

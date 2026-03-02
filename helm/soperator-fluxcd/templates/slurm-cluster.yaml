@@ -31,18 +31,13 @@ spec:
 {{- end }}
 
   install:
-    crds: Skip
-    remediation:
-      retries: 3
+    {{- toYaml .Values.slurmCluster.install | nindent 4 }}
   interval: {{ .Values.slurmCluster.interval }}
   timeout: {{ .Values.slurmCluster.timeout }}
   releaseName: soperator
   targetNamespace: soperator
   upgrade:
-    crds: Skip
-    remediation:
-      retries: 3
-      remediateLastFailure: true
+    {{- toYaml .Values.slurmCluster.upgrade | nindent 4 }}
   values:
   {{- if .Values.slurmCluster.overrideValues }}
     {{- toYaml .Values.slurmCluster.overrideValues | nindent 4 }}

@@ -19,18 +19,13 @@ spec:
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.observability.dcgmExporter.version }}
   install:
-    crds: CreateReplace
-    remediation:
-      retries: 3
+    {{- toYaml .Values.observability.dcgmExporter.install | nindent 4 }}
   interval: {{ .Values.observability.dcgmExporter.interval }}
   timeout: {{ .Values.observability.dcgmExporter.timeout }}
   releaseName: {{ .Values.observability.dcgmExporter.releaseName }}
   targetNamespace: {{ .Values.observability.dcgmExporter.namespace }}
   upgrade:
-    crds: CreateReplace
-    remediation:
-      retries: 3
-      remediateLastFailure: true
+    {{- toYaml .Values.observability.dcgmExporter.upgrade | nindent 4 }}
   values:
     dcgmHpcJobMappingDir: {{ .Values.observability.dcgmExporter.values.hpcJobMapDir }}
     validateToolkit: {{ .Values.observability.dcgmExporter.values.validateToolkit }}

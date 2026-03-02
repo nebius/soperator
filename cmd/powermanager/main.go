@@ -101,19 +101,22 @@ func main() {
 	}
 
 	command := os.Args[1]
-	if command != "resume" && command != "suspend" && command != "wait-added" && command != "wait-removed" {
-		fmt.Fprintf(os.Stderr, "Error: unknown command '%s'\n\n", command)
+	switch command {
+	case "resume", "suspend", "wait-added", "wait-removed":
+		// ok
+	default:
+		log.Error(fmt.Errorf("unknown command: %s", command), "Invalid command")
 		flag.Usage()
 		os.Exit(1)
 	}
 
 	if err := flag.CommandLine.Parse(os.Args[2:]); err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing flags: %v\n", err)
+		log.Error(err, "Error parsing flags")
 		os.Exit(1)
 	}
 
 	if *nodes == "" {
-		fmt.Fprintf(os.Stderr, "Error: --nodes is required\n")
+		log.Error(fmt.Errorf("--nodes is required"), "Missing required flag")
 		os.Exit(1)
 	}
 
@@ -122,7 +125,7 @@ func main() {
 		var err error
 		ns, err = getNamespaceFromServiceAccount()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: --namespace is required (could not auto-detect: %v)\n", err)
+			log.Error(fmt.Errorf("--namespace is required (could not auto-detect: %v)", err), "Missing required flag")
 			os.Exit(1)
 		}
 		log.Info("Auto-detected namespace from ServiceAccount", "namespace", ns)

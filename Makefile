@@ -37,7 +37,7 @@ CHART_FLUXCD_BOOTSTRAP_PATH					= $(CHART_PATH)/soperator-fluxcd-bootstrap
 CHART_STORAGECLASSES						= $(CHART_PATH)/storageclasses
 CHART_BACKUP_CONFIG							= $(CHART_PATH)/soperator-backup-config
 
-SLURM_VERSION		= 25.11.2
+SLURM_VERSION		= 25.11.3
 NFS_VERSION_BASE	= $(shell cat VERSION_NFS)
 VERSION_BASE		= $(shell cat VERSION)
 
@@ -280,9 +280,9 @@ sync-version: yq ## Sync versions from file
 	@$(YQ) -i ".images.slurmd.repository = \"$(IMAGE_REPO)/worker_slurmd\"" "helm/nodesets/values.yaml"
 	@$(YQ) -i ".images.slurmd.tag = \"$(IMAGE_VERSION)\"" "helm/nodesets/values.yaml"
 	@$(YQ) -i ".nodesets[0].slurmd.image.repository = \"$(IMAGE_REPO)/worker_slurmd\"" "helm/nodesets/values.yaml"
-	@$(YQ) -i ".nodesets[0].slurmd.image.tag = \"$(IMAGE_VERSION)+custom\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].slurmd.image.tag = \"$(IMAGE_VERSION)\"" "helm/nodesets/values.yaml"
 	@$(YQ) -i ".nodesets[0].munge.image.repository = \"$(IMAGE_REPO)/munge\"" "helm/nodesets/values.yaml"
-	@$(YQ) -i ".nodesets[0].munge.image.tag = \"$(IMAGE_VERSION)+custom\"" "helm/nodesets/values.yaml"
+	@$(YQ) -i ".nodesets[0].munge.image.tag = \"$(IMAGE_VERSION)\"" "helm/nodesets/values.yaml"
 	@# endregion helm/nodesets/values.yaml
 
 	@# region helm/soperator-activechecks/values.yaml
@@ -385,7 +385,7 @@ build: manifests generate fmt vet ## Build manager binary with native toolchain.
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host with native toolchain.
 	IS_PROMETHEUS_CRD_INSTALLED=true IS_MARIADB_CRD_INSTALLED=true ENABLE_WEBHOOKS=false IS_APPARMOR_CRD_INSTALLED=true go run cmd/main.go \
-	 -log-level=debug -leader-elect=true -operator-namespace=soperator-system -feature-gates=NodeSetWorkers=true
+	 -log-level=debug -leader-elect=true -operator-namespace=soperator-system
 
 .PHONY: docker-build-and-push
 docker-build-and-push: ## Build and push docker images
@@ -636,9 +636,6 @@ $(HELMIFY): $(LOCALBIN)
 yq: $(YQ) ## Download yq locally if necessary.
 $(YQ): $(LOCALBIN)
 	test -s $(LOCALBIN)/yq || GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@v$(YQ_VERSION)
-
-.PHONY: install-e2e-tools
-install-e2e-tools: yq ## Install tools required for E2E tests
 
 .PHONY: install-kind
 install-kind: $(KIND) ## Download kind locally if necessary.
