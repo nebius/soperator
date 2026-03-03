@@ -36,6 +36,8 @@ git worktree add "$WORKTREE_DIR" "origin/$BRANCH"
 
 pushd "$WORKTREE_DIR" > /dev/null
 git checkout -B "$BRANCH" "origin/$BRANCH"
+git config user.name "github-actions[bot]"
+git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 # Merge commits need -m 1 to specify which parent to revert to
 PARENT_COUNT=$(git cat-file -p "$MERGE_SHA" | grep -c '^parent ')
 if [ "$PARENT_COUNT" -gt 1 ]; then
