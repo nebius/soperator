@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -19,10 +20,10 @@ func Destroy(ctx context.Context, cfg Config) error {
 	}
 	defer cleanup()
 
-	return destroyWithK8sRecovery(ctx, tf, varFilePath, cfg.Profile.NebiusProjectID)
+	return destroyWithK8sRecovery(ctx, tf, varFilePath)
 }
 
-func destroyWithK8sRecovery(ctx context.Context, tf *tfexec.Terraform, varFilePath, nebiusProjectID string) error {
+func destroyWithK8sRecovery(ctx context.Context, tf *tfexec.Terraform, varFilePath string) error {
 	err := tf.Destroy(ctx, tfexec.VarFile(varFilePath))
 	if err == nil {
 		return nil
@@ -30,7 +31,7 @@ func destroyWithK8sRecovery(ctx context.Context, tf *tfexec.Terraform, varFilePa
 	if !strings.Contains(err.Error(), "Kubernetes cluster unreachable") {
 		return err
 	}
-	if !isMK8SClusterGone(ctx, nebiusProjectID) {
+	if !isMK8SClusterGone(ctx) {
 		return err
 	}
 	log.Print("K8s cluster is confirmed gone, removing helm releases from state and retrying destroy")
@@ -60,15 +61,16 @@ func removeHelmReleasesFromState(ctx context.Context, tf *tfexec.Terraform) {
 	}
 }
 
-func isMK8SClusterGone(ctx context.Context, nebiusProjectID string) bool {
-	if nebiusProjectID == "" {
-		log.Print("nebius project ID is empty, cannot verify cluster existence")
+func isMK8SClusterGone(ctx context.Context) bool {
+	projectID := os.Getenv("NEBIUS_PROJECT_ID")
+	if projectID == "" {
+		log.Print("NEBIUS_PROJECT_ID not set, cannot verify cluster existence")
 		return false
 	}
 
 	out, err := exec.CommandContext(ctx,
 		"nebius", "mk8s", "cluster", "get-by-name",
-		"--parent-id", nebiusProjectID,
+		"--parent-id", projectID,
 		"--name", k8sClusterName,
 	).CombinedOutput()
 	if err != nil {
