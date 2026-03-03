@@ -99,3 +99,159 @@ tests:
       - equal:
           path: spec.k8sJobSpec.jobContainer.appArmorProfile
           value: unconfined
+
+  - it: should resolve NCCL tests version from map for CUDA 12.9.0
+    documentSelector:
+      path: metadata.name
+      value: test-nccl-map-lookup
+    set:
+      slurmClusterRefName: test-cluster
+      cudaVersion: "12.9.0"
+      ncclTestsVersion: ""
+      ncclTestsVersions:
+        "12.9.0": "2.16.4"
+        "13.0.2": "2.17.6"
+      images:
+        k8sJob: "test-image:latest"
+        sansible: "sansible-image:latest"
+      jobContainer:
+        volumeMounts:
+          - mountPath: /mnt/jail
+            name: jail
+        volumes:
+          - name: jail
+            persistentVolumeClaim:
+              claimName: jail-pvc
+      checks:
+        test-nccl-map-lookup:
+          enabled: true
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              workingDir: /opt/ansible
+              image: "{{ .Values.images.sansible }}"
+              command: ["echo", "test"]
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - contains:
+          path: spec.k8sJobSpec.jobContainer.env
+          content:
+            name: NCCL_TESTS_VERSION
+            value: "2.16.4"
+
+  - it: should resolve NCCL tests version from map for CUDA 13.0.2
+    documentSelector:
+      path: metadata.name
+      value: test-nccl-map-lookup-alt
+    set:
+      slurmClusterRefName: test-cluster
+      cudaVersion: "13.0.2"
+      ncclTestsVersion: ""
+      ncclTestsVersions:
+        "12.9.0": "2.16.4"
+        "13.0.2": "2.17.6"
+      images:
+        k8sJob: "test-image:latest"
+        sansible: "sansible-image:latest"
+        activeCheckImageRepository: "cr.eu-north1.nebius.cloud#ml-containers/training_diag"
+        activeCheckImageTags:
+          "13.0.2": "13.0.2-ubuntu24.04-20260206170007"
+      jobContainer:
+        volumeMounts:
+          - mountPath: /mnt/jail
+            name: jail
+        volumes:
+          - name: jail
+            persistentVolumeClaim:
+              claimName: jail-pvc
+      checks:
+        test-nccl-map-lookup-alt:
+          enabled: true
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              workingDir: /opt/ansible
+              image: "{{ .Values.images.sansible }}"
+              command: ["echo", "test"]
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - contains:
+          path: spec.k8sJobSpec.jobContainer.env
+          content:
+            name: NCCL_TESTS_VERSION
+            value: "2.17.6"
+
+  - it: should use flat override when ncclTestsVersion is set
+    documentSelector:
+      path: metadata.name
+      value: test-nccl-flat-override
+    set:
+      slurmClusterRefName: test-cluster
+      cudaVersion: "12.9.0"
+      ncclTestsVersion: "2.99.0"
+      ncclTestsVersions:
+        "12.9.0": "2.16.4"
+      images:
+        k8sJob: "test-image:latest"
+        sansible: "sansible-image:latest"
+      jobContainer:
+        volumeMounts:
+          - mountPath: /mnt/jail
+            name: jail
+        volumes:
+          - name: jail
+            persistentVolumeClaim:
+              claimName: jail-pvc
+      checks:
+        test-nccl-flat-override:
+          enabled: true
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              workingDir: /opt/ansible
+              image: "{{ .Values.images.sansible }}"
+              command: ["echo", "test"]
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - contains:
+          path: spec.k8sJobSpec.jobContainer.env
+          content:
+            name: NCCL_TESTS_VERSION
+            value: "2.99.0"
+
+  - it: should fail when CUDA version is not in ncclTestsVersions map
+    set:
+      slurmClusterRefName: test-cluster
+      cudaVersion: "99.0.0"
+      ncclTestsVersion: ""
+      ncclTestsVersions:
+        "12.9.0": "2.16.4"
+      images:
+        k8sJob: "test-image:latest"
+        sansible: "sansible-image:latest"
+        activeCheckImageRepository: "cr.eu-north1.nebius.cloud#ml-containers/training_diag"
+        activeCheckImageTags:
+          "99.0.0": "99.0.0-ubuntu24.04-20260206170007"
+      jobContainer:
+        volumeMounts:
+          - mountPath: /mnt/jail
+            name: jail
+        volumes:
+          - name: jail
+            persistentVolumeClaim:
+              claimName: jail-pvc
+      checks:
+        test-nccl-unknown-cuda:
+          enabled: true
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              workingDir: /opt/ansible
+              image: "{{ .Values.images.sansible }}"
+              command: ["echo", "test"]
+    asserts:
+      - failedTemplate:
+          errorMessage: "ncclTestsVersions must contain an entry for CUDA 99.0.0, or set ncclTestsVersion explicitly"
