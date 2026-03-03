@@ -79,33 +79,43 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 		},
 	}
 
-	tfVars["slurm_nodeset_workers"] = []interface{}{
-		map[string]interface{}{
-			"name": "worker",
-			"size": 2,
+	var nodesetWorkers []interface{}
+	for _, ns := range cfg.Profile.NodeSets {
+		entry := map[string]interface{}{
+			"name": ns.Name,
+			"size": ns.Size,
 			"resource": map[string]interface{}{
-				"platform": cfg.WorkerPlatform,
-				"preset":   cfg.WorkerPreset,
+				"platform": ns.Platform,
+				"preset":   ns.Preset,
 			},
 			"boot_disk": map[string]interface{}{
 				"type":                 "NETWORK_SSD",
 				"size_gibibytes":       2048,
 				"block_size_kibibytes": 4,
 			},
-			"gpu_cluster": map[string]interface{}{
-				"infiniband_fabric": cfg.InfinibandFabric,
-			},
-			"preemptible":      preemptibleValue(cfg.PreemptibleNodes),
+			"gpu_cluster":      gpuClusterValue(ns.InfinibandFabric),
+			"preemptible":      preemptibleValue(ns.Preemptible),
 			"features":         nil,
 			"create_partition": nil,
-		},
+		}
+		nodesetWorkers = append(nodesetWorkers, entry)
 	}
+	tfVars["slurm_nodeset_workers"] = nodesetWorkers
 
-	tfVars["slurm_login_ssh_root_public_keys"] = cfg.SSHKeys
+	tfVars["slurm_login_ssh_root_public_keys"] = []string{cfg.SSHPublicKey}
 	tfVars["etcd_cluster_size"] = 1
 	tfVars["cleanup_bucket_on_destroy"] = true
 
 	return tfVars
+}
+
+func gpuClusterValue(infinibandFabric string) interface{} {
+	if infinibandFabric == "" {
+		return nil
+	}
+	return map[string]interface{}{
+		"infiniband_fabric": infinibandFabric,
+	}
 }
 
 func preemptibleValue(enabled bool) interface{} {
