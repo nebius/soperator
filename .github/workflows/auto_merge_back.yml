@@ -1,4 +1,4 @@
-name: "Auto merge back to main"
+name: "Auto merge back"
 
 on:
   push:
