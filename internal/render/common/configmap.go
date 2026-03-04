@@ -318,9 +318,9 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("TCPTimeout", 15)
 	res.AddProperty("WaitTime", 0)
 	if cluster.HasEphemeralNodes() {
-		res.AddProperty("SlurmctldParameters", "conmgr_max_connections=512,conmgr_threads=16,cloud_dns,idle_on_node_suspend")
+		res.AddProperty("SlurmctldParameters", "conmgr_max_connections=1024,conmgr_threads=32,cloud_dns,idle_on_node_suspend")
 	} else {
-		res.AddProperty("SlurmctldParameters", "conmgr_max_connections=512,conmgr_threads=16")
+		res.AddProperty("SlurmctldParameters", "conmgr_max_connections=1024,conmgr_threads=32")
 	}
 
 	res.AddProperty("RebootProgram", "/opt/bin/slurm/reboot.sh")
