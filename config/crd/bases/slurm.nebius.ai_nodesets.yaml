@@ -2680,6 +2680,11 @@ spec:
                   Defaults to 1 if not specified.
                 format: int32
                 type: integer
+              slurmClusterRefName:
+                description: |-
+                  SlurmClusterRefName is the name of the parent SlurmCluster this NodeSet belongs to.
+                  Must be in the same namespace as the NodeSet.
+                type: string
               slurmd:
                 description: Slurmd defines the Slurm worker daemon configuration.
                 properties:
@@ -11028,6 +11033,7 @@ spec:
                 type: object
             required:
             - munge
+            - slurmClusterRefName
             - slurmd
             type: object
           status:

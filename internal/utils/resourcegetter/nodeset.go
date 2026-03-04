@@ -11,11 +11,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
-	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 )
 
-// ListNodeSetsByClusterRef returns a list of [slurmv1alpha1.NodeSet] that have consts.AnnotationParentalClusterRefName annotation with clusterRef.Name value.
+// ListNodeSetsByClusterRef returns a list of [slurmv1alpha1.NodeSet] whose spec.slurmClusterRefName matches clusterRef.Name.
 func ListNodeSetsByClusterRef(ctx context.Context, r client.Reader, clusterRef types.NamespacedName) ([]slurmv1alpha1.NodeSet, error) {
 	logger := log.FromContext(ctx)
 
@@ -29,11 +28,7 @@ func ListNodeSetsByClusterRef(ctx context.Context, r client.Reader, clusterRef t
 
 	return slices.SortedFunc(
 		sliceutils.FilterSliceSeq(nodeSetList.Items, func(nodeSet slurmv1alpha1.NodeSet) bool {
-			clusterName, found := nodeSet.GetAnnotations()[consts.AnnotationParentalClusterRefName]
-			if found && clusterName == clusterRef.Name {
-				return true
-			}
-			return false
+			return nodeSet.Spec.SlurmClusterRefName == clusterRef.Name
 		}),
 		func(a, b slurmv1alpha1.NodeSet) int {
 			return strings.Compare(a.Name, b.Name)

@@ -60,7 +60,7 @@ func TestBuildAccountingFrom(t *testing.T) {
 	assert.Equal(t, buildContainerFrom(accounting.Munge, consts.ContainerNameMunge).Port, result.ContainerMunge.Port)
 	assert.Equal(t, buildContainerFrom(accounting.Munge, consts.ContainerNameMunge).Resources, result.ContainerMunge.Resources)
 	assert.Equal(t, buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeAccounting, defaultNameCluster)), result.Service)
-	assert.Equal(t, buildDeploymentFrom(naming.BuildDeploymentName(consts.ComponentTypeAccounting)), result.Deployment)
+	assert.Equal(t, buildDeploymentFrom(naming.BuildDeploymentName(consts.ComponentTypeAccounting, defaultNameCluster)), result.Deployment)
 	assert.Equal(t, accounting.ExternalDB, result.ExternalDB)
 	assert.Equal(t, accounting.Enabled, result.Enabled)
 	assert.Equal(t, slurmv1.NodeVolume{VolumeSourceName: ptr.To(consts.VolumeNameJail)}, result.VolumeJail)
