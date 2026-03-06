@@ -17,7 +17,7 @@ func Test_RenderDeployment(t *testing.T) {
 	deployment, err := accounting.RenderDeployment(defaultNamespace, defaultNameCluster, acc, defaultNodeFilter, defaultVolumeSources)
 	assert.NoError(t, err)
 
-	assert.Equal(t, naming.BuildDeploymentName(consts.ComponentTypeAccounting), deployment.Name)
+	assert.Equal(t, naming.BuildDeploymentName(consts.ComponentTypeAccounting, defaultNameCluster), deployment.Name)
 	assert.Equal(t, defaultNamespace, deployment.Namespace)
 	assert.Equal(t, common.RenderLabels(consts.ComponentTypeAccounting, defaultNameCluster), deployment.Labels)
 
