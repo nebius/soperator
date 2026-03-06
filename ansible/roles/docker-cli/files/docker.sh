@@ -22,12 +22,62 @@ get_docker_cgroup_parent() {
 DOCKER_SUBCOMMAND=""
 CGROUP_PARENT_SPECIFIED=false
 
-for arg in "$@"; do
-    if [[ -z "$DOCKER_SUBCOMMAND" ]] && [[ "$arg" != -* ]]; then
-        DOCKER_SUBCOMMAND="$arg"
+# Track when the next token is the value for a preceding option that takes an argument.
+EXPECT_VALUE_FOR_GLOBAL_OPTION=false
+
+for ((i = 1; i <= $#; i++)); do
+    arg="${!i}"
+
+    # If this token is just the value for a previous global option, skip it.
+    if [[ "$EXPECT_VALUE_FOR_GLOBAL_OPTION" == true ]]; then
+        EXPECT_VALUE_FOR_GLOBAL_OPTION=false
+        continue
     fi
-    if [[ "$arg" == "--cgroup-parent" ]] || [[ "$arg" == --cgroup-parent=* ]]; then
+
+    # Detect explicit --cgroup-parent usage (both forms).
+    if [[ "$arg" == "--cgroup-parent" ]]; then
         CGROUP_PARENT_SPECIFIED=true
+        # The next token is the value for --cgroup-parent; skip it for subcommand detection.
+        EXPECT_VALUE_FOR_GLOBAL_OPTION=true
+        continue
+    elif [[ "$arg" == --cgroup-parent=* ]]; then
+        CGROUP_PARENT_SPECIFIED=true
+        # Value is inline, nothing further to skip for this option.
+        continue
+    fi
+
+    # Handle common Docker global options that take a value, so we don't
+    # accidentally treat their value as the subcommand.
+    case "$arg" in
+        -H|--host|--context|--config|--log-level|--tlscacert|--tlscert|--tlskey)
+            EXPECT_VALUE_FOR_GLOBAL_OPTION=true
+            continue
+            ;;
+        -H=*|--host=*|--context=*|--config=*|--log-level=*|--tlscacert=*|--tlscert=*|--tlskey=*)
+            # Value is inline with the option.
+            continue
+            ;;
+        --*)
+            # Other flags without arguments: ignore for subcommand detection.
+            continue
+            ;;
+    esac
+
+    # First non-flag argument (that is not a value for a global option) is the subcommand.
+    if [[ -z "$DOCKER_SUBCOMMAND" ]]; then
+        DOCKER_SUBCOMMAND="$arg"
+
+        # Special handling for `docker container run` / `docker container create`:
+        # treat "run"/"create" as the effective subcommand.
+        if [[ "$DOCKER_SUBCOMMAND" == "container" ]]; then
+            next_index=$((i + 1))
+            if (( next_index <= $# )); then
+                next_arg="${!next_index}"
+                if [[ "$next_arg" == "run" || "$next_arg" == "create" ]]; then
+                    DOCKER_SUBCOMMAND="$next_arg"
+                fi
+            fi
+        fi
     fi
 done
 
