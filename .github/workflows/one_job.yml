@@ -26,6 +26,9 @@ on:
 
   # pull_request_target runs in base branch context, giving fork PRs access to secrets.
   # The "authorize" job gates fork PRs behind environment approval.
+  # TODO: remove pull_request trigger after merging (kept for transition, causes double runs).
+  pull_request:
+    types: [opened, synchronize, reopened]
   pull_request_target:
     types: [opened, synchronize, reopened]
 
@@ -36,8 +39,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' || github.event_name == 'pull_request' }}
 
 jobs:
   authorize:
@@ -57,7 +60,7 @@ jobs:
     needs: [authorize]
     runs-on: ubuntu-latest
     outputs:
-      should_build: ${{ steps.filter.outputs.has_code_changes == 'true' || github.event_name != 'pull_request_target' }}
+      should_build: ${{ steps.filter.outputs.has_code_changes == 'true' || (github.event_name != 'pull_request_target' && github.event_name != 'pull_request') }}
     steps:
       - uses: actions/checkout@v6
         with:
