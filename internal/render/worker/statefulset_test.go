@@ -139,6 +139,80 @@ func Test_RenderContainerWorkerInit_K8SServiceName(t *testing.T) {
 	}
 }
 
+func TestRenderNodeSetStatefulSet_RealMemoryEnv(t *testing.T) {
+	findEnvInContainer := func(containers []corev1.Container, containerName, envName string) (corev1.EnvVar, bool) {
+		for _, c := range containers {
+			if c.Name == containerName {
+				for _, e := range c.Env {
+					if e.Name == envName {
+						return e, true
+					}
+				}
+				return corev1.EnvVar{}, false
+			}
+		}
+		return corev1.EnvVar{}, false
+	}
+
+	makeNodeSet := func(resources corev1.ResourceList) *values.SlurmNodeSet {
+		return &values.SlurmNodeSet{
+			Name: "test-nodeset",
+			ParentalCluster: client.ObjectKey{
+				Namespace: "test-namespace",
+				Name:      "test-cluster",
+			},
+			ContainerSlurmd: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image:           "test-image",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Resources:       resources,
+				},
+			},
+			ContainerMunge: values.Container{
+				NodeContainer: slurmv1.NodeContainer{Image: "munge-image"},
+			},
+			VolumeSpool:              corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"}},
+			VolumeJail:               corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"}},
+			StatefulSet:              values.StatefulSet{Replicas: 1},
+			SupervisorDConfigMapName: "supervisord-config",
+			SSHDConfigMapName:        "sshd-config",
+			GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+		}
+	}
+
+	t.Run("REAL_MEMORY present and correct when memory request is set", func(t *testing.T) {
+		// 2 GiB = 2048 MiB
+		nodeSet := makeNodeSet(corev1.ResourceList{
+			corev1.ResourceMemory:           resource.MustParse("2Gi"),
+			corev1.ResourceCPU:              resource.MustParse("1"),
+			corev1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+		})
+
+		result, err := worker.RenderNodeSetStatefulSet("test-cluster", nodeSet, &slurmv1.Secrets{}, consts.CGroupV2, false)
+		assert.NoError(t, err)
+
+		env, found := findEnvInContainer(result.Spec.Template.Spec.Containers, consts.ContainerNameSlurmd, consts.EnvRealMemory)
+		assert.True(t, found, "REAL_MEMORY env var must be present when memory request is set")
+		assert.Equal(t, "2048", env.Value, "REAL_MEMORY should be 2048 MiB for a 2Gi memory request")
+	})
+
+	t.Run("REAL_MEMORY absent when memory request is sub-MiB (rounds to zero)", func(t *testing.T) {
+		// RenderRealMemorySlurmd does integer division by 1_048_576; a quantity
+		// smaller than 1 MiB produces 0, so REAL_MEMORY must not be injected.
+		nodeSet := makeNodeSet(corev1.ResourceList{
+			corev1.ResourceMemory:           resource.MustParse("512Ki"),
+			corev1.ResourceCPU:              resource.MustParse("1"),
+			corev1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+		})
+
+		result, err := worker.RenderNodeSetStatefulSet("test-cluster", nodeSet, &slurmv1.Secrets{}, consts.CGroupV2, false)
+		assert.NoError(t, err)
+
+		_, found := findEnvInContainer(result.Spec.Template.Spec.Containers, consts.ContainerNameSlurmd, consts.EnvRealMemory)
+		assert.False(t, found, "REAL_MEMORY env var must be absent when memory rounds to 0 MiB")
+	})
+}
+
 func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 	createNodeSet := func(ephemeralNodes *bool, waitTimeout int32) *values.SlurmNodeSet {
 		return &values.SlurmNodeSet{
