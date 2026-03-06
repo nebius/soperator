@@ -227,6 +227,7 @@ func renderContainerNodeSetSlurmd(
 				utils.Ternary(nodeSet.GPU.Enabled, consts.ClusterTypeGPU, consts.ClusterTypeCPU),
 				nodeSet.GPU.Nvidia.GDRCopyEnabled,
 				nodeSet.NodeExtra,
+				common.RenderRealMemorySlurmd(corev1.ResourceRequirements{Requests: nodeSet.ContainerSlurmd.Resources}),
 			),
 			nodeSet.ContainerSlurmd.CustomEnv...,
 		),
@@ -268,6 +269,7 @@ func renderNodeSetSlurmdEnv(
 	clusterType consts.ClusterType,
 	enableGDRCopy bool,
 	slurmNodeExtra string,
+	realMemoryMiB int64,
 ) []corev1.EnvVar {
 	envVar := []corev1.EnvVar{
 		{
@@ -301,6 +303,13 @@ func renderNodeSetSlurmdEnv(
 		envVar = append(envVar, corev1.EnvVar{
 			Name:  consts.EnvNvidiaGDRCopy,
 			Value: "enabled",
+		})
+	}
+
+	if realMemoryMiB > 0 {
+		envVar = append(envVar, corev1.EnvVar{
+			Name:  consts.EnvRealMemory,
+			Value: strconv.FormatInt(realMemoryMiB, 10),
 		})
 	}
 
