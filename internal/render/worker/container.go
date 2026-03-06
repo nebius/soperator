@@ -227,7 +227,7 @@ func renderContainerNodeSetSlurmd(
 				utils.Ternary(nodeSet.GPU.Enabled, consts.ClusterTypeGPU, consts.ClusterTypeCPU),
 				nodeSet.GPU.Nvidia.GDRCopyEnabled,
 				nodeSet.NodeExtra,
-				common.RenderRealMemorySlurmd(corev1.ResourceRequirements{Requests: nodeSet.ContainerSlurmd.Resources}),
+				common.RenderRealMemorySlurmd(resources),
 			),
 			nodeSet.ContainerSlurmd.CustomEnv...,
 		),
