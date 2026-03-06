@@ -11,6 +11,33 @@ if [ -n "${CGROUP_V2}" ]; then
         mkdir -p /sys/fs/cgroup/"${CGROUP_PATH}"/../system.slice
         # TODO: uncomment this line when 24.11 will be tested. It is OOMKillStep for taskPluginParam
         # echo "1" > /sys/fs/cgroup/${CGROUP_PATH}/../system.slice/memory.oom.group
+
+        # Create a single dedicated cgroup for all Docker containers launched within Slurm jobs.
+        # All jobs share this cgroup (it is created once at pod startup, not per job).
+        # Placing containers here isolates them from slurmd: Docker OOM events cannot evict
+        # the slurmd pod because slurmd remains in its own sibling cgroup.
+        #
+        # memory.max is set to REAL_MEMORY (in MiB, matching Slurm's RealMemory unit).
+        # This equals the node's allocatable memory for jobs, so Docker containers are
+        # OOM-killed at the node allocation boundary, leaving slurmd headroom unaffected.
+        DOCKER_CGROUP_PATH="${CGROUP_PATH%/*}/docker"
+        mkdir -p /sys/fs/cgroup/"${DOCKER_CGROUP_PATH}"
+
+        if [ -n "${REAL_MEMORY}" ]; then
+            if [[ "${REAL_MEMORY}" =~ ^[0-9]+$ ]]; then
+                DOCKER_MEM_MAX_BYTES=$((REAL_MEMORY * 1024 * 1024))
+                echo "${DOCKER_MEM_MAX_BYTES}" > /sys/fs/cgroup/"${DOCKER_CGROUP_PATH}"/memory.max
+                echo "Docker cgroup memory.max set to ${DOCKER_MEM_MAX_BYTES} bytes (REAL_MEMORY=${REAL_MEMORY} MiB)"
+            else
+                echo "WARNING: REAL_MEMORY is set but non-numeric ('${REAL_MEMORY}'); Docker cgroup memory.max left unlimited"
+            fi
+        else
+            echo "REAL_MEMORY not set, Docker cgroup memory.max left unlimited"
+        fi
+
+        # Persist the path so that docker.sh can inject it as --cgroup-parent
+        echo "${DOCKER_CGROUP_PATH}" > /run/docker-cgroup-parent
+        echo "Docker cgroup created at ${DOCKER_CGROUP_PATH}"
     else
         echo "cgroup v2 detected, but cgroup path is empty"
         exit 1

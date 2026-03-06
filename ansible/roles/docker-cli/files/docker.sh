@@ -2,6 +2,92 @@
 
 BASE_DIR="/mnt/jail"  # Base directory for chroot
 
+# get_docker_cgroup_parent returns the path of the dedicated Docker cgroup that
+# was created once at pod startup by supervisord_entrypoint.sh.
+#
+# All Docker containers (across all Slurm jobs) share this single cgroup.
+# Its memory.max is set to REAL_MEMORY, so containers are OOM-killed
+# at the Docker-cgroup level before the pod limit is reached, keeping slurmd stable.
+get_docker_cgroup_parent() {
+    local cgroup_file="/run/docker-cgroup-parent"
+    [[ ! -f "$cgroup_file" ]] && return
+    local cgroup_path
+    cgroup_path=$(cat "$cgroup_file")
+    [[ -z "$cgroup_path" ]] && return
+    [[ -d "/sys/fs/cgroup/${cgroup_path}" ]] && echo "$cgroup_path"
+}
+
+# Pre-scan original arguments to find the Docker subcommand and whether
+# --cgroup-parent has already been explicitly provided by the caller.
+DOCKER_SUBCOMMAND=""
+CGROUP_PARENT_SPECIFIED=false
+
+# Track when the next token is the value for a preceding option that takes an argument.
+EXPECT_VALUE_FOR_GLOBAL_OPTION=false
+
+for ((i = 1; i <= $#; i++)); do
+    arg="${!i}"
+
+    # If this token is just the value for a previous global option, skip it.
+    if [[ "$EXPECT_VALUE_FOR_GLOBAL_OPTION" == true ]]; then
+        EXPECT_VALUE_FOR_GLOBAL_OPTION=false
+        continue
+    fi
+
+    # Detect explicit --cgroup-parent usage (both forms).
+    if [[ "$arg" == "--cgroup-parent" ]]; then
+        CGROUP_PARENT_SPECIFIED=true
+        # The next token is the value for --cgroup-parent; skip it for subcommand detection.
+        EXPECT_VALUE_FOR_GLOBAL_OPTION=true
+        continue
+    elif [[ "$arg" == --cgroup-parent=* ]]; then
+        CGROUP_PARENT_SPECIFIED=true
+        # Value is inline, nothing further to skip for this option.
+        continue
+    fi
+
+    # Handle common Docker global options that take a value, so we don't
+    # accidentally treat their value as the subcommand.
+    case "$arg" in
+        -H|--host|--context|--config|--log-level|--tlscacert|--tlscert|--tlskey)
+            EXPECT_VALUE_FOR_GLOBAL_OPTION=true
+            continue
+            ;;
+        -H=*|--host=*|--context=*|--config=*|--log-level=*|--tlscacert=*|--tlscert=*|--tlskey=*)
+            # Value is inline with the option.
+            continue
+            ;;
+        --*)
+            # Other flags without arguments: ignore for subcommand detection.
+            continue
+            ;;
+    esac
+
+    # First non-flag argument (that is not a value for a global option) is the subcommand.
+    if [[ -z "$DOCKER_SUBCOMMAND" ]]; then
+        DOCKER_SUBCOMMAND="$arg"
+
+        # Special handling for `docker container run` / `docker container create`:
+        # treat "run"/"create" as the effective subcommand.
+        if [[ "$DOCKER_SUBCOMMAND" == "container" ]]; then
+            next_index=$((i + 1))
+            if (( next_index <= $# )); then
+                next_arg="${!next_index}"
+                if [[ "$next_arg" == "run" || "$next_arg" == "create" ]]; then
+                    DOCKER_SUBCOMMAND="$next_arg"
+                fi
+            fi
+        fi
+    fi
+done
+
+# Resolve the Docker cgroup parent once, before rebuilding arguments.
+INJECT_CGROUP_PARENT=""
+if [[ ("$DOCKER_SUBCOMMAND" == "run" || "$DOCKER_SUBCOMMAND" == "create") \
+        && "$CGROUP_PARENT_SPECIFIED" == "false" ]]; then
+    INJECT_CGROUP_PARENT=$(get_docker_cgroup_parent)
+fi
+
 ADJUSTED_ARGS=()
 SKIP_NEXT_ARG=false
 
@@ -114,6 +200,21 @@ for ((i = 1; i <= $#; i++)); do
     ADJUSTED_ARGS+=("$arg")
   fi
 done
+
+# Inject --cgroup-parent after the subcommand so Docker places new containers
+# inside the dedicated Docker cgroup instead of dockerd's own cgroup.
+if [[ -n "$INJECT_CGROUP_PARENT" ]]; then
+    NEW_ADJUSTED_ARGS=()
+    INJECTED=false
+    for arg in "${ADJUSTED_ARGS[@]}"; do
+        NEW_ADJUSTED_ARGS+=("$arg")
+        if [[ "$INJECTED" == "false" ]] && [[ "$arg" == "$DOCKER_SUBCOMMAND" ]]; then
+            NEW_ADJUSTED_ARGS+=("--cgroup-parent=${INJECT_CGROUP_PARENT}")
+            INJECTED=true
+        fi
+    done
+    ADJUSTED_ARGS=("${NEW_ADJUSTED_ARGS[@]}")
+fi
 
 # Debug: Print adjusted arguments
 # echo "Real args:" "$(printf "'%s' " "${ADJUSTED_ARGS[@]}")"
