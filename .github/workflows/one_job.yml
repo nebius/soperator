@@ -100,7 +100,7 @@ jobs:
 
       # This artifact is consumed by e2e_test.yml to determine which version to test.
       - name: Upload version artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: version
           path: version.txt
@@ -768,7 +768,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: helm-integration-test-results
           path: |
