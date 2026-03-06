@@ -24,9 +24,13 @@ if [ -n "${CGROUP_V2}" ]; then
         mkdir -p /sys/fs/cgroup/"${DOCKER_CGROUP_PATH}"
 
         if [ -n "${REAL_MEMORY}" ]; then
-            DOCKER_MEM_MAX_BYTES=$((REAL_MEMORY * 1024 * 1024))
-            echo "${DOCKER_MEM_MAX_BYTES}" > /sys/fs/cgroup/"${DOCKER_CGROUP_PATH}"/memory.max
-            echo "Docker cgroup memory.max set to ${DOCKER_MEM_MAX_BYTES} bytes (REAL_MEMORY=${REAL_MEMORY} MiB)"
+            if [[ "${REAL_MEMORY}" =~ ^[0-9]+$ ]]; then
+                DOCKER_MEM_MAX_BYTES=$((REAL_MEMORY * 1024 * 1024))
+                echo "${DOCKER_MEM_MAX_BYTES}" > /sys/fs/cgroup/"${DOCKER_CGROUP_PATH}"/memory.max
+                echo "Docker cgroup memory.max set to ${DOCKER_MEM_MAX_BYTES} bytes (REAL_MEMORY=${REAL_MEMORY} MiB)"
+            else
+                echo "WARNING: REAL_MEMORY is set but non-numeric ('${REAL_MEMORY}'); Docker cgroup memory.max left unlimited"
+            fi
         else
             echo "REAL_MEMORY not set, Docker cgroup memory.max left unlimited"
         fi
