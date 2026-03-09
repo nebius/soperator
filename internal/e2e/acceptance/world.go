@@ -24,9 +24,8 @@ type world struct {
 	replacementDelay time.Duration
 	logPrefix        string
 
-	cluster         clusterState
-	internalSSH     internalSSHContext
-	nodeReplacement nodeReplacementContext
+	cluster     clusterState
+	internalSSH internalSSHConfig
 }
 
 type clusterState struct {
@@ -37,14 +36,8 @@ type WorkerRef struct {
 	Name string
 }
 
-type internalSSHContext struct {
+type internalSSHConfig struct {
 	UserName string
-}
-
-type nodeReplacementContext struct {
-	WorkerName         string
-	MaintenanceJobID   string
-	OriginalInstanceID string
 }
 
 func (w *world) theProvisionedSlurmClusterIsReachable(ctx context.Context) error {
@@ -75,7 +68,6 @@ func (w *world) theProvisionedSlurmClusterIsReachable(ctx context.Context) error
 		return fmt.Errorf("no worker nodes discovered")
 	}
 	w.cluster.Workers = workers
-	w.internalSSH.UserName = "bob"
 
 	for _, worker := range w.cluster.Workers {
 		if _, err := w.execController(ctx, fmt.Sprintf("scontrol show node %s", shellQuote(worker.Name))); err != nil {
@@ -142,34 +134,34 @@ func (w *world) aMaintenanceEventReplacesTheWorkerNodeAndReturnsItToService(ctx 
 	if err != nil {
 		return err
 	}
-	w.nodeReplacement.WorkerName = worker.Name
+	workerName := worker.Name
 
-	nodeState, err := w.execController(ctx, fmt.Sprintf("scontrol show node %s", shellQuote(w.nodeReplacement.WorkerName)))
+	nodeState, err := w.execController(ctx, fmt.Sprintf("scontrol show node %s", shellQuote(workerName)))
 	if err != nil {
 		return fmt.Errorf("read original node state: %w", err)
 	}
 
-	w.nodeReplacement.OriginalInstanceID = parseInstanceID(nodeState)
-	if w.nodeReplacement.OriginalInstanceID == "" {
+	originalInstanceID := parseInstanceID(nodeState)
+	if originalInstanceID == "" {
 		return fmt.Errorf("unable to parse InstanceId from %q", nodeState)
 	}
 
-	jobID, err := w.execJail(ctx, fmt.Sprintf("sbatch --parsable -w %s --job-name=e2e-node-replacement --wrap=%s", shellQuote(w.nodeReplacement.WorkerName), shellQuote("sleep 600")))
+	maintenanceJobID, err := w.execJail(ctx, fmt.Sprintf("sbatch --parsable -w %s --job-name=e2e-node-replacement --wrap=%s", shellQuote(workerName), shellQuote("sleep 600")))
 	if err != nil {
 		return fmt.Errorf("submit maintenance job: %w", err)
 	}
-	w.nodeReplacement.MaintenanceJobID = strings.TrimSpace(jobID)
-	if w.nodeReplacement.MaintenanceJobID == "" {
+	maintenanceJobID = strings.TrimSpace(maintenanceJobID)
+	if maintenanceJobID == "" {
 		return fmt.Errorf("empty maintenance job id")
 	}
 	defer func() {
-		if err := w.cancelJob(context.Background()); err != nil {
+		if err := w.cancelJob(context.Background(), maintenanceJobID); err != nil {
 			w.logf("cleanup: cancel maintenance job: %v", err)
 		}
 	}()
 
 	if err := w.waitFor(ctx, "maintenance job running", w.replacementDelay, func(waitCtx context.Context) (bool, error) {
-		status, err := w.execController(waitCtx, fmt.Sprintf("squeue -h -j %s -o '%%T'", shellQuote(w.nodeReplacement.MaintenanceJobID)))
+		status, err := w.execController(waitCtx, fmt.Sprintf("squeue -h -j %s -o '%%T'", shellQuote(maintenanceJobID)))
 		if err != nil {
 			return false, err
 		}
@@ -179,12 +171,12 @@ func (w *world) aMaintenanceEventReplacesTheWorkerNodeAndReturnsItToService(ctx 
 	}
 
 	patch := fmt.Sprintf(`{"status":{"conditions":[{"type":"NebiusMaintenanceScheduled","status":"True","reason":"AcceptanceTest","message":"Maintenance scheduled for node","lastTransitionTime":"%s"}]}}`, time.Now().UTC().Format(time.RFC3339))
-	if _, err := w.run(ctx, "kubectl", "patch", "node", w.nodeReplacement.OriginalInstanceID, "--subresource=status", "--type=strategic", "-p", patch); err != nil {
+	if _, err := w.run(ctx, "kubectl", "patch", "node", originalInstanceID, "--subresource=status", "--type=strategic", "-p", patch); err != nil {
 		return fmt.Errorf("patch maintenance condition: %w", err)
 	}
 
 	if err := w.waitFor(ctx, "node drain reason", w.replacementDelay, func(waitCtx context.Context) (bool, error) {
-		state, err := w.execController(waitCtx, fmt.Sprintf("scontrol show node %s", shellQuote(w.nodeReplacement.WorkerName)))
+		state, err := w.execController(waitCtx, fmt.Sprintf("scontrol show node %s", shellQuote(workerName)))
 		if err != nil {
 			return false, err
 		}
@@ -195,12 +187,13 @@ func (w *world) aMaintenanceEventReplacesTheWorkerNodeAndReturnsItToService(ctx 
 		return err
 	}
 
-	if err := w.cancelJob(ctx); err != nil {
+	if err := w.cancelJob(ctx, maintenanceJobID); err != nil {
 		return err
 	}
+	maintenanceJobID = ""
 
 	if err := w.waitFor(ctx, "old instance removal", w.replacementDelay, func(waitCtx context.Context) (bool, error) {
-		_, err := w.run(waitCtx, "nebius", "compute", "instance", "get", "--id", w.nodeReplacement.OriginalInstanceID, "--format", "json")
+		_, err := w.run(waitCtx, "nebius", "compute", "instance", "get", "--id", originalInstanceID, "--format", "json")
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
 				return true, nil
@@ -213,13 +206,13 @@ func (w *world) aMaintenanceEventReplacesTheWorkerNodeAndReturnsItToService(ctx 
 	}
 
 	if err := w.waitFor(ctx, "replacement node ready", w.replacementDelay, func(waitCtx context.Context) (bool, error) {
-		state, err := w.execController(waitCtx, fmt.Sprintf("scontrol show node %s", shellQuote(w.nodeReplacement.WorkerName)))
+		state, err := w.execController(waitCtx, fmt.Sprintf("scontrol show node %s", shellQuote(workerName)))
 		if err != nil {
 			return false, err
 		}
 
 		newInstanceID := parseInstanceID(state)
-		if newInstanceID == "" || newInstanceID == w.nodeReplacement.OriginalInstanceID || strings.Contains(state, "DRAIN") {
+		if newInstanceID == "" || newInstanceID == originalInstanceID || strings.Contains(state, "DRAIN") {
 			return false, nil
 		}
 
@@ -228,7 +221,7 @@ func (w *world) aMaintenanceEventReplacesTheWorkerNodeAndReturnsItToService(ctx 
 		return err
 	}
 
-	if _, err := w.execController(ctx, fmt.Sprintf("srun -w %s nvidia-smi -L >/dev/null", shellQuote(w.nodeReplacement.WorkerName))); err != nil {
+	if _, err := w.execController(ctx, fmt.Sprintf("srun -w %s nvidia-smi -L >/dev/null", shellQuote(workerName))); err != nil {
 		return fmt.Errorf("validate replacement worker is operational: %w", err)
 	}
 
@@ -303,15 +296,14 @@ func (w *world) waitFor(ctx context.Context, description string, timeout time.Du
 	}
 }
 
-func (w *world) cancelJob(ctx context.Context) error {
-	if w.nodeReplacement.MaintenanceJobID == "" {
+func (w *world) cancelJob(ctx context.Context, maintenanceJobID string) error {
+	if maintenanceJobID == "" {
 		return nil
 	}
 
-	if _, err := w.execController(ctx, fmt.Sprintf("scancel %s || true", shellQuote(w.nodeReplacement.MaintenanceJobID))); err != nil {
-		return fmt.Errorf("cancel maintenance job %s: %w", w.nodeReplacement.MaintenanceJobID, err)
+	if _, err := w.execController(ctx, fmt.Sprintf("scancel %s || true", shellQuote(maintenanceJobID))); err != nil {
+		return fmt.Errorf("cancel maintenance job %s: %w", maintenanceJobID, err)
 	}
-	w.nodeReplacement.MaintenanceJobID = ""
 	return nil
 }
 

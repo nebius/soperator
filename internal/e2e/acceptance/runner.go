@@ -74,6 +74,9 @@ func newWorld(cfg Config) *world {
 		pollInterval:     10 * time.Second,
 		replacementDelay: 25 * time.Minute,
 		logPrefix:        "acceptance",
+		internalSSH: internalSSHConfig{
+			UserName: "bob",
+		},
 	}
 }
 
