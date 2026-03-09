@@ -60,7 +60,7 @@ func (s NodeReplacement) aMaintenanceEventReplacesTheWorkerNodeAndReturnsItToSer
 		}
 	}()
 
-	if err := s.exec.WaitFor(ctx, "maintenance job running", 25*time.Minute, func(waitCtx context.Context) (bool, error) {
+	if err := s.exec.WaitFor(ctx, "maintenance job running", 25*time.Minute, 10*time.Second, func(waitCtx context.Context) (bool, error) {
 		status, err := s.exec.ExecController(waitCtx, fmt.Sprintf("squeue -h -j %s -o '%%T'", framework.ShellQuote(maintenanceJobID)))
 		if err != nil {
 			return false, err
@@ -75,7 +75,7 @@ func (s NodeReplacement) aMaintenanceEventReplacesTheWorkerNodeAndReturnsItToSer
 		return fmt.Errorf("patch maintenance condition: %w", err)
 	}
 
-	if err := s.exec.WaitFor(ctx, "node drain reason", 25*time.Minute, func(waitCtx context.Context) (bool, error) {
+	if err := s.exec.WaitFor(ctx, "node drain reason", 25*time.Minute, 15*time.Second, func(waitCtx context.Context) (bool, error) {
 		state, err := s.exec.ExecController(waitCtx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(workerName)))
 		if err != nil {
 			return false, err
@@ -92,7 +92,7 @@ func (s NodeReplacement) aMaintenanceEventReplacesTheWorkerNodeAndReturnsItToSer
 	}
 	maintenanceJobID = ""
 
-	if err := s.exec.WaitFor(ctx, "old instance removal", 25*time.Minute, func(waitCtx context.Context) (bool, error) {
+	if err := s.exec.WaitFor(ctx, "old instance removal", 25*time.Minute, 30*time.Second, func(waitCtx context.Context) (bool, error) {
 		_, err := s.exec.Run(waitCtx, "nebius", "compute", "instance", "get", "--id", originalInstanceID, "--format", "json")
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
@@ -105,7 +105,7 @@ func (s NodeReplacement) aMaintenanceEventReplacesTheWorkerNodeAndReturnsItToSer
 		return err
 	}
 
-	if err := s.exec.WaitFor(ctx, "replacement node ready", 25*time.Minute, func(waitCtx context.Context) (bool, error) {
+	if err := s.exec.WaitFor(ctx, "replacement node ready", 25*time.Minute, 60*time.Second, func(waitCtx context.Context) (bool, error) {
 		state, err := s.exec.ExecController(waitCtx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(workerName)))
 		if err != nil {
 			return false, err
@@ -121,8 +121,12 @@ func (s NodeReplacement) aMaintenanceEventReplacesTheWorkerNodeAndReturnsItToSer
 		return err
 	}
 
-	if _, err := s.exec.ExecController(ctx, fmt.Sprintf("srun -w %s nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
-		return fmt.Errorf("validate replacement worker is operational: %w", err)
+	if _, err := s.exec.ExecJail(ctx, fmt.Sprintf("srun -w %s nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
+		output, stateErr := s.exec.ExecController(ctx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(workerName)))
+		if stateErr == nil {
+			s.exec.Logf("replacement worker state after failed final validation:\n%s", strings.TrimSpace(output))
+		}
+		return fmt.Errorf("validate replacement worker is operational from login node: %w", err)
 	}
 
 	return nil

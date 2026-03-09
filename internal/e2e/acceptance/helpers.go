@@ -50,7 +50,7 @@ func (w *world) Run(ctx context.Context, name string, args ...string) (string, e
 	return out, nil
 }
 
-func (w *world) WaitFor(ctx context.Context, description string, timeout time.Duration, condition func(context.Context) (bool, error)) error {
+func (w *world) WaitFor(ctx context.Context, description string, timeout, pollInterval time.Duration, condition func(context.Context) (bool, error)) error {
 	deadline := time.Now().Add(timeout)
 	for {
 		done, err := condition(ctx)
@@ -70,7 +70,7 @@ func (w *world) WaitFor(ctx context.Context, description string, timeout time.Du
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(w.pollInterval):
+		case <-time.After(pollInterval):
 		}
 	}
 }

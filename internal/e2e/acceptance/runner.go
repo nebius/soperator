@@ -36,8 +36,10 @@ func (r *Runner) Run(ctx context.Context) error {
 		Name:                "soperator-acceptance",
 		ScenarioInitializer: r.initializeScenario,
 		Options: &godog.Options{
-			Format:         "pretty",
-			Paths:          features,
+			Format: "pretty",
+			Paths:  features,
+			// Future option: enable StopOnFailure here if we want fast-fail acceptance runs.
+			// Future option: write per-scenario logs to files and upload them as CI artifacts.
 			TestingT:       nil,
 			Strict:         true,
 			DefaultContext: ctx,
@@ -79,7 +81,6 @@ func newWorld(cfg Config, state *framework.SharedState) *world {
 	return &world{
 		cfg:              cfg,
 		commandTimeout:   10 * time.Minute,
-		pollInterval:     10 * time.Second,
 		replacementDelay: 25 * time.Minute,
 		logPrefix:        "acceptance",
 		state:            state,

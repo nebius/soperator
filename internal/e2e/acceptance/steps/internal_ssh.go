@@ -38,6 +38,8 @@ func (s InternalSSH) aRegularUserCanSSHFromTheLoginNodeToAWorkerWithoutExtraSSHO
 	}
 
 	cmd := fmt.Sprintf("su - %s -c 'timeout 30 ssh %s hostname </dev/null'", framework.ShellQuote(userName), framework.ShellQuote(worker.Name))
+	// This may update the user's known_hosts on first connect; keep that in mind
+	// if later scenarios rely on SSH trust state.
 	out, err := s.exec.ExecJail(ctx, cmd)
 	if err != nil {
 		return fmt.Errorf("ssh from login to worker as %s: %w", userName, err)

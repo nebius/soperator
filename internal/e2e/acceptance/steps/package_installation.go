@@ -3,6 +3,7 @@ package steps
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cucumber/godog"
 
@@ -37,9 +38,28 @@ func (s PackageInstallation) packagesCanBeInstalledOnTheWorkerWithoutBreakingThe
 
 	for _, step := range steps {
 		if _, err := s.exec.ExecJail(ctx, step); err != nil {
+			s.logInstallFailureDiagnostics(ctx, worker.Name)
 			return fmt.Errorf("package installation step failed (%s): %w", step, err)
 		}
 	}
 
 	return nil
+}
+
+func (s PackageInstallation) logInstallFailureDiagnostics(ctx context.Context, workerName string) {
+	commands := []string{
+		fmt.Sprintf("ssh %s 'dpkg --audit || true'", framework.ShellQuote(workerName)),
+		fmt.Sprintf("ssh %s 'apt-cache policy nvitop || true'", framework.ShellQuote(workerName)),
+		fmt.Sprintf("ssh %s 'tail -n 200 /var/log/dpkg.log || true'", framework.ShellQuote(workerName)),
+		fmt.Sprintf("ssh %s 'tail -n 200 /var/log/apt/term.log || true'", framework.ShellQuote(workerName)),
+	}
+
+	for _, command := range commands {
+		output, err := s.exec.ExecJail(ctx, command)
+		if err != nil {
+			s.exec.Logf("package installation debug command failed (%s): %v", command, err)
+			continue
+		}
+		s.exec.Logf("package installation debug output (%s):\n%s", command, strings.TrimSpace(output))
+	}
 }

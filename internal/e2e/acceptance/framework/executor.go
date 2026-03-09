@@ -10,7 +10,7 @@ type Executor interface {
 	ExecController(ctx context.Context, command string) (string, error)
 	ExecJail(ctx context.Context, command string) (string, error)
 	Run(ctx context.Context, name string, args ...string) (string, error)
-	WaitFor(ctx context.Context, description string, timeout time.Duration, condition func(context.Context) (bool, error)) error
+	WaitFor(ctx context.Context, description string, timeout, pollInterval time.Duration, condition func(context.Context) (bool, error)) error
 	Logf(format string, args ...any)
 }
 

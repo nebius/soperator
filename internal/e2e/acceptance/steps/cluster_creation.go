@@ -34,7 +34,7 @@ func (s ClusterCreation) theProvisionedSlurmClusterIsReachable(ctx context.Conte
 		return err
 	}
 
-	workerOutput, err := s.exec.ExecController(ctx, `sinfo -hN -o '%N'`)
+	workerOutput, err := s.exec.ExecController(ctx, `sinfo -hN -p main -o '%N'`)
 	if err != nil {
 		return fmt.Errorf("discover worker nodes: %w", err)
 	}
@@ -51,12 +51,6 @@ func (s ClusterCreation) theProvisionedSlurmClusterIsReachable(ctx context.Conte
 		return fmt.Errorf("no worker nodes discovered")
 	}
 	s.state.Cluster.Workers = workers
-
-	for _, worker := range s.state.Cluster.Workers {
-		if _, err := s.exec.ExecController(ctx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(worker.Name))); err != nil {
-			return fmt.Errorf("read slurm worker state for %s: %w", worker.Name, err)
-		}
-	}
 
 	s.exec.Logf("discovered workers: %s", workerNames(s.state.Cluster.Workers))
 	return nil

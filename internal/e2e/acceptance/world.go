@@ -11,7 +11,6 @@ import (
 type world struct {
 	cfg              Config
 	commandTimeout   time.Duration
-	pollInterval     time.Duration
 	replacementDelay time.Duration
 	logPrefix        string
 
