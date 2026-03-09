@@ -20,6 +20,7 @@ Environment Variables (wait-topology):
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -177,6 +178,59 @@ def get_topology_poll_interval() -> int:
     """Get the poll interval in seconds."""
     interval = os.environ.get("TOPOLOGY_POLL_INTERVAL", "5")
     return int(interval)
+
+
+def topology_conf_contains_hostname(topology_conf_path: str, hostname: str) -> bool:
+    """Check whether topology.conf contains the given hostname in a nodes list."""
+    if not os.path.isfile(topology_conf_path):
+        return False
+
+    try:
+        with open(topology_conf_path, "r") as f:
+            content = f.read()
+    except (IOError, OSError) as e:
+        logger.warning("Failed to read topology config %s: %s", topology_conf_path, e)
+        return False
+
+    # Match hostname as a full token separated by key/value, comma or whitespace boundaries.
+    pattern = rf"(^|[=,\s]){re.escape(hostname)}($|[,\s])"
+    return re.search(pattern, content, flags=re.MULTILINE) is not None
+
+
+def wait_for_hostname_in_topology_conf(
+    hostname: str, wait_timeout: int, poll_interval: int, topology_conf_path: str = "/etc/slurm/topology.conf"
+) -> None:
+    """Wait until topology.conf contains hostname, otherwise exit on timeout."""
+    logger.info(
+        "Waiting for hostname %s to appear in %s (timeout=%ds, poll=%ds)",
+        hostname,
+        topology_conf_path,
+        wait_timeout,
+        poll_interval,
+    )
+    start_time = time.time()
+    while True:
+        elapsed = time.time() - start_time
+        if elapsed >= wait_timeout:
+            logger.error(
+                "Hostname %s not found in %s after %ds",
+                hostname,
+                topology_conf_path,
+                wait_timeout,
+            )
+            sys.exit(1)
+
+        if topology_conf_contains_hostname(topology_conf_path, hostname):
+            logger.info("Hostname %s found in %s", hostname, topology_conf_path)
+            return
+
+        logger.info(
+            "Hostname %s is not in %s yet, retrying... (%ds elapsed)",
+            hostname,
+            topology_conf_path,
+            int(elapsed),
+        )
+        time.sleep(poll_interval)
 
 
 def read_topology_for_node(topology_path: str, node_name: str) -> str:
@@ -346,6 +400,9 @@ def wait_for_topology() -> None:
         logger.error("HOSTNAME environment variable is not set")
         sys.exit(1)
 
+    wait_timeout = get_topology_wait_timeout()
+    poll_interval = get_topology_poll_interval()
+
     if not is_gpu_enabled():
         logger.info(
             "NODESET_GPU_ENABLED is not set to 'true', "
@@ -356,8 +413,6 @@ def wait_for_topology() -> None:
 
     node_name = get_node_name()
     topology_path = get_topology_path()
-    wait_timeout = get_topology_wait_timeout()
-    poll_interval = get_topology_poll_interval()
 
     logger.info("Waiting for topology data for node: %s", node_name)
     logger.info("Topology ConfigMap path: %s", topology_path)
@@ -413,6 +468,7 @@ def wait_for_topology() -> None:
         logger.error("Failed to format topology from raw data: %s", raw_topology)
         sys.exit(1)
 
+    wait_for_hostname_in_topology_conf(hostname, wait_timeout, poll_interval)
     apply_node_topology(hostname, topology)
 
 
