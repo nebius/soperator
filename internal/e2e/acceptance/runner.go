@@ -19,8 +19,8 @@ type Config struct {
 	ClusterName     string
 }
 
-func NewRunner(cfg Config) (*Runner, error) {
-	return &Runner{cfg: cfg}, nil
+func NewRunner(cfg Config) *Runner {
+	return &Runner{cfg: cfg}
 }
 
 func (r *Runner) Run(ctx context.Context) error {
