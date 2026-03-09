@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
+
+	"nebius.ai/slurm-operator/internal/e2e/acceptance/framework"
+	"nebius.ai/slurm-operator/internal/e2e/acceptance/steps"
 )
 
 type Runner struct {
@@ -59,24 +62,27 @@ func featurePaths() []string {
 }
 
 func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
-	world := newWorld(r.cfg)
+	state := &framework.SharedState{
+		InternalSSH: framework.InternalSSHConfig{
+			UserName: "bob",
+		},
+	}
+	world := newWorld(r.cfg, state)
 
-	sc.Step(`^the provisioned Slurm cluster is reachable$`, world.theProvisionedSlurmClusterIsReachable)
-	sc.Step(`^a regular user can SSH from the login node to a worker without extra SSH options$`, world.aRegularUserCanSSHFromTheLoginNodeToAWorkerWithoutExtraSSHOptions)
-	sc.Step(`^packages can be installed on the worker without breaking the NVIDIA driver$`, world.packagesCanBeInstalledOnTheWorkerWithoutBreakingTheNVIDIADriver)
-	sc.Step(`^a maintenance event replaces the worker node and returns it to service$`, world.aMaintenanceEventReplacesTheWorkerNodeAndReturnsItToService)
+	steps.NewClusterCreation(state, world).Register(sc)
+	steps.NewInternalSSH(state, world).Register(sc)
+	steps.NewPackageInstallation(state, world).Register(sc)
+	steps.NewNodeReplacement(state, world).Register(sc)
 }
 
-func newWorld(cfg Config) *world {
+func newWorld(cfg Config, state *framework.SharedState) *world {
 	return &world{
 		cfg:              cfg,
 		commandTimeout:   10 * time.Minute,
 		pollInterval:     10 * time.Second,
 		replacementDelay: 25 * time.Minute,
 		logPrefix:        "acceptance",
-		internalSSH: internalSSHConfig{
-			UserName: "bob",
-		},
+		state:            state,
 	}
 }
 
