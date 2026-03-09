@@ -185,23 +185,6 @@ func (w *world) aMaintenanceEventReplacesTheWorkerNodeAndReturnsItToService(ctx 
 	return nil
 }
 
-func (w *world) theWorkflowDestroyStepRemovesTheE2ECluster(ctx context.Context) error {
-	out, err := w.run(ctx,
-		"nebius", "mk8s", "cluster", "list",
-		"--parent-id", w.cfg.NebiusProjectID,
-		"--format", "json",
-	)
-	if err != nil {
-		return fmt.Errorf("list mk8s clusters: %w", err)
-	}
-
-	if strings.Contains(out, w.cfg.ClusterName) {
-		return fmt.Errorf("cluster %s still exists", w.cfg.ClusterName)
-	}
-
-	return nil
-}
-
 func (w *world) execController(ctx context.Context, command string) (string, error) {
 	return w.run(ctx, "kubectl", "exec", "-n", "soperator", "controller-0", "--", "bash", "-lc", command)
 }

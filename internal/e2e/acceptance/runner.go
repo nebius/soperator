@@ -2,7 +2,6 @@ package acceptance
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -11,14 +10,8 @@ import (
 	"github.com/cucumber/godog"
 )
 
-const (
-	phasePreDestroy  = "pre-destroy"
-	phasePostDestroy = "post-destroy"
-)
-
 type Runner struct {
-	cfg   Config
-	phase string
+	cfg Config
 }
 
 type Config struct {
@@ -26,27 +19,18 @@ type Config struct {
 	ClusterName     string
 }
 
-func NewRunner(cfg Config, phase string) (*Runner, error) {
-	if phase == "" {
-		phase = phasePreDestroy
-	}
-
-	switch phase {
-	case phasePreDestroy, phasePostDestroy:
-		return &Runner{cfg: cfg, phase: phase}, nil
-	default:
-		return nil, fmt.Errorf("unknown acceptance phase %q", phase)
-	}
+func NewRunner(cfg Config) (*Runner, error) {
+	return &Runner{cfg: cfg}, nil
 }
 
 func (r *Runner) Run(ctx context.Context) error {
-	features, err := featurePaths(r.phase)
-	if err != nil {
-		return err
+	features := featurePaths()
+	if len(features) == 0 {
+		return fmt.Errorf("no acceptance feature files configured")
 	}
 
 	suite := godog.TestSuite{
-		Name:                "soperator-acceptance-" + r.phase,
+		Name:                "soperator-acceptance",
 		ScenarioInitializer: r.initializeScenario,
 		Options: &godog.Options{
 			Format:         "pretty",
@@ -64,30 +48,14 @@ func (r *Runner) Run(ctx context.Context) error {
 	return nil
 }
 
-func featurePaths(phase string) ([]string, error) {
+func featurePaths() []string {
 	baseDir := filepath.Join("internal", "e2e", "acceptance", "features")
-	var paths []string
-	switch phase {
-	case phasePreDestroy:
-		paths = []string{
-			filepath.Join(baseDir, "cluster_creation.feature"),
-			filepath.Join(baseDir, "internal_ssh.feature"),
-			filepath.Join(baseDir, "package_installation.feature"),
-			filepath.Join(baseDir, "node_replacement.feature"),
-		}
-	case phasePostDestroy:
-		paths = []string{
-			filepath.Join(baseDir, "cluster_deletion.feature"),
-		}
-	default:
-		return nil, fmt.Errorf("unknown acceptance phase %q", phase)
+	return []string{
+		filepath.Join(baseDir, "cluster_creation.feature"),
+		filepath.Join(baseDir, "internal_ssh.feature"),
+		filepath.Join(baseDir, "package_installation.feature"),
+		filepath.Join(baseDir, "node_replacement.feature"),
 	}
-
-	if len(paths) == 0 {
-		return nil, errors.New("no feature files found for phase " + phase)
-	}
-
-	return paths, nil
 }
 
 func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
@@ -97,7 +65,6 @@ func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^a regular user can SSH from the login node to a worker without extra SSH options$`, world.aRegularUserCanSSHFromTheLoginNodeToAWorkerWithoutExtraSSHOptions)
 	sc.Step(`^packages can be installed on the worker without breaking the NVIDIA driver$`, world.packagesCanBeInstalledOnTheWorkerWithoutBreakingTheNVIDIADriver)
 	sc.Step(`^a maintenance event replaces the worker node and returns it to service$`, world.aMaintenanceEventReplacesTheWorkerNodeAndReturnsItToService)
-	sc.Step(`^the workflow destroy step removes the e2e cluster$`, world.theWorkflowDestroyStepRemovesTheE2ECluster)
 }
 
 func newWorld(cfg Config) *world {

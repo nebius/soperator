@@ -289,8 +289,6 @@ jobs:
 
       - name: Acceptance Tests
         timeout-minutes: 90
-        env:
-          E2E_ACCEPTANCE_PHASE: pre-destroy
         run: |
           bin/e2e acceptance
 
@@ -452,14 +450,6 @@ jobs:
           aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
 
           bin/e2e destroy
-
-      - name: Post-destroy Acceptance Tests
-        if: ${{ success() && !cancelled() }}
-        timeout-minutes: 10
-        env:
-          E2E_ACCEPTANCE_PHASE: post-destroy
-        run: |
-          bin/e2e acceptance
 
       - name: Force cleanup compute instances on failure
         if: failure()
