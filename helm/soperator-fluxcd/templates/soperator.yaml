@@ -47,7 +47,7 @@ spec:
     controllerManager:
       kubeRbacProxy:
         image:
-          repository: gcr.io/kubebuilder/kube-rbac-proxy
+          repository: registry.k8s.io/kubebuilder/kube-rbac-proxy
           tag: v0.15.0
       manager:
         {{- if .Values.soperator.featureGates }}
