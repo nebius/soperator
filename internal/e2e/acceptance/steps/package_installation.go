@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cucumber/godog"
 
@@ -37,7 +38,7 @@ func (s PackageInstallation) packagesCanBeInstalledOnTheWorkerWithoutBreakingThe
 	}
 
 	for _, step := range steps {
-		if _, err := s.exec.ExecJail(ctx, step); err != nil {
+		if _, err := s.exec.ExecJailWithRetry(ctx, step, 5, 10*time.Second); err != nil {
 			s.logInstallFailureDiagnostics(ctx, worker.Name)
 			return fmt.Errorf("package installation step failed (%s): %w", step, err)
 		}
@@ -50,12 +51,12 @@ func (s PackageInstallation) logInstallFailureDiagnostics(ctx context.Context, w
 	commands := []string{
 		fmt.Sprintf("ssh %s 'dpkg --audit || true'", framework.ShellQuote(workerName)),
 		fmt.Sprintf("ssh %s 'apt-cache policy nvitop || true'", framework.ShellQuote(workerName)),
-		fmt.Sprintf("ssh %s 'tail -n 200 /var/log/dpkg.log || true'", framework.ShellQuote(workerName)),
-		fmt.Sprintf("ssh %s 'tail -n 200 /var/log/apt/term.log || true'", framework.ShellQuote(workerName)),
+		fmt.Sprintf("ssh %s 'tail -n 60 /var/log/dpkg.log || true'", framework.ShellQuote(workerName)),
+		fmt.Sprintf("ssh %s 'tail -n 60 /var/log/apt/term.log || true'", framework.ShellQuote(workerName)),
 	}
 
 	for _, command := range commands {
-		output, err := s.exec.ExecJail(ctx, command)
+		output, err := s.exec.ExecJailWithRetry(ctx, command, 2, 10*time.Second)
 		if err != nil {
 			s.exec.Logf("package installation debug command failed (%s): %v", command, err)
 			continue

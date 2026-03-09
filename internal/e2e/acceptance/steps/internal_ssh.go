@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cucumber/godog"
 
@@ -33,14 +34,14 @@ func (s InternalSSH) aRegularUserCanSSHFromTheLoginNodeToAWorkerWithoutExtraSSHO
 	if userName == "" {
 		userName = "bob"
 	}
-	if _, err := s.exec.ExecJail(ctx, fmt.Sprintf("id %s >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh %s", framework.ShellQuote(userName), framework.ShellQuote(userName))); err != nil {
+	if _, err := s.exec.ExecJailWithRetry(ctx, fmt.Sprintf("id %s >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh %s", framework.ShellQuote(userName), framework.ShellQuote(userName)), 5, 10*time.Second); err != nil {
 		return fmt.Errorf("create user %s: %w", userName, err)
 	}
 
 	cmd := fmt.Sprintf("su - %s -c 'timeout 30 ssh %s hostname </dev/null'", framework.ShellQuote(userName), framework.ShellQuote(worker.Name))
 	// This may update the user's known_hosts on first connect; keep that in mind
 	// if later scenarios rely on SSH trust state.
-	out, err := s.exec.ExecJail(ctx, cmd)
+	out, err := s.exec.ExecJailWithRetry(ctx, cmd, 5, 10*time.Second)
 	if err != nil {
 		return fmt.Errorf("ssh from login to worker as %s: %w", userName, err)
 	}
