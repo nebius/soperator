@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/cucumber/godog"
@@ -68,18 +66,21 @@ func (r *Runner) Run(ctx context.Context) error {
 
 func featurePaths(phase string) ([]string, error) {
 	baseDir := filepath.Join("internal", "e2e", "acceptance", "features")
-	entries, err := os.ReadDir(baseDir)
-	if err != nil {
-		return nil, fmt.Errorf("read features directory: %w", err)
-	}
-
-	suffix := "." + phase + ".feature"
 	var paths []string
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), suffix) {
-			continue
+	switch phase {
+	case phasePreDestroy:
+		paths = []string{
+			filepath.Join(baseDir, "cluster_creation.feature"),
+			filepath.Join(baseDir, "internal_ssh.feature"),
+			filepath.Join(baseDir, "package_installation.feature"),
+			filepath.Join(baseDir, "node_replacement.feature"),
 		}
-		paths = append(paths, filepath.Join(baseDir, entry.Name()))
+	case phasePostDestroy:
+		paths = []string{
+			filepath.Join(baseDir, "cluster_deletion.feature"),
+		}
+	default:
+		return nil, fmt.Errorf("unknown acceptance phase %q", phase)
 	}
 
 	if len(paths) == 0 {
