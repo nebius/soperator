@@ -17,17 +17,34 @@ type NodeSetDef struct {
 	Preemptible      bool   `json:"preemptible"`
 }
 
+type CapacityStrategy string
+
+const (
+	CapacityStrategyWarn   CapacityStrategy = "warn"
+	CapacityStrategyCancel CapacityStrategy = "cancel"
+)
+
 // Profile holds infrastructure-specific settings loaded from the PROFILE env var.
 // JSON tags are required by sigs.k8s.io/yaml.
 type Profile struct {
-	NebiusProjectID string       `json:"nebius_project_id"`
-	NebiusRegion    string       `json:"nebius_region"`
-	NebiusTenantID  string       `json:"nebius_tenant_id"`
-	NodeSets        []NodeSetDef `json:"nodesets"`
+	NebiusProjectID  string           `json:"nebius_project_id"`
+	NebiusRegion     string           `json:"nebius_region"`
+	NebiusTenantID   string           `json:"nebius_tenant_id"`
+	CapacityStrategy CapacityStrategy `json:"capacity_strategy"`
+	NodeSets         []NodeSetDef     `json:"nodesets"`
 }
 
 // Validate checks that the profile is well-formed.
-func (p Profile) Validate() error {
+func (p *Profile) Validate() error {
+	switch p.CapacityStrategy {
+	case "":
+		p.CapacityStrategy = CapacityStrategyWarn
+	case CapacityStrategyWarn, CapacityStrategyCancel:
+		// ok
+	default:
+		return fmt.Errorf("unknown capacity_strategy %q (valid: warn, cancel)", p.CapacityStrategy)
+	}
+
 	if len(p.NodeSets) == 0 {
 		return fmt.Errorf("nodesets must not be empty")
 	}
