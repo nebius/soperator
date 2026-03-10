@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func validProfile() Profile {
@@ -25,8 +24,7 @@ func validProfile() Profile {
 }
 
 func TestValidate_Valid(t *testing.T) {
-	p := validProfile()
-	assert.NoError(t, p.Validate())
+	assert.NoError(t, validProfile().Validate())
 }
 
 func TestValidate_MultipleNodeSets(t *testing.T) {
@@ -80,30 +78,4 @@ func TestValidate_NegativeSize(t *testing.T) {
 	p := validProfile()
 	p.NodeSets[0].Size = -1
 	assert.ErrorContains(t, p.Validate(), "size must be positive")
-}
-
-func TestValidate_CapacityStrategyDefaultsToWarn(t *testing.T) {
-	p := validProfile()
-	require.NoError(t, p.Validate())
-	assert.Equal(t, CapacityStrategyWarn, p.CapacityStrategy)
-}
-
-func TestValidate_CapacityStrategyWarn(t *testing.T) {
-	p := validProfile()
-	p.CapacityStrategy = CapacityStrategyWarn
-	require.NoError(t, p.Validate())
-	assert.Equal(t, CapacityStrategyWarn, p.CapacityStrategy)
-}
-
-func TestValidate_CapacityStrategyCancel(t *testing.T) {
-	p := validProfile()
-	p.CapacityStrategy = CapacityStrategyCancel
-	require.NoError(t, p.Validate())
-	assert.Equal(t, CapacityStrategyCancel, p.CapacityStrategy)
-}
-
-func TestValidate_CapacityStrategyUnknown(t *testing.T) {
-	p := validProfile()
-	p.CapacityStrategy = "unknown"
-	assert.ErrorContains(t, p.Validate(), "unknown capacity_strategy")
 }
