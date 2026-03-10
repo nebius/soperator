@@ -101,7 +101,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	logger.V(1).Info("Fetched NodeSets for SlurmCluster", "count", len(nodeSetList))
 
-	existingTopologyConfig, err := r.EnsureWorkerTopologyConfigMap(ctx, req.Namespace, logger)
+	existingTopologyConfig, err := r.EnsureWorkerTopologyConfigMap(ctx, req.Namespace, nodeSetList, logger)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("ensure worker topology ConfigMap: %w", err)
 	}
@@ -110,8 +110,9 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("build NodeSet topology config: %w", err)
 	}
-	if desiredTopology == "" {
-		return ctrl.Result{}, fmt.Errorf("built empty topology config")
+	if strings.TrimSpace(desiredTopology) == "" {
+		logger.Info("No running worker pods yet, preserving existing topology config")
+		return DefaultRequeueResult, nil
 	}
 
 	existingTopology := existingTopologyConfig.Data[consts.ConfigMapKeyTopologyConfig]
@@ -144,7 +145,7 @@ func isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
 
 // EnsureWorkerTopologyConfigMap checks if the topology ConfigMap and JailedConfig exist, and creates them if they don't.
 func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
-	ctx context.Context, namespace string, logger logr.Logger,
+	ctx context.Context, namespace string, nodeSetList []v1alpha1.NodeSet, logger logr.Logger,
 ) (*corev1.ConfigMap, error) {
 	configMapKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
 	jailedConfigKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
@@ -178,7 +179,7 @@ func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
 			"configMapExists", configMapExists,
 			"jailedConfigExists", jailedConfigExists)
 
-		if err = r.createDefaultTopologyResources(ctx, namespace); err != nil {
+		if err = r.createDefaultTopologyResources(ctx, namespace, nodeSetList); err != nil {
 			return nil, fmt.Errorf("create default topology resources in namespace %q: %w", namespace, err)
 		}
 
@@ -195,17 +196,29 @@ func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
 }
 
 // createDefaultTopologyResources creates both ConfigMap and JailedConfig resources for topology configuration with default values.
-func (r *WorkerTopologyReconciler) createDefaultTopologyResources(ctx context.Context, namespace string,
+// It builds a flat topology with all worker nodes listed under a single root switch,
+// using the same naming pattern as slurm.conf: <nodeSetName>-<index>.
+func (r *WorkerTopologyReconciler) createDefaultTopologyResources(
+	ctx context.Context, namespace string, nodeSetList []v1alpha1.NodeSet,
 ) error {
+	var nodeNames []string
+	for _, nodeSet := range nodeSetList {
+		for i := int32(0); i < nodeSet.Spec.Replicas; i++ {
+			nodeNames = append(nodeNames, fmt.Sprintf("%s-%d", nodeSet.Name, i))
+		}
+	}
 
-	// Create ConfigMap
-	configMap := r.renderTopologyConfigMap(namespace, "SwitchName=root")
+	defaultTopology := "SwitchName=root"
+	if len(nodeNames) > 0 {
+		defaultTopology = fmt.Sprintf("SwitchName=root Nodes=%s", strings.Join(nodeNames, ","))
+	}
+
+	configMap := r.renderTopologyConfigMap(namespace, defaultTopology)
 	err := r.Client.Create(ctx, configMap)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("create ConfigMap %s: %w", configMap.Name, err)
 	}
 
-	// Create JailedConfig
 	jailedConfig := r.renderTopologyJailedConfig(namespace)
 	err = r.Client.Create(ctx, jailedConfig)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
