@@ -34,7 +34,7 @@ func (w *world) ExecJailWithRetry(ctx context.Context, command string, attempts 
 			return out, nil
 		}
 		lastErr = err
-		if attempt == attempts || !isRetriableSSHError(err) {
+		if attempt == attempts {
 			break
 		}
 
@@ -75,13 +75,6 @@ func (w *world) Run(ctx context.Context, name string, args ...string) (string, e
 	}
 
 	return out, nil
-}
-
-func isRetriableSSHError(err error) bool {
-	msg := err.Error()
-	return strings.Contains(msg, "Connection reset by") ||
-		strings.Contains(msg, "Connection closed by") ||
-		strings.Contains(msg, "kex_exchange_identification")
 }
 
 func (w *world) WaitFor(ctx context.Context, description string, timeout, pollInterval time.Duration, condition func(context.Context) (bool, error)) error {
