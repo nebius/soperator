@@ -3,6 +3,6 @@ Feature: Package installation
   As the soperator team
   We verify packages can be installed on a worker node
 
-  Scenario: Installing nvitop does not break the NVIDIA driver
+  Scenario: Installing jq does not break the NVIDIA driver
     Given the provisioned Slurm cluster is reachable
     When packages can be installed on the worker without breaking the NVIDIA driver

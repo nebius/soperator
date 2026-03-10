@@ -32,9 +32,9 @@ func (s PackageInstallation) packagesCanBeInstalledOnTheWorkerWithoutBreakingThe
 	steps := []string{
 		fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(worker.Name)),
 		fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get update'", framework.ShellQuote(worker.Name)),
-		fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nvitop'", framework.ShellQuote(worker.Name)),
+		fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jq'", framework.ShellQuote(worker.Name)),
 		fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(worker.Name)),
-		fmt.Sprintf("ssh %s 'nvitop --help >/dev/null'", framework.ShellQuote(worker.Name)),
+		fmt.Sprintf("ssh %s 'jq --version >/dev/null'", framework.ShellQuote(worker.Name)),
 	}
 
 	for _, step := range steps {
@@ -50,7 +50,7 @@ func (s PackageInstallation) packagesCanBeInstalledOnTheWorkerWithoutBreakingThe
 func (s PackageInstallation) logInstallFailureDiagnostics(ctx context.Context, workerName string) {
 	commands := []string{
 		fmt.Sprintf("ssh %s 'dpkg --audit || true'", framework.ShellQuote(workerName)),
-		fmt.Sprintf("ssh %s 'apt-cache policy nvitop || true'", framework.ShellQuote(workerName)),
+		fmt.Sprintf("ssh %s 'apt-cache policy jq || true'", framework.ShellQuote(workerName)),
 		fmt.Sprintf("ssh %s 'tail -n 60 /var/log/dpkg.log || true'", framework.ShellQuote(workerName)),
 		fmt.Sprintf("ssh %s 'tail -n 60 /var/log/apt/term.log || true'", framework.ShellQuote(workerName)),
 	}
