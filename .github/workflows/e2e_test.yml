@@ -73,7 +73,7 @@ jobs:
             echo "- Profile variable: \`$PROFILE_ENV_VAR\`"
             echo ""
             echo '```yaml'
-            echo "$E2E_PROFILE" | yq .
+            echo "$E2E_PROFILE"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
