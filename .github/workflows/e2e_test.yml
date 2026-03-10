@@ -3,6 +3,11 @@ name: E2E test soperator
 on:
   workflow_dispatch:
     inputs:
+      is_scheduled:
+        description: "Triggered by the scheduler?"
+        type: string
+        required: false
+        default: "false"
       terraform_repo_ref:
         description: "ref of terraform repo (defaults to current branch)"
         required: false
@@ -22,6 +27,9 @@ jobs:
   resolve-profile:
     runs-on: ubuntu-latest
     environment: e2e
+    concurrency:
+      group: e2e-resolve-profile
+      cancel-in-progress: false
     outputs:
       nebius_project_id: ${{ steps.resolve.outputs.nebius_project_id }}
       nebius_region: ${{ steps.resolve.outputs.nebius_region }}
@@ -44,6 +52,13 @@ jobs:
           echo "nebius_region=$(echo "$E2E_PROFILE" | yq -r '.nebius_region')" >> "$GITHUB_OUTPUT"
           echo "nebius_tenant_id=$(echo "$E2E_PROFILE" | yq -r '.nebius_tenant_id')" >> "$GITHUB_OUTPUT"
 
+          # Write metadata for conflict detection
+          jq -n \
+            --arg project_id "$(echo "$E2E_PROFILE" | yq -r '.nebius_project_id')" \
+            --argjson is_scheduled "${{ inputs.is_scheduled == 'true' }}" \
+            '{project_id: $project_id, is_scheduled: $is_scheduled}' \
+            > /tmp/e2e-run-metadata.json
+
       - name: Print run parameters
         shell: bash
         env:
@@ -58,9 +73,67 @@ jobs:
             echo "- Profile variable: \`$PROFILE_ENV_VAR\`"
             echo ""
             echo '```yaml'
-            echo "$E2E_PROFILE" | yq .
+            echo "$E2E_PROFILE"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload run metadata
+        uses: actions/upload-artifact@v6
+        with:
+          name: e2e-run-metadata
+          path: /tmp/e2e-run-metadata.json
+          retention-days: 1
+
+      - name: Check for same-project conflicts
+        if: inputs.is_scheduled == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+          PROJECT_ID: ${{ steps.resolve.outputs.nebius_project_id }}
+        run: |
+          echo "Checking for pending e2e runs on project $PROJECT_ID..."
+
+          # Only check for pending runs — not in_progress.
+          # One in_progress + one pending is fine (concurrency group handles that).
+          # We self-cancel only to avoid being the 3rd run that would bump an existing pending run.
+          pending_run_ids=$(gh api "repos/${{ github.repository }}/actions/workflows/e2e_test.yml/runs?status=pending" \
+            --jq ".workflow_runs[] | select(.id != $CURRENT_RUN_ID) | .id") || true
+
+          repo_url="https://github.com/${{ github.repository }}"
+
+          if [ -z "$pending_run_ids" ]; then
+            echo "No other pending e2e runs found. Proceeding."
+            echo "### Conflict Check" >> "$GITHUB_STEP_SUMMARY"
+            echo "No other pending e2e runs on project \`$PROJECT_ID\`. Proceeding." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          for run_id in $pending_run_ids; do
+            echo "Checking run $run_id..."
+            tmpdir=$(mktemp -d)
+            if gh run download "$run_id" -n e2e-run-metadata -D "$tmpdir" -R "${{ github.repository }}"; then
+              other_project=$(jq -r '.project_id' "$tmpdir/e2e-run-metadata.json")
+              if [ "$other_project" == "$PROJECT_ID" ]; then
+                echo "::warning::Conflict: run $run_id is already pending on project $PROJECT_ID. Cancelling this scheduled run."
+                {
+                  echo "### Conflict Check"
+                  echo "Run [$run_id]($repo_url/actions/runs/$run_id) is already pending on project \`$PROJECT_ID\`."
+                  echo "Cancelled this scheduled run to avoid bumping it from the queue."
+                } >> "$GITHUB_STEP_SUMMARY"
+                gh run cancel "$CURRENT_RUN_ID" -R "${{ github.repository }}"
+                exit 1
+              fi
+              echo "Run $run_id targets project $other_project (no conflict)"
+            else
+              echo "Run $run_id has no metadata artifact yet, skipping"
+            fi
+            rm -rf "$tmpdir"
+          done
+
+          echo "No conflicting runs found. Proceeding."
+          echo "### Conflict Check" >> "$GITHUB_STEP_SUMMARY"
+          echo "No conflicting pending runs on project \`$PROJECT_ID\`. Proceeding." >> "$GITHUB_STEP_SUMMARY"
 
   e2e-test:
     needs: resolve-profile
