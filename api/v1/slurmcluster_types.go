@@ -868,6 +868,8 @@ type SlurmNodeController struct {
 	// +kubebuilder:validation:Required
 	Munge NodeContainer `json:"munge"`
 
+	SidecarSSSD `json:",inline"`
+
 	// Volumes represents the volume configurations for the controller node
 	//
 	// +kubebuilder:validation:Required
@@ -919,6 +921,8 @@ type SlurmNodeLogin struct {
 	// +kubebuilder:validation:Required
 	Munge NodeContainer `json:"munge"`
 
+	SidecarSSSD `json:",inline"`
+
 	// SshdServiceType represents the service type for the SSH daemon
 	// Must be one of [corev1.ServiceTypeLoadBalancer] or [corev1.ServiceTypeNodePort]
 	//
@@ -960,6 +964,32 @@ type SlurmNodeLogin struct {
 	//
 	// +kubebuilder:validation:Required
 	Volumes SlurmNodeLoginVolumes `json:"volumes"`
+}
+
+// SidecarSSSD defines the shared SSSD sidecar configuration for Slurm node pods.
+type SidecarSSSD struct {
+	// Sssd represents the sssd container configuration
+	//
+	// +kubebuilder:validation:Optional
+	Sssd *NodeContainer `json:"sssd,omitempty"`
+
+	// SSSDDebugLevel defines the SSSD debug verbosity level.
+	// Lower values are suitable for production, higher values are intended for troubleshooting.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=0
+	SSSDDebugLevel int32 `json:"sssdDebugLevel,omitempty"`
+
+	// SSSDConfSecretRefName is the name of the Secret containing sssd.conf for the node and sssd sidecar containers.
+	//
+	// +kubebuilder:validation:Optional
+	SSSDConfSecretRefName string `json:"sssdConfSecretRefName,omitempty"`
+
+	// SSSDLdapCAConfigMapRefName is the name of the ConfigMap containing LDAP CA certificates for the sssd sidecar.
+	//
+	// +kubebuilder:validation:Optional
+	SSSDLdapCAConfigMapRefName string `json:"sssdLdapCAConfigMapRefName,omitempty"`
 }
 
 // SlurmNodeLoginVolumes defines the volumes for the Slurm login node

@@ -50,6 +50,14 @@ func RenderNodeSetStatefulSet(
 	initContainers := slices.Clone(nodeSet.CustomInitContainers)
 	initContainers = append(initContainers,
 		common.RenderContainerMunge(&nodeSet.ContainerMunge),
+	)
+	if nodeSet.ContainerSSSD != nil {
+		initContainers = append(initContainers, common.RenderContainerSSSD(
+			nodeSet.ContainerSSSD,
+			common.SSSDLdapCAConfigMap(nodeSet.SSSDLdapCAConfigMapName),
+		))
+	}
+	initContainers = append(initContainers,
 		RenderContainerWorkerInit(
 			clusterName, &nodeSet.ContainerSlurmd, topologyPluginEnabled,
 			nodeSet.GPU.Enabled, topologyTimeOut,

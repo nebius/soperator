@@ -174,6 +174,19 @@ plugStackConfig:
 #        foo: bar
 
 slurmNodes:
+  sssd:
+    enabled: false
+    sssdDebugLevel: 0
+    imagePullPolicy: "IfNotPresent"
+    appArmorProfile: "unconfined"
+    command: []
+    args: []
+    resources:
+      cpu: "200m"
+      memory: "500Mi"
+      ephemeralStorage: "5Gi"
+    sssdConfSecretRefName: ""
+    sssdLdapCAConfigMapRefName: ""
   accounting:
     enabled: false
     k8sNodeFilterName: "no-gpu"
@@ -506,6 +519,7 @@ images:
   slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:3.0.2-slurm25.11.3"
   sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:3.0.2-slurm25.11.3"
   munge: "cr.eu-north1.nebius.cloud/soperator/munge:3.0.2-slurm25.11.3"
+  sssd: "cr.eu-north1.nebius.cloud/soperator/sssd:2.9.4-1-63"
   populateJail: ""
   populateJailRepository: "cr.eu-north1.nebius.cloud/soperator/populate_jail"
   populateJailTag: "3.0.2-slurm25.11.3"

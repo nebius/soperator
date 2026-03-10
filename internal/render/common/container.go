@@ -117,3 +117,131 @@ func RenderPlaceholderContainerMunge(container *values.Container) corev1.Contain
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}
 }
+
+// RenderContainerSSSD renders [corev1.Container] for sssd
+func RenderContainerSSSD(container *values.Container, opts ...RenderOption) corev1.Container {
+
+	// Not all resources are guaranteed to be set in the container.Resources field.
+	options := renderOptions{
+		guaranteed: false,
+	}
+
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	limits := container.Resources
+
+	if !options.guaranteed {
+		// Create a copy of the container's limits and add non-CPU resources from Requests
+		limits = CopyNonCPUResources(container.Resources)
+	}
+
+	restartPolicy := corev1.ContainerRestartPolicy("Always")
+
+	securityContext := &corev1.SecurityContext{
+		AppArmorProfile: ParseAppArmorProfile(container.AppArmorProfile),
+	}
+
+	volumeMounts := []corev1.VolumeMount{
+		RenderVolumeMountSSSDConf(),
+		RenderVolumeMountSSSDSocket(),
+	}
+	if options.sssdLdapCAConfigMapName != "" {
+		volumeMounts = append(volumeMounts, RenderVolumeMountSSSDLdapCA())
+	}
+
+	command, args := renderCommandAndArgsSSSD(container)
+
+	return corev1.Container{
+		Name:            consts.ContainerNameSSSD,
+		Image:           container.Image,
+		Command:         command,
+		Args:            args,
+		Env:             container.CustomEnv,
+		RestartPolicy:   &restartPolicy,
+		ImagePullPolicy: container.ImagePullPolicy,
+		VolumeMounts:    volumeMounts,
+		ReadinessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"/bin/sh",
+						"-c",
+						"test -S /var/lib/sss/pipes/nss && test -S /var/lib/sss/pipes/pam",
+					},
+				},
+			},
+			TimeoutSeconds:   DefaultProbeTimeoutSeconds,
+			PeriodSeconds:    DefaultProbePeriodSeconds,
+			SuccessThreshold: DefaultProbeSuccessThreshold,
+			FailureThreshold: DefaultProbeFailureThreshold,
+		},
+		LivenessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"/bin/sh",
+						"-c",
+						"test -S /var/lib/sss/pipes/nss && test -S /var/lib/sss/pipes/pam",
+					},
+				},
+			},
+			TimeoutSeconds:   DefaultProbeTimeoutSeconds,
+			PeriodSeconds:    DefaultProbePeriodSeconds,
+			SuccessThreshold: DefaultProbeSuccessThreshold,
+			FailureThreshold: DefaultProbeFailureThreshold,
+		},
+		SecurityContext: securityContext,
+		Resources: corev1.ResourceRequirements{
+			Limits:   limits,
+			Requests: container.Resources,
+		},
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+	}
+}
+
+func renderCommandAndArgsSSSD(container *values.Container) ([]string, []string) {
+	command := container.Command
+	args := container.Args
+
+	if len(command) != 0 || len(args) != 0 {
+		return command, args
+	}
+
+	return []string{"/bin/sh", "-c"}, []string{
+		fmt.Sprintf(
+			"mkdir -p %s \\\n&& chmod 700 %s \\\n&& exec /usr/sbin/sssd --interactive -d %d --logger=stderr",
+			path.Join(consts.VolumeMountPathSSSDSocket, "private"),
+			path.Join(consts.VolumeMountPathSSSDSocket, "private"),
+			container.SSSDDebugLevel,
+		),
+	}
+}
+
+// RenderVolumeMountSSSDConf renders [corev1.VolumeMount] defining the mounting path for sssd config directory
+func RenderVolumeMountSSSDConf() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSSSDConf,
+		MountPath: consts.VolumeMountPathSSSDConf,
+		ReadOnly:  true,
+	}
+}
+
+// RenderVolumeMountSSSDSocket renders [corev1.VolumeMount] defining the mounting path for sssd socket
+func RenderVolumeMountSSSDSocket() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSSSDSocket,
+		MountPath: consts.VolumeMountPathSSSDSocket,
+	}
+}
+
+// RenderVolumeMountSSSDLdapCA renders [corev1.VolumeMount] defining the mounting path for LDAP CA certificates.
+func RenderVolumeMountSSSDLdapCA() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSSSDLdapCA,
+		MountPath: consts.VolumeMountPathSSSDLdapCA,
+		ReadOnly:  true,
+	}
+}
