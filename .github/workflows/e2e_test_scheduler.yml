@@ -46,5 +46,6 @@ jobs:
 
           gh workflow run e2e_test.yml \
             --ref "$REF" \
-            -f terraform_repo_ref="$TERRAFORM_REF"
+            -f terraform_repo_ref="$TERRAFORM_REF" \
+            -f is_scheduled=true
           echo "E2E test workflow triggered successfully"
