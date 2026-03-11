@@ -12,38 +12,69 @@ import (
 )
 
 type PackageInstallation struct {
-	exec framework.Executor
+	scenario *framework.ScenarioState
+	exec     framework.Executor
 }
 
-func NewPackageInstallation(_ *framework.SharedState, exec framework.Executor) PackageInstallation {
-	return PackageInstallation{exec: exec}
+func NewPackageInstallation(scenario *framework.ScenarioState, exec framework.Executor) PackageInstallation {
+	return PackageInstallation{scenario: scenario, exec: exec}
 }
 
 func (s PackageInstallation) Register(sc *godog.ScenarioContext) {
-	sc.Step(`^packages can be installed on the worker without breaking the NVIDIA driver$`, s.packagesCanBeInstalledOnTheWorkerWithoutBreakingTheNVIDIADriver)
+	sc.Step(`^the NVIDIA driver is working on a worker node$`, s.theNVIDIADriverIsWorkingOnAWorkerNode)
+	sc.Step(`^jq is installed on the worker node$`, s.jqIsInstalledOnTheWorkerNode)
+	sc.Step(`^the NVIDIA driver is still working on the worker node$`, s.theNVIDIADriverIsStillWorkingOnTheWorkerNode)
+	sc.Step(`^jq is available on the worker node$`, s.jqIsAvailableOnTheWorkerNode)
 }
 
-func (s PackageInstallation) packagesCanBeInstalledOnTheWorkerWithoutBreakingTheNVIDIADriver(ctx context.Context) error {
+func (s PackageInstallation) theNVIDIADriverIsWorkingOnAWorkerNode(ctx context.Context) error {
 	worker, err := s.exec.AnyWorker()
 	if err != nil {
 		return err
 	}
+	s.scenario.PackageWorker = worker
 
-	steps := []string{
-		fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(worker.Name)),
-		fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get update'", framework.ShellQuote(worker.Name)),
-		fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jq'", framework.ShellQuote(worker.Name)),
-		fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(worker.Name)),
-		fmt.Sprintf("ssh %s 'jq --version >/dev/null'", framework.ShellQuote(worker.Name)),
+	cmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(worker.Name))
+	if _, err := s.exec.ExecJailWithRetry(ctx, cmd, 5, 10*time.Second); err != nil {
+		s.logInstallFailureDiagnostics(ctx, worker.Name)
+		return fmt.Errorf("verify nvidia-smi before install: %w", err)
+	}
+	return nil
+}
+
+func (s PackageInstallation) jqIsInstalledOnTheWorkerNode(ctx context.Context) error {
+	workerName := s.scenario.PackageWorker.Name
+	updateCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get update'", framework.ShellQuote(workerName))
+	if _, err := s.exec.ExecJailWithRetry(ctx, updateCmd, 5, 10*time.Second); err != nil {
+		s.logInstallFailureDiagnostics(ctx, workerName)
+		return fmt.Errorf("apt-get update: %w", err)
 	}
 
-	for _, step := range steps {
-		if _, err := s.exec.ExecJailWithRetry(ctx, step, 5, 10*time.Second); err != nil {
-			s.logInstallFailureDiagnostics(ctx, worker.Name)
-			return fmt.Errorf("package installation step failed (%s): %w", step, err)
-		}
+	installCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jq'", framework.ShellQuote(workerName))
+	if _, err := s.exec.ExecJailWithRetry(ctx, installCmd, 5, 10*time.Second); err != nil {
+		s.logInstallFailureDiagnostics(ctx, workerName)
+		return fmt.Errorf("apt-get install jq: %w", err)
 	}
+	return nil
+}
 
+func (s PackageInstallation) theNVIDIADriverIsStillWorkingOnTheWorkerNode(ctx context.Context) error {
+	workerName := s.scenario.PackageWorker.Name
+	cmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(workerName))
+	if _, err := s.exec.ExecJailWithRetry(ctx, cmd, 5, 10*time.Second); err != nil {
+		s.logInstallFailureDiagnostics(ctx, workerName)
+		return fmt.Errorf("verify nvidia-smi after install: %w", err)
+	}
+	return nil
+}
+
+func (s PackageInstallation) jqIsAvailableOnTheWorkerNode(ctx context.Context) error {
+	workerName := s.scenario.PackageWorker.Name
+	cmd := fmt.Sprintf("ssh %s 'jq --version >/dev/null'", framework.ShellQuote(workerName))
+	if _, err := s.exec.ExecJailWithRetry(ctx, cmd, 5, 10*time.Second); err != nil {
+		s.logInstallFailureDiagnostics(ctx, workerName)
+		return fmt.Errorf("verify jq after install: %w", err)
+	}
 	return nil
 }
 

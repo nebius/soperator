@@ -1,8 +1,9 @@
 Feature: Node replacement
-  To validate maintenance handling
-  As the soperator team
-  We verify a maintenance event replaces a worker and returns it to service
-
   Scenario: A maintenance event replaces the selected worker node
-    Given the provisioned Slurm cluster is reachable
-    Then a maintenance event replaces the worker node and returns it to service
+    Given a test job is submitted and running on a worker node
+    When a maintenance event is triggered for that node
+    Then the node is drained with a maintenance reason
+    When the test job is cancelled
+    Then the old instance is removed
+    And a replacement node joins the cluster
+    And the replacement node passes GPU validation

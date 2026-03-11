@@ -10,16 +10,18 @@ import (
 	"time"
 )
 
+const soperatorNamespace = "soperator"
+
 func (w *world) Logf(format string, args ...any) {
 	w.logf(format, args...)
 }
 
 func (w *world) ExecController(ctx context.Context, command string) (string, error) {
-	return w.Run(ctx, "kubectl", "exec", "-n", "soperator", "controller-0", "--", "bash", "-lc", command)
+	return w.Run(ctx, "kubectl", "exec", "-n", soperatorNamespace, "controller-0", "--", "bash", "-lc", command)
 }
 
 func (w *world) ExecJail(ctx context.Context, command string) (string, error) {
-	return w.Run(ctx, "kubectl", "exec", "-n", "soperator", "login-0", "--", "chroot", "/mnt/jail", "bash", "-lc", command)
+	return w.Run(ctx, "kubectl", "exec", "-n", soperatorNamespace, "login-0", "--", "chroot", "/mnt/jail", "bash", "-lc", command)
 }
 
 func (w *world) ExecJailWithRetry(ctx context.Context, command string, attempts int, delay time.Duration) (string, error) {

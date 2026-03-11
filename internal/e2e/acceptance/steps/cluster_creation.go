@@ -3,7 +3,6 @@ package steps
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/cucumber/godog"
 
@@ -20,46 +19,13 @@ func NewClusterCreation(state *framework.SharedState, exec framework.Executor) C
 }
 
 func (s ClusterCreation) Register(sc *godog.ScenarioContext) {
-	sc.Step(`^the provisioned Slurm cluster is reachable$`, s.theProvisionedSlurmClusterIsReachable)
+	sc.Step(`^all Slurm pods are running in the cluster$`, s.allSlurmPodsAreRunning)
 }
 
-func (s ClusterCreation) theProvisionedSlurmClusterIsReachable(ctx context.Context) error {
-	if _, err := s.exec.Run(ctx, "kubectl", "get", "pods", "-n", "soperator"); err != nil {
-		return err
+func (s ClusterCreation) allSlurmPodsAreRunning(ctx context.Context) error {
+	if len(s.state.Cluster.Workers) == 0 {
+		return fmt.Errorf("cluster discovery did not run: no workers found")
 	}
-	if _, err := s.exec.Run(ctx, "kubectl", "get", "pod", "-n", "soperator", "login-0"); err != nil {
-		return err
-	}
-	if _, err := s.exec.Run(ctx, "kubectl", "get", "pod", "-n", "soperator", "controller-0"); err != nil {
-		return err
-	}
-
-	workerOutput, err := s.exec.ExecController(ctx, `sinfo -hN -p main -o '%N'`)
-	if err != nil {
-		return fmt.Errorf("discover worker nodes: %w", err)
-	}
-
-	var workers []framework.WorkerRef
-	for _, line := range strings.Split(workerOutput, "\n") {
-		name := strings.TrimSpace(line)
-		if name == "" {
-			continue
-		}
-		workers = append(workers, framework.WorkerRef{Name: name})
-	}
-	if len(workers) == 0 {
-		return fmt.Errorf("no worker nodes discovered")
-	}
-	s.state.Cluster.Workers = workers
-
-	s.exec.Logf("discovered workers: %s", workerNames(s.state.Cluster.Workers))
+	s.exec.Logf("cluster has %d workers", len(s.state.Cluster.Workers))
 	return nil
-}
-
-func workerNames(workers []framework.WorkerRef) string {
-	names := make([]string, 0, len(workers))
-	for _, worker := range workers {
-		names = append(names, worker.Name)
-	}
-	return strings.Join(names, ", ")
 }

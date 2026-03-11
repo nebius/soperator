@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/cucumber/godog"
@@ -14,7 +15,8 @@ import (
 )
 
 type Runner struct {
-	cfg Config
+	cfg   Config
+	state *framework.SharedState
 }
 
 type Config struct {
@@ -23,7 +25,14 @@ type Config struct {
 }
 
 func NewRunner(cfg Config) *Runner {
-	return &Runner{cfg: cfg}
+	return &Runner{
+		cfg: cfg,
+		state: &framework.SharedState{
+			InternalSSH: framework.InternalSSHConfig{
+				UserName: "bob",
+			},
+		},
+	}
 }
 
 func (r *Runner) Run(ctx context.Context) error {
@@ -33,13 +42,12 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 
 	suite := godog.TestSuite{
-		Name:                "soperator-acceptance",
-		ScenarioInitializer: r.initializeScenario,
+		Name:                 "soperator-acceptance",
+		TestSuiteInitializer: r.initializeSuite(ctx),
+		ScenarioInitializer:  r.initializeScenario,
 		Options: &godog.Options{
-			Format: "pretty",
-			Paths:  features,
-			// Future option: enable StopOnFailure here if we want fast-fail acceptance runs.
-			// Future option: write per-scenario logs to files and upload them as CI artifacts.
+			Format:         "pretty",
+			Paths:          features,
 			TestingT:       nil,
 			Strict:         true,
 			DefaultContext: ctx,
@@ -50,6 +58,50 @@ func (r *Runner) Run(ctx context.Context) error {
 		return fmt.Errorf("godog suite exited with status %d", status)
 	}
 
+	return nil
+}
+
+func (r *Runner) initializeSuite(ctx context.Context) func(*godog.TestSuiteContext) {
+	return func(sc *godog.TestSuiteContext) {
+		sc.BeforeSuite(func() {
+			w := newWorld(r.cfg, r.state)
+			if err := discoverCluster(ctx, w, r.state); err != nil {
+				log.Fatalf("BeforeSuite cluster discovery: %v", err)
+			}
+		})
+	}
+}
+
+func discoverCluster(ctx context.Context, w *world, state *framework.SharedState) error {
+	if _, err := w.Run(ctx, "kubectl", "get", "pods", "-n", soperatorNamespace); err != nil {
+		return err
+	}
+	if _, err := w.Run(ctx, "kubectl", "get", "pod", "-n", soperatorNamespace, "login-0"); err != nil {
+		return err
+	}
+	if _, err := w.Run(ctx, "kubectl", "get", "pod", "-n", soperatorNamespace, "controller-0"); err != nil {
+		return err
+	}
+
+	workerOutput, err := w.ExecController(ctx, `sinfo -hN -p main -o '%N'`)
+	if err != nil {
+		return fmt.Errorf("discover worker nodes: %w", err)
+	}
+
+	var workers []framework.WorkerRef
+	for _, line := range strings.Split(workerOutput, "\n") {
+		name := strings.TrimSpace(line)
+		if name == "" {
+			continue
+		}
+		workers = append(workers, framework.WorkerRef{Name: name})
+	}
+	if len(workers) == 0 {
+		return fmt.Errorf("no worker nodes discovered")
+	}
+	state.Cluster.Workers = workers
+
+	log.Printf("acceptance: discovered workers: %s", workerNames(workers))
 	return nil
 }
 
@@ -64,29 +116,32 @@ func featurePaths() []string {
 }
 
 func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
-	state := &framework.SharedState{
-		InternalSSH: framework.InternalSSHConfig{
-			UserName: "bob",
-		},
-	}
-	world := newWorld(r.cfg, state)
+	scenario := &framework.ScenarioState{}
+	w := newWorld(r.cfg, r.state)
 
-	steps.NewClusterCreation(state, world).Register(sc)
-	steps.NewInternalSSH(state, world).Register(sc)
-	steps.NewPackageInstallation(state, world).Register(sc)
-	steps.NewNodeReplacement(state, world).Register(sc)
+	steps.NewClusterCreation(r.state, w).Register(sc)
+	steps.NewInternalSSH(r.state, scenario, w).Register(sc)
+	steps.NewPackageInstallation(scenario, w).Register(sc)
+	steps.NewNodeReplacement(scenario, w, sc).Register(sc)
 }
 
 func newWorld(cfg Config, state *framework.SharedState) *world {
 	return &world{
-		cfg:              cfg,
-		commandTimeout:   10 * time.Minute,
-		replacementDelay: 25 * time.Minute,
-		logPrefix:        "acceptance",
-		state:            state,
+		cfg:            cfg,
+		commandTimeout: 10 * time.Minute,
+		logPrefix:      "acceptance",
+		state:          state,
 	}
 }
 
 func (w *world) logf(format string, args ...any) {
 	log.Printf("%s: %s", w.logPrefix, fmt.Sprintf(format, args...))
+}
+
+func workerNames(workers []framework.WorkerRef) string {
+	names := make([]string, 0, len(workers))
+	for _, worker := range workers {
+		names = append(names, worker.Name)
+	}
+	return strings.Join(names, ", ")
 }

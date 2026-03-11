@@ -9,10 +9,9 @@ import (
 )
 
 type world struct {
-	cfg              Config
-	commandTimeout   time.Duration
-	replacementDelay time.Duration
-	logPrefix        string
+	cfg            Config
+	commandTimeout time.Duration
+	logPrefix      string
 
 	state *framework.SharedState
 }
