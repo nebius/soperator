@@ -110,7 +110,7 @@ func TestParseNodeTopologyLabels(t *testing.T) {
 	}
 }
 
-func TestCollectRunningWorkerPods(t *testing.T) {
+func TestCollectWorkerPods(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -192,15 +192,11 @@ func TestCollectRunningWorkerPods(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(objects...).
-		WithIndex(&corev1.Pod{}, consts.FieldStatusPhase, func(obj client.Object) []string {
-			pod := obj.(*corev1.Pod)
-			return []string{string(pod.Status.Phase)}
-		}).
 		Build()
 
 	reconciler := tc.NewWorkerTopologyReconciler(fakeClient, scheme, namespace)
 
-	pods, err := reconciler.CollectRunningWorkerPods(context.Background(), nodeSetList, clusterName, namespace)
+	pods, err := reconciler.CollectWorkerPods(context.Background(), nodeSetList, clusterName, namespace)
 	require.NoError(t, err)
 
 	var names []string
@@ -209,5 +205,5 @@ func TestCollectRunningWorkerPods(t *testing.T) {
 	}
 	slices.Sort(names)
 
-	assert.Equal(t, []string{"pod-running-a1", "pod-running-b1"}, names)
+	assert.Equal(t, []string{"pod-pending-a", "pod-running-a1", "pod-running-b1"}, names)
 }

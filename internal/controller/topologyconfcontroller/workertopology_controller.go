@@ -101,7 +101,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	logger.V(1).Info("Fetched NodeSets for SlurmCluster", "count", len(nodeSetList))
 
-	existingTopologyConfig, err := r.EnsureWorkerTopologyConfigMap(ctx, req.Namespace, nodeSetList, logger)
+	existingTopologyConfig, err := r.EnsureWorkerTopologyConfigMap(ctx, req.Namespace, logger)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("ensure worker topology ConfigMap: %w", err)
 	}
@@ -145,7 +145,7 @@ func isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
 
 // EnsureWorkerTopologyConfigMap checks if the topology ConfigMap and JailedConfig exist, and creates them if they don't.
 func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
-	ctx context.Context, namespace string, nodeSetList []v1alpha1.NodeSet, logger logr.Logger,
+	ctx context.Context, namespace string, logger logr.Logger,
 ) (*corev1.ConfigMap, error) {
 	configMapKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
 	jailedConfigKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
@@ -179,7 +179,7 @@ func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
 			"configMapExists", configMapExists,
 			"jailedConfigExists", jailedConfigExists)
 
-		if err = r.createDefaultTopologyResources(ctx, namespace, nodeSetList); err != nil {
+		if err = r.createDefaultTopologyResources(ctx, namespace); err != nil {
 			return nil, fmt.Errorf("create default topology resources in namespace %q: %w", namespace, err)
 		}
 
@@ -195,23 +195,12 @@ func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
 	return configMap, nil
 }
 
-// createDefaultTopologyResources creates both ConfigMap and JailedConfig resources for topology configuration with default values.
-// It builds a flat topology with all worker nodes listed under a single root switch,
-// using the same naming pattern as slurm.conf: <nodeSetName>-<index>.
+// createDefaultTopologyResources creates the default topology ConfigMap and JailedConfig with a basic topology configuration.
 func (r *WorkerTopologyReconciler) createDefaultTopologyResources(
-	ctx context.Context, namespace string, nodeSetList []v1alpha1.NodeSet,
+	ctx context.Context, namespace string,
 ) error {
-	var nodeNames []string
-	for _, nodeSet := range nodeSetList {
-		for i := int32(0); i < nodeSet.Spec.Replicas; i++ {
-			nodeNames = append(nodeNames, fmt.Sprintf("%s-%d", nodeSet.Name, i))
-		}
-	}
 
 	defaultTopology := "SwitchName=root"
-	if len(nodeNames) > 0 {
-		defaultTopology = fmt.Sprintf("SwitchName=root Nodes=%s", strings.Join(nodeNames, ","))
-	}
 
 	configMap := r.renderTopologyConfigMap(namespace, defaultTopology)
 	err := r.Client.Create(ctx, configMap)
@@ -281,9 +270,9 @@ func (r *WorkerTopologyReconciler) buildNodeSetTopologyConfig(
 		return "", fmt.Errorf("get node topology labels config map: %w", err)
 	}
 
-	pods, err := r.CollectRunningWorkerPods(ctx, nodeSetList, slurmCluster.Name, namespace)
+	pods, err := r.CollectWorkerPods(ctx, nodeSetList, slurmCluster.Name, namespace)
 	if err != nil {
-		return "", fmt.Errorf("collect running worker pods: %w", err)
+		return "", fmt.Errorf("collect worker pods: %w", err)
 	}
 	podsByNode := r.GroupPodNamesByNode(pods)
 
@@ -312,8 +301,8 @@ func (r *WorkerTopologyReconciler) getNodeTopologyLabelsConfigMap(ctx context.Co
 	return configMap, nil
 }
 
-// CollectRunningWorkerPods retrieves all running worker pods for the given SlurmCluster.
-func (r *WorkerTopologyReconciler) CollectRunningWorkerPods(
+// CollectWorkerPods retrieves all worker pods for the given SlurmCluster.
+func (r *WorkerTopologyReconciler) CollectWorkerPods(
 	ctx context.Context, nodeSetList []v1alpha1.NodeSet, slurmClusterName, namespace string,
 ) ([]corev1.Pod, error) {
 
@@ -321,19 +310,18 @@ func (r *WorkerTopologyReconciler) CollectRunningWorkerPods(
 		"SlurmCluster", slurmClusterName, "Namespace", namespace,
 	)
 
-	fieldSelector := client.MatchingFields{consts.FieldStatusPhase: string(corev1.PodRunning)}
 	var pods []corev1.Pod
 
 	for _, nodeSet := range nodeSetList {
 		labelSelector := client.MatchingLabels{consts.LabelNodeSetKey: nodeSet.Name}
 
-		pl, err := r.listPods(ctx, labelSelector, fieldSelector, namespace)
+		pl, err := r.listPods(ctx, labelSelector, namespace)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("list pods for NodeSet %s: %w", nodeSet.Name, err)
 		}
 		if err != nil && apierrors.IsNotFound(err) {
 			logger.Info(
-				"No running pods found for NodeSet, skipping",
+				"No pods found for NodeSet, skipping",
 				"NodeSet", nodeSet.Name, "Namespace", namespace,
 			)
 			continue
@@ -348,13 +336,12 @@ func (r *WorkerTopologyReconciler) CollectRunningWorkerPods(
 
 // listPods retrieves the list of pods in the specified namespace with the given label selector.
 func (r *WorkerTopologyReconciler) listPods(
-	ctx context.Context, labelSelector client.MatchingLabels, fieldSelector client.MatchingFields, ns string,
+	ctx context.Context, labelSelector client.MatchingLabels, ns string,
 ) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(ns),
 		labelSelector,
-		fieldSelector,
 	}
 
 	if err := r.Client.List(ctx, podList, listOpts...); err != nil {
