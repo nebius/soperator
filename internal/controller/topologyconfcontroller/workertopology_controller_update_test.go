@@ -194,3 +194,26 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 		})
 	}
 }
+
+func TestWorkerTopologyReconciler_renderTopologyConfigMap(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(corev1.AddToScheme(scheme))
+
+	r := &WorkerTopologyReconciler{
+		BaseReconciler: BaseReconciler{
+			Client: fake.NewClientBuilder().WithScheme(scheme).Build(),
+			Scheme: scheme,
+		},
+	}
+
+	namespace := "test-namespace"
+	config := "SwitchName=root"
+
+	cm := r.renderTopologyConfigMap(namespace, config)
+
+	assert.Equal(t, consts.ConfigMapNameTopologyConfig, cm.Name)
+	assert.Equal(t, namespace, cm.Namespace)
+	assert.Equal(t, corev1.SchemeGroupVersion.String(), cm.APIVersion)
+	assert.Equal(t, "ConfigMap", cm.Kind)
+	assert.Equal(t, config, cm.Data[consts.ConfigMapKeyTopologyConfig])
+}

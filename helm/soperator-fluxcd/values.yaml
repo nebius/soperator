@@ -379,7 +379,7 @@ securityProfilesOperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 0.8.4-soperator
+  version: 0.8.5-soperator
   releaseName: security-profiles-operator
   namespace: security-profiles-operator-system
   install:

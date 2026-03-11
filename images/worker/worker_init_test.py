@@ -585,27 +585,32 @@ class TestIsGpuEnabled(unittest.TestCase):
 class TestWaitForTopologyNonGpu(unittest.TestCase):
     """Tests for wait_for_topology non-GPU fast path."""
 
+    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")
     @mock.patch("worker_init.is_gpu_enabled", return_value=False)
     @mock.patch.dict(os.environ, {"HOSTNAME": "worker-0"})
-    def test_non_gpu_applies_unknown_topology(self, mock_gpu, mock_apply):
+    def test_non_gpu_applies_unknown_topology(self, mock_gpu, mock_apply, mock_wait_hostname):
         """Non-GPU node immediately applies topology=default:root:unknown."""
         worker_init.wait_for_topology()
 
+        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
         mock_apply.assert_called_once_with("worker-0", "topology=default:root:unknown")
 
+    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")
     @mock.patch("worker_init.is_gpu_enabled", return_value=False)
     @mock.patch.dict(os.environ, {"HOSTNAME": "worker-0"})
-    def test_non_gpu_does_not_read_configmap(self, mock_gpu, mock_apply):
+    def test_non_gpu_does_not_read_configmap(self, mock_gpu, mock_apply, mock_wait_hostname):
         """Non-GPU node does not wait for ConfigMap at all."""
         with mock.patch("worker_init.read_topology_for_node") as mock_read:
             worker_init.wait_for_topology()
             mock_read.assert_not_called()
+        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
 
+    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")
     @mock.patch("worker_init.is_gpu_enabled", return_value=False)
-    def test_non_gpu_exits_if_hostname_not_set(self, mock_gpu, mock_apply):
+    def test_non_gpu_exits_if_hostname_not_set(self, mock_gpu, mock_apply, mock_wait_hostname):
         """Non-GPU node exits if HOSTNAME is not set."""
         env = os.environ.copy()
         env.pop("HOSTNAME", None)
@@ -613,7 +618,29 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
             with self.assertRaises(SystemExit) as ctx:
                 worker_init.wait_for_topology()
             self.assertEqual(ctx.exception.code, 1)
+        mock_wait_hostname.assert_not_called()
         mock_apply.assert_not_called()
+
+
+def test_topology_conf_contains_hostname_exact_token():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        topology_conf = os.path.join(temp_dir, "topology.conf")
+        with open(topology_conf, "w") as f:
+            f.write(
+                "SwitchName=root Switches=unknown\n"
+                "SwitchName=unknown Nodes=worker-0,worker-1\n"
+            )
+
+        assert worker_init.topology_conf_contains_hostname(topology_conf, "worker-0")
+
+
+def test_topology_conf_does_not_match_partial_hostname():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        topology_conf = os.path.join(temp_dir, "topology.conf")
+        with open(topology_conf, "w") as f:
+            f.write("SwitchName=unknown Nodes=worker-10\n")
+
+        assert not worker_init.topology_conf_contains_hostname(topology_conf, "worker-1")
 
 
 class TestTopologyIntegration(unittest.TestCase):

@@ -1,13 +1,22 @@
 package topologyconfcontroller_test
 
 import (
+	"context"
+	"slices"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/stretchr/testify/require"
 
+	"nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/consts"
 	tc "nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
 )
 
@@ -38,13 +47,13 @@ func TestGetPodByNode(t *testing.T) {
 				{Spec: corev1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Name: "pod2"}},
 			},
 			expected: map[string][]string{
-				"": {"pod1", "pod2"},
+				"unknown": {"pod1", "pod2"},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := reconciler.GetPodsByNode(tt.pods)
+			result := reconciler.GroupPodNamesByNode(tt.pods)
 			require.Equal(t, tt.expected, result, "Test %s failed: expected %v, got %v", tt.name, tt.expected, result)
 		})
 	}
@@ -99,4 +108,102 @@ func TestParseNodeTopologyLabels(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCollectWorkerPods(t *testing.T) {
+	t.Parallel()
+
+	const (
+		namespace   = "test-ns"
+		clusterName = "cluster-a"
+	)
+
+	scheme := runtime.NewScheme()
+	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	nodeSetList := []v1alpha1.NodeSet{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "nodeset-a",
+				Namespace: namespace,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "nodeset-b",
+				Namespace: namespace,
+			},
+		},
+	}
+
+	objects := []client.Object{
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-running-a1",
+				Namespace: namespace,
+				Labels: map[string]string{
+					consts.LabelNodeSetKey: "nodeset-a",
+				},
+			},
+			Status: corev1.PodStatus{Phase: corev1.PodRunning},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-pending-a",
+				Namespace: namespace,
+				Labels: map[string]string{
+					consts.LabelNodeSetKey: "nodeset-a",
+				},
+			},
+			Status: corev1.PodStatus{Phase: corev1.PodPending},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-running-b1",
+				Namespace: namespace,
+				Labels: map[string]string{
+					consts.LabelNodeSetKey: "nodeset-b",
+				},
+			},
+			Status: corev1.PodStatus{Phase: corev1.PodRunning},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-running-other-cluster",
+				Namespace: namespace,
+				Labels: map[string]string{
+					consts.LabelNodeSetKey: "nodeset-other-cluster",
+				},
+			},
+			Status: corev1.PodStatus{Phase: corev1.PodRunning},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-running-other-ns",
+				Namespace: "other-ns",
+				Labels: map[string]string{
+					consts.LabelNodeSetKey: "nodeset-a",
+				},
+			},
+			Status: corev1.PodStatus{Phase: corev1.PodRunning},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(objects...).
+		Build()
+
+	reconciler := tc.NewWorkerTopologyReconciler(fakeClient, scheme, namespace)
+
+	pods, err := reconciler.CollectWorkerPods(context.Background(), nodeSetList, clusterName, namespace)
+	require.NoError(t, err)
+
+	var names []string
+	for _, pod := range pods {
+		names = append(names, pod.Name)
+	}
+	slices.Sort(names)
+
+	assert.Equal(t, []string{"pod-pending-a", "pod-running-a1", "pod-running-b1"}, names)
 }
