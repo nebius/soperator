@@ -437,19 +437,30 @@ jobs:
           path: ./cluster-info
           retention-days: 7
 
-      - name: Collect Soperator Outputs
+      - name: Collect Jail Files
         if: '!cancelled()'
         shell: bash
         run: |
-          mkdir -p ./soperator-outputs
-          kubectl cp soperator/controller-0:/mnt/jail/opt/soperator-outputs ./soperator-outputs
+          mkdir -p ./jail/etc/slurm ./jail/opt/soperator-outputs
+          SCONFIG_POD=$(kubectl get pod -n soperator \
+            -l app.kubernetes.io/component=sconfigcontroller \
+            --field-selector=status.phase=Running \
+            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+          if [[ -n "$SCONFIG_POD" ]]; then
+            echo "Copying jail files from $SCONFIG_POD"
+            kubectl exec -n soperator "$SCONFIG_POD" -- find /mnt/jail -maxdepth 4 -not -path '*/proc/*' > ./jail/tree.txt 2>&1 || true
+            kubectl cp "soperator/$SCONFIG_POD:/mnt/jail/etc/slurm/" ./jail/etc/slurm
+            kubectl cp "soperator/$SCONFIG_POD:/mnt/jail/opt/soperator-outputs" ./jail/opt/soperator-outputs
+          else
+            echo "No running sconfigcontroller pod found, skipping jail files collection"
+          fi
 
-      - name: Upload Soperator Outputs
+      - name: Upload Jail
         if: '!cancelled()'
         uses: actions/upload-artifact@v6
         with:
-          name: soperator-outputs
-          path: ./soperator-outputs
+          name: jail
+          path: ./jail
           retention-days: 7
 
       - name: Terraform Destroy
