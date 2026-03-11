@@ -110,8 +110,9 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("build NodeSet topology config: %w", err)
 	}
-	if desiredTopology == "" {
-		return ctrl.Result{}, fmt.Errorf("built empty topology config")
+	if strings.TrimSpace(desiredTopology) == "" {
+		logger.Info("No worker topology to apply yet (empty desired topology), preserving existing topology config")
+		return DefaultRequeueResult, nil
 	}
 
 	existingTopology := existingTopologyConfig.Data[consts.ConfigMapKeyTopologyConfig]
@@ -194,18 +195,19 @@ func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
 	return configMap, nil
 }
 
-// createDefaultTopologyResources creates both ConfigMap and JailedConfig resources for topology configuration with default values.
-func (r *WorkerTopologyReconciler) createDefaultTopologyResources(ctx context.Context, namespace string,
+// createDefaultTopologyResources creates the default topology ConfigMap and JailedConfig with a basic topology configuration.
+func (r *WorkerTopologyReconciler) createDefaultTopologyResources(
+	ctx context.Context, namespace string,
 ) error {
 
-	// Create ConfigMap
-	configMap := r.renderTopologyConfigMap(namespace, "SwitchName=root")
+	defaultTopology := "SwitchName=root"
+
+	configMap := r.renderTopologyConfigMap(namespace, defaultTopology)
 	err := r.Client.Create(ctx, configMap)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("create ConfigMap %s: %w", configMap.Name, err)
 	}
 
-	// Create JailedConfig
 	jailedConfig := r.renderTopologyJailedConfig(namespace)
 	err = r.Client.Create(ctx, jailedConfig)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
@@ -268,9 +270,9 @@ func (r *WorkerTopologyReconciler) buildNodeSetTopologyConfig(
 		return "", fmt.Errorf("get node topology labels config map: %w", err)
 	}
 
-	pods, err := r.CollectRunningWorkerPods(ctx, nodeSetList, slurmCluster.Name, namespace)
+	pods, err := r.CollectWorkerPods(ctx, nodeSetList, slurmCluster.Name, namespace)
 	if err != nil {
-		return "", fmt.Errorf("collect running worker pods: %w", err)
+		return "", fmt.Errorf("collect worker pods: %w", err)
 	}
 	podsByNode := r.GroupPodNamesByNode(pods)
 
@@ -299,8 +301,8 @@ func (r *WorkerTopologyReconciler) getNodeTopologyLabelsConfigMap(ctx context.Co
 	return configMap, nil
 }
 
-// CollectRunningWorkerPods retrieves all running worker pods for the given SlurmCluster.
-func (r *WorkerTopologyReconciler) CollectRunningWorkerPods(
+// CollectWorkerPods retrieves all worker pods for the given SlurmCluster.
+func (r *WorkerTopologyReconciler) CollectWorkerPods(
 	ctx context.Context, nodeSetList []v1alpha1.NodeSet, slurmClusterName, namespace string,
 ) ([]corev1.Pod, error) {
 
@@ -308,19 +310,18 @@ func (r *WorkerTopologyReconciler) CollectRunningWorkerPods(
 		"SlurmCluster", slurmClusterName, "Namespace", namespace,
 	)
 
-	fieldSelector := client.MatchingFields{consts.FieldStatusPhase: string(corev1.PodRunning)}
 	var pods []corev1.Pod
 
 	for _, nodeSet := range nodeSetList {
 		labelSelector := client.MatchingLabels{consts.LabelNodeSetKey: nodeSet.Name}
 
-		pl, err := r.listPods(ctx, labelSelector, fieldSelector, namespace)
-		if err != nil && !apierrors.IsNotFound(err) {
+		pl, err := r.listPods(ctx, labelSelector, namespace)
+		if err != nil {
 			return nil, fmt.Errorf("list pods for NodeSet %s: %w", nodeSet.Name, err)
 		}
-		if err != nil && apierrors.IsNotFound(err) {
+		if len(pl.Items) == 0 {
 			logger.Info(
-				"No running pods found for NodeSet, skipping",
+				"No pods found for NodeSet, skipping",
 				"NodeSet", nodeSet.Name, "Namespace", namespace,
 			)
 			continue
@@ -335,13 +336,12 @@ func (r *WorkerTopologyReconciler) CollectRunningWorkerPods(
 
 // listPods retrieves the list of pods in the specified namespace with the given label selector.
 func (r *WorkerTopologyReconciler) listPods(
-	ctx context.Context, labelSelector client.MatchingLabels, fieldSelector client.MatchingFields, ns string,
+	ctx context.Context, labelSelector client.MatchingLabels, ns string,
 ) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(ns),
 		labelSelector,
-		fieldSelector,
 	}
 
 	if err := r.Client.List(ctx, podList, listOpts...); err != nil {
@@ -487,18 +487,6 @@ func (r *WorkerTopologyReconciler) ensureJailedConfig(ctx context.Context, names
 
 func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 	maxConcurrency int, cacheSyncTimeout time.Duration) error {
-
-	// Index pod statuses to get client.MatchingFields working.
-	if err := mgr.GetFieldIndexer().IndexField(
-		context.Background(),
-		&corev1.Pod{},
-		consts.FieldStatusPhase,
-		func(obj client.Object) []string {
-			return []string{string(obj.(*corev1.Pod).Status.Phase)}
-		},
-	); err != nil {
-		return fmt.Errorf("failed to setup %s field indexer: %w", consts.FieldStatusPhase, err)
-	}
 
 	return ctrl.NewControllerManagedBy(mgr).Named(WorkerTopologyReconcilerName).
 		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.Funcs{
