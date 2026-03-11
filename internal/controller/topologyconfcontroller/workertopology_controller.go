@@ -111,7 +111,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, fmt.Errorf("build NodeSet topology config: %w", err)
 	}
 	if strings.TrimSpace(desiredTopology) == "" {
-		logger.Info("No running worker pods yet, preserving existing topology config")
+		logger.Info("No worker topology to apply yet (empty desired topology), preserving existing topology config")
 		return DefaultRequeueResult, nil
 	}
 
