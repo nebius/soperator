@@ -316,10 +316,10 @@ func (r *WorkerTopologyReconciler) CollectWorkerPods(
 		labelSelector := client.MatchingLabels{consts.LabelNodeSetKey: nodeSet.Name}
 
 		pl, err := r.listPods(ctx, labelSelector, namespace)
-		if err != nil && !apierrors.IsNotFound(err) {
+		if err != nil {
 			return nil, fmt.Errorf("list pods for NodeSet %s: %w", nodeSet.Name, err)
 		}
-		if err != nil && apierrors.IsNotFound(err) {
+		if len(pl.Items) == 0 {
 			logger.Info(
 				"No pods found for NodeSet, skipping",
 				"NodeSet", nodeSet.Name, "Namespace", namespace,
@@ -487,18 +487,6 @@ func (r *WorkerTopologyReconciler) ensureJailedConfig(ctx context.Context, names
 
 func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 	maxConcurrency int, cacheSyncTimeout time.Duration) error {
-
-	// Index pod statuses to get client.MatchingFields working.
-	if err := mgr.GetFieldIndexer().IndexField(
-		context.Background(),
-		&corev1.Pod{},
-		consts.FieldStatusPhase,
-		func(obj client.Object) []string {
-			return []string{string(obj.(*corev1.Pod).Status.Phase)}
-		},
-	); err != nil {
-		return fmt.Errorf("failed to setup %s field indexer: %w", consts.FieldStatusPhase, err)
-	}
 
 	return ctrl.NewControllerManagedBy(mgr).Named(WorkerTopologyReconcilerName).
 		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.Funcs{
