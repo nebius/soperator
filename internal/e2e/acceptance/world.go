@@ -13,12 +13,12 @@ type world struct {
 	commandTimeout time.Duration
 	logPrefix      string
 
-	state *framework.SharedState
+	state *framework.ClusterState
 }
 
 func (w *world) AnyWorker() (framework.WorkerRef, error) {
-	if len(w.state.Cluster.Workers) == 0 {
+	if len(w.state.Workers) == 0 {
 		return framework.WorkerRef{}, fmt.Errorf("no workers discovered")
 	}
-	return w.state.Cluster.Workers[rand.Intn(len(w.state.Cluster.Workers))], nil
+	return w.state.Workers[rand.Intn(len(w.state.Workers))], nil
 }

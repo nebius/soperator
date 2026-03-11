@@ -25,16 +25,18 @@ var (
 )
 
 type NodeReplacement struct {
-	scenario *framework.ScenarioState
-	exec     framework.Executor
+	exec               framework.Executor
+	replacementWorker  framework.WorkerRef
+	originalInstanceID string
+	maintenanceJobID   string
 }
 
-func NewNodeReplacement(scenario *framework.ScenarioState, exec framework.Executor, sc *godog.ScenarioContext) NodeReplacement {
-	nr := NodeReplacement{scenario: scenario, exec: exec}
+func NewNodeReplacement(exec framework.Executor, sc *godog.ScenarioContext) *NodeReplacement {
+	nr := &NodeReplacement{exec: exec}
 
 	sc.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
-		if nr.scenario.MaintenanceJobID != "" {
-			if cancelErr := nr.cancelJob(context.Background(), nr.scenario.MaintenanceJobID); cancelErr != nil {
+		if nr.maintenanceJobID != "" {
+			if cancelErr := nr.cancelJob(context.Background(), nr.maintenanceJobID); cancelErr != nil {
 				nr.exec.Logf("cleanup: cancel maintenance job: %v", cancelErr)
 			}
 		}
@@ -44,7 +46,7 @@ func NewNodeReplacement(scenario *framework.ScenarioState, exec framework.Execut
 	return nr
 }
 
-func (s NodeReplacement) Register(sc *godog.ScenarioContext) {
+func (s *NodeReplacement) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^a test job is submitted and running on a worker node$`, s.aTestJobIsSubmittedAndRunningOnAWorkerNode)
 	sc.Step(`^a maintenance event is triggered for that node$`, s.aMaintenanceEventIsTriggeredForThatNode)
 	sc.Step(`^the node is drained with a maintenance reason$`, s.theNodeIsDrainedWithAMaintenanceReason)
@@ -54,12 +56,12 @@ func (s NodeReplacement) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^the replacement node passes GPU validation$`, s.theReplacementNodePassesGPUValidation)
 }
 
-func (s NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context.Context) error {
+func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context.Context) error {
 	worker, err := s.exec.AnyWorker()
 	if err != nil {
 		return err
 	}
-	s.scenario.ReplacementWorker = worker
+	s.replacementWorker = worker
 
 	nodeState, err := s.exec.ExecController(ctx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(worker.Name)))
 	if err != nil {
@@ -70,7 +72,7 @@ func (s NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context.
 	if originalInstanceID == "" {
 		return fmt.Errorf("unable to parse InstanceId from %q", nodeState)
 	}
-	s.scenario.OriginalInstanceID = originalInstanceID
+	s.originalInstanceID = originalInstanceID
 
 	jobID, err := s.exec.ExecJail(ctx, fmt.Sprintf(
 		"sbatch --parsable -w %s --job-name=e2e-node-replacement --wrap=%s",
@@ -82,7 +84,7 @@ func (s NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context.
 	if jobID == "" {
 		return fmt.Errorf("empty maintenance job id")
 	}
-	s.scenario.MaintenanceJobID = jobID
+	s.maintenanceJobID = jobID
 
 	return s.exec.WaitFor(ctx, "maintenance job running", nodeReplacementJobTimeout, 10*time.Second, func(waitCtx context.Context) (bool, error) {
 		status, err := s.exec.ExecController(waitCtx, fmt.Sprintf("squeue -h -j %s -o '%%T'", framework.ShellQuote(jobID)))
@@ -93,19 +95,19 @@ func (s NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context.
 	})
 }
 
-func (s NodeReplacement) aMaintenanceEventIsTriggeredForThatNode(ctx context.Context) error {
+func (s *NodeReplacement) aMaintenanceEventIsTriggeredForThatNode(ctx context.Context) error {
 	patch := fmt.Sprintf(
 		`{"status":{"conditions":[{"type":"NebiusMaintenanceScheduled","status":"True","reason":"AcceptanceTest","message":"Maintenance scheduled for node","lastTransitionTime":"%s"}]}}`,
 		time.Now().UTC().Format(time.RFC3339))
-	if _, err := s.exec.Run(ctx, "kubectl", "patch", "node", s.scenario.OriginalInstanceID,
+	if _, err := s.exec.Run(ctx, "kubectl", "patch", "node", s.originalInstanceID,
 		"--subresource=status", "--type=strategic", "-p", patch); err != nil {
 		return fmt.Errorf("patch maintenance condition: %w", err)
 	}
 	return nil
 }
 
-func (s NodeReplacement) theNodeIsDrainedWithAMaintenanceReason(ctx context.Context) error {
-	workerName := s.scenario.ReplacementWorker.Name
+func (s *NodeReplacement) theNodeIsDrainedWithAMaintenanceReason(ctx context.Context) error {
+	workerName := s.replacementWorker.Name
 	return s.exec.WaitFor(ctx, "node drain reason", nodeReplacementDrainTimeout, 15*time.Second, func(waitCtx context.Context) (bool, error) {
 		state, err := s.exec.ExecController(waitCtx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(workerName)))
 		if err != nil {
@@ -116,16 +118,16 @@ func (s NodeReplacement) theNodeIsDrainedWithAMaintenanceReason(ctx context.Cont
 	})
 }
 
-func (s NodeReplacement) theTestJobIsCancelled(ctx context.Context) error {
-	if err := s.cancelJob(ctx, s.scenario.MaintenanceJobID); err != nil {
+func (s *NodeReplacement) theTestJobIsCancelled(ctx context.Context) error {
+	if err := s.cancelJob(ctx, s.maintenanceJobID); err != nil {
 		return err
 	}
-	s.scenario.MaintenanceJobID = ""
+	s.maintenanceJobID = ""
 	return nil
 }
 
-func (s NodeReplacement) theOldInstanceIsRemoved(ctx context.Context) error {
-	originalInstanceID := s.scenario.OriginalInstanceID
+func (s *NodeReplacement) theOldInstanceIsRemoved(ctx context.Context) error {
+	originalInstanceID := s.originalInstanceID
 	return s.exec.WaitFor(ctx, "old instance removal", nodeReplacementRemoveTimeout, 30*time.Second, func(waitCtx context.Context) (bool, error) {
 		_, err := s.exec.Run(waitCtx, "nebius", "compute", "instance", "get", "--id", originalInstanceID, "--format", "json")
 		if err != nil {
@@ -138,9 +140,9 @@ func (s NodeReplacement) theOldInstanceIsRemoved(ctx context.Context) error {
 	})
 }
 
-func (s NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) error {
-	workerName := s.scenario.ReplacementWorker.Name
-	originalInstanceID := s.scenario.OriginalInstanceID
+func (s *NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) error {
+	workerName := s.replacementWorker.Name
+	originalInstanceID := s.originalInstanceID
 	return s.exec.WaitFor(ctx, "replacement node ready", nodeReplacementReadyTimeout, 60*time.Second, func(waitCtx context.Context) (bool, error) {
 		state, err := s.exec.ExecController(waitCtx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(workerName)))
 		if err != nil {
@@ -155,8 +157,8 @@ func (s NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) er
 	})
 }
 
-func (s NodeReplacement) theReplacementNodePassesGPUValidation(ctx context.Context) error {
-	workerName := s.scenario.ReplacementWorker.Name
+func (s *NodeReplacement) theReplacementNodePassesGPUValidation(ctx context.Context) error {
+	workerName := s.replacementWorker.Name
 	if _, err := s.exec.ExecJail(ctx, fmt.Sprintf("srun -w %s nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
 		output, stateErr := s.exec.ExecController(ctx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(workerName)))
 		if stateErr == nil {
@@ -167,7 +169,7 @@ func (s NodeReplacement) theReplacementNodePassesGPUValidation(ctx context.Conte
 	return nil
 }
 
-func (s NodeReplacement) cancelJob(ctx context.Context, maintenanceJobID string) error {
+func (s *NodeReplacement) cancelJob(ctx context.Context, maintenanceJobID string) error {
 	if maintenanceJobID == "" {
 		return nil
 	}

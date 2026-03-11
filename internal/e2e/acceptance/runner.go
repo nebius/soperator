@@ -16,7 +16,7 @@ import (
 
 type Runner struct {
 	cfg   Config
-	state *framework.SharedState
+	state *framework.ClusterState
 }
 
 type Config struct {
@@ -26,12 +26,8 @@ type Config struct {
 
 func NewRunner(cfg Config) *Runner {
 	return &Runner{
-		cfg: cfg,
-		state: &framework.SharedState{
-			InternalSSH: framework.InternalSSHConfig{
-				UserName: "bob",
-			},
-		},
+		cfg:   cfg,
+		state: &framework.ClusterState{},
 	}
 }
 
@@ -72,7 +68,7 @@ func (r *Runner) initializeSuite(ctx context.Context) func(*godog.TestSuiteConte
 	}
 }
 
-func discoverCluster(ctx context.Context, w *world, state *framework.SharedState) error {
+func discoverCluster(ctx context.Context, w *world, state *framework.ClusterState) error {
 	if _, err := w.Run(ctx, "kubectl", "get", "pods", "-n", soperatorNamespace); err != nil {
 		return err
 	}
@@ -99,7 +95,7 @@ func discoverCluster(ctx context.Context, w *world, state *framework.SharedState
 	if len(workers) == 0 {
 		return fmt.Errorf("no worker nodes discovered")
 	}
-	state.Cluster.Workers = workers
+	state.Workers = workers
 
 	log.Printf("acceptance: discovered workers: %s", workerNames(workers))
 	return nil
@@ -116,16 +112,15 @@ func featurePaths() []string {
 }
 
 func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
-	scenario := &framework.ScenarioState{}
 	w := newWorld(r.cfg, r.state)
 
 	steps.NewClusterCreation(r.state, w).Register(sc)
-	steps.NewInternalSSH(r.state, scenario, w).Register(sc)
-	steps.NewPackageInstallation(scenario, w).Register(sc)
-	steps.NewNodeReplacement(scenario, w, sc).Register(sc)
+	steps.NewInternalSSH(w).Register(sc)
+	steps.NewPackageInstallation(w).Register(sc)
+	steps.NewNodeReplacement(w, sc).Register(sc)
 }
 
-func newWorld(cfg Config, state *framework.SharedState) *world {
+func newWorld(cfg Config, state *framework.ClusterState) *world {
 	return &world{
 		cfg:            cfg,
 		commandTimeout: 10 * time.Minute,

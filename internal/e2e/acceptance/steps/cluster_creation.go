@@ -10,22 +10,22 @@ import (
 )
 
 type ClusterCreation struct {
-	state *framework.SharedState
+	state *framework.ClusterState
 	exec  framework.Executor
 }
 
-func NewClusterCreation(state *framework.SharedState, exec framework.Executor) ClusterCreation {
-	return ClusterCreation{state: state, exec: exec}
+func NewClusterCreation(state *framework.ClusterState, exec framework.Executor) *ClusterCreation {
+	return &ClusterCreation{state: state, exec: exec}
 }
 
-func (s ClusterCreation) Register(sc *godog.ScenarioContext) {
+func (s *ClusterCreation) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^all Slurm pods are running in the cluster$`, s.allSlurmPodsAreRunning)
 }
 
-func (s ClusterCreation) allSlurmPodsAreRunning(ctx context.Context) error {
-	if len(s.state.Cluster.Workers) == 0 {
+func (s *ClusterCreation) allSlurmPodsAreRunning(ctx context.Context) error {
+	if len(s.state.Workers) == 0 {
 		return fmt.Errorf("cluster discovery did not run: no workers found")
 	}
-	s.exec.Logf("cluster has %d workers", len(s.state.Cluster.Workers))
+	s.exec.Logf("cluster has %d workers", len(s.state.Workers))
 	return nil
 }
