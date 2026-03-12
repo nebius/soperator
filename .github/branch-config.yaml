@@ -8,3 +8,4 @@ nightly_release_branches:
 # Release branches for E2E tests
 e2e_release_branches:
   - soperator-release-3.0
+  - soperator-release-2.0
