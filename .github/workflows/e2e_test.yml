@@ -623,3 +623,28 @@ jobs:
               echo "Terraform repo not checked out."
             fi
           } >> $GITHUB_STEP_SUMMARY
+
+  notify-failure:
+    name: Notify Slack on E2E failure
+    needs: [e2e-test]
+    if: |
+      always() &&
+      needs.e2e-test.result == 'failure' &&
+      (github.ref_name == 'main' || startsWith(github.ref_name, 'soperator-release-'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.E2E_SLACK_WEBHOOK_URL }}
+        shell: bash
+        run: |
+          curl -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-type: application/json' \
+            --data "{
+              \"attachments\": [{
+                \"color\": \"danger\",
+                \"title\": \":warning: E2E Test failure\",
+                \"text\": \"Branch: ${{ github.ref_name }}\nWorkflow: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>\nRunbook: <https://nebius.atlassian.net/wiki/spaces/SCHED/pages/998015487/E2E+Runbook|E2E Runbook>\",
+                \"footer\": \"soperator e2e test\"
+              }]
+            }"
