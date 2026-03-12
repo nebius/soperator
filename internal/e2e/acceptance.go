@@ -10,7 +10,18 @@ import (
 )
 
 func RunAcceptance(ctx context.Context, _ Config) error {
-	cmd := exec.CommandContext(ctx, "go", "test", "-count=1", "-tags", "acceptance", "-timeout", "90m", "-v", "./internal/e2e/acceptance")
+	cmd := exec.CommandContext(
+		ctx,
+		"go", "test",
+		"-count=1",
+		"-tags", "acceptance",
+		"-timeout", "90m",
+		"-v",
+		"./internal/e2e/acceptance",
+		"-args",
+		"-ginkgo.v",
+		"-ginkgo.show-node-events",
+	)
 	cmd.Dir = repoRoot()
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
