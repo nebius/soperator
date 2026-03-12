@@ -4,7 +4,7 @@ ansible-core==2.19.4
 ansible-lint==25.9.2
 argcomplete==3.6.3
 attrs==25.4.0
-black==25.9.0
+black==26.3.1
 bracex==2.6
 cffi==2.0.0
 charset-normalizer==3.4.4
