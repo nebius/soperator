@@ -76,6 +76,9 @@ tests:
       clusterName: test-cluster
     asserts:
       - equal:
+          path: spec.volumeSources[0].configMap.defaultMode
+          value: 493
+      - equal:
           path: spec.plugStackConfig.pyxis.required
           value: true
       - equal:

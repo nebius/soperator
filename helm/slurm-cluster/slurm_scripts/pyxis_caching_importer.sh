@@ -20,10 +20,11 @@ case "${cmd}" in
         fi
 
         readonly image_uri="$2"
+        readonly enroot_image_uri="docker://${image_uri/\#//}"
 
         mkdir -p -m 700 "${cache_dir}"
 
-        readonly digest=$(enroot digest "${image_uri}")
+        readonly digest=$(enroot digest "${enroot_image_uri}")
         if [ -z "${digest}" ]; then
             echo "error: could not retrieve digest for image: ${image_uri}" >&2
             exit 1
@@ -44,7 +45,7 @@ case "${cmd}" in
             #     # Add the digest to the URI.
             #     enroot import --output "${squashfs_temp_path}" "${image_uri}@${digest}" >&2
             # fi
-            enroot import --output "${squashfs_temp_path}" "${image_uri}" >&2
+            enroot import --output "${squashfs_temp_path}" "${enroot_image_uri}" >&2
 
             # Save the URI as an extended attribute.
             if command -v "setfattr" >/dev/null; then
