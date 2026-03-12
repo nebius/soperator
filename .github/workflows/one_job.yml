@@ -24,8 +24,12 @@ on:
     tags:
       - "**" # Trigger on any tag
 
-  # pull_request are defined separately to allow to run CI from forks.
+  # pull_request_target runs in base branch context, giving fork PRs access to secrets.
+  # The "authorize" job gates fork PRs behind environment approval.
+  # TODO: remove pull_request trigger after merging (kept for transition, causes double runs).
   pull_request:
+    types: [opened, synchronize, reopened]
+  pull_request_target:
     types: [opened, synchronize, reopened]
 
 permissions:
@@ -35,17 +39,32 @@ permissions:
   id-token: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' || github.event_name == 'pull_request' }}
 
 jobs:
+  authorize:
+    name: Authorize
+    runs-on: ubuntu-latest
+    environment: >-
+      ${{
+        github.event_name == 'pull_request_target'
+        && github.event.pull_request.head.repo.full_name != github.repository
+        && 'fork-ci' || ''
+      }}
+    steps:
+      - run: echo "Authorized"
+
   changes:
     name: Detect Changes
+    needs: [authorize]
     runs-on: ubuntu-latest
     outputs:
-      should_build: ${{ steps.filter.outputs.has_code_changes == 'true' || github.event_name != 'pull_request' }}
+      should_build: ${{ steps.filter.outputs.has_code_changes == 'true' || (github.event_name != 'pull_request_target' && github.event_name != 'pull_request') }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -76,6 +95,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Fetch git history for the VERSION file changes detection
 
       - name: Install GO
@@ -120,13 +140,15 @@ jobs:
           fi
 
   lint:
-    needs: [changes]
+    needs: [changes, authorize]
     if: needs.changes.outputs.should_build == 'true'
     runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install GO
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -186,6 +208,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install GO
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -301,6 +325,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install GO
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -438,6 +464,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install GO
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -515,6 +543,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install Nebius CLI
         shell: bash
@@ -627,6 +657,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install Nebius CLI
         shell: bash
@@ -676,6 +708,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install GO
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -719,6 +753,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up Go
         uses: actions/setup-go@v6

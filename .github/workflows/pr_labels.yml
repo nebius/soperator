@@ -1,7 +1,15 @@
 ---
 name: Label Checker
 on:
+  # TODO: remove pull_request trigger after merging (kept for transition).
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+      - unlabeled
+  pull_request_target:
     types:
       - opened
       - synchronize
