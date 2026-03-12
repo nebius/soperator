@@ -8,7 +8,7 @@
   "contexts": ["hc_program"],
   "node_states": ["any"],
   "on_fail": "drain",
-  "on_ok": "undrain",
+  "on_ok": "none",
   "reason_base": "[node_problem] $name",
   "reason_append_details": true,
   "run_in_jail": false,
