@@ -6,9 +6,11 @@ import (
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -21,13 +23,16 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
+const populateJailRequeueDuration = 10 * time.Second
+
 // ReconcilePopulateJail reconciles and wait all resources necessary for deploying Populate Jail Job
 func (r SlurmClusterReconciler) ReconcilePopulateJail(
 	ctx context.Context,
 	clusterValues *values.SlurmCluster,
 	cluster *slurmv1.SlurmCluster,
-) error {
+) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+	populateJailRequeue := false
 
 	reconcilePopulateJailImpl := func() error {
 		return utils.ExecuteMultiStep(ctx,
@@ -40,6 +45,8 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 					stepLogger.V(1).Info("Reconciling")
 
 					isMaintenanceStopMode := check.IsModeDownscaleAndDeletePopulate(
+						clusterValues.PopulateJail.Maintenance)
+					isMaintenanceOverwriteMode := check.IsModeDownscaleAndOverwritePopulate(
 						clusterValues.PopulateJail.Maintenance)
 
 					desired := batchv1.Job{}
@@ -61,7 +68,7 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 							stepLogger.V(1).Info("Deleted")
 							return nil
 						}
-						if check.IsModeDownscaleAndOverwritePopulate(clusterValues.PopulateJail.Maintenance) {
+						if isMaintenanceOverwriteMode {
 							if isConditionNonOverwrite(cluster.Status.Conditions) {
 								if err := r.Delete(stepCtx, &desired); err != nil {
 									stepLogger.Error(err, "Failed to delete")
@@ -71,6 +78,8 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 							}
 							return nil
 						}
+						stepLogger.V(1).Info("Skipping creation: Populate jail Job already exists")
+						return nil
 					}
 
 					if getErr != nil && !apierrors.IsNotFound(getErr) && !isMaintenanceStopMode {
@@ -80,6 +89,24 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 
 					if isMaintenanceStopMode {
 						stepLogger.V(1).Info("Skipping creation due to MaintenanceStopMode")
+						return nil
+					}
+
+					hasActivePods, err := hasNonTerminalLoginOrWorkerPods(
+						stepCtx,
+						r.Client,
+						clusterValues.Namespace,
+						clusterValues.Name,
+					)
+					if err != nil {
+						stepLogger.Error(err, "Failed to check running login/worker pods")
+						return fmt.Errorf("checking running login/worker pods: %w", err)
+					}
+					if hasActivePods {
+						if isMaintenanceOverwriteMode {
+							populateJailRequeue = true
+						}
+						stepLogger.Info("Skipping Populate jail Job creation: login or worker pods are not fully terminated")
 						return nil
 					}
 
@@ -143,17 +170,67 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 
 	if err := reconcilePopulateJailImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile Populate jail Job")
-		return fmt.Errorf("reconciling Populate jail Job: %w", err)
+		return ctrl.Result{}, fmt.Errorf("reconciling Populate jail Job: %w", err)
+	}
+	if populateJailRequeue {
+		logger.Info("Populate jail reconciliation requeue requested: waiting for login/worker pods termination")
+		return ctrl.Result{RequeueAfter: populateJailRequeueDuration}, nil
 	}
 	logger.Info("Reconciled Populate jail Job")
 
-	return nil
+	return ctrl.Result{}, nil
 }
 
 func isConditionNonOverwrite(conditions []metav1.Condition) bool {
 	for _, condition := range conditions {
 		if condition.Type == slurmv1.ConditionClusterPopulateJailMode {
 			return condition.Reason != string(consts.ModeDownscaleAndOverwritePopulate)
+		}
+	}
+	return false
+}
+
+func hasNonTerminalLoginOrWorkerPods(
+	ctx context.Context,
+	cl client.Client,
+	namespace string,
+	clusterName string,
+) (bool, error) {
+	loginPods := &corev1.PodList{}
+	if err := cl.List(
+		ctx,
+		loginPods,
+		client.InNamespace(namespace),
+		client.MatchingLabels{
+			consts.LabelInstanceKey:  clusterName,
+			consts.LabelComponentKey: consts.ComponentTypeLogin.String(),
+		},
+	); err != nil {
+		return false, fmt.Errorf("listing login pods: %w", err)
+	}
+	if hasNonTerminalPods(loginPods.Items) {
+		return true, nil
+	}
+
+	workerPods := &corev1.PodList{}
+	if err := cl.List(
+		ctx,
+		workerPods,
+		client.InNamespace(namespace),
+		client.MatchingLabels{
+			consts.LabelInstanceKey: clusterName,
+			consts.LabelWorkerKey:   consts.LabelWorkerValue,
+		},
+	); err != nil {
+		return false, fmt.Errorf("listing worker pods: %w", err)
+	}
+	return hasNonTerminalPods(workerPods.Items), nil
+}
+
+func hasNonTerminalPods(pods []corev1.Pod) bool {
+	for _, pod := range pods {
+		if pod.Status.Phase != corev1.PodSucceeded && pod.Status.Phase != corev1.PodFailed {
+			return true
 		}
 	}
 	return false
