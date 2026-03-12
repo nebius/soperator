@@ -24,3 +24,10 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 	suite, err = framework.LoadSuite(ctx)
 	Expect(err).NotTo(HaveOccurred())
 }, NodeTimeout(5*time.Minute))
+
+var _ = Describe("Acceptance", Ordered, Serial, func() {
+	It("finds a provisioned cluster ready for acceptance tests", clusterCreationTest)
+	It("allows a regular user to SSH to a worker without extra options", internalSSHTest)
+	It("installs jq without breaking the NVIDIA driver", packageInstallationTest)
+	It("replaces the selected worker after a maintenance event", nodeReplacementTest)
+})
