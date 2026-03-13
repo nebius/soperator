@@ -14,7 +14,8 @@ RUN apt-get update && \
         kmod \
         libncurses5-dev \
         supervisor \
-        openssh-server && \
+        openssh-server \
+        sssd-common && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

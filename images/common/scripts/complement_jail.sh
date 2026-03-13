@@ -49,6 +49,15 @@ pushd "${jaildir}"
     echo "Bind-mount /etc/hosts"
     mount --bind /etc/hosts etc/hosts
 
+    echo "Bind mount pipes for sssd"
+    mount --bind /var/lib/sss/pipes var/lib/sss/pipes
+
+    echo "Bind mount sssd.conf if exists"
+    if [[ -f /etc/sssd/sssd.conf ]]; then
+      touch etc/sssd/sssd.conf
+      mount --bind /etc/sssd/sssd.conf etc/sssd/sssd.conf
+    fi
+
     echo "Bind-mount jail submounts from upper ${upperdir} into the actual ${jaildir}"
     submounts=$( \
         findmnt --output TARGET --submounts --target / --pairs | \
