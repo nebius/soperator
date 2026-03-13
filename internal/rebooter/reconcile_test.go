@@ -2,13 +2,16 @@ package rebooter_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"nebius.ai/slurm-operator/internal/consts"
@@ -346,6 +349,164 @@ func TestIsNodeTaintedWithNoExecute(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newRebooterWithFakeClient(scheme *runtime.Scheme, objs ...client.Object) *RebooterReconciler {
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(objs...).
+		WithIndex(&corev1.Pod{}, "spec.nodeName", func(obj client.Object) []string {
+			pod := obj.(*corev1.Pod)
+			if pod.Spec.NodeName != "" {
+				return []string{pod.Spec.NodeName}
+			}
+			return nil
+		}).
+		Build()
+	return &RebooterReconciler{
+		Reconciler: &reconciler.Reconciler{
+			Client: fakeClient,
+		},
+		APIReader: fakeClient,
+	}
+}
+
+func TestAreAllPodsEvicted(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+
+	const nodeName = "test-node"
+
+	daemonSetOwner := []metav1.OwnerReference{{Kind: "DaemonSet", Name: "ds", APIVersion: "apps/v1"}}
+	noExecuteToleration := corev1.Toleration{Effect: corev1.TaintEffectNoExecute}
+	existsToleration := corev1.Toleration{Operator: corev1.TolerationOpExists}
+
+	tests := []struct {
+		name    string
+		pods    []corev1.Pod
+		wantErr bool
+	}{
+		{
+			name:    "no pods — node is drained",
+			pods:    nil,
+			wantErr: false,
+		},
+		{
+			name: "only DaemonSet pods — exempt",
+			pods: []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "ds-pod", Namespace: "default", OwnerReferences: daemonSetOwner},
+					Spec:       corev1.PodSpec{NodeName: nodeName},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "pod with NoExecute toleration — exempt",
+			pods: []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "tolerated-pod", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: nodeName, Tolerations: []corev1.Toleration{noExecuteToleration}},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "pod with Exists toleration — exempt",
+			pods: []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "exists-tolerated-pod", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: nodeName, Tolerations: []corev1.Toleration{existsToleration}},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "blocking pod — not evicted",
+			pods: []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "blocking-pod", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: nodeName},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "mix of exempt and blocking pods — returns error for blocking",
+			pods: []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "ds-pod", Namespace: "default", OwnerReferences: daemonSetOwner},
+					Spec:       corev1.PodSpec{NodeName: nodeName},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "blocking-pod", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: nodeName},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "pod on different node — not counted",
+			pods: []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "other-node-pod", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: "other-node"},
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			objs := make([]client.Object, len(tt.pods))
+			for i := range tt.pods {
+				objs[i] = &tt.pods[i]
+			}
+			r := newRebooterWithFakeClient(scheme, objs...)
+
+			err := r.AreAllPodsEvicted(context.Background(), nodeName)
+			if tt.wantErr {
+				require.Error(t, err)
+				var podErr *PodNotEvictableError
+				assert.ErrorAs(t, err, &podErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestAreAllPodsEvictedCacheThreshold verifies that a blocking pod is still
+// detected when the total pod count exceeds podEvictionCacheThreshold and the
+// paginated API-reader path is taken.  The fake client used as APIReader does
+// not support real server-side pagination, but it does return all objects, so
+// the correctness of the filtering logic is exercised end-to-end.
+func TestAreAllPodsEvictedCacheThreshold(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+
+	const nodeName = "big-node"
+	// Build just over the threshold (1001 pods) to force the paginated path.
+	const podCount = 1001
+
+	objs := make([]client.Object, podCount)
+	for i := range podCount {
+		objs[i] = &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("pod-%d", i),
+				Namespace: "default",
+			},
+			Spec: corev1.PodSpec{NodeName: nodeName},
+		}
+	}
+
+	r := newRebooterWithFakeClient(scheme, objs...)
+
+	err := r.AreAllPodsEvicted(context.Background(), nodeName)
+	require.Error(t, err)
+	var podErr *PodNotEvictableError
+	assert.ErrorAs(t, err, &podErr, "expected PodNotEvictableError for blocking pod on large node")
 }
 
 func TestHasTolerationForExists(t *testing.T) {

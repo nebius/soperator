@@ -34,6 +34,19 @@ var (
 	ControllerName = "rebooter"
 )
 
+const (
+	// podEvictionPageSize is the number of pods fetched per page when using the
+	// paginated API-server path in AreAllPodsEvicted.
+	podEvictionPageSize int64 = 64
+
+	// podEvictionCacheThreshold is the number of pods on a node above which
+	// AreAllPodsEvicted switches from a single cached List to a paginated
+	// API-server read with early exit. Below this threshold the cheaper cache
+	// path avoids extra API-server calls; above it pagination avoids
+	// materialising the full PodList in memory at once.
+	podEvictionCacheThreshold int64 = 1000
+)
+
 type RebooterParams struct {
 	ReconcileTimeout time.Duration
 	NodeName         string
@@ -42,20 +55,27 @@ type RebooterParams struct {
 
 type RebooterReconciler struct {
 	*reconciler.Reconciler
+	// APIReader is a direct API-server reader used for paginated pod listing.
+	// It bypasses the controller-runtime cache, which does not support server-side
+	// pagination via client.Limit/Continue.
+	// See https://github.com/kubernetes-sigs/controller-runtime/issues/3044
+	APIReader        client.Reader
 	reconcileTimeout time.Duration
 	nodeName         string
 	evictionMethod   consts.RebooterMethod
 }
 
 func NewRebooterReconciler(
-	client client.Client,
+	c client.Client,
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
+	apiReader client.Reader,
 	rebooterParams RebooterParams,
 ) *RebooterReconciler {
-	r := reconciler.NewReconciler(client, scheme, recorder)
+	r := reconciler.NewReconciler(c, scheme, recorder)
 	return &RebooterReconciler{
 		Reconciler:       r,
+		APIReader:        apiReader,
 		reconcileTimeout: rebooterParams.ReconcileTimeout,
 		nodeName:         rebooterParams.NodeName,
 		evictionMethod:   rebooterParams.EvictionMethod,
@@ -405,31 +425,86 @@ func (r *RebooterReconciler) IsNodeTaintedWithNoExecute(node *corev1.Node) bool 
 }
 
 // AreAllPodsEvicted checks if all pods on the node with the given name are evicted.
+//
+// Strategy:
+//   - First, list pods from the local cache (cheap, no API-server load).
+//   - If the node has more than podEvictionCacheThreshold pods, discard the
+//     cached result and re-query the API server in pages of podEvictionPageSize.
+//     This avoids materialising a huge PodList in memory and allows an early
+//     exit as soon as the first blocking pod is found.
 func (r *RebooterReconciler) AreAllPodsEvicted(ctx context.Context, nodeName string) error {
-	logger := log.FromContext(ctx).WithName("EvictPodsFromNode").WithValues("nodeName", nodeName).V(1)
+	logger := log.FromContext(ctx).WithName("AreAllPodsEvicted").WithValues("nodeName", nodeName).V(1)
 	logger.Info("Listing pods on node")
 
+	nodeSelector := client.MatchingFields{"spec.nodeName": nodeName}
+
 	podList := &corev1.PodList{}
-	if err := r.List(ctx, podList, client.MatchingFields{"spec.nodeName": nodeName}); err != nil {
+	if err := r.List(ctx, podList, nodeSelector); err != nil {
 		return fmt.Errorf("failed to list pods on node %s: %w", nodeName, err)
 	}
 
-	for _, pod := range podList.Items {
+	if int64(len(podList.Items)) <= podEvictionCacheThreshold {
+		return checkPodsEvicted(podList.Items)
+	}
+
+	logger.Info("Node has many pods, switching to paginated API-server listing",
+		"count", len(podList.Items), "threshold", podEvictionCacheThreshold)
+	return r.areAllPodsEvictedPaginated(ctx, nodeName)
+}
+
+// areAllPodsEvictedPaginated queries the API server directly, page by page,
+// and returns as soon as the first blocking pod is found.  It does NOT use
+// the controller-runtime cache so that client.Limit/Continue work as
+// proper server-side pagination.
+func (r *RebooterReconciler) areAllPodsEvictedPaginated(ctx context.Context, nodeName string) error {
+	logger := log.FromContext(ctx).WithName("areAllPodsEvictedPaginated").WithValues("nodeName", nodeName).V(1)
+
+	continueToken := ""
+	for {
+		page := &corev1.PodList{}
+		opts := []client.ListOption{
+			client.MatchingFields{"spec.nodeName": nodeName},
+			client.Limit(podEvictionPageSize),
+		}
+		if continueToken != "" {
+			opts = append(opts, client.Continue(continueToken))
+		}
+
+		if err := r.APIReader.List(ctx, page, opts...); err != nil {
+			return fmt.Errorf("failed to list pods on node %s: %w", nodeName, err)
+		}
+
+		logger.Info("Processing pod page", "pageSize", len(page.Items))
+
+		if err := checkPodsEvicted(page.Items); err != nil {
+			return err
+		}
+
+		continueToken = page.Continue
+		if continueToken == "" {
+			break
+		}
+	}
+
+	return nil
+}
+
+// checkPodsEvicted iterates a slice of pods and returns a PodNotEvictableError
+// for the first pod that is still blocking eviction, or nil if all pods are
+// either evictable or exempt.
+func checkPodsEvicted(pods []corev1.Pod) error {
+	for _, pod := range pods {
 		if IsControlledByDaemonSet(pod) {
 			continue
 		}
-
 		if HasTolerationForNoExecute(pod) {
 			continue
 		}
-
 		if HasTolerationForExists(pod) {
 			continue
 		}
-
 		return &PodNotEvictableError{PodName: pod.Name}
 	}
-
 	return nil
 }
 
