@@ -20,20 +20,15 @@ type packageInstallationScenario struct {
 func packageInstallationTest(ctx SpecContext) {
 	state := packageInstallationScenario{}
 
-	suite.Step(ctx, "selecting a worker for package installation", "Selected the worker that will receive the package installation.", func() string {
-		if state.targetWorker.Name == "" {
-			return "Worker target has not been selected yet."
-		}
-		return fmt.Sprintf("Selected worker: %s", state.targetWorker.Name)
-	}, func(_ SpecContext) {
+	suite.Step(ctx, "selecting a worker for package installation", func(_ SpecContext, step *framework.StepRecorder) {
 		worker, err := suite.AnyWorker()
 		Expect(err).NotTo(HaveOccurred())
 		state.targetWorker = worker
+		step.Detail("worker", state.targetWorker.Name)
 	})
 
-	suite.Step(ctx, "verifying nvidia-smi works before installing jq", "Verified that GPU tooling worked before any package changes were made.", func() string {
-		return fmt.Sprintf("Worker: %s", state.targetWorker.Name)
-	}, func(ctx SpecContext) {
+	suite.Step(ctx, "verifying nvidia-smi works before installing jq", func(ctx SpecContext, step *framework.StepRecorder) {
+		step.Detail("worker", state.targetWorker.Name)
 		nvidiaCmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(state.targetWorker.Name))
 		_, err := suite.ExecJailWithRetry(ctx, nvidiaCmd, 5, 10*time.Second)
 		if err != nil {
@@ -42,9 +37,9 @@ func packageInstallationTest(ctx SpecContext) {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	suite.Step(ctx, "installing jq on the worker", "Installed the jq package on the selected worker.", func() string {
-		return fmt.Sprintf("Worker: %s\nPackage: jq", state.targetWorker.Name)
-	}, func(ctx SpecContext) {
+	suite.Step(ctx, "installing jq on the worker", func(ctx SpecContext, step *framework.StepRecorder) {
+		step.Detail("worker", state.targetWorker.Name)
+		step.Detail("package", "jq")
 		updateCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get update'", framework.ShellQuote(state.targetWorker.Name))
 		_, err := suite.ExecJailWithRetry(ctx, updateCmd, 5, 10*time.Second)
 		if err != nil {
@@ -60,9 +55,8 @@ func packageInstallationTest(ctx SpecContext) {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	suite.Step(ctx, "verifying nvidia-smi still works after installation", "Confirmed that GPU tooling still worked after the package installation.", func() string {
-		return fmt.Sprintf("Worker: %s", state.targetWorker.Name)
-	}, func(ctx SpecContext) {
+	suite.Step(ctx, "verifying nvidia-smi still works after installation", func(ctx SpecContext, step *framework.StepRecorder) {
+		step.Detail("worker", state.targetWorker.Name)
 		nvidiaCmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(state.targetWorker.Name))
 		_, err := suite.ExecJailWithRetry(ctx, nvidiaCmd, 5, 10*time.Second)
 		if err != nil {
@@ -71,9 +65,9 @@ func packageInstallationTest(ctx SpecContext) {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	suite.Step(ctx, "verifying jq is available on the worker", "Confirmed that the installed package is available to users on the worker.", func() string {
-		return fmt.Sprintf("Worker: %s\nCommand: jq --version", state.targetWorker.Name)
-	}, func(ctx SpecContext) {
+	suite.Step(ctx, "verifying jq is available on the worker", func(ctx SpecContext, step *framework.StepRecorder) {
+		step.Detail("worker", state.targetWorker.Name)
+		step.Detail("command", "jq --version")
 		jqCmd := fmt.Sprintf("ssh %s 'jq --version >/dev/null'", framework.ShellQuote(state.targetWorker.Name))
 		_, err := suite.ExecJailWithRetry(ctx, jqCmd, 5, 10*time.Second)
 		if err != nil {

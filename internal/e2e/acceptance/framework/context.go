@@ -23,6 +23,11 @@ type Suite struct {
 	report  *SummaryReporter
 }
 
+type StepRecorder struct {
+	report *SummaryReporter
+	token  *activeStep
+}
+
 func LoadSuite(ctx context.Context) (*Suite, error) {
 	suite := &Suite{
 		report: NewSummaryReporter(),
@@ -88,27 +93,30 @@ func (s *Suite) Logf(format string, args ...any) {
 	s.exec.Logf(format, args...)
 }
 
-func (s *Suite) Step(ctx SpecContext, name, summary string, details func() string, body func(SpecContext)) {
+func (r *StepRecorder) Detail(key, value string) {
+	r.report.AddStepDetail(r.token, key, value)
+}
+
+func (s *Suite) Step(ctx SpecContext, name string, body func(SpecContext, *StepRecorder)) {
 	By(name)
 
 	report := CurrentSpecReport()
-	token := s.report.StartStep(report, name, summary)
+	token := s.report.StartStep(report, name)
+	step := &StepRecorder{
+		report: s.report,
+		token:  token,
+	}
 
 	defer func() {
-		detailText := ""
-		if details != nil {
-			detailText = details()
-		}
-
 		if recovered := recover(); recovered != nil {
-			s.report.FinishStep(token, StepStatusFailed, fmt.Sprint(recovered), detailText)
+			s.report.FinishStep(token, StepStatusFailed, fmt.Sprint(recovered))
 			panic(recovered)
 		}
 
-		s.report.FinishStep(token, StepStatusPassed, "", detailText)
+		s.report.FinishStep(token, StepStatusPassed, "")
 	}()
 
-	body(ctx)
+	body(ctx, step)
 }
 
 func (s *Suite) WriteSummary(report types.Report) error {

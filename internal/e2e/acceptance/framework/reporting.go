@@ -41,15 +41,19 @@ type activeStep struct {
 	startTime time.Time
 }
 
+type StepDetail struct {
+	Key   string
+	Value string
+}
+
 type StepResult struct {
-	Name       string
-	Summary    string
-	Status     StepStatus
-	Failure    string
-	DetailText string
-	StartTime  time.Time
-	EndTime    time.Time
-	Duration   time.Duration
+	Name      string
+	Status    StepStatus
+	Failure   string
+	Details   []StepDetail
+	StartTime time.Time
+	EndTime   time.Time
+	Duration  time.Duration
 }
 
 func NewSummaryReporter() *SummaryReporter {
@@ -59,7 +63,7 @@ func NewSummaryReporter() *SummaryReporter {
 	}
 }
 
-func (r *SummaryReporter) StartStep(report types.SpecReport, name, summary string) *activeStep {
+func (r *SummaryReporter) StartStep(report types.SpecReport, name string) *activeStep {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -67,7 +71,6 @@ func (r *SummaryReporter) StartStep(report types.SpecReport, name, summary strin
 	spec := r.ensureSpecLocked(report)
 	spec.steps = append(spec.steps, &StepResult{
 		Name:      name,
-		Summary:   summary,
 		StartTime: time.Now(),
 	})
 
@@ -78,7 +81,32 @@ func (r *SummaryReporter) StartStep(report types.SpecReport, name, summary strin
 	}
 }
 
-func (r *SummaryReporter) FinishStep(token *activeStep, status StepStatus, failure, details string) {
+func (r *SummaryReporter) AddStepDetail(token *activeStep, key, value string) {
+	if token == nil {
+		return
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	spec, ok := r.specs[token.specKey]
+	if !ok || token.stepIndex >= len(spec.steps) {
+		return
+	}
+
+	key = strings.TrimSpace(key)
+	value = strings.TrimSpace(value)
+	if key == "" || value == "" {
+		return
+	}
+
+	spec.steps[token.stepIndex].Details = append(spec.steps[token.stepIndex].Details, StepDetail{
+		Key:   key,
+		Value: value,
+	})
+}
+
+func (r *SummaryReporter) FinishStep(token *activeStep, status StepStatus, failure string) {
 	if token == nil {
 		return
 	}
@@ -94,7 +122,6 @@ func (r *SummaryReporter) FinishStep(token *activeStep, status StepStatus, failu
 	step := spec.steps[token.stepIndex]
 	step.Status = status
 	step.Failure = strings.TrimSpace(failure)
-	step.DetailText = strings.TrimSpace(details)
 	step.EndTime = time.Now()
 	step.Duration = step.EndTime.Sub(token.startTime)
 }
@@ -259,7 +286,7 @@ func renderSuiteBreakdown(report types.Report, specs map[string]*specRuntime) st
 
 			if runtime != nil && len(runtime.steps) > 0 {
 				for _, step := range runtime.steps {
-					builder.WriteString(fmt.Sprintf("  - %s `%s` %s\n", stepStatusIcon(step.Status), formatDuration(step.Duration), step.Summary))
+					builder.WriteString(fmt.Sprintf("  - %s `%s` %s\n", stepStatusIcon(step.Status), formatDuration(step.Duration), step.Name))
 					if step.Status == StepStatusFailed && step.Failure != "" {
 						builder.WriteString(fmt.Sprintf("    - Failure: %s\n", sanitizeInline(step.Failure)))
 					}
@@ -308,13 +335,13 @@ func renderTechnicalAppendix(report types.Report, specs map[string]*specRuntime,
 			builder.WriteString("**Step details**\n\n")
 			for _, step := range runtime.steps {
 				builder.WriteString(fmt.Sprintf("- %s `%s` %s\n", stepStatusIcon(step.Status), formatDuration(step.Duration), step.Name))
-				if step.DetailText != "" {
-					builder.WriteString("```text\n")
-					builder.WriteString(step.DetailText)
-					if !strings.HasSuffix(step.DetailText, "\n") {
-						builder.WriteByte('\n')
+				if len(step.Details) > 0 {
+					sort.Slice(step.Details, func(i, j int) bool {
+						return step.Details[i].Key < step.Details[j].Key
+					})
+					for _, detail := range step.Details {
+						builder.WriteString(fmt.Sprintf("  - `%s`: `%s`\n", sanitizeInline(detail.Key), sanitizeInline(detail.Value)))
 					}
-					builder.WriteString("```\n")
 				}
 				if step.Status == StepStatusFailed && step.Failure != "" {
 					builder.WriteString("```text\n")
