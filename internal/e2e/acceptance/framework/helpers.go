@@ -17,10 +17,11 @@ const soperatorNamespace = "soperator"
 
 type Executor struct {
 	commandTimeout time.Duration
+	report         *SummaryReporter
 }
 
-func NewExecutor(commandTimeout time.Duration) *Executor {
-	return &Executor{commandTimeout: commandTimeout}
+func NewExecutor(commandTimeout time.Duration, report *SummaryReporter) *Executor {
+	return &Executor{commandTimeout: commandTimeout, report: report}
 }
 
 func (e *Executor) ExecController(ctx context.Context, command string) (string, error) {
@@ -88,7 +89,11 @@ func (e *Executor) Run(ctx context.Context, name string, args ...string) (string
 }
 
 func (e *Executor) Logf(format string, args ...any) {
-	fmt.Fprintf(GinkgoWriter, "acceptance: "+format+"\n", args...)
+	line := fmt.Sprintf("acceptance: "+format, args...)
+	fmt.Fprintln(GinkgoWriter, line)
+	if e.report != nil {
+		e.report.Logf(CurrentSpecReport().FullText(), line)
+	}
 }
 
 func ShellQuote(value string) string {

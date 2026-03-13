@@ -7,6 +7,7 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/types"
 	. "github.com/onsi/gomega"
 
 	"nebius.ai/slurm-operator/internal/e2e/acceptance/framework"
@@ -24,6 +25,14 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 	suite, err = framework.LoadSuite(ctx)
 	Expect(err).NotTo(HaveOccurred())
 }, NodeTimeout(5*time.Minute))
+
+var _ = ReportAfterSuite("write acceptance summary", func(report types.Report) {
+	if suite == nil {
+		return
+	}
+
+	Expect(suite.WriteSummary(report)).To(Succeed())
+})
 
 var _ = Describe("Acceptance", Ordered, Serial, func() {
 	It("finds a provisioned cluster ready for acceptance tests", clusterCreationTest)

@@ -8,6 +8,9 @@ import (
 	"math/rand"
 	"strings"
 	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/types"
 )
 
 type WorkerRef struct {
@@ -17,15 +20,17 @@ type WorkerRef struct {
 type Suite struct {
 	exec    *Executor
 	workers []WorkerRef
+	report  *SummaryReporter
 }
 
 func LoadSuite(ctx context.Context) (*Suite, error) {
 	suite := &Suite{
-		exec: NewExecutor(10 * time.Minute),
+		report: NewSummaryReporter(),
 	}
+	suite.exec = NewExecutor(10*time.Minute, suite.report)
 
 	if err := suite.discoverCluster(ctx); err != nil {
-		return nil, err
+		return suite, err
 	}
 
 	return suite, nil
@@ -81,6 +86,33 @@ func (s *Suite) discoverCluster(ctx context.Context) error {
 
 func (s *Suite) Logf(format string, args ...any) {
 	s.exec.Logf(format, args...)
+}
+
+func (s *Suite) Step(ctx SpecContext, name, summary string, details func() string, body func(SpecContext)) {
+	By(name)
+
+	report := CurrentSpecReport()
+	token := s.report.StartStep(report, name, summary)
+
+	defer func() {
+		detailText := ""
+		if details != nil {
+			detailText = details()
+		}
+
+		if recovered := recover(); recovered != nil {
+			s.report.FinishStep(token, StepStatusFailed, fmt.Sprint(recovered), detailText)
+			panic(recovered)
+		}
+
+		s.report.FinishStep(token, StepStatusPassed, "", detailText)
+	}()
+
+	body(ctx)
+}
+
+func (s *Suite) WriteSummary(report types.Report) error {
+	return s.report.WriteSummary(report)
 }
 
 func (s *Suite) Run(ctx context.Context, name string, args ...string) (string, error) {
