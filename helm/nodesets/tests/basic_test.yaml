@@ -129,6 +129,34 @@ tests:
       - exists:
           path: metadata.labels["app.kubernetes.io/managed-by"]
 
+  - it: should set slurmClusterRefName from top-level value
+    set:
+      slurmClusterRefName: "my-cluster"
+      nodesets:
+        - name: test-workers
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "1"
+              memory: "1Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+    asserts:
+      - equal:
+          path: spec.slurmClusterRefName
+          value: "my-cluster"
+
   - it: should set correct namespace
     set:
       nodesets:

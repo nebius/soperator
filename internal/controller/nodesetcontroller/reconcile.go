@@ -68,9 +68,9 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		err     error
 	)
 	{
-		clusterName, hasClusterRef := nodeSet.GetAnnotations()[consts.AnnotationParentalClusterRefName]
-		if !hasClusterRef {
-			err = fmt.Errorf("getting parental cluster ref from annotations")
+		clusterName := nodeSet.Spec.SlurmClusterRefName
+		if clusterName == "" {
+			err = fmt.Errorf("NodeSet %q has empty spec.slurmClusterRefName", nodeSet.Name)
 			logger.Error(err, "No parent cluster ref found")
 			return ctrl.Result{}, err
 		}
