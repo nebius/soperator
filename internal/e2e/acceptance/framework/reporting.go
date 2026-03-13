@@ -29,11 +29,9 @@ type SummaryReporter struct {
 }
 
 type specRuntime struct {
-	suiteName string
-	testName  string
-	details   map[string]string
-	steps     []*StepResult
-	logs      []string
+	details map[string]string
+	steps   []*StepResult
+	logs    []string
 }
 
 type activeStep struct {
@@ -168,9 +166,6 @@ func (r *SummaryReporter) ensureSpecLocked(report types.SpecReport) *specRuntime
 		spec = &specRuntime{}
 		r.specs[specKey] = spec
 	}
-
-	spec.suiteName = suiteNameFor(report)
-	spec.testName = report.LeafNodeText
 
 	return spec
 }

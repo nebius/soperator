@@ -26,8 +26,8 @@ func packageInstallationTest(ctx SpecContext) {
 		worker, err := suite.AnyWorker()
 		Expect(err).NotTo(HaveOccurred())
 		state.targetWorker = worker
-		suite.Detail("worker", state.targetWorker.Name)
 	})
+	suite.Detail("worker", state.targetWorker.Name)
 
 	suite.Step(ctx, "verifying nvidia-smi works before installing jq", func(ctx SpecContext, step *framework.StepRecorder) {
 		nvidiaCmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(state.targetWorker.Name))

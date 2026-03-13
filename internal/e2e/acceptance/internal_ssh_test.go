@@ -29,8 +29,8 @@ func internalSSHTest(ctx SpecContext) {
 		worker, err := suite.AnyWorker()
 		Expect(err).NotTo(HaveOccurred())
 		state.targetWorker = worker
-		suite.Detail("worker", state.targetWorker.Name)
 	})
+	suite.Detail("worker", state.targetWorker.Name)
 
 	suite.Step(ctx, "ensuring the regular user exists on the login node", func(ctx SpecContext, step *framework.StepRecorder) {
 		createUserCmd := fmt.Sprintf(
@@ -55,7 +55,6 @@ func internalSSHTest(ctx SpecContext) {
 	})
 
 	suite.Step(ctx, "checking that the SSH target reports the worker hostname", func(_ SpecContext, step *framework.StepRecorder) {
-		step.Detail("observed_hostname", strings.TrimSpace(state.sshOutput))
 		Expect(strings.TrimSpace(state.sshOutput)).To(ContainSubstring(state.targetWorker.Name))
 	})
 }
