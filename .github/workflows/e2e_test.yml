@@ -581,19 +581,39 @@ jobs:
       (needs.resolve-profile.result == 'failure' || needs.e2e-test.result == 'failure') &&
       (github.ref_name == 'main' || startsWith(github.ref_name, 'soperator-release-'))
     runs-on: ubuntu-latest
+    environment: e2e
     steps:
       - name: Send Slack notification
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.E2E_SLACK_WEBHOOK_URL }}
+          BRANCH: ${{ github.ref_name }}
+          ACTOR: ${{ github.triggering_actor }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         shell: bash
         run: |
+          text="Branch: ${BRANCH}"
+          text+="\nTriggered by: ${ACTOR}"
+
+          if [[ "$RUN_ATTEMPT" -gt 1 ]]; then
+            text+="\nRe-run: attempt #${RUN_ATTEMPT}"
+            RUN_URL+="/attempts/${RUN_ATTEMPT}"
+          fi
+
+          text+="\nWorkflow: <${RUN_URL}|View Run>"
+          text+="\nRunbook: <https://nebius.atlassian.net/wiki/spaces/SCHED/pages/998015487/E2E+Runbook|E2E Runbook>"
+
+          payload=$(jq -n \
+            --arg text "$text" \
+            '{
+              attachments: [{
+                color: "danger",
+                title: ":warning: E2E Test failure",
+                text: $text,
+                footer: "soperator e2e test"
+              }]
+            }')
+
           curl -X POST "$SLACK_WEBHOOK_URL" \
             -H 'Content-type: application/json' \
-            --data "{
-              \"attachments\": [{
-                \"color\": \"danger\",
-                \"title\": \":warning: E2E Test failure\",
-                \"text\": \"Branch: ${{ github.ref_name }}\nWorkflow: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>\nRunbook: <https://nebius.atlassian.net/wiki/spaces/SCHED/pages/998015487/E2E+Runbook|E2E Runbook>\",
-                \"footer\": \"soperator e2e test\"
-              }]
-            }"
+            --data "$payload"
