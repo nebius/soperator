@@ -330,7 +330,7 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Terraform Apply
-        timeout-minutes: 120
+        timeout-minutes: 90
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
           source .envrc
