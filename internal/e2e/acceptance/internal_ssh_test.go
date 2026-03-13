@@ -23,15 +23,16 @@ type sshScenario struct {
 func internalSSHTest(ctx SpecContext) {
 	state := sshScenario{}
 
+	suite.Detail("username", sshUserName)
+
 	suite.Step(ctx, "selecting a worker for the SSH check", func(_ SpecContext, step *framework.StepRecorder) {
 		worker, err := suite.AnyWorker()
 		Expect(err).NotTo(HaveOccurred())
 		state.targetWorker = worker
-		step.Detail("worker", state.targetWorker.Name)
+		suite.Detail("worker", state.targetWorker.Name)
 	})
 
 	suite.Step(ctx, "ensuring the regular user exists on the login node", func(ctx SpecContext, step *framework.StepRecorder) {
-		step.Detail("username", sshUserName)
 		createUserCmd := fmt.Sprintf(
 			"id %s >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh %s",
 			framework.ShellQuote(sshUserName),
@@ -42,7 +43,6 @@ func internalSSHTest(ctx SpecContext) {
 	})
 
 	suite.Step(ctx, "SSHing from the login node to the selected worker", func(ctx SpecContext, step *framework.StepRecorder) {
-		step.Detail("worker", state.targetWorker.Name)
 		sshCmd := fmt.Sprintf(
 			"su - %s -c 'timeout 30 ssh %s hostname </dev/null'",
 			framework.ShellQuote(sshUserName),
@@ -55,7 +55,6 @@ func internalSSHTest(ctx SpecContext) {
 	})
 
 	suite.Step(ctx, "checking that the SSH target reports the worker hostname", func(_ SpecContext, step *framework.StepRecorder) {
-		step.Detail("expected_hostname", state.targetWorker.Name)
 		step.Detail("observed_hostname", strings.TrimSpace(state.sshOutput))
 		Expect(strings.TrimSpace(state.sshOutput)).To(ContainSubstring(state.targetWorker.Name))
 	})

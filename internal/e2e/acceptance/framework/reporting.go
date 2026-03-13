@@ -31,6 +31,7 @@ type SummaryReporter struct {
 type specRuntime struct {
 	suiteName string
 	testName  string
+	details   map[string]string
 	steps     []*StepResult
 	logs      []string
 }
@@ -41,7 +42,7 @@ type activeStep struct {
 	startTime time.Time
 }
 
-type StepDetail struct {
+type Detail struct {
 	Key   string
 	Value string
 }
@@ -50,7 +51,7 @@ type StepResult struct {
 	Name      string
 	Status    StepStatus
 	Failure   string
-	Details   []StepDetail
+	Details   []Detail
 	StartTime time.Time
 	EndTime   time.Time
 	Duration  time.Duration
@@ -86,6 +87,11 @@ func (r *SummaryReporter) AddStepDetail(token *activeStep, key, value string) {
 		return
 	}
 
+	detail, ok := newStepDetail(key, value)
+	if !ok {
+		return
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -94,16 +100,23 @@ func (r *SummaryReporter) AddStepDetail(token *activeStep, key, value string) {
 		return
 	}
 
-	key = strings.TrimSpace(key)
-	value = strings.TrimSpace(value)
-	if key == "" || value == "" {
+	spec.steps[token.stepIndex].Details = append(spec.steps[token.stepIndex].Details, detail)
+}
+
+func (r *SummaryReporter) AddSpecDetail(report types.SpecReport, key, value string) {
+	detail, ok := newStepDetail(key, value)
+	if !ok {
 		return
 	}
 
-	spec.steps[token.stepIndex].Details = append(spec.steps[token.stepIndex].Details, StepDetail{
-		Key:   key,
-		Value: value,
-	})
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	spec := r.ensureSpecLocked(report)
+	if spec.details == nil {
+		spec.details = make(map[string]string)
+	}
+	spec.details[detail.Key] = detail.Value
 }
 
 func (r *SummaryReporter) FinishStep(token *activeStep, status StepStatus, failure string) {
@@ -278,7 +291,6 @@ func renderSuiteBreakdown(report types.Report, specs map[string]*specRuntime) st
 			builder.WriteString(fmt.Sprintf("#### %s %s\n\n", statusIcon(spec), spec.LeafNodeText))
 			builder.WriteString(fmt.Sprintf("- Result: %s\n", humanSpecStatus(spec)))
 			builder.WriteString(fmt.Sprintf("- Elapsed time: `%s`\n", formatDuration(spec.RunTime)))
-			builder.WriteString(fmt.Sprintf("- Check: %s\n", plainLanguageDescription(spec.LeafNodeText)))
 			if spec.Failure.Message != "" {
 				builder.WriteString(fmt.Sprintf("- Failure summary: %s\n", sanitizeInline(spec.Failure.Message)))
 			}
@@ -330,6 +342,19 @@ func renderTechnicalAppendix(report types.Report, specs map[string]*specRuntime,
 			builder.WriteString(fmt.Sprintf("- Failure: %s\n", sanitizeInline(spec.Failure.Message)))
 		}
 		builder.WriteString("\n")
+
+		if runtime != nil && len(runtime.details) > 0 {
+			builder.WriteString("**Test details**\n\n")
+			keys := make([]string, 0, len(runtime.details))
+			for key := range runtime.details {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			for _, key := range keys {
+				builder.WriteString(fmt.Sprintf("- `%s`: `%s`\n", sanitizeInline(key), sanitizeInline(runtime.details[key])))
+			}
+			builder.WriteString("\n")
+		}
 
 		if runtime != nil && len(runtime.steps) > 0 {
 			builder.WriteString("**Step details**\n\n")
@@ -445,19 +470,17 @@ func humanSpecStatus(spec types.SpecReport) string {
 	return spec.State.String()
 }
 
-func plainLanguageDescription(testName string) string {
-	switch testName {
-	case "finds a provisioned cluster ready for acceptance tests":
-		return "Confirms the provisioned Slurm cluster is available and ready for deeper validation."
-	case "allows a regular user to SSH to a worker without extra options":
-		return "Checks that end users can connect from the login node to a worker with the expected SSH experience."
-	case "installs jq without breaking the NVIDIA driver":
-		return "Verifies that a package installation on a worker does not break GPU functionality."
-	case "replaces the selected worker after a maintenance event":
-		return "Verifies that maintenance handling drains, replaces, and restores a worker node correctly."
-	default:
-		return testName
+func newStepDetail(key, value string) (Detail, bool) {
+	key = strings.TrimSpace(key)
+	value = strings.TrimSpace(value)
+	if key == "" || value == "" {
+		return Detail{}, false
 	}
+
+	return Detail{
+		Key:   key,
+		Value: value,
+	}, true
 }
 
 func formatSuiteDuration(specs types.SpecReports) string {

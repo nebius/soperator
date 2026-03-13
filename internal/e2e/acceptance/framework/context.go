@@ -93,6 +93,10 @@ func (s *Suite) Logf(format string, args ...any) {
 	s.exec.Logf(format, args...)
 }
 
+func (s *Suite) Detail(key, value string) {
+	s.report.AddSpecDetail(CurrentSpecReport(), key, value)
+}
+
 func (r *StepRecorder) Detail(key, value string) {
 	r.report.AddStepDetail(r.token, key, value)
 }

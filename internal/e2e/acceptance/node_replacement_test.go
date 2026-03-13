@@ -40,21 +40,19 @@ func nodeReplacementTest(ctx SpecContext) {
 		worker, err := suite.AnyWorker()
 		Expect(err).NotTo(HaveOccurred())
 		state.targetWorker = worker
-		step.Detail("worker", state.targetWorker.Name)
+		suite.Detail("worker", state.targetWorker.Name)
 	})
 
 	suite.Step(ctx, "capturing the worker's current instance id", func(ctx SpecContext, step *framework.StepRecorder) {
-		step.Detail("worker", state.targetWorker.Name)
 		nodeState, err := suite.ExecController(ctx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(state.targetWorker.Name)))
 		Expect(err).NotTo(HaveOccurred())
 
 		state.originalInstance = parseInstanceID(nodeState)
 		Expect(state.originalInstance).NotTo(BeEmpty())
-		step.Detail("original_instance", state.originalInstance)
+		suite.Detail("original_instance", state.originalInstance)
 	})
 
 	suite.Step(ctx, "submitting a test job pinned to the selected worker", func(ctx SpecContext, step *framework.StepRecorder) {
-		step.Detail("worker", state.targetWorker.Name)
 		jobID, err := suite.ExecJail(ctx, fmt.Sprintf(
 			"sbatch --parsable -w %s --job-name=e2e-node-replacement --wrap=%s",
 			framework.ShellQuote(state.targetWorker.Name),
@@ -64,7 +62,7 @@ func nodeReplacementTest(ctx SpecContext) {
 
 		state.maintenanceJobID = strings.TrimSpace(jobID)
 		Expect(state.maintenanceJobID).NotTo(BeEmpty())
-		step.Detail("maintenance_job_id", state.maintenanceJobID)
+		suite.Detail("maintenance_job_id", state.maintenanceJobID)
 	})
 
 	DeferCleanup(func() {
@@ -78,7 +76,6 @@ func nodeReplacementTest(ctx SpecContext) {
 	})
 
 	suite.Step(ctx, "waiting for the test job to enter RUNNING state", func(ctx SpecContext, step *framework.StepRecorder) {
-		step.Detail("maintenance_job_id", state.maintenanceJobID)
 		Eventually(func(ctx context.Context) (bool, error) {
 			status, runErr := suite.ExecController(ctx, fmt.Sprintf("squeue -h -j %s -o '%%T'", framework.ShellQuote(state.maintenanceJobID)))
 			if runErr != nil {
@@ -90,7 +87,6 @@ func nodeReplacementTest(ctx SpecContext) {
 	})
 
 	suite.Step(ctx, "triggering the maintenance condition on the original instance", func(ctx SpecContext, step *framework.StepRecorder) {
-		step.Detail("original_instance", state.originalInstance)
 		patch := fmt.Sprintf(
 			`{"status":{"conditions":[{"type":"NebiusMaintenanceScheduled","status":"True","reason":"AcceptanceTest","message":"Maintenance scheduled for node","lastTransitionTime":"%s"}]}}`,
 			time.Now().UTC().Format(time.RFC3339),
@@ -104,8 +100,6 @@ func nodeReplacementTest(ctx SpecContext) {
 	})
 
 	suite.Step(ctx, "waiting for the worker to drain with the maintenance reason", func(ctx SpecContext, step *framework.StepRecorder) {
-		step.Detail("worker", state.targetWorker.Name)
-		step.Detail("original_instance", state.originalInstance)
 		Eventually(func(ctx context.Context) (bool, error) {
 			nodeState, runErr := suite.ExecController(ctx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(state.targetWorker.Name)))
 			if runErr != nil {
@@ -118,14 +112,12 @@ func nodeReplacementTest(ctx SpecContext) {
 	})
 
 	suite.Step(ctx, "cancelling the test job", func(ctx SpecContext, step *framework.StepRecorder) {
-		step.Detail("maintenance_job_id", state.maintenanceJobID)
 		_, err := suite.ExecController(ctx, fmt.Sprintf("scancel %s || true", framework.ShellQuote(state.maintenanceJobID)))
 		Expect(err).NotTo(HaveOccurred())
 		state.maintenanceJobID = ""
 	})
 
 	suite.Step(ctx, "waiting for the original instance to be removed", func(ctx SpecContext, step *framework.StepRecorder) {
-		step.Detail("original_instance", state.originalInstance)
 		Eventually(func(ctx context.Context) bool {
 			_, runErr := suite.Run(ctx, "nebius", "compute", "instance", "get", "--id", state.originalInstance, "--format", "json")
 			return runErr != nil && strings.Contains(runErr.Error(), "not found")
@@ -133,8 +125,6 @@ func nodeReplacementTest(ctx SpecContext) {
 	})
 
 	suite.Step(ctx, "waiting for a replacement instance to join the cluster", func(ctx SpecContext, step *framework.StepRecorder) {
-		step.Detail("worker", state.targetWorker.Name)
-		step.Detail("original_instance", state.originalInstance)
 		Eventually(func(ctx context.Context) (bool, error) {
 			nodeState, runErr := suite.ExecController(ctx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(state.targetWorker.Name)))
 			if runErr != nil {
@@ -151,8 +141,6 @@ func nodeReplacementTest(ctx SpecContext) {
 	})
 
 	suite.Step(ctx, "verifying GPU access on the replacement node", func(ctx SpecContext, step *framework.StepRecorder) {
-		step.Detail("worker", state.targetWorker.Name)
-		step.Detail("original_instance", state.originalInstance)
 		_, err := suite.ExecJail(ctx, fmt.Sprintf("srun -w %s nvidia-smi -L >/dev/null", framework.ShellQuote(state.targetWorker.Name)))
 		if err != nil {
 			nodeState, stateErr := suite.ExecController(ctx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(state.targetWorker.Name)))

@@ -35,8 +35,8 @@ var _ = ReportAfterSuite("write acceptance summary", func(report types.Report) {
 })
 
 var _ = Describe("Acceptance", Ordered, Serial, func() {
-	It("finds a provisioned cluster ready for acceptance tests", clusterCreationTest)
-	It("allows a regular user to SSH to a worker without extra options", internalSSHTest)
-	It("installs jq without breaking the NVIDIA driver", packageInstallationTest)
-	It("replaces the selected worker after a maintenance event", nodeReplacementTest)
+	It("confirms that a provisioned cluster is ready for acceptance testing", clusterCreationTest)
+	It("confirms that a regular user can SSH from the login node to a worker", internalSSHTest)
+	It("confirms that installing jq does not break GPU tooling", packageInstallationTest)
+	It("confirms that a selected worker is replaced after a maintenance event", nodeReplacementTest)
 })
