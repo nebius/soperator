@@ -575,10 +575,10 @@ jobs:
 
   notify-failure:
     name: Notify Slack on E2E failure
-    needs: [e2e-test]
+    needs: [resolve-profile, e2e-test]
     if: |
       always() &&
-      needs.e2e-test.result == 'failure' &&
+      (needs.resolve-profile.result == 'failure' || needs.e2e-test.result == 'failure') &&
       (github.ref_name == 'main' || startsWith(github.ref_name, 'soperator-release-'))
     runs-on: ubuntu-latest
     steps:
