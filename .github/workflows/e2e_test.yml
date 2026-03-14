@@ -592,24 +592,26 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         shell: bash
         run: |
-          text="Branch: ${BRANCH}"
-          text+="\nTriggered by: ${ACTOR}"
-
           if [[ "$RUN_ATTEMPT" -gt 1 ]]; then
-            text+="\nRe-run: attempt #${RUN_ATTEMPT}"
             RUN_URL+="/attempts/${RUN_ATTEMPT}"
           fi
 
-          text+="\nWorkflow: <${RUN_URL}|View Run>"
-          text+="\nRunbook: <https://nebius.atlassian.net/wiki/spaces/SCHED/pages/998015487/E2E+Runbook|E2E Runbook>"
-
-          payload=$(jq -n \
-            --arg text "$text" \
+          payload=$(jq --null-input \
+            --arg branch "$BRANCH" \
+            --arg actor "$ACTOR" \
+            --arg attempt "$RUN_ATTEMPT" \
+            --arg run_url "$RUN_URL" \
+            --arg runbook_url "https://nebius.atlassian.net/wiki/spaces/SCHED/pages/998015487/E2E+Runbook" \
             '{
               attachments: [{
                 color: "danger",
                 title: ":warning: E2E Test failure",
-                text: $text,
+                text: (
+                  "Branch: \($branch)\nTriggered by: \($actor)"
+                  + if ($attempt | tonumber) > 1 then "\nRe-run: attempt #\($attempt)" else "" end
+                  + "\nWorkflow: <\($run_url)|View Run>"
+                  + "\nRunbook: <\($runbook_url)|E2E Runbook>"
+                ),
                 footer: "soperator e2e test"
               }]
             }')
