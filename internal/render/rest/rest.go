@@ -50,7 +50,7 @@ func RenderDeploymentREST(
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      naming.BuildDeploymentName(consts.ComponentTypeREST),
+			Name:      naming.BuildDeploymentName(consts.ComponentTypeREST, clusterName),
 			Namespace: namespace,
 			Labels:    labels,
 		},

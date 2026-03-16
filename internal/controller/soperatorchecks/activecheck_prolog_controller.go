@@ -85,7 +85,7 @@ func (r *ActiveCheckPrologReconciler) Reconcile(
 		"Starting reconciliation", "SlurmCluster", req.Name, "Namespace", req.Namespace,
 	)
 
-	if err := r.updatePrologConfigMap(ctx, req.Namespace, r.getPrologScript()); err != nil {
+	if err := r.updatePrologConfigMap(ctx, req.Namespace, req.Name, r.getPrologScript()); err != nil {
 		logger.Error(err, "Failed to update ConfigMap with active check prolog script")
 		return DefaultRequeueResult, nil
 	}
@@ -94,15 +94,19 @@ func (r *ActiveCheckPrologReconciler) Reconcile(
 	return DefaultRequeueResult, nil
 }
 
-func (r *ActiveCheckPrologReconciler) updatePrologConfigMap(ctx context.Context, namespace string, config string) error {
+func (r *ActiveCheckPrologReconciler) updatePrologConfigMap(ctx context.Context, namespace string, clusterName string, config string) error {
+	cmName := clusterName + "-" + consts.ConfigMapNameActiveCheckPrologScript
 	configMap := &corev1.ConfigMap{
 		TypeMeta: ctrl.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.Version,
 			Kind:       "ConfigMap",
 		},
 		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.ConfigMapNameActiveCheckPrologScript,
+			Name:      cmName,
 			Namespace: namespace,
+			Labels: map[string]string{
+				consts.LabelInstanceKey: clusterName,
+			},
 		},
 		Data: map[string]string{
 			consts.ConfigMapKeyActiveCheckPrologScript: config,
@@ -122,12 +126,15 @@ func (r *ActiveCheckPrologReconciler) updatePrologConfigMap(ctx context.Context,
 			Kind:       "JailedConfig",
 		},
 		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.ConfigMapNameActiveCheckPrologScript,
+			Name:      cmName,
 			Namespace: namespace,
+			Labels: map[string]string{
+				consts.LabelInstanceKey: clusterName,
+			},
 		},
 		Spec: v1alpha1.JailedConfigSpec{
 			ConfigMap: v1alpha1.ConfigMapReference{
-				Name: consts.ConfigMapNameActiveCheckPrologScript,
+				Name: cmName,
 			},
 			Items: []corev1.KeyToPath{
 				{

@@ -176,7 +176,7 @@ func main() {
 		WebhookServer:                 webhookServer,
 		HealthProbeBindAddress:        probeAddr,
 		LeaderElection:                enableLeaderElection,
-		LeaderElectionID:              "vqeyz6ae.nebius.ai",
+		LeaderElectionID:              clusterName + ".vqeyz6ae.nebius.ai",
 		LeaderElectionReleaseOnCancel: true,
 		Cache: cache.Options{
 			DefaultNamespaces: map[string]cache.Config{
@@ -215,6 +215,7 @@ func main() {
 	if err = (sconfigcontroller.NewJailedConfigReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
+		clusterName,
 		slurmAPIClient,
 		jailFs,
 		reconfigurePollInterval,

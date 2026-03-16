@@ -48,7 +48,7 @@ func buildAccountingFrom(clusterName string, maintenance *consts.MaintenanceMode
 		CustomInitContainers: accounting.CustomInitContainers,
 		Service:              buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeAccounting, clusterName)),
 		Deployment: buildDeploymentFrom(
-			naming.BuildDeploymentName(consts.ComponentTypeAccounting),
+			naming.BuildDeploymentName(consts.ComponentTypeAccounting, clusterName),
 		),
 		ExternalDB:     accounting.ExternalDB,
 		MariaDb:        accounting.MariaDbOperator,

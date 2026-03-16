@@ -340,7 +340,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 
 					if !isAccountingEnabled {
 						stepLogger.V(1).Info("Removing")
-						deploymentName := naming.BuildDeploymentName(consts.ComponentTypeAccounting)
+						deploymentName := naming.BuildDeploymentName(consts.ComponentTypeAccounting, clusterValues.Name)
 						if err = r.Deployment.Cleanup(stepCtx, cluster, deploymentName); err != nil {
 							return fmt.Errorf("cleanup accounting Deployment: %w", err)
 						}
