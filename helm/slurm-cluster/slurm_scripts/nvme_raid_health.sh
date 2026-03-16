@@ -2,7 +2,7 @@
 
 set -euxo pipefail
 
-DMESG_SINCE="${NVME_RAID_DMESG_SINCE:-1 hour ago}"
+DMESG_SINCE="${NVME_RAID_DMESG_SINCE:-15 minutes ago}"
 probe_file=""
 
 cleanup_probe_file() {
@@ -73,15 +73,39 @@ check_dmesg() {
 
 check_md_array() {
     local md_array="$1"
-    local detail
+    local md_name="${md_array##*/}"
+    local md_dir="/sys/block/${md_name}/md"
+    local array_state=""
+    local sync_action=""
+    local degraded=""
 
-    if ! detail="$(mdadm --detail "${md_array}" 2>/dev/null)"; then
-        echo "Could not inspect RAID array ${md_array} with mdadm" >&3
+    if [[ ! -d "${md_dir}" ]]; then
+        echo "Could not inspect RAID array ${md_array}: missing ${md_dir}" >&3
         exit 1
     fi
 
-    if printf '%s\n' "${detail}" | grep -Eq 'State : .*(degraded|recovering|resyncing|failed|inactive)'; then
-        echo "RAID array ${md_array} is not healthy: $(printf '%s\n' "${detail}" | awk -F' : ' '/State :/ { print $2; exit }')" >&3
+    if [[ -r "${md_dir}/array_state" ]]; then
+        array_state="$(<"${md_dir}/array_state")"
+    fi
+    if [[ -r "${md_dir}/sync_action" ]]; then
+        sync_action="$(<"${md_dir}/sync_action")"
+    fi
+    if [[ -r "${md_dir}/degraded" ]]; then
+        degraded="$(<"${md_dir}/degraded")"
+    fi
+
+    if [[ -n "${degraded}" && "${degraded}" != "0" ]]; then
+        echo "RAID array ${md_array} is degraded: missing ${degraded} device(s)" >&3
+        exit 1
+    fi
+
+    if [[ -n "${array_state}" && "${array_state}" =~ ^(clear|inactive|suspended|readonly)$ ]]; then
+        echo "RAID array ${md_array} is not healthy: array_state=${array_state}" >&3
+        exit 1
+    fi
+
+    if [[ -n "${sync_action}" && ! "${sync_action}" =~ ^(idle|check)$ ]]; then
+        echo "RAID array ${md_array} is not healthy: sync_action=${sync_action}" >&3
         exit 1
     fi
 }
@@ -144,14 +168,14 @@ echo "Detected NVMe-backed RAID arrays: ${md_arrays[*]}"
 discover_mount_points
 echo "Detected NVMe RAID mount points: ${mount_points[*]}"
 
+for mount_point in "${mount_points[@]}"; do
+    check_mount_rw "${mount_point}"
+done
+
 check_dmesg
 
 for md_array in "${md_arrays[@]}"; do
     check_md_array "${md_array}"
-done
-
-for mount_point in "${mount_points[@]}"; do
-    check_mount_rw "${mount_point}"
 done
 
 echo "NVMe RAID health check passed"
