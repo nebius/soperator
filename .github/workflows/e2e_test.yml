@@ -345,7 +345,7 @@ jobs:
           bin/e2e apply
 
       - name: K8s Cluster Info and NodeGroups
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           echo "=== Listing K8s clusters ==="
@@ -363,17 +363,17 @@ jobs:
           done
 
       - name: "K8s Cluster: Pods"
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: kubectl get pods -A -o wide
 
       - name: "K8s Cluster: Events"
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: kubectl get events -A --sort-by='.lastTimestamp'
 
       - name: "K8s Cluster: Nodes"
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           kubectl get nodes
@@ -381,7 +381,7 @@ jobs:
           kubectl get nodes -o yaml
 
       - name: "K8s Cluster: Jobs"
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           kubectl -n soperator get job
@@ -389,7 +389,7 @@ jobs:
           kubectl -n soperator get job -o yaml
 
       - name: "K8s Cluster: Helm Releases"
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           kubectl get helmreleases -n flux-system
@@ -397,7 +397,7 @@ jobs:
           kubectl get helmreleases -n flux-system -o yaml
 
       - name: "K8s Cluster: Slurm Cluster CRs"
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           kubectl get slurmclusters -A
@@ -405,7 +405,7 @@ jobs:
           kubectl get slurmclusters -A -o yaml
 
       - name: "K8s Cluster: Slurm Active Checks CRs"
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           kubectl get activechecks -A
@@ -413,7 +413,7 @@ jobs:
           kubectl get activechecks -A -o yaml
 
       - name: Slurm Cluster State
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           kubectl exec -n soperator controller-0 -- sinfo -N || true
@@ -423,14 +423,14 @@ jobs:
           kubectl exec -n soperator controller-0 -- sacct --parsable2 --allusers --starttime=now-6hours | column -t -s'|'
 
       - name: Collect Full Kubernetes Cluster Info
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           mkdir -p ./cluster-info
           kubectl cluster-info dump --namespaces=kruise-system,soperator-system,soperator,flux-system --output-directory=./cluster-info
 
       - name: Upload Full Kubernetes Cluster Info
-        if: '!cancelled()'
+        if: always()
         uses: actions/upload-artifact@v6
         with:
           name: cluster-info
@@ -438,7 +438,7 @@ jobs:
           retention-days: 7
 
       - name: Collect Jail Files
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           mkdir -p ./jail/etc/slurm ./jail/opt/soperator-outputs
@@ -456,7 +456,7 @@ jobs:
           fi
 
       - name: Upload Jail
-        if: '!cancelled()'
+        if: always()
         uses: actions/upload-artifact@v6
         with:
           name: jail
@@ -592,24 +592,26 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         shell: bash
         run: |
-          text="Branch: ${BRANCH}"
-          text+="\nTriggered by: ${ACTOR}"
-
           if [[ "$RUN_ATTEMPT" -gt 1 ]]; then
-            text+="\nRe-run: attempt #${RUN_ATTEMPT}"
             RUN_URL+="/attempts/${RUN_ATTEMPT}"
           fi
 
-          text+="\nWorkflow: <${RUN_URL}|View Run>"
-          text+="\nRunbook: <https://nebius.atlassian.net/wiki/spaces/SCHED/pages/998015487/E2E+Runbook|E2E Runbook>"
-
-          payload=$(jq -n \
-            --arg text "$text" \
+          payload=$(jq --null-input \
+            --arg branch "$BRANCH" \
+            --arg actor "$ACTOR" \
+            --arg attempt "$RUN_ATTEMPT" \
+            --arg run_url "$RUN_URL" \
+            --arg runbook_url "https://nebius.atlassian.net/wiki/spaces/SCHED/pages/998015487/E2E+Runbook" \
             '{
               attachments: [{
                 color: "danger",
                 title: ":warning: E2E Test failure",
-                text: $text,
+                text: (
+                  "Branch: \($branch)\nTriggered by: \($actor)"
+                  + if ($attempt | tonumber) > 1 then "\nRe-run: attempt #\($attempt)" else "" end
+                  + "\nWorkflow: <\($run_url)|View Run>"
+                  + "\nRunbook: <\($runbook_url)|E2E Runbook>"
+                ),
                 footer: "soperator e2e test"
               }]
             }')
