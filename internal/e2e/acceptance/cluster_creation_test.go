@@ -7,8 +7,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"nebius.ai/slurm-operator/internal/e2e/acceptance/framework"
 )
 
 func clusterCreationTest(ctx SpecContext) {
