@@ -20,14 +20,11 @@ type packageInstallationScenario struct {
 func packageInstallationTest(ctx SpecContext) {
 	state := packageInstallationScenario{}
 
-	suite.Detail("package", "jq")
-
 	suite.Step(ctx, "selecting a worker for package installation", func(_ SpecContext) {
 		worker, err := suite.AnyWorker()
 		Expect(err).NotTo(HaveOccurred())
 		state.targetWorker = worker
 	})
-	suite.Detail("worker", state.targetWorker.Name)
 
 	suite.Step(ctx, "verifying nvidia-smi works before installing jq", func(ctx SpecContext) {
 		nvidiaCmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(state.targetWorker.Name))

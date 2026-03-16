@@ -23,14 +23,11 @@ type sshScenario struct {
 func internalSSHTest(ctx SpecContext) {
 	state := sshScenario{}
 
-	suite.Detail("username", sshUserName)
-
 	suite.Step(ctx, "selecting a worker for the SSH check", func(_ SpecContext) {
 		worker, err := suite.AnyWorker()
 		Expect(err).NotTo(HaveOccurred())
 		state.targetWorker = worker
 	})
-	suite.Detail("worker", state.targetWorker.Name)
 
 	suite.Step(ctx, "ensuring the regular user exists on the login node", func(ctx SpecContext) {
 		createUserCmd := fmt.Sprintf(

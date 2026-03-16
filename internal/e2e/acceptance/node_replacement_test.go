@@ -41,7 +41,6 @@ func nodeReplacementTest(ctx SpecContext) {
 		Expect(err).NotTo(HaveOccurred())
 		state.targetWorker = worker
 	})
-	suite.Detail("worker", state.targetWorker.Name)
 
 	suite.Step(ctx, "capturing the worker's current instance id", func(ctx SpecContext) {
 		nodeState, err := suite.ExecController(ctx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(state.targetWorker.Name)))
@@ -50,7 +49,6 @@ func nodeReplacementTest(ctx SpecContext) {
 		state.originalInstance = parseInstanceID(nodeState)
 		Expect(state.originalInstance).NotTo(BeEmpty())
 	})
-	suite.Detail("original_instance", state.originalInstance)
 
 	suite.Step(ctx, "submitting a test job pinned to the selected worker", func(ctx SpecContext) {
 		jobID, err := suite.ExecJail(ctx, fmt.Sprintf(
@@ -63,7 +61,6 @@ func nodeReplacementTest(ctx SpecContext) {
 		state.maintenanceJobID = strings.TrimSpace(jobID)
 		Expect(state.maintenanceJobID).NotTo(BeEmpty())
 	})
-	suite.Detail("maintenance_job_id", state.maintenanceJobID)
 
 	DeferCleanup(func() {
 		if state.maintenanceJobID == "" {

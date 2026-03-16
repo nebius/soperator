@@ -4,7 +4,6 @@ package framework
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -88,10 +87,6 @@ func (s *Suite) Logf(format string, args ...any) {
 	s.exec.Logf(format, args...)
 }
 
-func (s *Suite) Detail(key, value string) {
-	s.report.AddSpecDetail(CurrentSpecReport(), key, value)
-}
-
 func (s *Suite) Step(ctx SpecContext, name string, body func(SpecContext)) {
 	By(name)
 
@@ -100,11 +95,11 @@ func (s *Suite) Step(ctx SpecContext, name string, body func(SpecContext)) {
 
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			s.report.FinishStep(token, StepStatusFailed, fmt.Sprint(recovered))
+			s.report.FinishStep(token, StepStatusFailed)
 			panic(recovered)
 		}
 
-		s.report.FinishStep(token, StepStatusPassed, "")
+		s.report.FinishStep(token, StepStatusPassed)
 	}()
 
 	body(ctx)

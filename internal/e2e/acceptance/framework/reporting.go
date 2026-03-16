@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -29,7 +30,6 @@ type SummaryReporter struct {
 }
 
 type specRuntime struct {
-	details         map[string]string
 	steps           []*StepResult
 	logs            []string
 	activeStepIndex int
@@ -44,12 +44,13 @@ type activeStep struct {
 type StepResult struct {
 	Name      string
 	Status    StepStatus
-	Failure   string
 	Logs      []string
 	StartTime time.Time
 	EndTime   time.Time
 	Duration  time.Duration
 }
+
+var ansiEscapePattern = regexp.MustCompile(`\x1b\[[0-9;]*[A-Za-z]`)
 
 func NewSummaryReporter() *SummaryReporter {
 	return &SummaryReporter{
@@ -77,23 +78,7 @@ func (r *SummaryReporter) StartStep(report types.SpecReport, name string) *activ
 	}
 }
 
-func (r *SummaryReporter) AddSpecDetail(report types.SpecReport, key, value string) {
-	key, value, ok := normalizeDetail(key, value)
-	if !ok {
-		return
-	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	spec := r.ensureSpecLocked(report)
-	if spec.details == nil {
-		spec.details = make(map[string]string)
-	}
-	spec.details[key] = value
-}
-
-func (r *SummaryReporter) FinishStep(token *activeStep, status StepStatus, failure string) {
+func (r *SummaryReporter) FinishStep(token *activeStep, status StepStatus) {
 	if token == nil {
 		return
 	}
@@ -108,7 +93,6 @@ func (r *SummaryReporter) FinishStep(token *activeStep, status StepStatus, failu
 
 	step := spec.steps[token.stepIndex]
 	step.Status = status
-	step.Failure = strings.TrimSpace(failure)
 	step.EndTime = time.Now()
 	step.Duration = step.EndTime.Sub(token.startTime)
 
@@ -272,21 +256,19 @@ func renderInlineSummary(report types.Report, specs map[string]*specRuntime, sui
 
 		for _, spec := range suiteReports {
 			runtime := specs[spec.FullText()]
-			builder.WriteString(fmt.Sprintf("<h4>%s (%s) %s</h4>\n\n", statusIcon(spec), formatDuration(spec.RunTime), html.EscapeString(spec.LeafNodeText)))
+			builder.WriteString(fmt.Sprintf("<h4><strong>%s (%s) %s</strong></h4>\n\n", statusIcon(spec), formatDuration(spec.RunTime), html.EscapeString(spec.LeafNodeText)))
 			if spec.Failure.Message != "" {
 				builder.WriteString("<p>")
 				builder.WriteString(fmt.Sprintf("<strong>Failure summary:</strong> %s", html.EscapeString(sanitizeInline(spec.Failure.Message))))
 				builder.WriteString("</p>\n\n")
 			}
 
-			builder.WriteString(renderDetailsDropdown("Details", runtime))
-			builder.WriteString(renderLogsDropdown("Logs", runtimeLogs(runtime)))
-
 			if runtime != nil && len(runtime.steps) > 0 {
-				for _, step := range runtime.steps {
-					builder.WriteString(renderStep(step))
+				for i, step := range runtime.steps {
+					builder.WriteString(renderStep(i+1, step))
 				}
 			}
+			builder.WriteString(renderLogsDropdown("Full logs", runtimeLogs(runtime)))
 			builder.WriteString("\n")
 		}
 	}
@@ -309,45 +291,22 @@ func renderSetupFailure(report types.Report, suiteLogs []string) string {
 	return builder.String()
 }
 
-func renderDetailsDropdown(label string, runtime *specRuntime) string {
-	if runtime == nil || len(runtime.details) == 0 {
-		return ""
-	}
-
-	var builder strings.Builder
-	builder.WriteString("<details>\n")
-	builder.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", html.EscapeString(label)))
-	builder.WriteString("<ul>\n")
-	keys := make([]string, 0, len(runtime.details))
-	for key := range runtime.details {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		builder.WriteString(fmt.Sprintf("<li><code>%s</code>: <code>%s</code></li>\n", html.EscapeString(key), html.EscapeString(runtime.details[key])))
-	}
-	builder.WriteString("</ul>\n\n</details>\n\n")
-	return builder.String()
-}
-
-func renderStep(step *StepResult) string {
+func renderStep(stepNumber int, step *StepResult) string {
 	lines := append([]string(nil), step.Logs...)
-	if step.Status == StepStatusFailed && step.Failure != "" {
-		lines = append(lines, "failure: "+step.Failure)
-	}
 
-	title := fmt.Sprintf("%s (%s) %s", stepStatusIcon(step.Status), formatDuration(step.Duration), step.Name)
-	if len(lines) == 0 {
-		return fmt.Sprintf("<p>%s</p>\n", html.EscapeString(title))
-	}
+	title := fmt.Sprintf("%s (%s) Step %d: %s", stepStatusIcon(step.Status), formatDuration(step.Duration), stepNumber, step.Name)
 
 	var builder strings.Builder
 	builder.WriteString("<details>\n")
 	builder.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", html.EscapeString(title)))
 	builder.WriteString("<pre>\n")
-	for _, line := range lines {
-		builder.WriteString(html.EscapeString(line))
-		builder.WriteByte('\n')
+	if len(lines) == 0 {
+		builder.WriteString("No step logs were captured.\n")
+	} else {
+		for _, line := range lines {
+			builder.WriteString(html.EscapeString(line))
+			builder.WriteByte('\n')
+		}
 	}
 	builder.WriteString("</pre>\n\n</details>\n")
 	return builder.String()
@@ -432,12 +391,6 @@ func isNotRun(spec types.SpecReport) bool {
 	return (spec.State.Is(types.SpecStateSkipped) || spec.State.Is(types.SpecStatePending)) && spec.RunTime == 0
 }
 
-func normalizeDetail(key, value string) (string, string, bool) {
-	key = strings.TrimSpace(key)
-	value = strings.TrimSpace(value)
-	return key, value, key != "" && value != ""
-}
-
 func formatSuiteDuration(specs types.SpecReports) string {
 	if len(specs) == 0 {
 		return "0s"
@@ -497,6 +450,12 @@ func reportStatusLabel(report types.Report) string {
 }
 
 func sanitizeInline(value string) string {
-	value = strings.TrimSpace(value)
+	value = stripANSIEscapes(strings.TrimSpace(value))
 	return strings.ReplaceAll(value, "\n", " ")
+}
+
+func stripANSIEscapes(value string) string {
+	value = ansiEscapePattern.ReplaceAllString(value, "")
+	value = strings.ReplaceAll(value, "�[", "")
+	return value
 }
