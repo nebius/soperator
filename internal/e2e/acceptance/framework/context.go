@@ -23,11 +23,6 @@ type Suite struct {
 	report  *SummaryReporter
 }
 
-type StepRecorder struct {
-	report *SummaryReporter
-	token  *activeStep
-}
-
 func LoadSuite(ctx context.Context) (*Suite, error) {
 	suite := &Suite{
 		report: NewSummaryReporter(),
@@ -97,19 +92,11 @@ func (s *Suite) Detail(key, value string) {
 	s.report.AddSpecDetail(CurrentSpecReport(), key, value)
 }
 
-func (r *StepRecorder) Detail(key, value string) {
-	r.report.AddStepDetail(r.token, key, value)
-}
-
-func (s *Suite) Step(ctx SpecContext, name string, body func(SpecContext, *StepRecorder)) {
+func (s *Suite) Step(ctx SpecContext, name string, body func(SpecContext)) {
 	By(name)
 
 	report := CurrentSpecReport()
 	token := s.report.StartStep(report, name)
-	step := &StepRecorder{
-		report: s.report,
-		token:  token,
-	}
 
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -120,7 +107,7 @@ func (s *Suite) Step(ctx SpecContext, name string, body func(SpecContext, *StepR
 		s.report.FinishStep(token, StepStatusPassed, "")
 	}()
 
-	body(ctx, step)
+	body(ctx)
 }
 
 func (s *Suite) WriteSummary(report types.Report) error {
