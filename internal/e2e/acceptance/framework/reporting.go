@@ -182,7 +182,7 @@ func (r *SummaryReporter) WriteSummary(report types.Report) error {
 }
 
 func renderSummaryHeader(report types.Report) string {
-	return fmt.Sprintf("## %s (%s) Acceptance Test Summary\n\n", reportStatusLabel(report), formatDuration(report.RunTime))
+	return fmt.Sprintf("<h2>%s (%s) Acceptance Test Summary</h2>\n\n", reportStatusLabel(report), formatDuration(report.RunTime))
 }
 
 func renderExecutiveSummary(report types.Report) string {
@@ -229,9 +229,11 @@ func renderExecutiveSummary(report types.Report) string {
 	}
 
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("- Suite success rate: `%d/%d` (%s)\n", passedSuites, totalSuites, formatRate(passedSuites, totalSuites)))
-	builder.WriteString(fmt.Sprintf("- Test success rate: `%d/%d` (%s)\n", passedTests, totalTests, formatRate(passedTests, totalTests)))
-	builder.WriteString(fmt.Sprintf("- Summary: %s\n\n", interpretation))
+	builder.WriteString("<ul>\n")
+	builder.WriteString(fmt.Sprintf("<li>Suite success rate: <code>%d/%d</code> (%s)</li>\n", passedSuites, totalSuites, formatRate(passedSuites, totalSuites)))
+	builder.WriteString(fmt.Sprintf("<li>Test success rate: <code>%d/%d</code> (%s)</li>\n", passedTests, totalTests, formatRate(passedTests, totalTests)))
+	builder.WriteString(fmt.Sprintf("<li>Summary: %s</li>\n", html.EscapeString(interpretation)))
+	builder.WriteString("</ul>\n\n")
 
 	return builder.String()
 }
@@ -244,7 +246,7 @@ func renderInlineSummary(report types.Report, specs map[string]*specRuntime, sui
 
 	var builder strings.Builder
 	if len(suiteLogs) > 0 {
-		builder.WriteString(renderLogsDropdown("Suite setup logs", suiteLogs, "No suite setup logs were captured."))
+		builder.WriteString(renderLogsDropdown("Suite setup logs", suiteLogs))
 	}
 
 	groups := groupBySuite(testSpecs)
@@ -263,26 +265,27 @@ func renderInlineSummary(report types.Report, specs map[string]*specRuntime, sui
 			}
 		}
 
-		builder.WriteString(fmt.Sprintf("### %s (%s) Suite: %s\n\n", suiteStatusLabel(suiteReports), formatSuiteDuration(suiteReports), suiteName))
-		builder.WriteString(fmt.Sprintf("- Test success rate: `%d/%d` (%s)\n\n", passedTests, len(suiteReports), formatRate(passedTests, len(suiteReports))))
+		builder.WriteString(fmt.Sprintf("<h3>%s (%s) Suite: %s</h3>\n\n", suiteStatusLabel(suiteReports), formatSuiteDuration(suiteReports), html.EscapeString(suiteName)))
+		builder.WriteString("<ul>\n")
+		builder.WriteString(fmt.Sprintf("<li>Test success rate: <code>%d/%d</code> (%s)</li>\n", passedTests, len(suiteReports), formatRate(passedTests, len(suiteReports))))
+		builder.WriteString("</ul>\n\n")
 
 		for _, spec := range suiteReports {
 			runtime := specs[spec.FullText()]
-			builder.WriteString(fmt.Sprintf("#### %s (%s) %s\n\n", statusIcon(spec), formatDuration(spec.RunTime), spec.LeafNodeText))
+			builder.WriteString(fmt.Sprintf("<h4>%s (%s) %s</h4>\n\n", statusIcon(spec), formatDuration(spec.RunTime), html.EscapeString(spec.LeafNodeText)))
 			if spec.Failure.Message != "" {
-				builder.WriteString(fmt.Sprintf("- Failure summary: %s\n\n", sanitizeInline(spec.Failure.Message)))
+				builder.WriteString("<p>")
+				builder.WriteString(fmt.Sprintf("<strong>Failure summary:</strong> %s", html.EscapeString(sanitizeInline(spec.Failure.Message))))
+				builder.WriteString("</p>\n\n")
 			}
 
-			builder.WriteString(renderDetailsDropdown("Details", spec, runtime))
-			builder.WriteString(renderLogsDropdown("Logs", runtimeLogs(runtime), "No test-level logs were captured."))
+			builder.WriteString(renderDetailsDropdown("Details", runtime))
+			builder.WriteString(renderLogsDropdown("Logs", runtimeLogs(runtime)))
 
 			if runtime != nil && len(runtime.steps) > 0 {
 				for _, step := range runtime.steps {
-					builder.WriteString(fmt.Sprintf("- %s (%s) %s\n", stepStatusIcon(step.Status), formatDuration(step.Duration), step.Name))
-					builder.WriteString(renderStepLogsDropdown(step))
+					builder.WriteString(renderStep(step))
 				}
-			} else {
-				builder.WriteString("- No step-level activity was recorded for this test.\n")
 			}
 			builder.WriteString("\n")
 		}
@@ -293,68 +296,77 @@ func renderInlineSummary(report types.Report, specs map[string]*specRuntime, sui
 
 func renderSetupFailure(report types.Report, suiteLogs []string) string {
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("### %s (%s) Suite Setup\n\n", reportStatusLabel(report), formatDuration(report.RunTime)))
-	builder.WriteString(fmt.Sprintf("- Planned tests: `%d`\n", report.PreRunStats.SpecsThatWillRun))
+	builder.WriteString(fmt.Sprintf("<h3>%s (%s) Suite Setup</h3>\n\n", reportStatusLabel(report), formatDuration(report.RunTime)))
+	builder.WriteString("<ul>\n")
+	builder.WriteString(fmt.Sprintf("<li>Planned tests: <code>%d</code></li>\n", report.PreRunStats.SpecsThatWillRun))
 	if failureSpec, ok := firstNonTestFailure(report.SpecReports); ok {
-		builder.WriteString(fmt.Sprintf("- Failure summary: %s\n", sanitizeInline(failureSpec.Failure.Message)))
+		builder.WriteString(fmt.Sprintf("<li>Failure summary: %s</li>\n", html.EscapeString(sanitizeInline(failureSpec.Failure.Message))))
 	}
-	builder.WriteString("\n")
+	builder.WriteString("</ul>\n\n")
 	if len(suiteLogs) > 0 {
-		builder.WriteString(renderLogsDropdown("Suite setup logs", suiteLogs, "No suite setup logs were captured."))
+		builder.WriteString(renderLogsDropdown("Suite setup logs", suiteLogs))
 	}
 	return builder.String()
 }
 
-func renderDetailsDropdown(label string, spec types.SpecReport, runtime *specRuntime) string {
+func renderDetailsDropdown(label string, runtime *specRuntime) string {
+	if runtime == nil || len(runtime.details) == 0 {
+		return ""
+	}
+
 	var builder strings.Builder
 	builder.WriteString("<details>\n")
 	builder.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", html.EscapeString(label)))
-	builder.WriteString(fmt.Sprintf("- Full name: `%s`\n", spec.FullText()))
-	builder.WriteString(fmt.Sprintf("- Runtime: `%s`\n", formatDuration(spec.RunTime)))
-	builder.WriteString(fmt.Sprintf("- State: `%s`\n", spec.State.String()))
-	if spec.Failure.Message != "" {
-		builder.WriteString(fmt.Sprintf("- Failure: %s\n", sanitizeInline(spec.Failure.Message)))
+	builder.WriteString("<ul>\n")
+	keys := make([]string, 0, len(runtime.details))
+	for key := range runtime.details {
+		keys = append(keys, key)
 	}
-	if runtime != nil && len(runtime.details) > 0 {
-		keys := make([]string, 0, len(runtime.details))
-		for key := range runtime.details {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-		for _, key := range keys {
-			builder.WriteString(fmt.Sprintf("- `%s`: `%s`\n", sanitizeInline(key), sanitizeInline(runtime.details[key])))
-		}
-	} else {
-		builder.WriteString("- No test details were recorded.\n")
+	sort.Strings(keys)
+	for _, key := range keys {
+		builder.WriteString(fmt.Sprintf("<li><code>%s</code>: <code>%s</code></li>\n", html.EscapeString(key), html.EscapeString(runtime.details[key])))
 	}
-	builder.WriteString("\n</details>\n\n")
+	builder.WriteString("</ul>\n\n</details>\n\n")
 	return builder.String()
 }
 
-func renderStepLogsDropdown(step *StepResult) string {
+func renderStep(step *StepResult) string {
 	lines := append([]string(nil), step.Logs...)
 	if step.Status == StepStatusFailed && step.Failure != "" {
 		lines = append(lines, "failure: "+step.Failure)
 	}
 
-	return indentLines(renderLogsDropdown("Logs", lines, "No step logs were captured."), "  ")
+	title := fmt.Sprintf("%s (%s) %s", stepStatusIcon(step.Status), formatDuration(step.Duration), step.Name)
+	if len(lines) == 0 {
+		return fmt.Sprintf("<p>%s</p>\n", html.EscapeString(title))
+	}
+
+	var builder strings.Builder
+	builder.WriteString("<details>\n")
+	builder.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", html.EscapeString(title)))
+	builder.WriteString("<pre>\n")
+	for _, line := range lines {
+		builder.WriteString(html.EscapeString(line))
+		builder.WriteByte('\n')
+	}
+	builder.WriteString("</pre>\n\n</details>\n")
+	return builder.String()
 }
 
-func renderLogsDropdown(label string, logs []string, empty string) string {
+func renderLogsDropdown(label string, logs []string) string {
+	if len(logs) == 0 {
+		return ""
+	}
+
 	var builder strings.Builder
 	builder.WriteString("<details>\n")
 	builder.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", html.EscapeString(label)))
-	builder.WriteString("```text\n")
-	if len(logs) == 0 {
-		builder.WriteString(empty)
+	builder.WriteString("<pre>\n")
+	for _, line := range logs {
+		builder.WriteString(html.EscapeString(line))
 		builder.WriteByte('\n')
-	} else {
-		for _, line := range logs {
-			builder.WriteString(line)
-			builder.WriteByte('\n')
-		}
 	}
-	builder.WriteString("```\n\n</details>\n")
+	builder.WriteString("</pre>\n\n</details>\n")
 	return builder.String()
 }
 
@@ -487,20 +499,4 @@ func reportStatusLabel(report types.Report) string {
 func sanitizeInline(value string) string {
 	value = strings.TrimSpace(value)
 	return strings.ReplaceAll(value, "\n", " ")
-}
-
-func indentLines(text, prefix string) string {
-	if text == "" {
-		return ""
-	}
-	lines := strings.SplitAfter(text, "\n")
-	var builder strings.Builder
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		builder.WriteString(prefix)
-		builder.WriteString(line)
-	}
-	return builder.String()
 }
