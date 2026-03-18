@@ -166,7 +166,7 @@ func (r *SummaryReporter) WriteSummary(report types.Report) error {
 }
 
 func renderSummaryHeader(report types.Report) string {
-	return fmt.Sprintf("<h2>%s (%s) Acceptance Test Summary</h2>\n\n", reportStatusLabel(report), formatDuration(report.RunTime))
+	return fmt.Sprintf("<h2>Acceptance Test Summary %s</h2>\n\n", formatHeaderSuffix(reportStatusText(report), report.RunTime))
 }
 
 func renderExecutiveSummary(report types.Report) string {
@@ -249,14 +249,14 @@ func renderInlineSummary(report types.Report, specs map[string]*specRuntime, sui
 			}
 		}
 
-		builder.WriteString(fmt.Sprintf("<h3>%s (%s) Suite: %s</h3>\n\n", suiteStatusLabel(suiteReports), formatSuiteDuration(suiteReports), html.EscapeString(suiteName)))
+		builder.WriteString(fmt.Sprintf("<h3>Suite: %s %s</h3>\n\n", html.EscapeString(suiteName), formatHeaderSuffix(suiteStatusText(suiteReports), suiteDuration(suiteReports))))
 		builder.WriteString("<ul>\n")
 		builder.WriteString(fmt.Sprintf("<li>Test success rate: <code>%d/%d</code> (%s)</li>\n", passedTests, len(suiteReports), formatRate(passedTests, len(suiteReports))))
 		builder.WriteString("</ul>\n\n")
 
 		for _, spec := range suiteReports {
 			runtime := specs[spec.FullText()]
-			builder.WriteString(fmt.Sprintf("<h4><strong>%s (%s) %s</strong></h4>\n\n", statusIcon(spec), formatDuration(spec.RunTime), html.EscapeString(spec.LeafNodeText)))
+			builder.WriteString(fmt.Sprintf("<h4><strong>%s %s</strong></h4>\n\n", html.EscapeString(spec.LeafNodeText), formatHeaderSuffix(specStatusText(spec), spec.RunTime)))
 			if spec.Failure.Message != "" {
 				builder.WriteString("<p>")
 				builder.WriteString(fmt.Sprintf("<strong>Failure summary:</strong> %s", html.EscapeString(sanitizeInline(spec.Failure.Message))))
@@ -278,7 +278,7 @@ func renderInlineSummary(report types.Report, specs map[string]*specRuntime, sui
 
 func renderSetupFailure(report types.Report, suiteLogs []string) string {
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("<h3>%s (%s) Suite Setup</h3>\n\n", reportStatusLabel(report), formatDuration(report.RunTime)))
+	builder.WriteString(fmt.Sprintf("<h3>Suite Setup %s</h3>\n\n", formatHeaderSuffix(reportStatusText(report), report.RunTime)))
 	builder.WriteString("<ul>\n")
 	builder.WriteString(fmt.Sprintf("<li>Planned tests: <code>%d</code></li>\n", report.PreRunStats.SpecsThatWillRun))
 	if failureSpec, ok := firstNonTestFailure(report.SpecReports); ok {
@@ -294,7 +294,7 @@ func renderSetupFailure(report types.Report, suiteLogs []string) string {
 func renderStep(stepNumber int, step *StepResult) string {
 	lines := append([]string(nil), step.Logs...)
 
-	title := fmt.Sprintf("%s (%s) Step %d: %s", stepStatusIcon(step.Status), formatDuration(step.Duration), stepNumber, step.Name)
+	title := fmt.Sprintf("%d. %s %s", stepNumber, step.Name, formatHeaderSuffix(stepStatusText(step.Status), step.Duration))
 
 	var builder strings.Builder
 	builder.WriteString("<details>\n")
@@ -380,20 +380,20 @@ func suiteSucceeded(specs types.SpecReports) bool {
 	return true
 }
 
-func suiteStatusLabel(specs types.SpecReports) string {
+func suiteStatusText(specs types.SpecReports) string {
 	if suiteSucceeded(specs) {
-		return "[PASS]"
+		return "PASS"
 	}
-	return "[FAIL]"
+	return "FAIL"
 }
 
 func isNotRun(spec types.SpecReport) bool {
 	return (spec.State.Is(types.SpecStateSkipped) || spec.State.Is(types.SpecStatePending)) && spec.RunTime == 0
 }
 
-func formatSuiteDuration(specs types.SpecReports) string {
+func suiteDuration(specs types.SpecReports) time.Duration {
 	if len(specs) == 0 {
-		return "0s"
+		return 0
 	}
 	start := specs[0].StartTime
 	end := specs[0].EndTime
@@ -406,9 +406,9 @@ func formatSuiteDuration(specs types.SpecReports) string {
 		}
 	}
 	if end.Before(start) {
-		return "0s"
+		return 0
 	}
-	return formatDuration(end.Sub(start))
+	return end.Sub(start)
 }
 
 func formatDuration(duration time.Duration) string {
@@ -425,28 +425,32 @@ func formatRate(passed, total int) string {
 	return fmt.Sprintf("%.0f%%", float64(passed)*100/float64(total))
 }
 
-func statusIcon(spec types.SpecReport) string {
+func specStatusText(spec types.SpecReport) string {
 	if spec.State.Is(types.SpecStatePassed) {
-		return "[PASS]"
+		return "PASS"
 	}
 	if isNotRun(spec) {
-		return "[NOT RUN]"
+		return "NOT RUN"
 	}
-	return "[FAIL]"
+	return "FAIL"
 }
 
-func stepStatusIcon(status StepStatus) string {
+func stepStatusText(status StepStatus) string {
 	if status == StepStatusPassed {
-		return "[PASS]"
+		return "PASS"
 	}
-	return "[FAIL]"
+	return "FAIL"
 }
 
-func reportStatusLabel(report types.Report) string {
+func reportStatusText(report types.Report) string {
 	if report.SuiteSucceeded {
-		return "[PASS]"
+		return "PASS"
 	}
-	return "[FAIL]"
+	return "FAIL"
+}
+
+func formatHeaderSuffix(status string, duration time.Duration) string {
+	return fmt.Sprintf("(%s, %s)", status, formatDuration(duration))
 }
 
 func sanitizeInline(value string) string {
