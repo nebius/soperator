@@ -89,10 +89,31 @@ func (s *Suite) Logf(format string, args ...any) {
 }
 
 func (s *Suite) Step(ctx SpecContext, name string, body func(SpecContext)) {
-	By(name)
+	s.runStep(ctx, "", name, body)
+}
+
+func (s *Suite) Given(ctx SpecContext, name string, body func(SpecContext)) {
+	s.runStep(ctx, "Given", name, body)
+}
+
+func (s *Suite) When(ctx SpecContext, name string, body func(SpecContext)) {
+	s.runStep(ctx, "When", name, body)
+}
+
+func (s *Suite) Then(ctx SpecContext, name string, body func(SpecContext)) {
+	s.runStep(ctx, "Then", name, body)
+}
+
+func (s *Suite) And(ctx SpecContext, name string, body func(SpecContext)) {
+	s.runStep(ctx, "And", name, body)
+}
+
+func (s *Suite) runStep(ctx SpecContext, keyword, name string, body func(SpecContext)) {
+	byText := strings.TrimSpace(strings.Join([]string{keyword, name}, " "))
+	By(byText)
 
 	report := CurrentSpecReport()
-	token := s.report.StartStep(report, name)
+	token := s.report.StartStep(report, keyword, name)
 
 	defer func() {
 		if recovered := recover(); recovered != nil {

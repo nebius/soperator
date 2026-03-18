@@ -20,13 +20,13 @@ type packageInstallationScenario struct {
 func packageInstallationTest(ctx SpecContext) {
 	state := packageInstallationScenario{}
 
-	suite.Step(ctx, "selecting a worker for package installation", func(_ SpecContext) {
+	suite.Given(ctx, "a worker is selected for package installation", func(_ SpecContext) {
 		worker, err := suite.AnyWorker()
 		Expect(err).NotTo(HaveOccurred())
 		state.targetWorker = worker
 	})
 
-	suite.Step(ctx, "verifying nvidia-smi works before installing jq", func(ctx SpecContext) {
+	suite.Then(ctx, "nvidia-smi works before jq is installed", func(ctx SpecContext) {
 		nvidiaCmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(state.targetWorker.Name))
 		_, err := suite.ExecJailWithRetry(ctx, nvidiaCmd, 5, 10*time.Second)
 		if err != nil {
@@ -35,7 +35,7 @@ func packageInstallationTest(ctx SpecContext) {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	suite.Step(ctx, "installing jq on the worker", func(ctx SpecContext) {
+	suite.When(ctx, "jq is installed on the worker", func(ctx SpecContext) {
 		updateCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get update'", framework.ShellQuote(state.targetWorker.Name))
 		_, err := suite.ExecJailWithRetry(ctx, updateCmd, 5, 10*time.Second)
 		if err != nil {
@@ -51,7 +51,7 @@ func packageInstallationTest(ctx SpecContext) {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	suite.Step(ctx, "verifying nvidia-smi still works after installation", func(ctx SpecContext) {
+	suite.Then(ctx, "nvidia-smi still works after jq is installed", func(ctx SpecContext) {
 		nvidiaCmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(state.targetWorker.Name))
 		_, err := suite.ExecJailWithRetry(ctx, nvidiaCmd, 5, 10*time.Second)
 		if err != nil {
@@ -60,7 +60,7 @@ func packageInstallationTest(ctx SpecContext) {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	suite.Step(ctx, "verifying jq is available on the worker", func(ctx SpecContext) {
+	suite.And(ctx, "jq is available on the worker", func(ctx SpecContext) {
 		jqCmd := fmt.Sprintf("ssh %s 'jq --version >/dev/null'", framework.ShellQuote(state.targetWorker.Name))
 		_, err := suite.ExecJailWithRetry(ctx, jqCmd, 5, 10*time.Second)
 		if err != nil {

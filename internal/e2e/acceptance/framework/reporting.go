@@ -42,6 +42,7 @@ type activeStep struct {
 }
 
 type StepResult struct {
+	Keyword   string
 	Name      string
 	Status    StepStatus
 	Logs      []string
@@ -59,13 +60,14 @@ func NewSummaryReporter() *SummaryReporter {
 	}
 }
 
-func (r *SummaryReporter) StartStep(report types.SpecReport, name string) *activeStep {
+func (r *SummaryReporter) StartStep(report types.SpecReport, keyword, name string) *activeStep {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	specKey := report.FullText()
 	spec := r.ensureSpecLocked(report)
 	spec.steps = append(spec.steps, &StepResult{
+		Keyword:   keyword,
 		Name:      name,
 		StartTime: time.Now(),
 	})
@@ -294,11 +296,11 @@ func renderSetupFailure(report types.Report, suiteLogs []string) string {
 func renderStep(stepNumber int, step *StepResult) string {
 	lines := append([]string(nil), step.Logs...)
 
-	title := fmt.Sprintf("%d. %s %s", stepNumber, step.Name, formatHeaderSuffix(stepStatusText(step.Status), step.Duration))
+	title := fmt.Sprintf("%d. %s %s", stepNumber, renderStepName(step), formatHeaderSuffix(stepStatusText(step.Status), step.Duration))
 
 	var builder strings.Builder
 	builder.WriteString("<details>\n")
-	builder.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", html.EscapeString(title)))
+	builder.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", title))
 	builder.WriteString("<pre>\n")
 	if len(lines) == 0 {
 		builder.WriteString("No step logs were captured.\n")
@@ -310,6 +312,14 @@ func renderStep(stepNumber int, step *StepResult) string {
 	}
 	builder.WriteString("</pre>\n\n</details>\n")
 	return builder.String()
+}
+
+func renderStepName(step *StepResult) string {
+	if step.Keyword == "" {
+		return html.EscapeString(step.Name)
+	}
+
+	return fmt.Sprintf("<strong>%s</strong> %s", html.EscapeString(step.Keyword), html.EscapeString(step.Name))
 }
 
 func renderLogsDropdown(label string, logs []string) string {

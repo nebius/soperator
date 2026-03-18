@@ -8,7 +8,7 @@ import (
 )
 
 func clusterCreationTest(ctx SpecContext) {
-	suite.Step(ctx, "verifying suite discovery found worker nodes", func(_ SpecContext) {
+	suite.Then(ctx, "worker discovery finds worker nodes", func(_ SpecContext) {
 		Expect(suite.WorkerCount()).To(BeNumerically(">", 0))
 		suite.Logf("cluster has %d workers", suite.WorkerCount())
 	})
