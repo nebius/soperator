@@ -4,6 +4,7 @@ package framework
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -23,13 +24,19 @@ type Suite struct {
 	report  *SummaryReporter
 }
 
-func LoadSuite(ctx context.Context) (*Suite, error) {
+func NewSuite() *Suite {
 	suite := &Suite{
 		report: NewSummaryReporter(),
 	}
 	suite.exec = NewExecutor(10*time.Minute, suite.report)
 
-	if err := suite.discoverCluster(ctx); err != nil {
+	return suite
+}
+
+func LoadSuite(ctx context.Context) (*Suite, error) {
+	suite := NewSuite()
+
+	if err := suite.DiscoverCluster(ctx); err != nil {
 		return suite, err
 	}
 
@@ -48,7 +55,7 @@ func (s *Suite) AnyWorker() (WorkerRef, error) {
 	return s.workers[rand.Intn(len(s.workers))], nil
 }
 
-func (s *Suite) discoverCluster(ctx context.Context) error {
+func (s *Suite) DiscoverCluster(ctx context.Context) error {
 	s.Logf("discovering acceptance cluster")
 
 	if _, err := s.exec.Run(ctx, "kubectl", "get", "pods", "-n", soperatorNamespace); err != nil {
@@ -84,6 +91,35 @@ func (s *Suite) discoverCluster(ctx context.Context) error {
 	return nil
 }
 
+func (s *Suite) EncodeWorkers() ([]byte, error) {
+	return json.Marshal(s.workers)
+}
+
+func (s *Suite) LoadWorkers(data []byte) error {
+	var workers []WorkerRef
+	if err := json.Unmarshal(data, &workers); err != nil {
+		return fmt.Errorf("decode workers: %w", err)
+	}
+	if len(workers) == 0 {
+		return fmt.Errorf("no worker nodes discovered")
+	}
+
+	s.workers = workers
+	return nil
+}
+
+func (s *Suite) BeginSpec() {
+	s.report.BeginNode()
+}
+
+func (s *Suite) FlushSpecLogs() {
+	s.report.FlushSpecLogs()
+}
+
+func (s *Suite) FlushSetupLogs() {
+	s.report.FlushSetupLogs()
+}
+
 func (s *Suite) Logf(format string, args ...any) {
 	s.exec.Logf(format, args...)
 }
@@ -112,8 +148,7 @@ func (s *Suite) runStep(ctx SpecContext, keyword, name string, body func(SpecCon
 	byText := strings.TrimSpace(strings.Join([]string{keyword, name}, " "))
 	By(byText)
 
-	report := CurrentSpecReport()
-	token := s.report.StartStep(report, keyword, name)
+	token := s.report.StartStep(keyword, name)
 
 	defer func() {
 		if recovered := recover(); recovered != nil {

@@ -3,15 +3,16 @@
 package framework
 
 import (
+	"encoding/json"
 	"fmt"
 	"html"
 	"os"
 	"regexp"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/types"
 )
 
@@ -22,33 +23,49 @@ const (
 	StepStatusFailed StepStatus = "failed"
 )
 
+const (
+	reportEntryStep      = "acceptance-step"
+	reportEntrySpecLogs  = "acceptance-full-logs"
+	reportEntrySetupLogs = "acceptance-setup-logs"
+)
+
+var preferredSuiteOrder = []string{
+	"Simple acceptance",
+	"Node replacement acceptance",
+}
+
 type SummaryReporter struct {
 	mu              sync.Mutex
 	stepSummaryPath string
-	specs           map[string]*specRuntime
-	suiteLogs       []string
-}
-
-type specRuntime struct {
-	steps           []*StepResult
 	logs            []string
-	activeStepIndex int
+	activeStep      *activeStep
+	nextStepNumber  int
 }
 
 type activeStep struct {
-	specKey   string
-	stepIndex int
-	startTime time.Time
+	Number    int
+	Keyword   string
+	Name      string
+	StartTime time.Time
+	Logs      []string
 }
 
 type StepResult struct {
-	Keyword   string
-	Name      string
-	Status    StepStatus
-	Logs      []string
-	StartTime time.Time
-	EndTime   time.Time
-	Duration  time.Duration
+	Number   int      `json:"number"`
+	Keyword  string   `json:"keyword"`
+	Name     string   `json:"name"`
+	Status   string   `json:"status"`
+	Duration string   `json:"duration"`
+	Logs     []string `json:"logs,omitempty"`
+}
+
+type LogsResult struct {
+	Logs []string `json:"logs,omitempty"`
+}
+
+type suiteGroup struct {
+	Name  string
+	Specs types.SpecReports
 }
 
 var ansiEscapePattern = regexp.MustCompile(`\x1b\[[0-9;]*[A-Za-z]`)
@@ -56,28 +73,34 @@ var ansiEscapePattern = regexp.MustCompile(`\x1b\[[0-9;]*[A-Za-z]`)
 func NewSummaryReporter() *SummaryReporter {
 	return &SummaryReporter{
 		stepSummaryPath: os.Getenv("GITHUB_STEP_SUMMARY"),
-		specs:           make(map[string]*specRuntime),
 	}
 }
 
-func (r *SummaryReporter) StartStep(report types.SpecReport, keyword, name string) *activeStep {
+func (r *SummaryReporter) BeginNode() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	specKey := report.FullText()
-	spec := r.ensureSpecLocked(report)
-	spec.steps = append(spec.steps, &StepResult{
+	r.logs = nil
+	r.activeStep = nil
+	r.nextStepNumber = 0
+}
+
+func (r *SummaryReporter) StartStep(keyword, name string) *activeStep {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.nextStepNumber++
+	r.activeStep = &activeStep{
+		Number:    r.nextStepNumber,
 		Keyword:   keyword,
 		Name:      name,
 		StartTime: time.Now(),
-	})
-	spec.activeStepIndex = len(spec.steps) - 1
-
-	return &activeStep{
-		specKey:   specKey,
-		stepIndex: spec.activeStepIndex,
-		startTime: spec.steps[spec.activeStepIndex].StartTime,
 	}
+
+	token := *r.activeStep
+	token.Logs = nil
+
+	return &token
 }
 
 func (r *SummaryReporter) FinishStep(token *activeStep, status StepStatus) {
@@ -86,24 +109,23 @@ func (r *SummaryReporter) FinishStep(token *activeStep, status StepStatus) {
 	}
 
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	spec, ok := r.specs[token.specKey]
-	if !ok || token.stepIndex >= len(spec.steps) {
-		return
+	payload := StepResult{
+		Number:   token.Number,
+		Keyword:  token.Keyword,
+		Name:     token.Name,
+		Status:   string(status),
+		Duration: formatDuration(time.Since(token.StartTime)),
 	}
-
-	step := spec.steps[token.stepIndex]
-	step.Status = status
-	step.EndTime = time.Now()
-	step.Duration = step.EndTime.Sub(token.startTime)
-
-	if spec.activeStepIndex == token.stepIndex {
-		spec.activeStepIndex = -1
+	if r.activeStep != nil && r.activeStep.Number == token.Number {
+		payload.Logs = append([]string(nil), r.activeStep.Logs...)
+		r.activeStep = nil
 	}
+	r.mu.Unlock()
+
+	r.addJSONReportEntry(reportEntryStep, payload)
 }
 
-func (r *SummaryReporter) Logf(specKey, line string) {
+func (r *SummaryReporter) Logf(line string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -112,32 +134,42 @@ func (r *SummaryReporter) Logf(specKey, line string) {
 		return
 	}
 
-	if specKey == "" {
-		r.suiteLogs = append(r.suiteLogs, line)
-		return
-	}
-
-	spec, ok := r.specs[specKey]
-	if !ok {
-		spec = &specRuntime{activeStepIndex: -1}
-		r.specs[specKey] = spec
-	}
-
-	spec.logs = append(spec.logs, line)
-	if spec.activeStepIndex >= 0 && spec.activeStepIndex < len(spec.steps) {
-		spec.steps[spec.activeStepIndex].Logs = append(spec.steps[spec.activeStepIndex].Logs, line)
+	r.logs = append(r.logs, line)
+	if r.activeStep != nil {
+		r.activeStep.Logs = append(r.activeStep.Logs, line)
 	}
 }
 
-func (r *SummaryReporter) ensureSpecLocked(report types.SpecReport) *specRuntime {
-	specKey := report.FullText()
-	spec, ok := r.specs[specKey]
-	if !ok {
-		spec = &specRuntime{activeStepIndex: -1}
-		r.specs[specKey] = spec
+func (r *SummaryReporter) FlushSpecLogs() {
+	r.flushLogs(reportEntrySpecLogs)
+}
+
+func (r *SummaryReporter) FlushSetupLogs() {
+	r.flushLogs(reportEntrySetupLogs)
+}
+
+func (r *SummaryReporter) flushLogs(entryName string) {
+	r.mu.Lock()
+	payload := LogsResult{
+		Logs: append([]string(nil), r.logs...),
+	}
+	r.logs = nil
+	r.mu.Unlock()
+
+	if len(payload.Logs) == 0 {
+		return
 	}
 
-	return spec
+	r.addJSONReportEntry(entryName, payload)
+}
+
+func (r *SummaryReporter) addJSONReportEntry(name string, value any) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		ginkgo.Fail(fmt.Sprintf("Failed to encode acceptance report entry %q: %v", name, err), 1)
+	}
+
+	ginkgo.AddReportEntry(name, string(data), ginkgo.ReportEntryVisibilityNever)
 }
 
 func (r *SummaryReporter) WriteSummary(report types.Report) error {
@@ -145,14 +177,11 @@ func (r *SummaryReporter) WriteSummary(report types.Report) error {
 		return nil
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	var builder strings.Builder
 	builder.WriteString("\n")
 	builder.WriteString(renderSummaryHeader(report))
 	builder.WriteString(renderExecutiveSummary(report))
-	builder.WriteString(renderInlineSummary(report, r.specs, r.suiteLogs))
+	builder.WriteString(renderInlineSummary(report))
 
 	f, err := os.OpenFile(r.stepSummaryPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
@@ -224,40 +253,32 @@ func renderExecutiveSummary(report types.Report) string {
 	return builder.String()
 }
 
-func renderInlineSummary(report types.Report, specs map[string]*specRuntime, suiteLogs []string) string {
+func renderInlineSummary(report types.Report) string {
 	testSpecs := filterTestSpecs(report.SpecReports)
 	if len(testSpecs) == 0 {
-		return renderSetupFailure(report, suiteLogs)
+		return renderSetupFailure(report)
 	}
 
 	var builder strings.Builder
-	if len(suiteLogs) > 0 {
-		builder.WriteString(renderLogsDropdown("Suite setup logs", suiteLogs))
+	setupLogs := setupLogs(report.SpecReports)
+	if len(setupLogs) > 0 {
+		builder.WriteString(renderLogsDropdown("Suite setup logs", setupLogs))
 	}
 
-	groups := groupBySuite(testSpecs)
-	suiteNames := make([]string, 0, len(groups))
-	for name := range groups {
-		suiteNames = append(suiteNames, name)
-	}
-	sort.Strings(suiteNames)
-
-	for _, suiteName := range suiteNames {
-		suiteReports := groups[suiteName]
+	for _, group := range orderedSuiteGroups(testSpecs) {
 		passedTests := 0
-		for _, spec := range suiteReports {
+		for _, spec := range group.Specs {
 			if spec.State.Is(types.SpecStatePassed) {
 				passedTests++
 			}
 		}
 
-		builder.WriteString(fmt.Sprintf("<h3>Suite: %s %s</h3>\n\n", html.EscapeString(suiteName), formatHeaderSuffix(suiteStatusText(suiteReports), suiteDuration(suiteReports))))
+		builder.WriteString(fmt.Sprintf("<h3>Suite: %s %s</h3>\n\n", html.EscapeString(group.Name), formatHeaderSuffix(suiteStatusText(group.Specs), suiteDuration(group.Specs))))
 		builder.WriteString("<ul>\n")
-		builder.WriteString(fmt.Sprintf("<li>Test success rate: <code>%d/%d</code> (%s)</li>\n", passedTests, len(suiteReports), formatRate(passedTests, len(suiteReports))))
+		builder.WriteString(fmt.Sprintf("<li>Test success rate: <code>%d/%d</code> (%s)</li>\n", passedTests, len(group.Specs), formatRate(passedTests, len(group.Specs))))
 		builder.WriteString("</ul>\n\n")
 
-		for _, spec := range suiteReports {
-			runtime := specs[spec.FullText()]
+		for _, spec := range group.Specs {
 			builder.WriteString(fmt.Sprintf("<h4><strong>%s %s</strong></h4>\n\n", html.EscapeString(spec.LeafNodeText), formatHeaderSuffix(specStatusText(spec), spec.RunTime)))
 			if spec.Failure.Message != "" {
 				builder.WriteString("<p>")
@@ -265,12 +286,10 @@ func renderInlineSummary(report types.Report, specs map[string]*specRuntime, sui
 				builder.WriteString("</p>\n\n")
 			}
 
-			if runtime != nil && len(runtime.steps) > 0 {
-				for i, step := range runtime.steps {
-					builder.WriteString(renderStep(i+1, step))
-				}
+			for _, step := range stepResults(spec) {
+				builder.WriteString(renderStep(step))
 			}
-			builder.WriteString(renderLogsDropdown("Full logs", runtimeLogs(runtime)))
+			builder.WriteString(renderLogsDropdown("Full logs", specLogs(spec)))
 			builder.WriteString("\n")
 		}
 	}
@@ -278,7 +297,7 @@ func renderInlineSummary(report types.Report, specs map[string]*specRuntime, sui
 	return builder.String()
 }
 
-func renderSetupFailure(report types.Report, suiteLogs []string) string {
+func renderSetupFailure(report types.Report) string {
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("<h3>Suite Setup %s</h3>\n\n", formatHeaderSuffix(reportStatusText(report), report.RunTime)))
 	builder.WriteString("<ul>\n")
@@ -287,25 +306,23 @@ func renderSetupFailure(report types.Report, suiteLogs []string) string {
 		builder.WriteString(fmt.Sprintf("<li>Failure summary: %s</li>\n", html.EscapeString(sanitizeInline(failureSpec.Failure.Message))))
 	}
 	builder.WriteString("</ul>\n\n")
-	if len(suiteLogs) > 0 {
-		builder.WriteString(renderLogsDropdown("Suite setup logs", suiteLogs))
+	if logs := setupLogs(report.SpecReports); len(logs) > 0 {
+		builder.WriteString(renderLogsDropdown("Suite setup logs", logs))
 	}
 	return builder.String()
 }
 
-func renderStep(stepNumber int, step *StepResult) string {
-	lines := append([]string(nil), step.Logs...)
-
-	title := fmt.Sprintf("%d. %s %s", stepNumber, renderStepName(step), formatHeaderSuffix(stepStatusText(step.Status), step.Duration))
+func renderStep(step StepResult) string {
+	title := fmt.Sprintf("%d. %s %s", step.Number, renderStepName(step), formatHeaderSuffix(stepStatusText(StepStatus(step.Status)), parseDuration(step.Duration)))
 
 	var builder strings.Builder
 	builder.WriteString("<details>\n")
 	builder.WriteString(fmt.Sprintf("<summary>%s</summary>\n\n", title))
 	builder.WriteString("<pre>\n")
-	if len(lines) == 0 {
+	if len(step.Logs) == 0 {
 		builder.WriteString("No step logs were captured.\n")
 	} else {
-		for _, line := range lines {
+		for _, line := range step.Logs {
 			builder.WriteString(html.EscapeString(line))
 			builder.WriteByte('\n')
 		}
@@ -314,7 +331,7 @@ func renderStep(stepNumber int, step *StepResult) string {
 	return builder.String()
 }
 
-func renderStepName(step *StepResult) string {
+func renderStepName(step StepResult) string {
 	if step.Keyword == "" {
 		return html.EscapeString(step.Name)
 	}
@@ -339,11 +356,101 @@ func renderLogsDropdown(label string, logs []string) string {
 	return builder.String()
 }
 
-func runtimeLogs(runtime *specRuntime) []string {
-	if runtime == nil {
-		return nil
+func stepResults(spec types.SpecReport) []StepResult {
+	results := make([]StepResult, 0)
+	for _, entry := range spec.ReportEntries {
+		if entry.Name != reportEntryStep {
+			continue
+		}
+
+		var step StepResult
+		if decodeReportEntry(entry, &step) {
+			results = append(results, step)
+		}
 	}
-	return runtime.logs
+
+	return results
+}
+
+func specLogs(spec types.SpecReport) []string {
+	logs := make([]string, 0)
+	for _, entry := range spec.ReportEntries {
+		if entry.Name != reportEntrySpecLogs {
+			continue
+		}
+
+		var payload LogsResult
+		if decodeReportEntry(entry, &payload) {
+			logs = append(logs, payload.Logs...)
+		}
+	}
+
+	return logs
+}
+
+func setupLogs(specReports types.SpecReports) []string {
+	logs := make([]string, 0)
+	for _, spec := range specReports {
+		if spec.LeafNodeType.Is(types.NodeTypeIt) {
+			continue
+		}
+		for _, entry := range spec.ReportEntries {
+			if entry.Name != reportEntrySetupLogs {
+				continue
+			}
+
+			var payload LogsResult
+			if decodeReportEntry(entry, &payload) {
+				logs = append(logs, payload.Logs...)
+			}
+		}
+	}
+
+	return logs
+}
+
+func decodeReportEntry(entry types.ReportEntry, out any) bool {
+	value, ok := entry.GetRawValue().(string)
+	if !ok {
+		value = entry.StringRepresentation()
+	}
+	if value == "" {
+		return false
+	}
+
+	return json.Unmarshal([]byte(value), out) == nil
+}
+
+func orderedSuiteGroups(specReports types.SpecReports) []suiteGroup {
+	groups := groupBySuite(specReports)
+	orderedNames := make([]string, 0, len(groups))
+	seen := make(map[string]struct{}, len(groups))
+
+	for _, name := range preferredSuiteOrder {
+		if _, ok := groups[name]; ok {
+			orderedNames = append(orderedNames, name)
+			seen[name] = struct{}{}
+		}
+	}
+
+	for _, spec := range specReports {
+		name := suiteNameFor(spec)
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		if _, ok := groups[name]; !ok {
+			continue
+		}
+		orderedNames = append(orderedNames, name)
+		seen[name] = struct{}{}
+	}
+
+	ordered := make([]suiteGroup, 0, len(orderedNames))
+	for _, name := range orderedNames {
+		ordered = append(ordered, suiteGroup{Name: name, Specs: groups[name]})
+	}
+
+	return ordered
 }
 
 func groupBySuite(specReports types.SpecReports) map[string]types.SpecReports {
@@ -426,6 +533,14 @@ func formatDuration(duration time.Duration) string {
 		return "0s"
 	}
 	return duration.Round(100 * time.Millisecond).String()
+}
+
+func parseDuration(value string) time.Duration {
+	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		return 0
+	}
+	return parsed
 }
 
 func formatRate(passed, total int) string {

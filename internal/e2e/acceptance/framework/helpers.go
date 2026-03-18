@@ -92,7 +92,7 @@ func (e *Executor) Logf(format string, args ...any) {
 	line := fmt.Sprintf("acceptance: "+format, args...)
 	fmt.Fprintln(GinkgoWriter, line)
 	if e.report != nil {
-		e.report.Logf(CurrentSpecReport().FullText(), line)
+		e.report.Logf(line)
 	}
 }
 
