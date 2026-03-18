@@ -427,7 +427,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p ./cluster-info
-          kubectl cluster-info dump --namespaces=kruise-system,soperator-system,soperator,flux-system --output-directory=./cluster-info
+          kubectl cluster-info dump --namespaces=kruise-system,soperator-system,soperator,flux-system,cert-manager-system --output-directory=./cluster-info
 
       - name: Upload Full Kubernetes Cluster Info
         if: always()
