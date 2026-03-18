@@ -2,6 +2,7 @@
 
 set -euxo pipefail
 
+export CHECKS_OUTPUTS_BASE_DIR="/opt/soperator-outputs"
 task_prolog="/mnt/jail$CHECKS_OUTPUTS_BASE_DIR/task_prolog"
 (umask 000; mkdir -p "$task_prolog")
 (
