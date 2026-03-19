@@ -34,6 +34,12 @@ if [ "${OVERWRITE:-}" = "1" ]; then
 elif [ -f "$SENTINEL" ]; then
     echo "Jail directory is already populated (sentinel exists), exiting"
     exit 0
+elif [ -d /mnt/jail/dev ] && [ -d /mnt/jail/usr ]; then
+    # Migration: jail was populated by an older version that didn't write the sentinel.
+    # Write it now so sconfigcontroller can proceed, and avoid unnecessary re-population.
+    echo "Jail looks already populated (legacy, no sentinel), writing sentinel and exiting"
+    date -Iseconds > "$SENTINEL"
+    exit 0
 else
     echo "Jail directory is not populated (no sentinel), populating"
     populate_jail_rootfs
