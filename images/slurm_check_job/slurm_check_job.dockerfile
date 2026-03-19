@@ -27,7 +27,7 @@ RUN chown 0:0 /etc/enroot/enroot.conf && \
     chmod 644 /etc/enroot/enroot.conf.d/custom-dirs.conf
 
 ARG SLURM_VERSION
-ARG PYXIS_VERSION=0.21.0
+ARG PYXIS_VERSION=0.23.0
 # Install slurm pyxis plugin \
 RUN apt-get update && \
     apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \
