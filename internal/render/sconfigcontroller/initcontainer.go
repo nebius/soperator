@@ -59,10 +59,18 @@ func renderInitContainerSConfigController(
 				Value: strconv.FormatInt(gid, 10),
 			},
 		},
-		Command: []string{"/bin/sh", "-c"}, // Use bash to execute the script
+		Command: []string{"/bin/sh", "-c"},
 		Args: []string{
-			// Quotes around variables are load-bearing, so shell would treat them as single string each
-			"mkdir -p \"${JAIL_CONFIG_PATH}\" && chown \"${JAIL_UID}:${JAIL_GID}\" \"${JAIL_CONFIG_PATH}\" && chmod 755 \"${JAIL_CONFIG_PATH}\"",
+			`echo "Waiting for populate-jail to complete..."
+timeout=600; elapsed=0
+while [ ! -f /mnt/jail/.populated ] && [ $elapsed -lt $timeout ]; do
+    sleep 5; elapsed=$((elapsed + 5))
+done
+if [ ! -f /mnt/jail/.populated ]; then
+    echo "ERROR: populate-jail did not complete within ${timeout}s"
+    exit 1
+fi
+mkdir -p "${JAIL_CONFIG_PATH}" && chown "${JAIL_UID}:${JAIL_GID}" "${JAIL_CONFIG_PATH}" && chmod 755 "${JAIL_CONFIG_PATH}"`,
 		},
 	}
 }

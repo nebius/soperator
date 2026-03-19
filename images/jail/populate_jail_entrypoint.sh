@@ -2,6 +2,8 @@
 
 set -eox
 
+SENTINEL="/mnt/jail/.populated"
+
 while ! mountpoint -q /mnt/jail; do
     echo "Waiting until /mnt/jail is mounted"
     sleep 2
@@ -21,6 +23,9 @@ populate_jail_rootfs() {
     echo "Generate an internal SSH keypair for user root"
     mkdir -p /mnt/jail/root/.ssh
     ssh-keygen -t ecdsa -f /mnt/jail/root/.ssh/id_ecdsa -N "" && cat /mnt/jail/root/.ssh/id_ecdsa.pub >> /mnt/jail/root/.ssh/authorized_keys
+
+    echo "Writing sentinel file"
+    date -Iseconds > "$SENTINEL"
 }
 
 remove_empty_lib_mount_targets() {
@@ -44,17 +49,18 @@ remove_empty_lib_mount_targets() {
 if [ "${OVERWRITE:-}" = "1" ]; then
     echo "Content overwriting is turned on, repopulating jail directory"
     populate_jail_rootfs
+elif [ -f "$SENTINEL" ]; then
+    remove_empty_lib_mount_targets
+    echo "Jail directory is already populated (sentinel exists), exiting"
+    exit 0
+elif [ -d /mnt/jail/dev ] && [ -d /mnt/jail/usr ]; then
+    remove_empty_lib_mount_targets
+    # Migration: jail was populated by an older version that didn't write the sentinel.
+    # Write it now so sconfigcontroller can proceed, and avoid unnecessary re-population.
+    echo "Jail looks already populated (legacy, no sentinel), writing sentinel and exiting"
+    date -Iseconds > "$SENTINEL"
+    exit 0
 else
-    echo "Content overwriting is turned off"
-    if [ -z "$(ls -A /mnt/jail)" ]; then
-        echo "Jail directory is empty, populating"
-        populate_jail_rootfs
-    elif [ -d /mnt/jail/dev ] || [ -d /mnt/jail/etc ] || [ -d /mnt/jail/usr ]; then
-        echo "Jail directory is already populated with something that resembles a rootfs, removing empty libs"
-        remove_empty_lib_mount_targets
-        exit 0
-    else
-        echo "Jail directory is filled with something that does not resemble a rootfs, failing"
-        exit 1
-    fi
+    echo "Jail directory is not populated (no sentinel), populating"
+    populate_jail_rootfs
 fi
