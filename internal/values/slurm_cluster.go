@@ -43,8 +43,10 @@ type SlurmCluster struct {
 	UseDefaultAppArmorProfile bool
 }
 
-// BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD
-func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (*SlurmCluster, error) {
+// BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD.
+// namePrefix is the prefix to use for workload resource names (StatefulSet, DaemonSet, Deployment).
+// Pass cluster.Name for new clusters, or "" to preserve legacy unprefixed names on existing clusters.
+func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster, namePrefix string) (*SlurmCluster, error) {
 	logger := log.FromContext(ctx)
 	logger.V(1).Info(fmt.Sprintf("%+v", cluster.Spec.SConfigController))
 
@@ -67,11 +69,11 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		NodeFilters:            buildNodeFiltersFrom(cluster.Spec.K8sNodeFilters),
 		VolumeSources:          buildVolumeSourcesFrom(cluster.Spec.VolumeSources),
 		Secrets:                BuildSecretsFrom(&cluster.Spec.Secrets),
-		NodeController:         buildSlurmControllerFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Controller),
-		NodeAccounting:         buildAccountingFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Accounting),
-		NodeRest:               buildRestFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Rest),
-		NodeLogin:              buildSlurmLoginFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
-		SlurmExporter:          buildSlurmExporterFrom(cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Exporter),
+		NodeController:         buildSlurmControllerFrom(cluster.Name, namePrefix, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Controller),
+		NodeAccounting:         buildAccountingFrom(cluster.Name, namePrefix, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Accounting),
+		NodeRest:               buildRestFrom(cluster.Name, namePrefix, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Rest),
+		NodeLogin:              buildSlurmLoginFrom(cluster.Name, namePrefix, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
+		SlurmExporter:          buildSlurmExporterFrom(namePrefix, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Exporter),
 		SlurmConfig:            cluster.Spec.SlurmConfig,
 		CustomSlurmConfig:      cluster.Spec.CustomSlurmConfig,
 		CustomCgroupConfig:     cluster.Spec.CustomCgroupConfig,
@@ -87,6 +89,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 			cluster.Spec.SConfigController.ReconfigurePollInterval,
 			cluster.Spec.SConfigController.ReconfigureWaitTimeout,
 			cluster.Spec.SConfigController.ServiceAccountName,
+			namePrefix,
 		),
 		UseDefaultAppArmorProfile: cluster.Spec.UseDefaultAppArmorProfile,
 	}

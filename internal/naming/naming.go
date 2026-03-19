@@ -83,10 +83,10 @@ func BuildAppArmorProfileName(clusterName, namespace string) string {
 	}.String()
 }
 
-func BuildStatefulSetName(componentType consts.ComponentType) string {
+func BuildStatefulSetName(componentType consts.ComponentType, clusterName string) string {
 	return namedEntity{
 		componentType: &componentType,
-		clusterName:   "",
+		clusterName:   clusterName,
 		entity:        "",
 	}.String()
 }
@@ -99,17 +99,18 @@ func BuildNodeSetStatefulSetName(nodeSetName string) string {
 	}.String()
 }
 
-func BuildDaemonSetName(componentType consts.ComponentType) string {
+func BuildDaemonSetName(componentType consts.ComponentType, clusterName string) string {
 	return namedEntity{
 		componentType: &componentType,
-		clusterName:   "",
+		clusterName:   clusterName,
 		entity:        "",
 	}.String()
 }
 
-func BuildDeploymentName(componentType consts.ComponentType) string {
+func BuildDeploymentName(componentType consts.ComponentType, clusterName string) string {
 	return namedEntity{
 		componentType: &componentType,
+		clusterName:   clusterName,
 		entity:        "",
 	}.String()
 }

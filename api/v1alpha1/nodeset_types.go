@@ -113,6 +113,12 @@ const (
 
 // NodeSetSpec defines the desired state of NodeSet
 type NodeSetSpec struct {
+	// ClusterName is the name of the SlurmCluster this NodeSet belongs to.
+	// Must be in the same namespace as the NodeSet.
+	//
+	// +kubebuilder:validation:Optional
+	ClusterName string `json:"clusterName,omitempty"`
+
 	// Replicas specifies the number of worker nodes in the NodeSet.
 	//
 	// Defaults to 1 if not specified.
