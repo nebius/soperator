@@ -93,7 +93,7 @@ spec:
   volumeSources:
     - name: slurm-scripts
       configMap:
-        name: slurm-scripts
+        name: {{ include "slurm-cluster.slurmScriptsCMName" . }}
         defaultMode: 0755
     {{- range .Values.volumeSources }}
     - name: {{ .name | quote }}
