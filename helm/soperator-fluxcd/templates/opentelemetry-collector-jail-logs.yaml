@@ -100,7 +100,7 @@ spec:
             - id: parse_task_prolog_base_name
               type: regex_parser
               parse_from: attributes.base_name
-              regex: ^(?P<job_id>\d+)\.(?P<job_step_id>\d+)(?:\.(?P<job_array_id>\d+))?$
+              regex: ^(?P<job_id>\d+)\.(?P<job_step_id>\d+)?\.(?P<job_array_id>\d+)?$
               if: resource["log_type"] == "task_prolog"
             - type: move
               from: attributes.job_id
