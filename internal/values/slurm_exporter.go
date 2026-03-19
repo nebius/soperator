@@ -51,12 +51,19 @@ type SlurmExporter struct {
 
 	// ServiceAccountName is the ServiceAccount to be used by exporter pods.
 	ServiceAccountName string
+
+	Deployment Deployment
 }
 
-func buildSlurmExporterFrom(maintenance *consts.MaintenanceMode, exporter *slurmv1.SlurmExporter) SlurmExporter {
+func buildSlurmExporterFrom(namePrefix string, maintenance *consts.MaintenanceMode, exporter *slurmv1.SlurmExporter) SlurmExporter {
 	enabled := false
 	if exporter.Enabled != nil {
 		enabled = *exporter.Enabled
+	}
+
+	deploymentName := "slurm-exporter"
+	if namePrefix != "" {
+		deploymentName = namePrefix + "-" + deploymentName
 	}
 
 	return SlurmExporter{
@@ -79,5 +86,6 @@ func buildSlurmExporterFrom(maintenance *consts.MaintenanceMode, exporter *slurm
 		AccountingJobStates:    append([]string(nil), exporter.AccountingJobStates...),
 		AccountingJobsLookback: exporter.AccountingJobsLookback,
 		ServiceAccountName:     exporter.ServiceAccountName,
+		Deployment:             buildDeploymentFrom(deploymentName),
 	}
 }

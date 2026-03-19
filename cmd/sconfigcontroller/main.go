@@ -176,7 +176,7 @@ func main() {
 		WebhookServer:                 webhookServer,
 		HealthProbeBindAddress:        probeAddr,
 		LeaderElection:                enableLeaderElection,
-		LeaderElectionID:              "vqeyz6ae.nebius.ai",
+		LeaderElectionID:              clusterName + ".vqeyz6ae.nebius.ai",
 		LeaderElectionReleaseOnCancel: true,
 		Cache: cache.Options{
 			DefaultNamespaces: map[string]cache.Config{

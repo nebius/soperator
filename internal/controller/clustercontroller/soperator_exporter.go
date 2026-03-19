@@ -75,8 +75,7 @@ func (r SlurmClusterReconciler) ReconcileSoperatorExporter(
 					}
 				} else {
 					debugLogger.Info("Exporter disabled, will delete Deployment if exists")
-					exporterDeploymentName := exporter.DeploymentName
-					if err := r.Deployment.Cleanup(stepCtx, cluster, exporterDeploymentName); err != nil {
+					if err := r.Deployment.Cleanup(stepCtx, cluster, clusterValues.SlurmExporter.Deployment.Name); err != nil {
 						return fmt.Errorf("cleanup soperator exporter deployment: %w", err)
 					}
 				}

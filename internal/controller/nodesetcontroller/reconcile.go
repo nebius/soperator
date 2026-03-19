@@ -68,16 +68,26 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		err     error
 	)
 	{
-		clusterName, hasClusterRef := nodeSet.GetAnnotations()[consts.AnnotationParentalClusterRefName]
-		if !hasClusterRef {
-			err = fmt.Errorf("getting parental cluster ref from annotations")
-			logger.Error(err, "No parent cluster ref found")
-			return ctrl.Result{}, err
+		// Migrate legacy annotation to spec.ClusterName if needed.
+		if nodeSet.Spec.ClusterName == "" {
+			clusterName, hasAnnotation := nodeSet.GetAnnotations()[consts.AnnotationParentalClusterRefName]
+			if !hasAnnotation || clusterName == "" {
+				err = fmt.Errorf("spec.clusterName must be set")
+				logger.Error(err, "No cluster name found")
+				return ctrl.Result{}, err
+			}
+			logger.Info("Migrating cluster name from annotation to spec.clusterName")
+			patch := client.MergeFrom(nodeSet.DeepCopy())
+			nodeSet.Spec.ClusterName = clusterName
+			delete(nodeSet.Annotations, consts.AnnotationParentalClusterRefName)
+			if err = r.Patch(ctx, nodeSet, patch); err != nil {
+				return ctrl.Result{}, fmt.Errorf("migrating cluster name from annotation: %w", err)
+			}
 		}
 		cluster, err = resourcegetter.GetCluster(ctx, r.Client,
 			types.NamespacedName{
 				Namespace: nodeSet.Namespace,
-				Name:      clusterName,
+				Name:      nodeSet.Spec.ClusterName,
 			},
 		)
 		if err != nil {
@@ -273,7 +283,7 @@ func (r NodeSetReconciler) executeReconciliation(
 				stepLogger := log.FromContext(stepCtx)
 				stepLogger.V(1).Info("Reconciling")
 
-				clusterValues, err := values.BuildSlurmClusterFrom(stepCtx, cluster)
+				clusterValues, err := values.BuildSlurmClusterFrom(stepCtx, cluster, cluster.Name)
 				if err != nil {
 					stepLogger.Error(err, "Failed to build cluster values")
 					return fmt.Errorf("building cluster values: %w", err)

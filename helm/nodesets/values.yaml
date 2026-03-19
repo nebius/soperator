@@ -5,6 +5,7 @@
 # Global settings
 nameOverride: ""
 fullnameOverride: ""
+clusterName: ""
 # Priority Classes configuration
 # Define priority classes that can be used by NodeSets
 priorityClasses:
