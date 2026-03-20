@@ -32,6 +32,10 @@ func (e *Executor) ExecJail(ctx context.Context, command string) (string, error)
 	return e.Run(ctx, "kubectl", "exec", "-n", soperatorNamespace, "login-0", "--", "chroot", "/mnt/jail", "bash", "-lc", command)
 }
 
+func (e *Executor) ExecWorker(ctx context.Context, workerName, command string) (string, error) {
+	return e.ExecJail(ctx, fmt.Sprintf("ssh %s %s", ShellQuote(workerName), ShellQuote(command)))
+}
+
 func (e *Executor) ExecJailWithRetry(ctx context.Context, command string, attempts int, delay time.Duration) (string, error) {
 	if attempts < 1 {
 		attempts = 1

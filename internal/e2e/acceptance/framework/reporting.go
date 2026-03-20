@@ -31,7 +31,7 @@ const (
 
 var preferredSuiteOrder = []string{
 	"Simple acceptance",
-	"Node replacement acceptance",
+	"Serial acceptance",
 }
 
 type SummaryReporter struct {

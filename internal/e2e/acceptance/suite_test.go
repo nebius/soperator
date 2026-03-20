@@ -61,11 +61,18 @@ var _ = ReportAfterSuite("write acceptance summary", func(report types.Report) {
 })
 
 var _ = Describe("Simple acceptance", func() {
-	It("confirms that a provisioned cluster is ready for acceptance testing", clusterCreationTest)
-	It("confirms that a regular user can SSH from the login node to a worker", internalSSHTest)
-	It("confirms that installing jq does not break GPU tooling", packageInstallationTest)
+	It("Scenario 050: confirms that installing jq does not break GPU tooling", packageInstallationTest)
+	It("Scenario 100: confirms that Slurm network topology is exposed to jobs", networkTopologyTest)
+	It("Scenario 210: confirms that the expected filesystem layout is present", filesystemLayoutTest)
+	It("Scenario 220: confirms that a regular user can SSH from the login node to a worker", internalSSHTest)
+	It("Scenario 280: confirms that the active Slurm config looks sane", defaultSlurmConfigTest)
 })
 
-var _ = Describe("Node replacement acceptance", Serial, func() {
-	It("confirms that a selected worker is replaced after a maintenance event", nodeReplacementTest)
+var _ = Describe("Serial acceptance", Serial, func() {
+	It("Scenario 030: confirms that Docker-based Slurm containers start and clean up correctly", dockerContainersTest)
+	It("Scenario 040: confirms that Enroot-based Slurm containers start and clean up correctly", enrootContainersTest)
+	It("Scenario 080: confirms that a selected worker is replaced after a maintenance event", nodeReplacementTest)
+	It("Scenario 130: confirms that GPU health checks produce healthy outputs for the current cluster", gpuHealthChecksTest)
+	It("Scenario 131: confirms that passive checks run for periodic, CPU, and GPU job paths", passiveChecksTest)
+	It("Scenario 132: confirms that selected ActiveChecks can be triggered and report expected results", activeChecksTest)
 })
