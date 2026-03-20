@@ -252,7 +252,13 @@ func renderContainerNodeSetSlurmd(
 			SeccompProfile: &corev1.SeccompProfile{
 				Type: corev1.SeccompProfileTypeUnconfined,
 			},
-			ProcMount:       func() *corev1.ProcMountType { if nodeSet.ContainerSlurmd.ProcMount == "" { return nil }; v := nodeSet.ContainerSlurmd.ProcMount; return &v }(),
+			ProcMount: func() *corev1.ProcMountType {
+				if nodeSet.ContainerSlurmd.ProcMount == "" {
+					return nil
+				}
+				v := nodeSet.ContainerSlurmd.ProcMount
+				return &v
+			}(),
 			AppArmorProfile: common.ParseAppArmorProfile(appArmorProfile),
 		},
 		Resources:                resources,
