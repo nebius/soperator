@@ -24,7 +24,7 @@ on:
     tags:
       - "**" # Trigger on any tag
 
-  # pull_request_target runs in base branch context, giving fork PRs access to secrets.
+  # pull_request_target runs in the base branch context, giving fork PRs access to secrets.
   # The "authorize" job gates fork PRs behind environment approval.
   pull_request_target:
     types: [opened, synchronize, reopened]
