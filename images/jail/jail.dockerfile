@@ -34,6 +34,11 @@ RUN apt update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+COPY ansible/sssd.yml /opt/ansible/sssd.yml
+COPY ansible/roles/sssd /opt/ansible/roles/sssd
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local sssd.yml
+
 # Install AWS CLI
 COPY images/common/scripts/install_awscli.sh /opt/bin/
 RUN chmod +x /opt/bin/install_awscli.sh && \

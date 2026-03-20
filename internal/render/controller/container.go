@@ -66,6 +66,19 @@ func renderContainerSlurmctld(container *values.Container, customMounts []slurmv
 	}
 }
 
+func renderContainerSlurmctldWithSSSD(
+	container *values.Container,
+	customMounts []slurmv1.NodeVolumeMount,
+) corev1.Container {
+	res := renderContainerSlurmctld(container, customMounts)
+	res.VolumeMounts = append(
+		res.VolumeMounts,
+		common.RenderVolumeMountSSSDSocket(),
+		common.RenderVolumeMountSSSDConf(),
+	)
+	return res
+}
+
 // renderContainerSlurmctldSleep renders [corev1.Container] for slurmctld in sleep mode for DaemonSet
 func renderContainerSlurmctldSleep(container *values.Container) corev1.Container {
 	return corev1.Container{

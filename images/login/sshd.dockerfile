@@ -24,6 +24,11 @@ RUN ALT_ARCH="$(uname -m)" && \
     mkdir -p "/lib/${ALT_ARCH}-linux-gnu" && \
     cp libdummy.so "/lib/${ALT_ARCH}-linux-gnu/"
 
+COPY ansible/sssd.yml /opt/ansible/sssd.yml
+COPY ansible/roles/sssd /opt/ansible/roles/sssd
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local sssd.yml
+
 # Install slurm сhroot plugin
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
 COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/

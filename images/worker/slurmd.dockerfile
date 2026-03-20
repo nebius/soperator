@@ -32,6 +32,11 @@ RUN arch=$(uname -m) && \
     echo "LD_LIBRARY_PATH=/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib:/lib/${alt_arch}-linux-gnu:/usr/lib/${alt_arch}-linux-gnu:/usr/local/cuda/targets/${alt_arch}-linux/lib" >> /etc/environment
 ENV PATH=${PATH}:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
+COPY ansible/sssd.yml /opt/ansible/sssd.yml
+COPY ansible/roles/sssd /opt/ansible/roles/sssd
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local sssd.yml
+
 # Install slurm сhroot plugin
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
 COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/

@@ -55,8 +55,19 @@ func RenderStatefulSet(
 
 	initContainers := slices.Clone(controller.CustomInitContainers)
 	initContainers = append(initContainers, common.RenderContainerMunge(&controller.ContainerMunge))
+	if controller.ContainerSSSD != nil {
+		initContainers = append(initContainers, common.RenderContainerSSSD(
+			controller.ContainerSSSD,
+			common.SSSDLdapCAConfigMap(controller.SSSDLdapCAConfigMapName),
+		))
+	}
 	if accountingEnabled {
 		initContainers = append(initContainers, renderContainerAccountingWaiter(&controller.ContainerSlurmctld))
+	}
+
+	slurmctldContainer := renderContainerSlurmctld(&controller.ContainerSlurmctld, controller.CustomVolumeMounts)
+	if controller.ContainerSSSD != nil {
+		slurmctldContainer = renderContainerSlurmctldWithSSSD(&controller.ContainerSlurmctld, controller.CustomVolumeMounts)
 	}
 
 	return kruisev1b1.StatefulSet{
@@ -100,14 +111,12 @@ func RenderStatefulSet(
 							ConditionType: appspub.InPlaceUpdateReady,
 						},
 					},
-					HostUsers:      controller.HostUsers,
-					Affinity:       nodeFilter.Affinity,
-					NodeSelector:   nodeFilter.NodeSelector,
-					Tolerations:    nodeFilter.Tolerations,
-					InitContainers: initContainers,
-					Containers: []corev1.Container{
-						renderContainerSlurmctld(&controller.ContainerSlurmctld, controller.CustomVolumeMounts),
-					},
+					HostUsers:                     controller.HostUsers,
+					Affinity:                      nodeFilter.Affinity,
+					NodeSelector:                  nodeFilter.NodeSelector,
+					Tolerations:                   nodeFilter.Tolerations,
+					InitContainers:                initContainers,
+					Containers:                    []corev1.Container{slurmctldContainer},
 					Volumes:                       volumes,
 					RestartPolicy:                 corev1.RestartPolicyAlways,
 					TerminationGracePeriodSeconds: ptr.To(common.DefaultPodTerminationGracePeriodSeconds),

@@ -150,6 +150,12 @@ func renderContainerNodeSetSlurmd(
 		renderVolumeMountSupervisordConfigMap(),
 		renderVolumeMountSshdConfigs(),
 	}
+	if nodeSet.ContainerSSSD != nil {
+		volumeMounts = append(volumeMounts,
+			common.RenderVolumeMountSSSDSocket(),
+			common.RenderVolumeMountSSSDConf(),
+		)
+	}
 	if nodeSet.GPU.Enabled {
 		volumeMounts = append(volumeMounts, renderVolumeMountNvidia())
 	}

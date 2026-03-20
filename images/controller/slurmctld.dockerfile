@@ -33,6 +33,11 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # https://github.com/nebius/ml-containers/pull/73
 FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260225115852 AS controller_slurmctld
 
+COPY ansible/sssd.yml /opt/ansible/sssd.yml
+COPY ansible/roles/sssd /opt/ansible/roles/sssd
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local sssd.yml
+
 # Delete users & home because they will be linked from jail
 RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*
 RUN rm -rf /home
