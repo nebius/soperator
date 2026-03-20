@@ -16,7 +16,7 @@ if [ "${SLURM_LOCALID}" = "0" ]; then
 fi
 
 if [ -v SLURM_JOB_ID_SOPERATOR_TASK_PROLOG ] && [ "${SLURM_JOB_ID_SOPERATOR_TASK_PROLOG:-}" != "${SLURM_JOB_ID:-}" ] && [ -z "${SOPERATOR_SURPRESS_RECURSIVE_SRUN:-}" ]; then
-    echo print "A Job from another Job was detected. Set SOPERATOR_SURPRESS_RECURSIVE_SRUN, if you think this is fine.">&2
+    echo print "A job submission from within another job was detected. If this behavior is intentional, set SOPERATOR_SUPPRESS_RECURSIVE_SRUN=1.">&2
 fi
 
 if [ -v SLURM_JOB_ID ]; then
