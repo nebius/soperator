@@ -839,6 +839,11 @@ func (in *SlurmConfig) DeepCopyInto(out *SlurmConfig) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.TaskEpilog != nil {
+		in, out := &in.TaskEpilog, &out.TaskEpilog
+		*out = new(string)
+		**out = **in
+	}
 	if in.TaskPluginParam != nil {
 		in, out := &in.TaskPluginParam, &out.TaskPluginParam
 		*out = new(string)
