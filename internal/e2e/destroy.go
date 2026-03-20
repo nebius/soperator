@@ -10,8 +10,6 @@ import (
 	"github.com/hashicorp/terraform-exec/tfexec"
 )
 
-const k8sClusterName = "soperator-e2e-test"
-
 func Destroy(ctx context.Context, cfg Config) error {
 	tf, varFilePath, cleanup, err := Init(ctx, cfg)
 	if err != nil {
@@ -39,7 +37,7 @@ func destroyWithK8sRecovery(ctx context.Context, tf *tfexec.Terraform, varFilePa
 	if retryErr := tf.Destroy(ctx, tfexec.VarFile(varFilePath)); retryErr != nil {
 		return fmt.Errorf("destroy after helm release state cleanup: %w", retryErr)
 	}
-	log.Printf("Destroy recovered: K8s cluster %s was already gone, removed helm releases from state to unblock cleanup", k8sClusterName)
+	log.Printf("Destroy recovered: K8s cluster %s was already gone, removed helm releases from state to unblock cleanup", E2EClusterName)
 	return nil
 }
 
@@ -69,12 +67,12 @@ func isMK8SClusterGone(ctx context.Context, nebiusProjectID string) bool {
 	out, err := exec.CommandContext(ctx,
 		"nebius", "mk8s", "cluster", "get-by-name",
 		"--parent-id", nebiusProjectID,
-		"--name", k8sClusterName,
+		"--name", E2EClusterName,
 	).CombinedOutput()
 	if err != nil {
-		log.Printf("mk8s cluster %s not found (get-by-name failed: %v, output: %s)", k8sClusterName, err, string(out))
+		log.Printf("mk8s cluster %s not found (get-by-name failed: %v, output: %s)", E2EClusterName, err, string(out))
 		return true
 	}
-	log.Printf("mk8s cluster %s still exists", k8sClusterName)
+	log.Printf("mk8s cluster %s still exists", E2EClusterName)
 	return false
 }
