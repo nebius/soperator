@@ -3452,6 +3452,7 @@ spec:
                   messageTimeout: 60
                   minJobAge: 28800
                   prolog: ""
+                  taskEpilog: ""
                   taskProlog: ""
                 description: SlurmConfig represents the Slurm configuration in slurm.conf.
                   Not all options are supported.
@@ -3500,6 +3501,11 @@ spec:
                     default: ""
                     description: Defines specific file to run the prolog when job
                       starts. Default value is no prolog
+                    type: string
+                  taskEpilog:
+                    default: ""
+                    description: Defines specific file to run the task epilog when
+                      job ends. Default value is no task epilog
                     type: string
                   taskPluginParam:
                     default: ""
