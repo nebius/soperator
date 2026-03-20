@@ -103,6 +103,15 @@ You can optionally enable [Tailscale](https://github.com/tailscale/tailscale) on
 
 See [docs/tailscale.md](docs/tailscale.md) for details.
 
+### SSSD support
+
+You can optionally enable [SSSD](https://sssd.io/) on Slurm login, controller, and worker pods to integrate Slurm with centralized identity providers such as LDAP, Active Directory, or FreeIPA.
+
+- SSSD can be used for remote user and group resolution through NSS/PAM.
+- It can also be used for centrally managed SSH public keys.
+
+See [docs/sssd.md](docs/sssd.md) for details.
+
 ### Accounting
 Slurm's accounting system records detailed job information such as:
 
