@@ -111,6 +111,13 @@ pushd "${jaildir}"
             --device=all \
             "${cap_args[@]}" \
             "${jaildir}"
+
+        echo "Checking NVIDIA lib state after nvidia-container-cli:"
+        echo "  /lib symlink: $(readlink lib 2>/dev/null || echo 'NOT a symlink')"
+        echo "  libnvidia-ml.so.1 exists: $(test -e usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.1 && echo 'yes' || echo 'NO')"
+        echo "  libnvidia-ml.so.1 target: $(readlink usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.1 2>/dev/null || echo 'MISSING')"
+        echo "  libnvidia-ml.so versioned file size: $(stat -c%s usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.*.* 2>/dev/null || echo 'NOT FOUND')"
+
         touch "etc/gpu_libs_installed.flag"
     fi
 
@@ -185,6 +192,17 @@ pushd "${jaildir}"
     # For worker node only
     if [ -n "$worker" ]; then
         echo "Update linker cache inside the jail"
-        flock --nonblock etc/complement_jail_ldconfig.lock -c "chroot \"${jaildir}\" /usr/sbin/ldconfig" || true
+        echo "  libnvidia-ml.so.1 exists before ldconfig: $(test -e usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.1 && echo 'yes' || echo 'NO')"
+        echo "  libnvidia-ml versioned file size before ldconfig: $(stat -c%s usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.*.* 2>/dev/null || echo 'NOT FOUND')"
+        ldconfig_rc=0
+        flock --nonblock etc/complement_jail_ldconfig.lock -c "chroot \"${jaildir}\" /usr/sbin/ldconfig" || ldconfig_rc=$?
+        if [ "$ldconfig_rc" -eq 0 ]; then
+            echo "ldconfig completed successfully (got flock)"
+        elif [ "$ldconfig_rc" -eq 1 ]; then
+            echo "ldconfig SKIPPED (flock busy)"
+        else
+            echo "ldconfig FAILED with exit code ${ldconfig_rc}"
+        fi
+        echo "  libnvidia-ml.so.1 exists after ldconfig: $(test -e usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.1 && echo 'yes' || echo 'NO')"
     fi
 popd
