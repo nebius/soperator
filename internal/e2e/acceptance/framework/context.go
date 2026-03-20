@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"slices"
 	"strings"
 	"time"
 
@@ -53,6 +54,22 @@ func (s *Suite) AnyWorker() (WorkerRef, error) {
 	}
 
 	return s.workers[rand.Intn(len(s.workers))], nil
+}
+
+func (s *Suite) WorkersForJob(max int) ([]WorkerRef, error) {
+	if len(s.workers) == 0 {
+		return nil, fmt.Errorf("no workers discovered")
+	}
+	if max <= 0 || max >= len(s.workers) {
+		return slices.Clone(s.workers), nil
+	}
+
+	workers := slices.Clone(s.workers)
+	rand.Shuffle(len(workers), func(i, j int) {
+		workers[i], workers[j] = workers[j], workers[i]
+	})
+
+	return workers[:max], nil
 }
 
 func (s *Suite) DiscoverCluster(ctx context.Context) error {
@@ -176,6 +193,10 @@ func (s *Suite) ExecController(ctx context.Context, command string) (string, err
 
 func (s *Suite) ExecJail(ctx context.Context, command string) (string, error) {
 	return s.exec.ExecJail(ctx, command)
+}
+
+func (s *Suite) ExecWorker(ctx context.Context, workerName, command string) (string, error) {
+	return s.exec.ExecWorker(ctx, workerName, command)
 }
 
 func (s *Suite) ExecJailWithRetry(ctx context.Context, command string, attempts int, delay time.Duration) (string, error) {
