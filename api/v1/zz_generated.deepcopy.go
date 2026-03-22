@@ -834,11 +834,6 @@ func (in *SlurmConfig) DeepCopyInto(out *SlurmConfig) {
 		*out = new(string)
 		**out = **in
 	}
-	if in.TaskProlog != nil {
-		in, out := &in.TaskProlog, &out.TaskProlog
-		*out = new(string)
-		**out = **in
-	}
 	if in.TaskPluginParam != nil {
 		in, out := &in.TaskPluginParam, &out.TaskPluginParam
 		*out = new(string)
