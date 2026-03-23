@@ -27,9 +27,6 @@ jobs:
   resolve-profile:
     runs-on: ubuntu-latest
     environment: e2e
-    concurrency:
-      group: e2e-resolve-profile
-      cancel-in-progress: false
     outputs:
       nebius_project_id: ${{ steps.resolve.outputs.nebius_project_id }}
       nebius_region: ${{ steps.resolve.outputs.nebius_region }}
@@ -97,6 +94,14 @@ jobs:
           # Only check for pending runs — not in_progress.
           # One in_progress + one pending is fine (concurrency group handles that).
           # We self-cancel only to avoid being the 3rd run that would bump an existing pending run.
+          #
+          # Note: there is no global lock on resolve-profile (was removed because GitHub's
+          # 1-pending limit caused queued runs to cancel each other with 3+ runs).
+          # This means two concurrent resolve-profile jobs could both pass this check
+          # before either becomes "pending" in e2e-test. This race requires a manual
+          # and a scheduled run to overlap within the ~6s resolve-profile window,
+          # giving a probability of ~0.05%. If it happens, GitHub bumps the older
+          # pending run from the e2e-test queue — the user just re-triggers.
           pending_run_ids=$(gh api "repos/${{ github.repository }}/actions/workflows/e2e_test.yml/runs?status=pending" \
             --jq ".workflow_runs[] | select(.id != $CURRENT_RUN_ID) | .id") || true
 
