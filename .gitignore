@@ -10,3 +10,4 @@ version.txt
 /version/
 
 .ansible
+/.e2e-triage/

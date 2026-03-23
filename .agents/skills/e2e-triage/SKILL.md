@@ -4,7 +4,7 @@ name: e2e-triage
 description: Analyze root cause of soperator e2e test failures from a GitHub Actions run URL. Use when asked to triage, diagnose, or analyze a failed e2e test run.
 # Claude compatibility metadata
 argument-hint: '<github-actions-run-url>'
-allowed-tools: Bash, Read, Glob, Grep, Agent, AskUserQuestion
+allowed-tools: Bash(python3 .agents/skills/e2e-triage/scripts/e2e-split-logs.py:*), Bash(gh:*), Bash(acli jira workitem search:*), Bash(acli jira workitem create:*), Bash(acli jira workitem comment:*), Bash(acli jira workitem view:*), Bash(tail:*), Bash(find:*), Bash(ls:*), Bash(cat:*), Bash(grep:*), Bash(brew:*), Read, Write, Glob, Grep, AskUserQuestion
 ---
 
 # E2E Triage
@@ -38,8 +38,8 @@ Read `steps.json` to get the overview of all steps and their conclusions.
 2. Read the last ~200 lines of the failed step's log file (errors are at the bottom).
 3. Based on what you see, consult the **Debug Info Reference** below to decide which diagnostic steps to read next. Follow the evidence — there is no fixed decision tree.
 4. If diagnostic step logs are not sufficient, download artifacts for deeper investigation:
-   - `gh run download {run_id} -n cluster-info -D /tmp/e2e-triage-{run_id}/cluster-info` — full `kubectl cluster-info dump` (pod logs, events, resources) for namespaces: kruise-system, soperator-system, soperator, flux-system
-   - `gh run download {run_id} -n jail -D /tmp/e2e-triage-{run_id}/jail` — Slurm config (`/etc/slurm/`) and soperator outputs (`/opt/soperator-outputs/`)
+   - `gh run download {run_id} -n cluster-info -D .e2e-triage/{run_id}/cluster-info` — full `kubectl cluster-info dump` (pod logs, events, resources) for namespaces: kruise-system, soperator-system, soperator, flux-system
+   - `gh run download {run_id} -n jail -D .e2e-triage/{run_id}/jail` — Slurm config (`/etc/slurm/`) and soperator outputs (`/opt/soperator-outputs/`)
 
 ### Debug Info Reference
 
@@ -63,68 +63,53 @@ Diagnostic steps between Terraform Apply and Terraform Destroy:
 - Post-destroy cleanup steps are not failure causes
 - When terraform destroy fails, always identify the specific resources that failed (resource type, name, ID) by searching for `Still destroying` and error lines in the destroy step log. Include them in the report.
 - The HTML/Slack output must contain the same resource IDs as the terminal summary — they are needed for debugging.
+- When `wait-for-active-checks` times out or fails, do NOT assume all checks failed for the same reason. Check sacct output (in jail artifact: `/opt/soperator-outputs/`) for individual job exit codes. Distinguish between jobs that never ran (infrastructure/timing issue) and jobs that ran but FAILED (exit code ≠ 0:0) — a failed job is a stronger root cause signal than a job that never started.
 
 ## Phase 3: Search Jira for similar issues
 
-Search for existing known e2e failure tickets:
+Search for existing known e2e failure tickets. If `acli` is not installed, ask the user to install it (`brew tap atlassian/homebrew-acli && brew install acli`) and run `acli auth login` for OAuth authorization. If `acli` fails because Jira is unavailable, retry the same command before concluding the search failed.
+
+Search open tickets and tickets closed in the last 7 days in a single query:
 
 ```bash
-acli jira workitem search --jql 'Labels = "soperator-e2e-fail" AND status NOT IN ("Done", "Won'\''t do")' --fields "key,summary,status" --limit 20
+acli jira workitem search --jql 'Labels = "soperator-e2e-fail" AND (status NOT IN ("Done", "Won'\''t do") OR resolved >= -7d)' --fields "key,summary,status,description" --limit 20
 ```
 
-If `acli` is not installed, ask the user to install it. Official macOS install:
+Compare your root cause against ticket summaries and descriptions. If a match is found, use it.
+
+**For a matched closed ticket, get the resolution date:**
 
 ```bash
-brew tap atlassian/homebrew-acli
-brew install acli
+acli jira workitem view SCHED-XXXX --fields "key,resolutiondate" --json
 ```
 
-Then ask the user to run:
+(`resolutiondate` is only available via `view --json`, not via `search --fields`)
 
-```bash
-acli auth login
-```
+Compare the run start time (from Phase 1 `gh api` metadata) with `resolutiondate`:
+- Resolved **before** the run started → **recidive** (bug came back after being fixed)
+- Resolved **after** the run started → **retrospective reproduction** (run reproduced an issue that was later fixed)
 
-for OAuth authorization.
-
-If `acli` fails because Jira is unavailable or temporarily unreachable, retry the same command before concluding the search failed.
-
-Compare your root cause against the ticket summaries. If a matching ticket exists, mention its key in the output. If no match is found, note that this may be a new issue.
+Include this classification in the output (Phase 4) and Jira comment (Phase 5).
 
 ## Phase 4: Output
 
-Print a structured summary to the terminal, then write an HTML version for Slack to `/tmp/e2e-triage-<run_id>/slack-message.html` and print the full path.
+Print a structured summary to the terminal, then write an HTML version for Slack to `.e2e-triage/<run_id>/slack-message.html` and print the full path.
 
-Use `<b>` for labels, `<code>` for log snippets, `<br>` for line breaks, `<a href="...">` for Jira links. Keep it compact enough for a single Slack message. The user can open the HTML file in a browser and copy from there.
+Use `<b>` for labels, `<code>` for log snippets, `<br>` for line breaks, `<a href="...">` for Jira links. Keep it compact enough for a single Slack message. The user can open the HTML file in a browser and copy from there. Do NOT include the Slack thread URL in the HTML — the message will be posted into that same thread.
 
-At the end, ask the user whether they want to open the HTML file in the browser. If they agree, run `open /tmp/e2e-triage-<run_id>/slack-message.html`.
+Print the absolute path to the HTML file so it is clickable in terminals (use `file://` URL or full path starting with `/`).
 
 ## Phase 5: Report to Jira
 
-**If a matching Jira ticket was found in Phase 3**, post a comment to it immediately (do NOT ask the user for confirmation):
-
-Post a rich-formatted comment using Atlassian Document Format (ADF):
+**If a matching Jira ticket was found in Phase 3** (open or closed), post a comment to it immediately (do NOT ask the user for confirmation):
 
 ```bash
 acli jira workitem comment create --key "SCHED-XXXX" --body '<ADF JSON>'
 ```
 
-If `acli` is not installed, ask the user to install it. Official macOS install:
-
-```bash
-brew tap atlassian/homebrew-acli
-brew install acli
-```
-
-Then ask the user to run:
-
-```bash
-acli auth login
-```
-
-for OAuth authorization.
-
 If an `acli jira` command fails because Jira is unavailable or temporarily unreachable, retry the same command before giving up.
+
+For closed tickets, include the recidive/retrospective classification in the comment (e.g. "Recidive — resolved on 2026-03-20, but reproduced in this run on 2026-03-23").
 
 ADF is a JSON format. Build it with these node types:
 - **Link**: `{"type":"text","text":"display text","marks":[{"type":"link","attrs":{"href":"URL"}}]}`
@@ -145,7 +130,7 @@ Example ADF comment structure:
 ]}]}
 ```
 
-**If no matching Jira ticket was found in Phase 3**, use AskUserQuestion to ask:
+**If no matching Jira ticket was found in Phase 3** (neither open nor closed), use AskUserQuestion to ask:
 - Option 1: "Create a new Jira ticket with `soperator-e2e-fail` label"
 - Option 2: "Investigate further"
 - Option 3: "Done, no ticket needed"
@@ -153,18 +138,3 @@ Example ADF comment structure:
 In Codex, ask the same question as a plain-text chat message.
 
 If creating a new ticket, use `acli jira workitem create` with the `soperator-e2e-fail` label, appropriate summary and description based on the root cause analysis, then post the triage comment to it as well.
-
-If `acli` is not installed, ask the user to install it with:
-
-```bash
-brew tap atlassian/homebrew-acli
-brew install acli
-```
-
-Then ask the user to run:
-
-```bash
-acli auth login
-```
-
-for OAuth authorization.
