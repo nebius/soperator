@@ -144,7 +144,6 @@ slurmConfig:
   defCpuPerGPU: 4
   completeWait: 5
   prolog: /opt/slurm_scripts/prolog.sh
-  taskProlog: /opt/slurm_scripts/task_prolog.sh
   epilog: /opt/slurm_scripts/epilog.sh
   taskPluginParam: ""
   maxJobCount: 20000
@@ -533,7 +532,6 @@ slurmScripts:
   # Base scripts content can be overridden here
   check_runner.py: null
   prolog.sh: null
-  task_prolog.sh: null
   epilog.sh: null
   hc_program.sh: null
   pyxis_caching_importer.sh: null

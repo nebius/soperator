@@ -40,7 +40,6 @@ These tests verify the following kubebuilder default values:
 - `completeWait: 5`
 - `epilog: ""`
 - `prolog: ""`
-- `taskProlog: ""`
 - `taskPluginParam: ""`
 - `maxJobCount: 20000`
 - `minJobAge: 28800`
