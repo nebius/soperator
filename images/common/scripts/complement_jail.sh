@@ -135,6 +135,8 @@ pushd "${jaildir}"
 
     echo "Bind-mount /etc/enroot, /usr/share/enroot and /usr/lib/enroot"
     mkdir -p etc/enroot usr/share/enroot usr/lib/enroot
+    mkdir -p /etc/enroot/mounts.d
+    echo '/opt/slurm_scripts/task_prolog.sh' | sudo tee /etc/enroot/mounts.d/task_prolog.fstab
     mount --rbind /etc/enroot etc/enroot
     mount --bind /usr/share/enroot usr/share/enroot
     mount --bind /usr/lib/enroot usr/lib/enroot
