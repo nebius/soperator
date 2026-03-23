@@ -175,6 +175,13 @@ pushd "${jaildir}"
          touch usr/sbin/slurmd usr/sbin/slurmstepd
          mount --bind /usr/sbin/slurmd usr/sbin/slurmd
          mount --bind /usr/sbin/slurmstepd usr/sbin/slurmstepd
+
+        echo "Bind-mount dockerd stuff from container to the jail"
+        mkdir -p var/lib/docker /var/lib/docker
+        for file in usr/bin/{containerd,docker-proxy,dockerd} var/lib/docker; do
+            touch "$file"
+            mount --bind "/$file" "$file"
+        done
     fi
 
     # For login node with cluster type GPU
