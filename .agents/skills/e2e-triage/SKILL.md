@@ -4,7 +4,7 @@ name: e2e-triage
 description: Analyze root cause of soperator e2e test failures from a GitHub Actions run URL. Use when asked to triage, diagnose, or analyze a failed e2e test run.
 # Claude compatibility metadata
 argument-hint: '<github-actions-run-url>'
-allowed-tools: Bash(python3 .agents/skills/e2e-triage/scripts/e2e-split-logs.py:*), Bash(gh:*), Bash(acli jira workitem search:*), Bash(acli jira workitem create:*), Bash(acli jira workitem comment:*), Bash(acli jira workitem view:*), Bash(tail:*), Bash(find:*), Bash(ls:*), Bash(cat:*), Bash(grep:*), Bash(brew:*), Read, Write, Glob, Grep, AskUserQuestion
+allowed-tools: Bash(python3 .agents/skills/e2e-triage/scripts/e2e-split-logs.py:*), Bash(gh:*), Bash(acli jira workitem search:*), Bash(acli jira workitem create:*), Bash(acli jira workitem comment:*), Bash(acli jira workitem view:*), Bash(tail:*), Bash(find:*), Bash(ls:*), Bash(cat:*), Bash(grep:*), Bash(npc:*), Bash(open:*), Bash(brew:*), Read, Write, Glob, Grep, AskUserQuestion
 ---
 
 # E2E Triage
@@ -26,7 +26,7 @@ Do not skip this step. If the user already provided a Slack thread URL, reuse it
 1. Use AskUserQuestion to ask: "Paste the Slack failure notification thread URL (or skip if none):"
    In Codex, ask the same question as a plain-text chat message.
 2. In parallel, run `python3 .agents/skills/e2e-triage/scripts/e2e-split-logs.py <run-url>` to download and split logs
-3. In parallel, fetch run metadata via `gh api repos/{repo}/actions/runs/{run_id} --jq '{date: .run_started_at, branch: .head_branch}'`
+3. In parallel, fetch run metadata via `gh api repos/{repo}/actions/runs/{run_id} --jq '{date: .run_started_at, end: .updated_at, branch: .head_branch}'`
 
 Save the Slack URL for use in Phase 4 (HTML output) and Phase 5 (Jira comment).
 
@@ -55,6 +55,7 @@ Diagnostic steps between Terraform Apply and Terraform Destroy:
 | K8s Cluster: Helm Releases | Helm releases in flux-system namespace | When a flux HelmRelease install failed |
 | K8s Cluster: Slurm Cluster CRs | SlurmCluster CRs | Rarely |
 | K8s Cluster: Slurm Active Checks CRs | ActiveCheck CRs | When active checks helm release timed out / failed — shows which checks ran / failed |
+| Grafana via `npc logging` | Pod logs not captured in artifacts | When a pod is in CrashLoopBackOff (need first-run logs), or when pods were destroyed by Flux remediation. See Domain knowledge for `npc logging` instructions |
 
 ### Domain knowledge
 
@@ -63,11 +64,18 @@ Diagnostic steps between Terraform Apply and Terraform Destroy:
 - Post-destroy cleanup steps are not failure causes
 - When terraform destroy fails, always identify the specific resources that failed (resource type, name, ID) by searching for `Still destroying` and error lines in the destroy step log. Include them in the report.
 - The HTML/Slack output must contain the same resource IDs as the terminal summary — they are needed for debugging.
+- `acli jira workitem view --json` exposes Atlassian API hosts in `self` fields (e.g. `jira-prod-...prod.atl-paas.net`), not the user-facing Jira browse URL. Do not build clickable Jira ticket links from `self`; use the configured Jira site URL instead.
 - When `wait-for-active-checks` times out or fails, do NOT assume all checks failed for the same reason. Check sacct output (in jail artifact: `/opt/soperator-outputs/`) for individual job exit codes. Distinguish between jobs that never ran (infrastructure/timing issue) and jobs that ran but FAILED (exit code ≠ 0:0) — a failed job is a stronger root cause signal than a job that never started.
+- When a pod is central to the failure (e.g. wait-for-soperatorchecks-*, wait-for-active-checks-*, controller-0), always get its logs. If the pod's logs are not in the cluster-info artifact (common when pods are destroyed by Flux uninstall remediation), immediately query Grafana via `npc logging` — do NOT stop at secondary evidence like sacct exit codes or DNS errors. For controller-0 CrashLoopBackOff, only the first run shows the real error (later restarts log irrelevant messages like "fatal: No Assoc usage file"), so use `--forward` and `--limit` to get the earliest logs:
+  1. Find o11y project ID in the Terraform Apply step log: `grep "Project for logs" <step-log>` — yields e.g. `project-e00xxx`
+  2. Convert to workspace ID by replacing prefix: `project-e00xxx` → `o11yworkspace-e00xxx`
+  3. Query by pod name prefix with regex, scoped to the run time window (`date` as `--since`, `end` as `--until` from Phase 1 metadata):
+     `npc logging query '{__workspace__="<workspace-id>", __bucket__="default", k8s_pod_name=~"<prefix>.*"}' --project-id <project-id> --since <run_started_at> --until <updated_at> --limit 100 --forward`
+  4. Use `--forward` for oldest-first order, and `|= "error"` or `|= "fatal"` LogQL filters to narrow down
 
 ## Phase 3: Search Jira for similar issues
 
-Search for existing known e2e failure tickets. If `acli` is not installed, ask the user to install it (`brew tap atlassian/homebrew-acli && brew install acli`) and run `acli auth login` for OAuth authorization. If `acli` fails because Jira is unavailable, retry the same command before concluding the search failed.
+Search for existing known e2e failure tickets. If `acli` is not installed, ask the user to install it (`brew tap atlassian/homebrew-acli && brew install acli`) and run `acli auth login` for OAuth authorization. If `acli` fails (including "unauthorized" errors, which are often transient), retry the same command before concluding the search failed.
 
 Search open tickets and tickets closed in the last 7 days in a single query:
 
@@ -97,7 +105,7 @@ Print a structured summary to the terminal, then write an HTML version for Slack
 
 Use `<b>` for labels, `<code>` for log snippets, `<br>` for line breaks, `<a href="...">` for Jira links. Keep it compact enough for a single Slack message. The user can open the HTML file in a browser and copy from there. Do NOT include the Slack thread URL in the HTML — the message will be posted into that same thread.
 
-Print the absolute path to the HTML file so it is clickable in terminals (use `file://` URL or full path starting with `/`).
+Ask the user if they want to open the HTML file in the browser. If yes, run `open <absolute-path-to-html>` (use `pwd` to construct the absolute path if needed).
 
 ## Phase 5: Report to Jira
 
@@ -107,7 +115,7 @@ Print the absolute path to the HTML file so it is clickable in terminals (use `f
 acli jira workitem comment create --key "SCHED-XXXX" --body '<ADF JSON>'
 ```
 
-If an `acli jira` command fails because Jira is unavailable or temporarily unreachable, retry the same command before giving up.
+If an `acli jira` command fails (including "unauthorized" errors, which are often transient), retry the same command before giving up.
 
 For closed tickets, include the recidive/retrospective classification in the comment (e.g. "Recidive — resolved on 2026-03-20, but reproduced in this run on 2026-03-23").
 
