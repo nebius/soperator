@@ -167,7 +167,7 @@ def main():
         print(f"Error: invalid input '{input_arg}' — expected a run URL or numeric run ID", file=sys.stderr)
         sys.exit(1)
 
-    out_dir = f"/tmp/e2e-triage-{run_id}"
+    out_dir = f".e2e-triage/{run_id}"
     if os.path.exists(out_dir):
         shutil.rmtree(out_dir)
     os.makedirs(out_dir)
