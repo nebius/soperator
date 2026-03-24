@@ -171,6 +171,9 @@ nodesets:
         # Optional, defaults to empty string
         # e.g. `* soft nofile 1024`
         limitsConfig: ""
+        # Proc mount type for the slurmd container
+        # Optional, valid values: "Default", "Unmasked"
+        # procMount: ""
     # Munge configuration
     munge:
       # Each particular NodeSet's containers can have images other than default ones
