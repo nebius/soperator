@@ -27,12 +27,19 @@ Do not skip this step. If the user already provided a Slack thread URL, reuse it
    In Codex, ask the same question as a plain-text chat message.
 2. In parallel, run `python3 .agents/skills/e2e-triage/scripts/e2e-split-logs.py <run-url>` to download and split logs
 3. In parallel, fetch run metadata via `gh api repos/{repo}/actions/runs/{run_id} --jq '{date: .run_started_at, end: .updated_at, branch: .head_branch}'`
+4. In parallel, fetch known e2e failure tickets (open + recently closed) so you have them as context during investigation:
+   ```bash
+   acli jira workitem search --jql 'Labels = "soperator-e2e-fail" AND (status NOT IN ("Done", "Won'\''t do") OR resolved >= -7d)' --fields "key,summary,status,description" --limit 20
+   ```
+   If `acli` is not installed, ask the user to install it (`brew tap atlassian/homebrew-acli && brew install acli`) and run `acli auth login` for OAuth authorization. If `acli` fails (including "unauthorized" errors, which are often transient), retry the same command before concluding the search failed.
 
 Save the Slack URL for use in Phase 4 (HTML output) and Phase 5 (Jira comment).
 
 Read `steps.json` to get the overview of all steps and their conclusions.
 
 ## Phase 2: Investigate
+
+Keep the Jira tickets loaded in Phase 1 in mind — recognizing patterns from known issues (ticket summaries and descriptions) can help focus the investigation and avoid missing a match later.
 
 1. Find the first step with `"conclusion": "failure"` — this is the root cause step. Later failures are usually consequences.
 2. Read the last ~200 lines of the failed step's log file (errors are at the bottom).
@@ -59,6 +66,7 @@ Diagnostic steps between Terraform Apply and Terraform Destroy:
 
 ### Domain knowledge
 
+- If a command fails with `tls: failed to verify certificate` or `x509:` errors, this means you are running inside a sandboxed environment. Do NOT retry — inform the user that the sandbox is blocking network access and ask them to disable it or run the command outside the sandbox.
 - NER = Not Enough Resources (Nebius cloud capacity issue, not a bug in soperator)
 - Ignore `opentelemetry-collector-jail-logs-*` pod failures when no active check has run — this is normal, the collector starts after an active check creates jail folders
 - Post-destroy cleanup steps are not failure causes
@@ -72,18 +80,11 @@ Diagnostic steps between Terraform Apply and Terraform Destroy:
   3. Query by pod name prefix with regex, scoped to the run time window (`date` as `--since`, `end` as `--until` from Phase 1 metadata):
      `npc logging query '{__workspace__="<workspace-id>", __bucket__="default", k8s_pod_name=~"<prefix>.*"}' --project-id <project-id> --since <run_started_at> --until <updated_at> --limit 100 --forward`
   4. Use `--forward` for oldest-first order, and `|= "error"` or `|= "fatal"` LogQL filters to narrow down
+  5. Note: `npc logging` displays timestamps in local time, but `--since`/`--until` accept UTC. GitHub Actions `run_started_at`/`updated_at` are UTC — pass them as-is, but be aware displayed times will differ by the local UTC offset
 
-## Phase 3: Search Jira for similar issues
+## Phase 3: Match root cause to Jira tickets
 
-Search for existing known e2e failure tickets. If `acli` is not installed, ask the user to install it (`brew tap atlassian/homebrew-acli && brew install acli`) and run `acli auth login` for OAuth authorization. If `acli` fails (including "unauthorized" errors, which are often transient), retry the same command before concluding the search failed.
-
-Search open tickets and tickets closed in the last 7 days in a single query:
-
-```bash
-acli jira workitem search --jql 'Labels = "soperator-e2e-fail" AND (status NOT IN ("Done", "Won'\''t do") OR resolved >= -7d)' --fields "key,summary,status,description" --limit 20
-```
-
-Compare your root cause against ticket summaries and descriptions. If a match is found, use it.
+Compare your root cause against the tickets loaded in Phase 1 (summaries and descriptions). Look for semantic matches — the same failure may be described with different wording (e.g. "task_prolog.sh missing" matches "TaskProlog not found inside pyxis container").
 
 **For a matched closed ticket, get the resolution date:**
 
