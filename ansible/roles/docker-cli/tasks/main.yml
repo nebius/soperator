@@ -4,6 +4,6 @@
   ansible.builtin.apt:
     name:
       - "docker-ce-cli={{ docker_cli_version }}"
-      - "docker.io"
+      - "docker.io={{ docker_cli_version }}"
   tags:
     - docker-cli
