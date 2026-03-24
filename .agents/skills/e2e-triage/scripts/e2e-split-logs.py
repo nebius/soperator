@@ -45,11 +45,24 @@ def usage():
     sys.exit(1)
 
 
+def _is_sandbox_error(result: subprocess.CompletedProcess) -> bool:
+    """Detect TLS/x509 errors caused by running inside a sandboxed environment."""
+    stderr = result.stderr if isinstance(result.stderr, str) else result.stderr.decode("utf-8", errors="replace")
+    return "tls: failed to verify certificate" in stderr or "x509:" in stderr
+
+
 def _run_with_retries(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
     for attempt in range(MAX_RETRIES):
         result = subprocess.run(cmd, capture_output=True, **kwargs)
         if result.returncode == 0:
             return result
+        if _is_sandbox_error(result):
+            print(
+                "ERROR: TLS certificate verification failed. This typically means the command is running "
+                "inside a sandboxed environment. Disable the sandbox or run the command outside of it.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         if attempt < MAX_RETRIES - 1:
             print(
                 f"Attempt {attempt + 1}/{MAX_RETRIES} failed, retrying in {RETRY_DELAY_SECONDS}s...",
