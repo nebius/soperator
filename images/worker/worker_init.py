@@ -373,6 +373,13 @@ def apply_node_topology(hostname: str, topology: str) -> None:
         )
         if result.returncode != 0:
             output = (result.stdout + result.stderr).strip()
+            if "Invalid node name" in output:
+                logger.warning(
+                    "scontrol update: node %s not yet registered (dynamic node first start), skipping: %s",
+                    hostname,
+                    output,
+                )
+                return
             logger.error("scontrol update failed (rc=%d): %s", result.returncode, output)
             sys.exit(1)
 
