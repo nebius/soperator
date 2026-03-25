@@ -511,7 +511,7 @@ jobs:
             echo "No running sconfigcontroller pod found, skipping jail files collection"
           fi
 
-      - name: Tar Jail
+      - name: Zip Jail
         if: always()
         run: |
           zip -r jail jail
