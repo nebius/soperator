@@ -6,10 +6,9 @@ if [ -z "${SLURM_JOB_ID:-}" ]; then
     exit 0
 fi
 
-proxy_dir="/tmp/soperator-docker-host"
-proxy_prefix="${SLURMD_NODENAME}.${SLURM_JOB_ID}.${SLURM_STEP_ID:-}.${SLURM_ARRAY_TASK_ID:-}"
-proxy_socket="$proxy_dir/$proxy_prefix.sock"
-proxy_pid_file="$proxy_dir/$proxy_prefix.pid"
+proxy_prefix="docker-proxy-${SLURMD_NODENAME}.${SLURM_JOB_ID}.${SLURM_STEP_ID:-}.${SLURM_ARRAY_TASK_ID:-}"
+proxy_socket="/var/run/$proxy_prefix.sock"
+proxy_pid_file="/var/run/$proxy_prefix.pid"
 
 if [ "${SLURM_LOCALID:-}" != "0" ]; then
     exit 0
