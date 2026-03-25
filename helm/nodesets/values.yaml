@@ -173,7 +173,7 @@ nodesets:
         limitsConfig: ""
         # Proc mount type for the slurmd container
         # Optional, valid values: "Default", "Unmasked"
-        # procMount: ""
+        # procMount: "Default"
     # Munge configuration
     munge:
       # Each particular NodeSet's containers can have images other than default ones
