@@ -179,6 +179,8 @@ pushd "${jaildir}"
         echo "Bind-mount dockerd stuff from container to the jail"
         mkdir -p {/,}var/lib/docker
         mount --bind {/,}var/lib/docker
+        touch etc/docker/daemon.json
+        mount --bind {/,}etc/docker/daemon.json
     fi
 
     # For login node with cluster type GPU
