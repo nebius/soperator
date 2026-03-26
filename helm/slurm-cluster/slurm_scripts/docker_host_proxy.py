@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import socket
 import socketserver
 import sys
@@ -14,37 +15,16 @@ from typing import Optional
 
 
 HOP_BY_HOP_HEADERS = {
-    "connection",
+    # "connection",
     "keep-alive",
     "proxy-authenticate",
     "proxy-authorization",
     "te",
     "trailers",
     "transfer-encoding",
-    "upgrade",
+    # "upgrade",
 }
 CONTAINER_CREATE_PATH_RE = re.compile(r"^(?:/v[0-9.]+)?/containers/create$")
-
-
-def read_default_cgroup_parent(cgroup_file: str = "/proc/self/cgroup") -> Optional[str]:
-    try:
-        with open(cgroup_file, "r", encoding="utf-8") as f:
-            for line in f:
-                entry = line.strip()
-                if not entry:
-                    continue
-                parts = entry.split(":", 2)
-                if len(parts) != 3:
-                    continue
-                cgroup_path = parts[2].strip()
-                if cgroup_path:
-                    return cgroup_path
-    except OSError:
-        return None
-    return None
-
-
-DEFAULT_CGROUP_PARENT = read_default_cgroup_parent()
 
 
 class UnixHTTPConnection(client.HTTPConnection):
@@ -66,33 +46,69 @@ class ThreadingUnixStreamServer(socketserver.ThreadingMixIn, socketserver.UnixSt
 class DockerProxyHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
-    def _handle(self) -> None:
+    def _maybe_patch_container_create_request(self) -> Optional[bytes]:
         content_length = int(self.headers.get("Content-Length", "0") or "0")
-        request_body = self.rfile.read(content_length) if content_length > 0 else None
-        request_body = maybe_patch_container_create_request(self.command, self.path, request_body)
+        if content_length < 0:
+            return
+        request_body = self.rfile.read(content_length)
+        if self.command.upper() != "POST":
+            return request_body
 
+        if not CONTAINER_CREATE_PATH_RE.match(urllib.parse.urlsplit(self.path).path):
+            return request_body
+
+        try:
+            payload = json.loads(request_body)
+        except json.JSONDecodeError:
+            return request_body
+
+        if not isinstance(payload, dict):
+            return request_body
+
+        host_config = payload.get("HostConfig")
+        if host_config is None:
+            host_config = {}
+            payload["HostConfig"] = host_config
+
+        if not isinstance(host_config, dict):
+            return request_body
+
+        cgroup_parent = self.headers.get("Cgroup-Parent")
+        if cgroup_parent and host_config.get("CgroupParent") in (None, ""):
+            host_config["CgroupParent"] = cgroup_parent
+
+        return json.dumps(payload, separators=(",", ":")).encode("utf-8")
+
+    def handle(self):
+        try:
+            self._connection = UnixHTTPConnection(self.server.target_socket)
+            super().handle()
+        finally:
+            self._connection.close()
+
+    def _handle(self) -> None:
+        request_body = self._maybe_patch_container_create_request()
+
+        print(self.headers)
         upstream_headers = {k: v for k, v in self.headers.items() if k.lower() not in HOP_BY_HOP_HEADERS}
         if request_body is not None:
             upstream_headers["Content-Length"] = str(len(request_body))
 
-        conn = UnixHTTPConnection(self.server.target_socket)  # type: ignore[attr-defined]
-        try:
-            conn.request(self.command, self.path, body=request_body, headers=upstream_headers)
-            response = conn.getresponse()
-            response_body = response.read()
-
-            self.send_response(response.status, response.reason)
-            for key, value in response.getheaders():
-                if key.lower() in HOP_BY_HOP_HEADERS:
-                    continue
-                self.send_header(key, value)
-            self.send_header("Content-Length", str(len(response_body)))
-            self.end_headers()
-
-            if response_body:
-                self.wfile.write(response_body)
-        finally:
-            conn.close()
+        self._connection.request(self.command, self.path, headers=upstream_headers, body=request_body if request_body is not None else self.rfile)
+        response = self._connection.getresponse()
+        self.send_response(response.status, response.reason)
+        for key, value in response.getheaders():
+            if key.lower() in HOP_BY_HOP_HEADERS:
+                continue
+            self.send_header(key, value)
+        self.end_headers()
+        print(response.status, response.getheaders())
+        if response.status == 101:
+            self.close_connection = True
+            shutil.copyfileobj(response.fp, self.wfile)
+        else:
+            shutil.copyfileobj(response, self.wfile)
+        self.wfile.flush()
 
     def do_GET(self) -> None:  # noqa: N802
         self._handle()
@@ -123,36 +139,6 @@ class DockerProxyHandler(BaseHTTPRequestHandler):
             client = self.client_address
         message = "%s - - [%s] %s" % (client, self.log_date_time_string(), fmt % args)
         print(message, file=sys.stderr, flush=True)
-
-
-def maybe_patch_container_create_request(method: str, path: str, request_body: Optional[bytes]) -> Optional[bytes]:
-    if method.upper() != "POST" or not request_body:
-        return request_body
-
-    path_only = urllib.parse.urlsplit(path).path
-    if not CONTAINER_CREATE_PATH_RE.match(path_only):
-        return request_body
-
-    try:
-        payload = json.loads(request_body)
-    except json.JSONDecodeError:
-        return request_body
-
-    if not isinstance(payload, dict):
-        return request_body
-
-    host_config = payload.get("HostConfig")
-    if host_config is None:
-        host_config = {}
-        payload["HostConfig"] = host_config
-
-    if not isinstance(host_config, dict):
-        return request_body
-
-    if DEFAULT_CGROUP_PARENT and host_config.get("CgroupParent") in (None, ""):
-        host_config["CgroupParent"] = DEFAULT_CGROUP_PARENT
-
-    return json.dumps(payload, separators=(",", ":")).encode("utf-8")
 
 
 def parse_args() -> argparse.Namespace:
