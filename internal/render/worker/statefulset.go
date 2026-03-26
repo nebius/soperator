@@ -132,11 +132,17 @@ func RenderNodeSetStatefulSet(
 		spec.PriorityClassName = nodeSet.PriorityClass
 	}
 
+	annotations := map[string]string{
+		"kruise.io/auto-generate-persistent-pod-state": "true",
+		"kruise.io/preferred-persistent-topology":      "kubernetes.io/hostname",
+	}
+
 	return kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      nodeSet.StatefulSet.Name,
-			Namespace: nodeSet.ParentalCluster.Namespace,
-			Labels:    labels,
+			Name:        nodeSet.StatefulSet.Name,
+			Namespace:   nodeSet.ParentalCluster.Namespace,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: kruisev1b1.StatefulSetSpec{
 			PodManagementPolicy: consts.PodManagementPolicy,
