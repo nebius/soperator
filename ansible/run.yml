@@ -38,7 +38,6 @@
     - slurm-divert
     - slurm-client
     - sssd
-    - skel
     - motd
     - nc-health-checker
   tags:
