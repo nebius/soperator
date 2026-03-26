@@ -340,6 +340,35 @@ checks:
           - -t
           - run-all-upgrade
           - --diff
+  manage-jail-state-force:
+    enabled: true
+    checkType: "k8sJob"
+    dependsOn:
+      - "create-user-soperatorchecks"
+    suspend: true
+    runAfterCreation: true
+    k8sJobSpec:
+      jobContainer:
+        appArmorProfile: unconfined
+        workingDir: /opt/ansible
+        image: "{{ .Values.images.sansible }}"
+        command: ["/opt/bin/sansible_entrypoint.sh"]
+        args:
+          - ansible-playbook
+          - -i
+          - inventory/
+          - -c
+          - local
+          - run.yml
+          - -t
+          - run-all-upgrade
+          - -e
+          - "cuda_force_upgrade=true"
+          - -e
+          - "cuda_samples_force=true"
+          - -e
+          - "perftest_force=true"
+          - --diff
   manage-jail-state-dry-run:
     enabled: true
     checkType: "k8sJob"
