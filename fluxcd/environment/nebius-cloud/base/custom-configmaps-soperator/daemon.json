@@ -1,5 +1,5 @@
 {
-  "data-root": "/mnt/image-storage/docker",
+  "data-root": "/mnt/jail/mnt/image-storage/docker",
   "cgroup-parent": "docker.slice",
   "hosts": [
     "unix:///var/run/docker.sock"
