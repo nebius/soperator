@@ -12,3 +12,4 @@
 .*
 *.sh
 Makefile
+!/bin/soperator-docker-proxy

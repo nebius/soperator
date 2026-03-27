@@ -5,6 +5,17 @@ set -euxo pipefail
 # Runs once at the job beginning without `SLURM_STEP_ID` and for each step with `SLURM_STEP_ID`.
 
 if [ "${SLURM_LOCALID}" = "0" ]; then
+    cgroup=$(cat /proc/self/cgroup)
+    cgroup="${cgroup#0::}"
+    # drop basename until it is user
+    while [ -n "$cgroup" ] && [ "${cgroup##*/}" != "user" ]; do
+    cgroup="${cgroup%/*}"
+    done
+    if [ -n "$cgroup" ]; then
+        echo export "DOCKER_HOST=unix:///var/run/soperator-docker.sock"
+        echo export "DOCKER_CUSTOM_HEADERS=Cgroup-Parent=$cgroup"
+    fi
+
     export CHECKS_OUTPUTS_BASE_DIR="/opt/soperator-outputs"
     task_prolog="$CHECKS_OUTPUTS_BASE_DIR/task_prolog"
     (umask 000; mkdir -p "$task_prolog")
@@ -31,21 +42,3 @@ fi
 if [ -z "${SLURM_JOB_ID:-}" ]; then
     exit 0
 fi
-
-cgroup_parent=$(python3 <<PYTHON
-with open("/proc/self/cgroup", "r", encoding="utf-8") as f:
-    for line in f:
-        entry = line.strip()
-        if not entry:
-            continue
-        parts = entry.split(":", 2)
-        if len(parts) != 3:
-            continue
-        cgroup_path = parts[2].strip()
-        if cgroup_path:
-            print(cgroup_path)
-            break
-PYTHON
-)
-echo export "DOCKER_HOST=unix:///var/run/docker-test.sock"
-echo export "DOCKER_CUSTOM_HEADERS=Cgroup-Parent=$cgroup_parent"
