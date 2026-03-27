@@ -96,11 +96,21 @@ func newProxyHandler(upstreamPath string) http.Handler {
 }
 
 func proxyRequest(w http.ResponseWriter, req *http.Request, upstreamPath string) error {
+	if isUpgradeRequest(req) {
+		return proxyUpgradeRequest(w, req, upstreamPath)
+	}
+
 	upstreamConn, err := (&net.Dialer{}).DialContext(req.Context(), "unix", upstreamPath)
 	if err != nil {
 		return err
 	}
 	defer upstreamConn.Close()
+
+	return proxyRequestToConn(w, req, upstreamConn)
+}
+
+func proxyRequestToConn(w http.ResponseWriter, req *http.Request, upstreamConn net.Conn) error {
+	reqCtx := req.Context()
 
 	outReq := req.Clone(req.Context())
 	outReq.URL = cloneURLForOriginForm(req.URL)
@@ -109,25 +119,115 @@ func proxyRequest(w http.ResponseWriter, req *http.Request, upstreamPath string)
 		outReq.Host = "docker"
 	}
 
-	if err := outReq.Write(upstreamConn); err != nil {
-		return err
-	}
+	errCh := make(chan error, 1)
+	writeErrCh := (<-chan error)(errCh)
+	go func() {
+		errCh <- outReq.Write(upstreamConn)
+	}()
 
 	upstreamReader := bufio.NewReader(upstreamConn)
 	resp, err := http.ReadResponse(upstreamReader, outReq)
 	if err != nil {
+		if err := maybeWaitForRequestWrite(writeErrCh); err != nil {
+			return err
+		}
 		return err
 	}
 	defer resp.Body.Close()
 
 	if shouldStreamResponse(req, resp) {
-		return streamHijackedConnection(w, upstreamConn, upstreamReader, resp)
+		if writeErrCh != nil {
+			_ = req.Body.Close()
+			if err := maybeWaitForRequestWrite(writeErrCh); err != nil {
+				return err
+			}
+		}
+		return streamHijackedConnection(w, req, upstreamConn, upstreamReader, resp)
+	}
+
+	if err := waitForRequestWrite(reqCtx, writeErrCh); err != nil {
+		return err
 	}
 
 	copyHeader(w.Header(), resp.Header)
 	w.WriteHeader(resp.StatusCode)
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
 	_, err = io.Copy(w, resp.Body)
 	return err
+}
+
+func proxyUpgradeRequest(w http.ResponseWriter, req *http.Request, upstreamPath string) error {
+	upstreamConn, err := (&net.Dialer{}).DialContext(req.Context(), "unix", upstreamPath)
+	if err != nil {
+		return err
+	}
+	defer upstreamConn.Close()
+
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		return errors.New("response writer does not support hijacking")
+	}
+
+	clientConn, clientRW, err := hijacker.Hijack()
+	if err != nil {
+		return err
+	}
+	defer clientConn.Close()
+
+	outReq := req.Clone(req.Context())
+	outReq.URL = cloneURLForOriginForm(req.URL)
+	outReq.RequestURI = ""
+	if outReq.Host == "" {
+		outReq.Host = "docker"
+	}
+	outReq.Body = nil
+	outReq.GetBody = nil
+	outReq.ContentLength = 0
+	outReq.TransferEncoding = nil
+
+	if err := outReq.Write(upstreamConn); err != nil {
+		_, _ = io.WriteString(clientConn, "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 11\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nproxy error")
+		return err
+	}
+	if req.Body != nil {
+		_ = req.Body.Close()
+	}
+
+	return tunnelRawHijackedConnection(clientConn, clientRW.Reader, upstreamConn, attachesStdin(req))
+}
+
+func waitForRequestWrite(ctx context.Context, errCh <-chan error) error {
+	if errCh == nil {
+		return nil
+	}
+
+	select {
+	case err := <-errCh:
+		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, net.ErrClosed) {
+			return err
+		}
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func maybeWaitForRequestWrite(errCh <-chan error) error {
+	if errCh == nil {
+		return nil
+	}
+
+	select {
+	case err := <-errCh:
+		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, net.ErrClosed) {
+			return err
+		}
+	default:
+	}
+
+	return nil
 }
 
 func cloneURLForOriginForm(in *url.URL) *url.URL {
@@ -157,7 +257,19 @@ func shouldStreamResponse(req *http.Request, resp *http.Response) bool {
 	return false
 }
 
-func streamHijackedConnection(w http.ResponseWriter, upstreamConn net.Conn, upstreamReader *bufio.Reader, resp *http.Response) error {
+func isUpgradeRequest(req *http.Request) bool {
+	if req.Header.Get("Upgrade") != "" {
+		return true
+	}
+
+	return strings.Contains(strings.ToLower(req.Header.Get("Connection")), "upgrade")
+}
+
+func attachesStdin(req *http.Request) bool {
+	return req.URL.Query().Get("stdin") == "1"
+}
+
+func streamHijackedConnection(w http.ResponseWriter, req *http.Request, upstreamConn net.Conn, upstreamReader *bufio.Reader, resp *http.Response) error {
 	hijacker, ok := w.(http.Hijacker)
 	if !ok {
 		return errors.New("response writer does not support hijacking")
@@ -176,29 +288,101 @@ func streamHijackedConnection(w http.ResponseWriter, upstreamConn net.Conn, upst
 		return err
 	}
 
-	errCh := make(chan error, 2)
+	type streamResult struct {
+		copyErr error
+		dir     string
+	}
+
+	errCh := make(chan streamResult, 2)
+	pendingResults := 1
 
 	go func() {
 		_, copyErr := io.Copy(clientConn, upstreamReader)
 		if cw, ok := clientConn.(interface{ CloseWrite() error }); ok {
 			_ = cw.CloseWrite()
 		}
-		errCh <- copyErr
+		errCh <- streamResult{copyErr: copyErr, dir: "upstream_to_client"}
 	}()
 
-	go func() {
-		_, copyErr := io.Copy(upstreamConn, rw.Reader)
-		if cw, ok := upstreamConn.(interface{ CloseWrite() error }); ok {
-			_ = cw.CloseWrite()
-		}
-		errCh <- copyErr
-	}()
+	if attachesStdin(req) {
+		pendingResults++
+		go func() {
+			_, copyErr := io.Copy(upstreamConn, rw.Reader)
+			if cw, ok := upstreamConn.(interface{ CloseWrite() error }); ok {
+				_ = cw.CloseWrite()
+			}
+			errCh <- streamResult{copyErr: copyErr, dir: "client_to_upstream"}
+		}()
+	}
 
 	var firstErr error
-	for i := 0; i < 2; i++ {
-		copyErr := <-errCh
-		if copyErr != nil && !errors.Is(copyErr, net.ErrClosed) && !errors.Is(copyErr, io.EOF) {
-			firstErr = copyErr
+	firstResult := <-errCh
+	if firstResult.copyErr != nil && !errors.Is(firstResult.copyErr, net.ErrClosed) && !errors.Is(firstResult.copyErr, io.EOF) {
+		firstErr = firstResult.copyErr
+	}
+	if firstResult.dir == "upstream_to_client" {
+		_ = clientConn.Close()
+		_ = upstreamConn.Close()
+	}
+
+	if pendingResults == 2 {
+		secondResult := <-errCh
+		if secondResult.copyErr != nil && !errors.Is(secondResult.copyErr, net.ErrClosed) && !errors.Is(secondResult.copyErr, io.EOF) && firstErr == nil {
+			firstErr = secondResult.copyErr
+		}
+	}
+	_ = clientConn.Close()
+	_ = upstreamConn.Close()
+
+	if firstErr != nil {
+		return fmt.Errorf("%w: %v", errAfterHijack, firstErr)
+	}
+
+	return errAfterHijack
+}
+
+func tunnelRawHijackedConnection(clientConn net.Conn, clientReader io.Reader, upstreamConn net.Conn, forwardClientInput bool) error {
+	type streamResult struct {
+		copyErr error
+		dir     string
+	}
+
+	pendingResults := 1
+	errCh := make(chan streamResult, 2)
+
+	go func() {
+		_, copyErr := io.Copy(clientConn, upstreamConn)
+		if cw, ok := clientConn.(interface{ CloseWrite() error }); ok {
+			_ = cw.CloseWrite()
+		}
+		errCh <- streamResult{copyErr: copyErr, dir: "upstream_to_client"}
+	}()
+
+	if forwardClientInput {
+		pendingResults++
+		go func() {
+			_, copyErr := io.Copy(upstreamConn, clientReader)
+			if cw, ok := upstreamConn.(interface{ CloseWrite() error }); ok {
+				_ = cw.CloseWrite()
+			}
+			errCh <- streamResult{copyErr: copyErr, dir: "client_to_upstream"}
+		}()
+	}
+
+	var firstErr error
+	firstResult := <-errCh
+	if firstResult.copyErr != nil && !errors.Is(firstResult.copyErr, net.ErrClosed) && !errors.Is(firstResult.copyErr, io.EOF) {
+		firstErr = firstResult.copyErr
+	}
+	if firstResult.dir == "upstream_to_client" {
+		_ = clientConn.Close()
+		_ = upstreamConn.Close()
+	}
+
+	if pendingResults == 2 {
+		secondResult := <-errCh
+		if secondResult.copyErr != nil && !errors.Is(secondResult.copyErr, net.ErrClosed) && !errors.Is(secondResult.copyErr, io.EOF) && firstErr == nil {
+			firstErr = secondResult.copyErr
 		}
 	}
 	_ = clientConn.Close()
