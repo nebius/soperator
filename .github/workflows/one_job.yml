@@ -418,8 +418,6 @@ jobs:
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=login_sshd DOCKERFILE=login/sshd.dockerfile \
             IMAGE_VERSION=${IMAGE_VERSION}
 
-          go build -o images/worker/soperator-docker-proxy docker-proxy/main.go
-
           echo "worker_slurmd - ${IMAGE_VERSION}"
           make docker-build-and-push \
             PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
