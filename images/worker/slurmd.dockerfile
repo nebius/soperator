@@ -2,6 +2,13 @@
 
 ARG SLURM_VERSION
 
+FROM golang:1.26 AS docker-proxy
+COPY docker-proxy/ /app/
+WORKDIR /app
+RUN go build -o soperator-docker-proxy main.go
+
+ARG SLURM_VERSION
+
 # https://github.com/nebius/ml-containers/pull/79
 FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260324153054 AS worker_slurmd
 
@@ -136,6 +143,8 @@ COPY images/worker/supervisord_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh && \
     chmod +x /opt/bin/slurm/supervisord_entrypoint.sh && \
     chmod +x /opt/bin/slurm/worker_init.py
+
+COPY --from=docker-proxy /app/soperator-docker-proxy /usr/bin/soperator-docker-proxy
 
 # Start supervisord that manages both slurmd and sshd as child processes
 ENTRYPOINT ["/opt/bin/slurm/supervisord_entrypoint.sh"]
