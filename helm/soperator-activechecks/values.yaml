@@ -1,4 +1,9 @@
 slurmClusterRefName: "soperator"
+# hostUsers controls spec.hostUsers on ActiveCheck pods.
+# When not set (null), it is auto-detected from the Kubernetes version:
+#   < 1.33 → false (user namespaces not stable)
+#   >= 1.33 → true
+# hostUsers: null
 # CUDA version used for active check image selection and for managing jail state
 cudaVersion: 12.9.0
 # Flat override: if non-empty, takes precedence over ncclTestsVersions map.

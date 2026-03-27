@@ -240,6 +240,21 @@ mungeContainer:
 {{- end -}}
 
 {{/*
+Compute the hostUsers value for ActiveCheck pods.
+If .Values.hostUsers is explicitly set, use it.
+Otherwise: false for Kubernetes < 1.33 (user namespaces not stable), true for >= 1.33.
+*/}}
+{{- define "soperator-activechecks.hostUsers" -}}
+{{- if not (kindIs "invalid" .Values.hostUsers) -}}
+  {{- .Values.hostUsers -}}
+{{- else if semverCompare ">=1.33.0" .Capabilities.KubeVersion.Version -}}
+  {{- true -}}
+{{- else -}}
+  {{- false -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Validate that a check does not enable both commentSlurmNode and drainSlurmNode
 under `failureReactions` for a single check. Invoke with (dict "name" "<checkKey>" "vals" .Values)
 */}}

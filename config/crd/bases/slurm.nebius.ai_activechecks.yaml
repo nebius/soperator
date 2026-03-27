@@ -1050,6 +1050,12 @@ spec:
                         type: string
                     type: object
                 type: object
+              hostUsers:
+                description: |-
+                  HostUsers controls whether the pod containers can share the host user namespace.
+                  When not set, hostUsers is not configured on the pod (the runtime decides).
+                  Set to false only if the runtime supports user namespaces.
+                type: boolean
               k8sJobSpec:
                 description: K8sJobSpec defines options for k8s cronjob
                 properties:
