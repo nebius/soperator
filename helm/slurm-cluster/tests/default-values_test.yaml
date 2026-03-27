@@ -41,9 +41,6 @@ tests:
           path: spec.slurmConfig.taskProlog
           value: "/opt/slurm_scripts/task_prolog.sh"
       - equal:
-          path: spec.slurmConfig.taskEpilog
-          value: "/opt/slurm_scripts/task_epilog.sh"
-      - equal:
           path: spec.slurmConfig.epilog
           value: "/opt/slurm_scripts/epilog.sh"
       - equal:

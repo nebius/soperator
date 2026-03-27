@@ -8,7 +8,7 @@ metadata:
     release: {{ .Release.Name }}
 data:
   # base scripts
-{{- range $name := list "check_runner.py" "prolog.sh" "task_prolog.sh" "task_epilog.sh" "epilog.sh" "hc_program.sh" "pyxis_caching_importer.sh" "docker_host_proxy.py" }}
+{{- range $name := list "check_runner.py" "prolog.sh" "task_prolog.sh" "epilog.sh" "hc_program.sh" "pyxis_caching_importer.sh" }}
 {{- $content := index $.Values.slurmScripts $name }}
   {{ $name }}: |-
   {{- if $content }}

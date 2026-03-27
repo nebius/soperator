@@ -71,7 +71,7 @@ type SlurmClusterSpec struct {
 	// SlurmConfig represents the Slurm configuration in slurm.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={defMemPerNode: 0, defCpuPerGPU: 4, completeWait: 5, epilog: "", prolog: "", taskProlog: "", taskEpilog: "", maxJobCount: 20000, minJobAge: 28800, messageTimeout: 60}
+	// +kubebuilder:default={defMemPerNode: 0, defCpuPerGPU: 4, completeWait: 5, epilog: "", prolog: "", taskProlog: "", maxJobCount: 20000, minJobAge: 28800, messageTimeout: 60}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 
 	// Topology contains topology-related parameters for Slurm.
@@ -162,11 +162,6 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=""
 	TaskProlog *string `json:"taskProlog,omitempty"`
-	// Defines specific file to run the task epilog when job ends. Default value is no task epilog
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=""
-	TaskEpilog *string `json:"taskEpilog,omitempty"`
 	// Additional parameters for the task plugin
 	//
 	// +kubebuilder:validation:Optional
