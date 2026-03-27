@@ -93,7 +93,7 @@ func (r SlurmClusterReconciler) ValidateSConfigController(
 		ctx,
 		types.NamespacedName{
 			Namespace: clusterValues.Namespace,
-			Name:      naming.BuildDeploymentName(consts.ComponentTypeSConfigController),
+			Name:      naming.BuildDeploymentName(consts.ComponentTypeSConfigController, clusterValues.Name),
 		},
 		existing,
 	)

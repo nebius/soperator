@@ -83,31 +83,34 @@ func BuildAppArmorProfileName(clusterName, namespace string) string {
 	}.String()
 }
 
-func BuildStatefulSetName(componentType consts.ComponentType) string {
+func BuildStatefulSetName(componentType consts.ComponentType, clusterName string) string {
 	return namedEntity{
 		componentType: &componentType,
-		clusterName:   "",
+		clusterName:   clusterName,
 		entity:        "",
 	}.String()
 }
 
-func BuildNodeSetStatefulSetName(nodeSetName string) string {
+func BuildNodeSetStatefulSetName(clusterName, nodeSetName string) string {
 	return namedEntity{
 		componentType: nil,
-		clusterName:   "",
+		clusterName:   clusterName,
 		entity:        nodeSetName,
 	}.String()
 }
 
-func BuildDaemonSetName(componentType consts.ComponentType) string {
+func BuildDaemonSetName(componentType consts.ComponentType, clusterName string) string {
 	return namedEntity{
 		componentType: &componentType,
-		clusterName:   "",
+		clusterName:   clusterName,
 		entity:        "",
 	}.String()
 }
 
-func BuildDeploymentName(componentType consts.ComponentType) string {
+func BuildDeploymentName(componentType consts.ComponentType, clusterName string) string {
+	// NOTE: Intentionally do NOT include clusterName in Deployment names to avoid
+	// changing the naming scheme and orphaning existing Deployments created by
+	// earlier versions of the operator.
 	return namedEntity{
 		componentType: &componentType,
 		entity:        "",

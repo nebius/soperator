@@ -76,7 +76,7 @@ func buildSlurmLoginFrom(
 		Service:              svc,
 		HeadlessService:      headlessSvc,
 		StatefulSet: buildStatefulSetFrom(
-			naming.BuildStatefulSetName(consts.ComponentTypeLogin),
+			naming.BuildStatefulSetName(consts.ComponentTypeLogin, clusterName),
 			login.SlurmNode.Size,
 		),
 		SSHDConfigMapName:         sshdConfigMapName,
