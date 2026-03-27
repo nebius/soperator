@@ -118,6 +118,7 @@ vet: ## Run go vet against code.
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
 	go test ./...
+	go test -tags acceptance -run '^$$' ./internal/e2e/acceptance
 
 .PHONY: test-coverage
 test-coverage: manifests generate fmt vet envtest ## Run tests and generate test coverage.
