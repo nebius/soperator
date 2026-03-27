@@ -37,6 +37,7 @@
     - soperator-scripts
     - slurm-divert
     - slurm-client
+    - slurm-divert # role doubled here, because we need to do that after Slurm version upgrade
     - sssd
     - motd
     - nc-health-checker
