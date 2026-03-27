@@ -1,5 +1,7 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
+ARG SLURM_VERSION
+
 FROM golang:1.26 AS docker-proxy
 COPY docker-proxy/ /app/
 WORKDIR /app
