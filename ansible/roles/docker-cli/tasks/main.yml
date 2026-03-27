@@ -7,7 +7,7 @@
   tags:
     - docker-cli
 
-- name: Ensure docker-cli package is installed
+- name: Ensure docker.io (Docker engine and CLI) is installed
   ansible.builtin.apt:
     name:
       - "docker.io={{ docker_cli_version }}"
