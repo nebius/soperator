@@ -1,34 +1,11 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
+FROM golang:1.26 AS docker-proxy
+COPY docker-proxy/ /app/
+WORKDIR /app
+RUN go build -o soperator-docker-proxy main.go
+
 ARG SLURM_VERSION
-
-FROM golang:1.25 AS go-base
-
-WORKDIR /build
-
-# Layer 1: Go modules (changes rarely)
-COPY go.mod go.sum ./
-RUN go mod download
-
-# Layer 2: Shared code (changes moderately)
-COPY api api
-COPY internal internal
-COPY pkg pkg
-
-# Build power-manager binary
-FROM go-base AS docker_proxy_builder
-
-ARG GO_LDFLAGS=""
-ARG CGO_ENABLED=0
-ARG GOOS=linux
-
-COPY go.mod go.sum ./
-RUN go mod download
-
-COPY docker-proxy docker-proxy
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
-    go build -v -o soperator-docker-proxy ./docker-proxy
 
 # https://github.com/nebius/ml-containers/pull/73
 FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260225115852 AS worker_slurmd
@@ -165,7 +142,7 @@ RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh && \
     chmod +x /opt/bin/slurm/supervisord_entrypoint.sh && \
     chmod +x /opt/bin/slurm/worker_init.py
 
-COPY --from=docker_proxy_builder /build/soperator-docker-proxy /usr/bin/soperator-docker-proxy
+COPY --from=docker-proxy /app/soperator-docker-proxy /usr/bin/soperator-docker-proxy
 
 # Start supervisord that manages both slurmd and sshd as child processes
 ENTRYPOINT ["/opt/bin/slurm/supervisord_entrypoint.sh"]
