@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Downloads and splits GitHub Actions e2e-test job logs into per-step files.
+"""Downloads logs, metadata, and artifacts for an e2e-test GitHub Actions run.
 
-Usage: e2e-split-logs.py <run-url-or-id> [repo]
+Usage: e2e-prepare.py <run-url-or-id> [repo]
 
 Output: prints the path to a directory containing:
-  steps.json          - step metadata array
-  NN-step-name.log    - per-step log files
+  run.json             - run metadata, profile, steps, artifact list
+  NN-step-name.log     - per-step log files
+  <artifact-name>/     - extracted artifact directories
 
 Requires: gh CLI
 """
 
+import concurrent.futures
 import dataclasses
 import json
 import os
@@ -18,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import time
+import zipfile
 from datetime import datetime, timezone
 
 MAX_RETRIES = 5
@@ -63,9 +66,10 @@ def _run_with_retries(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
                 file=sys.stderr,
             )
             sys.exit(1)
+        stderr = result.stderr if isinstance(result.stderr, str) else result.stderr.decode("utf-8", errors="replace")
         if attempt < MAX_RETRIES - 1:
             print(
-                f"Attempt {attempt + 1}/{MAX_RETRIES} failed, retrying in {RETRY_DELAY_SECONDS}s...",
+                f"Attempt {attempt + 1}/{MAX_RETRIES} failed, retrying in {RETRY_DELAY_SECONDS}s...\n  {stderr.strip()}",
                 file=sys.stderr,
             )
             time.sleep(RETRY_DELAY_SECONDS)
@@ -162,6 +166,31 @@ def split_log_lines(steps: list[Step], log_lines: list[str]) -> dict[str, list[s
     return step_lines
 
 
+def extract_profile(log_lines: list[str]) -> str | None:
+    """Extract PROFILE_ENV_VAR value from log lines."""
+    for line in log_lines:
+        match = re.search(r"PROFILE_ENV_VAR:\s*(\S+)", line)
+        if match:
+            return match.group(1)
+    return None
+
+
+def download_artifact(repo: str, run_id: str, artifact_name: str, out_dir: str) -> None:
+    """Download and extract a single artifact."""
+    dest = os.path.join(out_dir, artifact_name)
+    os.makedirs(dest, exist_ok=True)
+    _run_with_retries(
+        ["gh", "run", "download", run_id, "-R", repo, "-n", artifact_name, "-D", dest],
+    )
+    # If the artifact contains a single .zip file, extract it in place
+    contents = os.listdir(dest)
+    if len(contents) == 1 and contents[0].endswith(".zip"):
+        zip_path = os.path.join(dest, contents[0])
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            zf.extractall(dest)
+        os.remove(zip_path)
+
+
 def main():
     if len(sys.argv) < 2:
         usage()
@@ -181,13 +210,23 @@ def main():
         sys.exit(1)
 
     out_dir = f".e2e-triage/{run_id}"
+    logs_dir = os.path.join(out_dir, "logs")
+    artifacts_dir = os.path.join(out_dir, "artifacts")
     if os.path.exists(out_dir):
         shutil.rmtree(out_dir)
-    os.makedirs(out_dir)
+    os.makedirs(logs_dir)
+    os.makedirs(artifacts_dir)
 
-    # Fetch job metadata
-    print(f"Fetching job metadata for run {run_id}...", file=sys.stderr)
-    jobs_data = json.loads(gh_api(f"repos/{repo}/actions/runs/{run_id}/jobs"))
+    # Fetch job metadata and run metadata in parallel
+    print(f"Fetching metadata for run {run_id}...", file=sys.stderr)
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        jobs_future = pool.submit(gh_api, f"repos/{repo}/actions/runs/{run_id}/jobs")
+        run_future = pool.submit(gh_api, f"repos/{repo}/actions/runs/{run_id}")
+        artifacts_future = pool.submit(gh_api, f"repos/{repo}/actions/runs/{run_id}/artifacts")
+
+        jobs_data = json.loads(jobs_future.result())
+        run_data = json.loads(run_future.result())
+        artifacts_data = json.loads(artifacts_future.result())
 
     e2e_jobs = [j for j in jobs_data["jobs"] if j["name"] == "e2e-test"]
     if not e2e_jobs:
@@ -200,25 +239,49 @@ def main():
     job_id = job["id"]
     steps = steps_from_job(job)
 
-    # Download job log
-    print("Downloading job logs...", file=sys.stderr)
-    log_bytes = gh_api_raw(f"repos/{repo}/actions/jobs/{job_id}/logs")
-    log_text = log_bytes.decode("utf-8", errors="replace")
-    log_lines = log_text.splitlines()
-    print(f"Downloaded {len(log_lines)} lines", file=sys.stderr)
+    # Download logs and artifacts in parallel
+    artifact_names = [a["name"] for a in artifacts_data["artifacts"]]
+    print("Downloading job logs and artifacts...", file=sys.stderr)
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        log_future = pool.submit(gh_api_raw, f"repos/{repo}/actions/jobs/{job_id}/logs")
+        artifact_futures = {
+            pool.submit(download_artifact, repo, run_id, name, artifacts_dir): name
+            for name in artifact_names
+        }
 
-    # Split logs
+        # Process logs
+        log_bytes = log_future.result()
+        log_text = log_bytes.decode("utf-8", errors="replace")
+        log_lines = log_text.splitlines()
+        print(f"Downloaded {len(log_lines)} log lines", file=sys.stderr)
+
+        # Collect artifact results as they complete
+        for future in concurrent.futures.as_completed(artifact_futures):
+            name = artifact_futures[future]
+            try:
+                future.result()
+                print(f"  Downloaded artifact: {name}", file=sys.stderr)
+            except Exception as e:
+                print(f"  Failed to download artifact {name}: {e}", file=sys.stderr)
+
+    # Split logs into per-step files
     print("Splitting logs into per-step files...", file=sys.stderr)
     step_lines = split_log_lines(steps, log_lines)
 
-    # Write per-step files
     for filename, lines in step_lines.items():
         if lines:
-            filepath = os.path.join(out_dir, filename)
+            filepath = os.path.join(logs_dir, filename)
             with open(filepath, "w") as f:
                 f.write("\n".join(lines) + "\n")
 
-    # Write steps.json
+    # Extract profile from logs
+    profile = extract_profile(log_lines)
+    if profile:
+        print(f"Profile: {profile}", file=sys.stderr)
+    else:
+        print("Warning: could not extract PROFILE_ENV_VAR from logs", file=sys.stderr)
+
+    # Build steps list
     steps_output = [
         {
             "number": s.number,
@@ -230,10 +293,27 @@ def main():
         for s in steps
     ]
 
-    with open(os.path.join(out_dir, "steps.json"), "w") as f:
-        json.dump(steps_output, f, indent=2)
+    # Write run.json
+    run_output = {
+        "run_id": run_id,
+        "repo": repo,
+        "run_url": f"https://github.com/{repo}/actions/runs/{run_id}",
+        "branch": run_data.get("head_branch", ""),
+        "run_started_at": run_data.get("run_started_at", ""),
+        "updated_at": run_data.get("updated_at", ""),
+        "profile": profile,
+        "artifacts": artifact_names,
+        "steps": steps_output,
+    }
+
+    with open(os.path.join(out_dir, "run.json"), "w") as f:
+        json.dump(run_output, f, indent=2)
 
     # Print summary
+    print(f"\nRun: {run_output['run_url']}", file=sys.stderr)
+    print(f"Branch: {run_output['branch']}", file=sys.stderr)
+    print(f"Profile: {profile or 'unknown'}", file=sys.stderr)
+    print(f"Artifacts: {', '.join(artifact_names) or 'none'}", file=sys.stderr)
     print("\nSteps:", file=sys.stderr)
     max_name_len = max(len(s["file"]) for s in steps_output)
     for s in steps_output:
