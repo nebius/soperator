@@ -4,7 +4,7 @@ name: e2e-triage
 description: Analyze root cause of soperator e2e test failures from a GitHub Actions run URL. Use when asked to triage, diagnose, or analyze a failed e2e test run.
 # Claude compatibility metadata
 argument-hint: '<github-actions-run-url>'
-allowed-tools: Bash(python3 .agents/skills/e2e-triage/scripts/e2e-prepare.py:*), Bash(gh:*), Bash(tail:*), Bash(find:*), Bash(ls:*), Bash(cat:*), Bash(grep:*), Bash(npc:*), Bash(open:*), Read, Write, Glob, Grep, AskUserQuestion, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssue, mcp__atlassian__createJiraIssue, mcp__atlassian__addCommentToJiraIssue, mcp__atlassian__editJiraIssue, mcp__plugin_slack_slack__slack_send_message_draft
+allowed-tools: Bash(python3 .agents/skills/e2e-triage/scripts/e2e-prepare.py:*), Bash(gh:*), Bash(npc:*), Bash(open:*), Bash(ls:*), Read, Write, Glob, Grep, AskUserQuestion, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssue, mcp__atlassian__createJiraIssue, mcp__atlassian__addCommentToJiraIssue, mcp__atlassian__editJiraIssue, mcp__plugin_slack_slack__slack_send_message_draft
 ---
 
 # E2E Triage
@@ -12,8 +12,14 @@ allowed-tools: Bash(python3 .agents/skills/e2e-triage/scripts/e2e-prepare.py:*),
 Analyze a failed soperator e2e test run and produce a root cause summary.
 
 Compatibility notes:
-- This ckill is compatible with both Codex and Claude Code
+- This skill is compatible with both Codex and Claude Code
 - Where the instructions mention `AskUserQuestion`, keep the Claude wording for compatibility. In Codex, ask the same question directly in a plain-text chat message.
+
+**Tool usage:** Prefer built-in tools over Bash for file operations:
+- Use **Read** instead of `cat`, `head`, `tail` to read files
+- Use **Glob** instead of `find` to locate files by pattern
+- Use **Grep** instead of `grep`/`rg` to search file contents
+- Use `ls` only for listing directory contents
 
 ## Phase 1: Download, split logs, and ask for Slack URL
 
@@ -36,7 +42,7 @@ Keep the Jira tickets loaded in Phase 1 in mind — recognizing patterns from kn
 1. Find the first step with `"conclusion": "failure"` — this is the root cause step. Later failures are usually consequences.
 2. Read the last ~200 lines of the failed step's log file (errors are at the bottom).
 3. Based on what you see, consult the **Debug Info Reference** below to decide which diagnostic steps to read next. Follow the evidence — there is no fixed decision tree.
-4. If diagnostic step logs are not sufficient, use the pre-downloaded artifacts in `.e2e-triage/{run_id}/artifacts/` for deeper investigation (check `run.json` `artifacts` field for available names):
+4. If diagnostic step logs are not sufficient, use the pre-downloaded and already extracted artifacts in `.e2e-triage/{run_id}/artifacts/` for deeper investigation (check `run.json` `artifacts` field for available names — do NOT attempt to unzip, they are ready to use):
    - `artifacts/cluster-info/` — full `kubectl cluster-info dump` (pod logs, events, resources) for namespaces: kruise-system, soperator-system, soperator, flux-system
    - `artifacts/jail*/` — Slurm config (`/etc/slurm/`) and soperator outputs (`/opt/soperator-outputs/`)
 
