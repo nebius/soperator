@@ -9,7 +9,7 @@ bracex==2.6
 cffi==2.0.0
 charset-normalizer==3.4.6
 click==8.3.1
-cryptography==46.0.5
+cryptography==46.0.6
 distro==1.9.0
 filelock==3.25.2
 importlib_metadata==9.0.0
