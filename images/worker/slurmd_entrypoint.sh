@@ -33,9 +33,12 @@ feature_conf() {
 
 TOPO_LABELS_FILE="/tmp/slurm/topology-node-labels/$INSTANCE_ID"
 if [[ -f $TOPO_LABELS_FILE ]]; then
+    switch_tier1=$(jq -r '."tier-1" // empty' "$TOPO_LABELS_FILE" 2>/dev/null || echo "")
+    export TOPO_SWITCH_TIER1="${switch_tier1:-unknown}"
     switch_tier2=$(jq -r '."tier-2" // empty' "$TOPO_LABELS_FILE" 2>/dev/null || echo "")
     export TOPO_SWITCH_TIER2="${switch_tier2:-unknown}"
 else
+    export TOPO_SWITCH_TIER1="unknown"
     export TOPO_SWITCH_TIER2="unknown"
 fi
 
