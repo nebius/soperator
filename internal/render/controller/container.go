@@ -53,7 +53,6 @@ func renderContainerSlurmctld(container *values.Container, customMounts []slurmv
 					},
 				},
 			},
-
 			InitialDelaySeconds: common.DefaultProbeInitialDelaySeconds,
 			TimeoutSeconds:      15,
 			PeriodSeconds:       20,
