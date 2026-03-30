@@ -1,8 +1,10 @@
 slurmClusterRefName: "soperator"
-# hostUsers controls spec.hostUsers on ActiveCheck pods.
-# When not set (null), it is auto-detected from the Kubernetes version:
-#   < 1.33 → false (user namespaces not stable)
-#   >= 1.33 → true
+# hostUsers controls spec.hostUsers on ActiveCheck pods:
+#   true  → pods share the host user namespace
+#   false → pods do NOT share the host user namespace
+# When not set (null), the value is auto-detected from the Kubernetes version:
+#   < 1.33  → false (do NOT share the host user namespace; user namespaces not stable)
+#   >= 1.33 → true  (share the host user namespace)
 # hostUsers: null
 # CUDA version used for active check image selection and for managing jail state
 cudaVersion: 12.9.0
