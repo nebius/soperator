@@ -17,9 +17,19 @@ do
     esac
 done
 
-if ! mountpoint -q /run/nvidia/driver; then
-    echo "This command only works on GPU nodes"
-    exit 1
-fi
+POD_NAME="$(hostname)"
+NS="$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)"
+TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+CACERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 
-chroot /run/nvidia/driver nsenter -t 1 -m -u -i -n /usr/sbin/reboot
+curl --cacert "$CACERT" \
+  -H "Authorization: Bearer $TOKEN" \
+  -X DELETE \
+  "https://kubernetes.default.svc/api/v1/namespaces/$NS/pods/$POD_NAME"
+
+# if ! mountpoint -q /run/nvidia/driver; then
+#     echo "This command only works on GPU nodes"
+#     exit 1
+# fi
+
+# chroot /run/nvidia/driver nsenter -t 1 -m -u -i -n /usr/sbin/reboot
