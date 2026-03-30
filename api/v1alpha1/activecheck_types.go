@@ -96,7 +96,9 @@ type ActiveCheckSpec struct {
 	CheckType string `json:"checkType,omitempty"`
 
 	// HostUsers controls whether the pod containers can share the host user namespace.
-	// When not set, hostUsers is not configured on the pod (the runtime decides).
+	// When omitted in the ActiveCheck, the operator/Helm chart will still configure
+	// pod.spec.hostUsers, using either this value or an auto-detected default; the
+	// runtime is not expected to perform defaulting in this setup.
 	// Set to false only if the runtime supports user namespaces.
 	// +kubebuilder:validation:Optional
 	HostUsers *bool `json:"hostUsers,omitempty"`
