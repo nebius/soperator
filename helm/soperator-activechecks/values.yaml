@@ -346,7 +346,7 @@ checks:
     dependsOn:
       - "create-user-soperatorchecks"
     suspend: true
-    runAfterCreation: true
+    runAfterCreation: false
     k8sJobSpec:
       jobContainer:
         appArmorProfile: unconfined
