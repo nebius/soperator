@@ -86,7 +86,9 @@ Diagnostic steps between Terraform Apply and Terraform Destroy:
 
 ## Phase 3: Match root cause to Jira tickets
 
-Compare your root cause against the tickets loaded in Phase 1 (summaries and descriptions). Look for semantic matches — the same failure may be described with different wording (e.g. "task_prolog.sh missing" matches "TaskProlog not found inside pyxis container").
+A single run may have **multiple independent problems** (e.g. an active check failure AND a terraform destroy timeout). Identify all distinct issues and match each one against the tickets loaded in Phase 1. A run can match multiple Jira tickets — report to all of them in Phase 5.
+
+Compare your root cause(s) against the tickets loaded in Phase 1 (summaries and descriptions). Look for semantic matches — the same failure may be described with different wording (e.g. "task_prolog.sh missing" matches "TaskProlog not found inside pyxis container").
 
 **For a matched closed ticket**, use the `resolutiondate` field already fetched in the Phase 1 search results.
 
@@ -104,7 +106,7 @@ Print a structured summary to the terminal. Always include the **profile** (from
 
 Create a draft reply in the Slack thread provided in Phase 1 using `slack_send_message_draft`. Extract `channel_id` and `thread_ts` from the Slack thread URL (format: `https://nebius.slack.com/archives/<channel_id>/p<thread_ts_without_dot>`; convert `p1773949701936079` → `1773949701.936079`).
 
-Format the message using standard markdown: `**bold**` for labels, `` `code` `` for snippets, `[text](url)` for links. Keep it compact enough for a single Slack message. Do NOT include the Slack thread URL in the message — it will be posted into that same thread. Include the profile name in the message.
+Format the message using standard markdown: `**bold**` for labels, `` `code` `` for snippets, `[text](url)` for links. Jira tickets must be hyperlinks (e.g. `[SCHED-1184](https://nebius.atlassian.net/browse/SCHED-1184)`). Keep it compact enough for a single Slack message. Do NOT include the Slack thread URL in the message — it will be posted into that same thread. Include the profile name in the message.
 
 The draft will appear in the user's "Drafts & Sent" in Slack — they need to open Slack and send it manually.
 
@@ -112,7 +114,9 @@ The draft will appear in the user's "Drafts & Sent" in Slack — they need to op
 
 All Jira operations use Atlassian MCP tools with cloudId `nebius.atlassian.net`.
 
-**If a matching Jira ticket was found in Phase 3** (open or closed), post a comment and update the reproduction count immediately (do NOT ask the user for confirmation):
+If multiple issues were identified in Phase 3, repeat the steps below for **each** matched ticket — post a comment and increment the counter on every one.
+
+**For each matching Jira ticket** (open or closed), post a comment and update the reproduction count immediately (do NOT ask the user for confirmation):
 
 1. Post a comment using `addCommentToJiraIssue` with `contentFormat: "markdown"`. Example:
 
@@ -127,7 +131,7 @@ All Jira operations use Atlassian MCP tools with cloudId `nebius.atlassian.net`.
    - Update with `editJiraIssue`: fields `{"summary": "[N+1] <rest of summary>"}`
    - Include the reproduction number in the terminal summary (Phase 4) — e.g. "Reproduction #5".
 
-**If no matching Jira ticket was found in Phase 3** (neither open nor closed), use AskUserQuestion to ask:
+**For each identified issue with no matching Jira ticket** (neither open nor closed), use AskUserQuestion to ask:
 - Option 1: "Create a new Jira ticket with `soperator-e2e-fail` label"
 - Option 2: "Investigate further"
 - Option 3: "Done, no ticket needed"
