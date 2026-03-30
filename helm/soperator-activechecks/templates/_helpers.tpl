@@ -242,16 +242,15 @@ mungeContainer:
 {{/*
 Compute the hostUsers value for ActiveCheck pods.
 If .Values.hostUsers is explicitly set, use it.
-Otherwise: true for Kubernetes < 1.33 (user namespaces not stable), false for >= 1.33.
-In other words, only set hostUsers to false when the cluster/runtime is expected to support user namespaces.
+Otherwise: true for Kubernetes >= 1.33 (user namespaces stable, explicitly opt into host users), false for < 1.33.
 */}}
 {{- define "soperator-activechecks.hostUsers" -}}
 {{- if not (kindIs "invalid" .Values.hostUsers) -}}
   {{- .Values.hostUsers -}}
 {{- else if semverCompare ">=1.33.0" .Capabilities.KubeVersion.Version -}}
-  {{- false -}}
-{{- else -}}
   {{- true -}}
+{{- else -}}
+  {{- false -}}
 {{- end -}}
 {{- end -}}
 
