@@ -235,12 +235,6 @@ jobs:
 
           echo "Updating CRDs & auto-generated code (included in test step) & run tests"
           make test-coverage UNSTABLE="${UNSTABLE}"
-          
-          echo "go base for cache - ${OPERATOR_IMAGE_TAG}"
-          make docker-build-and-push \
-            PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
-            UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperator-go-base DOCKERFILE=soperator-controllers/Dockerfile \
-            IMAGE_VERSION="${OPERATOR_IMAGE_TAG}"
 
           echo "soperator controller - ${OPERATOR_IMAGE_TAG}"
           make docker-build-and-push \
