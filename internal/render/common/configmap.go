@@ -318,9 +318,9 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("TCPTimeout", 15)
 	res.AddProperty("WaitTime", 0)
 	if cluster.HasEphemeralNodes() {
-		res.AddProperty("SlurmctldParameters", "conmgr_max_connections=512,conmgr_threads=16,cloud_dns,idle_on_node_suspend")
+		res.AddProperty("SlurmctldParameters", "conmgr_max_connections=1024,conmgr_threads=32,cloud_dns,idle_on_node_suspend")
 	} else {
-		res.AddProperty("SlurmctldParameters", "conmgr_max_connections=512,conmgr_threads=16")
+		res.AddProperty("SlurmctldParameters", "conmgr_max_connections=1024,conmgr_threads=32")
 	}
 
 	res.AddProperty("RebootProgram", "/opt/bin/slurm/reboot.sh")
@@ -570,7 +570,6 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 
 	res.AddLine(fmt.Sprintf("required chroot.so %s", consts.VolumeMountPathJail))
 
-	// TODO(@itechdima): make `expose_enroot_logs` configurable and enable it once #413 is resolved.
 	res.AddLine(strings.Join(
 		[]string{
 			utils.Ternary(cluster.PlugStackConfig.Pyxis.Required != nil && *cluster.PlugStackConfig.Pyxis.Required, "required", "optional"),
@@ -579,7 +578,7 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 			"execute_entrypoint=0",
 			"container_scope=global",
 			"sbatch_support=1",
-			fmt.Sprintf("container_image_save=%s", cluster.PlugStackConfig.Pyxis.ContainerImageSave),
+			fmt.Sprintf("importer=%s", cluster.PlugStackConfig.Pyxis.ImporterPath),
 		},
 		" ",
 	))

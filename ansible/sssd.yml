@@ -1,0 +1,11 @@
+---
+
+- name: Manage configurations for sssd
+  hosts:
+    - all
+    - localhost
+  become: true
+  roles:
+    - sssd
+  tags:
+    - sssd

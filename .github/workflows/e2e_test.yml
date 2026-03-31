@@ -75,7 +75,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload run metadata
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-run-metadata
           path: /tmp/e2e-run-metadata.json
@@ -175,7 +175,7 @@ jobs:
         run: echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Install Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "1.12.2"
           terraform_wrapper: false
@@ -487,7 +487,7 @@ jobs:
 
       - name: Upload Full Kubernetes Cluster Info
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: cluster-info
           path: ./cluster-info
@@ -511,12 +511,18 @@ jobs:
             echo "No running sconfigcontroller pod found, skipping jail files collection"
           fi
 
+      - name: Zip Jail
+        if: always()
+        run: |
+          zip -r jail jail
+
       - name: Upload Jail
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
+          archive: false
           name: jail
-          path: ./jail
+          path: jail.zip
           retention-days: 7
 
       - name: Terraform Destroy

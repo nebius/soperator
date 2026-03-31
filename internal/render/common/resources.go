@@ -20,7 +20,8 @@ func CopyNonCPUResources(resourceList corev1.ResourceList) corev1.ResourceList {
 type RenderOption func(*renderOptions)
 
 type renderOptions struct {
-	guaranteed bool
+	guaranteed              bool
+	sssdLdapCAConfigMapName string
 }
 
 // GuaranteedPod is a RenderOption that sets the guaranteed flag
@@ -30,5 +31,12 @@ type renderOptions struct {
 func GuaranteedPod(guaranteed bool) RenderOption {
 	return func(opts *renderOptions) {
 		opts.guaranteed = guaranteed
+	}
+}
+
+// SSSDLdapCAConfigMap is a RenderOption that enables mounting the LDAP CA ConfigMap into the sssd sidecar.
+func SSSDLdapCAConfigMap(configMapName string) RenderOption {
+	return func(opts *renderOptions) {
+		opts.sssdLdapCAConfigMapName = configMapName
 	}
 }
