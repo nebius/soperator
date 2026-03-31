@@ -1,6 +1,6 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-FROM golang:1.25 AS go-base
+FROM golang:1.25 AS soperator-go-base
 
 WORKDIR /build
 
@@ -14,7 +14,7 @@ COPY internal internal
 COPY pkg pkg
 
 #######################################################################################################################
-FROM go-base AS slurm-operator-builder
+FROM soperator-go-base AS slurm-operator-builder
 
 ARG GO_LDFLAGS=""
 ARG BUILD_TIME
@@ -41,7 +41,7 @@ USER 1001
 CMD ["/usr/bin/slurm_operator"]
 
 #######################################################################################################################
-FROM go-base AS sconfigcontroller_builder
+FROM soperator-go-base AS sconfigcontroller_builder
 
 ARG GO_LDFLAGS=""
 ARG BUILD_TIME
@@ -68,7 +68,7 @@ USER 1001
 CMD ["/usr/bin/sconfigcontroller"]
 
 #######################################################################################################################
-FROM go-base AS rebooter_builder
+FROM soperator-go-base AS rebooter_builder
 
 ARG GO_LDFLAGS=""
 ARG BUILD_TIME
@@ -95,7 +95,7 @@ USER 1001
 CMD ["/usr/bin/rebooter"]
 
 #######################################################################################################################
-FROM go-base AS soperatorchecks_builder
+FROM soperator-go-base AS soperatorchecks_builder
 
 ARG GO_LDFLAGS=""
 ARG BUILD_TIME
@@ -122,7 +122,7 @@ USER 1001
 CMD ["/usr/bin/soperatorchecks"]
 
 #######################################################################################################################
-FROM go-base AS exporter-builder
+FROM soperator-go-base AS exporter-builder
 
 ARG GO_LDFLAGS=""
 ARG BUILD_TIME
