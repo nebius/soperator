@@ -175,6 +175,22 @@ def extract_profile(log_lines: list[str]) -> str | None:
     return None
 
 
+def extract_o11y_project(log_lines: list[str]) -> dict | None:
+    """Extract o11y project and workspace IDs from log lines.
+
+    Looks for 'Project for logs project-XXXX' in Terraform Apply output.
+    Returns dict with project_id and workspace_id, or None.
+    """
+    for line in log_lines:
+        match = re.search(r"Project for logs (project-\S+)", line)
+        if match:
+            project_id = match.group(1)
+            # workspace ID has the same suffix but different prefix
+            workspace_id = project_id.replace("project-", "o11yworkspace-", 1)
+            return {"project_id": project_id, "workspace_id": workspace_id}
+    return None
+
+
 def download_artifact(repo: str, run_id: str, artifact_name: str, out_dir: str) -> None:
     """Download and extract a single artifact."""
     dest = os.path.join(out_dir, artifact_name)
@@ -237,61 +253,114 @@ def main():
 
     job = e2e_jobs[0]
     job_id = job["id"]
-    steps = steps_from_job(job)
+    job_skipped = job["conclusion"] == "skipped"
 
-    # Download logs and artifacts in parallel
     artifact_names = [a["name"] for a in artifacts_data["artifacts"]]
-    print("Downloading job logs and artifacts...", file=sys.stderr)
-    with concurrent.futures.ThreadPoolExecutor() as pool:
-        log_future = pool.submit(gh_api_raw, f"repos/{repo}/actions/jobs/{job_id}/logs")
-        artifact_futures = {
-            pool.submit(download_artifact, repo, run_id, name, artifacts_dir): name
-            for name in artifact_names
-        }
+    resolve_jobs = [j for j in jobs_data["jobs"] if j["name"] == "resolve-profile"]
+    resolve_job_id = resolve_jobs[0]["id"] if resolve_jobs and resolve_jobs[0]["conclusion"] != "skipped" else None
+    steps_output = []
+    log_lines = []
+    profile = None
+    o11y = None
 
-        # Process logs
-        log_bytes = log_future.result()
-        log_text = log_bytes.decode("utf-8", errors="replace")
-        log_lines = log_text.splitlines()
-        print(f"Downloaded {len(log_lines)} log lines", file=sys.stderr)
+    def _download_resolve_profile_log(pool: concurrent.futures.ThreadPoolExecutor) -> concurrent.futures.Future | None:
+        if resolve_job_id:
+            return pool.submit(gh_api_raw, f"repos/{repo}/actions/jobs/{resolve_job_id}/logs")
+        return None
 
-        # Collect artifact results as they complete
-        for future in concurrent.futures.as_completed(artifact_futures):
-            name = artifact_futures[future]
-            try:
-                future.result()
-                print(f"  Downloaded artifact: {name}", file=sys.stderr)
-            except Exception as e:
-                print(f"  Failed to download artifact {name}: {e}", file=sys.stderr)
+    def _save_resolve_profile_log(future: concurrent.futures.Future | None) -> None:
+        if future is None:
+            return
+        try:
+            log_bytes = future.result()
+            log_text = log_bytes.decode("utf-8", errors="replace")
+            with open(os.path.join(logs_dir, "resolve-profile.log"), "w") as f:
+                f.write(log_text)
+            print("  Downloaded: resolve-profile.log", file=sys.stderr)
+        except Exception as e:
+            print(f"  Failed to download resolve-profile log: {e}", file=sys.stderr)
 
-    # Split logs into per-step files
-    print("Splitting logs into per-step files...", file=sys.stderr)
-    step_lines = split_log_lines(steps, log_lines)
-
-    for filename, lines in step_lines.items():
-        if lines:
-            filepath = os.path.join(logs_dir, filename)
-            with open(filepath, "w") as f:
-                f.write("\n".join(lines) + "\n")
-
-    # Extract profile from logs
-    profile = extract_profile(log_lines)
-    if profile:
-        print(f"Profile: {profile}", file=sys.stderr)
+    if job_skipped:
+        print("e2e-test job was skipped (no logs available)", file=sys.stderr)
+        failed_jobs = [j for j in jobs_data["jobs"] if j["conclusion"] == "failure"]
+        if failed_jobs:
+            print(f"Failed jobs: {[j['name'] for j in failed_jobs]}", file=sys.stderr)
+        # Still download resolve-profile log and artifacts
+        print("Downloading resolve-profile log and artifacts...", file=sys.stderr)
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            resolve_future = _download_resolve_profile_log(pool)
+            artifact_futures = {
+                pool.submit(download_artifact, repo, run_id, name, artifacts_dir): name
+                for name in artifact_names
+            }
+            _save_resolve_profile_log(resolve_future)
+            for future in concurrent.futures.as_completed(artifact_futures):
+                name = artifact_futures[future]
+                try:
+                    future.result()
+                    print(f"  Downloaded artifact: {name}", file=sys.stderr)
+                except Exception as e:
+                    print(f"  Failed to download artifact {name}: {e}", file=sys.stderr)
     else:
-        print("Warning: could not extract PROFILE_ENV_VAR from logs", file=sys.stderr)
+        steps = steps_from_job(job)
+        print("Downloading job logs and artifacts...", file=sys.stderr)
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            log_future = pool.submit(gh_api_raw, f"repos/{repo}/actions/jobs/{job_id}/logs")
+            resolve_future = _download_resolve_profile_log(pool)
+            artifact_futures = {
+                pool.submit(download_artifact, repo, run_id, name, artifacts_dir): name
+                for name in artifact_names
+            }
 
-    # Build steps list
-    steps_output = [
-        {
-            "number": s.number,
-            "name": s.name,
-            "conclusion": s.conclusion,
-            "file": s.file,
-            "line_count": len(step_lines[s.file]),
-        }
-        for s in steps
-    ]
+            # Process e2e-test logs
+            log_bytes = log_future.result()
+            log_text = log_bytes.decode("utf-8", errors="replace")
+            log_lines = log_text.splitlines()
+            print(f"  Downloaded {len(log_lines)} e2e-test log lines", file=sys.stderr)
+
+            _save_resolve_profile_log(resolve_future)
+
+            # Collect artifact results as they complete
+            for future in concurrent.futures.as_completed(artifact_futures):
+                name = artifact_futures[future]
+                try:
+                    future.result()
+                    print(f"  Downloaded artifact: {name}", file=sys.stderr)
+                except Exception as e:
+                    print(f"  Failed to download artifact {name}: {e}", file=sys.stderr)
+
+        # Split logs into per-step files
+        print("Splitting logs into per-step files...", file=sys.stderr)
+        step_lines = split_log_lines(steps, log_lines)
+
+        for filename, lines in step_lines.items():
+            if lines:
+                filepath = os.path.join(logs_dir, filename)
+                with open(filepath, "w") as f:
+                    f.write("\n".join(lines) + "\n")
+
+        # Extract profile and o11y workspace from logs
+        profile = extract_profile(log_lines)
+        if profile:
+            print(f"Profile: {profile}", file=sys.stderr)
+        else:
+            print("Warning: could not extract PROFILE_ENV_VAR from logs", file=sys.stderr)
+
+        o11y = extract_o11y_project(log_lines)
+        if o11y:
+            print(f"O11y workspace: {o11y['workspace_id']}", file=sys.stderr)
+
+        # Build steps list
+        steps_output = [
+            {
+                "number": s.number,
+                "name": s.name,
+                "conclusion": s.conclusion,
+                "file": f"logs/{s.file}",
+                "line_count": len(step_lines[s.file]),
+            }
+            for s in steps
+        ]
 
     # Write run.json
     run_output = {
@@ -301,7 +370,9 @@ def main():
         "branch": run_data.get("head_branch", ""),
         "run_started_at": run_data.get("run_started_at", ""),
         "updated_at": run_data.get("updated_at", ""),
+        "e2e_test_skipped": job_skipped,
         "profile": profile,
+        "o11y": o11y,
         "artifacts": artifact_names,
         "steps": steps_output,
     }
@@ -314,10 +385,13 @@ def main():
     print(f"Branch: {run_output['branch']}", file=sys.stderr)
     print(f"Profile: {profile or 'unknown'}", file=sys.stderr)
     print(f"Artifacts: {', '.join(artifact_names) or 'none'}", file=sys.stderr)
-    print("\nSteps:", file=sys.stderr)
-    max_name_len = max(len(s["file"]) for s in steps_output)
-    for s in steps_output:
-        print(f"  {s['file']:<{max_name_len}}  {s['conclusion']:<8}  {s['line_count']} lines", file=sys.stderr)
+    if steps_output:
+        print("\nSteps:", file=sys.stderr)
+        max_name_len = max(len(s["file"]) for s in steps_output)
+        for s in steps_output:
+            print(f"  {s['file']:<{max_name_len}}  {s['conclusion']:<8}  {s['line_count']} lines", file=sys.stderr)
+    else:
+        print("\nNo steps (e2e-test job was skipped)", file=sys.stderr)
     print(file=sys.stderr)
 
     # Output the directory path
