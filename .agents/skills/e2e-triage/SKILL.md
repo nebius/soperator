@@ -149,9 +149,18 @@ If multiple issues were identified in Phase 3, repeat the steps below for **each
 If creating a new ticket, use `createJiraIssue` with:
 - projectKey: `SCHED`
 - issueTypeName: `Task`
-- summary: `[N] E2E flaky: <description>` where N is number of occurences known
+- summary: `[N] E2E flaky: <description>` where N is number of occurrences known
 - description: root cause analysis (markdown)
 - contentFormat: `markdown`
-- additional_fields: `{"labels": ["soperator-e2e-fail", "tech-debt", "dataPlane"]}`
+- additional_fields: `{"labels": ["soperator-e2e-fail", "tech-debt", "dataPlane"], "customfield_10016": <story_points>}`
+
+Estimate story points using this rubric:
+
+| SP | Meaning |
+|----|---------|
+| 1 | If I start today, it will be ready tomorrow |
+| 2 | A couple of days |
+| 3 | Within a week |
+| 5 | Hard to say when, complex and uncertain |
 
 Then post the triage comment to the new ticket as well.
