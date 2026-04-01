@@ -222,6 +222,54 @@ tests:
             name: NCCL_TESTS_VERSION
             value: "2.99.0"
 
+  - it: should allow explicit hostUsers false override
+    documentSelector:
+      path: metadata.name
+      value: test-hostusers-override-false
+    set:
+      slurmClusterRefName: test-cluster
+      hostUsers: false
+      images:
+        k8sJob: "test-image:latest"
+      jobContainer:
+        volumeMounts: []
+        volumes: []
+      checks:
+        test-hostusers-override-false:
+          enabled: true
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              command: ["echo", "test"]
+    asserts:
+      - equal:
+          path: spec.hostUsers
+          value: false
+
+  - it: should allow explicit hostUsers true override
+    documentSelector:
+      path: metadata.name
+      value: test-hostusers-override-true
+    set:
+      slurmClusterRefName: test-cluster
+      hostUsers: true
+      images:
+        k8sJob: "test-image:latest"
+      jobContainer:
+        volumeMounts: []
+        volumes: []
+      checks:
+        test-hostusers-override-true:
+          enabled: true
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              command: ["echo", "test"]
+    asserts:
+      - equal:
+          path: spec.hostUsers
+          value: true
+
   - it: should fail when CUDA version is not in ncclTestsVersions map
     set:
       slurmClusterRefName: test-cluster
