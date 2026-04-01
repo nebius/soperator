@@ -79,6 +79,12 @@ func generateSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddLine("LoginGraceTime " + consts.SSHDLoginGraceTime)
 	res.AddLine("MaxAuthTries " + consts.SSHDMaxAuthTries)
 	res.AddLine("LogLevel DEBUG3")
+	if cluster.NodeLogin.ContainerSSSD != nil {
+		res.AddLine("")
+		res.AddLine("# Ask SSSD for users' public keys")
+		res.AddLine("AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys")
+		res.AddLine("AuthorizedKeysCommandUser root")
+	}
 	res.AddLine("")
 	res.AddLine("Match User root")
 	res.AddLine("    AuthorizedKeysFile /root/.ssh/authorized_keys " + consts.VolumeMountPathJail + "/root/.ssh/authorized_keys")

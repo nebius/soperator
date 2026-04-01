@@ -2,8 +2,8 @@
 
 ARG CUDA_VERSION
 ARG SLURM_VERSION
-# https://github.com/nebius/ml-containers/pull/77
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm_training_diag:slurm${SLURM_VERSION}-cuda${CUDA_VERSION}-ubuntu24.04-20260305113511 AS jail
+# https://github.com/nebius/ml-containers/pull/79
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm_training_diag:slurm${SLURM_VERSION}-cuda${CUDA_VERSION}-ubuntu24.04-20260324162019 AS jail
 
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host
@@ -33,6 +33,11 @@ RUN apt update && \
         aptitude && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+COPY ansible/sssd.yml /opt/ansible/sssd.yml
+COPY ansible/roles/sssd /opt/ansible/roles/sssd
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local sssd.yml
 
 # Install AWS CLI
 COPY images/common/scripts/install_awscli.sh /opt/bin/

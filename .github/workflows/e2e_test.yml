@@ -27,9 +27,6 @@ jobs:
   resolve-profile:
     runs-on: ubuntu-latest
     environment: e2e
-    concurrency:
-      group: e2e-resolve-profile
-      cancel-in-progress: false
     outputs:
       nebius_project_id: ${{ steps.resolve.outputs.nebius_project_id }}
       nebius_region: ${{ steps.resolve.outputs.nebius_region }}
@@ -78,7 +75,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload run metadata
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-run-metadata
           path: /tmp/e2e-run-metadata.json
@@ -97,6 +94,14 @@ jobs:
           # Only check for pending runs — not in_progress.
           # One in_progress + one pending is fine (concurrency group handles that).
           # We self-cancel only to avoid being the 3rd run that would bump an existing pending run.
+          #
+          # Note: there is no global lock on resolve-profile (was removed because GitHub's
+          # 1-pending limit caused queued runs to cancel each other with 3+ runs).
+          # This means two concurrent resolve-profile jobs could both pass this check
+          # before either becomes "pending" in e2e-test. This race requires a manual
+          # and a scheduled run to overlap within the ~6s resolve-profile window,
+          # giving a probability of ~0.05%. If it happens, GitHub bumps the older
+          # pending run from the e2e-test queue — the user just re-triggers.
           pending_run_ids=$(gh api "repos/${{ github.repository }}/actions/workflows/e2e_test.yml/runs?status=pending" \
             --jq ".workflow_runs[] | select(.id != $CURRENT_RUN_ID) | .id") || true
 
@@ -346,7 +351,7 @@ jobs:
           bin/e2e init
 
       - name: Terraform Apply
-        timeout-minutes: 120
+        timeout-minutes: 90
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
           source .envrc
@@ -366,7 +371,7 @@ jobs:
           bin/e2e acceptance
 
       - name: K8s Cluster Info and NodeGroups
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           echo "=== K8s Clusters ==="
@@ -419,17 +424,17 @@ jobs:
           done
 
       - name: "K8s Cluster: Pods"
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: kubectl get pods -A -o wide
 
       - name: "K8s Cluster: Events"
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: kubectl get events -A --sort-by='.lastTimestamp'
 
       - name: "K8s Cluster: Nodes"
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           kubectl get nodes
@@ -437,7 +442,7 @@ jobs:
           kubectl get nodes -o yaml
 
       - name: "K8s Cluster: Jobs"
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           kubectl -n soperator get job
@@ -445,7 +450,7 @@ jobs:
           kubectl -n soperator get job -o yaml
 
       - name: "K8s Cluster: Helm Releases"
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           kubectl get helmreleases -n flux-system
@@ -453,7 +458,7 @@ jobs:
           kubectl get helmreleases -n flux-system -o yaml
 
       - name: "K8s Cluster: Slurm Cluster CRs"
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           kubectl get slurmclusters -A
@@ -461,7 +466,7 @@ jobs:
           kubectl get slurmclusters -A -o yaml
 
       - name: "K8s Cluster: Slurm Active Checks CRs"
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           kubectl get activechecks -A
@@ -469,7 +474,7 @@ jobs:
           kubectl get activechecks -A -o yaml
 
       - name: Slurm Cluster State
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           kubectl exec -n soperator controller-0 -- sinfo -N || true
@@ -479,14 +484,14 @@ jobs:
           kubectl exec -n soperator controller-0 -- sacct --parsable2 --allusers --starttime=now-6hours | column -t -s'|'
 
       - name: Collect Full Kubernetes Cluster Info
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           mkdir -p ./cluster-info
-          kubectl cluster-info dump --namespaces=kruise-system,soperator-system,soperator,flux-system --output-directory=./cluster-info
+          kubectl cluster-info dump --namespaces=kruise-system,soperator-system,soperator,flux-system,cert-manager-system --output-directory=./cluster-info
 
       - name: Upload Full Kubernetes Cluster Info
-        if: '!cancelled()'
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: cluster-info
@@ -494,7 +499,7 @@ jobs:
           retention-days: 7
 
       - name: Collect Jail Files
-        if: '!cancelled()'
+        if: always()
         shell: bash
         run: |
           mkdir -p ./jail/etc/slurm ./jail/opt/soperator-outputs
@@ -511,12 +516,18 @@ jobs:
             echo "No running sconfigcontroller pod found, skipping jail files collection"
           fi
 
+      - name: Zip Jail
+        if: always()
+        run: |
+          zip -r jail jail
+
       - name: Upload Jail
-        if: '!cancelled()'
+        if: always()
         uses: actions/upload-artifact@v7
         with:
+          archive: false
           name: jail
-          path: ./jail
+          path: jail.zip
           retention-days: 7
 
       - name: Terraform Destroy
@@ -628,3 +639,50 @@ jobs:
               echo "Terraform repo not checked out."
             fi
           } >> $GITHUB_STEP_SUMMARY
+
+  notify-failure:
+    name: Notify Slack on E2E failure
+    needs: [resolve-profile, e2e-test]
+    if: |
+      always() &&
+      (needs.resolve-profile.result == 'failure' || needs.e2e-test.result == 'failure') &&
+      (github.ref_name == 'main' || startsWith(github.ref_name, 'soperator-release-'))
+    runs-on: ubuntu-latest
+    environment: e2e
+    steps:
+      - name: Send Slack notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.E2E_SLACK_WEBHOOK_URL }}
+          BRANCH: ${{ github.ref_name }}
+          ACTOR: ${{ github.triggering_actor }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          if [[ "$RUN_ATTEMPT" -gt 1 ]]; then
+            RUN_URL+="/attempts/${RUN_ATTEMPT}"
+          fi
+
+          payload=$(jq --null-input \
+            --arg branch "$BRANCH" \
+            --arg actor "$ACTOR" \
+            --arg attempt "$RUN_ATTEMPT" \
+            --arg run_url "$RUN_URL" \
+            --arg runbook_url "https://nebius.atlassian.net/wiki/spaces/SCHED/pages/998015487/E2E+Runbook" \
+            '{
+              attachments: [{
+                color: "danger",
+                title: ":warning: E2E Test failure",
+                text: (
+                  "Branch: \($branch)\nTriggered by: \($actor)"
+                  + if ($attempt | tonumber) > 1 then "\nRe-run: attempt #\($attempt)" else "" end
+                  + "\nWorkflow: <\($run_url)|View Run>"
+                  + "\nRunbook: <\($runbook_url)|E2E Runbook>"
+                ),
+                footer: "soperator e2e test"
+              }]
+            }')
+
+          curl -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-type: application/json' \
+            --data "$payload"

@@ -26,6 +26,15 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeTmpDisk(),
 		renderVolumeSshdConfigs(login.SSHDConfigMapName),
 	}
+	if login.ContainerSSSD != nil {
+		volumes = append(volumes,
+			common.RenderVolumeSSSDSocket(),
+			common.RenderVolumeSSSDConf(login.SSSDConfSecretName),
+		)
+		if login.SSSDLdapCAConfigMapName != "" {
+			volumes = append(volumes, common.RenderVolumeSSSDLdapCA(login.SSSDLdapCAConfigMapName))
+		}
+	}
 
 	// Jail could be specified by template spec or by volume source name
 	if v, s, err := common.AddVolumeOrSpec(

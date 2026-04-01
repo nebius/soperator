@@ -50,6 +50,14 @@ func RenderNodeSetStatefulSet(
 	initContainers := slices.Clone(nodeSet.CustomInitContainers)
 	initContainers = append(initContainers,
 		common.RenderContainerMunge(&nodeSet.ContainerMunge),
+	)
+	if nodeSet.ContainerSSSD != nil {
+		initContainers = append(initContainers, common.RenderContainerSSSD(
+			nodeSet.ContainerSSSD,
+			common.SSSDLdapCAConfigMap(nodeSet.SSSDLdapCAConfigMapName),
+		))
+	}
+	initContainers = append(initContainers,
 		RenderContainerWorkerInit(
 			clusterName, &nodeSet.ContainerSlurmd, topologyPluginEnabled,
 			nodeSet.GPU.Enabled, topologyTimeOut,
@@ -124,11 +132,17 @@ func RenderNodeSetStatefulSet(
 		spec.PriorityClassName = nodeSet.PriorityClass
 	}
 
+	annotations := map[string]string{
+		"kruise.io/auto-generate-persistent-pod-state": "true",
+		"kruise.io/preferred-persistent-topology":      "kubernetes.io/hostname",
+	}
+
 	return kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      nodeSet.StatefulSet.Name,
-			Namespace: nodeSet.ParentalCluster.Namespace,
-			Labels:    labels,
+			Name:        nodeSet.StatefulSet.Name,
+			Namespace:   nodeSet.ParentalCluster.Namespace,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: kruisev1b1.StatefulSetSpec{
 			PodManagementPolicy: consts.PodManagementPolicy,
