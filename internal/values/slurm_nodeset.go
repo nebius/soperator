@@ -83,7 +83,7 @@ func BuildSlurmNodeSetFrom(
 		//
 		ContainerSlurmd: buildContainerFrom(
 			slurmv1.NodeContainer{
-				CustomEnv:            nodeSet.Spec.Slurmd.CustomEnv,
+				CustomEnv:            nsSpec.Slurmd.CustomEnv,
 				Image:                nsSpec.Slurmd.Image.GetURI(),
 				ImagePullPolicy:      nsSpec.Slurmd.Image.PullPolicy,
 				Port:                 nsSpec.Slurmd.Port,
