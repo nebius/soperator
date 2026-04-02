@@ -1,0 +1,29 @@
+suite: test hostUsers on Kubernetes >= 1.33
+capabilities:
+  majorVersion: "1"
+  minorVersion: "33"
+templates:
+  - templates/active-checks.yaml
+tests:
+  - it: should set hostUsers true on Kubernetes >= 1.33
+    documentSelector:
+      path: metadata.name
+      value: test-hostusers-new-k8s
+    set:
+      slurmClusterRefName: test-cluster
+      images:
+        k8sJob: "test-image:latest"
+      jobContainer:
+        volumeMounts: []
+        volumes: []
+      checks:
+        test-hostusers-new-k8s:
+          enabled: true
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              command: ["echo", "test"]
+    asserts:
+      - equal:
+          path: spec.hostUsers
+          value: true

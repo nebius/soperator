@@ -173,6 +173,11 @@ func (in *ActiveCheckSpec) DeepCopyInto(out *ActiveCheckSpec) {
 	}
 	in.K8sJobSpec.DeepCopyInto(&out.K8sJobSpec)
 	in.SlurmJobSpec.DeepCopyInto(&out.SlurmJobSpec)
+	if in.HostUsers != nil {
+		in, out := &in.HostUsers, &out.HostUsers
+		*out = new(bool)
+		**out = **in
+	}
 	if in.SuccessReactions != nil {
 		in, out := &in.SuccessReactions, &out.SuccessReactions
 		*out = new(Reactions)
