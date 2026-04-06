@@ -5,10 +5,25 @@
 #SBATCH --exclusive
 #SBATCH --mem=0
 
+set -euo pipefail
+
 echo "Running all_reduce_perf_nccl_in_docker check on $(hostname)..."
 
 mkdir -p /tmp/soperatorchecks/docker_check/a
 mkdir -p /tmp/soperatorchecks/docker_check/b
+
+compose_file="/tmp/soperatorchecks/docker_check/compose.yaml"
+cat > "${compose_file}" <<EOF
+services:
+  mount-check:
+    image: {{ include "activecheck.image.docker" . }}
+    volumes:
+      - /tmp/soperatorchecks/docker_check/a:/a
+      - type: bind
+        source: /tmp/soperatorchecks/docker_check/b
+        target: /b
+    command: ["true"]
+EOF
 
 srun docker run --rm \
   --gpus=all --device=/dev/infiniband \
@@ -18,3 +33,4 @@ srun docker run --rm \
   {{ include "activecheck.image.docker" . }} \
   bash -l -c "NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring all_reduce_perf -b 512M -e 8G -f 2 -g 8"
 
+srun docker compose -f "${compose_file}" run --rm mount-check true
