@@ -61,6 +61,7 @@ func renderContainerSlurmctld(container *values.Container, customMounts []slurmv
 			SuccessThreshold:    common.DefaultProbeSuccessThreshold,
 			FailureThreshold:    5,
 		},
+
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}
