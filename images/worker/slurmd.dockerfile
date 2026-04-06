@@ -16,6 +16,7 @@ RUN apt-get update && \
         supervisor \
         openssh-server \
         nginx-extras \
+        libnginx-mod-http-lua \
         lua-cjson && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
