@@ -2,13 +2,6 @@
 
 ARG SLURM_VERSION
 
-FROM golang:1.26 AS docker-proxy
-COPY docker-proxy/ /app/
-WORKDIR /app
-RUN go build -o soperator-docker-proxy main.go
-
-ARG SLURM_VERSION
-
 # https://github.com/nebius/ml-containers/pull/79
 FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260324153054 AS worker_slurmd
 
@@ -21,7 +14,9 @@ RUN apt-get update && \
         kmod \
         libncurses5-dev \
         supervisor \
-        openssh-server && \
+        openssh-server \
+        nginx-extras \
+        lua-cjson && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -93,6 +88,8 @@ RUN apt-get update && \
 
 # Copy Docker daemon config
 COPY images/worker/docker/daemon.json /etc/docker/daemon.json
+COPY images/worker/nginx/soperator-docker-proxy.conf /etc/nginx/soperator-docker-proxy.conf
+COPY images/worker/nginx/docker_proxy.lua /etc/nginx/lua/docker_proxy.lua
 
 # Copy script for complementing jail filesystem in runtime
 COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
@@ -139,12 +136,12 @@ COPY images/worker/worker_init.py /opt/bin/slurm/
 
 # Copy supervisord entrypoint script
 COPY images/worker/supervisord_entrypoint.sh /opt/bin/slurm/
+COPY images/worker/docker_proxy_nginx_entrypoint.sh /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh && \
     chmod +x /opt/bin/slurm/supervisord_entrypoint.sh && \
-    chmod +x /opt/bin/slurm/worker_init.py
-
-COPY --from=docker-proxy /app/soperator-docker-proxy /usr/bin/soperator-docker-proxy
+    chmod +x /opt/bin/slurm/worker_init.py && \
+    chmod +x /opt/bin/slurm/docker_proxy_nginx_entrypoint.sh
 
 # Start supervisord that manages both slurmd and sshd as child processes
 ENTRYPOINT ["/opt/bin/slurm/supervisord_entrypoint.sh"]
