@@ -632,10 +632,14 @@ jobs:
   notify-failure:
     name: Notify Slack on E2E failure
     needs: [resolve-profile, e2e-test]
+    # Only fire when the run targeted the default terraform branch (empty input
+    # falls back to github.ref_name in e2e-test). Custom terraform branches are
+    # usually experiments and shouldn't page e2e owners on failure.
     if: |
       always() &&
       (needs.resolve-profile.result == 'failure' || needs.e2e-test.result == 'failure') &&
-      (github.ref_name == 'main' || startsWith(github.ref_name, 'soperator-release-'))
+      (github.ref_name == 'main' || startsWith(github.ref_name, 'soperator-release-')) &&
+      (inputs.terraform_repo_ref == '' || inputs.terraform_repo_ref == github.ref_name)
     runs-on: ubuntu-latest
     environment: e2e
     steps:
@@ -643,7 +647,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.E2E_SLACK_WEBHOOK_URL }}
           BRANCH: ${{ github.ref_name }}
-          ACTOR: ${{ github.triggering_actor }}
+          PROFILE: ${{ inputs.profile_env_var || vars.PROFILE_ENV_VAR }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         shell: bash
@@ -652,24 +656,22 @@ jobs:
             RUN_URL+="/attempts/${RUN_ATTEMPT}"
           fi
 
+          # Use top-level `text` (not `attachments`) so the Slack MCP plugin
+          # can read the body — see slackapi/slack-mcp-plugin#24. This trades
+          # the red side bar (an attachments-only feature) for triage-bot
+          # readability, which we care about more.
           payload=$(jq --null-input \
             --arg branch "$BRANCH" \
-            --arg actor "$ACTOR" \
-            --arg attempt "$RUN_ATTEMPT" \
+            --arg profile "$PROFILE" \
             --arg run_url "$RUN_URL" \
             --arg runbook_url "https://nebius.atlassian.net/wiki/spaces/SCHED/pages/998015487/E2E+Runbook" \
             '{
-              attachments: [{
-                color: "danger",
-                title: ":warning: E2E Test failure",
-                text: (
-                  "Branch: \($branch)\nTriggered by: \($actor)"
-                  + if ($attempt | tonumber) > 1 then "\nRe-run: attempt #\($attempt)" else "" end
-                  + "\nWorkflow: <\($run_url)|View Run>"
-                  + "\nRunbook: <\($runbook_url)|E2E Runbook>"
-                ),
-                footer: "soperator e2e test"
-              }]
+              text: (
+                ":warning: *E2E Test Failure*\n"
+                + "<\($run_url)|Workflow> | <\($runbook_url)|Runbook>\n"
+                + "Branch: `\($branch)`\n"
+                + "Profile: `\($profile)`"
+              )
             }')
 
           curl -X POST "$SLACK_WEBHOOK_URL" \
