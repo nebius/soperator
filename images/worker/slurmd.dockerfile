@@ -16,8 +16,7 @@ RUN apt-get update && \
         supervisor \
         openssh-server \
         nginx-extras \
-        libnginx-mod-http-lua \
-        lua-cjson && \
+        libnginx-mod-http-js && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -90,7 +89,7 @@ RUN apt-get update && \
 # Copy Docker daemon config
 COPY images/worker/docker/daemon.json /etc/docker/daemon.json
 COPY images/worker/nginx/soperator-docker-proxy.conf /etc/nginx/soperator-docker-proxy.conf
-COPY images/worker/nginx/docker_proxy.lua /etc/nginx/lua/docker_proxy.lua
+COPY images/worker/nginx/docker_proxy.js /etc/nginx/njs/docker_proxy.js
 
 # Copy script for complementing jail filesystem in runtime
 COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
