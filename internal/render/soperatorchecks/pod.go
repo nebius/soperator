@@ -52,7 +52,7 @@ func renderPodTemplateSpec(check *slurmv1alpha1.ActiveCheck, labels map[string]s
 			Annotations: annotations,
 		},
 		Spec: corev1.PodSpec{
-			HostUsers:             ptr.To(false),
+			HostUsers:             check.Spec.HostUsers,
 			Affinity:              check.Spec.Affinity,
 			NodeSelector:          check.Spec.NodeSelector,
 			Tolerations:           check.Spec.Tolerations,
