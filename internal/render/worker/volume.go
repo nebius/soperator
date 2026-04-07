@@ -20,6 +20,7 @@ func renderVolumesAndClaimTemplateSpecsForNodeSet(
 	volumes = []corev1.Volume{
 		common.RenderVolumeMungeKey(nodeSet.ParentalCluster.Name),
 		common.RenderVolumeMungeSocket(),
+		renderVolumeRuntime(),
 		common.RenderVolumeSecurityLimitsForNodeSet(nodeSet.ParentalCluster.Name, nodeSet.Name),
 		common.RenderVolumeSshdKeys(secrets.SshdKeysName),
 		common.RenderVolumeSshdRootKeys(nodeSet.ParentalCluster.Name),
@@ -97,6 +98,15 @@ func renderSupervisordConfigMap(name string) corev1.Volume {
 				},
 				DefaultMode: ptr.To(common.DefaultFileMode),
 			},
+		},
+	}
+}
+
+func renderVolumeRuntime() corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameRuntime,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
 		},
 	}
 }

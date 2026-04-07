@@ -56,6 +56,7 @@ const (
 	VolumeNameSharedMemory             = "dev-shm"
 	VolumeNameSysctl                   = sysctl
 	VolumeNameSupervisordConfigMap     = "supervisord-config"
+	VolumeNameRuntime                  = "runtime"
 	VolumeNameInMemorySubmount         = "in-memory"
 	VolumeNameTmpDisk                  = "tmp-disk"
 	VolumeNameSlurmdbdSSLCACertificate = "slurmdbd-ssl-ca-cert"
@@ -84,6 +85,7 @@ const (
 	VolumeMountPathSysctl                   = "/etc/" + sysctlConfFile
 	VolumeMountSubPathSysctl                = sysctlConfFile
 	VolumeMountPathSupervisordConfig        = "/etc/supervisor/conf.d/"
+	VolumeMountPathRuntime                  = "/run"
 	VolumeMountPathInMemorySubmount         = VolumeMountPathJailUpper + "/mnt/memory"
 	VolumeMountPathTmpDisk                  = "/tmp"
 	VolumeMountPathSlurmdbdSSLCACertificate = "/mnt/" + slurmdbdSSLCACertificate
