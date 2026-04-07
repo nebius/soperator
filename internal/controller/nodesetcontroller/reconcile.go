@@ -299,6 +299,39 @@ func (r NodeSetReconciler) executeReconciliation(
 				return nil
 			},
 		},
+		{
+			Name: "Worker sssd.conf Secret",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
+
+				if nodeSetValues.ContainerSSSD == nil {
+					stepLogger.V(1).Info("SSSD container is not configured, skipping")
+					return nil
+				}
+				if !nodeSetValues.IsSSSDSecretDefault {
+					stepLogger.V(1).Info("Use SSSD Secret from reference")
+					return nil
+				}
+
+				desired := common.RenderSecretDefaultSSSDConf(
+					nodeSet.Namespace,
+					cluster.Name,
+					nodeSetValues.SSSDConfSecretName,
+					consts.ComponentTypeNodeSet,
+				)
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				stepLogger.V(1).Info("Rendered")
+
+				if err := r.Secret.Reconcile(stepCtx, nodeSet, &desired); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling worker sssd Secret: %w", err)
+				}
+				stepLogger.V(1).Info("Reconciled")
+
+				return nil
+			},
+		},
 
 		{
 			Name: "Umbrella worker Service",

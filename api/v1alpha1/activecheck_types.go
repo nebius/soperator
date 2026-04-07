@@ -95,6 +95,14 @@ type ActiveCheckSpec struct {
 	// +kubebuilder:default="k8sJob"
 	CheckType string `json:"checkType,omitempty"`
 
+	// HostUsers controls whether the pod containers can share the host user namespace.
+	// When omitted in the ActiveCheck, the operator/Helm chart will still configure
+	// pod.spec.hostUsers, using either this value or an auto-detected default; the
+	// runtime is not expected to perform defaulting in this setup.
+	// Set to false only if the runtime supports user namespaces.
+	// +kubebuilder:validation:Optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
+
 	// SuccessReactions defines reaction on specific check when it succeeds
 	// +kubebuilder:validation:Optional
 	SuccessReactions *Reactions `json:"successReactions,omitempty"`

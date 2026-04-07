@@ -14,15 +14,19 @@ type SlurmLogin struct {
 
 	ContainerSshd        Container
 	ContainerMunge       Container
+	ContainerSSSD        *Container
 	CustomInitContainers []corev1.Container
 
 	Service         Service
 	HeadlessService Service
 	StatefulSet     StatefulSet
 
-	IsSSHDConfigMapDefault bool
-	SSHDConfigMapName      string
-	SSHRootPublicKeys      []string
+	IsSSHDConfigMapDefault  bool
+	SSHDConfigMapName       string
+	IsSSSDSecretDefault     bool
+	SSSDConfSecretName      string
+	SSSDLdapCAConfigMapName string
+	SSHRootPublicKeys       []string
 
 	VolumeJail         slurmv1.NodeVolume
 	JailSubMounts      []slurmv1.NodeVolumeMount
@@ -32,7 +36,10 @@ type SlurmLogin struct {
 	Maintenance               *consts.MaintenanceMode
 }
 
-func buildSlurmLoginFrom(clusterName string, maintenance *consts.MaintenanceMode, login *slurmv1.SlurmNodeLogin, useDefaultAppArmorProfile bool) SlurmLogin {
+func buildSlurmLoginFrom(
+	clusterName string, maintenance *consts.MaintenanceMode,
+	login *slurmv1.SlurmNodeLogin, useDefaultAppArmorProfile bool,
+) SlurmLogin {
 	svc := buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeLogin, clusterName))
 	svc.Type = login.SshdServiceType
 	svc.Annotations = login.SshdServiceAnnotations
@@ -47,6 +54,12 @@ func buildSlurmLoginFrom(clusterName string, maintenance *consts.MaintenanceMode
 	isSSHDConfigDefault := sshdConfigMapName == ""
 	if isSSHDConfigDefault {
 		sshdConfigMapName = naming.BuildConfigMapSSHDConfigsNameLogin(clusterName)
+	}
+
+	sssdConfSecretName := login.SSSDConfSecretRefName
+	isSSSDSecretDefault := sssdConfSecretName == ""
+	if isSSSDSecretDefault {
+		sssdConfSecretName = naming.BuildSecretSSSDConfName(clusterName)
 	}
 
 	res := SlurmLogin{
@@ -68,10 +81,21 @@ func buildSlurmLoginFrom(clusterName string, maintenance *consts.MaintenanceMode
 		),
 		SSHDConfigMapName:         sshdConfigMapName,
 		IsSSHDConfigMapDefault:    isSSHDConfigDefault,
+		SSSDConfSecretName:        sssdConfSecretName,
+		SSSDLdapCAConfigMapName:   login.SSSDLdapCAConfigMapRefName,
+		IsSSSDSecretDefault:       isSSSDSecretDefault,
 		SSHRootPublicKeys:         login.SshRootPublicKeys,
 		VolumeJail:                *login.Volumes.Jail.DeepCopy(),
 		UseDefaultAppArmorProfile: useDefaultAppArmorProfile,
 		Maintenance:               maintenance,
+	}
+	if login.Sssd != nil {
+		containerSSSD := buildContainerFrom(
+			*login.Sssd,
+			consts.ContainerNameSSSD,
+		)
+		containerSSSD.SSSDDebugLevel = login.SSSDDebugLevel
+		res.ContainerSSSD = &containerSSSD
 	}
 	for _, jailSubMount := range login.Volumes.JailSubMounts {
 		subMount := *jailSubMount.DeepCopy()

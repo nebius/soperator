@@ -16,6 +16,7 @@ func renderContainerSshd(
 	clusterType consts.ClusterType,
 	container *values.Container,
 	jailSubMounts, customMounts []slurmv1.NodeVolumeMount,
+	containerSSSD *values.Container,
 	appArmorProfile string,
 ) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
@@ -27,6 +28,12 @@ func renderContainerSshd(
 		common.RenderVolumeMountInMemory(),
 		common.RenderVolumeMountTmpDisk(),
 		renderVolumeMountSshdConfigs(),
+	}
+	if containerSSSD != nil {
+		volumeMounts = append(volumeMounts,
+			common.RenderVolumeMountSSSDSocket(),
+			common.RenderVolumeMountSSSDConf(),
+		)
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(jailSubMounts, consts.VolumeMountPathJailUpper)...)
 	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(customMounts, "")...)

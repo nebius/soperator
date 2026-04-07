@@ -1,4 +1,11 @@
 slurmClusterRefName: "soperator"
+# hostUsers controls spec.hostUsers on ActiveCheck pods:
+#   true  → pods share the host user namespace
+#   false → pods do NOT share the host user namespace
+# When not set (null), the value is auto-detected from the Kubernetes version:
+#   < 1.33  → false (do NOT share the host user namespace; user namespaces not stable)
+#   >= 1.33 → true  (share the host user namespace)
+# hostUsers: null
 # CUDA version used for active check image selection and for managing jail state
 cudaVersion: 12.9.0
 # Flat override: if non-empty, takes precedence over ncclTestsVersions map.
@@ -7,8 +14,8 @@ ncclTestsVersion: ""
 # Source of truth: https://github.com/nebius/ml-containers/blob/main/ansible/roles/nccl-tests/defaults/main.yml
 # Update this map together with activeCheckImageTags when adding new CUDA versions.
 ncclTestsVersions:
-  "12.9.0": "2.16.4"
-  "13.0.2": "2.17.6"
+  "12.9.0": "2.17.9"
+  "13.0.2": "2.17.9"
 jobContainer:
   env:
     - name: "K8S_POD_NAME"
@@ -29,15 +36,15 @@ jobContainer:
       persistentVolumeClaim:
         claimName: "jail-pvc"
 images:
-  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:3.0.2-slurm25.11.3"
-  k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:3.0.2-slurm25.11.3"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:3.0.2-slurm25.11.3"
-  sansible: "cr.eu-north1.nebius.cloud/soperator/sansible:3.0.2-slurm25.11.3"
+  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:4.0.0-slurm25.11.3"
+  k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:4.0.0-slurm25.11.3"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:4.0.0-slurm25.11.3"
+  sansible: "cr.eu-north1.nebius.cloud/soperator/sansible:4.0.0-slurm25.11.3"
   activeCheckImageRepository: "cr.eu-north1.nebius.cloud#ml-containers/training_diag"
   activeCheckImageTags:
-    # Image training_diag from PR https://github.com/nebius/ml-containers/pull/61
-    "12.9.0": "12.9.0-ubuntu24.04-20260206170007"
-    "13.0.2": "13.0.2-ubuntu24.04-20260206170007"
+    # Image training_diag from PR https://github.com/nebius/ml-containers/pull/79
+    "12.9.0": "12.9.0-ubuntu24.04-20260324155131"
+    "13.0.2": "13.0.2-ubuntu24.04-20260324155131"
 # Optional override in Pyxis ("reg#repo:tag") format.
 activeCheckImage: ""
 checks:
@@ -339,6 +346,35 @@ checks:
           - run.yml
           - -t
           - run-all-upgrade
+          - --diff
+  manage-jail-state-force:
+    enabled: true
+    checkType: "k8sJob"
+    dependsOn:
+      - "create-user-soperatorchecks"
+    suspend: true
+    runAfterCreation: false
+    k8sJobSpec:
+      jobContainer:
+        appArmorProfile: unconfined
+        workingDir: /opt/ansible
+        image: "{{ .Values.images.sansible }}"
+        command: ["/opt/bin/sansible_entrypoint.sh"]
+        args:
+          - ansible-playbook
+          - -i
+          - inventory/
+          - -c
+          - local
+          - run.yml
+          - -t
+          - run-all-upgrade
+          - -e
+          - "cuda_force_upgrade=true"
+          - -e
+          - "cuda_samples_force=true"
+          - -e
+          - "perftest_force=true"
           - --diff
   manage-jail-state-dry-run:
     enabled: true
