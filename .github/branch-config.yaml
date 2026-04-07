@@ -3,9 +3,10 @@
 
 # Release branches for nightly multi-arch builds
 nightly_release_branches:
-  - soperator-release-2.0
+  - soperator-release-4.0
+  - soperator-release-3.0
 
 # Release branches for E2E tests
 e2e_release_branches:
+  - soperator-release-4.0
   - soperator-release-3.0
-  - soperator-release-2.0
