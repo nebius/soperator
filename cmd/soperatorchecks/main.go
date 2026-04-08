@@ -126,6 +126,7 @@ func main() {
 		maxConcurrencyPodEphemeralStorageCheck   int
 		cacheSyncTimeout                         time.Duration
 		ephemeralStorageThreshold                float64
+		ephemeralStorageResumeThreshold          float64
 	)
 
 	var watchNsCacheByName = make(map[string]cache.Config)
@@ -157,6 +158,7 @@ func main() {
 	flag.DurationVar(&notReadyTimeout, "not-ready-timeout", 15*time.Minute, "The timeout after which a NotReady node will be deleted. Nodes can be NotReady for more than 10 minutes when GPU operator is starting.")
 	flag.BoolVar(&deleteNotReadyNodes, "delete-not-ready-nodes", true, "If set, NotReady nodes will be deleted after the not-ready timeout is reached. If false, they will be marked as NotReady but not deleted.")
 	flag.Float64Var(&ephemeralStorageThreshold, "ephemeral-storage-threshold", 85.0, "The threshold percentage for ephemeral storage usage warnings (default 85%)")
+	flag.Float64Var(&ephemeralStorageResumeThreshold, "ephemeral-storage-resume-threshold", 80.0, "The threshold percentage below which a drained node is resumed (default 80%). Must be less than ephemeral-storage-threshold to avoid flapping.")
 	flag.StringVar(&maintenanceConditionType, "maintenance-condition-type", string(consts.DefaultMaintenanceConditionType), "The condition type for scheduled maintenance")
 	flag.StringVar(&maintenanceIgnoreNodeLabels, "maintenance-ignore-node-labels", os.Getenv("MAINTENANCE_IGNORE_NODE_LABELS"), "Comma-separated list of node label key=value pairs to ignore during maintenance (e.g., 'env=prod,tier=critical')")
 	flag.StringVar(&controllersFlag, "controllers", "", "A comma-separated list of controllers to enable or disable. Use '*' for all, and '-name' to disable. Overrides SLURM_OPERATOR_CONTROLLERS if set.")
@@ -205,6 +207,12 @@ func main() {
 	// Validate ephemeral storage threshold
 	if ephemeralStorageThreshold < 0 || ephemeralStorageThreshold > 100 {
 		cli.Fail(setupLog, errors.New("invalid threshold"), fmt.Sprintf("ephemeral-storage-threshold must be between 0 and 100, got: %.2f", ephemeralStorageThreshold))
+	}
+	if ephemeralStorageResumeThreshold < 0 || ephemeralStorageResumeThreshold > 100 {
+		cli.Fail(setupLog, errors.New("invalid threshold"), fmt.Sprintf("ephemeral-storage-resume-threshold must be between 0 and 100, got: %.2f", ephemeralStorageResumeThreshold))
+	}
+	if ephemeralStorageResumeThreshold >= ephemeralStorageThreshold {
+		cli.Fail(setupLog, errors.New("invalid threshold"), fmt.Sprintf("ephemeral-storage-resume-threshold (%.2f) must be less than ephemeral-storage-threshold (%.2f)", ephemeralStorageResumeThreshold, ephemeralStorageThreshold))
 	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
@@ -358,6 +366,7 @@ func main() {
 			ctrl.GetConfigOrDie(),
 			reconcileTimeoutPodEphemeralStorageCheck,
 			ephemeralStorageThreshold,
+			ephemeralStorageResumeThreshold,
 			slurmAPIClients,
 		)
 		if err != nil {

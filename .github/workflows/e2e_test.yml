@@ -365,6 +365,11 @@ jobs:
 
           bin/e2e apply
 
+      - name: Acceptance Tests
+        timeout-minutes: 90
+        run: |
+          bin/e2e acceptance
+
       - name: K8s Cluster Info and NodeGroups
         if: always()
         shell: bash
