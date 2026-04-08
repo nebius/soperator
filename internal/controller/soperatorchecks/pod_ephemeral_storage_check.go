@@ -82,6 +82,7 @@ type PodEphemeralStorageCheck struct {
 	clientset        kubernetes.Interface
 	restConfig       *rest.Config
 	usageThreshold   float64
+	resumeThreshold  float64
 	slurmAPIClients  *slurmapi.ClientSet
 }
 
@@ -92,6 +93,7 @@ func NewPodEphemeralStorageCheck(
 	restConfig *rest.Config,
 	reconcileTimeout time.Duration,
 	usageThreshold float64,
+	resumeThreshold float64,
 	slurmAPIClients *slurmapi.ClientSet,
 ) (*PodEphemeralStorageCheck, error) {
 	r := reconciler.NewReconciler(client, scheme, recorder)
@@ -107,6 +109,7 @@ func NewPodEphemeralStorageCheck(
 		clientset:        clientset,
 		restConfig:       restConfig,
 		usageThreshold:   usageThreshold,
+		resumeThreshold:  resumeThreshold,
 		slurmAPIClients:  slurmAPIClients,
 	}, nil
 }
@@ -284,7 +287,7 @@ func (r *PodEphemeralStorageCheck) ReconcilePodEphemeralStorageCheckForPod(ctx c
 			if err := r.handleHighStorageUsage(ctx, pod, info); err != nil {
 				return err
 			}
-		} else {
+		} else if info.UsagePercent < r.resumeThreshold {
 			if err := r.handleLowStorageUsage(ctx, pod); err != nil {
 				return err
 			}
@@ -660,7 +663,7 @@ func (c *PodEphemeralStorageCheck) drainSlurmNode(
 		"pod_ephemeral_storage %[1].2f%% of ephemeral storage is used. Clean up volumes from 'ssh %[2]s /opt/soperator_utils/fs_usage.sh -l', "+
 			"delete leftover containers from 'ssh %[2]s enroot list' and 'ssh %[2]s docker ps -a', "+
 			"reboot the node using 'scontrol reboot %[2]s', "+
-			"or stop-start the InstanceId from 'scontrol show node %[2]s' ",
+			"or stop-start the InstanceId from 'scontrol show node %[2]s'. And 'scontrol update nodename=%[2]s state=resume' after resolving the issue. ",
 		info.UsagePercent, slurmNodeName,
 	)
 	reason := consts.SlurmUserReasonHC + " " + message
