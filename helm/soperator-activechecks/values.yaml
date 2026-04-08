@@ -115,6 +115,19 @@ checks:
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
+  docker-memory-limit-oomkilled:
+    enabled: true
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+      - "wait-for-topology"
+      - "prepull-container-image"
+    suspend: true
+    runAfterCreation: true
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/docker-memory-limit-oomkilled.sh"
+      eachWorkerJobs: true
   dcgmi-diag-r2:
     enabled: true
     checkType: "slurmJob"
@@ -155,6 +168,7 @@ checks:
       - "all-reduce-perf-nccl-with-ib"
       - "all-reduce-perf-nccl-without-ib"
       - "cuda-samples"
+      - "docker-memory-limit-oomkilled"
       - "dcgmi-diag-r2"
       - "dcgmi-diag-r3"
       - "gpu-fryer"
