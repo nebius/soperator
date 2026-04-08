@@ -523,7 +523,12 @@ jobs:
         if: always()
         timeout-minutes: 30
         env:
-          TF_LOG: DEBUG
+          # Opt in to terraform DEBUG logging only for the destroy flow.
+          # bin/e2e destroy reads this and calls tf.SetLogPath() on the
+          # terraform-exec handle — otherwise terraform-exec strips TF_LOG from
+          # the subprocess env. Init/Apply steps don't set this, so they stay
+          # clean. See internal/e2e/destroy.go.
+          TF_DESTROY_LOG_PATH: ${{ runner.temp }}/tf-destroy.log
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
           source .envrc
@@ -536,6 +541,18 @@ jobs:
           aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
 
           bin/e2e destroy
+
+      - name: Upload Terraform Destroy debug log
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: tf-destroy-debug-log
+          path: ${{ runner.temp }}/tf-destroy.log
+          if-no-files-found: ignore
+          retention-days: 7
+          # Debug log is plain text terraform TRACE output — highly
+          # compressible — and runner CPU is free, so max out the DEFLATE level.
+          compression-level: 9
 
       - name: Force cleanup compute instances on failure
         if: failure()
