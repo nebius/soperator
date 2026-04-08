@@ -8,10 +8,10 @@ import (
 	"nebius.ai/slurm-operator/internal/e2e/acceptance/framework"
 )
 
+const commandTimeout = 10 * time.Minute
+
 type world struct {
-	cfg            Config
-	commandTimeout time.Duration
-	logPrefix      string
+	logPrefix string
 
 	state *framework.ClusterState
 }

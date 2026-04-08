@@ -12,11 +12,11 @@ import (
 )
 
 type PackageInstallation struct {
-	exec          framework.Executor
+	exec          framework.Exec
 	packageWorker framework.WorkerRef
 }
 
-func NewPackageInstallation(exec framework.Executor) *PackageInstallation {
+func NewPackageInstallation(exec framework.Exec) *PackageInstallation {
 	return &PackageInstallation{exec: exec}
 }
 
@@ -35,7 +35,7 @@ func (s *PackageInstallation) theNVIDIADriverIsWorkingOnAWorkerNode(ctx context.
 	s.packageWorker = worker
 
 	cmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(worker.Name))
-	if _, err := s.exec.ExecJailWithRetry(ctx, cmd, 5, 10*time.Second); err != nil {
+	if _, err := framework.ExecJailWithDefaultRetry(ctx, s.exec, cmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, worker.Name)
 		return fmt.Errorf("verify nvidia-smi before install: %w", err)
 	}
@@ -45,13 +45,13 @@ func (s *PackageInstallation) theNVIDIADriverIsWorkingOnAWorkerNode(ctx context.
 func (s *PackageInstallation) jqIsInstalledOnTheWorkerNode(ctx context.Context) error {
 	workerName := s.packageWorker.Name
 	updateCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get update'", framework.ShellQuote(workerName))
-	if _, err := s.exec.ExecJailWithRetry(ctx, updateCmd, 5, 10*time.Second); err != nil {
+	if _, err := framework.ExecJailWithDefaultRetry(ctx, s.exec, updateCmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, workerName)
 		return fmt.Errorf("apt-get update: %w", err)
 	}
 
 	installCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jq'", framework.ShellQuote(workerName))
-	if _, err := s.exec.ExecJailWithRetry(ctx, installCmd, 5, 10*time.Second); err != nil {
+	if _, err := framework.ExecJailWithDefaultRetry(ctx, s.exec, installCmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, workerName)
 		return fmt.Errorf("apt-get install jq: %w", err)
 	}
@@ -61,7 +61,7 @@ func (s *PackageInstallation) jqIsInstalledOnTheWorkerNode(ctx context.Context) 
 func (s *PackageInstallation) theNVIDIADriverIsStillWorkingOnTheWorkerNode(ctx context.Context) error {
 	workerName := s.packageWorker.Name
 	cmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(workerName))
-	if _, err := s.exec.ExecJailWithRetry(ctx, cmd, 5, 10*time.Second); err != nil {
+	if _, err := framework.ExecJailWithDefaultRetry(ctx, s.exec, cmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, workerName)
 		return fmt.Errorf("verify nvidia-smi after install: %w", err)
 	}
@@ -71,7 +71,7 @@ func (s *PackageInstallation) theNVIDIADriverIsStillWorkingOnTheWorkerNode(ctx c
 func (s *PackageInstallation) jqIsAvailableOnTheWorkerNode(ctx context.Context) error {
 	workerName := s.packageWorker.Name
 	cmd := fmt.Sprintf("ssh %s 'jq --version >/dev/null'", framework.ShellQuote(workerName))
-	if _, err := s.exec.ExecJailWithRetry(ctx, cmd, 5, 10*time.Second); err != nil {
+	if _, err := framework.ExecJailWithDefaultRetry(ctx, s.exec, cmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, workerName)
 		return fmt.Errorf("verify jq after install: %w", err)
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/cucumber/godog"
 
@@ -14,12 +13,12 @@ import (
 const sshUserName = "bob"
 
 type InternalSSH struct {
-	exec         framework.Executor
+	exec         framework.Exec
 	targetWorker framework.WorkerRef
 	sshOutput    string
 }
 
-func NewInternalSSH(exec framework.Executor) *InternalSSH {
+func NewInternalSSH(exec framework.Exec) *InternalSSH {
 	return &InternalSSH{exec: exec}
 }
 
@@ -38,7 +37,7 @@ func (s *InternalSSH) aRegularUserAccountExistsOnTheLoginNode(ctx context.Contex
 
 	cmd := fmt.Sprintf("id %s >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh %s",
 		framework.ShellQuote(sshUserName), framework.ShellQuote(sshUserName))
-	if _, err := s.exec.ExecJailWithRetry(ctx, cmd, 5, 10*time.Second); err != nil {
+	if _, err := framework.ExecJailWithDefaultRetry(ctx, s.exec, cmd); err != nil {
 		return fmt.Errorf("create user %s: %w", sshUserName, err)
 	}
 
@@ -48,7 +47,7 @@ func (s *InternalSSH) aRegularUserAccountExistsOnTheLoginNode(ctx context.Contex
 func (s *InternalSSH) theUserSSHsFromTheLoginNodeToAWorker(ctx context.Context) error {
 	cmd := fmt.Sprintf("su - %s -c 'timeout 30 ssh %s hostname </dev/null'",
 		framework.ShellQuote(sshUserName), framework.ShellQuote(s.targetWorker.Name))
-	out, err := s.exec.ExecJailWithRetry(ctx, cmd, 5, 10*time.Second)
+	out, err := framework.ExecJailWithDefaultRetry(ctx, s.exec, cmd)
 	if err != nil {
 		return fmt.Errorf("ssh from login to worker as %s: %w", sshUserName, err)
 	}

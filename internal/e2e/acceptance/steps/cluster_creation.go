@@ -11,10 +11,10 @@ import (
 
 type ClusterCreation struct {
 	state *framework.ClusterState
-	exec  framework.Executor
+	exec  framework.Exec
 }
 
-func NewClusterCreation(state *framework.ClusterState, exec framework.Executor) *ClusterCreation {
+func NewClusterCreation(state *framework.ClusterState, exec framework.Exec) *ClusterCreation {
 	return &ClusterCreation{state: state, exec: exec}
 }
 

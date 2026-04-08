@@ -5,7 +5,12 @@ import (
 	"time"
 )
 
-type Executor interface {
+const (
+	DefaultJailRetryAttempts = 5
+	DefaultJailRetryDelay    = 10 * time.Second
+)
+
+type Exec interface {
 	AnyWorker() (WorkerRef, error)
 	ExecController(ctx context.Context, command string) (string, error)
 	ExecJail(ctx context.Context, command string) (string, error)
@@ -15,15 +20,6 @@ type Executor interface {
 	Logf(format string, args ...any)
 }
 
-func ShellQuote(value string) string {
-	result := "'"
-	for _, r := range value {
-		if r == '\'' {
-			result += `'"'"'`
-			continue
-		}
-		result += string(r)
-	}
-	result += "'"
-	return result
+func ExecJailWithDefaultRetry(ctx context.Context, exec Exec, command string) (string, error) {
+	return exec.ExecJailWithRetry(ctx, command, DefaultJailRetryAttempts, DefaultJailRetryDelay)
 }

@@ -3,6 +3,7 @@ package steps
 import (
 	"context"
 	"fmt"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -13,6 +14,10 @@ import (
 )
 
 const (
+	nodeReplacementFeatureFile = "node_replacement.feature"
+
+	// These timeouts intentionally leave slack for slower replacement flows; tune
+	// them together with the CI step budget when this scenario evolves.
 	nodeReplacementJobTimeout    = 25 * time.Minute
 	nodeReplacementDrainTimeout  = 25 * time.Minute
 	nodeReplacementRemoveTimeout = 25 * time.Minute
@@ -25,28 +30,27 @@ var (
 )
 
 type NodeReplacement struct {
-	exec               framework.Executor
+	exec               framework.Exec
 	replacementWorker  framework.WorkerRef
 	originalInstanceID string
 	maintenanceJobID   string
 }
 
-func NewNodeReplacement(exec framework.Executor, sc *godog.ScenarioContext) *NodeReplacement {
-	nr := &NodeReplacement{exec: exec}
+func NewNodeReplacement(exec framework.Exec) *NodeReplacement {
+	return &NodeReplacement{exec: exec}
+}
 
-	sc.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
-		if nr.maintenanceJobID != "" {
-			if cancelErr := nr.cancelJob(context.Background(), nr.maintenanceJobID); cancelErr != nil {
-				nr.exec.Logf("cleanup: cancel maintenance job: %v", cancelErr)
-			}
+func (s *NodeReplacement) Register(sc *godog.ScenarioContext) {
+	sc.After(func(ctx context.Context, scenario *godog.Scenario, err error) (context.Context, error) {
+		if path.Base(scenario.Uri) != nodeReplacementFeatureFile || s.maintenanceJobID == "" {
+			return ctx, nil
+		}
+		if cancelErr := s.cancelJob(context.Background(), s.maintenanceJobID); cancelErr != nil {
+			s.exec.Logf("cleanup: cancel maintenance job: %v", cancelErr)
 		}
 		return ctx, nil
 	})
 
-	return nr
-}
-
-func (s *NodeReplacement) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^a test job is submitted and running on a worker node$`, s.aTestJobIsSubmittedAndRunningOnAWorkerNode)
 	sc.Step(`^a maintenance event is triggered for that node$`, s.aMaintenanceEventIsTriggeredForThatNode)
 	sc.Step(`^the node is drained with a maintenance reason$`, s.theNodeIsDrainedWithAMaintenanceReason)
@@ -70,7 +74,7 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context
 
 	originalInstanceID := parseInstanceID(nodeState)
 	if originalInstanceID == "" {
-		return fmt.Errorf("unable to parse InstanceId from %q", nodeState)
+		return fmt.Errorf("parse InstanceId: no match in %q", nodeState)
 	}
 	s.originalInstanceID = originalInstanceID
 

@@ -2,11 +2,10 @@ package acceptance
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"log"
-	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/cucumber/godog"
 
@@ -14,35 +13,36 @@ import (
 	"nebius.ai/slurm-operator/internal/e2e/acceptance/steps"
 )
 
+//go:embed features/*.feature
+var acceptanceFeatures embed.FS
+
 type Runner struct {
-	cfg   Config
 	state *framework.ClusterState
 }
 
-type Config struct {
-	NebiusProjectID string
-	ClusterName     string
-}
-
-func NewRunner(cfg Config) *Runner {
+func NewRunner() *Runner {
 	return &Runner{
-		cfg:   cfg,
 		state: &framework.ClusterState{},
 	}
 }
 
 func (r *Runner) Run(ctx context.Context) error {
+	w := newWorld(r.state)
+	if err := discoverCluster(ctx, w, r.state); err != nil {
+		return fmt.Errorf("discover cluster before suite: %w", err)
+	}
+
 	features := featurePaths()
 	if len(features) == 0 {
 		return fmt.Errorf("no acceptance feature files configured")
 	}
 
 	suite := godog.TestSuite{
-		Name:                 "soperator-acceptance",
-		TestSuiteInitializer: r.initializeSuite(ctx),
-		ScenarioInitializer:  r.initializeScenario,
+		Name:                "soperator-acceptance",
+		ScenarioInitializer: r.initializeScenario,
 		Options: &godog.Options{
 			Format:         "pretty",
+			FS:             acceptanceFeatures,
 			Paths:          features,
 			TestingT:       nil,
 			Strict:         true,
@@ -55,17 +55,6 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (r *Runner) initializeSuite(ctx context.Context) func(*godog.TestSuiteContext) {
-	return func(sc *godog.TestSuiteContext) {
-		sc.BeforeSuite(func() {
-			w := newWorld(r.cfg, r.state)
-			if err := discoverCluster(ctx, w, r.state); err != nil {
-				log.Fatalf("BeforeSuite cluster discovery: %v", err)
-			}
-		})
-	}
 }
 
 func discoverCluster(ctx context.Context, w *world, state *framework.ClusterState) error {
@@ -102,30 +91,27 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 }
 
 func featurePaths() []string {
-	baseDir := filepath.Join("internal", "e2e", "acceptance", "features")
 	return []string{
-		filepath.Join(baseDir, "cluster_creation.feature"),
-		filepath.Join(baseDir, "internal_ssh.feature"),
-		filepath.Join(baseDir, "package_installation.feature"),
-		filepath.Join(baseDir, "node_replacement.feature"),
+		"features/cluster_creation.feature",
+		"features/internal_ssh.feature",
+		"features/package_installation.feature",
+		"features/node_replacement.feature",
 	}
 }
 
 func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
-	w := newWorld(r.cfg, r.state)
+	w := newWorld(r.state)
 
 	steps.NewClusterCreation(r.state, w).Register(sc)
 	steps.NewInternalSSH(w).Register(sc)
 	steps.NewPackageInstallation(w).Register(sc)
-	steps.NewNodeReplacement(w, sc).Register(sc)
+	steps.NewNodeReplacement(w).Register(sc)
 }
 
-func newWorld(cfg Config, state *framework.ClusterState) *world {
+func newWorld(state *framework.ClusterState) *world {
 	return &world{
-		cfg:            cfg,
-		commandTimeout: 10 * time.Minute,
-		logPrefix:      "acceptance",
-		state:          state,
+		logPrefix: "acceptance",
+		state:     state,
 	}
 }
 

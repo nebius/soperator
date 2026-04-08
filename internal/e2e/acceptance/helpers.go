@@ -3,6 +3,7 @@ package acceptance
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os/exec"
@@ -52,7 +53,7 @@ func (w *world) ExecJailWithRetry(ctx context.Context, command string, attempts 
 }
 
 func (w *world) Run(ctx context.Context, name string, args ...string) (string, error) {
-	cmdCtx, cancel := context.WithTimeout(ctx, w.commandTimeout)
+	cmdCtx, cancel := context.WithTimeout(ctx, commandTimeout)
 	defer cancel()
 
 	w.logf("run: %s %s", name, strings.Join(args, " "))
@@ -80,25 +81,32 @@ func (w *world) Run(ctx context.Context, name string, args ...string) (string, e
 }
 
 func (w *world) WaitFor(ctx context.Context, description string, timeout, pollInterval time.Duration, condition func(context.Context) (bool, error)) error {
-	deadline := time.Now().Add(timeout)
+	waitCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	var lastErr error
 	for {
-		done, err := condition(ctx)
+		if err := waitCtx.Err(); err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				if lastErr != nil {
+					return fmt.Errorf("wait for %s: %w", description, lastErr)
+				}
+				return fmt.Errorf("wait for %s: timed out after %s", description, timeout)
+			}
+			return err
+		}
+
+		done, err := condition(waitCtx)
 		if err == nil && done {
 			return nil
 		}
-		if time.Now().After(deadline) {
-			if err != nil {
-				return fmt.Errorf("wait for %s: %w", description, err)
-			}
-			return fmt.Errorf("wait for %s: timed out after %s", description, timeout)
-		}
-		if err != nil {
+		if err != nil && waitCtx.Err() == nil {
+			lastErr = err
 			w.logf("wait for %s still pending: %v", description, err)
 		}
 
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-waitCtx.Done():
 		case <-time.After(pollInterval):
 		}
 	}
