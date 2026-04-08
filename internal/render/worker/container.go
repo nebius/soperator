@@ -262,6 +262,8 @@ func renderContainerNodeSetSlurmd(
 			AppArmorProfile: common.ParseAppArmorProfile(appArmorProfile),
 		},
 		Resources:                resources,
+		LivenessProbe:            nodeSet.ContainerSlurmd.LivenessProbe,
+		ReadinessProbe:           nodeSet.ContainerSlurmd.ReadinessProbe,
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}, nil

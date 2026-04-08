@@ -93,6 +93,14 @@ spec:
     {{- end }}
 
     port: {{ .port | default 6818 }}
+    {{- with .livenessProbe }}
+    livenessProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .readinessProbe }}
+    readinessProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
 
     {{- with (required ".Values.nodesets[*].slurmd.resources is required" .resources) }}
     resources:
@@ -166,6 +174,14 @@ spec:
       ephemeral-storage: {{ . | quote }}
       {{- end }}
     {{- end }}
+    {{- with .livenessProbe }}
+    livenessProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .readinessProbe }}
+    readinessProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
 
     security:
       limitsConfig: {{ get (.security | default dict) "limitsConfig" | quote }}
@@ -199,6 +215,14 @@ spec:
       cpu: {{ default "200m" (get ($sssd.resources | default dict) "cpu") | quote }}
       memory: {{ default "500Mi" (get ($sssd.resources | default dict) "memory") | quote }}
       ephemeral-storage: {{ default "5Gi" (get ($sssd.resources | default dict) "ephemeralStorage") | quote }}
+    {{- with $sssd.livenessProbe }}
+    livenessProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $sssd.readinessProbe }}
+    readinessProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
 
     security:
       limitsConfig: {{ get ($sssd.security | default dict) "limitsConfig" | quote }}
