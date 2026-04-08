@@ -33,12 +33,3 @@ fi
 if [ -v SLURM_JOB_ID ]; then
     echo export "SLURM_JOB_ID_SOPERATOR_TASK_PROLOG=${SLURM_JOB_ID:-}"
 fi
-
-if ! /usr/bin/python3 -c "import sys; sys.exit(0)" >/dev/null 2>&1; then
-    echo "Python is not installed or not working" >&2
-    exit 0
-fi
-
-if [ -z "${SLURM_JOB_ID:-}" ]; then
-    exit 0
-fi
