@@ -48,5 +48,12 @@ func hasClusterLabel(obj client.Object, clusterName string) bool {
 	if labels == nil {
 		return false
 	}
-	return labels["app.kubernetes.io/instance"] == clusterName
+	return labels[consts.LabelInstanceKey] == clusterName
+}
+
+func BuildPrefixedName(prefix, base string) string {
+	if prefix == "" {
+		return base
+	}
+	return prefix + "-" + base
 }

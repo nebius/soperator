@@ -215,6 +215,7 @@ func main() {
 	if err = (sconfigcontroller.NewJailedConfigReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
+		clusterName,
 		slurmAPIClient,
 		jailFs,
 		reconfigurePollInterval,
