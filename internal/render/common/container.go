@@ -53,39 +53,8 @@ func RenderContainerMunge(container *values.Container, opts ...RenderOption) cor
 			RenderVolumeMountMungeKey(),
 			RenderVolumeMountMungeSocket(),
 		},
-		ReadinessProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{
-						"/bin/sh",
-						"-c",
-						fmt.Sprintf(
-							"test -S %s",
-							path.Join(consts.VolumeMountPathMungeSocket, "munge.socket.2"),
-						),
-					},
-				},
-			},
-			TimeoutSeconds:   DefaultProbeTimeoutSeconds,
-			PeriodSeconds:    DefaultProbePeriodSeconds,
-			SuccessThreshold: DefaultProbeSuccessThreshold,
-			FailureThreshold: DefaultProbeFailureThreshold,
-		},
-		LivenessProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{
-						"/bin/sh",
-						"-c",
-						"/usr/bin/munge -n > /dev/null && exit 0 || exit 1",
-					},
-				},
-			},
-			TimeoutSeconds:   DefaultProbeTimeoutSeconds,
-			PeriodSeconds:    DefaultProbePeriodSeconds,
-			SuccessThreshold: DefaultProbeSuccessThreshold,
-			FailureThreshold: DefaultProbeFailureThreshold,
-		},
+		ReadinessProbe:  container.ReadinessProbe,
+		LivenessProbe:   container.LivenessProbe,
 		SecurityContext: securityContext,
 		Resources: corev1.ResourceRequirements{
 			Limits:   limits,
@@ -162,36 +131,8 @@ func RenderContainerSSSD(container *values.Container, opts ...RenderOption) core
 		RestartPolicy:   &restartPolicy,
 		ImagePullPolicy: container.ImagePullPolicy,
 		VolumeMounts:    volumeMounts,
-		ReadinessProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{
-						"/bin/sh",
-						"-c",
-						"test -S /var/lib/sss/pipes/nss && test -S /var/lib/sss/pipes/pam",
-					},
-				},
-			},
-			TimeoutSeconds:   DefaultProbeTimeoutSeconds,
-			PeriodSeconds:    DefaultProbePeriodSeconds,
-			SuccessThreshold: DefaultProbeSuccessThreshold,
-			FailureThreshold: DefaultProbeFailureThreshold,
-		},
-		LivenessProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{
-						"/bin/sh",
-						"-c",
-						"test -S /var/lib/sss/pipes/nss && test -S /var/lib/sss/pipes/pam",
-					},
-				},
-			},
-			TimeoutSeconds:   DefaultProbeTimeoutSeconds,
-			PeriodSeconds:    DefaultProbePeriodSeconds,
-			SuccessThreshold: DefaultProbeSuccessThreshold,
-			FailureThreshold: DefaultProbeFailureThreshold,
-		},
+		ReadinessProbe:  container.ReadinessProbe,
+		LivenessProbe:   container.LivenessProbe,
 		SecurityContext: securityContext,
 		Resources: corev1.ResourceRequirements{
 			Limits:   limits,

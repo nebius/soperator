@@ -1,0 +1,51 @@
+suite: test probe customization
+templates:
+  - templates/slurm-cluster-cr.yaml
+tests:
+  - it: should render default controller slurmctld liveness probe
+    set:
+      clusterName: test-cluster
+    asserts:
+      - equal:
+          path: spec.slurmNodes.controller.slurmctld.livenessProbe.exec.command
+          value:
+            - scontrol
+            - ping
+      - equal:
+          path: spec.slurmNodes.controller.slurmctld.livenessProbe.initialDelaySeconds
+          value: 25
+
+  - it: should merge partial readiness probe overrides for login sshd
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        login:
+          sshd:
+            readinessProbe:
+              periodSeconds: 5
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.sshd.readinessProbe.tcpSocket.port
+          value: 22
+      - equal:
+          path: spec.slurmNodes.login.sshd.readinessProbe.periodSeconds
+          value: 5
+
+  - it: should render custom probes for exporter container without defaults
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        exporter:
+          exporterContainer:
+            readinessProbe:
+              httpGet:
+                path: /readyz
+                port: 8081
+              periodSeconds: 3
+    asserts:
+      - equal:
+          path: spec.slurmNodes.exporter.exporterContainer.readinessProbe.httpGet.path
+          value: /readyz
+      - equal:
+          path: spec.slurmNodes.exporter.exporterContainer.readinessProbe.periodSeconds
+          value: 3

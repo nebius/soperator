@@ -10,8 +10,6 @@ import (
 	"github.com/hashicorp/terraform-exec/tfexec"
 )
 
-const k8sClusterName = "soperator-e2e-test"
-
 func Destroy(ctx context.Context, cfg Config) error {
 	tf, varFilePath, cleanup, err := Init(ctx, cfg)
 	if err != nil {
