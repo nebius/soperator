@@ -251,7 +251,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 
 	{
 		svcName := cluster.NodeController.Service.Name
-		res.AddProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", "controller-0", svcName))
+		controllerHostname := cluster.NodeController.StatefulSet.Name + "-0"
+		res.AddProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", controllerHostname, svcName))
 	}
 
 	res.AddComment("")

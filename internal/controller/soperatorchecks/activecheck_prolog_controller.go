@@ -6,6 +6,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
@@ -21,6 +22,7 @@ import (
 	"nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
+	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
 )
 
 var (
@@ -85,7 +87,22 @@ func (r *ActiveCheckPrologReconciler) Reconcile(
 		"Starting reconciliation", "SlurmCluster", req.Name, "Namespace", req.Namespace,
 	)
 
-	if err := r.updatePrologConfigMap(ctx, req.Namespace, r.getPrologScript()); err != nil {
+	slurmCluster := &slurmv1.SlurmCluster{}
+	if err := r.Client.Get(ctx, req.NamespacedName, slurmCluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+		return DefaultRequeueResult, err
+	}
+
+	namePrefix, err := resourcegetter.ResolveWorkloadNamePrefix(ctx, r.Client, req.Namespace, req.Name)
+	if err != nil {
+		logger.Error(err, "Failed to resolve workload name prefix")
+		return DefaultRequeueResult, err
+	}
+	resourceName := resourcegetter.BuildPrefixedName(namePrefix, consts.ConfigMapNameActiveCheckPrologScript)
+
+	if err := r.updatePrologConfigMap(ctx, req.Namespace, resourceName, r.getPrologScript()); err != nil {
 		logger.Error(err, "Failed to update ConfigMap with active check prolog script")
 		return DefaultRequeueResult, nil
 	}
@@ -94,14 +111,14 @@ func (r *ActiveCheckPrologReconciler) Reconcile(
 	return DefaultRequeueResult, nil
 }
 
-func (r *ActiveCheckPrologReconciler) updatePrologConfigMap(ctx context.Context, namespace string, config string) error {
+func (r *ActiveCheckPrologReconciler) updatePrologConfigMap(ctx context.Context, namespace, resourceName, config string) error {
 	configMap := &corev1.ConfigMap{
 		TypeMeta: ctrl.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.Version,
 			Kind:       "ConfigMap",
 		},
 		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.ConfigMapNameActiveCheckPrologScript,
+			Name:      resourceName,
 			Namespace: namespace,
 		},
 		Data: map[string]string{
@@ -122,12 +139,12 @@ func (r *ActiveCheckPrologReconciler) updatePrologConfigMap(ctx context.Context,
 			Kind:       "JailedConfig",
 		},
 		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.ConfigMapNameActiveCheckPrologScript,
+			Name:      resourceName,
 			Namespace: namespace,
 		},
 		Spec: v1alpha1.JailedConfigSpec{
 			ConfigMap: v1alpha1.ConfigMapReference{
-				Name: consts.ConfigMapNameActiveCheckPrologScript,
+				Name: resourceName,
 			},
 			Items: []corev1.KeyToPath{
 				{

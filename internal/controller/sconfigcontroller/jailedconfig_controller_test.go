@@ -87,6 +87,7 @@ func newTestJailedConfigController(
 	sctrl := NewJailedConfigReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
+		"test-cluster",
 		apiClient,
 		fakeFs,
 		1*time.Second, // Poll interval for tests
