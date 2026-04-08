@@ -283,6 +283,16 @@ type ContainerSlurmdSpec struct {
 	// +kubebuilder:validation:Optional
 	Port int32 `json:"port,omitempty"`
 
+	// LivenessProbe defines the liveness probe for the slurmd container.
+	//
+	// +kubebuilder:validation:Optional
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// ReadinessProbe defines the readiness probe for the slurmd container.
+	//
+	// +kubebuilder:validation:Optional
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
+
 	// Security defines the security configuration for the container
 	//
 	// +kubebuilder:validation:Optional
@@ -301,6 +311,16 @@ type ContainerMungeSpec struct {
 	// +kubebuilder:validation:Required
 	Resources corev1.ResourceList `json:"resources,omitempty"`
 
+	// LivenessProbe defines the liveness probe for the munge container.
+	//
+	// +kubebuilder:validation:Optional
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// ReadinessProbe defines the readiness probe for the munge container.
+	//
+	// +kubebuilder:validation:Optional
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
+
 	// Security defines the security configuration for the container
 	//
 	// +kubebuilder:validation:Optional
@@ -318,6 +338,16 @@ type ContainerSSSDSpec struct {
 	//
 	// +kubebuilder:validation:Required
 	Resources corev1.ResourceList `json:"resources,omitempty"`
+
+	// LivenessProbe defines the liveness probe for the SSSD container.
+	//
+	// +kubebuilder:validation:Optional
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// ReadinessProbe defines the readiness probe for the SSSD container.
+	//
+	// +kubebuilder:validation:Optional
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
 
 	// Security defines the security configuration for the container
 	//

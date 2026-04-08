@@ -182,6 +182,26 @@ slurmNodes:
     appArmorProfile: "unconfined"
     command: []
     args: []
+    livenessProbe:
+      exec:
+        command:
+          - /bin/sh
+          - -c
+          - test -S /var/lib/sss/pipes/nss && test -S /var/lib/sss/pipes/pam
+      timeoutSeconds: 1
+      periodSeconds: 10
+      successThreshold: 1
+      failureThreshold: 3
+    readinessProbe:
+      exec:
+        command:
+          - /bin/sh
+          - -c
+          - test -S /var/lib/sss/pipes/nss && test -S /var/lib/sss/pipes/pam
+      timeoutSeconds: 1
+      periodSeconds: 10
+      successThreshold: 1
+      failureThreshold: 3
     resources:
       cpu: "200m"
       memory: "500Mi"
@@ -222,6 +242,14 @@ slurmNodes:
       appArmorProfile: "unconfined"
       command: []
       args: []
+      readinessProbe:
+        tcpSocket:
+          port: 6819
+        failureThreshold: 3
+        initialDelaySeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 1
       port: 6819
       resources:
         cpu: "1000m"
@@ -230,6 +258,26 @@ slurmNodes:
     munge:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      livenessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - /usr/bin/munge -n > /dev/null && exit 0 || exit 1
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
+      readinessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - test -S /run/munge/munge.socket.2
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
       resources:
         cpu: "1000m"
         memory: "1Gi"
@@ -340,6 +388,16 @@ slurmNodes:
       appArmorProfile: "unconfined"
       command: []
       args: []
+      livenessProbe:
+        exec:
+          command:
+            - scontrol
+            - ping
+        initialDelaySeconds: 25
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
       port: 6817
       resources:
         cpu: "1000m"
@@ -350,6 +408,26 @@ slurmNodes:
       appArmorProfile: "unconfined"
       command: []
       args: []
+      livenessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - /usr/bin/munge -n > /dev/null && exit 0 || exit 1
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
+      readinessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - test -S /run/munge/munge.socket.2
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
       resources:
         cpu: "1000m"
         memory: "1Gi"
@@ -375,6 +453,13 @@ slurmNodes:
     sshd:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      readinessProbe:
+        tcpSocket:
+          port: 22
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
       port: 22
       resources:
         cpu: "3000m"
@@ -403,6 +488,26 @@ slurmNodes:
       appArmorProfile: "unconfined"
       command: []
       args: []
+      livenessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - /usr/bin/munge -n > /dev/null && exit 0 || exit 1
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
+      readinessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - test -S /run/munge/munge.socket.2
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
       resources:
         cpu: "500m"
         memory: "500Mi"
@@ -445,10 +550,20 @@ slurmNodes:
       appArmorProfile: "unconfined"
       command: []
       args: []
+      # Deprecated legacy exporter config. Use exporterContainer below for probes/resources.
       resources:
         cpu: "250m"
         memory: "256Mi"
         ephemeralStorage: "500Mi"
+    exporterContainer:
+    # livenessProbe:
+    #   httpGet:
+    #     path: /healthz
+    #     port: 8081
+    # readinessProbe:
+    #   httpGet:
+    #     path: /readyz
+    #     port: 8081
     munge:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
@@ -475,6 +590,14 @@ slurmNodes:
       appArmorProfile: "unconfined"
       command: []
       args: []
+      livenessProbe:
+        tcpSocket:
+          port: 6820
+        failureThreshold: 5
+        initialDelaySeconds: 15
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 1
       resources:
         cpu: "2000m"
         memory: "8Gi"
@@ -488,6 +611,8 @@ sConfigController:
     size: 1
   container:
     imagePullPolicy: "IfNotPresent"
+    # livenessProbe: {}
+    # readinessProbe: {}
     resources:
       cpu: "250m"
       memory: "256Mi"
