@@ -42,7 +42,7 @@ function buildRequestBody(body, cgroupParent) {
 function handleCreate(r) {
     const cgroupParent = normalizeHeaderValue(r.headersIn['Cgroup-Parent']);
     if (!cgroupParent) {
-        r.internalRedirect('@docker_upstream');
+        r.internalRedirect('/_docker_upstream');
         return;
     }
 
@@ -50,12 +50,12 @@ function handleCreate(r) {
     try {
         updatedBody = buildRequestBody(r.requestText, cgroupParent);
     } catch (e) {
-        r.internalRedirect('@docker_upstream');
+        r.internalRedirect('/_docker_upstream');
         return;
     }
 
     if (updatedBody === null) {
-        r.internalRedirect('@docker_upstream');
+        r.internalRedirect('/_docker_upstream');
         return;
     }
 
