@@ -660,10 +660,10 @@ func (c *PodEphemeralStorageCheck) drainSlurmNode(
 	info EphemeralStorageInfo,
 ) error {
 	message := fmt.Sprintf(
-		"pod_ephemeral_storage %[1].2f%% of ephemeral storage is used. Clean up volumes from 'ssh %[2]s /opt/soperator_utils/fs_usage.sh -l', "+
+		"pod_ephemeral_storage %.2[1]f%% of ephemeral storage is used. Clean up volumes from 'ssh %[2]s /opt/soperator_utils/fs_usage.sh -l', "+
 			"delete leftover containers from 'ssh %[2]s enroot list' and 'ssh %[2]s docker ps -a', "+
 			"reboot the node using 'scontrol reboot %[2]s', "+
-			"or stop-start the InstanceId from 'scontrol show node %[2]s'. And 'scontrol update nodename=%[2]s state=resume' after resolving the issue. ",
+			"or stop-start the InstanceId from 'scontrol show node %[2]s'. And 'scontrol update nodename=%[2]s state=resume' after resolving the issue.",
 		info.UsagePercent, slurmNodeName,
 	)
 	reason := consts.SlurmUserReasonHC + " " + message
