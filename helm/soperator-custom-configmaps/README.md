@@ -6,7 +6,7 @@ This Helm chart deploys custom ConfigMaps for the Soperator deployment.
 
 The chart contains configuration files that are deployed as Kubernetes ConfigMaps:
 
-- **supervisord.conf** - Supervisord configuration for managing slurmd, sshd, and dockerd inside the worker container
+- **supervisord.conf** - Supervisord configuration for managing slurmd, sshd, and dockerd processes
 - **daemon.json** - Docker daemon configuration with NVIDIA runtime support
 - **enroot.conf** - Enroot container configuration paths
 - **95-nebius-o11y** - MOTD (Message of the Day) script for Nebius observability
