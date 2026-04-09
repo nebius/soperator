@@ -132,6 +132,7 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/docker-memory-limit-oomkilled.sh"
       eachWorkerJobs: true
+      requiresGpu: true
   dcgmi-diag-r2:
     enabled: true
     checkType: "slurmJob"
