@@ -50,6 +50,7 @@ activeCheckImage: ""
 checks:
   all-reduce-perf-nccl-in-docker:
     enabled: true
+    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -67,6 +68,7 @@ checks:
         drainReasonPrefix: "[node_problem]"
   all-reduce-perf-nccl-with-ib:
     enabled: true
+    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -84,6 +86,7 @@ checks:
         drainReasonPrefix: "[node_problem]"
   all-reduce-perf-nccl-without-ib:
     enabled: true
+    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -100,6 +103,7 @@ checks:
         drainReasonPrefix: "[node_problem]"
   cuda-samples:
     enabled: true
+    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -130,6 +134,7 @@ checks:
       eachWorkerJobs: true
   dcgmi-diag-r2:
     enabled: true
+    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -146,6 +151,7 @@ checks:
         drainReasonPrefix: "[node_problem]"
   dcgmi-diag-r3:
     enabled: true
+    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -180,6 +186,7 @@ checks:
       sbatchScriptFile: "scripts/ensure-healthy-nodes.sh"
   extensive-check:
     enabled: true
+    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -209,6 +216,7 @@ checks:
         prefix: "suspicious-node"
   gpu-fryer:
     enabled: true
+    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -226,6 +234,7 @@ checks:
         drainReasonPrefix: "[node_problem]"
   ib-gpu-perf:
     enabled: true
+    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -244,6 +253,7 @@ checks:
         commentPrefix: "[node_problem]"
   mem-perf:
     enabled: true
+    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -319,6 +329,7 @@ checks:
             value: "/opt/soperator-outputs/nccl_logs"
   prepull-container-image:
     enabled: true
+    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"

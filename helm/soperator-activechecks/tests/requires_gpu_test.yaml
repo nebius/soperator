@@ -1,0 +1,78 @@
+suite: test requiresGpu rendering
+templates:
+  - templates/active-checks.yaml
+tests:
+  - it: should render requiresGpu when set to true in values
+    documentSelector:
+      path: metadata.name
+      value: test-requires-gpu-true
+    set:
+      slurmClusterRefName: test-cluster
+      images:
+        k8sJob: "test-image:latest"
+      jobContainer:
+        volumeMounts: []
+        volumes: []
+      checks:
+        test-requires-gpu-true:
+          enabled: true
+          requiresGpu: true
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              command: ["echo", "test"]
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - equal:
+          path: spec.requiresGpu
+          value: true
+
+  - it: should omit requiresGpu when not set in values
+    documentSelector:
+      path: metadata.name
+      value: test-requires-gpu-unset
+    set:
+      slurmClusterRefName: test-cluster
+      images:
+        k8sJob: "test-image:latest"
+      jobContainer:
+        volumeMounts: []
+        volumes: []
+      checks:
+        test-requires-gpu-unset:
+          enabled: true
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              command: ["echo", "test"]
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - notExists:
+          path: spec.requiresGpu
+
+  - it: should omit requiresGpu when explicitly set to false
+    documentSelector:
+      path: metadata.name
+      value: test-requires-gpu-false
+    set:
+      slurmClusterRefName: test-cluster
+      images:
+        k8sJob: "test-image:latest"
+      jobContainer:
+        volumeMounts: []
+        volumes: []
+      checks:
+        test-requires-gpu-false:
+          enabled: true
+          requiresGpu: false
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              command: ["echo", "test"]
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - notExists:
+          path: spec.requiresGpu

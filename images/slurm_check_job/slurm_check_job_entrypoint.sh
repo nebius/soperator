@@ -37,6 +37,26 @@ echo "Create directory for slurm job outputs"
 echo "Set HOME to soperatorchecks' home directory"
 export HOME=~soperatorchecks
 
+if [[ "${ACTIVE_CHECK_REQUIRES_GPU:-false}" == "true" ]]; then
+    # slurm.conf is the authoritative node list rendered by soperator from
+    # NodeSets. Every GPU worker carries a `Gres=gpu:<vendor>:<count>` token.
+    # The leading `^[^#]*` skips commented-out example lines. A missing
+    # slurm.conf is fail-open (surface the real problem, don't silently skip).
+    if [[ -f /etc/slurm/slurm.conf ]] && ! grep -q '^[^#]*Gres=gpu' /etc/slurm/slurm.conf; then
+        SKIP_REASON="no GPU nodes in slurm.conf"
+        echo "$SKIP_REASON — marking check '$ACTIVE_CHECK_NAME' as Skipped"
+
+        K8S_JOB_NAME=$(kubectl get pod "$K8S_POD_NAME" -n "$K8S_POD_NAMESPACE" \
+            -o jsonpath='{.metadata.ownerReferences[?(@.kind=="Job")].name}')
+        if [[ -n "$K8S_JOB_NAME" ]]; then
+            kubectl annotate job "$K8S_JOB_NAME" \
+                -n "$K8S_POD_NAMESPACE" \
+                slurm-skipped-reason="$SKIP_REASON" --overwrite || true
+        fi
+        exit 0
+    fi
+fi
+
 if [[ -n "${RESERVATION_NAME:-}" ]]; then
     echo "Submitting Slurm job on reservation $RESERVATION_NAME..."
     OUT_PATTERN='/opt/soperator-outputs/slurm_jobs/%N.%x.%j.out'

@@ -110,6 +110,15 @@ type ActiveCheckSpec struct {
 	// FailureReactions defines reaction on specific check when it fails
 	// +kubebuilder:validation:Optional
 	FailureReactions *Reactions `json:"failureReactions,omitempty"`
+
+	// RequiresGPU declares that this check needs GPU workers. When true, the
+	// slurm_check_job entrypoint inspects /etc/slurm/slurm.conf and exits
+	// early (marking the run Skipped) if no GPU gres is available, without
+	// attempting to submit a slurm job. Only the slurmJob path honors this
+	// flag today.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	RequiresGPU bool `json:"requiresGpu,omitempty"`
 }
 
 type Reactions struct {
