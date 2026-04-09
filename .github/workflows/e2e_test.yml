@@ -550,8 +550,8 @@ jobs:
           path: ${{ runner.temp }}/tf-destroy.log
           if-no-files-found: ignore
           retention-days: 7
-          # Debug log is plain text terraform TRACE output — highly
-          # compressible — and runner CPU is free, so max out the DEFLATE level.
+          # Debug log is plain text terraform DEBUG output, highly
+          # compressible, and runner CPU is free, so max out the DEFLATE level.
           compression-level: 9
 
       - name: Force cleanup compute instances on failure

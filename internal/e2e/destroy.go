@@ -13,11 +13,16 @@ import (
 
 const k8sClusterName = "soperator-e2e-test"
 
-// tfDestroyLogPathEnvVar, when set, enables terraform TRACE/DEBUG logging for
-// the destroy flow and writes it to the given file. terraform-exec strips
-// TF_LOG from the child process env unless SetLogPath has been called on the
-// handle, so this opt-in path is the only way to get terraform logs out of
-// bin/e2e destroy. The file is typically uploaded as a CI artifact afterwards.
+// tfDestroyLogPathEnvVar, when set, enables terraform DEBUG logging for the
+// destroy flow and writes it to the given file. terraform-exec strips TF_LOG
+// from the child process env unless SetLogPath has been called on the handle,
+// so this opt-in path is the only way to get terraform logs out of bin/e2e
+// destroy. The file is typically uploaded as a CI artifact afterwards.
+//
+// The resulting file contains terraform DEBUG output: operational identifiers
+// (tenant/project/cluster/bucket IDs) and AWS-style access key IDs in SigV4
+// Authorization headers. Raw secrets, bearer tokens, and HTTP bodies are not
+// captured at DEBUG level, but treat the artifact as semi-sensitive.
 const tfDestroyLogPathEnvVar = "TF_DESTROY_LOG_PATH"
 
 func Destroy(ctx context.Context, cfg Config) error {
@@ -42,7 +47,7 @@ func enableTFDestroyLogging(tf *tfexec.Terraform) {
 		return
 	}
 	if err := tf.SetLog("DEBUG"); err != nil {
-		log.Printf("SetLog(DEBUG) failed, terraform will fall back to TRACE: %v", err)
+		log.Printf("SetLog(DEBUG) failed, terraform debug logging may remain disabled: %v", err)
 	}
 	log.Printf("Terraform debug logging enabled, writing to %s", path)
 }
