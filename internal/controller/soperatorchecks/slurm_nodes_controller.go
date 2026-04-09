@@ -178,7 +178,7 @@ func (c *SlurmNodesController) processDegradedNode(
 	k8sNode, err := getK8SNode(ctx, c.Client, node.InstanceID)
 	if err != nil {
 		if client.IgnoreNotFound(err) == nil {
-			return c.undrainSlurmNode(ctx, slurmClusterName, node.Name, false)
+			return c.undrainSlurmNode(ctx, slurmClusterName, node.Name)
 		}
 		return fmt.Errorf("get k8s node: %w", err)
 	}
@@ -221,15 +221,17 @@ func (c *SlurmNodesController) processSetUnhealthy(
 			return fmt.Errorf("get slurm node assignment time: %w", err)
 		}
 
-		if assignmentTime.After(slurmNode.Reason.ChangedAt) {
+		if slurmNode.Reason.ChangedAt.Before(k8sNode.CreationTimestamp.Time) ||
+			assignmentTime.After(slurmNode.Reason.ChangedAt) {
 			logger.V(1).Info(
-				"Undraining reassigned slurm node, current compute instance was assigned after drain",
+				"Undraining slurm node because current compute instance was assigned after drain",
 				"assignmentTime", assignmentTime,
 				"drainTime", slurmNode.Reason.ChangedAt,
 				"currentInstanceID", slurmNode.InstanceID,
 				"k8sNodeName", k8sNode.Name,
+				"k8sNodeCreationTime", k8sNode.CreationTimestamp.Time,
 			)
-			return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name, true)
+			return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
 		}
 	}
 
@@ -265,11 +267,26 @@ func (c *SlurmNodesController) getSlurmNodeAssignmentTime(
 	slurmClusterName types.NamespacedName,
 	slurmNodeName string,
 ) (time.Time, error) {
+	logger := log.FromContext(ctx).WithName("SlurmNodesController.getSlurmNodeAssignmentTime")
+
+	reader := c.apiReader
+	if reader == nil {
+		reader = c.Client
+	}
+
 	workerPod := &corev1.Pod{}
-	if err := c.Get(ctx, client.ObjectKey{
+	if err := reader.Get(ctx, client.ObjectKey{
 		Namespace: slurmClusterName.Namespace,
 		Name:      slurmNodeName,
 	}, workerPod); err != nil {
+		if client.IgnoreNotFound(err) == nil {
+			logger.V(1).Info(
+				"Worker pod not found, assignment time is unknown",
+				"slurmCluster", slurmClusterName,
+				"slurmNodeName", slurmNodeName,
+			)
+			return time.Time{}, nil
+		}
 		return time.Time{}, fmt.Errorf("get worker pod: %w", err)
 	}
 
@@ -278,20 +295,22 @@ func (c *SlurmNodesController) getSlurmNodeAssignmentTime(
 			continue
 		}
 		if condition.LastTransitionTime.IsZero() {
-			return time.Time{}, fmt.Errorf(
-				"worker pod %s/%s has empty PodScheduled transition time",
-				workerPod.Namespace,
-				workerPod.Name,
+			logger.V(1).Info(
+				"Worker pod has PodScheduled=True without transition time, assignment time is unknown",
+				"namespace", workerPod.Namespace,
+				"name", workerPod.Name,
 			)
+			return time.Time{}, nil
 		}
 		return condition.LastTransitionTime.Time, nil
 	}
 
-	return time.Time{}, fmt.Errorf(
-		"worker pod %s/%s is missing a successful PodScheduled condition",
-		workerPod.Namespace,
-		workerPod.Name,
+	logger.V(1).Info(
+		"Worker pod has no successful PodScheduled condition, assignment time is unknown",
+		"namespace", workerPod.Namespace,
+		"name", workerPod.Name,
 	)
+	return time.Time{}, nil
 }
 
 func (c *SlurmNodesController) processHealthCheckFailed(
@@ -315,7 +334,7 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 
 	if slurmNode.Reason.ChangedAt.Before(k8sNode.CreationTimestamp.Time) {
 		logger.V(1).Info("Undraining, slurm node drained before degraded condition changed")
-		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name, false)
+		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
 	}
 
 	/**
@@ -355,7 +374,7 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 	}
 
 	// Undrain node after creating the reservation to allow health checks to run.
-	err = c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name, false)
+	err = c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
 	if err != nil {
 		return fmt.Errorf("failed to undrain slurm node after creating a maintenance reservaiton: %w", err)
 	}
@@ -563,7 +582,7 @@ func (c *SlurmNodesController) processKillTaskFailed(
 	)
 	if slurmNode.Reason.ChangedAt.Before(degradedCondition.LastTransitionTime.Time) {
 		logger.V(1).Info("undraining, slurm node drained before degraded condition changed")
-		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name, false)
+		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
 	}
 
 	logger.V(1).Info("draining, slurm node drained after degraded condition changed")
@@ -615,7 +634,7 @@ func (c *SlurmNodesController) processSlurmNodeMaintenance(
 	slurmNodeName string) error {
 
 	undrainFn := func() error {
-		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNodeName, false)
+		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNodeName)
 	}
 
 	return c.processMaintenance(ctx, k8sNode, nil, undrainFn)
@@ -808,13 +827,11 @@ func (c *SlurmNodesController) undrainSlurmNode(
 	ctx context.Context,
 	slurmClusterName types.NamespacedName,
 	slurmNodeName string,
-	clearComment bool,
 ) error {
 	logger := log.FromContext(ctx).WithName("SlurmNodesController.undrainSlurmNode").V(1).
 		WithValues(
 			"slurmNodeName", slurmNodeName,
 			"slurmCluster", slurmClusterName,
-			"clearComment", clearComment,
 		)
 	logger.Info("undraining slurm node")
 
@@ -823,14 +840,11 @@ func (c *SlurmNodesController) undrainSlurmNode(
 		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 	}
 
-	updateReq := api.V0041UpdateNodeMsg{
-		State: ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateRESUME}),
-	}
-	if clearComment {
-		updateReq.Comment = ptr.To("")
-	}
-
-	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName, updateReq)
+	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
+		api.V0041UpdateNodeMsg{
+			State: ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateRESUME}),
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("post undrain slurm node: %w", err)
 	}
