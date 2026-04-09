@@ -142,6 +142,17 @@ type NodeSetSpec struct {
 	// +kubebuilder:default=false
 	EphemeralNodes *bool `json:"ephemeralNodes,omitempty"`
 
+	// InitialNumberEphemeralNodes specifies the initial number of powered-up nodes
+	// when the NodeSetPowerState is first created and EphemeralNodes is true.
+	// Changing this value after the initial creation has no effect; use NodeSetPowerState
+	// directly to scale active nodes up or down.
+	// Defaults to 1.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
+	InitialNumberEphemeralNodes int32 `json:"initialNumberEphemeralNodes,omitempty"`
+
 	// EphemeralTopologyWaitTimeout specifies the maximum time (in seconds) to wait
 	// for topology data to become available before starting slurmd.
 	// Only used when EphemeralNodes is true.

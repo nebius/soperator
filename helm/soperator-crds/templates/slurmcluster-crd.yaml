@@ -17645,6 +17645,17 @@ spec:
                         type: boolean
                     type: object
                 type: object
+              initialNumberEphemeralNodes:
+                default: 1
+                description: |-
+                  InitialNumberEphemeralNodes specifies the initial number of powered-up nodes
+                  when the NodeSetPowerState is first created and EphemeralNodes is true.
+                  Changing this value after the initial creation has no effect; use NodeSetPowerState
+                  directly to scale active nodes up or down.
+                  Defaults to 1.
+                format: int32
+                minimum: 1
+                type: integer
               maxUnavailable:
                 anyOf:
                 - type: integer
