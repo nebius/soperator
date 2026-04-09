@@ -5363,15 +5363,6 @@ spec:
                 description: PodTemplateNameRef points to a PodTemplate that contains
                   the pod configuration.
                 type: string
-              requiresGpu:
-                default: false
-                description: |-
-                  RequiresGPU declares that this check needs GPU workers. When true, the
-                  slurm_check_job entrypoint inspects /etc/slurm/slurm.conf and exits
-                  early (marking the run Skipped) if no GPU gres is available, without
-                  attempting to submit a slurm job. Only the slurmJob path honors this
-                  flag today.
-                type: boolean
               runAfterCreation:
                 default: true
                 description: RunAfterCreation specifies whether the job should run
@@ -9683,6 +9674,14 @@ spec:
                       workingDir:
                         type: string
                     type: object
+                  requiresGpu:
+                    default: false
+                    description: |-
+                      RequiresGPU declares that this check needs GPU workers. When true, the
+                      slurm_check_job entrypoint inspects /etc/slurm/slurm.conf and exits
+                      early (marking the run Skipped) if no GPU gres is available, without
+                      attempting to submit a slurm job.
+                    type: boolean
                   sbatchScript:
                     description: Multiline sbatch script
                     type: string

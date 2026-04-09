@@ -27,9 +27,6 @@ spec:
   hostUsers: {{ include "soperator-activechecks.hostUsers" $root }}
   suspend: {{ default false $check.suspend }}
   runAfterCreation: {{ default false $check.runAfterCreation }}
-  {{- if $check.requiresGpu }}
-  requiresGpu: true
-  {{- end }}
   {{- if eq $check.checkType "slurmJob" }}
   slurmJobSpec:
 {{ include "soperator-activechecks.slurmJobSpec" (dict "check" $check "ctx" $root) | indent 4 }}

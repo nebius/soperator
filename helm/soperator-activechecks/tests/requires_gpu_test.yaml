@@ -2,77 +2,80 @@ suite: test requiresGpu rendering
 templates:
   - templates/active-checks.yaml
 tests:
-  - it: should render requiresGpu when set to true in values
+  - it: should render slurmJobSpec.requiresGpu when set to true in values
     documentSelector:
       path: metadata.name
       value: test-requires-gpu-true
     set:
       slurmClusterRefName: test-cluster
       images:
-        k8sJob: "test-image:latest"
+        slurmJob: "test-image:latest"
+        munge: "munge-image:latest"
       jobContainer:
+        env: []
         volumeMounts: []
         volumes: []
       checks:
         test-requires-gpu-true:
           enabled: true
-          requiresGpu: true
-          checkType: k8sJob
-          k8sJobSpec:
-            jobContainer:
-              command: ["echo", "test"]
+          checkType: slurmJob
+          slurmJobSpec:
+            sbatchScriptFile: "scripts/cuda-samples.sh"
+            requiresGpu: true
     asserts:
       - isKind:
           of: ActiveCheck
       - equal:
-          path: spec.requiresGpu
+          path: spec.slurmJobSpec.requiresGpu
           value: true
 
-  - it: should omit requiresGpu when not set in values
+  - it: should omit slurmJobSpec.requiresGpu when not set in values
     documentSelector:
       path: metadata.name
       value: test-requires-gpu-unset
     set:
       slurmClusterRefName: test-cluster
       images:
-        k8sJob: "test-image:latest"
+        slurmJob: "test-image:latest"
+        munge: "munge-image:latest"
       jobContainer:
+        env: []
         volumeMounts: []
         volumes: []
       checks:
         test-requires-gpu-unset:
           enabled: true
-          checkType: k8sJob
-          k8sJobSpec:
-            jobContainer:
-              command: ["echo", "test"]
+          checkType: slurmJob
+          slurmJobSpec:
+            sbatchScriptFile: "scripts/cuda-samples.sh"
     asserts:
       - isKind:
           of: ActiveCheck
       - notExists:
-          path: spec.requiresGpu
+          path: spec.slurmJobSpec.requiresGpu
 
-  - it: should omit requiresGpu when explicitly set to false
+  - it: should omit slurmJobSpec.requiresGpu when explicitly set to false
     documentSelector:
       path: metadata.name
       value: test-requires-gpu-false
     set:
       slurmClusterRefName: test-cluster
       images:
-        k8sJob: "test-image:latest"
+        slurmJob: "test-image:latest"
+        munge: "munge-image:latest"
       jobContainer:
+        env: []
         volumeMounts: []
         volumes: []
       checks:
         test-requires-gpu-false:
           enabled: true
-          requiresGpu: false
-          checkType: k8sJob
-          k8sJobSpec:
-            jobContainer:
-              command: ["echo", "test"]
+          checkType: slurmJob
+          slurmJobSpec:
+            sbatchScriptFile: "scripts/cuda-samples.sh"
+            requiresGpu: false
     asserts:
       - isKind:
           of: ActiveCheck
       - notExists:
-          path: spec.requiresGpu
+          path: spec.slurmJobSpec.requiresGpu

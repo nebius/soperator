@@ -50,7 +50,6 @@ activeCheckImage: ""
 checks:
   all-reduce-perf-nccl-in-docker:
     enabled: true
-    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -63,12 +62,12 @@ checks:
       sbatchScriptFile: "scripts/all-reduce-perf-nccl-in-docker.sh"
       eachWorkerJobs: true
       maxNumberOfJobs: 200
+      requiresGpu: true
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
   all-reduce-perf-nccl-with-ib:
     enabled: true
-    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -81,12 +80,12 @@ checks:
       sbatchScriptFile: "scripts/all-reduce-perf-nccl-with-ib.sh"
       eachWorkerJobs: true
       maxNumberOfJobs: 200
+      requiresGpu: true
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
   all-reduce-perf-nccl-without-ib:
     enabled: true
-    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -98,12 +97,12 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/all-reduce-perf-nccl-without-ib.sh"
       eachWorkerJobs: true
+      requiresGpu: true
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
   cuda-samples:
     enabled: true
-    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -116,6 +115,7 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/cuda-samples.sh"
       eachWorkerJobs: true
+      requiresGpu: true
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -134,7 +134,6 @@ checks:
       eachWorkerJobs: true
   dcgmi-diag-r2:
     enabled: true
-    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -146,12 +145,12 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/dcgmi-diag-r2.sh"
       eachWorkerJobs: true
+      requiresGpu: true
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
   dcgmi-diag-r3:
     enabled: true
-    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -162,6 +161,7 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/dcgmi-diag-r3.sh"
       eachWorkerJobs: true
+      requiresGpu: true
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -184,9 +184,15 @@ checks:
     runAfterCreation: true
     slurmJobSpec:
       sbatchScriptFile: "scripts/ensure-healthy-nodes.sh"
+  # NOTE: extensive-check sets requiresGpu: true, so it is Skipped on
+  # CPU-only clusters. The stuck-reservation concern does not apply today
+  # because every failureReaction that drains a node with [node_problem]
+  # belongs to a GPU check that is itself Skipped on CPU-only — nothing
+  # drains, nothing creates a suspicious-node reservation, and nothing
+  # gets stuck. If a non-GPU check with drainSlurmNode.drainReasonPrefix=
+  # [node_problem] is ever added, this assumption must be revisited.
   extensive-check:
     enabled: true
-    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -202,6 +208,7 @@ checks:
     drainReasonPrefix: "[hardware_problem]"
     slurmJobSpec:
       sbatchScriptFile: "scripts/extensive-check.sh"
+      requiresGpu: true
       jobContainer:
         extraEnv:
           - name: "SLURM_EXTRA_COMMENT_JSON"
@@ -216,7 +223,6 @@ checks:
         prefix: "suspicious-node"
   gpu-fryer:
     enabled: true
-    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -229,12 +235,12 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/gpu-fryer.sh"
       eachWorkerJobs: true
+      requiresGpu: true
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
   ib-gpu-perf:
     enabled: true
-    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -248,12 +254,12 @@ checks:
       sbatchScriptFile: "scripts/ib-gpu-perf.sh"
       eachWorkerJobs: true
       maxNumberOfJobs: 200
+      requiresGpu: true
     failureReactions:
       commentSlurmNode:
         commentPrefix: "[node_problem]"
   mem-perf:
     enabled: true
-    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -266,6 +272,7 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/mem-perf.sh"
       eachWorkerJobs: true
+      requiresGpu: true
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -329,7 +336,6 @@ checks:
             value: "/opt/soperator-outputs/nccl_logs"
   prepull-container-image:
     enabled: true
-    requiresGpu: true
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -339,6 +345,7 @@ checks:
     runAfterCreation: true
     slurmJobSpec:
       sbatchScriptFile: "scripts/prepull-container-image.sh"
+      requiresGpu: true
   soperator-outputs-logs-cleaner:
     enabled: true
     checkType: "k8sJob"

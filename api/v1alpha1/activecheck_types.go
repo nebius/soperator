@@ -110,15 +110,6 @@ type ActiveCheckSpec struct {
 	// FailureReactions defines reaction on specific check when it fails
 	// +kubebuilder:validation:Optional
 	FailureReactions *Reactions `json:"failureReactions,omitempty"`
-
-	// RequiresGPU declares that this check needs GPU workers. When true, the
-	// slurm_check_job entrypoint inspects /etc/slurm/slurm.conf and exits
-	// early (marking the run Skipped) if no GPU gres is available, without
-	// attempting to submit a slurm job. Only the slurmJob path honors this
-	// flag today.
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	RequiresGPU bool `json:"requiresGpu,omitempty"`
 }
 
 type Reactions struct {
@@ -193,6 +184,14 @@ type SlurmJobSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=0
 	MaxNumberOfJobs *int64 `json:"maxNumberOfJobs,omitempty"`
+
+	// RequiresGPU declares that this check needs GPU workers. When true, the
+	// slurm_check_job entrypoint inspects /etc/slurm/slurm.conf and exits
+	// early (marking the run Skipped) if no GPU gres is available, without
+	// attempting to submit a slurm job.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	RequiresGPU bool `json:"requiresGpu,omitempty"`
 }
 
 // ActiveCheckK8sJobsStatus defines the observed state of ActiveCheck k8s jobs.
