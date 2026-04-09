@@ -24,8 +24,9 @@ on:
     tags:
       - "**" # Trigger on any tag
 
-  # pull_request are defined separately to allow to run CI from forks.
-  pull_request:
+  # pull_request_target runs in base branch context, giving fork PRs access to secrets.
+  # The "authorize" job gates fork PRs behind environment approval.
+  pull_request_target:
     types: [opened, synchronize, reopened]
 
 permissions:
@@ -36,17 +37,32 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
 
 jobs:
+  authorize:
+    name: Authorize
+    runs-on: ubuntu-latest
+    environment: >-
+      ${{
+        github.event_name == 'pull_request_target'
+        && github.event.pull_request.head.repo.full_name != github.repository
+        && 'fork-ci' || ''
+      }}
+    steps:
+      - run: echo "Authorized"
+
   changes:
     name: Detect Changes
+    needs: [authorize]
     runs-on: ubuntu-latest
     outputs:
-      should_build: ${{ steps.filter.outputs.has_code_changes == 'true' || github.event_name != 'pull_request' }}
+      should_build: ${{ steps.filter.outputs.has_code_changes == 'true' || github.event_name != 'pull_request_target' }}
     steps:
       - uses: actions/checkout@v6
-      - uses: dorny/paths-filter@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           predicate-quantifier: 'every'
@@ -76,6 +92,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Fetch git history for the VERSION file changes detection
 
       - name: Install GO
@@ -100,7 +117,7 @@ jobs:
 
       # This artifact is consumed by e2e_test.yml to determine which version to test.
       - name: Upload version artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: version
           path: version.txt
@@ -120,13 +137,15 @@ jobs:
           fi
 
   lint:
-    needs: [changes]
+    needs: [changes, authorize]
     if: needs.changes.outputs.should_build == 'true'
     runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install GO
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -157,7 +176,7 @@ jobs:
           GOARCH: arm64
           GOOS: darwin
 
-  build-docker-images:
+  build-soperator-images:
     needs:
       - changes
       - pre-build
@@ -186,6 +205,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install GO
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -203,14 +224,14 @@ jobs:
           echo "Nfs version: $NFS_VERSION"
 
       - name: Log in to the Github Container registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
       - name: Install Nebius CLI
         shell: bash
@@ -272,6 +293,84 @@ jobs:
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=soperator-exporter DOCKERFILE=soperator-controllers/Dockerfile \
             IMAGE_VERSION=${IMAGE_VERSION}
 
+  build-slurm-images:
+    needs:
+      - changes
+      - pre-build
+    if: needs.changes.outputs.should_build == 'true'
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ linux/amd64, linux/arm64 ]
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+            arch: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            arch: arm64
+
+    env:
+      UNSTABLE: ${{ needs.pre-build.outputs.unstable }}
+      VERSION: ${{ needs.pre-build.outputs.version }}
+      IMAGE_VERSION: ${{ needs.pre-build.outputs.image_version }}
+      OPERATOR_IMAGE_TAG: ${{ needs.pre-build.outputs.operator_image_tag }}
+      NFS_VERSION: ${{ needs.pre-build.outputs.nfs_version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install GO
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: "go.mod"
+          cache: false
+
+      - name: Read version and unstable
+        id: read-version
+        run: |
+          echo "Version: $VERSION"
+          echo "Unstable: $UNSTABLE"
+          echo "Image version: $IMAGE_VERSION"
+          echo "Operator image tag: $OPERATOR_IMAGE_TAG"
+          echo "Nfs version: $NFS_VERSION"
+
+      - name: Log in to the Github Container registry
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Install Nebius CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+          echo "$HOME/.nebius/bin" >> "$GITHUB_PATH"
+          mkdir -p "$HOME/.nebius"
+          echo "${{ secrets.NEBIUS_CONFIG_YAML_B64 }}" | base64 -d > "$HOME/.nebius/config.yaml"
+          chmod 600 "$HOME/.nebius/config.yaml"
+
+      - name: Configure Nebius docker credential-helper for auth
+        shell: bash
+        run: nebius registry configure-helper
+
+      - name: Build and push Docker images
+        shell: bash
+        run: |
+          echo "Building for platform: ${{ matrix.platform }}"
+
+          make sync-version UNSTABLE=${UNSTABLE}
+          
           echo "munge - ${IMAGE_VERSION}"
           make docker-build-and-push \
             PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
@@ -362,6 +461,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install GO
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -370,14 +471,14 @@ jobs:
           cache: false
 
       - name: Log in to the Github Container registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
       - name: Install Nebius CLI
         shell: bash
@@ -425,7 +526,8 @@ jobs:
     name: Create docker-images manifests
     needs:
       - pre-build
-      - build-docker-images
+      - build-soperator-images
+      - build-slurm-images
     runs-on: ubuntu-24.04
 
     env:
@@ -438,6 +540,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install Nebius CLI
         shell: bash
@@ -454,10 +558,10 @@ jobs:
         run: nebius registry configure-helper
 
       - name: Set up Docker Buildx (for imagetools)
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
       - name: Log in to the Github Container registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -550,6 +654,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install Nebius CLI
         shell: bash
@@ -566,10 +672,10 @@ jobs:
         run: nebius registry configure-helper
 
       - name: Set up Docker Buildx (for imagetools)
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
       - name: Log in to the Github Container registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -599,6 +705,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install GO
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -642,6 +750,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -691,7 +801,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: helm-integration-test-results
           path: |
@@ -707,7 +817,8 @@ jobs:
       - changes
       - pre-build
       - lint
-      - build-docker-images
+      - build-slurm-images
+      - build-soperator-images
       - manifest-populate-jail
       - build-helm-charts
       - helm-integration-test

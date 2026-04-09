@@ -181,3 +181,31 @@ func RenderSSHDKeysSecret(
 }
 
 // endregion Sshd keys
+
+// region SSSD conf
+
+// RenderSecretDefaultSSSDConf renders a Secret containing the sssd.conf file.
+func RenderSecretDefaultSSSDConf(
+	namespace, clusterName, secretName string,
+	componentType consts.ComponentType,
+) corev1.Secret {
+	return corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: namespace,
+			Labels:    RenderLabels(componentType, clusterName),
+		},
+		Data: map[string][]byte{
+			consts.SssdConfig: []byte(`[sssd]
+services = nss, pam
+enable_files_domain = true
+
+[nss]
+
+[pam]
+`),
+		},
+	}
+}
+
+// endregion SSSD conf

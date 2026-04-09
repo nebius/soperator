@@ -158,7 +158,7 @@ mpiConfig:
 plugStackConfig:
   pyxis:
     required: true
-    containerImageSave: "/var/cache/enroot-container-images/"
+    importerPath: /opt/slurm_scripts/pyxis_caching_importer.sh
   ncclDebug:
     required: false
     enabled: true
@@ -174,6 +174,39 @@ plugStackConfig:
 #        foo: bar
 
 slurmNodes:
+  sssd:
+    enabled: false
+    sssdDebugLevel: 0
+    imagePullPolicy: "IfNotPresent"
+    appArmorProfile: "unconfined"
+    command: []
+    args: []
+    livenessProbe:
+      exec:
+        command:
+          - /bin/sh
+          - -c
+          - test -S /var/lib/sss/pipes/nss && test -S /var/lib/sss/pipes/pam
+      timeoutSeconds: 1
+      periodSeconds: 10
+      successThreshold: 1
+      failureThreshold: 3
+    readinessProbe:
+      exec:
+        command:
+          - /bin/sh
+          - -c
+          - test -S /var/lib/sss/pipes/nss && test -S /var/lib/sss/pipes/pam
+      timeoutSeconds: 1
+      periodSeconds: 10
+      successThreshold: 1
+      failureThreshold: 3
+    resources:
+      cpu: "200m"
+      memory: "500Mi"
+      ephemeralStorage: "5Gi"
+    sssdConfSecretRefName: ""
+    sssdLdapCAConfigMapRefName: ""
   accounting:
     enabled: false
     k8sNodeFilterName: "no-gpu"
@@ -208,6 +241,14 @@ slurmNodes:
       appArmorProfile: "unconfined"
       command: []
       args: []
+      readinessProbe:
+        tcpSocket:
+          port: 6819
+        failureThreshold: 3
+        initialDelaySeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 1
       port: 6819
       resources:
         cpu: "1000m"
@@ -216,6 +257,26 @@ slurmNodes:
     munge:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      livenessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - /usr/bin/munge -n > /dev/null && exit 0 || exit 1
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
+      readinessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - test -S /run/munge/munge.socket.2
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
       resources:
         cpu: "1000m"
         memory: "1Gi"
@@ -326,6 +387,16 @@ slurmNodes:
       appArmorProfile: "unconfined"
       command: []
       args: []
+      livenessProbe:
+        exec:
+          command:
+            - scontrol
+            - ping
+        initialDelaySeconds: 25
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
       port: 6817
       resources:
         cpu: "1000m"
@@ -336,6 +407,26 @@ slurmNodes:
       appArmorProfile: "unconfined"
       command: []
       args: []
+      livenessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - /usr/bin/munge -n > /dev/null && exit 0 || exit 1
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
+      readinessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - test -S /run/munge/munge.socket.2
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
       resources:
         cpu: "1000m"
         memory: "1Gi"
@@ -361,6 +452,13 @@ slurmNodes:
     sshd:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
+      readinessProbe:
+        tcpSocket:
+          port: 22
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
       port: 22
       resources:
         cpu: "3000m"
@@ -389,6 +487,26 @@ slurmNodes:
       appArmorProfile: "unconfined"
       command: []
       args: []
+      livenessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - /usr/bin/munge -n > /dev/null && exit 0 || exit 1
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
+      readinessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - test -S /run/munge/munge.socket.2
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
       resources:
         cpu: "500m"
         memory: "500Mi"
@@ -431,10 +549,20 @@ slurmNodes:
       appArmorProfile: "unconfined"
       command: []
       args: []
+      # Deprecated legacy exporter config. Use exporterContainer below for probes/resources.
       resources:
         cpu: "250m"
         memory: "256Mi"
         ephemeralStorage: "500Mi"
+    exporterContainer:
+    # livenessProbe:
+    #   httpGet:
+    #     path: /healthz
+    #     port: 8081
+    # readinessProbe:
+    #   httpGet:
+    #     path: /readyz
+    #     port: 8081
     munge:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
@@ -461,6 +589,14 @@ slurmNodes:
       appArmorProfile: "unconfined"
       command: []
       args: []
+      livenessProbe:
+        tcpSocket:
+          port: 6820
+        failureThreshold: 5
+        initialDelaySeconds: 15
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 1
       resources:
         cpu: "2000m"
         memory: "8Gi"
@@ -474,6 +610,8 @@ sConfigController:
     size: 1
   container:
     imagePullPolicy: "IfNotPresent"
+    # livenessProbe: {}
+    # readinessProbe: {}
     resources:
       cpu: "250m"
       memory: "256Mi"
@@ -501,17 +639,18 @@ sConfigController:
     # This field is required in the SlurmCluster CR - it will be automatically populated from this value
     name: ""
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:3.0.2-slurm25.11.3"
-  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:3.0.2-slurm25.11.3"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:3.0.2-slurm25.11.3"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:3.0.2-slurm25.11.3"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:3.0.2-slurm25.11.3"
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:4.0.0-slurm25.11.3"
+  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:4.0.0-slurm25.11.3"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:4.0.0-slurm25.11.3"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:4.0.0-slurm25.11.3"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:4.0.0-slurm25.11.3"
+  sssd: "cr.eu-north1.nebius.cloud/soperator/sssd:2.9.4-1-63"
   populateJail: ""
   populateJailRepository: "cr.eu-north1.nebius.cloud/soperator/populate_jail"
-  populateJailTag: "3.0.2-slurm25.11.3"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:3.0.2-slurm25.11.3"
-  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:3.0.2-slurm25.11.3"
-  sConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:3.0.2"
+  populateJailTag: "4.0.0-slurm25.11.3"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:4.0.0-slurm25.11.3"
+  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:4.0.0-slurm25.11.3"
+  sConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:4.0.0"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:12.1.2"
 # Configuration for slurm scripts.
 slurmScripts:
@@ -520,6 +659,7 @@ slurmScripts:
   prolog.sh: null
   epilog.sh: null
   hc_program.sh: null
+  pyxis_caching_importer.sh: null
   # Built-in scripts can be overridden or disabled here
   # Keys must match file names in slurm_scripts/
   builtIn:

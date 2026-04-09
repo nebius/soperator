@@ -20,6 +20,15 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeSecurityLimits(clusterName, consts.ComponentTypeController),
 		common.RenderVolumeRESTJWTKey(clusterName),
 	}
+	if controller.ContainerSSSD != nil {
+		volumes = append(volumes,
+			common.RenderVolumeSSSDSocket(),
+			common.RenderVolumeSSSDConf(controller.SSSDConfSecretName),
+		)
+		if controller.SSSDLdapCAConfigMapName != "" {
+			volumes = append(volumes, common.RenderVolumeSSSDLdapCA(controller.SSSDLdapCAConfigMapName))
+		}
+	}
 
 	// Spool, Jail and CustomVolumes could be specified by template spec or by volume source name
 	{

@@ -11,8 +11,6 @@ import (
 	"github.com/hashicorp/terraform-exec/tfexec"
 )
 
-const k8sClusterName = "soperator-e2e-test"
-
 // tfDestroyLogPathEnvVar, when set, enables terraform DEBUG logging for the
 // destroy flow and writes it to the given file. terraform-exec strips TF_LOG
 // from the child process env unless SetLogPath has been called on the handle,

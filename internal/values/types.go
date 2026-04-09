@@ -17,7 +17,8 @@ import (
 type Container struct {
 	slurmv1.NodeContainer
 
-	Name string
+	Name           string
+	SSSDDebugLevel int32
 }
 
 func buildContainerFrom(

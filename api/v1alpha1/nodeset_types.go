@@ -169,6 +169,29 @@ type NodeSetSpec struct {
 	// +kubebuilder:validation:Required
 	Munge ContainerMungeSpec `json:"munge"`
 
+	// SSSD defines the SSSD sidecar configuration.
+	//
+	// +kubebuilder:validation:Optional
+	SSSD *ContainerSSSDSpec `json:"sssd,omitempty"`
+
+	// SSSDDebugLevel defines the SSSD debug verbosity level.
+	// Lower values are suitable for production, higher values are intended for troubleshooting.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=0
+	SSSDDebugLevel int32 `json:"sssdDebugLevel,omitempty"`
+
+	// SSSDConfSecretRefName is the name of the Secret containing sssd.conf for worker and sssd sidecar containers.
+	//
+	// +kubebuilder:validation:Optional
+	SSSDConfSecretRefName string `json:"sssdConfSecretRefName,omitempty"`
+
+	// SSSDLdapCAConfigMapRefName is the name of the ConfigMap containing LDAP CA certificates for the sssd sidecar.
+	//
+	// +kubebuilder:validation:Optional
+	SSSDLdapCAConfigMapRefName string `json:"sssdLdapCAConfigMapRefName,omitempty"`
+
 	// NodeConfig provides possibility to define extra values set for Node in `slurm.conf`.
 	NodeConfig NodeConfig `json:"nodeConfig,omitempty"`
 
@@ -260,6 +283,16 @@ type ContainerSlurmdSpec struct {
 	// +kubebuilder:validation:Optional
 	Port int32 `json:"port,omitempty"`
 
+	// LivenessProbe defines the liveness probe for the slurmd container.
+	//
+	// +kubebuilder:validation:Optional
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// ReadinessProbe defines the readiness probe for the slurmd container.
+	//
+	// +kubebuilder:validation:Optional
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
+
 	// Security defines the security configuration for the container
 	//
 	// +kubebuilder:validation:Optional
@@ -277,6 +310,44 @@ type ContainerMungeSpec struct {
 	//
 	// +kubebuilder:validation:Required
 	Resources corev1.ResourceList `json:"resources,omitempty"`
+
+	// LivenessProbe defines the liveness probe for the munge container.
+	//
+	// +kubebuilder:validation:Optional
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// ReadinessProbe defines the readiness probe for the munge container.
+	//
+	// +kubebuilder:validation:Optional
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
+
+	// Security defines the security configuration for the container
+	//
+	// +kubebuilder:validation:Optional
+	Security ContainerSecuritySpec `json:"security,omitempty"`
+}
+
+// ContainerSSSDSpec defines the SSSD sidecar configuration.
+type ContainerSSSDSpec struct {
+	// Image defines the image used for the SSSD container
+	//
+	// +kubebuilder:validation:Required
+	Image Image `json:"image"`
+
+	// Resources define the [corev1.ResourceList] for the SSSD container.
+	//
+	// +kubebuilder:validation:Required
+	Resources corev1.ResourceList `json:"resources,omitempty"`
+
+	// LivenessProbe defines the liveness probe for the SSSD container.
+	//
+	// +kubebuilder:validation:Optional
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// ReadinessProbe defines the readiness probe for the SSSD container.
+	//
+	// +kubebuilder:validation:Optional
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
 
 	// Security defines the security configuration for the container
 	//

@@ -2,7 +2,8 @@ name: E2E Test Scheduler
 
 on:
   schedule:
-    - cron: '0 */2 * * *'
+    - cron: '0 0,3,6,9,12,15,18,21 * * *'
+    - cron: '30 1,4,7,10,13,16,19,22 * * *'
   workflow_dispatch:  # Allow manual trigger for testing
 
 permissions:
@@ -12,6 +13,7 @@ permissions:
 jobs:
   trigger-e2e:
     runs-on: ubuntu-latest
+    environment: e2e
 
     steps:
       - name: Checkout repository
@@ -20,8 +22,11 @@ jobs:
       - name: Install yq
         uses: frenck/action-setup-yq@v1
 
-      - name: Determine branch and terraform ref
-        id: select_params
+      - name: Trigger E2E tests for all profiles
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SCHEDULING_YAML: ${{ vars.SCHEDULING_YAML }}
+          DEFAULT_PROFILE_ENV_VAR: ${{ vars.PROFILE_ENV_VAR }}
         shell: bash
         run: |
           readarray -t RELEASE_BRANCHES < <(yq -r '.e2e_release_branches[]' .github/branch-config.yaml)
@@ -29,27 +34,34 @@ jobs:
           BRANCH_COUNT=${#BRANCHES[@]}
 
           RUN_NUMBER=${{ github.run_number }}
-          RUN_INDEX=$(( RUN_NUMBER % BRANCH_COUNT ))
-          REF="${BRANCHES[$RUN_INDEX]}"
-          TERRAFORM_REF="$REF"
 
-          echo "ref=$REF" >> $GITHUB_OUTPUT
-          echo "terraform_ref=$TERRAFORM_REF" >> $GITHUB_OUTPUT
-          echo "Testing branch $REF (run #$RUN_NUMBER, index $RUN_INDEX of $BRANCH_COUNT branches)"
+          # Parse profiles from SCHEDULING_YAML, falling back to the default profile variable
+          if [[ -n "$SCHEDULING_YAML" ]]; then
+            readarray -t PROFILES < <(echo "$SCHEDULING_YAML" | yq -r '.profiles[]')
+          else
+            PROFILES=("${DEFAULT_PROFILE_ENV_VAR:-E2E_PROFILE}")
+          fi
 
-      - name: Trigger E2E test workflow
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          REF="${{ steps.select_params.outputs.ref }}"
-          TERRAFORM_REF="${{ steps.select_params.outputs.terraform_ref }}"
+          echo "Profiles: ${PROFILES[*]}"
+          echo "Branches: ${BRANCHES[*]}"
+          echo "Run number: $RUN_NUMBER"
 
-          echo "Triggering E2E test on branch: $REF"
-          echo "With terraform ref: $TERRAFORM_REF"
+          for i in "${!PROFILES[@]}"; do
+            PROFILE_NAME="${PROFILES[$i]}"
+            BRANCH_INDEX=$(( (RUN_NUMBER + i) % BRANCH_COUNT ))
+            REF="${BRANCHES[$BRANCH_INDEX]}"
+            TERRAFORM_REF="$REF"
 
-          gh workflow run e2e_test.yml \
-            --ref "$REF" \
-            -f terraform_repo_ref="$TERRAFORM_REF" \
-            -f is_scheduled=true
-          echo "E2E test workflow triggered successfully"
+            echo "---"
+            echo "Profile: $PROFILE_NAME"
+            echo "Branch: $REF (index $BRANCH_INDEX)"
+            echo "Terraform ref: $TERRAFORM_REF"
+
+            gh workflow run e2e_test.yml \
+              --ref "$REF" \
+              -f profile_env_var="$PROFILE_NAME" \
+              -f terraform_repo_ref="$TERRAFORM_REF" \
+              -f is_scheduled=true
+
+            echo "Triggered E2E test for profile $PROFILE_NAME on branch $REF"
+          done

@@ -150,6 +150,12 @@ func renderContainerNodeSetSlurmd(
 		renderVolumeMountSupervisordConfigMap(),
 		renderVolumeMountSshdConfigs(),
 	}
+	if nodeSet.ContainerSSSD != nil {
+		volumeMounts = append(volumeMounts,
+			common.RenderVolumeMountSSSDSocket(),
+			common.RenderVolumeMountSSSDConf(),
+		)
+	}
 	if nodeSet.GPU.Enabled {
 		volumeMounts = append(volumeMounts, renderVolumeMountNvidia())
 	}
@@ -246,10 +252,18 @@ func renderContainerNodeSetSlurmd(
 			SeccompProfile: &corev1.SeccompProfile{
 				Type: corev1.SeccompProfileTypeUnconfined,
 			},
-			ProcMount:       ptr.To(nodeSet.ContainerSlurmd.ProcMount),
+			ProcMount: func() *corev1.ProcMountType {
+				if nodeSet.ContainerSlurmd.ProcMount == "" {
+					return nil
+				}
+				v := nodeSet.ContainerSlurmd.ProcMount
+				return &v
+			}(),
 			AppArmorProfile: common.ParseAppArmorProfile(appArmorProfile),
 		},
 		Resources:                resources,
+		LivenessProbe:            nodeSet.ContainerSlurmd.LivenessProbe,
+		ReadinessProbe:           nodeSet.ContainerSlurmd.ReadinessProbe,
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}, nil

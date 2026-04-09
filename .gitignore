@@ -4,6 +4,7 @@
 bin
 cover.out
 .vscode
+.gocache
 version.txt
 
 # ignoring generated version folder

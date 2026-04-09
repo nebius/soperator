@@ -24,6 +24,8 @@
     owner: root
     group: root
     mode: "{{ item.mode }}"
+  no_log: true
+  diff: false
   loop:
     - { "path": .ssh/config, "dest_folder": "/etc/skel/", mode: "0600" }
     - { "path": .ssh/config, "dest_folder": "/root/", mode: "0600" }

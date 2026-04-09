@@ -2,7 +2,6 @@ package login
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -16,6 +15,7 @@ func renderContainerSshd(
 	clusterType consts.ClusterType,
 	container *values.Container,
 	jailSubMounts, customMounts []slurmv1.NodeVolumeMount,
+	containerSSSD *values.Container,
 	appArmorProfile string,
 ) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
@@ -27,6 +27,12 @@ func renderContainerSshd(
 		common.RenderVolumeMountInMemory(),
 		common.RenderVolumeMountTmpDisk(),
 		renderVolumeMountSshdConfigs(),
+	}
+	if containerSSSD != nil {
+		volumeMounts = append(volumeMounts,
+			common.RenderVolumeMountSSSDSocket(),
+			common.RenderVolumeMountSSSDConf(),
+		)
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(jailSubMounts, consts.VolumeMountPathJailUpper)...)
 	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(customMounts, "")...)
@@ -52,18 +58,9 @@ func renderContainerSshd(
 			ContainerPort: container.Port,
 			Protocol:      corev1.ProtocolTCP,
 		}},
-		VolumeMounts: volumeMounts,
-		ReadinessProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				TCPSocket: &corev1.TCPSocketAction{
-					Port: intstr.FromInt32(container.Port),
-				},
-			},
-			TimeoutSeconds:   common.DefaultProbeTimeoutSeconds,
-			PeriodSeconds:    common.DefaultProbePeriodSeconds,
-			SuccessThreshold: common.DefaultProbeSuccessThreshold,
-			FailureThreshold: common.DefaultProbeFailureThreshold,
-		},
+		VolumeMounts:   volumeMounts,
+		LivenessProbe:  container.LivenessProbe,
+		ReadinessProbe: container.ReadinessProbe,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: ptr.To(true),
 			Capabilities: &corev1.Capabilities{

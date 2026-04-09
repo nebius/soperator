@@ -26,14 +26,18 @@ type SlurmNodeSet struct {
 
 	ContainerSlurmd           Container
 	ContainerMunge            Container
+	ContainerSSSD             *Container
 	CustomInitContainers      []corev1.Container
 	AppArmorProfileUseDefault bool
 
 	SupervisorDConfigMapDefault bool
 	SupervisorDConfigMapName    string
 
-	SSHDConfigMapDefault bool
-	SSHDConfigMapName    string
+	SSHDConfigMapDefault    bool
+	SSHDConfigMapName       string
+	IsSSSDSecretDefault     bool
+	SSSDConfSecretName      string
+	SSSDLdapCAConfigMapName string
 
 	GPU *slurmv1alpha1.GPUSpec
 
@@ -79,11 +83,13 @@ func BuildSlurmNodeSetFrom(
 		//
 		ContainerSlurmd: buildContainerFrom(
 			slurmv1.NodeContainer{
-				CustomEnv:            nodeSet.Spec.Slurmd.CustomEnv,
+				CustomEnv:            nsSpec.Slurmd.CustomEnv,
 				Image:                nsSpec.Slurmd.Image.GetURI(),
 				ImagePullPolicy:      nsSpec.Slurmd.Image.PullPolicy,
 				Port:                 nsSpec.Slurmd.Port,
 				Resources:            nsSpec.Slurmd.Resources.DeepCopy(),
+				LivenessProbe:        nsSpec.Slurmd.LivenessProbe,
+				ReadinessProbe:       nsSpec.Slurmd.ReadinessProbe,
 				SecurityLimitsConfig: nsSpec.Slurmd.Security.LimitsConfig,
 				AppArmorProfile:      nsSpec.Slurmd.Security.AppArmorProfile,
 				ProcMount:            nsSpec.Slurmd.Security.ProcMount,
@@ -95,6 +101,8 @@ func BuildSlurmNodeSetFrom(
 				Image:                nsSpec.Munge.Image.GetURI(),
 				ImagePullPolicy:      nsSpec.Munge.Image.PullPolicy,
 				Resources:            nsSpec.Munge.Resources.DeepCopy(),
+				LivenessProbe:        nsSpec.Munge.LivenessProbe,
+				ReadinessProbe:       nsSpec.Munge.ReadinessProbe,
 				SecurityLimitsConfig: nsSpec.Munge.Security.LimitsConfig,
 				AppArmorProfile:      nsSpec.Munge.Security.AppArmorProfile,
 			},
@@ -165,6 +173,39 @@ func BuildSlurmNodeSetFrom(
 		res.SSHDConfigMapDefault = sshdConfigDefault
 	}
 	// endregion SSHDConfig
+
+	// region SSSDSecret
+	{
+		var (
+			sssdSecretName = nsSpec.SSSDConfSecretRefName
+			sssdDefault    = false
+		)
+		if nsSpec.SSSD != nil {
+			if sssdSecretName == "" {
+				sssdDefault = true
+				sssdSecretName = naming.BuildNodeSetSecretSSSDConfName(clusterName, nodeSet.Name)
+			}
+			res.SSSDConfSecretName = sssdSecretName
+			res.SSSDLdapCAConfigMapName = nsSpec.SSSDLdapCAConfigMapRefName
+			res.IsSSSDSecretDefault = sssdDefault
+
+			containerSSSD := buildContainerFrom(
+				slurmv1.NodeContainer{
+					Image:                nsSpec.SSSD.Image.GetURI(),
+					ImagePullPolicy:      nsSpec.SSSD.Image.PullPolicy,
+					Resources:            nsSpec.SSSD.Resources.DeepCopy(),
+					LivenessProbe:        nsSpec.SSSD.LivenessProbe,
+					ReadinessProbe:       nsSpec.SSSD.ReadinessProbe,
+					SecurityLimitsConfig: nsSpec.SSSD.Security.LimitsConfig,
+					AppArmorProfile:      nsSpec.SSSD.Security.AppArmorProfile,
+				},
+				consts.ContainerNameSSSD,
+			)
+			containerSSSD.SSSDDebugLevel = nsSpec.SSSDDebugLevel
+			res.ContainerSSSD = &containerSSSD
+		}
+	}
+	// endregion SSSDSecret
 
 	return res
 }

@@ -93,6 +93,14 @@ spec:
     {{- end }}
 
     port: {{ .port | default 6818 }}
+    {{- with .livenessProbe }}
+    livenessProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .readinessProbe }}
+    readinessProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
 
     {{- with (required ".Values.nodesets[*].slurmd.resources is required" .resources) }}
     resources:
@@ -166,10 +174,69 @@ spec:
       ephemeral-storage: {{ . | quote }}
       {{- end }}
     {{- end }}
+    {{- with .livenessProbe }}
+    livenessProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .readinessProbe }}
+    readinessProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
 
     security:
       limitsConfig: {{ get (.security | default dict) "limitsConfig" | quote }}
       appArmorProfile: {{ get (.security | default dict) "appArmorProfile" | default "unconfined" | quote }}
+  {{- end }}
+
+  {{- $sssd := (.sssd | default dict) }}
+  {{- if $sssd.enabled }}
+  sssd:
+    image:
+    {{- if $sssd.image }}
+    {{- with $sssd.image }}
+      repository: {{ (required ".Values.nodesets[*].sssd.image.repository is required as the custom image is used." .repository) | quote }}
+
+      {{- with .tag }}
+      tag: {{ . | quote }}
+      {{- end }}
+
+      {{- with .pullPolicy }}
+      pullPolicy: {{ . }}
+      {{- end }}
+    {{- end }}
+    {{- else }}
+      repository: {{ (required ".Values.images.sssd.repository is required as the default image is used." $.Values.images.sssd.repository) | quote }}
+      {{- with $.Values.images.sssd.tag }}
+      tag: {{ . | quote }}
+      {{- end }}
+    {{- end }}
+
+    resources:
+      cpu: {{ default "200m" (get ($sssd.resources | default dict) "cpu") | quote }}
+      memory: {{ default "500Mi" (get ($sssd.resources | default dict) "memory") | quote }}
+      ephemeral-storage: {{ default "5Gi" (get ($sssd.resources | default dict) "ephemeralStorage") | quote }}
+    {{- with $sssd.livenessProbe }}
+    livenessProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $sssd.readinessProbe }}
+    readinessProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+
+    security:
+      limitsConfig: {{ get ($sssd.security | default dict) "limitsConfig" | quote }}
+      appArmorProfile: {{ get ($sssd.security | default dict) "appArmorProfile" | default "unconfined" | quote }}
+  {{- end }}
+
+  sssdDebugLevel: {{ default 0 ($sssd.sssdDebugLevel | default 0) }}
+
+  {{- with (.sssdConfSecretRefName | default "") }}
+  sssdConfSecretRefName: {{ . | quote }}
+  {{- end }}
+
+  {{- with (.sssdLdapCAConfigMapRefName | default "") }}
+  sssdLdapCAConfigMapRefName: {{ . | quote }}
   {{- end }}
 
   {{- with (.configMapRefSupervisord | default "") }}
