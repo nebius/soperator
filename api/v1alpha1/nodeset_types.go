@@ -142,9 +142,10 @@ type NodeSetSpec struct {
 	// +kubebuilder:default=false
 	EphemeralNodes *bool `json:"ephemeralNodes,omitempty"`
 
-	// InitialNumberEphemeralNodes specifies the initial number of nodes to be created when EphemeralNodes is true.
-	// This field is used to set the initial size of the NodeSet when using ephemeral nodes.
-	// It can be updated later to scale the NodeSet up or down.
+	// InitialNumberEphemeralNodes specifies the initial number of powered-up nodes
+	// when the NodeSetPowerState is first created and EphemeralNodes is true.
+	// Changing this value after the initial creation has no effect; use NodeSetPowerState
+	// directly to scale active nodes up or down.
 	// Defaults to 1.
 	//
 	// +kubebuilder:validation:Optional
