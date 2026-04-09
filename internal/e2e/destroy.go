@@ -4,11 +4,24 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
 )
+
+// tfDestroyLogPathEnvVar, when set, enables terraform DEBUG logging for the
+// destroy flow and writes it to the given file. terraform-exec strips TF_LOG
+// from the child process env unless SetLogPath has been called on the handle,
+// so this opt-in path is the only way to get terraform logs out of bin/e2e
+// destroy. The file is typically uploaded as a CI artifact afterwards.
+//
+// The resulting file contains terraform DEBUG output: operational identifiers
+// (tenant/project/cluster/bucket IDs) and AWS-style access key IDs in SigV4
+// Authorization headers. Raw secrets, bearer tokens, and HTTP bodies are not
+// captured at DEBUG level, but treat the artifact as semi-sensitive.
+const tfDestroyLogPathEnvVar = "TF_DESTROY_LOG_PATH"
 
 func Destroy(ctx context.Context, cfg Config) error {
 	tf, varFilePath, cleanup, err := Init(ctx, cfg)
@@ -17,7 +30,24 @@ func Destroy(ctx context.Context, cfg Config) error {
 	}
 	defer cleanup()
 
+	enableTFDestroyLogging(tf)
+
 	return destroyWithK8sRecovery(ctx, tf, varFilePath, cfg.Profile.NebiusProjectID)
+}
+
+func enableTFDestroyLogging(tf *tfexec.Terraform) {
+	path := os.Getenv(tfDestroyLogPathEnvVar)
+	if path == "" {
+		return
+	}
+	if err := tf.SetLogPath(path); err != nil {
+		log.Printf("SetLogPath(%q) failed, continuing without terraform debug logging: %v", path, err)
+		return
+	}
+	if err := tf.SetLog("DEBUG"); err != nil {
+		log.Printf("SetLog(DEBUG) failed, terraform debug logging may remain disabled: %v", err)
+	}
+	log.Printf("Terraform debug logging enabled, writing to %s", path)
 }
 
 func destroyWithK8sRecovery(ctx context.Context, tf *tfexec.Terraform, varFilePath, nebiusProjectID string) error {
