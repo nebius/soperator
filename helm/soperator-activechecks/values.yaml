@@ -62,7 +62,6 @@ checks:
       sbatchScriptFile: "scripts/all-reduce-perf-nccl-in-docker.sh"
       eachWorkerJobs: true
       maxNumberOfJobs: 200
-      requiresGpu: true
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -80,7 +79,6 @@ checks:
       sbatchScriptFile: "scripts/all-reduce-perf-nccl-with-ib.sh"
       eachWorkerJobs: true
       maxNumberOfJobs: 200
-      requiresGpu: true
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -97,7 +95,6 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/all-reduce-perf-nccl-without-ib.sh"
       eachWorkerJobs: true
-      requiresGpu: true
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -115,7 +112,6 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/cuda-samples.sh"
       eachWorkerJobs: true
-      requiresGpu: true
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -132,7 +128,6 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/docker-memory-limit-oomkilled.sh"
       eachWorkerJobs: true
-      requiresGpu: true
   dcgmi-diag-r2:
     enabled: true
     checkType: "slurmJob"
@@ -146,7 +141,6 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/dcgmi-diag-r2.sh"
       eachWorkerJobs: true
-      requiresGpu: true
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -162,7 +156,6 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/dcgmi-diag-r3.sh"
       eachWorkerJobs: true
-      requiresGpu: true
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -185,14 +178,6 @@ checks:
     runAfterCreation: true
     slurmJobSpec:
       sbatchScriptFile: "scripts/ensure-healthy-nodes.sh"
-  # NOTE (SCHED-1417): extensive-check sets requiresGpu: true, so it is
-  # Skipped on CPU-only clusters. The stuck-reservation concern does not
-  # apply today because every failureReaction that drains a node with
-  # [node_problem] belongs to a GPU check that is itself Skipped on
-  # CPU-only — nothing drains, nothing creates a suspicious-node
-  # reservation, and nothing gets stuck. If a non-GPU check with
-  # drainSlurmNode.drainReasonPrefix=[node_problem] is ever added, this
-  # assumption must be revisited.
   extensive-check:
     enabled: true
     checkType: "slurmJob"
@@ -210,7 +195,6 @@ checks:
     drainReasonPrefix: "[hardware_problem]"
     slurmJobSpec:
       sbatchScriptFile: "scripts/extensive-check.sh"
-      requiresGpu: true
       jobContainer:
         extraEnv:
           - name: "SLURM_EXTRA_COMMENT_JSON"
@@ -237,7 +221,6 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/gpu-fryer.sh"
       eachWorkerJobs: true
-      requiresGpu: true
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -256,7 +239,6 @@ checks:
       sbatchScriptFile: "scripts/ib-gpu-perf.sh"
       eachWorkerJobs: true
       maxNumberOfJobs: 200
-      requiresGpu: true
     failureReactions:
       commentSlurmNode:
         commentPrefix: "[node_problem]"
@@ -274,7 +256,6 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/mem-perf.sh"
       eachWorkerJobs: true
-      requiresGpu: true
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -347,7 +328,6 @@ checks:
     runAfterCreation: true
     slurmJobSpec:
       sbatchScriptFile: "scripts/prepull-container-image.sh"
-      requiresGpu: true
   soperator-outputs-logs-cleaner:
     enabled: true
     checkType: "k8sJob"

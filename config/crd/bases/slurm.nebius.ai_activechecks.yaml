@@ -9675,14 +9675,6 @@ spec:
                       workingDir:
                         type: string
                     type: object
-                  requiresGpu:
-                    default: false
-                    description: |-
-                      RequiresGPU declares that this check needs GPU workers. When true, the
-                      slurm_check_job entrypoint inspects /etc/slurm/slurm.conf and exits
-                      early (marking the run Skipped) if no GPU gres is available, without
-                      attempting to submit a slurm job.
-                    type: boolean
                   sbatchScript:
                     description: Multiline sbatch script
                     type: string

@@ -54,9 +54,6 @@ func TestActiveCheckJobReconciler_SkippedAnnotation(t *testing.T) {
 			Name:                activeCheckName,
 			SlurmClusterRefName: "slurm",
 			CheckType:           "slurmJob",
-			SlurmJobSpec: slurmv1alpha1.SlurmJobSpec{
-				RequiresGPU: true,
-			},
 		},
 	}
 
@@ -144,9 +141,6 @@ func TestActiveCheckJobReconciler_SkippedAnnotation_Idempotent(t *testing.T) {
 			Name:                activeCheckName,
 			SlurmClusterRefName: "slurm",
 			CheckType:           "slurmJob",
-			SlurmJobSpec: slurmv1alpha1.SlurmJobSpec{
-				RequiresGPU: true,
-			},
 		},
 	}
 	// Sentinel value on the Job to prove idempotency: if the reconciler
@@ -236,9 +230,6 @@ func TestActiveCheckReconciler_DependsOn_SkippedAsSuccess(t *testing.T) {
 			Name:             "prepull-container-image",
 			CheckType:        "slurmJob",
 			RunAfterCreation: &runAfterCreation,
-			SlurmJobSpec: slurmv1alpha1.SlurmJobSpec{
-				RequiresGPU: true,
-			},
 		},
 		Status: slurmv1alpha1.ActiveCheckStatus{
 			SlurmJobsStatus: slurmv1alpha1.ActiveCheckSlurmJobsStatus{

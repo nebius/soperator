@@ -37,13 +37,12 @@ echo "Create directory for slurm job outputs"
 echo "Set HOME to soperatorchecks' home directory"
 export HOME=~soperatorchecks
 
-if [[ "${ACTIVE_CHECK_REQUIRES_GPU:-false}" == "true" ]]; then
-    # slurm.conf is the authoritative node list rendered by soperator from
-    # NodeSets. Every GPU worker carries a `Gres=gpu:<vendor>:<count>` token.
-    # The leading `^[^#]*` skips commented-out example lines. A missing
-    # slurm.conf is fail-open (surface the real problem, don't silently skip).
+# Auto-detect GPU requirement from the sbatch script's #SBATCH directives.
+# If the script requests GPU resources but the cluster has no GPU workers,
+# skip the check. Missing slurm.conf is fail-open (surface the real problem).
+if grep -qE '#SBATCH\s+.*(--gpus-per-node|--gpus\b|--gres=gpu|-G\s)' /opt/bin/sbatch.sh; then
     if [[ -f /etc/slurm/slurm.conf ]] && ! grep -q '^[^#]*Gres=gpu' /etc/slurm/slurm.conf; then
-        SKIP_REASON="no GPU nodes in slurm.conf"
+        SKIP_REASON="script requires GPU but no GPU nodes in slurm.conf"
         echo "$SKIP_REASON — marking check '$ACTIVE_CHECK_NAME' as Skipped"
 
         K8S_JOB_NAME=$(kubectl get pod "$K8S_POD_NAME" -n "$K8S_POD_NAMESPACE" \

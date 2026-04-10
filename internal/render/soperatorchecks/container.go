@@ -89,13 +89,6 @@ func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Containe
 			Value: fmt.Sprint(*check.Spec.SlurmJobSpec.MaxNumberOfJobs),
 		})
 	}
-	if check.Spec.SlurmJobSpec.RequiresGPU {
-		slurmEnvVars = append(slurmEnvVars, corev1.EnvVar{
-			Name:  consts.ActiveCheckRequiresGPUEnv,
-			Value: "true",
-		})
-	}
-
 	container = corev1.Container{
 		Name:            check.Spec.Name,
 		Image:           check.Spec.SlurmJobSpec.JobContainer.Image,

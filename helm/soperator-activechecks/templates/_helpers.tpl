@@ -139,9 +139,6 @@ eachWorkerJobs: {{ $spec.eachWorkerJobs }}
 {{- with $spec.maxNumberOfJobs }}
 maxNumberOfJobs: {{ . }}
 {{- end }}
-{{- if $spec.requiresGpu }}
-requiresGpu: true
-{{- end }}
 jobContainer:
 {{- if $workingDir }}
   workingDir: {{ $workingDir | quote }}
