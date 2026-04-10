@@ -168,6 +168,14 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 				return ctrl.Result{}, nil
 			}
 
+			// Wait until the K8s Job reaches a terminal state before updating
+			// the ActiveCheck status. The annotation is written while the pod
+			// is still running; processing it too early would be premature.
+			if status := getK8sJobStatus(k8sJob); status != consts.ActiveCheckK8sJobStatusComplete &&
+				status != consts.ActiveCheckK8sJobStatusFailed {
+				return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
+			}
+
 			activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{
 				LastRunId:          "",
 				LastRunName:        k8sJob.Name,

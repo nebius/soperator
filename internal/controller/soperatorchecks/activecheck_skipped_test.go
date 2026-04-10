@@ -78,6 +78,11 @@ func TestActiveCheckJobReconciler_SkippedAnnotation(t *testing.T) {
 				consts.LabelComponentKey: consts.ComponentTypeSoperatorChecks.String(),
 			},
 		},
+		Status: batchv1.JobStatus{
+			Conditions: []batchv1.JobCondition{
+				{Type: batchv1.JobComplete, Status: corev1.ConditionTrue},
+			},
+		},
 	}
 
 	pod := &corev1.Pod{

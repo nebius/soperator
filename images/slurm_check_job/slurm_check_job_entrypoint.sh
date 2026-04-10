@@ -48,11 +48,16 @@ if [[ "${ACTIVE_CHECK_REQUIRES_GPU:-false}" == "true" ]]; then
 
         K8S_JOB_NAME=$(kubectl get pod "$K8S_POD_NAME" -n "$K8S_POD_NAMESPACE" \
             -o jsonpath='{.metadata.ownerReferences[?(@.kind=="Job")].name}')
-        if [[ -n "$K8S_JOB_NAME" ]]; then
-            kubectl annotate job "$K8S_JOB_NAME" \
-                -n "$K8S_POD_NAMESPACE" \
-                slurm-skipped-reason="$SKIP_REASON" --overwrite || true
+        if [[ -z "$K8S_JOB_NAME" ]]; then
+            echo "Could not find owning Job for pod: $K8S_POD_NAME"
+            exit 1
         fi
+        kubectl annotate job "$K8S_JOB_NAME" \
+            -n "$K8S_POD_NAMESPACE" \
+            slurm-skipped-reason="$SKIP_REASON" --overwrite || {
+            echo "Failed to annotate Job $K8S_JOB_NAME with slurm-skipped-reason"
+            exit 1
+        }
         exit 0
     fi
 fi
