@@ -260,9 +260,18 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 	populateJailRes := ctrl.Result{}
 
 	if !check.IsModeSkipPopulateJail(clusterValues.PopulateJail.Maintenance) {
-		populateJailRes, err = r.ReconcilePopulateJail(ctx, clusterValues, cluster)
+		var populateJailNotReady bool
+		populateJailRes, populateJailNotReady, err = r.ReconcilePopulateJail(ctx, clusterValues, cluster)
 		if err != nil {
 			return ctrl.Result{}, err
+		}
+		// Skip rest of reconciliation if the populate-jail Job exists but hasn't
+		// completed yet — login/worker pods must not be created while restic
+		// restore is still running. Independent of the maintenance-overwrite
+		// requeue handled at the end of this function (which deliberately lets
+		// login/worker reconcilers run so they can scale to zero).
+		if populateJailNotReady {
+			return populateJailRes, nil
 		}
 	}
 

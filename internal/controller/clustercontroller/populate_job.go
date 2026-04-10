@@ -30,9 +30,10 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 	ctx context.Context,
 	clusterValues *values.SlurmCluster,
 	cluster *slurmv1.SlurmCluster,
-) (ctrl.Result, error) {
+) (res ctrl.Result, notReady bool, err error) {
 	logger := log.FromContext(ctx)
 	populateJailRequeue := false
+	populateJailNotReady := false
 
 	reconcilePopulateJailImpl := func() error {
 		return utils.ExecuteMultiStep(ctx,
@@ -78,7 +79,12 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 							}
 							return nil
 						}
-						stepLogger.V(1).Info("Skipping creation: Populate jail Job already exists")
+						if desired.Status.Succeeded == 0 {
+							stepLogger.Info("Populate jail Job exists but not yet completed, requeueing")
+							populateJailNotReady = true
+							return nil
+						}
+						stepLogger.V(1).Info("Skipping creation: Populate jail Job already completed")
 						return nil
 					}
 
@@ -170,15 +176,18 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 
 	if err := reconcilePopulateJailImpl(); err != nil {
 		logger.Error(err, "Failed to reconcile Populate jail Job")
-		return ctrl.Result{}, fmt.Errorf("reconciling Populate jail Job: %w", err)
+		return ctrl.Result{}, false, fmt.Errorf("reconciling Populate jail Job: %w", err)
+	}
+	if populateJailNotReady {
+		return ctrl.Result{RequeueAfter: populateJailRequeueDuration}, true, nil
 	}
 	if populateJailRequeue {
 		logger.Info("Populate jail reconciliation requeue requested: waiting for login/worker pods termination")
-		return ctrl.Result{RequeueAfter: populateJailRequeueDuration}, nil
+		return ctrl.Result{RequeueAfter: populateJailRequeueDuration}, false, nil
 	}
 	logger.Info("Reconciled Populate jail Job")
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, false, nil
 }
 
 func isConditionNonOverwrite(conditions []metav1.Condition) bool {
