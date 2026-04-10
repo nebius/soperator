@@ -70,6 +70,10 @@ func generateDefaultSupervisordConfig() renderutils.ConfigFile {
 	res.AddLine("stderr_logfile_maxbytes=0")
 	res.AddLine("redirect_stderr=true")
 	res.AddLine("command=/opt/bin/slurm/slurmd_entrypoint.sh")
+	// https://slurm.schedmd.com/faq.html#slurmd_oom
+	// https://man7.org/linux/man-pages/man5/proc_pid_oom_score_adj.5.html
+	// sshd is -17, the default is 2
+	res.AddLine(`environment=SLURMD_OOM_ADJ="-16"`)
 	res.AddLine("autostart=true")
 	res.AddLine("autorestart=true")
 	res.AddLine("startsecs=0")
