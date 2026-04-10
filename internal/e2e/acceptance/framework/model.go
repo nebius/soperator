@@ -1,7 +1,8 @@
 package framework
 
 type WorkerRef struct {
-	Name string
+	Name   string
+	HasGPU bool
 }
 
 type ExpectedNodeSet struct {
@@ -24,4 +25,16 @@ func (s *ClusterState) ExpectedWorkerCount() int {
 		total += nodeSet.Size
 	}
 	return total
+}
+
+func (s *ClusterState) HasGPUWorkers() bool {
+	if len(s.GPUWorkers) > 0 {
+		return true
+	}
+	for _, w := range s.Workers {
+		if w.HasGPU {
+			return true
+		}
+	}
+	return false
 }

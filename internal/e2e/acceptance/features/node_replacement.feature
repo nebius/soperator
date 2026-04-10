@@ -1,4 +1,5 @@
 Feature: Node replacement
+  @gpu
   Scenario: A maintenance event replaces the selected worker node
     Given a test job is submitted and running on a worker node
     When a maintenance event is triggered for that node

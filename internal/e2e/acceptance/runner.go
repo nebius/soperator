@@ -49,6 +49,12 @@ func (r *Runner) Run(ctx context.Context) error {
 		return fmt.Errorf("no acceptance feature files configured")
 	}
 
+	tags := ""
+	if !r.state.HasGPUWorkers() {
+		log.Printf("acceptance: no GPU workers found, excluding @gpu scenarios")
+		tags = "~@gpu"
+	}
+
 	suite := godog.TestSuite{
 		Name:                "soperator-acceptance",
 		ScenarioInitializer: r.initializeScenario,
@@ -59,6 +65,7 @@ func (r *Runner) Run(ctx context.Context) error {
 			TestingT:       nil,
 			Strict:         true,
 			DefaultContext: ctx,
+			Tags:           tags,
 		},
 	}
 
@@ -94,6 +101,10 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 	seen := make(map[string]struct{})
 	var workers []framework.WorkerRef
 	for _, line := range strings.Split(workerOutput, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
 		name := strings.TrimSpace(line)
 		if name == "" {
 			continue
