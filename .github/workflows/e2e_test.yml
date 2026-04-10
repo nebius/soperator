@@ -511,12 +511,18 @@ jobs:
             echo "No running sconfigcontroller pod found, skipping jail files collection"
           fi
 
+      - name: Zip Jail
+        if: always()
+        run: |
+          zip -r jail jail
+
       - name: Upload Jail
         if: always()
         uses: actions/upload-artifact@v6
         with:
+          archive: false
           name: jail
-          path: ./jail
+          path: jail.zip
           retention-days: 7
 
       - name: Terraform Destroy
