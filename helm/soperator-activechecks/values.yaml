@@ -185,13 +185,14 @@ checks:
     runAfterCreation: true
     slurmJobSpec:
       sbatchScriptFile: "scripts/ensure-healthy-nodes.sh"
-  # NOTE: extensive-check sets requiresGpu: true, so it is Skipped on
-  # CPU-only clusters. The stuck-reservation concern does not apply today
-  # because every failureReaction that drains a node with [node_problem]
-  # belongs to a GPU check that is itself Skipped on CPU-only — nothing
-  # drains, nothing creates a suspicious-node reservation, and nothing
-  # gets stuck. If a non-GPU check with drainSlurmNode.drainReasonPrefix=
-  # [node_problem] is ever added, this assumption must be revisited.
+  # NOTE (SCHED-1417): extensive-check sets requiresGpu: true, so it is
+  # Skipped on CPU-only clusters. The stuck-reservation concern does not
+  # apply today because every failureReaction that drains a node with
+  # [node_problem] belongs to a GPU check that is itself Skipped on
+  # CPU-only — nothing drains, nothing creates a suspicious-node
+  # reservation, and nothing gets stuck. If a non-GPU check with
+  # drainSlurmNode.drainReasonPrefix=[node_problem] is ever added, this
+  # assumption must be revisited.
   extensive-check:
     enabled: true
     checkType: "slurmJob"

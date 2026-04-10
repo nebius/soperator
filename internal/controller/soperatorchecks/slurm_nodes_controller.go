@@ -301,7 +301,7 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 
 	logger.V(1).Info("Creating a slurm reservation for drained node with [HC] reason")
 
-	// TODO(SCHED-1397): on CPU-only clusters extensive-check is Skipped
+	// TODO(SCHED-1417): on CPU-only clusters extensive-check is Skipped
 	// (requiresGpu: true), so a suspicious-node reservation added here would
 	// never be removed. Today this is unreachable — every failureReaction
 	// that drains with [node_problem] belongs to a GPU check that is itself
