@@ -215,24 +215,22 @@ func (c *SlurmNodesController) processSetUnhealthy(
 		return nil
 	}
 
-	if slurmNode.Reason != nil {
-		assignmentTime, err := c.getSlurmNodeAssignmentTime(ctx, slurmClusterName, slurmNode.Name)
-		if err != nil {
-			return fmt.Errorf("get slurm node assignment time: %w", err)
-		}
+	assignmentTime, err := c.getSlurmNodeAssignmentTime(ctx, slurmClusterName, slurmNode.Name)
+	if err != nil {
+		return fmt.Errorf("get slurm node assignment time: %w", err)
+	}
 
-		if slurmNode.Reason.ChangedAt.Before(k8sNode.CreationTimestamp.Time) ||
-			assignmentTime.After(slurmNode.Reason.ChangedAt) {
-			logger.V(1).Info(
-				"Undraining slurm node because current compute instance was assigned after drain",
-				"assignmentTime", assignmentTime,
-				"drainTime", slurmNode.Reason.ChangedAt,
-				"currentInstanceID", slurmNode.InstanceID,
-				"k8sNodeName", k8sNode.Name,
-				"k8sNodeCreationTime", k8sNode.CreationTimestamp.Time,
-			)
-			return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
-		}
+	if slurmNode.Reason.ChangedAt.Before(k8sNode.CreationTimestamp.Time) ||
+		assignmentTime.After(slurmNode.Reason.ChangedAt) {
+		logger.V(1).Info(
+			"Undraining slurm node because current compute instance was assigned after drain",
+			"assignmentTime", assignmentTime,
+			"drainTime", slurmNode.Reason.ChangedAt,
+			"currentInstanceID", slurmNode.InstanceID,
+			"k8sNodeName", k8sNode.Name,
+			"k8sNodeCreationTime", k8sNode.CreationTimestamp.Time,
+		)
+		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
 	}
 
 	// If HardwareIssuesSuspected is already set to True, no-op
@@ -269,13 +267,8 @@ func (c *SlurmNodesController) getSlurmNodeAssignmentTime(
 ) (time.Time, error) {
 	logger := log.FromContext(ctx).WithName("SlurmNodesController.getSlurmNodeAssignmentTime")
 
-	reader := c.apiReader
-	if reader == nil {
-		reader = c.Client
-	}
-
 	workerPod := &corev1.Pod{}
-	if err := reader.Get(ctx, client.ObjectKey{
+	if err := c.apiReader.Get(ctx, client.ObjectKey{
 		Namespace: slurmClusterName.Namespace,
 		Name:      slurmNodeName,
 	}, workerPod); err != nil {
