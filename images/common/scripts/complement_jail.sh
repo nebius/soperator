@@ -22,6 +22,16 @@ if [ -z "$jaildir" ] || [ -z "$upperdir" ]; then
     usage
 fi
 
+echo "Waiting for populate-jail to complete..."
+timeout=600; elapsed=0
+while [ ! -f "${jaildir}/.populated" ] && [ $elapsed -lt $timeout ]; do
+    sleep 5; elapsed=$((elapsed + 5))
+done
+if [ ! -f "${jaildir}/.populated" ]; then
+    echo "ERROR: populate-jail did not complete within ${timeout}s"
+    exit 1
+fi
+
 ALT_ARCH="$(uname -m)"
 echo "🔧 Using ALT_ARCH = ${ALT_ARCH}"
 
