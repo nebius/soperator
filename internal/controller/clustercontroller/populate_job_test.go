@@ -166,3 +166,63 @@ func TestReconcilePopulateJail_MaintenanceOverwriteWithActivePods(t *testing.T) 
 		t.Errorf("RequeueAfter = %v, want %v", res.RequeueAfter, 10*time.Second)
 	}
 }
+
+// TestReconcilePopulateJail_MaintenanceOverwriteIncompleteJob verifies that in
+// overwrite mode, if the new overwrite Job exists but hasn't completed yet
+// (e.g. operator restarted during poll loop), notReady is true so the
+// reconciler doesn't proceed to create login/worker pods.
+func TestReconcilePopulateJail_MaintenanceOverwriteIncompleteJob(t *testing.T) {
+	const (
+		namespace   = "test-ns"
+		clusterName = "test-cluster"
+		jobName     = "test-cluster-populate-jail"
+	)
+
+	maintenanceMode := consts.ModeDownscaleAndOverwritePopulate
+	clusterValues := &values.SlurmCluster{
+		NamespacedName: types.NamespacedName{
+			Namespace: namespace,
+			Name:      clusterName,
+		},
+		PopulateJail: values.PopulateJail{
+			Name:        jobName,
+			Maintenance: &maintenanceMode,
+		},
+	}
+	cluster := &slurmv1.SlurmCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Status: slurmv1.SlurmClusterStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:   slurmv1.ConditionClusterPopulateJailMode,
+					Reason: string(consts.ModeDownscaleAndOverwritePopulate),
+				},
+			},
+		},
+	}
+
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      jobName,
+			Namespace: namespace,
+		},
+		Status: batchv1.JobStatus{
+			Succeeded: 0,
+		},
+	}
+
+	r := newTestReconciler(t, job)
+	res, notReady, err := r.ReconcilePopulateJail(context.Background(), clusterValues, cluster)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !notReady {
+		t.Errorf("notReady = false, want true (incomplete overwrite Job must block reconciliation)")
+	}
+	if res.RequeueAfter != 10*time.Second {
+		t.Errorf("RequeueAfter = %v, want %v", res.RequeueAfter, 10*time.Second)
+	}
+}

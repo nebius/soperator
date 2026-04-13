@@ -77,6 +77,11 @@ func (r SlurmClusterReconciler) ReconcilePopulateJail(
 								}
 								stepLogger.V(1).Info("Successfully deleted Populate Jail Job")
 							}
+							if desired.Status.Succeeded == 0 {
+								stepLogger.Info("Populate jail Job exists but not yet completed, requeueing")
+								populateJailNotReady = true
+								return nil
+							}
 							return nil
 						}
 						if desired.Status.Succeeded == 0 {
