@@ -17,7 +17,11 @@ cleanup() {
 trap cleanup EXIT
 
 set +e
+# Use --runtime=runc to bypass the NVIDIA Container Runtime default.
+# This test validates Slurm memory limits, not GPU — runc works on both
+# CPU and GPU nodes.
 srun --mem 100m docker run \
+  --runtime=runc \
   --name "${container_name}" \
   "${image}" \
   python3 -c 'buf = bytearray(101 * 1024 * 1024); print(len(buf))'

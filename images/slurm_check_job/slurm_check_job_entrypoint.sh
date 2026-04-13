@@ -37,6 +37,30 @@ echo "Create directory for slurm job outputs"
 echo "Set HOME to soperatorchecks' home directory"
 export HOME=~soperatorchecks
 
+# Auto-detect GPU requirement from the sbatch script's #SBATCH directives.
+# If the script requests GPU resources but the cluster has no GPU workers,
+# skip the check. Missing slurm.conf is fail-open (surface the real problem).
+if grep -qE '#SBATCH\s+.*(--gpus-per-node|--gpus\b|--gres=gpu|-G\s)' /opt/bin/sbatch.sh; then
+    if [[ -f /etc/slurm/slurm.conf ]] && ! grep -q '^[^#]*Gres=gpu' /etc/slurm/slurm.conf; then
+        SKIP_REASON="script requires GPU but no GPU nodes in slurm.conf"
+        echo "$SKIP_REASON — marking check '$ACTIVE_CHECK_NAME' as Skipped"
+
+        K8S_JOB_NAME=$(kubectl get pod "$K8S_POD_NAME" -n "$K8S_POD_NAMESPACE" \
+            -o jsonpath='{.metadata.ownerReferences[?(@.kind=="Job")].name}')
+        if [[ -z "$K8S_JOB_NAME" ]]; then
+            echo "Could not find owning Job for pod: $K8S_POD_NAME"
+            exit 1
+        fi
+        kubectl annotate job "$K8S_JOB_NAME" \
+            -n "$K8S_POD_NAMESPACE" \
+            slurm-skipped-reason="$SKIP_REASON" --overwrite || {
+            echo "Failed to annotate Job $K8S_JOB_NAME with slurm-skipped-reason"
+            exit 1
+        }
+        exit 0
+    fi
+fi
+
 if [[ -n "${RESERVATION_NAME:-}" ]]; then
     echo "Submitting Slurm job on reservation $RESERVATION_NAME..."
     OUT_PATTERN='/opt/soperator-outputs/slurm_jobs/%N.%x.%j.out'

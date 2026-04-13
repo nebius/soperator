@@ -12,6 +12,7 @@ const (
 
 type Exec interface {
 	AnyWorker() (WorkerRef, error)
+	AnyGPUWorker() (WorkerRef, error)
 	ExecController(ctx context.Context, command string) (string, error)
 	ExecJail(ctx context.Context, command string) (string, error)
 	ExecJailWithRetry(ctx context.Context, command string, attempts int, delay time.Duration) (string, error)

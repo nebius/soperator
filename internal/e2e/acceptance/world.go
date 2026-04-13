@@ -22,3 +22,16 @@ func (w *world) AnyWorker() (framework.WorkerRef, error) {
 	}
 	return w.state.Workers[rand.Intn(len(w.state.Workers))], nil
 }
+
+func (w *world) AnyGPUWorker() (framework.WorkerRef, error) {
+	var gpuWorkers []framework.WorkerRef
+	for _, worker := range w.state.Workers {
+		if worker.HasGPU {
+			gpuWorkers = append(gpuWorkers, worker)
+		}
+	}
+	if len(gpuWorkers) == 0 {
+		return framework.WorkerRef{}, fmt.Errorf("no GPU workers discovered")
+	}
+	return gpuWorkers[rand.Intn(len(gpuWorkers))], nil
+}

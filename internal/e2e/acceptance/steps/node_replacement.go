@@ -61,7 +61,7 @@ func (s *NodeReplacement) Register(sc *godog.ScenarioContext) {
 }
 
 func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context.Context) error {
-	worker, err := s.exec.AnyWorker()
+	worker, err := s.exec.AnyGPUWorker()
 	if err != nil {
 		return err
 	}
