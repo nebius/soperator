@@ -215,8 +215,21 @@ func (c *SlurmNodesController) processSetUnhealthy(
 		return nil
 	}
 
-	if slurmNode.Reason != nil && slurmNode.Reason.ChangedAt.Before(k8sNode.CreationTimestamp.Time) {
-		logger.V(1).Info("Undraining, slurm node drained before degraded condition changed")
+	assignmentTime, err := c.getSlurmNodeAssignmentTime(ctx, slurmClusterName, slurmNode.Name)
+	if err != nil {
+		return fmt.Errorf("get slurm node assignment time: %w", err)
+	}
+
+	if slurmNode.Reason.ChangedAt.Before(k8sNode.CreationTimestamp.Time) ||
+		assignmentTime.After(slurmNode.Reason.ChangedAt) {
+		logger.V(1).Info(
+			"Undraining slurm node because current compute instance was assigned after drain",
+			"assignmentTime", assignmentTime,
+			"drainTime", slurmNode.Reason.ChangedAt,
+			"currentInstanceID", slurmNode.InstanceID,
+			"k8sNodeName", k8sNode.Name,
+			"k8sNodeCreationTime", k8sNode.CreationTimestamp.Time,
+		)
 		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
 	}
 
@@ -245,6 +258,52 @@ func (c *SlurmNodesController) processSetUnhealthy(
 	}
 
 	return nil
+}
+
+func (c *SlurmNodesController) getSlurmNodeAssignmentTime(
+	ctx context.Context,
+	slurmClusterName types.NamespacedName,
+	slurmNodeName string,
+) (time.Time, error) {
+	logger := log.FromContext(ctx).WithName("SlurmNodesController.getSlurmNodeAssignmentTime")
+
+	workerPod := &corev1.Pod{}
+	if err := c.apiReader.Get(ctx, client.ObjectKey{
+		Namespace: slurmClusterName.Namespace,
+		Name:      slurmNodeName,
+	}, workerPod); err != nil {
+		if client.IgnoreNotFound(err) == nil {
+			logger.V(1).Info(
+				"Worker pod not found, assignment time is unknown",
+				"slurmCluster", slurmClusterName,
+				"slurmNodeName", slurmNodeName,
+			)
+			return time.Time{}, nil
+		}
+		return time.Time{}, fmt.Errorf("get worker pod: %w", err)
+	}
+
+	for _, condition := range workerPod.Status.Conditions {
+		if condition.Type != corev1.PodScheduled || condition.Status != corev1.ConditionTrue {
+			continue
+		}
+		if condition.LastTransitionTime.IsZero() {
+			logger.V(1).Info(
+				"Worker pod has PodScheduled=True without transition time, assignment time is unknown",
+				"namespace", workerPod.Namespace,
+				"name", workerPod.Name,
+			)
+			return time.Time{}, nil
+		}
+		return condition.LastTransitionTime.Time, nil
+	}
+
+	logger.V(1).Info(
+		"Worker pod has no successful PodScheduled condition, assignment time is unknown",
+		"namespace", workerPod.Namespace,
+		"name", workerPod.Name,
+	)
+	return time.Time{}, nil
 }
 
 func (c *SlurmNodesController) processHealthCheckFailed(
