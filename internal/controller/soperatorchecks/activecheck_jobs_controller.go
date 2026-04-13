@@ -3,6 +3,7 @@ package soperatorchecks
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -209,8 +210,17 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			errorJobsAndReasons = activeCheck.Status.SlurmJobsStatus.LastRunErrorJobsAndReasons
 			cancelledJobs = activeCheck.Status.SlurmJobsStatus.LastRunCancelledJobs
 		}
+
+		lastHandledFinalStateTime := int64(0)
+		if finalStateTime, ok := k8sJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime]; ok && finalStateTime != "" {
+			lastHandledFinalStateTime, err = strconv.ParseInt(finalStateTime, 10, 64)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("parse final state time annotation: %w", err)
+			}
+		}
+
 		requeue := false
-		final := false
+		latestHandledFinalStateTime := lastHandledFinalStateTime
 		totalJobs := 0
 		for _, slurmJobID := range ids {
 			slurmJobs, err := slurmAPIClient.GetJobsByID(ctx, slurmJobID)
@@ -232,8 +242,8 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 					continue
 				}
 
-				// Job has already been seen in one of the previous reconciler runs
-				if k8sJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime] != "" {
+				// Job has already been seen in one of the previous reconciler runs.
+				if slurmJob.EndTime.Unix() <= lastHandledFinalStateTime {
 					continue
 				}
 
@@ -262,15 +272,18 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 					// Do nothing. The job could have been cancelled or interrupted. The job will run again.
 					logger.Info(fmt.Sprintf("unhandled state. The job is probably cancelled or interrupted and it will run again. Current state: %s ", slurmJob.State))
 				}
-				final = true
+
+				if slurmJob.EndTime.Unix() > latestHandledFinalStateTime {
+					latestHandledFinalStateTime = slurmJob.EndTime.Unix()
+				}
 			}
 		}
 
-		if final {
+		if latestHandledFinalStateTime > lastHandledFinalStateTime {
 			// Maybe we could delete the job because it will not be processed anymore
 			// Otherwise, we will have many of these jobs and they will keep being listed in every Reconcile()
 			k8sJobPatch := client.MergeFrom(k8sJob.DeepCopy())
-			k8sJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime] = fmt.Sprintf("%d", time.Now().Unix())
+			k8sJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime] = fmt.Sprintf("%d", latestHandledFinalStateTime)
 			if err := r.Job.Patch(ctx, k8sJob, k8sJobPatch); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to patch k8s Job: %w", err)
 			}
@@ -282,24 +295,10 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		// It doesn't really make sense to update the status of the active check.
 		// Leaving this logic as it is for now.
 
-		var state consts.ActiveCheckSlurmRunStatus
-		switch {
-		case requeue:
-			state = consts.ActiveCheckSlurmRunStatusInProgress
-		case len(failJobsAndReasons) != 0:
-			state = consts.ActiveCheckSlurmRunStatusFailed
-		case len(errorJobsAndReasons) != 0:
-			state = consts.ActiveCheckSlurmRunStatusError
-		case len(cancelledJobs) != 0:
-			state = consts.ActiveCheckSlurmRunStatusCancelled
-		default:
-			state = consts.ActiveCheckSlurmRunStatusComplete
-		}
-
 		activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{
 			LastRunId:                  firstJobId,
 			LastRunName:                jobName,
-			LastRunStatus:              state,
+			LastRunStatus:              deriveSlurmRunStatus(requeue, failJobsAndReasons, errorJobsAndReasons, cancelledJobs),
 			LastRunFailJobsAndReasons:  failJobsAndReasons,
 			LastRunErrorJobsAndReasons: errorJobsAndReasons,
 			LastRunCancelledJobs:       cancelledJobs,
@@ -354,6 +353,26 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 	logger.Info("Reconciled ActiveCheckJob")
 	return ctrl.Result{}, nil
+}
+
+func deriveSlurmRunStatus(
+	requeue bool,
+	failJobsAndReasons []slurmv1alpha1.JobAndReason,
+	errorJobsAndReasons []slurmv1alpha1.JobAndReason,
+	cancelledJobs []string,
+) consts.ActiveCheckSlurmRunStatus {
+	switch {
+	case requeue:
+		return consts.ActiveCheckSlurmRunStatusInProgress
+	case len(failJobsAndReasons) != 0:
+		return consts.ActiveCheckSlurmRunStatusFailed
+	case len(errorJobsAndReasons) != 0:
+		return consts.ActiveCheckSlurmRunStatusError
+	case len(cancelledJobs) != 0:
+		return consts.ActiveCheckSlurmRunStatusCancelled
+	default:
+		return consts.ActiveCheckSlurmRunStatusComplete
+	}
 }
 
 func updateSlurmNodeWithReactions(
