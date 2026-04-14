@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	DefaultJailRetryAttempts = 5
-	DefaultJailRetryDelay    = 10 * time.Second
+	DefaultRetryAttempts = 3
+	DefaultRetryDelay    = 5 * time.Second
 )
 
 type Exec interface {
@@ -17,10 +17,15 @@ type Exec interface {
 	ExecJail(ctx context.Context, command string) (string, error)
 	ExecJailWithRetry(ctx context.Context, command string, attempts int, delay time.Duration) (string, error)
 	Run(ctx context.Context, name string, args ...string) (string, error)
+	RunWithRetry(ctx context.Context, attempts int, delay time.Duration, name string, args ...string) (string, error)
 	WaitFor(ctx context.Context, description string, timeout, pollInterval time.Duration, condition func(context.Context) (bool, error)) error
 	Logf(format string, args ...any)
 }
 
 func ExecJailWithDefaultRetry(ctx context.Context, exec Exec, command string) (string, error) {
-	return exec.ExecJailWithRetry(ctx, command, DefaultJailRetryAttempts, DefaultJailRetryDelay)
+	return exec.ExecJailWithRetry(ctx, command, DefaultRetryAttempts, DefaultRetryDelay)
+}
+
+func RunWithDefaultRetry(ctx context.Context, exec Exec, name string, args ...string) (string, error) {
+	return exec.RunWithRetry(ctx, DefaultRetryAttempts, DefaultRetryDelay, name, args...)
 }

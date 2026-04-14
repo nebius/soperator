@@ -361,7 +361,7 @@ func (s *ClusterCreation) checkActiveChecks(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkWelcomeOutput(ctx context.Context) error {
-	output, err := s.exec.Run(ctx, "kubectl", "exec", "-n", clusterCreationNamespace, "login-0", "--", "sh", "-lc",
+	output, err := framework.RunWithDefaultRetry(ctx, s.exec, "kubectl", "exec", "-n", clusterCreationNamespace, "login-0", "--", "sh", "-lc",
 		"/etc/update-motd.d/00-welcome && /etc/update-motd.d/20-slurm-stats")
 	if err != nil {
 		return fmt.Errorf("render welcome output: %w", err)
@@ -453,7 +453,7 @@ type helmReleaseStatusRef struct {
 }
 
 func kubectlJSON(ctx context.Context, exec framework.Exec, out any, args ...string) error {
-	output, err := exec.Run(ctx, "kubectl", args...)
+	output, err := framework.RunWithDefaultRetry(ctx, exec, "kubectl", args...)
 	if err != nil {
 		return err
 	}

@@ -77,7 +77,7 @@ func (r *Runner) Run(ctx context.Context) error {
 }
 
 func discoverCluster(ctx context.Context, w *world, state *framework.ClusterState) error {
-	if _, err := w.Run(ctx, "kubectl", "get", "pods", "-n", soperatorNamespace); err != nil {
+	if _, err := framework.RunWithDefaultRetry(ctx, w, "kubectl", "get", "pods", "-n", soperatorNamespace); err != nil {
 		return err
 	}
 	if err := verifyPodReady(ctx, w, soperatorNamespace, "login-0"); err != nil {
@@ -89,7 +89,7 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 	if _, err := w.ExecController(ctx, "true"); err != nil {
 		return fmt.Errorf("exec controller sanity check: %w", err)
 	}
-	if _, err := w.ExecJail(ctx, "true"); err != nil {
+	if _, err := framework.ExecJailWithDefaultRetry(ctx, w, "true"); err != nil {
 		return fmt.Errorf("exec login jail sanity check: %w", err)
 	}
 
@@ -163,7 +163,7 @@ func workerNames(workers []framework.WorkerRef) string {
 }
 
 func verifyPodReady(ctx context.Context, w *world, namespace, name string) error {
-	output, err := w.Run(ctx, "kubectl", "get", "pod", "-n", namespace, name, "-o", "json")
+	output, err := framework.RunWithDefaultRetry(ctx, w, "kubectl", "get", "pod", "-n", namespace, name, "-o", "json")
 	if err != nil {
 		return err
 	}
