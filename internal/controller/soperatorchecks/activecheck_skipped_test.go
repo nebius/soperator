@@ -112,7 +112,7 @@ func TestActiveCheckJobReconciler_SkippedAnnotation(t *testing.T) {
 	require.NoError(t, client.Get(ctx, types.NamespacedName{Name: activeCheckName, Namespace: ns}, updated))
 	assert.Equal(t, consts.ActiveCheckSlurmRunStatusSkipped, updated.Status.SlurmJobsStatus.LastRunStatus)
 	assert.Equal(t, jobName, updated.Status.SlurmJobsStatus.LastRunName)
-	assert.Empty(t, updated.Status.SlurmJobsStatus.LastRunId)
+	assert.Equal(t, "No slurm job", updated.Status.SlurmJobsStatus.LastRunId)
 
 	updatedJob := &batchv1.Job{}
 	require.NoError(t, client.Get(ctx, types.NamespacedName{Name: jobName, Namespace: ns}, updatedJob))

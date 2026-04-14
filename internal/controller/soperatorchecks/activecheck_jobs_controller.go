@@ -178,7 +178,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			}
 
 			activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{
-				LastRunId:          "",
+				LastRunId:          "No slurm job",
 				LastRunName:        k8sJob.Name,
 				LastRunStatus:      consts.ActiveCheckSlurmRunStatusSkipped,
 				LastRunSubmitTime:  cronJob.Status.LastScheduleTime,
