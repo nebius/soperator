@@ -495,6 +495,11 @@ func (r *WorkerTopologyReconciler) ensureJailedConfig(ctx context.Context, names
 func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 	maxConcurrency int, cacheSyncTimeout time.Duration) error {
 
+	isTopologyConfigName := func(name string) bool {
+		return name == consts.ConfigMapNameTopologyConfig ||
+			strings.HasSuffix(name, "-"+consts.ConfigMapNameTopologyConfig)
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).Named(WorkerTopologyReconcilerName).
 		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
@@ -533,7 +538,7 @@ func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 					return false
 				},
 				DeleteFunc: func(e event.DeleteEvent) bool {
-					return e.Object.GetName() == consts.ConfigMapNameTopologyConfig
+					return isTopologyConfigName(e.Object.GetName())
 				},
 				UpdateFunc: func(e event.UpdateEvent) bool {
 					return false
@@ -549,7 +554,7 @@ func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 					return false
 				},
 				DeleteFunc: func(e event.DeleteEvent) bool {
-					return e.Object.GetName() == consts.ConfigMapNameTopologyConfig
+					return isTopologyConfigName(e.Object.GetName())
 				},
 				UpdateFunc: func(e event.UpdateEvent) bool {
 					return false
