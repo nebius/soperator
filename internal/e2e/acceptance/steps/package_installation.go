@@ -28,7 +28,7 @@ func (s *PackageInstallation) Register(sc *godog.ScenarioContext) {
 }
 
 func (s *PackageInstallation) theNVIDIADriverIsWorkingOnAWorkerNode(ctx context.Context) error {
-	worker, err := s.exec.AnyWorker()
+	worker, err := s.exec.AnyGPUWorker()
 	if err != nil {
 		return err
 	}

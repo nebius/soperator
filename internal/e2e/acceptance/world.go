@@ -22,3 +22,10 @@ func (w *world) AnyWorker() (framework.WorkerRef, error) {
 	}
 	return w.state.Workers[rand.Intn(len(w.state.Workers))], nil
 }
+
+func (w *world) AnyGPUWorker() (framework.WorkerRef, error) {
+	if len(w.state.GPUWorkers) == 0 {
+		return w.AnyWorker()
+	}
+	return w.state.GPUWorkers[rand.Intn(len(w.state.GPUWorkers))], nil
+}
