@@ -48,8 +48,6 @@ func renderContainerSConfigController(
 		Command: []string{
 			"/usr/bin/sconfigcontroller",
 		},
-		Args:           args,
-		LivenessProbe:  sConfigController.Container.LivenessProbe,
-		ReadinessProbe: sConfigController.Container.ReadinessProbe,
+		Args: args,
 	}
 }

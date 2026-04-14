@@ -46,8 +46,6 @@ func renderContainerExporter(clusterValues *values.SlurmCluster) corev1.Containe
 			Requests: clusterValues.SlurmExporter.Container.Resources,
 			Limits:   common.CopyNonCPUResources(clusterValues.SlurmExporter.Container.Resources),
 		},
-		LivenessProbe:  clusterValues.SlurmExporter.Container.LivenessProbe,
-		ReadinessProbe: clusterValues.SlurmExporter.Container.ReadinessProbe,
-		VolumeMounts:   []corev1.VolumeMount{},
+		VolumeMounts: []corev1.VolumeMount{},
 	}
 }

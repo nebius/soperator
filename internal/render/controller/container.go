@@ -46,7 +46,21 @@ func renderContainerSlurmctld(container *values.Container, customMounts []slurmv
 			Limits:   limits,
 			Requests: container.Resources,
 		},
-		LivenessProbe:            container.LivenessProbe,
+		LivenessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"scontrol",
+						"ping",
+					},
+				},
+			},
+			InitialDelaySeconds: common.DefaultProbeInitialDelaySeconds,
+			TimeoutSeconds:      common.DefaultProbeTimeoutSeconds,
+			PeriodSeconds:       common.DefaultProbePeriodSeconds,
+			SuccessThreshold:    common.DefaultProbeSuccessThreshold,
+			FailureThreshold:    common.DefaultProbeFailureThreshold,
+		},
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}

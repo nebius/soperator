@@ -106,3 +106,4 @@ Create the name of the role binding for slurm-controller
 {{- define "slurm-cluster.controller.roleBindingName" -}}
 {{- printf "%s-slurm-controller" (include "slurm-cluster.name" .) }}
 {{- end -}}
+

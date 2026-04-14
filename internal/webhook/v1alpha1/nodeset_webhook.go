@@ -96,20 +96,12 @@ type NodeSetCustomValidator struct{}
 var _ webhook.CustomValidator = &NodeSetCustomValidator{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type NodeSet.
-func (v *NodeSetCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	if _, ok := obj.(*slurmv1alpha1.NodeSet); !ok {
-		return nil, fmt.Errorf("expected a NodeSet object but got %T", obj)
-	}
-
+func (v *NodeSetCustomValidator) ValidateCreate(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
 	return nil, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type NodeSet.
-func (v *NodeSetCustomValidator) ValidateUpdate(_ context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
-	if _, ok := newObj.(*slurmv1alpha1.NodeSet); !ok {
-		return nil, fmt.Errorf("expected a NodeSet object for the newObj but got %T", newObj)
-	}
-
+func (v *NodeSetCustomValidator) ValidateUpdate(_ context.Context, _, _ runtime.Object) (admission.Warnings, error) {
 	return nil, nil
 }
 

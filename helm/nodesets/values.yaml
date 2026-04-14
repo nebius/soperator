@@ -100,8 +100,6 @@ nodesets:
       # Port to serve slurmd service on
       # Optional, defaults to 6818
       port: 6818
-      # livenessProbe: {}
-      # readinessProbe: {}
       # Slurmd container resources
       resources:
         cpu: "156000m"
@@ -184,8 +182,6 @@ nodesets:
         cpu: "2000m"
         memory: "4Gi"
         ephemeralStorage: "5Gi"
-      # livenessProbe: {}
-      # readinessProbe: {}
       # Munge container security configuration
       # Optional
       security:

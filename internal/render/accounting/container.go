@@ -2,6 +2,7 @@ package accounting
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -40,9 +41,19 @@ func renderContainerAccounting(container values.Container, additionalVolumeMount
 			ContainerPort: container.Port,
 			Protocol:      corev1.ProtocolTCP,
 		}},
-		VolumeMounts:   volumeMounts,
-		LivenessProbe:  container.LivenessProbe,
-		ReadinessProbe: container.ReadinessProbe,
+		VolumeMounts: volumeMounts,
+		ReadinessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.FromInt32(container.Port),
+				},
+			},
+			FailureThreshold:    3,
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       10,
+			SuccessThreshold:    1,
+			TimeoutSeconds:      1,
+		},
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{

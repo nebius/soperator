@@ -2,6 +2,7 @@ package login
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -51,9 +52,18 @@ func renderContainerSshd(
 			ContainerPort: container.Port,
 			Protocol:      corev1.ProtocolTCP,
 		}},
-		VolumeMounts:   volumeMounts,
-		LivenessProbe:  container.LivenessProbe,
-		ReadinessProbe: container.ReadinessProbe,
+		VolumeMounts: volumeMounts,
+		ReadinessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.FromInt32(container.Port),
+				},
+			},
+			TimeoutSeconds:   common.DefaultProbeTimeoutSeconds,
+			PeriodSeconds:    common.DefaultProbePeriodSeconds,
+			SuccessThreshold: common.DefaultProbeSuccessThreshold,
+			FailureThreshold: common.DefaultProbeFailureThreshold,
+		},
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: ptr.To(true),
 			Capabilities: &corev1.Capabilities{

@@ -85,34 +85,6 @@ recreates it.
 Our operator improves this further, continuously bringing the entire cluster to the desired state.
 
 
-### Configurable Health Probes
-Liveness and readiness probes for managed Slurm components can be customized directly in the CRDs and Helm values.
-This is useful for slower startup environments, constrained clusters, or custom health-check handlers.
-
-Examples:
-
-```yaml
-slurmNodes:
-  controller:
-    slurmctld:
-      livenessProbe:
-        initialDelaySeconds: 60
-        failureThreshold: 6
-  login:
-    sshd:
-      readinessProbe:
-        periodSeconds: 5
-  rest:
-    rest:
-      livenessProbe:
-        tcpSocket:
-          port: 6820
-        initialDelaySeconds: 30
-```
-
-When a probe block is omitted, the operator keeps the current default behavior.
-
-
 ### Isolation of User Actions
 Users can’t unintentionally break the Slurm cluster itself - all their actions are isolated within a dedicated
 environment (some sort of container). This clearly defines the boundary between the operator's responsibility and the
