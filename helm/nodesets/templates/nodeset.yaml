@@ -93,6 +93,14 @@ spec:
     {{- end }}
 
     port: {{ .port | default 6818 }}
+    {{- with .livenessProbe }}
+    livenessProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .readinessProbe }}
+    readinessProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
 
     {{- with (required ".Values.nodesets[*].slurmd.resources is required" .resources) }}
     resources:
@@ -165,6 +173,14 @@ spec:
       {{- with .ephemeralStorage }}
       ephemeral-storage: {{ . | quote }}
       {{- end }}
+    {{- end }}
+    {{- with .livenessProbe }}
+    livenessProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .readinessProbe }}
+    readinessProbe:
+      {{- toYaml . | nindent 6 }}
     {{- end }}
 
     security:

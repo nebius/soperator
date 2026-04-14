@@ -4,7 +4,6 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -49,19 +48,8 @@ func renderContainerREST(values *values.SlurmREST) corev1.Container {
 			common.RenderVolumeMountSlurmConfigs(),
 			common.RenderVolumeMountJailReadOnly(),
 		},
-		// TODO: Http check?
-		LivenessProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				TCPSocket: &corev1.TCPSocketAction{
-					Port: intstr.FromInt32(values.ContainerREST.Port),
-				},
-			},
-			FailureThreshold:    5,
-			InitialDelaySeconds: 15,
-			PeriodSeconds:       10,
-			SuccessThreshold:    1,
-			TimeoutSeconds:      1,
-		},
+		LivenessProbe:  values.ContainerREST.LivenessProbe,
+		ReadinessProbe: values.ContainerREST.ReadinessProbe,
 		SecurityContext: &corev1.SecurityContext{
 			AppArmorProfile: common.ParseAppArmorProfile(values.ContainerREST.AppArmorProfile),
 		},

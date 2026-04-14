@@ -329,6 +329,16 @@ func (in *ContainerMungeSpec) DeepCopyInto(out *ContainerMungeSpec) {
 			(*out)[key] = val.DeepCopy()
 		}
 	}
+	if in.LivenessProbe != nil {
+		in, out := &in.LivenessProbe, &out.LivenessProbe
+		*out = new(v1.Probe)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.ReadinessProbe != nil {
+		in, out := &in.ReadinessProbe, &out.ReadinessProbe
+		*out = new(v1.Probe)
+		(*in).DeepCopyInto(*out)
+	}
 	out.Security = in.Security
 }
 
@@ -376,6 +386,16 @@ func (in *ContainerSlurmdSpec) DeepCopyInto(out *ContainerSlurmdSpec) {
 		}
 	}
 	in.Volumes.DeepCopyInto(&out.Volumes)
+	if in.LivenessProbe != nil {
+		in, out := &in.LivenessProbe, &out.LivenessProbe
+		*out = new(v1.Probe)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.ReadinessProbe != nil {
+		in, out := &in.ReadinessProbe, &out.ReadinessProbe
+		*out = new(v1.Probe)
+		(*in).DeepCopyInto(*out)
+	}
 	out.Security = in.Security
 }
 

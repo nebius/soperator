@@ -1105,6 +1105,16 @@ type NodeContainer struct {
 	// +kubebuilder:validation:Optional
 	Resources corev1.ResourceList `json:"resources,omitempty"`
 
+	// LivenessProbe defines the liveness probe for the container.
+	//
+	// +kubebuilder:validation:Optional
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+
+	// ReadinessProbe defines the readiness probe for the container.
+	//
+	// +kubebuilder:validation:Optional
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
+
 	// SecurityLimitsConfig represents multiline limits.conf
 	// format of a string should be: '* <soft|hard> <item> <value>'
 	// example: '* soft nofile 1024'
