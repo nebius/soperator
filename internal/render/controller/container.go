@@ -40,6 +40,21 @@ func renderContainerSlurmctld(container *values.Container, customMounts []slurmv
 				},
 			},
 		},
+		LivenessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"scontrol",
+						"ping",
+					},
+				},
+			},
+			InitialDelaySeconds: 60,
+			TimeoutSeconds:      60,
+			PeriodSeconds:       70,
+			SuccessThreshold:    1,
+			FailureThreshold:    5,
+		},
 		Resources: corev1.ResourceRequirements{
 			Limits:   limits,
 			Requests: container.Resources,
