@@ -9,8 +9,6 @@ import (
 	"os/exec"
 	"strings"
 	"time"
-
-	"nebius.ai/slurm-operator/internal/e2e/acceptance/framework"
 )
 
 const soperatorNamespace = "soperator"
@@ -20,7 +18,11 @@ func (w *world) Logf(format string, args ...any) {
 }
 
 func (w *world) ExecController(ctx context.Context, command string) (string, error) {
-	return w.RunWithRetry(ctx, framework.DefaultRetryAttempts, framework.DefaultRetryDelay,
+	return w.Run(ctx, "kubectl", "exec", "-n", soperatorNamespace, "controller-0", "--", "bash", "-lc", command)
+}
+
+func (w *world) ExecControllerWithRetry(ctx context.Context, command string, attempts int, delay time.Duration) (string, error) {
+	return w.RunWithRetry(ctx, attempts, delay,
 		"kubectl", "exec", "-n", soperatorNamespace, "controller-0", "--", "bash", "-lc", command)
 }
 

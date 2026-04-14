@@ -86,14 +86,14 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 	if err := verifyPodReady(ctx, w, soperatorNamespace, "controller-0"); err != nil {
 		return fmt.Errorf("verify controller pod: %w", err)
 	}
-	if _, err := w.ExecController(ctx, "true"); err != nil {
+	if _, err := framework.ExecControllerWithDefaultRetry(ctx, w, "true"); err != nil {
 		return fmt.Errorf("exec controller sanity check: %w", err)
 	}
 	if _, err := framework.ExecJailWithDefaultRetry(ctx, w, "true"); err != nil {
 		return fmt.Errorf("exec login jail sanity check: %w", err)
 	}
 
-	workerOutput, err := w.ExecController(ctx, `sinfo -hN -p main -o '%N'`)
+	workerOutput, err := framework.ExecControllerWithDefaultRetry(ctx, w, `sinfo -hN -p main -o '%N'`)
 	if err != nil {
 		return fmt.Errorf("discover worker nodes: %w", err)
 	}

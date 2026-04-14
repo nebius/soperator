@@ -237,11 +237,11 @@ func (s *ClusterCreation) checkExpectedNodeSets(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkPartitions(ctx context.Context) error {
-	allPartitions, err := s.exec.ExecController(ctx, "scontrol show partitions --oneliner")
+	allPartitions, err := framework.ExecControllerWithDefaultRetry(ctx, s.exec, "scontrol show partitions --oneliner")
 	if err != nil {
 		return fmt.Errorf("show partitions: %w", err)
 	}
-	if _, err := s.exec.ExecController(ctx, "sinfo -Nel >/dev/null"); err != nil {
+	if _, err := framework.ExecControllerWithDefaultRetry(ctx, s.exec, "sinfo -Nel >/dev/null"); err != nil {
 		return fmt.Errorf("sinfo -Nel: %w", err)
 	}
 	if !strings.Contains(allPartitions, "PartitionName=main") {
@@ -251,11 +251,11 @@ func (s *ClusterCreation) checkPartitions(ctx context.Context) error {
 		return fmt.Errorf("partition hidden is missing from scontrol output")
 	}
 
-	mainPartition, err := s.exec.ExecController(ctx, "scontrol show partition main")
+	mainPartition, err := framework.ExecControllerWithDefaultRetry(ctx, s.exec, "scontrol show partition main")
 	if err != nil {
 		return fmt.Errorf("show partition main: %w", err)
 	}
-	hiddenPartition, err := s.exec.ExecController(ctx, "scontrol show partition hidden")
+	hiddenPartition, err := framework.ExecControllerWithDefaultRetry(ctx, s.exec, "scontrol show partition hidden")
 	if err != nil {
 		return fmt.Errorf("show partition hidden: %w", err)
 	}
@@ -278,7 +278,7 @@ func (s *ClusterCreation) checkPartitions(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkSlurmNodeHealth(ctx context.Context) error {
-	nodesOutput, err := s.exec.ExecController(ctx, "scontrol show nodes --oneliner")
+	nodesOutput, err := framework.ExecControllerWithDefaultRetry(ctx, s.exec, "scontrol show nodes --oneliner")
 	if err != nil {
 		return fmt.Errorf("show nodes: %w", err)
 	}
@@ -361,7 +361,8 @@ func (s *ClusterCreation) checkActiveChecks(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkWelcomeOutput(ctx context.Context) error {
-	output, err := framework.RunWithDefaultRetry(ctx, s.exec, "kubectl", "exec", "-n", clusterCreationNamespace, "login-0", "--", "sh", "-lc",
+	output, err := framework.RunWithDefaultRetry(ctx, s.exec,
+		"kubectl", "exec", "-n", clusterCreationNamespace, "login-0", "--", "sh", "-lc",
 		"/etc/update-motd.d/00-welcome && /etc/update-motd.d/20-slurm-stats")
 	if err != nil {
 		return fmt.Errorf("render welcome output: %w", err)
