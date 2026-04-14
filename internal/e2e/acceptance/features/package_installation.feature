@@ -1,4 +1,5 @@
 Feature: Package installation
+  @gpu
   Scenario: Installing jq does not break the NVIDIA driver
     Given the NVIDIA driver is working on a worker node
     When jq is installed on the worker node

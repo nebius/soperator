@@ -135,6 +135,8 @@ pushd "${jaildir}"
 
     echo "Bind-mount /etc/enroot, /usr/share/enroot and /usr/lib/enroot"
     mkdir -p etc/enroot usr/share/enroot usr/lib/enroot
+    mkdir -p /etc/enroot/mounts.d
+    echo '/opt/slurm_scripts/task_prolog.sh' | sudo tee /etc/enroot/mounts.d/task_prolog.fstab
     mount --rbind /etc/enroot etc/enroot
     mount --bind /usr/share/enroot usr/share/enroot
     mount --bind /usr/lib/enroot usr/lib/enroot
@@ -175,6 +177,11 @@ pushd "${jaildir}"
          touch usr/sbin/slurmd usr/sbin/slurmstepd
          mount --bind /usr/sbin/slurmd usr/sbin/slurmd
          mount --bind /usr/sbin/slurmstepd usr/sbin/slurmstepd
+
+        echo "Bind-mount dockerd stuff from container to the jail"
+        mkdir -p etc/docker
+        touch etc/docker/daemon.json
+        mount --bind "/etc/docker/daemon.json" "etc/docker/daemon.json"
     fi
 
     # For login node with cluster type GPU

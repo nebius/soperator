@@ -14,7 +14,9 @@ RUN apt-get update && \
         kmod \
         libncurses5-dev \
         supervisor \
-        openssh-server && \
+        openssh-server \
+        nginx-extras \
+        libnginx-mod-http-js && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -86,6 +88,8 @@ RUN apt-get update && \
 
 # Copy Docker daemon config
 COPY images/worker/docker/daemon.json /etc/docker/daemon.json
+COPY images/worker/nginx/soperator-docker-proxy.conf /etc/nginx/soperator-docker-proxy.conf
+COPY images/worker/nginx/docker_proxy.js /etc/nginx/njs/docker_proxy.js
 
 # Copy script for complementing jail filesystem in runtime
 COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
@@ -132,10 +136,12 @@ COPY images/worker/worker_init.py /opt/bin/slurm/
 
 # Copy supervisord entrypoint script
 COPY images/worker/supervisord_entrypoint.sh /opt/bin/slurm/
+COPY images/worker/docker_proxy_nginx_entrypoint.sh /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh && \
     chmod +x /opt/bin/slurm/supervisord_entrypoint.sh && \
-    chmod +x /opt/bin/slurm/worker_init.py
+    chmod +x /opt/bin/slurm/worker_init.py && \
+    chmod +x /opt/bin/slurm/docker_proxy_nginx_entrypoint.sh
 
 # Start supervisord that manages both slurmd and sshd as child processes
 ENTRYPOINT ["/opt/bin/slurm/supervisord_entrypoint.sh"]

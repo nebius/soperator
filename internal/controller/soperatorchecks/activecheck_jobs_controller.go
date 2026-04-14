@@ -161,6 +161,45 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 	}
 
 	if activeCheck.Spec.CheckType == "slurmJob" {
+		// Skipped: the entrypoint detected the cluster has no GPU and exited
+		// early without calling sbatch. The owning Job is in Complete state.
+		if reason, ok := k8sJob.Annotations[consts.ActiveCheckSkippedReasonAnnotation]; ok {
+			// Idempotency: don't re-process if this Job is already marked final.
+			if k8sJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime] != "" {
+				return ctrl.Result{}, nil
+			}
+
+			// Wait until the K8s Job reaches a terminal state before updating
+			// the ActiveCheck status. The annotation is written while the pod
+			// is still running; processing it too early would be premature.
+			if status := getK8sJobStatus(k8sJob); status != consts.ActiveCheckK8sJobStatusComplete &&
+				status != consts.ActiveCheckK8sJobStatusFailed {
+				return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
+			}
+
+			activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{
+				LastRunId:          "",
+				LastRunName:        k8sJob.Name,
+				LastRunStatus:      consts.ActiveCheckSlurmRunStatusSkipped,
+				LastRunSubmitTime:  cronJob.Status.LastScheduleTime,
+				LastTransitionTime: metav1.Now(),
+			}
+			logger = logger.WithValues(logfield.ResourceKV(activeCheck)...)
+			logger.Info("ActiveCheck skipped", "reason", reason)
+
+			if err := r.Status().Update(ctx, activeCheck); err != nil {
+				return ctrl.Result{}, fmt.Errorf("updating ActiveCheck status to Skipped: %w", err)
+			}
+
+			// Mark the Job final so subsequent reconciles short-circuit.
+			k8sJobPatch := client.MergeFrom(k8sJob.DeepCopy())
+			k8sJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime] = fmt.Sprintf("%d", time.Now().Unix())
+			if err := r.Job.Patch(ctx, k8sJob, k8sJobPatch); err != nil {
+				return ctrl.Result{}, fmt.Errorf("patching k8s Job final-state-time: %w", err)
+			}
+			return ctrl.Result{}, nil
+		}
+
 		// Failed k8s job, probably sbatch submission failed
 		if getK8sJobStatus(k8sJob) == consts.ActiveCheckK8sJobStatusFailed {
 			activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{

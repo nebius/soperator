@@ -37,6 +37,12 @@ func (r *Runner) Run(ctx context.Context) error {
 		return fmt.Errorf("no acceptance feature files configured")
 	}
 
+	tags := ""
+	if !r.state.HasGPUWorkers() {
+		log.Printf("acceptance: no GPU workers found, excluding @gpu scenarios")
+		tags = "~@gpu"
+	}
+
 	suite := godog.TestSuite{
 		Name:                "soperator-acceptance",
 		ScenarioInitializer: r.initializeScenario,
@@ -47,6 +53,7 @@ func (r *Runner) Run(ctx context.Context) error {
 			TestingT:       nil,
 			Strict:         true,
 			DefaultContext: ctx,
+			Tags:           tags,
 		},
 	}
 
@@ -68,18 +75,27 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 		return err
 	}
 
-	workerOutput, err := w.ExecController(ctx, `sinfo -hN -p main -o '%N'`)
+	workerOutput, err := w.ExecController(ctx, `sinfo -hN -p main -o '%N|%G'`)
 	if err != nil {
 		return fmt.Errorf("discover worker nodes: %w", err)
 	}
 
 	var workers []framework.WorkerRef
 	for _, line := range strings.Split(workerOutput, "\n") {
-		name := strings.TrimSpace(line)
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 2)
+		name := strings.TrimSpace(parts[0])
 		if name == "" {
 			continue
 		}
-		workers = append(workers, framework.WorkerRef{Name: name})
+		ref := framework.WorkerRef{Name: name}
+		if len(parts) > 1 && strings.Contains(parts[1], "gpu") {
+			ref.HasGPU = true
+		}
+		workers = append(workers, ref)
 	}
 	if len(workers) == 0 {
 		return fmt.Errorf("no worker nodes discovered")
