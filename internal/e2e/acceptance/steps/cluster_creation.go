@@ -55,7 +55,7 @@ func (s *ClusterCreation) Register(sc *godog.ScenarioContext) {
 
 func (s *ClusterCreation) checkPodsReady(ctx context.Context) error {
 	var pods corev1.PodList
-	if err := runJSON(ctx, s.exec, &pods, "kubectl", "get", "pods", "-n", clusterCreationNamespace, "-o", "json"); err != nil {
+	if err := kubectlJSON(ctx, s.exec, &pods, "get", "pods", "-n", clusterCreationNamespace, "-o", "json"); err != nil {
 		return fmt.Errorf("list pods: %w", err)
 	}
 	if len(pods.Items) == 0 {
@@ -84,7 +84,7 @@ func (s *ClusterCreation) checkPodsReady(ctx context.Context) error {
 
 func (s *ClusterCreation) checkHelmReleasesReady(ctx context.Context) error {
 	var releases helmReleaseList
-	if err := runJSON(ctx, s.exec, &releases, "kubectl", "get", "helmreleases", "-n", clusterCreationHelmNamespace, "-o", "json"); err != nil {
+	if err := kubectlJSON(ctx, s.exec, &releases, "get", "helmreleases", "-n", clusterCreationHelmNamespace, "-o", "json"); err != nil {
 		return fmt.Errorf("list HelmReleases: %w", err)
 	}
 	if len(releases.Items) == 0 {
@@ -111,7 +111,7 @@ func (s *ClusterCreation) checkHelmReleasesReady(ctx context.Context) error {
 
 func (s *ClusterCreation) checkSlurmClustersReady(ctx context.Context) error {
 	var clusters slurmv1.SlurmClusterList
-	if err := runJSON(ctx, s.exec, &clusters, "kubectl", "get", "slurmclusters", "-A", "-o", "json"); err != nil {
+	if err := kubectlJSON(ctx, s.exec, &clusters, "get", "slurmclusters", "-A", "-o", "json"); err != nil {
 		return fmt.Errorf("list SlurmClusters: %w", err)
 	}
 	if len(clusters.Items) == 0 {
@@ -166,7 +166,7 @@ func (s *ClusterCreation) checkSlurmClustersReady(ctx context.Context) error {
 
 func (s *ClusterCreation) checkNodeSetsReady(ctx context.Context) error {
 	var nodeSets slurmv1alpha1.NodeSetList
-	if err := runJSON(ctx, s.exec, &nodeSets, "kubectl", "get", "nodesets", "-A", "-o", "json"); err != nil {
+	if err := kubectlJSON(ctx, s.exec, &nodeSets, "get", "nodesets", "-A", "-o", "json"); err != nil {
 		return fmt.Errorf("list NodeSets: %w", err)
 	}
 	if len(nodeSets.Items) == 0 {
@@ -198,7 +198,7 @@ func (s *ClusterCreation) checkExpectedNodeSets(ctx context.Context) error {
 	}
 
 	var nodeSets slurmv1alpha1.NodeSetList
-	if err := runJSON(ctx, s.exec, &nodeSets, "kubectl", "get", "nodesets", "-A", "-o", "json"); err != nil {
+	if err := kubectlJSON(ctx, s.exec, &nodeSets, "get", "nodesets", "-A", "-o", "json"); err != nil {
 		return fmt.Errorf("list NodeSets: %w", err)
 	}
 
@@ -312,7 +312,7 @@ func (s *ClusterCreation) checkSlurmNodeHealth(ctx context.Context) error {
 
 func (s *ClusterCreation) checkActiveChecks(ctx context.Context) error {
 	var checks slurmv1alpha1.ActiveCheckList
-	if err := runJSON(ctx, s.exec, &checks, "kubectl", "get", "activechecks", "-A", "-o", "json"); err != nil {
+	if err := kubectlJSON(ctx, s.exec, &checks, "get", "activechecks", "-A", "-o", "json"); err != nil {
 		return fmt.Errorf("list ActiveChecks: %w", err)
 	}
 	if len(checks.Items) == 0 {
@@ -452,13 +452,13 @@ type helmReleaseStatusRef struct {
 	Conditions []metav1.Condition `json:"conditions"`
 }
 
-func runJSON(ctx context.Context, exec framework.Exec, out any, name string, args ...string) error {
-	output, err := exec.Run(ctx, name, args...)
+func kubectlJSON(ctx context.Context, exec framework.Exec, out any, args ...string) error {
+	output, err := exec.Run(ctx, "kubectl", args...)
 	if err != nil {
 		return err
 	}
 	if err := json.Unmarshal([]byte(output), out); err != nil {
-		return fmt.Errorf("decode %s %s output: %w", name, strings.Join(args, " "), err)
+		return fmt.Errorf("decode kubectl %s output: %w", strings.Join(args, " "), err)
 	}
 	return nil
 }
