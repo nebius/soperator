@@ -101,10 +101,6 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 	seen := make(map[string]struct{})
 	var workers []framework.WorkerRef
 	for _, line := range strings.Split(workerOutput, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
 		name := strings.TrimSpace(line)
 		if name == "" {
 			continue

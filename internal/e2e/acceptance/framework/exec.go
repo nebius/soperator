@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	DefaultRetryAttempts = 3
-	DefaultRetryDelay    = 5 * time.Second
+	DefaultRetryAttempts = 5
+	DefaultRetryDelay    = 10 * time.Second
 )
 
 type Exec interface {

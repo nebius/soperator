@@ -21,10 +21,10 @@ import (
 )
 
 const (
-	clusterCreationNamespace          = "soperator"
-	clusterCreationHelmNamespace      = "flux-system"
-	clusterCreationSmokeJobTimeout    = 2 * time.Minute
-	clusterCreationPerNodeSmokeTimout = 3 * time.Minute
+	clusterCreationNamespace           = "soperator"
+	clusterCreationHelmNamespace       = "flux-system"
+	clusterCreationSmokeJobTimeout     = 2 * time.Minute
+	clusterCreationPerNodeSmokeTimeout = 3 * time.Minute
 )
 
 var nodeStatePattern = regexp.MustCompile(`State=([^\s]+)`)
@@ -421,9 +421,9 @@ func (s *ClusterCreation) checkNodeSetSmokeJobs(ctx context.Context) error {
 		}
 		worker := workers[0]
 
-		command := fmt.Sprintf("timeout %.0f srun -w %s hostname", clusterCreationPerNodeSmokeTimout.Seconds(), framework.ShellQuote(worker.Name))
+		command := fmt.Sprintf("timeout %.0f srun -w %s hostname", clusterCreationPerNodeSmokeTimeout.Seconds(), framework.ShellQuote(worker.Name))
 		if nodeSet.HasGPU {
-			command = fmt.Sprintf("timeout %.0f srun -w %s nvidia-smi -L >/dev/null", clusterCreationPerNodeSmokeTimout.Seconds(), framework.ShellQuote(worker.Name))
+			command = fmt.Sprintf("timeout %.0f srun -w %s nvidia-smi -L >/dev/null", clusterCreationPerNodeSmokeTimeout.Seconds(), framework.ShellQuote(worker.Name))
 		}
 
 		if _, err := s.exec.ExecJail(ctx, command); err != nil {
