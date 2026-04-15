@@ -21,35 +21,18 @@ func (w *world) ExecController(ctx context.Context, command string) (string, err
 	return w.Run(ctx, "kubectl", "exec", "-n", soperatorNamespace, "controller-0", "--", "bash", "-lc", command)
 }
 
+func (w *world) ExecControllerWithRetry(ctx context.Context, command string, attempts int, delay time.Duration) (string, error) {
+	return w.RunWithRetry(ctx, attempts, delay,
+		"kubectl", "exec", "-n", soperatorNamespace, "controller-0", "--", "bash", "-lc", command)
+}
+
 func (w *world) ExecJail(ctx context.Context, command string) (string, error) {
 	return w.Run(ctx, "kubectl", "exec", "-n", soperatorNamespace, "login-0", "--", "chroot", "/mnt/jail", "bash", "-lc", command)
 }
 
 func (w *world) ExecJailWithRetry(ctx context.Context, command string, attempts int, delay time.Duration) (string, error) {
-	if attempts < 1 {
-		attempts = 1
-	}
-
-	var lastErr error
-	for attempt := 1; attempt <= attempts; attempt++ {
-		out, err := w.ExecJail(ctx, command)
-		if err == nil {
-			return out, nil
-		}
-		lastErr = err
-		if attempt == attempts {
-			break
-		}
-
-		w.logf("retrying SSH command after attempt %d/%d: %v", attempt, attempts, err)
-		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		case <-time.After(delay):
-		}
-	}
-
-	return "", lastErr
+	return w.RunWithRetry(ctx, attempts, delay,
+		"kubectl", "exec", "-n", soperatorNamespace, "login-0", "--", "chroot", "/mnt/jail", "bash", "-lc", command)
 }
 
 func (w *world) Run(ctx context.Context, name string, args ...string) (string, error) {
@@ -78,6 +61,34 @@ func (w *world) Run(ctx context.Context, name string, args ...string) (string, e
 	}
 
 	return out, nil
+}
+
+func (w *world) RunWithRetry(ctx context.Context, attempts int, delay time.Duration, name string, args ...string) (string, error) {
+	if attempts < 1 {
+		attempts = 1
+	}
+
+	var lastErr error
+	var out string
+	for attempt := 1; attempt <= attempts; attempt++ {
+		out, lastErr = w.Run(ctx, name, args...)
+		if lastErr == nil {
+			return out, nil
+		}
+		if attempt == attempts {
+			break
+		}
+
+		w.logf("retrying command after attempt %d/%d: %s %s: %v",
+			attempt, attempts, name, strings.Join(args, " "), lastErr)
+		select {
+		case <-ctx.Done():
+			return out, ctx.Err()
+		case <-time.After(delay):
+		}
+	}
+
+	return out, lastErr
 }
 
 func (w *world) WaitFor(ctx context.Context, description string, timeout, pollInterval time.Duration, condition func(context.Context) (bool, error)) error {

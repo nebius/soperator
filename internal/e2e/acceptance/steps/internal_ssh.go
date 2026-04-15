@@ -37,7 +37,7 @@ func (s *InternalSSH) aRegularUserAccountExistsOnTheLoginNode(ctx context.Contex
 
 	cmd := fmt.Sprintf("id %s >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh %s",
 		framework.ShellQuote(sshUserName), framework.ShellQuote(sshUserName))
-	if _, err := framework.ExecJailWithDefaultRetry(ctx, s.exec, cmd); err != nil {
+	if _, err := s.exec.ExecJail(ctx, cmd); err != nil {
 		return fmt.Errorf("create user %s: %w", sshUserName, err)
 	}
 
