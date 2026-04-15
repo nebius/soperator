@@ -28,7 +28,7 @@ func (s *PackageInstallation) Register(sc *godog.ScenarioContext) {
 }
 
 func (s *PackageInstallation) theNVIDIADriverIsWorkingOnAWorkerNode(ctx context.Context) error {
-	worker, err := s.exec.AnyWorker()
+	worker, err := s.exec.AnyGPUWorker()
 	if err != nil {
 		return err
 	}
@@ -45,13 +45,13 @@ func (s *PackageInstallation) theNVIDIADriverIsWorkingOnAWorkerNode(ctx context.
 func (s *PackageInstallation) jqIsInstalledOnTheWorkerNode(ctx context.Context) error {
 	workerName := s.packageWorker.Name
 	updateCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get update'", framework.ShellQuote(workerName))
-	if _, err := framework.ExecJailWithDefaultRetry(ctx, s.exec, updateCmd); err != nil {
+	if _, err := s.exec.ExecJail(ctx, updateCmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, workerName)
 		return fmt.Errorf("apt-get update: %w", err)
 	}
 
 	installCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jq'", framework.ShellQuote(workerName))
-	if _, err := framework.ExecJailWithDefaultRetry(ctx, s.exec, installCmd); err != nil {
+	if _, err := s.exec.ExecJail(ctx, installCmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, workerName)
 		return fmt.Errorf("apt-get install jq: %w", err)
 	}
