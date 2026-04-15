@@ -24,6 +24,7 @@ func NewInternalSSH(exec framework.Exec) *InternalSSH {
 
 func (s *InternalSSH) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^a regular user account exists on the login node$`, s.aRegularUserAccountExistsOnTheLoginNode)
+	sc.Step(`^the selected worker host key is not present for that user$`, s.theSelectedWorkerHostKeyIsNotPresentForThatUser)
 	sc.Step(`^the user SSHs from the login node to a worker$`, s.theUserSSHsFromTheLoginNodeToAWorker)
 	sc.Step(`^the connection succeeds without extra SSH options$`, s.theConnectionSucceedsWithoutExtraSSHOptions)
 }
@@ -44,10 +45,22 @@ func (s *InternalSSH) aRegularUserAccountExistsOnTheLoginNode(ctx context.Contex
 	return nil
 }
 
+func (s *InternalSSH) theSelectedWorkerHostKeyIsNotPresentForThatUser(ctx context.Context) error {
+	cmd := fmt.Sprintf(
+		"su - %s -c 'mkdir -p ~/.ssh && touch ~/.ssh/known_hosts && ssh-keygen -R %s -f ~/.ssh/known_hosts >/dev/null 2>&1 || true'",
+		framework.ShellQuote(sshUserName),
+		framework.ShellQuote(s.targetWorker.Name),
+	)
+	if _, err := s.exec.ExecJail(ctx, cmd); err != nil {
+		return fmt.Errorf("remove existing host key for %s and user %s: %w", s.targetWorker.Name, sshUserName, err)
+	}
+	return nil
+}
+
 func (s *InternalSSH) theUserSSHsFromTheLoginNodeToAWorker(ctx context.Context) error {
 	cmd := fmt.Sprintf("su - %s -c 'timeout 30 ssh %s hostname </dev/null'",
 		framework.ShellQuote(sshUserName), framework.ShellQuote(s.targetWorker.Name))
-	out, err := framework.ExecJailWithDefaultRetry(ctx, s.exec, cmd)
+	out, err := s.exec.ExecJail(ctx, cmd)
 	if err != nil {
 		return fmt.Errorf("ssh from login to worker as %s: %w", sshUserName, err)
 	}
