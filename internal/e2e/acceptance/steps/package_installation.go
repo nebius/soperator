@@ -22,9 +22,9 @@ func NewPackageInstallation(exec framework.Exec) *PackageInstallation {
 
 func (s *PackageInstallation) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^the NVIDIA driver is working on a worker node$`, s.theNVIDIADriverIsWorkingOnAWorkerNode)
-	sc.Step(`^jq is installed on the worker node$`, s.jqIsInstalledOnTheWorkerNode)
+	sc.Step(`^nvitop is installed on the worker node$`, s.nvitopIsInstalledOnTheWorkerNode)
 	sc.Step(`^the NVIDIA driver is still working on the worker node$`, s.theNVIDIADriverIsStillWorkingOnTheWorkerNode)
-	sc.Step(`^jq is available on the worker node$`, s.jqIsAvailableOnTheWorkerNode)
+	sc.Step(`^nvitop is available on the worker node$`, s.nvitopIsAvailableOnTheWorkerNode)
 }
 
 func (s *PackageInstallation) theNVIDIADriverIsWorkingOnAWorkerNode(ctx context.Context) error {
@@ -42,7 +42,7 @@ func (s *PackageInstallation) theNVIDIADriverIsWorkingOnAWorkerNode(ctx context.
 	return nil
 }
 
-func (s *PackageInstallation) jqIsInstalledOnTheWorkerNode(ctx context.Context) error {
+func (s *PackageInstallation) nvitopIsInstalledOnTheWorkerNode(ctx context.Context) error {
 	workerName := s.packageWorker.Name
 	updateCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get update'", framework.ShellQuote(workerName))
 	if _, err := s.exec.ExecJail(ctx, updateCmd); err != nil {
@@ -50,10 +50,10 @@ func (s *PackageInstallation) jqIsInstalledOnTheWorkerNode(ctx context.Context) 
 		return fmt.Errorf("apt-get update: %w", err)
 	}
 
-	installCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jq'", framework.ShellQuote(workerName))
+	installCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nvitop'", framework.ShellQuote(workerName))
 	if _, err := s.exec.ExecJail(ctx, installCmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, workerName)
-		return fmt.Errorf("apt-get install jq: %w", err)
+		return fmt.Errorf("apt-get install nvitop: %w", err)
 	}
 	return nil
 }
@@ -68,12 +68,12 @@ func (s *PackageInstallation) theNVIDIADriverIsStillWorkingOnTheWorkerNode(ctx c
 	return nil
 }
 
-func (s *PackageInstallation) jqIsAvailableOnTheWorkerNode(ctx context.Context) error {
+func (s *PackageInstallation) nvitopIsAvailableOnTheWorkerNode(ctx context.Context) error {
 	workerName := s.packageWorker.Name
-	cmd := fmt.Sprintf("ssh %s 'jq --version >/dev/null'", framework.ShellQuote(workerName))
+	cmd := fmt.Sprintf("ssh %s 'nvitop --version >/dev/null'", framework.ShellQuote(workerName))
 	if _, err := framework.ExecJailWithDefaultRetry(ctx, s.exec, cmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, workerName)
-		return fmt.Errorf("verify jq after install: %w", err)
+		return fmt.Errorf("verify nvitop after install: %w", err)
 	}
 	return nil
 }
@@ -81,7 +81,7 @@ func (s *PackageInstallation) jqIsAvailableOnTheWorkerNode(ctx context.Context) 
 func (s *PackageInstallation) logInstallFailureDiagnostics(ctx context.Context, workerName string) {
 	commands := []string{
 		fmt.Sprintf("ssh %s 'dpkg --audit || true'", framework.ShellQuote(workerName)),
-		fmt.Sprintf("ssh %s 'apt-cache policy jq || true'", framework.ShellQuote(workerName)),
+		fmt.Sprintf("ssh %s 'apt-cache policy nvitop || true'", framework.ShellQuote(workerName)),
 		fmt.Sprintf("ssh %s 'tail -n 60 /var/log/dpkg.log || true'", framework.ShellQuote(workerName)),
 		fmt.Sprintf("ssh %s 'tail -n 60 /var/log/apt/term.log || true'", framework.ShellQuote(workerName)),
 	}
