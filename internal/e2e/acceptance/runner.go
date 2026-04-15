@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/cucumber/godog"
 	corev1 "k8s.io/api/core/v1"
@@ -19,6 +20,13 @@ import (
 
 //go:embed features/*.feature
 var acceptanceFeatures embed.FS
+
+type timingCtxKey string
+
+const (
+	scenarioStartTimeKey timingCtxKey = "acceptance_scenario_start_time"
+	stepStartTimeKey     timingCtxKey = "acceptance_step_start_time"
+)
 
 type Runner struct {
 	state *framework.ClusterState
@@ -69,7 +77,10 @@ func (r *Runner) Run(ctx context.Context) error {
 		},
 	}
 
-	if status := suite.Run(); status != 0 {
+	suiteStart := time.Now()
+	status := suite.Run()
+	log.Printf("acceptance: suite finished duration=%s", time.Since(suiteStart).Round(time.Millisecond))
+	if status != 0 {
 		return fmt.Errorf("godog suite exited with status %d", status)
 	}
 
@@ -119,6 +130,7 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 
 	log.Printf("acceptance: discovered workers: %s", workerNames(state.Workers))
 	log.Printf("acceptance: discovered GPU workers: %s", workerNames(state.GPUWorkers))
+	log.Printf("acceptance: discovered workers by nodeset: %s", workersByNodeSetSummary(state.WorkersByNodeSet))
 	return nil
 }
 
@@ -132,12 +144,51 @@ func featurePaths() []string {
 }
 
 func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
+	registerTimingHooks(sc)
+
 	w := newWorld(r.state)
 
 	steps.NewClusterCreation(r.state, w).Register(sc)
 	steps.NewInternalSSH(w).Register(sc)
 	steps.NewPackageInstallation(w).Register(sc)
 	steps.NewNodeReplacement(w).Register(sc)
+}
+
+func registerTimingHooks(sc *godog.ScenarioContext) {
+	sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
+		log.Printf("acceptance: scenario started: %q", scenario.Name)
+		return context.WithValue(ctx, scenarioStartTimeKey, time.Now()), nil
+	})
+
+	sc.StepContext().Before(func(ctx context.Context, step *godog.Step) (context.Context, error) {
+		return context.WithValue(ctx, stepStartTimeKey, time.Now()), nil
+	})
+
+	sc.StepContext().After(func(ctx context.Context, step *godog.Step, status godog.StepResultStatus, err error) (context.Context, error) {
+		duration := "unknown"
+		if startedAt, ok := ctx.Value(stepStartTimeKey).(time.Time); ok && !startedAt.IsZero() {
+			duration = time.Since(startedAt).Round(time.Millisecond).String()
+		}
+		if err != nil {
+			log.Printf("acceptance: step finished: %q status=%s duration=%s err=%v", step.Text, status, duration, err)
+			return ctx, nil
+		}
+		log.Printf("acceptance: step finished: %q status=%s duration=%s", step.Text, status, duration)
+		return ctx, nil
+	})
+
+	sc.After(func(ctx context.Context, scenario *godog.Scenario, err error) (context.Context, error) {
+		duration := "unknown"
+		if startedAt, ok := ctx.Value(scenarioStartTimeKey).(time.Time); ok && !startedAt.IsZero() {
+			duration = time.Since(startedAt).Round(time.Millisecond).String()
+		}
+		if err != nil {
+			log.Printf("acceptance: scenario finished: %q duration=%s err=%v", scenario.Name, duration, err)
+			return ctx, nil
+		}
+		log.Printf("acceptance: scenario finished: %q duration=%s", scenario.Name, duration)
+		return ctx, nil
+	})
 }
 
 func newWorld(state *framework.ClusterState) *world {
@@ -160,6 +211,25 @@ func workerNames(workers []framework.WorkerRef) string {
 		names = append(names, worker.Name)
 	}
 	return strings.Join(names, ", ")
+}
+
+func workersByNodeSetSummary(workersByNodeSet map[string][]framework.WorkerRef) string {
+	if len(workersByNodeSet) == 0 {
+		return "<none>"
+	}
+
+	names := make([]string, 0, len(workersByNodeSet))
+	for nodeSet := range workersByNodeSet {
+		names = append(names, nodeSet)
+	}
+	sort.Strings(names)
+
+	parts := make([]string, 0, len(names))
+	for _, nodeSet := range names {
+		parts = append(parts, fmt.Sprintf("%s=[%s]", nodeSet, workerNames(workersByNodeSet[nodeSet])))
+	}
+
+	return strings.Join(parts, "; ")
 }
 
 func verifyPodReady(ctx context.Context, w *world, namespace, name string) error {
