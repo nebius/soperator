@@ -25,7 +25,7 @@ func (w *world) AnyWorker() (framework.WorkerRef, error) {
 
 func (w *world) AnyGPUWorker() (framework.WorkerRef, error) {
 	if len(w.state.GPUWorkers) == 0 {
-		return w.AnyWorker()
+		return framework.WorkerRef{}, fmt.Errorf("no GPU workers discovered")
 	}
 	return w.state.GPUWorkers[rand.Intn(len(w.state.GPUWorkers))], nil
 }

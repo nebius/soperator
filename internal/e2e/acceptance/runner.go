@@ -117,7 +117,8 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 	state.Workers = workers
 	classifyWorkers(state)
 
-	log.Printf("acceptance: discovered workers: %s", workerNames(workers))
+	log.Printf("acceptance: discovered workers: %s", workerNames(state.Workers))
+	log.Printf("acceptance: discovered GPU workers: %s", workerNames(state.GPUWorkers))
 	return nil
 }
 
@@ -151,6 +152,9 @@ func (w *world) logf(format string, args ...any) {
 }
 
 func workerNames(workers []framework.WorkerRef) string {
+	if len(workers) == 0 {
+		return "<none>"
+	}
 	names := make([]string, 0, len(workers))
 	for _, worker := range workers {
 		names = append(names, worker.Name)
