@@ -18,6 +18,11 @@ on:
         required: false
         default: ""
         type: string
+      run_unstable_tests:
+        description: "Run acceptance scenarios tagged @unstable"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -158,6 +163,7 @@ jobs:
       O11Y_ACCESS_TOKEN: ${{ secrets.E2E_O11Y_ACCESS_TOKEN }}
       PROFILE_ENV_VAR: ${{ inputs.profile_env_var || vars.PROFILE_ENV_VAR }}
       E2E_PROFILE: ${{ vars[inputs.profile_env_var || vars.PROFILE_ENV_VAR] }}
+      RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests }}
 
     steps:
       - name: Checkout repository
