@@ -21,7 +21,7 @@ func RunAcceptance(ctx context.Context, cfg Config) error {
 		})
 	}
 
-	runner := acceptance.NewRunner(state)
+	runner := acceptance.NewRunner(state, cfg.RunUnstableTests)
 
 	if err := runner.Run(ctx); err != nil {
 		return fmt.Errorf("run acceptance suite: %w", err)

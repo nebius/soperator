@@ -27,6 +27,7 @@ const (
 var (
 	instanceIDPattern = regexp.MustCompile(`InstanceId=([^\s]+)`)
 	reasonPattern     = regexp.MustCompile(`Reason=([^\n]+)`)
+	statePattern      = regexp.MustCompile(`State=([^\s]+)`)
 )
 
 type NodeReplacement struct {
@@ -67,7 +68,7 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context
 	}
 	s.replacementWorker = worker
 
-	nodeState, err := s.exec.ExecController(ctx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(worker.Name)))
+	nodeState, err := framework.ExecControllerWithDefaultRetry(ctx, s.exec, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(worker.Name)))
 	if err != nil {
 		return fmt.Errorf("read original node state: %w", err)
 	}
@@ -154,16 +155,27 @@ func (s *NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) e
 		}
 
 		newInstanceID := parseInstanceID(state)
-		if newInstanceID == "" || newInstanceID == originalInstanceID || strings.Contains(state, "DRAIN") {
+		if newInstanceID == "" || newInstanceID == originalInstanceID {
 			return false, nil
 		}
+
+		nodeState := parseNodeState(state)
+		if nodeState == "" {
+			return false, nil
+		}
+		for _, bad := range []string{"DRAIN", "DOWN", "NOT_RESPONDING", "FAIL", "INVALID_REG"} {
+			if strings.Contains(nodeState, bad) {
+				return false, nil
+			}
+		}
+
 		return true, nil
 	})
 }
 
 func (s *NodeReplacement) theReplacementNodePassesGPUValidation(ctx context.Context) error {
 	workerName := s.replacementWorker.Name
-	if _, err := s.exec.ExecJail(ctx, fmt.Sprintf("srun -w %s nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
+	if _, err := s.exec.ExecJail(ctx, fmt.Sprintf("srun -w %s --gpus-per-node=8 nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
 		output, stateErr := s.exec.ExecController(ctx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(workerName)))
 		if stateErr == nil {
 			s.exec.Logf("replacement worker state after failed final validation:\n%s", strings.TrimSpace(output))
@@ -194,6 +206,14 @@ func parseInstanceID(state string) string {
 
 func parseReason(state string) string {
 	match := reasonPattern.FindStringSubmatch(state)
+	if len(match) != 2 {
+		return ""
+	}
+	return strings.TrimSpace(match[1])
+}
+
+func parseNodeState(state string) string {
+	match := statePattern.FindStringSubmatch(state)
 	if len(match) != 2 {
 		return ""
 	}
