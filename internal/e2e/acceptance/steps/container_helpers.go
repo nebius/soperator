@@ -16,7 +16,7 @@ func selectGPUWorkers(ctx context.Context, exec framework.Exec, count int) ([]st
 		return nil, fmt.Errorf("invalid GPU worker count %d", count)
 	}
 
-	output, err := framework.ExecControllerWithDefaultRetry(ctx, exec, `sinfo -hN -p main -o '%N %G'`)
+	output, err := framework.ExecJailWithDefaultRetry(ctx, exec, `sinfo -hN -p main -o '%N %G'`)
 	if err != nil {
 		return nil, fmt.Errorf("discover GPU workers from Slurm: %w", err)
 	}
@@ -66,7 +66,7 @@ func parseSbatchJobID(output string) (string, error) {
 
 func waitForJobRunning(ctx context.Context, exec framework.Exec, jobID string, timeout time.Duration) error {
 	return exec.WaitFor(ctx, fmt.Sprintf("job %s running", jobID), timeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
-		status, err := framework.ExecControllerWithDefaultRetry(waitCtx, exec, fmt.Sprintf("squeue -h -j %s -o '%%T'", framework.ShellQuote(jobID)))
+		status, err := framework.ExecJailWithDefaultRetry(waitCtx, exec, fmt.Sprintf("squeue -h -j %s -o '%%T'", framework.ShellQuote(jobID)))
 		if err != nil {
 			return false, err
 		}
@@ -76,7 +76,7 @@ func waitForJobRunning(ctx context.Context, exec framework.Exec, jobID string, t
 
 func waitForJobGone(ctx context.Context, exec framework.Exec, jobID string, timeout time.Duration) error {
 	return exec.WaitFor(ctx, fmt.Sprintf("job %s gone from queue", jobID), timeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
-		status, err := framework.ExecControllerWithDefaultRetry(waitCtx, exec, fmt.Sprintf("squeue -h -j %s -o '%%T'", framework.ShellQuote(jobID)))
+		status, err := framework.ExecJailWithDefaultRetry(waitCtx, exec, fmt.Sprintf("squeue -h -j %s -o '%%T'", framework.ShellQuote(jobID)))
 		if err != nil {
 			return false, err
 		}
@@ -89,7 +89,7 @@ func cancelSlurmJob(ctx context.Context, exec framework.Exec, jobID string, wait
 		return nil
 	}
 
-	if _, err := exec.ExecController(ctx, fmt.Sprintf("scancel %s", framework.ShellQuote(jobID))); err != nil {
+	if _, err := exec.ExecJail(ctx, fmt.Sprintf("scancel %s", framework.ShellQuote(jobID))); err != nil {
 		// The job may already be gone by the time we try to cancel it.
 		if !isMissingJobError(err) {
 			return fmt.Errorf("scancel job %s: %w", jobID, err)

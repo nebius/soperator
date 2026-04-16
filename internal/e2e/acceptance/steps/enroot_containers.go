@@ -261,7 +261,7 @@ func (s *EnrootContainers) theNamedEnrootRuntimeDirectoryIsCleanedUp(ctx context
 		framework.ShellQuote(strings.Join(s.workers, ",")),
 		framework.ShellQuote(cleanupWrap),
 	)
-	out, err := s.exec.ExecController(ctx, submitCmd)
+	out, err := s.exec.ExecJail(ctx, submitCmd)
 	if err != nil {
 		return fmt.Errorf("submit named enroot cleanup job: %w", err)
 	}
@@ -318,7 +318,7 @@ func (s *EnrootContainers) submitEnrootJob(ctx context.Context, containerName, j
 		framework.ShellQuote(jobName),
 		framework.ShellQuote(wrap),
 	)
-	out, err := s.exec.ExecController(ctx, submit)
+	out, err := s.exec.ExecJail(ctx, submit)
 	if err != nil {
 		return fmt.Errorf("submit enroot job %q: %w", jobName, err)
 	}

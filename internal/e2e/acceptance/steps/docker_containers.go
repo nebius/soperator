@@ -71,7 +71,7 @@ func (s *DockerContainers) aLongRunningDockerNCCLJobIsSubmittedOnTwoGPUWorkers(c
 		framework.ShellQuote(wrap),
 	)
 
-	out, err := s.exec.ExecController(ctx, submit)
+	out, err := s.exec.ExecJail(ctx, submit)
 	if err != nil {
 		return fmt.Errorf("submit Docker NCCL job: %w", err)
 	}
