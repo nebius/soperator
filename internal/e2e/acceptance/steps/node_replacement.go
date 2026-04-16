@@ -190,7 +190,7 @@ func (s *NodeReplacement) cancelJob(ctx context.Context, maintenanceJobID string
 		return nil
 	}
 
-	if _, err := s.exec.ExecController(ctx, fmt.Sprintf("scancel %s || true", framework.ShellQuote(maintenanceJobID))); err != nil {
+	if err := cancelSlurmJob(ctx, s.exec, maintenanceJobID, 0); err != nil {
 		return fmt.Errorf("cancel maintenance job %s: %w", maintenanceJobID, err)
 	}
 	return nil
