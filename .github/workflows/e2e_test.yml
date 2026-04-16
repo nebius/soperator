@@ -35,7 +35,9 @@ jobs:
       E2E_PROFILE: ${{ vars[inputs.profile_env_var || vars.PROFILE_ENV_VAR] }}
     steps:
       - name: Install yq
-        uses: frenck/action-setup-yq@v1
+        uses: frenck/action-setup-yq@c4b5be8b4a215c536a41d436757d9feb92836d4f # v1.0.2
+        with:
+          version: v4.44.6
 
       - name: Resolve profile
         id: resolve
