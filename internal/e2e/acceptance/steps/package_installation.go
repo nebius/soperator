@@ -50,10 +50,17 @@ func (s *PackageInstallation) nvitopIsInstalledOnTheWorkerNode(ctx context.Conte
 		return fmt.Errorf("apt-get update: %w", err)
 	}
 
-	installCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nvitop'", framework.ShellQuote(workerName))
+	installCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends --no-upgrade nvitop'", framework.ShellQuote(workerName))
 	if _, err := s.exec.ExecJail(ctx, installCmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, workerName)
 		return fmt.Errorf("apt-get install nvitop: %w", err)
+	}
+
+	verifyInstallCmd := fmt.Sprintf("ssh %s \"dpkg-query -W -f='${Status}' nvitop 2>/dev/null | grep -q 'install ok installed'\"",
+		framework.ShellQuote(workerName))
+	if _, err := framework.ExecJailWithDefaultRetry(ctx, s.exec, verifyInstallCmd); err != nil {
+		s.logInstallFailureDiagnostics(ctx, workerName)
+		return fmt.Errorf("verify nvitop package installation: %w", err)
 	}
 	return nil
 }
