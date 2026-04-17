@@ -21,6 +21,7 @@ const (
 	enrootARP           = "all_reduce_perf_mpi -b 8G -e 8G -f 2 -g 1 -N 0"
 	enrootNamedJobName  = "kek"
 	enrootSquashPattern = "active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-3935b93.squashfs"
+	enrootSquashRoot    = "/mnt/jail/var/cache/enroot-container-images"
 
 	enrootJobStartTimeout = 25 * time.Minute
 	enrootProbeTimeout    = 10 * time.Minute
@@ -94,7 +95,8 @@ func (s *EnrootContainers) enrootSquashfsImageIsPresentOnAWorker(ctx context.Con
 	}
 
 	return s.exec.WaitFor(ctx, "enroot squashfs image present", enrootProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
-		treeOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, "sudo tree -hug /var/cache/enroot-container-images/")
+		treeOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker,
+			fmt.Sprintf("sudo tree -L 4 -hug %s 2>/dev/null || true", framework.ShellQuote(enrootSquashRoot)))
 		if err != nil {
 			return false, err
 		}
@@ -102,7 +104,8 @@ func (s *EnrootContainers) enrootSquashfsImageIsPresentOnAWorker(ctx context.Con
 			return false, nil
 		}
 
-		findOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, "sudo find /var/cache/enroot-container-images -type f -name '*.squashfs' | sort")
+		findOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker,
+			fmt.Sprintf("sudo find %s -type f -name '*.squashfs' 2>/dev/null | sort", framework.ShellQuote(enrootSquashRoot)))
 		if err != nil {
 			return false, err
 		}
@@ -351,7 +354,7 @@ func (s *EnrootContainers) waitForTreeEntriesOnWorker(ctx context.Context, stora
 	}
 
 	return s.exec.WaitFor(ctx, description, enrootProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
-		out, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, fmt.Sprintf("sudo tree -a %s", framework.ShellQuote(storagePath)))
+		out, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, fmt.Sprintf("sudo tree -L 2 -a %s", framework.ShellQuote(storagePath)))
 		if err != nil {
 			return false, err
 		}
