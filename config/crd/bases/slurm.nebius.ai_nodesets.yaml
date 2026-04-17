@@ -2560,7 +2560,7 @@ spec:
                   directly to scale active nodes up or down.
                   Defaults to 1.
                 format: int32
-                minimum: 1
+                minimum: 0
                 type: integer
               maxUnavailable:
                 anyOf:

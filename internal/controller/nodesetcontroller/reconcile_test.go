@@ -1,12 +1,20 @@
 package nodesetcontroller
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/controller/reconciler"
 )
 
 func makeNodeSetWithConditions(conditions ...metav1.Condition) *slurmv1alpha1.NodeSet {
@@ -98,4 +106,51 @@ func TestComputePhase(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestReconcileNodeSetPowerState_AllowsZeroInitialEphemeralNodes(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, slurmv1alpha1.AddToScheme(scheme))
+
+	nodeSet := &slurmv1alpha1.NodeSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-nodeset",
+			Namespace: "test-namespace",
+			UID:       "test-uid",
+		},
+		Spec: slurmv1alpha1.NodeSetSpec{
+			InitialNumberEphemeralNodes: 0,
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(nodeSet).
+		WithStatusSubresource(&slurmv1alpha1.NodeSetPowerState{}).
+		Build()
+
+	r := &NodeSetReconciler{
+		Reconciler: reconciler.NewReconciler(fakeClient, scheme, record.NewFakeRecorder(10)),
+		NodeSetPowerState: reconciler.NewNodeSetPowerStateReconciler(
+			reconciler.NewReconciler(fakeClient, scheme, record.NewFakeRecorder(10)),
+		),
+	}
+
+	activeNodes, err := r.reconcileNodeSetPowerState(context.Background(), nodeSet)
+	require.NoError(t, err)
+	assert.Empty(t, activeNodes)
+
+	var powerState slurmv1alpha1.NodeSetPowerState
+	err = fakeClient.Get(context.Background(), client.ObjectKey{
+		Namespace: nodeSet.Namespace,
+		Name:      nodeSet.Name,
+	}, &powerState)
+	require.NoError(t, err)
+
+	assert.Equal(t, nodeSet.Name, powerState.Spec.NodeSetRef)
+	assert.Empty(t, powerState.Spec.ActiveNodes)
+	assert.Equal(t, int32(0), powerState.Status.ActiveCount)
+	readyCondition := meta.FindStatusCondition(powerState.Status.Conditions, slurmv1alpha1.ConditionNodeSetPowerStateReady)
+	require.NotNil(t, readyCondition)
+	assert.Equal(t, metav1.ConditionTrue, readyCondition.Status)
 }
