@@ -149,7 +149,7 @@ type NodeSetSpec struct {
 	// Defaults to 1.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
 	InitialNumberEphemeralNodes int32 `json:"initialNumberEphemeralNodes,omitempty"`
 
