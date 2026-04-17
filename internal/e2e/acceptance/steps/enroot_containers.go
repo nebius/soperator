@@ -47,6 +47,9 @@ func (s *EnrootContainers) Register(sc *godog.ScenarioContext) {
 		if path.Base(scenario.Uri) != enrootContainersFeatureFile {
 			return ctx, nil
 		}
+		if err != nil {
+			s.dumpEnrootDiagnostics(context.Background(), "scenario failed")
+		}
 
 		if cleanupErr := s.cancelCurrentJob(context.Background()); cleanupErr != nil {
 			s.exec.Logf("cleanup: cancel enroot job: %v", cleanupErr)
@@ -94,7 +97,7 @@ func (s *EnrootContainers) enrootSquashfsImageIsPresentOnAWorker(ctx context.Con
 		return fmt.Errorf("enroot workers are not selected")
 	}
 
-	return s.exec.WaitFor(ctx, "enroot squashfs image present", enrootProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
+	if err := s.exec.WaitFor(ctx, "enroot squashfs image present", enrootProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
 		treeOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker,
 			fmt.Sprintf("sudo tree -L 4 -hug %s 2>/dev/null || true", framework.ShellQuote(enrootSquashRoot)))
 		if err != nil {
@@ -115,7 +118,11 @@ func (s *EnrootContainers) enrootSquashfsImageIsPresentOnAWorker(ctx context.Con
 		}
 		s.squashPath = squashPath
 		return true, nil
-	})
+	}); err != nil {
+		s.dumpEnrootDiagnostics(ctx, "squashfs artifact not found")
+		return err
+	}
+	return nil
 }
 
 func (s *EnrootContainers) enrootRuntimeContainerDataIsVisibleWhileTheJobIsRunning(ctx context.Context) error {
@@ -409,4 +416,41 @@ func namedEnrootDir(containerName string) string {
 
 func namedEnrootDirPath(containerName string) string {
 	return "/mnt/image-storage/enroot/data/" + namedEnrootDir(containerName)
+}
+
+func (s *EnrootContainers) dumpEnrootDiagnostics(ctx context.Context, reason string) {
+	s.exec.Logf("enroot containers debug: reason=%s job_id=%s workers=%s squash_path=%s",
+		reason, s.jobID, strings.Join(s.workers, ","), s.squashPath)
+
+	if s.jobID != "" {
+		s.logEnrootJailCommandOutput(ctx, "enroot debug squeue", fmt.Sprintf("squeue -j %s -o '%%i %%T %%R'", framework.ShellQuote(s.jobID)))
+		s.logEnrootJailCommandOutput(ctx, "enroot debug scontrol show job", fmt.Sprintf("scontrol show job %s || true", framework.ShellQuote(s.jobID)))
+	}
+
+	for _, worker := range s.workers {
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug plugstack", "sudo sh -lc 'cat /etc/slurm/plugstack.conf; echo; grep -R \"pyxis\\|importer\" /etc/slurm/plugstack.conf* 2>/dev/null || true'")
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug cache tree", fmt.Sprintf("sudo tree -L 3 -hug %s 2>/dev/null || true", framework.ShellQuote(enrootSquashRoot)))
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug cache find sqsh", fmt.Sprintf("sudo find %s -type f -name '*.sqsh' 2>/dev/null | sort || true", framework.ShellQuote(enrootSquashRoot)))
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug cache find all", fmt.Sprintf("sudo find %s -maxdepth 4 -type f 2>/dev/null | sort || true", framework.ShellQuote(enrootSquashRoot)))
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug runtime tree", "sudo tree -L 2 /mnt/image-storage/enroot/data/ 2>/dev/null || true")
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug enroot list", "sudo enroot list || true")
+	}
+}
+
+func (s *EnrootContainers) logEnrootJailCommandOutput(ctx context.Context, label, command string) {
+	out, err := s.exec.ExecJailWithRetry(ctx, command, 2, 5*time.Second)
+	if err != nil {
+		s.exec.Logf("%s failed: %v", label, err)
+		return
+	}
+	s.exec.Logf("%s output:\n%s", label, strings.TrimSpace(out))
+}
+
+func (s *EnrootContainers) logEnrootWorkerCommandOutput(ctx context.Context, worker, label, command string) {
+	out, err := runWorkerCommandWithDefaultRetry(ctx, s.exec, worker, command)
+	if err != nil {
+		s.exec.Logf("%s on %s failed: %v", label, worker, err)
+		return
+	}
+	s.exec.Logf("%s on %s output:\n%s", label, worker, strings.TrimSpace(out))
 }
