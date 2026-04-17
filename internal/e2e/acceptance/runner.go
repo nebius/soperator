@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -61,11 +63,22 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	tags := r.tagFilter()
 
+	format := "pretty"
+	if dir := os.Getenv("E2E_REPORT_DIR"); dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("create report dir %q: %w", dir, err)
+		}
+		format = fmt.Sprintf("pretty,cucumber:%s,junit:%s",
+			filepath.Join(dir, "acceptance.cucumber.json"),
+			filepath.Join(dir, "acceptance.junit.xml"),
+		)
+	}
+
 	suite := godog.TestSuite{
 		Name:                "soperator-acceptance",
 		ScenarioInitializer: r.initializeScenario,
 		Options: &godog.Options{
-			Format:         "pretty",
+			Format:         format,
 			FS:             acceptanceFeatures,
 			Paths:          features,
 			TestingT:       nil,
