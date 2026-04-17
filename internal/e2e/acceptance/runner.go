@@ -29,10 +29,11 @@ const (
 )
 
 type Runner struct {
-	state *framework.ClusterState
+	state            *framework.ClusterState
+	runUnstableTests bool
 }
 
-func NewRunner(state *framework.ClusterState) *Runner {
+func NewRunner(state *framework.ClusterState, runUnstableTests bool) *Runner {
 	if state == nil {
 		state = &framework.ClusterState{
 			WorkersByNodeSet: make(map[string][]framework.WorkerRef),
@@ -42,7 +43,8 @@ func NewRunner(state *framework.ClusterState) *Runner {
 		state.WorkersByNodeSet = make(map[string][]framework.WorkerRef)
 	}
 	return &Runner{
-		state: state,
+		state:            state,
+		runUnstableTests: runUnstableTests,
 	}
 }
 
@@ -57,11 +59,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		return fmt.Errorf("no acceptance feature files configured")
 	}
 
-	tags := ""
-	if !r.state.HasGPUWorkers() {
-		log.Printf("acceptance: no GPU workers found, excluding @gpu scenarios")
-		tags = "~@gpu"
-	}
+	tags := r.tagFilter()
 
 	suite := godog.TestSuite{
 		Name:                "soperator-acceptance",
@@ -85,6 +83,21 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (r *Runner) tagFilter() string {
+	var filters []string
+
+	if !r.runUnstableTests {
+		log.Printf("acceptance: RUN_UNSTABLE_TESTS=false, excluding @unstable scenarios")
+		filters = append(filters, "~@unstable")
+	}
+	if !r.state.HasGPUWorkers() {
+		log.Printf("acceptance: no GPU workers found, excluding @gpu scenarios")
+		filters = append(filters, "~@gpu")
+	}
+
+	return strings.Join(filters, " && ")
 }
 
 func discoverCluster(ctx context.Context, w *world, state *framework.ClusterState) error {
