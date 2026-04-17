@@ -24,6 +24,10 @@ spec:
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   - name: {{ include "soperator-fluxcd.fullname" . }}-vm-logs
+  # nodesets itself reaches Ready very quickly (it just creates NodeSet CRs), so this is
+  # not sufficient on its own — the init container below waits for actual worker output.
+  # But the ordering is logically correct: jail logs cannot appear before nodesets exist.
+  - name: {{ include "soperator-fluxcd.fullname" . }}-nodesets
   install:
     {{- toYaml .Values.observability.opentelemetry.logs.install | nindent 4 }}
   upgrade:
@@ -334,8 +338,8 @@ spec:
     {{- end }}
     - mountPath: /var/lib/otelcol-jail
       name: varlibotelcol
-    - mountPath: /mnt/jail/opt/soperator-outputs
-      name: soperator-outputs
+    - mountPath: /mnt/jail
+      name: jail
       readOnly: true
     extraVolumes:
     {{- if $hasPublicEndpoint }}
@@ -349,9 +353,9 @@ spec:
         type: Directory
       {{- end }}
     {{- end }}
-    - name: soperator-outputs
+    - name: jail
       hostPath:
-        path: /mnt/jail/opt/soperator-outputs
+        path: /mnt/jail
         type: Directory
     - hostPath:
         path: /var/lib/otelcol-jail
@@ -374,6 +378,23 @@ spec:
       volumeMounts:
       - mountPath: /var/lib/otelcol-jail
         name: varlibotelcol
+    # /mnt/jail/opt/soperator-outputs is created by complement_jail.sh on first
+    # worker/login startup; we mount the jail NFS root and gate on this directory here
+    # so the HelmRelease does not get marked Stalled before workers come up.
+    - command:
+      - sh
+      - -c
+      - |
+        until [ -d /mnt/jail/opt/soperator-outputs ]; do
+          echo "Waiting for /mnt/jail/opt/soperator-outputs to be created by a worker or login pod"
+          sleep 5
+        done
+      image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
+      name: wait-soperator-outputs
+      volumeMounts:
+      - mountPath: /mnt/jail
+        name: jail
+        readOnly: true
     mode: deployment  # Single deployment on system nodes instead of DaemonSet on all workers
     replicaCount: 1   # Only one replica to avoid file lock conflicts on shared storage and prevent log duplication
     rollout:
