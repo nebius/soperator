@@ -46,9 +46,7 @@ func (s *DockerContainers) Register(sc *godog.ScenarioContext) {
 				s.exec.Logf("cleanup: cancel docker job: %v", cleanupErr)
 			}
 		}
-		if cleanupErr := s.stopContainersByNamePrefix(context.Background()); cleanupErr != nil {
-			s.exec.Logf("cleanup: stop docker containers by prefix: %v", cleanupErr)
-		}
+		s.stopContainersByNamePrefix(context.Background())
 		return ctx, nil
 	})
 
@@ -201,9 +199,9 @@ func parseIDSet(output string) map[string]struct{} {
 	return result
 }
 
-func (s *DockerContainers) stopContainersByNamePrefix(ctx context.Context) error {
+func (s *DockerContainers) stopContainersByNamePrefix(ctx context.Context) {
 	if s.containerNamePrefix == "" {
-		return nil
+		return
 	}
 
 	for _, worker := range s.workers {
@@ -216,5 +214,4 @@ func (s *DockerContainers) stopContainersByNamePrefix(ctx context.Context) error
 			_, _ = runWorkerCommand(ctx, s.exec, worker, fmt.Sprintf("sudo docker stop %s >/dev/null 2>&1 || true", framework.ShellQuote(id)))
 		}
 	}
-	return nil
 }
