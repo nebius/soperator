@@ -2,7 +2,6 @@ package steps
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path"
 	"strings"
@@ -29,8 +28,7 @@ type DockerContainers struct {
 	workers []string
 	jobID   string
 
-	baselineContainerIDs map[string]map[string]struct{}
-	jobContainerIDs      map[string]map[string]struct{}
+	containerNamePrefix string
 }
 
 func NewDockerContainers(exec framework.Exec) *DockerContainers {
@@ -48,8 +46,8 @@ func (s *DockerContainers) Register(sc *godog.ScenarioContext) {
 				s.exec.Logf("cleanup: cancel docker job: %v", cleanupErr)
 			}
 		}
-		if cleanupErr := s.stopTrackedContainers(context.Background()); cleanupErr != nil {
-			s.exec.Logf("cleanup: stop tracked docker containers: %v", cleanupErr)
+		if cleanupErr := s.stopContainersByNamePrefix(context.Background()); cleanupErr != nil {
+			s.exec.Logf("cleanup: stop docker containers by prefix: %v", cleanupErr)
 		}
 		return ctx, nil
 	})
@@ -69,18 +67,9 @@ func (s *DockerContainers) aLongRunningDockerNCCLJobIsSubmittedOnTwoGPUWorkers(c
 		return err
 	}
 	s.workers = workers
-	s.baselineContainerIDs = make(map[string]map[string]struct{}, len(workers))
-	s.jobContainerIDs = make(map[string]map[string]struct{}, len(workers))
-	for _, worker := range workers {
-		ids, collectErr := s.dockerContainerIDsForImage(ctx, worker)
-		if collectErr != nil {
-			return fmt.Errorf("collect baseline docker containers on %s: %w", worker, collectErr)
-		}
-		s.baselineContainerIDs[worker] = ids
-	}
 
 	nodelist := strings.Join(workers, ",")
-	wrap := fmt.Sprintf("srun docker run --rm --gpus=all --device=/dev/infiniband %s bash -lc %s",
+	wrap := fmt.Sprintf("srun docker run --rm --name e2e-docker-${SLURM_JOB_ID}-${SLURM_NODEID} --gpus=all --device=/dev/infiniband %s bash -lc %s",
 		framework.ShellQuote(dockerImage),
 		framework.ShellQuote(dockerARP),
 	)
@@ -99,6 +88,7 @@ func (s *DockerContainers) aLongRunningDockerNCCLJobIsSubmittedOnTwoGPUWorkers(c
 		return fmt.Errorf("parse Docker job id: %w", err)
 	}
 	s.jobID = jobID
+	s.containerNamePrefix = fmt.Sprintf("e2e-docker-%s-", jobID)
 	s.exec.Logf("docker containers: selected workers=%s job_id=%s", nodelist, jobID)
 	return nil
 }
@@ -121,21 +111,12 @@ func (s *DockerContainers) dockerContainerContentBlobsArePopulatedOnAWorker(ctx 
 func (s *DockerContainers) aDockerContainerFromTheJobIsRunningOnWorkers(ctx context.Context) error {
 	return s.exec.WaitFor(ctx, "docker containers running on selected workers", dockerProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
-			currentIDs, err := s.dockerContainerIDsForImage(waitCtx, worker)
+			currentIDs, err := s.dockerContainerIDsByNamePrefix(waitCtx, worker)
 			if err != nil {
 				return false, err
 			}
-
-			newIDs := subtractIDSets(currentIDs, s.baselineContainerIDs[worker])
-			if len(newIDs) == 0 {
+			if len(currentIDs) == 0 {
 				return false, nil
-			}
-
-			if s.jobContainerIDs[worker] == nil {
-				s.jobContainerIDs[worker] = make(map[string]struct{}, len(newIDs))
-			}
-			for id := range newIDs {
-				s.jobContainerIDs[worker][id] = struct{}{}
 			}
 		}
 		return true, nil
@@ -157,21 +138,11 @@ func (s *DockerContainers) dockerContainersFromThatJobAreNoLongerRunning(ctx con
 func (s *DockerContainers) waitForTrackedContainersGone(ctx context.Context, timeout time.Duration) error {
 	return s.exec.WaitFor(ctx, "docker containers stopped on selected workers", timeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
-			currentIDs, err := s.dockerContainerIDsForImage(waitCtx, worker)
+			currentIDs, err := s.dockerContainerIDsByNamePrefix(waitCtx, worker)
 			if err != nil {
 				return false, err
 			}
-
-			tracked := s.jobContainerIDs[worker]
-			if len(tracked) > 0 {
-				if idSetIntersects(currentIDs, tracked) {
-					return false, nil
-				}
-				continue
-			}
-
-			// Fallback in case no tracked IDs were captured.
-			if len(subtractIDSets(currentIDs, s.baselineContainerIDs[worker])) > 0 {
+			if len(currentIDs) > 0 {
 				return false, nil
 			}
 		}
@@ -205,9 +176,13 @@ func (s *DockerContainers) cancelJob(ctx context.Context) error {
 	return nil
 }
 
-func (s *DockerContainers) dockerContainerIDsForImage(ctx context.Context, worker string) (map[string]struct{}, error) {
+func (s *DockerContainers) dockerContainerIDsByNamePrefix(ctx context.Context, worker string) (map[string]struct{}, error) {
+	if s.containerNamePrefix == "" {
+		return nil, fmt.Errorf("docker container name prefix is empty")
+	}
+
 	out, err := runWorkerCommandWithDefaultRetry(ctx, s.exec, worker,
-		fmt.Sprintf("sudo docker ps --filter ancestor=%s --format '{{.ID}}'", framework.ShellQuote(dockerImage)))
+		fmt.Sprintf("sudo docker ps --filter name=%s --format '{{.ID}}'", framework.ShellQuote(s.containerNamePrefix)))
 	if err != nil {
 		return nil, err
 	}
@@ -226,38 +201,20 @@ func parseIDSet(output string) map[string]struct{} {
 	return result
 }
 
-func subtractIDSets(left, right map[string]struct{}) map[string]struct{} {
-	out := make(map[string]struct{})
-	for id := range left {
-		if _, exists := right[id]; exists {
+func (s *DockerContainers) stopContainersByNamePrefix(ctx context.Context) error {
+	if s.containerNamePrefix == "" {
+		return nil
+	}
+
+	for _, worker := range s.workers {
+		out, err := runWorkerCommandWithDefaultRetry(ctx, s.exec, worker,
+			fmt.Sprintf("sudo docker ps --filter name=%s --format '{{.ID}}'", framework.ShellQuote(s.containerNamePrefix)))
+		if err != nil {
 			continue
 		}
-		out[id] = struct{}{}
-	}
-	return out
-}
-
-func idSetIntersects(left, right map[string]struct{}) bool {
-	for id := range left {
-		if _, exists := right[id]; exists {
-			return true
+		for id := range parseIDSet(out) {
+			_, _ = runWorkerCommand(ctx, s.exec, worker, fmt.Sprintf("sudo docker stop %s >/dev/null 2>&1 || true", framework.ShellQuote(id)))
 		}
-	}
-	return false
-}
-
-func (s *DockerContainers) stopTrackedContainers(ctx context.Context) error {
-	var failures []string
-	for _, worker := range s.workers {
-		for id := range s.jobContainerIDs[worker] {
-			_, err := runWorkerCommand(ctx, s.exec, worker, fmt.Sprintf("sudo docker stop %s >/dev/null 2>&1 || true", framework.ShellQuote(id)))
-			if err != nil {
-				failures = append(failures, fmt.Sprintf("%s/%s: %v", worker, id, err))
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return errors.New(strings.Join(failures, "; "))
 	}
 	return nil
 }

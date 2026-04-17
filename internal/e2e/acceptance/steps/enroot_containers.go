@@ -20,7 +20,7 @@ const (
 	enrootDockerMount   = "/usr/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu,/usr/lib64:/usr/lib64"
 	enrootARP           = "all_reduce_perf_mpi -b 8G -e 8G -f 2 -g 1 -N 0"
 	enrootNamedJobName  = "kek"
-	enrootSquashPattern = "active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-3935b93.squashfs"
+	enrootSquashPattern = ".sqsh"
 	enrootSquashRoot    = "/mnt/jail/var/cache/enroot-container-images"
 
 	enrootJobStartTimeout = 25 * time.Minute
@@ -100,12 +100,12 @@ func (s *EnrootContainers) enrootSquashfsImageIsPresentOnAWorker(ctx context.Con
 		if err != nil {
 			return false, err
 		}
-		if !strings.Contains(treeOutput, ".squashfs") {
+		if !strings.Contains(treeOutput, enrootSquashPattern) {
 			return false, nil
 		}
 
 		findOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker,
-			fmt.Sprintf("sudo find %s -type f -name '*.squashfs' 2>/dev/null | sort", framework.ShellQuote(enrootSquashRoot)))
+			fmt.Sprintf("sudo find %s -type f -name '*%s' 2>/dev/null | sort", framework.ShellQuote(enrootSquashRoot), enrootSquashPattern))
 		if err != nil {
 			return false, err
 		}
