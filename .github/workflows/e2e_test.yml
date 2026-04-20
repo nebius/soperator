@@ -375,8 +375,29 @@ jobs:
 
       - name: Acceptance Tests
         timeout-minutes: 90
+        env:
+          E2E_REPORT_DIR: e2e-reports/acceptance
         run: |
           bin/e2e acceptance
+
+      - name: Acceptance Summary
+        if: always()
+        shell: bash
+        run: |
+          json="e2e-reports/acceptance/acceptance.cucumber.json"
+          if [[ ! -f "$json" ]]; then
+            echo "no cucumber report at $json"
+            exit 0
+          fi
+          python3 .github/scripts/acceptance_summary.py "$json" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Acceptance Reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: acceptance-reports
+          path: e2e-reports/acceptance/
+          retention-days: 14
 
       - name: K8s Cluster Info and NodeGroups
         if: always()
