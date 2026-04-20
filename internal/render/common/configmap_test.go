@@ -395,31 +395,10 @@ func TestRenderPlugstack(t *testing.T) {
 		assert.Contains(t, result, "required spanknccldebug.so enabled=1 log-level=TRACE out-file=1 out-dir=/tmp out-stdout=1")
 	})
 
-	t.Run("NCCL Inspector Pre-Configuration no options", func(t *testing.T) {
-		result := generateSpankConfig(&values.SlurmCluster{
-			PlugStackConfig: slurmv1.PlugStackConfig{
-				NcclInspectorPreConf: slurmv1.PluginConfigNcclInspectorPreConf{},
-			},
-		}).Render()
+	t.Run("NCCL Inspector Pre-Configuration", func(t *testing.T) {
+		result := generateSpankConfig(&values.SlurmCluster{}).Render()
 		assert.NotEmpty(t, result)
-		assert.Contains(t, result, "optional /usr/lib/x86_64-linux-gnu/slurm/spank_nccl_inspector_preconf.so enabled=0 profiler-plugin=/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so dump-dir=/opt/soperator-outputs/nccl_profiles/%j/%s dump-thread-interval-microseconds=1000000")
-	})
-
-	t.Run("NCCL Inspector Pre-Configuration options", func(t *testing.T) {
-		result := generateSpankConfig(&values.SlurmCluster{
-			PlugStackConfig: slurmv1.PlugStackConfig{
-				NcclInspectorPreConf: slurmv1.PluginConfigNcclInspectorPreConf{
-					Required:                       true,
-					PluginPath:                     "/usr/lib/s.so",
-					Enabled:                        ptr.To(true),
-					ProfilerPlugin:                 "/usr/lib/a.so",
-					DumpDir:                        "/tmp",
-					DumpThreadIntervalMicroseconds: 500,
-				},
-			},
-		}).Render()
-		assert.NotEmpty(t, result)
-		assert.Contains(t, result, "required /usr/lib/s.so enabled=1 profiler-plugin=/usr/lib/a.so dump-dir=/tmp dump-thread-interval-microseconds=500")
+		assert.Contains(t, result, "optional /usr/lib/x86_64-linux-gnu/slurm/spank_nccl_inspector_preconf.so enabled=1 profiler-plugin=/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so dump-dir=/opt/soperator-outputs/nccl_profiles/%j/%s dump-thread-interval-microseconds=1000000")
 	})
 
 	t.Run("Custom not provided", func(t *testing.T) {
