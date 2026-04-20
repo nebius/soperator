@@ -223,6 +223,12 @@ type PlugStackConfig struct {
 	// +kubebuilder:default={ required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" }
 	NcclDebug PluginConfigNcclDebug `json:"ncclDebug,omitempty"`
 
+	// NcclInspectorPreConf represents the NCCL Inspector Pre-Configuration SPANK plugin configuration.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={ required: false, pluginPath: "/usr/lib/x86_64-linux-gnu/slurm/spank_nccl_inspector_preconf.so", enabled: false, profilerPlugin: "/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so", dumpDir: "/opt/soperator-outputs/nccl_profiles/%j/%s", dumpThreadIntervalMicroseconds: 1000000 }
+	NcclInspectorPreConf PluginConfigNcclInspectorPreConf `json:"ncclInspectorPreConf,omitempty"`
+
 	// PluginConfigCustom represents a configuration of custom SPANK plugins.
 	//
 	// +kubebuilder:validation:Optional
@@ -299,6 +305,53 @@ type PluginConfigNcclDebug struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="/opt/soperator-outputs/nccl_logs"
 	OutputDirectory string `json:"outputDirectory,omitempty"`
+}
+
+// PluginConfigNcclInspectorPreConf represents the NCCL Inspector Pre-Configuration SPANK plugin configuration.
+//
+// See: https://github.com/nebius/slurm-plugins/tree/main/spank/nccl-inspector-preconf
+type PluginConfigNcclInspectorPreConf struct {
+	// Required defines if NCCL Inspector Pre-Configuration is 'required' for SLURM.
+	// Otherwise, 'optional'.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Required bool `json:"required,omitempty"`
+
+	// PluginPath defines a file path to the NCCL Inspector Pre-Configuration's SO file.
+	//
+	// Deprecated: It makes the ldconfig execution being not required.
+	// This is going to be removed when the plugin installation is established.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="/usr/lib/x86_64-linux-gnu/slurm/spank_nccl_inspector_preconf.so"
+	PluginPath string `json:"pluginPath,omitempty"`
+
+	// Enabled defines whether to enable the plugin.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// ProfilerPlugin defines a file path to NCCL Inspector's SO file.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so"
+	ProfilerPlugin string `json:"profilerPlugin,omitempty"`
+
+	// DumpDir defines a directory path where NCCL profiles will be dumped into.
+	//
+	// If the path does not exist, it will be created by the plugin.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="/opt/soperator-outputs/nccl_profiles/%j/%s"
+	DumpDir string `json:"dumpDir,omitempty"`
+
+	// DumpThreadIntervalMicroseconds defines an interval between NCCL Inspector dump thread runs in microseconds.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=1000000
+	DumpThreadIntervalMicroseconds uint64 `json:"dumpThreadIntervalMicroseconds,omitempty"`
 }
 
 // PluginConfigCustom represents a custom SPANK plugin configuration.
@@ -1308,6 +1361,13 @@ func (p *PluginConfigPyxis) SetDefaults() {
 
 // SetDefaults sets default values for PluginConfigNcclDebug
 func (p *PluginConfigNcclDebug) SetDefaults() {
+	if p.Enabled == nil {
+		p.Enabled = ptr.To(false)
+	}
+}
+
+// SetDefaults sets default values for PluginConfigNcclInspectorPreConf
+func (p *PluginConfigNcclInspectorPreConf) SetDefaults() {
 	if p.Enabled == nil {
 		p.Enabled = ptr.To(false)
 	}

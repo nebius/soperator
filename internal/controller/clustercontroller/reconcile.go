@@ -149,6 +149,7 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	slurmCluster.Spec.PlugStackConfig.Pyxis.SetDefaults()
 	slurmCluster.Spec.PlugStackConfig.NcclDebug.SetDefaults()
+	slurmCluster.Spec.PlugStackConfig.NcclInspectorPreConf.SetDefaults()
 	slurmCluster.Spec.SlurmNodes.Exporter.SetDefaults()
 
 	// If cluster marked for deletion, we have nothing to do

@@ -28144,6 +28144,54 @@ spec:
                           Otherwise, 'optional'.
                         type: boolean
                     type: object
+                  ncclInspectorPreConf:
+                    default:
+                      dumpDir: /opt/soperator-outputs/nccl_profiles/%j/%s
+                      dumpThreadIntervalMicroseconds: 1000000
+                      enabled: false
+                      pluginPath: /usr/lib/x86_64-linux-gnu/slurm/spank_nccl_inspector_preconf.so
+                      profilerPlugin: /usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so
+                      required: false
+                    description: NcclInspectorPreConf represents the NCCL Inspector
+                      Pre-Configuration SPANK plugin configuration.
+                    properties:
+                      dumpDir:
+                        default: /opt/soperator-outputs/nccl_profiles/%j/%s
+                        description: |-
+                          DumpDir defines a directory path where NCCL profiles will be dumped into.
+
+                          If the path does not exist, it will be created by the plugin.
+                        type: string
+                      dumpThreadIntervalMicroseconds:
+                        default: 1000000
+                        description: DumpThreadIntervalMicroseconds defines an interval
+                          between NCCL Inspector dump thread runs in microseconds.
+                        format: int64
+                        type: integer
+                      enabled:
+                        default: false
+                        description: Enabled defines whether to enable the plugin.
+                        type: boolean
+                      pluginPath:
+                        default: /usr/lib/x86_64-linux-gnu/slurm/spank_nccl_inspector_preconf.so
+                        description: |-
+                          PluginPath defines a file path to the NCCL Inspector Pre-Configuration's SO file.
+
+                          Deprecated: It makes the ldconfig execution being not required.
+                          This is going to be removed when the plugin installation is established.
+                        type: string
+                      profilerPlugin:
+                        default: /usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so
+                        description: ProfilerPlugin defines a file path to NCCL Inspector's
+                          SO file.
+                        type: string
+                      required:
+                        default: false
+                        description: |-
+                          Required defines if NCCL Inspector Pre-Configuration is 'required' for SLURM.
+                          Otherwise, 'optional'.
+                        type: boolean
+                    type: object
                   pyxis:
                     default:
                       containerImageSave: /var/cache/enroot-container-images/
