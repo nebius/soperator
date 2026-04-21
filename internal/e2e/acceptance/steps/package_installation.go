@@ -43,6 +43,9 @@ func (s *PackageInstallation) theNVIDIADriverIsWorkingOnAWorkerNode(ctx context.
 }
 
 func (s *PackageInstallation) jqIsInstalledOnTheWorkerNode(ctx context.Context) error {
+	// TODO(SCHED-1498): switch this test back to installing nvitop.
+	// nvitop currently pulls NVIDIA user-space packages, and dpkg fails in our jail/chroot layout
+	// with "Invalid cross-device link" when creating backup hardlinks during package replacement.
 	workerName := s.packageWorker.Name
 	updateCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get update'", framework.ShellQuote(workerName))
 	if _, err := s.exec.ExecJail(ctx, updateCmd); err != nil {

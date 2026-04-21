@@ -18,9 +18,10 @@ const (
 	dockerImage = "cr.eu-north1.nebius.cloud/soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-3935b93"
 	dockerARP   = "NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring all_reduce_perf -b 8G -e 8G -f 2 -g 8 -N 0"
 
-	dockerJobStartTimeout = 20 * time.Minute
-	dockerProbeTimeout    = 10 * time.Minute
-	dockerStopTimeout     = 5 * time.Minute
+	dockerJobStartTimeout      = 20 * time.Minute
+	dockerProbeTimeout         = 10 * time.Minute
+	dockerJobCancelTimeout     = 5 * time.Minute
+	dockerContainerStopTimeout = 5 * time.Minute
 )
 
 type DockerContainers struct {
@@ -130,7 +131,10 @@ func (s *DockerContainers) theDockerNCCLJobIsCancelled(ctx context.Context) erro
 }
 
 func (s *DockerContainers) dockerContainersFromThatJobAreNoLongerRunning(ctx context.Context) error {
-	return s.waitForTrackedContainersGone(ctx, dockerStopTimeout)
+	// Expected behavior is that containers stop after `scancel`, but currently this is unreliable.
+	// TODO(SCHED-1497): remove explicit docker stop workaround once cancellation cleanup is fixed.
+	s.stopContainersByNamePrefix(ctx)
+	return s.waitForTrackedContainersGone(ctx, dockerContainerStopTimeout)
 }
 
 func (s *DockerContainers) waitForTrackedContainersGone(ctx context.Context, timeout time.Duration) error {
@@ -168,7 +172,7 @@ func (s *DockerContainers) cancelJob(ctx context.Context) error {
 		return nil
 	}
 
-	if err := cancelSlurmJob(ctx, s.exec, s.jobID, dockerStopTimeout); err != nil {
+	if err := cancelSlurmJob(ctx, s.exec, s.jobID, dockerJobCancelTimeout); err != nil {
 		return fmt.Errorf("cancel Docker job %s: %w", s.jobID, err)
 	}
 	return nil

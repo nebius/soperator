@@ -440,6 +440,8 @@ func (s *EnrootContainers) logEnrootJobFailureMessages(ctx context.Context, reas
 	jobState := scontrolField(scontrolOutput, "JobState")
 	jobReason := scontrolField(scontrolOutput, "Reason")
 	exitCode := scontrolField(scontrolOutput, "ExitCode")
+	jobStart := normalizeSlurmTimeForJournalctl(scontrolField(scontrolOutput, "StartTime"))
+	jobEnd := normalizeSlurmTimeForJournalctl(scontrolField(scontrolOutput, "EndTime"))
 	batchHost := scontrolField(scontrolOutput, "BatchHost")
 	stdoutPath := scontrolField(scontrolOutput, "StdOut")
 	if stdoutPath == "" {
@@ -448,6 +450,64 @@ func (s *EnrootContainers) logEnrootJobFailureMessages(ctx context.Context, reas
 
 	s.exec.Logf("enroot job failure: reason=%s job_id=%s state=%s reason_code=%s exit_code=%s batch_host=%s stdout=%s",
 		reason, s.jobID, jobState, jobReason, exitCode, batchHost, stdoutPath)
+
+	s.logEnrootJailCommandOutput(ctx, "enroot debug scontrol show job -d",
+		fmt.Sprintf("scontrol show job -d %s || true", framework.ShellQuote(s.jobID)))
+	s.logEnrootJailCommandOutput(ctx, "enroot debug scontrol show step",
+		fmt.Sprintf("scontrol show step %s.0 || true", framework.ShellQuote(s.jobID)))
+	s.logEnrootJailCommandOutput(ctx, "enroot debug sacct",
+		fmt.Sprintf("sacct -j %s --format=JobID,JobName,NodeList,State,ExitCode,Elapsed,ReqTRES,AllocTRES -P || true", framework.ShellQuote(s.jobID)))
+	s.logEnrootJailCommandOutput(ctx, "enroot debug sstat",
+		fmt.Sprintf("sstat -j %s.0 --format=AveCPU,MaxRSS,MaxVMSize -P || true", framework.ShellQuote(s.jobID)))
+
+	since := jobStart
+	if since == "" {
+		since = "2 hours ago"
+	}
+	until := jobEnd
+	if until == "" {
+		until = "now"
+	}
+	journalPattern := fmt.Sprintf("%s|pyxis|enroot|pmix|ucx|mpi|abort|timeout", s.jobID)
+
+	for _, worker := range s.workers {
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug slurmd journal",
+			fmt.Sprintf(
+				"sudo sh -lc %s",
+				framework.ShellQuote(fmt.Sprintf(
+					"journalctl -u slurmd --since %s --until %s --no-pager | grep -Ei %s || true",
+					framework.ShellQuote(since),
+					framework.ShellQuote(until),
+					framework.ShellQuote(journalPattern),
+				)),
+			),
+		)
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug ibstat", "sudo sh -lc 'ibstat || true'")
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug ibv_devinfo", "sudo sh -lc 'ibv_devinfo -v || true'")
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug rdma link", "sudo sh -lc 'rdma link show || true'")
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug ibdev2netdev", "sudo sh -lc 'ibdev2netdev || true'")
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug infiniband counters",
+			`sudo sh -lc 'for p in /sys/class/infiniband/*/ports/*/counters; do [ -d "$p" ] || continue; for n in port_rcv_errors port_xmit_discards link_downed symbol_error; do f="$p/$n"; [ -e "$f" ] || continue; printf "%s=%s\n" "$f" "$(cat "$f" 2>/dev/null)"; done; done || true'`)
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug pyxis runtime ls", "sudo sh -lc 'ls -lah /run/pyxis || true'")
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug pyxis runtime files", "sudo sh -lc 'find /run/pyxis -maxdepth 3 -type f -print 2>/dev/null || true'")
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug enroot cache tree", "sudo sh -lc 'tree -L 3 /mnt/image-storage/enroot/cache/ 2>/dev/null || true'")
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug enroot data tree", "sudo sh -lc 'tree -L 3 /mnt/image-storage/enroot/data/ 2>/dev/null || true'")
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug enroot squashfs files",
+			fmt.Sprintf("sudo sh -lc %s", framework.ShellQuote(
+				fmt.Sprintf("find %s -maxdepth 6 -type f -ls 2>/dev/null || true", framework.ShellQuote(enrootSquashRoot)),
+			)),
+		)
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug coredumpctl",
+			fmt.Sprintf(
+				"sudo sh -lc %s",
+				framework.ShellQuote(fmt.Sprintf(
+					"coredumpctl --no-pager --since %s --until %s | tail -n 50 || true",
+					framework.ShellQuote(since),
+					framework.ShellQuote(until),
+				)),
+			),
+		)
+	}
 
 	if batchHost == "" {
 		return
@@ -462,6 +522,24 @@ func (s *EnrootContainers) logEnrootJobFailureMessages(ctx context.Context, reas
 	s.exec.Logf("enroot job failure stdout tail on %s:\n%s", batchHost, strings.TrimSpace(out))
 }
 
+func (s *EnrootContainers) logEnrootJailCommandOutput(ctx context.Context, label, command string) {
+	output, err := s.exec.ExecJailWithRetry(ctx, command, 2, 5*time.Second)
+	if err != nil {
+		s.exec.Logf("%s failed: %v", label, err)
+		return
+	}
+	s.exec.Logf("%s output:\n%s", label, strings.TrimSpace(output))
+}
+
+func (s *EnrootContainers) logEnrootWorkerCommandOutput(ctx context.Context, worker, label, command string) {
+	output, err := runWorkerCommandWithDefaultRetry(ctx, s.exec, worker, command)
+	if err != nil {
+		s.exec.Logf("%s on %s failed: %v", label, worker, err)
+		return
+	}
+	s.exec.Logf("%s on %s output:\n%s", label, worker, strings.TrimSpace(output))
+}
+
 func scontrolField(output, key string) string {
 	prefix := key + "="
 	for _, token := range strings.Fields(output) {
@@ -470,4 +548,15 @@ func scontrolField(output, key string) string {
 		}
 	}
 	return ""
+}
+
+func normalizeSlurmTimeForJournalctl(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return ""
+	}
+	if strings.EqualFold(value, "Unknown") || strings.EqualFold(value, "N/A") || strings.EqualFold(value, "None") {
+		return ""
+	}
+	return strings.ReplaceAll(value, ".UTC", " UTC")
 }
