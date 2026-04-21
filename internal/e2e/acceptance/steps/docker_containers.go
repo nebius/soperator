@@ -40,9 +40,6 @@ func (s *DockerContainers) Register(sc *godog.ScenarioContext) {
 		if path.Base(scenario.Uri) != dockerContainersFeatureFile {
 			return ctx, nil
 		}
-		if err != nil {
-			s.dumpDockerDiagnostics(context.Background(), "scenario failed")
-		}
 
 		if s.jobID != "" {
 			if cleanupErr := s.cancelJob(context.Background()); cleanupErr != nil {
@@ -133,11 +130,7 @@ func (s *DockerContainers) theDockerNCCLJobIsCancelled(ctx context.Context) erro
 }
 
 func (s *DockerContainers) dockerContainersFromThatJobAreNoLongerRunning(ctx context.Context) error {
-	if err := s.waitForTrackedContainersGone(ctx, dockerStopTimeout); err != nil {
-		s.dumpDockerDiagnostics(ctx, "containers did not stop in time")
-		return err
-	}
-	return nil
+	return s.waitForTrackedContainersGone(ctx, dockerStopTimeout)
 }
 
 func (s *DockerContainers) waitForTrackedContainersGone(ctx context.Context, timeout time.Duration) error {
@@ -221,47 +214,4 @@ func (s *DockerContainers) stopContainersByNamePrefix(ctx context.Context) {
 			_, _ = runWorkerCommand(ctx, s.exec, worker, fmt.Sprintf("sudo docker stop %s >/dev/null 2>&1 || true", framework.ShellQuote(id)))
 		}
 	}
-}
-
-func (s *DockerContainers) dumpDockerDiagnostics(ctx context.Context, reason string) {
-	s.exec.Logf("docker containers debug: reason=%s job_id=%s container_prefix=%s workers=%s",
-		reason, s.jobID, s.containerNamePrefix, strings.Join(s.workers, ","))
-
-	if s.jobID != "" {
-		s.logJailCommandOutput(ctx, "docker debug squeue", fmt.Sprintf("squeue -j %s -o '%%i %%T %%R'", framework.ShellQuote(s.jobID)))
-		s.logJailCommandOutput(ctx, "docker debug scontrol show job", fmt.Sprintf("scontrol show job %s || true", framework.ShellQuote(s.jobID)))
-	}
-
-	for _, worker := range s.workers {
-		s.logWorkerCommandOutput(ctx, worker, "docker debug ps", fmt.Sprintf(
-			"sudo docker ps --filter name=%s --no-trunc --format '{{.ID}} {{.Status}} {{.Names}}'",
-			framework.ShellQuote(s.containerNamePrefix),
-		))
-		s.logWorkerCommandOutput(ctx, worker, "docker debug ps -a", fmt.Sprintf(
-			"sudo docker ps -a --filter name=%s --no-trunc --format '{{.ID}} {{.Status}} {{.Names}}'",
-			framework.ShellQuote(s.containerNamePrefix),
-		))
-		s.logWorkerCommandOutput(ctx, worker, "docker debug inspect", fmt.Sprintf(
-			"ids=$(sudo docker ps -a --filter name=%s --format '{{.ID}}'); [ -n \"$ids\" ] && sudo docker inspect $ids || true",
-			framework.ShellQuote(s.containerNamePrefix),
-		))
-	}
-}
-
-func (s *DockerContainers) logJailCommandOutput(ctx context.Context, label, command string) {
-	out, err := s.exec.ExecJailWithRetry(ctx, command, 2, 5*time.Second)
-	if err != nil {
-		s.exec.Logf("%s failed: %v", label, err)
-		return
-	}
-	s.exec.Logf("%s output:\n%s", label, strings.TrimSpace(out))
-}
-
-func (s *DockerContainers) logWorkerCommandOutput(ctx context.Context, worker, label, command string) {
-	out, err := runWorkerCommandWithDefaultRetry(ctx, s.exec, worker, command)
-	if err != nil {
-		s.exec.Logf("%s on %s failed: %v", label, worker, err)
-		return
-	}
-	s.exec.Logf("%s on %s output:\n%s", label, worker, strings.TrimSpace(out))
 }

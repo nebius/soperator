@@ -36,6 +36,7 @@ type EnrootContainers struct {
 
 	squashPath       string
 	squashStatBefore string
+	failureLogged    bool
 }
 
 func NewEnrootContainers(exec framework.Exec) *EnrootContainers {
@@ -48,7 +49,7 @@ func (s *EnrootContainers) Register(sc *godog.ScenarioContext) {
 			return ctx, nil
 		}
 		if err != nil {
-			s.dumpEnrootDiagnostics(context.Background(), "scenario failed")
+			s.logEnrootJobFailureMessages(context.Background(), "scenario failed")
 		}
 
 		if cleanupErr := s.cancelCurrentJob(context.Background()); cleanupErr != nil {
@@ -119,7 +120,7 @@ func (s *EnrootContainers) enrootSquashfsImageIsPresentOnAWorker(ctx context.Con
 		s.squashPath = squashPath
 		return true, nil
 	}); err != nil {
-		s.dumpEnrootDiagnostics(ctx, "squashfs artifact not found")
+		s.logEnrootJobFailureMessages(ctx, "squashfs artifact not found")
 		return err
 	}
 	return nil
@@ -337,6 +338,7 @@ func (s *EnrootContainers) submitEnrootJob(ctx context.Context, containerName, j
 		return fmt.Errorf("parse enroot job id for %q: %w", jobName, err)
 	}
 	s.jobID = jobID
+	s.failureLogged = false
 	s.exec.Logf("enroot containers: submitted job=%s id=%s", jobName, jobID)
 	return nil
 }
@@ -418,39 +420,54 @@ func namedEnrootDirPath(containerName string) string {
 	return "/mnt/image-storage/enroot/data/" + namedEnrootDir(containerName)
 }
 
-func (s *EnrootContainers) dumpEnrootDiagnostics(ctx context.Context, reason string) {
-	s.exec.Logf("enroot containers debug: reason=%s job_id=%s workers=%s squash_path=%s",
-		reason, s.jobID, strings.Join(s.workers, ","), s.squashPath)
-
-	if s.jobID != "" {
-		s.logEnrootJailCommandOutput(ctx, "enroot debug squeue", fmt.Sprintf("squeue -j %s -o '%%i %%T %%R'", framework.ShellQuote(s.jobID)))
-		s.logEnrootJailCommandOutput(ctx, "enroot debug scontrol show job", fmt.Sprintf("scontrol show job %s || true", framework.ShellQuote(s.jobID)))
-	}
-
-	for _, worker := range s.workers {
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug plugstack", "sudo sh -lc 'cat /etc/slurm/plugstack.conf; echo; grep -R \"pyxis\\|importer\" /etc/slurm/plugstack.conf* 2>/dev/null || true'")
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug cache tree", fmt.Sprintf("sudo tree -L 3 -hug %s 2>/dev/null || true", framework.ShellQuote(enrootSquashRoot)))
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug cache find sqsh", fmt.Sprintf("sudo find %s -type f -name '*.sqsh' 2>/dev/null | sort || true", framework.ShellQuote(enrootSquashRoot)))
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug cache find all", fmt.Sprintf("sudo find %s -maxdepth 4 -type f 2>/dev/null | sort || true", framework.ShellQuote(enrootSquashRoot)))
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug runtime tree", "sudo tree -L 2 /mnt/image-storage/enroot/data/ 2>/dev/null || true")
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug enroot list", "sudo enroot list || true")
-	}
-}
-
-func (s *EnrootContainers) logEnrootJailCommandOutput(ctx context.Context, label, command string) {
-	out, err := s.exec.ExecJailWithRetry(ctx, command, 2, 5*time.Second)
-	if err != nil {
-		s.exec.Logf("%s failed: %v", label, err)
+func (s *EnrootContainers) logEnrootJobFailureMessages(ctx context.Context, reason string) {
+	if s.failureLogged {
 		return
 	}
-	s.exec.Logf("%s output:\n%s", label, strings.TrimSpace(out))
-}
+	s.failureLogged = true
 
-func (s *EnrootContainers) logEnrootWorkerCommandOutput(ctx context.Context, worker, label, command string) {
-	out, err := runWorkerCommandWithDefaultRetry(ctx, s.exec, worker, command)
-	if err != nil {
-		s.exec.Logf("%s on %s failed: %v", label, worker, err)
+	if s.jobID == "" {
+		s.exec.Logf("enroot job failed: reason=%s job_id is empty", reason)
 		return
 	}
-	s.exec.Logf("%s on %s output:\n%s", label, worker, strings.TrimSpace(out))
+
+	scontrolOutput, err := framework.ExecJailWithDefaultRetry(ctx, s.exec, fmt.Sprintf("scontrol show job %s || true", framework.ShellQuote(s.jobID)))
+	if err != nil {
+		s.exec.Logf("enroot job failed: reason=%s job_id=%s scontrol error=%v", reason, s.jobID, err)
+		return
+	}
+
+	jobState := scontrolField(scontrolOutput, "JobState")
+	jobReason := scontrolField(scontrolOutput, "Reason")
+	exitCode := scontrolField(scontrolOutput, "ExitCode")
+	batchHost := scontrolField(scontrolOutput, "BatchHost")
+	stdoutPath := scontrolField(scontrolOutput, "StdOut")
+	if stdoutPath == "" {
+		stdoutPath = fmt.Sprintf("/slurm-%s.out", s.jobID)
+	}
+
+	s.exec.Logf("enroot job failure: reason=%s job_id=%s state=%s reason_code=%s exit_code=%s batch_host=%s stdout=%s",
+		reason, s.jobID, jobState, jobReason, exitCode, batchHost, stdoutPath)
+
+	if batchHost == "" {
+		return
+	}
+
+	out, err := runWorkerCommandWithDefaultRetry(ctx, s.exec, batchHost,
+		fmt.Sprintf("sudo sh -lc %s", framework.ShellQuote(fmt.Sprintf("tail -n 200 %s 2>/dev/null || echo 'slurm output not found: %s'", framework.ShellQuote(stdoutPath), stdoutPath))))
+	if err != nil {
+		s.exec.Logf("enroot job failure stdout tail on %s failed: %v", batchHost, err)
+		return
+	}
+	s.exec.Logf("enroot job failure stdout tail on %s:\n%s", batchHost, strings.TrimSpace(out))
+}
+
+func scontrolField(output, key string) string {
+	prefix := key + "="
+	for _, token := range strings.Fields(output) {
+		if strings.HasPrefix(token, prefix) {
+			return strings.TrimPrefix(token, prefix)
+		}
+	}
+	return ""
 }
