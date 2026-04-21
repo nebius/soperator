@@ -31,8 +31,8 @@ spec:
   ephemeralNodes: {{ .ephemeralNodes }}
   {{- end }}
 
-  {{- with .initialNumberEphemeralNodes }}
-  initialNumberEphemeralNodes: {{ . }}
+  {{- if hasKey . "initialNumberEphemeralNodes" }}
+  initialNumberEphemeralNodes: {{ .initialNumberEphemeralNodes }}
   {{- end }}
 
   {{- with .ephemeralTopologyWaitTimeout }}

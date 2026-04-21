@@ -40,7 +40,9 @@ jobs:
       E2E_PROFILE: ${{ vars[inputs.profile_env_var || vars.PROFILE_ENV_VAR] }}
     steps:
       - name: Install yq
-        uses: frenck/action-setup-yq@v1
+        uses: frenck/action-setup-yq@c4b5be8b4a215c536a41d436757d9feb92836d4f # v1.0.2
+        with:
+          version: v4.44.6
 
       - name: Resolve profile
         id: resolve
@@ -373,8 +375,29 @@ jobs:
 
       - name: Acceptance Tests
         timeout-minutes: 90
+        env:
+          E2E_REPORT_DIR: e2e-reports/acceptance
         run: |
           bin/e2e acceptance
+
+      - name: Acceptance Summary
+        if: always()
+        shell: bash
+        run: |
+          json="e2e-reports/acceptance/acceptance.cucumber.json"
+          if [[ ! -f "$json" ]]; then
+            echo "no cucumber report at $json"
+            exit 0
+          fi
+          python3 .github/scripts/acceptance_summary.py "$json" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Acceptance Reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: acceptance-reports
+          path: e2e-reports/acceptance/
+          retention-days: 14
 
       - name: K8s Cluster Info and NodeGroups
         if: always()

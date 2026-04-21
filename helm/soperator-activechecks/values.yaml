@@ -375,6 +375,8 @@ checks:
           - "cuda_samples_force=true"
           - -e
           - "perftest_force=true"
+          - -e
+          - "nccl_tests_force=true"
           - --diff
   manage-jail-state-dry-run:
     enabled: true

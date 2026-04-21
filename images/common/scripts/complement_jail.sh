@@ -54,6 +54,12 @@ pushd "${jaildir}"
       mount --bind /etc/sssd etc/sssd
     fi
 
+    echo "Bind-mount SSSD sockets if they exist"
+    if [[ -d /var/lib/sss/pipes ]]; then
+      mkdir -p var/lib/sss/pipes
+      mount --bind /var/lib/sss/pipes var/lib/sss/pipes
+    fi
+
     echo "Bind-mount jail submounts from upper ${upperdir} into the actual ${jaildir}"
     submounts=$( \
         findmnt --output TARGET --submounts --target / --pairs | \
