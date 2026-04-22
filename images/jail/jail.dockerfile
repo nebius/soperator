@@ -109,7 +109,7 @@ COPY VERSION /etc/soperator-jail-version
 RUN ldconfig
 
 #######################################################################################################################
-FROM restic/restic:0.18.0 AS untaped
+FROM cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/restic/restic:0.18.0 AS untaped
 
 COPY --from=jail / /jail
 
@@ -121,7 +121,7 @@ RUN restic init --insecure-no-password --repo /jail_restic && \
         --host soperator
 
 #######################################################################################################################
-FROM restic/restic:0.18.0 AS populate_jail
+FROM cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/restic/restic:0.18.0 AS populate_jail
 
 COPY --from=untaped /jail_restic /jail_restic
 
