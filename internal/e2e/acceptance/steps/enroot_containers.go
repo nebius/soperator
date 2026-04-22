@@ -22,7 +22,7 @@ const (
 	enrootNamedJobName  = "kek"
 	enrootSquashPattern = ".sqsh"
 	enrootSquashRoot    = "/var/cache/enroot-container-images"
-	enrootTasksPerNode  = 1
+	enrootTasksPerNode  = 8
 
 	enrootJobStartTimeout = 25 * time.Minute
 	enrootProbeTimeout    = 10 * time.Minute
