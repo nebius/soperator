@@ -1,6 +1,6 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-FROM alpine:3.22 AS nfs-server
+FROM cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/library/alpine:3.22 AS nfs-server
 
 RUN apk add --no-cache --update \
     nfs-utils \

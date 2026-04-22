@@ -12,7 +12,7 @@ spec:
       serviceAccountName: activecheck-waiter
       containers:
         - name: wait-for-active-checks
-          image: alpine/k8s:1.31.11
+          image: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/alpine/k8s:1.31.11
           command:
             - /bin/sh
             - -c
