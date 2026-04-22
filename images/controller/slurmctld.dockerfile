@@ -2,7 +2,7 @@
 
 ARG SLURM_VERSION
 
-FROM golang:1.25 AS go-base
+FROM cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/library/golang:1.25 AS go-base
 
 WORKDIR /build
 

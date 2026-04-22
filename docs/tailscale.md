@@ -70,7 +70,7 @@ kubectl -n soperator patch SlurmCluster soperator \
     "path":"/spec/slurmNodes/login/customInitContainers/-",
     "value":{
       "name":"tailscale",
-      "image":"ghcr.io/tailscale/tailscale:latest",
+      "image":"cr.eu-north1.nebius.cloud/soperator-proxy-ghcr-io/tailscale/tailscale:latest",
       "imagePullPolicy":"Always",
       "restartPolicy":"Always",
       "securityContext":{"privileged":true},

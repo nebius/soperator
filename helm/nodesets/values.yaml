@@ -257,7 +257,7 @@ nodesets:
     # Optional, defaults to empty list
     customInitContainers:
       - name: say-hi
-        image: busybox
+        image: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/library/busybox
         command: ["echo", "Hi!"]
   - name: worker-cpu
     replicas: 6
