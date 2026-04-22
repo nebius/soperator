@@ -185,7 +185,140 @@ tests:
           value:
             cpu: 100m
             memory: 128Mi
+
 ---
+
+suite: test values override default values opentelemetry-collector-nccl-profiles
+templates:
+  - templates/opentelemetry-collector-nccl-profiles.yaml
+tests:
+  - it: should use override values for opentelemetry collector chart when provided
+    set:
+      observability.enabled: true
+      observability.ncclProfiles.enabled: true
+      observability.ncclProfiles.overrideValues:
+        customConfig: true
+        image:
+          repository: example.test/custom-agent
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-otelcol-nccl-profiles
+    asserts:
+      - equal:
+          path: spec.values.customConfig
+          value: true
+      - equal:
+          path: spec.values.image.repository
+          value: example.test/custom-agent
+      - notExists:
+          path: spec.values.clusterRole
+
+  - it: should use default values for opentelemetry collector chart when override values not provided
+    set:
+      observability.enabled: true
+      observability.ncclProfiles.enabled: true
+      observability.ncclProfiles.overrideValues: null
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-otelcol-nccl-profiles
+    asserts:
+      - exists:
+          path: spec.values.clusterRole
+      - equal:
+          path: spec.values.image.repository
+          value: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
+      - equal:
+          path: spec.values.configMap.existingName
+          value: opentelemetry-collector-nccl-profiles-agent
+
+  - it: should propagate nccl profiles values to opentelemetry collector chart
+    set:
+      observability.enabled: true
+      observability.ncclProfiles.enabled: true
+      observability.ncclProfiles.values.dumpDir: /custom/nccl
+      observability.ncclProfiles.values.enableFileStorage: false
+      observability.ncclProfiles.values.resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
+        limits:
+          memory: 512Mi
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-otelcol-nccl-profiles
+    asserts:
+      - equal:
+          path: spec.values.extraVolumes[0].hostPath.path
+          value: /custom/nccl
+      - equal:
+          path: spec.values.initContainers
+          value: []
+      - equal:
+          path: spec.values.resources.requests
+          value:
+            cpu: 250m
+            memory: 256Mi
+      - equal:
+          path: spec.values.resources.limits
+          value:
+            memory: 512Mi
+
+  - it: should use custom values when provided
+    set:
+      observability.enabled: true
+      observability.ncclProfiles.enabled: true
+      observability.ncclProfiles.values.enableFileStorage: true
+      observability.ncclProfiles.values.metricsEndpoint: http://example.test:8429/custom
+      observability.ncclProfiles.values.deleteAfterRead.enabled: true
+      observability.ncclProfiles.values.deleteAfterRead.minAge: 30m
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-otelcol-nccl-profiles-cm
+    asserts:
+      - matchRegex:
+          path: spec.values.resources[0].data.relay
+          pattern: 'file_storage'
+      - matchRegex:
+          path: spec.values.resources[0].data.relay
+          pattern: 'metrics_endpoint: http://example\.test:8429/custom'
+      - matchRegex:
+          path: spec.values.resources[0].data.relay
+          pattern: 'delete_after_read: true'
+      - matchRegex:
+          path: spec.values.resources[0].data.relay
+          pattern: 'delete_after_read_min_age: 30m'
+
+  - it: should not include file_storage in relay config when disabled
+    set:
+      observability.enabled: true
+      observability.ncclProfiles.enabled: true
+      observability.ncclProfiles.values.enableFileStorage: false
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-otelcol-nccl-profiles-cm
+    asserts:
+      - notMatchRegex:
+          path: spec.values.resources[0].data.relay
+          pattern: 'file_storage'
+
+  - it: should not use delete_after_read in relay config when disabled
+    set:
+      observability.enabled: true
+      observability.ncclProfiles.enabled: true
+      observability.ncclProfiles.values.deleteAfterRead.enabled: false
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-otelcol-nccl-profiles-cm
+    asserts:
+      - matchRegex:
+          path: spec.values.resources[0].data.relay
+          pattern: 'delete_after_read: false'
+      - notMatchRegex:
+          path: spec.values.resources[0].data.relay
+          pattern: 'delete_after_read_min_age'
+
+---
+
 suite: test values override default values nodesets
 templates:
   - templates/nodesets.yaml
