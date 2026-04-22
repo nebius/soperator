@@ -394,6 +394,8 @@ observability:
     driftDetection:
       mode: warn
     releaseName: opentelemetry-collector-nccl-profiles
+    configMapOverrideValues: null
+    collectorOverrideValues: null
     values:
       resources:
         requests:

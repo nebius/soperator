@@ -34,6 +34,9 @@ spec:
   targetNamespace: {{ .Values.observability.vmStack.namespace }}
 
   values:
+  {{- if .Values.observability.ncclProfiles.configMapOverrideValues }}
+    {{- toYaml .Values.observability.ncclProfiles.configMapOverrideValues | nindent 4 }}
+  {{- else }}
     resources:
     - apiVersion: v1
       kind: ConfigMap
@@ -125,7 +128,18 @@ spec:
             {{- end }}
             health_check:
               endpoint: 0.0.0.0:13133
+  {{- end }}
 
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-opentelemetry-collector-nccl-profiles-cm
+      optional: true
+      valuesKey: values.yaml
+
+    - kind: ConfigMap
+      name: opentelemetry-collector-nccl-profiles-cm
+      optional: true
+      valuesKey: values.yaml
 ---
 
 apiVersion: helm.toolkit.fluxcd.io/v2
@@ -164,8 +178,8 @@ spec:
   targetNamespace: {{ .Values.observability.vmStack.namespace }}
 
   values:
-  {{- if .Values.observability.ncclProfiles.overrideValues }}
-    {{- toYaml .Values.observability.ncclProfiles.overrideValues | nindent 4 }}
+  {{- if .Values.observability.ncclProfiles.collectorOverrideValues }}
+    {{- toYaml .Values.observability.ncclProfiles.collectorOverrideValues | nindent 4 }}
   {{- else }}
     clusterRole:
       create: true

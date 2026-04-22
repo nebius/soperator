@@ -192,11 +192,34 @@ suite: test values override default values opentelemetry-collector-nccl-profiles
 templates:
   - templates/opentelemetry-collector-nccl-profiles.yaml
 tests:
-  - it: should use override values for opentelemetry collector chart when provided
+  - it: should use override values for nccl profiles configmap chart when provided
     set:
       observability.enabled: true
       observability.ncclProfiles.enabled: true
-      observability.ncclProfiles.overrideValues:
+      observability.ncclProfiles.configMapOverrideValues:
+        resources:
+          - apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: custom-nccl-profiles-agent
+            data:
+              relay: "custom: relay"
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-otelcol-nccl-profiles-cm
+    asserts:
+      - equal:
+          path: spec.values.resources[0].metadata.name
+          value: custom-nccl-profiles-agent
+      - equal:
+          path: spec.values.resources[0].data.relay
+          value: "custom: relay"
+
+  - it: should use collector override values for opentelemetry collector chart when provided
+    set:
+      observability.enabled: true
+      observability.ncclProfiles.enabled: true
+      observability.ncclProfiles.collectorOverrideValues:
         customConfig: true
         image:
           repository: example.test/custom-agent
@@ -213,11 +236,28 @@ tests:
       - notExists:
           path: spec.values.clusterRole
 
+  - it: should use legacy overrideValues for opentelemetry collector chart when provided
+    set:
+      observability.enabled: true
+      observability.ncclProfiles.enabled: true
+      observability.ncclProfiles.collectorOverrideValues:
+        legacyConfig: true
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-otelcol-nccl-profiles
+    asserts:
+      - equal:
+          path: spec.values.legacyConfig
+          value: true
+      - notExists:
+          path: spec.values.clusterRole
+
   - it: should use default values for opentelemetry collector chart when override values not provided
     set:
       observability.enabled: true
       observability.ncclProfiles.enabled: true
-      observability.ncclProfiles.overrideValues: null
+      observability.ncclProfiles.configMapOverrideValues: null
+      observability.ncclProfiles.collectorOverrideValues: null
     documentSelector:
       path: metadata.name
       value: RELEASE-NAME-otelcol-nccl-profiles
