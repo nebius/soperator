@@ -166,6 +166,7 @@ func featurePaths() []string {
 		"features/internal_ssh.feature",
 		"features/package_installation.feature",
 		"features/node_replacement.feature",
+		"features/topology.feature",
 	}
 }
 
@@ -178,6 +179,7 @@ func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
 	steps.NewInternalSSH(w).Register(sc)
 	steps.NewPackageInstallation(w).Register(sc)
 	steps.NewNodeReplacement(w).Register(sc)
+	steps.NewTopology(r.state, w).Register(sc)
 }
 
 func registerTimingHooks(sc *godog.ScenarioContext) {
