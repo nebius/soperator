@@ -101,7 +101,12 @@ spec:
             {{- if .Values.observability.opentelemetry.metrics.enabled }}
             telemetry:
               metrics:
-                address: 0.0.0.0:8889
+                readers:
+                  - pull:
+                      exporter:
+                        prometheus:
+                          host: 0.0.0.0
+                          port: 8889
             {{- end }}
             extensions:
               - health_check
