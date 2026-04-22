@@ -50,9 +50,16 @@ spec:
               compression: gzip
               encoding: proto
               metrics_endpoint: {{ .Values.observability.ncclProfiles.values.metricsEndpoint | default "http://vmsingle-metrics-victoria-metrics-k8s-stack:8429/opentelemetry/v1/metrics" }}
+              timeout: {{ .Values.observability.ncclProfiles.values.metricsExporterTimeout | default "15s" }}
               retry_on_failure:
-                initial_interval: 200ms
-              timeout: 5s
+                enabled: true
+                initial_interval: 1s
+                max_interval: 10s
+                max_elapsed_time: 5m
+              sending_queue:
+                enabled: true
+                queue_size: {{ .Values.observability.ncclProfiles.values.metricsExporterSendingQueueSize | default 2000 }}
+                num_consumers: {{ .Values.observability.ncclProfiles.values.metricsExporterNumConsumers | default 4 }}
 
           receivers:
             filelog/nccl_metrics:

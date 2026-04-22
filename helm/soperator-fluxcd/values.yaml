@@ -408,6 +408,9 @@ observability:
       nebiusO11yAgentVersion: 2.0.3
       useGoMemLimit: true
       metricsEndpoint: http://vmsingle-metrics-victoria-metrics-k8s-stack:8429/opentelemetry/v1/metrics
+      metricsExporterTimeout: 15s
+      metricsExporterSendingQueueSize: 2000
+      metricsExporterNumConsumers: 4
       dumpDir: /mnt/jail/opt/soperator-outputs/nccl_profiles
       pollInterval: 30s
       exportLabels:

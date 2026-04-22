@@ -344,6 +344,9 @@ tests:
       observability.ncclProfiles.enabled: true
       observability.ncclProfiles.values.enableFileStorage: true
       observability.ncclProfiles.values.metricsEndpoint: http://example.test:8429/custom
+      observability.ncclProfiles.values.metricsExporterTimeout: 25s
+      observability.ncclProfiles.values.metricsExporterSendingQueueSize: 4321
+      observability.ncclProfiles.values.metricsExporterNumConsumers: 7
       observability.ncclProfiles.values.deleteAfterRead.enabled: true
       observability.ncclProfiles.values.deleteAfterRead.minAge: 30m
     documentSelector:
@@ -356,6 +359,15 @@ tests:
       - matchRegex:
           path: spec.values.resources[0].data.relay
           pattern: 'metrics_endpoint: http://example\.test:8429/custom'
+      - matchRegex:
+          path: spec.values.resources[0].data.relay
+          pattern: 'timeout: 25s'
+      - matchRegex:
+          path: spec.values.resources[0].data.relay
+          pattern: 'queue_size: 4321'
+      - matchRegex:
+          path: spec.values.resources[0].data.relay
+          pattern: 'num_consumers: 7'
       - matchRegex:
           path: spec.values.resources[0].data.relay
           pattern: 'delete_after_read: true'
