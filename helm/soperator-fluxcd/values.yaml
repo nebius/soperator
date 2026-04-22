@@ -375,6 +375,46 @@ observability:
           cpu: 100m
     driftDetection:
       mode: warn
+  ncclProfiles:
+    enabled: true
+    interval: 5m
+    timeout: 5m
+    version:
+      bedag: 2.0.0
+      opentelemetryCollector: 0.149.*
+    install:
+      crds: Skip
+      remediation:
+        retries: 3
+    upgrade:
+      crds: Skip
+      remediation:
+        retries: 3
+        remediateLastFailure: true
+    driftDetection:
+      mode: warn
+    releaseName: opentelemetry-collector-nccl-profiles
+    values:
+      resources:
+        requests:
+          memory: 200Mi
+          cpu: 500m
+        limits:
+          memory: 1Gi
+      nebiusO11yAgentVersion: 2.0.3
+      useGoMemLimit: true
+      metricsEndpoint: http://vmsingle-metrics-victoria-metrics-k8s-stack:8429/opentelemetry/v1/metrics
+      dumpDir: /mnt/jail/opt/soperator-outputs/nccl_profiles
+      pollInterval: 30s
+      exportLabels:
+        slurmJobId: slurm_job_id
+        slurmStepId: slurm_step_id
+        hostnamePid: hostname_pid
+      enableFileStorage: true
+      deleteAfterRead:
+        enabled: false
+        minAge: 15m
+
 securityProfilesOperator:
   enabled: true
   interval: 5m
