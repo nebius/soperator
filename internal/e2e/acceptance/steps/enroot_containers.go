@@ -18,10 +18,10 @@ const (
 
 	enrootDockerImage   = "docker://cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-3935b93"
 	enrootDockerMount   = "/usr/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu,/usr/lib64:/usr/lib64"
-	enrootARP           = "all_reduce_perf_mpi -b 8G -e 8G -f 2 -g 1 -N 0"
+	enrootARP           = "NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring all_reduce_perf -b 8G -e 8G -f 2 -g 8 -N 0"
 	enrootNamedJobName  = "kek"
 	enrootSquashPattern = ".sqsh"
-	enrootSquashRoot    = "/mnt/jail/var/cache/enroot-container-images"
+	enrootSquashRoot    = "/var/cache/enroot-container-images"
 	enrootTasksPerNode  = 1
 
 	enrootJobStartTimeout = 25 * time.Minute
@@ -100,15 +100,6 @@ func (s *EnrootContainers) enrootSquashfsImageIsPresentOnAWorker(ctx context.Con
 	}
 
 	if err := s.exec.WaitFor(ctx, "enroot squashfs image present", enrootProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
-		treeOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker,
-			fmt.Sprintf("sudo tree -L 4 -hug %s 2>/dev/null || true", framework.ShellQuote(enrootSquashRoot)))
-		if err != nil {
-			return false, err
-		}
-		if !strings.Contains(treeOutput, enrootSquashPattern) {
-			return false, nil
-		}
-
 		findOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker,
 			fmt.Sprintf("sudo find %s -type f -name '*%s' 2>/dev/null | sort", framework.ShellQuote(enrootSquashRoot), enrootSquashPattern))
 		if err != nil {
@@ -119,6 +110,7 @@ func (s *EnrootContainers) enrootSquashfsImageIsPresentOnAWorker(ctx context.Con
 			return false, nil
 		}
 		s.squashPath = squashPath
+		s.exec.Logf("enroot containers: tracked squashfs path=%s", squashPath)
 		return true, nil
 	}); err != nil {
 		s.logEnrootJobFailureMessages(ctx, "squashfs artifact not found")
@@ -451,58 +443,10 @@ func (s *EnrootContainers) logEnrootJobFailureMessages(ctx context.Context, reas
 	s.exec.Logf("enroot job failure: reason=%s job_id=%s state=%s reason_code=%s exit_code=%s batch_host=%s stdout=%s",
 		reason, s.jobID, jobState, jobReason, exitCode, batchHost, stdoutPath)
 
-	s.logEnrootJailCommandOutput(ctx, "enroot debug scontrol show job -d",
-		fmt.Sprintf("scontrol show job -d %s || true", framework.ShellQuote(s.jobID)))
-	s.logEnrootJailCommandOutput(ctx, "enroot debug scontrol show step",
-		fmt.Sprintf("scontrol show step %s.0 || true", framework.ShellQuote(s.jobID)))
-	s.logEnrootJailCommandOutput(ctx, "enroot debug sacct",
-		fmt.Sprintf("sacct -j %s --format=JobID,JobName,NodeList,State,ExitCode,Elapsed,ReqTRES,AllocTRES -P || true", framework.ShellQuote(s.jobID)))
-	s.logEnrootJailCommandOutput(ctx, "enroot debug sstat",
-		fmt.Sprintf("sstat -j %s.0 --format=AveCPU,MaxRSS,MaxVMSize -P || true", framework.ShellQuote(s.jobID)))
-
-	failurePattern := fmt.Sprintf("%s|pyxis|enroot|pmix|ucx|mpi|abort|timeout", s.jobID)
-
-	for _, worker := range s.workers {
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug slurmd log excerpt",
-			fmt.Sprintf(
-				"sudo sh -lc %s",
-				framework.ShellQuote(fmt.Sprintf(
-					"grep -Ei %s /var/log/slurm/slurmd.log 2>/dev/null | tail -n 200 || true",
-					framework.ShellQuote(failurePattern),
-				)),
-			),
-		)
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug pyxis plugstack",
-			`sudo sh -lc 'cat /etc/slurm/plugstack.conf 2>/dev/null || true; echo; grep -R "spank_pyxis\|importer=" /etc/slurm/plugstack.conf* 2>/dev/null || true'`)
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug importer script",
-			`sudo sh -lc 'ls -lah /opt/slurm_scripts/pyxis_caching_importer.sh 2>/dev/null || true; sha256sum /opt/slurm_scripts/pyxis_caching_importer.sh 2>/dev/null || true; sed -n "1,200p" /opt/slurm_scripts/pyxis_caching_importer.sh 2>/dev/null || true'`)
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug enroot host config",
-			`sudo sh -lc 'echo "[host] /etc/enroot/enroot.conf"; sed -n "1,200p" /etc/enroot/enroot.conf 2>/dev/null || true; echo; echo "[host] /etc/enroot/enroot.conf.d"; ls -lah /etc/enroot/enroot.conf.d 2>/dev/null || true; for f in /etc/enroot/enroot.conf.d/*.conf; do [ -f "$f" ] || continue; echo "--- $f"; sed -n "1,200p" "$f" 2>/dev/null || true; done'`)
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug enroot jail config",
-			`sudo sh -lc 'echo "[jail] /mnt/jail/etc/enroot/enroot.conf"; sed -n "1,200p" /mnt/jail/etc/enroot/enroot.conf 2>/dev/null || true; echo; echo "[jail] /mnt/jail/etc/enroot/enroot.conf.d"; ls -lah /mnt/jail/etc/enroot/enroot.conf.d 2>/dev/null || true; for f in /mnt/jail/etc/enroot/enroot.conf.d/*.conf; do [ -f "$f" ] || continue; echo "--- $f"; sed -n "1,200p" "$f" 2>/dev/null || true; done'`)
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug path candidates",
-			`sudo sh -lc 'for p in /mnt/jail/var/cache/enroot-container-images /var/cache/enroot-container-images /mnt/image-storage/enroot/cache /mnt/jail/mnt/image-storage/enroot/cache /mnt/image-storage/enroot/data /mnt/jail/mnt/image-storage/enroot/data; do echo "=== $p ==="; if [ -d "$p" ]; then files=$(find "$p" -maxdepth 2 -type f 2>/dev/null | wc -l); sqsh=$(find "$p" -maxdepth 6 -type f -name "*.sqsh" 2>/dev/null | wc -l); echo "files(maxdepth2)=$files sqsh(maxdepth6)=$sqsh"; find "$p" -maxdepth 6 -type f -name "*.sqsh" 2>/dev/null | sort | head -n 50; else echo "missing"; fi; echo; done'`)
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug pyxis runtime ls", "sudo sh -lc 'ls -lah /run/pyxis || true'")
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug pyxis runtime files", "sudo sh -lc 'find /run/pyxis -maxdepth 3 -type f -print 2>/dev/null || true'")
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug enroot cache tree", "sudo sh -lc 'tree -L 3 /mnt/image-storage/enroot/cache/ 2>/dev/null || true'")
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug enroot data tree", "sudo sh -lc 'tree -L 3 /mnt/image-storage/enroot/data/ 2>/dev/null || true'")
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug enroot squashfs files",
-			fmt.Sprintf("sudo sh -lc %s", framework.ShellQuote(
-				fmt.Sprintf("find %s -maxdepth 6 -type f -ls 2>/dev/null || true", framework.ShellQuote(enrootSquashRoot)),
-			)),
-		)
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug checks output",
-			`sudo sh -lc 'ls -lah /mnt/jail/opt/soperator-outputs/slurm_scripts 2>/dev/null || true; tail -n 120 /mnt/jail/opt/soperator-outputs/slurm_scripts/*cleanup_enroot* 2>/dev/null || true; tail -n 120 /mnt/jail/opt/soperator-outputs/slurm_scripts/*chmod_enroot_layers* 2>/dev/null || true'`)
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug coredumpctl",
-			fmt.Sprintf(
-				"sudo sh -lc %s",
-				framework.ShellQuote(fmt.Sprintf(
-					"command -v coredumpctl >/dev/null && coredumpctl --no-pager --since %s | tail -n 50 || true",
-					framework.ShellQuote("2 hours ago"),
-				)),
-			),
-		)
-	}
+	s.logEnrootJailCommandOutput(ctx, "enroot debug scontrol show job",
+		fmt.Sprintf("scontrol show job %s || true", framework.ShellQuote(s.jobID)))
+	s.logEnrootJailCommandOutput(ctx, "enroot debug sacct summary",
+		fmt.Sprintf("sacct -j %s --format=JobID,JobName,NodeList,State,ExitCode,Elapsed -P || true", framework.ShellQuote(s.jobID)))
 
 	if batchHost == "" {
 		return
