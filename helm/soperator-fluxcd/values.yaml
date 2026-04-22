@@ -397,6 +397,8 @@ observability:
     configMapOverrideValues: null
     collectorOverrideValues: null
     values:
+      # or nodeLocal
+      mode: shared
       resources:
         requests:
           memory: 200Mi
@@ -416,7 +418,6 @@ observability:
       deleteAfterRead:
         enabled: false
         minAge: 15m
-
 securityProfilesOperator:
   enabled: true
   interval: 5m
