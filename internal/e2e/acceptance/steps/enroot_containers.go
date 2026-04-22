@@ -22,6 +22,7 @@ const (
 	enrootNamedJobName  = "kek"
 	enrootSquashPattern = ".sqsh"
 	enrootSquashRoot    = "/mnt/jail/var/cache/enroot-container-images"
+	enrootTasksPerNode  = 1
 
 	enrootJobStartTimeout = 25 * time.Minute
 	enrootProbeTimeout    = 10 * time.Minute
@@ -324,8 +325,9 @@ func (s *EnrootContainers) submitEnrootJob(ctx context.Context, containerName, j
 	}
 
 	submit := fmt.Sprintf(
-		"sbatch --parsable -N 2 --nodelist=%s --gpus-per-node=8 --ntasks-per-node=8 --job-name=%s --wrap=%s",
+		"sbatch --parsable -N 2 --nodelist=%s --gpus-per-node=8 --ntasks-per-node=%d --job-name=%s --wrap=%s",
 		framework.ShellQuote(strings.Join(s.workers, ",")),
+		enrootTasksPerNode,
 		framework.ShellQuote(jobName),
 		framework.ShellQuote(wrap),
 	)
@@ -440,8 +442,6 @@ func (s *EnrootContainers) logEnrootJobFailureMessages(ctx context.Context, reas
 	jobState := scontrolField(scontrolOutput, "JobState")
 	jobReason := scontrolField(scontrolOutput, "Reason")
 	exitCode := scontrolField(scontrolOutput, "ExitCode")
-	jobStart := normalizeSlurmTimeForJournalctl(scontrolField(scontrolOutput, "StartTime"))
-	jobEnd := normalizeSlurmTimeForJournalctl(scontrolField(scontrolOutput, "EndTime"))
 	batchHost := scontrolField(scontrolOutput, "BatchHost")
 	stdoutPath := scontrolField(scontrolOutput, "StdOut")
 	if stdoutPath == "" {
@@ -460,34 +460,28 @@ func (s *EnrootContainers) logEnrootJobFailureMessages(ctx context.Context, reas
 	s.logEnrootJailCommandOutput(ctx, "enroot debug sstat",
 		fmt.Sprintf("sstat -j %s.0 --format=AveCPU,MaxRSS,MaxVMSize -P || true", framework.ShellQuote(s.jobID)))
 
-	since := jobStart
-	if since == "" {
-		since = "2 hours ago"
-	}
-	until := jobEnd
-	if until == "" {
-		until = "now"
-	}
-	journalPattern := fmt.Sprintf("%s|pyxis|enroot|pmix|ucx|mpi|abort|timeout", s.jobID)
+	failurePattern := fmt.Sprintf("%s|pyxis|enroot|pmix|ucx|mpi|abort|timeout", s.jobID)
 
 	for _, worker := range s.workers {
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug slurmd journal",
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug slurmd log excerpt",
 			fmt.Sprintf(
 				"sudo sh -lc %s",
 				framework.ShellQuote(fmt.Sprintf(
-					"journalctl -u slurmd --since %s --until %s --no-pager | grep -Ei %s || true",
-					framework.ShellQuote(since),
-					framework.ShellQuote(until),
-					framework.ShellQuote(journalPattern),
+					"grep -Ei %s /var/log/slurm/slurmd.log 2>/dev/null | tail -n 200 || true",
+					framework.ShellQuote(failurePattern),
 				)),
 			),
 		)
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug ibstat", "sudo sh -lc 'ibstat || true'")
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug ibv_devinfo", "sudo sh -lc 'ibv_devinfo -v || true'")
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug rdma link", "sudo sh -lc 'rdma link show || true'")
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug ibdev2netdev", "sudo sh -lc 'ibdev2netdev || true'")
-		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug infiniband counters",
-			`sudo sh -lc 'for p in /sys/class/infiniband/*/ports/*/counters; do [ -d "$p" ] || continue; for n in port_rcv_errors port_xmit_discards link_downed symbol_error; do f="$p/$n"; [ -e "$f" ] || continue; printf "%s=%s\n" "$f" "$(cat "$f" 2>/dev/null)"; done; done || true'`)
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug pyxis plugstack",
+			`sudo sh -lc 'cat /etc/slurm/plugstack.conf 2>/dev/null || true; echo; grep -R "spank_pyxis\|importer=" /etc/slurm/plugstack.conf* 2>/dev/null || true'`)
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug importer script",
+			`sudo sh -lc 'ls -lah /opt/slurm_scripts/pyxis_caching_importer.sh 2>/dev/null || true; sha256sum /opt/slurm_scripts/pyxis_caching_importer.sh 2>/dev/null || true; sed -n "1,200p" /opt/slurm_scripts/pyxis_caching_importer.sh 2>/dev/null || true'`)
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug enroot host config",
+			`sudo sh -lc 'echo "[host] /etc/enroot/enroot.conf"; sed -n "1,200p" /etc/enroot/enroot.conf 2>/dev/null || true; echo; echo "[host] /etc/enroot/enroot.conf.d"; ls -lah /etc/enroot/enroot.conf.d 2>/dev/null || true; for f in /etc/enroot/enroot.conf.d/*.conf; do [ -f "$f" ] || continue; echo "--- $f"; sed -n "1,200p" "$f" 2>/dev/null || true; done'`)
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug enroot jail config",
+			`sudo sh -lc 'echo "[jail] /mnt/jail/etc/enroot/enroot.conf"; sed -n "1,200p" /mnt/jail/etc/enroot/enroot.conf 2>/dev/null || true; echo; echo "[jail] /mnt/jail/etc/enroot/enroot.conf.d"; ls -lah /mnt/jail/etc/enroot/enroot.conf.d 2>/dev/null || true; for f in /mnt/jail/etc/enroot/enroot.conf.d/*.conf; do [ -f "$f" ] || continue; echo "--- $f"; sed -n "1,200p" "$f" 2>/dev/null || true; done'`)
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug path candidates",
+			`sudo sh -lc 'for p in /mnt/jail/var/cache/enroot-container-images /var/cache/enroot-container-images /mnt/image-storage/enroot/cache /mnt/jail/mnt/image-storage/enroot/cache /mnt/image-storage/enroot/data /mnt/jail/mnt/image-storage/enroot/data; do echo "=== $p ==="; if [ -d "$p" ]; then files=$(find "$p" -maxdepth 2 -type f 2>/dev/null | wc -l); sqsh=$(find "$p" -maxdepth 6 -type f -name "*.sqsh" 2>/dev/null | wc -l); echo "files(maxdepth2)=$files sqsh(maxdepth6)=$sqsh"; find "$p" -maxdepth 6 -type f -name "*.sqsh" 2>/dev/null | sort | head -n 50; else echo "missing"; fi; echo; done'`)
 		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug pyxis runtime ls", "sudo sh -lc 'ls -lah /run/pyxis || true'")
 		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug pyxis runtime files", "sudo sh -lc 'find /run/pyxis -maxdepth 3 -type f -print 2>/dev/null || true'")
 		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug enroot cache tree", "sudo sh -lc 'tree -L 3 /mnt/image-storage/enroot/cache/ 2>/dev/null || true'")
@@ -497,13 +491,14 @@ func (s *EnrootContainers) logEnrootJobFailureMessages(ctx context.Context, reas
 				fmt.Sprintf("find %s -maxdepth 6 -type f -ls 2>/dev/null || true", framework.ShellQuote(enrootSquashRoot)),
 			)),
 		)
+		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug checks output",
+			`sudo sh -lc 'ls -lah /mnt/jail/opt/soperator-outputs/slurm_scripts 2>/dev/null || true; tail -n 120 /mnt/jail/opt/soperator-outputs/slurm_scripts/*cleanup_enroot* 2>/dev/null || true; tail -n 120 /mnt/jail/opt/soperator-outputs/slurm_scripts/*chmod_enroot_layers* 2>/dev/null || true'`)
 		s.logEnrootWorkerCommandOutput(ctx, worker, "enroot debug coredumpctl",
 			fmt.Sprintf(
 				"sudo sh -lc %s",
 				framework.ShellQuote(fmt.Sprintf(
-					"coredumpctl --no-pager --since %s --until %s | tail -n 50 || true",
-					framework.ShellQuote(since),
-					framework.ShellQuote(until),
+					"command -v coredumpctl >/dev/null && coredumpctl --no-pager --since %s | tail -n 50 || true",
+					framework.ShellQuote("2 hours ago"),
 				)),
 			),
 		)
@@ -548,15 +543,4 @@ func scontrolField(output, key string) string {
 		}
 	}
 	return ""
-}
-
-func normalizeSlurmTimeForJournalctl(raw string) string {
-	value := strings.TrimSpace(raw)
-	if value == "" {
-		return ""
-	}
-	if strings.EqualFold(value, "Unknown") || strings.EqualFold(value, "N/A") || strings.EqualFold(value, "None") {
-		return ""
-	}
-	return strings.ReplaceAll(value, ".UTC", " UTC")
 }
