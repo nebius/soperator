@@ -265,11 +265,46 @@ tests:
       - exists:
           path: spec.values.clusterRole
       - equal:
+          path: spec.values.mode
+          value: deployment
+      - equal:
+          path: spec.values.replicaCount
+          value: 1
+      - equal:
+          path: spec.values.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]
+          value: system
+      - notExists:
+          path: spec.values.tolerations
+      - equal:
           path: spec.values.image.repository
           value: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
       - equal:
           path: spec.values.configMap.existingName
           value: opentelemetry-collector-nccl-profiles-agent
+
+  - it: should use daemonset mode on worker nodes for node-local storage
+    set:
+      observability.enabled: true
+      observability.ncclProfiles.enabled: true
+      observability.ncclProfiles.values.mode: nodeLocal
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-otelcol-nccl-profiles
+    asserts:
+      - equal:
+          path: spec.values.mode
+          value: daemonset
+      - notExists:
+          path: spec.values.replicaCount
+      - equal:
+          path: spec.values.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]
+          value: worker
+      - contains:
+          path: spec.values.tolerations
+          content:
+            effect: NoSchedule
+            key: nvidia.com/gpu
+            operator: Exists
 
   - it: should propagate nccl profiles values to opentelemetry collector chart
     set:

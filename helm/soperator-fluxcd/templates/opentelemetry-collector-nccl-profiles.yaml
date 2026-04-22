@@ -199,10 +199,13 @@ spec:
       repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
       tag: {{ .Values.observability.ncclProfiles.values.nebiusO11yAgentVersion | default "2.0.3" }}
 
-    mode: deployment  # Single deployment on system nodes instead of DaemonSet on all workers
+    {{- if eq (.Values.observability.ncclProfiles.values.mode | default "shared") "shared" }}
+    mode: deployment
     replicaCount: 1   # Only one replica to avoid file lock conflicts on shared storage and prevent log duplication
+
     rollout:
       strategy: Recreate  # Ensure old pod terminates before new one starts to maintain max one pod running
+
     affinity:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
@@ -210,7 +213,31 @@ spec:
             - matchExpressions:
                 - key: slurm.nebius.ai/nodeset
                   operator: In
-                  values: ["system"]
+                  values:
+                    - "system"
+    {{- else }}{{- if eq (.Values.observability.ncclProfiles.values.mode | default "shared") "nodeLocal" }}
+    mode: daemonset
+
+    rollout:
+      rollingUpdate:
+        maxUnavailable: 50%
+      strategy: RollingUpdate
+
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: slurm.nebius.ai/nodeset
+                  operator: In
+                  values:
+                    - "worker"
+
+    tolerations:
+      - effect: NoSchedule
+        key: nvidia.com/gpu
+        operator: Exists
+    {{- end }}{{- end }}
 
     extraVolumes:
       - name: nccl-profiles
