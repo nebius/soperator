@@ -130,9 +130,9 @@ This helps cluster administrators and users monitor resource utilization, enforc
 - **Single-partition clusters**. Slurm's ability to split clusters into several partitions isn't supported now.
 - **Software versions**. The list of software versions we currently support is quite short.
     - Linux: Ubuntu [24.04](https://releases.ubuntu.com/noble/).
-    - Slurm: versions `25.11.3`.
-    - CUDA: version [12.9](https://docs.nvidia.com/cuda/archive/12.9.0/cuda-toolkit-release-notes/contents.html).
-    - Kubernetes: >= [1.31](https://kubernetes.io/blog/2024/08/13/kubernetes-v1-31-release/).
+    - Slurm: versions `25.11.5`.
+    - CUDA: version [13.0](https://docs.nvidia.com/cuda/archive/13.0.2/cuda-toolkit-release-notes/contents.html).
+    - Kubernetes: >= [1.33](https://kubernetes.io/blog/2025/04/23/kubernetes-v1-33-release/).
     - Versions of some preinstalled software packages can't be changed.
 
 
