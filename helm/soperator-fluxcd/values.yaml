@@ -75,7 +75,7 @@ backup:
   values:
     cleanup:
       pullPolicy: IfNotPresent
-      registry: docker.io
+      registry: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io
       repository: alpine/k8s
       tag: 1.34.0
   overrideValues: null
