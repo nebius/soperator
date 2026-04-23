@@ -98,7 +98,7 @@ func (s *EnrootContainers) enrootSquashfsImageIsPresentOnAWorker(ctx context.Con
 		return fmt.Errorf("enroot connection worker is not selected")
 	}
 
-	if err := s.exec.WaitFor(ctx, "enroot squashfs image present", enrootProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+	if err := s.exec.WaitFor(ctx, "enroot squashfs image present", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		findOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx,
 			fmt.Sprintf("sudo find %s -type f -name '*%s' 2>/dev/null | sort", framework.ShellQuote(enrootSquashRoot), enrootSquashPattern))
 		if err != nil {
@@ -122,7 +122,7 @@ func (s *EnrootContainers) enrootRuntimeContainerDataIsVisibleWhileTheJobIsRunni
 		return fmt.Errorf("enroot connection worker is not selected")
 	}
 
-	return s.exec.WaitFor(ctx, "enroot runtime container visible", enrootProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.exec.WaitFor(ctx, "enroot runtime container visible", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		listOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo enroot list || true")
 		if err != nil {
 			return false, err
@@ -153,7 +153,7 @@ func (s *EnrootContainers) enrootRuntimeDataIsCleanedUpAndSquashfsCacheRemains(c
 		return fmt.Errorf("enroot connection worker is not selected")
 	}
 
-	err := s.exec.WaitFor(ctx, "enroot runtime data cleaned and squashfs cache remains", enrootProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+	err := s.exec.WaitFor(ctx, "enroot runtime data cleaned and squashfs cache remains", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		treeOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
 		if err != nil {
 			return false, err
@@ -199,7 +199,7 @@ func (s *EnrootContainers) enrootRuntimeDataIsRepopulatedWithoutChangingTheSquas
 		return fmt.Errorf("enroot connection worker is not selected")
 	}
 
-	return s.exec.WaitFor(ctx, "enroot data repopulated from cache", enrootProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.exec.WaitFor(ctx, "enroot data repopulated from cache", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		// We validate cache reuse by checking the tracked squashfs stat is unchanged
 		// while runtime data is recreated. We do not compare full directory trees.
 		treeOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
@@ -230,7 +230,7 @@ func (s *EnrootContainers) aNamedEnrootContainerJobIsSubmitted(ctx context.Conte
 		return err
 	}
 	namedDir := namedEnrootDir(enrootNamedJobName)
-	if err := s.exec.WaitFor(ctx, "named enroot runtime directory created", enrootProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+	if err := s.exec.WaitFor(ctx, "named enroot runtime directory created", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
 			treeOutput, err := s.exec.Worker(worker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
 			if err != nil {
@@ -250,7 +250,7 @@ func (s *EnrootContainers) aNamedEnrootContainerJobIsSubmitted(ctx context.Conte
 func (s *EnrootContainers) theNamedEnrootRuntimeDirectoryRemainsAfterCancellation(ctx context.Context) error {
 	namedDir := namedEnrootDir(enrootNamedJobName)
 
-	return s.exec.WaitFor(ctx, "named enroot runtime directory remains", enrootProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.exec.WaitFor(ctx, "named enroot runtime directory remains", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
 			treeOutput, err := s.exec.Worker(worker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
 			if err != nil {
@@ -289,7 +289,7 @@ func (s *EnrootContainers) theNamedEnrootRuntimeDirectoryIsCleanedUp(ctx context
 
 func (s *EnrootContainers) theNamedEnrootRuntimeDirectoryIsRemoved(ctx context.Context) error {
 	namedDir := namedEnrootDir(enrootNamedJobName)
-	return s.exec.WaitFor(ctx, "named enroot runtime directory removed", enrootProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.exec.WaitFor(ctx, "named enroot runtime directory removed", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
 			treeOutput, err := s.exec.Worker(worker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
 			if err != nil {

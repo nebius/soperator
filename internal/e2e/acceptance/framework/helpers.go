@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+const DefaultPollInterval = 10 * time.Second
+
 func RequiredEnv(key string) (string, error) {
 	value := strings.TrimSpace(os.Getenv(key))
 	if value == "" {
@@ -57,7 +59,7 @@ func WaitForTreeEntriesOnWorker(ctx context.Context, exec Exec, worker, storageP
 		return fmt.Errorf("%s: worker is not selected", description)
 	}
 
-	return exec.WaitFor(ctx, description, timeout, SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+	return exec.WaitFor(ctx, description, timeout, DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		out, err := exec.Worker(trimmedWorker).RunWithDefaultRetry(waitCtx, fmt.Sprintf("sudo tree -L 2 -a %s", ShellQuote(storagePath)))
 		if err != nil {
 			return false, err

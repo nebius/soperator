@@ -119,7 +119,7 @@ func (s *DockerContainers) dockerContainerContentBlobsArePopulatedOnAWorker(ctx 
 }
 
 func (s *DockerContainers) aDockerContainerFromTheJobIsRunningOnWorkers(ctx context.Context) error {
-	return s.exec.WaitFor(ctx, "Docker containers running on selected workers", dockerProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.exec.WaitFor(ctx, "Docker containers running on selected workers", dockerProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
 			currentIDs, err := s.dockerContainerIDsByNamePrefix(waitCtx, worker)
 			if err != nil {
@@ -134,10 +134,7 @@ func (s *DockerContainers) aDockerContainerFromTheJobIsRunningOnWorkers(ctx cont
 }
 
 func (s *DockerContainers) theDockerNCCLJobIsCancelled(ctx context.Context) error {
-	if err := s.cancelCurrentJob(ctx); err != nil {
-		return err
-	}
-	return nil
+	return s.cancelCurrentJob(ctx)
 }
 
 func (s *DockerContainers) dockerContainersFromThatJobAreNoLongerRunning(ctx context.Context) error {
@@ -149,7 +146,7 @@ func (s *DockerContainers) dockerContainersFromThatJobAreNoLongerRunning(ctx con
 }
 
 func (s *DockerContainers) waitForTrackedContainersGone(ctx context.Context, timeout time.Duration) error {
-	return s.exec.WaitFor(ctx, "Docker containers stopped on selected workers", timeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.exec.WaitFor(ctx, "Docker containers stopped on selected workers", timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
 			currentIDs, err := s.dockerContainerIDsByNamePrefix(waitCtx, worker)
 			if err != nil {

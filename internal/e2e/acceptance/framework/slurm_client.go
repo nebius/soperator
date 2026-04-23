@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-const SlurmPollInterval = 10 * time.Second
-
 type SlurmClient struct {
 	exec Exec
 }
@@ -27,7 +25,7 @@ func (s *SlurmClient) AnyGPUWorkers(count int) ([]string, error) {
 }
 
 func (s *SlurmClient) WaitForJobRunning(ctx context.Context, jobID string, timeout time.Duration) error {
-	return s.exec.WaitFor(ctx, fmt.Sprintf("job %s running", jobID), timeout, SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.exec.WaitFor(ctx, fmt.Sprintf("job %s running", jobID), timeout, DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		status, err := s.exec.Jail().RunWithDefaultRetry(waitCtx, fmt.Sprintf("squeue -h -j %s -o '%%T'", ShellQuote(jobID)))
 		if err != nil {
 			return false, err
@@ -37,7 +35,7 @@ func (s *SlurmClient) WaitForJobRunning(ctx context.Context, jobID string, timeo
 }
 
 func (s *SlurmClient) WaitForJobGone(ctx context.Context, jobID string, timeout time.Duration) error {
-	return s.exec.WaitFor(ctx, fmt.Sprintf("job %s gone from queue", jobID), timeout, SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.exec.WaitFor(ctx, fmt.Sprintf("job %s gone from queue", jobID), timeout, DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		status, err := s.exec.Jail().RunWithDefaultRetry(waitCtx, fmt.Sprintf("squeue -h -j %s -o '%%T'", ShellQuote(jobID)))
 		if err != nil {
 			return false, err
