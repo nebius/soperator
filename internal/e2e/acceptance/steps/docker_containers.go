@@ -47,7 +47,7 @@ func (s *DockerContainers) Register(sc *godog.ScenarioContext) {
 		}
 
 		if cleanupErr := s.cancelCurrentJob(context.Background()); cleanupErr != nil {
-			s.exec.Logf("cleanup: cancel docker job: %v", cleanupErr)
+			s.exec.Logf("cleanup: cancel Docker job: %v", cleanupErr)
 		}
 		s.stopContainersByNamePrefix(context.Background())
 		return ctx, nil
@@ -86,6 +86,7 @@ func (s *DockerContainers) aLongRunningDockerNCCLJobIsSubmittedOnTwoGPUWorkers(c
 		framework.ShellQuote(wrap),
 	)
 
+	// TODO: Add safe retries for sbatch without creating duplicate jobs.
 	out, err := s.exec.Jail().Run(ctx, submit)
 	if err != nil {
 		return fmt.Errorf("submit Docker NCCL job: %w", err)
@@ -96,29 +97,29 @@ func (s *DockerContainers) aLongRunningDockerNCCLJobIsSubmittedOnTwoGPUWorkers(c
 	}
 	s.jobID = jobID
 	s.containerNamePrefix = fmt.Sprintf("e2e-docker-%s-", jobID)
-	s.exec.Logf("docker containers: selected workers=%s job_id=%s", nodelist, jobID)
+	s.exec.Logf("Docker containers: selected workers=%s job_id=%s", nodelist, jobID)
 	return nil
 }
 
 func (s *DockerContainers) theDockerNCCLJobIsRunning(ctx context.Context) error {
 	if s.jobID == "" {
-		return fmt.Errorf("docker job id is empty")
+		return fmt.Errorf("Docker job ID is empty")
 	}
 	return s.slurm.WaitForJobRunning(ctx, s.jobID, dockerJobStartTimeout)
 }
 
 func (s *DockerContainers) dockerOverlayfsStorageIsPopulatedOnAWorker(ctx context.Context) error {
-	return s.waitForTreeEntriesOnWorker(ctx, "/mnt/image-storage/docker/rootfs/overlayfs/", "docker overlayfs storage")
+	return framework.WaitForTreeEntriesOnWorker(ctx, s.exec, s.connectionWorker, "/mnt/image-storage/docker/rootfs/overlayfs/", "Docker overlayfs storage", dockerProbeTimeout)
 }
 
 func (s *DockerContainers) dockerContainerContentBlobsArePopulatedOnAWorker(ctx context.Context) error {
 	// This scenario checks storage population/cleanup only.
 	// It does not currently assert strict blob-by-blob identity across repeated runs.
-	return s.waitForTreeEntriesOnWorker(ctx, "/mnt/image-storage/docker/containerd/daemon/io.containerd.content.v1.content/blobs/sha256/", "docker container content blobs")
+	return framework.WaitForTreeEntriesOnWorker(ctx, s.exec, s.connectionWorker, "/mnt/image-storage/docker/containerd/daemon/io.containerd.content.v1.content/blobs/sha256/", "Docker container content blobs", dockerProbeTimeout)
 }
 
 func (s *DockerContainers) aDockerContainerFromTheJobIsRunningOnWorkers(ctx context.Context) error {
-	return s.exec.WaitFor(ctx, "docker containers running on selected workers", dockerProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.exec.WaitFor(ctx, "Docker containers running on selected workers", dockerProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
 			currentIDs, err := s.dockerContainerIDsByNamePrefix(waitCtx, worker)
 			if err != nil {
@@ -141,13 +142,14 @@ func (s *DockerContainers) theDockerNCCLJobIsCancelled(ctx context.Context) erro
 
 func (s *DockerContainers) dockerContainersFromThatJobAreNoLongerRunning(ctx context.Context) error {
 	// Expected behavior is that containers stop after `scancel`, but currently this is unreliable.
-	// TODO(SCHED-1497): remove explicit docker stop workaround once cancellation cleanup is fixed.
+	// TODO(SCHED-1497): remove explicit Docker stop workaround once cancellation cleanup is fixed.
+	s.exec.Logf("Docker containers: applying SCHED-1497 workaround (explicit docker stop before assertion)")
 	s.stopContainersByNamePrefix(ctx)
 	return s.waitForTrackedContainersGone(ctx, dockerContainerStopTimeout)
 }
 
 func (s *DockerContainers) waitForTrackedContainersGone(ctx context.Context, timeout time.Duration) error {
-	return s.exec.WaitFor(ctx, "docker containers stopped on selected workers", timeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.exec.WaitFor(ctx, "Docker containers stopped on selected workers", timeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
 			currentIDs, err := s.dockerContainerIDsByNamePrefix(waitCtx, worker)
 			if err != nil {
@@ -158,24 +160,6 @@ func (s *DockerContainers) waitForTrackedContainersGone(ctx context.Context, tim
 			}
 		}
 		return true, nil
-	})
-}
-
-func (s *DockerContainers) waitForTreeEntriesOnWorker(ctx context.Context, storagePath, description string) error {
-	if len(s.workers) == 0 {
-		return fmt.Errorf("docker workers are not selected")
-	}
-	if s.connectionWorker == "" {
-		return fmt.Errorf("docker connection worker is not selected")
-	}
-	worker := s.connectionWorker
-
-	return s.exec.WaitFor(ctx, description, dockerProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
-		out, err := s.exec.Worker(worker).RunWithDefaultRetry(waitCtx, fmt.Sprintf("sudo tree -L 2 -a %s", framework.ShellQuote(storagePath)))
-		if err != nil {
-			return false, err
-		}
-		return framework.TreeOutputHasEntries(out), nil
 	})
 }
 
@@ -193,7 +177,7 @@ func (s *DockerContainers) cancelCurrentJob(ctx context.Context) error {
 
 func (s *DockerContainers) dockerContainerIDsByNamePrefix(ctx context.Context, worker string) (map[string]struct{}, error) {
 	if s.containerNamePrefix == "" {
-		return nil, fmt.Errorf("docker container name prefix is empty")
+		return nil, fmt.Errorf("Docker container name prefix is empty")
 	}
 
 	out, err := s.exec.Worker(worker).RunWithDefaultRetry(ctx,
@@ -225,10 +209,13 @@ func (s *DockerContainers) stopContainersByNamePrefix(ctx context.Context) {
 		out, err := s.exec.Worker(worker).RunWithDefaultRetry(ctx,
 			fmt.Sprintf("sudo docker ps --filter name=%s --format '{{.ID}}'", framework.ShellQuote(s.containerNamePrefix)))
 		if err != nil {
+			s.exec.Logf("Docker cleanup: list containers on worker %s failed: %v", worker, err)
 			continue
 		}
 		for id := range parseIDSet(out) {
-			_, _ = s.exec.Worker(worker).Run(ctx, fmt.Sprintf("sudo docker stop %s >/dev/null 2>&1 || true", framework.ShellQuote(id)))
+			if _, err := s.exec.Worker(worker).Run(ctx, fmt.Sprintf("sudo docker stop %s >/dev/null 2>&1 || true", framework.ShellQuote(id))); err != nil {
+				s.exec.Logf("Docker cleanup: stop container %s on worker %s failed: %v", id, worker, err)
+			}
 		}
 	}
 }

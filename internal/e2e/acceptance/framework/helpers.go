@@ -1,9 +1,11 @@
 package framework
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 func RequiredEnv(key string) (string, error) {
@@ -47,4 +49,19 @@ func TreeOutputHasEntries(output string) bool {
 		}
 	}
 	return false
+}
+
+func WaitForTreeEntriesOnWorker(ctx context.Context, exec Exec, worker, storagePath, description string, timeout time.Duration) error {
+	trimmedWorker := strings.TrimSpace(worker)
+	if trimmedWorker == "" {
+		return fmt.Errorf("%s: worker is not selected", description)
+	}
+
+	return exec.WaitFor(ctx, description, timeout, SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+		out, err := exec.Worker(trimmedWorker).RunWithDefaultRetry(waitCtx, fmt.Sprintf("sudo tree -L 2 -a %s", ShellQuote(storagePath)))
+		if err != nil {
+			return false, err
+		}
+		return TreeOutputHasEntries(out), nil
+	})
 }

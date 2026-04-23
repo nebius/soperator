@@ -83,6 +83,7 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context
 	}
 	s.originalInstanceID = originalInstanceID
 
+	// TODO: Add safe retries for sbatch without creating duplicate jobs.
 	jobID, err := s.exec.Jail().Run(ctx, fmt.Sprintf(
 		"sbatch --parsable -w %s --job-name=e2e-node-replacement --wrap=%s",
 		framework.ShellQuote(s.replacementWorker), framework.ShellQuote("sleep 600")))

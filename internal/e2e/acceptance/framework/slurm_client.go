@@ -51,7 +51,7 @@ func (s *SlurmClient) CancelJob(ctx context.Context, jobID string, waitTimeout t
 		return nil
 	}
 
-	if _, err := s.exec.Jail().Run(ctx, fmt.Sprintf("scancel %s", ShellQuote(jobID))); err != nil {
+	if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("scancel %s", ShellQuote(jobID))); err != nil {
 		if !isMissingJobError(err) {
 			return fmt.Errorf("scancel job %s: %w", jobID, err)
 		}

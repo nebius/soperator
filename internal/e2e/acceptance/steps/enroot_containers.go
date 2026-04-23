@@ -90,7 +90,7 @@ func (s *EnrootContainers) theEnrootNCCLJobIsRunning(ctx context.Context) error 
 }
 
 func (s *EnrootContainers) enrootCacheIsPopulatedOnLocalStorageOnAWorker(ctx context.Context) error {
-	return s.waitForTreeEntriesOnWorker(ctx, "/mnt/image-storage/enroot/cache/", "enroot cache is populated")
+	return framework.WaitForTreeEntriesOnWorker(ctx, s.exec, s.connectionWorker, "/mnt/image-storage/enroot/cache/", "enroot cache is populated", enrootProbeTimeout)
 }
 
 func (s *EnrootContainers) enrootSquashfsImageIsPresentOnAWorker(ctx context.Context) error {
@@ -275,6 +275,7 @@ func (s *EnrootContainers) theNamedEnrootRuntimeDirectoryIsCleanedUp(ctx context
 		framework.ShellQuote(strings.Join(s.workers, ",")),
 		framework.ShellQuote(cleanupWrap),
 	)
+	// TODO: Add safe retries for sbatch without creating duplicate jobs.
 	out, err := s.exec.Jail().Run(ctx, submitCmd)
 	if err != nil {
 		return fmt.Errorf("submit named enroot cleanup job: %w", err)
@@ -341,6 +342,7 @@ func (s *EnrootContainers) submitEnrootJob(ctx context.Context, containerName, j
 		framework.ShellQuote(jobName),
 		framework.ShellQuote(wrap),
 	)
+	// TODO: Add safe retries for sbatch without creating duplicate jobs.
 	out, err := s.exec.Jail().Run(ctx, submit)
 	if err != nil {
 		return fmt.Errorf("submit enroot job %q: %w", jobName, err)
@@ -365,20 +367,6 @@ func (s *EnrootContainers) cancelCurrentJob(ctx context.Context) error {
 	}
 	s.jobID = ""
 	return nil
-}
-
-func (s *EnrootContainers) waitForTreeEntriesOnWorker(ctx context.Context, storagePath, description string) error {
-	if s.connectionWorker == "" {
-		return fmt.Errorf("enroot connection worker is not selected")
-	}
-
-	return s.exec.WaitFor(ctx, description, enrootProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
-		out, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, fmt.Sprintf("sudo tree -L 2 -a %s", framework.ShellQuote(storagePath)))
-		if err != nil {
-			return false, err
-		}
-		return framework.TreeOutputHasEntries(out), nil
-	})
 }
 
 func (s *EnrootContainers) removeNamedRuntimeDir(ctx context.Context) error {
