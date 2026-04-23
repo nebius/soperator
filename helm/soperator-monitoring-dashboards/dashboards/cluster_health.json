@@ -19,7 +19,20 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": 20,
-  "links": [],
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": ["soperator", "gpu"],
+      "targetBlank": true,
+      "title": "GPU Stats",
+      "tooltip": "",
+      "type": "dashboards",
+      "url": ""
+    }
+  ],
   "panels": [
     {
       "collapsed": false,
@@ -5824,7 +5837,7 @@
   ],
   "preload": false,
   "schemaVersion": 41,
-  "tags": [],
+  "tags": ["nebius", "soperator", "overview", "cluster"],
   "templating": {
     "list": [
       {
