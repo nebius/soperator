@@ -146,6 +146,9 @@ spec:
     security:
       limitsConfig: {{ get (.security | default dict) "limitsConfig" | quote }}
       appArmorProfile: {{ get (.security | default dict) "appArmorProfile" | default "unconfined" | quote }}
+      {{- with (get (.security | default dict) "procMount") }}
+      procMount: {{ . | quote }}
+      {{- end }}
   {{- end }}
 
   {{- with (required ".Values.nodesets[*].munge is required." .munge) }}
@@ -190,6 +193,9 @@ spec:
     security:
       limitsConfig: {{ get (.security | default dict) "limitsConfig" | quote }}
       appArmorProfile: {{ get (.security | default dict) "appArmorProfile" | default "unconfined" | quote }}
+      {{- with (get (.security | default dict) "procMount") }}
+      procMount: {{ . | quote }}
+      {{- end }}
   {{- end }}
 
   {{- $sssd := (.sssd | default dict) }}
