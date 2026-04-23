@@ -234,6 +234,21 @@ func (s *EnrootContainers) aNamedEnrootContainerJobIsSubmitted(ctx context.Conte
 	if err := waitForJobRunning(ctx, s.exec, s.jobID, enrootJobStartTimeout); err != nil {
 		return err
 	}
+	namedDir := namedEnrootDir(enrootNamedJobName)
+	if err := s.exec.WaitFor(ctx, "named enroot runtime directory created", enrootProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
+		for _, worker := range s.workers {
+			treeOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+			if err != nil {
+				return false, err
+			}
+			if !strings.Contains(treeOutput, namedDir) {
+				return false, nil
+			}
+		}
+		return true, nil
+	}); err != nil {
+		return err
+	}
 	return s.cancelCurrentJob(ctx)
 }
 
