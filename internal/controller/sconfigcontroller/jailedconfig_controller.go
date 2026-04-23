@@ -190,6 +190,10 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig) (ctrl.Result, error) {
 	logger := logf.FromContext(ctx)
 
+	if jailedConfig.Labels[consts.LabelInstanceKey] != r.clusterName {
+		return ctrl.Result{}, nil
+	}
+
 	err := r.shouldInitializeConditions(ctx, jailedConfig)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("initializing conditions: %w", err)

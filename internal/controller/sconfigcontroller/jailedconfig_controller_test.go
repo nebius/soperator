@@ -43,6 +43,7 @@ import (
 	v0041 "github.com/SlinkyProject/slurm-client/api/v0041"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/consts"
 	fakes "nebius.ai/slurm-operator/internal/controller/sconfigcontroller/fake"
 	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
 )
@@ -162,6 +163,9 @@ func prepareTest(t *testing.T, options ...testOption) (*JailedConfigReconciler, 
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      testJailedConfig,
 				Namespace: testNamespace,
+				Labels: map[string]string{
+					consts.LabelInstanceKey: "test-cluster",
+				},
 			},
 			Spec: slurmv1alpha1.JailedConfigSpec{
 				ConfigMap: slurmv1alpha1.ConfigMapReference{

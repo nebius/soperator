@@ -495,6 +495,10 @@ func (r *WorkerTopologyReconciler) ensureJailedConfig(ctx context.Context, names
 func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 	maxConcurrency int, cacheSyncTimeout time.Duration) error {
 
+	// Matches both the legacy unprefixed name and any cluster-prefixed variant.
+	// Intentionally broad: events from other clusters in the same namespace will
+	// trigger reconciliation, but the reconciler uses its own cluster-specific
+	// ConfigMap name so spurious triggers are harmless.
 	isTopologyConfigName := func(name string) bool {
 		return name == consts.ConfigMapNameTopologyConfig ||
 			strings.HasSuffix(name, "-"+consts.ConfigMapNameTopologyConfig)

@@ -6,13 +6,15 @@
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
-  name: {{ $name | quote }}
+  name: {{ printf "%s-%s" $root.Values.slurmClusterRefName $name | quote }}
 spec:
   checkType: {{ $check.checkType | quote }}
-  name: {{ $name | quote }}
+  name: {{ printf "%s-%s" $root.Values.slurmClusterRefName $name | quote }}
   {{- with $check.dependsOn }}
   dependsOn:
-{{ toYaml . | indent 4 }}
+    {{- range . }}
+    - {{ printf "%s-%s" $root.Values.slurmClusterRefName . | quote }}
+    {{- end }}
   {{- end }}
   slurmClusterRefName: {{ $root.Values.slurmClusterRefName | quote }}
   {{- with $check.schedule }}
