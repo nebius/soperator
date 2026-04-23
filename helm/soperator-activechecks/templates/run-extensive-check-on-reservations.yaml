@@ -1,7 +1,8 @@
+{{- if (index .Values.checks "extensive-check").enabled -}}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: "run-extensive-check-on-reservations"
+  name: {{ include "soperator-activechecks.extensiveCheckJobName" . | quote }}
   labels:
     app.kubernetes.io/component: soperatorchecks
     app.kubernetes.io/instance: soperator
@@ -51,7 +52,7 @@ spec:
             - name: RESERVATION_PREFIX
               value: {{ (index .Values.checks "extensive-check").reservationPrefix | quote }}
             - name: TARGET_ACTIVE_CHECK_NAME
-              value: extensive-check
+              value: {{ printf "%s-extensive-check" .Values.slurmClusterRefName | quote }}
             volumeMounts:
             - mountPath: /mnt/slurm-configs
               name: slurm-configs
@@ -101,8 +102,8 @@ spec:
               name: munge-socket
           dnsPolicy: ClusterFirst
           restartPolicy: Never
-          serviceAccount: run-extensive-check-on-reservations
-          serviceAccountName: run-extensive-check-on-reservations
+          serviceAccount: {{ include "soperator-activechecks.extensiveCheckJobName" . }}
+          serviceAccountName: {{ include "soperator-activechecks.extensiveCheckJobName" . }}
           schedulerName: default-scheduler
           terminationGracePeriodSeconds: 30
           volumes:
@@ -127,14 +128,14 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: run-extensive-check-on-reservations
-  namespace: soperator
+  name: {{ include "soperator-activechecks.extensiveCheckJobName" . }}
+  namespace: {{ .Release.Namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: run-extensive-check-on-reservations
-  namespace: soperator
+  name: {{ include "soperator-activechecks.extensiveCheckJobName" . }}
+  namespace: {{ .Release.Namespace }}
 rules:
 - apiGroups:
   - batch
@@ -155,13 +156,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: run-extensive-check-on-reservations
-  namespace: soperator
+  name: {{ include "soperator-activechecks.extensiveCheckJobName" . }}
+  namespace: {{ .Release.Namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: run-extensive-check-on-reservations
+  name: {{ include "soperator-activechecks.extensiveCheckJobName" . }}
 subjects:
 - kind: ServiceAccount
-  name: run-extensive-check-on-reservations
-  namespace: soperator
+  name: {{ include "soperator-activechecks.extensiveCheckJobName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}

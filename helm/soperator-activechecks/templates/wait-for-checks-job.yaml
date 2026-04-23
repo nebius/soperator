@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: wait-for-active-checks
+  name: {{ printf "%s-wait-for-active-checks" .Values.slurmClusterRefName | trunc 63 | trimSuffix "-" }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-delete-policy": hook-succeeded,hook-failed,before-hook-creation
@@ -9,7 +9,7 @@ spec:
   template:
     spec:
       restartPolicy: Never
-      serviceAccountName: activecheck-waiter
+      serviceAccountName: {{ include "soperator-activechecks.waitForChecksName" . }}
       containers:
         - name: wait-for-active-checks
           image: alpine/k8s:1.31.11
@@ -23,11 +23,12 @@ spec:
 
               NAMESPACE="{{ .Release.Namespace }}"
               CRD_KIND="activechecks.slurm.nebius.ai"
+              SLURM_CLUSTER_REF_NAME="{{ .Values.slurmClusterRefName }}"
 
               echo "Fetching ActiveCheck list..."
               # Only wait for checks that run on creation and ignore flappy comment-only checks.
               active_check_names=$(kubectl get "$CRD_KIND" -n "$NAMESPACE" -o json \
-                | jq -r '.items[] | select(.spec.runAfterCreation == true and .spec.failureReactions.commentSlurmNode == null) | .metadata.name')
+                | jq -r --arg cluster "$SLURM_CLUSTER_REF_NAME" '.items[] | select(.spec.runAfterCreation == true and .spec.failureReactions.commentSlurmNode == null and .spec.slurmClusterRefName == $cluster) | .metadata.name')
 
               if [ -z "$active_check_names" ]; then
                 echo "No CRs with runAfterCreation=true found. Exiting."

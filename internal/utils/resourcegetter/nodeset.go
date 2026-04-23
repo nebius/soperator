@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 )
 
@@ -28,7 +29,11 @@ func ListNodeSetsByClusterRef(ctx context.Context, r client.Reader, clusterRef t
 
 	return slices.SortedFunc(
 		sliceutils.FilterSliceSeq(nodeSetList.Items, func(nodeSet slurmv1alpha1.NodeSet) bool {
-			return nodeSet.Spec.ClusterName == clusterRef.Name
+			if nodeSet.Spec.ClusterName != "" {
+				return nodeSet.Spec.ClusterName == clusterRef.Name
+			}
+			// Fallback for NodeSets not yet migrated by the nodesetcontroller.
+			return nodeSet.GetAnnotations()[consts.AnnotationParentalClusterRefName] == clusterRef.Name
 		}),
 		func(a, b slurmv1alpha1.NodeSet) int {
 			return strings.Compare(a.Name, b.Name)

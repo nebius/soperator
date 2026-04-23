@@ -102,7 +102,7 @@ func (r *ActiveCheckPrologReconciler) Reconcile(
 	}
 	resourceName := resourcegetter.BuildPrefixedName(namePrefix, consts.ConfigMapNameActiveCheckPrologScript)
 
-	if err := r.updatePrologConfigMap(ctx, req.Namespace, resourceName, r.getPrologScript()); err != nil {
+	if err := r.updatePrologConfigMap(ctx, req.Namespace, req.Name, resourceName, r.getPrologScript()); err != nil {
 		logger.Error(err, "Failed to update ConfigMap with active check prolog script")
 		return DefaultRequeueResult, nil
 	}
@@ -111,7 +111,7 @@ func (r *ActiveCheckPrologReconciler) Reconcile(
 	return DefaultRequeueResult, nil
 }
 
-func (r *ActiveCheckPrologReconciler) updatePrologConfigMap(ctx context.Context, namespace, resourceName, config string) error {
+func (r *ActiveCheckPrologReconciler) updatePrologConfigMap(ctx context.Context, namespace, clusterName, resourceName, config string) error {
 	configMap := &corev1.ConfigMap{
 		TypeMeta: ctrl.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.Version,
@@ -141,6 +141,9 @@ func (r *ActiveCheckPrologReconciler) updatePrologConfigMap(ctx context.Context,
 		ObjectMeta: ctrl.ObjectMeta{
 			Name:      resourceName,
 			Namespace: namespace,
+			Labels: map[string]string{
+				consts.LabelInstanceKey: clusterName,
+			},
 		},
 		Spec: v1alpha1.JailedConfigSpec{
 			ConfigMap: v1alpha1.ConfigMapReference{

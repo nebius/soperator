@@ -7,6 +7,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
 )
 
 type SlurmExporter struct {
@@ -51,10 +52,7 @@ func buildSlurmExporterFrom(namePrefix string, maintenance *consts.MaintenanceMo
 		enabled = *exporter.Enabled
 	}
 
-	deploymentName := "slurm-exporter"
-	if namePrefix != "" {
-		deploymentName = namePrefix + "-" + deploymentName
-	}
+	deploymentName := resourcegetter.BuildPrefixedName(namePrefix, "slurm-exporter")
 
 	return SlurmExporter{
 		SlurmNode:         *exporter.SlurmNode.DeepCopy(),
