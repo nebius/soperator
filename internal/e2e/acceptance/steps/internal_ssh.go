@@ -14,12 +14,13 @@ const sshUserName = "bob"
 
 type InternalSSH struct {
 	exec         framework.Exec
-	targetWorker framework.WorkerRef
+	slurm        *framework.SlurmClient
+	targetWorker string
 	sshOutput    string
 }
 
-func NewInternalSSH(exec framework.Exec) *InternalSSH {
-	return &InternalSSH{exec: exec}
+func NewInternalSSH(exec framework.Exec, slurm *framework.SlurmClient) *InternalSSH {
+	return &InternalSSH{exec: exec, slurm: slurm}
 }
 
 func (s *InternalSSH) Register(sc *godog.ScenarioContext) {
@@ -29,15 +30,15 @@ func (s *InternalSSH) Register(sc *godog.ScenarioContext) {
 }
 
 func (s *InternalSSH) aRegularUserAccountExistsOnTheLoginNode(ctx context.Context) error {
-	worker, err := s.exec.AnyWorker()
+	workers, err := s.slurm.AnyWorkers(1)
 	if err != nil {
 		return err
 	}
-	s.targetWorker = worker
+	s.targetWorker = workers[0]
 
 	cmd := fmt.Sprintf("id %s >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh %s",
 		framework.ShellQuote(sshUserName), framework.ShellQuote(sshUserName))
-	if _, err := s.exec.ExecJail(ctx, cmd); err != nil {
+	if _, err := s.exec.Jail().Run(ctx, cmd); err != nil {
 		return fmt.Errorf("create user %s: %w", sshUserName, err)
 	}
 
@@ -45,7 +46,7 @@ func (s *InternalSSH) aRegularUserAccountExistsOnTheLoginNode(ctx context.Contex
 }
 
 func (s *InternalSSH) theUserSSHsFromTheLoginNodeToAWorker(ctx context.Context) error {
-	worker := framework.ShellQuote(s.targetWorker.Name)
+	worker := framework.ShellQuote(s.targetWorker)
 	// Remove the worker key before each SSH attempt so retries don't depend on
 	// persisted known_hosts state from previous attempts.
 	cmd := fmt.Sprintf("su - %s -c %s",
@@ -56,7 +57,7 @@ func (s *InternalSSH) theUserSSHsFromTheLoginNodeToAWorker(ctx context.Context) 
 			worker,
 		)),
 	)
-	out, err := framework.ExecJailWithDefaultRetry(ctx, s.exec, cmd)
+	out, err := s.exec.Jail().RunWithDefaultRetry(ctx, cmd)
 	if err != nil {
 		return fmt.Errorf("ssh from login to worker as %s: %w", sshUserName, err)
 	}
@@ -65,9 +66,9 @@ func (s *InternalSSH) theUserSSHsFromTheLoginNodeToAWorker(ctx context.Context) 
 }
 
 func (s *InternalSSH) theConnectionSucceedsWithoutExtraSSHOptions() error {
-	if !strings.Contains(s.sshOutput, s.targetWorker.Name) {
+	if !strings.Contains(s.sshOutput, s.targetWorker) {
 		return fmt.Errorf("unexpected ssh output %q, expected hostname %q",
-			strings.TrimSpace(s.sshOutput), s.targetWorker.Name)
+			strings.TrimSpace(s.sshOutput), s.targetWorker)
 	}
 	return nil
 }

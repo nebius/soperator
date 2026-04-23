@@ -15,8 +15,7 @@ import (
 const (
 	dockerContainersFeatureFile = "docker_containers.feature"
 
-	dockerImage = "cr.eu-north1.nebius.cloud/soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-3935b93"
-	dockerARP   = "NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring all_reduce_perf -b 8G -e 8G -f 2 -g 8 -N 0"
+	dockerARP = "NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring all_reduce_perf -b 8G -e 8G -f 2 -g 8 -N 0"
 
 	dockerJobStartTimeout      = 20 * time.Minute
 	dockerProbeTimeout         = 10 * time.Minute
@@ -26,14 +25,19 @@ const (
 
 type DockerContainers struct {
 	exec    framework.Exec
+	slurm   *framework.SlurmClient
 	workers []string
 	jobID   string
 
 	containerNamePrefix string
+	connectionWorker    string
 }
 
-func NewDockerContainers(exec framework.Exec) *DockerContainers {
-	return &DockerContainers{exec: exec}
+func NewDockerContainers(exec framework.Exec, slurm *framework.SlurmClient) *DockerContainers {
+	return &DockerContainers{
+		exec:  exec,
+		slurm: slurm,
+	}
 }
 
 func (s *DockerContainers) Register(sc *godog.ScenarioContext) {
@@ -42,10 +46,8 @@ func (s *DockerContainers) Register(sc *godog.ScenarioContext) {
 			return ctx, nil
 		}
 
-		if s.jobID != "" {
-			if cleanupErr := s.cancelJob(context.Background()); cleanupErr != nil {
-				s.exec.Logf("cleanup: cancel docker job: %v", cleanupErr)
-			}
+		if cleanupErr := s.cancelCurrentJob(context.Background()); cleanupErr != nil {
+			s.exec.Logf("cleanup: cancel docker job: %v", cleanupErr)
 		}
 		s.stopContainersByNamePrefix(context.Background())
 		return ctx, nil
@@ -61,15 +63,21 @@ func (s *DockerContainers) Register(sc *godog.ScenarioContext) {
 }
 
 func (s *DockerContainers) aLongRunningDockerNCCLJobIsSubmittedOnTwoGPUWorkers(ctx context.Context) error {
-	workers, err := selectGPUWorkers(ctx, s.exec, 2)
+	workers, err := s.slurm.AnyGPUWorkers(2)
 	if err != nil {
 		return err
 	}
 	s.workers = workers
+	s.connectionWorker = s.workers[0]
 
-	nodelist := strings.Join(workers, ",")
+	image, err := framework.RequiredEnv("E2E_DOCKER_IMAGE")
+	if err != nil {
+		return err
+	}
+
+	nodelist := strings.Join(s.workers, ",")
 	wrap := fmt.Sprintf("srun docker run --rm --name e2e-docker-${SLURM_JOB_ID}-${SLURM_NODEID} --gpus=all --device=/dev/infiniband %s bash -lc %s",
-		framework.ShellQuote(dockerImage),
+		framework.ShellQuote(image),
 		framework.ShellQuote(dockerARP),
 	)
 	submit := fmt.Sprintf(
@@ -78,11 +86,11 @@ func (s *DockerContainers) aLongRunningDockerNCCLJobIsSubmittedOnTwoGPUWorkers(c
 		framework.ShellQuote(wrap),
 	)
 
-	out, err := s.exec.ExecJail(ctx, submit)
+	out, err := s.exec.Jail().Run(ctx, submit)
 	if err != nil {
 		return fmt.Errorf("submit Docker NCCL job: %w", err)
 	}
-	jobID, err := parseSbatchJobID(out)
+	jobID, err := framework.ParseSbatchJobID(out)
 	if err != nil {
 		return fmt.Errorf("parse Docker job id: %w", err)
 	}
@@ -96,7 +104,7 @@ func (s *DockerContainers) theDockerNCCLJobIsRunning(ctx context.Context) error 
 	if s.jobID == "" {
 		return fmt.Errorf("docker job id is empty")
 	}
-	return waitForJobRunning(ctx, s.exec, s.jobID, dockerJobStartTimeout)
+	return s.slurm.WaitForJobRunning(ctx, s.jobID, dockerJobStartTimeout)
 }
 
 func (s *DockerContainers) dockerOverlayfsStorageIsPopulatedOnAWorker(ctx context.Context) error {
@@ -104,11 +112,13 @@ func (s *DockerContainers) dockerOverlayfsStorageIsPopulatedOnAWorker(ctx contex
 }
 
 func (s *DockerContainers) dockerContainerContentBlobsArePopulatedOnAWorker(ctx context.Context) error {
+	// This scenario checks storage population/cleanup only.
+	// It does not currently assert strict blob-by-blob identity across repeated runs.
 	return s.waitForTreeEntriesOnWorker(ctx, "/mnt/image-storage/docker/containerd/daemon/io.containerd.content.v1.content/blobs/sha256/", "docker container content blobs")
 }
 
 func (s *DockerContainers) aDockerContainerFromTheJobIsRunningOnWorkers(ctx context.Context) error {
-	return s.exec.WaitFor(ctx, "docker containers running on selected workers", dockerProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.exec.WaitFor(ctx, "docker containers running on selected workers", dockerProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
 			currentIDs, err := s.dockerContainerIDsByNamePrefix(waitCtx, worker)
 			if err != nil {
@@ -123,10 +133,9 @@ func (s *DockerContainers) aDockerContainerFromTheJobIsRunningOnWorkers(ctx cont
 }
 
 func (s *DockerContainers) theDockerNCCLJobIsCancelled(ctx context.Context) error {
-	if err := s.cancelJob(ctx); err != nil {
+	if err := s.cancelCurrentJob(ctx); err != nil {
 		return err
 	}
-	s.jobID = ""
 	return nil
 }
 
@@ -138,7 +147,7 @@ func (s *DockerContainers) dockerContainersFromThatJobAreNoLongerRunning(ctx con
 }
 
 func (s *DockerContainers) waitForTrackedContainersGone(ctx context.Context, timeout time.Duration) error {
-	return s.exec.WaitFor(ctx, "docker containers stopped on selected workers", timeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.exec.WaitFor(ctx, "docker containers stopped on selected workers", timeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
 			currentIDs, err := s.dockerContainerIDsByNamePrefix(waitCtx, worker)
 			if err != nil {
@@ -156,25 +165,29 @@ func (s *DockerContainers) waitForTreeEntriesOnWorker(ctx context.Context, stora
 	if len(s.workers) == 0 {
 		return fmt.Errorf("docker workers are not selected")
 	}
-	worker := s.workers[0]
+	if s.connectionWorker == "" {
+		return fmt.Errorf("docker connection worker is not selected")
+	}
+	worker := s.connectionWorker
 
-	return s.exec.WaitFor(ctx, description, dockerProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
-		out, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, fmt.Sprintf("sudo tree -L 2 -a %s", framework.ShellQuote(storagePath)))
+	return s.exec.WaitFor(ctx, description, dockerProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+		out, err := s.exec.Worker(worker).RunWithDefaultRetry(waitCtx, fmt.Sprintf("sudo tree -L 2 -a %s", framework.ShellQuote(storagePath)))
 		if err != nil {
 			return false, err
 		}
-		return treeOutputHasEntries(out), nil
+		return framework.TreeOutputHasEntries(out), nil
 	})
 }
 
-func (s *DockerContainers) cancelJob(ctx context.Context) error {
+func (s *DockerContainers) cancelCurrentJob(ctx context.Context) error {
 	if s.jobID == "" {
 		return nil
 	}
 
-	if err := cancelSlurmJob(ctx, s.exec, s.jobID, dockerJobCancelTimeout); err != nil {
+	if err := s.slurm.CancelJob(ctx, s.jobID, dockerJobCancelTimeout); err != nil {
 		return fmt.Errorf("cancel Docker job %s: %w", s.jobID, err)
 	}
+	s.jobID = ""
 	return nil
 }
 
@@ -183,7 +196,7 @@ func (s *DockerContainers) dockerContainerIDsByNamePrefix(ctx context.Context, w
 		return nil, fmt.Errorf("docker container name prefix is empty")
 	}
 
-	out, err := runWorkerCommandWithDefaultRetry(ctx, s.exec, worker,
+	out, err := s.exec.Worker(worker).RunWithDefaultRetry(ctx,
 		fmt.Sprintf("sudo docker ps --filter name=%s --format '{{.ID}}'", framework.ShellQuote(s.containerNamePrefix)))
 	if err != nil {
 		return nil, err
@@ -209,13 +222,13 @@ func (s *DockerContainers) stopContainersByNamePrefix(ctx context.Context) {
 	}
 
 	for _, worker := range s.workers {
-		out, err := runWorkerCommandWithDefaultRetry(ctx, s.exec, worker,
+		out, err := s.exec.Worker(worker).RunWithDefaultRetry(ctx,
 			fmt.Sprintf("sudo docker ps --filter name=%s --format '{{.ID}}'", framework.ShellQuote(s.containerNamePrefix)))
 		if err != nil {
 			continue
 		}
 		for id := range parseIDSet(out) {
-			_, _ = runWorkerCommand(ctx, s.exec, worker, fmt.Sprintf("sudo docker stop %s >/dev/null 2>&1 || true", framework.ShellQuote(id)))
+			_, _ = s.exec.Worker(worker).Run(ctx, fmt.Sprintf("sudo docker stop %s >/dev/null 2>&1 || true", framework.ShellQuote(id)))
 		}
 	}
 }

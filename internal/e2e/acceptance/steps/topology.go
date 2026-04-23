@@ -56,7 +56,7 @@ func (s *Topology) Register(sc *godog.ScenarioContext) {
 }
 
 func (s *Topology) theSlurmTopologyPluginIsTree(ctx context.Context) error {
-	out, err := framework.ExecControllerWithDefaultRetry(ctx, s.exec,
+	out, err := s.exec.Controller().RunWithDefaultRetry(ctx,
 		`scontrol show config | awk -F'= *' '/^TopologyPlugin /{print $2; exit}'`)
 	if err != nil {
 		return fmt.Errorf("read TopologyPlugin from scontrol: %w", err)
@@ -70,7 +70,7 @@ func (s *Topology) theSlurmTopologyPluginIsTree(ctx context.Context) error {
 }
 
 func (s *Topology) scontrolTopologyIsParsedIntoASwitchTree(ctx context.Context) error {
-	raw, err := framework.ExecControllerWithDefaultRetry(ctx, s.exec, "scontrol show topology")
+	raw, err := s.exec.Controller().RunWithDefaultRetry(ctx, "scontrol show topology")
 	if err != nil {
 		return fmt.Errorf("scontrol show topology: %w", err)
 	}
@@ -83,7 +83,7 @@ func (s *Topology) scontrolTopologyIsParsedIntoASwitchTree(ctx context.Context) 
 
 	expand := func(hostlist string) ([]string, error) {
 		cmd := fmt.Sprintf("scontrol show hostnames %s", framework.ShellQuote(hostlist))
-		out, err := framework.ExecControllerWithDefaultRetry(ctx, s.exec, cmd)
+		out, err := s.exec.Controller().RunWithDefaultRetry(ctx, cmd)
 		if err != nil {
 			return nil, err
 		}
@@ -145,7 +145,7 @@ func (s *Topology) aJobRunsOnAllAvailableWorkers(ctx context.Context) error {
 		len(names),
 		framework.ShellQuote(strings.Join(names, ",")),
 		framework.ShellQuote(inner))
-	out, err := s.exec.ExecJail(ctx, cmd)
+	out, err := s.exec.Jail().Run(ctx, cmd)
 	s.exec.Logf("srun topology addrs output:\n%s", strings.TrimSpace(out))
 	if err != nil {
 		return fmt.Errorf("srun for topology addrs: %w", err)

@@ -16,7 +16,6 @@ import (
 const (
 	enrootContainersFeatureFile = "enroot_containers.feature"
 
-	enrootDockerImage   = "docker://cr.eu-north1.nebius.cloud#soperator/active_checks:12.9.0-ubuntu24.04-nccl_tests2.16.4-3935b93"
 	enrootDockerMount   = "/usr/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu,/usr/lib64:/usr/lib64"
 	enrootARP           = "NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring all_reduce_perf -b 8G -e 8G -f 2 -g 8 -N 0"
 	enrootNamedJobName  = "kek"
@@ -30,27 +29,28 @@ const (
 )
 
 type EnrootContainers struct {
-	exec framework.Exec
+	exec  framework.Exec
+	slurm *framework.SlurmClient
 
-	workers []string
-	jobID   string
+	workers          []string
+	connectionWorker string
+	jobID            string
 
 	squashPath       string
 	squashStatBefore string
-	failureLogged    bool
 }
 
-func NewEnrootContainers(exec framework.Exec) *EnrootContainers {
-	return &EnrootContainers{exec: exec}
+func NewEnrootContainers(exec framework.Exec, slurm *framework.SlurmClient) *EnrootContainers {
+	return &EnrootContainers{
+		exec:  exec,
+		slurm: slurm,
+	}
 }
 
 func (s *EnrootContainers) Register(sc *godog.ScenarioContext) {
 	sc.After(func(ctx context.Context, scenario *godog.Scenario, err error) (context.Context, error) {
 		if path.Base(scenario.Uri) != enrootContainersFeatureFile {
 			return ctx, nil
-		}
-		if err != nil {
-			s.logEnrootJobFailureMessages(context.Background(), "scenario failed")
 		}
 
 		if cleanupErr := s.cancelCurrentJob(context.Background()); cleanupErr != nil {
@@ -86,7 +86,7 @@ func (s *EnrootContainers) theEnrootNCCLJobIsRunning(ctx context.Context) error 
 	if s.jobID == "" {
 		return fmt.Errorf("enroot job id is empty")
 	}
-	return waitForJobRunning(ctx, s.exec, s.jobID, enrootJobStartTimeout)
+	return s.slurm.WaitForJobRunning(ctx, s.jobID, enrootJobStartTimeout)
 }
 
 func (s *EnrootContainers) enrootCacheIsPopulatedOnLocalStorageOnAWorker(ctx context.Context) error {
@@ -94,13 +94,12 @@ func (s *EnrootContainers) enrootCacheIsPopulatedOnLocalStorageOnAWorker(ctx con
 }
 
 func (s *EnrootContainers) enrootSquashfsImageIsPresentOnAWorker(ctx context.Context) error {
-	worker := s.firstWorker()
-	if worker == "" {
-		return fmt.Errorf("enroot workers are not selected")
+	if s.connectionWorker == "" {
+		return fmt.Errorf("enroot connection worker is not selected")
 	}
 
-	if err := s.exec.WaitFor(ctx, "enroot squashfs image present", enrootProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
-		findOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker,
+	if err := s.exec.WaitFor(ctx, "enroot squashfs image present", enrootProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+		findOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx,
 			fmt.Sprintf("sudo find %s -type f -name '*%s' 2>/dev/null | sort", framework.ShellQuote(enrootSquashRoot), enrootSquashPattern))
 		if err != nil {
 			return false, err
@@ -113,24 +112,22 @@ func (s *EnrootContainers) enrootSquashfsImageIsPresentOnAWorker(ctx context.Con
 		s.exec.Logf("enroot containers: tracked squashfs path=%s", squashPath)
 		return true, nil
 	}); err != nil {
-		s.logEnrootJobFailureMessages(ctx, "squashfs artifact not found")
 		return err
 	}
 	return nil
 }
 
 func (s *EnrootContainers) enrootRuntimeContainerDataIsVisibleWhileTheJobIsRunning(ctx context.Context) error {
-	worker := s.firstWorker()
-	if worker == "" {
-		return fmt.Errorf("enroot workers are not selected")
+	if s.connectionWorker == "" {
+		return fmt.Errorf("enroot connection worker is not selected")
 	}
 
-	return s.exec.WaitFor(ctx, "enroot runtime container visible", enrootProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
-		listOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, "sudo enroot list || true")
+	return s.exec.WaitFor(ctx, "enroot runtime container visible", enrootProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+		listOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo enroot list || true")
 		if err != nil {
 			return false, err
 		}
-		treeOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+		treeOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
 		if err != nil {
 			return false, err
 		}
@@ -152,24 +149,22 @@ func (s *EnrootContainers) enrootRuntimeDataIsCleanedUpAndSquashfsCacheRemains(c
 	if s.squashPath == "" {
 		return fmt.Errorf("squashfs path is not captured")
 	}
-
-	worker := s.firstWorker()
-	if worker == "" {
-		return fmt.Errorf("enroot workers are not selected")
+	if s.connectionWorker == "" {
+		return fmt.Errorf("enroot connection worker is not selected")
 	}
 
-	err := s.exec.WaitFor(ctx, "enroot runtime data cleaned and squashfs cache remains", enrootProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
-		treeOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+	err := s.exec.WaitFor(ctx, "enroot runtime data cleaned and squashfs cache remains", enrootProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+		treeOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
 		if err != nil {
 			return false, err
 		}
 		if strings.Contains(treeOutput, "pyxis_") {
 			return false, nil
 		}
-		if _, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, fmt.Sprintf("sudo test -f %s", framework.ShellQuote(s.squashPath))); err != nil {
+		if _, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, fmt.Sprintf("sudo test -f %s", framework.ShellQuote(s.squashPath))); err != nil {
 			return false, err
 		}
-		statOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, fmt.Sprintf("sudo stat -c '%%Y:%%s' %s", framework.ShellQuote(s.squashPath)))
+		statOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, fmt.Sprintf("sudo stat -c '%%Y:%%s' %s", framework.ShellQuote(s.squashPath)))
 		if err != nil {
 			return false, err
 		}
@@ -190,7 +185,7 @@ func (s *EnrootContainers) theSameEnrootNCCLJobIsSubmittedAgain(ctx context.Cont
 	if err := s.submitEnrootJob(ctx, "", "e2e-enroot-repeated"); err != nil {
 		return err
 	}
-	return waitForJobRunning(ctx, s.exec, s.jobID, enrootJobStartTimeout)
+	return s.slurm.WaitForJobRunning(ctx, s.jobID, enrootJobStartTimeout)
 }
 
 func (s *EnrootContainers) enrootRuntimeDataIsRepopulatedWithoutChangingTheSquashfsArtifact(ctx context.Context) error {
@@ -200,14 +195,14 @@ func (s *EnrootContainers) enrootRuntimeDataIsRepopulatedWithoutChangingTheSquas
 	if s.squashStatBefore == "" {
 		return fmt.Errorf("baseline squashfs stat is not captured")
 	}
-
-	worker := s.firstWorker()
-	if worker == "" {
-		return fmt.Errorf("enroot workers are not selected")
+	if s.connectionWorker == "" {
+		return fmt.Errorf("enroot connection worker is not selected")
 	}
 
-	return s.exec.WaitFor(ctx, "enroot data repopulated from cache", enrootProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
-		treeOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+	return s.exec.WaitFor(ctx, "enroot data repopulated from cache", enrootProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+		// We validate cache reuse by checking the tracked squashfs stat is unchanged
+		// while runtime data is recreated. We do not compare full directory trees.
+		treeOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
 		if err != nil {
 			return false, err
 		}
@@ -215,7 +210,7 @@ func (s *EnrootContainers) enrootRuntimeDataIsRepopulatedWithoutChangingTheSquas
 			return false, nil
 		}
 
-		statOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, fmt.Sprintf("sudo stat -c '%%Y:%%s' %s", framework.ShellQuote(s.squashPath)))
+		statOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, fmt.Sprintf("sudo stat -c '%%Y:%%s' %s", framework.ShellQuote(s.squashPath)))
 		if err != nil {
 			return false, err
 		}
@@ -231,13 +226,13 @@ func (s *EnrootContainers) aNamedEnrootContainerJobIsSubmitted(ctx context.Conte
 	if err := s.submitEnrootJob(ctx, enrootNamedJobName, "e2e-enroot-named"); err != nil {
 		return err
 	}
-	if err := waitForJobRunning(ctx, s.exec, s.jobID, enrootJobStartTimeout); err != nil {
+	if err := s.slurm.WaitForJobRunning(ctx, s.jobID, enrootJobStartTimeout); err != nil {
 		return err
 	}
 	namedDir := namedEnrootDir(enrootNamedJobName)
-	if err := s.exec.WaitFor(ctx, "named enroot runtime directory created", enrootProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
+	if err := s.exec.WaitFor(ctx, "named enroot runtime directory created", enrootProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
-			treeOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+			treeOutput, err := s.exec.Worker(worker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
 			if err != nil {
 				return false, err
 			}
@@ -255,9 +250,9 @@ func (s *EnrootContainers) aNamedEnrootContainerJobIsSubmitted(ctx context.Conte
 func (s *EnrootContainers) theNamedEnrootRuntimeDirectoryRemainsAfterCancellation(ctx context.Context) error {
 	namedDir := namedEnrootDir(enrootNamedJobName)
 
-	return s.exec.WaitFor(ctx, "named enroot runtime directory remains", enrootProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.exec.WaitFor(ctx, "named enroot runtime directory remains", enrootProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
-			treeOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+			treeOutput, err := s.exec.Worker(worker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
 			if err != nil {
 				return false, err
 			}
@@ -280,22 +275,22 @@ func (s *EnrootContainers) theNamedEnrootRuntimeDirectoryIsCleanedUp(ctx context
 		framework.ShellQuote(strings.Join(s.workers, ",")),
 		framework.ShellQuote(cleanupWrap),
 	)
-	out, err := s.exec.ExecJail(ctx, submitCmd)
+	out, err := s.exec.Jail().Run(ctx, submitCmd)
 	if err != nil {
 		return fmt.Errorf("submit named enroot cleanup job: %w", err)
 	}
-	cleanupJobID, err := parseSbatchJobID(out)
+	cleanupJobID, err := framework.ParseSbatchJobID(out)
 	if err != nil {
 		return fmt.Errorf("parse named enroot cleanup job id: %w", err)
 	}
-	return waitForJobGone(ctx, s.exec, cleanupJobID, enrootStopTimeout)
+	return s.slurm.WaitForJobGone(ctx, cleanupJobID, enrootStopTimeout)
 }
 
 func (s *EnrootContainers) theNamedEnrootRuntimeDirectoryIsRemoved(ctx context.Context) error {
 	namedDir := namedEnrootDir(enrootNamedJobName)
-	return s.exec.WaitFor(ctx, "named enroot runtime directory removed", enrootProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.exec.WaitFor(ctx, "named enroot runtime directory removed", enrootProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
-			treeOutput, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+			treeOutput, err := s.exec.Worker(worker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
 			if err != nil {
 				return false, err
 			}
@@ -309,22 +304,30 @@ func (s *EnrootContainers) theNamedEnrootRuntimeDirectoryIsRemoved(ctx context.C
 
 func (s *EnrootContainers) submitEnrootJob(ctx context.Context, containerName, jobName string) error {
 	if len(s.workers) == 0 {
-		workers, err := selectGPUWorkers(ctx, s.exec, 2)
+		workers, err := s.slurm.AnyGPUWorkers(2)
 		if err != nil {
 			return err
 		}
 		s.workers = workers
-		s.exec.Logf("enroot containers: selected workers=%s", strings.Join(workers, ","))
+		s.connectionWorker = s.workers[0]
+		s.exec.Logf("enroot containers: selected workers=%s", strings.Join(s.workers, ","))
+	} else if s.connectionWorker == "" {
+		s.connectionWorker = s.workers[0]
+	}
+
+	image, err := framework.RequiredEnv("E2E_ENROOT_IMAGE")
+	if err != nil {
+		return err
 	}
 
 	wrap := fmt.Sprintf("srun --mpi=pmix --container-image=%s --container-mounts=%s %s",
-		framework.ShellQuote(enrootDockerImage),
+		framework.ShellQuote(image),
 		framework.ShellQuote(enrootDockerMount),
 		enrootARP,
 	)
 	if containerName != "" {
 		wrap = fmt.Sprintf("srun --mpi=pmix --container-image=%s --container-name=%s --container-mounts=%s %s",
-			framework.ShellQuote(enrootDockerImage),
+			framework.ShellQuote(image),
 			framework.ShellQuote(containerName),
 			framework.ShellQuote(enrootDockerMount),
 			enrootARP,
@@ -338,16 +341,15 @@ func (s *EnrootContainers) submitEnrootJob(ctx context.Context, containerName, j
 		framework.ShellQuote(jobName),
 		framework.ShellQuote(wrap),
 	)
-	out, err := s.exec.ExecJail(ctx, submit)
+	out, err := s.exec.Jail().Run(ctx, submit)
 	if err != nil {
 		return fmt.Errorf("submit enroot job %q: %w", jobName, err)
 	}
-	jobID, err := parseSbatchJobID(out)
+	jobID, err := framework.ParseSbatchJobID(out)
 	if err != nil {
 		return fmt.Errorf("parse enroot job id for %q: %w", jobName, err)
 	}
 	s.jobID = jobID
-	s.failureLogged = false
 	s.exec.Logf("enroot containers: submitted job=%s id=%s", jobName, jobID)
 	return nil
 }
@@ -358,7 +360,7 @@ func (s *EnrootContainers) cancelCurrentJob(ctx context.Context) error {
 	}
 
 	jobID := s.jobID
-	if err := cancelSlurmJob(ctx, s.exec, jobID, enrootStopTimeout); err != nil {
+	if err := s.slurm.CancelJob(ctx, jobID, enrootStopTimeout); err != nil {
 		return fmt.Errorf("cancel enroot job %s: %w", jobID, err)
 	}
 	s.jobID = ""
@@ -366,25 +368,17 @@ func (s *EnrootContainers) cancelCurrentJob(ctx context.Context) error {
 }
 
 func (s *EnrootContainers) waitForTreeEntriesOnWorker(ctx context.Context, storagePath, description string) error {
-	worker := s.firstWorker()
-	if worker == "" {
-		return fmt.Errorf("enroot workers are not selected")
+	if s.connectionWorker == "" {
+		return fmt.Errorf("enroot connection worker is not selected")
 	}
 
-	return s.exec.WaitFor(ctx, description, enrootProbeTimeout, containerPollInterval, func(waitCtx context.Context) (bool, error) {
-		out, err := runWorkerCommandWithDefaultRetry(waitCtx, s.exec, worker, fmt.Sprintf("sudo tree -L 2 -a %s", framework.ShellQuote(storagePath)))
+	return s.exec.WaitFor(ctx, description, enrootProbeTimeout, framework.SlurmPollInterval, func(waitCtx context.Context) (bool, error) {
+		out, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, fmt.Sprintf("sudo tree -L 2 -a %s", framework.ShellQuote(storagePath)))
 		if err != nil {
 			return false, err
 		}
-		return treeOutputHasEntries(out), nil
+		return framework.TreeOutputHasEntries(out), nil
 	})
-}
-
-func (s *EnrootContainers) firstWorker() string {
-	if len(s.workers) == 0 {
-		return ""
-	}
-	return s.workers[0]
 }
 
 func (s *EnrootContainers) removeNamedRuntimeDir(ctx context.Context) error {
@@ -393,7 +387,7 @@ func (s *EnrootContainers) removeNamedRuntimeDir(ctx context.Context) error {
 	}
 	var failures []string
 	for _, worker := range s.workers {
-		_, err := runWorkerCommand(ctx, s.exec, worker, fmt.Sprintf("sudo rm -rf %s", framework.ShellQuote(namedEnrootDirPath(enrootNamedJobName))))
+		_, err := s.exec.Worker(worker).Run(ctx, fmt.Sprintf("sudo rm -rf %s", framework.ShellQuote(namedEnrootDirPath(enrootNamedJobName))))
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", worker, err))
 		}
@@ -427,79 +421,4 @@ func namedEnrootDir(containerName string) string {
 
 func namedEnrootDirPath(containerName string) string {
 	return "/mnt/image-storage/enroot/data/" + namedEnrootDir(containerName)
-}
-
-func (s *EnrootContainers) logEnrootJobFailureMessages(ctx context.Context, reason string) {
-	if s.failureLogged {
-		return
-	}
-	s.failureLogged = true
-
-	if s.jobID == "" {
-		s.exec.Logf("enroot job failed: reason=%s job_id is empty", reason)
-		return
-	}
-
-	scontrolOutput, err := framework.ExecJailWithDefaultRetry(ctx, s.exec, fmt.Sprintf("scontrol show job %s || true", framework.ShellQuote(s.jobID)))
-	if err != nil {
-		s.exec.Logf("enroot job failed: reason=%s job_id=%s scontrol error=%v", reason, s.jobID, err)
-		return
-	}
-
-	jobState := scontrolField(scontrolOutput, "JobState")
-	jobReason := scontrolField(scontrolOutput, "Reason")
-	exitCode := scontrolField(scontrolOutput, "ExitCode")
-	batchHost := scontrolField(scontrolOutput, "BatchHost")
-	stdoutPath := scontrolField(scontrolOutput, "StdOut")
-	if stdoutPath == "" {
-		stdoutPath = fmt.Sprintf("/slurm-%s.out", s.jobID)
-	}
-
-	s.exec.Logf("enroot job failure: reason=%s job_id=%s state=%s reason_code=%s exit_code=%s batch_host=%s stdout=%s",
-		reason, s.jobID, jobState, jobReason, exitCode, batchHost, stdoutPath)
-
-	s.logEnrootJailCommandOutput(ctx, "enroot debug scontrol show job",
-		fmt.Sprintf("scontrol show job %s || true", framework.ShellQuote(s.jobID)))
-	s.logEnrootJailCommandOutput(ctx, "enroot debug sacct summary",
-		fmt.Sprintf("sacct -j %s --format=JobID,JobName,NodeList,State,ExitCode,Elapsed -P || true", framework.ShellQuote(s.jobID)))
-
-	if batchHost == "" {
-		return
-	}
-
-	out, err := runWorkerCommandWithDefaultRetry(ctx, s.exec, batchHost,
-		fmt.Sprintf("sudo sh -lc %s", framework.ShellQuote(fmt.Sprintf("tail -n 200 %s 2>/dev/null || echo 'slurm output not found: %s'", framework.ShellQuote(stdoutPath), stdoutPath))))
-	if err != nil {
-		s.exec.Logf("enroot job failure stdout tail on %s failed: %v", batchHost, err)
-		return
-	}
-	s.exec.Logf("enroot job failure stdout tail on %s:\n%s", batchHost, strings.TrimSpace(out))
-}
-
-func (s *EnrootContainers) logEnrootJailCommandOutput(ctx context.Context, label, command string) {
-	output, err := s.exec.ExecJailWithRetry(ctx, command, 2, 5*time.Second)
-	if err != nil {
-		s.exec.Logf("%s failed: %v", label, err)
-		return
-	}
-	s.exec.Logf("%s output:\n%s", label, strings.TrimSpace(output))
-}
-
-func (s *EnrootContainers) logEnrootWorkerCommandOutput(ctx context.Context, worker, label, command string) {
-	output, err := runWorkerCommandWithDefaultRetry(ctx, s.exec, worker, command)
-	if err != nil {
-		s.exec.Logf("%s on %s failed: %v", label, worker, err)
-		return
-	}
-	s.exec.Logf("%s on %s output:\n%s", label, worker, strings.TrimSpace(output))
-}
-
-func scontrolField(output, key string) string {
-	prefix := key + "="
-	for _, token := range strings.Fields(output) {
-		if strings.HasPrefix(token, prefix) {
-			return strings.TrimPrefix(token, prefix)
-		}
-	}
-	return ""
 }
