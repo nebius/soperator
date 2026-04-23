@@ -1439,7 +1439,7 @@
   "preload": false,
   "refresh": "",
   "schemaVersion": 41,
-  "tags": ["nfs"],
+  "tags": ["nebius", "soperator", "nfs"],
   "templating": {
     "list": [
       {

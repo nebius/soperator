@@ -167,6 +167,7 @@ func featurePaths() []string {
 		"features/node_replacement.feature",
 		"features/docker_containers.feature",
 		"features/enroot_containers.feature",
+		"features/topology.feature",
 	}
 }
 
@@ -181,6 +182,7 @@ func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
 	steps.NewNodeReplacement(w).Register(sc)
 	steps.NewDockerContainers(w).Register(sc)
 	steps.NewEnrootContainers(w).Register(sc)
+	steps.NewTopology(r.state, w).Register(sc)
 }
 
 func registerTimingHooks(sc *godog.ScenarioContext) {
