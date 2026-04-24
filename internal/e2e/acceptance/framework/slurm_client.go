@@ -166,6 +166,12 @@ func (s *SlurmClient) WaitForJobGone(ctx context.Context, jobID string, timeout 
 	return s.exec.WaitFor(ctx, fmt.Sprintf("job %s gone from queue", jobID), timeout, DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		status, err := s.exec.Jail().RunWithDefaultRetry(waitCtx, fmt.Sprintf("squeue -h -j %s -o '%%T'", ShellQuote(jobID)))
 		if err != nil {
+			// Some Slurm deployments exit non‑zero with "Invalid job id specified"
+			// once a job has left the active queue. Treat that as "gone" so this
+			// wait doesn't burn its timeout on an already‑finished job.
+			if isMissingJobError(err) {
+				return true, nil
+			}
 			return false, err
 		}
 		return strings.TrimSpace(status) == "", nil
