@@ -5,15 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
-	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/controller/reconciler"
-	"nebius.ai/slurm-operator/internal/controllerconfig"
-	"nebius.ai/slurm-operator/internal/jwt"
-	"nebius.ai/slurm-operator/internal/naming"
-	"nebius.ai/slurm-operator/internal/slurmapi"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,6 +15,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/controller/reconciler"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
+	"nebius.ai/slurm-operator/internal/jwt"
+	"nebius.ai/slurm-operator/internal/naming"
+	"nebius.ai/slurm-operator/internal/slurmapi"
 )
 
 var (
@@ -31,8 +30,7 @@ var (
 type SlurmAPIClientsController struct {
 	*reconciler.Reconciler
 
-	slurmAPIClients          *slurmapi.ClientSet
-	MaintenanceConditionType corev1.NodeConditionType
+	slurmAPIClients *slurmapi.ClientSet
 }
 
 func NewSlurmAPIClientsController(
@@ -40,18 +38,12 @@ func NewSlurmAPIClientsController(
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
 	slurmAPIClients *slurmapi.ClientSet,
-	maintenanceConditionType corev1.NodeConditionType,
 ) *SlurmAPIClientsController {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
-	if maintenanceConditionType == "" {
-		maintenanceConditionType = consts.DefaultMaintenanceConditionType
-	}
-
 	return &SlurmAPIClientsController{
-		Reconciler:               r,
-		slurmAPIClients:          slurmAPIClients,
-		MaintenanceConditionType: maintenanceConditionType,
+		Reconciler:      r,
+		slurmAPIClients: slurmAPIClients,
 	}
 }
 

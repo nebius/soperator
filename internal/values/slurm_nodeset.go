@@ -59,6 +59,8 @@ type SlurmNodeSet struct {
 	EphemeralTopologyWaitTimeout int32
 
 	ActiveNodes []int32
+
+	UpdateStrategy consts.UpdateStrategy
 }
 
 func BuildSlurmNodeSetFrom(
@@ -131,6 +133,8 @@ func BuildSlurmNodeSetFrom(
 		//
 		EphemeralNodes:               nsSpec.EphemeralNodes,
 		EphemeralTopologyWaitTimeout: nsSpec.EphemeralTopologyWaitTimeout,
+		//
+		UpdateStrategy: nsSpec.UpdateStrategy,
 	}
 
 	// region Submounts

@@ -27,6 +27,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -53,8 +55,11 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
 	"nebius.ai/slurm-operator/internal/controller/nodeconfigurator"
 	"nebius.ai/slurm-operator/internal/controller/nodesetcontroller"
+	"nebius.ai/slurm-operator/internal/controller/soperatorchecks"
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
+	"nebius.ai/slurm-operator/internal/controller/updatecontroller"
 	"nebius.ai/slurm-operator/internal/controllersenabled"
+	"nebius.ai/slurm-operator/internal/slurmapi"
 	webhookv1 "nebius.ai/slurm-operator/internal/webhook/v1"
 	webhookv1alpha1 "nebius.ai/slurm-operator/internal/webhook/v1alpha1"
 	//+kubebuilder:scaffold:imports
@@ -248,6 +253,11 @@ func main() {
 		Cache: cache.Options{
 			DefaultNamespaces: watchNsCacheByName,
 		},
+		Client: client.Options{
+			Cache: &client.CacheOptions{
+				DisableFor: []client.Object{&batchv1.Job{}, &batchv1.CronJob{}},
+			},
+		},
 	})
 	if err != nil {
 		cli.Fail(setupLog, err, "unable to start manager")
@@ -310,6 +320,30 @@ func main() {
 		}
 	}
 	// endregion Reconciler/NodeSet
+
+	{
+		slurmAPIClients := slurmapi.NewClientSet()
+
+		if err = soperatorchecks.NewSlurmAPIClientsController(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(soperatorchecks.SlurmAPIClientsControllerName),
+			slurmAPIClients,
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create slurm api clients controller", "controller", soperatorchecks.SlurmAPIClientsControllerName)
+		}
+
+		if err = updatecontroller.NewRollingUpdateReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor("kekus"),
+			slurmAPIClients,
+		).
+			SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create controller", "controller", "kek")
+		}
+
+	}
 
 	// region Reconciler/Topology
 	if controllersSet.Enabled("topology") {

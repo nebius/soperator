@@ -106,7 +106,7 @@ func RenderNodeSetStatefulSet(
 			},
 		},
 		PriorityClassName:  nodeSet.PriorityClass,
-		ServiceAccountName: naming.BuildServiceAccountWorkerName(nodeSet.ParentalCluster.Name),
+		ServiceAccountName: naming.BuildServiceAccountNodeSetName(nodeSet.ParentalCluster.Name, nodeSet.Name),
 		Affinity:           nodeSet.Affinity,
 		NodeSelector:       nodeSet.NodeSelector,
 		Tolerations:        nodeSet.Tolerations,
@@ -139,6 +139,8 @@ func RenderNodeSetStatefulSet(
 		"kruise.io/preferred-persistent-topology":      "kubernetes.io/hostname",
 	}
 
+	updateStrategy, volumeClaimUpdateStrategy, err := renderUpdateStrategies(nodeSet)
+
 	return kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        nodeSet.StatefulSet.Name,
@@ -151,15 +153,7 @@ func RenderNodeSetStatefulSet(
 			ServiceName:         nodeSet.ServiceUmbrella.Name,
 			Replicas:            replicas,
 			ReserveOrdinals:     reserveOrdinals,
-			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
-				Type: appsv1.RollingUpdateStatefulSetStrategyType,
-				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
-					MaxUnavailable:  &nodeSet.StatefulSet.MaxUnavailable,
-					PodUpdatePolicy: kruisev1b1.InPlaceIfPossiblePodUpdateStrategyType,
-					Partition:       ptr.To(int32(0)),
-					MinReadySeconds: ptr.To(int32(0)),
-				},
-			},
+			UpdateStrategy:      updateStrategy,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: matchLabels,
 			},
@@ -169,9 +163,7 @@ func RenderNodeSetStatefulSet(
 				nodeSet.ParentalCluster.Name,
 				pvcTemplateSpecs,
 			),
-			VolumeClaimUpdateStrategy: kruisev1b1.VolumeClaimUpdateStrategy{
-				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
-			},
+			VolumeClaimUpdateStrategy: volumeClaimUpdateStrategy,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
@@ -185,6 +177,37 @@ func RenderNodeSetStatefulSet(
 			},
 		},
 	}, nil
+}
+
+func renderUpdateStrategies(nodeSet *values.SlurmNodeSet) (kruisev1b1.StatefulSetUpdateStrategy, kruisev1b1.VolumeClaimUpdateStrategy, error) {
+	switch nodeSet.UpdateStrategy {
+	case consts.UpdateStrategyRollingUpdate:
+		return kruisev1b1.StatefulSetUpdateStrategy{
+				Type: appsv1.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
+					MaxUnavailable:  &nodeSet.StatefulSet.MaxUnavailable,
+					PodUpdatePolicy: kruisev1b1.InPlaceIfPossiblePodUpdateStrategyType,
+					Partition:       ptr.To(int32(0)),
+					MinReadySeconds: ptr.To(int32(0)),
+				},
+			},
+			kruisev1b1.VolumeClaimUpdateStrategy{
+				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
+			},
+			nil
+	case consts.UpdateStrategyOnDelete:
+		return kruisev1b1.StatefulSetUpdateStrategy{
+				Type: appsv1.OnDeleteStatefulSetStrategyType,
+			},
+			// This doesn't work in kruise
+			// TODO: fix not working on-flight pvc resize
+			kruisev1b1.VolumeClaimUpdateStrategy{
+				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
+			},
+			nil
+	default:
+		return kruisev1b1.StatefulSetUpdateStrategy{}, kruisev1b1.VolumeClaimUpdateStrategy{}, fmt.Errorf("kek")
+	}
 }
 
 func renderNodeSetAnnotations(nodeSet *values.SlurmNodeSet) map[string]string {

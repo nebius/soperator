@@ -26,6 +26,9 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the {{ .ProjectName }} itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- rollingupdatestate_admin_role.yaml
+- rollingupdatestate_editor_role.yaml
+- rollingupdatestate_viewer_role.yaml
 - activecheck_admin_role.yaml
 - activecheck_editor_role.yaml
 - activecheck_viewer_role.yaml

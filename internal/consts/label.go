@@ -43,4 +43,7 @@ const (
 	LabelJailedAggregationCommonValue = "common"
 
 	AnnotationConfigHash = K8sGroupNameSoperator + "/config-hash"
+
+	LabelSoperatorRollingUpdateEnabled = K8sGroupNameSoperator + "/rolling-update-enabled"
+	LabelSoperatorRollingUpdateValue   = "true"
 )
