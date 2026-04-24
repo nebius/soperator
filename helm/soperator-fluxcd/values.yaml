@@ -405,7 +405,7 @@ observability:
           cpu: 500m
         limits:
           memory: 1Gi
-      nebiusO11yAgentVersion: 2.0.3
+      nebiusO11yAgentVersion: 2.0.5
       useGoMemLimit: true
       metricsEndpoint: http://vmsingle-metrics-victoria-metrics-k8s-stack:8429/opentelemetry/v1/metrics
       metricsExporterTimeout: 15s
