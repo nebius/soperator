@@ -35,7 +35,7 @@ type NodeReplacement struct {
 	slurm              *framework.SlurmClient
 	replacementWorker  string
 	originalInstanceID string
-	maintenanceJobID   string
+	maintenanceJob     framework.SbatchJob
 }
 
 func NewNodeReplacement(exec framework.Exec, slurm *framework.SlurmClient) *NodeReplacement {
@@ -47,10 +47,10 @@ func NewNodeReplacement(exec framework.Exec, slurm *framework.SlurmClient) *Node
 
 func (s *NodeReplacement) Register(sc *godog.ScenarioContext) {
 	sc.After(func(ctx context.Context, scenario *godog.Scenario, err error) (context.Context, error) {
-		if path.Base(scenario.Uri) != nodeReplacementFeatureFile || s.maintenanceJobID == "" {
+		if path.Base(scenario.Uri) != nodeReplacementFeatureFile || s.maintenanceJob.IsZero() {
 			return ctx, nil
 		}
-		if cancelErr := s.cancelJob(context.Background(), s.maintenanceJobID); cancelErr != nil {
+		if cancelErr := s.cancelJob(context.Background(), s.maintenanceJob.ID); cancelErr != nil {
 			s.exec.Logf("cleanup: cancel maintenance job: %v", cancelErr)
 		}
 		return ctx, nil
@@ -83,21 +83,20 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context
 	}
 	s.originalInstanceID = originalInstanceID
 
-	// TODO: Add safe retries for sbatch without creating duplicate jobs.
-	jobID, err := s.exec.Jail().Run(ctx, fmt.Sprintf(
-		"sbatch --parsable -w %s --job-name=e2e-node-replacement --wrap=%s",
-		framework.ShellQuote(s.replacementWorker), framework.ShellQuote("sleep 600")))
+	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
+		JobName:    "e2e-node-replacement",
+		ExtraFlags: []string{fmt.Sprintf("-w %s", framework.ShellQuote(s.replacementWorker))},
+		Wrap:       "sleep 600",
+	})
 	if err != nil {
-		return fmt.Errorf("submit maintenance job: %w", err)
+		return err
 	}
-	jobID = strings.TrimSpace(jobID)
-	if jobID == "" {
-		return fmt.Errorf("empty maintenance job id")
-	}
-	s.maintenanceJobID = jobID
+	s.maintenanceJob = job
+	s.exec.Logf("node replacement: submitted maintenance job id=%s stdout=%s stderr=%s",
+		job.ID, job.StdoutPath, job.StderrPath)
 
 	return s.exec.WaitFor(ctx, "maintenance job running", nodeReplacementJobTimeout, 10*time.Second, func(waitCtx context.Context) (bool, error) {
-		status, err := s.exec.Jail().Run(waitCtx, fmt.Sprintf("squeue -h -j %s -o '%%T'", framework.ShellQuote(jobID)))
+		status, err := s.exec.Jail().Run(waitCtx, fmt.Sprintf("squeue -h -j %s -o '%%T'", framework.ShellQuote(job.ID)))
 		if err != nil {
 			return false, err
 		}
@@ -129,10 +128,10 @@ func (s *NodeReplacement) theNodeIsDrainedWithAMaintenanceReason(ctx context.Con
 }
 
 func (s *NodeReplacement) theTestJobIsCancelled(ctx context.Context) error {
-	if err := s.cancelJob(ctx, s.maintenanceJobID); err != nil {
+	if err := s.cancelJob(ctx, s.maintenanceJob.ID); err != nil {
 		return err
 	}
-	s.maintenanceJobID = ""
+	s.maintenanceJob = framework.SbatchJob{}
 	return nil
 }
 

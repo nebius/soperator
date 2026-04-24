@@ -34,7 +34,7 @@ type EnrootContainers struct {
 
 	workers          []string
 	connectionWorker string
-	jobID            string
+	job              framework.SbatchJob
 
 	squashPath       string
 	squashStatBefore string
@@ -83,10 +83,11 @@ func (s *EnrootContainers) aLongRunningEnrootNCCLJobIsSubmittedOnTwoGPUWorkers(c
 }
 
 func (s *EnrootContainers) theEnrootNCCLJobIsRunning(ctx context.Context) error {
-	if s.jobID == "" {
+	if s.job.IsZero() {
 		return fmt.Errorf("enroot job id is empty")
 	}
-	return s.slurm.WaitForJobRunning(ctx, s.jobID, enrootJobStartTimeout)
+	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job,
+		s.slurm.WaitForJobRunning(ctx, s.job.ID, enrootJobStartTimeout))
 }
 
 func (s *EnrootContainers) enrootCacheIsPopulatedOnLocalStorageOnAWorker(ctx context.Context) error {
@@ -122,23 +123,25 @@ func (s *EnrootContainers) enrootRuntimeContainerDataIsVisibleWhileTheJobIsRunni
 		return fmt.Errorf("enroot connection worker is not selected")
 	}
 
-	return s.exec.WaitFor(ctx, "enroot runtime container visible", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		listOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo enroot list || true")
-		if err != nil {
-			return false, err
-		}
-		treeOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
-		if err != nil {
-			return false, err
-		}
-		if !strings.Contains(listOutput, "pyxis_") {
-			return false, nil
-		}
-		if !strings.Contains(treeOutput, "pyxis_") {
-			return false, nil
-		}
-		return true, nil
-	})
+	err := framework.WaitForWithJobAlive(ctx, s.exec, s.slurm, s.job, "enroot runtime container visible",
+		enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+			listOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo enroot list || true")
+			if err != nil {
+				return false, err
+			}
+			treeOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+			if err != nil {
+				return false, err
+			}
+			if !strings.Contains(listOutput, "pyxis_") {
+				return false, nil
+			}
+			if !strings.Contains(treeOutput, "pyxis_") {
+				return false, nil
+			}
+			return true, nil
+		})
+	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job, err)
 }
 
 func (s *EnrootContainers) theEnrootNCCLJobIsCancelled(ctx context.Context) error {
@@ -175,17 +178,15 @@ func (s *EnrootContainers) enrootRuntimeDataIsCleanedUpAndSquashfsCacheRemains(c
 		s.squashStatBefore = statValue
 		return true, nil
 	})
-	if err != nil {
-		return err
-	}
-	return nil
+	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job, err)
 }
 
 func (s *EnrootContainers) theSameEnrootNCCLJobIsSubmittedAgain(ctx context.Context) error {
 	if err := s.submitEnrootJob(ctx, "", "e2e-enroot-repeated"); err != nil {
 		return err
 	}
-	return s.slurm.WaitForJobRunning(ctx, s.jobID, enrootJobStartTimeout)
+	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job,
+		s.slurm.WaitForJobRunning(ctx, s.job.ID, enrootJobStartTimeout))
 }
 
 func (s *EnrootContainers) enrootRuntimeDataIsRepopulatedWithoutChangingTheSquashfsArtifact(ctx context.Context) error {
@@ -199,23 +200,25 @@ func (s *EnrootContainers) enrootRuntimeDataIsRepopulatedWithoutChangingTheSquas
 		return fmt.Errorf("enroot connection worker is not selected")
 	}
 
-	return s.exec.WaitFor(ctx, "enroot data repopulated from cache", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		// We validate cache reuse by checking the tracked squashfs stat is unchanged
-		// while runtime data is recreated. We do not compare full directory trees.
-		treeOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
-		if err != nil {
-			return false, err
-		}
-		if !strings.Contains(treeOutput, "pyxis_") {
-			return false, nil
-		}
+	err := framework.WaitForWithJobAlive(ctx, s.exec, s.slurm, s.job, "enroot data repopulated from cache",
+		enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+			// We validate cache reuse by checking the tracked squashfs stat is unchanged
+			// while runtime data is recreated. We do not compare full directory trees.
+			treeOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+			if err != nil {
+				return false, err
+			}
+			if !strings.Contains(treeOutput, "pyxis_") {
+				return false, nil
+			}
 
-		statOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, fmt.Sprintf("sudo stat -c '%%Y:%%s' %s", framework.ShellQuote(s.squashPath)))
-		if err != nil {
-			return false, err
-		}
-		return strings.TrimSpace(statOutput) == s.squashStatBefore, nil
-	})
+			statOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, fmt.Sprintf("sudo stat -c '%%Y:%%s' %s", framework.ShellQuote(s.squashPath)))
+			if err != nil {
+				return false, err
+			}
+			return strings.TrimSpace(statOutput) == s.squashStatBefore, nil
+		})
+	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job, err)
 }
 
 func (s *EnrootContainers) theRepeatedEnrootNCCLJobIsCancelled(ctx context.Context) error {
@@ -226,22 +229,25 @@ func (s *EnrootContainers) aNamedEnrootContainerJobIsSubmitted(ctx context.Conte
 	if err := s.submitEnrootJob(ctx, enrootNamedJobName, "e2e-enroot-named"); err != nil {
 		return err
 	}
-	if err := s.slurm.WaitForJobRunning(ctx, s.jobID, enrootJobStartTimeout); err != nil {
+	if err := framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job,
+		s.slurm.WaitForJobRunning(ctx, s.job.ID, enrootJobStartTimeout)); err != nil {
 		return err
 	}
 	namedDir := namedEnrootDir(enrootNamedJobName)
-	if err := s.exec.WaitFor(ctx, "named enroot runtime directory created", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		for _, worker := range s.workers {
-			treeOutput, err := s.exec.Worker(worker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
-			if err != nil {
-				return false, err
+	err := framework.WaitForWithJobAlive(ctx, s.exec, s.slurm, s.job, "named enroot runtime directory created",
+		enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+			for _, worker := range s.workers {
+				treeOutput, err := s.exec.Worker(worker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+				if err != nil {
+					return false, err
+				}
+				if !strings.Contains(treeOutput, namedDir) {
+					return false, nil
+				}
 			}
-			if !strings.Contains(treeOutput, namedDir) {
-				return false, nil
-			}
-		}
-		return true, nil
-	}); err != nil {
+			return true, nil
+		})
+	if err := framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job, err); err != nil {
 		return err
 	}
 	return s.cancelCurrentJob(ctx)
@@ -270,21 +276,20 @@ func (s *EnrootContainers) theNamedEnrootRuntimeDirectoryIsCleanedUp(ctx context
 	}
 
 	cleanupWrap := fmt.Sprintf("srun rm -rf %s", framework.ShellQuote(namedEnrootDirPath(enrootNamedJobName)))
-	submitCmd := fmt.Sprintf(
-		"sbatch --parsable -N 2 --nodelist=%s --ntasks-per-node=1 --job-name=e2e-enroot-cleanup --wrap=%s",
-		framework.ShellQuote(strings.Join(s.workers, ",")),
-		framework.ShellQuote(cleanupWrap),
-	)
-	// TODO: Add safe retries for sbatch without creating duplicate jobs.
-	out, err := s.exec.Jail().Run(ctx, submitCmd)
+	cleanup, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
+		JobName:      "e2e-enroot-cleanup",
+		Nodes:        2,
+		Nodelist:     s.workers,
+		TasksPerNode: 1,
+		Wrap:         cleanupWrap,
+	})
 	if err != nil {
-		return fmt.Errorf("submit named enroot cleanup job: %w", err)
+		return err
 	}
-	cleanupJobID, err := framework.ParseSbatchJobID(out)
-	if err != nil {
-		return fmt.Errorf("parse named enroot cleanup job id: %w", err)
-	}
-	return s.slurm.WaitForJobGone(ctx, cleanupJobID, enrootStopTimeout)
+	s.exec.Logf("enroot containers: submitted cleanup job id=%s stdout=%s stderr=%s",
+		cleanup.ID, cleanup.StdoutPath, cleanup.StderrPath)
+	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, cleanup,
+		s.slurm.WaitForJobGone(ctx, cleanup.ID, enrootStopTimeout))
 }
 
 func (s *EnrootContainers) theNamedEnrootRuntimeDirectoryIsRemoved(ctx context.Context) error {
@@ -335,37 +340,33 @@ func (s *EnrootContainers) submitEnrootJob(ctx context.Context, containerName, j
 		)
 	}
 
-	submit := fmt.Sprintf(
-		"sbatch --parsable -N 2 --nodelist=%s --gpus-per-node=8 --ntasks-per-node=%d --job-name=%s --wrap=%s",
-		framework.ShellQuote(strings.Join(s.workers, ",")),
-		enrootTasksPerNode,
-		framework.ShellQuote(jobName),
-		framework.ShellQuote(wrap),
-	)
-	// TODO: Add safe retries for sbatch without creating duplicate jobs.
-	out, err := s.exec.Jail().Run(ctx, submit)
+	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
+		JobName:      jobName,
+		Nodes:        2,
+		Nodelist:     s.workers,
+		GPUsPerNode:  8,
+		TasksPerNode: enrootTasksPerNode,
+		Wrap:         wrap,
+	})
 	if err != nil {
-		return fmt.Errorf("submit enroot job %q: %w", jobName, err)
+		return err
 	}
-	jobID, err := framework.ParseSbatchJobID(out)
-	if err != nil {
-		return fmt.Errorf("parse enroot job id for %q: %w", jobName, err)
-	}
-	s.jobID = jobID
-	s.exec.Logf("enroot containers: submitted job=%s id=%s", jobName, jobID)
+	s.job = job
+	s.exec.Logf("enroot containers: submitted job=%s id=%s stdout=%s stderr=%s",
+		job.JobName, job.ID, job.StdoutPath, job.StderrPath)
 	return nil
 }
 
 func (s *EnrootContainers) cancelCurrentJob(ctx context.Context) error {
-	if s.jobID == "" {
+	if s.job.IsZero() {
 		return nil
 	}
 
-	jobID := s.jobID
+	jobID := s.job.ID
 	if err := s.slurm.CancelJob(ctx, jobID, enrootStopTimeout); err != nil {
 		return fmt.Errorf("cancel enroot job %s: %w", jobID, err)
 	}
-	s.jobID = ""
+	s.job = framework.SbatchJob{}
 	return nil
 }
 

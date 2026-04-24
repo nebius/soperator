@@ -27,7 +27,7 @@ type DockerContainers struct {
 	exec    framework.Exec
 	slurm   *framework.SlurmClient
 	workers []string
-	jobID   string
+	job     framework.SbatchJob
 
 	containerNamePrefix string
 	connectionWorker    string
@@ -75,37 +75,33 @@ func (s *DockerContainers) aLongRunningDockerNCCLJobIsSubmittedOnTwoGPUWorkers(c
 		return err
 	}
 
-	nodelist := strings.Join(s.workers, ",")
 	wrap := fmt.Sprintf("srun docker run --rm --name e2e-docker-${SLURM_JOB_ID}-${SLURM_NODEID} --gpus=all --device=/dev/infiniband %s bash -lc %s",
 		framework.ShellQuote(image),
 		framework.ShellQuote(dockerARP),
 	)
-	submit := fmt.Sprintf(
-		"sbatch --parsable -N 2 --nodelist=%s --gpus-per-node=8 --job-name=e2e-docker-containers --wrap=%s",
-		framework.ShellQuote(nodelist),
-		framework.ShellQuote(wrap),
-	)
-
-	// TODO: Add safe retries for sbatch without creating duplicate jobs.
-	out, err := s.exec.Jail().Run(ctx, submit)
+	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
+		JobName:     "e2e-docker-containers",
+		Nodes:       2,
+		Nodelist:    s.workers,
+		GPUsPerNode: 8,
+		Wrap:        wrap,
+	})
 	if err != nil {
-		return fmt.Errorf("submit Docker NCCL job: %w", err)
+		return err
 	}
-	jobID, err := framework.ParseSbatchJobID(out)
-	if err != nil {
-		return fmt.Errorf("parse Docker job id: %w", err)
-	}
-	s.jobID = jobID
-	s.containerNamePrefix = fmt.Sprintf("e2e-docker-%s-", jobID)
-	s.exec.Logf("Docker containers: selected workers=%s job_id=%s", nodelist, jobID)
+	s.job = job
+	s.containerNamePrefix = fmt.Sprintf("e2e-docker-%s-", job.ID)
+	s.exec.Logf("Docker containers: selected workers=%s job_id=%s stdout=%s stderr=%s",
+		strings.Join(s.workers, ","), job.ID, job.StdoutPath, job.StderrPath)
 	return nil
 }
 
 func (s *DockerContainers) theDockerNCCLJobIsRunning(ctx context.Context) error {
-	if s.jobID == "" {
+	if s.job.IsZero() {
 		return fmt.Errorf("Docker job ID is empty")
 	}
-	return s.slurm.WaitForJobRunning(ctx, s.jobID, dockerJobStartTimeout)
+	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job,
+		s.slurm.WaitForJobRunning(ctx, s.job.ID, dockerJobStartTimeout))
 }
 
 func (s *DockerContainers) dockerOverlayfsStorageIsPopulatedOnAWorker(ctx context.Context) error {
@@ -119,18 +115,20 @@ func (s *DockerContainers) dockerContainerContentBlobsArePopulatedOnAWorker(ctx 
 }
 
 func (s *DockerContainers) aDockerContainerFromTheJobIsRunningOnWorkers(ctx context.Context) error {
-	return s.exec.WaitFor(ctx, "Docker containers running on selected workers", dockerProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		for _, worker := range s.workers {
-			currentIDs, err := s.dockerContainerIDsByNamePrefix(waitCtx, worker)
-			if err != nil {
-				return false, err
+	err := framework.WaitForWithJobAlive(ctx, s.exec, s.slurm, s.job, "Docker containers running on selected workers",
+		dockerProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+			for _, worker := range s.workers {
+				currentIDs, err := s.dockerContainerIDsByNamePrefix(waitCtx, worker)
+				if err != nil {
+					return false, err
+				}
+				if len(currentIDs) == 0 {
+					return false, nil
+				}
 			}
-			if len(currentIDs) == 0 {
-				return false, nil
-			}
-		}
-		return true, nil
-	})
+			return true, nil
+		})
+	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job, err)
 }
 
 func (s *DockerContainers) theDockerNCCLJobIsCancelled(ctx context.Context) error {
@@ -161,14 +159,14 @@ func (s *DockerContainers) waitForTrackedContainersGone(ctx context.Context, tim
 }
 
 func (s *DockerContainers) cancelCurrentJob(ctx context.Context) error {
-	if s.jobID == "" {
+	if s.job.IsZero() {
 		return nil
 	}
 
-	if err := s.slurm.CancelJob(ctx, s.jobID, dockerJobCancelTimeout); err != nil {
-		return fmt.Errorf("cancel Docker job %s: %w", s.jobID, err)
+	if err := s.slurm.CancelJob(ctx, s.job.ID, dockerJobCancelTimeout); err != nil {
+		return fmt.Errorf("cancel Docker job %s: %w", s.job.ID, err)
 	}
-	s.jobID = ""
+	s.job = framework.SbatchJob{}
 	return nil
 }
 
