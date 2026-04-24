@@ -88,12 +88,14 @@ func WaitForWithJobAlive(
 	}
 
 	return exec.WaitFor(ctx, description, timeout, pollInterval, func(waitCtx context.Context) (bool, error) {
-		state, dump, stateErr := slurm.JobState(waitCtx, job.ID)
+		// Only the state is inlined here; the sacct dump + log tails come from
+		// AnnotateWithJobLog at the outer call site, to keep the message single‑sourced.
+		state, _, stateErr := slurm.JobState(waitCtx, job.ID)
 		if stateErr != nil {
 			return false, fmt.Errorf("check job %s state: %w", job.ID, stateErr)
 		}
 		if !IsJobAliveState(state) {
-			return false, fmt.Errorf("job %s is not alive (state=%q); sacct: %s", job.ID, state, singleLine(dump))
+			return false, fmt.Errorf("job %s is not alive (state=%q)", job.ID, state)
 		}
 		return probe(waitCtx)
 	})
