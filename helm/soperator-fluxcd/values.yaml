@@ -419,7 +419,7 @@ observability:
         hostnamePid: hostname_pid
       enableFileStorage: true
       deleteAfterRead:
-        enabled: false
+        enabled: true
         minAge: 15m
 securityProfilesOperator:
   enabled: true
