@@ -3017,7 +3017,7 @@
   "preload": false,
   "refresh": "",
   "schemaVersion": 40,
-  "tags": [],
+  "tags": ["nebius", "soperator", "overview", "jobs"],
   "templating": {
     "list": [
       {

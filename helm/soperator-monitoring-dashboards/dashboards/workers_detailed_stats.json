@@ -29,9 +29,7 @@
         "expr": "group by (node, pod) (\n  changes(\n      sum without (uid, pod_ip)(\n          kube_pod_info{pod=~\"worker-.*\", node!=\"\"}\n      )\n  ) > 0\n  and on (pod) \n  sum by (pod)(\n      kube_pod_info{pod=~\"worker-.*\", node!=\"\"}\n  )\n)",
         "filter": {
           "exclude": true,
-          "ids": [
-            324
-          ]
+          "ids": [324]
         },
         "hide": false,
         "iconColor": "red",
@@ -15002,9 +15000,7 @@
   "preload": false,
   "refresh": "",
   "schemaVersion": 40,
-  "tags": [
-    "worker-stats"
-  ],
+  "tags": ["nebius", "soperator", "worker-stats"],
   "templating": {
     "list": [
       {
@@ -15034,9 +15030,7 @@
       {
         "current": {
           "text": "All",
-          "value": [
-            "$__all"
-          ]
+          "value": ["$__all"]
         },
         "datasource": {
           "type": "prometheus",
@@ -15080,9 +15074,7 @@
       {
         "current": {
           "text": "All",
-          "value": [
-            "$__all"
-          ]
+          "value": ["$__all"]
         },
         "datasource": {
           "type": "prometheus",

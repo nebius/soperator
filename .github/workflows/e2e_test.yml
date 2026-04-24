@@ -539,8 +539,10 @@ jobs:
           if [[ -n "$SCONFIG_POD" ]]; then
             echo "Copying jail files from $SCONFIG_POD"
             kubectl exec -n soperator "$SCONFIG_POD" -- find /mnt/jail -maxdepth 4 -not -path '*/proc/*' > ./jail/tree.txt 2>&1 || true
-            kubectl cp "soperator/$SCONFIG_POD:/mnt/jail/etc/slurm/" ./jail/etc/slurm
-            kubectl cp "soperator/$SCONFIG_POD:/mnt/jail/opt/soperator-outputs" ./jail/opt/soperator-outputs
+            .github/workflows/scripts/retry.sh \
+              kubectl cp "soperator/$SCONFIG_POD:/mnt/jail/etc/slurm/" ./jail/etc/slurm
+            .github/workflows/scripts/retry.sh \
+              kubectl cp "soperator/$SCONFIG_POD:/mnt/jail/opt/soperator-outputs" ./jail/opt/soperator-outputs
           else
             echo "No running sconfigcontroller pod found, skipping jail files collection"
           fi
