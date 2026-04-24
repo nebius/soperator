@@ -326,17 +326,21 @@ func (s *EnrootContainers) submitEnrootJob(ctx context.Context, containerName, j
 		return err
 	}
 
-	wrap := fmt.Sprintf("srun --mpi=pmix --container-image=%s --container-mounts=%s %s",
+	// Wrap the NCCL body in `bash -lc` so env assignments (NCCL_*=…) are
+	// shell‑parsed inside the container instead of being passed as positional
+	// args to srun / pyxis, where execve() treats them as the program name and
+	// fails with "No such file or directory". Mirrors docker_containers.go.
+	wrap := fmt.Sprintf("srun --mpi=pmix --container-image=%s --container-mounts=%s bash -lc %s",
 		framework.ShellQuote(image),
 		framework.ShellQuote(enrootDockerMount),
-		enrootARP,
+		framework.ShellQuote(enrootARP),
 	)
 	if containerName != "" {
-		wrap = fmt.Sprintf("srun --mpi=pmix --container-image=%s --container-name=%s --container-mounts=%s %s",
+		wrap = fmt.Sprintf("srun --mpi=pmix --container-image=%s --container-name=%s --container-mounts=%s bash -lc %s",
 			framework.ShellQuote(image),
 			framework.ShellQuote(containerName),
 			framework.ShellQuote(enrootDockerMount),
-			enrootARP,
+			framework.ShellQuote(enrootARP),
 		)
 	}
 
