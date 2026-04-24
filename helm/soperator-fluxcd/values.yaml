@@ -376,7 +376,7 @@ observability:
     driftDetection:
       mode: warn
   ncclProfiles:
-    enabled: true
+    enabled: false
     interval: 5m
     timeout: 5m
     version:
