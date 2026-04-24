@@ -54,17 +54,6 @@ func TestMaintenanceConditionTypeConfiguration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			controller := NewSlurmAPIClientsController(
-				client,
-				scheme,
-				recorder,
-				slurmAPIClients,
-				corev1.NodeConditionType(tt.inputConditionType),
-			)
-
-			assert.Equal(t, tt.expectedConditionType, string(controller.MaintenanceConditionType),
-				"SlurmAPIClientsController: %s", tt.description)
-
 			k8sController := NewK8SNodesController(
 				client,
 				scheme,
@@ -103,65 +92,13 @@ func TestDefaultMaintenanceConditionTypeConstant(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	slurmAPIClients := slurmapi.NewClientSet()
 
-	slurmAPIController := NewSlurmAPIClientsController(client, scheme, recorder, slurmAPIClients, "")
 	k8sController := NewK8SNodesController(client, scheme, recorder, 15*time.Minute, true, "", "")
 	slurmController := NewSlurmNodesController(client, scheme, recorder, slurmAPIClients, 30*time.Second, true, true, client, "")
 
 	expectedDefault := string(consts.DefaultMaintenanceConditionType)
 
-	assert.Equal(t, expectedDefault, string(slurmAPIController.MaintenanceConditionType),
-		"SlurmAPIClientsController should use default maintenance condition type")
 	assert.Equal(t, expectedDefault, string(k8sController.MaintenanceConditionType),
 		"K8SNodesController should use default maintenance condition type")
 	assert.Equal(t, expectedDefault, string(slurmController.MaintenanceConditionType),
 		"SlurmNodesController should use default maintenance condition type")
-}
-
-func TestMaintenanceConditionTypeIntegration(t *testing.T) {
-	testCases := []struct {
-		name           string
-		cmdLineArg     string
-		expectedResult string
-	}{
-		{
-			name:           "command line flag with custom value",
-			cmdLineArg:     "ProductionMaintenanceScheduled",
-			expectedResult: "ProductionMaintenanceScheduled",
-		},
-		{
-			name:           "command line flag with default value",
-			cmdLineArg:     string(consts.DefaultMaintenanceConditionType),
-			expectedResult: "NebiusMaintenanceScheduled",
-		},
-		{
-			name:           "empty command line flag uses default",
-			cmdLineArg:     "",
-			expectedResult: string(consts.DefaultMaintenanceConditionType),
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			scheme := runtime.NewScheme()
-			client := fake.NewClientBuilder().WithScheme(scheme).Build()
-			recorder := record.NewFakeRecorder(10)
-			slurmAPIClients := slurmapi.NewClientSet()
-
-			maintenanceConditionType := tc.cmdLineArg
-			if maintenanceConditionType == "" {
-				maintenanceConditionType = string(consts.DefaultMaintenanceConditionType)
-			}
-
-			controller := NewSlurmAPIClientsController(
-				client,
-				scheme,
-				recorder,
-				slurmAPIClients,
-				corev1.NodeConditionType(maintenanceConditionType),
-			)
-
-			assert.Equal(t, tc.expectedResult, string(controller.MaintenanceConditionType),
-				"Integration test failed for case: %s", tc.name)
-		})
-	}
 }

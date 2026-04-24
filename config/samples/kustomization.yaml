@@ -4,4 +4,5 @@ resources:
 - slurm_v1alpha1_nodeconfigurator.yaml
 - slurm_v1alpha1_nodeset.yaml
 - slurm_v1alpha1_jailedconfig.yaml
+- slurm_v1alpha1_rollingupdatestate.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

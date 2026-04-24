@@ -180,25 +180,6 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 				},
 			},
 			utils.MultiStepExecutionStep{
-				Name: "Slurm Worker ServiceAccount",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling")
-
-					desired := worker.RenderServiceAccount(clusterValues.Namespace, clusterValues.Name)
-					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.V(1).Info("Rendered")
-
-					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
-						return fmt.Errorf("reconciling worker ServiceAccount: %w", err)
-					}
-					stepLogger.V(1).Info("Reconciled")
-
-					return nil
-				},
-			},
-			utils.MultiStepExecutionStep{
 				Name: "Slurm Worker sysctl ConfigMap",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)

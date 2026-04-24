@@ -106,7 +106,7 @@ func RenderNodeSetStatefulSet(
 			},
 		},
 		PriorityClassName:  nodeSet.PriorityClass,
-		ServiceAccountName: naming.BuildServiceAccountWorkerName(nodeSet.ParentalCluster.Name),
+		ServiceAccountName: naming.BuildServiceAccountNodeSetName(nodeSet.ParentalCluster.Name, nodeSet.Name),
 		Affinity:           nodeSet.Affinity,
 		NodeSelector:       nodeSet.NodeSelector,
 		Tolerations:        nodeSet.Tolerations,
