@@ -246,7 +246,7 @@ func workerNames(workers []framework.WorkerPodRef) string {
 	return strings.Join(names, ", ")
 }
 
-func workersByNodeSetSummary(workersByNodeSet map[string][]framework.WorkerRef) string {
+func workersByNodeSetSummary(workersByNodeSet map[string][]framework.WorkerPodRef) string {
 	if len(workersByNodeSet) == 0 {
 		return "<none>"
 	}
