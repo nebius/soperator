@@ -32,21 +32,25 @@ var (
 
 type NodeReplacement struct {
 	exec               framework.Exec
-	replacementWorker  framework.WorkerRef
+	slurm              *framework.SlurmClient
+	replacementWorker  string
 	originalInstanceID string
-	maintenanceJobID   string
+	maintenanceJob     framework.SbatchJob
 }
 
-func NewNodeReplacement(exec framework.Exec) *NodeReplacement {
-	return &NodeReplacement{exec: exec}
+func NewNodeReplacement(exec framework.Exec, slurm *framework.SlurmClient) *NodeReplacement {
+	return &NodeReplacement{
+		exec:  exec,
+		slurm: slurm,
+	}
 }
 
 func (s *NodeReplacement) Register(sc *godog.ScenarioContext) {
 	sc.After(func(ctx context.Context, scenario *godog.Scenario, err error) (context.Context, error) {
-		if path.Base(scenario.Uri) != nodeReplacementFeatureFile || s.maintenanceJobID == "" {
+		if path.Base(scenario.Uri) != nodeReplacementFeatureFile || s.maintenanceJob.IsZero() {
 			return ctx, nil
 		}
-		if cancelErr := s.cancelJob(context.Background(), s.maintenanceJobID); cancelErr != nil {
+		if cancelErr := s.cancelJob(context.Background(), s.maintenanceJob.ID); cancelErr != nil {
 			s.exec.Logf("cleanup: cancel maintenance job: %v", cancelErr)
 		}
 		return ctx, nil
@@ -62,13 +66,13 @@ func (s *NodeReplacement) Register(sc *godog.ScenarioContext) {
 }
 
 func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context.Context) error {
-	worker, err := s.exec.AnyGPUWorker()
+	workers, err := s.slurm.AnyGPUWorkers(1)
 	if err != nil {
 		return err
 	}
-	s.replacementWorker = worker
+	s.replacementWorker = workers[0]
 
-	nodeState, err := framework.ExecControllerWithDefaultRetry(ctx, s.exec, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(worker.Name)))
+	nodeState, err := s.exec.Controller().RunWithDefaultRetry(ctx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(s.replacementWorker)))
 	if err != nil {
 		return fmt.Errorf("read original node state: %w", err)
 	}
@@ -79,20 +83,20 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context
 	}
 	s.originalInstanceID = originalInstanceID
 
-	jobID, err := s.exec.ExecJail(ctx, fmt.Sprintf(
-		"sbatch --parsable -w %s --job-name=e2e-node-replacement --wrap=%s",
-		framework.ShellQuote(worker.Name), framework.ShellQuote("sleep 600")))
+	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
+		JobName:    "e2e-node-replacement",
+		ExtraFlags: []string{fmt.Sprintf("-w %s", framework.ShellQuote(s.replacementWorker))},
+		Wrap:       "sleep 600",
+	})
 	if err != nil {
-		return fmt.Errorf("submit maintenance job: %w", err)
+		return err
 	}
-	jobID = strings.TrimSpace(jobID)
-	if jobID == "" {
-		return fmt.Errorf("empty maintenance job id")
-	}
-	s.maintenanceJobID = jobID
+	s.maintenanceJob = job
+	s.exec.Logf("node replacement: submitted maintenance job id=%s stdout=%s stderr=%s",
+		job.ID, job.StdoutPath, job.StderrPath)
 
 	return s.exec.WaitFor(ctx, "maintenance job running", nodeReplacementJobTimeout, 10*time.Second, func(waitCtx context.Context) (bool, error) {
-		status, err := s.exec.ExecController(waitCtx, fmt.Sprintf("squeue -h -j %s -o '%%T'", framework.ShellQuote(jobID)))
+		status, err := s.exec.Jail().Run(waitCtx, fmt.Sprintf("squeue -h -j %s -o '%%T'", framework.ShellQuote(job.ID)))
 		if err != nil {
 			return false, err
 		}
@@ -112,9 +116,9 @@ func (s *NodeReplacement) aMaintenanceEventIsTriggeredForThatNode(ctx context.Co
 }
 
 func (s *NodeReplacement) theNodeIsDrainedWithAMaintenanceReason(ctx context.Context) error {
-	workerName := s.replacementWorker.Name
+	workerName := s.replacementWorker
 	return s.exec.WaitFor(ctx, "node drain reason", nodeReplacementDrainTimeout, 15*time.Second, func(waitCtx context.Context) (bool, error) {
-		state, err := s.exec.ExecController(waitCtx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(workerName)))
+		state, err := s.exec.Controller().Run(waitCtx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(workerName)))
 		if err != nil {
 			return false, err
 		}
@@ -124,10 +128,10 @@ func (s *NodeReplacement) theNodeIsDrainedWithAMaintenanceReason(ctx context.Con
 }
 
 func (s *NodeReplacement) theTestJobIsCancelled(ctx context.Context) error {
-	if err := s.cancelJob(ctx, s.maintenanceJobID); err != nil {
+	if err := s.cancelJob(ctx, s.maintenanceJob.ID); err != nil {
 		return err
 	}
-	s.maintenanceJobID = ""
+	s.maintenanceJob = framework.SbatchJob{}
 	return nil
 }
 
@@ -146,10 +150,10 @@ func (s *NodeReplacement) theOldInstanceIsRemoved(ctx context.Context) error {
 }
 
 func (s *NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) error {
-	workerName := s.replacementWorker.Name
+	workerName := s.replacementWorker
 	originalInstanceID := s.originalInstanceID
 	return s.exec.WaitFor(ctx, "replacement node ready", nodeReplacementReadyTimeout, 60*time.Second, func(waitCtx context.Context) (bool, error) {
-		state, err := s.exec.ExecController(waitCtx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(workerName)))
+		state, err := s.exec.Controller().Run(waitCtx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(workerName)))
 		if err != nil {
 			return false, err
 		}
@@ -174,9 +178,9 @@ func (s *NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) e
 }
 
 func (s *NodeReplacement) theReplacementNodePassesGPUValidation(ctx context.Context) error {
-	workerName := s.replacementWorker.Name
-	if _, err := s.exec.ExecJail(ctx, fmt.Sprintf("srun -w %s --gpus-per-node=8 nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
-		output, stateErr := s.exec.ExecController(ctx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(workerName)))
+	workerName := s.replacementWorker
+	if _, err := s.exec.Jail().Run(ctx, fmt.Sprintf("srun -w %s --gpus-per-node=8 nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
+		output, stateErr := s.exec.Controller().Run(ctx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(workerName)))
 		if stateErr == nil {
 			s.exec.Logf("replacement worker state after failed final validation:\n%s", strings.TrimSpace(output))
 		}
@@ -190,7 +194,7 @@ func (s *NodeReplacement) cancelJob(ctx context.Context, maintenanceJobID string
 		return nil
 	}
 
-	if _, err := s.exec.ExecController(ctx, fmt.Sprintf("scancel %s || true", framework.ShellQuote(maintenanceJobID))); err != nil {
+	if err := s.slurm.CancelJob(ctx, maintenanceJobID, 0); err != nil {
 		return fmt.Errorf("cancel maintenance job %s: %w", maintenanceJobID, err)
 	}
 	return nil

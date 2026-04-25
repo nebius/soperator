@@ -1,6 +1,6 @@
 package framework
 
-type WorkerRef struct {
+type WorkerPodRef struct {
 	Name string
 }
 
@@ -12,9 +12,9 @@ type ExpectedNodeSet struct {
 }
 
 type ClusterState struct {
-	Workers          []WorkerRef
-	GPUWorkers       []WorkerRef
-	WorkersByNodeSet map[string][]WorkerRef
+	Workers          []WorkerPodRef
+	GPUWorkers       []WorkerPodRef
+	WorkersByNodeSet map[string][]WorkerPodRef
 	ExpectedNodeSets []ExpectedNodeSet
 }
 

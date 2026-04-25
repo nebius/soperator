@@ -237,11 +237,11 @@ func (s *ClusterCreation) checkExpectedNodeSets(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkPartitions(ctx context.Context) error {
-	allPartitions, err := framework.ExecControllerWithDefaultRetry(ctx, s.exec, "scontrol show partitions --oneliner")
+	allPartitions, err := s.exec.Controller().RunWithDefaultRetry(ctx, "scontrol show partitions --oneliner")
 	if err != nil {
 		return fmt.Errorf("show partitions: %w", err)
 	}
-	if _, err := framework.ExecControllerWithDefaultRetry(ctx, s.exec, "sinfo -Nel >/dev/null"); err != nil {
+	if _, err := s.exec.Controller().RunWithDefaultRetry(ctx, "sinfo -Nel >/dev/null"); err != nil {
 		return fmt.Errorf("sinfo -Nel: %w", err)
 	}
 	if !strings.Contains(allPartitions, "PartitionName=main") {
@@ -251,11 +251,11 @@ func (s *ClusterCreation) checkPartitions(ctx context.Context) error {
 		return fmt.Errorf("partition hidden is missing from scontrol output")
 	}
 
-	mainPartition, err := framework.ExecControllerWithDefaultRetry(ctx, s.exec, "scontrol show partition main")
+	mainPartition, err := s.exec.Controller().RunWithDefaultRetry(ctx, "scontrol show partition main")
 	if err != nil {
 		return fmt.Errorf("show partition main: %w", err)
 	}
-	hiddenPartition, err := framework.ExecControllerWithDefaultRetry(ctx, s.exec, "scontrol show partition hidden")
+	hiddenPartition, err := s.exec.Controller().RunWithDefaultRetry(ctx, "scontrol show partition hidden")
 	if err != nil {
 		return fmt.Errorf("show partition hidden: %w", err)
 	}
@@ -278,7 +278,7 @@ func (s *ClusterCreation) checkPartitions(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkSlurmNodeHealth(ctx context.Context) error {
-	nodesOutput, err := framework.ExecControllerWithDefaultRetry(ctx, s.exec, "scontrol show nodes --oneliner")
+	nodesOutput, err := s.exec.Controller().RunWithDefaultRetry(ctx, "scontrol show nodes --oneliner")
 	if err != nil {
 		return fmt.Errorf("show nodes: %w", err)
 	}
@@ -361,7 +361,7 @@ func (s *ClusterCreation) checkActiveChecks(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkWelcomeOutput(ctx context.Context) error {
-	output, err := framework.RunWithDefaultRetry(ctx, s.exec,
+	output, err := s.exec.RunWithDefaultRetry(ctx,
 		"kubectl", "exec", "-n", clusterCreationNamespace, "login-0", "--", "sh", "-lc",
 		"/etc/update-motd.d/00-welcome && /etc/update-motd.d/20-slurm-stats")
 	if err != nil {
@@ -385,7 +385,7 @@ func (s *ClusterCreation) checkWelcomeOutput(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkMainSmokeJob(ctx context.Context) error {
-	output, err := s.exec.ExecJail(ctx, fmt.Sprintf("timeout %.0f srun -N 1 hostname", clusterCreationSmokeJobTimeout.Seconds()))
+	output, err := s.exec.Jail().Run(ctx, fmt.Sprintf("timeout %.0f srun -N 1 hostname", clusterCreationSmokeJobTimeout.Seconds()))
 	if err != nil {
 		return fmt.Errorf("run srun on default partition: %w", err)
 	}
@@ -396,7 +396,7 @@ func (s *ClusterCreation) checkMainSmokeJob(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkHiddenSmokeJob(ctx context.Context) error {
-	output, err := s.exec.ExecJail(ctx, fmt.Sprintf("timeout %.0f srun -p hidden -N 1 hostname", clusterCreationSmokeJobTimeout.Seconds()))
+	output, err := s.exec.Jail().Run(ctx, fmt.Sprintf("timeout %.0f srun -p hidden -N 1 hostname", clusterCreationSmokeJobTimeout.Seconds()))
 	if err != nil {
 		return fmt.Errorf("run srun on hidden partition: %w", err)
 	}
@@ -426,7 +426,7 @@ func (s *ClusterCreation) checkNodeSetSmokeJobs(ctx context.Context) error {
 			command = fmt.Sprintf("timeout %.0f srun -w %s nvidia-smi -L >/dev/null", clusterCreationPerNodeSmokeTimeout.Seconds(), framework.ShellQuote(worker.Name))
 		}
 
-		if _, err := s.exec.ExecJail(ctx, command); err != nil {
+		if _, err := s.exec.Jail().Run(ctx, command); err != nil {
 			problems = append(problems, fmt.Sprintf("%s worker %s smoke job failed: %v", nodeSet.Name, worker.Name, err))
 		}
 	}
@@ -454,7 +454,7 @@ type helmReleaseStatusRef struct {
 }
 
 func kubectlJSON(ctx context.Context, exec framework.Exec, out any, args ...string) error {
-	output, err := framework.RunWithDefaultRetry(ctx, exec, "kubectl", args...)
+	output, err := exec.RunWithDefaultRetry(ctx, "kubectl", args...)
 	if err != nil {
 		return err
 	}

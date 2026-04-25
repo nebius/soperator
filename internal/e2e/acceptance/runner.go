@@ -38,11 +38,11 @@ type Runner struct {
 func NewRunner(state *framework.ClusterState, runUnstableTests bool) *Runner {
 	if state == nil {
 		state = &framework.ClusterState{
-			WorkersByNodeSet: make(map[string][]framework.WorkerRef),
+			WorkersByNodeSet: make(map[string][]framework.WorkerPodRef),
 		}
 	}
 	if state.WorkersByNodeSet == nil {
-		state.WorkersByNodeSet = make(map[string][]framework.WorkerRef)
+		state.WorkersByNodeSet = make(map[string][]framework.WorkerPodRef)
 	}
 	return &Runner{
 		state:            state,
@@ -114,7 +114,7 @@ func (r *Runner) tagFilter() string {
 }
 
 func discoverCluster(ctx context.Context, w *world, state *framework.ClusterState) error {
-	if _, err := framework.RunWithDefaultRetry(ctx, w, "kubectl", "get", "pods", "-n", soperatorNamespace); err != nil {
+	if _, err := w.RunWithDefaultRetry(ctx, "kubectl", "get", "pods", "-n", soperatorNamespace); err != nil {
 		return err
 	}
 	if err := verifyPodReady(ctx, w, soperatorNamespace, "login-0"); err != nil {
@@ -123,20 +123,20 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 	if err := verifyPodReady(ctx, w, soperatorNamespace, "controller-0"); err != nil {
 		return fmt.Errorf("verify controller pod: %w", err)
 	}
-	if _, err := framework.ExecControllerWithDefaultRetry(ctx, w, "true"); err != nil {
+	if _, err := w.Controller().RunWithDefaultRetry(ctx, "true"); err != nil {
 		return fmt.Errorf("exec controller sanity check: %w", err)
 	}
-	if _, err := framework.ExecJailWithDefaultRetry(ctx, w, "true"); err != nil {
+	if _, err := w.Jail().RunWithDefaultRetry(ctx, "true"); err != nil {
 		return fmt.Errorf("exec login jail sanity check: %w", err)
 	}
 
-	workerOutput, err := framework.ExecControllerWithDefaultRetry(ctx, w, `sinfo -hN -p main -o '%N'`)
+	workerOutput, err := w.Controller().RunWithDefaultRetry(ctx, `sinfo -hN -p main -o '%N'`)
 	if err != nil {
 		return fmt.Errorf("discover worker nodes: %w", err)
 	}
 
 	seen := make(map[string]struct{})
-	var workers []framework.WorkerRef
+	var workers []framework.WorkerPodRef
 	for _, line := range strings.Split(workerOutput, "\n") {
 		name := strings.TrimSpace(line)
 		if name == "" {
@@ -146,7 +146,7 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 			continue
 		}
 		seen[name] = struct{}{}
-		workers = append(workers, framework.WorkerRef{Name: name})
+		workers = append(workers, framework.WorkerPodRef{Name: name})
 	}
 	if len(workers) == 0 {
 		return fmt.Errorf("no worker nodes discovered")
@@ -165,6 +165,8 @@ func featurePaths() []string {
 		"features/internal_ssh.feature",
 		"features/package_installation.feature",
 		"features/node_replacement.feature",
+		"features/docker_containers.feature",
+		"features/enroot_containers.feature",
 		"features/topology.feature",
 	}
 }
@@ -173,11 +175,14 @@ func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
 	registerTimingHooks(sc)
 
 	w := newWorld(r.state)
+	slurm := framework.NewSlurmClient(w)
 
 	steps.NewClusterCreation(r.state, w).Register(sc)
-	steps.NewInternalSSH(w).Register(sc)
-	steps.NewPackageInstallation(w).Register(sc)
-	steps.NewNodeReplacement(w).Register(sc)
+	steps.NewInternalSSH(w, slurm).Register(sc)
+	steps.NewPackageInstallation(w, slurm).Register(sc)
+	steps.NewNodeReplacement(w, slurm).Register(sc)
+	steps.NewDockerContainers(w, slurm).Register(sc)
+	steps.NewEnrootContainers(w, slurm).Register(sc)
 	steps.NewTopology(r.state, w).Register(sc)
 }
 
@@ -229,7 +234,7 @@ func (w *world) logf(format string, args ...any) {
 	log.Printf("%s: %s", w.logPrefix, fmt.Sprintf(format, args...))
 }
 
-func workerNames(workers []framework.WorkerRef) string {
+func workerNames(workers []framework.WorkerPodRef) string {
 	if len(workers) == 0 {
 		return "<none>"
 	}
@@ -241,7 +246,7 @@ func workerNames(workers []framework.WorkerRef) string {
 }
 
 func verifyPodReady(ctx context.Context, w *world, namespace, name string) error {
-	output, err := framework.RunWithDefaultRetry(ctx, w, "kubectl", "get", "pod", "-n", namespace, name, "-o", "json")
+	output, err := w.RunWithDefaultRetry(ctx, "kubectl", "get", "pod", "-n", namespace, name, "-o", "json")
 	if err != nil {
 		return err
 	}
@@ -262,7 +267,7 @@ func verifyPodReady(ctx context.Context, w *world, namespace, name string) error
 }
 
 func classifyWorkers(state *framework.ClusterState) {
-	state.WorkersByNodeSet = make(map[string][]framework.WorkerRef, len(state.ExpectedNodeSets))
+	state.WorkersByNodeSet = make(map[string][]framework.WorkerPodRef, len(state.ExpectedNodeSets))
 	state.GPUWorkers = nil
 
 	if len(state.ExpectedNodeSets) == 0 {

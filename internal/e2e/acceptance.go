@@ -10,7 +10,7 @@ import (
 
 func RunAcceptance(ctx context.Context, cfg Config) error {
 	state := &framework.ClusterState{
-		WorkersByNodeSet: make(map[string][]framework.WorkerRef),
+		WorkersByNodeSet: make(map[string][]framework.WorkerPodRef),
 	}
 	for _, nodeSet := range cfg.Profile.NodeSets {
 		state.ExpectedNodeSets = append(state.ExpectedNodeSets, framework.ExpectedNodeSet{
