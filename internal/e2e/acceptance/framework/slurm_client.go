@@ -116,12 +116,12 @@ func (s *SlurmClient) JobState(ctx context.Context, jobID string) (state, sacctD
 	if id == "" {
 		return "", "", fmt.Errorf("job id is empty")
 	}
-	rawState, queueErr := s.exec.Jail().Run(ctx, fmt.Sprintf("squeue -h -j %s -o '%%T' 2>/dev/null || true", ShellQuote(id)))
+	rawState, queueErr := s.exec.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("squeue -h -j %s -o '%%T' 2>/dev/null || true", ShellQuote(id)))
 	if queueErr != nil {
 		return "", "", fmt.Errorf("query squeue for job %s: %w", id, queueErr)
 	}
 	state = strings.TrimSpace(rawState)
-	rawDump, sacctErr := s.exec.Jail().Run(ctx, fmt.Sprintf(
+	rawDump, sacctErr := s.exec.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf(
 		"sacct -j %s --noheader --parsable2 --format=JobID,State,ExitCode,Reason,Start,End 2>/dev/null || true",
 		ShellQuote(id),
 	))
@@ -130,6 +130,22 @@ func (s *SlurmClient) JobState(ctx context.Context, jobID string) (state, sacctD
 		return state, "", nil //nolint:nilerr // swallowing sacctErr is intentional here
 	}
 	return state, strings.TrimSpace(rawDump), nil
+}
+
+// AssertJobRunning returns an error if jobID is not currently in RUNNING state.
+// Strict equality with "RUNNING": once a scenario has cleared WaitForJobRunning,
+// transitions back to PENDING / COMPLETING / etc. are unexpected and worth flagging.
+// The returned error carries the observed state; sacct dump and log tails are
+// expected to come from a call‑site wrapper such as AnnotateWithJobLog.
+func (s *SlurmClient) AssertJobRunning(ctx context.Context, jobID string) error {
+	state, _, err := s.JobState(ctx, jobID)
+	if err != nil {
+		return err
+	}
+	if state != "RUNNING" {
+		return fmt.Errorf("expected job %s to be RUNNING, got state=%q", strings.TrimSpace(jobID), state)
+	}
+	return nil
 }
 
 // IsJobAliveState reports whether state represents a job that Slurm still considers live

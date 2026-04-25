@@ -58,6 +58,7 @@ func (s *DockerContainers) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^Docker overlayfs storage is populated on a worker$`, s.dockerOverlayfsStorageIsPopulatedOnAWorker)
 	sc.Step(`^Docker container content blobs are populated on a worker$`, s.dockerContainerContentBlobsArePopulatedOnAWorker)
 	sc.Step(`^a Docker container from the job is running on workers$`, s.aDockerContainerFromTheJobIsRunningOnWorkers)
+	sc.Step(`^the Docker NCCL job is still running$`, s.theDockerNCCLJobIsStillRunning)
 	sc.Step(`^the Docker NCCL job is cancelled$`, s.theDockerNCCLJobIsCancelled)
 	sc.Step(`^Docker containers from that job are no longer running$`, s.dockerContainersFromThatJobAreNoLongerRunning)
 }
@@ -102,6 +103,14 @@ func (s *DockerContainers) theDockerNCCLJobIsRunning(ctx context.Context) error 
 	}
 	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job,
 		s.slurm.WaitForJobRunning(ctx, s.job.ID, dockerJobStartTimeout))
+}
+
+func (s *DockerContainers) theDockerNCCLJobIsStillRunning(ctx context.Context) error {
+	if s.job.IsZero() {
+		return fmt.Errorf("Docker job ID is empty")
+	}
+	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job,
+		s.slurm.AssertJobRunning(ctx, s.job.ID))
 }
 
 func (s *DockerContainers) dockerOverlayfsStorageIsPopulatedOnAWorker(ctx context.Context) error {

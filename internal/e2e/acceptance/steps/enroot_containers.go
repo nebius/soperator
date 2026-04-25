@@ -67,10 +67,12 @@ func (s *EnrootContainers) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^Enroot cache is populated on local storage on a worker$`, s.enrootCacheIsPopulatedOnLocalStorageOnAWorker)
 	sc.Step(`^Enroot squashfs image is present on a worker$`, s.enrootSquashfsImageIsPresentOnAWorker)
 	sc.Step(`^Enroot runtime container data is visible while the job is running$`, s.enrootRuntimeContainerDataIsVisibleWhileTheJobIsRunning)
+	sc.Step(`^the Enroot NCCL job is still running$`, s.theEnrootNCCLJobIsStillRunning)
 	sc.Step(`^the Enroot NCCL job is cancelled$`, s.theEnrootNCCLJobIsCancelled)
 	sc.Step(`^Enroot runtime data is cleaned up and squashfs cache remains$`, s.enrootRuntimeDataIsCleanedUpAndSquashfsCacheRemains)
 	sc.Step(`^the same Enroot NCCL job is submitted again$`, s.theSameEnrootNCCLJobIsSubmittedAgain)
 	sc.Step(`^Enroot runtime data is repopulated without changing the squashfs artifact$`, s.enrootRuntimeDataIsRepopulatedWithoutChangingTheSquashfsArtifact)
+	sc.Step(`^the repeated Enroot NCCL job is still running$`, s.theEnrootNCCLJobIsStillRunning)
 	sc.Step(`^the repeated Enroot NCCL job is cancelled$`, s.theRepeatedEnrootNCCLJobIsCancelled)
 	sc.Step(`^a named Enroot container job is submitted$`, s.aNamedEnrootContainerJobIsSubmitted)
 	sc.Step(`^the named Enroot runtime directory remains after cancellation$`, s.theNamedEnrootRuntimeDirectoryRemainsAfterCancellation)
@@ -88,6 +90,14 @@ func (s *EnrootContainers) theEnrootNCCLJobIsRunning(ctx context.Context) error 
 	}
 	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job,
 		s.slurm.WaitForJobRunning(ctx, s.job.ID, enrootJobStartTimeout))
+}
+
+func (s *EnrootContainers) theEnrootNCCLJobIsStillRunning(ctx context.Context) error {
+	if s.job.IsZero() {
+		return fmt.Errorf("enroot job id is empty")
+	}
+	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job,
+		s.slurm.AssertJobRunning(ctx, s.job.ID))
 }
 
 func (s *EnrootContainers) enrootCacheIsPopulatedOnLocalStorageOnAWorker(ctx context.Context) error {
@@ -248,6 +258,12 @@ func (s *EnrootContainers) aNamedEnrootContainerJobIsSubmitted(ctx context.Conte
 			return true, nil
 		})
 	if err := framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job, err); err != nil {
+		return err
+	}
+	// Mirror the explicit "still running" Gherkin step from the other cancellations:
+	// catch the case where the named job died between dir‑creation and our cancel.
+	if err := framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job,
+		s.slurm.AssertJobRunning(ctx, s.job.ID)); err != nil {
 		return err
 	}
 	return s.cancelCurrentJob(ctx)

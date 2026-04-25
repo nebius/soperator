@@ -6,5 +6,6 @@ Feature: Docker containers
     Then Docker overlayfs storage is populated on a worker
     And Docker container content blobs are populated on a worker
     And a Docker container from the job is running on workers
+    And the Docker NCCL job is still running
     When the Docker NCCL job is cancelled
     Then Docker containers from that job are no longer running
