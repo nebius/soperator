@@ -176,6 +176,29 @@ jobs:
           GOARCH: arm64
           GOOS: darwin
 
+  build-e2e:
+    needs: [changes]
+    if: needs.changes.outputs.should_build == 'true'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install GO
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: "go.mod"
+          cache: false
+
+      # cmd/e2e is the only Go binary not built by any image build, so it is
+      # the only one that can break unnoticed on a merge to main.
+      - name: go build ./cmd/e2e
+        shell: bash
+        run: go build -o /dev/null ./cmd/e2e
+
   build-soperator-images:
     needs:
       - changes
@@ -817,6 +840,7 @@ jobs:
       - changes
       - pre-build
       - lint
+      - build-e2e
       - build-slurm-images
       - build-soperator-images
       - manifest-populate-jail
