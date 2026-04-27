@@ -337,7 +337,7 @@ func (s *EnrootContainers) submitEnrootJob(ctx context.Context, containerName, j
 		s.connectionWorker = s.workers[0]
 	}
 
-	image, err := framework.RequiredEnv("E2E_ENROOT_IMAGE")
+	image, err := PrepullContainerImageEnroot(ctx, s.exec)
 	if err != nil {
 		return err
 	}

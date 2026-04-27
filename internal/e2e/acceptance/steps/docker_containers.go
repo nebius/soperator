@@ -71,7 +71,7 @@ func (s *DockerContainers) aLongRunningDockerNCCLJobIsSubmittedOnTwoGPUWorkers(c
 	s.workers = workers
 	s.connectionWorker = s.workers[0]
 
-	image, err := framework.RequiredEnv("E2E_DOCKER_IMAGE")
+	image, err := PrepullContainerImageDocker(ctx, s.exec)
 	if err != nil {
 		return err
 	}
