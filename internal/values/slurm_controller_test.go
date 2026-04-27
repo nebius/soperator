@@ -21,7 +21,7 @@ func TestBuildSlurmControllerFrom_SSSD(t *testing.T) {
 			Volumes: slurmv1.SlurmNodeControllerVolumes{Spool: slurmv1.NodeVolume{}, Jail: slurmv1.NodeVolume{}},
 		}
 
-		result := buildSlurmControllerFrom("test-cluster", nil, controller)
+		result := buildSlurmControllerFrom("test-cluster", "", nil, controller)
 
 		if assert.NotNil(t, result.ContainerSSSD) {
 			assert.Equal(t, "sssd-image", result.ContainerSSSD.Image)
@@ -42,7 +42,7 @@ func TestBuildSlurmControllerFrom_SSSD(t *testing.T) {
 			Volumes: slurmv1.SlurmNodeControllerVolumes{Spool: slurmv1.NodeVolume{}, Jail: slurmv1.NodeVolume{}},
 		}
 
-		result := buildSlurmControllerFrom("test-cluster", nil, controller)
+		result := buildSlurmControllerFrom("test-cluster", "", nil, controller)
 
 		assert.False(t, result.IsSSSDSecretDefault)
 		assert.Equal(t, "custom-controller-sssd-secret", result.SSSDConfSecretName)
@@ -55,7 +55,7 @@ func TestBuildSlurmControllerFrom_SSSD(t *testing.T) {
 			Volumes:   slurmv1.SlurmNodeControllerVolumes{Spool: slurmv1.NodeVolume{}, Jail: slurmv1.NodeVolume{}},
 		}
 
-		result := buildSlurmControllerFrom("test-cluster", nil, controller)
+		result := buildSlurmControllerFrom("test-cluster", "", nil, controller)
 
 		assert.Nil(t, result.ContainerSSSD)
 		assert.Equal(t, naming.BuildSecretSSSDConfName("test-cluster"), result.SSSDConfSecretName)

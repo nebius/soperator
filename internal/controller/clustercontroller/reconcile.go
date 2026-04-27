@@ -224,7 +224,12 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 	var clusterValues *values.SlurmCluster
 	{
 		var errReconciliation error
-		clusterValues, errReconciliation = values.BuildSlurmClusterFrom(ctx, cluster)
+		var namePrefix string
+		namePrefix, errReconciliation = resourcegetter.ResolveWorkloadNamePrefix(ctx, r.Client, cluster.Namespace, cluster.Name)
+		if errReconciliation != nil {
+			return ctrl.Result{}, errReconciliation
+		}
+		clusterValues, errReconciliation = values.BuildSlurmClusterFrom(ctx, cluster, namePrefix)
 		if errReconciliation != nil {
 			return ctrl.Result{}, errReconciliation
 		}
