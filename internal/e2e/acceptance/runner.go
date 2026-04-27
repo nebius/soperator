@@ -184,6 +184,20 @@ func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
 	steps.NewDockerContainers(w, slurm).Register(sc)
 	steps.NewEnrootContainers(w, slurm).Register(sc)
 	steps.NewTopology(r.state, w).Register(sc)
+
+	registerSkipHook(sc)
+}
+
+func registerSkipHook(sc *godog.ScenarioContext) {
+	sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
+		for _, t := range scenario.Tags {
+			if t.Name == "@skip" {
+				log.Printf("acceptance: scenario %q has @skip, marking as skipped", scenario.Name)
+				return ctx, godog.ErrSkip
+			}
+		}
+		return ctx, nil
+	})
 }
 
 func registerTimingHooks(sc *godog.ScenarioContext) {
