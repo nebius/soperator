@@ -4,8 +4,8 @@ helmRepository:
     url: oci://cr.eu-north1.nebius.cloud/soperator
     type: oci
   kruise:
-    url: https://openkruise.github.io/charts/
-    type: default
+    url: oci://cr.eu-north1.nebius.cloud/soperator
+    type: oci
   certManager:
     url: https://charts.jetstack.io
     type: default
@@ -515,7 +515,7 @@ soperator:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 1.8.0
+    version: 1.8.3-custom
     releaseName: soperator-kruise
     install:
       crds: CreateReplace
@@ -535,7 +535,6 @@ soperator:
           repository: cr.eu-north1.nebius.cloud/soperator/kruise-manager
         resources:
           limits:
-            cpu: 1000m
             memory: 2Gi
           requests:
             cpu: 1000m
