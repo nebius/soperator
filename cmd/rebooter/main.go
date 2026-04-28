@@ -114,7 +114,7 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.StringVar(&logFormat, "log-format", "json", "Log format: plain or json")
 	flag.StringVar(&logLevel, "log-level", "debug", "Log level: debug, info, warn, error, dpanic, panic, fatal")
-	flag.DurationVar(&reconcileTimeout, "reconcile-timeout", 3*time.Minute, "The maximum duration allowed for a single reconcile if some error occurs")
+	flag.DurationVar(&reconcileTimeout, "reconcile-timeout", 1*time.Minute, "The maximum duration allowed for a single reconcile if some error occurs")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
 	flag.Parse()
 
@@ -142,6 +142,11 @@ func main() {
 	tlsOpts := []func(*tls.Config){}
 	if !enableHTTP2 {
 		tlsOpts = append(tlsOpts, disableHTTP2)
+	}
+
+	nodeName := os.Getenv(consts.RebooterNodeNameEnv)
+	if nodeName == "" {
+		cli.Fail(setupLog, fmt.Errorf("%s environment variable is not set", consts.RebooterNodeNameEnv), "unable to determine rebooter node name")
 	}
 
 	webhookServer := webhook.NewServer(webhook.Options{
@@ -177,13 +182,7 @@ func main() {
 
 	rebooterParams := rebooter.RebooterParams{
 		ReconcileTimeout: reconcileTimeout,
-	}
-
-	// Rebooter is a daemonset and should only reconcile the node it is running on
-	rebooterParams.NodeName = os.Getenv(consts.RebooterNodeNameEnv)
-	if rebooterParams.NodeName == "" {
-		errorStr := fmt.Errorf("%s environment variable is not set", consts.RebooterMethodEnv)
-		cli.Fail(setupLog, errorStr, "unable to determine rebooter node name")
+		NodeName:         nodeName,
 	}
 
 	envEvictionMethod := os.Getenv(consts.RebooterMethodEnv)
@@ -196,11 +195,18 @@ func main() {
 	default:
 		rebooterParams.EvictionMethod = consts.RebooterEvict
 	}
+	nodePodsFetcher, err := rebooter.NewAPIServerNodePodsFetcher(mgr.GetConfig())
+	if err != nil {
+		cli.Fail(setupLog, err, "unable to create node pods fetcher")
+	}
+
 	if err = rebooter.NewRebooterReconciler(
 		mgr.GetClient(),
+		mgr.GetAPIReader(),
 		mgr.GetScheme(),
 		mgr.GetEventRecorderFor(rebooter.ControllerName),
 		rebooterParams,
+		nodePodsFetcher,
 	).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout, rebooterParams.NodeName); err != nil {
 		cli.Fail(setupLog, err, "unable to create controller", rebooter.ControllerName)
 	}

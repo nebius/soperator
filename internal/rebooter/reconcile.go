@@ -11,24 +11,27 @@ import (
 	"github.com/mackerelio/go-osstat/uptime"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 )
 
-//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;
-//+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;update
+//+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=core,resources=nodes/status,verbs=get;update;patch;watch;list
+//+kubebuilder:rbac:groups=core,resources=nodes/proxy,verbs=get
 
 var (
 	ControllerName = "rebooter"
@@ -42,23 +45,29 @@ type RebooterParams struct {
 
 type RebooterReconciler struct {
 	*reconciler.Reconciler
+	APIReader        client.Reader
 	reconcileTimeout time.Duration
 	nodeName         string
 	evictionMethod   consts.RebooterMethod
+	NodePodsFetcher  NodePodsFetcher
 }
 
 func NewRebooterReconciler(
-	client client.Client,
+	c client.Client,
+	apiReader client.Reader,
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
 	rebooterParams RebooterParams,
+	nodePodsFetcher NodePodsFetcher,
 ) *RebooterReconciler {
-	r := reconciler.NewReconciler(client, scheme, recorder)
+	r := reconciler.NewReconciler(c, scheme, recorder)
 	return &RebooterReconciler{
 		Reconciler:       r,
+		APIReader:        apiReader,
 		reconcileTimeout: rebooterParams.ReconcileTimeout,
 		nodeName:         rebooterParams.NodeName,
 		evictionMethod:   rebooterParams.EvictionMethod,
+		NodePodsFetcher:  nodePodsFetcher,
 	}
 }
 
@@ -99,6 +108,10 @@ func (r *RebooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	logger.V(1).Info("Starting handling node reboot")
 	if err := r.handleNodeReboot(ctx, node, nodeActions); err != nil {
+		if apierrors.IsConflict(err) {
+			logger.V(1).Info("Conflict during reboot handling, requeueing")
+			return ctrl.Result{Requeue: true}, nil
+		}
 		return ctrl.Result{}, err
 	}
 
@@ -106,10 +119,11 @@ func (r *RebooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
 }
 
-// getNode returns the node with the given name.
+// getNode returns the node with the given name directly from the API server,
+// bypassing the informer cache.
 func (r *RebooterReconciler) getNode(ctx context.Context) (*corev1.Node, error) {
 	node := &corev1.Node{}
-	if err := r.Get(ctx, client.ObjectKey{Name: r.nodeName}, node); err != nil {
+	if err := r.APIReader.Get(ctx, client.ObjectKey{Name: r.nodeName}, node); err != nil {
 		return nil, fmt.Errorf("failed to get node %s: %w", r.nodeName, err)
 	}
 	return node, nil
@@ -179,6 +193,10 @@ func (r *RebooterReconciler) handleDrainError(ctx context.Context, err error) (c
 	if errors.As(err, &podErr) {
 		log.FromContext(ctx).V(1).Info("Reenqueueing reconciliation due to failed pod eviction")
 		return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
+	}
+	if apierrors.IsConflict(err) {
+		log.FromContext(ctx).V(1).Info("Conflict during drain handling, requeueing")
+		return ctrl.Result{Requeue: true}, nil
 	}
 	return ctrl.Result{}, fmt.Errorf("failed to drain node: %w", err)
 }
@@ -325,7 +343,7 @@ func (r *RebooterReconciler) DrainNodeIfNeeded(ctx context.Context, node *corev1
 	}
 
 	logger.Info("Evicting pods from node")
-	if err := r.AreAllPodsEvicted(ctx, node.Name); err != nil {
+	if err := r.AreAllPodsEvicted(ctx, node); err != nil {
 		return err
 	}
 
@@ -343,8 +361,13 @@ func (r *RebooterReconciler) SetNodeUnschedulable(ctx context.Context, node *cor
 	logger := log.FromContext(ctx).WithName("SetNodeUnschedulable").WithValues("nodeName", node.Name).V(1)
 	logger.Info("Setting node schedulable status", "unschedulable", unschedulable)
 
-	node.Spec.Unschedulable = unschedulable
-	if err := r.Update(ctx, node); err != nil {
+	if err := r.patchNodeSpecWithRetry(ctx, node, func(currentNode *corev1.Node) (bool, error) {
+		if currentNode.Spec.Unschedulable == unschedulable {
+			return false, nil
+		}
+		currentNode.Spec.Unschedulable = unschedulable
+		return true, nil
+	}); err != nil {
 		return fmt.Errorf("failed to update node %s to  is %v: %w", node.Name, unschedulable, err)
 	}
 	return nil
@@ -363,35 +386,67 @@ func (r *RebooterReconciler) TaintNodeWithNoExecute(ctx context.Context, node *c
 		Effect: corev1.TaintEffectNoExecute,
 	}
 
-	if addTaint {
-		if r.IsNodeTaintedWithNoExecute(node) {
-			logger.Info("Node already has NoExecute taint", "node name", node.Name)
-			return nil
+	if err := r.patchNodeSpecWithRetry(ctx, node, func(currentNode *corev1.Node) (bool, error) {
+		if addTaint {
+			if r.IsNodeTaintedWithNoExecute(currentNode) {
+				logger.Info("Node already has NoExecute taint", "node name", currentNode.Name)
+				return false, nil
+			}
+			currentNode.Spec.Taints = append(currentNode.Spec.Taints, taint)
+			logger.Info("Adding NoExecute taint to node", "node name", currentNode.Name)
+			return true, nil
 		}
-		node.Spec.Taints = append(node.Spec.Taints, taint)
-		logger.Info("Adding NoExecute taint to node", "node name", node.Name)
-	} else {
-		newTaints := []corev1.Taint{}
-		for _, t := range node.Spec.Taints {
+
+		newTaints := make([]corev1.Taint, 0, len(currentNode.Spec.Taints))
+		for _, t := range currentNode.Spec.Taints {
 			if t.Key != taint.Key || t.Effect != taint.Effect {
 				newTaints = append(newTaints, t)
 			}
 		}
-		if len(newTaints) == len(node.Spec.Taints) {
-			logger.Info("Node does not have NoExecute taint", "node name", node.Name)
-			return nil
+		if len(newTaints) == len(currentNode.Spec.Taints) {
+			logger.Info("Node does not have NoExecute taint", "node name", currentNode.Name)
+			return false, nil
 		}
-		node.Spec.Taints = newTaints
-		logger.Info("Removing NoExecute taint from node", "node name", node.Name)
-	}
-
-	if err := r.Update(ctx, node); err != nil {
+		currentNode.Spec.Taints = newTaints
+		logger.Info("Removing NoExecute taint from node", "node name", currentNode.Name)
+		return true, nil
+	}); err != nil {
 		logger.Error(err, "Failed to update node with NoExecute taint modification", "node name", node.Name)
 		return err
 	}
 
 	logger.Info("Successfully modified NoExecute taint on node", "node name", node.Name)
 	return nil
+}
+
+func (r *RebooterReconciler) patchNodeSpecWithRetry(
+	ctx context.Context,
+	node *corev1.Node,
+	mutate func(*corev1.Node) (bool, error),
+) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		currentNode := &corev1.Node{}
+		if err := r.APIReader.Get(ctx, client.ObjectKeyFromObject(node), currentNode); err != nil {
+			return fmt.Errorf("get latest node %s: %w", node.Name, err)
+		}
+
+		base := currentNode.DeepCopy()
+		changed, err := mutate(currentNode)
+		if err != nil {
+			return err
+		}
+		if !changed {
+			*node = *currentNode
+			return nil
+		}
+
+		if err := r.Client.Patch(ctx, currentNode, client.MergeFrom(base)); err != nil {
+			return fmt.Errorf("patch object: %w", err)
+		}
+
+		*node = *currentNode
+		return nil
+	})
 }
 
 // IsNodeTaintedWithNoExecute check if the taint already exists
@@ -404,32 +459,31 @@ func (r *RebooterReconciler) IsNodeTaintedWithNoExecute(node *corev1.Node) bool 
 	return false
 }
 
-// AreAllPodsEvicted checks if all pods on the node with the given name are evicted.
-func (r *RebooterReconciler) AreAllPodsEvicted(ctx context.Context, nodeName string) error {
-	logger := log.FromContext(ctx).WithName("EvictPodsFromNode").WithValues("nodeName", nodeName).V(1)
-	logger.Info("Listing pods on node")
+// AreAllPodsEvicted checks if all pods on the node are evicted by querying
+// the API server's node proxy endpoint. This avoids loading full PodList
+// objects into the informer cache while staying on the API server's auth path.
+func (r *RebooterReconciler) AreAllPodsEvicted(ctx context.Context, node *corev1.Node) error {
+	logger := log.FromContext(ctx).WithName("AreAllPodsEvicted").WithValues("nodeName", node.Name).V(1)
 
-	podList := &corev1.PodList{}
-	if err := r.List(ctx, podList, client.MatchingFields{"spec.nodeName": nodeName}); err != nil {
-		return fmt.Errorf("failed to list pods on node %s: %w", nodeName, err)
+	podList, err := r.NodePodsFetcher.GetPodsOnNode(ctx, node.Name)
+	if err != nil {
+		return fmt.Errorf("fetch pods on node %s: %w", node.Name, err)
 	}
 
-	for _, pod := range podList.Items {
-		if IsControlledByDaemonSet(pod) {
+	logger.Info("Checking pods via API server proxy", "count", len(podList.Items))
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if IsControlledByDaemonSet(*pod) {
 			continue
 		}
-
-		if HasTolerationForNoExecute(pod) {
+		if HasTolerationForNoExecute(*pod) {
 			continue
 		}
-
-		if HasTolerationForExists(pod) {
+		if HasTolerationForExists(*pod) {
 			continue
 		}
-
 		return &PodNotEvictableError{PodName: pod.Name}
 	}
-
 	return nil
 }
 
@@ -478,7 +532,7 @@ func (r *RebooterReconciler) setNodeCondition(
 	message consts.MessageConditionType,
 ) error {
 	if err := r.SetNodeConditionIfNotExists(ctx, node, conditionType, status, reason, message); err != nil {
-		return fmt.Errorf("failed to set node condition for node %s: %w", r.nodeName, err)
+		return fmt.Errorf("set node condition for node %s: %w", r.nodeName, err)
 	}
 	return nil
 }
@@ -511,8 +565,11 @@ func (r *RebooterReconciler) SetNodeConditionIfNotExists(
 	// In Kubernetes, the status is considered a "system-owned" object and cannot be
 	// modified using a regular Update call.
 	// Instead, changes to the status must be made using the Status().Update method.
-	for i, cond := range node.Status.Conditions {
-		if cond.Type == conditionType {
+	return r.patchNodeStatusWithRetry(ctx, node, func(currentNode *corev1.Node) (bool, error) {
+		for i, cond := range currentNode.Status.Conditions {
+			if cond.Type != conditionType {
+				continue
+			}
 
 			if cond.Status == status && cond.Reason == string(reason) {
 				logger.Info(fmt.Sprintf("Node already has condition %s set to %s", conditionType, status))
@@ -520,16 +577,14 @@ func (r *RebooterReconciler) SetNodeConditionIfNotExists(
 			}
 
 			logger.Info("Updating existing condition on node")
-			patch := client.MergeFrom(node.DeepCopy())
-			node.Status.Conditions[i] = newNodeCondition
-
-			return r.Status().Patch(ctx, node, patch)
+			currentNode.Status.Conditions[i] = newNodeCondition
+			return true, nil
 		}
-	}
 
-	logger.Info("Adding new condition to node")
-	node.Status.Conditions = append(node.Status.Conditions, newNodeCondition)
-	return r.UpdateStatus(ctx, node)
+		logger.Info("Adding new condition to node")
+		currentNode.Status.Conditions = append(currentNode.Status.Conditions, newNodeCondition)
+		return true, nil
+	})
 }
 
 // RebootNode reboots the node with the given name.
@@ -551,100 +606,35 @@ func (r *RebooterReconciler) RebootNode(ctx context.Context, node *corev1.Node) 
 }
 
 // SetupWithManager sets up the controller with the Manager.
+// No node informer is registered — this avoids a LIST+WATCH against the API server
+// at startup. Instead, one GenericEvent is sent on startCh to kick off the first
+// reconcile; subsequent cycles are driven by ctrl.Result{RequeueAfter: ...}.
 func (r *RebooterReconciler) SetupWithManager(
 	mgr ctrl.Manager, maxConcurrency int, cacheSyncTimeout time.Duration, nodeName string,
 ) error {
-	ctx := context.Background()
-
-	// Index pods by node name. This is used to list and evict pods from a specific node.
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
-		pod := rawObj.(*corev1.Pod)
-		// Check if the pod.Spec.NodeName is the same as the nodeName.
-		// If it is, return the nodeName to index the pod by it.
-		if pod.Spec.NodeName == nodeName {
-			return []string{pod.Spec.NodeName}
-		}
-		return nil
-	}); err != nil {
-		return fmt.Errorf("failed to setup field indexer: %w", err)
-	}
-
-	// Index the nodes by name
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Node{}, "metadata.name", func(rawObj client.Object) []string {
-		node := rawObj.(*corev1.Node)
-		if node.Name == nodeName {
-			return []string{node.Name}
-		}
-		return nil
-	}); err != nil {
-		return fmt.Errorf("failed to setup node field indexer: %w", err)
+	startCh := make(chan event.GenericEvent, 1)
+	startCh <- event.GenericEvent{
+		Object: &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}},
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Node{}, builder.WithPredicates(predicate.Funcs{
-			UpdateFunc: func(e event.UpdateEvent) bool {
-				// Rebooter is daemonset and should only reconcile the node it is running on
-				// so we compare the node name to the NODE_NAME environment variable
-				if e.ObjectNew.GetName() != nodeName {
-					return false
-				}
-				oldNode := e.ObjectOld.(*corev1.Node)
-				newNode := e.ObjectNew.(*corev1.Node)
-
-				// Extract the desired conditions from both old and new nodes
-				// and compare them to determine if reconciliation is needed
-				// based on the conditions changing
-				var oldDrainCondition, newDrainCondition, oldRebootCondition, newRebootCondition *corev1.NodeCondition
-				for i := range oldNode.Status.Conditions {
-					if oldNode.Status.Conditions[i].Type == consts.SlurmNodeDrain {
-						oldDrainCondition = &oldNode.Status.Conditions[i]
-					} else if oldNode.Status.Conditions[i].Type == consts.SlurmNodeReboot {
-						oldRebootCondition = &oldNode.Status.Conditions[i]
-					}
-				}
-				for i := range newNode.Status.Conditions {
-					if newNode.Status.Conditions[i].Type == consts.SlurmNodeDrain {
-						newDrainCondition = &newNode.Status.Conditions[i]
-					} else if newNode.Status.Conditions[i].Type == consts.SlurmNodeReboot {
-						newRebootCondition = &newNode.Status.Conditions[i]
-					}
-				}
-
-				// Trigger reconciliation if the Drain condition has changed
-				if oldDrainCondition == nil || newDrainCondition == nil || oldDrainCondition.Status != newDrainCondition.Status {
-					return true
-				}
-
-				// Trigger reconciliation if the Reboot condition has changed
-				if oldRebootCondition == nil || newRebootCondition == nil || oldRebootCondition.Status != newRebootCondition.Status {
-					return true
-				}
-
-				return false
-			},
-			CreateFunc: func(e event.CreateEvent) bool {
-				return e.Object.GetName() == nodeName
-			},
-			DeleteFunc: func(e event.DeleteEvent) bool {
-				return false
-			},
-			GenericFunc: func(e event.GenericEvent) bool {
-				return e.Object.GetName() == nodeName
-			},
-		})).
+		Named(ControllerName).
+		WatchesRawSource(source.Channel(
+			startCh,
+			handler.EnqueueRequestsFromMapFunc(func(_ context.Context, _ client.Object) []ctrl.Request {
+				return []ctrl.Request{{NamespacedName: types.NamespacedName{Name: nodeName}}}
+			}),
+		)).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
 		Complete(r)
 }
 
-// This workaround is needed because kube-apiserver expects up-to-date objects for the following update operations.
-// And this why we modify the object in-place.
+// Update writes the node spec to the API server. controller-runtime mutates the
+// object in-place with the server response (including the new resourceVersion),
+// so no extra Get is needed to keep subsequent updates consistent.
 func (r *RebooterReconciler) Update(ctx context.Context, node *corev1.Node, opts ...client.UpdateOption) error {
 	if err := r.Client.Update(ctx, node, opts...); err != nil {
 		return fmt.Errorf("failed to update object: %w", err)
-	}
-
-	if err := r.Get(ctx, client.ObjectKey{Name: node.GetName()}, node); err != nil {
-		return fmt.Errorf("failed to get updated node: %w", err)
 	}
 	return nil
 }
@@ -653,9 +643,35 @@ func (r *RebooterReconciler) UpdateStatus(ctx context.Context, node *corev1.Node
 	if err := r.Status().Update(ctx, node, opts...); err != nil {
 		return fmt.Errorf("failed to update object status: %w", err)
 	}
-
-	if err := r.Get(ctx, client.ObjectKey{Name: node.GetName()}, node); err != nil {
-		return fmt.Errorf("failed to get updated node: %w", err)
-	}
 	return nil
+}
+
+func (r *RebooterReconciler) patchNodeStatusWithRetry(
+	ctx context.Context,
+	node *corev1.Node,
+	mutate func(*corev1.Node) (bool, error),
+) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		currentNode := &corev1.Node{}
+		if err := r.APIReader.Get(ctx, client.ObjectKeyFromObject(node), currentNode); err != nil {
+			return fmt.Errorf("get latest node %s: %w", node.Name, err)
+		}
+
+		base := currentNode.DeepCopy()
+		changed, err := mutate(currentNode)
+		if err != nil {
+			return err
+		}
+		if !changed {
+			*node = *currentNode
+			return nil
+		}
+
+		if err := r.Status().Patch(ctx, currentNode, client.MergeFrom(base)); err != nil {
+			return fmt.Errorf("patch object status: %w", err)
+		}
+
+		*node = *currentNode
+		return nil
+	})
 }
