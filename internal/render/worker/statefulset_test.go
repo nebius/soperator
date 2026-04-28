@@ -243,6 +243,7 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			// Verify init container count
 			assert.Len(t, result.Spec.Template.Spec.InitContainers, tt.expectedInitContainerCount,
 				"expected %d init containers", tt.expectedInitContainerCount)
+			assert.Len(t, result.Spec.Template.Spec.Containers, 2, "expected slurmd and docker-proxy containers")
 
 			// Verify worker-init container has topology command when topology plugin is enabled
 			var hasWaitForTopology bool
@@ -275,6 +276,37 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			}
 			assert.Equal(t, tt.expectTopologyVolumes, hasTopologyNodeLabelsVolume,
 				"topology-node-labels volume presence mismatch")
+
+			var hasRuntimeVolume bool
+			var hasDockerProxyContainer bool
+			for _, volume := range result.Spec.Template.Spec.Volumes {
+				if volume.Name == consts.VolumeNameRuntime {
+					hasRuntimeVolume = true
+					assert.NotNil(t, volume.EmptyDir, "runtime volume should be EmptyDir")
+				}
+			}
+			for _, container := range result.Spec.Template.Spec.Containers {
+				if container.Name == consts.ContainerNameDockerProxy {
+					hasDockerProxyContainer = true
+					assert.Equal(t, nodeSet.ContainerSlurmd.Image, container.Image)
+					assert.Equal(t, []string{"/opt/bin/slurm/docker_proxy_nginx_entrypoint.sh"}, container.Command)
+					assert.Len(t, container.VolumeMounts, 1)
+					assert.Equal(t, consts.VolumeNameRuntime, container.VolumeMounts[0].Name)
+					assert.Equal(t, consts.VolumeMountPathRuntime, container.VolumeMounts[0].MountPath)
+				}
+				if container.Name == consts.ContainerNameSlurmd {
+					var hasRuntimeMount bool
+					for _, mount := range container.VolumeMounts {
+						if mount.Name == consts.VolumeNameRuntime && mount.MountPath == consts.VolumeMountPathRuntime {
+							hasRuntimeMount = true
+							break
+						}
+					}
+					assert.True(t, hasRuntimeMount, "slurmd container should mount shared runtime volume")
+				}
+			}
+			assert.True(t, hasRuntimeVolume, "runtime volume should be present")
+			assert.True(t, hasDockerProxyContainer, "docker-proxy sidecar should be present")
 		})
 	}
 }

@@ -144,6 +144,7 @@ slurmConfig:
   defCpuPerGPU: 4
   completeWait: 5
   prolog: /opt/slurm_scripts/prolog.sh
+  taskProlog: /opt/slurm_scripts/task_prolog.sh
   epilog: /opt/slurm_scripts/epilog.sh
   taskPluginParam: ""
   maxJobCount: 20000
@@ -639,17 +640,17 @@ sConfigController:
     # This field is required in the SlurmCluster CR - it will be automatically populated from this value
     name: ""
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:4.0.0-slurm25.11.3"
-  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:4.0.0-slurm25.11.3"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:4.0.0-slurm25.11.3"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:4.0.0-slurm25.11.3"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:4.0.0-slurm25.11.3"
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:4.0.0-slurm25.11.5"
+  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:4.0.0-slurm25.11.5"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:4.0.0-slurm25.11.5"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:4.0.0-slurm25.11.5"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:4.0.0-slurm25.11.5"
   sssd: "cr.eu-north1.nebius.cloud/soperator/sssd:2.9.4-1-63"
   populateJail: ""
   populateJailRepository: "cr.eu-north1.nebius.cloud/soperator/populate_jail"
-  populateJailTag: "4.0.0-slurm25.11.3"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:4.0.0-slurm25.11.3"
-  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:4.0.0-slurm25.11.3"
+  populateJailTag: "4.0.0-slurm25.11.5"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:4.0.0-slurm25.11.5"
+  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:4.0.0-slurm25.11.5"
   sConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:4.0.0"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:12.1.2"
 # Configuration for slurm scripts.
@@ -657,6 +658,7 @@ slurmScripts:
   # Base scripts content can be overridden here
   check_runner.py: null
   prolog.sh: null
+  task_prolog.sh: null
   epilog.sh: null
   hc_program.sh: null
   pyxis_caching_importer.sh: null

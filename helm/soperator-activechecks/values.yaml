@@ -36,10 +36,10 @@ jobContainer:
       persistentVolumeClaim:
         claimName: "jail-pvc"
 images:
-  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:4.0.0-slurm25.11.3"
-  k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:4.0.0-slurm25.11.3"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:4.0.0-slurm25.11.3"
-  sansible: "cr.eu-north1.nebius.cloud/soperator/sansible:4.0.0-slurm25.11.3"
+  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:4.0.0-slurm25.11.5"
+  k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:4.0.0-slurm25.11.5"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:4.0.0-slurm25.11.5"
+  sansible: "cr.eu-north1.nebius.cloud/soperator/sansible:4.0.0-slurm25.11.5"
   activeCheckImageRepository: "cr.eu-north1.nebius.cloud#ml-containers/training_diag"
   activeCheckImageTags:
     # Image training_diag from PR https://github.com/nebius/ml-containers/pull/79
@@ -115,6 +115,19 @@ checks:
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
+  docker-memory-limit-oomkilled:
+    enabled: true
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+      - "wait-for-topology"
+      - "prepull-container-image"
+    suspend: true
+    runAfterCreation: true
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/docker-memory-limit-oomkilled.sh"
+      eachWorkerJobs: true
   dcgmi-diag-r2:
     enabled: true
     checkType: "slurmJob"
@@ -155,6 +168,7 @@ checks:
       - "all-reduce-perf-nccl-with-ib"
       - "all-reduce-perf-nccl-without-ib"
       - "cuda-samples"
+      - "docker-memory-limit-oomkilled"
       - "dcgmi-diag-r2"
       - "dcgmi-diag-r3"
       - "gpu-fryer"
