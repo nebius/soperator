@@ -125,7 +125,6 @@ There are four deployment paths, all based on the same codebase.
 | Path | Best for |
 |---|---|
 | **Self-deploy on any Kubernetes** | Teams running their own K8s, on any cloud or on-premises. [Learn more](https://docs.nebius.com/slurm-soperator/deploy/overview#self-deployment-on-other-platforms-and-on-premises). |
-| **Self-deploy on Nebius (Terraform)** | Teams creating a new cluster on Nebius with Terraform. [Learn more](https://docs.nebius.com/slurm-soperator/deploy/overview#self-deployment-in-nebius-ai-cloud). |
 | **Managed Service for Soperator by Nebius** | Teams that want a managed cluster on Nebius. This service lets you get started with Soperator in just a few clicks using the Nebius web console. [Learn more](https://nebius.com/services/soperator). |
 | **Soperator Pro on Nebius** | Teams that want Nebius engineers to install, tune, and support the cluster. [Learn more](https://docs.nebius.com/slurm-soperator/deploy/overview#pro-solution-for-soperator). |
 
