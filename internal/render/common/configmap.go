@@ -599,6 +599,21 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		))
 	}
 
+	{
+		opts := cluster.PlugStackConfig.NcclInspectorPreConf.DeepCopy()
+		res.AddLine(strings.Join(
+			[]string{
+				utils.Ternary(opts.Required, "required", "optional"),
+				fmt.Sprintf("%s", utils.Ternary(opts.PluginPath != "", opts.PluginPath, "/usr/lib/x86_64-linux-gnu/slurm/spank_nccl_inspector_preconf.so")),
+				fmt.Sprintf("enabled=%d", utils.Ternary(opts.Enabled != nil && *opts.Enabled, 1, 0)),
+				fmt.Sprintf("profiler-plugin=%s", utils.Ternary(opts.ProfilerPlugin != "", opts.ProfilerPlugin, "/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so")),
+				fmt.Sprintf("dump-dir=%s", utils.Ternary(opts.DumpDir != "", opts.DumpDir, "/opt/soperator-outputs/nccl_profiles/%j/%s")),
+				fmt.Sprintf("dump-thread-interval-microseconds=%d", utils.Ternary(opts.DumpThreadIntervalMicroseconds > 0, opts.DumpThreadIntervalMicroseconds, 1000000)),
+			},
+			" ",
+		))
+	}
+
 	for _, plugin := range cluster.PlugStackConfig.CustomPlugins {
 		conf := []string{
 			utils.Ternary(plugin.Required, "required", "optional"),
