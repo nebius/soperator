@@ -314,15 +314,19 @@ func (r *PodEphemeralStorageCheck) initSlurmClientAndGetNode(
 		Namespace: pod.Namespace,
 	}
 
-	if err := r.InitSlurmAPIClients(slurmClusterNamespacedName, slurmClusterName); err != nil {
+	if err := r.ensureNodeCache(ctx, slurmClusterNamespacedName, slurmClusterName); err != nil {
 		return types.NamespacedName{}, slurmapi.Node{}, fmt.Errorf("initializing Slurm API clients: %w", err)
 	}
 
-	slurmNode, err := r.getSlurmNode(ctx, slurmClusterNamespacedName, pod.Name)
-	if err != nil {
-		return types.NamespacedName{}, slurmapi.Node{}, fmt.Errorf("getting Slurm node: %w for pod %s/%s", err, pod.Namespace, pod.Name)
+	nc, found := r.slurmAPIClients.GetNodeCache(slurmClusterNamespacedName)
+	if !found {
+		return types.NamespacedName{}, slurmapi.Node{}, fmt.Errorf("node cache not found for cluster %v", slurmClusterNamespacedName)
 	}
 
+	slurmNode, found := nc.GetNode(pod.Name)
+	if !found {
+		return types.NamespacedName{}, slurmapi.Node{}, fmt.Errorf("slurm node %s not found in cache for cluster %v", pod.Name, slurmClusterNamespacedName)
+	}
 	return slurmClusterNamespacedName, slurmNode, nil
 }
 
@@ -561,40 +565,39 @@ func (r *PodEphemeralStorageCheck) getSlurmClusterName(ctx context.Context, name
 	return slurmClusterName, nil
 }
 
-// InitSlurmAPIClients initializes Slurm API clients for the given Slurm cluster
-func (r *PodEphemeralStorageCheck) InitSlurmAPIClients(
-	slurmClusterNamespacedName types.NamespacedName, slurmClusterName string) error {
-	if _, found := r.slurmAPIClients.GetClient(slurmClusterNamespacedName); found {
-		return nil // Client already exists, no need to create a new one
-	}
-
-	jwtToken := jwt.NewToken(r.Client).For(slurmClusterNamespacedName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
-	slurmAPIServer := fmt.Sprintf("http://%s.%s:6820", naming.BuildServiceName(consts.ComponentTypeREST, slurmClusterName), slurmClusterNamespacedName.Namespace)
-	slurmAPIClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
-	if err != nil {
-		return fmt.Errorf("creating slurm api client: %w", err)
-	}
-	r.slurmAPIClients.AddClient(slurmClusterNamespacedName, slurmAPIClient)
-	return nil
-}
-
-func (c *PodEphemeralStorageCheck) getSlurmNode(
+// ensureNodeCache creates the Slurm API client and starts the node cache background
+// goroutine for the given cluster if they do not already exist, then blocks until
+// the first successful ListNodes refresh completes.
+func (r *PodEphemeralStorageCheck) ensureNodeCache(
 	ctx context.Context,
-	slurmClusterName types.NamespacedName,
-	slurmNodeName string,
-) (slurmapi.Node, error) {
-
-	slurmAPIClient, found := c.slurmAPIClients.GetClient(slurmClusterName)
-	if !found {
-		return slurmapi.Node{}, fmt.Errorf("slurm cluster %v not found", slurmClusterName)
+	slurmClusterNamespacedName types.NamespacedName,
+	slurmClusterName string,
+) error {
+	// Always wait for readiness, even when cache already exists — a concurrent
+	// reconcile may have just created it and the first refresh is still in flight.
+	if nc, found := r.slurmAPIClients.GetNodeCache(slurmClusterNamespacedName); found {
+		return nc.WaitReady(ctx)
 	}
 
-	node, err := slurmAPIClient.GetNode(ctx, slurmNodeName)
-	if err != nil {
-		return slurmapi.Node{}, fmt.Errorf("get node: %w", err)
+	if _, found := r.slurmAPIClients.GetClient(slurmClusterNamespacedName); !found {
+		jwtToken := jwt.NewToken(r.Client).For(slurmClusterNamespacedName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
+		slurmAPIServer := fmt.Sprintf("http://%s.%s:6820", naming.BuildServiceName(consts.ComponentTypeREST, slurmClusterName), slurmClusterNamespacedName.Namespace)
+		slurmAPIClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
+		if err != nil {
+			return fmt.Errorf("creating slurm api client: %w", err)
+		}
+		r.slurmAPIClients.AddClient(slurmClusterNamespacedName, slurmAPIClient)
 	}
 
-	return node, nil
+	nc := r.slurmAPIClients.EnsureNodeCache(
+		slurmClusterNamespacedName,
+		r.reconcileTimeout,
+		log.Log.WithName("NodeCache").WithValues("cluster", slurmClusterNamespacedName),
+	)
+	if nc == nil {
+		return fmt.Errorf("no slurm API client for cluster %v", slurmClusterNamespacedName)
+	}
+	return nc.WaitReady(ctx)
 }
 
 func (r *PodEphemeralStorageCheck) handleLowStorageUsage(ctx context.Context, pod *corev1.Pod) error {

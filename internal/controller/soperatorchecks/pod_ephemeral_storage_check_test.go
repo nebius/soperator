@@ -1706,7 +1706,7 @@ func TestUndrainSlurmNode(t *testing.T) {
 			mockClient := slurmapifake.NewMockClient(t)
 			tt.setupMock(mockClient)
 
-			slurmAPIClients := slurmapi.NewClientSet()
+			slurmAPIClients := slurmapi.NewClientSet(context.Background())
 			slurmAPIClients.AddClient(clusterName, mockClient)
 
 			controller := createTestPodEphemeralStorageCheck(t)
@@ -1723,7 +1723,7 @@ func TestUndrainSlurmNode(t *testing.T) {
 }
 
 func TestUndrainSlurmNode_ClusterNotFound(t *testing.T) {
-	slurmAPIClients := slurmapi.NewClientSet()
+	slurmAPIClients := slurmapi.NewClientSet(context.Background())
 	// Don't add any client — the cluster won't be found.
 
 	controller := createTestPodEphemeralStorageCheck(t)
