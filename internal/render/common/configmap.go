@@ -599,6 +599,20 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		))
 	}
 
+	{
+		res.AddLine(strings.Join(
+			[]string{
+				"optional",
+				"/usr/lib/x86_64-linux-gnu/slurm/spank_nccl_inspector_preconf.so",
+				fmt.Sprintf("enabled=%d", 1),
+				fmt.Sprintf("profiler-plugin=%s", "/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so"),
+				fmt.Sprintf("dump-dir=%s", "/opt/soperator-outputs/nccl_profiles/%j/%s"),
+				fmt.Sprintf("dump-thread-interval-microseconds=%d", 1000000),
+			},
+			" ",
+		))
+	}
+
 	for _, plugin := range cluster.PlugStackConfig.CustomPlugins {
 		conf := []string{
 			utils.Ternary(plugin.Required, "required", "optional"),
