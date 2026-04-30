@@ -1,245 +1,191 @@
-# Soperator – Kubernetes Operator for Slurm
-[//]: # (Badges)
 <div align="center">
 
-[![tag-machine-learning](https://img.shields.io/badge/machine_learning-blue?style=for-the-badge)](#)
-[![tag-model-training](https://img.shields.io/badge/model_training-deepskyblue?style=for-the-badge)](#)
-[![tag-high-performance-computing](https://img.shields.io/badge/high--performance_computing-lightseagreen?style=for-the-badge)](#)
+# Soperator
+
+### Run Slurm on Kubernetes. Anywhere.
+
+Soperator is an open-source Kubernetes operator for running Slurm clusters for AI training and high-performance computing (HPC).
+
+**Simple cluster management · High reliability · Efficient GPU use**
+
+<br/>
+
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/nebius/soperator)](https://github.com/nebius/soperator/releases)
+[![Go Report](https://goreportcard.com/badge/github.com/nebius/soperator)](https://goreportcard.com/report/github.com/nebius/soperator)
+[![Stars](https://img.shields.io/github/stars/nebius/soperator?style=social)](https://github.com/nebius/soperator/stargazers)
+
+[📚 Docs on GitHub](docs/) · [📚 Docs on Nebius](https://docs.nebius.com/slurm-soperator/) · [🗒️ Releases](https://github.com/nebius/soperator/releases) · [🐞 Issues](https://github.com/nebius/soperator/issues)
+
+<br/>
+
+![Soperator overview](docs/images/layers_diagram.png)
 
 </div>
 
-<div align="center">
-
-[![github-last-commit](https://img.shields.io/github/last-commit/nebius/soperator?style=for-the-badge)](#)
-[![github-license](https://img.shields.io/github/license/nebius/soperator?style=for-the-badge)](#-license)
-
-</div>
-
-[//]: # (Short description)
-Run Slurm in Kubernetes and enjoy the benefits of both systems. You can learn more about Soperator, its prerequisites,
-and architecture in the [Medium article](https://medium.com/p/e7a41f307d14).
-
-<img src="docs/images/layers_diagram.png" alt="Slurm in Kubernetes" width="100%" height="auto"/>
-
+---
 
 ## 📋 Table of contents
-- [💡 Rationale](#-rationale)
-- [⭐ Features](#-features)
-- [❌ Limitations](#-limitations)
-- [🚀 Installation](#-installation)
-- [📈 Future plans](#-future-plans)
-- [📚 Documentation](#-documentation)
-- [🤬 Feedback](#-feedback)
-- [🤝 Contribution](#-contribution)
-- [🏛 License](#-license)
 
+- [What is Soperator](#-what-is-soperator)
+- [Why Soperator](#-why-soperator)
+- [Key features](#-key-features)
+- [How it works](#-how-it-works)
+- [Roadmap](#-roadmap)
+- [Deployment options](#-deployment-options)
+- [Requirements & supported versions](#-requirements--supported-versions)
+- [Documentation](#-documentation)
+- [Community & contributing](#-community--contributing)
+- [License](#-license)
 
+---
 
-## 💡 Rationale
-Both [Slurm](https://slurm.schedmd.com/overview.html) and [Kubernetes](https://kubernetes.io/docs/concepts/overview/)
-can serve as workload managers for distributed model training and high-performance computing (HPC) in general.
+## ❓ What is Soperator
 
-Each of these systems has its strengths and weaknesses, and the trade-offs between them are significant. Slurm offers
-advanced and effective scheduling, granular hardware control, and accounting, but lacks universality. On the other hand,
-Kubernetes can be used for purposes other than training (e.g. inference) and provides good auto-scaling and self-healing
-capabilities. For a detailed comparison, see the [Nebius AI blog post](https://nebius.ai/blog/posts/model-pre-training/slurm-vs-k8s).
+Slurm is a common scheduler for AI training and HPC workloads. Soperator is a Kubernetes operator that turns a `SlurmCluster` custom resource into a working Slurm cluster, including drivers, the CUDA/NCCL stack, shared storage, health checks, and accounting.
 
-It's unfortunate that there is no way to combine the benefits of both solutions. And since many big tech companies use
-Kubernetes as their default infrastructure layer without supporting a dedicated model training system, some ML engineers
-don't even have a choice.
+It is intended for platform teams and engineers who need to provide Slurm without managing each part of the cluster manually. It is also useful for teams moving from bare metal to Kubernetes-based Slurm.
 
-That's why we decided to marry these systems, taking a "Kubernetes-first" approach. We implemented a [Kubernetes
-operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/), which is a software component that runs
-and manages Slurm clusters as Kubernetes resources.
+## 🎯 Why Soperator
 
-<img src="docs/images/architecture_diagram.svg" alt="Solution Architecture" width="100%" height="auto"/>
+Running Slurm at scale is a challenge. Soperator focuses on solving three common problems.
 
-This allowed us to reuse the autoscaling and self-healing of Kubernetes in Slurm, and implement some unique features,
-while maintaining the usual way of interacting with it.
+| Problem | How Soperator solves it |
+|---|---|
+| **Slow setup and hard maintenance.** Deploying, resizing, upgrading, and reconfiguring Slurm clusters can take a lot of manual work. Keeping software consistent across nodes is also difficult. | A single `SlurmCluster` resource and a shared root filesystem (the *jail*) reduce manual setup and keep nodes in sync. |
+| **Training jobs fail because of hardware issues.** A single bad GPU or node can interrupt long-running jobs. | Passive and active health checks detect GPU, network, storage, and system issues. Failed nodes can be drained and replaced automatically, and the control plane recovers after failures and restarts. |
+| **GPUs sit idle.** Fixed-size clusters and poor placement reduce efficiency. | Ephemeral workers, InfiniBand-aware placement, and native Slurm scheduling help use GPU capacity more effectively. |
 
+---
 
+## ⭐ Key features
 
-## ⭐ Features
+These features are available in the codebase today.
 
+### Simple cluster management
 
-### Shared root filesystem
-When users interact with a Slurm cluster, they see a shared filesystem as their root "**/**" directory. With this
-approach, you can keep using Slurm in a familiar way (e.g. you don't need to run all jobs in containers).
+- **Kubernetes operator.** Define controllers, login nodes, workers, accounting, and storage in a single `SlurmCluster` resource. The operator keeps the cluster aligned with that spec.
+- **Portable deployment.** It can run on AWS, GCP, Azure, Nebius, OCI, bare metal, and air-gapped environments, as long as the Kubernetes cluster meets the requirements.
+- **Jail (shared root filesystem).** Login and worker nodes share one root filesystem, so package and configuration changes appear across the cluster without per-node drift.
+- **Preinstalled training stack.** Images include NVIDIA drivers, CUDA, NCCL, `nccl-tests`, and common training dependencies, with an explicit CUDA-to-NCCL version mapping.
+- **Declarative maintenance.** Upgrades, resizing, `NodeSet` changes, and configuration updates are driven by `SlurmCluster` changes instead of manual node work.
+- **Identity and accounting.** Supports SSSD for centralized users and groups (LDAP / AD / FreeIPA), Tailscale for SSH over a Tailnet, and Slurm accounting for job and user metrics.
+- **Observability.** Integrates with Prometheus, Grafana, and Loki for metrics, dashboards, and logs.
+- **Works with common Kubernetes tooling.** Supports Helm, Argo/Flux, cert-manager, Cilium, and NVIDIA GPU Operator.
 
-It also means that you don't have to keep nodes in an identical state. Changes that you make on one node—e.g.
-install new software packages, create Linux users, write job outputs, or download datasets—can be **immediately
-reflected on all other nodes**.
+### High reliability
 
+- **Passive health checks.** Monitors Kubernetes and Slurm control-plane signals, along with node-local conditions such as NVMe disk health.
+- **Active health checks.** `ActiveCheck` resources run scheduled GPU, system, storage, and network probes, including GPU performance checks.
+- **Automatic draining, replacement, and recovery.** Failed nodes are drained and replaced automatically. Controllers, the accounting database, and login nodes return to the declared state after failures, restarts, and rolling updates.
 
-### GPU health checks
-If your Kubernetes cluster contains NVIDIA GPUs, the operator will perform regular GPU health checks. If a Slurm
-node fails a health check, the operator “drains” it, so that new jobs are not scheduled on it.
+### Efficient GPU use
 
+- **Ephemeral nodes and autoscaling.** Workers are created on demand and scaled down when they are no longer needed.
+- **InfiniBand topology awareness.** Supports correct InfiniBand topology for GPU nodes, tier-2 switch constraints, and exclusion of CPU-only nodes from the InfiniBand tree.
+- **Container runtime support.** Pyxis / Enroot and OCI-compatible runtimes for jobs that still want image-based isolation.
+- **Standard Slurm scheduling behavior.** Gang scheduling, fair-share, preemption, reservations, and dependencies work as expected.
 
-### Easy scaling
-Each stage of building an ML product has its own requirements for computing resources.
+---
 
-Soperator allows Slurm to reuse the unique Kubernetes feature of scaling automatically according to current needs.
-You can simply change a single value in the YAML manifest and watch the cluster change in size.
+## 💡 How it works
 
+Soperator applies the standard Kubernetes operator pattern to Slurm.
 
-### High availability
-Kubernetes comes with some level of HA out of the box. If a pod or container, such as a Slurm controller, fails,
-Kubernetes recreates it.
+1. **Declare a `SlurmCluster`.** One custom resource describes the cluster layout, including controllers, login nodes, worker `NodeSet`s, the accounting database, shared volumes, health checks, observability, and identity integration.
+2. **The operator reconciles it.** Soperator turns that spec into Kubernetes objects such as Deployments, StatefulSets, PVCs, Services, ConfigMaps, and Slurm configuration, then keeps them in sync.
+3. **The jail provides the root filesystem.** A shared PVC is mounted into each login and worker node as its root, so cluster-wide changes to binaries, libraries, and config files are visible immediately.
+4. **Health checks keep watching the cluster.** Passive checks monitor control-plane and node signals, while `ActiveCheck` resources run scheduled probes. Failed nodes are drained and replaced automatically.
+5. **Slurm behavior stays familiar.** `sbatch`, `srun`, `sinfo`, accounting, reservations, dependencies, and preemption work the way Slurm users expect.
 
-Soperator takes this even further, continuously bringing the entire cluster up to the desired state.
+![Soperator architecture](docs/images/architecture_diagram.svg)
 
+📰 Deeper reading: [engineering deep-dive on Medium](https://medium.com/nebius) · [`docs/architecture.md`](docs/architecture.md)
 
-### Isolation of user actions
-All user actions are isolated within a dedicated container-like environment, so that an action can't break the
-Slurm cluster itself by accident. This defines a clear boundary between operator and user responsibility.
+---
 
-### Tailscale support
+## 📈 Roadmap
 
-You can optionally enable [Tailscale](https://github.com/tailscale/tailscale) on Slurm login pods to SSH to login nodes securely over your Tailnet.
+The items below are planned work. Follow our [release notes](https://github.com/nebius/soperator/releases) to see the latest changes.
 
-- Enabling Tailscale requires applying Kubernetes RBAC and adding a Tailscale container to login pods.
-- A Tailnet admin must authenticate/approve each login pod device (auth URL is printed in the Tailscale container logs).
+- **Improved health checks.** Better active and passive checks for earlier detection and stronger resilience on long-running jobs.
+- **Automatic acceptance tests.** Faster validation of new cluster configurations with less manual verification.
+- **Next-generation GPU platforms.** Support for GB300-based systems.
+- **Local disk support.** High-speed node-local storage for performance-sensitive training, faster checkpointing, and efficient data staging.
+- **NCCL profiling dashboards.** Better visibility into collective communication bottlenecks.
+- **Capacity sharing between training and inference.** Shift capacity as demand changes without running a separate cluster.
+- **Multi-cluster, multi-cloud scheduling.** Coordinate workloads across multiple environments.
 
-See [docs/tailscale.md](docs/tailscale.md) for details.
+---
 
-### SSSD support
+## 🚀 Deployment options
 
-You can optionally enable [SSSD](https://sssd.io/) on Slurm login, controller, and worker pods to integrate Slurm with centralized identity providers such as LDAP, Active Directory, or FreeIPA.
+There are four deployment paths, all based on the same codebase.
 
-- SSSD can be used for remote user and group resolution through NSS/PAM.
-- It can also be used for centrally managed SSH public keys.
+| Path | Best for |
+|---|---|
+| **Self-deploy on any Kubernetes** | Teams running their own K8s, on any cloud or on-premises. [Learn more](https://docs.nebius.com/slurm-soperator/deploy/overview#self-deployment-on-other-platforms-and-on-premises). |
+| **Managed Service for Soperator by Nebius** | Teams that want a managed cluster on Nebius. This service lets you get started with Soperator in just a few clicks using the Nebius web console. [Learn more](https://nebius.com/services/soperator). |
+| **Soperator Pro on Nebius** | Teams that want Nebius engineers to install, tune, and support the cluster. [Learn more](https://docs.nebius.com/slurm-soperator/deploy/overview#pro-solution-for-soperator). |
 
-See [docs/sssd.md](docs/sssd.md) for details.
+---
 
-### Accounting
-Slurm's accounting system records detailed job information such as:
+## 🧪 Requirements & supported versions
 
-- CPU and memory consumption
-- User and group identities
-- Job start/end times
-- Resource requests and allocations
-- If `protectedSecret` is set to `true`, the user secret for MariaDB will not be deleted after the MariaDB CR is deleted
+| Component | Version |
+|---|---|
+| Linux (node images) | Ubuntu 24.04 |
+| Slurm | 25.11.3 |
+| CUDA | 12.8-13.0 |
+| NCCL | ≥2.28  |
+| Kubernetes | ≥ 1.32 |
+| Helm | ≥ 3.14 |
+| NVIDIA GPU Operator | latest stable |
+| CNI | Cilium (kube-proxy replacement) recommended |
 
-This helps cluster administrators and users monitor resource utilization, enforce quotas, and generate usage reports for performance optimization or billing purposes.
+Some pre-installed software versions are pinned to the images Soperator ships. See [`docs/limitations.md`](docs/limitations.md) for current caveats, including the single-partition and GPU-only or CPU-only cluster constraints.
 
-
-## ❌ Limitations
-- **GPU-only or CPU-only**.The cluster of Slurm can currently be either GPU-only or CPU-only. 
-  Support for mixed configurations based on nodesets (e.g., separate GPU and CPU nodesets) has not been implemented yet.
-- **Single-partition clusters**. Slurm's ability to split clusters into several partitions isn't supported now.
-- **Software versions**. The list of software versions we currently support is quite short.
-    - Linux: Ubuntu [24.04](https://releases.ubuntu.com/noble/).
-    - Slurm: versions `25.11.5`.
-    - CUDA: version [13.0](https://docs.nvidia.com/cuda/archive/13.0.2/cuda-toolkit-release-notes/contents.html).
-    - Kubernetes: >= [1.33](https://kubernetes.io/blog/2025/04/23/kubernetes-v1-33-release/).
-    - Versions of some preinstalled software packages can't be changed.
-
-
-## 🚀 Installation
-The steps required to deploy Soperator to your Kubernetes cluster depend on whether you are using Kubernetes
-on premises or in a cloud.
-
-
-### Nebius AI
-For [Nebius AI](https://nebius.ai/), we provide a Terraform recipe that creates everything itself, which includes:
-- A [Managed Kubernetes](https://nebius.ai/docs/managed-kubernetes) cluster.
-- A [virtual network](https://nebius.ai/docs/vpc) and public IP addresses.
-- At least one shared [file storage](https://nebius.ai/docs/compute/concepts/filesystem) that stores your environment.
-  File storages are distributed filesystems focused on concurrent reads and writes.
-
-Everything specific to Nebius AI is contained in a separate repository:
-[nebius/nebius-solutions-library](https://github.com/nebius/nebius-solutions-library/tree/main/soperator).
-
-[//]: #
-
-
-### Other clouds and on-premises
-> [!IMPORTANT]
-> When using the soperator, it is important that the CNI supports preserving the client source IP.
-> Therefore, if kube-proxy is configured in IPVS mode, or if you're using CNI plugins like kube-router or Antrea Proxy,
-the operator will not work.
-> This operator has been tested with
-the [Cilium network plugin](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/)
-> running in
-[kube-proxy replacement mode](https://docs.cilium.io/en/stable/network/kubernetes/kubeproxy-free/#kubernetes-without-kube-proxy).
-
-In general, you need to follow these steps:
-1. Decide on the shared storage technology you would like to use. At least one shared filesystem is necessary, because
-   it will store the environment shared by Slurm nodes. The only thing the Soperator requires is the
-   [PVC](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) name. Consider using
-   [NFS](https://kubernetes.io/docs/concepts/storage/volumes/#nfs) as the simplest option, or something more advanced
-   like [OpenEBS](https://openebs.io/) or [GlusterFS](https://www.gluster.org/).
-2. Install the [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator).
-3. If you use InfiniBand, install the [NVIDIA Network Operator](https://github.com/Mellanox/network-operator).
-4. Install Soperator by applying the [soperator](helm/soperator) Helm chart.
-5. Create a Slurm cluster in a namespace with the same name as the slurm cluster by 
-   applying the [slurm-cluster](helm/slurm-cluster) Helm chart.
-6. Wait until the `slurm.nebius.ai/SlurmCluster` resource becomes `Available`.
-
-[//]: # (TODO: Refer to Helm OCI images instead of file directories when the repo is open)
-
-> [!WARNING]
-> Although Soperator should be compatible with any Kubernetes installation in principle, we haven't tested
-> it anywhere outside Nebius AI, so it's likely that something won't work out of the box or will require additional
-> configuration. If you're facing issues, create an issue in this repository, and we will help you install Soperator
-> to your Kubernetes and update these docs.
-
-
-
-## 📈 Future plans
-- 💡 **On-demand nodes**. The easy scaling can be improved further by provisioning new Kubernetes nodes only when
-  there are queued jobs that need them.
-- 💡 **Network topology-aware job scheduling**. Thanks to the Slurm topology feature, we can support detailed
-  configuration of the network topology for more efficient scheduling.
-- 💡 **Automatic replacement of bad-performing nodes**. Currently, Soperator just drains the Slurm nodes that have
-  problems. We have a plan to replace such nodes automatically.
-- 💡 **More system checks**. Soperator only checks GPUs at the moment, but there are more things to check: software
-  issues, storage performance, network connectivity, etc. So we're going to continue adding new checks.
-- 💡 **Jail backups**. This means backing up the shared storage to improve durability.
-- 💡 **Automatic external checkpointing**. We consider using NVIDIA's
-  [cuda-checkpoint](https://github.com/NVIDIA/cuda-checkpoint) for dumping and resuming job processes externally.
-
-
+---
 
 ## 📚 Documentation
-The detailed documentation is located in the [docs](docs) directory of this repository.
 
-It includes, among other things:
-- A detailed description of the Soperator [architecture](docs/architecture.md).
-- The [full list of features](docs/features.md) that this solution provides comparing to typical Slurm installations.
-- A more complete description of the existing [limitations](docs/limitations.md).
-- [Local development with Kind](docs/local-development.md) - setting up a local Kubernetes cluster for development and testing.
-- The [release process](docs/release-process.md) for both soperator and nebius-solutions-library repositories.
-- [Metrics collection and processing](docs/metrics-pipeline.md) documentation.
-- [Logs collection and aggregation](docs/logs-pipeline.md) pipeline guide.
+The [`docs/`](docs/) directory in this repository contains documentation for the
+open-source, cloud-agnostic version of Soperator. It covers:
 
+- Architecture details.
+- Feature coverage compared with typical Slurm installations.
+- Current limitations.
+- Guidance for deploying Soperator on any cloud or on-premises.
+- Local development with Kind.
+- The release process for both the `soperator` and `nebius-solutions-library` repositories.
+- Metrics collection and processing.
+- Log collection and aggregation.
 
+You can find documentation on Nebius services built on top of Soperator, including Managed Soperator at [docs.nebius.com/slurm-soperator](https://docs.nebius.com/slurm-soperator/).
 
-## 🤬 Feedback
-If you like this project, **star it on GitHub**. So we will see that the community is interested in it and continue
-developing it further, openly and publicly.
+---
 
-If you failed to install Soperator to your Kubernetes cluster or encounter any other issue with it, create a
-[GitHub issue](https://github.com/nebius/soperator/issues) and write details about your problem. We will try to help.
+## 🤝 Community & contributing
 
-> [!NOTE]
-> This project is very new and quite raw - it was started in May 2024. And if it already works stably in Nebius AI,
-> this may not be the case for other clouds.
+Soperator is an open-source project.
 
+- ⭐ **Star** the repo if Soperator is useful to you.
+- 🐞 **Report bugs and request features** in [Issues](https://github.com/nebius/soperator/issues).
+- 💬 **Ask questions and share patterns** in [Discussions](https://github.com/nebius/soperator/discussions).
+- 🔒 **Security** — report vulnerabilities per [`SECURITY.md`](SECURITY.md).
+- 📰 **Blog** — [Introducing Soperator](https://nebius.com/blog/posts/soperator) · [Managed Soperator launch](https://nebius.com/blog/posts/managed-soperator) · [Soperator explained](https://nebius.com/blog/posts/soperator-explained).
 
-
-## 🤝 Contribution
-Unfortunately, at the moment we don't have development docs for outside developers who want to participate in this
-project. If you are interested in contribution, create a GitHub issue, and we'll figure something out.
-
-Also, pay attention to the list of future plans we have. The tasks we are currently working on are marked there. Maybe
-you need just one of these.
-
-
+---
 
 ## 🏛 License
-The Soperator itself is licensed under [Apache 2.0](LICENSE), a permissive free software license that allows you to use
-the software for any purpose, to distribute it, to modify it, and to distribute modified versions under specific terms.
 
-Please note that various pieces of software it installs in your cluster may have other licenses.
+Soperator is licensed under [Apache 2.0](LICENSE). Software it installs into your cluster may carry other licenses; please review for your use case.
+
+---
+
+<div align="center">
+
+**Built by [Nebius](https://nebius.com) and the Soperator community.**
+_Run Slurm on Kubernetes. Anywhere._
+
+</div>
