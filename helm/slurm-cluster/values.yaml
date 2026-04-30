@@ -389,15 +389,14 @@ slurmNodes:
       command: []
       args: []
       livenessProbe:
-        exec:
-          command:
-            - scontrol
-            - ping
-        initialDelaySeconds: 25
-        timeoutSeconds: 1
-        periodSeconds: 10
+        httpGet:
+          path: /livez
+          port: 6817
+        initialDelaySeconds: 10
+        timeoutSeconds: 10
+        periodSeconds: 60
         successThreshold: 1
-        failureThreshold: 3
+        failureThreshold: 5
       port: 6817
       resources:
         cpu: "1000m"
