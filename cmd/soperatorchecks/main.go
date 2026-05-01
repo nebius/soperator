@@ -283,7 +283,6 @@ func main() {
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.SlurmAPIClientsControllerName),
 			slurmAPIClients,
-			corev1.NodeConditionType(maintenanceConditionType),
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create slurm api clients controller", "controller", soperatorchecks.SlurmAPIClientsControllerName)
 		}

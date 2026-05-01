@@ -66,9 +66,12 @@ type NodeSetReconciler struct {
 
 	AdvancedStatefulSet *reconciler.AdvancedStatefulSetReconciler
 	Service             *reconciler.ServiceReconciler
+	ServiceAccount      *reconciler.ServiceAccountReconciler
 	Secret              *reconciler.SecretReconciler
 	ConfigMap           *reconciler.ConfigMapReconciler
 	NodeSetPowerState   *reconciler.NodeSetPowerStateReconciler
+	Role                *reconciler.RoleReconciler
+	RoleBinding         *reconciler.RoleBindingReconciler
 }
 
 func NewNodeSetReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *NodeSetReconciler {
@@ -77,9 +80,12 @@ func NewNodeSetReconciler(client client.Client, scheme *runtime.Scheme, recorder
 		Reconciler:          r,
 		AdvancedStatefulSet: reconciler.NewAdvancedStatefulSetReconciler(r),
 		Service:             reconciler.NewServiceReconciler(r),
+		ServiceAccount:      reconciler.NewServiceAccountReconciler(r),
 		Secret:              reconciler.NewSecretReconciler(r),
 		ConfigMap:           reconciler.NewConfigMapReconciler(r),
 		NodeSetPowerState:   reconciler.NewNodeSetPowerStateReconciler(r),
+		Role:                reconciler.NewRoleReconciler(r),
+		RoleBinding:         reconciler.NewRoleBindingReconciler(r),
 	}
 }
 

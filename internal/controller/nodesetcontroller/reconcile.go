@@ -300,6 +300,63 @@ func (r NodeSetReconciler) executeReconciliation(
 			},
 		},
 		{
+			Name: "Slurm NodeSet ServiceAccount",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
+
+				desired := worker.RenderServiceAccount(nodeSet.Namespace, cluster.Name, nodeSet.Name)
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				stepLogger.V(1).Info("Rendered")
+
+				if err := r.ServiceAccount.Reconcile(stepCtx, cluster, desired); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling nodeSet ServiceAccount: %w", err)
+				}
+				stepLogger.V(1).Info("Reconciled")
+
+				return nil
+			},
+		},
+		{
+			Name: "Slurm NodeSet Role",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
+
+				desired := worker.RenderRole(nodeSet.Namespace, cluster.Name, nodeSet)
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				stepLogger.V(1).Info("Rendered")
+
+				if err := r.Role.Reconcile(stepCtx, cluster, desired); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling nodeSet Role: %w", err)
+				}
+				stepLogger.V(1).Info("Reconciled")
+
+				return nil
+			},
+		},
+		{
+			Name: "Slurm NodeSet RoleBinding",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
+
+				desired := worker.RenderRoleBinding(nodeSet.Namespace, cluster.Name, nodeSet.Name)
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				stepLogger.V(1).Info("Rendered")
+
+				if err := r.RoleBinding.Reconcile(stepCtx, cluster, desired); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling nodeSet RoleBinding: %w", err)
+				}
+				stepLogger.V(1).Info("Reconciled")
+
+				return nil
+			},
+		},
+		{
 			Name: "Worker sssd.conf Secret",
 			Func: func(stepCtx context.Context) error {
 				stepLogger := log.FromContext(stepCtx)
