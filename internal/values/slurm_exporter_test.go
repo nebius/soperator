@@ -18,6 +18,8 @@ func Test_BuildSlurmExporterFrom(t *testing.T) {
 		Munge: slurmv1.NodeContainer{
 			Image: "testImage",
 		},
+		JobSources:        "controller,accounting",
+		AccountingJobMode: "completed",
 	}
 
 	result := buildSlurmExporterFrom(ptr.To(consts.ModeNone), exporter)
@@ -25,6 +27,8 @@ func Test_BuildSlurmExporterFrom(t *testing.T) {
 	assert.NotNil(t, result.ExporterContainer)
 	assert.NotNil(t, result.SlurmNode)
 	assert.NotNil(t, result.ContainerMunge)
+	assert.Equal(t, "controller,accounting", result.JobSources)
+	assert.Equal(t, "completed", result.AccountingJobMode)
 }
 
 func Test_BuildSlurmExporterFromWithNilTelemetry(t *testing.T) {

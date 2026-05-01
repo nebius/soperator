@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -50,6 +51,8 @@ type Flags struct {
 	clusterNamespace   string
 	clusterName        string
 	collectionInterval string
+	jobSources         string
+	accountingJobMode  string
 
 	// modes
 	kubeconfigPath string
@@ -110,6 +113,8 @@ func parseFlags() Flags {
 		{"cluster-namespace", "SLURM_EXPORTER_CLUSTER_NAMESPACE", "soperator", "The namespace of the Slurm cluster", &flags.clusterNamespace},
 		{"cluster-name", "SLURM_EXPORTER_CLUSTER_NAME", "", "The name of the Slurm cluster (required)", &flags.clusterName},
 		{"collection-interval", "SLURM_EXPORTER_COLLECTION_INTERVAL", "30s", "How often to collect metrics from SLURM APIs", &flags.collectionInterval},
+		{"job-sources", "SLURM_EXPORTER_JOB_SOURCES", "controller", "Comma-separated SLURM job sources: controller, accounting", &flags.jobSources},
+		{"accounting-job-mode", "SLURM_EXPORTER_ACCOUNTING_JOB_MODE", "all", "Accounting API job set: pending, running, completed, all", &flags.accountingJobMode},
 		{"scontrol-path", "SLURM_EXPORTER_SCONTROL_PATH", "scontrol", "Path to scontrol command for standalone mode", &flags.scontrolPath},
 		{"key-rotation-interval", "SLURM_EXPORTER_KEY_ROTATION_INTERVAL", "30m", "Key rotation interval for standalone mode (e.g., 30m, 1h)", &flags.keyRotationInterval},
 	}
@@ -146,6 +151,44 @@ func parseFlags() Flags {
 		os.Exit(1)
 	}
 	return flags
+}
+
+func buildJobListParams(flags Flags) (slurmapi.ListJobsParams, error) {
+	var sources []slurmapi.JobSource
+	seenSources := map[slurmapi.JobSource]struct{}{}
+	for _, source := range strings.Split(flags.jobSources, ",") {
+		source = strings.TrimSpace(strings.ToLower(source))
+		if source == "" {
+			continue
+		}
+
+		jobSource := slurmapi.JobSource(source)
+		switch jobSource {
+		case slurmapi.JobSourceController, slurmapi.JobSourceAccounting:
+			if _, ok := seenSources[jobSource]; ok {
+				continue
+			}
+			seenSources[jobSource] = struct{}{}
+			sources = append(sources, jobSource)
+		default:
+			return slurmapi.ListJobsParams{}, fmt.Errorf("unsupported job source %q", source)
+		}
+	}
+
+	accountingJobMode := slurmapi.AccountingJobMode(strings.ToLower(strings.TrimSpace(flags.accountingJobMode)))
+	switch accountingJobMode {
+	case slurmapi.AccountingJobModePending,
+		slurmapi.AccountingJobModeRunning,
+		slurmapi.AccountingJobModeCompleted,
+		slurmapi.AccountingJobModeAll:
+	default:
+		return slurmapi.ListJobsParams{}, fmt.Errorf("unsupported accounting job mode %q", flags.accountingJobMode)
+	}
+
+	return slurmapi.ListJobsParams{
+		Sources:           sources,
+		AccountingJobMode: accountingJobMode,
+	}, nil
 }
 
 // simple issuer that returns a fixed token
@@ -231,12 +274,18 @@ func main() {
 		cli.Fail(log, err, "Failed to parse collection interval")
 	}
 
+	jobListParams, err := buildJobListParams(flags)
+	if err != nil {
+		cli.Fail(log, err, "Failed to parse job collection configuration")
+	}
+
 	clusterExporter := exporter.NewClusterExporter(
 		slurmAPIClient,
 		exporter.Params{
 			SlurmAPIServer:     flags.slurmAPIServer,
 			SlurmClusterID:     slurmClusterID,
 			CollectionInterval: interval,
+			JobListParams:      jobListParams,
 		},
 	)
 

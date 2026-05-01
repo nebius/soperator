@@ -544,6 +544,10 @@ slurmNodes:
       # - If empty and create is false, the "default" ServiceAccount will be used and you must ensure it has the required RBAC.
       name: ""
     collectionInterval: "30s"
+    # Comma-separated Slurm job sources: controller, accounting.
+    jobSources: "controller"
+    # Accounting API job set: pending, running, completed, all.
+    accountingJobMode: "all"
     exporter:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"

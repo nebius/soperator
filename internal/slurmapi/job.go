@@ -117,6 +117,78 @@ func JobFromAPI(apiJob api.V0041JobInfo) (Job, error) {
 	return job, nil
 }
 
+func JobFromAccountingAPI(apiJob api.V0041Job) (Job, error) {
+	job := Job{}
+	if apiJob.JobId == nil {
+		return job, fmt.Errorf("job ID is missing")
+	}
+	job.ID = *apiJob.JobId
+
+	if apiJob.Name != nil {
+		job.Name = *apiJob.Name
+	}
+
+	if apiJob.State == nil || apiJob.State.Current == nil || len(*apiJob.State.Current) == 0 {
+		return Job{}, fmt.Errorf("job state is missing")
+	}
+
+	job.State = string((*apiJob.State.Current)[0])
+
+	if apiJob.State.Reason != nil {
+		job.StateReason = *apiJob.State.Reason
+	}
+
+	if apiJob.Partition != nil {
+		job.Partition = *apiJob.Partition
+	}
+
+	if apiJob.User != nil {
+		job.UserName = *apiJob.User
+	} else if apiJob.Association != nil {
+		job.UserName = apiJob.Association.User
+	}
+
+	if apiJob.StderrExpanded != nil {
+		job.StandardError = *apiJob.StderrExpanded
+	} else if apiJob.Stderr != nil {
+		job.StandardError = *apiJob.Stderr
+	}
+
+	if apiJob.StdoutExpanded != nil {
+		job.StandardOutput = *apiJob.StdoutExpanded
+	} else if apiJob.Stdout != nil {
+		job.StandardOutput = *apiJob.Stdout
+	}
+
+	if apiJob.Nodes != nil {
+		job.Nodes = *apiJob.Nodes
+	}
+
+	job.NodeCount = apiJob.AllocationNodes
+	if apiJob.Array != nil {
+		job.ArrayJobID = apiJob.Array.JobId
+		job.ArrayTaskID = convertToInt(apiJob.Array.TaskId)
+	}
+
+	if apiJob.Time != nil {
+		job.SubmitTime = unixTimeToMetav1Time(apiJob.Time.Submission)
+		job.StartTime = unixTimeToMetav1Time(apiJob.Time.Start)
+		job.EndTime = unixTimeToMetav1Time(apiJob.Time.End)
+	}
+
+	if apiJob.Tres != nil {
+		job.TresAllocated = tresListToString(apiJob.Tres.Allocated)
+		job.TresRequested = tresListToString(apiJob.Tres.Requested)
+	}
+
+	if apiJob.Required != nil {
+		job.CPUs = apiJob.Required.CPUs
+		job.MemoryPerNode = convertToInt64(apiJob.Required.MemoryPerNode)
+	}
+
+	return job, nil
+}
+
 func (j Job) String() string {
 	return fmt.Sprintf("Job{ID: %d, Name: %s, State: %s, StateReason: %s, Partition: %s, User: %s}",
 		j.ID, j.Name, j.State, j.StateReason, j.Partition, j.UserName)
@@ -306,6 +378,15 @@ func convertToMetav1Time(input *api.V0041Uint64NoValStruct) *metav1.Time {
 	return &metav1.Time{Time: t}
 }
 
+func unixTimeToMetav1Time(input *int64) *metav1.Time {
+	if input == nil || *input <= 0 {
+		return nil
+	}
+
+	t := time.Unix(*input, 0)
+	return &metav1.Time{Time: t}
+}
+
 func convertToInt(input *api.V0041Uint32NoValStruct) *int32 {
 	if input == nil || input.Set == nil || !*input.Set || input.Number == nil {
 		return nil
@@ -328,4 +409,26 @@ func convertToInt64(input *api.V0041Uint64NoValStruct) *int64 {
 	}
 
 	return input.Number
+}
+
+func tresListToString(input *api.V0041TresList) string {
+	if input == nil {
+		return ""
+	}
+
+	parts := make([]string, 0, len(*input))
+	for _, tres := range *input {
+		if tres.Count == nil {
+			continue
+		}
+
+		key := tres.Type
+		if tres.Name != nil && *tres.Name != "" {
+			key = fmt.Sprintf("%s/%s", key, *tres.Name)
+		}
+
+		parts = append(parts, fmt.Sprintf("%s=%d", key, *tres.Count))
+	}
+
+	return strings.Join(parts, ",")
 }

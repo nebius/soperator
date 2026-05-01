@@ -192,28 +192,133 @@ func (c *client) GetJobsByID(ctx context.Context, jobID string) ([]Job, error) {
 }
 
 func (c *client) ListJobs(ctx context.Context) ([]Job, error) {
+	return c.ListJobsWithParams(ctx, ListJobsParams{
+		Sources: []JobSource{JobSourceController},
+	})
+}
+
+func (c *client) ListJobsWithParams(ctx context.Context, params ListJobsParams) ([]Job, error) {
+	params = params.normalized()
+
+	var (
+		controllerJobs []Job
+		accountingJobs []Job
+	)
+
+	type listJobsResult struct {
+		source JobSource
+		jobs   []Job
+		err    error
+	}
+
+	resultCh := make(chan listJobsResult, len(params.Sources))
+	for _, source := range params.Sources {
+		switch source {
+		case JobSourceController:
+			go func() {
+				jobs, err := c.listControllerJobs(ctx)
+				resultCh <- listJobsResult{source: JobSourceController, jobs: jobs, err: err}
+			}()
+		case JobSourceAccounting:
+			go func() {
+				jobs, err := c.listAccountingJobs(ctx, params)
+				resultCh <- listJobsResult{source: JobSourceAccounting, jobs: jobs, err: err}
+			}()
+		default:
+			return nil, fmt.Errorf("list jobs: unsupported source %q", source)
+		}
+	}
+
+	for range params.Sources {
+		result := <-resultCh
+		if result.err != nil {
+			return nil, result.err
+		}
+
+		switch result.source {
+		case JobSourceController:
+			controllerJobs = append(controllerJobs, result.jobs...)
+		case JobSourceAccounting:
+			accountingJobs = append(accountingJobs, result.jobs...)
+		}
+	}
+
+	return deduplicateJobs(controllerJobs, accountingJobs), nil
+}
+
+func (c *client) listControllerJobs(ctx context.Context) ([]Job, error) {
 	getJobsResp, err := c.SlurmV0041GetJobsWithResponse(ctx, &api.SlurmV0041GetJobsParams{})
 	if err != nil {
-		return nil, fmt.Errorf("list jobs: %w", err)
+		return nil, fmt.Errorf("list jobs from controller API: %w", err)
 	}
 	if getJobsResp.JSON200 == nil {
-		return nil, fmt.Errorf("json200 field is nil")
+		return nil, fmt.Errorf("list jobs from controller API: json200 field is nil")
 	}
 	if getJobsResp.JSON200.Errors != nil && len(*getJobsResp.JSON200.Errors) != 0 {
-		return nil, fmt.Errorf("list jobs responded with errors: %v", *getJobsResp.JSON200.Errors)
+		return nil, fmt.Errorf("list jobs from controller API responded with errors: %v", *getJobsResp.JSON200.Errors)
 	}
 
 	jobs := make([]Job, 0, len(getJobsResp.JSON200.Jobs))
 	for _, j := range getJobsResp.JSON200.Jobs {
 		job, err := JobFromAPI(j)
 		if err != nil {
-			return nil, fmt.Errorf("convert job from api response: %w", err)
+			return nil, fmt.Errorf("convert job from controller api response: %w", err)
 		}
 
 		jobs = append(jobs, job)
 	}
 
 	return jobs, nil
+}
+
+func (c *client) listAccountingJobs(ctx context.Context, params ListJobsParams) ([]Job, error) {
+	getJobsResp, err := c.SlurmdbV0041GetJobsWithResponse(ctx, &api.SlurmdbV0041GetJobsParams{
+		State: params.accountingStateFilter(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list jobs from accounting API: %w", err)
+	}
+	if getJobsResp.JSON200 == nil {
+		return nil, fmt.Errorf("list jobs from accounting API: json200 field is nil")
+	}
+	if getJobsResp.JSON200.Errors != nil && len(*getJobsResp.JSON200.Errors) != 0 {
+		return nil, fmt.Errorf("list jobs from accounting API responded with errors: %v", *getJobsResp.JSON200.Errors)
+	}
+
+	jobs := make([]Job, 0, len(getJobsResp.JSON200.Jobs))
+	for _, j := range getJobsResp.JSON200.Jobs {
+		job, err := JobFromAccountingAPI(j)
+		if err != nil {
+			return nil, fmt.Errorf("convert job from accounting api response: %w", err)
+		}
+
+		jobs = append(jobs, job)
+	}
+
+	return jobs, nil
+}
+
+func deduplicateJobs(jobGroups ...[]Job) []Job {
+	var total int
+	for _, jobs := range jobGroups {
+		total += len(jobs)
+	}
+
+	seen := make(map[int32]struct{}, total)
+	result := make([]Job, 0, total)
+
+	for _, jobs := range jobGroups {
+		for _, job := range jobs {
+			if _, exists := seen[job.ID]; exists {
+				continue
+			}
+
+			seen[job.ID] = struct{}{}
+			result = append(result, job)
+		}
+	}
+
+	return result
 }
 
 func (c *client) GetDiag(ctx context.Context) (*api.V0041OpenapiDiagResp, error) {

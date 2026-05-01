@@ -21,6 +21,7 @@ import (
 // MetricsCollector exposes SLURM metrics by implementing prometheus.Collector interface
 type MetricsCollector struct {
 	slurmAPIClient slurmapi.Client
+	jobListParams  slurmapi.ListJobsParams
 
 	nodeInfo                   *prometheus.Desc
 	nodeCPUTotal               *prometheus.Desc
@@ -76,7 +77,7 @@ var durationBuckets = []float64{
 }
 
 // NewMetricsCollector creates a new MetricsCollector
-func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
+func NewMetricsCollector(slurmAPIClient slurmapi.Client, jobListParams slurmapi.ListJobsParams) *MetricsCollector {
 	var nodeInfoLabels = []string{
 		"node_name",
 		"instance_id",
@@ -115,6 +116,7 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 	}
 	collector := &MetricsCollector{
 		slurmAPIClient: slurmAPIClient,
+		jobListParams:  jobListParams,
 		Monitoring:     NewMonitoringMetrics(),
 
 		nodeInfo:                 prometheus.NewDesc("slurm_node_info", "Slurm node info", nodeInfoLabels, nil),
@@ -348,7 +350,7 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 	c.updateNodeStateMetrics(nodes, previousState, newState, time.Now())
 	newState.lastGPUSecondsUpdate = c.updateGPUSecondsMetrics(ctx, nodes, previousState.lastGPUSecondsUpdate, time.Now())
 
-	jobs, err := c.slurmAPIClient.ListJobs(ctx)
+	jobs, err := c.slurmAPIClient.ListJobsWithParams(ctx, c.jobListParams)
 	if err != nil {
 		return fmt.Errorf("get jobs from SLURM API: %w", err)
 	}

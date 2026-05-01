@@ -39,6 +39,10 @@ type SlurmExporter struct {
 	// CollectionInterval specifies how often to collect metrics from SLURM APIs
 	CollectionInterval prometheusv1.Duration
 
+	JobSources string
+
+	AccountingJobMode string
+
 	// ServiceAccountName is the ServiceAccount to be used by exporter pods.
 	ServiceAccountName string
 }
@@ -65,6 +69,8 @@ func buildSlurmExporterFrom(maintenance *consts.MaintenanceMode, exporter *slurm
 		Maintenance:        maintenance,
 		Container:          *exporter.ExporterContainer.DeepCopy(),
 		CollectionInterval: exporter.CollectionInterval,
+		JobSources:         exporter.JobSources,
+		AccountingJobMode:  exporter.AccountingJobMode,
 		ServiceAccountName: exporter.ServiceAccountName,
 	}
 }

@@ -39981,6 +39981,16 @@ spec:
                     description: |
                       Exporter represents the Slurm exporter node configuration
                     properties:
+                      accountingJobMode:
+                        default: all
+                        description: AccountingJobMode selects which accounting jobs
+                          are exported.
+                        enum:
+                        - pending
+                        - running
+                        - completed
+                        - all
+                        type: string
                       collectionInterval:
                         default: 30s
                         description: CollectionInterval specifies how often to collect
@@ -42613,6 +42623,11 @@ spec:
                         description: HostUsers controls if the pod containers can
                           use the host user namespace
                         type: boolean
+                      jobSources:
+                        default: controller
+                        description: JobSources is a comma-separated list of Slurm
+                          APIs used for job collection.
+                        type: string
                       k8sNodeFilterName:
                         description: |-
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.

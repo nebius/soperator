@@ -1059,6 +1059,19 @@ type SlurmExporter struct {
 	// +kubebuilder:default="30s"
 	CollectionInterval prometheusv1.Duration `json:"collectionInterval,omitempty"`
 
+	// JobSources is a comma-separated list of Slurm APIs used for job collection.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="controller"
+	JobSources string `json:"jobSources,omitempty"`
+
+	// AccountingJobMode selects which accounting jobs are exported.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=pending;running;completed;all
+	// +kubebuilder:default="all"
+	AccountingJobMode string `json:"accountingJobMode,omitempty"`
+
 	// ServiceAccountName is the name of the ServiceAccount to use for exporter pods.
 	// +kubebuilder:validation:Optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
@@ -1360,5 +1373,11 @@ func (p *PluginConfigNcclDebug) SetDefaults() {
 func (s *SlurmExporter) SetDefaults() {
 	if s.Enabled == nil {
 		s.Enabled = ptr.To(false)
+	}
+	if s.JobSources == "" {
+		s.JobSources = "controller"
+	}
+	if s.AccountingJobMode == "" {
+		s.AccountingJobMode = "all"
 	}
 }

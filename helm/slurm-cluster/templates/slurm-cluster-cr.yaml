@@ -453,6 +453,12 @@ spec:
       {{- if .Values.slurmNodes.exporter.collectionInterval }}
       collectionInterval: {{ .Values.slurmNodes.exporter.collectionInterval | quote }}
       {{- end }}
+      {{- if .Values.slurmNodes.exporter.jobSources }}
+      jobSources: {{ .Values.slurmNodes.exporter.jobSources | quote }}
+      {{- end }}
+      {{- if .Values.slurmNodes.exporter.accountingJobMode }}
+      accountingJobMode: {{ .Values.slurmNodes.exporter.accountingJobMode | quote }}
+      {{- end }}
       {{- if .Values.slurmNodes.exporter.podMonitorConfig }}
       podMonitorConfig:
         {{- toYaml .Values.slurmNodes.exporter.podMonitorConfig | nindent 8 }}
