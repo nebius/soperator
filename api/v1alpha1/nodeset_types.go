@@ -6,6 +6,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"nebius.ai/slurm-operator/internal/consts"
 )
 
 // +kubebuilder:object:root=true
@@ -263,6 +265,12 @@ type NodeSetSpec struct {
 	CustomInitContainers []corev1.Container `json:"customInitContainers,omitempty"`
 
 	// endregion Scheduling
+
+	// UpdateStrategy for the advanced StatefulSet
+	//
+	// +kubebuilder:validation:Enum=rollingUpdate;onDelete
+	// +kubebuilder:default="rollingUpdate"
+	UpdateStrategy consts.UpdateStrategy `json:"updateStrategy"`
 }
 
 // ContainerSlurmdSpec defines the Slurm worker daemon configuration
