@@ -210,7 +210,9 @@ spec:
           spec:
             endpoints:
               - honorLabels: true
-                max_scrape_size: {{ $kubeStateMetrics.maxScrapeSize | default "150554432" | quote }}
+                {{- if $kubeStateMetrics.maxScrapeSize }}
+                max_scrape_size: {{ $kubeStateMetrics.maxScrapeSize | quote }}
+                {{- end }}
                 metricRelabelConfigs:
                   - action: labeldrop
                     regex: (uid|container_id|image_id)

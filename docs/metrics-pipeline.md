@@ -105,7 +105,7 @@ Key Metrics:
 - Metrics: Pod state metrics (filtered subset)
 - Deployment: Single replica deployment in `monitoring-system` namespace
 - Configuration: pod/node collectors with metric allowlist filtering
-- Scrape size: VMServiceScrape allows up to `150554432` bytes for the main `http` endpoint to support large clusters
+- Scrape size: inherits the global vmagent scrape size by default; `observability.vmStack.values.kubeStateMetrics.maxScrapeSize` can raise the main `http` endpoint limit for large clusters
 
 Connection Example:
 ```bash
