@@ -136,6 +136,7 @@ func renderContainerNodeSetSlurmd(
 	cgroupVersion string,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
+		renderVolumeMountRuntime(),
 		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
 		common.RenderVolumeMountJail(),
 		common.RenderVolumeMountMungeSocket(),
@@ -269,11 +270,32 @@ func renderContainerNodeSetSlurmd(
 	}, nil
 }
 
+func renderContainerNodeSetDockerProxy(nodeSet *values.SlurmNodeSet) corev1.Container {
+	return corev1.Container{
+		Name:            consts.ContainerNameDockerProxy,
+		Image:           nodeSet.ContainerSlurmd.Image,
+		ImagePullPolicy: nodeSet.ContainerSlurmd.ImagePullPolicy,
+		Command:         []string{"/opt/bin/slurm/docker_proxy_nginx_entrypoint.sh"},
+		VolumeMounts: []corev1.VolumeMount{
+			renderVolumeMountRuntime(),
+		},
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+	}
+}
+
 func renderVolumeMountSupervisordConfigMap() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      consts.VolumeNameSupervisordConfigMap,
 		MountPath: consts.VolumeMountPathSupervisordConfig,
 		ReadOnly:  true,
+	}
+}
+
+func renderVolumeMountRuntime() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameRuntime,
+		MountPath: consts.VolumeMountPathRuntime,
 	}
 }
 

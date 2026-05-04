@@ -1,4 +1,9 @@
 #!/bin/bash
+# NOTE (SCHED-1417): --gpus-per-node=8 means this script is auto-detected
+# as GPU-requiring and Skipped on CPU-only clusters. On CPU-only, no check
+# drains nodes with [node_problem] today, so no suspicious-node reservation
+# is ever created and skipping extensive-check is safe. If a non-GPU check
+# with drainSlurmNode [node_problem] is ever added, revisit this.
 #SBATCH --deadline="now+24hours"
 #SBATCH --time=01:00:00
 #SBATCH --gpus-per-node=8

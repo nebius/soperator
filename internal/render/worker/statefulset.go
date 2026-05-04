@@ -84,6 +84,7 @@ func RenderNodeSetStatefulSet(
 	if err != nil {
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
 	}
+	dockerProxyContainer := renderContainerNodeSetDockerProxy(nodeSet)
 
 	replicas := &nodeSet.StatefulSet.Replicas
 	var reserveOrdinals []intstr.IntOrString
@@ -112,6 +113,7 @@ func RenderNodeSetStatefulSet(
 		InitContainers:     initContainers,
 		Containers: []corev1.Container{
 			slurmdContainer,
+			dockerProxyContainer,
 		},
 		Volumes:   volumes,
 		Subdomain: nodeSet.ServiceUmbrella.Name,

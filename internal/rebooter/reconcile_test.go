@@ -2,6 +2,7 @@ package rebooter_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,6 +16,16 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	. "nebius.ai/slurm-operator/internal/rebooter"
 )
+
+// mockNodePodsFetcher is a test double for NodePodsFetcher.
+type mockNodePodsFetcher struct {
+	podList *corev1.PodList
+	err     error
+}
+
+func (m *mockNodePodsFetcher) GetPodsOnNode(_ context.Context, _ string) (*corev1.PodList, error) {
+	return m.podList, m.err
+}
 
 func TestCheckNodeCondition(t *testing.T) {
 	scheme := runtime.NewScheme()
@@ -131,9 +142,8 @@ func TestSetNodeSchedulable(t *testing.T) {
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	r := &RebooterReconciler{
-		Reconciler: &reconciler.Reconciler{
-			Client: fakeClient,
-		},
+		Reconciler: &reconciler.Reconciler{Client: fakeClient},
+		APIReader:  fakeClient,
 	}
 
 	ctx := context.TODO()
@@ -170,9 +180,8 @@ func TestSetNodeConditionIfNotExists(t *testing.T) {
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	r := &RebooterReconciler{
-		Reconciler: &reconciler.Reconciler{
-			Client: fakeClient,
-		},
+		Reconciler: &reconciler.Reconciler{Client: fakeClient},
+		APIReader:  fakeClient,
 	}
 
 	ctx := context.TODO()
@@ -212,15 +221,67 @@ func TestSetNodeConditionIfNotExists(t *testing.T) {
 	}
 }
 
+func TestSetNodeConditionIfNotExistsRefreshesStaleNode(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	r := &RebooterReconciler{
+		Reconciler: &reconciler.Reconciler{Client: fakeClient},
+		APIReader:  fakeClient,
+	}
+
+	ctx := context.TODO()
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node-status-stale",
+		},
+	}
+
+	err := fakeClient.Create(ctx, node)
+	if err != nil {
+		t.Fatalf("failed to create node: %v", err)
+	}
+
+	liveNode := &corev1.Node{}
+	err = fakeClient.Get(ctx, types.NamespacedName{Name: node.Name}, liveNode)
+	if err != nil {
+		t.Fatalf("failed to get live node: %v", err)
+	}
+
+	liveNode.Status.Conditions = append(liveNode.Status.Conditions, corev1.NodeCondition{
+		Type:   corev1.NodeReady,
+		Status: corev1.ConditionTrue,
+	})
+	err = fakeClient.Status().Update(ctx, liveNode)
+	if err != nil {
+		t.Fatalf("failed to update live node status: %v", err)
+	}
+
+	err = r.SetNodeConditionIfNotExists(ctx, node, consts.SlurmNodeDrain, corev1.ConditionTrue, consts.ReasonNodeDrained, consts.MessageDrained)
+	if err != nil {
+		t.Fatalf("SetNodeConditionIfNotExists returned an error for stale object: %v", err)
+	}
+
+	updatedNode := &corev1.Node{}
+	err = fakeClient.Get(ctx, types.NamespacedName{Name: node.Name}, updatedNode)
+	if err != nil {
+		t.Fatalf("failed to get updated node: %v", err)
+	}
+
+	assert.Len(t, updatedNode.Status.Conditions, 2)
+	assert.Equal(t, corev1.NodeReady, updatedNode.Status.Conditions[0].Type)
+	assert.Equal(t, consts.SlurmNodeDrain, updatedNode.Status.Conditions[1].Type)
+}
+
 func TestTaintNodeWithNoExecute(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	r := &RebooterReconciler{
-		Reconciler: &reconciler.Reconciler{
-			Client: fakeClient,
-		},
+		Reconciler: &reconciler.Reconciler{Client: fakeClient},
+		APIReader:  fakeClient,
 	}
 
 	ctx := context.TODO()
@@ -268,6 +329,59 @@ func TestTaintNodeWithNoExecute(t *testing.T) {
 	if len(updatedNode.Spec.Taints) != 0 {
 		t.Errorf("node was not untainted")
 	}
+}
+
+func TestTaintNodeWithNoExecuteRefreshesStaleNode(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	r := &RebooterReconciler{
+		Reconciler: &reconciler.Reconciler{Client: fakeClient},
+		APIReader:  fakeClient,
+	}
+
+	ctx := context.TODO()
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node-stale",
+		},
+	}
+
+	err := fakeClient.Create(ctx, node)
+	if err != nil {
+		t.Fatalf("failed to create node: %v", err)
+	}
+
+	// Make the local object stale by updating the live object through a different copy.
+	liveNode := &corev1.Node{}
+	err = fakeClient.Get(ctx, types.NamespacedName{Name: node.Name}, liveNode)
+	if err != nil {
+		t.Fatalf("failed to get live node: %v", err)
+	}
+
+	liveNode.Spec.Unschedulable = true
+	err = fakeClient.Update(ctx, liveNode)
+	if err != nil {
+		t.Fatalf("failed to update live node: %v", err)
+	}
+
+	err = r.TaintNodeWithNoExecute(ctx, node, true)
+	if err != nil {
+		t.Fatalf("TaintNodeWithNoExecute returned an error for stale object: %v", err)
+	}
+
+	updatedNode := &corev1.Node{}
+	err = fakeClient.Get(ctx, types.NamespacedName{Name: node.Name}, updatedNode)
+	if err != nil {
+		t.Fatalf("failed to get updated node: %v", err)
+	}
+
+	assert.True(t, updatedNode.Spec.Unschedulable)
+	if len(updatedNode.Spec.Taints) != 1 {
+		t.Fatalf("expected 1 taint, got %d", len(updatedNode.Spec.Taints))
+	}
+	assert.Equal(t, corev1.TaintEffectNoExecute, updatedNode.Spec.Taints[0].Effect)
 }
 
 func TestIsNodeTaintedWithNoExecute(t *testing.T) {
@@ -412,6 +526,83 @@ func TestHasTolerationForExists(t *testing.T) {
 			result := HasTolerationForExists(tt.pod)
 			if result != tt.expected {
 				t.Errorf("HasTolerationForExists() = %v, expected %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestAreAllPodsEvicted(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	ctx := context.TODO()
+	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}}
+
+	daemonSetPod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "ds-pod",
+			OwnerReferences: []metav1.OwnerReference{{Kind: "DaemonSet", Name: "my-ds"}},
+		},
+	}
+	noExecutePod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "no-execute-pod"},
+		Spec:       corev1.PodSpec{Tolerations: []corev1.Toleration{{Effect: corev1.TaintEffectNoExecute}}},
+	}
+	existsPod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "exists-pod"},
+		Spec:       corev1.PodSpec{Tolerations: []corev1.Toleration{{Operator: corev1.TolerationOpExists}}},
+	}
+	blockingPod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "blocking-pod"}}
+
+	tests := []struct {
+		name        string
+		fetcher     NodePodsFetcher
+		wantErr     bool
+		wantErrType interface{}
+	}{
+		{
+			name:    "all pods exempt — eviction complete",
+			fetcher: &mockNodePodsFetcher{podList: &corev1.PodList{Items: []corev1.Pod{daemonSetPod, noExecutePod, existsPod}}},
+			wantErr: false,
+		},
+		{
+			name:    "empty pod list — eviction complete",
+			fetcher: &mockNodePodsFetcher{podList: &corev1.PodList{}},
+			wantErr: false,
+		},
+		{
+			name:        "one blocking pod — not yet evicted",
+			fetcher:     &mockNodePodsFetcher{podList: &corev1.PodList{Items: []corev1.Pod{daemonSetPod, blockingPod}}},
+			wantErr:     true,
+			wantErrType: &PodNotEvictableError{},
+		},
+		{
+			name:        "early return on first blocking pod",
+			fetcher:     &mockNodePodsFetcher{podList: &corev1.PodList{Items: []corev1.Pod{blockingPod, blockingPod}}},
+			wantErr:     true,
+			wantErrType: &PodNotEvictableError{},
+		},
+		{
+			name:    "proxy request fails",
+			fetcher: &mockNodePodsFetcher{err: fmt.Errorf("connection refused")},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &RebooterReconciler{
+				Reconciler:      &reconciler.Reconciler{Client: fakeClient},
+				NodePodsFetcher: tt.fetcher,
+			}
+			err := r.AreAllPodsEvicted(ctx, node)
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.wantErrType != nil {
+					assert.ErrorAs(t, err, &tt.wantErrType)
+				}
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}

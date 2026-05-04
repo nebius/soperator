@@ -38,6 +38,9 @@ tests:
           path: spec.slurmConfig.prolog
           value: "/opt/slurm_scripts/prolog.sh"
       - equal:
+          path: spec.slurmConfig.taskProlog
+          value: "/opt/slurm_scripts/task_prolog.sh"
+      - equal:
           path: spec.slurmConfig.epilog
           value: "/opt/slurm_scripts/epilog.sh"
       - equal:
@@ -48,7 +51,7 @@ tests:
           value: 20000
       - equal:
           path: spec.slurmConfig.minJobAge
-          value: 28800
+          value: 3600
       - equal:
           path: spec.slurmConfig.messageTimeout
           value: 60

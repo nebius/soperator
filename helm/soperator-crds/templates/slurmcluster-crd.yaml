@@ -30989,8 +30989,9 @@ spec:
                   epilog: ""
                   maxJobCount: 20000
                   messageTimeout: 60
-                  minJobAge: 28800
+                  minJobAge: 3600
                   prolog: ""
+                  taskProlog: ""
                 description: SlurmConfig represents the Slurm configuration in slurm.conf.
                   Not all options are supported.
                 properties:
@@ -31029,7 +31030,7 @@ spec:
                     format: int32
                     type: integer
                   minJobAge:
-                    default: 28800
+                    default: 3600
                     description: Don't remove jobs from controller memory after some
                       time
                     format: int32
@@ -31042,6 +31043,11 @@ spec:
                   taskPluginParam:
                     default: ""
                     description: Additional parameters for the task plugin
+                    type: string
+                  taskProlog:
+                    default: ""
+                    description: Defines specific file to run the task prolog when
+                      job starts. Default value is no task prolog
                     type: string
                   topologyParam:
                     default: SwitchAsNodeRank
