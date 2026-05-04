@@ -3,6 +3,7 @@ package common
 import (
 	"cmp"
 	"fmt"
+	"math/bits"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -317,10 +318,12 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("SlurmdTimeout", 180)
 	res.AddProperty("TCPTimeout", 15)
 	res.AddProperty("WaitTime", 0)
+	total := totalWorkerNodes(cluster)
+	connMax := max(int32(1024), nextPow2(total*2))
 	if cluster.HasEphemeralNodes() {
-		res.AddProperty("SlurmctldParameters", "conmgr_max_connections=1024,conmgr_threads=32,cloud_dns,idle_on_node_suspend")
+		res.AddProperty("SlurmctldParameters", fmt.Sprintf("conmgr_max_connections=%d,conmgr_threads=32,cloud_dns,idle_on_node_suspend", connMax))
 	} else {
-		res.AddProperty("SlurmctldParameters", "conmgr_max_connections=1024,conmgr_threads=32")
+		res.AddProperty("SlurmctldParameters", fmt.Sprintf("conmgr_max_connections=%d,conmgr_threads=32", connMax))
 	}
 
 	res.AddProperty("RebootProgram", "/opt/bin/slurm/reboot.sh")
@@ -356,8 +359,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddComment("COMPUTE NODES")
 	res.AddComment("We're using the \"dynamic nodes\" feature: https://slurm.schedmd.com/dynamic_nodes.html")
-	res.AddProperty("MaxNodeCount", "1024")
-	res.AddProperty("MaxArraySize", "1024")
+	res.AddProperty("MaxNodeCount", max(int32(1024), nextPow2(total*2)))
+	res.AddProperty("MaxArraySize", max(int32(1024), total*5))
 	res.AddProperty("JobRequeue", 1)
 	res.AddProperty("PreemptMode", "REQUEUE")
 	res.AddProperty("PreemptType", "preempt/partition_prio")
@@ -445,6 +448,22 @@ func buildSuspendExcNodes(cluster *values.SlurmCluster) string {
 	}
 
 	return strings.Join(staticNodeSets, ",")
+}
+
+func totalWorkerNodes(cluster *values.SlurmCluster) int32 {
+	var total int32
+	for _, ns := range cluster.NodeSets {
+		total += ns.Spec.Replicas
+	}
+	return total
+}
+
+// nextPow2 returns the smallest power of 2 >= n (minimum 1).
+func nextPow2(n int32) int32 {
+	if n <= 1 {
+		return 1
+	}
+	return 1 << bits.Len(uint(n-1))
 }
 
 // addSlurmConfigProperties adds properties from the given struct to the config file
