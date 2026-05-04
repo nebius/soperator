@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"context"
 	"crypto/tls"
 	"errors"
 	"flag"
@@ -265,7 +264,7 @@ func main() {
 		cli.Fail(setupLog, err, "unable to start manager")
 	}
 
-	ctx := context.Background()
+	ctx := ctrl.SetupSignalHandler()
 
 	// Index pods by node name. This is used to list and evict pods from a specific node.
 	if err = mgr.GetFieldIndexer().IndexField(ctx, &corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
@@ -275,7 +274,7 @@ func main() {
 		cli.Fail(setupLog, err, "unable to setup index field")
 	}
 
-	slurmAPIClients := slurmapi.NewClientSet()
+	slurmAPIClients := slurmapi.NewClientSet(ctx)
 
 	if controllersSet.Enabled("slurmapiclients") {
 		if err = soperatorchecks.NewSlurmAPIClientsController(
@@ -387,7 +386,7 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err = mgr.Start(ctx); err != nil {
 		cli.Fail(setupLog, err, "unable to start manager")
 	}
 }

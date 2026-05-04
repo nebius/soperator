@@ -143,7 +143,7 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 			apiClient := slurmapifake.NewMockClient(t)
 			apiClient.On("ListNodes", ctx).Return(tt.listNodesOut, tt.listNodesErr)
 
-			slurmAPIClients := slurmapi.NewClientSet()
+			slurmAPIClients := slurmapi.NewClientSet(context.Background())
 			slurmAPIClients.AddClient(tt.slurmClusterName, apiClient)
 			c := &SlurmNodesController{
 				slurmAPIClients: slurmAPIClients,
@@ -234,7 +234,7 @@ func TestSlurmNodesController_processSetUnhealthy_reassignedInstanceUndrains(t *
 		},
 	}, nil).Once()
 
-	slurmAPIClients := slurmapi.NewClientSet()
+	slurmAPIClients := slurmapi.NewClientSet(context.Background())
 	slurmAPIClients.AddClient(slurmClusterName, apiClient)
 
 	controller := NewSlurmNodesController(
@@ -306,7 +306,7 @@ func TestSlurmNodesController_processSetUnhealthy_setsHardwareConditionWhenAssig
 		client,
 		scheme,
 		record.NewFakeRecorder(10),
-		slurmapi.NewClientSet(),
+		slurmapi.NewClientSet(context.Background()),
 		time.Minute,
 		true,
 		true,
@@ -361,7 +361,7 @@ func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodFallsBackToSet
 		client,
 		scheme,
 		record.NewFakeRecorder(10),
-		slurmapi.NewClientSet(),
+		slurmapi.NewClientSet(context.Background()),
 		time.Minute,
 		true,
 		true,
@@ -425,7 +425,7 @@ func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodUndrainsWhenCu
 		},
 	}, nil).Once()
 
-	slurmAPIClients := slurmapi.NewClientSet()
+	slurmAPIClients := slurmapi.NewClientSet(context.Background())
 	slurmAPIClients.AddClient(slurmClusterName, apiClient)
 
 	controller := NewSlurmNodesController(

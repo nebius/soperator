@@ -140,7 +140,7 @@ func TestActiveCheckJobReconciler_Reconcile_DoesNotFinalizeUntilAllSlurmJobsFini
 		}).
 		Twice()
 
-	slurmClients := slurmapi.NewClientSet()
+	slurmClients := slurmapi.NewClientSet(context.Background())
 	slurmClients.AddClient(types.NamespacedName{
 		Namespace: namespace,
 		Name:      activeCheck.Spec.SlurmClusterRefName,
@@ -696,7 +696,7 @@ func newActiveCheckJobTestReconciler(
 		WithObjects(activeCheck, cronJob, k8sJob, pod).
 		Build()
 
-	slurmClients := slurmapi.NewClientSet()
+	slurmClients := slurmapi.NewClientSet(context.Background())
 	if slurmClient != nil {
 		slurmClients.AddClient(types.NamespacedName{
 			Namespace: activeCheck.Namespace,
