@@ -273,6 +273,8 @@ observability:
           enabled: true
           org_name: Main Org.
           org_role: Admin
+      kubeStateMetrics:
+        maxScrapeSize: "150554432"
       vmagent:
         spec:
           extraArgs:

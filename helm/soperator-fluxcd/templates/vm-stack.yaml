@@ -38,6 +38,7 @@ spec:
   {{- if .Values.observability.vmStack.overrideValues }}
     {{- toYaml .Values.observability.vmStack.overrideValues | nindent 4 }}
   {{- else }}
+  {{- $kubeStateMetrics := .Values.observability.vmStack.values.kubeStateMetrics | default dict }}
       alertmanager:
         enabled: false
       crds:
@@ -209,6 +210,7 @@ spec:
           spec:
             endpoints:
               - honorLabels: true
+                max_scrape_size: {{ $kubeStateMetrics.maxScrapeSize | default "150554432" | quote }}
                 metricRelabelConfigs:
                   - action: labeldrop
                     regex: (uid|container_id|image_id)
