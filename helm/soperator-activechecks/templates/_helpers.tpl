@@ -255,6 +255,22 @@ Otherwise: true for Kubernetes >= 1.33 (user namespaces stable, explicitly opt i
 {{- end -}}
 
 {{/*
+Name for the run-extensive-check-on-reservations CronJob and its RBAC resources.
+Prefixed with slurmClusterRefName to support multiple releases in the same namespace.
+*/}}
+{{- define "soperator-activechecks.extensiveCheckJobName" -}}
+{{- printf "%s-run-extensive-check-on-reservations" .Values.slurmClusterRefName | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Name for the activecheck-waiter ServiceAccount and its RBAC resources.
+Prefixed with slurmClusterRefName to support multiple releases in the same namespace.
+*/}}
+{{- define "soperator-activechecks.waitForChecksName" -}}
+{{- printf "%s-activecheck-waiter" .Values.slurmClusterRefName | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
 Validate that a check does not enable both commentSlurmNode and drainSlurmNode
 under `failureReactions` for a single check. Invoke with (dict "name" "<checkKey>" "vals" .Values)
 */}}

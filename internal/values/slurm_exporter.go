@@ -7,6 +7,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
 )
 
 type SlurmExporter struct {
@@ -41,13 +42,17 @@ type SlurmExporter struct {
 
 	// ServiceAccountName is the ServiceAccount to be used by exporter pods.
 	ServiceAccountName string
+
+	Deployment Deployment
 }
 
-func buildSlurmExporterFrom(maintenance *consts.MaintenanceMode, exporter *slurmv1.SlurmExporter) SlurmExporter {
+func buildSlurmExporterFrom(namePrefix string, maintenance *consts.MaintenanceMode, exporter *slurmv1.SlurmExporter) SlurmExporter {
 	enabled := false
 	if exporter.Enabled != nil {
 		enabled = *exporter.Enabled
 	}
+
+	deploymentName := resourcegetter.BuildPrefixedName(namePrefix, "slurm-exporter")
 
 	return SlurmExporter{
 		SlurmNode:         *exporter.SlurmNode.DeepCopy(),
@@ -66,5 +71,6 @@ func buildSlurmExporterFrom(maintenance *consts.MaintenanceMode, exporter *slurm
 		Container:          *exporter.ExporterContainer.DeepCopy(),
 		CollectionInterval: exporter.CollectionInterval,
 		ServiceAccountName: exporter.ServiceAccountName,
+		Deployment:         buildDeploymentFrom(deploymentName),
 	}
 }
