@@ -26,6 +26,7 @@ type Params struct {
 	SlurmClusterID types.NamespacedName
 	// CollectionInterval specifies how often to collect metrics from SLURM APIs
 	CollectionInterval time.Duration
+	JobListParams      slurmapi.ListJobsParams
 }
 
 // Exporter collects metrics from a SLURM cluster and exports them in Prometheus format
@@ -54,7 +55,7 @@ type Exporter struct {
 func NewClusterExporter(slurmAPIClient slurmapi.Client, params Params) *Exporter {
 	registry := prometheus.NewRegistry()
 	monitoringRegistry := prometheus.NewRegistry()
-	collector := NewMetricsCollector(slurmAPIClient)
+	collector := NewMetricsCollector(slurmAPIClient, params.JobListParams)
 
 	return &Exporter{
 		params:             params,

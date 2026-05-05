@@ -34,7 +34,10 @@ func TestRenderContainerExporter(t *testing.T) {
 				Image:     imageExporter,
 				Resources: resourceExporter,
 			},
-			CollectionInterval: prometheusv1.Duration("30s"),
+			CollectionInterval:     prometheusv1.Duration("30s"),
+			JobSource:              "accounting",
+			AccountingJobStates:    []string{"RUNNING", "PENDING"},
+			AccountingJobsLookback: prometheusv1.Duration("30m"),
 		},
 		NodeRest: values.SlurmREST{
 			Service: values.Service{Name: "rest-service"},
@@ -66,6 +69,9 @@ func TestRenderContainerExporter(t *testing.T) {
 			{Name: "SLURM_EXPORTER_CLUSTER_NAME", Value: "test-cluster"},
 			{Name: "SLURM_EXPORTER_SLURM_API_SERVER", Value: "http://rest-service.soperator-ns.svc:6817"},
 			{Name: "SLURM_EXPORTER_COLLECTION_INTERVAL", Value: "30s"},
+			{Name: "SLURM_EXPORTER_JOB_SOURCE", Value: "accounting"},
+			{Name: "SLURM_EXPORTER_ACCOUNTING_JOB_STATES", Value: "RUNNING,PENDING"},
+			{Name: "SLURM_EXPORTER_ACCOUNTING_JOBS_LOOKBACK", Value: "30m"},
 		},
 	}
 

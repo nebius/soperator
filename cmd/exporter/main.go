@@ -22,10 +22,12 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/prometheus/common/model"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
@@ -42,14 +44,17 @@ import (
 )
 
 type Flags struct {
-	logFormat          string
-	logLevel           string
-	metricsAddr        string
-	monitoringAddr     string
-	slurmAPIServer     string
-	clusterNamespace   string
-	clusterName        string
-	collectionInterval string
+	logFormat              string
+	logLevel               string
+	metricsAddr            string
+	monitoringAddr         string
+	slurmAPIServer         string
+	clusterNamespace       string
+	clusterName            string
+	collectionInterval     string
+	jobSource              string
+	accountingJobStates    string
+	accountingJobsLookback string
 
 	// modes
 	kubeconfigPath string
@@ -110,6 +115,9 @@ func parseFlags() Flags {
 		{"cluster-namespace", "SLURM_EXPORTER_CLUSTER_NAMESPACE", "soperator", "The namespace of the Slurm cluster", &flags.clusterNamespace},
 		{"cluster-name", "SLURM_EXPORTER_CLUSTER_NAME", "", "The name of the Slurm cluster (required)", &flags.clusterName},
 		{"collection-interval", "SLURM_EXPORTER_COLLECTION_INTERVAL", "30s", "How often to collect metrics from SLURM APIs", &flags.collectionInterval},
+		{"job-source", "SLURM_EXPORTER_JOB_SOURCE", "controller", "EXPERIMENTAL: SLURM job source: controller (Slurm controller API) or accounting (Slurm accounting API)", &flags.jobSource},
+		{"accounting-job-states", "SLURM_EXPORTER_ACCOUNTING_JOB_STATES", "", "EXPERIMENTAL: when --job-source=accounting, CSV of Slurm job states forwarded verbatim to the accounting state filter (e.g. RUNNING,PENDING). Empty = no state filter. Filter is applied by slurmdbd to the historical states a job held during the lookback window (sacct --state semantics) — not to the current state of returned jobs.", &flags.accountingJobStates},
+		{"accounting-jobs-lookback", "SLURM_EXPORTER_ACCOUNTING_JOBS_LOOKBACK", "1h", "EXPERIMENTAL: when --job-source=accounting, the size of the time window queried from the accounting API ([now - lookback, now + 5m]).", &flags.accountingJobsLookback},
 		{"scontrol-path", "SLURM_EXPORTER_SCONTROL_PATH", "scontrol", "Path to scontrol command for standalone mode", &flags.scontrolPath},
 		{"key-rotation-interval", "SLURM_EXPORTER_KEY_ROTATION_INTERVAL", "30m", "Key rotation interval for standalone mode (e.g., 30m, 1h)", &flags.keyRotationInterval},
 	}
@@ -146,6 +154,69 @@ func parseFlags() Flags {
 		os.Exit(1)
 	}
 	return flags
+}
+
+// parseDuration accepts both Prometheus-style durations (y/w/d/h/m/s/ms — what the CRD's
+// prometheusv1.Duration regex allows) and Go-style time.Duration syntax (fractional values like
+// "0.5s" or "2h45m30.5s"). Prometheus is tried first because it's the documented CRD shape;
+// Go-style is the historical exporter-flag shape and is kept for backward compatibility. The two
+// formats only overlap on integer h/m/s/ms values where both yield the same result.
+func parseDuration(s string) (time.Duration, error) {
+	d, promErr := model.ParseDuration(s)
+	if promErr == nil {
+		return time.Duration(d), nil
+	}
+	if gd, err := time.ParseDuration(s); err == nil {
+		return gd, nil
+	}
+	return 0, promErr
+}
+
+func buildJobListParams(flags Flags) (slurmapi.ListJobsParams, error) {
+	rawSource := strings.TrimSpace(strings.ToLower(flags.jobSource))
+	if rawSource == "" {
+		rawSource = string(slurmapi.JobSourceController)
+	}
+	source := slurmapi.JobSource(rawSource)
+	switch source {
+	case slurmapi.JobSourceController, slurmapi.JobSourceAccounting:
+	default:
+		return slurmapi.ListJobsParams{}, fmt.Errorf("unsupported job source %q", flags.jobSource)
+	}
+
+	var states []string
+	for _, s := range strings.Split(flags.accountingJobStates, ",") {
+		if s = strings.TrimSpace(s); s != "" {
+			states = append(states, s)
+		}
+	}
+
+	// Parse the lookback only when the accounting source is selected. A stale or invalid value
+	// in the env/CLI must not abort the exporter when the controller path is in use.
+	var lookback time.Duration
+	if source == slurmapi.JobSourceAccounting {
+		if flags.accountingJobsLookback == "" {
+			return slurmapi.ListJobsParams{}, fmt.Errorf("--accounting-jobs-lookback is required when --job-source=accounting")
+		}
+		var err error
+		lookback, err = parseDuration(flags.accountingJobsLookback)
+		if err != nil {
+			return slurmapi.ListJobsParams{}, fmt.Errorf("parse --accounting-jobs-lookback: %w", err)
+		}
+		if lookback <= 0 {
+			return slurmapi.ListJobsParams{}, fmt.Errorf("--accounting-jobs-lookback must be > 0 when --job-source=accounting")
+		}
+	}
+
+	return slurmapi.ListJobsParams{
+		Source:              source,
+		AccountingJobStates: states,
+		AccountingLookback:  lookback,
+		// In soperator the K8s SlurmCluster CR name is the same as Slurm's `ClusterName`, so
+		// reusing --cluster-name scopes the slurmdbd query to this deployment's jobs even when
+		// the slurmdbd backs multiple Slurm clusters.
+		AccountingCluster: flags.clusterName,
+	}, nil
 }
 
 // simple issuer that returns a fixed token
@@ -226,9 +297,14 @@ func main() {
 		cli.Fail(log, err, "Failed to initialize Slurm API client")
 	}
 
-	interval, err := time.ParseDuration(flags.collectionInterval)
+	interval, err := parseDuration(flags.collectionInterval)
 	if err != nil {
 		cli.Fail(log, err, "Failed to parse collection interval")
+	}
+
+	jobListParams, err := buildJobListParams(flags)
+	if err != nil {
+		cli.Fail(log, err, "Failed to parse job collection configuration")
 	}
 
 	clusterExporter := exporter.NewClusterExporter(
@@ -237,6 +313,7 @@ func main() {
 			SlurmAPIServer:     flags.slurmAPIServer,
 			SlurmClusterID:     slurmClusterID,
 			CollectionInterval: interval,
+			JobListParams:      jobListParams,
 		},
 	)
 
