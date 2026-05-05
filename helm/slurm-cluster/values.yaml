@@ -544,10 +544,19 @@ slurmNodes:
       # - If empty and create is false, the "default" ServiceAccount will be used and you must ensure it has the required RBAC.
       name: ""
     collectionInterval: "30s"
-    # Comma-separated Slurm job sources: controller, accounting.
-    jobSources: "controller"
-    # Accounting API job set: pending, running, completed, all.
-    accountingJobMode: "all"
+    # EXPERIMENTAL: Slurm job source: controller (Slurm controller API) or accounting (Slurm accounting API / slurmdbd).
+    # Use "accounting" when the controller endpoint is overloaded on large clusters.
+    jobSource: "controller"
+    # EXPERIMENTAL: when jobSource=accounting, list of Slurm job-state strings forwarded verbatim to the
+    # accounting API state filter (e.g. ["RUNNING", "PENDING"]). Empty list = no state filter.
+    # Note: slurmdbd applies this filter to the *historical* states a job held during the lookback
+    # window (same as `sacct --state=...`) — not to the current state of the returned jobs. A job
+    # that was RUNNING during the window and has since completed will still be returned with its
+    # current state set to e.g. COMPLETED.
+    accountingJobStates: []
+    # EXPERIMENTAL: when jobSource=accounting, the size of the time window queried from the accounting API
+    # ([now - lookback, now + 5m]). The +5m skew tolerates clock drift between slurmrestd, slurmctld and slurmdbd.
+    accountingJobsLookback: "1h"
     exporter:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"

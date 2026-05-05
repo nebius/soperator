@@ -199,11 +199,11 @@ tests:
           path: spec.slurmNodes.exporter.collectionInterval
           value: "30s"
       - equal:
-          path: spec.slurmNodes.exporter.jobSources
+          path: spec.slurmNodes.exporter.jobSource
           value: "controller"
       - equal:
-          path: spec.slurmNodes.exporter.accountingJobMode
-          value: "all"
+          path: spec.slurmNodes.exporter.accountingJobsLookback
+          value: "1h"
       - equal:
           path: spec.slurmNodes.exporter.podMonitorConfig.jobLabel
           value: "slurm-exporter"

@@ -1424,3 +1424,80 @@ func TestNodeStateDetectionFunctions(t *testing.T) {
 		assert.False(t, isNodeDraining(downDrainNode))
 	})
 }
+
+func TestJobAllocatedResources_MemoryFallback(t *testing.T) {
+	logger := zap.New(zap.UseDevMode(true))
+
+	t.Run("MemoryPerNode with NodeCount → memory reported", func(t *testing.T) {
+		job := slurmapi.Job{
+			MemoryPerNode: ptr.To(int64(8192)),
+			NodeCount:     ptr.To(int32(4)),
+		}
+		_, _, mem, memOK := jobAllocatedResources(logger, job)
+		assert.True(t, memOK)
+		assert.Equal(t, mbToBytes(8192*4), mem)
+	})
+
+	t.Run("MemoryPerNode without NodeCount → memory omitted", func(t *testing.T) {
+		// Typical accounting-mode pending multi-node job: AllocationNodes=0 leaves NodeCount nil.
+		// Reporting MemoryPerNode×1 would silently undercount; better to omit the metric.
+		job := slurmapi.Job{
+			MemoryPerNode: ptr.To(int64(8192)),
+			NodeCount:     nil,
+		}
+		_, _, _, memOK := jobAllocatedResources(logger, job)
+		assert.False(t, memOK)
+	})
+
+	t.Run("TresAllocated with mem wins over MemoryPerNode fallback", func(t *testing.T) {
+		// For running jobs the TRES path takes precedence and the NodeCount fallback is irrelevant.
+		job := slurmapi.Job{
+			TresAllocated: "cpu=4,mem=16384M",
+			MemoryPerNode: ptr.To(int64(8192)),
+			NodeCount:     nil,
+		}
+		_, _, mem, memOK := jobAllocatedResources(logger, job)
+		assert.True(t, memOK)
+		assert.Equal(t, float64(16384*1024*1024), mem)
+	})
+
+	t.Run("TresRequested cpu used when TresAllocated empty", func(t *testing.T) {
+		// Bug scenario: pending/DEADLINE accounting jobs have no allocation; Required.CPUs is
+		// the per-task minimum (often 1). The requested-TRES fallback is what makes the metric
+		// reflect what the user actually requested.
+		job := slurmapi.Job{
+			TresRequested: "cpu=192,mem=64000M,gres/gpu=8",
+			CPUs:          ptr.To(int32(1)),
+		}
+		cpu, cpuOK, mem, memOK := jobAllocatedResources(logger, job)
+		assert.True(t, cpuOK)
+		assert.Equal(t, float64(192), cpu)
+		assert.True(t, memOK)
+		assert.Equal(t, float64(64000)*1024*1024, mem)
+	})
+
+	t.Run("TresAllocated wins over TresRequested", func(t *testing.T) {
+		job := slurmapi.Job{
+			TresAllocated: "cpu=4,mem=8192M",
+			TresRequested: "cpu=192,mem=64000M",
+		}
+		cpu, cpuOK, mem, memOK := jobAllocatedResources(logger, job)
+		assert.True(t, cpuOK)
+		assert.Equal(t, float64(4), cpu)
+		assert.True(t, memOK)
+		assert.Equal(t, float64(8192)*1024*1024, mem)
+	})
+
+	t.Run("TresRequested fills only the side that's missing", func(t *testing.T) {
+		// Allocated TRES has CPU but no memory; Requested fills only the memory side.
+		job := slurmapi.Job{
+			TresAllocated: "cpu=4",
+			TresRequested: "cpu=192,mem=8192M",
+		}
+		cpu, cpuOK, mem, memOK := jobAllocatedResources(logger, job)
+		assert.True(t, cpuOK)
+		assert.Equal(t, float64(4), cpu)
+		assert.True(t, memOK)
+		assert.Equal(t, float64(8192)*1024*1024, mem)
+	})
+}

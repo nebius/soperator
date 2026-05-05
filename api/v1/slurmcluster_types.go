@@ -1059,18 +1059,49 @@ type SlurmExporter struct {
 	// +kubebuilder:default="30s"
 	CollectionInterval prometheusv1.Duration `json:"collectionInterval,omitempty"`
 
-	// JobSources is a comma-separated list of Slurm APIs used for job collection.
+	// JobSource selects the Slurm API used for job collection.
+	//
+	// EXPERIMENTAL: this field's name and shape may change in a future release.
+	//
+	// "controller" reads jobs from the Slurm controller API (default, current behavior).
+	// "accounting" reads jobs from the Slurm accounting API (slurmdbd) and is intended for clusters where
+	// the controller endpoint is overloaded.
+	//
+	// Note: the accounting source has known label-fidelity limitations (empty user_id, "None" job_state_reason
+	// for pending jobs, collapsed pending array tasks). See docs/slurm-exporter.md "Known limitations of
+	// the accounting source" for details.
 	//
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=controller;accounting
 	// +kubebuilder:default="controller"
-	JobSources string `json:"jobSources,omitempty"`
+	JobSource string `json:"jobSource,omitempty"`
 
-	// AccountingJobMode selects which accounting jobs are exported.
+	// AccountingJobStates is a list of Slurm job-state strings forwarded verbatim to the accounting API's
+	// "state" CSV query parameter (e.g. "PENDING", "RUNNING", "COMPLETED").
+	// Empty list means no state filter (the accounting API returns jobs in any state).
+	// Only applied when JobSource is "accounting".
+	//
+	// Important: this filter is applied by slurmdbd to the *historical* states a job held during the
+	// query window [now - AccountingJobsLookback, now + 5m] — same as `sacct --state=...`. It is NOT a
+	// filter on the current job state. A job that was RUNNING during the window and has since
+	// completed will still be returned, with its current state set to e.g. COMPLETED.
+	//
+	// EXPERIMENTAL: this field's name and shape may change in a future release.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Enum=pending;running;completed;all
-	// +kubebuilder:default="all"
-	AccountingJobMode string `json:"accountingJobMode,omitempty"`
+	AccountingJobStates []string `json:"accountingJobStates,omitempty"`
+
+	// AccountingJobsLookback sets the size of the time window queried from the accounting API:
+	// [now − lookback, now + 5 min]. The +5 min skew tolerates clock drift between slurmrestd, slurmctld and slurmdbd.
+	// Long-running jobs that started before the window are still included (sacct overlap semantics).
+	// Only applied when JobSource is "accounting".
+	//
+	// EXPERIMENTAL: this field's name and shape may change in a future release.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="1h"
+	// +kubebuilder:validation:XValidation:rule="self.matches('[1-9]')",message="accountingJobsLookback must be greater than zero"
+	AccountingJobsLookback prometheusv1.Duration `json:"accountingJobsLookback,omitempty"`
 
 	// ServiceAccountName is the name of the ServiceAccount to use for exporter pods.
 	// +kubebuilder:validation:Optional
@@ -1374,10 +1405,10 @@ func (s *SlurmExporter) SetDefaults() {
 	if s.Enabled == nil {
 		s.Enabled = ptr.To(false)
 	}
-	if s.JobSources == "" {
-		s.JobSources = "controller"
+	if s.JobSource == "" {
+		s.JobSource = "controller"
 	}
-	if s.AccountingJobMode == "" {
-		s.AccountingJobMode = "all"
+	if s.AccountingJobsLookback == "" {
+		s.AccountingJobsLookback = "1h"
 	}
 }

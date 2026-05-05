@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -18,11 +19,14 @@ func renderContainerExporter(clusterValues *values.SlurmCluster) corev1.Containe
 		{Name: "SLURM_EXPORTER_SLURM_API_SERVER", Value: rest.GetServiceURL(clusterValues.Namespace, &clusterValues.NodeRest)},
 		{Name: "SLURM_EXPORTER_COLLECTION_INTERVAL", Value: string(clusterValues.SlurmExporter.CollectionInterval)},
 	}
-	if clusterValues.SlurmExporter.JobSources != "" {
-		env = append(env, corev1.EnvVar{Name: "SLURM_EXPORTER_JOB_SOURCES", Value: clusterValues.SlurmExporter.JobSources})
+	if clusterValues.SlurmExporter.JobSource != "" {
+		env = append(env, corev1.EnvVar{Name: "SLURM_EXPORTER_JOB_SOURCE", Value: clusterValues.SlurmExporter.JobSource})
 	}
-	if clusterValues.SlurmExporter.AccountingJobMode != "" {
-		env = append(env, corev1.EnvVar{Name: "SLURM_EXPORTER_ACCOUNTING_JOB_MODE", Value: clusterValues.SlurmExporter.AccountingJobMode})
+	if len(clusterValues.SlurmExporter.AccountingJobStates) > 0 {
+		env = append(env, corev1.EnvVar{Name: "SLURM_EXPORTER_ACCOUNTING_JOB_STATES", Value: strings.Join(clusterValues.SlurmExporter.AccountingJobStates, ",")})
+	}
+	if clusterValues.SlurmExporter.AccountingJobsLookback != "" {
+		env = append(env, corev1.EnvVar{Name: "SLURM_EXPORTER_ACCOUNTING_JOBS_LOOKBACK", Value: string(clusterValues.SlurmExporter.AccountingJobsLookback)})
 	}
 
 	return corev1.Container{
