@@ -59,7 +59,7 @@ spec:
           timeout: 5s
         {{- if $hasPublicEndpoint }}
         otlp:
-          endpoint: {{ include "soperator-fluxcd.loggingEndpoint" . }}
+          endpoint: {{ .Values.observability.opentelemetry.publicEndpoint }}
           balancer_name: round_robin
           compression: snappy
           retry_on_failure:
