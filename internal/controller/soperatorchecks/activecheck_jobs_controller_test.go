@@ -104,7 +104,7 @@ func TestActiveCheckJobReconciler_Reconcile_DoesNotFinalizeUntilAllSlurmJobsFini
 	reconcileRound := 1
 
 	mockClient.EXPECT().
-		GetJobsByID(mock.Anything, firstSlurmJobID).
+		GetJobsByIDFromAccounting(mock.Anything, firstSlurmJobID).
 		RunAndReturn(func(context.Context, string) ([]slurmapi.Job, error) {
 			return []slurmapi.Job{{
 				ID:         101,
@@ -117,7 +117,7 @@ func TestActiveCheckJobReconciler_Reconcile_DoesNotFinalizeUntilAllSlurmJobsFini
 		Twice()
 
 	mockClient.EXPECT().
-		GetJobsByID(mock.Anything, nextSlurmJobID).
+		GetJobsByIDFromAccounting(mock.Anything, nextSlurmJobID).
 		RunAndReturn(func(context.Context, string) ([]slurmapi.Job, error) {
 			if reconcileRound == 1 {
 				return []slurmapi.Job{{
@@ -312,7 +312,7 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobAggregatesTerminalResultsInS
 	errorEndTime := metav1.NewTime(submitTime.Add(4 * time.Minute))
 
 	mockClient := slurmapifake.NewMockClient(t)
-	mockClient.EXPECT().GetJobsByID(mock.Anything, "101").Return([]slurmapi.Job{{
+	mockClient.EXPECT().GetJobsByIDFromAccounting(mock.Anything, "101").Return([]slurmapi.Job{{
 		ID:          101,
 		Name:        activeCheck.Name,
 		State:       string(api.V0041JobInfoJobStateFAILED),
@@ -320,21 +320,21 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobAggregatesTerminalResultsInS
 		SubmitTime:  &submitTime,
 		EndTime:     &failedEndTime,
 	}}, nil).Once()
-	mockClient.EXPECT().GetJobsByID(mock.Anything, "102").Return([]slurmapi.Job{{
+	mockClient.EXPECT().GetJobsByIDFromAccounting(mock.Anything, "102").Return([]slurmapi.Job{{
 		ID:         102,
 		Name:       activeCheck.Name,
 		State:      string(api.V0041JobInfoJobStateCANCELLED),
 		SubmitTime: &submitTime,
 		EndTime:    &cancelledEndTime,
 	}}, nil).Once()
-	mockClient.EXPECT().GetJobsByID(mock.Anything, "103").Return([]slurmapi.Job{{
+	mockClient.EXPECT().GetJobsByIDFromAccounting(mock.Anything, "103").Return([]slurmapi.Job{{
 		ID:         103,
 		Name:       activeCheck.Name,
 		State:      string(api.V0041JobInfoJobStateCOMPLETED),
 		SubmitTime: &submitTime,
 		EndTime:    &completedEndTime,
 	}}, nil).Once()
-	mockClient.EXPECT().GetJobsByID(mock.Anything, "104").Return([]slurmapi.Job{{
+	mockClient.EXPECT().GetJobsByIDFromAccounting(mock.Anything, "104").Return([]slurmapi.Job{{
 		ID:          104,
 		Name:        activeCheck.Name,
 		State:       string(api.V0041JobInfoJobStateTIMEOUT),
@@ -388,7 +388,7 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobAccumulatesTerminalResultsAc
 	reconcileRound := 1
 
 	mockClient.EXPECT().
-		GetJobsByID(mock.Anything, "101").
+		GetJobsByIDFromAccounting(mock.Anything, "101").
 		RunAndReturn(func(context.Context, string) ([]slurmapi.Job, error) {
 			return []slurmapi.Job{{
 				ID:          101,
@@ -402,7 +402,7 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobAccumulatesTerminalResultsAc
 		Twice()
 
 	mockClient.EXPECT().
-		GetJobsByID(mock.Anything, "102").
+		GetJobsByIDFromAccounting(mock.Anything, "102").
 		RunAndReturn(func(context.Context, string) ([]slurmapi.Job, error) {
 			if reconcileRound == 1 {
 				return []slurmapi.Job{{
@@ -470,7 +470,7 @@ func TestActiveCheckJobReconciler_Reconcile_FailedSlurmJobWithoutReactionsOnlyUp
 	failedEndTime := metav1.NewTime(submitTime.Add(1 * time.Minute))
 
 	mockClient := slurmapifake.NewMockClient(t)
-	mockClient.EXPECT().GetJobsByID(mock.Anything, "101").Return([]slurmapi.Job{{
+	mockClient.EXPECT().GetJobsByIDFromAccounting(mock.Anything, "101").Return([]slurmapi.Job{{
 		ID:          101,
 		Name:        activeCheck.Name,
 		State:       string(api.V0041JobInfoJobStateFAILED),
@@ -495,6 +495,40 @@ func TestActiveCheckJobReconciler_Reconcile_FailedSlurmJobWithoutReactionsOnlyUp
 	}}, updatedCheck.Status.SlurmJobsStatus.LastRunFailJobsAndReasons)
 }
 
+// Slurmdbd lags slurmctld by some interval after sbatch — the just-submitted job ID may not yet
+// resolve on `/slurmdb/.../job/{id}`. The reconciler must requeue in that case rather than treat
+// "no rows" as success and finalize the run as Complete.
+func TestActiveCheckJobReconciler_Reconcile_SlurmJobNotYetVisibleInAccountingRequeues(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	scheme := newActiveCheckJobTestScheme(t)
+
+	activeCheck, cronJob, k8sJob, pod := newActiveCheckJobTestObjects("gpu-check", "gpu-check-123", "slurmJob")
+	k8sJob.Annotations["slurm-job-id"] = "101"
+
+	mockClient := slurmapifake.NewMockClient(t)
+	mockClient.EXPECT().GetJobsByIDFromAccounting(mock.Anything, "101").Return([]slurmapi.Job{}, nil).Once()
+
+	reconciler, fakeClient := newActiveCheckJobTestReconciler(t, scheme, activeCheck, cronJob, k8sJob, pod, mockClient)
+
+	result, err := reconciler.Reconcile(ctx, newActiveCheckJobRequest(k8sJob))
+	require.NoError(t, err)
+	assert.True(t, result.Requeue)
+
+	updatedCheck := &slurmv1alpha1.ActiveCheck{}
+	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(activeCheck), updatedCheck))
+	assert.Equal(t, consts.ActiveCheckSlurmRunStatusInProgress, updatedCheck.Status.SlurmJobsStatus.LastRunStatus)
+	assert.Empty(t, updatedCheck.Status.SlurmJobsStatus.LastRunFailJobsAndReasons)
+	assert.Empty(t, updatedCheck.Status.SlurmJobsStatus.LastRunErrorJobsAndReasons)
+	assert.Empty(t, updatedCheck.Status.SlurmJobsStatus.LastRunCancelledJobs)
+
+	updatedJob := &batchv1.Job{}
+	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(k8sJob), updatedJob))
+	assert.Empty(t, updatedJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime],
+		"watermark must not advance until the job is observed in slurmdbd")
+}
+
 func TestActiveCheckJobReconciler_Reconcile_FailedSlurmJobExecutesCommentReaction(t *testing.T) {
 	t.Parallel()
 
@@ -513,7 +547,7 @@ func TestActiveCheckJobReconciler_Reconcile_FailedSlurmJobExecutesCommentReactio
 	failedEndTime := metav1.NewTime(submitTime.Add(1 * time.Minute))
 
 	mockClient := slurmapifake.NewMockClient(t)
-	mockClient.EXPECT().GetJobsByID(mock.Anything, "101").Return([]slurmapi.Job{{
+	mockClient.EXPECT().GetJobsByIDFromAccounting(mock.Anything, "101").Return([]slurmapi.Job{{
 		ID:          101,
 		Name:        activeCheck.Name,
 		State:       string(api.V0041JobInfoJobStateFAILED),
