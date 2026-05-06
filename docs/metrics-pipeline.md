@@ -104,7 +104,8 @@ Key Metrics:
   - 8081 - Telemetry endpoint (self-monitoring)
 - Metrics: Pod state metrics (filtered subset)
 - Deployment: Single replica deployment in `monitoring-system` namespace
-- Configuration: `--resources=pods` with metric allowlist filtering
+- Configuration: pod/node collectors with metric allowlist filtering
+- Scrape size: inherits the global vmagent scrape size by default; `observability.vmStack.values.kubeStateMetrics.maxScrapeSize` can raise the main `http` endpoint limit for large clusters
 
 Connection Example:
 ```bash
