@@ -315,6 +315,65 @@ func (_c *MockClient_ListJobs_Call) RunAndReturn(run func(context.Context) ([]sl
 	return _c
 }
 
+// ListJobsWithParams provides a mock function with given fields: ctx, params
+func (_m *MockClient) ListJobsWithParams(ctx context.Context, params slurmapi.ListJobsParams) ([]slurmapi.Job, error) {
+	ret := _m.Called(ctx, params)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListJobsWithParams")
+	}
+
+	var r0 []slurmapi.Job
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, slurmapi.ListJobsParams) ([]slurmapi.Job, error)); ok {
+		return rf(ctx, params)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, slurmapi.ListJobsParams) []slurmapi.Job); ok {
+		r0 = rf(ctx, params)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]slurmapi.Job)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, slurmapi.ListJobsParams) error); ok {
+		r1 = rf(ctx, params)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_ListJobsWithParams_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListJobsWithParams'
+type MockClient_ListJobsWithParams_Call struct {
+	*mock.Call
+}
+
+// ListJobsWithParams is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params slurmapi.ListJobsParams
+func (_e *MockClient_Expecter) ListJobsWithParams(ctx interface{}, params interface{}) *MockClient_ListJobsWithParams_Call {
+	return &MockClient_ListJobsWithParams_Call{Call: _e.mock.On("ListJobsWithParams", ctx, params)}
+}
+
+func (_c *MockClient_ListJobsWithParams_Call) Run(run func(ctx context.Context, params slurmapi.ListJobsParams)) *MockClient_ListJobsWithParams_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(slurmapi.ListJobsParams))
+	})
+	return _c
+}
+
+func (_c *MockClient_ListJobsWithParams_Call) Return(_a0 []slurmapi.Job, _a1 error) *MockClient_ListJobsWithParams_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_ListJobsWithParams_Call) RunAndReturn(run func(context.Context, slurmapi.ListJobsParams) ([]slurmapi.Job, error)) *MockClient_ListJobsWithParams_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListNodes provides a mock function with given fields: ctx
 func (_m *MockClient) ListNodes(ctx context.Context) ([]slurmapi.Node, error) {
 	ret := _m.Called(ctx)
