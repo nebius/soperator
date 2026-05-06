@@ -260,11 +260,23 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 		requeue := false
 		latestHandledFinalStateTime := lastHandledFinalStateTime
+		var notFoundInAccountingIDs []string
 		for _, slurmJobID := range ids {
-			slurmJobs, err := slurmAPIClient.GetJobsByID(ctx, slurmJobID)
+			slurmJobs, err := slurmAPIClient.GetJobsByIDFromAccounting(ctx, slurmJobID)
 			if err != nil {
 				logger.Error(err, "failed to get slurm job status")
 				return ctrl.Result{}, err
+			}
+
+			// slurmdbd may not yet have a record for a just-submitted job; the propagation
+			// from slurmctld is asynchronous. Treat an empty result as "not visible yet" and
+			// requeue, otherwise the loop would silently mark the run Complete with no jobs seen.
+			// Accumulate the IDs and log once after the loop so a misconfigured/down slurmdbd
+			// surfaces in logs instead of degrading silently into an infinite requeue.
+			if len(slurmJobs) == 0 {
+				notFoundInAccountingIDs = append(notFoundInAccountingIDs, slurmJobID)
+				requeue = true
+				continue
 			}
 
 			for _, slurmJob := range slurmJobs {
@@ -314,6 +326,14 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 					latestHandledFinalStateTime = slurmJob.EndTime.Unix()
 				}
 			}
+		}
+
+		if len(notFoundInAccountingIDs) > 0 {
+			logger.Info("Slurm jobs not found in accounting, will retry",
+				"count", len(notFoundInAccountingIDs),
+				"job_ids", notFoundInAccountingIDs,
+				"total", len(ids),
+			)
 		}
 
 		if latestHandledFinalStateTime > lastHandledFinalStateTime {

@@ -239,13 +239,24 @@ func (c *client) GetNode(ctx context.Context, nodeName string) (Node, error) {
 	return node, nil
 }
 
-func (c *client) GetJobsByID(ctx context.Context, jobID string) ([]Job, error) {
-	getJobResp, err := c.SlurmV0041GetJobWithResponse(ctx, jobID, &api.SlurmV0041GetJobParams{})
+// GetJobsByIDFromAccounting looks up a single Slurm job through slurmdbd's
+// `/slurmdb/v0.0.41/job/{id}`. Going to slurmdbd here, instead of slurmctld, keeps active-check
+// polling off the scheduler's hot path — on busy clusters this single call site dominates
+// slurmctld's REQUEST_JOB_INFO_SINGLE counter. Slurmdbd has all the fields the active-check
+// reconciler reads (state, end_time, name, nodes, state_reason).
+//
+// An empty `Jobs` slice with no error means slurmdbd has no record for the ID. That happens in
+// two situations callers must distinguish themselves: (a) the job was just submitted and the
+// slurmctld→slurmdbd propagation hasn't completed yet — the right behavior is requeue/retry;
+// (b) the job has been purged by slurmdbd's `PurgeJobAfter` (default 12 months) — retries will
+// loop forever. Bound retries by elapsed time since submit if a caller can hit case (b).
+func (c *client) GetJobsByIDFromAccounting(ctx context.Context, jobID string) ([]Job, error) {
+	getJobResp, err := c.SlurmdbV0041GetJobWithResponse(ctx, jobID)
 	if err != nil {
 		return nil, fmt.Errorf("get job %s: %w", jobID, err)
 	}
 	if getJobResp.JSON200 == nil {
-		return nil, fmt.Errorf("json200 field is nil for job ID %s", jobID)
+		return nil, fmt.Errorf("get job %s: status=%d %s", jobID, getJobResp.StatusCode(), summarizeSlurmRESTBody(getJobResp.Body))
 	}
 	if getJobResp.JSON200.Errors != nil && len(*getJobResp.JSON200.Errors) != 0 {
 		return nil, fmt.Errorf("get job %s responded with errors: %v", jobID, *getJobResp.JSON200.Errors)
@@ -253,9 +264,9 @@ func (c *client) GetJobsByID(ctx context.Context, jobID string) ([]Job, error) {
 
 	jobs := make([]Job, 0, len(getJobResp.JSON200.Jobs))
 	for _, j := range getJobResp.JSON200.Jobs {
-		job, err := JobFromAPI(j)
+		job, err := JobFromAccountingAPI(j)
 		if err != nil {
-			return nil, fmt.Errorf("convert job from api response: %w", err)
+			return nil, fmt.Errorf("convert job from accounting api response: %w", err)
 		}
 
 		jobs = append(jobs, job)
