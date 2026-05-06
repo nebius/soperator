@@ -62,3 +62,17 @@ Validate observability.publicEndpointTokenKind is one of: secret, hostPath
   {{- fail (printf "observability.publicEndpointTokenKind must be one of: secret, hostPath (got %q)" $kind) -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Default public logging endpoint derived from observability.region.
+*/}}
+{{- define "soperator-fluxcd.defaultLoggingEndpoint" -}}
+{{- printf "dns:///write.logging.%s.nebius.cloud.:443" (.Values.observability.region | default "eu-north1") -}}
+{{- end -}}
+
+{{/*
+Public logging endpoint. Explicit observability.opentelemetry.publicEndpoint overrides the regional default.
+*/}}
+{{- define "soperator-fluxcd.loggingEndpoint" -}}
+{{- .Values.observability.opentelemetry.publicEndpoint | default (include "soperator-fluxcd.defaultLoggingEndpoint" .) -}}
+{{- end -}}

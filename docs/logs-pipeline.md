@@ -40,6 +40,10 @@ Logs are delivered to both local VictoriaLogs and Nebius Cloud Logging (when `pu
 - Local: VictoriaLogs at port 9428 for direct API queries
 - Cloud: Nebius Cloud Logging via OTLP/gRPC with bearer token authentication
 
+The public logging endpoint is derived from `observability.region` by default. For example, `region: eu-west1`
+uses `dns:///write.logging.eu-west1.nebius.cloud.:443`. Set
+`observability.opentelemetry.publicEndpoint` only when an explicit endpoint override is needed.
+
 ## Components
 
 ### Log Collection
@@ -150,8 +154,15 @@ The logging system automatically extracts metadata from filenames and creates th
 observability:
   # Cloud delivery
   publicEndpointEnabled: true  # Enable/disable cloud export
-  projectId: "your-nebius-project-id"
+  logsProjectId: "your-nebius-project-id"
   region: "eu-north1"
+  opentelemetry:
+    # Optional. Defaults to dns:///write.logging.<region>.nebius.cloud.:443
+    publicEndpoint: ""
+    batch:
+      timeout: 1s
+      sendBatchSize: 2000
+      sendBatchMaxSize: 5000
   
   # Storage
   vmLogs:

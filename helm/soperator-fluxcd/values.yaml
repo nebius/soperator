@@ -152,9 +152,13 @@ observability:
   region: eu-north1
   opentelemetry:
     enabled: true
-    publicEndpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
+    publicEndpoint: ""
     namespace: logs-system
     extraHeaders: {}
+    batch:
+      timeout: 1s
+      sendBatchSize: 2000
+      sendBatchMaxSize: 5000
     metrics:
       enabled: true
       interval: 30s

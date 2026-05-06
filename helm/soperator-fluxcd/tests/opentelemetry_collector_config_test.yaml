@@ -1,0 +1,94 @@
+suite: test opentelemetry collector logs config
+templates:
+  - templates/opentelemetry-collector-logs.yaml
+tests:
+  - it: should derive public endpoint from observability region and render default batch settings
+    set:
+      observability.region: eu-west1
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.config.exporters.otlp.endpoint
+          value: dns:///write.logging.eu-west1.nebius.cloud.:443
+      - equal:
+          path: spec.values.config.processors.batch.timeout
+          value: 1s
+      - equal:
+          path: spec.values.config.processors.batch.send_batch_size
+          value: 2000
+      - equal:
+          path: spec.values.config.processors.batch.send_batch_max_size
+          value: 5000
+
+  - it: should prefer explicit public endpoint override
+    set:
+      observability.region: eu-west1
+      observability.opentelemetry.publicEndpoint: dns:///write.logging.custom.nebius.cloud.:443
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.config.exporters.otlp.endpoint
+          value: dns:///write.logging.custom.nebius.cloud.:443
+
+  - it: should fall back to default batch settings when batch config is empty
+    set:
+      observability.opentelemetry.batch: null
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.config.processors.batch.timeout
+          value: 1s
+      - equal:
+          path: spec.values.config.processors.batch.send_batch_size
+          value: 2000
+      - equal:
+          path: spec.values.config.processors.batch.send_batch_max_size
+          value: 5000
+---
+suite: test opentelemetry collector events config
+templates:
+  - templates/opentelemetry-collector-events.yaml
+tests:
+  - it: should render configured batch settings
+    set:
+      observability.opentelemetry.batch.timeout: 2s
+      observability.opentelemetry.batch.sendBatchSize: 3000
+      observability.opentelemetry.batch.sendBatchMaxSize: 7000
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.config.processors.batch.timeout
+          value: 2s
+      - equal:
+          path: spec.values.config.processors.batch.send_batch_size
+          value: 3000
+      - equal:
+          path: spec.values.config.processors.batch.send_batch_max_size
+          value: 7000
+---
+suite: test opentelemetry collector jail logs config
+templates:
+  - templates/opentelemetry-collector-jail-logs.yaml
+tests:
+  - it: should derive public endpoint from observability region and render default batch settings
+    set:
+      observability.region: me-west1
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.config.exporters.otlp.endpoint
+          value: dns:///write.logging.me-west1.nebius.cloud.:443
+      - equal:
+          path: spec.values.config.processors.batch.timeout
+          value: 1s
+      - equal:
+          path: spec.values.config.processors.batch.send_batch_size
+          value: 2000
+      - equal:
+          path: spec.values.config.processors.batch.send_batch_max_size
+          value: 5000

@@ -38,6 +38,7 @@ spec:
   targetNamespace: logs-system
   values:
   {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
+  {{- $batch := .Values.observability.opentelemetry.batch | default dict }}
   {{- if .Values.observability.opentelemetry.logs.overrideValues }}
     {{- toYaml .Values.observability.opentelemetry.logs.overrideValues | nindent 4 }}
   {{- else }}
@@ -214,8 +215,9 @@ spec:
         prometheus: null
       processors:
         batch:
-          send_batch_max_size: 700
-          send_batch_size: 250
+          timeout: {{ $batch.timeout | default "1s" }}
+          send_batch_size: {{ $batch.sendBatchSize | default 2000 }}
+          send_batch_max_size: {{ $batch.sendBatchMaxSize | default 5000 }}
         k8sattributes:
           pod_association:
           - sources:
@@ -266,7 +268,7 @@ spec:
           timeout: 5s
         {{- if $hasPublicEndpoint }}
         otlp:
-          endpoint: {{ .Values.observability.opentelemetry.publicEndpoint }}
+          endpoint: {{ include "soperator-fluxcd.loggingEndpoint" . }}
           balancer_name: round_robin
           compression: snappy
           retry_on_failure:
