@@ -203,6 +203,8 @@ func (r Reconciler) reconcile(
 				existing = &appsv1.Deployment{}
 			case *prometheusv1.PodMonitor:
 				existing = &prometheusv1.PodMonitor{}
+			case *prometheusv1.ServiceMonitor:
+				existing = &prometheusv1.ServiceMonitor{}
 			case *mariadbv1alpha1.MariaDB:
 				existing = &mariadbv1alpha1.MariaDB{}
 			case *mariadbv1alpha1.Grant:
