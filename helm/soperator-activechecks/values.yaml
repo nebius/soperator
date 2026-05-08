@@ -331,6 +331,7 @@ checks:
       - "create-user-soperatorchecks"
     suspend: true
     runAfterCreation: true
+    activeDeadlineSeconds: 3600
     k8sJobSpec:
       jobContainer:
         appArmorProfile: unconfined
@@ -354,6 +355,7 @@ checks:
       - "create-user-soperatorchecks"
     suspend: true
     runAfterCreation: false
+    activeDeadlineSeconds: 3600
     k8sJobSpec:
       jobContainer:
         appArmorProfile: unconfined
@@ -386,6 +388,7 @@ checks:
     schedule: "0 11 * * *"
     suspend: false
     runAfterCreation: false
+    activeDeadlineSeconds: 3600
     k8sJobSpec:
       jobContainer:
         appArmorProfile: unconfined
