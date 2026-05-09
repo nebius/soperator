@@ -184,20 +184,4 @@ pushd "${jaildir}"
         done
     fi
 
-    # For worker node only
-    if [ -n "$worker" ]; then
-        echo "Update linker cache inside the jail"
-        echo "  libnvidia-ml.so.1 exists before ldconfig: $(test -e usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.1 && echo 'yes' || echo 'NO')"
-        echo "  libnvidia-ml versioned file size before ldconfig: $(stat -c%s usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.*.* 2>/dev/null || echo 'NOT FOUND')"
-        ldconfig_rc=0
-        flock --nonblock etc/complement_jail_ldconfig.lock -c "chroot \"${jaildir}\" /usr/sbin/ldconfig" || ldconfig_rc=$?
-        if [ "$ldconfig_rc" -eq 0 ]; then
-            echo "ldconfig completed successfully (got flock)"
-        elif [ "$ldconfig_rc" -eq 1 ]; then
-            echo "ldconfig SKIPPED (flock busy)"
-        else
-            echo "ldconfig FAILED with exit code ${ldconfig_rc}"
-        fi
-        echo "  libnvidia-ml.so.1 exists after ldconfig: $(test -e usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.1 && echo 'yes' || echo 'NO')"
-    fi
 popd
