@@ -32,6 +32,8 @@ type SlurmController struct {
 	SSSDLdapCAConfigMapName string
 
 	ServiceAccountName string
+
+	OpenMetrics slurmv1.OpenMetrics
 }
 
 func buildSlurmControllerFrom(clusterName string, maintenance *consts.MaintenanceMode, controller *slurmv1.SlurmNodeController) SlurmController {
@@ -75,6 +77,7 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 		Maintenance:             maintenance,
 		PriorityClass:           controller.PriorityClass,
 		ServiceAccountName:      controller.ServiceAccountName,
+		OpenMetrics:             controller.OpenMetrics,
 	}
 
 	if controller.Sssd != nil {

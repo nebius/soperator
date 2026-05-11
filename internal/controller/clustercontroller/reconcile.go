@@ -67,6 +67,7 @@ import (
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;delete;patch
 //+kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=podmonitors,verbs=get;list;watch;update;patch;delete;create
+//+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=core,resources=podtemplates,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=k8s.mariadb.com,resources=mariadbs,verbs=get;list;watch;update;patch;delete;create
@@ -94,6 +95,7 @@ type SlurmClusterReconciler struct {
 	Role                *reconciler.RoleReconciler
 	RoleBinding         *reconciler.RoleBindingReconciler
 	PodMonitor          *reconciler.PodMonitorReconciler
+	ServiceMonitor      *reconciler.ServiceMonitorReconciler
 	Deployment          *reconciler.DeploymentReconciler
 	MariaDb             *reconciler.MariaDbReconciler
 	MariaDbGrant        *reconciler.MariaDbGrantReconciler
@@ -117,6 +119,7 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 		Role:                reconciler.NewRoleReconciler(r),
 		RoleBinding:         reconciler.NewRoleBindingReconciler(r),
 		PodMonitor:          reconciler.NewPodMonitorReconciler(r),
+		ServiceMonitor:      reconciler.NewServiceMonitorReconciler(r),
 		Deployment:          reconciler.NewDeploymentReconciler(r),
 		MariaDb:             reconciler.NewMariaDbReconciler(r),
 		MariaDbGrant:        reconciler.NewMariaDbGrantReconciler(r),
@@ -865,6 +868,7 @@ func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Func
 			Check: check.IsPrometheusOperatorCRDInstalled,
 			Objects: []client.Object{
 				&prometheusv1.PodMonitor{},
+				&prometheusv1.ServiceMonitor{},
 			},
 			Predicate: predicate.GenerationChangedPredicate{},
 		},
