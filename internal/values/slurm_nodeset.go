@@ -3,6 +3,7 @@ package values
 import (
 	"maps"
 
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -41,11 +42,12 @@ type SlurmNodeSet struct {
 	Service         Service
 	ServiceUmbrella Service
 
-	VolumeSpool        corev1.VolumeSource
-	VolumeJail         corev1.VolumeSource
-	JailSubMounts      []slurmv1alpha1.NodeVolumeMount
-	CustomVolumeMounts []slurmv1alpha1.NodeVolumeMount
-	SharedMemorySize   *resource.Quantity
+	VolumeSpool                          corev1.VolumeSource
+	VolumeJail                           corev1.VolumeSource
+	JailSubMounts                        []slurmv1alpha1.NodeVolumeMount
+	CustomVolumeMounts                   []slurmv1alpha1.NodeVolumeMount
+	SharedMemorySize                     *resource.Quantity
+	PersistentVolumeClaimRetentionPolicy *kruisev1b1.StatefulSetPersistentVolumeClaimRetentionPolicy
 
 	Maintenance             *consts.MaintenanceMode
 	NodeExtra               string
@@ -120,6 +122,9 @@ func BuildSlurmNodeSetFrom(
 		VolumeSpool:      *nsSpec.Slurmd.Volumes.Spool.DeepCopy(),
 		VolumeJail:       *nsSpec.Slurmd.Volumes.Jail.DeepCopy(),
 		SharedMemorySize: nsSpec.Slurmd.Volumes.SharedMemorySize,
+		PersistentVolumeClaimRetentionPolicy: defaultPersistentVolumeClaimRetentionPolicy(
+			nsSpec.Slurmd.Volumes.PersistentVolumeClaimRetentionPolicy,
+		),
 		//
 		Maintenance:             maintenance,
 		NodeExtra:               nsSpec.NodeConfig.Dynamic,
@@ -170,5 +175,24 @@ func BuildSlurmNodeSetFrom(
 	}
 	// endregion SSHDConfig
 
+	return res
+}
+
+func defaultPersistentVolumeClaimRetentionPolicy(
+	explicit *slurmv1alpha1.PersistentVolumeClaimRetentionPolicy,
+) *kruisev1b1.StatefulSetPersistentVolumeClaimRetentionPolicy {
+	res := &kruisev1b1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+		WhenDeleted: kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+		WhenScaled:  kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+	}
+	if explicit == nil {
+		return res
+	}
+	if explicit.WhenDeleted != "" {
+		res.WhenDeleted = kruisev1b1.PersistentVolumeClaimRetentionPolicyType(explicit.WhenDeleted)
+	}
+	if explicit.WhenScaled != "" {
+		res.WhenScaled = kruisev1b1.PersistentVolumeClaimRetentionPolicyType(explicit.WhenScaled)
+	}
 	return res
 }

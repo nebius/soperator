@@ -331,7 +331,44 @@ type WorkerVolumesSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="64Gi"
 	SharedMemorySize *resource.Quantity `json:"sharedMemorySize,omitempty"`
+
+	// PersistentVolumeClaimRetentionPolicy controls PVC retention for all
+	// volumeClaimTemplateSpec volumes in this NodeSet.
+	// This applies to all PVC templates in the StatefulSet, not per mount.
+	// If omitted, both whenDeleted and whenScaled default to Delete.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:={whenDeleted:Delete,whenScaled:Delete}
+	PersistentVolumeClaimRetentionPolicy *PersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty"`
 }
+
+// PersistentVolumeClaimRetentionPolicy defines PVC retention behavior for
+// StatefulSet PVC templates.
+type PersistentVolumeClaimRetentionPolicy struct {
+	// WhenDeleted controls what happens with PVC templates when the NodeSet is deleted.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=Retain;Delete
+	// +kubebuilder:default=Delete
+	WhenDeleted PersistentVolumeClaimRetentionPolicyType `json:"whenDeleted,omitempty"`
+
+	// WhenScaled controls what happens with PVC templates when the NodeSet is scaled down.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=Retain;Delete
+	// +kubebuilder:default=Delete
+	WhenScaled PersistentVolumeClaimRetentionPolicyType `json:"whenScaled,omitempty"`
+}
+
+// PersistentVolumeClaimRetentionPolicyType defines the retention policy type for PVC templates.
+type PersistentVolumeClaimRetentionPolicyType string
+
+const (
+	// PersistentVolumeClaimRetentionPolicyTypeRetain keeps PVCs.
+	PersistentVolumeClaimRetentionPolicyTypeRetain PersistentVolumeClaimRetentionPolicyType = "Retain"
+	// PersistentVolumeClaimRetentionPolicyTypeDelete deletes PVCs.
+	PersistentVolumeClaimRetentionPolicyTypeDelete PersistentVolumeClaimRetentionPolicyType = "Delete"
+)
 
 // NodeVolumeMount defines the configuration of volume mount
 type NodeVolumeMount struct {
