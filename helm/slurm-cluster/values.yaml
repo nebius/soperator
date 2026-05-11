@@ -444,6 +444,27 @@ slurmNodes:
       jail:
         volumeSourceName: "jail"
       customMounts: []
+    # Slurmctld native OpenMetrics endpoint (https://slurm.schedmd.com/metrics.html).
+    # When enabled (default), sets MetricsType=metrics/openmetrics in slurm.conf
+    # and renders a ServiceMonitor scraping /metrics/jobs, /metrics/jobs-users-accts,
+    # /metrics/nodes, /metrics/partitions, /metrics/scheduler on the slurmctld port.
+    # The endpoint is unauthenticated HTTP; it's only reachable in-cluster via
+    # the slurmctld Service.
+    openMetrics:
+      enabled: true
+      serviceMonitor:
+        # Each scrape issues one HTTP request per selected subendpoint. Bump
+        # the interval on large multi-partition clusters if slurmctld load
+        # becomes a concern.
+        interval: "30s"
+        scrapeTimeout: "28s"
+        # Subendpoints to scrape. Empty/unset means all five:
+        #   jobs, jobs-users-accts, nodes, partitions, scheduler
+        # CARDINALITY WARNING: jobs-users-accts grows a series for every
+        # (user, account) ever seen. Drop it from the list if your Prometheus
+        # / VictoriaMetrics is sensitive to high cardinality:
+        #   endpoints: [jobs, nodes, partitions, scheduler]
+        # endpoints: []
   login:
     size: 2
     k8sNodeFilterName: "no-gpu"

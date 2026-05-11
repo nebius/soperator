@@ -892,6 +892,16 @@ type SlurmNodeController struct {
 	//
 	// +kubebuilder:validation:Optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+
+	// OpenMetrics configures slurmctld's native OpenMetrics endpoint
+	// (https://slurm.schedmd.com/metrics.html) and the Prometheus ServiceMonitor
+	// that scrapes it. When enabled, sets MetricsType=metrics/openmetrics in
+	// slurm.conf and renders a ServiceMonitor against the slurmctld Service.
+	// The endpoint is unauthenticated HTTP on the slurmctld port.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={enabled: true, serviceMonitor: {interval: "30s", scrapeTimeout: "28s"}}
+	OpenMetrics OpenMetrics `json:"openMetrics,omitempty"`
 }
 
 // SlurmNodeControllerVolumes define the volumes for the Slurm controller node
@@ -1277,6 +1287,61 @@ type NodeVolumeMount struct {
 	//
 	// +kubebuilder:validation:Optional
 	VolumeClaimTemplateSpec *corev1.PersistentVolumeClaimSpec `json:"volumeClaimTemplateSpec,omitempty"`
+}
+
+// OpenMetrics configures slurmctld's native OpenMetrics endpoint and the
+// Prometheus ServiceMonitor that scrapes it.
+//
+// PrivateData must NOT be set in slurm.conf or Slurm silently disables
+// the metrics plugin.
+type OpenMetrics struct {
+	// Enabled gates both the slurm.conf MetricsType=metrics/openmetrics line
+	// and the ServiceMonitor that scrapes the endpoint.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// ServiceMonitor configures the Prometheus ServiceMonitor scraping
+	// slurmctld's OpenMetrics subendpoints.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={interval: "30s", scrapeTimeout: "28s"}
+	ServiceMonitor OpenMetricsServiceMonitor `json:"serviceMonitor,omitempty"`
+}
+
+// OpenMetricsServiceMonitor configures the ServiceMonitor that scrapes
+// slurmctld's native OpenMetrics endpoint. Relabel hooks are intentionally
+// omitted: Slurm's native label set is fixed and small, and users who need
+// to rewrite labels can do it Prometheus-side. The "job" label on scraped
+// metrics defaults to the controller Service name.
+type OpenMetricsServiceMonitor struct {
+	// Interval for scraping metrics.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="30s"
+	Interval prometheusv1.Duration `json:"interval,omitempty"`
+
+	// ScrapeTimeout defines the timeout for scraping metrics.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="28s"
+	ScrapeTimeout prometheusv1.Duration `json:"scrapeTimeout,omitempty"`
+
+	// Endpoints lists which slurmctld OpenMetrics subendpoints to scrape.
+	// An empty list means all five are scraped: jobs, jobs-users-accts, nodes,
+	// partitions, scheduler.
+	//
+	// CARDINALITY WARNING: "jobs-users-accts" is unbounded — Slurm creates a
+	// new series for every (user, account) that has ever submitted a job, and
+	// those series stay around in Prometheus until they fall out of retention.
+	// Slurm's docs (https://slurm.schedmd.com/metrics.html) explicitly say not
+	// to send this endpoint to long-term storage. Drop it from this list if
+	// your Prometheus / VictoriaMetrics setup is sensitive to high cardinality.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:items:Enum=jobs;jobs-users-accts;nodes;partitions;scheduler
+	Endpoints []string `json:"endpoints,omitempty"`
 }
 
 // PodMonitorConfig defines a prometheus PodMonitor object.

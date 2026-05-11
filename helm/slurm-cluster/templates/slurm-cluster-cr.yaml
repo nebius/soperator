@@ -327,6 +327,10 @@ spec:
         customMounts:
           {{- .Values.slurmNodes.controller.volumes.customMounts | toYaml | nindent 10 }}
         {{- end }}
+      {{- with .Values.slurmNodes.controller.openMetrics }}
+      openMetrics:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     login:
       size: {{ required ".Values.slurmNodes.login.size must be provided." .Values.slurmNodes.login.size }}
       k8sNodeFilterName: {{ required ".Values.slurmNodes.login.k8sNodeFilterName must be provided." .Values.slurmNodes.login.k8sNodeFilterName | quote }}
