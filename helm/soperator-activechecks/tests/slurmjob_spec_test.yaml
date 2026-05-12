@@ -6,7 +6,7 @@ tests:
   - it: should render docker memory limit OOMKilled active check
     documentSelector:
       path: metadata.name
-      value: docker-memory-limit-oomkilled
+      value: soperator-docker-memory-limit-oomkilled
     asserts:
       - isKind:
           of: ActiveCheck
@@ -21,7 +21,7 @@ tests:
           value: true
       - contains:
           path: spec.dependsOn
-          content: prepull-container-image
+          content: soperator-prepull-container-image
       - matchRegex:
           path: spec.slurmJobSpec.sbatchScript
           pattern: 'srun --mem 100m docker run'
