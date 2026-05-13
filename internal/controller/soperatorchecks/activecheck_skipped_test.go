@@ -99,9 +99,9 @@ func TestActiveCheckJobReconciler_SkippedAnnotation(t *testing.T) {
 
 	baseReconciler := reconciler.NewReconciler(client, scheme, record.NewFakeRecorder(10))
 	r := &ActiveCheckJobReconciler{
-		Reconciler:       baseReconciler,
-		Job:              reconciler.NewJobReconciler(baseReconciler),
-		reconcileTimeout: 30 * time.Second,
+		Reconciler:   baseReconciler,
+		Job:          reconciler.NewJobReconciler(baseReconciler),
+		requeueAfter: 30 * time.Second,
 	}
 
 	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: jobName, Namespace: ns}}
@@ -183,9 +183,9 @@ func TestActiveCheckJobReconciler_SkippedAnnotation_Idempotent(t *testing.T) {
 
 	baseReconciler := reconciler.NewReconciler(client, scheme, record.NewFakeRecorder(10))
 	r := &ActiveCheckJobReconciler{
-		Reconciler:       baseReconciler,
-		Job:              reconciler.NewJobReconciler(baseReconciler),
-		reconcileTimeout: 30 * time.Second,
+		Reconciler:   baseReconciler,
+		Job:          reconciler.NewJobReconciler(baseReconciler),
+		requeueAfter: 30 * time.Second,
 	}
 
 	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: jobName, Namespace: ns}}

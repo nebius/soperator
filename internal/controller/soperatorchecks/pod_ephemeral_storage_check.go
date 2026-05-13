@@ -26,6 +26,7 @@ import (
 
 	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
@@ -78,12 +79,12 @@ type EphemeralStorageInfo struct {
 
 type PodEphemeralStorageCheck struct {
 	*reconciler.Reconciler
-	reconcileTimeout time.Duration
-	clientset        kubernetes.Interface
-	restConfig       *rest.Config
-	usageThreshold   float64
-	resumeThreshold  float64
-	slurmAPIClients  *slurmapi.ClientSet
+	requeueAfter    time.Duration
+	clientset       kubernetes.Interface
+	restConfig      *rest.Config
+	usageThreshold  float64
+	resumeThreshold float64
+	slurmAPIClients *slurmapi.ClientSet
 }
 
 func NewPodEphemeralStorageCheck(
@@ -91,7 +92,7 @@ func NewPodEphemeralStorageCheck(
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
 	restConfig *rest.Config,
-	reconcileTimeout time.Duration,
+	requeueAfter time.Duration,
 	usageThreshold float64,
 	resumeThreshold float64,
 	slurmAPIClients *slurmapi.ClientSet,
@@ -104,13 +105,13 @@ func NewPodEphemeralStorageCheck(
 	}
 
 	return &PodEphemeralStorageCheck{
-		Reconciler:       r,
-		reconcileTimeout: reconcileTimeout,
-		clientset:        clientset,
-		restConfig:       restConfig,
-		usageThreshold:   usageThreshold,
-		resumeThreshold:  resumeThreshold,
-		slurmAPIClients:  slurmAPIClients,
+		Reconciler:      r,
+		requeueAfter:    requeueAfter,
+		clientset:       clientset,
+		restConfig:      restConfig,
+		usageThreshold:  usageThreshold,
+		resumeThreshold: resumeThreshold,
+		slurmAPIClients: slurmAPIClients,
 	}, nil
 }
 
@@ -178,8 +179,8 @@ func (r *PodEphemeralStorageCheck) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, fmt.Errorf("reconciling Pod Ephemeral Storage Check: %w", err)
 	}
 
-	logger.Info("Pod Ephemeral Storage Check completed successfully")
-	return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
+	logger.V(1).Info("Pod Ephemeral Storage Check completed successfully")
+	return ctrl.Result{RequeueAfter: r.requeueAfter}, nil
 }
 
 func (r *PodEphemeralStorageCheck) isPodRelevant(pod *corev1.Pod) bool {
@@ -591,7 +592,7 @@ func (r *PodEphemeralStorageCheck) ensureNodeCache(
 
 	nc := r.slurmAPIClients.EnsureNodeCache(
 		slurmClusterNamespacedName,
-		r.reconcileTimeout,
+		r.requeueAfter,
 		log.Log.WithName("NodeCache").WithValues("cluster", slurmClusterNamespacedName),
 	)
 	if nc == nil {

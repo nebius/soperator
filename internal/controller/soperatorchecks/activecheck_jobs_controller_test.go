@@ -77,7 +77,8 @@ func TestActiveCheckJobReconciler_Reconcile_DoesNotFinalizeUntilAllSlurmJobsFini
 				consts.LabelComponentKey: consts.ComponentTypeSoperatorChecks.String(),
 			},
 			Annotations: map[string]string{
-				"slurm-job-id": firstSlurmJobID + "," + nextSlurmJobID,
+				"unhandled-slurm-job-id": firstSlurmJobID + "," + nextSlurmJobID,
+				"slurm-job-id":           firstSlurmJobID + "," + nextSlurmJobID,
 			},
 		},
 	}
@@ -114,7 +115,7 @@ func TestActiveCheckJobReconciler_Reconcile_DoesNotFinalizeUntilAllSlurmJobsFini
 				EndTime:    &firstEndTime,
 			}}, nil
 		}).
-		Twice()
+		Once()
 
 	mockClient.EXPECT().
 		GetJobsByIDFromAccounting(mock.Anything, nextSlurmJobID).
@@ -303,6 +304,7 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobAggregatesTerminalResultsInS
 	scheme := newActiveCheckJobTestScheme(t)
 
 	activeCheck, cronJob, k8sJob, pod := newActiveCheckJobTestObjects("gpu-check", "gpu-check-123", "slurmJob")
+	k8sJob.Annotations["unhandled-slurm-job-id"] = "101,102,103,104"
 	k8sJob.Annotations["slurm-job-id"] = "101,102,103,104"
 
 	submitTime := metav1.NewTime(time.Date(2026, time.April, 13, 10, 0, 0, 0, time.UTC))
@@ -378,6 +380,7 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobAccumulatesTerminalResultsAc
 	scheme := newActiveCheckJobTestScheme(t)
 
 	activeCheck, cronJob, k8sJob, pod := newActiveCheckJobTestObjects("gpu-check", "gpu-check-123", "slurmJob")
+	k8sJob.Annotations["unhandled-slurm-job-id"] = "101,102"
 	k8sJob.Annotations["slurm-job-id"] = "101,102"
 
 	submitTime := metav1.NewTime(time.Date(2026, time.April, 13, 10, 0, 0, 0, time.UTC))
@@ -399,7 +402,7 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobAccumulatesTerminalResultsAc
 				EndTime:     &failedEndTime,
 			}}, nil
 		}).
-		Twice()
+		Once()
 
 	mockClient.EXPECT().
 		GetJobsByIDFromAccounting(mock.Anything, "102").
@@ -464,6 +467,7 @@ func TestActiveCheckJobReconciler_Reconcile_FailedSlurmJobWithoutReactionsOnlyUp
 	scheme := newActiveCheckJobTestScheme(t)
 
 	activeCheck, cronJob, k8sJob, pod := newActiveCheckJobTestObjects("gpu-check", "gpu-check-123", "slurmJob")
+	k8sJob.Annotations["unhandled-slurm-job-id"] = "101"
 	k8sJob.Annotations["slurm-job-id"] = "101"
 
 	submitTime := metav1.NewTime(time.Date(2026, time.April, 13, 10, 0, 0, 0, time.UTC))
@@ -505,6 +509,7 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobNotYetVisibleInAccountingReq
 	scheme := newActiveCheckJobTestScheme(t)
 
 	activeCheck, cronJob, k8sJob, pod := newActiveCheckJobTestObjects("gpu-check", "gpu-check-123", "slurmJob")
+	k8sJob.Annotations["unhandled-slurm-job-id"] = "101"
 	k8sJob.Annotations["slurm-job-id"] = "101"
 
 	mockClient := slurmapifake.NewMockClient(t)
@@ -541,6 +546,7 @@ func TestActiveCheckJobReconciler_Reconcile_FailedSlurmJobExecutesCommentReactio
 			CommentPrefix: "[node_problem]",
 		},
 	}
+	k8sJob.Annotations["unhandled-slurm-job-id"] = "101"
 	k8sJob.Annotations["slurm-job-id"] = "101"
 
 	submitTime := metav1.NewTime(time.Date(2026, time.April, 13, 10, 0, 0, 0, time.UTC))
