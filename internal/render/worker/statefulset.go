@@ -137,6 +137,14 @@ func RenderNodeSetStatefulSet(
 		"kruise.io/preferred-persistent-topology":      "kubernetes.io/hostname",
 	}
 
+	pvcRetentionPolicy := nodeSet.PersistentVolumeClaimRetentionPolicy
+	if pvcRetentionPolicy == nil {
+		pvcRetentionPolicy = &kruisev1b1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+			WhenDeleted: kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+			WhenScaled:  kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+		}
+	}
+
 	return kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        nodeSet.StatefulSet.Name,
@@ -177,10 +185,7 @@ func RenderNodeSetStatefulSet(
 				},
 				Spec: spec,
 			},
-			PersistentVolumeClaimRetentionPolicy: &kruisev1b1.StatefulSetPersistentVolumeClaimRetentionPolicy{
-				WhenDeleted: kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
-				WhenScaled:  kruisev1b1.RetainPersistentVolumeClaimRetentionPolicyType,
-			},
+			PersistentVolumeClaimRetentionPolicy: pvcRetentionPolicy,
 		},
 	}, nil
 }

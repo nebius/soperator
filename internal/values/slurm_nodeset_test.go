@@ -3,7 +3,9 @@ package values
 import (
 	"testing"
 
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -68,6 +70,40 @@ func TestBuildSlurmNodeSetFrom_SSSD(t *testing.T) {
 		assert.Nil(t, result.ContainerSSSD)
 		assert.Empty(t, result.SSSDConfSecretName)
 		assert.False(t, result.IsSSSDSecretDefault)
+	})
+}
+
+func TestDefaultPersistentVolumeClaimRetentionPolicy(t *testing.T) {
+	t.Run("defaults to delete for both fields when unset", func(t *testing.T) {
+		got := defaultPersistentVolumeClaimRetentionPolicy(nil)
+
+		if assert.NotNil(t, got) {
+			assert.Equal(t, kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType, got.WhenDeleted)
+			assert.Equal(t, kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType, got.WhenScaled)
+		}
+	})
+
+	t.Run("keeps explicit retain values", func(t *testing.T) {
+		got := defaultPersistentVolumeClaimRetentionPolicy(&slurmv1alpha1.PersistentVolumeClaimRetentionPolicy{
+			WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+			WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+		})
+
+		if assert.NotNil(t, got) {
+			assert.Equal(t, kruisev1b1.RetainPersistentVolumeClaimRetentionPolicyType, got.WhenDeleted)
+			assert.Equal(t, kruisev1b1.RetainPersistentVolumeClaimRetentionPolicyType, got.WhenScaled)
+		}
+	})
+
+	t.Run("defaults missing fields independently to delete", func(t *testing.T) {
+		got := defaultPersistentVolumeClaimRetentionPolicy(&slurmv1alpha1.PersistentVolumeClaimRetentionPolicy{
+			WhenScaled: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+		})
+
+		if assert.NotNil(t, got) {
+			assert.Equal(t, kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType, got.WhenDeleted)
+			assert.Equal(t, kruisev1b1.RetainPersistentVolumeClaimRetentionPolicyType, got.WhenScaled)
+		}
 	})
 }
 

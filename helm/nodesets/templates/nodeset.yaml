@@ -141,6 +141,10 @@ spec:
       {{- with (.sharedMemorySize | default "") }}
       sharedMemorySize: {{ . | quote }}
       {{- end }}
+      {{- with (.persistentVolumeClaimRetentionPolicy | default dict) }}
+      persistentVolumeClaimRetentionPolicy:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     {{- end }}
 
     security:

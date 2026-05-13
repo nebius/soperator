@@ -58,6 +58,7 @@ func (r *StatefulSetReconciler) patch(existing, desired client.Object) (client.P
 		dst.Spec.UpdateStrategy = src.Spec.UpdateStrategy
 		dst.Spec.VolumeClaimTemplates = append([]corev1.PersistentVolumeClaim{}, src.Spec.VolumeClaimTemplates...)
 		dst.Spec.Template.Spec = src.Spec.Template.Spec
+		dst.Spec.PersistentVolumeClaimRetentionPolicy = src.Spec.PersistentVolumeClaimRetentionPolicy
 
 		return res
 	}

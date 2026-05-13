@@ -166,6 +166,11 @@ nodesets:
         # Size of the shared memory
         # Optional
         sharedMemorySize: "64Gi"
+        # PVC retention policy for all volumeClaimTemplateSpec volumes in the NodeSet.
+        # Optional. Defaults to:
+        # persistentVolumeClaimRetentionPolicy:
+        #   whenDeleted: Delete
+        #   whenScaled: Delete
       # Slurmd container security configuration
       # Optional
       security:
