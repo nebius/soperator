@@ -197,3 +197,38 @@ tests:
       - equal:
           path: spec.munge.security.limitsConfig
           value: ""
+
+  - it: should configure persistentVolumeClaimRetentionPolicy as object
+    set:
+      nodesets:
+        - name: gpu-workers
+          replicas: 3
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "4"
+              memory: "8Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+              persistentVolumeClaimRetentionPolicy:
+                whenDeleted: Retain
+                whenScaled: Delete
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.slurmd.volumes.persistentVolumeClaimRetentionPolicy.whenDeleted
+          value: "Retain"
+      - equal:
+          path: spec.slurmd.volumes.persistentVolumeClaimRetentionPolicy.whenScaled
+          value: "Delete"

@@ -1,4 +1,5 @@
 !go.mod
+.gocache
 .DS_Store
 /.idea/
 bin

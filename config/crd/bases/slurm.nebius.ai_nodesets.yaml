@@ -9684,6 +9684,33 @@ spec:
                           - name
                           type: object
                         type: array
+                      persistentVolumeClaimRetentionPolicy:
+                        default:
+                          whenDeleted: Delete
+                          whenScaled: Delete
+                        description: |-
+                          PersistentVolumeClaimRetentionPolicy controls PVC retention for all
+                          volumeClaimTemplateSpec volumes in this NodeSet.
+                          This applies to all PVC templates in the StatefulSet, not per mount.
+                          If omitted, both whenDeleted and whenScaled default to Delete.
+                        properties:
+                          whenDeleted:
+                            default: Delete
+                            description: WhenDeleted controls what happens with PVC
+                              templates when the NodeSet is deleted.
+                            enum:
+                            - Retain
+                            - Delete
+                            type: string
+                          whenScaled:
+                            default: Delete
+                            description: WhenScaled controls what happens with PVC
+                              templates when the NodeSet is scaled down.
+                            enum:
+                            - Retain
+                            - Delete
+                            type: string
+                        type: object
                       sharedMemorySize:
                         anyOf:
                         - type: integer
