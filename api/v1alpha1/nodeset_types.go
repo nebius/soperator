@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -350,25 +351,15 @@ type PersistentVolumeClaimRetentionPolicy struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum=Retain;Delete
 	// +kubebuilder:default=Delete
-	WhenDeleted PersistentVolumeClaimRetentionPolicyType `json:"whenDeleted,omitempty"`
+	WhenDeleted appsv1.PersistentVolumeClaimRetentionPolicyType `json:"whenDeleted,omitempty"`
 
 	// WhenScaled controls what happens with PVC templates when the NodeSet is scaled down.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum=Retain;Delete
 	// +kubebuilder:default=Delete
-	WhenScaled PersistentVolumeClaimRetentionPolicyType `json:"whenScaled,omitempty"`
+	WhenScaled appsv1.PersistentVolumeClaimRetentionPolicyType `json:"whenScaled,omitempty"`
 }
-
-// PersistentVolumeClaimRetentionPolicyType defines the retention policy type for PVC templates.
-type PersistentVolumeClaimRetentionPolicyType string
-
-const (
-	// PersistentVolumeClaimRetentionPolicyTypeRetain keeps PVCs.
-	PersistentVolumeClaimRetentionPolicyTypeRetain PersistentVolumeClaimRetentionPolicyType = "Retain"
-	// PersistentVolumeClaimRetentionPolicyTypeDelete deletes PVCs.
-	PersistentVolumeClaimRetentionPolicyTypeDelete PersistentVolumeClaimRetentionPolicyType = "Delete"
-)
 
 // NodeVolumeMount defines the configuration of volume mount
 type NodeVolumeMount struct {

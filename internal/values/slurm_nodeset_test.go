@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 )
@@ -24,8 +25,8 @@ func TestDefaultPersistentVolumeClaimRetentionPolicy(t *testing.T) {
 
 	t.Run("keeps explicit delete values", func(t *testing.T) {
 		got := defaultPersistentVolumeClaimRetentionPolicy(&slurmv1alpha1.PersistentVolumeClaimRetentionPolicy{
-			WhenDeleted: slurmv1alpha1.PersistentVolumeClaimRetentionPolicyTypeDelete,
-			WhenScaled:  slurmv1alpha1.PersistentVolumeClaimRetentionPolicyTypeDelete,
+			WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+			WhenScaled:  appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
 		})
 		if got.WhenDeleted != kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType {
 			t.Fatalf("expected whenDeleted=%q, got %q", kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType, got.WhenDeleted)
@@ -37,7 +38,7 @@ func TestDefaultPersistentVolumeClaimRetentionPolicy(t *testing.T) {
 
 	t.Run("defaults missing fields independently", func(t *testing.T) {
 		got := defaultPersistentVolumeClaimRetentionPolicy(&slurmv1alpha1.PersistentVolumeClaimRetentionPolicy{
-			WhenScaled: slurmv1alpha1.PersistentVolumeClaimRetentionPolicyTypeDelete,
+			WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
 		})
 		if got.WhenDeleted != kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType {
 			t.Fatalf("expected whenDeleted=%q, got %q", kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType, got.WhenDeleted)
@@ -49,7 +50,7 @@ func TestDefaultPersistentVolumeClaimRetentionPolicy(t *testing.T) {
 
 	t.Run("defaults missing fields independently to delete", func(t *testing.T) {
 		got := defaultPersistentVolumeClaimRetentionPolicy(&slurmv1alpha1.PersistentVolumeClaimRetentionPolicy{
-			WhenScaled: slurmv1alpha1.PersistentVolumeClaimRetentionPolicyTypeRetain,
+			WhenScaled: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
 		})
 		if got.WhenDeleted != kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType {
 			t.Fatalf("expected whenDeleted=%q, got %q", kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType, got.WhenDeleted)
