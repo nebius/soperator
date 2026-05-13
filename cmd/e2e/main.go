@@ -19,7 +19,7 @@ func main() {
 	log.SetFlags(0)
 
 	if len(os.Args) < 2 {
-		_, _ = fmt.Fprintf(os.Stderr, "Usage: e2e <init|apply|destroy|check-capacity>\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: e2e <init|apply|destroy|check-capacity|acceptance>\n")
 		os.Exit(2)
 	}
 
@@ -43,8 +43,11 @@ func main() {
 	case "destroy":
 		cfg := loadFullConfig(profile)
 		err = e2e.Destroy(ctx, cfg)
+	case "acceptance":
+		cfg := loadFullConfig(profile)
+		err = e2e.RunAcceptance(ctx, cfg)
 	default:
-		_, _ = fmt.Fprintf(os.Stderr, "Unknown command: %s\nUsage: e2e <init|apply|destroy|check-capacity>\n", os.Args[1])
+		_, _ = fmt.Fprintf(os.Stderr, "Unknown command: %s\nUsage: e2e <init|apply|destroy|check-capacity|acceptance>\n", os.Args[1])
 		os.Exit(2)
 	}
 	if err != nil {

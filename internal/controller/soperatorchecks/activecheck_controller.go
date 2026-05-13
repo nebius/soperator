@@ -157,9 +157,9 @@ func (r *ActiveCheckReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 	if !dependenciesReady {
-		logger.Info("Not all dependencies are ready, requeueing in 1 minute.")
+		logger.Info("Not all dependencies are ready, requeueing in 10 seconds.")
 		return ctrl.Result{
-			RequeueAfter: time.Minute,
+			RequeueAfter: time.Second * 10,
 		}, nil
 	}
 

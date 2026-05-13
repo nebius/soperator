@@ -53,6 +53,17 @@ func RenderStatefulSet(
 		sshAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
 	}
 
+	initContainers := append(
+		login.CustomInitContainers,
+		common.RenderContainerMunge(&login.ContainerMunge),
+	)
+	if login.ContainerSSSD != nil {
+		initContainers = append(initContainers, common.RenderContainerSSSD(
+			login.ContainerSSSD,
+			common.SSSDLdapCAConfigMap(login.SSSDLdapCAConfigMapName),
+		))
+	}
+
 	return kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      login.StatefulSet.Name,
@@ -90,20 +101,18 @@ func RenderStatefulSet(
 					Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameSshd),
 				},
 				Spec: corev1.PodSpec{
-					HostUsers:    login.HostUsers,
-					Affinity:     nodeFilter.Affinity,
-					NodeSelector: nodeFilter.NodeSelector,
-					Tolerations:  nodeFilter.Tolerations,
-					InitContainers: append(
-						login.CustomInitContainers,
-						common.RenderContainerMunge(&login.ContainerMunge),
-					),
+					HostUsers:      login.HostUsers,
+					Affinity:       nodeFilter.Affinity,
+					NodeSelector:   nodeFilter.NodeSelector,
+					Tolerations:    nodeFilter.Tolerations,
+					InitContainers: initContainers,
 					Containers: []corev1.Container{
 						renderContainerSshd(
 							clusterType,
 							&login.ContainerSshd,
 							login.JailSubMounts,
 							login.CustomVolumeMounts,
+							login.ContainerSSSD,
 							sshAppArmorProfile,
 						),
 					},

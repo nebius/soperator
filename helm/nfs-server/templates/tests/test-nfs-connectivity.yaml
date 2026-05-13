@@ -12,7 +12,7 @@ spec:
   restartPolicy: Never
   containers:
     - name: nfs-test
-      image: alpine:3.18
+      image: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/library/alpine:3.18
       command:
         - /bin/sh
         - -c

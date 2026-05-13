@@ -144,6 +144,22 @@ func BuildSecretSSHDKeysName(clusterName string) string {
 	}.String()
 }
 
+func BuildSecretSSSDConfName(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.SecretSSSDConfName,
+	}.String()
+}
+
+func BuildNodeSetSecretSSSDConfName(clusterName, nodeSetName string) string {
+	return namedEntity{
+		clusterName:        clusterName,
+		componentType:      &consts.ComponentTypeNodeSet,
+		componentSpecifier: nodeSetName,
+		entity:             consts.SecretSSSDConfName,
+	}.String()
+}
+
 func BuildConfigMapSshRootPublicKeysName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,

@@ -24,6 +24,7 @@ spec:
   {{- with $check.failedJobsHistoryLimit }}
   failedJobsHistoryLimit: {{ . }}
   {{- end }}
+  hostUsers: {{ include "soperator-activechecks.hostUsers" $root }}
   suspend: {{ default false $check.suspend }}
   runAfterCreation: {{ default false $check.runAfterCreation }}
   {{- if eq $check.checkType "slurmJob" }}

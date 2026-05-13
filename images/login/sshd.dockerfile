@@ -2,8 +2,8 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/73
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260225115852 AS login_sshd
+# https://github.com/nebius/ml-containers/pull/79
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260324153054 AS login_sshd
 
 # Install OpenSSH server
 # Create root .ssh directory
@@ -23,6 +23,11 @@ RUN ALT_ARCH="$(uname -m)" && \
     gcc -shared -o libdummy.so dummy.c && \
     mkdir -p "/lib/${ALT_ARCH}-linux-gnu" && \
     cp libdummy.so "/lib/${ALT_ARCH}-linux-gnu/"
+
+COPY ansible/sssd.yml /opt/ansible/sssd.yml
+COPY ansible/roles/sssd /opt/ansible/roles/sssd
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local sssd.yml
 
 # Install slurm сhroot plugin
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
@@ -53,7 +58,7 @@ RUN chown 0:0 /etc/enroot/enroot.conf && \
     chmod 644 /etc/enroot/enroot.conf.d/custom-dirs.conf
 
 ARG SLURM_VERSION
-ARG PYXIS_VERSION=0.21.0
+ARG PYXIS_VERSION=0.23.0
 # Install slurm pyxis plugin
 RUN apt-get update && \
     apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \

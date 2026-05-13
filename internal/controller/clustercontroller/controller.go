@@ -37,6 +37,41 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 			utils.MultiStepExecutionStrategyCollectErrors,
 
 			utils.MultiStepExecutionStep{
+				Name: "Slurm Controller sssd.conf Secret",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling")
+
+					if clusterValues.NodeController.ContainerSSSD == nil {
+						stepLogger.V(1).Info("SSSD container is not configured, skipping")
+						return nil
+					}
+					if !clusterValues.NodeController.IsSSSDSecretDefault {
+						stepLogger.V(1).Info("Use SSSD Secret from reference")
+						stepLogger.V(1).Info("Reconciled")
+						return nil
+					}
+
+					desired := common.RenderSecretDefaultSSSDConf(
+						clusterValues.Namespace,
+						clusterValues.Name,
+						clusterValues.NodeController.SSSDConfSecretName,
+						consts.ComponentTypeController,
+					)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("SSSD Secret from reference does not exists, using default")
+					stepLogger.V(1).Info("Rendered")
+
+					if err := r.Secret.Reconcile(stepCtx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return fmt.Errorf("reconciling controller sssd Secret: %w", err)
+					}
+					stepLogger.V(1).Info("Reconciled")
+
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
 				Name: "Slurm Controller Security limits ConfigMap",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)

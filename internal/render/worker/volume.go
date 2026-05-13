@@ -31,6 +31,15 @@ func renderVolumesAndClaimTemplateSpecsForNodeSet(
 		renderSupervisordConfigMap(nodeSet.SupervisorDConfigMapName),
 		renderVolumeSshdConfigs(nodeSet.SSHDConfigMapName),
 	}
+	if nodeSet.ContainerSSSD != nil {
+		volumes = append(volumes,
+			common.RenderVolumeSSSDSocket(),
+			common.RenderVolumeSSSDConf(nodeSet.SSSDConfSecretName),
+		)
+		if nodeSet.SSSDLdapCAConfigMapName != "" {
+			volumes = append(volumes, common.RenderVolumeSSSDLdapCA(nodeSet.SSSDLdapCAConfigMapName))
+		}
+	}
 	if nodeSet.GPU.Enabled {
 		volumes = append(volumes, renderVolumeNvidia())
 	}
