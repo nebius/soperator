@@ -3,6 +3,7 @@ package worker_test
 import (
 	"testing"
 
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -307,6 +308,112 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			}
 			assert.True(t, hasRuntimeVolume, "runtime volume should be present")
 			assert.True(t, hasDockerProxyContainer, "docker-proxy sidecar should be present")
+		})
+	}
+}
+
+func TestRenderNodeSetStatefulSet_PersistentVolumeClaimRetentionPolicy(t *testing.T) {
+	createNodeSet := func(ephemeralNodes *bool, jailSubMounts []slurmv1alpha1.NodeVolumeMount, customVolumeMounts []slurmv1alpha1.NodeVolumeMount) *values.SlurmNodeSet {
+		return &values.SlurmNodeSet{
+			Name: "test-nodeset",
+			ParentalCluster: client.ObjectKey{
+				Namespace: "test-namespace",
+				Name:      "test-cluster",
+			},
+			ContainerSlurmd: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image:           "test-image",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Resources: corev1.ResourceList{
+						corev1.ResourceMemory:           resource.MustParse("1Gi"),
+						corev1.ResourceCPU:              resource.MustParse("100m"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+					},
+				},
+			},
+			ContainerMunge: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image: "munge-image",
+				},
+			},
+			VolumeSpool: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+			},
+			VolumeJail: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+			},
+			JailSubMounts:      jailSubMounts,
+			CustomVolumeMounts: customVolumeMounts,
+			StatefulSet: values.StatefulSet{
+				Replicas: 1,
+			},
+			SupervisorDConfigMapName: "supervisord-config",
+			SSHDConfigMapName:        "sshd-config",
+			GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+			EphemeralNodes:           ephemeralNodes,
+		}
+	}
+
+	tests := []struct {
+		name                string
+		nodeSet             *values.SlurmNodeSet
+		expectedWhenDeleted kruisev1b1.PersistentVolumeClaimRetentionPolicyType
+		expectedWhenScaled  kruisev1b1.PersistentVolumeClaimRetentionPolicyType
+	}{
+		{
+			name:                "default delete for non-ephemeral nodes when no explicit policy is set",
+			nodeSet:             createNodeSet(ptr.To(false), nil, nil),
+			expectedWhenDeleted: kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+			expectedWhenScaled:  kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+		},
+		{
+			name:                "default delete for ephemeral nodes when no explicit policy is set",
+			nodeSet:             createNodeSet(ptr.To(true), nil, nil),
+			expectedWhenDeleted: kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+			expectedWhenScaled:  kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+		},
+		{
+			name: "delete when nodeSet policy requests delete on scale down",
+			nodeSet: func() *values.SlurmNodeSet {
+				ns := createNodeSet(ptr.To(true), nil, nil)
+				ns.PersistentVolumeClaimRetentionPolicy = &kruisev1b1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+					WhenScaled:  kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+				}
+				return ns
+			}(),
+			expectedWhenDeleted: kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+			expectedWhenScaled:  kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+		},
+		{
+			name: "retain when nodeSet policy is retain",
+			nodeSet: func() *values.SlurmNodeSet {
+				ns := createNodeSet(ptr.To(true), nil, nil)
+				ns.PersistentVolumeClaimRetentionPolicy = &kruisev1b1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: kruisev1b1.RetainPersistentVolumeClaimRetentionPolicyType,
+					WhenScaled:  kruisev1b1.RetainPersistentVolumeClaimRetentionPolicyType,
+				}
+				return ns
+			}(),
+			expectedWhenDeleted: kruisev1b1.RetainPersistentVolumeClaimRetentionPolicyType,
+			expectedWhenScaled:  kruisev1b1.RetainPersistentVolumeClaimRetentionPolicyType,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := worker.RenderNodeSetStatefulSet(
+				"test-cluster",
+				tt.nodeSet,
+				&slurmv1.Secrets{},
+				consts.CGroupV2,
+				false,
+			)
+			assert.NoError(t, err)
+			if assert.NotNil(t, result.Spec.PersistentVolumeClaimRetentionPolicy) {
+				assert.Equal(t, tt.expectedWhenDeleted, result.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted)
+				assert.Equal(t, tt.expectedWhenScaled, result.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled)
+			}
 		})
 	}
 }

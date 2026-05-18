@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -144,5 +145,84 @@ soperator.soperator-slurmdbd-configs: "3"`,
 				t.Errorf("Annotations match expectation failed. Expected: %v, Got: %v", tt.expectMatch, match)
 			}
 		})
+	}
+}
+
+func TestAdvancedStatefulSetPatchCopiesPVCDeletionPolicy(t *testing.T) {
+	existing := &kruisev1b1.StatefulSet{
+		Spec: kruisev1b1.StatefulSetSpec{
+			PersistentVolumeClaimRetentionPolicy: &kruisev1b1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  kruisev1b1.RetainPersistentVolumeClaimRetentionPolicyType,
+			},
+		},
+	}
+	desired := &kruisev1b1.StatefulSet{
+		Spec: kruisev1b1.StatefulSetSpec{
+			PersistentVolumeClaimRetentionPolicy: &kruisev1b1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+			},
+		},
+	}
+
+	r := &AdvancedStatefulSetReconciler{}
+	if _, err := r.patch(existing, desired); err != nil {
+		t.Fatalf("patch returned error: %v", err)
+	}
+
+	if existing.Spec.PersistentVolumeClaimRetentionPolicy == nil {
+		t.Fatal("expected PersistentVolumeClaimRetentionPolicy to be copied")
+	}
+
+	if existing.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled != kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType {
+		t.Fatalf(
+			"expected WhenScaled=%q, got %q",
+			kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
+			existing.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled,
+		)
+	}
+}
+
+func TestStatefulSetPatchCopiesPVCDeletionPolicy(t *testing.T) {
+	existing := &appsv1.StatefulSet{
+		Spec: appsv1.StatefulSetSpec{
+			PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+			},
+		},
+	}
+	desired := &appsv1.StatefulSet{
+		Spec: appsv1.StatefulSetSpec{
+			PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+			},
+		},
+	}
+
+	r := &StatefulSetReconciler{}
+	if _, err := r.patch(existing, desired); err != nil {
+		t.Fatalf("patch returned error: %v", err)
+	}
+
+	if existing.Spec.PersistentVolumeClaimRetentionPolicy == nil {
+		t.Fatal("expected PersistentVolumeClaimRetentionPolicy to be copied")
+	}
+
+	if existing.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted != appsv1.RetainPersistentVolumeClaimRetentionPolicyType {
+		t.Fatalf(
+			"expected WhenDeleted=%q, got %q",
+			appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+			existing.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted,
+		)
+	}
+	if existing.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled != appsv1.RetainPersistentVolumeClaimRetentionPolicyType {
+		t.Fatalf(
+			"expected WhenScaled=%q, got %q",
+			appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+			existing.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled,
+		)
 	}
 }
