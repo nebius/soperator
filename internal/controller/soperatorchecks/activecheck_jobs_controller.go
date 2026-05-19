@@ -253,7 +253,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			oldUnhandledIDs = []string{}
 		}
 		allIDs := strings.Split(allSlurmJobIDs, ",")
-		unhandledIds := make([]string, 0)
+		unhandledIdsMap := make(map[string]struct{})
 		firstJobId := allIDs[0]
 
 		var jobName string
@@ -282,7 +282,8 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			slurmJobs, err := slurmAPIClient.GetJobsByIDFromAccounting(ctx, slurmJobID)
 			if err != nil {
 				logger.Error(err, "failed to get slurm job status", "slurm_job_id", slurmJobID)
-				unhandledIds = append(unhandledIds, slurmJobID)
+				unhandledIdsMap[slurmJobID] = struct{}{}
+				requeue = true
 				continue
 			}
 
@@ -293,7 +294,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			// surfaces in logs instead of degrading silently into an infinite requeue.
 			if len(slurmJobs) == 0 {
 				notFoundInAccountingIDs = append(notFoundInAccountingIDs, slurmJobID)
-				unhandledIds = append(unhandledIds, slurmJobID)
+				unhandledIdsMap[slurmJobID] = struct{}{}
 				requeue = true
 				continue
 			}
@@ -306,8 +307,8 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 				// Job is not yet finished
 				if !slurmJob.IsTerminalState() || slurmJob.EndTime == nil {
+					unhandledIdsMap[slurmJobID] = struct{}{}
 					requeue = true
-					unhandledIds = append(unhandledIds, slurmJobID)
 					continue
 				}
 
@@ -357,6 +358,10 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		}
 
 		k8sJobPatch := client.MergeFrom(k8sJob.DeepCopy())
+		unhandledIds := make([]string, 0, len(unhandledIdsMap))
+		for id := range unhandledIdsMap {
+			unhandledIds = append(unhandledIds, id)
+		}
 		k8sJob.Annotations["unhandled-slurm-job-id"] = strings.Join(unhandledIds, ",")
 		if latestHandledFinalStateTime > lastHandledFinalStateTime {
 			// Maybe we could delete the job because it will not be processed anymore
