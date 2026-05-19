@@ -10970,6 +10970,67 @@ spec:
                         required:
                         - image
                         type: object
+                      openMetrics:
+                        default:
+                          enabled: true
+                          serviceMonitor:
+                            interval: 30s
+                            scrapeTimeout: 28s
+                        description: |-
+                          OpenMetrics configures slurmctld's native OpenMetrics endpoint
+                          (https://slurm.schedmd.com/metrics.html) and the Prometheus ServiceMonitor
+                          that scrapes it. When enabled, sets MetricsType=metrics/openmetrics in
+                          slurm.conf and renders a ServiceMonitor against the slurmctld Service.
+                          The endpoint is unauthenticated HTTP on the slurmctld port.
+                        properties:
+                          enabled:
+                            default: true
+                            description: |-
+                              Enabled gates both the slurm.conf MetricsType=metrics/openmetrics line
+                              and the ServiceMonitor that scrapes the endpoint.
+                            type: boolean
+                          serviceMonitor:
+                            default:
+                              interval: 30s
+                              scrapeTimeout: 28s
+                            description: |-
+                              ServiceMonitor configures the Prometheus ServiceMonitor scraping
+                              slurmctld's OpenMetrics subendpoints.
+                            properties:
+                              endpoints:
+                                description: |-
+                                  Endpoints lists which slurmctld OpenMetrics subendpoints to scrape.
+                                  An empty list means all five are scraped: jobs, jobs-users-accts, nodes,
+                                  partitions, scheduler.
+
+                                  CARDINALITY WARNING: "jobs-users-accts" is unbounded — Slurm creates a
+                                  new series for every (user, account) that has ever submitted a job, and
+                                  those series stay around in Prometheus until they fall out of retention.
+                                  Slurm's docs (https://slurm.schedmd.com/metrics.html) explicitly say not
+                                  to send this endpoint to long-term storage. Drop it from this list if
+                                  your Prometheus / VictoriaMetrics setup is sensitive to high cardinality.
+                                items:
+                                  enum:
+                                  - jobs
+                                  - jobs-users-accts
+                                  - nodes
+                                  - partitions
+                                  - scheduler
+                                  type: string
+                                type: array
+                              interval:
+                                default: 30s
+                                description: Interval for scraping metrics.
+                                pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
+                                type: string
+                              scrapeTimeout:
+                                default: 28s
+                                description: ScrapeTimeout defines the timeout for
+                                  scraping metrics.
+                                pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
+                                type: string
+                            type: object
+                        type: object
                       priorityClass:
                         description: PriorityClass for Slurm controller pods
                         type: string

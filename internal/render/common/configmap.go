@@ -273,6 +273,11 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddProperty("SlurmctldPidFile", "/var/run/"+consts.SlurmctldName+".pid")
 	res.AddProperty("SlurmctldPort", cluster.NodeController.ContainerSlurmctld.Port)
+	// Slurm silently disables the metrics plugin if PrivateData is set in
+	// slurm.conf. Don't add a PrivateData property anywhere in this file.
+	if om := cluster.NodeController.OpenMetrics; om.Enabled == nil || *om.Enabled {
+		res.AddProperty("MetricsType", "metrics/openmetrics")
+	}
 	res.AddComment("")
 	res.AddProperty("SlurmdPidFile", "/var/run/"+consts.SlurmdName+".pid")
 	res.AddComment("")

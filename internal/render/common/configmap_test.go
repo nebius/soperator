@@ -344,6 +344,47 @@ func TestRenderSlurmConfigMapAndTopology(t *testing.T) {
 	}
 }
 
+func TestRenderSlurmConfig_MetricsType(t *testing.T) {
+	tests := []struct {
+		name        string
+		openMetrics slurmv1.OpenMetrics
+		expectLine  bool
+	}{
+		{
+			name:        "default (Enabled nil) renders MetricsType",
+			openMetrics: slurmv1.OpenMetrics{},
+			expectLine:  true,
+		},
+		{
+			name:        "Enabled=true renders MetricsType",
+			openMetrics: slurmv1.OpenMetrics{Enabled: ptr.To(true)},
+			expectLine:  true,
+		},
+		{
+			name:        "Enabled=false omits MetricsType",
+			openMetrics: slurmv1.OpenMetrics{Enabled: ptr.To(false)},
+			expectLine:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := &values.SlurmCluster{
+				NodeController: values.SlurmController{
+					OpenMetrics: tt.openMetrics,
+				},
+			}
+			result := RenderConfigMapSlurmConfigs(cluster)
+			conf := result.Data[consts.ConfigMapKeySlurmConfig]
+			if tt.expectLine {
+				assert.Contains(t, conf, "MetricsType=metrics/openmetrics")
+			} else {
+				assert.NotContains(t, conf, "MetricsType=")
+			}
+		})
+	}
+}
+
 func TestRenderPlugstack(t *testing.T) {
 	t.Run("Pyxis no options", func(t *testing.T) {
 		result := generateSpankConfig(&values.SlurmCluster{
