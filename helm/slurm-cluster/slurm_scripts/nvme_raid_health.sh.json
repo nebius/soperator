@@ -1,7 +1,7 @@
 {
   "name": "nvme_raid_health",
   "command": "./nvme_raid_health.sh",
-  "platforms": ["8xB300"],
+  "platforms": ["any"],
   "skip_for_cpu_jobs": false,
   "skip_for_partial_gpu_jobs": false,
   "skip_for_reservation_prefixes": [],
@@ -9,7 +9,7 @@
   "node_states": ["any"],
   "on_fail": "drain",
   "on_ok": "none",
-  "reason_base": "$name",
+  "reason_base": "[node_problem] $name",
   "reason_append_details": true,
   "run_in_jail": false,
   "log": "slurm_scripts/$worker.$name.$context.out",
