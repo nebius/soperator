@@ -17656,6 +17656,20 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
+              maxConcurrentStartup:
+                anyOf:
+                - type: integer
+                - type: string
+                default: 500
+                description: |-
+                  MaxConcurrentStartup caps the number of worker pods created in parallel
+                  during initial NodeSet scale-out (i.e. cluster creation or NodeSet growth).
+                  Value can be an absolute number (ex: 500) or a percentage of desired pods (ex: 10%).
+                  Maps to the underlying kruise AdvancedStatefulSet's scaleStrategy.maxUnavailable.
+                  Prevents overloading the Slurm controller with simultaneous slurmd registrations
+                  on large clusters.
+                  Defaults to 500.
+                x-kubernetes-int-or-string: true
               maxUnavailable:
                 anyOf:
                 - type: integer

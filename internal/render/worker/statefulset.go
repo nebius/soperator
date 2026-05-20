@@ -159,6 +159,9 @@ func RenderNodeSetStatefulSet(
 			ServiceName:         nodeSet.ServiceUmbrella.Name,
 			Replicas:            replicas,
 			ReserveOrdinals:     reserveOrdinals,
+			ScaleStrategy: &kruisev1b1.StatefulSetScaleStrategy{
+				MaxUnavailable: &nodeSet.StatefulSet.MaxConcurrentStartup,
+			},
 			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
