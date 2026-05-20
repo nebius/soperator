@@ -585,6 +585,7 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 				makeNodeSet(tt.maxConcurrentStartup, tt.maxUnavailable),
 				&slurmv1.Secrets{},
 				consts.CGroupV2,
+				consts.ClusterTypeGPU,
 				false,
 			)
 			assert.NoError(t, err)
