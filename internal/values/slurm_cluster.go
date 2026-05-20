@@ -102,6 +102,16 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 	return res, nil
 }
 
+func BuildClusterTypeFromNodeSets(nodeSets []slurmav1alpha1.NodeSet) consts.ClusterType {
+	for _, nodeSet := range nodeSets {
+		if nodeSet.Spec.GPU.Enabled {
+			return consts.ClusterTypeGPU
+		}
+	}
+
+	return consts.ClusterTypeCPU
+}
+
 // HasEphemeralNodes returns true if any NodeSet in the cluster has ephemeral nodes enabled
 func (c *SlurmCluster) HasEphemeralNodes() bool {
 	for _, ns := range c.NodeSets {

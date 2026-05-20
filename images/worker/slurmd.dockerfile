@@ -32,6 +32,15 @@ RUN arch=$(uname -m) && \
     echo "LD_LIBRARY_PATH=/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib:/lib/${alt_arch}-linux-gnu:/usr/lib/${alt_arch}-linux-gnu:/usr/local/cuda/targets/${alt_arch}-linux/lib" >> /etc/environment
 ENV PATH=${PATH}:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
+# Create dummy library for replacing GPU-specific libraries on CPU workers in GPU clusters
+RUN ALT_ARCH="$(uname -m)" && \
+    mkdir -p /usr/src/dummy && \
+    cd /usr/src/dummy && \
+    echo 'int main() { return 0; }' > dummy.c && \
+    gcc -shared -o libdummy.so dummy.c && \
+    mkdir -p "/lib/${ALT_ARCH}-linux-gnu" && \
+    cp libdummy.so "/lib/${ALT_ARCH}-linux-gnu/"
+
 COPY ansible/sssd.yml /opt/ansible/sssd.yml
 COPY ansible/roles/sssd /opt/ansible/roles/sssd
 RUN cd /opt/ansible && \
