@@ -97,6 +97,13 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		cluster.Spec.UseDefaultAppArmorProfile,
 	)
 
+	nodeSets, err := resourcegetter.ListNodeSetsByClusterRef(ctx, r.Client, client.ObjectKeyFromObject(cluster))
+	if err != nil {
+		logger.Error(err, fmt.Sprintf("Failed to list %s", slurmv1alpha1.KindNodeSet))
+		return ctrl.Result{}, fmt.Errorf("listing node sets: %w", err)
+	}
+	clusterType := values.BuildClusterTypeFromNodeSets(nodeSets)
+
 	// region Ephemeral nodes power state
 	if nodeSetValues.EphemeralNodes != nil && *nodeSetValues.EphemeralNodes {
 		activeNodes, err := r.reconcileNodeSetPowerState(ctx, nodeSet)
@@ -108,7 +115,7 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 	}
 	// endregion Ephemeral nodes power state
 
-	if err = r.executeReconciliation(ctx, nodeSet, &nodeSetValues, cluster); err != nil {
+	if err = r.executeReconciliation(ctx, nodeSet, &nodeSetValues, cluster, clusterType); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -245,6 +252,7 @@ func (r NodeSetReconciler) executeReconciliation(
 	nodeSet *slurmv1alpha1.NodeSet,
 	nodeSetValues *values.SlurmNodeSet,
 	cluster *slurmv1.SlurmCluster,
+	clusterType consts.ClusterType,
 ) error {
 	steps := []utils.MultiStepExecutionStep{
 		{
@@ -393,6 +401,7 @@ func (r NodeSetReconciler) executeReconciliation(
 					nodeSetValues,
 					&secrets,
 					cluster.Spec.CgroupVersion,
+					clusterType,
 					topologyPluginEnabled,
 				)
 				if err != nil {

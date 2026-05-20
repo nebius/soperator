@@ -29,6 +29,7 @@ func RenderNodeSetStatefulSet(
 	nodeSet *values.SlurmNodeSet,
 	secrets *slurmv1.Secrets,
 	cgroupVersion string,
+	clusterType consts.ClusterType,
 	topologyPluginEnabled bool,
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
@@ -80,7 +81,7 @@ func RenderNodeSetStatefulSet(
 		)
 	}
 
-	slurmdContainer, err := renderContainerNodeSetSlurmd(nodeSet, topologyPluginEnabled, cgroupVersion)
+	slurmdContainer, err := renderContainerNodeSetSlurmd(nodeSet, topologyPluginEnabled, cgroupVersion, clusterType)
 	if err != nil {
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
 	}

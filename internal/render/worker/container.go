@@ -10,7 +10,6 @@ import (
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/naming"
-	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -134,6 +133,7 @@ func renderContainerNodeSetSlurmd(
 	nodeSet *values.SlurmNodeSet,
 	topologyEnabled bool,
 	cgroupVersion string,
+	clusterType consts.ClusterType,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
 		renderVolumeMountRuntime(),
@@ -231,7 +231,8 @@ func renderContainerNodeSetSlurmd(
 		Env: append(
 			renderNodeSetSlurmdEnv(
 				cgroupVersion,
-				utils.Ternary(nodeSet.GPU.Enabled, consts.ClusterTypeGPU, consts.ClusterTypeCPU),
+				clusterType,
+				nodeSet.GPU.Enabled,
 				nodeSet.GPU.Nvidia.GDRCopyEnabled,
 				nodeSet.NodeExtra,
 			),
@@ -302,6 +303,7 @@ func renderVolumeMountRuntime() corev1.VolumeMount {
 func renderNodeSetSlurmdEnv(
 	cgroupVersion string,
 	clusterType consts.ClusterType,
+	nodeSetGPUEnabled bool,
 	enableGDRCopy bool,
 	slurmNodeExtra string,
 ) []corev1.EnvVar {
@@ -318,6 +320,10 @@ func renderNodeSetSlurmdEnv(
 		{
 			Name:  "SLURM_CLUSTER_TYPE",
 			Value: clusterType.String(),
+		},
+		{
+			Name:  "NODESET_GPU_ENABLED",
+			Value: strconv.FormatBool(nodeSetGPUEnabled),
 		},
 	}
 

@@ -69,7 +69,7 @@ func TestRenderNodeSetStatefulSet_SSSD(t *testing.T) {
 		CustomInitContainers:     []corev1.Container{},
 	}
 
-	result, err := worker.RenderNodeSetStatefulSet("test-cluster", nodeSet, &slurmv1.Secrets{}, consts.CGroupV2, false)
+	result, err := worker.RenderNodeSetStatefulSet("test-cluster", nodeSet, &slurmv1.Secrets{}, consts.CGroupV2, consts.ClusterTypeCPU, false)
 	assert.NoError(t, err)
 
 	assert.Len(t, result.Spec.Template.Spec.InitContainers, 3)
