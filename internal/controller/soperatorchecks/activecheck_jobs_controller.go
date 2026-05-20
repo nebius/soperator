@@ -17,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
-	"nebius.ai/slurm-operator/internal/slurmapi"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,6 +29,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/logfield"
+	"nebius.ai/slurm-operator/internal/slurmapi"
 )
 
 var (
@@ -40,9 +40,9 @@ var (
 
 type ActiveCheckJobReconciler struct {
 	*reconciler.Reconciler
-	Job              *reconciler.JobReconciler
-	slurmAPIClients  *slurmapi.ClientSet
-	reconcileTimeout time.Duration
+	Job             *reconciler.JobReconciler
+	slurmAPIClients *slurmapi.ClientSet
+	requeueAfter    time.Duration
 }
 
 func NewActiveCheckJobController(
@@ -50,15 +50,15 @@ func NewActiveCheckJobController(
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
 	slurmAPIClients *slurmapi.ClientSet,
-	reconcileTimeout time.Duration,
+	requeueAfter time.Duration,
 ) *ActiveCheckJobReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
 	return &ActiveCheckJobReconciler{
-		Reconciler:       r,
-		Job:              reconciler.NewJobReconciler(r),
-		slurmAPIClients:  slurmAPIClients,
-		reconcileTimeout: reconcileTimeout,
+		Reconciler:      r,
+		Job:             reconciler.NewJobReconciler(r),
+		slurmAPIClients: slurmAPIClients,
+		requeueAfter:    requeueAfter,
 	}
 }
 
@@ -128,10 +128,15 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		return ctrl.Result{}, fmt.Errorf("get active check job: %w", err)
 	}
 
-	activeCheckName, err := r.getActiveCheckNameFromJob(ctx, k8sJob)
+	activeCheckName, found, err := r.getActiveCheckNameFromJob(ctx, k8sJob)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("get active check name: %w", err)
+		return ctrl.Result{}, err
 	}
+	// No need to return an error and reconcile again if the annotation is not found because it won't appear anyway.
+	if !found {
+		return ctrl.Result{}, nil
+	}
+
 	activeCheck := &slurmv1alpha1.ActiveCheck{}
 	err = r.Get(ctx, types.NamespacedName{
 		Namespace: req.Namespace,
@@ -174,7 +179,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			// is still running; processing it too early would be premature.
 			if status := getK8sJobStatus(k8sJob); status != consts.ActiveCheckK8sJobStatusComplete &&
 				status != consts.ActiveCheckK8sJobStatusFailed {
-				return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
+				return ctrl.Result{Requeue: true, RequeueAfter: r.requeueAfter}, nil
 			}
 
 			activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{
@@ -231,13 +236,25 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			return ctrl.Result{}, fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 		}
 
-		slurmJobIDs, ok := k8sJob.Annotations["slurm-job-id"]
+		allSlurmJobIDs, ok := k8sJob.Annotations["slurm-job-id"]
 		if !ok {
 			logger.Error(err, "failed to get slurm job id")
 			return ctrl.Result{}, err
 		}
-		ids := strings.Split(slurmJobIDs, ",")
-		firstJobId := ids[0]
+
+		oldUnhandledSlurmJobIDs, ok := k8sJob.Annotations["unhandled-slurm-job-id"]
+		if !ok {
+			// Most likely controller was updated, but the previous job is still running.
+			oldUnhandledSlurmJobIDs = allSlurmJobIDs
+		}
+
+		oldUnhandledIDs := strings.Split(oldUnhandledSlurmJobIDs, ",")
+		if oldUnhandledSlurmJobIDs == "" {
+			oldUnhandledIDs = []string{}
+		}
+		allIDs := strings.Split(allSlurmJobIDs, ",")
+		unhandledIdsMap := make(map[string]struct{})
+		firstJobId := allIDs[0]
 
 		var jobName string
 		var submitTime *metav1.Time
@@ -261,11 +278,13 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		requeue := false
 		latestHandledFinalStateTime := lastHandledFinalStateTime
 		var notFoundInAccountingIDs []string
-		for _, slurmJobID := range ids {
+		for _, slurmJobID := range oldUnhandledIDs {
 			slurmJobs, err := slurmAPIClient.GetJobsByIDFromAccounting(ctx, slurmJobID)
 			if err != nil {
-				logger.Error(err, "failed to get slurm job status")
-				return ctrl.Result{}, err
+				logger.Error(err, "failed to get slurm job status", "slurm_job_id", slurmJobID)
+				unhandledIdsMap[slurmJobID] = struct{}{}
+				requeue = true
+				continue
 			}
 
 			// slurmdbd may not yet have a record for a just-submitted job; the propagation
@@ -275,6 +294,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			// surfaces in logs instead of degrading silently into an infinite requeue.
 			if len(slurmJobs) == 0 {
 				notFoundInAccountingIDs = append(notFoundInAccountingIDs, slurmJobID)
+				unhandledIdsMap[slurmJobID] = struct{}{}
 				requeue = true
 				continue
 			}
@@ -287,6 +307,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 				// Job is not yet finished
 				if !slurmJob.IsTerminalState() || slurmJob.EndTime == nil {
+					unhandledIdsMap[slurmJobID] = struct{}{}
 					requeue = true
 					continue
 				}
@@ -332,18 +353,24 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			logger.Info("Slurm jobs not found in accounting, will retry",
 				"count", len(notFoundInAccountingIDs),
 				"job_ids", notFoundInAccountingIDs,
-				"total", len(ids),
+				"total", len(oldUnhandledIDs),
 			)
 		}
 
+		k8sJobPatch := client.MergeFrom(k8sJob.DeepCopy())
+		unhandledIds := make([]string, 0, len(unhandledIdsMap))
+		for id := range unhandledIdsMap {
+			unhandledIds = append(unhandledIds, id)
+		}
+		k8sJob.Annotations["unhandled-slurm-job-id"] = strings.Join(unhandledIds, ",")
 		if latestHandledFinalStateTime > lastHandledFinalStateTime {
 			// Maybe we could delete the job because it will not be processed anymore
 			// Otherwise, we will have many of these jobs and they will keep being listed in every Reconcile()
-			k8sJobPatch := client.MergeFrom(k8sJob.DeepCopy())
 			k8sJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime] = fmt.Sprintf("%d", latestHandledFinalStateTime)
-			if err := r.Job.Patch(ctx, k8sJob, k8sJobPatch); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to patch k8s Job: %w", err)
-			}
+		}
+
+		if err := r.Job.Patch(ctx, k8sJob, k8sJobPatch); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to patch k8s Job: %w", err)
 		}
 
 		// Updating the ActiveCheck status is relevant for normal active checks
@@ -373,7 +400,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		}
 
 		if requeue {
-			return ctrl.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
+			return ctrl.Result{Requeue: true, RequeueAfter: r.requeueAfter}, nil
 		}
 
 	} else if activeCheck.Spec.CheckType == "k8sJob" {
@@ -473,20 +500,23 @@ func updateSlurmNodeWithReactions(
 	return nil
 }
 
-func (r *ActiveCheckJobReconciler) getActiveCheckNameFromJob(ctx context.Context, k8sJob *batchv1.Job) (string, error) {
+func (r *ActiveCheckJobReconciler) getActiveCheckNameFromJob(ctx context.Context, k8sJob *batchv1.Job) (string, bool, error) {
 	podList := &corev1.PodList{}
 	err := r.List(ctx, podList, client.InNamespace(k8sJob.Namespace), client.MatchingLabels{"job-name": k8sJob.Name})
-	if err != nil || len(podList.Items) == 0 {
-		return "", fmt.Errorf("failed to find pod for job %s: %w", k8sJob.Name, err)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to find pod for job %s: %w", k8sJob.Name, err)
+	}
+	if len(podList.Items) == 0 {
+		return "", false, nil
 	}
 
 	pod := &podList.Items[0]
 	activeCheckName, ok := pod.Annotations[consts.AnnotationActiveCheckName]
 	if !ok {
-		return "", fmt.Errorf("annotation %s not found on pod %s", consts.AnnotationActiveCheckName, pod.Name)
+		return "", false, nil
 	}
 
-	return activeCheckName, nil
+	return activeCheckName, true, nil
 }
 
 func getK8sJobStatus(k8sJob *batchv1.Job) consts.ActiveCheckK8sJobStatus {

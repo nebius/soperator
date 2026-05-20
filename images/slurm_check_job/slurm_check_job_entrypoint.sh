@@ -123,8 +123,8 @@ if [[ -z "$K8S_JOB_NAME" ]]; then
     exit 1
 fi
 
-echo "Annotating Job $K8S_JOB_NAME with slurm-job-id=$SLURM_JOB_ID"
-kubectl annotate job "$K8S_JOB_NAME" slurm-job-id="$SLURM_JOB_ID" \
+echo "Annotating Job $K8S_JOB_NAME with slurm-job-id and unhandled-slurm-job-id = $SLURM_JOB_ID"
+kubectl annotate job "$K8S_JOB_NAME" slurm-job-id="$SLURM_JOB_ID" unhandled-slurm-job-id="$SLURM_JOB_ID" \
     -n "$K8S_POD_NAMESPACE" --overwrite || {
     echo "Failed to annotate Job"
     exit 1

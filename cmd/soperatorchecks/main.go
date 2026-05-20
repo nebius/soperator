@@ -119,13 +119,15 @@ func main() {
 		maintenanceIgnoreNodeLabels string
 		controllersFlag             string
 
-		reconcileTimeout                         time.Duration
-		reconcileTimeoutPodEphemeralStorageCheck time.Duration
-		maxConcurrency                           int
-		maxConcurrencyPodEphemeralStorageCheck   int
-		cacheSyncTimeout                         time.Duration
-		ephemeralStorageThreshold                float64
-		ephemeralStorageResumeThreshold          float64
+		requeueAfterSlurmNodes                 time.Duration
+		requeueAfterActiveCheck                time.Duration
+		requeueAfterActiveCheckJob             time.Duration
+		requeueAfterPodEphemeralStorageCheck   time.Duration
+		maxConcurrency                         int
+		maxConcurrencyPodEphemeralStorageCheck int
+		cacheSyncTimeout                       time.Duration
+		ephemeralStorageThreshold              float64
+		ephemeralStorageResumeThreshold        float64
 	)
 
 	var watchNsCacheByName = make(map[string]cache.Config)
@@ -147,8 +149,10 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.StringVar(&logFormat, "log-format", "json", "Log format: plain or json")
 	flag.StringVar(&logLevel, "log-level", "debug", "Log level: debug, info, warn, error, dpanic, panic, fatal")
-	flag.DurationVar(&reconcileTimeout, "reconcile-timeout", 3*time.Minute, "The maximum duration allowed for a single reconcile")
-	flag.DurationVar(&reconcileTimeoutPodEphemeralStorageCheck, "pod-ephemeral-reconcile-timeout", 15*time.Second, "The maximum duration allowed for a single reconcile of Pod Ephemeral Storage Check")
+	flag.DurationVar(&requeueAfterSlurmNodes, "requeue-after-slurm-nodes", 3*time.Minute, "The duration after which SlurmNodesController will be requeued for reconciliation.")
+	flag.DurationVar(&requeueAfterActiveCheck, "requeue-after-activecheck", 10*time.Second, "The duration after which ActiveCheck will be requeued for reconciliation.")
+	flag.DurationVar(&requeueAfterActiveCheckJob, "requeue-after-activecheckjob", time.Minute, "The duration after which ActiveCheckJob will be requeued for reconciliation.")
+	flag.DurationVar(&requeueAfterPodEphemeralStorageCheck, "requeue-after-pod-ephemeral-storage-check", time.Minute, "The duration after which Pod Ephemeral Storage Check will be requeued for reconciliation.")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.IntVar(&maxConcurrencyPodEphemeralStorageCheck, "pod-ephemeral-max-concurrent-reconciles", 10, "Configures number of concurrent reconciles for Pod Ephemeral Storage Check. It should improve performance for clusters with many pods.")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
@@ -293,7 +297,7 @@ func main() {
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.SlurmNodesControllerName),
 			slurmAPIClients,
-			reconcileTimeout,
+			requeueAfterSlurmNodes,
 			enabledNodeReplacement,
 			enableExtensiveCheck,
 			mgr.GetAPIReader(),
@@ -320,7 +324,7 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckControllerName),
-			reconcileTimeout,
+			requeueAfterActiveCheck,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create activecheck controller", "controller", "ActiveCheck")
 		}
@@ -331,7 +335,7 @@ func main() {
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckJobControllerName),
 			slurmAPIClients,
-			reconcileTimeout,
+			requeueAfterActiveCheckJob,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create activecheckjob controller", "controller", "ActiveCheckJob")
 		}
@@ -341,7 +345,6 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.SlurmChecksServiceAccountControllerName),
-			reconcileTimeout,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create soperatorchecks serviceaccount controller", "controller", "ServiceAccount")
 		}
@@ -351,7 +354,6 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckPrologControllerName),
-			reconcileTimeout,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create soperatorchecks prolog controller", "controller", "Prolog")
 		}
@@ -363,7 +365,7 @@ func main() {
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.PodEphemeralStorageCheckName),
 			ctrl.GetConfigOrDie(),
-			reconcileTimeoutPodEphemeralStorageCheck,
+			requeueAfterPodEphemeralStorageCheck,
 			ephemeralStorageThreshold,
 			ephemeralStorageResumeThreshold,
 			slurmAPIClients,

@@ -36,7 +36,7 @@ const (
 type SlurmNodesController struct {
 	*reconciler.Reconciler
 	slurmAPIClients          *slurmapi.ClientSet
-	reconcileTimeout         time.Duration
+	requeueAfter             time.Duration
 	enabledNodeReplacement   bool
 	enableExtensiveCheck     bool
 	apiReader                client.Reader // Direct API reader for pagination
@@ -48,7 +48,7 @@ func NewSlurmNodesController(
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
 	slurmAPIClients *slurmapi.ClientSet,
-	reconcileTimeout time.Duration,
+	requeueAfter time.Duration,
 	enabledNodeReplacement bool,
 	enableExtensiveCheck bool,
 	apiReader client.Reader,
@@ -63,7 +63,7 @@ func NewSlurmNodesController(
 	return &SlurmNodesController{
 		Reconciler:               r,
 		slurmAPIClients:          slurmAPIClients,
-		reconcileTimeout:         reconcileTimeout,
+		requeueAfter:             requeueAfter,
 		enabledNodeReplacement:   enabledNodeReplacement,
 		enableExtensiveCheck:     enableExtensiveCheck,
 		apiReader:                apiReader,
@@ -127,7 +127,7 @@ func (c *SlurmNodesController) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Set RequeueAfter so SlurmNodesController can perform periodical checks against
 	// slurm nodes to find degraded nodes and k8s nodes to find maintenance.
-	return ctrl.Result{RequeueAfter: c.reconcileTimeout}, nil
+	return ctrl.Result{RequeueAfter: c.requeueAfter}, nil
 }
 
 // TODO: filter slurmNodes by supported slurm clusters

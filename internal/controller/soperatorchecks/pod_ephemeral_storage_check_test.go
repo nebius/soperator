@@ -547,11 +547,11 @@ func TestGetEphemeralStorageStatsFromNode(t *testing.T) {
 	}
 
 	controller := &PodEphemeralStorageCheck{
-		clientset:        fakeClientset,
-		restConfig:       restConfig,
-		usageThreshold:   80.0,
-		resumeThreshold:  75.0,
-		reconcileTimeout: time.Minute,
+		clientset:       fakeClientset,
+		restConfig:      restConfig,
+		usageThreshold:  80.0,
+		resumeThreshold: 75.0,
+		requeueAfter:    time.Minute,
 	}
 
 	// Note: This test will fail because we can't easily mock the kubernetes REST client
