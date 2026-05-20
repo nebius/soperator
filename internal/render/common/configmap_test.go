@@ -585,7 +585,7 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "NodeName=nodeA-0 State=CLOUD NodeHostname=nodeA-0 NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 Feature=a,b Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeA-0 State=CLOUD NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 Feature=a,b Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
 		},
 		{
 			name: "Single nodeset with multiple replicas",
@@ -614,9 +614,7 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "NodeName=nodeB-0 State=CLOUD NodeHostname=nodeB-0 NodeAddr=nodeB-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeB-1 State=CLOUD NodeHostname=nodeB-1 NodeAddr=nodeB-1.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeB-2 State=CLOUD NodeHostname=nodeB-2 NodeAddr=nodeB-2.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeB-[0-2] State=CLOUD NodeAddr=nodeB-[0-2].slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
 		},
 		{
 			name: "Multiple nodesets with varying replicas",
@@ -662,9 +660,8 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "NodeName=nodeC-0 State=CLOUD NodeHostname=nodeC-0 NodeAddr=nodeC-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeC-1 State=CLOUD NodeHostname=nodeC-1 NodeAddr=nodeC-1.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeD-0 State=CLOUD NodeHostname=nodeD-0 NodeAddr=nodeD-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=16384 Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeC-[0-1] State=CLOUD NodeAddr=nodeC-[0-1].slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
+				"NodeName=nodeD-0 State=CLOUD NodeAddr=nodeD-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=16384 Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
 		},
 		{
 			name: "Nodeset with zero replicas",
