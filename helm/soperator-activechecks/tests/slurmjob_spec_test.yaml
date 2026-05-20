@@ -1,0 +1,30 @@
+suite: test slurmJobSpec structure
+templates:
+  - templates/active-checks.yaml
+
+tests:
+  - it: should render docker memory limit OOMKilled active check
+    documentSelector:
+      path: metadata.name
+      value: docker-memory-limit-oomkilled
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - equal:
+          path: spec.checkType
+          value: slurmJob
+      - equal:
+          path: spec.runAfterCreation
+          value: true
+      - equal:
+          path: spec.suspend
+          value: true
+      - contains:
+          path: spec.dependsOn
+          content: prepull-container-image
+      - matchRegex:
+          path: spec.slurmJobSpec.sbatchScript
+          pattern: 'srun --mem 100m docker run'
+      - matchRegex:
+          path: spec.slurmJobSpec.sbatchScript
+          pattern: 'State.OOMKilled'

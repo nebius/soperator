@@ -119,6 +119,7 @@ func BuildSlurmNodeSetFrom(
 			naming.BuildNodeSetStatefulSetName(nodeSet.Name),
 			nsSpec.Replicas,
 			nsSpec.MaxUnavailable,
+			nsSpec.MaxConcurrentStartup,
 		),
 		Service:         buildServiceFrom(naming.BuildNodeSetServiceName(clusterName, nodeSet.Name)),
 		ServiceUmbrella: buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeNodeSet, clusterName)),

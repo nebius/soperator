@@ -141,6 +141,8 @@ pushd "${jaildir}"
 
     echo "Bind-mount /etc/enroot, /usr/share/enroot and /usr/lib/enroot"
     mkdir -p etc/enroot usr/share/enroot usr/lib/enroot
+    mkdir -p /etc/enroot/mounts.d
+    echo '/opt/slurm_scripts/task_prolog.sh' | sudo tee /etc/enroot/mounts.d/task_prolog.fstab
     mount --rbind /etc/enroot etc/enroot
     mount --bind /usr/share/enroot usr/share/enroot
     mount --bind /usr/lib/enroot usr/lib/enroot
@@ -186,11 +188,18 @@ pushd "${jaildir}"
     if [ -n "$worker" ]; then
         echo "Bind-mount slurmd spool directory from the host because it should be propagated to the jail"
         mount --bind /var/spool/slurmd var/spool/slurmd/
+
         # slurmd package tree https://gist.github.com/asteny/9eb5089a10a793834d12a5b2449cc2b9
         echo "Bind-mount slurmd binaries from container to the jail"
         touch usr/sbin/slurmd usr/sbin/slurmstepd
         mount --bind /usr/sbin/slurmd usr/sbin/slurmd
         mount --bind /usr/sbin/slurmstepd usr/sbin/slurmstepd
+
+        echo "Bind-mount dockerd stuff from container to the jail"
+        mkdir -p etc/docker
+        touch etc/docker/daemon.json
+        mount --bind "/etc/docker/daemon.json" "etc/docker/daemon.json"
+
         echo "Update linker cache inside the jail"
         echo "  libnvidia-ml.so.1 exists before ldconfig: $(test -e usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.1 && echo 'yes' || echo 'NO')"
         echo "  libnvidia-ml versioned file size before ldconfig: $(stat -c%s usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.*.* 2>/dev/null || echo 'NOT FOUND')"

@@ -9,14 +9,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/consts"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 
 	"nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
@@ -33,20 +34,17 @@ var (
 
 type ActiveCheckPrologReconciler struct {
 	*reconciler.Reconciler
-	reconcileTimeout time.Duration
 }
 
 func NewActiveCheckPrologController(
 	client client.Client,
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
-	reconcileTimeout time.Duration,
 ) *ActiveCheckPrologReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
 	return &ActiveCheckPrologReconciler{
-		Reconciler:       r,
-		reconcileTimeout: reconcileTimeout,
+		Reconciler: r,
 	}
 }
 
