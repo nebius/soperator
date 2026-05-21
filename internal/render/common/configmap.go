@@ -261,7 +261,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	addSlurmConfigProperties(res, cluster.SlurmConfig)
 	res.AddComment("")
 
-	if cluster.ClusterType == consts.ClusterTypeGPU {
+	if cluster.ClusterWithGPU {
 		res.AddProperty("GresTypes", "gpu")
 	}
 
@@ -625,7 +625,7 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 func generateGresConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
 	res.AddComment("Gres config")
-	if cluster.ClusterType == consts.ClusterTypeGPU {
+	if cluster.ClusterWithGPU {
 		res.AddProperty("AutoDetect", "nvidia")
 	}
 	if cluster.PartitionConfiguration.ConfigType == slurmv1.PartitionConfigTypeStructured {

@@ -66,7 +66,7 @@ func TestRenderStatefulSet_SSSD(t *testing.T) {
 	result, err := RenderStatefulSet(
 		"test-ns",
 		"test-cluster",
-		consts.ClusterTypeGPU,
+		true,
 		[]slurmv1.K8sNodeFilter{{Name: "test-filter"}},
 		&slurmv1.Secrets{},
 		[]slurmv1.VolumeSource{{Name: "test-volume", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}},

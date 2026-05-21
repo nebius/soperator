@@ -22,7 +22,7 @@ import (
 func RenderStatefulSet(
 	namespace,
 	clusterName string,
-	clusterType consts.ClusterType,
+	clusterWithGPU bool,
 	nodeFilters []slurmv1.K8sNodeFilter,
 	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
@@ -108,7 +108,7 @@ func RenderStatefulSet(
 					InitContainers: initContainers,
 					Containers: []corev1.Container{
 						renderContainerSshd(
-							clusterType,
+							clusterWithGPU,
 							&login.ContainerSshd,
 							login.JailSubMounts,
 							login.CustomVolumeMounts,
