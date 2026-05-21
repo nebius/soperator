@@ -238,7 +238,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		return ctrl.Result{}, fmt.Errorf("listing node sets: %w", err)
 	}
 
-	clusterValues.ClusterType = values.BuildClusterTypeFromNodeSets(nodeSets)
+	clusterValues.ClusterWithGPU = values.BuildClusterWithGPUFromNodeSets(nodeSets)
 
 	// region Reconciliation
 	logger.Info("Starting reconciliation of Slurm Cluster")

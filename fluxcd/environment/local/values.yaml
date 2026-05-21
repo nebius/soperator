@@ -62,7 +62,6 @@ slurmCluster:
   releaseName: soperator
   overrideValues:
     clusterName: soperator
-    clusterType: cpu
     useDefaultAppArmorProfile: false
     maintenance: downscale
     k8sNodeFilters:

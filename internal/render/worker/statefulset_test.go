@@ -156,32 +156,32 @@ func Test_RenderContainerWorkerInit_K8SServiceName(t *testing.T) {
 
 func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
 	tests := []struct {
-		name                   string
-		clusterType            consts.ClusterType
-		nodeSetGPUEnabled      bool
-		expectedClusterType    string
-		expectedNodeSetGPUFlag string
+		name                       string
+		clusterWithGPU             bool
+		nodeSetGPUEnabled          bool
+		expectedClusterWithGPUFlag string
+		expectedNodeSetGPUFlag     string
 	}{
 		{
-			name:                   "gpu cluster with gpu nodeset",
-			clusterType:            consts.ClusterTypeGPU,
-			nodeSetGPUEnabled:      true,
-			expectedClusterType:    "gpu",
-			expectedNodeSetGPUFlag: "true",
+			name:                       "gpu cluster with gpu nodeset",
+			clusterWithGPU:             true,
+			nodeSetGPUEnabled:          true,
+			expectedClusterWithGPUFlag: "true",
+			expectedNodeSetGPUFlag:     "true",
 		},
 		{
-			name:                   "gpu cluster with cpu nodeset",
-			clusterType:            consts.ClusterTypeGPU,
-			nodeSetGPUEnabled:      false,
-			expectedClusterType:    "gpu",
-			expectedNodeSetGPUFlag: "false",
+			name:                       "gpu cluster with cpu nodeset",
+			clusterWithGPU:             true,
+			nodeSetGPUEnabled:          false,
+			expectedClusterWithGPUFlag: "true",
+			expectedNodeSetGPUFlag:     "false",
 		},
 		{
-			name:                   "cpu cluster with cpu nodeset",
-			clusterType:            consts.ClusterTypeCPU,
-			nodeSetGPUEnabled:      false,
-			expectedClusterType:    "cpu",
-			expectedNodeSetGPUFlag: "false",
+			name:                       "cpu cluster with cpu nodeset",
+			clusterWithGPU:             false,
+			nodeSetGPUEnabled:          false,
+			expectedClusterWithGPUFlag: "false",
+			expectedNodeSetGPUFlag:     "false",
 		},
 	}
 
@@ -229,12 +229,12 @@ func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
 				nodeSet,
 				&slurmv1.Secrets{},
 				consts.CGroupV2,
-				tt.clusterType,
+				tt.clusterWithGPU,
 				false,
 			)
 			assert.NoError(t, err)
 
-			assertEnvValue(t, result.Spec.Template.Spec.Containers[0].Env, "SLURM_CLUSTER_TYPE", tt.expectedClusterType)
+			assertEnvValue(t, result.Spec.Template.Spec.Containers[0].Env, "SLURM_CLUSTER_WITH_GPU", tt.expectedClusterWithGPUFlag)
 			assertEnvValue(t, result.Spec.Template.Spec.Containers[0].Env, "NODESET_GPU_ENABLED", tt.expectedNodeSetGPUFlag)
 		})
 	}
@@ -337,7 +337,7 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 				nodeSet,
 				&slurmv1.Secrets{},
 				consts.CGroupV2,
-				consts.ClusterTypeGPU,
+				true,
 				tt.topologyPluginEnabled,
 			)
 			assert.NoError(t, err)
@@ -508,7 +508,7 @@ func TestRenderNodeSetStatefulSet_PersistentVolumeClaimRetentionPolicy(t *testin
 				tt.nodeSet,
 				&slurmv1.Secrets{},
 				consts.CGroupV2,
-				consts.ClusterTypeGPU,
+				true,
 				false,
 			)
 			assert.NoError(t, err)
@@ -696,7 +696,7 @@ func TestRenderNodeSetStatefulSet_EphemeralNodesReserveOrdinals(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeSet := createNodeSetWithActiveNodes(tt.ephemeralNodes, tt.activeNodes)
 
-			result, err := worker.RenderNodeSetStatefulSet("test-cluster", nodeSet, &slurmv1.Secrets{}, consts.CGroupV2, consts.ClusterTypeGPU, false)
+			result, err := worker.RenderNodeSetStatefulSet("test-cluster", nodeSet, &slurmv1.Secrets{}, consts.CGroupV2, true, false)
 			assert.NoError(t, err)
 
 			// Verify replicas

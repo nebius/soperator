@@ -102,7 +102,7 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		logger.Error(err, fmt.Sprintf("Failed to list %s", slurmv1alpha1.KindNodeSet))
 		return ctrl.Result{}, fmt.Errorf("listing node sets: %w", err)
 	}
-	clusterType := values.BuildClusterTypeFromNodeSets(nodeSets)
+	clusterWithGPU := values.BuildClusterWithGPUFromNodeSets(nodeSets)
 
 	// region Ephemeral nodes power state
 	if nodeSetValues.EphemeralNodes != nil && *nodeSetValues.EphemeralNodes {
@@ -115,7 +115,7 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 	}
 	// endregion Ephemeral nodes power state
 
-	if err = r.executeReconciliation(ctx, nodeSet, &nodeSetValues, cluster, clusterType); err != nil {
+	if err = r.executeReconciliation(ctx, nodeSet, &nodeSetValues, cluster, clusterWithGPU); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -252,7 +252,7 @@ func (r NodeSetReconciler) executeReconciliation(
 	nodeSet *slurmv1alpha1.NodeSet,
 	nodeSetValues *values.SlurmNodeSet,
 	cluster *slurmv1.SlurmCluster,
-	clusterType consts.ClusterType,
+	clusterWithGPU bool,
 ) error {
 	steps := []utils.MultiStepExecutionStep{
 		{
@@ -401,7 +401,7 @@ func (r NodeSetReconciler) executeReconciliation(
 					nodeSetValues,
 					&secrets,
 					cluster.Spec.CgroupVersion,
-					clusterType,
+					clusterWithGPU,
 					topologyPluginEnabled,
 				)
 				if err != nil {

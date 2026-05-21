@@ -9,14 +9,13 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmav1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
-	"nebius.ai/slurm-operator/internal/consts"
 )
 
 type SlurmCluster struct {
 	types.NamespacedName
 
 	CRVersion              string
-	ClusterType            consts.ClusterType
+	ClusterWithGPU         bool
 	PartitionConfiguration PartitionConfiguration
 	HealthCheckConfig      *HealthCheckConfig
 
@@ -48,19 +47,12 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 	logger := log.FromContext(ctx)
 	logger.V(1).Info(fmt.Sprintf("%+v", cluster.Spec.SConfigController))
 
-	clusterType, err := consts.StringToClusterType(cluster.Spec.ClusterType)
-	if err != nil {
-		logger.Error(err, "Failed to get cluster type")
-		return nil, fmt.Errorf("getting cluster type: %w", err)
-	}
-
 	res := &SlurmCluster{
 		NamespacedName: types.NamespacedName{
 			Namespace: cluster.Namespace,
 			Name:      cluster.Name,
 		},
 		CRVersion:              buildCRVersionFrom(ctx, cluster.Spec.CRVersion),
-		ClusterType:            clusterType,
 		PartitionConfiguration: buildPartitionConfiguration(&cluster.Spec.PartitionConfiguration),
 		HealthCheckConfig:      buildHealthCheckConfig(cluster.Spec.HealthCheckConfig),
 		PopulateJail:           buildSlurmPopulateJailFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.PopulateJail),
@@ -102,14 +94,14 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 	return res, nil
 }
 
-func BuildClusterTypeFromNodeSets(nodeSets []slurmav1alpha1.NodeSet) consts.ClusterType {
+func BuildClusterWithGPUFromNodeSets(nodeSets []slurmav1alpha1.NodeSet) bool {
 	for _, nodeSet := range nodeSets {
 		if nodeSet.Spec.GPU.Enabled {
-			return consts.ClusterTypeGPU
+			return true
 		}
 	}
 
-	return consts.ClusterTypeCPU
+	return false
 }
 
 // HasEphemeralNodes returns true if any NodeSet in the cluster has ephemeral nodes enabled

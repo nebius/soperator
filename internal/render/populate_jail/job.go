@@ -16,7 +16,6 @@ import (
 func RenderPopulateJailJob(
 	namespace,
 	clusterName string,
-	clusterType consts.ClusterType,
 	nodeFilters []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
 	populateJail *values.PopulateJail,
@@ -61,7 +60,7 @@ func RenderPopulateJailJob(
 					RestartPolicy:     "Never",
 					PriorityClassName: populateJail.PriorityClass,
 					Volumes:           volumes,
-					Containers:        []corev1.Container{renderContainerPopulateJail(clusterType, populateJail)},
+					Containers:        []corev1.Container{renderContainerPopulateJail(populateJail)},
 				},
 			},
 			Parallelism: ptr.To(int32(1)),

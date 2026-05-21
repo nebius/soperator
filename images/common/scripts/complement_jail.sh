@@ -173,7 +173,7 @@ pushd "${jaildir}"
     mkdir -m 777 -p opt/soperator-outputs
 
     # For login nodes in GPU clusters and CPU workers in GPU clusters
-    if { [ -z "$worker" ] && [ "$SLURM_CLUSTER_TYPE" = "gpu" ]; } || { [ -n "$worker" ] && [ "$SLURM_CLUSTER_TYPE" = "gpu" ] && [ "$NODESET_GPU_ENABLED" != "true" ]; }; then
+    if { [ -z "$worker" ] && [ "$SLURM_CLUSTER_WITH_GPU" = "true" ]; } || { [ -n "$worker" ] && [ "$SLURM_CLUSTER_WITH_GPU" = "true" ] && [ "$NODESET_GPU_ENABLED" != "true" ]; }; then
         while [ ! -f "etc/gpu_libs_installed.flag" ]; do
             echo "Waiting for GPU libs to be propagated to the jail from a worker node"
             sleep 10

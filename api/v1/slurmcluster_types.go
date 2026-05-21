@@ -19,11 +19,6 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	CRVersion string `json:"crVersion,omitempty"` // TODO backward compatibility
 
-	// ClusterType define type of slurm worker nodes
-	// +kubebuilder:validation:Enum=gpu;cpu
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="gpu"
-	ClusterType string `json:"clusterType,omitempty"`
 	// Maintenance defines the maintenance window for the cluster.
 	// It can have the following values:
 	// - none: No maintenance is performed. The cluster operates normally.

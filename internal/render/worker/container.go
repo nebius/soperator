@@ -133,7 +133,7 @@ func renderContainerNodeSetSlurmd(
 	nodeSet *values.SlurmNodeSet,
 	topologyEnabled bool,
 	cgroupVersion string,
-	clusterType consts.ClusterType,
+	clusterWithGPU bool,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
 		renderVolumeMountRuntime(),
@@ -231,7 +231,7 @@ func renderContainerNodeSetSlurmd(
 		Env: append(
 			renderNodeSetSlurmdEnv(
 				cgroupVersion,
-				clusterType,
+				clusterWithGPU,
 				nodeSet.GPU.Enabled,
 				nodeSet.GPU.Nvidia.GDRCopyEnabled,
 				nodeSet.NodeExtra,
@@ -302,7 +302,7 @@ func renderVolumeMountRuntime() corev1.VolumeMount {
 
 func renderNodeSetSlurmdEnv(
 	cgroupVersion string,
-	clusterType consts.ClusterType,
+	clusterWithGPU bool,
 	nodeSetGPUEnabled bool,
 	enableGDRCopy bool,
 	slurmNodeExtra string,
@@ -318,8 +318,8 @@ func renderNodeSetSlurmdEnv(
 			},
 		},
 		{
-			Name:  "SLURM_CLUSTER_TYPE",
-			Value: clusterType.String(),
+			Name:  "SLURM_CLUSTER_WITH_GPU",
+			Value: strconv.FormatBool(clusterWithGPU),
 		},
 		{
 			Name:  "NODESET_GPU_ENABLED",

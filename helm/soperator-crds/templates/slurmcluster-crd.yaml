@@ -27338,13 +27338,6 @@ spec:
                 - v1
                 - v2
                 type: string
-              clusterType:
-                default: gpu
-                description: ClusterType define type of slurm worker nodes
-                enum:
-                - gpu
-                - cpu
-                type: string
               crVersion:
                 description: CRVersion defines the version of the Operator the Custom
                   Resource belongs to

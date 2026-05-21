@@ -2,15 +2,6 @@ suite: test default values from kubebuilder annotations
 templates:
   - templates/slurm-cluster-cr.yaml
 tests:
-  # Test clusterType default value
-  - it: should set clusterType to default gpu
-    set:
-      clusterName: test-cluster
-    asserts:
-      - equal:
-          path: spec.clusterType
-          value: gpu
-
   # Test maintenance default value
   - it: should set maintenance to default none
     set:
