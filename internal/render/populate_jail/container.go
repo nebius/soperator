@@ -9,7 +9,7 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-func renderContainerPopulateJail(clusterType consts.ClusterType, populateJail *values.PopulateJail) corev1.Container {
+func renderContainerPopulateJail(populateJail *values.PopulateJail) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountJail(),
 	}
@@ -29,10 +29,6 @@ func renderContainerPopulateJail(clusterType consts.ClusterType, populateJail *v
 			{
 				Name:  "OVERWRITE",
 				Value: overwriteEnv},
-			{
-				Name:  "SLURM_CLUSTER_TYPE",
-				Value: clusterType.String(),
-			},
 		},
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
