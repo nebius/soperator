@@ -14,8 +14,7 @@ populate_jail_rootfs() {
     restic --repo /jail_restic --insecure-no-password restore latest --target /mnt/jail \
       --overwrite always --delete \
       --no-cache --no-extra-verify --option local.connections=64 \
-      --json \
-      --exclude-xattr system.nfs4_acl
+      --json
 
     echo "Set permissions for jail directory"
     chmod 755 /mnt/jail # Permissions 755 are only allowed permissions for OpenSSH ChrootDirectory feature
