@@ -7,7 +7,6 @@ slurmCluster:
   releaseName: soperator
   overrideValues:
     clusterName: soperator
-    clusterType: gpu
     useDefaultAppArmorProfile: true
     maintenance: none
     k8sNodeFilters:

@@ -30,7 +30,6 @@ helm unittest -f 'tests/default-values_test.yaml' helm/slurm-cluster
 These tests verify the following kubebuilder default values:
 
 ### SlurmClusterSpec
-- `clusterType: "gpu"`
 - `maintenance: "none"`
 - `useDefaultAppArmorProfile: false`
 
