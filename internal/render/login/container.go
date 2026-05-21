@@ -1,6 +1,8 @@
 package login
 
 import (
+	"strconv"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
@@ -12,7 +14,7 @@ import (
 
 // renderContainerSshd renders [corev1.Container] for sshd
 func renderContainerSshd(
-	clusterType consts.ClusterType,
+	clusterWithGPU bool,
 	container *values.Container,
 	jailSubMounts, customMounts []slurmv1.NodeVolumeMount,
 	containerSSSD *values.Container,
@@ -46,8 +48,8 @@ func renderContainerSshd(
 		Env: append(
 			[]corev1.EnvVar{
 				{
-					Name:  "SLURM_CLUSTER_TYPE",
-					Value: clusterType.String(),
+					Name:  "SLURM_CLUSTER_WITH_GPU",
+					Value: strconv.FormatBool(clusterWithGPU),
 				},
 			},
 			container.CustomEnv...,
