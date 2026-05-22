@@ -537,6 +537,7 @@ soperator:
         replicas: 2
         image:
           repository: cr.eu-north1.nebius.cloud/soperator/kruise-manager
+          tag: v1.8.3
         resources:
           limits:
             memory: 2Gi
@@ -546,6 +547,7 @@ soperator:
       helmHooks:
         image:
           repository: cr.eu-north1.nebius.cloud/soperator/kruise-helm-hook
+          tag: v0.1.0
       featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true,ResourceDistributionGate=true"
     driftDetection:
       mode: warn
