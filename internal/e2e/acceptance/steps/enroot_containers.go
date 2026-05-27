@@ -65,6 +65,7 @@ func (s *EnrootContainers) Register(sc *godog.ScenarioContext) {
 		return ctx, nil
 	})
 
+	sc.Step(`^Enroot direct SquashFS startup is enabled$`, s.enrootDirectSquashFSStartupIsEnabled)
 	sc.Step(`^a long-running Enroot NCCL job is submitted on two GPU workers$`, s.aLongRunningEnrootNCCLJobIsSubmittedOnTwoGPUWorkers)
 	sc.Step(`^the Enroot NCCL job is running$`, s.theEnrootNCCLJobIsRunning)
 	sc.Step(`^Enroot cache is populated on local storage on a worker$`, s.enrootCacheIsPopulatedOnLocalStorageOnAWorker)
@@ -81,6 +82,18 @@ func (s *EnrootContainers) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^the named Enroot runtime directory remains after cancellation$`, s.theNamedEnrootRuntimeDirectoryRemainsAfterCancellation)
 	sc.Step(`^the named Enroot runtime directory is cleaned up$`, s.theNamedEnrootRuntimeDirectoryIsCleanedUp)
 	sc.Step(`^the named Enroot runtime directory is removed$`, s.theNamedEnrootRuntimeDirectoryIsRemoved)
+}
+
+func (s *EnrootContainers) enrootDirectSquashFSStartupIsEnabled(ctx context.Context) error {
+	output, err := s.exec.Jail().RunWithDefaultRetry(ctx, "grep -E 'spank_pyxis\\.so.*use_squashfuse=1' /etc/slurm/plugstack.conf /etc/slurm/plugstack.conf.d/*.conf 2>/dev/null || true")
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(output) == "" {
+		s.exec.Logf("enroot containers: direct SquashFS startup is disabled, skipping opt-in scenario")
+		return godog.ErrSkip
+	}
+	return nil
 }
 
 func (s *EnrootContainers) aLongRunningEnrootNCCLJobIsSubmittedOnTwoGPUWorkers(ctx context.Context) error {

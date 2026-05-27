@@ -599,19 +599,24 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 
 	res.AddLine(fmt.Sprintf("required chroot.so %s", consts.VolumeMountPathJail))
 
-	res.AddLine(strings.Join(
-		[]string{
-			utils.Ternary(cluster.PlugStackConfig.Pyxis.Required != nil && *cluster.PlugStackConfig.Pyxis.Required, "required", "optional"),
-			"spank_pyxis.so",
-			"runtime_path=/run/pyxis",
-			"execute_entrypoint=0",
-			"container_scope=global",
-			"sbatch_support=1",
-			"use_squashfuse=1",
-			fmt.Sprintf("importer=%s", cluster.PlugStackConfig.Pyxis.ImporterPath),
-		},
-		" ",
-	))
+	pyxis := cluster.PlugStackConfig.Pyxis
+	pyxisArgs := []string{
+		utils.Ternary(pyxis.Required != nil && *pyxis.Required, "required", "optional"),
+		"spank_pyxis.so",
+		"runtime_path=/run/pyxis",
+		"execute_entrypoint=0",
+		"container_scope=global",
+		"sbatch_support=1",
+	}
+	if pyxis.UseSquashfuse != nil && *pyxis.UseSquashfuse {
+		pyxisArgs = append(pyxisArgs, "use_squashfuse=1")
+	}
+	if pyxis.ImporterPath != "" {
+		pyxisArgs = append(pyxisArgs, fmt.Sprintf("importer=%s", pyxis.ImporterPath))
+	} else if pyxis.ContainerImageSave != "" && !(pyxis.UseSquashfuse != nil && *pyxis.UseSquashfuse) {
+		pyxisArgs = append(pyxisArgs, fmt.Sprintf("container_image_save=%s", pyxis.ContainerImageSave))
+	}
+	res.AddLine(strings.Join(pyxisArgs, " "))
 
 	{
 		opts := cluster.PlugStackConfig.NcclDebug.DeepCopy()

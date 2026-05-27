@@ -142,7 +142,7 @@ pushd "${jaildir}"
     echo "Bind-mount /etc/enroot, /usr/share/enroot and /usr/lib/enroot"
     mkdir -p etc/enroot usr/share/enroot usr/lib/enroot
     mkdir -p /etc/enroot/mounts.d
-    echo '/opt/slurm_scripts/task_prolog.sh' | sudo tee /etc/enroot/mounts.d/task_prolog.fstab
+    printf '%s\n' '/opt/slurm_scripts/task_prolog.sh /opt/slurm_scripts/task_prolog.sh none x-create=file,bind,ro,nosuid,nodev,private,nofail 0 0' | sudo tee /etc/enroot/mounts.d/task_prolog.fstab
     mount --rbind /etc/enroot etc/enroot
     mount --bind /usr/share/enroot usr/share/enroot
     mount --bind /usr/lib/enroot usr/lib/enroot
@@ -151,6 +151,20 @@ pushd "${jaildir}"
     for file in /usr/bin/enroot*; do
         filename=$(basename "$file")
         touch "usr/bin/$filename" && mount --bind "$file" "usr/bin/$filename"
+    done
+
+    echo "Bind-mount enroot FUSE helpers"
+    for file in \
+        /usr/bin/squashfuse \
+        /usr/bin/fuse-overlayfs \
+        /usr/bin/fusermount3 \
+        /lib/${ALT_ARCH}-linux-gnu/libfuse3.so.3 \
+        /usr/lib/${ALT_ARCH}-linux-gnu/libfuse3.so.3; do
+        if [ -e "$file" ]; then
+            target="${file#/}"
+            mkdir -p "$(dirname "$target")"
+            touch "$target" && mount --bind "$file" "$target"
+        fi
     done
 
     if ! getcap usr/bin/enroot-mksquashovlfs | grep -q 'cap_sys_admin+pe'; then

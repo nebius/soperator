@@ -106,7 +106,7 @@ type SlurmClusterSpec struct {
 	// PlugStackConfig represents the Plugin stack configurations in `plugstack.conf`.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ pyxis: { required: true, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" } }
+	// +kubebuilder:default={ pyxis: { required: true, useSquashfuse: false, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" } }
 	PlugStackConfig PlugStackConfig `json:"plugStackConfig,omitempty"`
 
 	// SConfigController defines the desired state of controller that watches after configs
@@ -214,7 +214,7 @@ type PlugStackConfig struct {
 	// Pyxis represents the 'Pyxis' SPANK plugin configuration.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ required: true, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }
+	// +kubebuilder:default={ required: true, useSquashfuse: false, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }
 	Pyxis PluginConfigPyxis `json:"pyxis,omitempty"`
 
 	// NcclDebug represents the 'NCCL Debug' SPANK plugin configuration.
@@ -238,6 +238,13 @@ type PluginConfigPyxis struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=true
 	Required *bool `json:"required,omitempty"`
+
+	// UseSquashfuse enables Pyxis to start importer-produced SquashFS images directly through squashfuse.
+	// When disabled, Pyxis still uses ImporterPath for image caching but lets Enroot create the runtime rootfs.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	UseSquashfuse *bool `json:"useSquashfuse,omitempty"`
 
 	// Path to the executable for pyxis importer extension.
 	// File should be available to execute for every user in Slurm.
@@ -1450,6 +1457,9 @@ func init() {
 func (p *PluginConfigPyxis) SetDefaults() {
 	if p.Required == nil {
 		p.Required = ptr.To(true)
+	}
+	if p.UseSquashfuse == nil {
+		p.UseSquashfuse = ptr.To(false)
 	}
 }
 
