@@ -67,6 +67,7 @@ func TestRenderNodeSetStatefulSet_SSSD(t *testing.T) {
 		SSHDConfigMapName:        "sshd-config",
 		GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
 		CustomInitContainers:     []corev1.Container{},
+		UpdateStrategy:           consts.UpdateStrategyRollingUpdate,
 	}
 
 	result, err := worker.RenderNodeSetStatefulSet("test-cluster", nodeSet, &slurmv1.Secrets{}, consts.CGroupV2, false, false)

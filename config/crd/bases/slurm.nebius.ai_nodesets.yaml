@@ -12066,6 +12066,13 @@ spec:
                       type: string
                   type: object
                 type: array
+              updateStrategy:
+                default: rollingUpdate
+                description: UpdateStrategy for the advanced StatefulSet
+                enum:
+                - rollingUpdate
+                - onDelete
+                type: string
               workerAnnotations:
                 additionalProperties:
                   type: string
@@ -12075,6 +12082,7 @@ spec:
             required:
             - munge
             - slurmd
+            - updateStrategy
             type: object
           status:
             description: NodeSetStatus defines the observed state of SlurmCluster

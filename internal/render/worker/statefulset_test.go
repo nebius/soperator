@@ -222,6 +222,7 @@ func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
 				SupervisorDConfigMapName: "supervisord-config",
 				SSHDConfigMapName:        "sshd-config",
 				GPU:                      &slurmv1alpha1.GPUSpec{Enabled: tt.nodeSetGPUEnabled},
+				UpdateStrategy:           consts.UpdateStrategyRollingUpdate,
 			}
 
 			result, err := worker.RenderNodeSetStatefulSet(
@@ -278,6 +279,7 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			GPU:                          &slurmv1alpha1.GPUSpec{Enabled: false},
 			EphemeralNodes:               ephemeralNodes,
 			EphemeralTopologyWaitTimeout: waitTimeout,
+			UpdateStrategy:               consts.UpdateStrategyRollingUpdate,
 		}
 	}
 
@@ -452,6 +454,7 @@ func TestRenderNodeSetStatefulSet_PersistentVolumeClaimRetentionPolicy(t *testin
 			SSHDConfigMapName:        "sshd-config",
 			GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
 			EphemeralNodes:           ephemeralNodes,
+			UpdateStrategy:           consts.UpdateStrategyRollingUpdate,
 		}
 	}
 
@@ -552,6 +555,7 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 			SupervisorDConfigMapName: "supervisord-config",
 			SSHDConfigMapName:        "sshd-config",
 			GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+			UpdateStrategy:           consts.UpdateStrategyRollingUpdate,
 		}
 	}
 
@@ -645,6 +649,7 @@ func TestRenderNodeSetStatefulSet_EphemeralNodesReserveOrdinals(t *testing.T) {
 			GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
 			EphemeralNodes:           &ephemeralNodes,
 			ActiveNodes:              activeNodes,
+			UpdateStrategy:           consts.UpdateStrategyRollingUpdate,
 		}
 	}
 
