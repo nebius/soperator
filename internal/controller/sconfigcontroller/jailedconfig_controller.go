@@ -681,8 +681,10 @@ func (r *JailedConfigReconciler) getNodesStartTime(ctx context.Context) (map[str
 
 		var skip bool
 		for _, state := range *node.State {
-			if state == v0041.V0041NodeStateNOTRESPONDING {
-				// Ignore NOT_RESPONDING nodes, since their start time doesn't change after reconfigure.
+			if state == v0041.V0041NodeStateNOTRESPONDING ||
+				state == v0041.V0041NodeStatePOWERINGDOWN ||
+				state == v0041.V0041NodeStatePOWEREDDOWN {
+				// Ignore NOT_RESPONDING, POWERING_DOWN and POWERED_DOWN nodes, since their start time doesn't change after reconfigure.
 				skip = true
 			}
 		}
