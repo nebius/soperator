@@ -36,12 +36,18 @@ RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
     /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
-# Install NCCL debug plugin
+# Install NCCL Debug SPANK plugin
 COPY images/common/spank-nccl-debug/src /usr/src/soperator/spank/nccld-debug
 COPY images/common/scripts/install_nccld_debug_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
     /opt/bin/install_nccld_debug_plugin.sh && \
     rm /opt/bin/install_nccld_debug_plugin.sh
+
+# Install NCCL Inspector PreConf SPANK plugin
+COPY images/common/scripts/install_spank_nccl_inspector_preconf.sh /opt/bin/
+RUN chmod +x /opt/bin/install_spank_nccl_inspector_preconf.sh && \
+    /opt/bin/install_spank_nccl_inspector_preconf.sh && \
+    rm /opt/bin/install_spank_nccl_inspector_preconf.sh
 
 # Install enroot
 COPY images/common/scripts/install_enroot.sh /opt/bin/
