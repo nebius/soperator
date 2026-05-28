@@ -71,7 +71,6 @@ import (
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=k8s.mariadb.com,resources=mariadbs,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=k8s.mariadb.com,resources=grants,verbs=get;list;watch;update;patch;delete;create
-//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=security-profiles-operator.x-k8s.io,resources=apparmorprofiles,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/status,verbs=get;update;patch
@@ -89,7 +88,6 @@ type SlurmClusterReconciler struct {
 	Service             *reconciler.ServiceReconciler
 	StatefulSet         *reconciler.StatefulSetReconciler
 	AdvancedStatefulSet *reconciler.AdvancedStatefulSetReconciler
-	DaemonSet           *reconciler.DaemonSetReconciler
 	ServiceAccount      *reconciler.ServiceAccountReconciler
 	Role                *reconciler.RoleReconciler
 	RoleBinding         *reconciler.RoleBindingReconciler
@@ -113,7 +111,6 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 		Service:             reconciler.NewServiceReconciler(r),
 		StatefulSet:         reconciler.NewStatefulSetReconciler(r),
 		AdvancedStatefulSet: reconciler.NewAdvancedStatefulSetReconciler(r),
-		DaemonSet:           reconciler.NewDaemonSetReconciler(r),
 		ServiceAccount:      reconciler.NewServiceAccountReconciler(r),
 		Role:                reconciler.NewRoleReconciler(r),
 		RoleBinding:         reconciler.NewRoleBindingReconciler(r),
