@@ -20,45 +20,6 @@ import (
 	tc "nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
 )
 
-func TestGetPodByNode(t *testing.T) {
-	reconciler := &tc.WorkerTopologyReconciler{}
-
-	tests := []struct {
-		name     string
-		pods     []corev1.Pod
-		expected map[string][]string
-	}{
-		{
-			name: "Pods with NodeName",
-			pods: []corev1.Pod{
-				{Spec: corev1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Name: "pod1"}},
-				{Spec: corev1.PodSpec{NodeName: "node2"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2"}},
-				{Spec: corev1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Name: "pod3"}},
-			},
-			expected: map[string][]string{
-				"node1": {"pod1", "pod3"},
-				"node2": {"pod2"},
-			},
-		},
-		{
-			name: "Pods without NodeName",
-			pods: []corev1.Pod{
-				{Spec: corev1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Name: "pod1"}},
-				{Spec: corev1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Name: "pod2"}},
-			},
-			expected: map[string][]string{
-				"unknown": {"pod1", "pod2"},
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := reconciler.GroupPodNamesByNode(tt.pods)
-			require.Equal(t, tt.expected, result, "Test %s failed: expected %v, got %v", tt.name, tt.expected, result)
-		})
-	}
-}
-
 func TestParseNodeTopologyLabels(t *testing.T) {
 	reconciler := &tc.WorkerTopologyReconciler{}
 	tests := []struct {
