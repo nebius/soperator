@@ -1,7 +1,7 @@
 {
   "name": "nvme_raid_health",
   "command": "./nvme_raid_health.sh",
-  "platforms": ["8xB300", "8xGB300"],
+  "platforms": ["8xB300", "4xGB300"],
   "skip_for_cpu_jobs": false,
   "skip_for_partial_gpu_jobs": false,
   "skip_for_reservation_prefixes": [],
