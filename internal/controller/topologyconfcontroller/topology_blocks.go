@@ -3,7 +3,6 @@ package topologyconfcontroller
 import (
 	"context"
 	"fmt"
-	"maps"
 	"strings"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -47,36 +46,50 @@ func (b TopologyBlocks) RenderConfigLines() []string {
 	return lines
 }
 
-// BuildTopologyBlocks groups worker pods by their "tier-0" node label into topology
-// blocks. Nodes without the label (or pods left without a labeled node) are assigned
-// to the synthetic "unknown" block so every pod is represented in the output.
+// BuildTopologyBlocks builds the block topology in two stages, mirroring BuildTopologyGraph.
+//
+// Stage 1 places every Slurm node from allNodeNames into the synthetic "unknown" block, keeping
+// the topology complete and stable regardless of pod lifecycle. Stage 2 overlays real blocks:
+// GPU pods scheduled to a K8s node carrying a "tier-0" label (gpuPodsByNode) are moved from
+// "unknown" into that block. Non-GPU nodes and unscheduled or unlabeled GPU nodes stay in
+// "unknown".
 func BuildTopologyBlocks(
-	ctx context.Context, labelsByNode map[string]NodeTopologyLabels, podsByNode map[string][]string,
+	ctx context.Context,
+	labelsByNode map[string]NodeTopologyLabels,
+	gpuPodsByNode map[string][]string,
+	allNodeNames []string,
 ) TopologyBlocks {
 	logger := log.FromContext(ctx).WithName(WorkerTopologyReconcilerName)
 	blocks := newTopologyBlocks()
-	podsByNode = maps.Clone(podsByNode)
+
+	// Stage 2: place scheduled GPU pods into their tier-0 block.
+	placed := make(map[string]struct{})
 	for node, labels := range labelsByNode {
+		workers := gpuPodsByNode[node]
+		if len(workers) == 0 {
+			continue
+		}
+
 		blockName, ok := labels["tier-0"]
 		if !ok {
+			// Pods fall back to the "unknown" block via stage 1.
 			logger.Error(nil, "missing tier-0 label for the block topology", "node", node)
 			continue
 		}
 
-		workers := podsByNode[node]
-		delete(podsByNode, node)
-
 		for _, worker := range workers {
 			blocks.AddNode(blockName, worker)
+			placed[worker] = struct{}{}
 		}
 	}
 
-	// Add rest of the pods for unknown blocks.
+	// Stage 1: every node not placed into a real block goes into "unknown".
 	const unknownBlockName = "unknown"
-	for _, pods := range podsByNode {
-		for _, worker := range pods {
-			blocks.AddNode(unknownBlockName, worker)
+	for _, name := range allNodeNames {
+		if _, ok := placed[name]; ok {
+			continue
 		}
+		blocks.AddNode(unknownBlockName, name)
 	}
 
 	return blocks
