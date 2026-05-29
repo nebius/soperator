@@ -24,9 +24,9 @@ swap space.
 
 
 ### Job Containers
-This solution supports (and pre-installs) Pyxis+enroot containerization plugin. Pulled images are stored on the "jail" 
-shared storage so users don't need to separately pull it on each node. Container filesystems are stored either on tmpfs 
-or node-local volumes.
+This solution supports (and pre-installs) Pyxis+enroot containerization plugin. Pulled images are stored on the "jail"
+shared storage so users don't need to separately pull it on each node. Direct startup from cached SquashFS images with
+an ephemeral overlay can be enabled through `plugStackConfig.pyxis.useSquashfuse`;
 
 
 ### Client Commands Auto-Completion

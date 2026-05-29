@@ -2,10 +2,13 @@
 
 set -e # Exit immediately if any command returns a non-zero error code
 
-ENROOT_VERSION=4.0.1
+ENROOT_VERSION=4.1.2
 
 apt-get update
-apt -y install enroot=${ENROOT_VERSION}-1 enroot+caps=${ENROOT_VERSION}-1
+apt -y install \
+    enroot=${ENROOT_VERSION}-1 \
+    enroot+caps=${ENROOT_VERSION}-1 \
+    squashfuse
 apt-get clean
 rm -rf /var/lib/apt/lists/*
 

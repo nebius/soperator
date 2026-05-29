@@ -26,6 +26,7 @@ RUN apt update && \
         strace \
         pciutils \
         rsync \
+        squashfuse \
         htop \
         hwloc \
         bsdmainutils \
@@ -128,4 +129,3 @@ COPY --from=untaped /jail_restic /jail_restic
 COPY images/jail/populate_jail_entrypoint.sh /opt/bin/
 RUN chmod +x /opt/bin/populate_jail_entrypoint.sh
 ENTRYPOINT ["/opt/bin/populate_jail_entrypoint.sh"]
-

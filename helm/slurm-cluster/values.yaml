@@ -157,6 +157,8 @@ mpiConfig:
 plugStackConfig:
   pyxis:
     required: true
+    # Direct SquashFS startup is opt-in. It requires Pyxis >= 0.24.0 and squashfuse in the jail.
+    useSquashfuse: false
     importerPath: /opt/slurm_scripts/pyxis_caching_importer.sh
   ncclDebug:
     required: false
