@@ -261,6 +261,15 @@ observability:
       remediation:
         retries: 3
         remediateLastFailure: true
+    tsaTokenSidecar:
+      enabled: true
+      image:
+        repository: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/alpine/curl
+        tag: "8.19.0"
+        pullPolicy: IfNotPresent
+      tokenMountPath: /mnt/imds
+      tokenFilePath: /mnt/imds/tsa-token
+      resources: {}
     values:
       dashboardNamespaces:
         - soperator

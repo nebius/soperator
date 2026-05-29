@@ -163,7 +163,7 @@ curl "http://localhost:8429/api/v1/query?query=up"
 
 #### Remote Write to Nebius Cloud
 - Endpoint: `https://write.monitoring.{region}.nebius.cloud/projects/{projectId}/buckets/soperator/prometheus`
-- Authentication: Bearer token from `/mnt/cloud-metadata/tsa-token`
+- Authentication: Bearer token from `/mnt/imds/tsa-token`, populated and refreshed by the vmagent IMDS token sidecar
 - When: Enabled with `publicEndpointEnabled: true`
 
 ### Visualization

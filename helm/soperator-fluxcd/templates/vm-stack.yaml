@@ -391,6 +391,31 @@ spec:
         spec:
           {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
           {{- $hasVmagentSpec := .Values.observability.vmStack.values.vmagent.spec }}
+          {{- $tsaTokenSidecar := .Values.observability.vmStack.tsaTokenSidecar | default dict }}
+          {{- $tsaTokenSidecarEnabled := true }}
+          {{- if hasKey $tsaTokenSidecar "enabled" }}
+          {{- $tsaTokenSidecarEnabled = $tsaTokenSidecar.enabled }}
+          {{- end }}
+          {{- $tsaTokenImage := $tsaTokenSidecar.image | default dict }}
+          {{- $tsaTokenImageRepository := required "observability.vmStack.tsaTokenSidecar.image.repository is required" $tsaTokenImage.repository }}
+          {{- $tsaTokenImageTag := required "observability.vmStack.tsaTokenSidecar.image.tag is required" $tsaTokenImage.tag }}
+          {{- $tsaTokenImagePullPolicy := required "observability.vmStack.tsaTokenSidecar.image.pullPolicy is required" $tsaTokenImage.pullPolicy }}
+          {{- $tsaTokenMountPath := required "observability.vmStack.tsaTokenSidecar.tokenMountPath is required" $tsaTokenSidecar.tokenMountPath }}
+          {{- $tsaTokenFilePath := required "observability.vmStack.tsaTokenSidecar.tokenFilePath is required" $tsaTokenSidecar.tokenFilePath }}
+          {{- $hasHostNetwork := and $hasVmagentSpec (hasKey $hasVmagentSpec "hostNetwork") }}
+          {{- $hasDnsPolicy := and $hasVmagentSpec (hasKey $hasVmagentSpec "dnsPolicy") }}
+
+          {{- if and $hasPublicEndpoint $tsaTokenSidecarEnabled }}
+          hostNetwork: true
+          dnsPolicy: {{ default "ClusterFirstWithHostNet" $hasVmagentSpec.dnsPolicy }}
+          {{- else }}
+          {{- if $hasHostNetwork }}
+          hostNetwork: {{ $hasVmagentSpec.hostNetwork }}
+          {{- end }}
+          {{- if $hasDnsPolicy }}
+          dnsPolicy: {{ $hasVmagentSpec.dnsPolicy }}
+          {{- end }}
+          {{- end }}
 
           {{- $hasExternalLabels := and $hasVmagentSpec $hasVmagentSpec.externalLabels }}
           {{- if and $hasExternalLabels (gt (len $hasExternalLabels) 0) }}
@@ -432,12 +457,53 @@ spec:
           {{- toYaml $hasVmagentSpec.remoteWrite | nindent 12 }}
           {{- end }}
 
+          {{- $hasContainers := and $hasVmagentSpec $hasVmagentSpec.containers }}
+          {{- $containersNotEmpty := and $hasContainers (gt (len $hasVmagentSpec.containers) 0) }}
+          {{- if or (and $hasPublicEndpoint $tsaTokenSidecarEnabled) $containersNotEmpty }}
+          containers:
+          {{- if and $hasPublicEndpoint $tsaTokenSidecarEnabled }}
+            - name: tsa-token-refresher
+              image: {{ printf "%s:%s" $tsaTokenImageRepository $tsaTokenImageTag | quote }}
+              imagePullPolicy: {{ $tsaTokenImagePullPolicy | quote }}
+              command:
+                - /bin/sh
+                - -ec
+                - |
+{{ .Files.Get "files/tsa-token-refresher.sh" | indent 18 }}
+              env:
+                - name: TSA_TOKEN_PATH
+                  value: {{ $tsaTokenFilePath | quote }}
+                {{- with $tsaTokenSidecar.expiryFilePath }}
+                - name: TSA_TOKEN_EXPIRY_PATH
+                  value: {{ . | quote }}
+                {{- end }}
+                {{- with $tsaTokenSidecar.imdsBaseUrl }}
+                - name: IMDS_BASE_URL
+                  value: {{ . | quote }}
+                {{- end }}
+                {{- with $tsaTokenSidecar.refreshSafetyMarginSeconds }}
+                - name: TSA_TOKEN_REFRESH_SAFETY_MARGIN_SECONDS
+                  value: {{ . | quote }}
+                {{- end }}
+              volumeMounts:
+                - name: cloud-metadata
+                  mountPath: {{ $tsaTokenMountPath | quote }}
+              {{- with $tsaTokenSidecar.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+          {{- end }}
+          {{- if $containersNotEmpty }}
+          {{- toYaml $hasVmagentSpec.containers | nindent 12 }}
+          {{- end }}
+          {{- end }}
+
           volumeMounts:
           {{- $hasVolumeMounts := and $hasVmagentSpec $hasVmagentSpec.volumeMounts }}
           {{- $volumeMountsNotEmpty := and $hasVolumeMounts (gt (len $hasVmagentSpec.volumeMounts) 0) }}
-          {{- if $hasPublicEndpoint }}
+          {{- if and $hasPublicEndpoint $tsaTokenSidecarEnabled }}
             - name: cloud-metadata
-              mountPath: /mnt/cloud-metadata
+              mountPath: {{ $tsaTokenMountPath | quote }}
               readOnly: true
           {{- if $volumeMountsNotEmpty }}
           {{- toYaml $hasVmagentSpec.volumeMounts | nindent 12 }}
@@ -449,11 +515,9 @@ spec:
           volumes:
           {{- $hasVolumes := and $hasVmagentSpec $hasVmagentSpec.volumes }}
           {{- $volumesNotEmpty := and $hasVolumes (gt (len $hasVmagentSpec.volumes) 0) }}
-          {{- if $hasPublicEndpoint }}
+          {{- if and $hasPublicEndpoint $tsaTokenSidecarEnabled }}
             - name: cloud-metadata
-              hostPath:
-                path: /mnt/cloud-metadata
-                type: Directory
+              emptyDir: {}
           {{- if $volumesNotEmpty }}
           {{- toYaml $hasVmagentSpec.volumes | nindent 12 }}
           {{- end }}
@@ -466,7 +530,9 @@ spec:
           {{- $extraArgsNotEmpty := and $hasExtraArgs (gt (len $hasVmagentSpec.extraArgs) 0) }}
           {{- if $hasPublicEndpoint }}
             remoteWrite.flushInterval: 2s
-            remoteWrite.bearerTokenFile: /mnt/cloud-metadata/tsa-token
+          {{- if $tsaTokenSidecarEnabled }}
+            remoteWrite.bearerTokenFile: {{ $tsaTokenFilePath | quote }}
+          {{- end }}
             remoteWrite.maxRowsPerBlock: "12000"
           {{- if $extraArgsNotEmpty }}
           {{- toYaml $hasVmagentSpec.extraArgs | nindent 12 }}
