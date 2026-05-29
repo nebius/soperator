@@ -17,13 +17,14 @@ func TestBuildTopologyBlocks_GroupsWorkersByTierZero(t *testing.T) {
 		"node2": {"tier-0": "block-a"},
 		"node3": {"tier-0": "block-b"},
 	}
-	podsByNode := map[string][]string{
+	gpuPodsByNode := map[string][]string{
 		"node1": {"pod1", "pod2"},
 		"node2": {"pod3"},
 		"node3": {"pod4"},
 	}
+	allNodeNames := []string{"pod1", "pod2", "pod3", "pod4"}
 
-	blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, podsByNode)
+	blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode, allNodeNames)
 	lines := blocks.RenderConfigLines()
 
 	require.True(t, len(lines) != 0, "expected non-empty block lines")
@@ -37,7 +38,7 @@ func TestBuildTopologyBlocks_GroupsWorkersByTierZero(t *testing.T) {
 		"node1": {"pod1", "pod2"},
 		"node2": {"pod3"},
 		"node3": {"pod4"},
-	}, podsByNode, "BuildTopologyBlocks must not mutate the input podsByNode map")
+	}, gpuPodsByNode, "BuildTopologyBlocks must not mutate the input gpuPodsByNode map")
 }
 
 func TestBuildTopologyBlocks_AssignsUnknownBlock(t *testing.T) {
@@ -45,13 +46,14 @@ func TestBuildTopologyBlocks_AssignsUnknownBlock(t *testing.T) {
 		"node1": {"tier-0": "block-a"},
 		"node2": {}, // missing tier-0 label
 	}
-	podsByNode := map[string][]string{
+	gpuPodsByNode := map[string][]string{
 		"node1": {"pod1"},
-		"node2": {"pod2"},
-		"node3": {"pod3"}, // node without labels entry
+		"node2": {"pod2"}, // labeled node without tier-0 -> unknown
 	}
+	// pod3 is a node with no scheduled GPU pod (e.g. powered down or CPU) -> unknown.
+	allNodeNames := []string{"pod1", "pod2", "pod3"}
 
-	blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, podsByNode)
+	blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode, allNodeNames)
 	result := parseBlockLines(t, blocks.RenderConfigLines())
 
 	require.Equal(t, map[string][]string{
@@ -61,7 +63,7 @@ func TestBuildTopologyBlocks_AssignsUnknownBlock(t *testing.T) {
 }
 
 func TestBuildTopologyBlocks_RenderEmpty(t *testing.T) {
-	blocks := tc.BuildTopologyBlocks(context.Background(), map[string]tc.NodeTopologyLabels{}, map[string][]string{})
+	blocks := tc.BuildTopologyBlocks(context.Background(), map[string]tc.NodeTopologyLabels{}, map[string][]string{}, nil)
 	require.Nil(t, blocks.RenderConfigLines())
 }
 

@@ -3804,6 +3804,14 @@ spec:
                     description: Defines specific file to run the prolog when job
                       starts. Default value is no prolog
                     type: string
+                  suspendTime:
+                    default: -1
+                    description: |-
+                      SuspendTime is the idle time in seconds after which ephemeral (CLOUD) nodes become eligible
+                      for automatic power down. A negative value (the default, -1) disables automatic power down.
+                      Automatic power up is unaffected by this setting.
+                    format: int32
+                    type: integer
                   taskPluginParam:
                     default: ""
                     description: Additional parameters for the task plugin

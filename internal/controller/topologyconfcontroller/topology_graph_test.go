@@ -11,10 +11,11 @@ import (
 
 func TestRenderTopologyConfig(t *testing.T) {
 	tests := []struct {
-		name         string
-		labelsByNode map[string]tc.NodeTopologyLabels
-		podsByNode   map[string][]string
-		expected     []string
+		name          string
+		labelsByNode  map[string]tc.NodeTopologyLabels
+		gpuPodsByNode map[string][]string
+		allNodeNames  []string
+		expected      []string
 	}{
 		{
 			name: "With root node - combined tier1 and higher tiers",
@@ -23,12 +24,12 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node2": {"tier-1": "switch2", "tier-2": "spine2"},
 				"node3": {"tier-1": "switch1", "tier-2": "spine3"},
 			},
-			podsByNode: map[string][]string{
+			gpuPodsByNode: map[string][]string{
 				"node1": {"pod1", "pod2"},
 				"node2": {"pod3"},
 				"node3": {"pod4"},
-				"":      {"pod5", "pod6"},
 			},
+			allNodeNames: []string{"pod1", "pod2", "pod3", "pod4", "pod5", "pod6"},
 			expected: []string{
 				"SwitchName=root Switches=spine1,spine2,spine3,unknown",
 				"SwitchName=spine1 Switches=switch1",
@@ -46,12 +47,12 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node2": {"tier-0": "block0", "tier-1": "switch2", "tier-2": "spine2"},
 				"node3": {"tier-0": "block0", "tier-1": "switch1", "tier-2": "spine3"},
 			},
-			podsByNode: map[string][]string{
+			gpuPodsByNode: map[string][]string{
 				"node1": {"pod1", "pod2"},
 				"node2": {"pod3"},
 				"node3": {"pod4"},
-				"":      {"pod5", "pod6"},
 			},
+			allNodeNames: []string{"pod1", "pod2", "pod3", "pod4", "pod5", "pod6"},
 			expected: []string{
 				"SwitchName=root Switches=spine1,spine2,spine3,unknown",
 				"SwitchName=spine1 Switches=switch1",
@@ -63,17 +64,18 @@ func TestRenderTopologyConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "Without root node - combined tier1 and higher tiers",
+			name: "Without unknown - all nodes placed on switches",
 			labelsByNode: map[string]tc.NodeTopologyLabels{
 				"node1": {"tier-1": "switch1", "tier-2": "spine1"},
 				"node2": {"tier-1": "switch2", "tier-2": "spine2"},
 				"node3": {"tier-1": "switch1", "tier-2": "spine3"},
 			},
-			podsByNode: map[string][]string{
+			gpuPodsByNode: map[string][]string{
 				"node1": {"pod1", "pod2"},
 				"node2": {"pod3"},
 				"node3": {"pod4"},
 			},
+			allNodeNames: []string{"pod1", "pod2", "pod3", "pod4"},
 			expected: []string{
 				"SwitchName=root Switches=spine1,spine2,spine3",
 				"SwitchName=spine1 Switches=switch1",
@@ -91,12 +93,13 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node3": {"tier-1": "switch2", "tier-2": "leaf2", "tier-3": "spine1"},
 				"node4": {"tier-1": "switch3", "tier-2": "leaf3", "tier-3": "spine3"},
 			},
-			podsByNode: map[string][]string{
+			gpuPodsByNode: map[string][]string{
 				"node1": {"node1"},
 				"node2": {"node2"},
 				"node3": {"node3"},
 				"node4": {"node4"},
 			},
+			allNodeNames: []string{"node1", "node2", "node3", "node4"},
 			expected: []string{
 				"SwitchName=root Switches=spine1,spine3",
 				"SwitchName=leaf1 Switches=switch0,switch1",
@@ -116,10 +119,11 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node1": {"tier-1": "switch1"},
 				"node2": {"tier-1": "switch2"},
 			},
-			podsByNode: map[string][]string{
+			gpuPodsByNode: map[string][]string{
 				"node1": {"node1"},
 				"node2": {"node2"},
 			},
+			allNodeNames: []string{"node1", "node2"},
 			expected: []string{
 				"SwitchName=root Switches=switch1,switch2",
 				"SwitchName=switch1 Nodes=node1",
@@ -127,10 +131,23 @@ func TestRenderTopologyConfig(t *testing.T) {
 			},
 		},
 		{
-			name:         "Empty topology",
-			labelsByNode: map[string]tc.NodeTopologyLabels{},
-			podsByNode:   map[string][]string{},
-			expected:     []string{},
+			name:          "Empty topology",
+			labelsByNode:  map[string]tc.NodeTopologyLabels{},
+			gpuPodsByNode: map[string][]string{},
+			allNodeNames:  nil,
+			expected:      []string{},
+		},
+		{
+			name: "All nodes powered down - present under unknown",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-1": "switch1", "tier-2": "spine1"},
+			},
+			gpuPodsByNode: map[string][]string{},
+			allNodeNames:  []string{"gpu-0", "gpu-1", "cpu-0"},
+			expected: []string{
+				"SwitchName=root Switches=unknown",
+				"SwitchName=unknown Nodes=cpu-0,gpu-0,gpu-1",
+			},
 		},
 		{
 			name: "Two tier topology",
@@ -139,11 +156,12 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node2": {"tier-1": "switch2", "tier-2": "spine1"},
 				"node3": {"tier-1": "switch3", "tier-2": "spine2"},
 			},
-			podsByNode: map[string][]string{
+			gpuPodsByNode: map[string][]string{
 				"node1": {"node1"},
 				"node2": {"node2"},
 				"node3": {"node3"},
 			},
+			allNodeNames: []string{"node1", "node2", "node3"},
 			expected: []string{
 				"SwitchName=root Switches=spine1,spine2",
 				"SwitchName=spine1 Switches=switch1,switch2",
@@ -160,11 +178,12 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node2": {"tier-1": "switch2", "tier-2": "leaf1", "tier-3": "spine1", "tier-4": "core1"},
 				"node3": {"tier-1": "switch3", "tier-2": "leaf2", "tier-3": "spine2", "tier-4": "core2"},
 			},
-			podsByNode: map[string][]string{
+			gpuPodsByNode: map[string][]string{
 				"node1": {"node1"},
 				"node2": {"node2"},
 				"node3": {"node3"},
 			},
+			allNodeNames: []string{"node1", "node2", "node3"},
 			expected: []string{
 				"SwitchName=root Switches=core1,core2",
 				"SwitchName=core1 Switches=spine1",
@@ -186,12 +205,13 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node3": {"tier-1": "switch3"},
 				"node4": {"tier-2": "leaf2", "tier-3": "spine2"},
 			},
-			podsByNode: map[string][]string{
+			gpuPodsByNode: map[string][]string{
 				"node1": {"node1"},
 				"node2": {"node2"},
 				"node3": {"node3"},
 				"node4": {"node4"},
 			},
+			allNodeNames: []string{"node1", "node2", "node3", "node4"},
 			expected: []string{
 				"SwitchName=root Switches=spine1,switch3,unknown",
 				"SwitchName=leaf1 Switches=switch1,switch2",
@@ -209,11 +229,12 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node2": {"tier-1": "switch1", "tier-2": "leaf1"},
 				"node3": {"tier-1": "switch2", "tier-2": "leaf1"},
 			},
-			podsByNode: map[string][]string{
+			gpuPodsByNode: map[string][]string{
 				"node1": {"node1"},
 				"node2": {"node2"},
 				"node3": {"node3"},
 			},
+			allNodeNames: []string{"node1", "node2", "node3"},
 			expected: []string{
 				"SwitchName=root Switches=leaf1",
 				"SwitchName=leaf1 Switches=switch1,switch2",
@@ -230,13 +251,14 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node4": {"tier-1": "switch4", "tier-2": "leaf1"},
 				"node5": {"tier-1": "switch5", "tier-2": "leaf2"},
 			},
-			podsByNode: map[string][]string{
+			gpuPodsByNode: map[string][]string{
 				"node1": {"node1"},
 				"node2": {"node2"},
 				"node3": {"node3"},
 				"node4": {"node4"},
 				"node5": {"node5"},
 			},
+			allNodeNames: []string{"node1", "node2", "node3", "node4", "node5"},
 			expected: []string{
 				"SwitchName=root Switches=leaf1,leaf2,leaf3",
 				"SwitchName=leaf1 Switches=switch1,switch4",
@@ -255,10 +277,11 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node1": {"tier-1": "", "tier-2": "leaf1"},
 				"node2": {"tier-1": "switch1", "tier-2": ""},
 			},
-			podsByNode: map[string][]string{
+			gpuPodsByNode: map[string][]string{
 				"node1": {"node1"},
 				"node2": {"node2"},
 			},
+			allNodeNames: []string{"node1", "node2"},
 			expected: []string{
 				"SwitchName=root Switches=unknown",
 				"SwitchName=unknown Nodes=node1,node2",
@@ -269,9 +292,10 @@ func TestRenderTopologyConfig(t *testing.T) {
 			labelsByNode: map[string]tc.NodeTopologyLabels{
 				"node1": {"tier-1": "switch1", "tier-2": "leaf1", "tier-3": "spine1"},
 			},
-			podsByNode: map[string][]string{
+			gpuPodsByNode: map[string][]string{
 				"node1": {"node1"},
 			},
+			allNodeNames: []string{"node1"},
 			expected: []string{
 				"SwitchName=root Switches=spine1",
 				"SwitchName=leaf1 Switches=switch1",
@@ -286,11 +310,12 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node2": {"tier-1": "a-switch", "tier-2": "a-leaf"},
 				"node3": {"tier-1": "m-switch", "tier-2": "m-leaf"},
 			},
-			podsByNode: map[string][]string{
+			gpuPodsByNode: map[string][]string{
 				"node1": {"node1"},
 				"node2": {"node2"},
 				"node3": {"node3"},
 			},
+			allNodeNames: []string{"node1", "node2", "node3"},
 			expected: []string{
 				"SwitchName=root Switches=a-leaf,m-leaf,z-leaf",
 				"SwitchName=a-leaf Switches=a-switch",
@@ -307,11 +332,11 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node1": {"tier-1": "switch1", "tier-2": "spine1"},
 				"node2": {"tier-1": "switch2", "tier-2": "spine1"},
 			},
-			podsByNode: map[string][]string{
+			gpuPodsByNode: map[string][]string{
 				"node1": {"pod1", "pod2", "pod3"},
 				"node2": {"pod4", "pod5"},
-				"":      {"pod6"},
 			},
+			allNodeNames: []string{"pod1", "pod2", "pod3", "pod4", "pod5", "pod6"},
 			expected: []string{
 				"SwitchName=root Switches=spine1,unknown",
 				"SwitchName=spine1 Switches=switch1,switch2",
@@ -327,11 +352,12 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"node2": {"tier-1": "leaf-B", "tier-2": "spine-X"},
 				"node3": {"tier-1": "leaf-C", "tier-2": "spine-X"}, // This node has no pods!
 			},
-			podsByNode: map[string][]string{
+			gpuPodsByNode: map[string][]string{
 				"node1": {"worker-1"},
 				"node2": {"worker-2"},
 				// "node3" is missing - this should not create invalid topology
 			},
+			allNodeNames: []string{"worker-1", "worker-2"},
 			expected: []string{
 				// This is what SHOULD be generated (without leaf-C):
 				"SwitchName=root Switches=spine-X",
@@ -344,7 +370,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			graph := tc.BuildTopologyGraph(context.Background(), tt.labelsByNode, tt.podsByNode)
+			graph := tc.BuildTopologyGraph(context.Background(), tt.labelsByNode, tt.gpuPodsByNode, tt.allNodeNames)
 			result := graph.RenderConfigLines()
 			require.ElementsMatch(t, tt.expected, result)
 		})
