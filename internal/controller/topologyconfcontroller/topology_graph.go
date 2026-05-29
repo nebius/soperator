@@ -3,7 +3,6 @@ package topologyconfcontroller
 import (
 	"context"
 	"fmt"
-	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -110,44 +109,55 @@ func (g TopologyGraph) RenderConfigLines() []string {
 	return lines
 }
 
-// BuildTopologyGraph constructs a single tree topology from node labels and pod assignments.
-// Only nodes with actual pod assignments create topology edges - nodes with labels but no
-// pods are ignored to prevent "invalid child" errors in Slurm.
+// BuildTopologyGraph constructs a single tree topology in two stages.
+//
+// Stage 1 places every Slurm node from allNodeNames under the synthetic "unknown" switch, so the
+// topology stays complete and stable regardless of pod lifecycle (powered-down ephemeral nodes
+// included). Stage 2 overlays IB switches: GPU pods that are scheduled to a labeled K8s node
+// (gpuPodsByNode) are moved from "unknown" onto their real switch path. Non-GPU nodes and
+// unscheduled or unlabeled GPU nodes stay under "unknown".
 //
 // The tree construction ensures strong connectivity required for Slurm job scheduling.
 func BuildTopologyGraph(
-	ctx context.Context, labelsByNode map[string]NodeTopologyLabels, podsByNode map[string][]string,
+	ctx context.Context,
+	labelsByNode map[string]NodeTopologyLabels,
+	gpuPodsByNode map[string][]string,
+	allNodeNames []string,
 ) TopologyGraph {
 	logger := log.FromContext(ctx).WithName(WorkerTopologyReconcilerName)
 	graph := newTopologyGraph()
-	podsByNode = maps.Clone(podsByNode)
+
+	// Stage 2: place scheduled GPU pods onto their IB switch path.
+	placed := make(map[string]struct{})
 	for node, labels := range labelsByNode {
+		workers := gpuPodsByNode[node]
+		if len(workers) == 0 {
+			continue
+		}
+
 		pathToRoot, err := labelsToPath(labels)
 		if err != nil {
+			// Pods fall back to the "unknown" switch via stage 1.
 			logger.Error(err, "Invalid node topology labels", "node", node, "labels", labels)
 			continue
 		}
 
-		workers := podsByNode[node]
-		delete(podsByNode, node)
-
-		// Only create topology edges if this node has workers
-		if len(workers) > 0 {
-			for _, worker := range workers {
-				graph.AddEdge(pathToRoot[0], worker)
-			}
-			for i := range len(pathToRoot) - 1 {
-				graph.AddEdge(pathToRoot[i+1], pathToRoot[i])
-			}
+		for _, worker := range workers {
+			graph.AddEdge(pathToRoot[0], worker)
+			placed[worker] = struct{}{}
+		}
+		for i := range len(pathToRoot) - 1 {
+			graph.AddEdge(pathToRoot[i+1], pathToRoot[i])
 		}
 	}
 
-	// Add rest of the pods for unknown nodes.
+	// Stage 1: every node not placed on a real switch goes under "unknown".
 	const unknownSwitchName = "unknown"
-	for _, pods := range podsByNode {
-		for _, worker := range pods {
-			graph.AddEdge(unknownSwitchName, worker)
+	for _, name := range allNodeNames {
+		if _, ok := placed[name]; ok {
+			continue
 		}
+		graph.AddEdge(unknownSwitchName, name)
 	}
 
 	// Ensure all top-level switches are under a single root

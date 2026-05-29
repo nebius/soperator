@@ -270,21 +270,63 @@ func (r *WorkerTopologyReconciler) buildNodeSetTopologyConfig(
 		return "", fmt.Errorf("get node topology labels config map: %w", err)
 	}
 
-	pods, err := r.CollectWorkerPods(ctx, nodeSetList, slurmCluster.Name, namespace)
+	allNodeNames := collectAllNodeNames(nodeSetList)
+
+	gpuPodsByNode, err := r.collectScheduledGPUPodsByNode(ctx, nodeSetList, slurmCluster.Name, namespace)
 	if err != nil {
-		return "", fmt.Errorf("collect worker pods: %w", err)
+		return "", fmt.Errorf("collect scheduled GPU pods: %w", err)
 	}
-	podsByNode := r.GroupPodNamesByNode(pods)
 
 	if slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyBlock {
 		var blockSize *int
 		if slurmCluster.Spec.Topology != nil {
 			blockSize = slurmCluster.Spec.Topology.BlockSize
 		}
-		return r.BuildTopologyBlocks(ctx, blockSize, nodeTopologyCM, podsByNode)
+		return r.BuildTopologyBlocks(ctx, blockSize, nodeTopologyCM, gpuPodsByNode, allNodeNames)
 	}
 
-	return r.BuildTopologyConfig(ctx, nodeTopologyCM, podsByNode)
+	return r.BuildTopologyConfig(ctx, nodeTopologyCM, gpuPodsByNode, allNodeNames)
+}
+
+// collectAllNodeNames returns every Slurm node name derived from the NodeSets' replica ranges,
+// including powered-down ephemeral nodes that currently have no pod. Stage 1 of topology building
+// relies on this complete list to keep topology.conf stable across pod lifecycle changes.
+func collectAllNodeNames(nodeSetList []v1alpha1.NodeSet) []string {
+	var names []string
+	for _, nodeSet := range nodeSetList {
+		for i := int32(0); i < nodeSet.Spec.Replicas; i++ {
+			names = append(names, fmt.Sprintf("%s-%d", nodeSet.Name, i))
+		}
+	}
+	return names
+}
+
+// collectScheduledGPUPodsByNode returns pods of GPU-enabled NodeSets that are scheduled to a K8s
+// node (Spec.NodeName set, not necessarily Running), grouped by K8s node name. These are the only
+// pods that get placed onto a real IB switch in stage 2 of topology building.
+func (r *WorkerTopologyReconciler) collectScheduledGPUPodsByNode(
+	ctx context.Context, nodeSetList []v1alpha1.NodeSet, slurmClusterName, namespace string,
+) (map[string][]string, error) {
+	var gpuNodeSets []v1alpha1.NodeSet
+	for _, nodeSet := range nodeSetList {
+		if nodeSet.Spec.GPU.Enabled {
+			gpuNodeSets = append(gpuNodeSets, nodeSet)
+		}
+	}
+
+	pods, err := r.CollectWorkerPods(ctx, gpuNodeSets, slurmClusterName, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("collect GPU worker pods: %w", err)
+	}
+
+	podsByNode := make(map[string][]string)
+	for _, pod := range pods {
+		if pod.Spec.NodeName == "" {
+			continue
+		}
+		podsByNode[pod.Spec.NodeName] = append(podsByNode[pod.Spec.NodeName], pod.Name)
+	}
+	return podsByNode, nil
 }
 
 // getNodeTopologyLabelsConfigMap retrieves the ConfigMap containing node topology labels, which is used for building the topology config.
@@ -351,21 +393,13 @@ func (r *WorkerTopologyReconciler) listPods(
 	return podList, nil
 }
 
-// GroupPodNamesByNode organizes pods by their node name.
-func (r *WorkerTopologyReconciler) GroupPodNamesByNode(pods []corev1.Pod) map[string][]string {
-	podsByNode := make(map[string][]string, len(pods))
-	for _, pod := range pods {
-		if pod.Spec.NodeName == "" {
-			pod.Spec.NodeName = "unknown"
-		}
-		podsByNode[pod.Spec.NodeName] = append(podsByNode[pod.Spec.NodeName], pod.Name)
-	}
-	return podsByNode
-}
-
 // BuildTopologyBlocks builds topology config.
 func (r *WorkerTopologyReconciler) BuildTopologyBlocks(
-	ctx context.Context, blockSize *int, topologyNodeLabelsCM *corev1.ConfigMap, podsByNode map[string][]string,
+	ctx context.Context,
+	blockSize *int,
+	topologyNodeLabelsCM *corev1.ConfigMap,
+	gpuPodsByNode map[string][]string,
+	allNodeNames []string,
 ) (string, error) {
 	bs := defBlockSize
 	if blockSize != nil {
@@ -376,7 +410,7 @@ func (r *WorkerTopologyReconciler) BuildTopologyBlocks(
 	if err != nil {
 		return "", fmt.Errorf("deserialize node block topology: %w", err)
 	}
-	blocks := BuildTopologyBlocks(ctx, labelsByNode, podsByNode)
+	blocks := BuildTopologyBlocks(ctx, labelsByNode, gpuPodsByNode, allNodeNames)
 	config := strings.Join(blocks.RenderConfigLines(), "\n") + "\n"
 	config = fmt.Sprintf("%sBlockSizes=%d\n", config, bs)
 	return config, nil
@@ -384,13 +418,16 @@ func (r *WorkerTopologyReconciler) BuildTopologyBlocks(
 
 // BuildTopologyConfig builds topology config.
 func (r *WorkerTopologyReconciler) BuildTopologyConfig(
-	ctx context.Context, topologyNodeLabelsCM *corev1.ConfigMap, podsByNode map[string][]string,
+	ctx context.Context,
+	topologyNodeLabelsCM *corev1.ConfigMap,
+	gpuPodsByNode map[string][]string,
+	allNodeNames []string,
 ) (string, error) {
 	labelsByNode, err := r.ParseNodeTopologyLabels(topologyNodeLabelsCM.Data)
 	if err != nil {
 		return "", fmt.Errorf("deserialize node tree topology: %w", err)
 	}
-	graph := BuildTopologyGraph(ctx, labelsByNode, podsByNode)
+	graph := BuildTopologyGraph(ctx, labelsByNode, gpuPodsByNode, allNodeNames)
 	config := strings.Join(graph.RenderConfigLines(), "\n") + "\n"
 	return config, nil
 }
