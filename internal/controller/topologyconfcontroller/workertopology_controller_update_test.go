@@ -162,7 +162,7 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			err := reconciler.updateTopologyConfigMap(ctx, namespace, "new-topology-config")
+			err := reconciler.updateTopologyConfigMap(ctx, namespace, consts.ConfigMapNameTopologyConfig, "new-topology-config", "test-cluster")
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -209,7 +209,7 @@ func TestWorkerTopologyReconciler_renderTopologyConfigMap(t *testing.T) {
 	namespace := "test-namespace"
 	config := "SwitchName=root"
 
-	cm := r.renderTopologyConfigMap(namespace, config)
+	cm := r.renderTopologyConfigMap(namespace, consts.ConfigMapNameTopologyConfig, config)
 
 	assert.Equal(t, consts.ConfigMapNameTopologyConfig, cm.Name)
 	assert.Equal(t, namespace, cm.Namespace)

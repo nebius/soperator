@@ -20,6 +20,7 @@ type SlurmController struct {
 
 	Service     Service
 	StatefulSet StatefulSet
+	DaemonSet   DaemonSet
 
 	VolumeSpool             slurmv1.NodeVolume
 	VolumeJail              slurmv1.NodeVolume
@@ -35,13 +36,17 @@ type SlurmController struct {
 	OpenMetrics slurmv1.OpenMetrics
 }
 
-func buildSlurmControllerFrom(clusterName string, maintenance *consts.MaintenanceMode, controller *slurmv1.SlurmNodeController) SlurmController {
+func buildSlurmControllerFrom(clusterName, namePrefix string, maintenance *consts.MaintenanceMode, controller *slurmv1.SlurmNodeController) SlurmController {
 	// Controller always has 1 replica
 	statefulSet := buildStatefulSetWithMaxUnavailableFrom(
-		naming.BuildStatefulSetName(consts.ComponentTypeController),
+		naming.BuildStatefulSetName(consts.ComponentTypeController, namePrefix),
 		consts.SingleReplicas,
 		nil,
 		nil,
+	)
+
+	daemonSet := buildDaemonSetFrom(
+		naming.BuildDaemonSetName(consts.ComponentTypeController, namePrefix),
 	)
 
 	sssdConfSecretName := controller.SSSDConfSecretRefName
@@ -67,6 +72,7 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 		IsSSSDSecretDefault:     isSSSDSecretDefault,
 		Service:                 buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeController, clusterName)),
 		StatefulSet:             statefulSet,
+		DaemonSet:               daemonSet,
 		VolumeSpool:             *controller.Volumes.Spool.DeepCopy(),
 		VolumeJail:              *controller.Volumes.Jail.DeepCopy(),
 		Maintenance:             maintenance,

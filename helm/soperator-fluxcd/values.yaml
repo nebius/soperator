@@ -460,6 +460,7 @@ slurmCluster:
     mode: warn
 nodesets:
   enabled: false
+  clusterName: ""
   driftDetection:
     mode: warn
   interval: 5m
