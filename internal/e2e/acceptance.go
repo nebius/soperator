@@ -10,6 +10,7 @@ import (
 
 func RunAcceptance(ctx context.Context, cfg Config) error {
 	state := &framework.ClusterState{
+		SlurmClusterName: cfg.SlurmClusterName,
 		WorkersByNodeSet: make(map[string][]framework.WorkerPodRef),
 	}
 	for _, nodeSet := range cfg.Profile.NodeSets {

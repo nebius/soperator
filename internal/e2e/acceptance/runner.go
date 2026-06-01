@@ -117,10 +117,10 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 	if _, err := w.RunWithDefaultRetry(ctx, "kubectl", "get", "pods", "-n", soperatorNamespace); err != nil {
 		return err
 	}
-	if err := verifyPodReady(ctx, w, soperatorNamespace, "login-0"); err != nil {
+	if err := verifyPodReady(ctx, w, soperatorNamespace, state.SlurmClusterName+"-login-0"); err != nil {
 		return fmt.Errorf("verify login pod: %w", err)
 	}
-	if err := verifyPodReady(ctx, w, soperatorNamespace, "controller-0"); err != nil {
+	if err := verifyPodReady(ctx, w, soperatorNamespace, state.SlurmClusterName+"-controller-0"); err != nil {
 		return fmt.Errorf("verify controller pod: %w", err)
 	}
 	if _, err := w.Controller().RunWithDefaultRetry(ctx, "true"); err != nil {
@@ -182,8 +182,8 @@ func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
 	steps.NewInternalSSH(w, slurm).Register(sc)
 	steps.NewPackageInstallation(w, slurm).Register(sc)
 	steps.NewNodeReplacement(w, slurm).Register(sc)
-	steps.NewDockerContainers(w, slurm).Register(sc)
-	steps.NewEnrootContainers(w, slurm).Register(sc)
+	steps.NewDockerContainers(w, slurm, r.state.SlurmClusterName).Register(sc)
+	steps.NewEnrootContainers(w, slurm, r.state.SlurmClusterName).Register(sc)
 	steps.NewTopology(r.state, w).Register(sc)
 
 	registerSkipHook(sc)
