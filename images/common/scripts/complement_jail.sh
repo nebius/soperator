@@ -153,19 +153,6 @@ pushd "${jaildir}"
         touch "usr/bin/$filename" && mount --bind "$file" "usr/bin/$filename"
     done
 
-    echo "Bind-mount enroot FUSE helpers"
-    for file in \
-        /usr/bin/squashfuse \
-        /usr/bin/fusermount3 \
-        /lib/${ALT_ARCH}-linux-gnu/libfuse3.so.3 \
-        /usr/lib/${ALT_ARCH}-linux-gnu/libfuse3.so.3; do
-        if [ -e "$file" ]; then
-            target="${file#/}"
-            mkdir -p "$(dirname "$target")"
-            touch "$target" && mount --bind "$file" "$target"
-        fi
-    done
-
     if ! getcap usr/bin/enroot-mksquashovlfs | grep -q 'cap_sys_admin+pe'; then
         echo "Set capabilities for enroot-mksquashovlfs to run containers without privileges"
         flock etc/complement_jail_setcap_enroot_mksquashovlfs.lock -c "setcap cap_sys_admin+pe usr/bin/enroot-mksquashovlfs"

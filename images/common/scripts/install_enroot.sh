@@ -7,8 +7,7 @@ ENROOT_VERSION=4.1.2
 apt-get update
 apt -y install \
     enroot=${ENROOT_VERSION}-1 \
-    enroot+caps=${ENROOT_VERSION}-1 \
-    squashfuse
+    enroot+caps=${ENROOT_VERSION}-1
 apt-get clean
 rm -rf /var/lib/apt/lists/*
 

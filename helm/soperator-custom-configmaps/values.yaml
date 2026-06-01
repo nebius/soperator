@@ -1,5 +1,10 @@
 namespace: soperator
 
+enroot:
+  # Store Enroot cache/data/runtime under the node tmpfs path.
+  # This must be enabled together with plugStackConfig.pyxis.useSquashfuse.
+  useTmpfsStorage: false
+
 configMaps:
   supervisord:
     enabled: true

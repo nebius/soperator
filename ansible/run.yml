@@ -23,6 +23,7 @@
     - repos
     - python
     - common-packages
+    - squashfuse
     - cuda
     - cuda-samples
     - nccl-tests
