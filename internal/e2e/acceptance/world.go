@@ -113,11 +113,11 @@ type controllerScope struct {
 }
 
 func (s controllerScope) Run(ctx context.Context, command string) (string, error) {
-	return s.world.Run(ctx, "kubectl", "exec", "-n", soperatorNamespace, "controller-0", "--", "bash", "-lc", command)
+	return s.world.Run(ctx, "kubectl", "exec", "-n", soperatorNamespace, s.world.state.SlurmClusterName+"-controller-0", "--", "bash", "-lc", command)
 }
 
 func (s controllerScope) RunWithRetry(ctx context.Context, command string, attempts int, delay time.Duration) (string, error) {
-	return s.world.RunWithRetry(ctx, attempts, delay, "kubectl", "exec", "-n", soperatorNamespace, "controller-0", "--", "bash", "-lc", command)
+	return s.world.RunWithRetry(ctx, attempts, delay, "kubectl", "exec", "-n", soperatorNamespace, s.world.state.SlurmClusterName+"-controller-0", "--", "bash", "-lc", command)
 }
 
 func (s controllerScope) RunWithDefaultRetry(ctx context.Context, command string) (string, error) {
@@ -129,11 +129,11 @@ type jailScope struct {
 }
 
 func (s jailScope) Run(ctx context.Context, command string) (string, error) {
-	return s.world.Run(ctx, "kubectl", "exec", "-n", soperatorNamespace, "login-0", "--", "chroot", "/mnt/jail", "bash", "-lc", command)
+	return s.world.Run(ctx, "kubectl", "exec", "-n", soperatorNamespace, s.world.state.SlurmClusterName+"-login-0", "--", "chroot", "/mnt/jail", "bash", "-lc", command)
 }
 
 func (s jailScope) RunWithRetry(ctx context.Context, command string, attempts int, delay time.Duration) (string, error) {
-	return s.world.RunWithRetry(ctx, attempts, delay, "kubectl", "exec", "-n", soperatorNamespace, "login-0", "--", "chroot", "/mnt/jail", "bash", "-lc", command)
+	return s.world.RunWithRetry(ctx, attempts, delay, "kubectl", "exec", "-n", soperatorNamespace, s.world.state.SlurmClusterName+"-login-0", "--", "chroot", "/mnt/jail", "bash", "-lc", command)
 }
 
 func (s jailScope) RunWithDefaultRetry(ctx context.Context, command string) (string, error) {

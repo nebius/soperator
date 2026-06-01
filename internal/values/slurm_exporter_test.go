@@ -23,7 +23,7 @@ func Test_BuildSlurmExporterFrom(t *testing.T) {
 		AccountingJobsLookback: prometheusv1.Duration("30m"),
 	}
 
-	result := buildSlurmExporterFrom(ptr.To(consts.ModeNone), exporter)
+	result := buildSlurmExporterFrom("test-cluster", ptr.To(consts.ModeNone), exporter)
 
 	assert.NotNil(t, result.ExporterContainer)
 	assert.NotNil(t, result.SlurmNode)
@@ -46,7 +46,7 @@ func Test_BuildSlurmExporterFromWithNilTelemetry(t *testing.T) {
 			t.Errorf("The code panicked: %v", r)
 		}
 	}()
-	buildSlurmExporterFrom(ptr.To(consts.ModeNone), exporter)
+	buildSlurmExporterFrom("test-cluster", ptr.To(consts.ModeNone), exporter)
 }
 
 func Test_BuildSlurmExporterFromWithNilPrometheus(t *testing.T) {
@@ -63,5 +63,5 @@ func Test_BuildSlurmExporterFromWithNilPrometheus(t *testing.T) {
 			t.Errorf("The code panicked: %v", r)
 		}
 	}()
-	buildSlurmExporterFrom(ptr.To(consts.ModeNone), exporter)
+	buildSlurmExporterFrom("test-cluster", ptr.To(consts.ModeNone), exporter)
 }

@@ -16064,6 +16064,11 @@ spec:
                         x-kubernetes-list-type: atomic
                     type: object
                 type: object
+              clusterName:
+                description: |-
+                  ClusterName is the name of the SlurmCluster this NodeSet belongs to.
+                  Must be in the same namespace as the NodeSet.
+                type: string
               configMapRefSshd:
                 description: |-
                   ConfigMapRefSSHD defines the config name of Slurm SSHD.
