@@ -40,14 +40,22 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 	}
 
 	t.Run("with topology enabled", func(t *testing.T) {
-		result := worker.RenderContainerWorkerInit("test-cluster", container, true, true, 300)
+		result := worker.RenderContainerWorkerInit(
+			"test-cluster",
+			container,
+			true,
+			true,
+			300,
+			consts.SlurmTopologyBlock,
+		)
 
 		assert.Equal(t, consts.ContainerNameWorkerInit, result.Name)
 		assert.Equal(t, container.Image, result.Image)
 		assert.Equal(t, container.ImagePullPolicy, result.ImagePullPolicy)
 		assert.Equal(t, []string{"python3", "/opt/bin/slurm/worker_init.py", "wait-controller", "wait-topology"}, result.Command)
-		assert.Equal(t, 10, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 3 topology
+		assert.Equal(t, 11, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 4 topology
 		assert.Equal(t, 3, len(result.VolumeMounts))
+		assertEnvValue(t, result.Env, "TOPOLOGY_PLUGIN", consts.SlurmTopologyBlock)
 
 		expectedMounts := map[string]string{
 			consts.VolumeNameJail:               consts.VolumeMountPathJail,
@@ -63,7 +71,14 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 	})
 
 	t.Run("without topology", func(t *testing.T) {
-		result := worker.RenderContainerWorkerInit("test-cluster", container, false, false, 0)
+		result := worker.RenderContainerWorkerInit(
+			"test-cluster",
+			container,
+			false,
+			false,
+			0,
+			"",
+		)
 
 		assert.Equal(t, consts.ContainerNameWorkerInit, result.Name)
 		assert.Equal(t, container.Image, result.Image)
@@ -86,7 +101,12 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 
 		// Verify no topology env vars
 		for _, envVar := range result.Env {
-			assert.NotContains(t, []string{"TOPOLOGY_CONFIGMAP_PATH", "TOPOLOGY_WAIT_TIMEOUT", "TOPOLOGY_POLL_INTERVAL"}, envVar.Name,
+			assert.NotContains(t, []string{
+				"TOPOLOGY_CONFIGMAP_PATH",
+				"TOPOLOGY_PLUGIN",
+				"TOPOLOGY_WAIT_TIMEOUT",
+				"TOPOLOGY_POLL_INTERVAL",
+			}, envVar.Name,
 				"topology env var %s should not be present when topology is disabled", envVar.Name)
 		}
 	})
@@ -143,7 +163,14 @@ func Test_RenderContainerWorkerInit_K8SServiceName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := worker.RenderContainerWorkerInit(tt.clusterName, container, false, tt.gpuEnabled, 0)
+			result := worker.RenderContainerWorkerInit(
+				tt.clusterName,
+				container,
+				false,
+				tt.gpuEnabled,
+				0,
+				"",
+			)
 
 			env, found := findEnv(result.Env, "K8S_SERVICE_NAME")
 			assert.True(t, found, "K8S_SERVICE_NAME env var must be present")
@@ -231,6 +258,7 @@ func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
 				consts.CGroupV2,
 				tt.clusterWithGPU,
 				false,
+				"",
 			)
 			assert.NoError(t, err)
 
@@ -339,6 +367,7 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 				consts.CGroupV2,
 				true,
 				tt.topologyPluginEnabled,
+				consts.SlurmTopologyBlock,
 			)
 			assert.NoError(t, err)
 
@@ -349,8 +378,10 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 
 			// Verify worker-init container has topology command when topology plugin is enabled
 			var hasWaitForTopology bool
+			var workerInitContainer *corev1.Container
 			for _, container := range result.Spec.Template.Spec.InitContainers {
 				if container.Name == consts.ContainerNameWorkerInit {
+					workerInitContainer = &container
 					for _, arg := range container.Command {
 						if arg == "wait-topology" {
 							hasWaitForTopology = true
@@ -362,6 +393,9 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			}
 			assert.Equal(t, tt.expectWaitForTopology, hasWaitForTopology,
 				"wait-topology command presence mismatch")
+			if tt.expectWaitForTopology && assert.NotNil(t, workerInitContainer) {
+				assertEnvValue(t, workerInitContainer.Env, "TOPOLOGY_PLUGIN", consts.SlurmTopologyBlock)
+			}
 
 			// Verify topology-related volumes
 			var hasTopologyNodeLabelsVolume bool
@@ -510,6 +544,7 @@ func TestRenderNodeSetStatefulSet_PersistentVolumeClaimRetentionPolicy(t *testin
 				consts.CGroupV2,
 				true,
 				false,
+				"",
 			)
 			assert.NoError(t, err)
 			if assert.NotNil(t, result.Spec.PersistentVolumeClaimRetentionPolicy) {
@@ -587,6 +622,7 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 				consts.CGroupV2,
 				true,
 				false,
+				"",
 			)
 			assert.NoError(t, err)
 
@@ -696,7 +732,15 @@ func TestRenderNodeSetStatefulSet_EphemeralNodesReserveOrdinals(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeSet := createNodeSetWithActiveNodes(tt.ephemeralNodes, tt.activeNodes)
 
-			result, err := worker.RenderNodeSetStatefulSet("test-cluster", nodeSet, &slurmv1.Secrets{}, consts.CGroupV2, true, false)
+			result, err := worker.RenderNodeSetStatefulSet(
+				"test-cluster",
+				nodeSet,
+				&slurmv1.Secrets{},
+				consts.CGroupV2,
+				true,
+				false,
+				"",
+			)
 			assert.NoError(t, err)
 
 			// Verify replicas

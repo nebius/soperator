@@ -70,9 +70,7 @@ class TestFormatSlurmTopology(unittest.TestCase):
 
     def test_tier_format_with_spaces(self):
         """Tier format with spaces is handled correctly."""
-        result = worker_init.format_slurm_topology(
-            "tier-1 = leaf01 , tier-2 = spine01"
-        )
+        result = worker_init.format_slurm_topology("tier-1 = leaf01 , tier-2 = spine01")
         self.assertEqual(result, "topology=default:root:spine01:leaf01")
 
     def test_tier_format_unordered(self):
@@ -89,7 +87,10 @@ class TestFormatSlurmTopology(unittest.TestCase):
             '{"tier-1":"4dcbe855beb5ce19f484ba1a8960929d","tier-2":"5df641bb92d51e0dd5d97037fc7e2971"}'
         )
         # tier-2 (spine) first, tier-1 (leaf) last
-        self.assertEqual(result, "topology=default:root:5df641bb92d51e0dd5d97037fc7e2971:4dcbe855beb5ce19f484ba1a8960929d")
+        self.assertEqual(
+            result,
+            "topology=default:root:5df641bb92d51e0dd5d97037fc7e2971:4dcbe855beb5ce19f484ba1a8960929d",
+        )
 
     def test_json_format_single_tier(self):
         """JSON format with single tier is parsed correctly."""
@@ -119,6 +120,46 @@ class TestFormatSlurmTopology(unittest.TestCase):
         # tier-1 (rack/leaf-switch) first, tier-0 (NVL domain) last
         self.assertEqual(result, "topology=default:root:leaf01:nvl0")
 
+    def test_json_format_block_topology_uses_tier_zero(self):
+        """JSON format in block mode uses tier-0 as the block name."""
+        result = worker_init.format_slurm_topology(
+            '{"tier-0":"block1","tier-1":"leaf01","tier-2":"spine01"}',
+            worker_init.TOPOLOGY_PLUGIN_BLOCK,
+        )
+        self.assertEqual(result, "topology=default:block1")
+
+    def test_tier_format_block_topology_uses_tier_zero(self):
+        """Key/value format in block mode uses tier-0 as the block name."""
+        result = worker_init.format_slurm_topology(
+            "tier-0=block1,tier-1=leaf01,tier-2=spine01",
+            worker_init.TOPOLOGY_PLUGIN_BLOCK,
+        )
+        self.assertEqual(result, "topology=default:block1")
+
+    def test_named_block_topology_preserves_topology_name(self):
+        """Block topology with an explicit topology name is preserved."""
+        result = worker_init.format_slurm_topology(
+            "default:block1",
+            worker_init.TOPOLOGY_PLUGIN_BLOCK,
+        )
+        self.assertEqual(result, "topology=default:block1")
+
+    def test_simple_block_topology_name(self):
+        """Simple block name gets the default topology name."""
+        result = worker_init.format_slurm_topology(
+            "block1",
+            worker_init.TOPOLOGY_PLUGIN_BLOCK,
+        )
+        self.assertEqual(result, "topology=default:block1")
+
+    def test_block_topology_requires_tier_zero_for_structured_data(self):
+        """Structured block data without tier-0 is rejected."""
+        result = worker_init.format_slurm_topology(
+            '{"tier-1":"leaf01"}',
+            worker_init.TOPOLOGY_PLUGIN_BLOCK,
+        )
+        self.assertEqual(result, "")
+
 
 class TestFormatTierTopology(unittest.TestCase):
     """Tests for _format_tier_topology internal function."""
@@ -140,72 +181,64 @@ class TestFormatTierTopology(unittest.TestCase):
 
     def test_two_tiers_builds_hierarchy(self):
         """Two tiers builds full hierarchy: spine first, leaf last."""
-        result = worker_init._format_tier_topology({
-            "tier-1": "leaf01",
-            "tier-2": "spine01"
-        })
+        result = worker_init._format_tier_topology(
+            {"tier-1": "leaf01", "tier-2": "spine01"}
+        )
         self.assertEqual(result, "topology=default:root:spine01:leaf01")
 
     def test_tier_zero_included_as_leaf(self):
         """tier-0 is included as the innermost switch (leaf/block domain)."""
-        result = worker_init._format_tier_topology({
-            "tier-0": "nvl0",
-            "tier-1": "leaf01",
-            "tier-2": "spine01"
-        })
+        result = worker_init._format_tier_topology(
+            {"tier-0": "nvl0", "tier-1": "leaf01", "tier-2": "spine01"}
+        )
         self.assertEqual(result, "topology=default:root:spine01:leaf01:nvl0")
 
     def test_three_tiers_builds_hierarchy(self):
         """Three tiers builds full path from fabric to leaf."""
-        result = worker_init._format_tier_topology({
-            "tier-1": "leaf01",
-            "tier-2": "spine01",
-            "tier-3": "fabric01"
-        })
+        result = worker_init._format_tier_topology(
+            {"tier-1": "leaf01", "tier-2": "spine01", "tier-3": "fabric01"}
+        )
         self.assertEqual(result, "topology=default:root:fabric01:spine01:leaf01")
 
     def test_unordered_tier_keys(self):
         """Tier keys in any order produce the same sorted hierarchy."""
-        result = worker_init._format_tier_topology({
-            "tier-3": "fabric01",
-            "tier-1": "leaf01",
-            "tier-2": "spine01"
-        })
+        result = worker_init._format_tier_topology(
+            {"tier-3": "fabric01", "tier-1": "leaf01", "tier-2": "spine01"}
+        )
         self.assertEqual(result, "topology=default:root:fabric01:spine01:leaf01")
 
     def test_non_tier_keys_ignored(self):
         """Non-tier keys are ignored, tier keys used."""
-        result = worker_init._format_tier_topology({
-            "other": "value",
-            "tier-1": "leaf01",
-            "name": "test"
-        })
+        result = worker_init._format_tier_topology(
+            {"other": "value", "tier-1": "leaf01", "name": "test"}
+        )
         self.assertEqual(result, "topology=default:root:leaf01")
 
     def test_only_non_tier_keys_uses_first_value(self):
         """Only non-tier keys uses first value as fallback."""
-        result = worker_init._format_tier_topology({
-            "switch": "sw1",
-            "rack": "r1"
-        })
+        result = worker_init._format_tier_topology({"switch": "sw1", "rack": "r1"})
         self.assertEqual(result, "topology=default:root:sw1")
 
     def test_invalid_tier_format_ignored(self):
         """Invalid tier format keys are ignored."""
-        result = worker_init._format_tier_topology({
-            "tier-abc": "invalid",
-            "tier-1": "leaf01"
-        })
+        result = worker_init._format_tier_topology(
+            {"tier-abc": "invalid", "tier-1": "leaf01"}
+        )
         self.assertEqual(result, "topology=default:root:leaf01")
 
     def test_tier_with_hash_value(self):
         """Tier with hash value (real ConfigMap data) builds full hierarchy."""
-        result = worker_init._format_tier_topology({
-            "tier-1": "4dcbe855beb5ce19f484ba1a8960929d",
-            "tier-2": "5df641bb92d51e0dd5d97037fc7e2971"
-        })
+        result = worker_init._format_tier_topology(
+            {
+                "tier-1": "4dcbe855beb5ce19f484ba1a8960929d",
+                "tier-2": "5df641bb92d51e0dd5d97037fc7e2971",
+            }
+        )
         # tier-2 (spine) first, tier-1 (leaf) last
-        self.assertEqual(result, "topology=default:root:5df641bb92d51e0dd5d97037fc7e2971:4dcbe855beb5ce19f484ba1a8960929d")
+        self.assertEqual(
+            result,
+            "topology=default:root:5df641bb92d51e0dd5d97037fc7e2971:4dcbe855beb5ce19f484ba1a8960929d",
+        )
 
 
 class TestReadTopologyForNode(unittest.TestCase):
@@ -218,6 +251,7 @@ class TestReadTopologyForNode(unittest.TestCase):
     def tearDown(self):
         """Clean up temporary directory."""
         import shutil
+
         shutil.rmtree(self.temp_dir)
 
     def test_read_existing_node(self):
@@ -334,6 +368,36 @@ class TestGetEnvironmentVariables(unittest.TestCase):
             result = worker_init.get_topology_poll_interval()
         self.assertEqual(result, 10)
 
+    def test_get_topology_plugin_env_override(self):
+        """Topology plugin can be supplied by environment variable."""
+        with mock.patch.dict(
+            os.environ,
+            {"TOPOLOGY_PLUGIN": worker_init.TOPOLOGY_PLUGIN_BLOCK},
+        ):
+            result = worker_init.get_topology_plugin("/missing/slurm.conf")
+        self.assertEqual(result, worker_init.TOPOLOGY_PLUGIN_BLOCK)
+
+    def test_get_topology_plugin_from_slurm_conf(self):
+        """Topology plugin is read from slurm.conf when env is not set."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            slurm_conf = os.path.join(temp_dir, "slurm.conf")
+            with open(slurm_conf, "w") as f:
+                f.write("# comment\nTopologyPlugin = topology/block # inline\n")
+
+            env = os.environ.copy()
+            env.pop("TOPOLOGY_PLUGIN", None)
+            with mock.patch.dict(os.environ, env, clear=True):
+                result = worker_init.get_topology_plugin(slurm_conf)
+        self.assertEqual(result, worker_init.TOPOLOGY_PLUGIN_BLOCK)
+
+    def test_get_topology_plugin_defaults_to_tree(self):
+        """Missing slurm.conf defaults to topology/tree."""
+        env = os.environ.copy()
+        env.pop("TOPOLOGY_PLUGIN", None)
+        with mock.patch.dict(os.environ, env, clear=True):
+            result = worker_init.get_topology_plugin("/missing/slurm.conf")
+        self.assertEqual(result, worker_init.TOPOLOGY_PLUGIN_TREE)
+
     def test_get_controller_max_attempts_default(self):
         """Get controller max attempts returns default when not set."""
         env = os.environ.copy()
@@ -376,12 +440,14 @@ class TestCreateSlurmConfigSymlink(unittest.TestCase):
     def tearDown(self):
         """Clean up temporary directories."""
         import shutil
+
         shutil.rmtree(self.temp_dir)
 
     def test_create_symlink_no_existing_target(self):
         """Creates symlink when target does not exist."""
-        with mock.patch.object(worker_init, "SLURM_CONFIG_LINK_SOURCE", self.source), \
-             mock.patch.object(worker_init, "SLURM_CONFIG_LINK_TARGET", self.target):
+        with mock.patch.object(
+            worker_init, "SLURM_CONFIG_LINK_SOURCE", self.source
+        ), mock.patch.object(worker_init, "SLURM_CONFIG_LINK_TARGET", self.target):
             worker_init.create_slurm_config_symlink()
 
         self.assertTrue(os.path.islink(self.target))
@@ -391,8 +457,9 @@ class TestCreateSlurmConfigSymlink(unittest.TestCase):
         """Replaces existing symlink at target."""
         os.symlink("/some/old/path", self.target)
 
-        with mock.patch.object(worker_init, "SLURM_CONFIG_LINK_SOURCE", self.source), \
-             mock.patch.object(worker_init, "SLURM_CONFIG_LINK_TARGET", self.target):
+        with mock.patch.object(
+            worker_init, "SLURM_CONFIG_LINK_SOURCE", self.source
+        ), mock.patch.object(worker_init, "SLURM_CONFIG_LINK_TARGET", self.target):
             worker_init.create_slurm_config_symlink()
 
         self.assertTrue(os.path.islink(self.target))
@@ -405,8 +472,9 @@ class TestCreateSlurmConfigSymlink(unittest.TestCase):
         with open(os.path.join(self.target, "test.conf"), "w") as f:
             f.write("test")
 
-        with mock.patch.object(worker_init, "SLURM_CONFIG_LINK_SOURCE", self.source), \
-             mock.patch.object(worker_init, "SLURM_CONFIG_LINK_TARGET", self.target):
+        with mock.patch.object(
+            worker_init, "SLURM_CONFIG_LINK_SOURCE", self.source
+        ), mock.patch.object(worker_init, "SLURM_CONFIG_LINK_TARGET", self.target):
             worker_init.create_slurm_config_symlink()
 
         self.assertTrue(os.path.islink(self.target))
@@ -416,23 +484,48 @@ class TestCreateSlurmConfigSymlink(unittest.TestCase):
 class TestWaitForController(unittest.TestCase):
     """Tests for wait_for_controller function."""
 
-    _PING_UP_JSON = json.dumps({
-        "pings": [{"hostname": "controller-0", "pinged": "UP", "responding": True, "mode": "primary"}],
-        "errors": [], "warnings": [],
-    })
+    _PING_UP_JSON = json.dumps(
+        {
+            "pings": [
+                {
+                    "hostname": "controller-0",
+                    "pinged": "UP",
+                    "responding": True,
+                    "mode": "primary",
+                }
+            ],
+            "errors": [],
+            "warnings": [],
+        }
+    )
 
-    _PING_DOWN_JSON = json.dumps({
-        "pings": [{"hostname": "controller-0", "pinged": "DOWN", "responding": False, "mode": "primary"}],
-        "errors": [], "warnings": [],
-    })
+    _PING_DOWN_JSON = json.dumps(
+        {
+            "pings": [
+                {
+                    "hostname": "controller-0",
+                    "pinged": "DOWN",
+                    "responding": False,
+                    "mode": "primary",
+                }
+            ],
+            "errors": [],
+            "warnings": [],
+        }
+    )
 
     @mock.patch("worker_init.create_slurm_config_symlink")
     @mock.patch("subprocess.run")
     def test_controller_ready_immediately(self, mock_run, mock_symlink):
         """Controller is ready on first attempt."""
-        mock_run.return_value = mock.Mock(returncode=0, stdout=self._PING_UP_JSON, stderr="")
+        mock_run.return_value = mock.Mock(
+            returncode=0, stdout=self._PING_UP_JSON, stderr=""
+        )
 
-        with mock.patch.dict(os.environ, {"CONTROLLER_MAX_ATTEMPTS": "5", "CONTROLLER_POLL_INTERVAL": "0"}):
+        with mock.patch.dict(
+            os.environ,
+            {"CONTROLLER_MAX_ATTEMPTS": "5", "CONTROLLER_POLL_INTERVAL": "0"},
+        ):
             worker_init.wait_for_controller()
 
         mock_symlink.assert_called_once()
@@ -449,7 +542,10 @@ class TestWaitForController(unittest.TestCase):
             mock.Mock(returncode=0, stdout=self._PING_UP_JSON, stderr=""),
         ]
 
-        with mock.patch.dict(os.environ, {"CONTROLLER_MAX_ATTEMPTS": "5", "CONTROLLER_POLL_INTERVAL": "1"}):
+        with mock.patch.dict(
+            os.environ,
+            {"CONTROLLER_MAX_ATTEMPTS": "5", "CONTROLLER_POLL_INTERVAL": "1"},
+        ):
             worker_init.wait_for_controller()
 
         self.assertEqual(mock_run.call_count, 3)
@@ -458,14 +554,19 @@ class TestWaitForController(unittest.TestCase):
     @mock.patch("worker_init.create_slurm_config_symlink")
     @mock.patch("subprocess.run")
     @mock.patch("time.sleep")
-    def test_controller_not_responding_retries(self, mock_sleep, mock_run, mock_symlink):
+    def test_controller_not_responding_retries(
+        self, mock_sleep, mock_run, mock_symlink
+    ):
         """Controller returns JSON but responding=false, retries until ready."""
         mock_run.side_effect = [
             mock.Mock(returncode=0, stdout=self._PING_DOWN_JSON, stderr=""),
             mock.Mock(returncode=0, stdout=self._PING_UP_JSON, stderr=""),
         ]
 
-        with mock.patch.dict(os.environ, {"CONTROLLER_MAX_ATTEMPTS": "5", "CONTROLLER_POLL_INTERVAL": "0"}):
+        with mock.patch.dict(
+            os.environ,
+            {"CONTROLLER_MAX_ATTEMPTS": "5", "CONTROLLER_POLL_INTERVAL": "0"},
+        ):
             worker_init.wait_for_controller()
 
         self.assertEqual(mock_run.call_count, 2)
@@ -480,7 +581,10 @@ class TestWaitForController(unittest.TestCase):
             mock.Mock(returncode=0, stdout=self._PING_UP_JSON, stderr=""),
         ]
 
-        with mock.patch.dict(os.environ, {"CONTROLLER_MAX_ATTEMPTS": "5", "CONTROLLER_POLL_INTERVAL": "0"}):
+        with mock.patch.dict(
+            os.environ,
+            {"CONTROLLER_MAX_ATTEMPTS": "5", "CONTROLLER_POLL_INTERVAL": "0"},
+        ):
             worker_init.wait_for_controller()
 
         self.assertEqual(mock_run.call_count, 2)
@@ -490,9 +594,14 @@ class TestWaitForController(unittest.TestCase):
     @mock.patch("time.sleep")
     def test_controller_timeout(self, mock_sleep, mock_run, mock_symlink):
         """Controller does not become ready within max attempts."""
-        mock_run.return_value = mock.Mock(returncode=1, stdout="", stderr="connection refused")
+        mock_run.return_value = mock.Mock(
+            returncode=1, stdout="", stderr="connection refused"
+        )
 
-        with mock.patch.dict(os.environ, {"CONTROLLER_MAX_ATTEMPTS": "3", "CONTROLLER_POLL_INTERVAL": "0"}):
+        with mock.patch.dict(
+            os.environ,
+            {"CONTROLLER_MAX_ATTEMPTS": "3", "CONTROLLER_POLL_INTERVAL": "0"},
+        ):
             with self.assertRaises(SystemExit) as ctx:
                 worker_init.wait_for_controller()
             self.assertEqual(ctx.exception.code, 1)
@@ -505,7 +614,10 @@ class TestWaitForController(unittest.TestCase):
         """scontrol command not found exits immediately."""
         mock_run.side_effect = FileNotFoundError("scontrol not found")
 
-        with mock.patch.dict(os.environ, {"CONTROLLER_MAX_ATTEMPTS": "5", "CONTROLLER_POLL_INTERVAL": "0"}):
+        with mock.patch.dict(
+            os.environ,
+            {"CONTROLLER_MAX_ATTEMPTS": "5", "CONTROLLER_POLL_INTERVAL": "0"},
+        ):
             with self.assertRaises(SystemExit) as ctx:
                 worker_init.wait_for_controller()
             self.assertEqual(ctx.exception.code, 1)
@@ -516,12 +628,16 @@ class TestWaitForController(unittest.TestCase):
     def test_controller_ping_timeout(self, mock_sleep, mock_run, mock_symlink):
         """scontrol ping times out but retries."""
         import subprocess
+
         mock_run.side_effect = [
             subprocess.TimeoutExpired(cmd="scontrol", timeout=30),
             mock.Mock(returncode=0, stdout=self._PING_UP_JSON, stderr=""),
         ]
 
-        with mock.patch.dict(os.environ, {"CONTROLLER_MAX_ATTEMPTS": "5", "CONTROLLER_POLL_INTERVAL": "0"}):
+        with mock.patch.dict(
+            os.environ,
+            {"CONTROLLER_MAX_ATTEMPTS": "5", "CONTROLLER_POLL_INTERVAL": "0"},
+        ):
             worker_init.wait_for_controller()
 
         self.assertEqual(mock_run.call_count, 2)
@@ -529,28 +645,39 @@ class TestWaitForController(unittest.TestCase):
     @mock.patch("worker_init.create_slurm_config_symlink")
     @mock.patch("subprocess.run")
     @mock.patch("time.sleep")
-    def test_controller_multiple_pings_all_must_be_up(self, mock_sleep, mock_run, mock_symlink):
+    def test_controller_multiple_pings_all_must_be_up(
+        self, mock_sleep, mock_run, mock_symlink
+    ):
         """All controllers in pings array must be UP and responding."""
-        partial_json = json.dumps({
-            "pings": [
-                {"hostname": "ctrl-0", "pinged": "UP", "responding": True},
-                {"hostname": "ctrl-1", "pinged": "DOWN", "responding": False},
-            ],
-            "errors": [], "warnings": [],
-        })
-        all_up_json = json.dumps({
-            "pings": [
-                {"hostname": "ctrl-0", "pinged": "UP", "responding": True},
-                {"hostname": "ctrl-1", "pinged": "UP", "responding": True},
-            ],
-            "errors": [], "warnings": [],
-        })
+        partial_json = json.dumps(
+            {
+                "pings": [
+                    {"hostname": "ctrl-0", "pinged": "UP", "responding": True},
+                    {"hostname": "ctrl-1", "pinged": "DOWN", "responding": False},
+                ],
+                "errors": [],
+                "warnings": [],
+            }
+        )
+        all_up_json = json.dumps(
+            {
+                "pings": [
+                    {"hostname": "ctrl-0", "pinged": "UP", "responding": True},
+                    {"hostname": "ctrl-1", "pinged": "UP", "responding": True},
+                ],
+                "errors": [],
+                "warnings": [],
+            }
+        )
         mock_run.side_effect = [
             mock.Mock(returncode=0, stdout=partial_json, stderr=""),
             mock.Mock(returncode=0, stdout=all_up_json, stderr=""),
         ]
 
-        with mock.patch.dict(os.environ, {"CONTROLLER_MAX_ATTEMPTS": "5", "CONTROLLER_POLL_INTERVAL": "0"}):
+        with mock.patch.dict(
+            os.environ,
+            {"CONTROLLER_MAX_ATTEMPTS": "5", "CONTROLLER_POLL_INTERVAL": "0"},
+        ):
             worker_init.wait_for_controller()
 
         self.assertEqual(mock_run.call_count, 2)
@@ -589,9 +716,15 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
     @mock.patch("worker_init.apply_node_topology")
     @mock.patch("worker_init.is_gpu_enabled", return_value=False)
     @mock.patch.dict(os.environ, {"HOSTNAME": "worker-0"})
-    def test_non_gpu_applies_unknown_topology(self, mock_gpu, mock_apply, mock_wait_hostname):
+    def test_non_gpu_applies_unknown_topology(
+        self, mock_gpu, mock_apply, mock_wait_hostname
+    ):
         """Non-GPU node immediately applies topology=default:root:unknown."""
-        worker_init.wait_for_topology()
+        with mock.patch(
+            "worker_init.get_topology_plugin",
+            return_value=worker_init.TOPOLOGY_PLUGIN_TREE,
+        ):
+            worker_init.wait_for_topology()
 
         mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
         mock_apply.assert_called_once_with("worker-0", "topology=default:root:unknown")
@@ -600,9 +733,31 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
     @mock.patch("worker_init.apply_node_topology")
     @mock.patch("worker_init.is_gpu_enabled", return_value=False)
     @mock.patch.dict(os.environ, {"HOSTNAME": "worker-0"})
-    def test_non_gpu_does_not_read_configmap(self, mock_gpu, mock_apply, mock_wait_hostname):
+    def test_non_gpu_applies_unknown_block_topology(
+        self, mock_gpu, mock_apply, mock_wait_hostname
+    ):
+        """Non-GPU node in block mode applies topology=default:unknown."""
+        with mock.patch(
+            "worker_init.get_topology_plugin",
+            return_value=worker_init.TOPOLOGY_PLUGIN_BLOCK,
+        ):
+            worker_init.wait_for_topology()
+
+        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
+        mock_apply.assert_called_once_with("worker-0", "topology=default:unknown")
+
+    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
+    @mock.patch("worker_init.apply_node_topology")
+    @mock.patch("worker_init.is_gpu_enabled", return_value=False)
+    @mock.patch.dict(os.environ, {"HOSTNAME": "worker-0"})
+    def test_non_gpu_does_not_read_configmap(
+        self, mock_gpu, mock_apply, mock_wait_hostname
+    ):
         """Non-GPU node does not wait for ConfigMap at all."""
-        with mock.patch("worker_init.read_topology_for_node") as mock_read:
+        with mock.patch(
+            "worker_init.get_topology_plugin",
+            return_value=worker_init.TOPOLOGY_PLUGIN_TREE,
+        ), mock.patch("worker_init.read_topology_for_node") as mock_read:
             worker_init.wait_for_topology()
             mock_read.assert_not_called()
         mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
@@ -610,7 +765,9 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
     @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")
     @mock.patch("worker_init.is_gpu_enabled", return_value=False)
-    def test_non_gpu_exits_if_hostname_not_set(self, mock_gpu, mock_apply, mock_wait_hostname):
+    def test_non_gpu_exits_if_hostname_not_set(
+        self, mock_gpu, mock_apply, mock_wait_hostname
+    ):
         """Non-GPU node exits if HOSTNAME is not set."""
         env = os.environ.copy()
         env.pop("HOSTNAME", None)
@@ -640,7 +797,9 @@ def test_topology_conf_does_not_match_partial_hostname():
         with open(topology_conf, "w") as f:
             f.write("SwitchName=unknown Nodes=worker-10\n")
 
-        assert not worker_init.topology_conf_contains_hostname(topology_conf, "worker-1")
+        assert not worker_init.topology_conf_contains_hostname(
+            topology_conf, "worker-1"
+        )
 
 
 class TestTopologyIntegration(unittest.TestCase):
@@ -655,6 +814,7 @@ class TestTopologyIntegration(unittest.TestCase):
     def tearDown(self):
         """Clean up temporary directories."""
         import shutil
+
         shutil.rmtree(self.temp_dir)
 
     def test_full_flow_read_and_format(self):
@@ -689,6 +849,34 @@ class TestTopologyIntegration(unittest.TestCase):
 
         formatted = worker_init.format_slurm_topology(result)
         self.assertEqual(formatted, "topology=default:root:spine01:leaf01")
+
+    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
+    @mock.patch("worker_init.apply_node_topology")
+    def test_wait_for_topology_block_json_applies_tier_zero(
+        self, mock_apply, mock_wait_hostname
+    ):
+        """Block mode applies tier-0 as the dynamic topology unit."""
+        node_name = "gpu-node-003"
+        topology = '{"tier-0":"block1","tier-1":"leaf01","tier-2":"spine01"}'
+
+        node_file = os.path.join(self.configmap_dir, node_name)
+        with open(node_file, "w") as f:
+            f.write(topology)
+
+        env = {
+            "HOSTNAME": "worker-0",
+            "K8S_NODE_NAME": node_name,
+            "TOPOLOGY_CONFIGMAP_PATH": self.configmap_dir,
+            "NODESET_GPU_ENABLED": "true",
+        }
+        with mock.patch.dict(os.environ, env), mock.patch(
+            "worker_init.get_topology_plugin",
+            return_value=worker_init.TOPOLOGY_PLUGIN_BLOCK,
+        ):
+            worker_init.wait_for_topology()
+
+        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
+        mock_apply.assert_called_once_with("worker-0", "topology=default:block1")
 
 
 class TestEdgeCases(unittest.TestCase):
@@ -747,7 +935,9 @@ class TestMainArgparse(unittest.TestCase):
     @mock.patch("worker_init.wait_for_controller")
     def test_main_both_commands(self, mock_controller, mock_topology):
         """Main runs both commands sequentially."""
-        with mock.patch("sys.argv", ["worker_init.py", "wait-controller", "wait-topology"]):
+        with mock.patch(
+            "sys.argv", ["worker_init.py", "wait-controller", "wait-topology"]
+        ):
             worker_init.main()
         mock_controller.assert_called_once()
         mock_topology.assert_called_once()
