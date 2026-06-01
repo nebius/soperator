@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	slurmpattern "nebius.ai/slurm-operator/internal/utils/slurm/pattern"
 )
 
 // TopologyGraph represents a network topology as a single tree with two types of vertices:
@@ -100,7 +102,7 @@ func (g TopologyGraph) RenderConfigLines() []string {
 		}
 		slices.Sort(children)
 		if hasGrandChildren {
-			lines = append(lines, fmt.Sprintf("SwitchName=%s Switches=%s", parent, strings.Join(children, ",")))
+			lines = append(lines, fmt.Sprintf("SwitchName=%s Switches=%s", parent, slurmpattern.Merge(children)))
 		} else {
 			lines = append(lines, fmt.Sprintf("SwitchName=%s Nodes=%s", parent, strings.Join(children, ",")))
 		}

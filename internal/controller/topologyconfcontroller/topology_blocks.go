@@ -3,9 +3,10 @@ package topologyconfcontroller
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	slurmpattern "nebius.ai/slurm-operator/internal/utils/slurm/pattern"
 )
 
 // TopologyBlocks represents a block topology.
@@ -40,7 +41,14 @@ func (b TopologyBlocks) RenderConfigLines() []string {
 		if len(workers) == 0 {
 			continue
 		}
-		lines = append(lines, fmt.Sprintf("BlockName=%s Nodes=%s", blockName, strings.Join(workers, ",")))
+		lines = append(
+			lines,
+			fmt.Sprintf(
+				"BlockName=%s Nodes=%s",
+				blockName,
+				slurmpattern.Merge(workers),
+			),
+		)
 	}
 
 	return lines
