@@ -422,8 +422,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	}
 
 	res.AddComment("")
-	res.AddComment(fmt.Sprintf("Include %s", consts.ConfigMapKeyCustomSlurmConfig))
-	res.AddPropertyWithConnector("include", consts.ConfigMapKeyCustomSlurmConfig, renderutils.SpaceConnector)
+	res.AddComment(fmt.Sprintf("Include %s", slurmConfigPath(consts.ConfigMapKeyCustomSlurmConfig)))
+	res.AddPropertyWithConnector("include", slurmConfigPath(consts.ConfigMapKeyCustomSlurmConfig), renderutils.SpaceConnector)
 
 	return res
 }
@@ -673,7 +673,7 @@ func generateMPIConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 func generateRESTConfig() renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
 	res.AddComment("REST API config")
-	res.AddPropertyWithConnector("include", consts.ConfigMapKeySlurmConfig, renderutils.SpaceConnector)
+	res.AddPropertyWithConnector("include", slurmConfigPath(consts.ConfigMapKeySlurmConfig), renderutils.SpaceConnector)
 	res.AddProperty("AuthType", "auth/jwt")
 	return res
 }
