@@ -780,27 +780,123 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
         mock_apply.assert_not_called()
 
 
-def test_topology_conf_contains_hostname_exact_token():
-    with tempfile.TemporaryDirectory() as temp_dir:
-        topology_conf = os.path.join(temp_dir, "topology.conf")
-        with open(topology_conf, "w") as f:
-            f.write(
-                "SwitchName=root Switches=unknown\n"
-                "SwitchName=unknown Nodes=worker-0,worker-1\n"
+class TestTopologyConfContainsHostname(unittest.TestCase):
+    """Tests for topology.conf hostname membership checks."""
+
+    def test_exact_token(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            topology_conf = Path(temp_dir) / "topology.conf"
+            with open(topology_conf, "w") as f:
+                f.write(
+                    "SwitchName=root Switches=unknown\n"
+                    "SwitchName=unknown Nodes=worker-0,worker-1\n"
+                )
+
+            self.assertTrue(
+                worker_init.topology_conf_contains_hostname(
+                    topology_conf,
+                    "worker-0",
+                )
             )
 
-        assert worker_init.topology_conf_contains_hostname(topology_conf, "worker-0")
+    def test_does_not_match_partial_hostname(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            topology_conf = Path(temp_dir) / "topology.conf"
+            with open(topology_conf, "w") as f:
+                f.write("SwitchName=unknown Nodes=worker-10\n")
 
+            self.assertFalse(
+                worker_init.topology_conf_contains_hostname(
+                    topology_conf,
+                    "worker-1",
+                )
+            )
 
-def test_topology_conf_does_not_match_partial_hostname():
-    with tempfile.TemporaryDirectory() as temp_dir:
-        topology_conf = os.path.join(temp_dir, "topology.conf")
-        with open(topology_conf, "w") as f:
-            f.write("SwitchName=unknown Nodes=worker-10\n")
+    def test_contains_hostname_in_slurm_range(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            topology_conf = Path(temp_dir) / "topology.conf"
+            with open(topology_conf, "w") as f:
+                f.write("SwitchName=unknown Nodes=worker-[0-5]\n")
 
-        assert not worker_init.topology_conf_contains_hostname(
-            topology_conf, "worker-1"
-        )
+            self.assertTrue(
+                worker_init.topology_conf_contains_hostname(
+                    topology_conf,
+                    "worker-1",
+                )
+            )
+
+    def test_does_not_match_hostname_outside_slurm_range(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            topology_conf = Path(temp_dir) / "topology.conf"
+            with open(topology_conf, "w") as f:
+                f.write("SwitchName=unknown Nodes=worker-[10-15]\n")
+
+            self.assertFalse(
+                worker_init.topology_conf_contains_hostname(
+                    topology_conf,
+                    "worker-1",
+                )
+            )
+
+    def test_contains_hostname_in_merged_slurm_hostlist(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            topology_conf = Path(temp_dir) / "topology.conf"
+            with open(topology_conf, "w") as f:
+                f.write(
+                    "BlockName=block-a "
+                    "Nodes=worker-[0-2,4],worker-cpu-[0-1],workerkek1\n"
+                )
+
+            self.assertTrue(
+                worker_init.topology_conf_contains_hostname(
+                    topology_conf,
+                    "worker-cpu-1",
+                )
+            )
+            self.assertTrue(
+                worker_init.topology_conf_contains_hostname(
+                    topology_conf,
+                    "worker-4",
+                )
+            )
+            self.assertFalse(
+                worker_init.topology_conf_contains_hostname(
+                    topology_conf,
+                    "worker-3",
+                )
+            )
+            self.assertTrue(
+                worker_init.topology_conf_contains_hostname(
+                    topology_conf,
+                    "workerkek1",
+                )
+            )
+
+    def test_contains_hostname_in_zero_padded_slurm_range(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            topology_conf = Path(temp_dir) / "topology.conf"
+            with open(topology_conf, "w") as f:
+                f.write("SwitchName=leaf Nodes=gpu[099-101]\n")
+
+            self.assertTrue(
+                worker_init.topology_conf_contains_hostname(topology_conf, "gpu099")
+            )
+            self.assertFalse(
+                worker_init.topology_conf_contains_hostname(topology_conf, "gpu99")
+            )
+
+    def test_nodes_all_contains_hostname(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            topology_conf = Path(temp_dir) / "topology.conf"
+            with open(topology_conf, "w") as f:
+                f.write("SwitchName=root Nodes=ALL\n")
+
+            self.assertTrue(
+                worker_init.topology_conf_contains_hostname(
+                    topology_conf,
+                    "worker-1",
+                )
+            )
 
 
 class TestTopologyIntegration(unittest.TestCase):

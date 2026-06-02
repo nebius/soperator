@@ -235,11 +235,143 @@ def topology_conf_contains_hostname(topology_conf_path: Path, hostname: str) -> 
         logger.warning("Failed to read topology config %s: %s", topology_conf_path, e)
         return False
 
-    # Match hostname as a full token separated by key/value, comma or whitespace boundaries.
-    pattern: re.Pattern[str] = re.compile(
-        rf"(^|[=,\s]){re.escape(hostname)}($|[,\s])", re.MULTILINE
+    return any(
+        nodes == "ALL" or _slurm_hostlist_contains(nodes, hostname)
+        for nodes in _topology_nodes_values(content)
     )
-    return re.search(pattern, content) is not None
+
+
+def _topology_nodes_values(content: str) -> list[str]:
+    """Extract Nodes= values from topology.conf content."""
+    values: list[str] = []
+    pattern: re.Pattern[str] = re.compile(r"(?:^|\s)Nodes=(\S+)")
+
+    for raw_line in content.splitlines():
+        line: str = raw_line.split("#", 1)[0].strip()
+        match: re.Match[str] | None = pattern.search(line)
+        if match:
+            values.append(match.group(1))
+
+    return values
+
+
+def _slurm_hostlist_contains(hostlist: str, hostname: str) -> bool:
+    """Return True when a Slurm hostlist expression contains hostname."""
+    return any(
+        _slurm_hostlist_token_contains(token, hostname)
+        for token in _split_slurm_hostlist(hostlist)
+    )
+
+
+def _split_slurm_hostlist(hostlist: str) -> list[str]:
+    """Split a Slurm hostlist on commas, ignoring commas inside brackets."""
+    tokens: list[str] = []
+    start: int = 0
+    bracket_depth: int = 0
+
+    for index, char in enumerate(hostlist):
+        if char == "[":
+            bracket_depth += 1
+        elif char == "]" and bracket_depth > 0:
+            bracket_depth -= 1
+        elif char == "," and bracket_depth == 0:
+            token: str = hostlist[start:index].strip()
+            if token:
+                tokens.append(token)
+            start = index + 1
+
+    token: str = hostlist[start:].strip()
+    if token:
+        tokens.append(token)
+
+    return tokens
+
+
+def _slurm_hostlist_token_contains(token: str, hostname: str) -> bool:
+    """Return True when one Slurm hostlist token contains hostname."""
+    bracket_start: int = token.find("[")
+    if bracket_start == -1:
+        return token == hostname
+
+    bracket_end: int = token.find("]", bracket_start)
+    if bracket_end == -1:
+        return token == hostname
+
+    prefix: str = token[:bracket_start]
+    suffix: str = token[bracket_end + 1 :]
+    if not hostname.startswith(prefix):
+        return False
+
+    remainder: str = hostname[len(prefix) :]
+    return any(
+        _slurm_hostlist_range_contains(part.strip(), suffix, remainder)
+        for part in token[bracket_start + 1 : bracket_end].split(",")
+        if part.strip()
+    )
+
+
+def _slurm_hostlist_range_contains(part: str, suffix: str, remainder: str) -> bool:
+    """Return True when one bracket item can match the hostname remainder."""
+    if "-" in part:
+        start_value, end_value = part.split("-", 1)
+    else:
+        start_value = end_value = part
+
+    if start_value.isdigit() and end_value.isdigit():
+        return _slurm_numeric_range_contains(
+            start_value,
+            end_value,
+            suffix,
+            remainder,
+        )
+
+    return remainder.startswith(part) and _slurm_hostlist_token_contains(
+        suffix,
+        remainder[len(part) :],
+    )
+
+
+def _slurm_numeric_range_contains(
+    start_value: str,
+    end_value: str,
+    suffix: str,
+    remainder: str,
+) -> bool:
+    """Return True when a numeric hostlist range can match hostname remainder."""
+    start: int = int(start_value)
+    end: int = int(end_value)
+    if start > end:
+        return False
+
+    padded_width: int = 0
+    if start_value.startswith("0") or end_value.startswith("0"):
+        padded_width = max(len(start_value), len(end_value))
+
+    if padded_width > 0:
+        candidate: str = remainder[:padded_width]
+        if len(candidate) != padded_width or not candidate.isdigit():
+            return False
+        return start <= int(candidate) <= end and _slurm_hostlist_token_contains(
+            suffix, remainder[padded_width:]
+        )
+
+    digit_count: int = 0
+    for char in remainder:
+        if not char.isdigit():
+            break
+        digit_count += 1
+
+    for length in range(1, digit_count + 1):
+        candidate = remainder[:length]
+        if len(candidate) > 1 and candidate.startswith("0"):
+            continue
+        if start <= int(candidate) <= end and _slurm_hostlist_token_contains(
+            suffix,
+            remainder[length:],
+        ):
+            return True
+
+    return False
 
 
 def wait_for_hostname_in_topology_conf(
