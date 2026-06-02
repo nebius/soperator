@@ -1034,6 +1034,11 @@ func (in *NodeSetSpec) DeepCopyInto(out *NodeSetSpec) {
 		*out = new(intstr.IntOrString)
 		**out = **in
 	}
+	if in.MaxConcurrentStartup != nil {
+		in, out := &in.MaxConcurrentStartup, &out.MaxConcurrentStartup
+		*out = new(intstr.IntOrString)
+		**out = **in
+	}
 	if in.EphemeralNodes != nil {
 		in, out := &in.EphemeralNodes, &out.EphemeralNodes
 		*out = new(bool)

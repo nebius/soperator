@@ -27,6 +27,10 @@ spec:
   maxUnavailable: {{ . }}
   {{- end }}
 
+  {{- with .maxConcurrentStartup }}
+  maxConcurrentStartup: {{ . }}
+  {{- end }}
+
   {{- if .ephemeralNodes }}
   ephemeralNodes: {{ .ephemeralNodes }}
   {{- end }}

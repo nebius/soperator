@@ -66,6 +66,8 @@ spec:
 
                     if [ "$status" = "Complete" ]; then
                       echo "$name succeeded."
+                    elif [ "$status" = "Skipped" ]; then
+                      echo "$name skipped."
                     elif [ "$status" = "Cancelled" ]; then
                       echo "$name cancelled."
                     elif [ "$status" = "Failed" ] || [ "$status" = "Degraded" ]; then

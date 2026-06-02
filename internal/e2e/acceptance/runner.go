@@ -156,6 +156,7 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 
 	log.Printf("acceptance: discovered workers: %s", workerNames(state.Workers))
 	log.Printf("acceptance: discovered GPU workers: %s", workerNames(state.GPUWorkers))
+	log.Printf("acceptance: discovered workers by nodeset: %s", workersByNodeSetSummary(state.WorkersByNodeSet))
 	return nil
 }
 
@@ -257,6 +258,25 @@ func workerNames(workers []framework.WorkerPodRef) string {
 		names = append(names, worker.Name)
 	}
 	return strings.Join(names, ", ")
+}
+
+func workersByNodeSetSummary(workersByNodeSet map[string][]framework.WorkerPodRef) string {
+	if len(workersByNodeSet) == 0 {
+		return "<none>"
+	}
+
+	names := make([]string, 0, len(workersByNodeSet))
+	for nodeSet := range workersByNodeSet {
+		names = append(names, nodeSet)
+	}
+	sort.Strings(names)
+
+	parts := make([]string, 0, len(names))
+	for _, nodeSet := range names {
+		parts = append(parts, fmt.Sprintf("%s=[%s]", nodeSet, workerNames(workersByNodeSet[nodeSet])))
+	}
+
+	return strings.Join(parts, "; ")
 }
 
 func verifyPodReady(ctx context.Context, w *world, namespace, name string) error {

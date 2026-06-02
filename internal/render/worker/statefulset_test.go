@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -344,6 +345,7 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			// Verify init container count
 			assert.Len(t, result.Spec.Template.Spec.InitContainers, tt.expectedInitContainerCount,
 				"expected %d init containers", tt.expectedInitContainerCount)
+			assert.Len(t, result.Spec.Template.Spec.Containers, 2, "expected slurmd and docker-proxy containers")
 
 			// Verify worker-init container has topology command when topology plugin is enabled
 			var hasWaitForTopology bool
@@ -376,6 +378,37 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			}
 			assert.Equal(t, tt.expectTopologyVolumes, hasTopologyNodeLabelsVolume,
 				"topology-node-labels volume presence mismatch")
+
+			var hasRuntimeVolume bool
+			var hasDockerProxyContainer bool
+			for _, volume := range result.Spec.Template.Spec.Volumes {
+				if volume.Name == consts.VolumeNameRuntime {
+					hasRuntimeVolume = true
+					assert.NotNil(t, volume.EmptyDir, "runtime volume should be EmptyDir")
+				}
+			}
+			for _, container := range result.Spec.Template.Spec.Containers {
+				if container.Name == consts.ContainerNameDockerProxy {
+					hasDockerProxyContainer = true
+					assert.Equal(t, nodeSet.ContainerSlurmd.Image, container.Image)
+					assert.Equal(t, []string{"/opt/bin/slurm/docker_proxy_nginx_entrypoint.sh"}, container.Command)
+					assert.Len(t, container.VolumeMounts, 1)
+					assert.Equal(t, consts.VolumeNameRuntime, container.VolumeMounts[0].Name)
+					assert.Equal(t, consts.VolumeMountPathRuntime, container.VolumeMounts[0].MountPath)
+				}
+				if container.Name == consts.ContainerNameSlurmd {
+					var hasRuntimeMount bool
+					for _, mount := range container.VolumeMounts {
+						if mount.Name == consts.VolumeNameRuntime && mount.MountPath == consts.VolumeMountPathRuntime {
+							hasRuntimeMount = true
+							break
+						}
+					}
+					assert.True(t, hasRuntimeMount, "slurmd container should mount shared runtime volume")
+				}
+			}
+			assert.True(t, hasRuntimeVolume, "runtime volume should be present")
+			assert.True(t, hasDockerProxyContainer, "docker-proxy sidecar should be present")
 		})
 	}
 }
@@ -482,6 +515,91 @@ func TestRenderNodeSetStatefulSet_PersistentVolumeClaimRetentionPolicy(t *testin
 			if assert.NotNil(t, result.Spec.PersistentVolumeClaimRetentionPolicy) {
 				assert.Equal(t, tt.expectedWhenDeleted, result.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted)
 				assert.Equal(t, tt.expectedWhenScaled, result.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled)
+			}
+		})
+	}
+}
+
+func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
+	makeNodeSet := func(maxConcurrentStartup, maxUnavailable intstr.IntOrString) *values.SlurmNodeSet {
+		return &values.SlurmNodeSet{
+			Name: "test-nodeset",
+			ParentalCluster: client.ObjectKey{
+				Namespace: "test-namespace",
+				Name:      "test-cluster",
+			},
+			ContainerSlurmd: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image:           "test-image",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Resources: corev1.ResourceList{
+						corev1.ResourceMemory:           resource.MustParse("1Gi"),
+						corev1.ResourceCPU:              resource.MustParse("100m"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+					},
+				},
+			},
+			ContainerMunge: values.Container{
+				NodeContainer: slurmv1.NodeContainer{Image: "munge-image"},
+			},
+			VolumeSpool: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"}},
+			VolumeJail:  corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"}},
+			StatefulSet: values.StatefulSet{
+				Replicas:             1,
+				MaxUnavailable:       maxUnavailable,
+				MaxConcurrentStartup: maxConcurrentStartup,
+			},
+			SupervisorDConfigMapName: "supervisord-config",
+			SSHDConfigMapName:        "sshd-config",
+			GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+		}
+	}
+
+	tests := []struct {
+		name                       string
+		maxConcurrentStartup       intstr.IntOrString
+		maxUnavailable             intstr.IntOrString
+		expectedMaxConcurrentStart intstr.IntOrString
+		expectedMaxUnavailable     intstr.IntOrString
+	}{
+		{
+			name:                       "absolute MaxConcurrentStartup is propagated to ScaleStrategy",
+			maxConcurrentStartup:       intstr.FromInt32(500),
+			maxUnavailable:             intstr.FromString("20%"),
+			expectedMaxConcurrentStart: intstr.FromInt32(500),
+			expectedMaxUnavailable:     intstr.FromString("20%"),
+		},
+		{
+			name:                       "percentage MaxConcurrentStartup is propagated to ScaleStrategy",
+			maxConcurrentStartup:       intstr.FromString("10%"),
+			maxUnavailable:             intstr.FromInt32(1),
+			expectedMaxConcurrentStart: intstr.FromString("10%"),
+			expectedMaxUnavailable:     intstr.FromInt32(1),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := worker.RenderNodeSetStatefulSet(
+				"test-cluster",
+				makeNodeSet(tt.maxConcurrentStartup, tt.maxUnavailable),
+				&slurmv1.Secrets{},
+				consts.CGroupV2,
+				true,
+				false,
+			)
+			assert.NoError(t, err)
+
+			if assert.NotNil(t, result.Spec.ScaleStrategy) &&
+				assert.NotNil(t, result.Spec.ScaleStrategy.MaxUnavailable) {
+				assert.Equal(t, tt.expectedMaxConcurrentStart, *result.Spec.ScaleStrategy.MaxUnavailable,
+					"ScaleStrategy.MaxUnavailable should mirror StatefulSet.MaxConcurrentStartup")
+			}
+
+			if assert.NotNil(t, result.Spec.UpdateStrategy.RollingUpdate) &&
+				assert.NotNil(t, result.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable) {
+				assert.Equal(t, tt.expectedMaxUnavailable, *result.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
+					"UpdateStrategy.RollingUpdate.MaxUnavailable governs the update path and must not be affected")
 			}
 		})
 	}

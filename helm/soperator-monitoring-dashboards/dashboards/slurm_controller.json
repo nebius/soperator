@@ -50,7 +50,7 @@
             "type": "prometheus",
             "uid": "VictoriaMetrics"
           },
-          "description": "Time since the controller pod started, derived from the oldest running container (container_start_time_seconds).",
+          "description": "Time since the slurmctld container last (re)started (`container_start_time_seconds`). Container restarts due to crashes or rollouts reset this to zero \u2014 useful for spotting unexpected slurmctld restarts.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -111,13 +111,13 @@
                 "uid": "VictoriaMetrics"
               },
               "editorMode": "code",
-              "expr": "time() - min(container_start_time_seconds{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"})",
-              "legendFormat": "uptime",
+              "expr": "time() - max(container_start_time_seconds{namespace=~\"soperator\", pod=\"$pod\", container=\"slurmctld\"})",
+              "legendFormat": "slurmctld uptime",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Pod Uptime",
+          "title": "Container Uptime",
           "type": "stat"
         },
         {
@@ -389,8 +389,39 @@
           "color": {
             "mode": "thresholds"
           },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "thresholds",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "area"
+            }
+          },
           "mappings": [],
-          "noValue": "-",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -408,7 +439,7 @@
               }
             ]
           },
-          "unit": "none"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -420,21 +451,20 @@
       },
       "id": 5,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
+        "legend": {
           "calcs": [
-            "lastNotNull"
+            "lastNotNull",
+            "max",
+            "mean"
           ],
-          "fields": "",
-          "values": false
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": false
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "pluginVersion": "11.6.14",
       "targets": [
@@ -451,14 +481,14 @@
         }
       ],
       "title": "slurmctld Server Threads",
-      "type": "stat"
+      "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Slurmctld container memory working set as % of the container memory limit (`container_memory_working_set_bytes` \u00f7 `kube_pod_container_resource_limits{resource=\"memory\"}`). Approaching 100% means slurmctld is close to being OOM-killed by the kubelet. Requires a memory limit to be set on the slurmctld container; if no limit is configured this panel will show \"No data\". For the absolute byte timeseries see the **Memory** row \u2192 'Memory Working Set'.",
+      "description": "Slurmctld container memory working set as % of the container memory limit (`container_memory_working_set_bytes` \u00f7 `kube_pod_container_resource_limits{resource=\"memory\"}`). Approaching 100% means slurmctld is close to being OOM-killed by the kubelet. Requires a memory limit to be set on the slurmctld container; if no limit is configured this panel will show \"No data\". For the absolute byte timeseries see the **Memory** row \u2192 'Memory Working Set'.\n\nValue shown is the **1h moving average**, not the instantaneous reading \u2014 smooths out scrape jitter and short bursts.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -518,13 +548,13 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "100 * sum(container_memory_working_set_bytes{namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\"}) / sum(kube_pod_container_resource_limits{namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\", resource=\"memory\"})",
+          "expr": "avg_over_time((100 * sum(container_memory_working_set_bytes{namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\"}) / sum(kube_pod_container_resource_limits{namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\", resource=\"memory\"}))[1h:])",
           "legendFormat": "used %",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Memory",
+      "title": "Memory (1h avg)",
       "type": "gauge"
     },
     {
@@ -532,7 +562,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Inode usage % of the controller spool PVC (`controller-spool-$pod`) \u2014 slurmctld's state-save directory accumulates many small files, so inode pressure typically hits before byte capacity. For bytes usage and the underlying timeseries see the **Storage** row.",
+      "description": "Inode usage % of the controller spool PVC (`controller-spool-$pod`) \u2014 slurmctld's state-save directory accumulates many small files, so inode pressure typically hits before byte capacity. For bytes usage and the underlying timeseries see the **Storage** row.\n\nValue shown is the **1h moving average**, not the instantaneous reading \u2014 smooths out scrape jitter and short bursts.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -592,13 +622,13 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "100 * (1 - max(kubelet_volume_stats_inodes_free{persistentvolumeclaim=\"controller-spool-$pod\"} / kubelet_volume_stats_inodes{persistentvolumeclaim=\"controller-spool-$pod\"}))",
+          "expr": "avg_over_time((100 * (1 - max(kubelet_volume_stats_inodes_free{persistentvolumeclaim=\"controller-spool-$pod\"} / kubelet_volume_stats_inodes{persistentvolumeclaim=\"controller-spool-$pod\"})))[1h:])",
           "legendFormat": "inodes used %",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Spool PVC Usage",
+      "title": "Spool PVC Usage (1h avg)",
       "type": "gauge"
     },
     {
@@ -606,7 +636,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Slurmctld container CPU usage in cores (5m rate of `container_cpu_usage_seconds_total`). Full CPU timeseries lives in the **System** row \u2192 \"CPU Usage (cores)\" panel.",
+      "description": "Slurmctld container CPU usage in cores (5m rate of `container_cpu_usage_seconds_total`). Full CPU timeseries lives in the **System** row \u2192 \"CPU Usage (cores)\" panel.\n\nValue shown is the **1h moving average**, not the instantaneous reading \u2014 smooths out scrape jitter and short bursts.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -666,13 +696,13 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\"}[5m]))",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\"}[1h]))",
           "legendFormat": "cores",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "CPU Cores",
+      "title": "CPU Cores (1h avg)",
       "type": "gauge"
     },
     {
@@ -680,7 +710,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Share of GPUs Slurm has assigned to running jobs \u2014 DCGM exporter via the `hpc_job` label populated by soperator's `map_job_dcgm.sh` prolog/epilog scripts. Same definition as the **Cluster Usage \u2192 GPU Allocation %** timeseries, shown here as an at-a-glance gauge.\n\nReflects scheduler packing quality. Compare against GPU Utilization to see the gap between assigned and actually-working GPUs.\n\nRequires the DCGM exporter and the soperator GPU-mapping scripts (both default in the chart). CPU-only clusters or non-soperator deployments will show \"No data\".",
+      "description": "Share of GPUs Slurm is currently using, as reported by the DCGM exporter via the `hpc_job` label (set by soperator's `map_job_dcgm.sh` prolog/epilog).\n\nBoth numerator and denominator are joined with `slurm_node_info{is_unavailable=\"\"}` on `exported_pod` \u2194 `node_name`, so only GPUs on *available* nodes (not DOWN or DRAINED) are counted. This means drained/down hosts don't dilute the score on either side \u2014 no manual ratio correction needed.\n\nRequires the DCGM exporter and soperator's GPU-mapping scripts (default in the chart). CPU-only clusters or non-soperator deployments will show \"No data\".\n\nValue shown is the **1h moving average**, not the instantaneous reading \u2014 smooths out scrape jitter and short bursts.\n\n**Note on join keys**: DCGM's `pod` label is the DaemonSet-pod name and conflicts with the Prometheus scrape target's `pod`, so the scrape rules relabel the original (worker pod) to `exported_pod`. That's the label we join on.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -740,13 +770,13 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "100 * (count(DCGM_FI_DEV_GPU_TEMP{hpc_job!=\"\"}) or vector(0)) / count(DCGM_FI_DEV_GPU_TEMP)",
+          "expr": "avg_over_time((100 * (count(DCGM_FI_DEV_GPU_TEMP{hpc_job!=\"\"} and on(exported_pod) label_replace(slurm_node_info{is_unavailable=\"\"}, \"exported_pod\", \"$1\", \"node_name\", \"(.*)\")) or vector(0)) / count(DCGM_FI_DEV_GPU_TEMP and on(exported_pod) label_replace(slurm_node_info{is_unavailable=\"\"}, \"exported_pod\", \"$1\", \"node_name\", \"(.*)\")))[1h:])",
           "legendFormat": "allocated %",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "GPU Allocation",
+      "title": "GPU Allocation (1h avg)",
       "type": "gauge"
     },
     {
@@ -754,7 +784,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Share of GPUs currently doing real work \u2014 DCGM reports `DCGM_FI_DEV_GPU_UTIL \u2265 10%`. Same metric and definition as the **Cluster Usage \u2192 GPU Utilization %** timeseries, shown here as an at-a-glance gauge.\n\nRequires the DCGM exporter (default in the soperator chart). CPU-only clusters or non-soperator deployments will show \"No data\".",
+      "description": "Share of GPUs currently doing real work \u2014 DCGM reports `DCGM_FI_DEV_GPU_UTIL \u2265 10%`. Same metric and definition as the **Cluster Usage \u2192 GPU Utilization %** timeseries, shown here as an at-a-glance gauge.\n\nRequires the DCGM exporter (default in the soperator chart). CPU-only clusters or non-soperator deployments will show \"No data\".\n\nValue shown is the **1h moving average**, not the instantaneous reading \u2014 smooths out scrape jitter and short bursts.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -814,13 +844,13 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "100 * (count(DCGM_FI_DEV_GPU_UTIL >= 10) or vector(0)) / count(DCGM_FI_DEV_GPU_UTIL)",
+          "expr": "avg_over_time((100 * (count(DCGM_FI_DEV_GPU_UTIL >= 10) or vector(0)) / count(DCGM_FI_DEV_GPU_UTIL))[1h:])",
           "legendFormat": "utilized %",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "GPU Utilization",
+      "title": "GPU Utilization (1h avg)",
       "type": "gauge"
     },
     {
@@ -838,7 +868,7 @@
             "type": "prometheus",
             "uid": "VictoriaMetrics"
           },
-          "description": "Container filesystem read/write throughput (rate over 5m). Read positive, Write negative.",
+          "description": "Container filesystem read/write throughput (rate over 5m). Read positive, Write negative. Split by `device` so per-disk hot spots are visible (typically only one device on the controller pod's spool PVC).",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -921,8 +951,8 @@
                 "uid": "VictoriaMetrics"
               },
               "editorMode": "code",
-              "expr": "sum(\n  rate(container_fs_reads_bytes_total{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}[5m])\n)",
-              "legendFormat": "read",
+              "expr": "sum by (device) (\n  rate(container_fs_reads_bytes_total{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}[5m])\n)",
+              "legendFormat": "{{device}} read",
               "range": true,
               "refId": "A"
             },
@@ -932,8 +962,8 @@
                 "uid": "VictoriaMetrics"
               },
               "editorMode": "code",
-              "expr": "-1 * sum(\n  rate(container_fs_writes_bytes_total{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}[5m])\n)",
-              "legendFormat": "write",
+              "expr": "-1 * sum by (device) (\n  rate(container_fs_writes_bytes_total{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}[5m])\n)",
+              "legendFormat": "{{device}} write",
               "range": true,
               "refId": "B"
             }
@@ -1881,7 +1911,7 @@
                 "axisPlacement": "auto",
                 "barAlignment": 0,
                 "drawStyle": "line",
-                "fillOpacity": 30,
+                "fillOpacity": 0,
                 "gradientMode": "none",
                 "hideFrom": {
                   "legend": false,
@@ -1899,7 +1929,7 @@
                 "spanNulls": false,
                 "stacking": {
                   "group": "A",
-                  "mode": "normal"
+                  "mode": "none"
                 },
                 "thresholdsStyle": {
                   "mode": "off"
@@ -1965,7 +1995,7 @@
             "type": "prometheus",
             "uid": "VictoriaMetrics"
           },
-          "description": "How many GPUs Slurm has assigned to running jobs, vs left idle. The two series stack to 100% of the live GPU count. Same data source as the Health \u2192 GPU Packing gauge.\n\nThis is a signal about **scheduler packing quality**. Low values mean either the scheduler isn't optimising well (e.g. hitting `default_queue_depth` / `bf_max_job_test` caps, fragmenting nodes, or priority/QoS preventing fills), or there simply aren't enough pending jobs to keep all GPUs busy. Cross-check with the Pending jobs panel: high pending + low allocation = scheduler problem; low pending + low allocation = no demand.",
+          "description": "Share of GPUs Slurm is currently using, per-scrape. Both numerator and denominator are joined with `slurm_node_info{is_unavailable=\"\"}` on `exported_pod` \u2194 `node_name`, so only GPUs on *available* nodes (not DOWN or DRAINED) are counted \u2014 drained/down hosts don't dilute the score on either side.\n\nComplement to the GPU Utilization % panel \u2014 together they show scheduler packing vs actual GPU work.\n\n**Note on join keys**: DCGM's `pod` label is the DaemonSet-pod name and conflicts with the Prometheus scrape target's `pod`, so the scrape rules relabel the original (worker pod) to `exported_pod`. That's the label we join on.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2051,7 +2081,7 @@
                 "uid": "VictoriaMetrics"
               },
               "editorMode": "code",
-              "expr": "100 * (count(DCGM_FI_DEV_GPU_TEMP{hpc_job!=\"\"}) or vector(0)) / count(DCGM_FI_DEV_GPU_TEMP)",
+              "expr": "100 * (count(DCGM_FI_DEV_GPU_TEMP{hpc_job!=\"\"} and on(exported_pod) label_replace(slurm_node_info{is_unavailable=\"\"}, \"exported_pod\", \"$1\", \"node_name\", \"(.*)\")) or vector(0)) / count(DCGM_FI_DEV_GPU_TEMP and on(exported_pod) label_replace(slurm_node_info{is_unavailable=\"\"}, \"exported_pod\", \"$1\", \"node_name\", \"(.*)\"))",
               "legendFormat": "allocated",
               "range": true,
               "refId": "A"
@@ -2455,6 +2485,107 @@
             }
           ],
           "title": "Nodes by State",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "description": "Share of *schedulable* nodes Slurm is currently using (at least partially). Numerator: nodes where `state_base \u2208 {ALLOCATED, MIXED}` regardless of drain flag \u2014 DRAINING nodes are still doing useful work and count. Denominator: `count(slurm_node_info{is_unavailable=\"\"})` \u2014 the exporter's computed schedulability flag (`true` when node is DOWN+* or IDLE+DRAIN+*, empty otherwise). So DOWN and DRAINED nodes are excluded from both sides automatically.\n\nComplement to the **GPU Allocation %** panel above: node-level packing is coarser but works on CPU-only clusters and doesn't depend on DCGM.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "purple"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 15,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "noValue": "0"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 27
+          },
+          "id": 217,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.14",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              },
+              "editorMode": "code",
+              "expr": "100 * (count(slurm_node_info{state_base=~\"ALLOCATED|MIXED\"}) or vector(0)) / count(slurm_node_info{is_unavailable=\"\"})",
+              "legendFormat": "allocated",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Node Allocation %",
           "type": "timeseries"
         }
       ],
@@ -4830,7 +4961,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 53
+            "y": 61
           },
           "id": 22,
           "options": {
@@ -4968,7 +5099,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 53
+            "y": 61
           },
           "id": 23,
           "options": {
@@ -5076,7 +5207,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 37
+            "y": 45
           },
           "id": 24,
           "options": {
@@ -5195,7 +5326,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 45
+            "y": 53
           },
           "id": 25,
           "options": {
@@ -5307,7 +5438,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 37
+            "y": 45
           },
           "id": 26,
           "options": {
@@ -5403,7 +5534,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 45
+            "y": 53
           },
           "id": 27,
           "options": {
@@ -5511,7 +5642,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 61
+            "y": 69
           },
           "id": 28,
           "options": {
@@ -5641,7 +5772,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 61
+            "y": 69
           },
           "id": 29,
           "options": {
@@ -5686,6 +5817,125 @@
             }
           ],
           "title": "Memory Anonymous",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "description": "Container-level memory breakdown for the controller pod, split by container. Complements **Memory Working Set** with three orthogonal views of where the pod's memory is sitting:\n\n- **`rss`** \u2014 actual heap + private anonymous mappings. Typically the dominant component for slurmctld.\n- **`cache`** \u2014 kernel page cache touched by this container's file I/O. Reclaimable; not real pressure.\n- **`mapped_file`** \u2014 pages mmap'd into the container's address space (subset of cache). slurmctld memory-maps state files in `StateSaveLocation`, so this can be MBs\u2013GBs on busy clusters.\n\nSum of `rss + cache` \u2248 container memory usage; sum of `rss + (cache \u2212 mapped_file)` is roughly what's accounted as Working Set.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 37
+          },
+          "id": 30,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.14",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              },
+              "editorMode": "code",
+              "expr": "container_memory_rss{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}",
+              "legendFormat": "{{container}} rss",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              },
+              "editorMode": "code",
+              "expr": "container_memory_cache{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}",
+              "legendFormat": "{{container}} cache",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              },
+              "editorMode": "code",
+              "expr": "container_memory_mapped_file{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}",
+              "legendFormat": "{{container}} mapped_file",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "Container Memory Breakdown",
           "type": "timeseries"
         }
       ],
@@ -6557,6 +6807,673 @@
         }
       ],
       "title": "Network",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 121
+      },
+      "id": 112,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "description": "Pod-level network throughput on controller-0 (RX = receive, TX = transmit). Source is the `node-exporter` sidecar running in the controller pod, scraped via `VMPodScrape` `custom-node-exporter`. Excludes `lo`. Note: this is **pod-level** traffic (slurmctld + sidecars), distinct from the host-level Network row below which shows the whole K8s node.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "Bps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 122
+          },
+          "id": 230,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.14",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_network_receive_bytes_total{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} {{device}} RX",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              },
+              "editorMode": "code",
+              "expr": "-1 * irate(node_network_transmit_bytes_total{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} {{device}} TX",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Network Bandwidth",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "description": "Currently established TCP connections inside the controller pod (`node_netstat_Tcp_CurrEstab`). This is essentially the count of live slurmctld RPC clients plus a few sidecar/operator connections. Spikes correlate with bursts of `sbatch`/`squeue`/`sinfo` traffic.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 122
+          },
+          "id": 231,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.14",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              },
+              "editorMode": "code",
+              "expr": "node_netstat_Tcp_CurrEstab{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}",
+              "legendFormat": "{{pod}} established",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "TCP Established Connections",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "description": "Pod-level packet rate (RX/TX packets per second), excluding `lo`. Useful for spotting packet-flood patterns that don't show up clearly in bytes (lots of small RPCs).",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "pps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 130
+          },
+          "id": 232,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.14",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_network_receive_packets_total{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} {{device}} RX",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              },
+              "editorMode": "code",
+              "expr": "-1 * irate(node_network_transmit_packets_total{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} {{device}} TX",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Packet Rate",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "description": "Rate of TCP retransmissions (`node_netstat_Tcp_RetransSegs`) and SYN retransmissions (`node_netstat_TcpExt_TCPSynRetrans`). Both should sit near zero. Sustained non-zero values indicate packet loss between the pod and its peers \u2014 slurmd nodes, slurmdbd, or external clients.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "pps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 130
+          },
+          "id": 233,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.14",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_netstat_Tcp_RetransSegs{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} retrans",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_netstat_TcpExt_TCPSynRetrans{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} SYN retrans",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "TCP Retransmits",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "description": "Interface-level errors and drops (`node_network_receive_errs_total`, `node_network_receive_drop_total`, `node_network_transmit_errs_total`, `node_network_transmit_drop_total`), excluding `lo`. Healthy is flat-zero. Anything non-zero typically means a network-stack or NIC problem.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "pps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 138
+          },
+          "id": 234,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.14",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_network_receive_errs_total{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "legendFormat": "{{device}} RX errs",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_network_receive_drop_total{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "legendFormat": "{{device}} RX drops",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_network_transmit_errs_total{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "legendFormat": "{{device}} TX errs",
+              "range": true,
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_network_transmit_drop_total{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "legendFormat": "{{device}} TX drops",
+              "range": true,
+              "refId": "D"
+            }
+          ],
+          "title": "Network Errors & Drops",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "description": "Rate of TCP listen-queue overflows (`node_netstat_TcpExt_ListenDrops`) and connections from the SYN-cookie / SYN-queue path that got dropped. A non-zero rate here is a strong signal that slurmctld is being overwhelmed and the kernel can't keep up enqueuing new connections \u2014 cross-reference with the RPC row's *Outbound RPC* and inbound rate panels.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "pps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 138
+          },
+          "id": 235,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.14",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "VictoriaMetrics"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_netstat_TcpExt_ListenDrops{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} listen drops",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "TCP Listen Queue Drops",
+          "type": "timeseries"
+        }
+      ],
+      "targets": [],
+      "title": "Controller Pod Network",
       "type": "row"
     },
     {

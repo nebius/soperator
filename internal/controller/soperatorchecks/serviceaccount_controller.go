@@ -33,7 +33,6 @@ var (
 
 type ServiceAccountReconciler struct {
 	*reconciler.Reconciler
-	reconcileTimeout time.Duration
 
 	ServiceAccount *reconciler.ServiceAccountReconciler
 	Role           *reconciler.RoleReconciler
@@ -44,7 +43,6 @@ func NewServiceAccountController(
 	client client.Client,
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
-	reconcileTimeout time.Duration,
 ) *ServiceAccountReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 	serviceAccountReconciler := reconciler.NewServiceAccountReconciler(r)
@@ -52,11 +50,10 @@ func NewServiceAccountController(
 	roleBindingReconciler := reconciler.NewRoleBindingReconciler(r)
 
 	return &ServiceAccountReconciler{
-		Reconciler:       r,
-		reconcileTimeout: reconcileTimeout,
-		ServiceAccount:   serviceAccountReconciler,
-		Role:             roleReconciler,
-		RoleBinding:      roleBindingReconciler,
+		Reconciler:     r,
+		ServiceAccount: serviceAccountReconciler,
+		Role:           roleReconciler,
+		RoleBinding:    roleBindingReconciler,
 	}
 }
 

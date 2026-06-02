@@ -20,7 +20,6 @@ type SlurmController struct {
 
 	Service     Service
 	StatefulSet StatefulSet
-	DaemonSet   DaemonSet
 
 	VolumeSpool             slurmv1.NodeVolume
 	VolumeJail              slurmv1.NodeVolume
@@ -42,10 +41,7 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 		naming.BuildStatefulSetName(consts.ComponentTypeController),
 		consts.SingleReplicas,
 		nil,
-	)
-
-	daemonSet := buildDaemonSetFrom(
-		naming.BuildDaemonSetName(consts.ComponentTypeController),
+		nil,
 	)
 
 	sssdConfSecretName := controller.SSSDConfSecretRefName
@@ -71,7 +67,6 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 		IsSSSDSecretDefault:     isSSSDSecretDefault,
 		Service:                 buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeController, clusterName)),
 		StatefulSet:             statefulSet,
-		DaemonSet:               daemonSet,
 		VolumeSpool:             *controller.Volumes.Spool.DeepCopy(),
 		VolumeJail:              *controller.Volumes.Jail.DeepCopy(),
 		Maintenance:             maintenance,

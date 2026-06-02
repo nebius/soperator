@@ -64,9 +64,10 @@ func buildServiceFrom(
 // region StatefulSet
 
 type StatefulSet struct {
-	Name           string
-	Replicas       int32
-	MaxUnavailable intstr.IntOrString
+	Name                 string
+	Replicas             int32
+	MaxUnavailable       intstr.IntOrString
+	MaxConcurrentStartup intstr.IntOrString
 }
 
 func buildStatefulSetFrom(
@@ -84,6 +85,7 @@ func buildStatefulSetWithMaxUnavailableFrom(
 	name string,
 	size int32,
 	maxUnavailable *intstr.IntOrString,
+	maxConcurrentStartup *intstr.IntOrString,
 ) StatefulSet {
 	result := StatefulSet{
 		Name:     name,
@@ -94,24 +96,14 @@ func buildStatefulSetWithMaxUnavailableFrom(
 		result.MaxUnavailable = *maxUnavailable
 	}
 
+	if maxConcurrentStartup != nil {
+		result.MaxConcurrentStartup = *maxConcurrentStartup
+	}
+
 	return result
 }
 
 // endregion StatefulSet
-
-// region DaemonSet
-
-type DaemonSet struct {
-	Name string
-}
-
-func buildDaemonSetFrom(name string) DaemonSet {
-	return DaemonSet{
-		Name: name,
-	}
-}
-
-// endregion DaemonSet
 
 // region CR version
 

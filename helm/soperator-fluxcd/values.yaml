@@ -4,8 +4,8 @@ helmRepository:
     url: oci://cr.eu-north1.nebius.cloud/soperator
     type: oci
   kruise:
-    url: https://openkruise.github.io/charts/
-    type: default
+    url: oci://cr.eu-north1.nebius.cloud/soperator
+    type: oci
   certManager:
     url: https://charts.jetstack.io
     type: default
@@ -155,6 +155,10 @@ observability:
     publicEndpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
     namespace: logs-system
     extraHeaders: {}
+    batch:
+      timeout: 1s
+      sendBatchSize: 2000
+      sendBatchMaxSize: 5000
     metrics:
       enabled: true
       interval: 30s
@@ -257,6 +261,15 @@ observability:
       remediation:
         retries: 3
         remediateLastFailure: true
+    tsaTokenSidecar:
+      enabled: true
+      image:
+        repository: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/alpine/curl
+        tag: "8.19.0"
+        pullPolicy: IfNotPresent
+      tokenMountPath: /mnt/imds
+      tokenFilePath: /mnt/imds/tsa-token
+      resources: {}
     values:
       dashboardNamespaces:
         - soperator
@@ -515,7 +528,7 @@ soperator:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 1.8.0
+    version: 1.8.3-custom
     releaseName: soperator-kruise
     install:
       crds: CreateReplace
@@ -533,9 +546,9 @@ soperator:
         replicas: 2
         image:
           repository: cr.eu-north1.nebius.cloud/soperator/kruise-manager
+          tag: v1.8.3
         resources:
           limits:
-            cpu: 1000m
             memory: 2Gi
           requests:
             cpu: 1000m
@@ -543,6 +556,7 @@ soperator:
       helmHooks:
         image:
           repository: cr.eu-north1.nebius.cloud/soperator/kruise-helm-hook
+          tag: v0.1.0
       featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true,ResourceDistributionGate=true"
     driftDetection:
       mode: warn
