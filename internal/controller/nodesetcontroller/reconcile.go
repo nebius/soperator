@@ -394,7 +394,8 @@ func (r NodeSetReconciler) executeReconciliation(
 					secrets.SshdKeysName = naming.BuildSecretSSHDKeysName(cluster.Name)
 				}
 
-				topologyPluginEnabled := cluster.Spec.SlurmConfig.TopologyPlugin != ""
+				topologyPlugin := cluster.Spec.SlurmConfig.TopologyPlugin
+				topologyPluginEnabled := topologyPlugin != ""
 
 				desired, err := worker.RenderNodeSetStatefulSet(
 					cluster.Name,
@@ -403,6 +404,7 @@ func (r NodeSetReconciler) executeReconciliation(
 					cluster.Spec.CgroupVersion,
 					clusterWithGPU,
 					topologyPluginEnabled,
+					topologyPlugin,
 				)
 				if err != nil {
 					stepLogger.Error(err, "Failed to render")

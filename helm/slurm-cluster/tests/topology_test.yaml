@@ -1,0 +1,21 @@
+suite: test topology configuration
+templates:
+  - templates/slurm-cluster-cr.yaml
+tests:
+  - it: should not render topology by default
+    asserts:
+      - isKind:
+          of: SlurmCluster
+      - notExists:
+          path: spec.topology
+
+  - it: should render topology when provided
+    set:
+      topology:
+        blockSize: 18
+    asserts:
+      - isKind:
+          of: SlurmCluster
+      - equal:
+          path: spec.topology.blockSize
+          value: 18
