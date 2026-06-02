@@ -1,4 +1,9 @@
 slurmClusterRefName: "soperator"
+
+nodeSelector: {}
+affinity: {}
+tolerations: []
+
 # hostUsers controls spec.hostUsers on ActiveCheck pods:
 #   true  → pods share the host user namespace
 #   false → pods do NOT share the host user namespace
