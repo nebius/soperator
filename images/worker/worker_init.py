@@ -13,20 +13,22 @@ Environment Variables (wait-controller):
 Environment Variables (wait-topology):
     K8S_NODE_NAME: Kubernetes node name (required, from Downward API)
     TOPOLOGY_CONFIGMAP_PATH: Path to mounted ConfigMap (default: /tmp/slurm/topology-node-labels)
-    TOPOLOGY_PLUGIN: Slurm topology plugin override (default: read from slurm.conf)
     TOPOLOGY_WAIT_TIMEOUT: Max wait time in seconds (default: 180)
     TOPOLOGY_POLL_INTERVAL: Poll interval in seconds (default: 5)
+    SLURM_TOPOLOGY_PLUGIN: Slurm topology plugin override (default: read from slurm.conf)
 """
 
 import argparse
 import json
+import logging
 import os
 import re
 import shutil
 import subprocess
 import sys
 import time
-import logging
+from pathlib import Path
+from typing import Any
 
 # Configure logging
 logging.basicConfig(
@@ -34,35 +36,54 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 # Constants
-SLURM_CONFIG_LINK_SOURCE = "/mnt/jail/etc/slurm"
-SLURM_CONFIG_LINK_TARGET = "/etc/slurm"
-SLURM_CONF_PATH = "/etc/slurm/slurm.conf"
-TOPOLOGY_PLUGIN_TREE = "topology/tree"
-TOPOLOGY_PLUGIN_BLOCK = "topology/block"
+SLURM_CONFIG_LINK_SOURCE: Path = Path("/mnt/jail/etc/slurm")
+SLURM_CONFIG_LINK_TARGET: Path = Path("/etc/slurm")
+SLURM_CONFIG_PATH: Path = Path("/etc/slurm/slurm.conf")
+SLURM_TOPOLOGY_CONFIG_PATH: Path = Path("/etc/slurm/topology.conf")
+
+TOPOLOGY_PLUGIN_TREE: str = "topology/tree"
+TOPOLOGY_PLUGIN_BLOCK: str = "topology/block"
 
 
-# ============================================================
-# Controller readiness functions
-# ============================================================
+# region Common env functions
+
+
+def get_from_env_required(name: str) -> str:
+    """Get a value from environment variable."""
+    value: str | None = os.environ.get(name)
+
+    if value is None:
+        logger.error("Environment variable %s must be set", name)
+        sys.exit(1)
+
+    return str(value)
+
+
+# endregion Common env functions
+
+# region Controller readiness functions
 
 
 def create_slurm_config_symlink() -> None:
     """Create symlink to Slurm configs from jail mount."""
+    source: Path = Path(SLURM_CONFIG_LINK_SOURCE)
+    target: Path = Path(SLURM_CONFIG_LINK_TARGET)
+
     logger.info(
         "Creating symlink to slurm configs: %s -> %s",
-        SLURM_CONFIG_LINK_TARGET,
-        SLURM_CONFIG_LINK_SOURCE,
+        target,
+        source,
     )
-    if os.path.islink(SLURM_CONFIG_LINK_TARGET) or os.path.isfile(
-        SLURM_CONFIG_LINK_TARGET
-    ):
-        os.unlink(SLURM_CONFIG_LINK_TARGET)
-    elif os.path.isdir(SLURM_CONFIG_LINK_TARGET):
-        shutil.rmtree(SLURM_CONFIG_LINK_TARGET)
-    os.symlink(SLURM_CONFIG_LINK_SOURCE, SLURM_CONFIG_LINK_TARGET)
+
+    if target.is_symlink() or target.is_file():
+        target.unlink()
+    elif target.is_dir():
+        shutil.rmtree(target)
+
+    target.symlink_to(source)
 
 
 def get_controller_max_attempts() -> int:
@@ -75,32 +96,23 @@ def get_controller_poll_interval() -> int:
     return int(os.environ.get("CONTROLLER_POLL_INTERVAL", "5"))
 
 
-def get_hostname() -> str:
-    """Get the hostname of the current node."""
-    return os.environ.get("HOSTNAME")
-
-
 def get_node_addr() -> str:
-    """Construct the NodeAddr for scontrol update based on environment variables."""
-    pod_name = os.environ.get("K8S_POD_NAME")
+    pod_name: str = get_from_env_required("K8S_POD_NAME")
     logger.info("Using K8S_POD_NAME=%s for NodeAddr construction", pod_name)
-    service_name = os.environ.get("K8S_SERVICE_NAME")
+
+    service_name: str = get_from_env_required("K8S_SERVICE_NAME")
     logger.info("Using K8S_SERVICE_NAME=%s for NodeAddr construction", service_name)
-    pod_namespace = os.environ.get("K8S_POD_NAMESPACE")
+
+    pod_namespace: str = get_from_env_required("K8S_POD_NAMESPACE")
     logger.info("Using K8S_POD_NAMESPACE=%s for NodeAddr construction", pod_namespace)
-    if not pod_name or not service_name or not pod_namespace:
-        logger.error(
-            "Environment variables K8S_POD_NAME, K8S_SERVICE_NAME, and K8S_POD_NAMESPACE must be set"
-        )
-        sys.exit(1)
-    node_addr = f"nodeaddr={pod_name}.{service_name}.{pod_namespace}.svc"
-    return node_addr
+
+    return f"nodeaddr={pod_name}.{service_name}.{pod_namespace}.svc"
 
 
 def wait_for_controller() -> None:
     """Wait for slurmctld to be ready by polling scontrol ping."""
-    max_attempts = get_controller_max_attempts()
-    poll_interval = get_controller_poll_interval()
+    max_attempts: int = get_controller_max_attempts()
+    poll_interval: int = get_controller_poll_interval()
 
     logger.info("Waiting for Slurm controller to be ready...")
     logger.info("Max attempts: %d, Poll interval: %ds", max_attempts, poll_interval)
@@ -116,7 +128,7 @@ def wait_for_controller() -> None:
         )
 
         try:
-            result = subprocess.run(
+            result: subprocess.CompletedProcess[str] = subprocess.run(
                 ["scontrol", "ping", "--json"],
                 capture_output=True,
                 text=True,
@@ -124,8 +136,8 @@ def wait_for_controller() -> None:
             )
             if result.returncode == 0:
                 try:
-                    data = json.loads(result.stdout)
-                    pings = data.get("pings", [])
+                    data: Any = json.loads(result.stdout)
+                    pings: list[dict[str, Any]] = data.get("pings", [])
                     if pings and all(
                         p.get("responding") is True and p.get("pinged") == "UP"
                         for p in pings
@@ -147,7 +159,7 @@ def wait_for_controller() -> None:
                         result.stdout.strip(),
                     )
             else:
-                output = (result.stdout + result.stderr).strip()
+                output: str = (result.stdout + result.stderr).strip()
                 logger.warning("scontrol ping failed with output:\n%s", output)
         except subprocess.TimeoutExpired:
             logger.warning("scontrol ping timed out")
@@ -161,45 +173,48 @@ def wait_for_controller() -> None:
     sys.exit(1)
 
 
-# ============================================================
-# Topology functions
-# ============================================================
+# endregion Controller readiness functions
+
+# region Topology functions
 
 
 def get_node_name() -> str:
     """Get the Kubernetes node name from environment variable."""
-    node_name = os.environ["K8S_NODE_NAME"]
-    return node_name
+    return os.environ["K8S_NODE_NAME"]
 
 
-def get_topology_path() -> str:
+def get_topology_path() -> Path:
     """Get the path to the topology ConfigMap mount."""
-    return os.environ.get("TOPOLOGY_CONFIGMAP_PATH", "/tmp/slurm/topology-node-labels")
+    return Path(
+        os.environ.get("TOPOLOGY_CONFIGMAP_PATH", "/tmp/slurm/topology-node-labels")
+    )
 
 
 def get_topology_wait_timeout() -> int:
     """Get the maximum wait timeout in seconds."""
-    timeout = os.environ.get("TOPOLOGY_WAIT_TIMEOUT", "180")
-    return int(timeout)
+    return int(os.environ.get("TOPOLOGY_WAIT_TIMEOUT", "180"))
 
 
 def get_topology_poll_interval() -> int:
     """Get the poll interval in seconds."""
-    interval = os.environ.get("TOPOLOGY_POLL_INTERVAL", "5")
-    return int(interval)
+    return int(os.environ.get("TOPOLOGY_POLL_INTERVAL", "5"))
 
 
-def get_topology_plugin(slurm_conf_path: str = SLURM_CONF_PATH) -> str:
+def get_topology_plugin(slurm_conf_path: Path = SLURM_CONFIG_PATH) -> str:
     """Get the configured Slurm topology plugin."""
     topology_plugin = os.environ.get("TOPOLOGY_PLUGIN", "").strip()
     if topology_plugin:
         return topology_plugin.lower()
 
+    slurm_conf_path: Path = Path(slurm_conf_path)
     try:
-        with open(slurm_conf_path, "r") as f:
+        with slurm_conf_path.open("r") as f:
+            pattern: re.Pattern[str] = re.compile(
+                r"^TopologyPlugin\s*=\s*(\S+)", re.IGNORECASE
+            )
             for line in f:
-                line = line.split("#", 1)[0].strip()
-                match = re.match(r"^TopologyPlugin\s*=\s*(\S+)", line, re.IGNORECASE)
+                line: str = line.split("#", 1)[0].strip()
+                match: re.Match[str] | None = re.match(pattern, line)
                 if match:
                     return match.group(1).lower()
     except (IOError, OSError) as e:
@@ -208,28 +223,30 @@ def get_topology_plugin(slurm_conf_path: str = SLURM_CONF_PATH) -> str:
     return TOPOLOGY_PLUGIN_TREE
 
 
-def topology_conf_contains_hostname(topology_conf_path: str, hostname: str) -> bool:
+def topology_conf_contains_hostname(topology_conf_path: Path, hostname: str) -> bool:
     """Check whether topology.conf contains the given hostname in a nodes list."""
-    if not os.path.isfile(topology_conf_path):
+    topology_conf_path: Path = Path(topology_conf_path)
+    if not topology_conf_path.is_file():
         return False
 
     try:
-        with open(topology_conf_path, "r") as f:
-            content = f.read()
+        content: str = topology_conf_path.read_text()
     except (IOError, OSError) as e:
         logger.warning("Failed to read topology config %s: %s", topology_conf_path, e)
         return False
 
     # Match hostname as a full token separated by key/value, comma or whitespace boundaries.
-    pattern = rf"(^|[=,\s]){re.escape(hostname)}($|[,\s])"
-    return re.search(pattern, content, flags=re.MULTILINE) is not None
+    pattern: re.Pattern[str] = re.compile(
+        rf"(^|[=,\s]){re.escape(hostname)}($|[,\s])", re.MULTILINE
+    )
+    return re.search(pattern, content) is not None
 
 
 def wait_for_hostname_in_topology_conf(
     hostname: str,
     wait_timeout: int,
     poll_interval: int,
-    topology_conf_path: str = "/etc/slurm/topology.conf",
+    topology_conf_path: Path = SLURM_TOPOLOGY_CONFIG_PATH,
 ) -> None:
     """Wait until topology.conf contains hostname, otherwise exit on timeout."""
     logger.info(
@@ -239,9 +256,9 @@ def wait_for_hostname_in_topology_conf(
         wait_timeout,
         poll_interval,
     )
-    start_time = time.time()
+    start_time: float = time.monotonic()
     while True:
-        elapsed = time.time() - start_time
+        elapsed: float = time.monotonic() - start_time
         if elapsed >= wait_timeout:
             logger.error(
                 "Hostname %s not found in %s after %ds",
@@ -264,22 +281,21 @@ def wait_for_hostname_in_topology_conf(
         time.sleep(poll_interval)
 
 
-def read_topology_for_node(topology_path: str, node_name: str) -> str:
+def read_topology_for_node(topology_path: Path, node_name: str) -> str:
     """
     Read topology data for the given node from the ConfigMap.
 
     ConfigMap is mounted as a directory where each key is a file.
     Returns the topology string or "" if not found.
     """
-    node_file = os.path.join(topology_path, node_name)
+    node_file: Path = Path(topology_path) / node_name
 
-    if not os.path.isfile(node_file):
+    if not node_file.is_file():
         return ""
 
     try:
-        with open(node_file, "r") as f:
-            topology = f.read().strip()
-            return topology if topology else ""
+        topology: str = node_file.read_text().strip()
+        return topology if topology else ""
     except (IOError, OSError) as e:
         logger.warning("Failed to read topology file %s: %s", node_file, e)
         return ""
@@ -319,15 +335,17 @@ def format_slurm_topology(
     if not topology:
         return ""
 
-    topology = topology.strip()
-    topology_plugin = (topology_plugin or TOPOLOGY_PLUGIN_TREE).strip().lower()
-    block_topology = topology_plugin == TOPOLOGY_PLUGIN_BLOCK
+    topology: str = topology.strip()
+    topology_plugin: str = (topology_plugin or TOPOLOGY_PLUGIN_TREE).strip().lower()
+    block_topology: bool = topology_plugin == TOPOLOGY_PLUGIN_BLOCK
 
     if topology.startswith("{"):
         try:
-            parts = json.loads(topology)
+            parts: dict[str, str] = json.loads(topology)
+
             if block_topology:
                 return _format_block_topology(parts)
+
             return _format_tier_topology(parts)
         except json.JSONDecodeError:
             logger.warning("Failed to parse topology as JSON: %s", topology)
@@ -336,18 +354,23 @@ def format_slurm_topology(
     if ":" in topology and "=" not in topology:
         if block_topology:
             return f"topology={topology}"
-        colon_parts = topology.split(":")
+
+        colon_parts: list[str] = topology.split(":")
+
         # "name:leaf" -> add root: "topology=name:root:leaf"
         # "name:sw1:sw2:sw3" -> already has intermediates, keep as-is
         if len(colon_parts) == 2:
             return f"topology={colon_parts[0]}:root:{colon_parts[1]}"
+
         return f"topology={topology}"
 
     # If in format "tier-0=switch1,tier-1=rack1", build switch hierarchy
     if "=" in topology:
-        parts = _parse_key_value_topology(topology)
+        parts: dict[str, str] = _parse_key_value_topology(topology)
+
         if block_topology:
             return _format_block_topology(parts)
+
         return _format_tier_topology(parts)
 
     if block_topology:
@@ -356,18 +379,20 @@ def format_slurm_topology(
     return f"topology=default:root:{topology}"
 
 
-def _parse_key_value_topology(topology: str) -> dict:
+def _parse_key_value_topology(topology: str) -> dict[str, str]:
     """Parse comma-separated topology key/value pairs."""
-    parts = {}
+    parts: dict[str, str] = {}
+
     for item in topology.split(","):
-        item = item.strip()
+        item: str = item.strip()
         if "=" in item:
             key, value = item.split("=", 1)
             parts[key.strip()] = value.strip()
+
     return parts
 
 
-def _format_block_topology(parts: dict) -> str:
+def _format_block_topology(parts: dict[str, str]) -> str:
     """
     Format tier-based topology for topology/block.
 
@@ -377,7 +402,9 @@ def _format_block_topology(parts: dict) -> str:
     if not parts or not isinstance(parts, dict):
         return ""
 
-    block_name = parts.get("tier-0") or parts.get("block") or parts.get("BlockName")
+    block_name: str | None = (
+        parts.get("tier-0") or parts.get("block") or parts.get("BlockName")
+    )
     if not block_name:
         logger.warning("Failed to find tier-0 block name in topology data: %s", parts)
         return ""
@@ -385,7 +412,7 @@ def _format_block_topology(parts: dict) -> str:
     return f"topology=default:{block_name}"
 
 
-def _format_tier_topology(parts: dict) -> str:
+def _format_tier_topology(parts: dict[str, str]) -> str:
     """
     Format tier-based topology from a dictionary.
 
@@ -409,11 +436,11 @@ def _format_tier_topology(parts: dict) -> str:
         return ""
 
     # Find all tier keys and their numbers
-    tier_keys = []
+    tier_keys: list[tuple[int, str]] = []
     for k in parts.keys():
         if k.startswith("tier-"):
             try:
-                tier_num = int(k.split("-")[1])
+                tier_num: int = int(k.split("-")[1])
                 tier_keys.append((tier_num, k))
             except (ValueError, IndexError):
                 continue
@@ -421,11 +448,11 @@ def _format_tier_topology(parts: dict) -> str:
     if tier_keys:
         # Sort descending: highest tier first (spine/root-side), lowest last (leaf)
         tier_keys.sort(key=lambda x: x[0], reverse=True)
-        switches = [parts[k] for _, k in tier_keys]
+        switches: list[str] = [parts[k] for _, k in tier_keys]
         return f"topology=default:root:{':'.join(switches)}"
 
     if parts:
-        first_value = next(iter(parts.values()))
+        first_value: str = next(iter(parts.values()))
         return f"topology=default:root:{first_value}"
 
     return ""
@@ -434,7 +461,7 @@ def _format_tier_topology(parts: dict) -> str:
 def apply_node_topology(hostname: str, topology: str) -> None:
     """Apply topology to a node via scontrol update."""
     try:
-        node_addr = get_node_addr()
+        node_addr: str = get_node_addr()
         cmd = [
             "scontrol",
             "update",
@@ -446,14 +473,14 @@ def apply_node_topology(hostname: str, topology: str) -> None:
             "comment=",
         ]
         logger.info("Running: %s", " ".join(cmd))
-        result = subprocess.run(
+        result: subprocess.CompletedProcess[str] = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=30,
         )
         if result.returncode != 0:
-            output = (result.stdout + result.stderr).strip()
+            output: str = (result.stdout + result.stderr).strip()
             if "Invalid node name" in output:
                 logger.warning(
                     "scontrol update: node %s not yet registered (dynamic node first start), skipping: %s",
@@ -487,17 +514,14 @@ def wait_for_topology() -> None:
     immediately assigns the node to the generic 'unknown' topology unit defined
     in topology.conf.
     """
-    hostname = get_hostname()
-    if not hostname:
-        logger.error("HOSTNAME environment variable is not set")
-        sys.exit(1)
+    hostname: str = get_from_env_required("HOSTNAME")
 
-    wait_timeout = get_topology_wait_timeout()
-    poll_interval = get_topology_poll_interval()
-    topology_plugin = get_topology_plugin()
+    wait_timeout: int = get_topology_wait_timeout()
+    poll_interval: int = get_topology_poll_interval()
+    topology_plugin: str = get_topology_plugin()
 
     if not is_gpu_enabled():
-        topology = "topology=default:root:unknown"
+        topology: str = "topology=default:root:unknown"
         if topology_plugin == TOPOLOGY_PLUGIN_BLOCK:
             topology = "topology=default:unknown"
 
@@ -511,27 +535,30 @@ def wait_for_topology() -> None:
         apply_node_topology(hostname, topology)
         return
 
-    node_name = get_node_name()
-    topology_path = get_topology_path()
+    node_name: str = get_node_name()
+    topology_path: Path = get_topology_path()
 
     logger.info("Waiting for topology data for node: %s", node_name)
     logger.info("Topology ConfigMap path: %s", topology_path)
     logger.info("Timeout: %ds, Poll interval: %ds", wait_timeout, poll_interval)
 
-    start_time = time.time()
-    raw_topology = ""
+    start_time: float = time.monotonic()
+    raw_topology: str = ""
 
     while True:
-        elapsed = time.time() - start_time
+        elapsed: float = time.monotonic() - start_time
 
         if elapsed >= wait_timeout:
             logger.error(
                 "Topology for node %s not found after %ds", node_name, wait_timeout
             )
             try:
-                if os.path.isdir(topology_path):
-                    files = os.listdir(topology_path)
-                    node_files = [f for f in files if not f.startswith(".")]
+                if topology_path.is_dir():
+                    node_files: list[str] = [
+                        path.name
+                        for path in topology_path.iterdir()
+                        if not path.name.startswith(".")
+                    ]
                     logger.error("Available nodes in ConfigMap: %s", node_files)
                 else:
                     logger.error("Topology ConfigMap not mounted at %s", topology_path)
@@ -543,15 +570,14 @@ def wait_for_topology() -> None:
                 )
             sys.exit(1)
 
-        if not os.path.isdir(topology_path):
+        if not topology_path.is_dir():
             logger.info(
                 "Waiting for ConfigMap to be mounted... (%ds elapsed)", int(elapsed)
             )
             time.sleep(poll_interval)
             continue
 
-        raw_topology = read_topology_for_node(topology_path, node_name)
-
+        raw_topology: str = read_topology_for_node(topology_path, node_name)
         if raw_topology:
             logger.info("Found topology for node %s: %s", node_name, raw_topology)
             break
@@ -563,7 +589,7 @@ def wait_for_topology() -> None:
         )
         time.sleep(poll_interval)
 
-    topology = format_slurm_topology(raw_topology, topology_plugin)
+    topology: str = format_slurm_topology(raw_topology, topology_plugin)
     if not topology:
         logger.error("Failed to format topology from raw data: %s", raw_topology)
         sys.exit(1)
@@ -572,8 +598,11 @@ def wait_for_topology() -> None:
     apply_node_topology(hostname, topology)
 
 
+# endregion Topology functions
+
+
 def main():
-    parser = argparse.ArgumentParser(
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(
         description="Worker initialization tasks for Slurm",
     )
     parser.add_argument(
@@ -584,10 +613,12 @@ def main():
         "If both are specified, wait-controller is always executed first.",
     )
 
-    args = parser.parse_args()
+    args: argparse.Namespace = parser.parse_args()
 
     # Ensure wait-controller always runs first
-    commands = sorted(args.commands, key=lambda c: 0 if c == "wait-controller" else 1)
+    commands: list[str] = sorted(
+        args.commands, key=lambda c: 0 if c == "wait-controller" else 1
+    )
 
     for cmd in commands:
         if cmd == "wait-controller":

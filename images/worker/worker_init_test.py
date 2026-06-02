@@ -11,6 +11,7 @@ import os
 import tempfile
 import unittest
 import unittest.mock as mock
+from pathlib import Path
 
 # Import the module under test
 import worker_init
@@ -326,13 +327,13 @@ class TestGetEnvironmentVariables(unittest.TestCase):
         env.pop("TOPOLOGY_CONFIGMAP_PATH", None)
         with mock.patch.dict(os.environ, env, clear=True):
             result = worker_init.get_topology_path()
-        self.assertEqual(result, "/tmp/slurm/topology-node-labels")
+        self.assertEqual(result, Path("/tmp/slurm/topology-node-labels"))
 
     def test_get_topology_path_custom(self):
         """Get topology path returns custom value when set."""
         with mock.patch.dict(os.environ, {"TOPOLOGY_CONFIGMAP_PATH": "/custom/path"}):
             result = worker_init.get_topology_path()
-        self.assertEqual(result, "/custom/path")
+        self.assertEqual(result, Path("/custom/path"))
 
     def test_get_topology_wait_timeout_default(self):
         """Get wait timeout returns default when not set."""
