@@ -18,6 +18,11 @@ example: `gpu:nvidia_h100_80gb_hbm3:8`.
 Worker nodes register themselves in the controller upon start.
 
 
+### Ephemeral Nodes
+Worker `NodeSet`s can be configured as Slurm `State=CLOUD` capacity and powered on or off through Slurm's
+`ResumeProgram` and `SuspendProgram`. See [Ephemeral Nodes](ephemeral-nodes.md) for the short operational flow.
+
+
 ### Cgroups
 Cgroups V2 are used for limiting access of jobs to resources on a node. All available cgroups are enabled except for the 
 swap space.
