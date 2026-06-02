@@ -365,7 +365,7 @@ observability:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 4.0.0
+    version: 4.0.1
     namespace: soperator
     releaseName: soperator-dcgm-exporter
     install:
@@ -426,7 +426,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 4.0.0
+  version: 4.0.1
   namespace: soperator
   releaseName: soperator
   values: null
@@ -464,7 +464,7 @@ nodesets:
     mode: warn
   interval: 5m
   timeout: 5m
-  version: 4.0.0
+  version: 4.0.1
   namespace: soperator
   releaseName: soperator-nodesets
   values: null
@@ -482,7 +482,7 @@ soperatorActiveChecks:
   enabled: true
   interval: 5m
   timeout: 120m
-  version: 4.0.0
+  version: 4.0.1
   releaseName: soperator-activechecks
   namespace: soperator
   overrideValues: null
@@ -501,7 +501,7 @@ soperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 4.0.0
+  version: 4.0.1
   namespace: "soperator-system"
   releaseName: soperator-controller
   install:
@@ -624,7 +624,7 @@ notifier:
   enabled: false
   interval: 5m
   timeout: 5m
-  version: 4.0.0
+  version: 4.0.1
   namespace: monitoring-system
   releaseName: soperator-notifier
   install:
@@ -683,7 +683,7 @@ storageClasses:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 4.0.0
+  version: 4.0.1
   namespace: storage-system
   releaseName: soperator-storageclasses
   values: null
@@ -702,7 +702,7 @@ customConfigmaps:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 4.0.0
+  version: 4.0.1
   namespace: soperator
   releaseName: soperator-custom-configmaps
   overrideValues: null
