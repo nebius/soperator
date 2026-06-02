@@ -150,6 +150,11 @@ slurmConfig:
   messageTimeout: 60
   topologyPlugin: "topology/tree"
   topologyParam: "SwitchAsNodeRank"
+# Topology contains topology-related parameters for Slurm.
+# Example for topology/block plugin:
+# topology:
+#   blockSize: 18
+topology: null
 customSlurmConfig: ""
 customCgroupConfig: ""
 mpiConfig:

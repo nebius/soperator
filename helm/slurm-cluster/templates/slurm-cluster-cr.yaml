@@ -21,6 +21,10 @@ spec:
   slurmConfig:
     {{- toYaml .Values.slurmConfig | nindent 4 }}
   {{- end }}
+  {{- if .Values.topology }}
+  topology:
+    {{- toYaml .Values.topology | nindent 4 }}
+  {{- end }}
   {{- if .Values.customSlurmConfig }}
   customSlurmConfig: |
 {{- .Values.customSlurmConfig | nindent 4 }}
