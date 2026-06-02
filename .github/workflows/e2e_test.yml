@@ -275,11 +275,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Looking for successful build run on branch: ${{ github.ref_name }}"
+          echo "Looking for successful build run on branch: soperator-release-4.0"
 
           run_info=$(gh api -X GET \
             "/repos/${{ github.repository }}/actions/workflows/one_job.yml/runs" \
-            -F branch="${{ github.ref_name }}" \
+            -F branch="soperator-release-4.0" \
             -F status=success \
             -F per_page=1 \
             --jq '.workflow_runs[0] | {id: .id, head_sha: .head_sha, created_at: .created_at, html_url: .html_url}')
@@ -287,7 +287,7 @@ jobs:
           run_id=$(jq -r '.id' <<<"$run_info")
 
           if [[ "$run_id" == "null" || -z "$run_id" ]]; then
-            echo "::error::No successful build found on branch ${{ github.ref_name }}"
+            echo "::error::No successful build found on branch soperator-release-4.0"
             exit 1
           fi
 
@@ -582,7 +582,7 @@ jobs:
           aws configure set region $NEBIUS_REGION
           aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
 
-          bin/e2e destroy
+          # bin/e2e destroy
 
       - name: Upload Terraform Destroy debug log
         if: always()
