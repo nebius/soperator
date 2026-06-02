@@ -24,7 +24,8 @@ import (
 
 // RenderConfigMapSlurmConfigs renders new [corev1.ConfigMap] containing '.conf' files for the following components:
 //
-// [consts.ConfigMapKeySlurmConfig] - Slurm config
+// [consts.ConfigMapKeySlurmConfig] - Slurm config entrypoint
+// [consts.ConfigMapKeyAutogenSlurmConfig] - Generated Slurm config
 // [consts.ConfigMapKeyCGroupConfig] - Cgroup config
 // [consts.ConfigMapKeySpankConfig] - SPANK plugins config
 // [consts.ConfigMapKeyGresConfig] - GRES config
@@ -37,13 +38,14 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) corev1.ConfigMap 
 			Labels:    RenderLabels(consts.ComponentTypeController, cluster.Name),
 		},
 		Data: map[string]string{
-			consts.ConfigMapKeySlurmConfig:       generateSlurmConfig(cluster).Render(),
-			consts.ConfigMapKeyRESTConfig:        generateRESTConfig().Render(),
-			consts.ConfigMapKeyCustomSlurmConfig: generateCustomSlurmConfig(cluster).Render(),
-			consts.ConfigMapKeyCGroupConfig:      generateCGroupConfig(cluster).Render(),
-			consts.ConfigMapKeySpankConfig:       generateSpankConfig(cluster).Render(),
-			consts.ConfigMapKeyGresConfig:        generateGresConfig(cluster).Render(),
-			consts.ConfigMapKeyMPIConfig:         generateMPIConfig(cluster).Render(),
+			consts.ConfigMapKeySlurmConfig:        RenderSlurmConfigEntrypoint().Render(),
+			consts.ConfigMapKeyAutogenSlurmConfig: WithManagedSlurmConfigWarning(generateSlurmConfig(cluster)).Render(),
+			consts.ConfigMapKeyRESTConfig:         WithManagedSlurmConfigWarning(generateRESTConfig()).Render(),
+			consts.ConfigMapKeyCustomSlurmConfig:  WithOverrideSlurmConfigWarning(generateCustomSlurmConfig(cluster)).Render(),
+			consts.ConfigMapKeyCGroupConfig:       WithManagedSlurmConfigWarning(generateCGroupConfig(cluster)).Render(),
+			consts.ConfigMapKeySpankConfig:        WithManagedSlurmConfigWarning(generateSpankConfig(cluster)).Render(),
+			consts.ConfigMapKeyGresConfig:         WithManagedSlurmConfigWarning(generateGresConfig(cluster)).Render(),
+			consts.ConfigMapKeyMPIConfig:          WithManagedSlurmConfigWarning(generateMPIConfig(cluster)).Render(),
 		},
 	}
 }
@@ -68,6 +70,7 @@ func RenderJailedConfigSlurmConfigs(cluster *values.SlurmCluster) slurmv1alpha1.
 			},
 			Items: []corev1.KeyToPath{
 				{Key: consts.ConfigMapKeySlurmConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeySlurmConfig)},
+				{Key: consts.ConfigMapKeyAutogenSlurmConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyAutogenSlurmConfig)},
 				{Key: consts.ConfigMapKeyRESTConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyRESTConfig)},
 				{Key: consts.ConfigMapKeyCustomSlurmConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyCustomSlurmConfig)},
 				{Key: consts.ConfigMapKeyCGroupConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyCGroupConfig)},
@@ -281,7 +284,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("SlurmctldPidFile", "/var/run/"+consts.SlurmctldName+".pid")
 	res.AddProperty("SlurmctldPort", cluster.NodeController.ContainerSlurmctld.Port)
 	// Slurm silently disables the metrics plugin if PrivateData is set in
-	// slurm.conf. Don't add a PrivateData property anywhere in this file.
+	// the generated Slurm config. Don't add a PrivateData property anywhere in this file.
 	if om := cluster.NodeController.OpenMetrics; om.Enabled == nil || *om.Enabled {
 		res.AddProperty("MetricsType", "metrics/openmetrics")
 	}
@@ -406,7 +409,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		res.AddProperty("AccountingStoragePort", consts.DefaultAccountingPort)
 		res.AddProperty("JobCompType", "jobcomp/none")
 
-		// In slurm.conf, the accounting section has many optional values
+		// In the generated Slurm config, the accounting section has many optional values
 		// that can be added or removed, and to avoid writing many if statements, we decided to use a reflector.
 		addSlurmConfigProperties(res, cluster.NodeAccounting.SlurmConfig)
 
