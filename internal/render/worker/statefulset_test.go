@@ -55,7 +55,7 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 		assert.Equal(t, []string{"python3", "/opt/bin/slurm/worker_init.py", "wait-controller", "wait-topology"}, result.Command)
 		assert.Equal(t, 11, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 4 topology
 		assert.Equal(t, 3, len(result.VolumeMounts))
-		assertEnvValue(t, result.Env, "TOPOLOGY_PLUGIN", consts.SlurmTopologyBlock)
+		assertEnvValue(t, result.Env, "SLURM_TOPOLOGY_PLUGIN", consts.SlurmTopologyBlock)
 
 		expectedMounts := map[string]string{
 			consts.VolumeNameJail:               consts.VolumeMountPathJail,
@@ -103,9 +103,9 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 		for _, envVar := range result.Env {
 			assert.NotContains(t, []string{
 				"TOPOLOGY_CONFIGMAP_PATH",
-				"TOPOLOGY_PLUGIN",
 				"TOPOLOGY_WAIT_TIMEOUT",
 				"TOPOLOGY_POLL_INTERVAL",
+				"SLURM_TOPOLOGY_PLUGIN",
 			}, envVar.Name,
 				"topology env var %s should not be present when topology is disabled", envVar.Name)
 		}
@@ -394,7 +394,7 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			assert.Equal(t, tt.expectWaitForTopology, hasWaitForTopology,
 				"wait-topology command presence mismatch")
 			if tt.expectWaitForTopology && assert.NotNil(t, workerInitContainer) {
-				assertEnvValue(t, workerInitContainer.Env, "TOPOLOGY_PLUGIN", consts.SlurmTopologyBlock)
+				assertEnvValue(t, workerInitContainer.Env, "SLURM_TOPOLOGY_PLUGIN", consts.SlurmTopologyBlock)
 			}
 
 			// Verify topology-related volumes

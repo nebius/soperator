@@ -373,7 +373,7 @@ class TestGetEnvironmentVariables(unittest.TestCase):
         """Topology plugin can be supplied by environment variable."""
         with mock.patch.dict(
             os.environ,
-            {"TOPOLOGY_PLUGIN": worker_init.TOPOLOGY_PLUGIN_BLOCK},
+            {"SLURM_TOPOLOGY_PLUGIN": worker_init.TOPOLOGY_PLUGIN_BLOCK},
         ):
             result = worker_init.get_topology_plugin("/missing/slurm.conf")
         self.assertEqual(result, worker_init.TOPOLOGY_PLUGIN_BLOCK)
@@ -386,7 +386,7 @@ class TestGetEnvironmentVariables(unittest.TestCase):
                 f.write("# comment\nTopologyPlugin = topology/block # inline\n")
 
             env = os.environ.copy()
-            env.pop("TOPOLOGY_PLUGIN", None)
+            env.pop("SLURM_TOPOLOGY_PLUGIN", None)
             with mock.patch.dict(os.environ, env, clear=True):
                 result = worker_init.get_topology_plugin(slurm_conf)
         self.assertEqual(result, worker_init.TOPOLOGY_PLUGIN_BLOCK)
@@ -394,7 +394,7 @@ class TestGetEnvironmentVariables(unittest.TestCase):
     def test_get_topology_plugin_defaults_to_tree(self):
         """Missing slurm.conf defaults to topology/tree."""
         env = os.environ.copy()
-        env.pop("TOPOLOGY_PLUGIN", None)
+        env.pop("SLURM_TOPOLOGY_PLUGIN", None)
         with mock.patch.dict(os.environ, env, clear=True):
             result = worker_init.get_topology_plugin("/missing/slurm.conf")
         self.assertEqual(result, worker_init.TOPOLOGY_PLUGIN_TREE)

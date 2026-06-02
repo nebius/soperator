@@ -118,7 +118,7 @@ func RenderContainerWorkerInit(
 		if topologyPlugin != "" {
 			env = append(env,
 				corev1.EnvVar{
-					Name:  "TOPOLOGY_PLUGIN",
+					Name:  "SLURM_TOPOLOGY_PLUGIN",
 					Value: topologyPlugin,
 				},
 			)

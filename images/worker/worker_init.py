@@ -202,7 +202,7 @@ def get_topology_poll_interval() -> int:
 
 def get_topology_plugin(slurm_conf_path: Path = SLURM_CONFIG_PATH) -> str:
     """Get the configured Slurm topology plugin."""
-    topology_plugin = os.environ.get("TOPOLOGY_PLUGIN", "").strip()
+    topology_plugin: str = os.environ.get("SLURM_TOPOLOGY_PLUGIN", "").strip()
     if topology_plugin:
         return topology_plugin.lower()
 
