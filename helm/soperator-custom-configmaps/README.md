@@ -55,7 +55,7 @@ enroot:
 | `configMaps.motd.name` | Name of MOTD ConfigMap | `motd-nebius-o11y` |
 | `configMaps.imageStorage.enabled` | Enable image storage ConfigMap | `true` |
 | `configMaps.imageStorage.name` | Name of image storage ConfigMap | `image-storage` |
-| `enroot.useDedicatedImageStorage` | Store Enroot cache/data/runtime under `/mnt/image-storage/enroot` | `true` |
+| `enroot.useDedicatedImageStorage` | Store Enroot cache/data/runtime under `/mnt/image-storage/enroot`; when false, cache uses shared `/var/cache/enroot/user-$(id -u)` and data/runtime use Enroot defaults | `true` |
 
 ## Deployed ConfigMaps
 

@@ -26,7 +26,7 @@ swap space.
 ### Job Containers
 This solution supports (and pre-installs) Pyxis+enroot containerization plugin. Pulled images are stored on the "jail"
 shared storage so users don't need to separately pull it on each node. Direct startup from cached SquashFS images with
-an ephemeral overlay can be enabled through `plugStackConfig.pyxis.useSquashfuse`. You can also set `enroot.useDedicatedImageStorage=false` so Enroot data/runtime paths move to node tmpfs while the cache uses shared `/var/cache`.
+an ephemeral overlay can be enabled through `plugStackConfig.pyxis.useSquashfuse`. You can also set `enroot.useDedicatedImageStorage=false` so Enroot uses its default data/runtime paths while the cache uses shared `/var/cache`.
 
 
 ### Client Commands Auto-Completion

@@ -30,16 +30,3 @@ else
     echo "Creating job tmpfs directory ($JOB_TMPFS_DIR)"
     mkdir -p "${JOB_TMPFS_DIR:?}" || true
 fi
-
-# This is used when Enroot is configured to use tmpfs-backed data and runtime directories,
-# i.e. when enroot.useDedicatedImageStorage is false.
-ENROOT_TMPFS_DIR="${TMPFS_DIR}/enroot"
-
-mkdir -p \
-    "${ENROOT_TMPFS_DIR:?}/data" \
-    "${ENROOT_TMPFS_DIR:?}/runtime"
-
-chmod 1777 \
-    "${ENROOT_TMPFS_DIR:?}" \
-    "${ENROOT_TMPFS_DIR:?}/data" \
-    "${ENROOT_TMPFS_DIR:?}/runtime"
