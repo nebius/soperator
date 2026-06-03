@@ -44,6 +44,55 @@ tests:
       - exists:
           path: spec.k8sJobSpec.mungeContainer.image
 
+  - it: should render global scheduling fields
+    documentSelector:
+      path: metadata.name
+      value: test-scheduling
+    set:
+      slurmClusterRefName: test-cluster
+      images:
+        k8sJob: "test-image:latest"
+        munge: "munge-image:latest"
+      jobContainer:
+        volumeMounts: []
+        volumes: []
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: slurm.nebius.ai/nodeset
+                    operator: In
+                    values:
+                      - worker
+      tolerations:
+        - key: slurm.nebius.ai/nodeset
+          operator: Equal
+          value: worker
+          effect: NoSchedule
+      checks:
+        test-scheduling:
+          enabled: true
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              command: ["echo", "test"]
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - equal:
+          path: spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key
+          value: slurm.nebius.ai/nodeset
+      - equal:
+          path: spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]
+          value: worker
+      - equal:
+          path: spec.tolerations[0].key
+          value: slurm.nebius.ai/nodeset
+      - equal:
+          path: spec.tolerations[0].value
+          value: worker
+
   - it: should allow overriding k8sJob container image
     documentSelector:
       path: metadata.name
